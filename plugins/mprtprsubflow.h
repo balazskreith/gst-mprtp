@@ -55,8 +55,10 @@ struct _MPRTPReceiverSubflow{
   guint32              ssrc;
   GMutex               mutex;
   GstClockTime         rr_riport_time;
+  guint32              rr_intertime;
   GstClockTime         last_received_time;
-  GstClockTime         last_sent_time;
+  guint64              ext_rtptime;
+  //GstClockTime         last_sent_time;
   guint64              last_packet_skew;
   guint64              skews[100];
   guint64              received_times[100];
@@ -71,12 +73,12 @@ struct _MPRTPReceiverSubflow{
   gboolean             (*is_active)(MPRTPRSubflow*);
   gboolean             (*is_early_discarded_packets)(MPRTPRSubflow*);
   guint64              (*get_skews_median)(MPRTPRSubflow*);
-  void                 (*add_packet_skew)(MPRTPRSubflow*,GstClockTime,GstClockTime);
+  void                 (*add_packet_skew)(MPRTPRSubflow*,guint32,guint32);
   GList*               (*get_packets)(MPRTPRSubflow*);
   void                 (*setup_sr_riport)(MPRTPRSubflow*, GstMPRTCPSubflowRiport*);
   guint16              (*get_id)(MPRTPRSubflow*);
   GstClockTime         (*get_rr_riport_time)(MPRTPRSubflow*);
-  void                 (*set_rr_riport_time)(MPRTPRSubflow*, GstClockTime);
+  void                 (*setup_rr_riport_time)(MPRTPRSubflow*);
   void                 (*setup_rr_riport)(MPRTPRSubflow*, GstMPRTCPSubflowRiport*);
   void                 (*setup_xr_rfc2743_late_discarded_riport)(MPRTPRSubflow*, GstMPRTCPSubflowRiport*);
   GstPad*              (*get_outpad)(MPRTPRSubflow*);

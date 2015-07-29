@@ -56,11 +56,12 @@ typedef enum{
 
 struct _MPRTPSenderSubflow{
   GObject              object;
+  GMutex               mutex;
   GstClock*            sysclock;
   guint16              id;
   GstPad*              outpad;
-  gboolean             active;
-  gboolean             linked;
+
+  //gboolean             linked;
   MPRTPSubflowStates   state;
 
   void               (*fire)(MPRTPSSubflow*,MPRTPSubflowEvent,void*);
@@ -70,10 +71,26 @@ struct _MPRTPSenderSubflow{
   guint16            (*get_id)(MPRTPSSubflow*);
   GstClockTime       (*get_sr_riport_time)(MPRTPSSubflow*);
   void               (*set_sr_riport_time)(MPRTPSSubflow*, GstClockTime);
+  void               (*set_charge_value)(MPRTPSSubflow*, gfloat);
+  void               (*set_alpha_value)(MPRTPSSubflow*, gfloat);
+  void               (*set_beta_value)(MPRTPSSubflow*, gfloat);
+  void               (*set_gamma_value)(MPRTPSSubflow*, gfloat);
+  guint32            (*get_sending_rate)(MPRTPSSubflow*);
   gboolean           (*is_active)(MPRTPSSubflow*);
   GstPad*            (*get_outpad)(MPRTPSSubflow*);
+  guint32            (*get_sent_packet_num)(MPRTPSSubflow*);
 
-  GMutex               mutex;
+
+  //influence calculation and states
+  GstClockTime         last_riport_received;
+  gfloat               alpha_value;
+  gfloat               beta_value;
+  gfloat               gamma_value;
+  gfloat               charge_value;
+  gboolean             active;
+  gfloat               SR; //Sending Rate
+  guint32              UB; //Utilized bytes
+  guint32              DB; //Discarded bytes
   guint8               distortions;  //History of lost and discarded packet riports by using a continously shifted 8 byte value
   guint16              consequent_RR_missing;
   guint16              consequent_settlements;
@@ -94,6 +111,7 @@ struct _MPRTPSenderSubflow{
   //refreshed by receiving a receiver report
   gboolean             RR_arrived;        //Indicate that a receiver report is arrived, used by the scheduler
   guint16              HSN_r;
+  guint16              cycle_num_r;
   guint8               fraction_lost;
   guint32              cum_packet_losts; //
   guint16              inter_packet_losts;
@@ -115,12 +133,7 @@ struct _MPRTPSenderSubflow{
   guint32              sent_report_size;
   guint32              received_report_size;
 
-  //refreshed by the scheduler
-  GstClockTime         last_riport_received;
-  gfloat               receive_rate;
-  gfloat               SR; //Sending Rate
-  guint32              UB; //Utilized bytes
-  guint32              DB; //Discarded bytes
+  guint32              sent_packet_num;
 };
 
 struct _MPRTPSenderSubflowClass {

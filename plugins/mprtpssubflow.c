@@ -45,8 +45,15 @@ static void _print_rtp_packet_info(GstRTPBuffer *rtp);
 static guint16 mprtps_subflow_get_id(MPRTPSSubflow* this);
 static GstClockTime mprtps_subflow_get_sr_riport_time(MPRTPSSubflow* this);
 static void mprtps_subflow_set_sr_riport_time(MPRTPSSubflow*,GstClockTime);
+static guint32 mprtps_subflow_get_sent_packet_num(MPRTPSSubflow* this);
 static gboolean mprtps_subflow_is_active(MPRTPSSubflow* this);
 static GstPad* mprtps_subflow_get_outpad(MPRTPSSubflow* this);
+static void mprtps_subflow_set_alpha_value(MPRTPSSubflow* this, gfloat value);
+static void mprtps_subflow_set_beta_value(MPRTPSSubflow* this, gfloat value);
+static void mprtps_subflow_set_gamma_value(MPRTPSSubflow* this, gfloat value);
+static void mprtps_subflow_set_charge_value(MPRTPSSubflow* this, gfloat value);
+static guint32 mprtps_subflow_get_sending_rate(MPRTPSSubflow* this);
+static void _fire(MPRTPSSubflow *this, MPRTPSubflowEvent event, void *data);
 
 static void
 mprtps_subflow_setup_sr_riport(MPRTPSSubflow *this, GstMPRTCPSubflowRiport *header);
@@ -99,10 +106,12 @@ mprtps_subflow_reset (MPRTPSSubflow * subflow)
   subflow->octet_count = 0;
   subflow->packet_count = 0;
   subflow->active = FALSE;
-  subflow->linked = FALSE;
   subflow->early_discarded_bytes = 0;
   subflow->late_discarded_bytes = 0;
+  subflow->state = MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED;
+  subflow->sent_packet_num = 0;
   subflow->ssrc = g_random_int ();
+  subflow->HSN_r = 0;
 }
 
 
@@ -112,14 +121,20 @@ mprtps_subflow_init (MPRTPSSubflow * subflow)
   subflow->fire = mprtps_subflow_FSM_fire;
   subflow->process_rtpbuf_out = mprtps_subflow_process_rtpbuffer_out;
   subflow->setup_sr_riport = mprtps_subflow_setup_sr_riport;
-  mprtps_subflow_reset (subflow);
   subflow->get_id = mprtps_subflow_get_id;
   subflow->get_sr_riport_time = mprtps_subflow_get_sr_riport_time;
   subflow->set_sr_riport_time = mprtps_subflow_set_sr_riport_time;
+  subflow->get_sent_packet_num = mprtps_subflow_get_sent_packet_num;
   subflow->is_active = mprtps_subflow_is_active;
   subflow->get_outpad = mprtps_subflow_get_outpad;
   subflow->process_mprtcp_block = mprtps_subflow_process_mprtcp_block;
+  subflow->set_alpha_value = mprtps_subflow_set_alpha_value;
+  subflow->set_beta_value = mprtps_subflow_set_beta_value;
+  subflow->set_gamma_value = mprtps_subflow_set_gamma_value;
+  subflow->set_charge_value = mprtps_subflow_set_charge_value;
+  subflow->get_sending_rate = mprtps_subflow_get_sending_rate;
 
+  mprtps_subflow_reset (subflow);
   g_mutex_init(&subflow->mutex);
   subflow->sysclock = gst_system_clock_obtain();
 }
@@ -146,6 +161,7 @@ mprtps_subflow_process_rtpbuffer_out(MPRTPSSubflow* subflow, guint ext_header_id
 	}
 	data.seq = subflow->seq;
 	++subflow->packet_count;
+	++subflow->sent_packet_num;
 
 	subflow->octet_count += gst_rtp_buffer_get_payload_len(rtp);
 	gst_rtp_buffer_add_extension_onebyte_header(rtp, ext_header_id, (gpointer) &data, sizeof(data));
@@ -174,12 +190,34 @@ void mprtps_subflow_process_mprtcp_block(MPRTPSSubflow* this,
   g_mutex_unlock(&this->mutex);
 }
 
+guint32 mprtps_subflow_get_sending_rate(MPRTPSSubflow* this)
+{
+  guint32 result;
+  g_mutex_lock(&this->mutex);
+  result = (guint32) this->SR;
+  g_mutex_unlock(&this->mutex);
+  return result;
+}
+
+static guint16 uint16_diff(guint16 a, guint16 b)
+{
+  if(a <= b){
+  	return b-a;
+  }
+  return ~((guint16)(a-b));
+}
+
 void
 _proc_rtcprr(MPRTPSSubflow* this, GstRTCPRR* rr)
 {
   guint32 ext_hsn;
   guint32 cum_packet_lost,LSR,DLSR;
   GstClockTime now;
+  guint16 last_HSN_r = this->HSN_r;
+  guint16 last_cycle_num_r = this->cycle_num_r;
+  guint16 last_inter_packet_losts = this->inter_packet_losts;
+  gfloat sending_rate = this->SR;
+  guint16 sent_packet_num;
 
   now = gst_clock_get_time (this->sysclock);
 
@@ -189,7 +227,7 @@ _proc_rtcprr(MPRTPSSubflow* this, GstRTCPRR* rr)
 
   this->inter_packet_losts = cum_packet_lost - this->cum_packet_losts;
   this->cum_packet_losts = cum_packet_lost;
-  this->cycle_num = ext_hsn>>16;
+  this->cycle_num_r = ext_hsn>>16;
   this->HSN_r = ext_hsn & 0xFFFF;
   this->LSR =  (now & 0xFFFF000000000000ULL) | ((guint64)LSR)<<16;
   this->DLSR = (guint64)DLSR;
@@ -203,6 +241,21 @@ _proc_rtcprr(MPRTPSSubflow* this, GstRTCPRR* rr)
 		  this->inter_packet_losts, this->cum_packet_losts, this->fraction_lost,
 		  this->jitter, this->HSN_r, this->LSR, this->DLSR, this->RTT);
   */
+
+  //calculate sending rate;
+  sent_packet_num = uint16_diff(last_HSN_r, this->HSN_r);
+  if(this->inter_packet_losts == 0 && sent_packet_num == 0){
+    return;
+  }
+  MPRTPSubflowEvent event = MPRTP_SENDER_SUBFLOW_EVENT_KEEP;
+  sending_rate = sent_packet_num - this->inter_packet_losts;
+
+  this->SR = (this->SR + 15.0 * sending_rate) / 16.0;
+  if(last_inter_packet_losts > 0 && this->late_discarded_bytes > 0){
+    _fire(this, MPRTP_SENDER_SUBFLOW_EVENT_DISTORTION, NULL);
+  }
+
+  g_print("subflow %d SR: %f\n", this->id, this->SR);
 }
 
 void
@@ -266,86 +319,15 @@ mprtps_subflow_setup_sr_riport(MPRTPSSubflow *this,
 
 
 void
-mprtps_subflow_FSM_fire(MPRTPSSubflow *subflow, MPRTPSubflowEvent event, void *data)
+mprtps_subflow_FSM_fire(MPRTPSSubflow *this, MPRTPSubflowEvent event, void *data)
 {
   gfloat *rate;
-  g_mutex_lock(&subflow->mutex);
-  switch(subflow->state){
-    case MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED:
-	  switch(event){
-	    case MPRTP_SENDER_SUBFLOW_EVENT_JOINED:
-	      rate = data;
-		  subflow->active = TRUE;
-		  subflow->SR = *rate;
-	    break;
-	    case MPRTP_SENDER_SUBFLOW_EVENT_KEEP:
-	      subflow->SR = subflow->receive_rate;
-	    break;
-	    case MPRTP_SENDER_SUBFLOW_EVENT_DISTORTION:
-	      rate = (gfloat*) data;
-	      subflow->SR = *rate;
-	    break;
-	    case MPRTP_SENDER_SUBFLOW_EVENT_DETACHED:
-	      subflow->active = FALSE;
-	      subflow->linked = FALSE;
-	    case MPRTP_SENDER_SUBFLOW_EVENT_LATE:
-	      subflow->SR = 0.0;
-	      subflow->state = MPRTP_SENDER_SUBFLOW_STATE_PASSIVE;
-	    break;
-	    case MPRTP_SENDER_SUBFLOW_EVENT_BID:
-	      rate = (gfloat*) data;
-	      subflow->SR = *rate;
-	    break;
-	    case MPRTP_SENDER_SUBFLOW_EVENT_CONGESTION:
-	      rate = (gfloat*) data;
-          subflow->SR = *rate;
-	      subflow->state = MPRTP_SENDER_SUBFLOW_STATE_CONGESTED;
-	    break;
-	    default:
-	    break;
-	  }
-  	  break;
-    case MPRTP_SENDER_SUBFLOW_STATE_CONGESTED:
-	  switch(event){
-		case MPRTP_SENDER_SUBFLOW_EVENT_KEEP:
-		  subflow->SR = subflow->receive_rate;
-		break;
-		case MPRTP_SENDER_SUBFLOW_EVENT_DETACHED:
-		  subflow->active = FALSE;
-		  subflow->linked = FALSE;
-		case MPRTP_SENDER_SUBFLOW_EVENT_LATE:
-		  subflow->SR = 0.0;
-		  subflow->state = MPRTP_SENDER_SUBFLOW_STATE_PASSIVE;
-		break;
-		case MPRTP_SENDER_SUBFLOW_EVENT_SETTLED:
-		  subflow->SR = subflow->receive_rate;
-		  subflow->state = MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED;
-		break;
-		default:
-	    break;
-	  }
-  	  break;
-    case MPRTP_SENDER_SUBFLOW_STATE_PASSIVE:
-	  switch(event){
-	    case MPRTP_SENDER_SUBFLOW_EVENT_DETACHED:
-	      subflow->linked = FALSE;
-	    case MPRTP_SENDER_SUBFLOW_EVENT_DEAD:
-	      subflow->active = FALSE;
-	      subflow->SR = 0;
-	    break;
-	    case MPRTP_SENDER_SUBFLOW_EVENT_SETTLED:
-	      subflow->state = MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED;
-	    break;
-	    default:
-	    break;
-	  }
-  	  break;
-	default:
-	  break;
-  }
-
-  g_mutex_unlock(&subflow->mutex);
+  g_mutex_lock(&this->mutex);
+  _fire(this, event, data);
+  g_mutex_unlock(&this->mutex);
 }
+
+
 
 
 guint16 mprtps_subflow_get_id(MPRTPSSubflow* this)
@@ -365,10 +347,50 @@ GstClockTime mprtps_subflow_get_sr_riport_time(MPRTPSSubflow* this)
 	g_mutex_unlock(&this->mutex);
 	return result;
 }
+
+guint32 mprtps_subflow_get_sent_packet_num(MPRTPSSubflow* this)
+{
+	guint32 result;
+	g_mutex_lock(&this->mutex);
+	result = this->sent_packet_num;
+	this->sent_packet_num = 0;
+	g_mutex_unlock(&this->mutex);
+	return result;
+}
+
+
 void mprtps_subflow_set_sr_riport_time(MPRTPSSubflow* this, GstClockTime time)
 {
 	g_mutex_lock(&this->mutex);
 	this->sr_riport_time = time;
+	g_mutex_unlock(&this->mutex);
+}
+
+void mprtps_subflow_set_alpha_value(MPRTPSSubflow* this, gfloat value)
+{
+	g_mutex_lock(&this->mutex);
+	this->alpha_value = value;
+	g_mutex_unlock(&this->mutex);
+}
+
+void mprtps_subflow_set_beta_value(MPRTPSSubflow* this, gfloat value)
+{
+	g_mutex_lock(&this->mutex);
+	this->beta_value = value;
+	g_mutex_unlock(&this->mutex);
+}
+
+void mprtps_subflow_set_gamma_value(MPRTPSSubflow* this, gfloat value)
+{
+	g_mutex_lock(&this->mutex);
+	this->gamma_value = value;
+	g_mutex_unlock(&this->mutex);
+}
+
+void mprtps_subflow_set_charge_value(MPRTPSSubflow* this, gfloat value)
+{
+	g_mutex_lock(&this->mutex);
+	this->charge_value = value;
 	g_mutex_unlock(&this->mutex);
 }
 
@@ -389,6 +411,71 @@ GstPad* mprtps_subflow_get_outpad(MPRTPSSubflow* this)
 	result = this->outpad;
 	g_mutex_unlock(&this->mutex);
 	return result;
+}
+
+void _fire(MPRTPSSubflow *this, MPRTPSubflowEvent event, void *data)
+{
+  switch(this->state){
+    case MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED:
+	  switch(event){
+	    case MPRTP_SENDER_SUBFLOW_EVENT_JOINED:
+		  this->active = TRUE;
+		  this->SR = (gfloat)this->charge_value;
+	    break;
+	    case MPRTP_SENDER_SUBFLOW_EVENT_DISTORTION:
+	      this->SR *= (1.0 - this->alpha_value);
+	    break;
+	    case MPRTP_SENDER_SUBFLOW_EVENT_DETACHED:
+	    case MPRTP_SENDER_SUBFLOW_EVENT_LATE:
+	      this->SR = 0.0;
+	      this->active = FALSE;
+	      this->state = MPRTP_SENDER_SUBFLOW_STATE_PASSIVE;
+	    break;
+	    case MPRTP_SENDER_SUBFLOW_EVENT_BID:
+	      this->SR *= (1.0 + this->gamma_value);
+	    break;
+	    case MPRTP_SENDER_SUBFLOW_EVENT_CONGESTION:
+          this->SR *= (1.0 - this->beta_value);
+	      this->state = MPRTP_SENDER_SUBFLOW_STATE_CONGESTED;
+	    break;
+	    case MPRTP_SENDER_SUBFLOW_EVENT_KEEP:
+	    default:
+	    break;
+	  }
+  	  break;
+    case MPRTP_SENDER_SUBFLOW_STATE_CONGESTED:
+	  switch(event){
+		break;
+		case MPRTP_SENDER_SUBFLOW_EVENT_DETACHED:
+		case MPRTP_SENDER_SUBFLOW_EVENT_LATE:
+		  this->active = FALSE;
+		  this->SR = 0.0;
+		  this->state = MPRTP_SENDER_SUBFLOW_STATE_PASSIVE;
+		break;
+		case MPRTP_SENDER_SUBFLOW_EVENT_SETTLED:
+		  this->state = MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED;
+		break;
+		case MPRTP_SENDER_SUBFLOW_EVENT_KEEP:
+		default:
+	    break;
+	  }
+  	  break;
+    case MPRTP_SENDER_SUBFLOW_STATE_PASSIVE:
+	  switch(event){
+	    case MPRTP_SENDER_SUBFLOW_EVENT_DETACHED:
+	    case MPRTP_SENDER_SUBFLOW_EVENT_DEAD:
+	    break;
+	    case MPRTP_SENDER_SUBFLOW_EVENT_SETTLED:
+	      this->SR = this->charge_value;
+	      this->state = MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED;
+	    break;
+	    default:
+	    break;
+	  }
+  	  break;
+	default:
+	  break;
+  }
 }
 
 /*

@@ -210,6 +210,7 @@ gst_mprtpreceiver_init (GstMprtpreceiver *mprtpreceiver)
     mprtpreceiver->pivot_clock_rate = 0;
     mprtpreceiver->pivot_ssrc = MPRTP_RECEIVER_DEFAULT_SSRC;
     mprtpreceiver->path_skew_counter = 0;
+    mprtpreceiver->ext_rtptime = -1;
     mprtpreceiver->path_skew_index = 0;
     g_mutex_init(&mprtpreceiver->mutex);
 }
@@ -339,7 +340,6 @@ gst_mprtpreceiver_request_new_pad (GstElement * element, GstPadTemplate * templ,
 	            GST_DEBUG_FUNCPTR(gst_mprtpreceiver_sink_chain));
 	subflow = make_mprtpr_subflow(subflow_id, sinkpad, mprtpr->ext_header_id);
 	mprtpr->subflows = g_list_prepend(mprtpr->subflows, subflow);
-
 	MPRTPR_UNLOCK(mprtpr);
 
 	gst_element_add_pad (GST_ELEMENT (mprtpr), sinkpad);
@@ -409,7 +409,6 @@ gst_mprtpreceiver_change_state (GstElement * element, GstStateChange transition)
   return ret;
 }
 
-
 void
 gst_mprtpreceiver_playouter_run (void *data)
 {
@@ -422,7 +421,7 @@ gst_mprtpreceiver_playouter_run (void *data)
 	gint i;
 	guint64 path_skew;
 	guint32 max_path_skew = 0;
-	GList *F = NULL,*L = NULL;
+	GList *F = NULL,*L = NULL, *P = NULL;
 	GstBuffer *buf;
 
 	MPRTPR_LOCK(this);
@@ -434,6 +433,8 @@ gst_mprtpreceiver_playouter_run (void *data)
         continue;
       }
       F = subflow->get_packets(subflow);
+      F = g_list_reverse(F);
+
       L = _merge_lists(F, L);
       path_skew = subflow->get_skews_median(subflow);
       //g_print("Median: %llu ", path_skew);
@@ -443,29 +444,38 @@ gst_mprtpreceiver_playouter_run (void *data)
       }
       ++this->path_skew_counter;
     }
-    F = g_list_reverse(L);
-    while(F != NULL){
-      buf = F->data;
-      gst_pad_push(this->rtp_srcpad, buf);
-      F = F->next;
+    //F = g_list_reverse(L);
+    /*
+    P = L;
+    if(P != NULL) g_print("\nMerged list: ");
+    while(P != NULL){
+      GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+      buf = P->data;
+      gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
+      g_print("%d->",gst_rtp_buffer_get_seq(&rtp));
+      gst_rtp_buffer_unmap(&rtp);
+      //gst_pad_push(this->rtp_srcpad, buf);
+      P = P->next;
     }
+    if(L != NULL) g_print("\n");
+    /**/
+    while(L != NULL){
+	  buf = L->data;
+	  gst_pad_push(this->rtp_srcpad, buf);
+	  L = L->next;
+	}
     for(i=0; i < 256 && i < this->path_skew_counter; ++i){
     	if(max_path_skew < this->path_skews[i]){
     	  max_path_skew = this->path_skews[i];
     	}
     }
-    //g_print(" Max path skew: %lu , counter: %d ",max_path_skew, this->path_skew_counter);
+
     this->playout_delay =
       ((gfloat)max_path_skew + 124.0 * this->playout_delay) / 125.0;
-    /*
-    g_print("(%f + 124.0 * %f) / 125.0 = %f (%f)\n",
-    	(gfloat)max_path_skew, this->playout_delay,
-	    ((gfloat)max_path_skew + 124.0 * this->playout_delay) / 125.0,
-		this->playout_delay);
-/**/
+
 	next_scheduler_time = now + (guint64)this->playout_delay;
 	MPRTPR_UNLOCK(this);
-//g_print("Playout delay: %f\n", this->playout_delay);
+
 	clock_id = gst_clock_new_single_shot_id (GST_ELEMENT_CLOCK(this), next_scheduler_time);
 	if(gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED){
 	  GST_WARNING_OBJECT(this, "The playout clock wait is interrupted");
@@ -493,7 +503,7 @@ gst_mprtpreceiver_mprtcp_riporter_run (void *data)
   now = gst_clock_get_time(GST_ELEMENT_CLOCK(this));
 
   MPRTPR_LOCK(this);
-  compound_sending = TRUE;
+  compound_sending = FALSE;
   for(first = TRUE, it = this->subflows; it != NULL; it = it->next){
     subflow = it->data;
     if(now < subflow->get_rr_riport_time(subflow) ||
@@ -510,9 +520,8 @@ gst_mprtpreceiver_mprtcp_riporter_run (void *data)
     riport = gst_mprtcp_add_riport(header);
     subflow->setup_rr_riport(subflow, riport);
     gst_rtcp_add_end(&rtcp, header);
-
-    next_riport_time = now + GST_SECOND * 3;
-    subflow->set_rr_riport_time(subflow, next_riport_time);
+//gst_print_rtcp(header);
+    subflow->setup_rr_riport_time(subflow);
 
     if(subflow->is_early_discarded_packets(subflow)){
 	  header = gst_rtcp_add_begin(&rtcp);
@@ -524,7 +533,8 @@ gst_mprtpreceiver_mprtcp_riporter_run (void *data)
 	  continue;
     }
     gst_rtcp_buffer_unmap(&rtcp);
-    //gst_pad_push(subflow->get_outpad(subflow), outbuf);
+    //g_print("sending %d\n", subflow->get_id(subflow));
+    gst_pad_push(this->mprtcp_srcpad, outbuf);
 
     outbuf = gst_rtcp_buffer_new(1400);
     gst_rtcp_buffer_map (outbuf, GST_MAP_READWRITE, &rtcp);
@@ -678,6 +688,8 @@ _processing_mprtp_packet(GstMprtpreceiver *mprtpr, GstBuffer *buf)
 	  return;
 	}
 
+    //gst_print_rtp_packet_info(&rtp);
+
 	if(!gst_rtp_buffer_get_extension(&rtp)){
 
 		//Backward compatibility in a way to process rtp packet must be implemented here!!!
@@ -703,15 +715,12 @@ _processing_mprtp_packet(GstMprtpreceiver *mprtpr, GstBuffer *buf)
 	if(gst_rtp_buffer_get_ssrc(&rtp) == mprtpr->pivot_ssrc ||
 	  mprtpr->pivot_ssrc == MPRTP_RECEIVER_DEFAULT_SSRC){
 	  guint32 rtptime;
-	  guint64 ext_rtptime;
-	  GstClockTime sent,received;
-	  received = gst_clock_get_time(GST_ELEMENT_CLOCK(mprtpr));
 	  rtptime = gst_rtp_buffer_get_timestamp(&rtp);
-	  ext_rtptime = gst_rtp_buffer_ext_timestamp (&mprtpr->ext_rtptime, rtptime);
-	  sent = gst_util_uint64_scale_int (ext_rtptime,
-		GST_SECOND, mprtpr->pivot_clock_rate);
+	  //ext_rtptime = gst_rtp_buffer_ext_timestamp (&mprtpr->ext_rtptime, rtptime);
+	  //sent = gst_util_uint64_scale_int (ext_rtptime-last_arrived,
+		//GST_SECOND, mprtpr->pivot_clock_rate);
 
-	  subflow->add_packet_skew(subflow, sent, received);
+	  subflow->add_packet_skew(subflow, rtptime, mprtpr->pivot_clock_rate);
 	}
 
 	subflow->process_mprtp_packets(subflow, buf, subflow_infos->sequence);
@@ -781,12 +790,17 @@ GList* _merge_lists(GList *F, GList *L)
   GList *head = NULL,*tail = NULL,*p = NULL,**s = NULL;
   GstRTPBuffer F_rtp = GST_RTP_BUFFER_INIT, L_rtp = GST_RTP_BUFFER_INIT;
   GstBuffer *F_buf, *L_buf;
+  guint16 s1,s2;
+
   while(F != NULL && L != NULL){
 	F_buf = F->data;
 	L_buf = L->data;
 	gst_rtp_buffer_map(F_buf, GST_MAP_READ, &F_rtp);
 	gst_rtp_buffer_map(L_buf, GST_MAP_READ, &L_rtp);
-	if(_cmp_seq(gst_rtp_buffer_get_seq(&F_rtp), gst_rtp_buffer_get_seq(&L_rtp)) < 0){
+	s1 = gst_rtp_buffer_get_seq(&F_rtp);
+	s2 = gst_rtp_buffer_get_seq(&L_rtp);
+	//g_print("S1: %d S2: %d cmp(s1,s2): %d\n", s1,s2, _cmp_seq(s1, s2));
+	if(_cmp_seq(s1, s2) < 0){
 	  s = &F;
 	}else{
 	  s = &L;

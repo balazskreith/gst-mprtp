@@ -34,12 +34,11 @@ static gboolean mprtpr_subflow_is_active(MPRTPRSubflow* this);
 static gboolean mprtpr_subflow_is_early_discarded_packets(MPRTPRSubflow* this);
 static guint64 mprtpr_subflow_get_packet_skew_median(MPRTPRSubflow* this);
 static GstClockTime mprtpr_subflow_get_rr_riport_time(MPRTPRSubflow* this);
+static void mprtpr_subflow_setup_rr_riport_time(MPRTPRSubflow* this);
 static guint16 mprtpr_subflow_get_id(MPRTPRSubflow* this);
-static void mprtpr_subflow_set_rr_riport_time(MPRTPRSubflow* this,
-	GstClockTime time);
 static GList* mprtpr_subflow_get_packets(MPRTPRSubflow* this);
 static void mprtpr_subflow_add_packet_skew(MPRTPRSubflow* this,
-		GstClockTime sent, GstClockTime received);
+		guint32 rtptime, guint32 clockrate);
 static void mprtpr_subflow_setup_rr_riport(MPRTPRSubflow* this,
 	GstMPRTCPSubflowRiport* riport);
 static void mprtps_subflow_setup_xr_rfc2743_late_discarded_riport(
@@ -99,8 +98,10 @@ mprtpr_subflow_reset (MPRTPRSubflow * this)
   this->jitter = 0;
   this->cum_packet_losts = 0;
   this->packet_losts = 0;
+  this->ext_rtptime = -1;
   this->rr_riport_time = 0;
   this->result = NULL;
+  this->rr_intertime = 5;
 }
 
 void
@@ -114,7 +115,7 @@ mprtpr_subflow_init (MPRTPRSubflow * this)
   this->add_packet_skew = mprtpr_subflow_add_packet_skew;
   this->get_packets = mprtpr_subflow_get_packets;
   this->get_rr_riport_time = mprtpr_subflow_get_rr_riport_time;
-  this->set_rr_riport_time = mprtpr_subflow_set_rr_riport_time;
+  this->setup_rr_riport_time = mprtpr_subflow_setup_rr_riport_time;
   this->setup_rr_riport = mprtpr_subflow_setup_rr_riport;
   this->setup_xr_rfc2743_late_discarded_riport = mprtps_subflow_setup_xr_rfc2743_late_discarded_riport;
   this->get_id = mprtpr_subflow_get_id;
@@ -211,10 +212,28 @@ GstClockTime mprtpr_subflow_get_rr_riport_time(MPRTPRSubflow* this)
 	g_mutex_unlock(&this->mutex);
 	return result;
 }
-void mprtpr_subflow_set_rr_riport_time(MPRTPRSubflow* this, GstClockTime time)
+
+
+void mprtpr_subflow_setup_rr_riport_time(MPRTPRSubflow* this)
 {
 	g_mutex_lock(&this->mutex);
-	this->rr_riport_time = time;
+	if(this->late_discarded > 0 && this->packet_losts > 0){
+	  this->rr_intertime = this->rr_intertime * 0.75;
+	}
+	if(this->late_discarded == 0 && this->packet_losts == 0){
+		this->rr_intertime = this->rr_intertime * 1.25;
+	}
+
+	if(this->rr_intertime < 2){
+		this->rr_intertime = 2;
+	}
+	if(this->rr_intertime > 7){
+		this->rr_intertime = 7;
+	}
+
+	this->rr_riport_time = gst_clock_get_time(this->sysclock) +
+			GST_SECOND * this->rr_intertime;
+
 	g_mutex_unlock(&this->mutex);
 }
 
@@ -246,6 +265,7 @@ mprtpr_subflow_setup_rr_riport(MPRTPRSubflow *this,
   rtptime = (guint32)(gst_rtcp_ntp_to_unix (ntptime)>>32), //rtptime
 
   block = gst_mprtcp_riport_add_block_begin(riport, this->id);
+  gst_mprtcp_riport_setup(riport, this->ssrc);
   rr = gst_mprtcp_riport_block_add_rr(block);
 
   expected = uint16_diff(this->HSN, this->actual_seq);
@@ -349,28 +369,44 @@ mprtpr_subflow_get_packet_skew_median_done:
 
 void
 mprtpr_subflow_add_packet_skew(MPRTPRSubflow* this,
-	GstClockTime sent, GstClockTime received)
+	guint32 rtptime, guint32 clockrate)
 {
-  guint64 packet_skew, send_diff, recv_diff;
+  guint64 packet_skew, send_diff, recv_diff, last_ext_rtptime;
+  guint64 received;
   g_mutex_lock(&this->mutex);
+
+  received = gst_clock_get_time(this->sysclock);
   if(this->skew_initialized == FALSE){
-	 this->last_sent_time = sent;
+	 this->ext_rtptime = gst_rtp_buffer_ext_timestamp (&this->ext_rtptime, rtptime);
+	 //this->last_sent_time = sent;
 	 this->last_received_time = received;
 	 this->skew_initialized = TRUE;
 	 goto mprtpr_subflow_add_packet_skew_done;
   }
+  last_ext_rtptime = this->ext_rtptime;
+  this->ext_rtptime = gst_rtp_buffer_ext_timestamp (&this->ext_rtptime, rtptime);
+
   recv_diff = received - this->last_received_time;
   if(recv_diff > 0x8000000000000000){
     recv_diff = 0;
   }
-  send_diff = sent - this->last_sent_time;
+
+  send_diff = gst_util_uint64_scale_int (this->ext_rtptime-last_ext_rtptime,
+	  		GST_SECOND, clockrate);
+
   if(send_diff > 0x8000000000000000){
 	send_diff = 0;
+  }
+  if(send_diff == 0){
+	  goto mprtpr_subflow_add_packet_skew_done;
   }
   packet_skew = recv_diff - send_diff;
   if(packet_skew > 0x8000000000000000){
 	packet_skew = this->last_packet_skew;
   }
+
+  //g_print("send dif: %llu, recv diff: %llu, packet skew: %llu\n", send_diff, recv_diff, packet_skew);
+
   this->jitter = this->jitter +
 		  (((gfloat)packet_skew - (gfloat)this->jitter) / 16.0);
 
@@ -392,7 +428,8 @@ mprtpr_subflow_add_packet_skew(MPRTPRSubflow* this,
     }
   }
 
-  this->last_sent_time = sent;
+  this->ext_rtptime = gst_rtp_buffer_ext_timestamp (&this->ext_rtptime, rtptime);
+  //this->last_sent_time = sent;
   this->last_received_time = received;
 
 mprtpr_subflow_add_packet_skew_done:

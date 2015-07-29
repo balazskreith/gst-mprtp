@@ -882,4 +882,54 @@ void gst_print_rtcp_srb(GstRTCPSRBlock *block)
 }
 
 
+void gst_print_rtp_packet_info(GstRTPBuffer *rtp)
+{
+	gboolean extended;
+	g_print(
+   "0               1               2               3          \n"
+   "0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 \n"
+   "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+   "|%3d|%1d|%1d|%7d|%1d|%13d|%31d|\n"
+   "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+   "|%63u|\n"
+   "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+   "|%63u|\n",
+			gst_rtp_buffer_get_version(rtp),
+			gst_rtp_buffer_get_padding(rtp),
+			extended = gst_rtp_buffer_get_extension(rtp),
+			gst_rtp_buffer_get_csrc_count(rtp),
+			gst_rtp_buffer_get_marker(rtp),
+			gst_rtp_buffer_get_payload_type(rtp),
+			gst_rtp_buffer_get_seq(rtp),
+			gst_rtp_buffer_get_timestamp(rtp),
+			gst_rtp_buffer_get_ssrc(rtp)
+			);
+
+	if(extended){
+		guint16 bits;
+		guint8 *pdata;
+		guint wordlen;
+		gulong index = 0;
+
+		gst_rtp_buffer_get_extension_data (rtp, &bits, (gpointer) & pdata, &wordlen);
+
+
+		g_print(
+	   "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+	   "|0x%-29X|%31d|\n"
+	   "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n",
+	   bits,
+	   wordlen);
+
+	   for(index = 0; index < wordlen; ++index){
+		 g_print("|0x%-5X = %5d|0x%-5X = %5d|0x%-5X = %5d|0x%-5X = %5d|\n"
+				 "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n",
+				 *(pdata+index*4), *(pdata+index*4),
+				 *(pdata+index*4+1),*(pdata+index*4+1),
+				 *(pdata+index*4+2),*(pdata+index*4+2),
+				 *(pdata+index*4+3),*(pdata+index*4+3));
+	  }
+	  g_print("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n");
+	}
+}
 

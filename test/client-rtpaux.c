@@ -279,9 +279,9 @@ static void
 join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
 	guint32 clockrate)
 {
-  GstElement *rtpSrc;
+  GstElement *rtpSrc_1, *rtpSrc_2;
   GstElement *rtcpSrc;
-  GstElement *rtcpSink;
+  GstElement *rtcpSink,*rtcpSink_1,*rtcpSink_2;
   GstElement *mprtpr;
   GstElement *mprtcps;
   gchar *padName,*padname2;
@@ -291,31 +291,44 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
 
   session->rtpbin = g_object_ref (rtpBin);
 
-  basePort = 5000 + (session->sessionNum * 6);
+  basePort = 5000 + (session->sessionNum * 20);
 
-  rtpSrc = gst_element_factory_make ("udpsrc", NULL);
+  rtpSrc_1 = gst_element_factory_make ("udpsrc", NULL);
+  rtpSrc_2 = gst_element_factory_make ("udpsrc", NULL);
   rtcpSrc = gst_element_factory_make ("udpsrc", NULL);
   rtcpSink = gst_element_factory_make ("udpsink", NULL);
+  rtcpSink_1 = gst_element_factory_make ("udpsink", NULL);
+  rtcpSink_2 = gst_element_factory_make ("udpsink", NULL);
   mprtpr = gst_element_factory_make("mprtpreceiver", NULL);
   mprtcps = gst_element_factory_make("mprtcpsender", NULL);
 
-  g_object_set (rtpSrc, "port", basePort, "caps", session->caps,
+  g_object_set (rtpSrc_1, "port", basePort, "caps", session->caps, NULL);
+  g_object_set (rtpSrc_2, "port", basePort + 1, "caps", session->caps, NULL);
+
+  g_object_set (rtcpSrc, "port", basePort + 5, NULL);
+
+  g_object_set (rtcpSink_1, "port", basePort + 11, "host", "127.0.0.1",
 	"async", FALSE, NULL);
-  g_object_set (rtcpSink, "port", basePort + 5, "host", "127.0.0.1",
+
+  g_object_set (rtcpSink_2, "port", basePort + 12, "host", "127.0.0.1",
 	"async", FALSE, NULL);
+
+  g_object_set (rtcpSink, "port", basePort + 10, "host", "127.0.0.1",
+	"async", FALSE, NULL);
+
   g_object_set (mprtpr, "pivot-clock-rate", clockrate, NULL);
 
-  g_object_set (rtcpSrc, "port", basePort + 1, NULL);
-
-  g_print ("Connecting to %i/%i/%i\n", basePort, basePort + 1, basePort + 5);
+  g_print ("Connecting to %i/%i/%i/%i/%i/%i\n",
+		basePort, basePort + 1, basePort + 5,
+		basePort + 11, basePort + 12, basePort + 10);
 
   /* enable RFC4588 retransmission handling by setting rtprtxreceive
    * as the "aux" element of rtpbin */
   g_signal_connect (rtpBin, "request-aux-receiver",
       (GCallback) request_aux_receiver, session);
 
-  gst_bin_add_many (GST_BIN (pipeline), rtpSrc, rtcpSrc, rtcpSink,
-	mprtpr, mprtcps, NULL);
+  gst_bin_add_many (GST_BIN (pipeline), rtpSrc_1, rtpSrc_2, rtcpSrc, rtcpSink,
+	mprtpr, mprtcps, rtcpSink_1, rtcpSink_2, NULL);
 
   g_signal_connect_data (rtpBin, "pad-added", G_CALLBACK (handle_new_stream),
       session_ref (session), (GClosureNotify) session_unref, 0);
@@ -323,8 +336,9 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
   g_signal_connect_data (rtpBin, "request-pt-map", G_CALLBACK (request_pt_map),
       session_ref (session), (GClosureNotify) session_unref, 0);
 
-  padName = g_strdup_printf ("sink_%u", 1);
-  gst_element_link_pads (rtpSrc, "src", mprtpr, padName);
+  gst_element_link_pads (rtpSrc_1, "src", mprtpr, "sink_1");
+  gst_element_link_pads (rtpSrc_2, "src", mprtpr, "sink_2");
+
   padName = g_strdup_printf ("recv_rtp_sink_%u", session->sessionNum);
   gst_element_link_pads (mprtpr, "rtp_src", rtpBin, padName);
   gst_element_link_pads (rtcpSrc, "src", mprtpr, "rtcp_sink");
@@ -338,8 +352,9 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
 
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");
-  gst_element_link_pads (rtpBin, padName, mprtcps, "rtcp_sink");
-  gst_element_link_pads (mprtcps, "rtcp_src", rtcpSink, "sink");
+  //gst_element_link_pads (rtpBin, padName, mprtcps, "rtcp_sink");
+  gst_element_link_pads (mprtcps, "src_1", rtcpSink_1, "sink");
+  gst_element_link_pads (mprtcps, "src_2", rtcpSink_2, "sink");
   g_free (padName);
 
   session_unref (session);

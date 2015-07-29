@@ -29,18 +29,21 @@ struct _SchTree
 {
   GObject          object;
   SchNode*         root;
-  SchNode*         actual;
   GRWLock          rwmutex;
+
+  guint16          max_value;
   MPRTPSSubflow*   paths[MPRTP_SENDER_SCHTREE_MAX_PATH_NUM];
-  gint             path_values[MPRTP_SENDER_SCHTREE_MAX_PATH_NUM];
-  gfloat           path_weights[MPRTP_SENDER_SCHTREE_MAX_PATH_NUM];
-  void           (*set_rate)(SchTree*,MPRTPSSubflow*,float);
+  guint32          path_values[MPRTP_SENDER_SCHTREE_MAX_PATH_NUM];
+  gint             path_delta_values[MPRTP_SENDER_SCHTREE_MAX_PATH_NUM];
+
+  //void           (*set_rate)(SchTree*,MPRTPSSubflow*,gfloat);
   MPRTPSSubflow* (*get_actual)(SchTree*);
+  //guint16        (*get_max_value)(SchTree*);
   MPRTPSSubflow* (*get_next)(SchTree*);
   void           (*print)(SchTree*);
-  void           (*set_path_and_value)(SchTree*, MPRTPSSubflow*, guint16);
-  void           (*create_and_replace)(SchTree*);
-  gint             max_value;
+  void           (*setup_change)(SchTree*, MPRTPSSubflow*, guint32);
+  void           (*commit_changes)(SchTree*);
+
 };
 
 struct _SchTreeClass{

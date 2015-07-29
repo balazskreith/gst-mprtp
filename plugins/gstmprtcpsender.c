@@ -246,7 +246,6 @@ gst_mprtcpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
 	GST_DEBUG_OBJECT (mprtcps, "requesting pad");
 
 	sscanf(name, "src_%u", &subflow_id);
-
 	SUBFLOW_WRITELOCK(mprtcps);
 	subflow = (Subflow*) g_malloc0(sizeof(Subflow));
 

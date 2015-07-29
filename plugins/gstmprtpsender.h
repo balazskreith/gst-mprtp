@@ -51,10 +51,10 @@ struct _GstMprtpsender
   GstSegment     segment;
   guint8         ext_header_id;
   guint16        mprtcp_mtu;
-  gfloat         alpha_charge;
-  gfloat         alpha_discharge;
-  gfloat         beta;
-  gfloat         gamma;
+  gfloat         charge_value;
+  gfloat         alpha_value;
+  gfloat         beta_value;
+  gfloat         gamma_value;
   guint32        max_delay;
   GList*         subflows;
   gboolean       no_active_subflows;

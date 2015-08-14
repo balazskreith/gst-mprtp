@@ -239,7 +239,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
 
   /* this is just to drop some rtp packets at random, to demonstrate
    * that rtprtxsend actually works */
-  g_object_set (identity, "drop-probability", 0.0, NULL);
+  g_object_set (identity, "drop-probability", 0.1, NULL);
 
   padName = g_strdup_printf ("send_rtp_sink_%u", session->sessionNum);
   gst_element_link_pads (session->input, "src", rtpBin, padName);

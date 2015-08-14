@@ -43,6 +43,8 @@
 #define RTCPHEADER_WORDS (RTCPHEADER_BYTES>>2)
 #define RTCPSRBLOCK_BYTES 20
 #define RTCPSRBLOCK_WORDS (RTCPSRBLOCK_BYTES>>2)
+#define RTCPXRBLOCK_BYTES 12
+#define RTCPXRBLOCK_WORDS (RTCPXRBLOCK_BYTES>>2)
 #define RTCPRRBLOCK_BYTES 24
 #define RTCPRRBLOCK_WORDS (RTCPRRBLOCK_BYTES>>2)
 #define MPRTCPBLOCK_BYTES 4
@@ -187,7 +189,7 @@ gst_mprtcp_riport_add_block_begin(GstMPRTCPSubflowRiport* riport,
     ptr += (block_length + 1)<<2;
   }
   result = ptr;
-  src++;
+  ++src;
   gst_mprtcp_block_setup(&result->info, MPRTCP_BLOCK_TYPE_RIPORT, 0, subflow_id);
   gst_rtcp_header_change(&riport->header, NULL, NULL, &src, NULL, NULL, NULL);
   return result;
@@ -232,7 +234,6 @@ gst_mprtcp_riport_add_block_end(GstMPRTCPSubflowRiport* riport,
   		 NULL, NULL, NULL, &block_header_length, NULL);
 
   block_length = (guint8) block_header_length + 1;
-
   gst_mprtcp_block_change(info, NULL, &block_length, NULL);
 
 
@@ -284,7 +285,7 @@ GstMPRTCPSubflowBlock *gst_mprtcp_get_first_block(GstMPRTCPSubflowRiport *riport
 GstMPRTCPSubflowBlock *gst_mprtcp_get_next_block(GstMPRTCPSubflowRiport *riport,
 	GstMPRTCPSubflowBlock *actual)
 {
-  guint8 *next = &actual;
+  guint8 *next = actual;
   guint8 *max_ptr = &riport->header;
   guint16 riport_length;
   guint8 block_length;
@@ -292,7 +293,10 @@ GstMPRTCPSubflowBlock *gst_mprtcp_get_next_block(GstMPRTCPSubflowRiport *riport,
 	&riport_length, NULL);
   gst_mprtcp_block_getdown(&actual->info, NULL, &block_length, NULL);
   max_ptr += riport_length<<2;
-  next+= block_length<<2;
+  next+= (block_length+1)<<2;
+  if(block_length == 0){
+    return NULL;
+  }
   return next < max_ptr ? (GstMPRTCPSubflowBlock *) next : NULL;
 }
 
@@ -409,13 +413,29 @@ void gst_rtcp_rrb_getdown(
 	  }
 }
 
+void gst_rtcp_copy_rrb_ntoh(GstRTCPRRBlock *from, GstRTCPRRBlock *to)
+{
+  guint32 cum_packet_lost;
+  to->fraction_lost = from->fraction_lost;
+  gst_rtcp_rrb_getdown(from,
+		               &to->ssrc,
+					   NULL,
+					   &cum_packet_lost,
+					   &to->ext_hsn,
+					   &to->jitter,
+					   &to->LSR,
+					   &to->DLSR);
+  to->cum_packet_lost = cum_packet_lost;
+}
+
 
 //------------------ XR7243 ------------------------
 void gst_rtcp_xr_rfc7243_init(GstRTCPXR_RFC7243 *riport)
 {
 	gst_rtcp_header_init(&riport->header);
 	gst_rtcp_header_setup(&riport->header, FALSE, 0,
-		GST_RTCP_TYPE_XR, RTCPHEADER_WORDS - 1, 0);
+		GST_RTCP_TYPE_XR, RTCPHEADER_WORDS - 1 + RTCPXRBLOCK_WORDS, 0);
+	gst_rtcp_xr_rfc7243_setup(riport, 0, FALSE, 0, 0);
 }
 
 
@@ -446,7 +466,7 @@ void gst_rtcp_xr_rfc7243_change(
 		riport->interval_metric = *interval_metric;
 	}
 	if(ssrc){
-		riport->interval_metric = g_htonl(ssrc);
+		riport->ssrc = g_htonl(*ssrc);
 	}
 }
 
@@ -464,7 +484,7 @@ void gst_rtcp_xr_rfc7243_getdown(
 		*interval_metric = riport->interval_metric;
 	}
 	if(ssrc){
-		*ssrc = g_ntohs(riport->interval_metric);
+		*ssrc = g_ntohs(riport->ssrc);
 	}
 }
 
@@ -695,6 +715,9 @@ void gst_print_rtcp(GstRTCPHeader *header)
 	  case GST_RTCP_TYPE_RR:
 		gst_print_rtcp_rr((GstRTCPRR*)header);
 		break;
+	  case GST_RTCP_TYPE_XR:
+		gst_print_rtcp_xr((GstRTCPXR_RFC7243*)header);
+		break;
 	  default:
 		  ok = FALSE;
 		  break;
@@ -725,7 +748,7 @@ void gst_print_mprtcp(GstMPRTCPSubflowRiport *riport)
 	   ssrc
 	   );
 
-  for(index = 0; index < src; ++index, ++block){
+  for(index = 0; index < src; ++index){
 	  guint8 type, block_length;
 	  guint16 subflow_id;
 	  info = &block->info;
@@ -740,6 +763,7 @@ void gst_print_mprtcp(GstMPRTCPSubflowRiport *riport)
 	  );
 
 	  gst_print_rtcp(&block->block_header);
+	  block = ((guint8*) block) + ((block_length + 1)<<2);
   }
 }
 
@@ -825,6 +849,35 @@ void gst_print_rtcp_rr(GstRTCPRR *riport)
 	}
 }
 
+void gst_print_rtcp_xr(GstRTCPXR_RFC7243 *riport)
+{
+	gint index;
+	guint8 interval_metric;
+	gboolean early_bit;
+	guint32 ssrc;
+	guint32 discarded_bytes;
+
+	gst_rtcp_header_getdown(&riport->header, NULL, NULL, NULL, NULL, NULL, NULL);
+
+	gst_print_rtcp_header(&riport->header);
+    gst_rtcp_xr_rfc7243_getdown(riport, &interval_metric, &early_bit, &ssrc, &discarded_bytes);
+	g_print(
+		   "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+		   "|%15d|%3d|%1d|%9d|%31d|\n"
+		   "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+		   "|%63X|\n"
+		   "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+		   "|%63X|\n",
+		   riport->block_type,
+		   interval_metric,
+		   early_bit,
+		   0,
+		   g_ntohs(riport->block_length),
+           ssrc,
+		   discarded_bytes
+		);
+}
+
 void gst_print_rtcp_rrb(GstRTCPRRBlock *block)
 {
 	guint32 ssrc, exthighestseq, jitter, lsr, dlsr;
@@ -845,9 +898,9 @@ void gst_print_rtcp_rrb(GstRTCPRRBlock *block)
 	   "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
 			"|%63u|\n"
 	   "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
-			"|%63u|\n"
+			"|%63X|\n"
 	   "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
-			"|%63u|\n",
+			"|%63X|\n",
 	   ssrc,
 	   fraction_lost,
 	   packetslost,

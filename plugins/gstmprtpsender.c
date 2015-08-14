@@ -118,6 +118,8 @@ gst_mprtp_sender_mprtcp_riporter_run (void *data);
 
 static MPRTPSSubflow*
 _get_next_subflow(GstMprtpsender *this, GstRTPBuffer *rtp);
+static void _delete_subflow(GstMprtpsender* this, MPRTPSSubflow *subflow);
+
 
 enum
 {
@@ -311,37 +313,21 @@ gst_mprtpsender_set_property (GObject * object, guint property_id,
     case PROP_CHARGE:
       SUBFLOW_LOCK(mprtpsender);
   	  mprtpsender->charge_value = g_value_get_float(value);
-  	  for(it = mprtpsender->subflows; it != NULL; it = it->next){
-  		subflow = it->data;
-  		subflow->set_charge_value(subflow, mprtpsender->charge_value);
-  	  }
   	  SUBFLOW_UNLOCK(mprtpsender);
   	  break;
     case PROP_ALPHA:
       SUBFLOW_LOCK(mprtpsender);
       mprtpsender->alpha_value = g_value_get_float(value);
-  	  for(it = mprtpsender->subflows; it != NULL; it = it->next){
-  		subflow = it->data;
-  		subflow->set_alpha_value(subflow, mprtpsender->alpha_value);
-  	  }
       SUBFLOW_UNLOCK(mprtpsender);
       break;
     case PROP_BETA:
       SUBFLOW_LOCK(mprtpsender);
       mprtpsender->beta_value = g_value_get_float(value);
-  	  for(it = mprtpsender->subflows; it != NULL; it = it->next){
-  		subflow = it->data;
-  		subflow->set_beta_value(subflow, mprtpsender->beta_value);
-  	  }
       SUBFLOW_UNLOCK(mprtpsender);
       break;
     case PROP_GAMMA:
       SUBFLOW_LOCK(mprtpsender);
       mprtpsender->gamma_value = g_value_get_float(value);
-  	  for(it = mprtpsender->subflows; it != NULL; it = it->next){
-  		subflow = it->data;
-  		subflow->set_gamma_value(subflow, mprtpsender->gamma_value);
-  	  }
       SUBFLOW_UNLOCK(mprtpsender);
       break;
     case PROP_EXT_HEADER_ID:
@@ -461,10 +447,6 @@ gst_mprtpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
 			GST_DEBUG_FUNCPTR(gst_mprtpsender_src_unlink));
 
     subflow = make_mprtps_subflow(subflow_id, srcpad);
-    subflow->set_alpha_value(subflow, mprtps->alpha_value);
-    subflow->set_beta_value(subflow, mprtps->beta_value);
-    subflow->set_gamma_value(subflow, mprtps->gamma_value);
-    subflow->set_charge_value(subflow, mprtps->charge_value);
     mprtps->subflows = g_list_prepend(mprtps->subflows, subflow);
     SUBFLOW_UNLOCK(mprtps);
 
@@ -673,7 +655,7 @@ gst_mprtpsender_src_link (GstPad *pad, GstObject *parent, GstPad *peer)
     GST_WARNING_OBJECT(mprtpsender, "Can not find subflow for the recently linked pad.");
     return GST_PAD_LINK_OK;
   }
-  selected->fire(selected, MPRTP_SENDER_SUBFLOW_EVENT_JOINED, NULL);
+  selected->set_event(selected, MPRTP_SENDER_SUBFLOW_EVENT_JOINED);
   SUBFLOW_UNLOCK(mprtpsender);
   return GST_PAD_LINK_OK;
 }
@@ -699,7 +681,7 @@ gst_mprtpsender_src_unlink (GstPad *pad, GstObject *parent)
     GST_WARNING_OBJECT(mprtpsender, "Can not find subflow for the recently unlinked pad.");
     return;
   }
-  selected->fire(subflow, MPRTP_SENDER_SUBFLOW_EVENT_DETACHED, NULL);
+  selected->set_event(selected, MPRTP_SENDER_SUBFLOW_EVENT_DETACHED);
   SUBFLOW_UNLOCK(mprtpsender);
 }
 
@@ -783,7 +765,7 @@ gst_mprtpsender_mprtcp_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *bu
       if(pt != MPRTCP_PACKET_TYPE_IDENTIFIER){
         continue;
       }
-      gst_print_rtcp(header);
+      //gst_print_rtcp(header);
       riport = (GstMPRTCPSubflowRiport*) header;
       for(block = gst_mprtcp_get_first_block(riport);
     	  block != NULL;
@@ -817,33 +799,173 @@ gst_mprtp_sender_scheduler_run (void *data)
   GstClockID clock_id;
   GstClockTime next_scheduler_time;
   GList *it;
+  gfloat subflow_sending_rate;
+  gfloat charge_value = 0.0;
   MPRTPSSubflow *subflow;
+  MPRTPSubflowEvent subflow_event;
   gboolean has_active_subflow, had_active_subflows = !mprtps->no_active_subflows;
+  gboolean commit_schtree_changes = FALSE;
+  guint32 non_congested_path_num = 0, congested_path_num = 0;
+  guint consecutive_keeps;
 
   GST_DEBUG_OBJECT(mprtps, "Scheduler task is started");
   SUBFLOW_LOCK(mprtps);
 
-  for(has_active_subflow = FALSE,
-	  it = mprtps->subflows; it != NULL; it = it->next)
+  //determine the charge_value
+  {
+    gfloat charge_start_value = 1.0, charge_nc_value = 0.0, charge_c_value = 0.0;
+    MPRTPSubflowStates state;
+	for(it = mprtps->subflows; it != NULL; it = it->next){
+	  subflow = (MPRTPSSubflow*) it->data;
+      state = subflow->get_state(subflow);
+	  if(state == MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED){
+	    charge_nc_value += subflow->get_sending_rate(subflow);
+	    ++non_congested_path_num;
+	  }else if(state == MPRTP_SENDER_SUBFLOW_STATE_CONGESTED){
+		charge_c_value += subflow->get_sending_rate(subflow);
+	    ++congested_path_num;
+	  }
+    }
+	if(non_congested_path_num > 0){
+	  charge_value = charge_nc_value / (non_congested_path_num*2.0);
+	}else if(congested_path_num > 0){
+	  charge_value = charge_c_value*2.0;
+	}
+
+	if(charge_value < 1.0){
+	  charge_value = charge_start_value;
+	}
+	//g_print("charge_value: %f\n", charge_value);
+  }
+
+  //Fire
+  has_active_subflow = FALSE;
+  for(it = mprtps->subflows; it != NULL; it = it->next)
   {
     subflow = (MPRTPSSubflow*) it->data;
-	if(!subflow->is_active(subflow)){
-	  continue;
+	subflow_event = subflow->check(subflow);
+	subflow_sending_rate = subflow->get_sending_rate(subflow);
+	if(subflow_event != MPRTP_SENDER_SUBFLOW_EVENT_KEEP){
+      g_print("subflow: %d event: %d sending rate: %f\n"
+    		, subflow->get_id(subflow), subflow_event, subflow_sending_rate);
 	}
-    schtree->setup_change(schtree, subflow, subflow->get_sending_rate(subflow));
-    has_active_subflow = TRUE;
+    switch(subflow->get_state(subflow)){
+      case MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED:
+        switch(subflow_event){
+          case MPRTP_SENDER_SUBFLOW_EVENT_JOINED:
+			schtree->setup_sending_rate(schtree, subflow, charge_value);
+			subflow->set_state(subflow, MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED);
+			commit_schtree_changes = TRUE;
+		  break;
+          case MPRTP_SENDER_SUBFLOW_EVENT_DISTORTION:
+            subflow_sending_rate *= (1.0 - mprtps->alpha_value);
+            schtree->setup_sending_rate(schtree, subflow, subflow_sending_rate);
+            commit_schtree_changes = TRUE;
+          break;
+          case MPRTP_SENDER_SUBFLOW_EVENT_CONGESTION:
+  		    subflow_sending_rate *= (1.0 - mprtps->beta_value);
+  		    schtree->setup_sending_rate(schtree, subflow, subflow_sending_rate);
+  		    subflow->set_state(subflow, MPRTP_SENDER_SUBFLOW_STATE_CONGESTED);
+		    commit_schtree_changes = TRUE;
+		  break;
+
+          case MPRTP_SENDER_SUBFLOW_EVENT_LATE:
+			subflow->set_state(subflow, MPRTP_SENDER_SUBFLOW_STATE_PASSIVE);
+			schtree->setup_sending_rate(schtree, subflow, 0.0);
+			commit_schtree_changes = TRUE;
+		  break;
+          case MPRTP_SENDER_SUBFLOW_EVENT_DETACHED:
+            schtree->delete_path(schtree, subflow);
+            commit_schtree_changes = TRUE;
+            _delete_subflow(mprtps, subflow);
+          break;
+          case MPRTP_SENDER_SUBFLOW_EVENT_KEEP:
+        	consecutive_keeps = subflow->get_consecutive_keeps_num(subflow);
+        	if(consecutive_keeps > 2){
+              subflow->save_sending_rate(subflow);
+              schtree->setup_sending_rate(schtree, subflow, subflow_sending_rate);
+        	}
+          break;
+          case MPRTP_SENDER_SUBFLOW_EVENT_REFRESH:
+        	  schtree->setup_sending_rate(schtree, subflow, subflow_sending_rate);
+        	  commit_schtree_changes = TRUE;
+          break;
+          default:
+          break;
+        }
+      break;
+      case MPRTP_SENDER_SUBFLOW_STATE_CONGESTED:
+        switch(subflow_event){
+          case MPRTP_SENDER_SUBFLOW_EVENT_LATE:
+			subflow->set_state(subflow, MPRTP_SENDER_SUBFLOW_STATE_PASSIVE);
+			schtree->setup_sending_rate(schtree, subflow, 0.0);
+			commit_schtree_changes = TRUE;
+		  break;
+          case MPRTP_SENDER_SUBFLOW_EVENT_SETTLED:
+        	subflow->set_state(subflow, MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED);
+			subflow_sending_rate = subflow->load_sending_rate(subflow);
+			if(subflow_sending_rate == 0.0){
+			  subflow_sending_rate = charge_value;
+			}
+			schtree->setup_sending_rate(schtree, subflow, subflow_sending_rate);
+			commit_schtree_changes = TRUE;
+		  break;
+          case MPRTP_SENDER_SUBFLOW_EVENT_DETACHED:
+        	schtree->delete_path(schtree, subflow);
+		    commit_schtree_changes = TRUE;
+		    _delete_subflow(mprtps, subflow);
+		  break;
+		  default:
+			//g_print("CONGESTED state got KEEP/DISTORTION/OTHER event\n");
+		  break;
+	    }
+	  break;
+      case MPRTP_SENDER_SUBFLOW_STATE_PASSIVE:
+        switch(subflow_event){
+          case MPRTP_SENDER_SUBFLOW_EVENT_SETTLED:
+			subflow->set_state(subflow, MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED);
+			subflow_sending_rate = subflow->load_sending_rate(subflow);
+			if(subflow_sending_rate == 0.0){
+			  subflow_sending_rate = charge_value;
+			}
+			schtree->setup_sending_rate(schtree, subflow, subflow_sending_rate);
+			commit_schtree_changes = TRUE;
+		  break;
+          case MPRTP_SENDER_SUBFLOW_EVENT_DETACHED:
+        	schtree->delete_path(schtree, subflow);
+			commit_schtree_changes = TRUE;
+			_delete_subflow(mprtps, subflow);
+		  break;
+          case MPRTP_SENDER_SUBFLOW_EVENT_KEEP:
+          default:
+          break;
+        }
+	  break;
+      default:
+      break;
+    }
+    if(subflow->is_active(subflow)){
+	  has_active_subflow = TRUE;
+	}
+    //g_print("Subflow %d, sent packet num: %d\n", subflow->get_id(subflow),
+    	//	subflow->get_sent_packet_num(subflow));
   }
-  if(has_active_subflow){
+  now = gst_clock_get_time(GST_ELEMENT_CLOCK(mprtps));
+  if(mprtps->last_schtree_commit < now - 30 * GST_SECOND){
+    commit_schtree_changes = TRUE;
+  }
+  if(commit_schtree_changes){
     schtree->commit_changes(schtree);
+    mprtps->last_schtree_commit = now;
   }
 
   mprtps->no_active_subflows = !has_active_subflow;
-
+  //g_print("mprtps->no_active_subflows: %d had_active_subflows: %d\n",
+	//	  mprtps->no_active_subflows, had_active_subflows);
   if(mprtps->no_active_subflows == FALSE && had_active_subflows == FALSE){
 	 g_cond_signal(&mprtps->scheduler_cond);
   }
 
-  now = gst_clock_get_time(GST_ELEMENT_CLOCK(mprtps));
   mprtps->scheduler_last_run = now;
 
 
@@ -889,8 +1011,7 @@ gst_mprtp_sender_mprtcp_riporter_run (void *data)
   compound_sending = gst_pad_is_linked(this->rtcp_srcpad);
   for(first = TRUE, it = this->subflows; it != NULL; it = it->next){
     subflow = it->data;
-    if(now < subflow->get_sr_riport_time(subflow) ||
-	   !subflow->is_active(subflow)){
+    if(now < subflow->get_sr_riport_time(subflow)){
 	  continue;
 	}
     if(first == TRUE){
@@ -936,7 +1057,12 @@ gst_mprtpreceiver_mprtcp_riporter_run_end:
 
 }
 
-
+void _delete_subflow(GstMprtpsender* this, MPRTPSSubflow *subflow)
+{
+  GList *it;
+  this->subflows = g_list_remove(this->subflows, subflow);
+  g_object_unref((GObject*)subflow);
+}
 
 /*
 

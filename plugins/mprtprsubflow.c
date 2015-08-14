@@ -5,6 +5,7 @@
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include "mprtprsubflow.h"
+#include "mprtpssubflow.h"
 #include "gstmprtcpbuffer.h"
 
 GST_DEBUG_CATEGORY_STATIC (gst_mprtprsubflow_debug_category);
@@ -12,10 +13,6 @@ GST_DEBUG_CATEGORY_STATIC (gst_mprtprsubflow_debug_category);
 
 G_DEFINE_TYPE (MPRTPRSubflow, mprtpr_subflow, G_TYPE_OBJECT);
 
-typedef struct _MPRTPRSubflowHeaderExtension{
-  guint16 id;
-  guint16 sequence;
-}MPRTPRSubflowHeaderExtension;
 
 typedef struct _Gap{
   GList   *at;
@@ -275,6 +272,7 @@ mprtpr_subflow_setup_rr_riport(MPRTPRSubflow *this,
   this->cum_packet_losts += (guint32)this->packet_losts;
 
   ext_hsn = (((guint32)this->cycle_num)<<16) | ((guint32)this->actual_seq);
+  //g_print("this->LSR: %016llX -> %016llX\n", this->LSR, (guint32)(this->LSR>>16));
   LSR = (guint32)(this->LSR>>16);
   if(this->LSR == 0 || ntptime < this->LSR){
     DLSR = 0;
@@ -600,12 +598,12 @@ guint16 _mprtp_buffer_get_subflow_id(GstRTPBuffer* rtp, guint8 MPRTP_EXT_HEADER_
 {
 	gpointer pointer = NULL;
 	guint size = 0;
-	MPRTPRSubflowHeaderExtension *ext_header;
+	MPRTPSubflowHeaderExtension *ext_header;
 	if(!gst_rtp_buffer_get_extension_onebyte_header(rtp, MPRTP_EXT_HEADER_ID, 0, &pointer, &size)){
 	  GST_WARNING("The requested rtp buffer doesn't contain one byte header extension with id: %d", MPRTP_EXT_HEADER_ID);
 	  return FALSE;
 	}
-	ext_header = (MPRTPRSubflowHeaderExtension*) pointer;
+	ext_header = (MPRTPSubflowHeaderExtension*) pointer;
 	return ext_header->id;
 }
 
@@ -613,13 +611,13 @@ guint16 _mprtp_buffer_get_sequence_num(GstRTPBuffer* rtp, guint8 MPRTP_EXT_HEADE
 {
 	gpointer pointer = NULL;
 	guint size = 0;
-	MPRTPRSubflowHeaderExtension *ext_header;
+	MPRTPSubflowHeaderExtension *ext_header;
 	if(!gst_rtp_buffer_get_extension_onebyte_header(rtp, MPRTP_EXT_HEADER_ID, 0, &pointer, &size)){
 	  GST_WARNING("The requested rtp buffer doesn't contain one byte header extension with id: %d", MPRTP_EXT_HEADER_ID);
 	  return FALSE;
 	}
-	ext_header = (MPRTPRSubflowHeaderExtension*) pointer;
-	return ext_header->sequence;
+	ext_header = (MPRTPSubflowHeaderExtension*) pointer;
+	return ext_header->seq;
 }
 
 void _proc_rtcp_sr(MPRTPRSubflow* this, GstRTCPSR *sr)

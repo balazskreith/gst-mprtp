@@ -33,15 +33,16 @@ struct _SchTree
 
   guint16          max_value;
   MPRTPSSubflow*   paths[MPRTP_SENDER_SCHTREE_MAX_PATH_NUM];
-  guint32          path_values[MPRTP_SENDER_SCHTREE_MAX_PATH_NUM];
-  gint             path_delta_values[MPRTP_SENDER_SCHTREE_MAX_PATH_NUM];
+  gfloat           path_values[MPRTP_SENDER_SCHTREE_MAX_PATH_NUM];
+  gfloat           path_delta_values[MPRTP_SENDER_SCHTREE_MAX_PATH_NUM];
 
   //void           (*set_rate)(SchTree*,MPRTPSSubflow*,gfloat);
   MPRTPSSubflow* (*get_actual)(SchTree*);
   //guint16        (*get_max_value)(SchTree*);
   MPRTPSSubflow* (*get_next)(SchTree*);
   void           (*print)(SchTree*);
-  void           (*setup_change)(SchTree*, MPRTPSSubflow*, guint32);
+  void           (*setup_sending_rate)(SchTree*, MPRTPSSubflow*, gfloat);
+  void           (*delete_path)(SchTree*, MPRTPSSubflow*);
   void           (*commit_changes)(SchTree*);
 
 };

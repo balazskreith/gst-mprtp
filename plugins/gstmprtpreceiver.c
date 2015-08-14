@@ -519,16 +519,11 @@ gst_mprtpreceiver_mprtcp_riporter_run (void *data)
     header = gst_rtcp_add_begin(&rtcp);
     riport = gst_mprtcp_add_riport(header);
     subflow->setup_rr_riport(subflow, riport);
+    subflow->setup_xr_rfc2743_late_discarded_riport(subflow, riport);
     gst_rtcp_add_end(&rtcp, header);
-//gst_print_rtcp(header);
+
     subflow->setup_rr_riport_time(subflow);
 
-    if(subflow->is_early_discarded_packets(subflow)){
-	  header = gst_rtcp_add_begin(&rtcp);
-	  riport = gst_mprtcp_add_riport(header);
-	  subflow->setup_xr_rfc2743_late_discarded_riport(subflow, riport);
-	  gst_rtcp_add_end(&rtcp, header);
-    }
     if(compound_sending){
 	  continue;
     }

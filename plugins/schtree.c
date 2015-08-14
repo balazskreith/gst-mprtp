@@ -24,6 +24,8 @@
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include "schtree.h"
+#include <math.h>
+
 
 GST_DEBUG_CATEGORY_STATIC (schtree_debug_category);
 #define GST_CAT_DEFAULT schtree_debug_category
@@ -45,9 +47,9 @@ static void _schtree_insert(SchNode** node,
 	MPRTPSSubflow* path, gint* change, gint level_value);
 static void schtree_commit_changes(SchTree *tree);
 static void _schnode_overlap_trees(SchNode *old_node, SchNode *new_node);
-static void schtree_setup_change(SchTree *tree,
-	MPRTPSSubflow* path, guint32 value);
+static void schtree_setup_change(SchTree *tree, MPRTPSSubflow* path,  gfloat value);
 static void schtree_print(SchTree* tree);
+static void schtree_delete_path(SchTree *tree, MPRTPSSubflow* path);
 
 static void _schnode_rdtor(SchNode* node);
 static SchNode* _schnode_ctor();
@@ -80,7 +82,8 @@ void
 schtree_init(SchTree* tree)
 {
   gint i;
-  tree->setup_change= schtree_setup_change;
+  tree->setup_sending_rate= schtree_setup_change;
+  tree->delete_path = schtree_delete_path;
   tree->commit_changes = schtree_commit_changes;
   tree->get_actual = schtree_get_actual;
   //tree->get_max_value = schtree_get_max_value;
@@ -120,8 +123,8 @@ void
 schtree_commit_changes(SchTree *tree)
 {
   gint32 index, max_index = 0, path_num = 0;
-  guint16 sum = 0;
-  gint max_value = 0, *value, actual_value, delta_value;
+  gfloat sum = 0.0;
+  gfloat max_value = 0.0, *value, actual_value;
   SchNode *new_root = NULL;
   MPRTPSSubflow *path;
   g_rw_lock_writer_lock (&tree->rwmutex);
@@ -129,8 +132,11 @@ schtree_commit_changes(SchTree *tree)
   for(index = 0; index < MPRTP_SENDER_SCHTREE_MAX_PATH_NUM &&
       tree->paths[index] != NULL; ++index, ++path_num)
   {
-	actual_value = (gint)tree->path_values[index] + tree->path_delta_values[index];
-	tree->path_values[index] = actual_value > 0 ? actual_value : 1;
+	actual_value = tree->path_values[index] + tree->path_delta_values[index];
+	tree->path_delta_values[index] = 0.0;
+	//g_print("tree->path_values[index]: %f, tree->path_delta_values[index]: %f, "
+		//	"actual value: %f\n", tree->path_values[index], tree->path_delta_values[index], actual_value);
+	tree->path_values[index] = actual_value >= 0.0 ? actual_value : 0.0;
     if(max_value < actual_value){
       max_index = index;
     }
@@ -139,23 +145,25 @@ schtree_commit_changes(SchTree *tree)
 
   for(index = 0; index < path_num; ++index)
   {
-
+    gint insert_value;
 	path = tree->paths[index];
 
-	actual_value = (gfloat) tree->path_values[index] /
-				   (gfloat) sum * (gfloat) tree->max_value;
-
-     //g_print("insert: %d / %d * %d = %d\n",
-    	//	 tree->path_values[index], sum, tree->max_value, actual_value);
-
-     _schtree_insert(&new_root, path, &actual_value, tree->max_value);
+	actual_value =  tree->path_values[index] /
+				    sum * (gfloat) tree->max_value;
+	insert_value = (guint16) roundf(actual_value);
+     //g_print("insert: %f / %f * %f = %f (%d)\n",
+    	//	 tree->path_values[index], sum,(gfloat) tree->max_value, actual_value, insert_value);
+	 //g_print("path value is %f\n",tree->path_values[index]);
+     if(tree->path_values[index] > 0.0){
+       _schtree_insert(&new_root, path, &insert_value, tree->max_value);
+     }
   }
 
   //check 128 integrity
   _schnode_rdtor(tree->root);
   tree->root = new_root;
   _schtree_loadup(tree->root, tree->paths[max_index]);
-  //tree->print(tree);
+  tree->print(tree);
   g_rw_lock_writer_unlock (&tree->rwmutex);
 
 }
@@ -186,7 +194,7 @@ void _schnode_overlap_trees(SchNode *old_node, SchNode *new_node)
 }
 
 void
-schtree_setup_change(SchTree *tree, MPRTPSSubflow* path, guint32 value)
+schtree_setup_change(SchTree *tree, MPRTPSSubflow* path, gfloat value)
 {
   gint32 index;
   g_rw_lock_writer_lock (&tree->rwmutex);
@@ -207,11 +215,36 @@ schtree_setup_change(SchTree *tree, MPRTPSSubflow* path, guint32 value)
   }
 
   tree->paths[index] = path;
+  tree->path_values[index] = 0.0;
   tree->path_delta_values[index] = value;
 
 schtree_set_path_and_values_done:
-  //g_print("value: %d, %p path value: %d, delta value: %d\n",
-	//	  value, path, tree->path_values[index], tree->path_delta_values[index]);
+  //g_print("schtree_setup_change: subflow: %d, path: %p, desired value:%f, actual value: %f, delta value: %f\n",
+	//	  path->get_id(path), path, value, tree->path_values[index], tree->path_delta_values[index]);
+  g_rw_lock_writer_unlock (&tree->rwmutex);
+}
+
+
+void
+schtree_delete_path(SchTree *tree, MPRTPSSubflow* path)
+{
+  gint32 index;
+  g_rw_lock_writer_lock (&tree->rwmutex);
+  for(index = 0;
+	  index < MPRTP_SENDER_SCHTREE_MAX_PATH_NUM && tree->paths[index] != path;
+	  ++index);
+
+  if(index == MPRTP_SENDER_SCHTREE_MAX_PATH_NUM){
+    goto schtree_delete_path_done;
+  }
+
+  tree->paths[index] = NULL;
+  tree->path_values[index] = 0.0;
+  tree->path_delta_values[index] = 0.0;
+
+schtree_delete_path_done:
+  //g_print("schtree_setup_change: subflow: %d, desired value:%f, actual value: %f, delta value: %f\n",
+	//	  path->get_id(path), value, tree->path_values[index], tree->path_delta_values[index]);
   g_rw_lock_writer_unlock (&tree->rwmutex);
 }
 
@@ -239,7 +272,7 @@ _schtree_insert(SchNode** node, MPRTPSSubflow* path, gint* change, gint level_va
   if(*node == NULL){
     *node = _schnode_ctor();
   }
-  if((*node)->path != NULL){
+  if((*node)->path != NULL || level_value < 1){
     return;
   }
   if(*change >= level_value && (*node)->left == NULL && (*node)->right == NULL){
@@ -317,11 +350,8 @@ schtree_get_next(SchTree* tree)
 	while(selected->path == NULL){
 	  selected->next = (selected->next == selected->left) ? selected->right : selected->left;
 	  selected = selected->next;
-	  //g_print("node: %p l->%p r->%p p: %p\n",
-		//	  selected, selected->left, selected->right, selected->path);
 	}
 	result = selected->path;
-	//g_print("selected: %p->path:%p\n", selected, selected->path);
 	g_rw_lock_writer_unlock (&tree->rwmutex);
 	return result;
 }
@@ -368,7 +398,6 @@ void _print_tree(SchNode* node, gint top, gint level)
   gint i;
 
   for(i = 0; i < level; ++i) g_print("--");
-  g_print("%d:", level);
   g_print("%p (%p)\n", node->path, top>>level);
   _print_tree(node->left, top, level+1);
   _print_tree(node->right, top, level+1);

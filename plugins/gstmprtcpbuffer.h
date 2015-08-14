@@ -260,6 +260,7 @@ void gst_rtcp_rrb_setup(
 		guint8 fraction_lost, guint32 cum_packet_lost,
 		guint32 ext_hsn, guint32 jitter, guint32 LSR, guint32 DLSR
 		);
+void gst_rtcp_copy_rrb_ntoh(GstRTCPRRBlock *from, GstRTCPRRBlock *to);
 
 
 void gst_rtcp_xr_rfc7243_init(GstRTCPXR_RFC7243 *riport);
@@ -296,6 +297,7 @@ void gst_print_rtcp(GstRTCPHeader *header);
 void gst_print_rtcp_header(GstRTCPHeader *header);
 void gst_print_rtcp_sr(GstRTCPSR *riport);
 void gst_print_rtcp_rr(GstRTCPRR *riport);
+void gst_print_rtcp_xr(GstRTCPXR_RFC7243 *riport);
 void gst_print_rtcp_srb(GstRTCPSRBlock *block_ptr);
 void gst_print_rtcp_rrb(GstRTCPRRBlock *block_ptr);
 

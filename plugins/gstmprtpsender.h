@@ -67,6 +67,7 @@ struct _GstMprtpsender
   GRecMutex      riporter_mutex;
   GCond          scheduler_cond;
   GstClockTime   scheduler_last_run;
+  GstClockTime   last_schtree_commit;
 
   GstMprtpsenderPrivate *priv;
 };

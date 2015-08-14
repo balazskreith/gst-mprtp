@@ -1,5 +1,5 @@
 libgstmprtp_la-gsttry.lo: gsttry.c /usr/include/stdc-predef.h ../config.h \
- /usr/local/include/gstreamer-1.0/gst/gst.h /usr/include/glib-2.0/glib.h \
+ /home/balazs/gst/master/gstreamer/gst/gst.h /usr/include/glib-2.0/glib.h \
  /usr/include/glib-2.0/glib/galloca.h /usr/include/glib-2.0/glib/gtypes.h \
  /usr/lib/x86_64-linux-gnu/glib-2.0/include/glibconfig.h \
  /usr/include/glib-2.0/glib/gmacros.h \
@@ -100,8 +100,8 @@ libgstmprtp_la-gsttry.lo: gsttry.c /usr/include/stdc-predef.h ../config.h \
  /usr/include/x86_64-linux-gnu/sys/sysmacros.h /usr/include/pthread.h \
  /usr/include/sched.h /usr/include/x86_64-linux-gnu/bits/sched.h \
  /usr/include/x86_64-linux-gnu/bits/setjmp.h \
- /usr/local/include/gstreamer-1.0/gst/glib-compat.h \
- /usr/local/include/gstreamer-1.0/gst/gstenumtypes.h \
+ /home/balazs/gst/master/gstreamer/gst/glib-compat.h \
+ /home/balazs/gst/master/gstreamer/gst/gstenumtypes.h \
  /usr/include/glib-2.0/glib-object.h \
  /usr/include/glib-2.0/gobject/gbinding.h \
  /usr/include/glib-2.0/gobject/gobject.h \
@@ -120,82 +120,83 @@ libgstmprtp_la-gsttry.lo: gsttry.c /usr/include/stdc-predef.h ../config.h \
  /usr/include/glib-2.0/gobject/gtypeplugin.h \
  /usr/include/glib-2.0/gobject/gvaluearray.h \
  /usr/include/glib-2.0/gobject/gvaluetypes.h \
- /usr/local/include/gstreamer-1.0/gst/gstversion.h \
- /usr/local/include/gstreamer-1.0/gst/gstatomicqueue.h \
- /usr/local/include/gstreamer-1.0/gst/gstbin.h \
- /usr/local/include/gstreamer-1.0/gst/gstelement.h \
- /usr/local/include/gstreamer-1.0/gst/gstconfig.h \
- /usr/local/include/gstreamer-1.0/gst/gstobject.h \
- /usr/local/include/gstreamer-1.0/gst/gstcontrolbinding.h \
- /usr/local/include/gstreamer-1.0/gst/gstcontrolsource.h \
- /usr/local/include/gstreamer-1.0/gst/gstclock.h \
- /usr/local/include/gstreamer-1.0/gst/gstpad.h \
- /usr/local/include/gstreamer-1.0/gst/gstbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/gstminiobject.h \
- /usr/local/include/gstreamer-1.0/gst/gstallocator.h \
- /usr/local/include/gstreamer-1.0/gst/gstmemory.h \
- /usr/local/include/gstreamer-1.0/gst/gstmeta.h \
- /usr/local/include/gstreamer-1.0/gst/gstbufferlist.h \
- /usr/local/include/gstreamer-1.0/gst/gstcaps.h \
- /usr/local/include/gstreamer-1.0/gst/gststructure.h \
- /usr/local/include/gstreamer-1.0/gst/gstdatetime.h \
- /usr/local/include/gstreamer-1.0/gst/gstcapsfeatures.h \
- /usr/local/include/gstreamer-1.0/gst/gstpadtemplate.h \
- /usr/local/include/gstreamer-1.0/gst/gstevent.h \
- /usr/local/include/gstreamer-1.0/gst/gstformat.h \
- /usr/local/include/gstreamer-1.0/gst/gstiterator.h \
- /usr/local/include/gstreamer-1.0/gst/gsttaglist.h \
- /usr/local/include/gstreamer-1.0/gst/gstsample.h \
- /usr/local/include/gstreamer-1.0/gst/gstsegment.h \
- /usr/local/include/gstreamer-1.0/gst/gstmessage.h \
- /usr/local/include/gstreamer-1.0/gst/gstquery.h \
- /usr/local/include/gstreamer-1.0/gst/gsttoc.h \
- /usr/local/include/gstreamer-1.0/gst/gstcontext.h \
- /usr/local/include/gstreamer-1.0/gst/gstdevice.h \
- /usr/local/include/gstreamer-1.0/gst/gsttask.h \
- /usr/local/include/gstreamer-1.0/gst/gsttaskpool.h \
- /usr/local/include/gstreamer-1.0/gst/gstbus.h \
- /usr/local/include/gstreamer-1.0/gst/gstelementfactory.h \
- /usr/local/include/gstreamer-1.0/gst/gstplugin.h \
- /usr/local/include/gstreamer-1.0/gst/gstmacros.h \
- /usr/local/include/gstreamer-1.0/gst/gstpluginfeature.h \
- /usr/local/include/gstreamer-1.0/gst/gsturi.h \
- /usr/local/include/gstreamer-1.0/gst/gstminiobject.h \
- /usr/local/include/gstreamer-1.0/gst/gstbufferpool.h \
- /usr/local/include/gstreamer-1.0/gst/gstchildproxy.h \
- /usr/local/include/gstreamer-1.0/gst/gstdebugutils.h \
- /usr/local/include/gstreamer-1.0/gst/gstdevicemonitor.h \
- /usr/local/include/gstreamer-1.0/gst/gstdeviceprovider.h \
- /usr/local/include/gstreamer-1.0/gst/gstdeviceproviderfactory.h \
- /usr/local/include/gstreamer-1.0/gst/gstelementmetadata.h \
- /usr/local/include/gstreamer-1.0/gst/gsterror.h /usr/include/errno.h \
+ /home/balazs/gst/master/gstreamer/gst/gstversion.h \
+ /home/balazs/gst/master/gstreamer/gst/gstatomicqueue.h \
+ /home/balazs/gst/master/gstreamer/gst/gstbin.h \
+ /home/balazs/gst/master/gstreamer/gst/gstelement.h \
+ /home/balazs/gst/master/gstreamer/gst/gstconfig.h \
+ /home/balazs/gst/master/gstreamer/gst/gstobject.h \
+ /home/balazs/gst/master/gstreamer/gst/gstcontrolbinding.h \
+ /home/balazs/gst/master/gstreamer/gst/gstcontrolsource.h \
+ /home/balazs/gst/master/gstreamer/gst/gstclock.h \
+ /home/balazs/gst/master/gstreamer/gst/gstpad.h \
+ /home/balazs/gst/master/gstreamer/gst/gstbuffer.h \
+ /home/balazs/gst/master/gstreamer/gst/gstminiobject.h \
+ /home/balazs/gst/master/gstreamer/gst/gstallocator.h \
+ /home/balazs/gst/master/gstreamer/gst/gstmemory.h \
+ /home/balazs/gst/master/gstreamer/gst/gstmeta.h \
+ /home/balazs/gst/master/gstreamer/gst/gstbufferlist.h \
+ /home/balazs/gst/master/gstreamer/gst/gstcaps.h \
+ /home/balazs/gst/master/gstreamer/gst/gststructure.h \
+ /home/balazs/gst/master/gstreamer/gst/gstdatetime.h \
+ /home/balazs/gst/master/gstreamer/gst/gstcapsfeatures.h \
+ /home/balazs/gst/master/gstreamer/gst/gstpadtemplate.h \
+ /home/balazs/gst/master/gstreamer/gst/gstevent.h \
+ /home/balazs/gst/master/gstreamer/gst/gstformat.h \
+ /home/balazs/gst/master/gstreamer/gst/gstiterator.h \
+ /home/balazs/gst/master/gstreamer/gst/gsttaglist.h \
+ /home/balazs/gst/master/gstreamer/gst/gstsample.h \
+ /home/balazs/gst/master/gstreamer/gst/gstsegment.h \
+ /home/balazs/gst/master/gstreamer/gst/gstmessage.h \
+ /home/balazs/gst/master/gstreamer/gst/gstquery.h \
+ /home/balazs/gst/master/gstreamer/gst/gsttoc.h \
+ /home/balazs/gst/master/gstreamer/gst/gstcontext.h \
+ /home/balazs/gst/master/gstreamer/gst/gstdevice.h \
+ /home/balazs/gst/master/gstreamer/gst/gsttask.h \
+ /home/balazs/gst/master/gstreamer/gst/gsttaskpool.h \
+ /home/balazs/gst/master/gstreamer/gst/gstbus.h \
+ /home/balazs/gst/master/gstreamer/gst/gstelementfactory.h \
+ /home/balazs/gst/master/gstreamer/gst/gstplugin.h \
+ /home/balazs/gst/master/gstreamer/gst/gstmacros.h \
+ /home/balazs/gst/master/gstreamer/gst/gstpluginfeature.h \
+ /home/balazs/gst/master/gstreamer/gst/gsturi.h \
+ /home/balazs/gst/master/gstreamer/gst/gstminiobject.h \
+ /home/balazs/gst/master/gstreamer/gst/gstbufferpool.h \
+ /home/balazs/gst/master/gstreamer/gst/gstchildproxy.h \
+ /home/balazs/gst/master/gstreamer/gst/gstdebugutils.h \
+ /home/balazs/gst/master/gstreamer/gst/gstdevicemonitor.h \
+ /home/balazs/gst/master/gstreamer/gst/gstdeviceprovider.h \
+ /home/balazs/gst/master/gstreamer/gst/gstdeviceproviderfactory.h \
+ /home/balazs/gst/master/gstreamer/gst/gstelementmetadata.h \
+ /home/balazs/gst/master/gstreamer/gst/gsterror.h /usr/include/errno.h \
  /usr/include/x86_64-linux-gnu/bits/errno.h /usr/include/linux/errno.h \
  /usr/include/x86_64-linux-gnu/asm/errno.h \
  /usr/include/asm-generic/errno.h /usr/include/asm-generic/errno-base.h \
- /usr/local/include/gstreamer-1.0/gst/gstghostpad.h \
- /usr/local/include/gstreamer-1.0/gst/gstinfo.h \
- /usr/local/include/gstreamer-1.0/gst/gstparamspecs.h \
- /usr/local/include/gstreamer-1.0/gst/gstvalue.h \
- /usr/local/include/gstreamer-1.0/gst/gstpipeline.h \
- /usr/local/include/gstreamer-1.0/gst/gstpoll.h \
- /usr/local/include/gstreamer-1.0/gst/gstpreset.h \
- /usr/local/include/gstreamer-1.0/gst/gstprotection.h \
- /usr/local/include/gstreamer-1.0/gst/gstregistry.h \
- /usr/local/include/gstreamer-1.0/gst/gstsystemclock.h \
- /usr/local/include/gstreamer-1.0/gst/gsttagsetter.h \
- /usr/local/include/gstreamer-1.0/gst/gsttocsetter.h \
- /usr/local/include/gstreamer-1.0/gst/gsttypefind.h \
- /usr/local/include/gstreamer-1.0/gst/gsttypefindfactory.h \
- /usr/local/include/gstreamer-1.0/gst/gstutils.h \
- /usr/local/include/gstreamer-1.0/gst/gstparse.h \
- /usr/local/include/gstreamer-1.0/gst/gstcompat.h \
- /usr/local/include/gstreamer-1.0/gst/base/gstbasetransform.h gsttry.h
+ /home/balazs/gst/master/gstreamer/gst/gstghostpad.h \
+ /home/balazs/gst/master/gstreamer/gst/gstinfo.h \
+ /home/balazs/gst/master/gstreamer/gst/gstparamspecs.h \
+ /home/balazs/gst/master/gstreamer/gst/gstvalue.h \
+ /home/balazs/gst/master/gstreamer/gst/gstpipeline.h \
+ /home/balazs/gst/master/gstreamer/gst/gstpoll.h \
+ /home/balazs/gst/master/gstreamer/gst/gstpreset.h \
+ /home/balazs/gst/master/gstreamer/gst/gstprotection.h \
+ /home/balazs/gst/master/gstreamer/gst/gstregistry.h \
+ /home/balazs/gst/master/gstreamer/gst/gstsystemclock.h \
+ /home/balazs/gst/master/gstreamer/gst/gsttagsetter.h \
+ /home/balazs/gst/master/gstreamer/gst/gsttocsetter.h \
+ /home/balazs/gst/master/gstreamer/gst/gsttypefind.h \
+ /home/balazs/gst/master/gstreamer/gst/gsttypefindfactory.h \
+ /home/balazs/gst/master/gstreamer/gst/gstutils.h \
+ /home/balazs/gst/master/gstreamer/gst/gstparse.h \
+ /home/balazs/gst/master/gstreamer/gst/gstcompat.h \
+ /home/balazs/gst/master/gstreamer/libs/gst/base/gstbasetransform.h \
+ gsttry.h
 
 /usr/include/stdc-predef.h:
 
 ../config.h:
 
-/usr/local/include/gstreamer-1.0/gst/gst.h:
+/home/balazs/gst/master/gstreamer/gst/gst.h:
 
 /usr/include/glib-2.0/glib.h:
 
@@ -439,9 +440,9 @@ libgstmprtp_la-gsttry.lo: gsttry.c /usr/include/stdc-predef.h ../config.h \
 
 /usr/include/x86_64-linux-gnu/bits/setjmp.h:
 
-/usr/local/include/gstreamer-1.0/gst/glib-compat.h:
+/home/balazs/gst/master/gstreamer/gst/glib-compat.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstenumtypes.h:
+/home/balazs/gst/master/gstreamer/gst/gstenumtypes.h:
 
 /usr/include/glib-2.0/glib-object.h:
 
@@ -479,103 +480,103 @@ libgstmprtp_la-gsttry.lo: gsttry.c /usr/include/stdc-predef.h ../config.h \
 
 /usr/include/glib-2.0/gobject/gvaluetypes.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstversion.h:
+/home/balazs/gst/master/gstreamer/gst/gstversion.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstatomicqueue.h:
+/home/balazs/gst/master/gstreamer/gst/gstatomicqueue.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstbin.h:
+/home/balazs/gst/master/gstreamer/gst/gstbin.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstelement.h:
+/home/balazs/gst/master/gstreamer/gst/gstelement.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstconfig.h:
+/home/balazs/gst/master/gstreamer/gst/gstconfig.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstobject.h:
+/home/balazs/gst/master/gstreamer/gst/gstobject.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstcontrolbinding.h:
+/home/balazs/gst/master/gstreamer/gst/gstcontrolbinding.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstcontrolsource.h:
+/home/balazs/gst/master/gstreamer/gst/gstcontrolsource.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstclock.h:
+/home/balazs/gst/master/gstreamer/gst/gstclock.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstpad.h:
+/home/balazs/gst/master/gstreamer/gst/gstpad.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstbuffer.h:
+/home/balazs/gst/master/gstreamer/gst/gstbuffer.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstminiobject.h:
+/home/balazs/gst/master/gstreamer/gst/gstminiobject.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstallocator.h:
+/home/balazs/gst/master/gstreamer/gst/gstallocator.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstmemory.h:
+/home/balazs/gst/master/gstreamer/gst/gstmemory.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstmeta.h:
+/home/balazs/gst/master/gstreamer/gst/gstmeta.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstbufferlist.h:
+/home/balazs/gst/master/gstreamer/gst/gstbufferlist.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstcaps.h:
+/home/balazs/gst/master/gstreamer/gst/gstcaps.h:
 
-/usr/local/include/gstreamer-1.0/gst/gststructure.h:
+/home/balazs/gst/master/gstreamer/gst/gststructure.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstdatetime.h:
+/home/balazs/gst/master/gstreamer/gst/gstdatetime.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstcapsfeatures.h:
+/home/balazs/gst/master/gstreamer/gst/gstcapsfeatures.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstpadtemplate.h:
+/home/balazs/gst/master/gstreamer/gst/gstpadtemplate.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstevent.h:
+/home/balazs/gst/master/gstreamer/gst/gstevent.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstformat.h:
+/home/balazs/gst/master/gstreamer/gst/gstformat.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstiterator.h:
+/home/balazs/gst/master/gstreamer/gst/gstiterator.h:
 
-/usr/local/include/gstreamer-1.0/gst/gsttaglist.h:
+/home/balazs/gst/master/gstreamer/gst/gsttaglist.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstsample.h:
+/home/balazs/gst/master/gstreamer/gst/gstsample.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstsegment.h:
+/home/balazs/gst/master/gstreamer/gst/gstsegment.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstmessage.h:
+/home/balazs/gst/master/gstreamer/gst/gstmessage.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstquery.h:
+/home/balazs/gst/master/gstreamer/gst/gstquery.h:
 
-/usr/local/include/gstreamer-1.0/gst/gsttoc.h:
+/home/balazs/gst/master/gstreamer/gst/gsttoc.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstcontext.h:
+/home/balazs/gst/master/gstreamer/gst/gstcontext.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstdevice.h:
+/home/balazs/gst/master/gstreamer/gst/gstdevice.h:
 
-/usr/local/include/gstreamer-1.0/gst/gsttask.h:
+/home/balazs/gst/master/gstreamer/gst/gsttask.h:
 
-/usr/local/include/gstreamer-1.0/gst/gsttaskpool.h:
+/home/balazs/gst/master/gstreamer/gst/gsttaskpool.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstbus.h:
+/home/balazs/gst/master/gstreamer/gst/gstbus.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstelementfactory.h:
+/home/balazs/gst/master/gstreamer/gst/gstelementfactory.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstplugin.h:
+/home/balazs/gst/master/gstreamer/gst/gstplugin.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstmacros.h:
+/home/balazs/gst/master/gstreamer/gst/gstmacros.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstpluginfeature.h:
+/home/balazs/gst/master/gstreamer/gst/gstpluginfeature.h:
 
-/usr/local/include/gstreamer-1.0/gst/gsturi.h:
+/home/balazs/gst/master/gstreamer/gst/gsturi.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstminiobject.h:
+/home/balazs/gst/master/gstreamer/gst/gstminiobject.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstbufferpool.h:
+/home/balazs/gst/master/gstreamer/gst/gstbufferpool.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstchildproxy.h:
+/home/balazs/gst/master/gstreamer/gst/gstchildproxy.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstdebugutils.h:
+/home/balazs/gst/master/gstreamer/gst/gstdebugutils.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstdevicemonitor.h:
+/home/balazs/gst/master/gstreamer/gst/gstdevicemonitor.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstdeviceprovider.h:
+/home/balazs/gst/master/gstreamer/gst/gstdeviceprovider.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstdeviceproviderfactory.h:
+/home/balazs/gst/master/gstreamer/gst/gstdeviceproviderfactory.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstelementmetadata.h:
+/home/balazs/gst/master/gstreamer/gst/gstelementmetadata.h:
 
-/usr/local/include/gstreamer-1.0/gst/gsterror.h:
+/home/balazs/gst/master/gstreamer/gst/gsterror.h:
 
 /usr/include/errno.h:
 
@@ -589,40 +590,40 @@ libgstmprtp_la-gsttry.lo: gsttry.c /usr/include/stdc-predef.h ../config.h \
 
 /usr/include/asm-generic/errno-base.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstghostpad.h:
+/home/balazs/gst/master/gstreamer/gst/gstghostpad.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstinfo.h:
+/home/balazs/gst/master/gstreamer/gst/gstinfo.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstparamspecs.h:
+/home/balazs/gst/master/gstreamer/gst/gstparamspecs.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstvalue.h:
+/home/balazs/gst/master/gstreamer/gst/gstvalue.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstpipeline.h:
+/home/balazs/gst/master/gstreamer/gst/gstpipeline.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstpoll.h:
+/home/balazs/gst/master/gstreamer/gst/gstpoll.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstpreset.h:
+/home/balazs/gst/master/gstreamer/gst/gstpreset.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstprotection.h:
+/home/balazs/gst/master/gstreamer/gst/gstprotection.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstregistry.h:
+/home/balazs/gst/master/gstreamer/gst/gstregistry.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstsystemclock.h:
+/home/balazs/gst/master/gstreamer/gst/gstsystemclock.h:
 
-/usr/local/include/gstreamer-1.0/gst/gsttagsetter.h:
+/home/balazs/gst/master/gstreamer/gst/gsttagsetter.h:
 
-/usr/local/include/gstreamer-1.0/gst/gsttocsetter.h:
+/home/balazs/gst/master/gstreamer/gst/gsttocsetter.h:
 
-/usr/local/include/gstreamer-1.0/gst/gsttypefind.h:
+/home/balazs/gst/master/gstreamer/gst/gsttypefind.h:
 
-/usr/local/include/gstreamer-1.0/gst/gsttypefindfactory.h:
+/home/balazs/gst/master/gstreamer/gst/gsttypefindfactory.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstutils.h:
+/home/balazs/gst/master/gstreamer/gst/gstutils.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstparse.h:
+/home/balazs/gst/master/gstreamer/gst/gstparse.h:
 
-/usr/local/include/gstreamer-1.0/gst/gstcompat.h:
+/home/balazs/gst/master/gstreamer/gst/gstcompat.h:
 
-/usr/local/include/gstreamer-1.0/gst/base/gstbasetransform.h:
+/home/balazs/gst/master/gstreamer/libs/gst/base/gstbasetransform.h:
 
 gsttry.h:

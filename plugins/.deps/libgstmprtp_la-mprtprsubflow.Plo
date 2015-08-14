@@ -193,7 +193,7 @@ libgstmprtp_la-mprtprsubflow.lo: mprtprsubflow.c \
  /home/balazs/gst/master/gstreamer/gst/gstcompat.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h mprtprsubflow.h \
- gstmprtcpbuffer.h
+ gstmprtcpbuffer.h mprtpssubflow.h
 
 /usr/include/stdc-predef.h:
 
@@ -636,3 +636,5 @@ libgstmprtp_la-mprtprsubflow.lo: mprtprsubflow.c \
 mprtprsubflow.h:
 
 gstmprtcpbuffer.h:
+
+mprtpssubflow.h:

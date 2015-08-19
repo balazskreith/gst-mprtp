@@ -26,6 +26,7 @@ typedef struct _MPRTPSubflowHeaderExtension MPRTPSubflowHeaderExtension;
 #define MPRTPS_SUBFLOW_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),MPRTPS_SUBFLOW_TYPE))
 #define MPRTPS_SUBFLOW_CAST(src)        ((MPRTPSSubflow *)(src))
 
+
 #define MPRTPS_SUBFLOW_RRBLOCK_MAX 10
 #define MPRTPS_SUBFLOW_XR7243BLOCK_MAX 5
 #define MPRTPS_SUBFLOW_PAYLOAD_BYTES_ARRAY_LENGTH 32768
@@ -66,6 +67,9 @@ struct _MPRTPSenderSubflow{
 
   MPRTPSubflowStates   state;
   gboolean             never_checked;
+  gboolean             segment_sent;
+  gboolean             cap_sent;
+  gboolean             flowable;
 
   void               (*process_rtpbuf_out)(MPRTPSSubflow*, guint, GstRTPBuffer*);
   void               (*process_mprtcp_block)(MPRTPSSubflow*,GstMPRTCPSubflowBlock*);
@@ -84,30 +88,26 @@ struct _MPRTPSenderSubflow{
   guint              (*get_consecutive_keeps_num)(MPRTPSSubflow*);
   void               (*save_sending_rate)(MPRTPSSubflow*);
   gfloat             (*load_sending_rate)(MPRTPSSubflow*);
+  gboolean           (*push_event)(MPRTPSSubflow*,GstEvent*);
+  GstFlowReturn      (*push_buffer)(MPRTPSSubflow*,GstBuffer*);
+  gboolean           (*is_flowable)(MPRTPSSubflow*);
 
 
   //influence calculation and states
   GstClockTime         last_riport_received;
   GstClockTime         last_checked_riport_time;
   GstClockTime         last_xr7243_riport_received;
+  gboolean             late_riported;
   //gboolean             active;
   gfloat               SR; //Sending Rate
   guint32              UB; //Utilized bytes
   guint32              DB; //Discarded bytes
-  guint8               distortions;  //History of lost and discarded packet riports by using a continously shifted 8 byte value
-  //guint16              consequent_RR_missing;
-  //guint16              consecutive_settlements;
-  //gboolean             last_increased_failed;
-  //gboolean             try_increased;
   guint16              consequent_distortions;
 
   //maintained by sending packets
   guint16              seq;               //The actual subflow specific sequence number
   guint16              cycle_num;         // the number of cycle the sequence number has
   guint32              ssrc;
-  //guint16              payload_bytes_write_index;
-  //guint16              payload_bytes_read_index;
-  //guint                payload_bytes[MPRTPS_SUBFLOW_PAYLOAD_BYTES_ARRAY_LENGTH];
 
   //refreshed by sending an SR
   guint16              HSN_s;             //HSN at the sender report time
@@ -161,7 +161,7 @@ struct _MPRTPSenderSubflow{
 
 struct _MPRTPSenderSubflowClass {
   GObjectClass   parent_class;
-
+  void           (*push_packet)(MPRTPSSubflow*,GstBuffer*);
 };
 
 GType mprtps_subflow_get_type (void);

@@ -78,6 +78,7 @@ static gboolean gst_mprtpsender_query (GstElement * element, GstQuery * query);
 
 static GstFlowReturn gst_mprtpsender_rtp_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *buffer);
 static GstFlowReturn gst_mprtpsender_rtp_sink_chainlist (GstPad *pad, GstObject *parent, GstBufferList *list);
+static gboolean gst_mprtpsender_rtp_event_handler (GstPad *pad, GstObject *parent, GstEvent * event);
 
 static GstFlowReturn gst_mprtpsender_rtcp_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *outbuf);
 static GstFlowReturn gst_mprtpsender_mprtcp_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *outbuf);
@@ -231,6 +232,25 @@ gst_mprtpsender_class_init (GstMprtpsenderClass * klass)
 
 }
 
+static gboolean
+gst_mprtpsender_rtp_event_handler (GstPad *pad, GstObject *parent, GstEvent * event)
+{
+
+  GstMprtpsender *this = GST_MPRTPSENDER(parent);
+  MPRTPSSubflow *subflow;
+  GList *it;
+  SUBFLOW_LOCK(this);
+
+  for(it = this->subflows; it != NULL; it = it->next){
+    subflow = it->data;
+    subflow->push_event(subflow, event);
+  }
+
+gst_mprtpsender_rtp_event_handler_done:
+  SUBFLOW_UNLOCK(this);
+  return TRUE;
+}
+
 static void
 gst_mprtpsender_init (GstMprtpsender *mprtpsender)
 {
@@ -242,6 +262,8 @@ gst_mprtpsender_init (GstMprtpsender *mprtpsender)
 			GST_DEBUG_FUNCPTR(gst_mprtpsender_rtp_sink_chain));
     gst_pad_set_chain_list_function (mprtpsender->rtp_sinkpad,
 			GST_DEBUG_FUNCPTR(gst_mprtpsender_rtp_sink_chainlist));
+    gst_pad_set_event_function(mprtpsender->rtp_sinkpad,
+    		GST_DEBUG_FUNCPTR(gst_mprtpsender_rtp_event_handler));
 
     gst_element_add_pad (GST_ELEMENT(mprtpsender), mprtpsender->rtp_sinkpad);
 
@@ -296,7 +318,6 @@ gst_mprtpsender_init (GstMprtpsender *mprtpsender)
   mprtpsender->ssrc = g_random_int();
 
   gst_segment_init (&mprtpsender->segment, GST_FORMAT_UNDEFINED);
-
   mprtpsender->priv = GST_MPRTPSENDER_GET_PRIVATE(mprtpsender);
 }
 
@@ -547,6 +568,7 @@ gst_mprtpsender_change_state (GstElement * element, GstStateChange transition)
 
 
 
+
 static gboolean
 gst_mprtpsender_send_event (GstElement * element, GstEvent * event)
 {
@@ -594,6 +616,7 @@ gst_mprtpsender_rtp_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *buffe
     g_cond_wait(&mprtpsender->scheduler_cond, &mprtpsender->subflows_mutex);
   }
 
+
   //subflow = schtree->get_next(schtree);
   subflow = _get_next_subflow(mprtpsender, &rtp);
   subflow->process_rtpbuf_out(subflow, mprtpsender->ext_header_id, &rtp);
@@ -602,8 +625,8 @@ gst_mprtpsender_rtp_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *buffe
 
   //gst_print_rtp_packet_info(&rtp);
   gst_rtp_buffer_unmap (&rtp);
-  result = gst_pad_push(subflow->get_outpad(subflow), outbuf);
-
+  //result = gst_pad_push(subflow->get_outpad(subflow), outbuf);
+  result = subflow->push_buffer(subflow, outbuf);
   GST_DEBUG_OBJECT(mprtpsender, "packet sent out on %d, chain is going to be unlocked", subflow->get_id(subflow));
 
   SUBFLOW_UNLOCK(mprtpsender);
@@ -616,12 +639,22 @@ gst_mprtpsender_rtp_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *buffe
 MPRTPSSubflow* _get_next_subflow(GstMprtpsender *this, GstRTPBuffer *rtp)
 {
   SchTree *schtree = this->schtree;
+  MPRTPSSubflow *result;
   /*
   if(!gst_rtp_buffer_get_marker(rtp)){
     return schtree->get_actual(schtree);
   }
+/**/
+  //gst_print_rtp_packet_info(rtp);
+  result = schtree->get_next(schtree);
+  /*
+  if(!GST_BUFFER_FLAG_IS_SET(rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT)){
+	while(result->get_state(result) != MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED){
+	  result = schtree->get_next(schtree);
+    }
+  }
   /**/
-  return schtree->get_next(schtree);
+  return result;
 
 }
 static GstFlowReturn
@@ -637,26 +670,26 @@ gst_mprtpsender_rtp_sink_chainlist (GstPad *pad, GstObject *parent, GstBufferLis
 static GstPadLinkReturn
 gst_mprtpsender_src_link (GstPad *pad, GstObject *parent, GstPad *peer)
 {
-  GstMprtpsender *mprtpsender;
+  GstMprtpsender *this;
   GList *it;
   MPRTPSSubflow *subflow, *selected = NULL;
-  mprtpsender = GST_MPRTPSENDER (parent);
-  GST_DEBUG_OBJECT(mprtpsender, "Link the source pad");
+  this = GST_MPRTPSENDER (parent);
+  GST_DEBUG_OBJECT(this, "Link the source pad");
 
-  SUBFLOW_LOCK(mprtpsender);
-  for(it = mprtpsender->subflows; it != NULL; it = it->next){
+  SUBFLOW_LOCK(this);
+  for(it = this->subflows; it != NULL; it = it->next){
     subflow = it->data;
     if(subflow->get_outpad(subflow) == pad){
       selected = subflow;
     }
   }
   if(G_UNLIKELY(selected == NULL)){
-	SUBFLOW_UNLOCK (mprtpsender);
-    GST_WARNING_OBJECT(mprtpsender, "Can not find subflow for the recently linked pad.");
+	SUBFLOW_UNLOCK (this);
+    GST_WARNING_OBJECT(this, "Can not find subflow for the recently linked pad.");
     return GST_PAD_LINK_OK;
   }
   selected->set_event(selected, MPRTP_SENDER_SUBFLOW_EVENT_JOINED);
-  SUBFLOW_UNLOCK(mprtpsender);
+  SUBFLOW_UNLOCK(this);
   return GST_PAD_LINK_OK;
 }
 
@@ -690,11 +723,11 @@ gst_mprtpsender_src_unlink (GstPad *pad, GstObject *parent)
 static GstPadLinkReturn
 gst_mprtpsender_rtcp_src_link (GstPad *pad, GstObject *parent, GstPad *peer)
 {
-  GstMprtpsender *mprtpsender;
+  GstMprtpsender *this;
   GList *it;
   MPRTPSSubflow *subflow;
-  mprtpsender = GST_MPRTPSENDER (parent);
-  GST_DEBUG_OBJECT(mprtpsender, "Link the source rtcp pad");
+  this = GST_MPRTPSENDER (parent);
+  GST_DEBUG_OBJECT(this, "Link the source rtcp pad");
 
   return GST_PAD_LINK_OK;
 }
@@ -846,8 +879,8 @@ gst_mprtp_sender_scheduler_run (void *data)
 	subflow_event = subflow->check(subflow);
 	subflow_sending_rate = subflow->get_sending_rate(subflow);
 	if(subflow_event != MPRTP_SENDER_SUBFLOW_EVENT_KEEP){
-      g_print("subflow: %d event: %d sending rate: %f\n"
-    		, subflow->get_id(subflow), subflow_event, subflow_sending_rate);
+      //g_print("subflow: %d event: %d sending rate: %f\n"
+    	//	, subflow->get_id(subflow), subflow_event, subflow_sending_rate);
 	}
     switch(subflow->get_state(subflow)){
       case MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED:
@@ -947,14 +980,17 @@ gst_mprtp_sender_scheduler_run (void *data)
     if(subflow->is_active(subflow)){
 	  has_active_subflow = TRUE;
 	}
-    //g_print("Subflow %d, sent packet num: %d\n", subflow->get_id(subflow),
-    	//	subflow->get_sent_packet_num(subflow));
   }
   now = gst_clock_get_time(GST_ELEMENT_CLOCK(mprtps));
   if(mprtps->last_schtree_commit < now - 30 * GST_SECOND){
     commit_schtree_changes = TRUE;
   }
   if(commit_schtree_changes){
+	  for(it = mprtps->subflows; it != NULL; it = it->next){
+		  subflow = it->data;
+		  g_print("Subflow %d, sent packet num: %d\n", subflow->get_id(subflow),
+		  	          		subflow->get_sent_packet_num(subflow));
+	  }
     schtree->commit_changes(schtree);
     mprtps->last_schtree_commit = now;
   }
@@ -1031,13 +1067,19 @@ gst_mprtp_sender_mprtcp_riporter_run (void *data)
       continue;
     }
     gst_rtcp_buffer_unmap(&rtcp);
-    gst_pad_push(subflow->get_outpad(subflow), outbuf);
+    if(subflow->is_flowable(subflow)){
+      subflow->push_buffer(subflow, outbuf);
+    }else{
+      gst_buffer_unref(outbuf);
+    }
 
-    outbuf = gst_rtcp_buffer_new(1400);
-    gst_rtcp_buffer_map (outbuf, GST_MAP_READWRITE, &rtcp);
+    if(it->next != NULL){
+      outbuf = gst_rtcp_buffer_new(1400);
+      gst_rtcp_buffer_map (outbuf, GST_MAP_READWRITE, &rtcp);
+    }
 
   }
-  if(first == FALSE){
+  if(first == FALSE && compound_sending){
     gst_rtcp_buffer_unmap(&rtcp);
   }
 
@@ -1475,7 +1517,6 @@ gst_mprtpsender_rtcp_sink_eventfunc (GstPad *pad, GstObject *parent,
     case GST_EVENT_FLUSH_START:
       break;
     case GST_EVENT_FLUSH_STOP:
-      g_print("GST_EVENT_FLUSH_STOP\n");
       /* we need new segment info after the flush. */
       //mprtps->have_segment = FALSE;
       //gst_segment_init (&mprtps->segment, GST_FORMAT_UNDEFINED);
@@ -1499,7 +1540,7 @@ gst_mprtpsender_rtcp_sink_eventfunc (GstPad *pad, GstObject *parent,
     }
     case GST_EVENT_SEGMENT:
     {
-      g_print("GST_EVENT_SEGMENT\n");
+      //g_print("GST_EVENT_SEGMENT\n");
       //gst_event_copy_segment (event, &mprtps->segment);
       //mprtps->have_segment = TRUE;
 
@@ -1535,7 +1576,7 @@ gst_mprtpsender_rtcp_src_eventfunc (GstPad *pad, GstObject *parent,
       break;
     case GST_EVENT_QOS:
     {
-      g_print("GST_EVENT_QOS\n");
+      //g_print("GST_EVENT_QOS\n");
       //gdouble proportion;
       //GstClockTimeDiff diff;
       //GstClockTime timestamp;

@@ -151,8 +151,8 @@ schtree_commit_changes(SchTree *tree)
 	actual_value =  tree->path_values[index] /
 				    sum * (gfloat) tree->max_value;
 	insert_value = (guint16) roundf(actual_value);
-     //g_print("insert: %f / %f * %f = %f (%d)\n",
-    	//	 tree->path_values[index], sum,(gfloat) tree->max_value, actual_value, insert_value);
+     //g_print("%p -> insert: %d (%f%)\n",
+    	//	 tree, insert_value, actual_value / tree->max_value * 100.0);
 	 //g_print("path value is %f\n",tree->path_values[index]);
      if(tree->path_values[index] > 0.0){
        _schtree_insert(&new_root, path, &insert_value, tree->max_value);
@@ -163,7 +163,7 @@ schtree_commit_changes(SchTree *tree)
   _schnode_rdtor(tree->root);
   tree->root = new_root;
   _schtree_loadup(tree->root, tree->paths[max_index]);
-  tree->print(tree);
+  //tree->print(tree);
   g_rw_lock_writer_unlock (&tree->rwmutex);
 
 }

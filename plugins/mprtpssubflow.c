@@ -64,6 +64,9 @@ static MPRTPSubflowEvent _get_event_for_congested_state(MPRTPSSubflow* this, Gst
 static void mprtps_subflow_save_sending_rate(MPRTPSSubflow *this);
 static gfloat mprtps_subflow_load_sending_rate(MPRTPSSubflow *this);
 static guint mprtps_subflow_get_consecutive_keeps_num(MPRTPSSubflow *this);
+static GstFlowReturn mprtps_subflow_push_buffer(MPRTPSSubflow* this, GstBuffer *buffer);
+static gboolean mprtps_subflow_push_event(MPRTPSSubflow* this, GstEvent* event);
+static gboolean mprtps_subflow_is_flowable(MPRTPSSubflow* this);
 
 static void
 mprtps_subflow_setup_sr_riport(MPRTPSSubflow *this, GstMPRTCPSubflowRiport *header);
@@ -121,6 +124,7 @@ mprtps_subflow_reset (MPRTPSSubflow * subflow)
   subflow->early_discarded_bytes_sum = 0;
   subflow->late_discarded_bytes_sum = 0;
   subflow->state = MPRTP_SENDER_SUBFLOW_STATE_NON_CONGESTED;
+  subflow->late_riported = FALSE;
   subflow->last_riport_received = 0;
   subflow->RTT = 0;
   subflow->never_checked = TRUE;
@@ -147,6 +151,9 @@ mprtps_subflow_reset (MPRTPSSubflow * subflow)
   subflow->saved_sending_rate_time = 0;
   subflow->sent_packet_num_since_last_rr = 0;
   subflow->sent_payload_bytes_sum = 0;
+  subflow->cap_sent = FALSE;
+  subflow->segment_sent = FALSE;
+  subflow->flowable = FALSE;
 }
 
 
@@ -171,6 +178,9 @@ mprtps_subflow_init (MPRTPSSubflow * subflow)
   subflow->save_sending_rate = mprtps_subflow_save_sending_rate;
   subflow->load_sending_rate = mprtps_subflow_load_sending_rate;
   subflow->get_consecutive_keeps_num = mprtps_subflow_get_consecutive_keeps_num;
+  subflow->push_buffer = mprtps_subflow_push_buffer;
+  subflow->push_event = mprtps_subflow_push_event;
+  subflow->is_flowable = mprtps_subflow_is_flowable;
 
   mprtps_subflow_reset (subflow);
   g_mutex_init(&subflow->mutex);
@@ -288,6 +298,9 @@ mprtps_subflow_get_sending_rate_done:
 void mprtps_subflow_set_state(MPRTPSSubflow* this, MPRTPSubflowStates target)
 {
   g_mutex_lock(&this->mutex);
+  if(this->state != target){
+    this->late_riported = FALSE;
+  }
   this->state = target;
   g_mutex_unlock(&this->mutex);
 }
@@ -426,11 +439,11 @@ _proc_rtcprr(MPRTPSSubflow* this, GstRTCPRR* rr)
   discarded_bytes = this->late_discarded_bytes + this->early_discarded_bytes;
 
   this->receiver_rate = ((gfloat) payload_bytes_sum *
-						 (1.0-lost_rate) -
+		                 (1.0-lost_rate) * (1.0-lost_rate) -
 						 (gfloat)discarded_bytes) /
 						((gfloat)(interval>>16));
 
-  //*
+  /*
   g_print("subflow %d %f * %f - %f / %f = %f\n", this->id,
 		  (gfloat)payload_bytes_sum,
 		  (1.0-lost_rate),
@@ -612,6 +625,56 @@ GstPad* mprtps_subflow_get_outpad(MPRTPSSubflow* this)
 	return result;
 }
 
+gboolean mprtps_subflow_is_flowable(MPRTPSSubflow* this)
+{
+	gboolean result;
+	g_mutex_lock(&this->mutex);
+	result = this->flowable;
+	g_mutex_unlock(&this->mutex);
+	return result;
+}
+
+gboolean mprtps_subflow_push_event(MPRTPSSubflow* this,GstEvent* event)
+{
+	gboolean result;
+	g_mutex_lock(&this->mutex);
+	switch(GST_EVENT_TYPE(event)){
+	case GST_EVENT_CAPS:
+		this->cap_sent = TRUE;
+		break;
+	case GST_EVENT_SEGMENT:
+		this->segment_sent = TRUE;
+		break;
+	default:
+		break;
+	}
+
+	if(!this->flowable && this->segment_sent && this->cap_sent){
+      this->flowable = TRUE;
+	}
+
+	result = gst_pad_push_event(this->outpad, gst_event_copy(event));
+	g_mutex_unlock(&this->mutex);
+	return result;
+}
+
+
+GstFlowReturn mprtps_subflow_push_buffer(MPRTPSSubflow* this, GstBuffer *buffer)
+{
+  GstFlowReturn result;
+  g_mutex_lock(&this->mutex);
+
+  if(!this->flowable){
+    result = GST_FLOW_NOT_NEGOTIATED;
+    goto mprtps_subflow_push_buffer_done;
+  }
+
+  result = gst_pad_push(this->outpad, buffer);
+
+mprtps_subflow_push_buffer_done:
+  g_mutex_unlock(&this->mutex);
+  return result;
+}
 
 //one thing is certain:
 //the state is non_congested
@@ -628,7 +691,10 @@ MPRTPSubflowEvent _get_event_for_non_congested_state(MPRTPSSubflow* this, GstClo
   if(this->last_checked_riport_time == this->last_riport_received){
     if(this->rr_blocks_arrived &&
        this->last_riport_received <
-	   now - MPRTPS_SUBFLOW_RIPORT_TIMEOUT_TO_LATE_EVENT){
+	   now - MPRTPS_SUBFLOW_RIPORT_TIMEOUT_TO_LATE_EVENT &&
+	   !this->late_riported)
+    {
+      this->late_riported = TRUE;
       return MPRTP_SENDER_SUBFLOW_EVENT_LATE;
     }
 	return result;
@@ -669,7 +735,11 @@ MPRTPSubflowEvent _get_event_for_congested_state(MPRTPSSubflow* this, GstClockTi
   }
 
   if(this->last_checked_riport_time == this->last_riport_received){
-    if(this->last_riport_received < now - MPRTPS_SUBFLOW_RIPORT_TIMEOUT_TO_LATE_EVENT){
+    if(this->last_riport_received <
+       now - MPRTPS_SUBFLOW_RIPORT_TIMEOUT_TO_LATE_EVENT &&
+	   !this->late_riported)
+    {
+      this->late_riported = TRUE;
       result = MPRTP_SENDER_SUBFLOW_EVENT_LATE;
     }
     goto _get_event_for_congested_state_done;
@@ -697,19 +767,18 @@ _get_event_for_congested_state_done:
 
 MPRTPSubflowEvent _get_event_for_passive_state(MPRTPSSubflow* this, GstClockTime now)
 {
-  if(this->last_riport_received < now - MPRTPS_SUBFLOW_TIME_BOUNDARY_TO_DETACHED_EVENT)
-  {
-	 return MPRTP_SENDER_SUBFLOW_EVENT_DETACHED;
-  }
 
   if(this->last_checked_riport_time == this->last_riport_received){
 	if(this->rr_blocks_arrived &&
 	   this->last_riport_received <
-	   now - MPRTPS_SUBFLOW_RIPORT_TIMEOUT_TO_LATE_EVENT){
+	   now - MPRTPS_SUBFLOW_RIPORT_TIMEOUT_TO_LATE_EVENT &&
+	   !this->late_riported){
+	  this->late_riported = TRUE;
 	  return MPRTP_SENDER_SUBFLOW_EVENT_LATE;
 	}
 	return MPRTP_SENDER_SUBFLOW_EVENT_KEEP;
   }
+  this->late_riported = FALSE;
 
   if(this->RTT < MPRTPS_SUBFLOW_RTT_BOUNDARY_FROM_PASSIVE_STATE){
 	return MPRTP_SENDER_SUBFLOW_EVENT_SETTLED;
@@ -717,6 +786,8 @@ MPRTPSubflowEvent _get_event_for_passive_state(MPRTPSSubflow* this, GstClockTime
 
   return MPRTP_SENDER_SUBFLOW_EVENT_KEEP;
 }
+
+
 
 void _print_rtp_packet_info(GstRTPBuffer *rtp)
 {

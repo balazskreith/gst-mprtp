@@ -21,7 +21,6 @@
 #define _GST_MPRTPRECEIVER_H_
 
 #include <gst/gst.h>
-#include "gstmprtcpbuffer.h"
 
 G_BEGIN_DECLS
 
@@ -36,28 +35,14 @@ typedef struct _GstMprtpreceiverClass GstMprtpreceiverClass;
 
 struct _GstMprtpreceiver
 {
-  GstElement base_mprtpreceiver;
-
-  guint8         ext_header_id;
-  guint32        pivot_ssrc;
-  guint32        pivot_clock_rate;
-  guint64        ext_rtptime;
+  GstElement     base_mprtpreceiver;
+  GRWLock        rwmutex;
   GList*         subflows;
-  GstPad*        rtp_srcpad;
-  GstPad*        rtcp_srcpad;
+  GstPad*        mprtp_srcpad;
   GstPad*        rtcp_sinkpad;
-  GstPad*        mprtcp_srcpad;
-
-  gfloat         playout_delay;
-  GMutex         mutex;
-  guint32        path_skews[256];
-  gint           path_skew_index;
-  gint           path_skew_counter;
-
-  GstTask*       playouter;
-  GRecMutex      playouter_mutex;
-  GstTask*       riporter;
-  GRecMutex      riporter_mutex;
+  GstPad*        rtcp_srcpad;
+  GstPad*        mprtcp_rr_srcpad;
+  GstPad*        mprtcp_sr_srcpad;
 };
 
 struct _GstMprtpreceiverClass
@@ -69,4 +54,4 @@ GType gst_mprtpreceiver_get_type (void);
 
 G_END_DECLS
 
-#endif
+#endif //_GST_MPRTPRECEIVER_H_

@@ -202,9 +202,17 @@ gst_try_prepare_output_buffer (GstBaseTransform * trans, GstBuffer * input,
 static GstFlowReturn
 gst_try_transform (GstBaseTransform * trans, GstBuffer * inbuf, GstBuffer * outbuf)
 {
-  GstTry *try = GST_TRY (trans);
-  GST_DEBUG_OBJECT (try, "transform");
+  GstTry *this = GST_TRY (trans);
+  gdouble rand = g_random_double_range(0.0, 1.0);
+  GST_DEBUG_OBJECT (this, "transform");
 g_print("--->RTCP\n");
+/*
+  if(rand < this->drops){
+
+  }else if(rand < this->discards){
+
+  }
+  */
   return GST_FLOW_OK;
 }
 

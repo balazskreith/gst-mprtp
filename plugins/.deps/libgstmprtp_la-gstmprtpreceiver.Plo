@@ -190,11 +190,10 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
  /home/balazs/gst/master/gstreamer/gst/gstutils.h \
  /home/balazs/gst/master/gstreamer/gst/gstparse.h \
  /home/balazs/gst/master/gstreamer/gst/gstcompat.h gstmprtpreceiver.h \
- gstmprtcpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
+ mprtpssubflow.h /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
- mprtprsubflow.h
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
+ gstmprtcpbuffer.h mprtprsubflow.h
 
 /usr/include/stdc-predef.h:
 
@@ -630,12 +629,14 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
 
 gstmprtpreceiver.h:
 
-gstmprtcpbuffer.h:
-
-/usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h:
+mprtpssubflow.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
+
+/usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h:
+
+gstmprtcpbuffer.h:
 
 mprtprsubflow.h:

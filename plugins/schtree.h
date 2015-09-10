@@ -36,6 +36,13 @@ struct _SchTree
   gfloat           path_values[MPRTP_SENDER_SCHTREE_MAX_PATH_NUM];
   gfloat           path_delta_values[MPRTP_SENDER_SCHTREE_MAX_PATH_NUM];
 
+  gfloat          congested_bid;
+  gfloat          lossy_bid;
+  gfloat          non_congested_bid;
+  gfloat          bid_const;
+
+  gboolean        nc_nl_path_exists;
+
   //void           (*set_rate)(SchTree*,MPRTPSSubflow*,gfloat);
   MPRTPSSubflow* (*get_actual)(SchTree*);
   //guint16        (*get_max_value)(SchTree*);
@@ -44,7 +51,9 @@ struct _SchTree
   void           (*setup_sending_rate)(SchTree*, MPRTPSSubflow*, gfloat);
   void           (*delete_path)(SchTree*, MPRTPSSubflow*);
   void           (*commit_changes)(SchTree*);
-
+  void           (*setup_bid_values)(SchTree*, gfloat);
+  void           (*change_bid_values)(SchTree*, gfloat);
+  gboolean       (*has_nc_nl_path)(SchTree*);
 };
 
 struct _SchTreeClass{

@@ -126,12 +126,12 @@ am__DEPENDENCIES_1 =
 libgstmprtp_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-gstmprtcpbuffer.lo \
-	libgstmprtp_la-gstmprtpsender.lo \
+	libgstmprtp_la-gstmprtpscheduler.lo \
 	libgstmprtp_la-mprtpssubflow.lo \
-	libgstmprtp_la-gstmprtpreceiver.lo \
+	libgstmprtp_la-gstmprtpplayouter.lo \
 	libgstmprtp_la-mprtprsubflow.lo libgstmprtp_la-schtree.lo \
-	libgstmprtp_la-gstmprtcpreceiver.lo \
-	libgstmprtp_la-gstmprtcpsender.lo libgstmprtp_la-gsttry.lo
+	libgstmprtp_la-gstmprtpreceiver.lo \
+	libgstmprtp_la-gstmprtpsender.lo libgstmprtp_la-gsttry.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -331,13 +331,13 @@ plugin_LTLIBRARIES = libgstmprtp.la
 # sources used to compile this plug-in
 libgstmprtp_la_SOURCES = gstmprtpplugin.c    \
                          gstmprtcpbuffer.c   \
-                         gstmprtpsender.c    \
+                         gstmprtpscheduler.c    \
                          mprtpssubflow.c     \
-                         gstmprtpreceiver.c  \
+                         gstmprtpplayouter.c  \
                          mprtprsubflow.c     \
                          schtree.c           \
-                         gstmprtcpreceiver.c \
-                         gstmprtcpsender.c   \
+                         gstmprtpreceiver.c \
+                         gstmprtpsender.c   \
                          gsttry.c 
 
 noinst_HEADERS = mprtpssubflow.h schtree.h mprtprsubflow.h
@@ -427,10 +427,10 @@ distclean-compile:
 	-rm -f *.tab.c
 
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtcpbuffer.Plo
-include ./$(DEPDIR)/libgstmprtp_la-gstmprtcpreceiver.Plo
-include ./$(DEPDIR)/libgstmprtp_la-gstmprtcpsender.Plo
+include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplayouter.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplugin.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo
+include ./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gsttry.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtprsubflow.Plo
@@ -472,12 +472,12 @@ libgstmprtp_la-gstmprtcpbuffer.lo: gstmprtcpbuffer.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtcpbuffer.lo `test -f 'gstmprtcpbuffer.c' || echo '$(srcdir)/'`gstmprtcpbuffer.c
 
-libgstmprtp_la-gstmprtpsender.lo: gstmprtpsender.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gstmprtpsender.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gstmprtpsender.Tpo -c -o libgstmprtp_la-gstmprtpsender.lo `test -f 'gstmprtpsender.c' || echo '$(srcdir)/'`gstmprtpsender.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gstmprtpsender.Tpo $(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
-#	$(AM_V_CC)source='gstmprtpsender.c' object='libgstmprtp_la-gstmprtpsender.lo' libtool=yes \
+libgstmprtp_la-gstmprtpscheduler.lo: gstmprtpscheduler.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gstmprtpscheduler.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Tpo -c -o libgstmprtp_la-gstmprtpscheduler.lo `test -f 'gstmprtpscheduler.c' || echo '$(srcdir)/'`gstmprtpscheduler.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Tpo $(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
+#	$(AM_V_CC)source='gstmprtpscheduler.c' object='libgstmprtp_la-gstmprtpscheduler.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtpsender.lo `test -f 'gstmprtpsender.c' || echo '$(srcdir)/'`gstmprtpsender.c
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtpscheduler.lo `test -f 'gstmprtpscheduler.c' || echo '$(srcdir)/'`gstmprtpscheduler.c
 
 libgstmprtp_la-mprtpssubflow.lo: mprtpssubflow.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-mprtpssubflow.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-mprtpssubflow.Tpo -c -o libgstmprtp_la-mprtpssubflow.lo `test -f 'mprtpssubflow.c' || echo '$(srcdir)/'`mprtpssubflow.c
@@ -486,12 +486,12 @@ libgstmprtp_la-mprtpssubflow.lo: mprtpssubflow.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-mprtpssubflow.lo `test -f 'mprtpssubflow.c' || echo '$(srcdir)/'`mprtpssubflow.c
 
-libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gstmprtpreceiver.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Tpo -c -o libgstmprtp_la-gstmprtpreceiver.lo `test -f 'gstmprtpreceiver.c' || echo '$(srcdir)/'`gstmprtpreceiver.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Tpo $(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo
-#	$(AM_V_CC)source='gstmprtpreceiver.c' object='libgstmprtp_la-gstmprtpreceiver.lo' libtool=yes \
+libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gstmprtpplayouter.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gstmprtpplayouter.Tpo -c -o libgstmprtp_la-gstmprtpplayouter.lo `test -f 'gstmprtpplayouter.c' || echo '$(srcdir)/'`gstmprtpplayouter.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gstmprtpplayouter.Tpo $(DEPDIR)/libgstmprtp_la-gstmprtpplayouter.Plo
+#	$(AM_V_CC)source='gstmprtpplayouter.c' object='libgstmprtp_la-gstmprtpplayouter.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtpreceiver.lo `test -f 'gstmprtpreceiver.c' || echo '$(srcdir)/'`gstmprtpreceiver.c
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtpplayouter.lo `test -f 'gstmprtpplayouter.c' || echo '$(srcdir)/'`gstmprtpplayouter.c
 
 libgstmprtp_la-mprtprsubflow.lo: mprtprsubflow.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-mprtprsubflow.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-mprtprsubflow.Tpo -c -o libgstmprtp_la-mprtprsubflow.lo `test -f 'mprtprsubflow.c' || echo '$(srcdir)/'`mprtprsubflow.c
@@ -507,19 +507,19 @@ libgstmprtp_la-schtree.lo: schtree.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-schtree.lo `test -f 'schtree.c' || echo '$(srcdir)/'`schtree.c
 
-libgstmprtp_la-gstmprtcpreceiver.lo: gstmprtcpreceiver.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gstmprtcpreceiver.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gstmprtcpreceiver.Tpo -c -o libgstmprtp_la-gstmprtcpreceiver.lo `test -f 'gstmprtcpreceiver.c' || echo '$(srcdir)/'`gstmprtcpreceiver.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gstmprtcpreceiver.Tpo $(DEPDIR)/libgstmprtp_la-gstmprtcpreceiver.Plo
-#	$(AM_V_CC)source='gstmprtcpreceiver.c' object='libgstmprtp_la-gstmprtcpreceiver.lo' libtool=yes \
+libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gstmprtpreceiver.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Tpo -c -o libgstmprtp_la-gstmprtpreceiver.lo `test -f 'gstmprtpreceiver.c' || echo '$(srcdir)/'`gstmprtpreceiver.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Tpo $(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo
+#	$(AM_V_CC)source='gstmprtpreceiver.c' object='libgstmprtp_la-gstmprtpreceiver.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtcpreceiver.lo `test -f 'gstmprtcpreceiver.c' || echo '$(srcdir)/'`gstmprtcpreceiver.c
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtpreceiver.lo `test -f 'gstmprtpreceiver.c' || echo '$(srcdir)/'`gstmprtpreceiver.c
 
-libgstmprtp_la-gstmprtcpsender.lo: gstmprtcpsender.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gstmprtcpsender.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gstmprtcpsender.Tpo -c -o libgstmprtp_la-gstmprtcpsender.lo `test -f 'gstmprtcpsender.c' || echo '$(srcdir)/'`gstmprtcpsender.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gstmprtcpsender.Tpo $(DEPDIR)/libgstmprtp_la-gstmprtcpsender.Plo
-#	$(AM_V_CC)source='gstmprtcpsender.c' object='libgstmprtp_la-gstmprtcpsender.lo' libtool=yes \
+libgstmprtp_la-gstmprtpsender.lo: gstmprtpsender.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gstmprtpsender.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gstmprtpsender.Tpo -c -o libgstmprtp_la-gstmprtpsender.lo `test -f 'gstmprtpsender.c' || echo '$(srcdir)/'`gstmprtpsender.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gstmprtpsender.Tpo $(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
+#	$(AM_V_CC)source='gstmprtpsender.c' object='libgstmprtp_la-gstmprtpsender.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtcpsender.lo `test -f 'gstmprtcpsender.c' || echo '$(srcdir)/'`gstmprtcpsender.c
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtpsender.lo `test -f 'gstmprtpsender.c' || echo '$(srcdir)/'`gstmprtpsender.c
 
 libgstmprtp_la-gsttry.lo: gsttry.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gsttry.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gsttry.Tpo -c -o libgstmprtp_la-gsttry.lo `test -f 'gsttry.c' || echo '$(srcdir)/'`gsttry.c

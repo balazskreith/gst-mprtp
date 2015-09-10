@@ -194,36 +194,83 @@ request_aux_sender (GstElement * rtpbin, guint sessid, SessionData * session)
   return bin;
 }
 
+typedef struct _Identities
+{
+	GstElement *identity_s1;
+	GstElement *identity_s2;
+	guint       called;
+}Identities;
+
+gboolean _timeout_callback(gpointer data)
+{
+	Identities *ids = data;
+
+	//g_print("Called %d\n", ids->called);
+	switch(ids->called){
+	  case 0:
+		  g_print("Subflow 1 dp: 0.2, subflow 2 dp: 0.0\n");
+		  g_object_set (ids->identity_s1, "drop-probability", 0.2, NULL);
+		  g_object_set (ids->identity_s2, "drop-probability", 0.0, NULL);
+	  break;
+	  case 1:
+		  g_print("Subflow 1 dp: 0.0, subflow 2 dp: 0.2\n");
+		  g_object_set (ids->identity_s1, "drop-probability", 0.0, NULL);
+		  g_object_set (ids->identity_s2, "drop-probability", 0.2, NULL);
+	  break;
+	  case 2:
+		  g_print("Subflow 1 dp: 0.1, subflow 2 dp: 0.0\n");
+		  g_object_set (ids->identity_s1, "drop-probability", 0.1, NULL);
+		  g_object_set (ids->identity_s2, "drop-probability", 0.0, NULL);
+	  break;
+	  case 3:
+		  g_print("Subflow 1 dp: 0.0, subflow 2 dp: 0.1\n");
+		  g_object_set (ids->identity_s1, "drop-probability", 0.0, NULL);
+		  g_object_set (ids->identity_s2, "drop-probability", 0.1, NULL);
+	  break;
+	  default:
+	  break;
+	}
+    ++ids->called;
+	return TRUE;
+}
+
 /*
  * This function sets up the UDP sinks and sources for RTP/RTCP, adds the
  * given session's bin into the pipeline, and links it to the properly numbered
  * pads on the rtpbin
  */
 static void
-add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
+add_stream (GstPipeline *pipe, GstElement *rtpBin, SessionData *session)
 {
-  GstElement *mprtps = gst_element_factory_make ("mprtpsender", NULL);
+  GstElement *mprtpsnd = gst_element_factory_make ("mprtpsender", NULL);
   GstElement *try = gst_element_factory_make ("try", NULL);
   GstElement *rtpSink_1 = gst_element_factory_make ("udpsink", NULL);
   GstElement *rtpSink_2 = gst_element_factory_make ("udpsink", NULL);
   GstElement *rtcpSink = gst_element_factory_make ("udpsink", NULL);
   GstElement *rtcpSrc = gst_element_factory_make ("udpsrc", NULL);
-  GstElement *rtcpSrc_1 = gst_element_factory_make ("udpsrc", NULL);
-  GstElement *rtcpSrc_2 = gst_element_factory_make ("udpsrc", NULL);
-  GstElement *mprtcpr = gst_element_factory_make ("mprtcpreceiver", NULL);
-  GstElement *identity = gst_element_factory_make ("identity", NULL);
+  GstElement *rtpSrc_1 = gst_element_factory_make ("udpsrc", NULL);
+  GstElement *rtpSrc_2 = gst_element_factory_make ("udpsrc", NULL);
+  GstElement *mprtprecv = gst_element_factory_make ("mprtpreceiver", NULL);
+  GstElement *mprtpsch = gst_element_factory_make ("mprtpscheduler", NULL);
+  GstElement *identity_1 = gst_element_factory_make ("identity", NULL);
+  GstElement *identity_2 = gst_element_factory_make ("identity", NULL);
+  Identities *ids = g_malloc0(sizeof(Identities));
   int basePort;
   gchar *padName;
 
+  ids->identity_s1 = identity_1;
+  ids->identity_s2 = identity_2;
+  ids->called = 0;
+
   basePort = 5000 + (session->sessionNum * 20);
 
-  gst_bin_add_many (GST_BIN (pipe), rtpSink_1, rtpSink_2, mprtcpr, mprtps,
-		  try, rtcpSink, rtcpSrc, rtcpSrc_1, rtcpSrc_2, identity,
-      session->input, NULL);
+  gst_bin_add_many (GST_BIN (pipe), rtpSink_1, rtpSink_2, mprtprecv, mprtpsnd,
+		  mprtpsch, try, rtcpSink, rtcpSrc, rtpSrc_1, rtpSrc_2, identity_1,
+		  identity_2, session->input, NULL);
 
   /* enable retransmission by setting rtprtxsend as the "aux" element of rtpbin */
   g_signal_connect (rtpBin, "request-aux-sender",
-      (GCallback) request_aux_sender, session);
+		   (GCallback) request_aux_sender, session);
 
   g_object_set (rtpSink_1, "port", basePort, "host", "127.0.0.1", "sync",
 	      FALSE, "async", FALSE, NULL);
@@ -233,13 +280,15 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
   g_object_set (rtcpSink, "port", basePort + 5, "host", "127.0.0.1", "sync",
       FALSE, "async", FALSE, NULL);
 
-  g_object_set (rtcpSrc_1, "port", basePort + 11, NULL);
-  g_object_set (rtcpSrc_2, "port", basePort + 12, NULL);
+  g_object_set (rtpSrc_1, "port", basePort + 11, NULL);
+  g_object_set (rtpSrc_2, "port", basePort + 12, NULL);
   g_object_set (rtcpSrc, "port", basePort + 10, NULL);
 
   /* this is just to drop some rtp packets at random, to demonstrate
    * that rtprtxsend actually works */
-  g_object_set (identity, "drop-probability", 0.1, NULL);
+  //g_object_set (identity, "drop-probability", 0.1, NULL);
+
+  g_timeout_add (30000 , _timeout_callback , ids);
 
   padName = g_strdup_printf ("send_rtp_sink_%u", session->sessionNum);
   gst_element_link_pads (session->input, "src", rtpBin, padName);
@@ -248,15 +297,21 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
   //MPRTP Sender
 
   padName = g_strdup_printf ("send_rtp_src_%u", session->sessionNum);
-  gst_element_link_pads (rtpBin, padName, mprtps, "rtp_sink");
+  gst_element_link_pads (rtpBin, padName, mprtpsch, "rtp_sink");
+  gst_element_link_pads (mprtpsch, "mprtp_src", mprtpsnd, "mprtp_sink");
   g_free (padName);
   /* link rtpbin to udpsink directly here if you don't want
    * artificial packet loss */
-  gst_element_link_pads (mprtps, "src_1", identity, "sink");
-  gst_element_link (identity, rtpSink_1);
+  gst_element_link_pads (mprtpsnd, "src_1", identity_1, "sink");
+    gst_element_link (identity_1, rtpSink_1);
 
-  gst_element_link_pads (mprtps, "src_2", rtpSink_2, "sink");
+    gst_element_link_pads (mprtpsnd, "src_2", identity_2, "sink");
+      gst_element_link (identity_2, rtpSink_2);
+  //gst_element_link_pads (mprtpsnd, "src_2", rtpSink_2, "sink");
   //gst_element_link_pads (rtpBin, padName, identity, "sink");
+
+  g_object_set(mprtpsch, "join-subflow", 1, NULL);
+  g_object_set(mprtpsch, "join-subflow", 2, NULL);
 
 
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
@@ -269,10 +324,11 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
 
 
   padName = g_strdup_printf ("recv_rtcp_sink_%u", session->sessionNum);
-  gst_element_link_pads(rtcpSrc_1, "src", mprtcpr, "sink_1");
-  gst_element_link_pads(rtcpSrc_2, "src", mprtcpr, "sink_2");
-  gst_element_link_pads(mprtcpr, "rtcp_src", rtpBin, padName);
-  gst_element_link_pads(mprtcpr, "mprtcp_src", mprtps, "mprtcp_sink");
+  gst_element_link_pads(rtpSrc_1, "src", mprtprecv, "sink_1");
+  gst_element_link_pads(rtpSrc_2, "src", mprtprecv, "sink_2");
+  //gst_element_link_pads(mprtprecv, "rtcp_src", rtpBin, padName);
+  gst_element_link_pads(mprtprecv, "mprtcp_rr_src", mprtpsch, "mprtcp_rr_sink");
+  gst_element_link_pads(mprtpsch, "mprtcp_sr_src", mprtpsnd, "mprtcp_sr_sink");
   gst_element_link_pads (rtcpSrc, "src", rtpBin, padName);
   g_free (padName);
 

@@ -3,13 +3,13 @@ plugin_LTLIBRARIES = libgstmprtp.la
 # sources used to compile this plug-in
 libgstmprtp_la_SOURCES = gstmprtpplugin.c    \
                          gstmprtcpbuffer.c   \
-                         gstmprtpsender.c    \
+                         gstmprtpscheduler.c    \
                          mprtpssubflow.c     \
-                         gstmprtpreceiver.c  \
+                         gstmprtpplayouter.c  \
                          mprtprsubflow.c     \
                          schtree.c           \
-                         gstmprtcpreceiver.c \
-                         gstmprtcpsender.c   \
+                         gstmprtpreceiver.c \
+                         gstmprtpsender.c   \
                          gsttry.c 
                          
 noinst_HEADERS = mprtpssubflow.h schtree.h mprtprsubflow.h

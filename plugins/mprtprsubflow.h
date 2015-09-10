@@ -43,10 +43,13 @@ struct _MPRTPReceiverSubflow{
   gboolean             seq_initialized;
   gboolean             skew_initialized;
   guint16              cycle_num;
-  guint16              received;
+  guint16              packet_received;
   guint32              jitter;
   guint16              HSN;
   guint16              packet_losts;
+  gboolean             distortion;
+  GstClockTime         distortion_happened;
+  gfloat               packet_lost_rate;
   guint32              cum_packet_losts;
   GRWLock              rwmutex;
 
@@ -54,8 +57,23 @@ struct _MPRTPReceiverSubflow{
   GstClockTime         LSR;
   guint32              ssrc;
   GMutex               mutex;
+
+  GstClockTime         rr_riport_normal_period_time;
+  guint                packet_limit_to_riport;
+  gboolean             urgent_riport_is_requested;
+  gboolean             allow_early;
+  gboolean             rr_started;
+  gdouble              avg_rtcp_size;
+  gdouble              avg_rtp_size;
+  gdouble              rr_riport_bw;
+  gdouble              media_bw_avg;
   GstClockTime         rr_riport_time;
-  guint32              rr_intertime;
+  GstClockTime         rr_riport_interval;
+  gboolean             rr_paths_congestion_riport_is_started;
+  GstClockTime         rr_paths_changing_riport_started;
+  GstClockTime         rr_riport_timeout_interval;
+  GstClockTime         last_riport_sent_time;
+
   GstClockTime         last_received_time;
   guint64              ext_rtptime;
   //GstClockTime         last_sent_time;
@@ -65,6 +83,10 @@ struct _MPRTPReceiverSubflow{
   guint8               skews_write_index;
   guint8               skews_read_index;
   gboolean             active;
+  gboolean             lost_started_riporting;
+  GstClockTime         lost_started_riporting_time;
+  gboolean             settled_started_riporting;
+  GstClockTime         settled_started_riporting_time;
 
   void                 (*process_mprtp_packets)(MPRTPRSubflow*,GstBuffer*, guint16 subflow_sequence);
   void                 (*process_mprtcpsr_packets)(MPRTPRSubflow*,GstRTCPBuffer*);
@@ -77,11 +99,11 @@ struct _MPRTPReceiverSubflow{
   GList*               (*get_packets)(MPRTPRSubflow*);
   void                 (*setup_sr_riport)(MPRTPRSubflow*, GstMPRTCPSubflowRiport*);
   guint16              (*get_id)(MPRTPRSubflow*);
-  GstClockTime         (*get_rr_riport_time)(MPRTPRSubflow*);
-  void                 (*setup_rr_riport_time)(MPRTPRSubflow*);
+  gboolean             (*do_riport_now)(MPRTPRSubflow*, GstClockTime *);
+  void                 (*set_avg_rtcp_size)(MPRTPRSubflow*,gsize);
   void                 (*setup_rr_riport)(MPRTPRSubflow*, GstMPRTCPSubflowRiport*);
   void                 (*setup_xr_rfc2743_late_discarded_riport)(MPRTPRSubflow*, GstMPRTCPSubflowRiport*);
-  GstPad*              (*get_outpad)(MPRTPRSubflow*);
+  //GstPad*              (*get_outpad)(MPRTPRSubflow*);
 };
 
 struct _MPRTPReceiverSubflowClass {
@@ -90,7 +112,7 @@ struct _MPRTPReceiverSubflowClass {
 
 
 GType mprtpr_subflow_get_type (void);
-MPRTPRSubflow* make_mprtpr_subflow(guint16 id, GstPad* sinkpad, guint8 header_ext_id);
+MPRTPRSubflow* make_mprtpr_subflow(guint16 id, guint8 header_ext_id);
 
 G_END_DECLS
 

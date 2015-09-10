@@ -21,9 +21,6 @@
 #define _GST_MPRTPSENDER_H_
 
 #include <gst/gst.h>
-#include "mprtpssubflow.h"
-#include "schtree.h"
-#include "gstmprtcpbuffer.h"
 
 G_BEGIN_DECLS
 
@@ -34,51 +31,35 @@ G_BEGIN_DECLS
 #define GST_IS_MPRTPSENDER_CLASS(obj)   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_MPRTPSENDER))
 
 typedef struct _GstMprtpsender GstMprtpsender;
-typedef struct _GstMprtpsenderPrivate GstMprtpsenderPrivate;
 typedef struct _GstMprtpsenderClass GstMprtpsenderClass;
+typedef struct _GstMprtpsenderPrivate GstMprtpsenderPrivate;
 
 struct _GstMprtpsender
 {
-  GstElement     base_object;
-
-  GstPad        *rtp_sinkpad;
-  GstPad        *rtcp_sinkpad;
-  GstPad        *rtcp_srcpad;
-  GstPad        *mprtcp_sinkpad;
-
-  GMutex         subflows_mutex;
-  guint32        ssrc;
-  GstSegment     segment;
+  GstElement     base_mprtpsender;
+  GRWLock        rwmutex;
   guint8         ext_header_id;
-  guint16        mprtcp_mtu;
-  gfloat         charge_value;
-  gfloat         alpha_value;
-  gfloat         beta_value;
-  gfloat         gamma_value;
-  guint32        max_delay;
   GList*         subflows;
-  gboolean       no_active_subflows;
-  GList*         rtcp_send_item;
-  SchTree*       schtree;
-  GstTask*       scheduler;
-  guint32        scheduler_state;
-  GRecMutex      scheduler_mutex;
-  GstTask*       riporter;
-  GRecMutex      riporter_mutex;
-  GCond          scheduler_cond;
-  GstClockTime   scheduler_last_run;
-  GstClockTime   last_schtree_commit;
+  GList*         iterator;
+  GstPad*        mprtcp_rr_sinkpad;
+  GstPad*        mprtp_sinkpad;
+  GstPad*        rtcp_srcpad;
+  GstPad*        mprtcp_sr_sinkpad;
+  GstPad*        rtcp_sinkpad;
 
-  GstMprtpsenderPrivate *priv;
+  //GQueue        *events;
+  //GstTask       *eventing;
+  //GRecMutex      eventing_mutex;
+  GstMprtpsenderPrivate* priv;
 };
 
 struct _GstMprtpsenderClass
 {
-  GstElementClass base_class;
+  GstElementClass base_mprtpsender_class;
 };
 
 GType gst_mprtpsender_get_type (void);
 
 G_END_DECLS
 
-#endif
+#endif //_GST_MPRTPSENDER_H_

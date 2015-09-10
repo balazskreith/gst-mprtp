@@ -30,8 +30,7 @@ static void mprtpr_subflow_proc_mprtcpblock(MPRTPRSubflow* this, GstMPRTCPSubflo
 static gboolean mprtpr_subflow_is_active(MPRTPRSubflow* this);
 static gboolean mprtpr_subflow_is_early_discarded_packets(MPRTPRSubflow* this);
 static guint64 mprtpr_subflow_get_packet_skew_median(MPRTPRSubflow* this);
-static GstClockTime mprtpr_subflow_get_rr_riport_time(MPRTPRSubflow* this);
-static void mprtpr_subflow_setup_rr_riport_time(MPRTPRSubflow* this);
+static gboolean mprtpr_subflow_do_riport_now(MPRTPRSubflow* this, GstClockTime *next_time);
 static guint16 mprtpr_subflow_get_id(MPRTPRSubflow* this);
 static GList* mprtpr_subflow_get_packets(MPRTPRSubflow* this);
 static void mprtpr_subflow_add_packet_skew(MPRTPRSubflow* this,
@@ -41,7 +40,7 @@ static void mprtpr_subflow_setup_rr_riport(MPRTPRSubflow* this,
 static void mprtps_subflow_setup_xr_rfc2743_late_discarded_riport(
 		MPRTPRSubflow *this, GstMPRTCPSubflowRiport *riport);
 static void _proc_rtcp_sr(MPRTPRSubflow* this, GstRTCPSR *sr);
-
+static void mprtpr_subflow_set_avg_rtcp_size(MPRTPRSubflow *this, gsize packet_size);
 
 static guint16
 _mprtp_buffer_get_sequence_num(GstRTPBuffer* rtp,
@@ -51,8 +50,7 @@ static guint16 _mprtp_buffer_get_subflow_id(GstRTPBuffer* rtp,
 static gboolean
 _found_in_gaps(GList *gaps, guint16 actual_subflow_sequence,
 		guint8 ext_header_id, GList **result_item, Gap **result_gap);
-static Gap*
-_make_gap(GList *at, guint16 start, guint16 end);
+static Gap* _make_gap(GList *at, guint16 start, guint16 end);
 static gint
 _cmp_seq(guint16 x, guint16 y);
 
@@ -73,7 +71,7 @@ mprtpr_subflow_class_init (MPRTPRSubflowClass *klass)
 
 
 MPRTPRSubflow*
-make_mprtpr_subflow(guint16 id, GstPad* sinkpad, guint8 header_ext_id)
+make_mprtpr_subflow(guint16 id, guint8 header_ext_id)
 {
   MPRTPRSubflow *result;
 
@@ -98,7 +96,18 @@ mprtpr_subflow_reset (MPRTPRSubflow * this)
   this->ext_rtptime = -1;
   this->rr_riport_time = 0;
   this->result = NULL;
-  this->rr_intertime = 5;
+  this->lost_started_riporting = FALSE;
+  this->lost_started_riporting_time = 0;
+  this->rr_riport_normal_period_time = 5 * GST_SECOND;
+  this->rr_riport_bw = 100000;
+  this->allow_early = TRUE;
+  this->urgent_riport_is_requested = FALSE;
+  this->rr_riport_interval = 0;
+  this->rr_riport_timeout_interval = 5 * GST_SECOND;
+  this->avg_rtcp_size = 128.;
+  this->packet_limit_to_riport = 10;
+  this->rr_started = FALSE;
+  this->media_bw_avg = 0.;
 }
 
 void
@@ -111,13 +120,15 @@ mprtpr_subflow_init (MPRTPRSubflow * this)
   this->get_skews_median = mprtpr_subflow_get_packet_skew_median;
   this->add_packet_skew = mprtpr_subflow_add_packet_skew;
   this->get_packets = mprtpr_subflow_get_packets;
-  this->get_rr_riport_time = mprtpr_subflow_get_rr_riport_time;
-  this->setup_rr_riport_time = mprtpr_subflow_setup_rr_riport_time;
+  this->set_avg_rtcp_size = mprtpr_subflow_set_avg_rtcp_size;
   this->setup_rr_riport = mprtpr_subflow_setup_rr_riport;
   this->setup_xr_rfc2743_late_discarded_riport = mprtps_subflow_setup_xr_rfc2743_late_discarded_riport;
   this->get_id = mprtpr_subflow_get_id;
+  this->do_riport_now = mprtpr_subflow_do_riport_now;
   this->active = TRUE;
   this->ssrc = g_random_int ();
+
+
   g_mutex_init(&this->mutex);
   mprtpr_subflow_reset (this);
 
@@ -154,7 +165,12 @@ mprtpr_subflow_get_packets(MPRTPRSubflow* this)
 {
   GList *result,*it;
   Gap *gap;
+  GstClockTime now;
+  gboolean distortion_was;
   g_mutex_lock(&this->mutex);
+  distortion_was = this->distortion;
+
+  now = gst_clock_get_time(this->sysclock);
   result = this->result;
   for(it = this->gaps; it != NULL; it = it->next){
     gap = it->data;
@@ -163,6 +179,19 @@ mprtpr_subflow_get_packets(MPRTPRSubflow* this)
     }
     this->packet_losts += gap->total - gap->filled;
   }
+  if(this->distortion && this->distortion_happened + 30 * GST_SECOND < now){
+	  this->distortion = FALSE;
+  }
+
+  if(this->packet_losts > 0 || this->late_discarded > 0){
+    this->distortion = TRUE;
+    this->distortion_happened = now;
+  }
+
+  if(!distortion_was && this->distortion){
+	  this->urgent_riport_is_requested = TRUE;
+  }
+
   g_list_free_full(this->gaps, g_free);
   this->gaps = NULL;
   this->result = NULL;
@@ -201,38 +230,124 @@ guint16 mprtpr_subflow_get_id(MPRTPRSubflow* this)
 	return result;
 }
 
-GstClockTime mprtpr_subflow_get_rr_riport_time(MPRTPRSubflow* this)
+
+
+void mprtpr_subflow_set_avg_rtcp_size(MPRTPRSubflow *this, gsize packet_size)
 {
-	GstClockTime result;
 	g_mutex_lock(&this->mutex);
-	result = this->rr_riport_time;
+	this->avg_rtcp_size += ((gdouble)packet_size - this->avg_rtcp_size) * 1./16.;
+	g_mutex_unlock(&this->mutex);
+}
+
+
+
+gboolean mprtpr_subflow_do_riport_now(MPRTPRSubflow* this, GstClockTime *next_time)
+{
+	GstClockTime now;
+	gboolean result = FALSE;
+	GstClockTime t_normal, t_max = 7 * GST_SECOND + 500 * GST_MSECOND;
+	GstClockTimeDiff dif;
+	GstClockTime t_bw_min;
+
+	gdouble randv = g_random_double_range(0.5, 1.5);
+	g_mutex_lock(&this->mutex);
+	now = gst_clock_get_time(this->sysclock);
+    if(!this->rr_started){
+      this->rr_riport_interval = 1 * GST_SECOND;
+      this->rr_riport_time = now + this->rr_riport_interval;
+      this->rr_started = TRUE;
+      goto mprtpr_subflow_is_riporting_time_done;
+    }
+
+	if(this->urgent_riport_is_requested){
+		this->urgent_riport_is_requested = FALSE;
+		if(!this->allow_early){
+		  goto mprtpr_subflow_is_riporting_time_done;
+		}
+		this->allow_early = FALSE;
+		result = TRUE;
+		this->rr_riport_interval= (gdouble)this->rr_riport_interval / 2. * randv;
+		if(this->rr_riport_interval < 500 * GST_MSECOND){
+		  this->rr_riport_interval = 750. * (gdouble)GST_MSECOND * randv;
+		}else if(2 * GST_SECOND < this->rr_riport_interval){
+		  this->rr_riport_interval = 2. * (gdouble)GST_SECOND * randv;
+		}
+	    this->rr_riport_time = now + this->rr_riport_interval;
+	    goto mprtpr_subflow_is_riporting_time_done;
+    }
+
+	if(now < this->rr_riport_time){
+      goto mprtpr_subflow_is_riporting_time_done;
+	}
+
+    if(this->media_bw_avg > 0.0){
+      this->rr_riport_bw = this->media_bw_avg * 0.01;
+      t_bw_min = (GstClockTime)(this->avg_rtcp_size*2./this->rr_riport_bw * (gdouble)GST_SECOND) ;
+      t_normal = MAX(this->rr_riport_normal_period_time, t_bw_min);
+    }else{
+      t_normal = this->rr_riport_normal_period_time;
+    }
+
+	if(this->packet_received < this->packet_limit_to_riport){
+	  if(this->last_riport_sent_time + ((GstClockTime)(t_normal * 3)) < now){
+		result = TRUE;
+		this->rr_riport_interval = (GstClockTime) ((gdouble)t_normal * randv);
+		this->rr_riport_time = now + this->rr_riport_time;
+	    goto mprtpr_subflow_is_riporting_time_done;
+	  }
+	  this->rr_riport_time = now + (GstClockTime) (t_normal *
+			  (1.1 -
+			   this->packet_received /
+			   this->packet_limit_to_riport));
+	  this->rr_riport_interval = this->rr_riport_interval * 1.5;
+	  if(t_max < this->rr_riport_interval){
+	    this->rr_riport_interval = t_max;
+	  }
+	  goto mprtpr_subflow_is_riporting_time_done;
+    }
+
+    result = TRUE;
+	this->allow_early = TRUE;
+	if(this->packet_losts > 0 || this->late_discarded > 0){
+	  if(!this->rr_paths_congestion_riport_is_started){
+	    this->rr_paths_changing_riport_started = now;
+	  }
+	  this->rr_paths_congestion_riport_is_started = TRUE;
+	  if(now - 10 * GST_SECOND < this->rr_paths_changing_riport_started){
+	    this->rr_riport_interval = (gdouble)this->rr_riport_interval / 2. * randv;
+	  }else{
+		this->rr_riport_interval = (gdouble)t_normal * randv;
+	  }
+	  if(this->rr_riport_interval < 500 * GST_MSECOND){
+        this->rr_riport_interval = (gdouble) (750 * GST_MSECOND) * randv;
+	  }
+	}else{
+	  if(this->rr_paths_congestion_riport_is_started){
+		this->rr_paths_congestion_riport_is_started = FALSE;
+	    this->rr_paths_changing_riport_started = now;
+	  }
+	  if(now - 10 * GST_SECOND < this->rr_paths_changing_riport_started){
+		this->rr_riport_interval = (gdouble)this->rr_riport_interval / 2. * randv;
+	  }else{
+	    this->rr_riport_interval= (gdouble)this->rr_riport_interval * 1.5 * randv;
+	  }
+	  if(this->rr_riport_interval < 500 * GST_MSECOND){
+		  this->rr_riport_interval = (gdouble) (750 * GST_MSECOND) * randv;
+	  }else if(t_max < this->rr_riport_interval){
+		  this->rr_riport_interval = (gdouble)t_normal * randv;
+	  }
+	}
+
+	this->rr_riport_time = now + this->rr_riport_interval;
+
+mprtpr_subflow_is_riporting_time_done:
+//    g_print("subflow %d this->rr_riport_time = %llu + %llu\n", this->id, now,
+//			GST_TIME_AS_MSECONDS(this->rr_riport_interval));
+    *next_time = this->rr_riport_time;
 	g_mutex_unlock(&this->mutex);
 	return result;
 }
 
-
-void mprtpr_subflow_setup_rr_riport_time(MPRTPRSubflow* this)
-{
-	g_mutex_lock(&this->mutex);
-	if(this->late_discarded > 0 && this->packet_losts > 0){
-	  this->rr_intertime = this->rr_intertime * 0.75;
-	}
-	if(this->late_discarded == 0 && this->packet_losts == 0){
-		this->rr_intertime = this->rr_intertime * 1.25;
-	}
-
-	if(this->rr_intertime < 2){
-		this->rr_intertime = 2;
-	}
-	if(this->rr_intertime > 7){
-		this->rr_intertime = 7;
-	}
-
-	this->rr_riport_time = gst_clock_get_time(this->sysclock) +
-			GST_SECOND * this->rr_intertime;
-
-	g_mutex_unlock(&this->mutex);
-}
 
 
 static guint16 uint16_diff(guint16 a, guint16 b)
@@ -268,26 +383,33 @@ mprtpr_subflow_setup_rr_riport(MPRTPRSubflow *this,
   expected = uint16_diff(this->HSN, this->actual_seq);
 
   fraction_lost = (256.0 * (gfloat)this->packet_losts) / ((gfloat)(expected));
-
+  this->packet_lost_rate = (gfloat)this->packet_losts / (gfloat)(expected);
   this->cum_packet_losts += (guint32)this->packet_losts;
 
   ext_hsn = (((guint32)this->cycle_num)<<16) | ((guint32)this->actual_seq);
   //g_print("this->LSR: %016llX -> %016llX\n", this->LSR, (guint32)(this->LSR>>16));
   LSR = (guint32)(this->LSR>>16);
+
   if(this->LSR == 0 || ntptime < this->LSR){
     DLSR = 0;
   }else{
-    DLSR = (guint32)GST_CLOCK_DIFF(this->LSR, ntptime);
+    DLSR = (guint32) GST_TIME_AS_MSECONDS( (GstClockTime) GST_CLOCK_DIFF(this->LSR, ntptime));
   }
 
   gst_rtcp_rr_add_rrb(rr, 0,
 	fraction_lost, this->cum_packet_losts, ext_hsn, this->jitter, LSR, DLSR);
   gst_mprtcp_riport_add_block_end(riport, block);
-
   //reset
-  this->received = 0;
+  this->media_bw_avg += (this->avg_rtp_size * (gdouble)this->packet_received /
+                       (gdouble) (GST_TIME_AS_MSECONDS(ntptime - this->last_riport_sent_time) * 1./1000.) - this->media_bw_avg) * 1./16.;
+
+//  g_print("this->media_bw = %f * %f / %f * 1./1000. = %f\n",
+//		  this->avg_rtp_size, (gdouble)this->packet_received,
+//		  (gdouble) (GST_TIME_AS_MSECONDS(ntptime - this->last_riport_sent_time)), this->media_bw_avg);
+  this->packet_received = 0;
   this->packet_losts = 0;
   this->HSN = this->actual_seq;
+  this->last_riport_sent_time = ntptime;
   g_mutex_unlock(&this->mutex);
 }
 
@@ -442,12 +564,14 @@ mprtpr_subflow_process_rtpbuffer(MPRTPRSubflow* this, GstBuffer* buf, guint16 su
   guint64 reception_time;
   guint32 rtptime;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  guint payload_size;
+  guint packet_size;
   g_mutex_lock(&this->mutex);
   //printf("Packet is received by (%d-%d) path receiver with %d absolute sequence and %d subflow sequence\n",this->id, actual->subflow_id, actual->absolute_sequence, actual->subflow_sequence);
   if(this->seq_initialized == FALSE){
     this->actual_seq = subflow_sequence;
     this->HSN = subflow_sequence;
-    this->received = 1;
+    this->packet_received = 1;
     this->seq_initialized = TRUE;
     this->result = g_list_prepend(this->result, buf);
     goto mprtpr_subflow_process_rtpbuffer_end;
@@ -456,18 +580,21 @@ mprtpr_subflow_process_rtpbuffer(MPRTPRSubflow* this, GstBuffer* buf, guint16 su
   //goto mprtpr_subflow_process_rtpbuffer_end;
 
   //calculate lost, discarded and received packets
-  ++this->received;
+  ++this->packet_received;
   if(0x8000 < this->HSN && subflow_sequence < 0x8000 &&
 	 this->received_since_cycle_is_increased > 0x8888){
 	  this->received_since_cycle_is_increased = 0;
 	  ++this->cycle_num;
   }
+  gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
+  payload_size = gst_rtp_buffer_get_payload_len(&rtp);
+  packet_size = payload_size + gst_rtp_buffer_get_header_len(&rtp) + 28<<3 /*UDP size*/;
+  this->avg_rtp_size += ((gdouble) packet_size - this->avg_rtp_size) * 1./16.;
+  gst_rtp_buffer_unmap(&rtp);
 
   if(_cmp_seq(this->HSN, subflow_sequence) > 0){
     ++this->late_discarded;
-    gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
-    this->late_discarded_bytes += gst_rtp_buffer_get_payload_len(&rtp);
-    gst_rtp_buffer_unmap(&rtp);
+    this->late_discarded_bytes += payload_size;
     goto mprtpr_subflow_process_rtpbuffer_end;
   }
   if(subflow_sequence == (guint16)(this->actual_seq + 1)){
@@ -625,3 +752,7 @@ void _proc_rtcp_sr(MPRTPRSubflow* this, GstRTCPSR *sr)
   GstRTCPSRBlock *srblock = &sr->sender_block;
   this->LSR = gst_clock_get_time(this->sysclock);
 }
+
+
+
+

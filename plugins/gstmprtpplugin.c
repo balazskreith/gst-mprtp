@@ -46,19 +46,19 @@
 #endif
 
 #include <gst/gst.h>
+#include "gstmprtpscheduler.h"
 #include "gstmprtpsender.h"
-#include "gstmprtcpsender.h"
+#include "gstmprtpplayouter.h"
 #include "gstmprtpreceiver.h"
-#include "gstmprtcpreceiver.h"
 #include "gsttry.h"
 
 static gboolean
 plugin_init (GstPlugin * plugin)
 {
+  gst_element_register (plugin, "mprtpscheduler", GST_RANK_NONE, GST_TYPE_MPRTPSCHEDULER);
   gst_element_register (plugin, "mprtpsender", GST_RANK_NONE, GST_TYPE_MPRTPSENDER);
-  gst_element_register (plugin, "mprtcpsender", GST_RANK_NONE, GST_TYPE_MPRTCPSENDER);
+  gst_element_register (plugin, "mprtpplayouter", GST_RANK_NONE, GST_TYPE_MPRTPPLAYOUTER);
   gst_element_register (plugin, "mprtpreceiver", GST_RANK_NONE, GST_TYPE_MPRTPRECEIVER);
-  gst_element_register (plugin, "mprtcpreceiver", GST_RANK_NONE, GST_TYPE_MPRTCPRECEIVER);
   gst_element_register (plugin, "try", GST_RANK_NONE, GST_TYPE_TRY);
   return TRUE;
 }
@@ -69,21 +69,21 @@ plugin_init (GstPlugin * plugin)
    remove these, as they're always defined.  Otherwise, edit as
    appropriate for your external plugin package. */
 #ifndef VERSION
-#define VERSION "0.0.FIXME"
+#define VERSION "0.4.alpha"
 #endif
 #ifndef PACKAGE
-#define PACKAGE "FIXME_package"
+#define PACKAGE "Multipath RTP protocol handler and multipath streamer"
 #endif
 #ifndef PACKAGE_NAME
-#define PACKAGE_NAME "FIXME_package_name"
+#define PACKAGE_NAME "mprtp"
 #endif
 #ifndef GST_PACKAGE_ORIGIN
-#define GST_PACKAGE_ORIGIN "http://FIXME.org/"
+#define GST_PACKAGE_ORIGIN "http://https://github.com/multipath-rtp/gst-mprtp/"
 #endif
 
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
     mprtp,
-    "FIXME plugin description",
+    "MPRTP plugins are intended to realize streaming amongst multiple subflows by using MPRTP protocol.",
     plugin_init, VERSION, "LGPL", PACKAGE_NAME, GST_PACKAGE_ORIGIN)
 

@@ -189,12 +189,12 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /home/balazs/gst/master/gstreamer/gst/gsttypefindfactory.h \
  /home/balazs/gst/master/gstreamer/gst/gstutils.h \
  /home/balazs/gst/master/gstreamer/gst/gstparse.h \
- /home/balazs/gst/master/gstreamer/gst/gstcompat.h gstmprtpsender.h \
+ /home/balazs/gst/master/gstreamer/gst/gstcompat.h gstmprtpscheduler.h \
  mprtpssubflow.h /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
- gstmprtcpbuffer.h schtree.h gstmprtcpsender.h gstmprtpreceiver.h \
- gstmprtcpreceiver.h gsttry.h \
+ gstmprtcpbuffer.h schtree.h gstmprtpsender.h gstmprtpplayouter.h \
+ gstmprtpreceiver.h gsttry.h \
  /home/balazs/gst/master/gstreamer/libs/gst/base/gstbasetransform.h
 
 /usr/include/stdc-predef.h:
@@ -629,7 +629,7 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
 
 /home/balazs/gst/master/gstreamer/gst/gstcompat.h:
 
-gstmprtpsender.h:
+gstmprtpscheduler.h:
 
 mprtpssubflow.h:
 
@@ -643,11 +643,11 @@ gstmprtcpbuffer.h:
 
 schtree.h:
 
-gstmprtcpsender.h:
+gstmprtpsender.h:
+
+gstmprtpplayouter.h:
 
 gstmprtpreceiver.h:
-
-gstmprtcpreceiver.h:
 
 gsttry.h:
 

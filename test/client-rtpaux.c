@@ -282,8 +282,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
   GstElement *rtpSrc_1, *rtpSrc_2;
   GstElement *rtcpSrc;
   GstElement *rtcpSink,*rtcpSink_1,*rtcpSink_2;
-  GstElement *mprtpr;
-  GstElement *mprtcps;
+  GstElement *mprtprcv, *mprtpsnd, *mprtpply;
   gchar *padName,*padname2;
   guint basePort;
 
@@ -299,8 +298,9 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
   rtcpSink = gst_element_factory_make ("udpsink", NULL);
   rtcpSink_1 = gst_element_factory_make ("udpsink", NULL);
   rtcpSink_2 = gst_element_factory_make ("udpsink", NULL);
-  mprtpr = gst_element_factory_make("mprtpreceiver", NULL);
-  mprtcps = gst_element_factory_make("mprtcpsender", NULL);
+  mprtprcv = gst_element_factory_make("mprtpreceiver", NULL);
+  mprtpply = gst_element_factory_make("mprtpplayouter", NULL);
+  mprtpsnd = gst_element_factory_make("mprtpsender", NULL);
 
   g_object_set (rtpSrc_1, "port", basePort, "caps", session->caps, NULL);
   g_object_set (rtpSrc_2, "port", basePort + 1, "caps", session->caps, NULL);
@@ -316,7 +316,10 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
   g_object_set (rtcpSink, "port", basePort + 10, "host", "127.0.0.1",
 	"async", FALSE, NULL);
 
-  g_object_set (mprtpr, "pivot-clock-rate", clockrate, NULL);
+  g_object_set (mprtpply, "pivot-clock-rate", clockrate, NULL);
+
+  g_object_set(mprtpply, "join-subflow", 1, NULL);
+  g_object_set(mprtpply, "join-subflow", 2, NULL);
 
   g_print ("Connecting to %i/%i/%i/%i/%i/%i\n",
 		basePort, basePort + 1, basePort + 5,
@@ -328,7 +331,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
       (GCallback) request_aux_receiver, session);
 
   gst_bin_add_many (GST_BIN (pipeline), rtpSrc_1, rtpSrc_2, rtcpSrc, rtcpSink,
-	mprtpr, mprtcps, rtcpSink_1, rtcpSink_2, NULL);
+		  mprtpsnd, mprtprcv, mprtpply, rtcpSink_1, rtcpSink_2, NULL);
 
   g_signal_connect_data (rtpBin, "pad-added", G_CALLBACK (handle_new_stream),
       session_ref (session), (GClosureNotify) session_unref, 0);
@@ -336,25 +339,28 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
   g_signal_connect_data (rtpBin, "request-pt-map", G_CALLBACK (request_pt_map),
       session_ref (session), (GClosureNotify) session_unref, 0);
 
-  gst_element_link_pads (rtpSrc_1, "src", mprtpr, "sink_1");
-  gst_element_link_pads (rtpSrc_2, "src", mprtpr, "sink_2");
+  gst_element_link_pads (rtpSrc_1, "src", mprtprcv, "sink_1");
+  gst_element_link_pads (rtpSrc_2, "src", mprtprcv, "sink_2");
 
   padName = g_strdup_printf ("recv_rtp_sink_%u", session->sessionNum);
-  gst_element_link_pads (mprtpr, "rtp_src", rtpBin, padName);
-  gst_element_link_pads (rtcpSrc, "src", mprtpr, "rtcp_sink");
+  gst_element_link_pads (mprtprcv, "mprtp_src", mprtpply, "mprtp_sink");
+  gst_element_link_pads (mprtpply, "mprtp_src", rtpBin, padName);
+  gst_element_link_pads (rtcpSrc, "src", mprtprcv, "rtcp_sink");
   g_free (padName);
 
   padName = g_strdup_printf ("recv_rtcp_sink_%u", session->sessionNum);
-  gst_element_link_pads (mprtpr, "rtcp_src", rtpBin, padName);
-  gst_element_link_pads (mprtpr, "mprtcp_src", mprtcps, "mprtcp_sink");
+  gst_element_link_pads (mprtprcv, "rtcp_src", rtpBin, padName);
+  gst_element_link_pads (mprtprcv, "mprtcp_sr_src", mprtpply, "mprtcp_sr_sink");
   //gst_element_link_pads (rtcpSrc, "src", rtpBin, padName);
   g_free (padName);
+
+  gst_element_link_pads (mprtpply, "mprtcp_rr_src", mprtpsnd, "mprtcp_rr_sink");
 
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");
   //gst_element_link_pads (rtpBin, padName, mprtcps, "rtcp_sink");
-  gst_element_link_pads (mprtcps, "src_1", rtcpSink_1, "sink");
-  gst_element_link_pads (mprtcps, "src_2", rtcpSink_2, "sink");
+  gst_element_link_pads (mprtpsnd, "src_1", rtcpSink_1, "sink");
+  gst_element_link_pads (mprtpsnd, "src_2", rtcpSink_2, "sink");
   g_free (padName);
 
   session_unref (session);

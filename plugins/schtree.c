@@ -46,11 +46,13 @@ static void _schtree_delete(SchNode* parent, SchNode* node,
 static void _schtree_insert(SchNode** node,
 	MPRTPSSubflow* path, gint* change, gint level_value);
 static void schtree_commit_changes(SchTree *tree);
+static gboolean schtree_has_nc_nl_path(SchTree *this);
 static void _schnode_overlap_trees(SchNode *old_node, SchNode *new_node);
 static void schtree_setup_change(SchTree *tree, MPRTPSSubflow* path,  gfloat value);
 static void schtree_print(SchTree* tree);
 static void schtree_delete_path(SchTree *tree, MPRTPSSubflow* path);
-
+static void schtree_setup_bid_values(SchTree *tree, gfloat non_congested_non_lossy_share);
+static void schtree_change_bid_values(SchTree *tree, gfloat non_congested_non_lossy_share_change);
 static void _schnode_rdtor(SchNode* node);
 static SchNode* _schnode_ctor();
 static void _print_tree(SchNode* node, gint top, gint level);
@@ -86,6 +88,11 @@ schtree_init(SchTree* tree)
   tree->delete_path = schtree_delete_path;
   tree->commit_changes = schtree_commit_changes;
   tree->get_actual = schtree_get_actual;
+  tree->setup_bid_values = schtree_setup_bid_values;
+  tree->change_bid_values = schtree_change_bid_values;
+  tree->has_nc_nl_path = schtree_has_nc_nl_path;
+
+  tree->nc_nl_path_exists = FALSE;
   //tree->get_max_value = schtree_get_max_value;
   tree->get_next = schtree_get_next;
   tree->print = schtree_print;
@@ -95,6 +102,7 @@ schtree_init(SchTree* tree)
 	  tree->paths[i] = NULL;
 	  tree->path_values[i] = 0;
   }
+  tree->bid_const = 100.0;
 }
 
 static void
@@ -119,40 +127,117 @@ _schtree_loadup(SchNode* node, MPRTPSSubflow *path)
   }
 }
 
+void schtree_setup_bid_values(SchTree *tree, gfloat non_congested_non_lossy_share)
+{
+  g_rw_lock_writer_lock (&tree->rwmutex);
+  tree->non_congested_bid = non_congested_non_lossy_share * tree->bid_const;
+  tree->lossy_bid = (1.0 - non_congested_non_lossy_share) * 0.75 * tree->bid_const;
+  tree->congested_bid = (1.0 - non_congested_non_lossy_share) * 0.25 * tree->bid_const;
+//  g_print("bid values: %f-%f-%f\n",tree->non_congested_bid,
+//		  tree->lossy_bid, tree->congested_bid);
+
+  g_rw_lock_writer_unlock (&tree->rwmutex);
+}
+
+void schtree_change_bid_values(SchTree *tree, gfloat non_congested_non_lossy_share_change)
+{
+  gfloat new_non_congested_non_lossy_share;
+  g_rw_lock_reader_lock (&tree->rwmutex);
+  new_non_congested_non_lossy_share =  tree->non_congested_bid / tree->bid_const *
+		  (1.0 + non_congested_non_lossy_share_change);
+  g_rw_lock_reader_lock (&tree->rwmutex);
+  schtree_setup_bid_values(tree, new_non_congested_non_lossy_share);
+}
+
+gboolean schtree_has_nc_nl_path(SchTree *this)
+{
+  gboolean result;
+  g_rw_lock_reader_lock(&this->rwmutex);
+  result = this->nc_nl_path_exists;
+  g_rw_lock_reader_unlock(&this->rwmutex);
+  return result;
+}
+
 void
 schtree_commit_changes(SchTree *tree)
 {
   gint32 index, max_index = 0, path_num = 0;
   gfloat sum = 0.0;
-  gfloat max_value = 0.0, *value, actual_value;
+  gfloat max_value = 0.0, actual_value;
   SchNode *new_root = NULL;
   MPRTPSSubflow *path;
+  gboolean nc_nl_bid_added = FALSE;
+  gboolean l_bid_added = FALSE;
+  gboolean c_bid_added = FALSE;
+  gfloat nc_nl_sum = 0.0, c_sum = 0.0, l_sum = 0.0, bid_sum = 0.0;
+
   g_rw_lock_writer_lock (&tree->rwmutex);
+  tree->nc_nl_path_exists = FALSE;
 
   for(index = 0; index < MPRTP_SENDER_SCHTREE_MAX_PATH_NUM &&
       tree->paths[index] != NULL; ++index, ++path_num)
   {
-	actual_value = tree->path_values[index] + tree->path_delta_values[index];
+	path = tree->paths[index];
+	actual_value = (tree->path_values[index] + tree->path_delta_values[index]);
 	tree->path_delta_values[index] = 0.0;
+	if(actual_value <= 0.0){
+		actual_value = 0.0;
+	}
 	//g_print("tree->path_values[index]: %f, tree->path_delta_values[index]: %f, "
 		//	"actual value: %f\n", tree->path_values[index], tree->path_delta_values[index], actual_value);
-	tree->path_values[index] = actual_value >= 0.0 ? actual_value : 0.0;
+	tree->path_values[index] = actual_value;
+
     if(max_value < actual_value){
       max_index = index;
     }
-    sum += actual_value;
+    if(path->is_active(path)){
+      gboolean non_congested = path->is_non_congested(path);
+      gboolean non_lossy = path->is_non_lossy(path);
+      if(non_congested && non_lossy){
+        nc_nl_sum += actual_value;
+        bid_sum += (!nc_nl_bid_added) ? tree->non_congested_bid : 0.0;
+        nc_nl_bid_added = TRUE;
+        tree->nc_nl_path_exists = TRUE;
+      }else if(non_congested){
+    	l_sum += actual_value;
+    	bid_sum += (!l_bid_added) ? tree->lossy_bid : 0.0;
+    	l_bid_added = TRUE;
+      }else{
+    	c_sum += actual_value;
+    	bid_sum += (!c_bid_added) ? tree->congested_bid : 0.0;
+    	c_bid_added = TRUE;
+      }
+      sum += actual_value;
+    }
   }
 
   for(index = 0; index < path_num; ++index)
   {
     gint insert_value;
 	path = tree->paths[index];
+	gboolean non_congested = path->is_non_congested(path);
+	gboolean non_lossy = path->is_non_lossy(path);
+	if(non_congested && non_lossy){
+      actual_value = tree->path_values[index] / nc_nl_sum *
+    		         tree->non_congested_bid / bid_sum * (gfloat) tree->max_value;
+	}else if(non_congested){
+	      actual_value = tree->path_values[index] / l_sum *
+	    		         tree->lossy_bid / bid_sum * (gfloat) tree->max_value;
+	}else{
+		actual_value = tree->path_values[index] / c_sum *
+					   tree->congested_bid / bid_sum * (gfloat) tree->max_value;
+	}
+//
+//	actual_value =  tree->path_values[index] /
+//				    sum * (gfloat) tree->max_value;
 
-	actual_value =  tree->path_values[index] /
-				    sum * (gfloat) tree->max_value;
 	insert_value = (guint16) roundf(actual_value);
-     //g_print("%p -> insert: %d (%f%)\n",
-    	//	 tree, insert_value, actual_value / tree->max_value * 100.0);
+
+	//g_print("subflow %d new rate: %f\n", path->get_id(path),
+		//	tree->path_values[index] / sum);
+//
+     g_print("%p -> insert subflow %d: %d (%f%)\n",
+    		 tree, path->get_id(path), insert_value, actual_value / tree->max_value * 100.0);
 	 //g_print("path value is %f\n",tree->path_values[index]);
      if(tree->path_values[index] > 0.0){
        _schtree_insert(&new_root, path, &insert_value, tree->max_value);
@@ -167,6 +252,64 @@ schtree_commit_changes(SchTree *tree)
   g_rw_lock_writer_unlock (&tree->rwmutex);
 
 }
+
+//
+//void
+//schtree_commit_changes(SchTree *tree)
+//{
+//  gint32 index, max_index = 0, path_num = 0;
+//  gfloat sum = 0.0;
+//  gfloat max_value = 0.0, actual_value;
+//  SchNode *new_root = NULL;
+//  MPRTPSSubflow *path;
+//  gfloat bid;
+//  g_rw_lock_writer_lock (&tree->rwmutex);
+//
+//  for(index = 0; index < MPRTP_SENDER_SCHTREE_MAX_PATH_NUM &&
+//      tree->paths[index] != NULL; ++index, ++path_num)
+//  {
+//	bid = _get_bid_for_subflow(tree, tree->paths[index]);
+//	actual_value = (tree->path_values[index] + tree->path_delta_values[index]) * bid;
+//	tree->path_delta_values[index] = 0.0;
+//	//g_print("tree->path_values[index]: %f, tree->path_delta_values[index]: %f, "
+//		//	"actual value: %f\n", tree->path_values[index], tree->path_delta_values[index], actual_value);
+//	tree->path_values[index] = actual_value >= 0.0 ? actual_value : 0.0;
+//    if(max_value < actual_value){
+//      max_index = index;
+//    }
+//    sum += actual_value;
+//  }
+//
+//  for(index = 0; index < path_num; ++index)
+//  {
+//    gint insert_value;
+//	path = tree->paths[index];
+//
+//	actual_value =  tree->path_values[index] /
+//				    sum * (gfloat) tree->max_value;
+//
+//	insert_value = (guint16) roundf(actual_value);
+//
+//	//g_print("subflow %d new rate: %f\n", path->get_id(path),
+//		//	tree->path_values[index] / sum);
+//
+//     g_print("%p -> insert: %d (%f%)\n",
+//    		 tree, insert_value, actual_value / tree->max_value * 100.0);
+//	 //g_print("path value is %f\n",tree->path_values[index]);
+//     if(tree->path_values[index] > 0.0){
+//       _schtree_insert(&new_root, path, &insert_value, tree->max_value);
+//     }
+//  }
+//
+//  //check 128 integrity
+//  _schnode_rdtor(tree->root);
+//  tree->root = new_root;
+//  _schtree_loadup(tree->root, tree->paths[max_index]);
+//  //tree->print(tree);
+//  g_rw_lock_writer_unlock (&tree->rwmutex);
+//
+//}
+
 
 void _schnode_rdtor(SchNode* node)
 {
@@ -398,7 +541,7 @@ void _print_tree(SchNode* node, gint top, gint level)
   gint i;
 
   for(i = 0; i < level; ++i) g_print("--");
-  g_print("%p (%p)\n", node->path, top>>level);
+  g_print("%p (%d)\n", node->path, top>>level);
   _print_tree(node->left, top, level+1);
   _print_tree(node->right, top, level+1);
 }

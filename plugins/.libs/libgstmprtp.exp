@@ -13,9 +13,9 @@ gst_mprtcp_riport_block_add_xr_rfc2743
 gst_mprtcp_riport_getdown
 gst_mprtcp_riport_init
 gst_mprtcp_riport_setup
-gst_mprtcpreceiver_get_type
-gst_mprtcpsender_get_type
+gst_mprtpplayouter_get_type
 gst_mprtpreceiver_get_type
+gst_mprtpscheduler_get_type
 gst_mprtpsender_get_type
 gst_plugin_desc
 gst_print_mprtcp

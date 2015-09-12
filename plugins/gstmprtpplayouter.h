@@ -46,6 +46,7 @@ struct _GstMprtpplayouter
   guint64        ext_rtptime;
   GList*         subflows;
   gboolean       compound_sending;
+  gboolean       subflow_riports_enabled;
   GstPad*        mprtp_srcpad;
   GstPad*        mprtp_sinkpad;
   GstPad*        mprtcp_sr_sinkpad;

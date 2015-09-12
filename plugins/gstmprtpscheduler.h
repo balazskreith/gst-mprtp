@@ -58,6 +58,8 @@ struct _GstMprtpscheduler
   guint32        ssrc;
   GstSegment     segment;
   guint8         ext_header_id;
+  gboolean       subflow_riports_enabled;
+  gboolean       manual_sending_rates_enabled;
   guint16        mprtcp_mtu;
   gfloat         charge_value;
   gfloat         alpha_value;

@@ -70,6 +70,10 @@ static GstFlowReturn gst_mprtpplayouter_mprtp_sink_chain (GstPad *pad, GstObject
 static GstFlowReturn gst_mprtpplayouter_mprtcp_sr_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *buffer);
 static void gst_mprtpplayouter_mprtcp_riporter_run (void *data);
 static void gst_mprtpplayouter_playouter_run (void *data);
+static gboolean gst_mprtpplayouter_sink_query(GstPad *sinkpad, GstObject *parent,
+        GstQuery *query);
+static gboolean gst_mprtpplayouter_sink_event(GstPad *pad, GstObject *parent,
+        GstEvent *event);
 
 static gboolean _select_subflow(GstMprtpplayouter *this, guint16 id,
 		MPRTPRSubflow **result);
@@ -87,7 +91,8 @@ enum
   PROP_PIVOT_SSRC,
   PROP_JOIN_SUBFLOW,
   PROP_DETACH_SUBFLOW,
-  PROP_PIVOT_CLOCK_RATE
+  PROP_PIVOT_CLOCK_RATE,
+  PROP_SUBFLOW_RIPORTS_ENABLED,
 };
 
 /* pad templates */
@@ -182,6 +187,11 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                 255, 0,
 				G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_SUBFLOW_RIPORTS_ENABLED,
+            g_param_spec_boolean ("subflow-riports-enabled", "enable or disable the subflow riports",
+                "Enable or Disable sending subflow SR riports", TRUE,
+				G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   element_class->change_state = GST_DEBUG_FUNCPTR (gst_mprtpplayouter_change_state);
   element_class->query = GST_DEBUG_FUNCPTR (gst_mprtpplayouter_query);
 }
@@ -207,6 +217,10 @@ gst_mprtpplayouter_init (GstMprtpplayouter *mprtpplayouter)
 		gst_pad_set_chain_function (mprtpplayouter->mprtp_sinkpad,
 		    GST_DEBUG_FUNCPTR(gst_mprtpplayouter_mprtp_sink_chain));
 
+		gst_pad_set_query_function(mprtpplayouter->mprtp_sinkpad,
+				GST_DEBUG_FUNCPTR(gst_mprtpplayouter_sink_query));
+		gst_pad_set_event_function(mprtpplayouter->mprtp_sinkpad,
+				GST_DEBUG_FUNCPTR(gst_mprtpplayouter_sink_event));
 
     mprtpplayouter->ext_header_id = MPRTP_PLAYOUTER_DEFAULT_EXTENSION_HEADER_ID;
     mprtpplayouter->playout_delay = 0.0;
@@ -218,6 +232,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter *mprtpplayouter)
     mprtpplayouter->compound_sending = FALSE;
     mprtpplayouter->flowable = FALSE;
     mprtpplayouter->rtcp_sent_octet_sum = 0;
+    mprtpplayouter->subflow_riports_enabled = TRUE;
     g_mutex_init(&mprtpplayouter->mutex);
 }
 
@@ -260,6 +275,11 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
   	  _detach_subflow(mprtpplayouter, g_value_get_uint(value));
   	  THIS_UNLOCK(mprtpplayouter);
   	  break;
+  case PROP_SUBFLOW_RIPORTS_ENABLED:
+ 	  THIS_LOCK(mprtpplayouter);
+ 	  mprtpplayouter->subflow_riports_enabled = g_value_get_boolean(value);
+ 	  THIS_UNLOCK(mprtpplayouter);
+ 	break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -290,11 +310,52 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
     	  g_value_set_uint(value, mprtpplayouter->pivot_ssrc);
     	  THIS_UNLOCK(mprtpplayouter);
     	break;
+  case PROP_SUBFLOW_RIPORTS_ENABLED:
+  	  THIS_LOCK(mprtpplayouter);
+  	  g_value_set_boolean(value, mprtpplayouter->subflow_riports_enabled);
+  	  THIS_UNLOCK(mprtpplayouter);
+  	break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
   }
 }
+
+gboolean gst_mprtpplayouter_sink_query(GstPad *sinkpad, GstObject *parent,
+        GstQuery *query)
+{
+	GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (parent);
+	gboolean result;
+	GST_DEBUG_OBJECT (this, "query");
+	switch (GST_QUERY_TYPE (query)) {
+
+	default:
+	    result = gst_pad_peer_query(this->mprtp_srcpad, query);
+	  break;
+	}
+
+	return result;
+}
+
+
+static gboolean gst_mprtpplayouter_sink_event(GstPad *pad, GstObject *parent,
+        GstEvent *event)
+{
+	GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (parent);
+	gboolean result;
+	GstPad *peer;
+
+	GST_DEBUG_OBJECT (this, "sink event");
+	switch (GST_QUERY_TYPE (event)) {
+	default:
+	  peer = gst_pad_get_peer(this->mprtp_srcpad);
+      result = gst_pad_send_event(peer, event);
+	  break;
+	}
+
+	return result;
+}
+
 
 void
 gst_mprtpplayouter_dispose (GObject * object)
@@ -498,7 +559,7 @@ gst_mprtpplayouter_mprtcp_riporter_run (void *data)
   now = gst_clock_get_time(GST_ELEMENT_CLOCK(this));
   next_scheduler_time = 0;
   THIS_LOCK(this);
-  if(!this->flowable){
+  if(!this->flowable || !this->subflow_riports_enabled){
     goto gst_mprtpplayouter_mprtcp_riporter_run_done;
   }
   compound_sending = this->compound_sending;

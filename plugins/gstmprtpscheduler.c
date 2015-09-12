@@ -78,9 +78,11 @@ static GstFlowReturn gst_mprtpscheduler_rtp_sink_chain (GstPad *pad, GstObject *
 static GstFlowReturn gst_mprtpscheduler_rtp_sink_chainlist (GstPad *pad, GstObject *parent, GstBufferList *list);
 
 static GstFlowReturn gst_mprtpscheduler_mprtcp_rr_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *outbuf);
-
+static gboolean		 gst_mprtpscheduler_rtp_sink	(GstPad *pad, GstObject *parent,
+                                                                 GstEvent *event);
 static void gst_mprtp_sender_scheduler_run (void *data);
-
+static gboolean gst_mprtpscheduler_sink_query(GstPad *pad, GstObject *parent,
+        GstQuery *query);
 static void
 gst_mprtp_sender_mprtcp_riporter_run (void *data);
 
@@ -107,6 +109,9 @@ enum
   PROP_EXT_HEADER_ID,
   PROP_JOIN_SUBFLOW,
   PROP_DETACH_SUBFLOW,
+  PROP_SUBFLOW_RIPORTS_ENABLED,
+  PROP_SUBFLOW_MANUAL_SENDING_RATE_ENABLED,
+  PROP_SUBFLOW_RATE,
 };
 
 /* pad templates */
@@ -202,11 +207,29 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
                   255, 0,
                   G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-    g_object_class_install_property (gobject_class, PROP_DETACH_SUBFLOW,
-              g_param_spec_uint ("detach-subflow", "the subflow id requested to detach",
-                  "Detach a subflow with a given id.", 0,
-                  255, 0,
-  				G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (gobject_class, PROP_DETACH_SUBFLOW,
+            g_param_spec_uint ("detach-subflow", "the subflow id requested to detach",
+                "Detach a subflow with a given id.", 0,
+                255, 0,
+				G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_SUBFLOW_RIPORTS_ENABLED,
+            g_param_spec_boolean ("subflow-riports-enabled", "enable or disable the subflow riports",
+                "Enable or Disable sending subflow SR riports", TRUE,
+				G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_SUBFLOW_MANUAL_SENDING_RATE_ENABLED,
+            g_param_spec_boolean ("subflow-manual-rate-enabled", "Enable or disable the subflow rate manual changes",
+                "Enable or disable the subflow rate manual changes", FALSE,
+				G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_SUBFLOW_RATE,
+        g_param_spec_value_array ("subflow-rate", "Set subflow rate",
+            "Setup the sending rate for a specific subflow",
+            g_param_spec_uint ("rates", "subflow id and rate ",
+                "Filter coefficient", 0, 255, 0.0,
+                G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS),
+			G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 }
 /*
 static gboolean
@@ -236,7 +259,7 @@ gst_mprtpscheduler_rtp_event_handler_done:
 static gboolean
 gst_mprtpscheduler_mprtp_src_event (GstPad * pad, GstObject * parent, GstEvent * event)
 {
-  //GstMprtpscheduler *this;
+  GstMprtpscheduler *this;
   gboolean result;
 //  const GstStructure *s;
 
@@ -244,8 +267,8 @@ gst_mprtpscheduler_mprtp_src_event (GstPad * pad, GstObject * parent, GstEvent *
 //  MPRTPSSubflow *subflow;
 //  guint subflow_id, event_value;
 
-  //this = GST_MPRTPSCHEDULER (parent);
-  //THIS_LOCK(this);
+  this = GST_MPRTPSCHEDULER (parent);
+  THIS_LOCK(this);
   switch(GST_EVENT_TYPE(event))
   {
 //    case GST_EVENT_CUSTOM_UPSTREAM:
@@ -281,6 +304,7 @@ gst_mprtpscheduler_mprtp_src_event (GstPad * pad, GstObject * parent, GstEvent *
     default:
       result = gst_pad_event_default (pad, parent, event);
   }
+  THIS_UNLOCK(this);
   return result;
 }
 
@@ -325,6 +349,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler *mprtpscheduler)
 			GST_DEBUG_FUNCPTR(gst_mprtpscheduler_rtp_sink_chain));
     gst_pad_set_chain_list_function (mprtpscheduler->rtp_sinkpad,
 			GST_DEBUG_FUNCPTR(gst_mprtpscheduler_rtp_sink_chainlist));
+    gst_pad_set_event_function(mprtpscheduler->rtp_sinkpad,
+    		gst_mprtpscheduler_rtp_sink);
 
     gst_element_add_pad (GST_ELEMENT(mprtpscheduler), mprtpscheduler->rtp_sinkpad);
 
@@ -333,6 +359,9 @@ gst_mprtpscheduler_init (GstMprtpscheduler *mprtpscheduler)
 
     gst_pad_set_chain_function (mprtpscheduler->mprtcp_rr_sinkpad,
 			GST_DEBUG_FUNCPTR(gst_mprtpscheduler_mprtcp_rr_sink_chain));
+
+    gst_pad_set_query_function(mprtpscheduler->rtp_sinkpad,
+    		GST_DEBUG_FUNCPTR(gst_mprtpscheduler_sink_query));
 
     gst_element_add_pad (GST_ELEMENT(mprtpscheduler),
     		mprtpscheduler->mprtcp_rr_sinkpad);
@@ -364,6 +393,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler *mprtpscheduler)
   mprtpscheduler->ssrc = g_random_int();
   mprtpscheduler->flowable = FALSE;
   mprtpscheduler->subflows = NULL;
+  mprtpscheduler->subflow_riports_enabled = TRUE;
+  mprtpscheduler->manual_sending_rates_enabled = FALSE;
 
   schtree->setup_bid_values(schtree, 0.675);
 /*
@@ -381,6 +412,12 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
     const GValue * value, GParamSpec * pspec)
 {
   GstMprtpscheduler *mprtpscheduler = GST_MPRTPSCHEDULER (object);
+  GValueArray *array;
+  GValue *v;
+  guint subflow_id, rate;
+  MPRTPSSubflow *subflow;
+  GList *it;
+  SchTree *schtree;
   GST_DEBUG_OBJECT (mprtpscheduler, "set_property");
 
   switch (property_id) {
@@ -420,8 +457,34 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       THIS_UNLOCK(mprtpscheduler);
     break;
     case PROP_DETACH_SUBFLOW:
+	  THIS_LOCK(mprtpscheduler);
+	  _detach_subflow(mprtpscheduler, g_value_get_uint(value));
+	  THIS_UNLOCK(mprtpscheduler);
+	break;
+    case PROP_SUBFLOW_MANUAL_SENDING_RATE_ENABLED:
+	  THIS_LOCK(mprtpscheduler);
+	  mprtpscheduler->manual_sending_rates_enabled = g_value_get_boolean(value);
+	  THIS_UNLOCK(mprtpscheduler);
+	break;
+    case PROP_SUBFLOW_RIPORTS_ENABLED:
+	  THIS_LOCK(mprtpscheduler);
+	  mprtpscheduler->subflow_riports_enabled = g_value_get_boolean(value);
+	  THIS_UNLOCK(mprtpscheduler);
+	break;
+    case PROP_SUBFLOW_RATE:
       THIS_LOCK(mprtpscheduler);
-      _detach_subflow(mprtpscheduler, g_value_get_uint(value));
+      schtree = mprtpscheduler->schtree;
+      array = g_value_dup_boxed (value);
+      v = g_value_array_get_nth (array, 0);
+      subflow_id = g_value_get_uint (v);
+      v = g_value_array_get_nth (array, 1);
+      rate = g_value_get_uint (v);
+      for(it = mprtpscheduler->subflows; it != NULL; it = it->next){
+    	subflow = it->data;
+    	if(subflow->get_id(subflow) == subflow_id){
+    	  schtree->setup_sending_rate(schtree, subflow, (gfloat)rate);
+    	}
+      }
       THIS_UNLOCK(mprtpscheduler);
     break;
     default:
@@ -469,6 +532,16 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
   	  g_value_set_uint(value, mprtpscheduler->mprtcp_mtu);
   	  THIS_UNLOCK(mprtpscheduler);
   	  break;
+  case PROP_SUBFLOW_RIPORTS_ENABLED:
+ 	  THIS_LOCK(mprtpscheduler);
+ 	  g_value_set_boolean(value, mprtpscheduler->subflow_riports_enabled);
+ 	  THIS_UNLOCK(mprtpscheduler);
+ 	break;
+  case PROP_SUBFLOW_MANUAL_SENDING_RATE_ENABLED:
+ 	  THIS_LOCK(mprtpscheduler);
+ 	  g_value_set_boolean(value, mprtpscheduler->manual_sending_rates_enabled);
+ 	  THIS_UNLOCK(mprtpscheduler);
+ 	break;
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
   break;
@@ -533,6 +606,7 @@ gst_mprtpscheduler_change_state (GstElement * element, GstStateChange transition
       break;
   }
 
+
   ret = GST_ELEMENT_CLASS (gst_mprtpscheduler_parent_class)->change_state (element, transition);
 
   switch (transition) {
@@ -563,7 +637,29 @@ gst_mprtpscheduler_change_state (GstElement * element, GstStateChange transition
   return ret;
 }
 
+static gboolean
+gst_mprtpscheduler_rtp_sink	(GstPad *pad, GstObject *parent, GstEvent *event)
+{
+  gboolean result;
+  GstMprtpscheduler *this = GST_MPRTPSCHEDULER(parent);
+  if(GST_EVENT_TYPE(event) == GST_EVENT_STREAM_START &&
+     gst_task_get_state (this->scheduler) != GST_TASK_STARTED)
+  {
+    gst_task_start (this->scheduler);
+	gst_task_start (this->riporter);
+  }
 
+  if(GST_EVENT_TYPE(event) == GST_EVENT_EOS &&
+     gst_task_get_state (this->scheduler) != GST_TASK_STOPPED)
+  {
+    gst_task_stop (this->scheduler);
+    gst_task_stop (this->riporter);
+  }
+
+  GstPad *peer = gst_pad_get_peer(this->mprtp_srcpad);
+  result = gst_pad_send_event(peer, event);
+  return result;
+}
 
 
 
@@ -631,6 +727,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *bu
   THIS_LOCK(this);
 
   if(this->no_active_subflows){
+	  g_print("no active subflow");
     g_cond_wait(&this->scheduler_cond, &this->subflows_mutex);
   }
   //subflow = schtree->get_next(schtree);
@@ -767,6 +864,24 @@ gst_mprtpscheduler_mprtcp_sink_chain_done:
 	return result;
 }
 
+
+static gboolean gst_mprtpscheduler_sink_query(GstPad *sinkpad, GstObject *parent,
+        GstQuery *query)
+{
+	GstMprtpscheduler *this = GST_MPRTPSCHEDULER (parent);
+	gboolean result;
+	GST_DEBUG_OBJECT (this, "query");
+	switch (GST_QUERY_TYPE (query)) {
+
+	default:
+	    result = gst_pad_peer_query(this->mprtp_srcpad, query);
+	  break;
+	}
+
+	return result;
+}
+
+
 static void _set_charge_value(GstMprtpscheduler* this, gfloat *charge_value)
 {
   GList *it;
@@ -868,7 +983,6 @@ gst_mprtp_sender_scheduler_run (void *data)
   guint congested_subflow_num = 0, lossy_subflow_num = 0;
   guint non_congested_non_lossy_subflow_num = 0;
   guint active_subflow_num = 0;
-
   GST_DEBUG_OBJECT(this, "Scheduler task is started");
   THIS_LOCK(this);
   had_active_subflows = !this->no_active_subflows;
@@ -892,6 +1006,9 @@ gst_mprtp_sender_scheduler_run (void *data)
 		commit_schtree_changes = TRUE;
 		_delete_subflow(this, subflow);
 		continue;
+    }
+    if(this->manual_sending_rates_enabled){
+    	continue;
     }
     subflow_id = subflow->get_id(subflow);
     //check latency
@@ -1019,8 +1136,8 @@ gst_mprtp_sender_scheduler_run (void *data)
   if(non_congested_non_lossy_subflow_num < active_subflow_num){
     //increasing decreasing ratio!;
   }
-
-  now = gst_clock_get_time(GST_ELEMENT_CLOCK(this));
+  GstClock *sysclock = gst_system_clock_obtain();
+  now = gst_clock_get_time(sysclock);
   if(this->last_schtree_commit < now - 60 * GST_SECOND){
     commit_schtree_changes = TRUE;
   }
@@ -1049,13 +1166,14 @@ gst_mprtp_sender_scheduler_run_done:
   rand = g_random_double();
   next_scheduler_time = now + GST_SECOND * (0.5 + rand);
   GST_DEBUG_OBJECT(this, "Next scheduling interval time is %u", next_scheduler_time);
-  clock_id = gst_clock_new_single_shot_id (GST_ELEMENT_CLOCK(this), next_scheduler_time);
+  clock_id = gst_clock_new_single_shot_id (sysclock, next_scheduler_time);
 
   THIS_UNLOCK(this);
 
   if(gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED){
     GST_WARNING_OBJECT(this, "The scheduler clock wait is interrupted");
   }
+  g_object_unref (sysclock);
   gst_clock_id_unref (clock_id);
 
 }
@@ -1081,8 +1199,13 @@ gst_mprtp_sender_mprtcp_riporter_run (void *data)
   guint rtcp_packet_size, rtcp_packet_size_compound = 0;
 
 
-  now = gst_clock_get_time(GST_ELEMENT_CLOCK(this));
+  GstClock *sysclock = gst_system_clock_obtain();
+  now = gst_clock_get_time(sysclock);
   THIS_LOCK(this);
+  if(!this->subflow_riports_enabled){
+	  goto gst_mprtpreceiver_mprtcp_riporter_run_end;
+  }
+
   compound_sending = FALSE; //this->mprtcp_riport_compound_sending;
   for(first = TRUE, it = this->subflows; it != NULL; it = it->next){
     subflow = it->data;
@@ -1136,11 +1259,12 @@ gst_mprtpreceiver_mprtcp_riporter_run_end:
   THIS_UNLOCK(this);
 
   next_scheduler_time = now + GST_MSECOND * 100;
-  clock_id = gst_clock_new_single_shot_id (GST_ELEMENT_CLOCK(this), next_scheduler_time);
+  clock_id = gst_clock_new_single_shot_id (sysclock, next_scheduler_time);
   if(gst_clock_id_wait (clock_id, &clock_jitter) == GST_CLOCK_UNSCHEDULED){
     GST_WARNING_OBJECT(this, "The scheduler clock wait is interrupted");
   }
   gst_clock_id_unref (clock_id);
+  g_object_unref (sysclock);
 
 }
 

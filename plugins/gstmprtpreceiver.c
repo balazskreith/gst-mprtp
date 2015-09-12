@@ -70,7 +70,10 @@ static void gst_mprtpreceiver_release_pad (GstElement * element, GstPad * pad);
 static GstStateChangeReturn
 gst_mprtpreceiver_change_state (GstElement * element, GstStateChange transition);
 static gboolean gst_mprtpreceiver_query (GstElement * element, GstQuery * query);
-
+static gboolean gst_mprtpreceiver_sink_query(GstPad *pad, GstObject *parent,
+        GstQuery *query);
+static gboolean gst_mprtpreceiver_sink_event(GstPad *pad, GstObject *parent,
+        GstEvent *event);
 static GstPadLinkReturn gst_mprtpreceiver_sink_link (GstPad *pad, GstObject *parent, GstPad *peer);
 static void gst_mprtpreceiver_sink_unlink (GstPad *pad, GstObject *parent);
 static GstFlowReturn gst_mprtpreceiver_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *buffer);
@@ -203,6 +206,7 @@ gst_mprtpreceiver_init (GstMprtpreceiver *mprtpreceiver)
   gst_element_add_pad (GST_ELEMENT(mprtpreceiver), mprtpreceiver->mprtp_srcpad);
 
   g_rw_lock_init(&mprtpreceiver->rwmutex);
+  mprtpreceiver->caps_not_set = TRUE;
 }
 
 void
@@ -278,6 +282,10 @@ gst_mprtpreceiver_request_new_pad (GstElement * element, GstPadTemplate * templ,
 	THIS_WRITELOCK(this);
 
 	sinkpad = gst_pad_new_from_template (templ, name);
+	gst_pad_set_query_function(sinkpad,
+			GST_DEBUG_FUNCPTR(gst_mprtpreceiver_sink_query));
+	gst_pad_set_event_function(sinkpad,
+			GST_DEBUG_FUNCPTR(gst_mprtpreceiver_sink_event));
 	gst_pad_set_link_function (sinkpad,
 	            GST_DEBUG_FUNCPTR(gst_mprtpreceiver_sink_link));
 	gst_pad_set_unlink_function (sinkpad,
@@ -338,6 +346,41 @@ gst_mprtpreceiver_change_state (GstElement * element, GstStateChange transition)
   return ret;
 }
 
+static gboolean gst_mprtpreceiver_sink_query(GstPad *sinkpad, GstObject *parent,
+        GstQuery *query)
+{
+	GstMprtpreceiver *this = GST_MPRTPRECEIVER (parent);
+	gboolean result;
+	GST_DEBUG_OBJECT (this, "query");
+	g_print("QUERY to the sink: %s\n",GST_QUERY_TYPE_NAME(query));
+	switch (GST_QUERY_TYPE (query)) {
+
+	default:
+	    result = gst_pad_peer_query(this->mprtp_srcpad, query);
+	  break;
+	}
+
+	return result;
+}
+
+static gboolean gst_mprtpreceiver_sink_event(GstPad *pad, GstObject *parent,
+        GstEvent *event)
+{
+	GstMprtpreceiver *this = GST_MPRTPRECEIVER (parent);
+	gboolean result;
+	GstPad *peer;
+
+	GST_DEBUG_OBJECT (this, "sink event");
+	g_print("EVENT to the sink: %s\n",GST_EVENT_TYPE_NAME(event));
+	switch (GST_QUERY_TYPE (event)) {
+	default:
+	  peer = gst_pad_get_peer(this->mprtp_srcpad);
+      result = gst_pad_send_event(peer, event);
+	  break;
+	}
+
+	return result;
+}
 
 static gboolean
 gst_mprtpreceiver_query (GstElement * element, GstQuery * query)
@@ -346,6 +389,7 @@ gst_mprtpreceiver_query (GstElement * element, GstQuery * query)
   gboolean ret;
 
   GST_DEBUG_OBJECT (mprtpreceiver, "query");
+  g_print("QUERY to the element: %s\n",GST_QUERY_TYPE_NAME(query));
   switch (GST_QUERY_TYPE (query)) {
     default:
       ret = GST_ELEMENT_CLASS (gst_mprtpreceiver_parent_class)->query (element, query);

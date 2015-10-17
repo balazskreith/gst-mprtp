@@ -73,12 +73,21 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([ ], [ ])], [
 ])
 
 dnl set the plugindir where plugins should be installed (for plugins/Makefile.am)
-if test "x${prefix}" = "x$HOME"; then
-  plugindir="$HOME/.gstreamer-1.0/plugins"
-else
-  plugindir="\$(libdir)/gstreamer-1.0"
-fi
+dnl if test "x${prefix}" = "x$HOME"; then
+dnl   plugindir="$HOME/.gstreamer-1.0/plugins"
+dnl else
+dnl   plugindir="\$(libdir)/gstreamer-1.0"
+dnl fi
+plugindir="\$(libdir)/gstreamer-1.0"
 AC_SUBST(plugindir)
+
+dnl set location of plugin directory
+dnl AG_GST_SET_PLUGINDIR
+
+GST_API_VERSION=1.0
+AC_SUBST(GST_API_VERSION)
+AC_DEFINE_UNQUOTED(GST_API_VERSION, "$GST_API_VERSION",
+  [GStreamer API Version])
 
 dnl set proper LDFLAGS for plugins
 GST_PLUGIN_LDFLAGS='-module -avoid-version -export-symbols-regex [_]*\(gst_\|Gst\|GST_\).*'

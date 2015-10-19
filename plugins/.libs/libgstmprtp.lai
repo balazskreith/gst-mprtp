@@ -11,13 +11,13 @@ dlname='libgstmprtp.so'
 library_names='libgstmprtp.so libgstmprtp.so libgstmprtp.so'
 
 # The name of the static archive.
-old_library='libgstmprtp.a'
+old_library=''
 
 # Linker flags that can not go in dependency_libs.
 inherited_linker_flags=' -pthread'
 
 # Libraries that this one depends upon.
-dependency_libs=' -L/usr/local/lib /usr/local/lib/libgstcontroller-1.0.la /usr/local/lib/libgstrtp-1.0.la /usr/local/lib/libgstbase-1.0.la /usr/local/lib/libgstreamer-1.0.la -lgmodule-2.0 -lm -lrt -ldl -lgobject-2.0 -lglib-2.0'
+dependency_libs=' -L/usr/local/lib /usr/local/lib/libgstnet-1.0.la -lgio-2.0 /usr/local/lib/libgstrtp-1.0.la /usr/local/lib/libgstbase-1.0.la /usr/local/lib/libgstreamer-1.0.la -lgmodule-2.0 -lm -lrt -ldl -lgobject-2.0 -lglib-2.0'
 
 # Names of additional weak libraries provided by this library
 weak_library_names=''

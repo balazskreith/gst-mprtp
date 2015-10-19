@@ -1,5 +1,5 @@
 libgstmprtp_la-gstmprtcpbuffer.lo: gstmprtcpbuffer.c \
- /usr/include/stdc-predef.h ../../config.h /usr/include/stdlib.h \
+ /usr/include/stdc-predef.h ../config.h /usr/include/stdlib.h \
  /usr/include/features.h /usr/include/x86_64-linux-gnu/sys/cdefs.h \
  /usr/include/x86_64-linux-gnu/bits/wordsize.h \
  /usr/include/x86_64-linux-gnu/gnu/stubs.h \
@@ -100,6 +100,14 @@ libgstmprtp_la-gstmprtcpbuffer.lo: gstmprtcpbuffer.c \
  /usr/include/glib-2.0/glib/gvarianttype.h \
  /usr/include/glib-2.0/glib/gvariant.h \
  /usr/include/glib-2.0/glib/gversion.h \
+ /usr/include/glib-2.0/glib/deprecated/gallocator.h \
+ /usr/include/glib-2.0/glib/deprecated/gcache.h \
+ /usr/include/glib-2.0/glib/deprecated/gcompletion.h \
+ /usr/include/glib-2.0/glib/deprecated/gmain.h \
+ /usr/include/glib-2.0/glib/deprecated/grel.h \
+ /usr/include/glib-2.0/glib/deprecated/gthread.h /usr/include/pthread.h \
+ /usr/include/sched.h /usr/include/x86_64-linux-gnu/bits/sched.h \
+ /usr/include/x86_64-linux-gnu/bits/setjmp.h \
  /usr/local/include/gstreamer-1.0/gst/glib-compat.h \
  /usr/local/include/gstreamer-1.0/gst/gstenumtypes.h \
  /usr/include/glib-2.0/glib-object.h \
@@ -196,7 +204,7 @@ libgstmprtp_la-gstmprtcpbuffer.lo: gstmprtcpbuffer.c \
 
 /usr/include/stdc-predef.h:
 
-../../config.h:
+../config.h:
 
 /usr/include/stdlib.h:
 
@@ -443,6 +451,26 @@ libgstmprtp_la-gstmprtcpbuffer.lo: gstmprtcpbuffer.c \
 /usr/include/glib-2.0/glib/gvariant.h:
 
 /usr/include/glib-2.0/glib/gversion.h:
+
+/usr/include/glib-2.0/glib/deprecated/gallocator.h:
+
+/usr/include/glib-2.0/glib/deprecated/gcache.h:
+
+/usr/include/glib-2.0/glib/deprecated/gcompletion.h:
+
+/usr/include/glib-2.0/glib/deprecated/gmain.h:
+
+/usr/include/glib-2.0/glib/deprecated/grel.h:
+
+/usr/include/glib-2.0/glib/deprecated/gthread.h:
+
+/usr/include/pthread.h:
+
+/usr/include/sched.h:
+
+/usr/include/x86_64-linux-gnu/bits/sched.h:
+
+/usr/include/x86_64-linux-gnu/bits/setjmp.h:
 
 /usr/local/include/gstreamer-1.0/gst/glib-compat.h:
 

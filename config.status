@@ -551,8 +551,11 @@ double_quote_subst='s/\(["`\\]\)/\\\1/g'
 delay_variable_subst='s/\\\\\\\\\\\$/\\\\\\$/g'
 macro_version='2.4.2'
 macro_revision='1.3337'
+AS='as'
+DLLTOOL='false'
+OBJDUMP='objdump'
+enable_static='no'
 enable_shared='yes'
-enable_static='yes'
 pic_mode='default'
 enable_fast_install='yes'
 SHELL='/bin/bash'
@@ -582,12 +585,10 @@ lt_cv_to_host_file_cmd='func_convert_file_noop'
 lt_cv_to_tool_file_cmd='func_convert_file_noop'
 reload_flag=' -r'
 reload_cmds='$LD$reload_flag -o $output$reload_objs'
-OBJDUMP='objdump'
 deplibs_check_method='pass_all'
 file_magic_cmd='$MAGIC_CMD'
 file_magic_glob=''
 want_nocaseglob='no'
-DLLTOOL='false'
 sharedlib_from_linklib_cmd='printf %s\n'
 AR='ar'
 AR_FLAGS='cru'
@@ -677,9 +678,9 @@ hardcode_into_libs='yes'
 sys_lib_search_path_spec='/usr/lib/gcc/x86_64-linux-gnu/4.8 /usr/lib/x86_64-linux-gnu /usr/lib /lib/x86_64-linux-gnu /lib '
 sys_lib_dlsearch_path_spec='/lib /usr/lib /usr/lib/x86_64-linux-gnu/libfakeroot /usr/lib/i386-linux-gnu/mesa /lib/i386-linux-gnu /usr/lib/i386-linux-gnu /lib/i686-linux-gnu /usr/lib/i686-linux-gnu /usr/local/lib /lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu/mesa-egl /usr/lib/x86_64-linux-gnu/mesa /usr/lib/x86_64-linux-gnu/mir/clientplatform/mesa '
 hardcode_action='immediate'
-enable_dlopen='unknown'
-enable_dlopen_self='unknown'
-enable_dlopen_self_static='unknown'
+enable_dlopen='yes'
+enable_dlopen_self='yes'
+enable_dlopen_self_static='no'
 old_striplib='strip --strip-debug'
 striplib='strip --strip-unneeded'
 
@@ -696,7 +697,7 @@ _LTECHO_EOF'
 }
 
 # Quote evaled strings.
-for var in SHELL ECHO PATH_SEPARATOR SED GREP EGREP FGREP LD NM LN_S lt_SP2NL lt_NL2SP reload_flag OBJDUMP deplibs_check_method file_magic_cmd file_magic_glob want_nocaseglob DLLTOOL sharedlib_from_linklib_cmd AR AR_FLAGS archiver_list_spec STRIP RANLIB CC CFLAGS compiler lt_cv_sys_global_symbol_pipe lt_cv_sys_global_symbol_to_cdecl lt_cv_sys_global_symbol_to_c_name_address lt_cv_sys_global_symbol_to_c_name_address_lib_prefix nm_file_list_spec lt_prog_compiler_no_builtin_flag lt_prog_compiler_pic lt_prog_compiler_wl lt_prog_compiler_static lt_cv_prog_compiler_c_o need_locks MANIFEST_TOOL DSYMUTIL NMEDIT LIPO OTOOL OTOOL64 shrext_cmds export_dynamic_flag_spec whole_archive_flag_spec compiler_needs_object with_gnu_ld allow_undefined_flag no_undefined_flag hardcode_libdir_flag_spec hardcode_libdir_separator exclude_expsyms include_expsyms file_list_spec variables_saved_for_relink libname_spec library_names_spec soname_spec install_override_mode finish_eval old_striplib striplib; do
+for var in AS DLLTOOL OBJDUMP SHELL ECHO PATH_SEPARATOR SED GREP EGREP FGREP LD NM LN_S lt_SP2NL lt_NL2SP reload_flag deplibs_check_method file_magic_cmd file_magic_glob want_nocaseglob sharedlib_from_linklib_cmd AR AR_FLAGS archiver_list_spec STRIP RANLIB CC CFLAGS compiler lt_cv_sys_global_symbol_pipe lt_cv_sys_global_symbol_to_cdecl lt_cv_sys_global_symbol_to_c_name_address lt_cv_sys_global_symbol_to_c_name_address_lib_prefix nm_file_list_spec lt_prog_compiler_no_builtin_flag lt_prog_compiler_pic lt_prog_compiler_wl lt_prog_compiler_static lt_cv_prog_compiler_c_o need_locks MANIFEST_TOOL DSYMUTIL NMEDIT LIPO OTOOL OTOOL64 shrext_cmds export_dynamic_flag_spec whole_archive_flag_spec compiler_needs_object with_gnu_ld allow_undefined_flag no_undefined_flag hardcode_libdir_flag_spec hardcode_libdir_separator exclude_expsyms include_expsyms file_list_spec variables_saved_for_relink libname_spec library_names_spec soname_spec install_override_mode finish_eval old_striplib striplib; do
     case `eval \\$ECHO \\""\\$$var"\\"` in
     *[\\\`\"\$]*)
       eval "lt_$var=\\\"\`\$ECHO \"\$$var\" | \$SED \"\$sed_quote_subst\"\`\\\""
@@ -820,15 +821,41 @@ S["am__EXEEXT_TRUE"]="#"
 S["LTLIBOBJS"]=""
 S["LIBOBJS"]=""
 S["GST_PLUGIN_LDFLAGS"]="-module -avoid-version -export-symbols-regex _*\\(gst_\\|Gst\\|GST_\\).*"
-S["GST_API_VERSION"]="1.0"
+S["HAVE_PKGCONFIG"]=" "
+S["MAINT"]=""
+S["MAINTAINER_MODE_FALSE"]="#"
+S["MAINTAINER_MODE_TRUE"]=""
 S["plugindir"]="$(libdir)/gstreamer-1.0"
-S["GST_LIBS"]="-L/usr/local/lib -lgstbase-1.0 -lgstcontroller-1.0 -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0  "
+S["PLUGINDIR"]="/usr/local/lib/gstreamer-1.0"
+S["GST_LICENSE"]="LGPL"
+S["GSTPB_PREFIX"]="/usr/local"
+S["GST_PREFIX"]="/usr/local"
+S["GLIB_PREFIX"]="/usr"
+S["HAVE_GST_CHECK_FALSE"]="#"
+S["HAVE_GST_CHECK_TRUE"]=""
+S["GSTPB_PLUGINS_DIR"]="/usr/local/lib/gstreamer-1.0"
+S["GST_PLUGINS_BASE_DIR"]="/usr/local/lib/gstreamer-1.0/gst:/usr/local/lib/gstreamer-1.0/sys:/usr/local/lib/gstreamer-1.0/ext"
+S["GST_PLUGINS_BASE_LIBS"]="-L/usr/local/lib -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0  "
+S["GST_PLUGINS_BASE_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/incl"\
+"ude  "
+S["GST_CHECK_LIBS"]="-L/usr/local/lib -lgstcheck-1.0 -lm -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0  "
+S["GST_CHECK_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/incl"\
+"ude  "
+S["GST_NET_LIBS"]="-L/usr/local/lib -lgstnet-1.0 -lgstreamer-1.0 -lgio-2.0 -lgobject-2.0 -lglib-2.0  "
+S["GST_NET_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/incl"\
+"ude  "
+S["GST_CONTROLLER_LIBS"]="-L/usr/local/lib -lgstcontroller-1.0 -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0  "
+S["GST_CONTROLLER_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/incl"\
+"ude  "
+S["GST_BASE_LIBS"]="-L/usr/local/lib -lgstbase-1.0 -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0  "
+S["GST_BASE_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/incl"\
+"ude  "
+S["GST_PLUGINS_DIR"]="/usr/local/lib/gstreamer-1.0"
+S["GST_TOOLS_DIR"]="/usr/local/bin"
+S["GST_LIBS"]="-L/usr/local/lib -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0  "
 S["GST_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/incl"\
 "ude   -Wall"
-S["PKG_CONFIG_LIBDIR"]=""
-S["PKG_CONFIG_PATH"]=""
 S["PKG_CONFIG"]="/usr/bin/pkg-config"
-S["HAVE_PKGCONFIG"]=" "
 S["CPP"]="gcc -E"
 S["OTOOL64"]=""
 S["OTOOL"]=""
@@ -839,8 +866,6 @@ S["MANIFEST_TOOL"]=":"
 S["RANLIB"]="ranlib"
 S["ac_ct_AR"]="ar"
 S["AR"]="ar"
-S["DLLTOOL"]="false"
-S["OBJDUMP"]="objdump"
 S["LN_S"]="ln -s"
 S["NM"]="/usr/bin/nm -B"
 S["ac_ct_DUMPBIN"]=""
@@ -850,15 +875,6 @@ S["FGREP"]="/bin/grep -F"
 S["EGREP"]="/bin/grep -E"
 S["GREP"]="/bin/grep"
 S["SED"]="/bin/sed"
-S["host_os"]="linux-gnu"
-S["host_vendor"]="unknown"
-S["host_cpu"]="x86_64"
-S["host"]="x86_64-unknown-linux-gnu"
-S["build_os"]="linux-gnu"
-S["build_vendor"]="unknown"
-S["build_cpu"]="x86_64"
-S["build"]="x86_64-unknown-linux-gnu"
-S["LIBTOOL"]="$(SHELL) $(top_builddir)/libtool"
 S["am__fastdepCC_FALSE"]="#"
 S["am__fastdepCC_TRUE"]=""
 S["CCDEPMODE"]="depmode=gcc3"
@@ -876,9 +892,16 @@ S["CPPFLAGS"]=""
 S["LDFLAGS"]=""
 S["CFLAGS"]="-g -O2 -Wall"
 S["CC"]="gcc"
-S["MAINT"]=""
-S["MAINTAINER_MODE_FALSE"]="#"
-S["MAINTAINER_MODE_TRUE"]=""
+S["LIBTOOL"]="$(SHELL) $(top_builddir)/libtool"
+S["OBJDUMP"]="objdump"
+S["DLLTOOL"]="false"
+S["AS"]="as"
+S["GST_LT_LDFLAGS"]=" -version-info 502:0:502"
+S["GST_LIBVERSION"]="502:0:502"
+S["GST_AGE"]="502"
+S["GST_REVISION"]="0"
+S["GST_CURRENT"]="502"
+S["GST_API_VERSION"]="1.0"
 S["AM_BACKSLASH"]="\\"
 S["AM_DEFAULT_VERBOSITY"]="1"
 S["AM_DEFAULT_V"]="$(AM_DEFAULT_VERBOSITY)"
@@ -906,6 +929,19 @@ S["am__isrc"]=""
 S["INSTALL_DATA"]="${INSTALL} -m 644"
 S["INSTALL_SCRIPT"]="${INSTALL}"
 S["INSTALL_PROGRAM"]="${INSTALL}"
+S["target_os"]="linux-gnu"
+S["target_vendor"]="unknown"
+S["target_cpu"]="x86_64"
+S["target"]="x86_64-unknown-linux-gnu"
+S["host_os"]="linux-gnu"
+S["host_vendor"]="unknown"
+S["host_cpu"]="x86_64"
+S["host"]="x86_64-unknown-linux-gnu"
+S["build_os"]="linux-gnu"
+S["build_vendor"]="unknown"
+S["build_cpu"]="x86_64"
+S["build"]="x86_64-unknown-linux-gnu"
+S["ACLOCAL_AMFLAGS"]="-I m4 -I common/m4"
 S["target_alias"]=""
 S["host_alias"]=""
 S["build_alias"]=""
@@ -993,6 +1029,7 @@ D["PACKAGE_BUGREPORT"]=" \"\""
 D["PACKAGE_URL"]=" \"\""
 D["PACKAGE"]=" \"gst-mprtp\""
 D["VERSION"]=" \"1.0.0\""
+D["GST_API_VERSION"]=" \"1.0\""
 D["STDC_HEADERS"]=" 1"
 D["HAVE_SYS_TYPES_H"]=" 1"
 D["HAVE_SYS_STAT_H"]=" 1"
@@ -1005,6 +1042,8 @@ D["HAVE_STDINT_H"]=" 1"
 D["HAVE_UNISTD_H"]=" 1"
 D["HAVE_DLFCN_H"]=" 1"
 D["LT_OBJDIR"]=" \".libs/\""
+D["GST_LICENSE"]=" \"LGPL\""
+D["PLUGINDIR"]=" \"/usr/local/lib/gstreamer-1.0\""
 D["GST_API_VERSION"]=" \"1.0\""
   for (key in D) D_is_set[key] = 1
   FS = ""
@@ -1480,11 +1519,20 @@ available_tags=""
 macro_version=$macro_version
 macro_revision=$macro_revision
 
-# Whether or not to build shared libraries.
-build_libtool_libs=$enable_shared
+# Assembler program.
+AS=$lt_AS
+
+# DLL creation program.
+DLLTOOL=$lt_DLLTOOL
+
+# Object dumper program.
+OBJDUMP=$lt_OBJDUMP
 
 # Whether or not to build static libraries.
 build_old_libs=$enable_static
+
+# Whether or not to build shared libraries.
+build_libtool_libs=$enable_shared
 
 # What type of objects to build.
 pic_mode=$pic_mode
@@ -1556,9 +1604,6 @@ to_host_file_cmd=$lt_cv_to_host_file_cmd
 # convert \$build files to toolchain format.
 to_tool_file_cmd=$lt_cv_to_tool_file_cmd
 
-# An object symbol dumper.
-OBJDUMP=$lt_OBJDUMP
-
 # Method to check whether dependent libraries are shared objects.
 deplibs_check_method=$lt_deplibs_check_method
 
@@ -1570,9 +1615,6 @@ file_magic_glob=$lt_file_magic_glob
 
 # Find potential files using nocaseglob when deplibs_check_method = "file_magic".
 want_nocaseglob=$lt_want_nocaseglob
-
-# DLL creation program.
-DLLTOOL=$lt_DLLTOOL
 
 # Command to associate shared and link libraries.
 sharedlib_from_linklib_cmd=$lt_sharedlib_from_linklib_cmd

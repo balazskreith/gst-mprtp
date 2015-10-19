@@ -79,14 +79,20 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = x86_64-unknown-linux-gnu
 host_triplet = x86_64-unknown-linux-gnu
+target_triplet = x86_64-unknown-linux-gnu
 subdir = plugins
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/depcomp $(noinst_HEADERS)
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
-	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
-	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/common/m4/as-ac-expand.m4 \
+	$(top_srcdir)/common/m4/as-libtool.m4 \
+	$(top_srcdir)/common/m4/gst-check.m4 \
+	$(top_srcdir)/common/m4/gst-platform.m4 \
+	$(top_srcdir)/common/m4/gst-plugindir.m4 \
+	$(top_srcdir)/common/m4/gst.m4 $(top_srcdir)/common/m4/pkg.m4 \
+	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
+	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
+	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -123,7 +129,9 @@ am__uninstall_files_from_dir = { \
 am__installdirs = "$(DESTDIR)$(plugindir)"
 LTLIBRARIES = $(plugin_LTLIBRARIES)
 am__DEPENDENCIES_1 =
-libgstmprtp_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
+libgstmprtp_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-gstmprtcpbuffer.lo \
 	libgstmprtp_la-gstmprtpscheduler.lo \
@@ -206,9 +214,11 @@ ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = ${SHELL} /home/balazs/gst/master/gst-mprtp/missing aclocal-1.14
+ACLOCAL_AMFLAGS = -I m4 -I common/m4
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 1
 AR = ar
+AS = as
 AUTOCONF = ${SHELL} /home/balazs/gst/master/gst-mprtp/missing autoconf
 AUTOHEADER = ${SHELL} /home/balazs/gst/master/gst-mprtp/missing autoheader
 AUTOMAKE = ${SHELL} /home/balazs/gst/master/gst-mprtp/missing automake-1.14
@@ -230,11 +240,34 @@ ECHO_T =
 EGREP = /bin/grep -E
 EXEEXT = 
 FGREP = /bin/grep -F
+GLIB_PREFIX = /usr
 GREP = /bin/grep
+GSTPB_PLUGINS_DIR = /usr/local/lib/gstreamer-1.0
+GSTPB_PREFIX = /usr/local
+GST_AGE = 502
 GST_API_VERSION = 1.0
+GST_BASE_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include  
+GST_BASE_LIBS = -L/usr/local/lib -lgstbase-1.0 -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0  
 GST_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include   -Wall
-GST_LIBS = -L/usr/local/lib -lgstbase-1.0 -lgstcontroller-1.0 -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0  
+GST_CHECK_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include  
+GST_CHECK_LIBS = -L/usr/local/lib -lgstcheck-1.0 -lm -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0  
+GST_CONTROLLER_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include  
+GST_CONTROLLER_LIBS = -L/usr/local/lib -lgstcontroller-1.0 -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0  
+GST_CURRENT = 502
+GST_LIBS = -L/usr/local/lib -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0  
+GST_LIBVERSION = 502:0:502
+GST_LICENSE = LGPL
+GST_LT_LDFLAGS =  -version-info 502:0:502
+GST_NET_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include  
+GST_NET_LIBS = -L/usr/local/lib -lgstnet-1.0 -lgstreamer-1.0 -lgio-2.0 -lgobject-2.0 -lglib-2.0  
+GST_PLUGINS_BASE_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include  
+GST_PLUGINS_BASE_DIR = /usr/local/lib/gstreamer-1.0/gst:/usr/local/lib/gstreamer-1.0/sys:/usr/local/lib/gstreamer-1.0/ext
+GST_PLUGINS_BASE_LIBS = -L/usr/local/lib -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0  
+GST_PLUGINS_DIR = /usr/local/lib/gstreamer-1.0
 GST_PLUGIN_LDFLAGS = -module -avoid-version -export-symbols-regex _*\(gst_\|Gst\|GST_\).*
+GST_PREFIX = /usr/local
+GST_REVISION = 0
+GST_TOOLS_DIR = /usr/local/bin
 HAVE_PKGCONFIG =  
 INSTALL = /usr/bin/install -c
 INSTALL_DATA = ${INSTALL} -m 644
@@ -268,8 +301,7 @@ PACKAGE_URL =
 PACKAGE_VERSION = 1.0.0
 PATH_SEPARATOR = :
 PKG_CONFIG = /usr/bin/pkg-config
-PKG_CONFIG_LIBDIR = 
-PKG_CONFIG_PATH = 
+PLUGINDIR = /usr/local/lib/gstreamer-1.0
 RANLIB = ranlib
 SED = /bin/sed
 SET_MAKE = 
@@ -325,7 +357,11 @@ sbindir = ${exec_prefix}/sbin
 sharedstatedir = ${prefix}/com
 srcdir = .
 sysconfdir = ${prefix}/etc
+target = x86_64-unknown-linux-gnu
 target_alias = 
+target_cpu = x86_64
+target_os = linux-gnu
+target_vendor = unknown
 top_build_prefix = ../
 top_builddir = ..
 top_srcdir = ..

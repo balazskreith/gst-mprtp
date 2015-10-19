@@ -77,17 +77,23 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+target_triplet = @target@
 subdir = .
 DIST_COMMON = INSTALL NEWS README AUTHORS ChangeLog \
 	$(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/configure $(am__configure_deps) \
-	$(srcdir)/config.h.in COPYING compile config.guess config.sub \
-	depcomp install-sh missing ltmain.sh
+	$(srcdir)/config.h.in ABOUT-NLS COPYING compile config.guess \
+	config.rpath config.sub depcomp install-sh missing ltmain.sh
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
-	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
-	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/common/m4/as-ac-expand.m4 \
+	$(top_srcdir)/common/m4/as-libtool.m4 \
+	$(top_srcdir)/common/m4/gst-check.m4 \
+	$(top_srcdir)/common/m4/gst-platform.m4 \
+	$(top_srcdir)/common/m4/gst-plugindir.m4 \
+	$(top_srcdir)/common/m4/gst.m4 $(top_srcdir)/common/m4/pkg.m4 \
+	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
+	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
+	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
@@ -196,9 +202,11 @@ am__distuninstallcheck_listfiles = $(distuninstallcheck_listfiles) \
   | sed 's|^\./|$(prefix)/|' | grep -v '$(infodir)/dir$$'
 distcleancheck_listfiles = find . -type f -print
 ACLOCAL = @ACLOCAL@
+ACLOCAL_AMFLAGS = -I m4 -I common/m4
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AR = @AR@
+AS = @AS@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
@@ -220,11 +228,34 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
+GLIB_PREFIX = @GLIB_PREFIX@
 GREP = @GREP@
+GSTPB_PLUGINS_DIR = @GSTPB_PLUGINS_DIR@
+GSTPB_PREFIX = @GSTPB_PREFIX@
+GST_AGE = @GST_AGE@
 GST_API_VERSION = @GST_API_VERSION@
+GST_BASE_CFLAGS = @GST_BASE_CFLAGS@
+GST_BASE_LIBS = @GST_BASE_LIBS@
 GST_CFLAGS = @GST_CFLAGS@
+GST_CHECK_CFLAGS = @GST_CHECK_CFLAGS@
+GST_CHECK_LIBS = @GST_CHECK_LIBS@
+GST_CONTROLLER_CFLAGS = @GST_CONTROLLER_CFLAGS@
+GST_CONTROLLER_LIBS = @GST_CONTROLLER_LIBS@
+GST_CURRENT = @GST_CURRENT@
 GST_LIBS = @GST_LIBS@
+GST_LIBVERSION = @GST_LIBVERSION@
+GST_LICENSE = @GST_LICENSE@
+GST_LT_LDFLAGS = @GST_LT_LDFLAGS@
+GST_NET_CFLAGS = @GST_NET_CFLAGS@
+GST_NET_LIBS = @GST_NET_LIBS@
+GST_PLUGINS_BASE_CFLAGS = @GST_PLUGINS_BASE_CFLAGS@
+GST_PLUGINS_BASE_DIR = @GST_PLUGINS_BASE_DIR@
+GST_PLUGINS_BASE_LIBS = @GST_PLUGINS_BASE_LIBS@
+GST_PLUGINS_DIR = @GST_PLUGINS_DIR@
 GST_PLUGIN_LDFLAGS = @GST_PLUGIN_LDFLAGS@
+GST_PREFIX = @GST_PREFIX@
+GST_REVISION = @GST_REVISION@
+GST_TOOLS_DIR = @GST_TOOLS_DIR@
 HAVE_PKGCONFIG = @HAVE_PKGCONFIG@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
@@ -258,8 +289,7 @@ PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
-PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
-PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
+PLUGINDIR = @PLUGINDIR@
 RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
@@ -315,13 +345,16 @@ sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
+target = @target@
 target_alias = @target_alias@
+target_cpu = @target_cpu@
+target_os = @target_os@
+target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 SUBDIRS = plugins tools
 EXTRA_DIST = autogen.sh
-ACLOCAL_AMFLAGS = -I m4
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 

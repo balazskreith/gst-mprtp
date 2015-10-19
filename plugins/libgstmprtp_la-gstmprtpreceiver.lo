@@ -8,5 +8,5 @@
 pic_object='.libs/libgstmprtp_la-gstmprtpreceiver.o'
 
 # Name of the non-PIC object
-non_pic_object='libgstmprtp_la-gstmprtpreceiver.o'
+non_pic_object=none
 

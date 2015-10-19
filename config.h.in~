@@ -3,6 +3,9 @@
 /* GStreamer API Version */
 #undef GST_API_VERSION
 
+/* GStreamer license */
+#undef GST_LICENSE
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
@@ -57,6 +60,9 @@
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
+
+/* directory where plugins are located */
+#undef PLUGINDIR
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS

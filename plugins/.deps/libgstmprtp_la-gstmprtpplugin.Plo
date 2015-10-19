@@ -1,5 +1,5 @@
 libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
- /usr/include/stdc-predef.h ../../config.h \
+ /usr/include/stdc-predef.h ../config.h \
  /usr/local/include/gstreamer-1.0/gst/gst.h /usr/include/glib-2.0/glib.h \
  /usr/include/glib-2.0/glib/galloca.h /usr/include/glib-2.0/glib/gtypes.h \
  /usr/lib/x86_64-linux-gnu/glib-2.0/include/glibconfig.h \
@@ -85,6 +85,22 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/include/glib-2.0/glib/gvarianttype.h \
  /usr/include/glib-2.0/glib/gvariant.h \
  /usr/include/glib-2.0/glib/gversion.h \
+ /usr/include/glib-2.0/glib/deprecated/gallocator.h \
+ /usr/include/glib-2.0/glib/deprecated/gcache.h \
+ /usr/include/glib-2.0/glib/deprecated/gcompletion.h \
+ /usr/include/glib-2.0/glib/deprecated/gmain.h \
+ /usr/include/glib-2.0/glib/deprecated/grel.h \
+ /usr/include/glib-2.0/glib/deprecated/gthread.h \
+ /usr/include/x86_64-linux-gnu/sys/types.h /usr/include/endian.h \
+ /usr/include/x86_64-linux-gnu/bits/endian.h \
+ /usr/include/x86_64-linux-gnu/bits/byteswap.h \
+ /usr/include/x86_64-linux-gnu/bits/byteswap-16.h \
+ /usr/include/x86_64-linux-gnu/sys/select.h \
+ /usr/include/x86_64-linux-gnu/bits/select.h \
+ /usr/include/x86_64-linux-gnu/bits/select2.h \
+ /usr/include/x86_64-linux-gnu/sys/sysmacros.h /usr/include/pthread.h \
+ /usr/include/sched.h /usr/include/x86_64-linux-gnu/bits/sched.h \
+ /usr/include/x86_64-linux-gnu/bits/setjmp.h \
  /usr/local/include/gstreamer-1.0/gst/glib-compat.h \
  /usr/local/include/gstreamer-1.0/gst/gstenumtypes.h \
  /usr/include/glib-2.0/glib-object.h \
@@ -210,14 +226,6 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/include/x86_64-linux-gnu/bits/environments.h \
  /usr/include/x86_64-linux-gnu/bits/confname.h /usr/include/getopt.h \
  /usr/include/x86_64-linux-gnu/bits/unistd.h \
- /usr/include/x86_64-linux-gnu/sys/types.h /usr/include/endian.h \
- /usr/include/x86_64-linux-gnu/bits/endian.h \
- /usr/include/x86_64-linux-gnu/bits/byteswap.h \
- /usr/include/x86_64-linux-gnu/bits/byteswap-16.h \
- /usr/include/x86_64-linux-gnu/sys/select.h \
- /usr/include/x86_64-linux-gnu/bits/select.h \
- /usr/include/x86_64-linux-gnu/bits/select2.h \
- /usr/include/x86_64-linux-gnu/sys/sysmacros.h \
  /usr/include/glib-2.0/gio/gdatainputstream.h \
  /usr/include/glib-2.0/gio/gdataoutputstream.h \
  /usr/include/glib-2.0/gio/gdbusaddress.h \
@@ -364,7 +372,7 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
 
 /usr/include/stdc-predef.h:
 
-../../config.h:
+../config.h:
 
 /usr/local/include/gstreamer-1.0/gst/gst.h:
 
@@ -571,6 +579,44 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
 /usr/include/glib-2.0/glib/gvariant.h:
 
 /usr/include/glib-2.0/glib/gversion.h:
+
+/usr/include/glib-2.0/glib/deprecated/gallocator.h:
+
+/usr/include/glib-2.0/glib/deprecated/gcache.h:
+
+/usr/include/glib-2.0/glib/deprecated/gcompletion.h:
+
+/usr/include/glib-2.0/glib/deprecated/gmain.h:
+
+/usr/include/glib-2.0/glib/deprecated/grel.h:
+
+/usr/include/glib-2.0/glib/deprecated/gthread.h:
+
+/usr/include/x86_64-linux-gnu/sys/types.h:
+
+/usr/include/endian.h:
+
+/usr/include/x86_64-linux-gnu/bits/endian.h:
+
+/usr/include/x86_64-linux-gnu/bits/byteswap.h:
+
+/usr/include/x86_64-linux-gnu/bits/byteswap-16.h:
+
+/usr/include/x86_64-linux-gnu/sys/select.h:
+
+/usr/include/x86_64-linux-gnu/bits/select.h:
+
+/usr/include/x86_64-linux-gnu/bits/select2.h:
+
+/usr/include/x86_64-linux-gnu/sys/sysmacros.h:
+
+/usr/include/pthread.h:
+
+/usr/include/sched.h:
+
+/usr/include/x86_64-linux-gnu/bits/sched.h:
+
+/usr/include/x86_64-linux-gnu/bits/setjmp.h:
 
 /usr/local/include/gstreamer-1.0/gst/glib-compat.h:
 
@@ -847,24 +893,6 @@ mprtprpath.h:
 /usr/include/getopt.h:
 
 /usr/include/x86_64-linux-gnu/bits/unistd.h:
-
-/usr/include/x86_64-linux-gnu/sys/types.h:
-
-/usr/include/endian.h:
-
-/usr/include/x86_64-linux-gnu/bits/endian.h:
-
-/usr/include/x86_64-linux-gnu/bits/byteswap.h:
-
-/usr/include/x86_64-linux-gnu/bits/byteswap-16.h:
-
-/usr/include/x86_64-linux-gnu/sys/select.h:
-
-/usr/include/x86_64-linux-gnu/bits/select.h:
-
-/usr/include/x86_64-linux-gnu/bits/select2.h:
-
-/usr/include/x86_64-linux-gnu/sys/sysmacros.h:
 
 /usr/include/glib-2.0/gio/gdatainputstream.h:
 

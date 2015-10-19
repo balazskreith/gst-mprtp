@@ -8,5 +8,5 @@
 pic_object='.libs/libgstmprtp_la-sefctrler.o'
 
 # Name of the non-PIC object
-non_pic_object='libgstmprtp_la-sefctrler.o'
+non_pic_object=none
 

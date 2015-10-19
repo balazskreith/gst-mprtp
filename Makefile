@@ -86,8 +86,10 @@ DIST_COMMON = INSTALL NEWS README AUTHORS ChangeLog \
 	config.rpath config.sub depcomp install-sh missing ltmain.sh
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/common/m4/as-ac-expand.m4 \
+	$(top_srcdir)/common/m4/as-compiler-flag.m4 \
 	$(top_srcdir)/common/m4/as-libtool.m4 \
 	$(top_srcdir)/common/m4/gst-check.m4 \
+	$(top_srcdir)/common/m4/gst-error.m4 \
 	$(top_srcdir)/common/m4/gst-platform.m4 \
 	$(top_srcdir)/common/m4/gst-plugindir.m4 \
 	$(top_srcdir)/common/m4/gst.m4 $(top_srcdir)/common/m4/pkg.m4 \
@@ -216,6 +218,10 @@ CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2 -Wall
 CPP = gcc -E
 CPPFLAGS = 
+CXX = g++
+CXXCPP = g++ -E
+CXXDEPMODE = depmode=gcc3
+CXXFLAGS = -g -O2
 CYGPATH_W = echo
 DEFS = -DHAVE_CONFIG_H
 DEPDIR = .deps
@@ -226,6 +232,9 @@ ECHO_C =
 ECHO_N = -n
 ECHO_T = 
 EGREP = /bin/grep -E
+ERROR_CFLAGS =  -Werror
+ERROR_CXXFLAGS =  -Werror -Wno-non-virtual-dtor
+ERROR_OBJCFLAGS = 
 EXEEXT = 
 FGREP = /bin/grep -F
 GLIB_PREFIX = /usr
@@ -276,6 +285,9 @@ MANIFEST_TOOL = :
 MKDIR_P = /bin/mkdir -p
 NM = /usr/bin/nm -B
 NMEDIT = 
+OBJC = gcc
+OBJCDEPMODE = depmode=gcc3
+OBJCFLAGS = 
 OBJDUMP = objdump
 OBJEXT = o
 OTOOL = 
@@ -296,13 +308,18 @@ SET_MAKE =
 SHELL = /bin/bash
 STRIP = strip
 VERSION = 1.0.0
+WARNING_CFLAGS =  -Wall -Wdeclaration-after-statement -Wvla -Wpointer-arith -Wmissing-declarations -Wmissing-prototypes -Wredundant-decls -Wwrite-strings -Wold-style-definition -Waggregate-return -Winit-self -Wmissing-include-dirs -Waddress -Wno-multichar -Wnested-externs
+WARNING_CXXFLAGS =  -Wall -Wmissing-declarations -Wredundant-decls -Wwrite-strings -Winit-self -Wmissing-include-dirs -Waddress -Wno-multichar
+WARNING_OBJCFLAGS = 
 abs_builddir = /home/balazs/gst/master/gst-mprtp
 abs_srcdir = /home/balazs/gst/master/gst-mprtp
 abs_top_builddir = /home/balazs/gst/master/gst-mprtp
 abs_top_srcdir = /home/balazs/gst/master/gst-mprtp
 ac_ct_AR = ar
 ac_ct_CC = gcc
+ac_ct_CXX = g++
 ac_ct_DUMPBIN = 
+ac_ct_OBJC = gcc
 am__include = include
 am__leading_dot = .
 am__quote = 

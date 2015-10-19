@@ -185,6 +185,7 @@ libgstmprtp_la-sefctrler.lo: sefctrler.c /usr/include/stdc-predef.h \
  /usr/local/include/gstreamer-1.0/gst/gstsystemclock.h \
  /usr/local/include/gstreamer-1.0/gst/gsttagsetter.h \
  /usr/local/include/gstreamer-1.0/gst/gsttocsetter.h \
+ /usr/local/include/gstreamer-1.0/gst/gsttracerfactory.h \
  /usr/local/include/gstreamer-1.0/gst/gsttypefind.h \
  /usr/local/include/gstreamer-1.0/gst/gsttypefindfactory.h \
  /usr/local/include/gstreamer-1.0/gst/gstutils.h \
@@ -628,6 +629,8 @@ libgstmprtp_la-sefctrler.lo: sefctrler.c /usr/include/stdc-predef.h \
 /usr/local/include/gstreamer-1.0/gst/gsttagsetter.h:
 
 /usr/local/include/gstreamer-1.0/gst/gsttocsetter.h:
+
+/usr/local/include/gstreamer-1.0/gst/gsttracerfactory.h:
 
 /usr/local/include/gstreamer-1.0/gst/gsttypefind.h:
 

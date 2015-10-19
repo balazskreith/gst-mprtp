@@ -137,6 +137,28 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([ ], [ ])], [
   AC_MSG_RESULT([no])
 ])
 
+dnl define an ERROR_CFLAGS Makefile variable
+dnl -Wundef: too many broken headers
+AG_GST_SET_ERROR_CFLAGS($FATAL_WARNINGS, [
+      -Wmissing-declarations -Wmissing-prototypes -Wredundant-decls
+      -Wwrite-strings -Wold-style-definition -Waggregate-return
+      -Winit-self -Wmissing-include-dirs -Waddress -Wno-multichar
+      -Wnested-externs $NO_WARNINGS])
+
+dnl define an ERROR_CXXFLAGS Makefile variable
+AG_GST_SET_ERROR_CXXFLAGS($FATAL_WARNINGS, [
+        -Wmissing-declarations -Wredundant-decls
+        -Wwrite-strings
+        -Winit-self -Wmissing-include-dirs -Waddress -Wno-multichar
+        $NO_WARNINGS])
+
+dnl define an ERROR_OBJCFLAGS Makefile variable
+AG_GST_SET_ERROR_OBJCFLAGS($FATAL_WARNINGS, [
+      -Wmissing-declarations -Wmissing-prototypes -Wredundant-decls
+      -Wwrite-strings -Wold-style-definition
+      -Winit-self -Wmissing-include-dirs -Wno-multichar
+      -Wnested-externs $NO_WARNINGS])
+
 dnl set the plugindir where plugins should be installed (for plugins/Makefile.am)
 dnl if test "x${prefix}" = "x$HOME"; then
 dnl   plugindir="$HOME/.gstreamer-1.0/plugins"
@@ -158,5 +180,5 @@ dnl set proper LDFLAGS for plugins
 GST_PLUGIN_LDFLAGS='-module -avoid-version -export-symbols-regex [_]*\(gst_\|Gst\|GST_\).*'
 AC_SUBST(GST_PLUGIN_LDFLAGS)
 
-AC_CONFIG_FILES([Makefile plugins/Makefile tools/Makefile])
+AC_CONFIG_FILES([Makefile plugins/Makefile tools/Makefile tests/Makefile])
 AC_OUTPUT

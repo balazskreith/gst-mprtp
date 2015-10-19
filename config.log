@@ -340,7 +340,7 @@ configure:11333: checking how to hardcode library paths into programs
 configure:11358: result: immediate
 configure:11452: checking for shl_load
 configure:11452: gcc -o conftest -g -O2   conftest.c  >&5
-/tmp/cc1W5pdG.o: In function `main':
+/tmp/cccNqHxx.o: In function `main':
 /home/balazs/gst/master/gst-mprtp/conftest.c:58: undefined reference to `shl_load'
 collect2: error: ld returned 1 exit status
 configure:11452: $? = 1
@@ -454,7 +454,7 @@ configure: failed program was:
 configure:11490: result: no
 configure:11495: checking for dlopen
 configure:11495: gcc -o conftest -g -O2   conftest.c  >&5
-/tmp/ccGEu60I.o: In function `main':
+/tmp/ccXKQDhH.o: In function `main':
 /home/balazs/gst/master/gst-mprtp/conftest.c:58: undefined reference to `dlopen'
 collect2: error: ld returned 1 exit status
 configure:11495: $? = 1
@@ -531,7 +531,7 @@ configure:11735: $? = 0
 configure:11753: result: yes
 configure:11758: checking whether a statically linked program can dlopen itself
 configure:11838: gcc -o conftest -g -O2  -DHAVE_DLFCN_H  -Wl,--export-dynamic -static conftest.c -ldl  >&5
-/tmp/ccGccn2W.o: In function `main':
+/tmp/ccByl82N.o: In function `main':
 /home/balazs/gst/master/gst-mprtp/configure:11817: warning: Using 'dlopen' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
 /usr/bin/ld: dynamic STT_GNU_IFUNC symbol `strcmp' with pointer equality in `/usr/lib/gcc/x86_64-linux-gnu/4.8/../../../x86_64-linux-gnu/libc.a(strcmp.o)' can not be used when making an executable; recompile with -fPIE and relink with -pie
 collect2: error: ld returned 1 exit status

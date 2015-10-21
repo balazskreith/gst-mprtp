@@ -63,9 +63,10 @@ void sefctrler_setup(SndEventBasedController* this,
                      StreamSplitter* splitter);
 
 void sefctrler_set_callbacks(void(**riport_can_flow_indicator)(gpointer),
-                             void(**controller_add_path)(gpointer,guint8,MPRTPSPath*),
-                             void(**controller_rem_path)(gpointer,guint8),
-                             void(**controller_pacing)(gpointer, gboolean));
+                              void(**controller_add_path)(gpointer,guint8,MPRTPSPath*),
+                              void(**controller_rem_path)(gpointer,guint8),
+                              void(**controller_pacing)(gpointer, gboolean),
+                              gboolean (**controller_is_pacing)(gpointer));
 
 GstBufferReceiverFunc
 sefctrler_setup_mprtcp_exchange(SndEventBasedController * this,

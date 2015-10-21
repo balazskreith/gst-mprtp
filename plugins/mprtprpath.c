@@ -78,6 +78,7 @@ struct _Packet
 
 };
 
+
 static void mprtpr_path_finalize (GObject * object);
 static void mprtpr_path_reset (MpRTPRPath * this);
 
@@ -179,6 +180,11 @@ mprtpr_path_init (MpRTPRPath * this)
   mprtpr_path_reset (this);
 }
 
+void mprtpr_path_destroy(gpointer ptr)
+{
+
+  G_OBJECT_CLASS(mprtpr_path_parent_class)->finalize(G_OBJECT(ptr));
+}
 
 void
 mprtpr_path_finalize (GObject * object)

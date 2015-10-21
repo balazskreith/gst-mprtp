@@ -201,7 +201,7 @@ static void sefctrler_rem_path (gpointer controller_ptr, guint8 subflow_id);
 static void sefctrler_add_path (gpointer controller_ptr, guint8 subflow_id,
     MPRTPSPath * path);
 static void sefctrler_pacing (gpointer controller_ptr, gboolean allowed);
-
+static gboolean sefctrler_is_pacing (gpointer controller_ptr);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -388,11 +388,24 @@ sefctrler_pacing (gpointer controller_ptr, gboolean allowed)
   THIS_WRITEUNLOCK (this);
 }
 
+gboolean
+sefctrler_is_pacing (gpointer controller_ptr)
+{
+  SndEventBasedController *this;
+  gboolean result;
+  this = SEFCTRLER (controller_ptr);
+  THIS_READLOCK (this);
+  result = this->pacing;
+  THIS_READUNLOCK (this);
+  return result;
+}
+
 void
 sefctrler_set_callbacks (void (**riport_can_flow_indicator) (gpointer),
     void (**controller_add_path) (gpointer, guint8, MPRTPSPath *),
     void (**controller_rem_path) (gpointer, guint8),
-    void (**controller_pacing) (gpointer, gboolean))
+    void (**controller_pacing) (gpointer, gboolean),
+    gboolean (**controller_is_pacing)(gpointer))
 {
   if (riport_can_flow_indicator) {
     *riport_can_flow_indicator = sefctrler_riport_can_flow;
@@ -405,6 +418,9 @@ sefctrler_set_callbacks (void (**riport_can_flow_indicator) (gpointer),
   }
   if (controller_pacing) {
     *controller_pacing = sefctrler_pacing;
+  }
+  if (controller_is_pacing) {
+    *controller_is_pacing = sefctrler_is_pacing;
   }
 }
 

@@ -350,18 +350,22 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
   g_signal_connect (rtpBin, "request-aux-sender",
       (GCallback) request_aux_sender, session);
 
-  g_object_set (rtpSink_1, "port", basePort, "host", "127.0.0.1", "sync",
-      FALSE, "async", FALSE, NULL);
-  g_object_set (rtpSink_2, "port", basePort + 1, "host", "127.0.0.1", "sync",
-      FALSE, "async", FALSE, NULL);
+  g_object_set (rtpSink_1, "port", basePort, "host", "127.0.0.1",
+      NULL);
+//      "sync",FALSE, "async", FALSE, NULL);
 
-  g_object_set (rtcpSink, "port", basePort + 5, "host", "127.0.0.1", "sync",
-      FALSE, "async", FALSE, NULL);
+  g_object_set (rtpSink_2, "port", basePort + 1, "host", "127.0.0.1",
+//      NULL);
+      "sync",FALSE, "async", FALSE, NULL);
+
+  g_object_set (rtcpSink, "port", basePort + 5, "host", "127.0.0.1",
+//      NULL);
+       "sync",FALSE, "async", FALSE, NULL);
 
   g_object_set (rtpSrc_1, "port", basePort + 11, NULL);
   g_object_set (rtpSrc_2, "port", basePort + 12, NULL);
   g_object_set (rtcpSrc, "port", basePort + 10, NULL);
-  g_object_set (mprtpsch, "auto-flow-controlling", TRUE, NULL);
+//  g_object_set (mprtpsch, "auto-flow-controlling", TRUE, NULL);
 
 
   /* this is just to drop some rtp packets at random, to demonstrate

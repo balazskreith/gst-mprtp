@@ -37,7 +37,8 @@ struct _SndManualControllerClass{
 void smanctrler_set_callbacks(void(**riport_can_flow_indicator)(gpointer),
                               void(**controller_add_path)(gpointer,guint8,MPRTPSPath*),
                               void(**controller_rem_path)(gpointer,guint8),
-                              void(**controller_pacing)(gpointer, gboolean));
+                              void(**controller_pacing)(gpointer, gboolean),
+                              gboolean (**controller_is_pacing)(gpointer));
 
 GstBufferReceiverFunc
 smanctrler_setup_mprtcp_exchange(SndManualController *this,

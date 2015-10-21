@@ -34,8 +34,10 @@ G_BEGIN_DECLS
 #define GST_IS_MPRTPSCHEDULER_CLASS(obj)   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_MPRTPSCHEDULER))
 #define GST_MPRTCP_SCHEDULER_SENT_BYTES_STRUCTURE_NAME "GstCustomQueryMpRTCPScheduler"
 #define GST_MPRTCP_SCHEDULER_SENT_OCTET_SUM_FIELD "RTCPSchedulerSentBytes"
+
 typedef struct _GstMprtpscheduler GstMprtpscheduler;
 typedef struct _GstMprtpschedulerClass GstMprtpschedulerClass;
+typedef struct _GstMprtpschedulerPrivate GstMprtpschedulerPrivate;
 
 #define SCHEDULER_RETAIN_QUEUE_MAX_ITEMS 255
 
@@ -82,11 +84,11 @@ struct _GstMprtpscheduler
   void (*mprtcp_receiver) (gpointer, GstBuffer *);
   void (*riport_can_flow) (gpointer);
   void (*controller_pacing) (gpointer,gboolean);
+  gboolean (*controller_is_pacing) (gpointer);
 
   guint32 rtcp_sent_octet_sum;
 
-
-
+  GstMprtpschedulerPrivate* priv;
 };
 
 struct _GstMprtpschedulerClass

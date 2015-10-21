@@ -43,6 +43,7 @@ static void smanctrler_add_path (gpointer controller_ptr, guint8 subflow_id,
     MPRTPSPath * path);
 static void smanctrler_rem_path (gpointer controller_ptr, guint8 subflow_id);
 static void smanctrler_pacing (gpointer controller_ptr, gboolean allowed);
+static gboolean smanctrler_is_pacing (gpointer controller_ptr);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -101,11 +102,21 @@ smanctrler_pacing (gpointer controller_ptr, gboolean allowed)
       allowed ? " " : " NOT");
 }
 
+gboolean
+smanctrler_is_pacing (gpointer controller_ptr)
+{
+  SndManualController *this;
+  this = SMANCTRLER (controller_ptr);
+  GST_DEBUG_OBJECT (this, "Sending Manual Controller is pacing");
+  return FALSE;
+}
+
 void
 smanctrler_set_callbacks (void (**riport_can_flow_indicator) (gpointer),
     void (**controller_add_path) (gpointer, guint8, MPRTPSPath *),
     void (**controller_rem_path) (gpointer, guint8),
-    void (**controller_pacing) (gpointer, gboolean))
+    void (**controller_pacing) (gpointer, gboolean),
+    gboolean (**controller_is_pacing)(gpointer))
 {
   if (riport_can_flow_indicator) {
     *riport_can_flow_indicator = smanctrler_riport_can_flow;
@@ -118,6 +129,9 @@ smanctrler_set_callbacks (void (**riport_can_flow_indicator) (gpointer),
   }
   if (controller_pacing) {
     *controller_pacing = smanctrler_pacing;
+  }
+  if(controller_is_pacing){
+    *controller_is_pacing = smanctrler_is_pacing;
   }
 }
 

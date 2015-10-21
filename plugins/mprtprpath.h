@@ -80,6 +80,7 @@ struct _MpRTPReceiverPathClass
 
 
 GType mprtpr_path_get_type (void);
+void mprtpr_path_destroy(gpointer ptr);
 MpRTPRPath *make_mprtpr_path (guint8 id);
 //guint64 mprtpr_path_get_packet_skew_median (MPRTPRPath * this);
 

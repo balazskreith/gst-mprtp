@@ -169,6 +169,8 @@ gst_mprtpsender_mprtp_sink_event_handler (GstPad * pad, GstObject * parent,
   const GstSegment *segment;
   GstCaps *caps;
 
+  g_print ("SND EVENT to the sink: %s", GST_EVENT_TYPE_NAME (event));
+
   this = GST_MPRTPSENDER (parent);
   THIS_WRITELOCK (this);
   switch (GST_EVENT_TYPE (event)) {
@@ -192,6 +194,7 @@ gst_mprtpsender_mprtp_sink_event_handler (GstPad * pad, GstObject * parent,
       }
       gst_event_parse_caps (event, &caps);
       this->event_caps = gst_event_new_caps (caps);
+
     sending:
       for (subflow = NULL, it = this->subflows; it != NULL; it = it->next) {
         subflow = it->data;
@@ -465,6 +468,7 @@ gst_mprtpsender_query (GstElement * element, GstQuery * query)
   gboolean ret;
 
   GST_DEBUG_OBJECT (mprtpsender, "query");
+  g_print ("SND QUERY to the element: %s\n", GST_QUERY_TYPE_NAME (query));
   switch (GST_QUERY_TYPE (query)) {
     default:
       ret =

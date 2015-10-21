@@ -77,6 +77,8 @@ static GstFlowReturn gst_mprtpplayouter_mprtcp_sr_sink_chain (GstPad * pad,
     GstObject * parent, GstBuffer * buffer);
 static gboolean gst_mprtpplayouter_sink_query (GstPad * sinkpad,
     GstObject * parent, GstQuery * query);
+static gboolean gst_mprtpplayouter_src_query (GstPad * sinkpad,
+    GstObject * parent, GstQuery * query);
 static gboolean gst_mprtpplayouter_sink_event (GstPad * pad, GstObject * parent,
     GstEvent * event);
 static void gst_mprtpplayouter_mprtcp_sender (gpointer ptr, GstBuffer * buf);
@@ -261,6 +263,9 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
       (&gst_mprtpplayouter_mprtcp_rr_src_template, "mprtcp_rr_src");
   gst_element_add_pad (GST_ELEMENT (this), this->mprtcp_rr_srcpad);
 
+  gst_pad_set_query_function (this->mprtp_srcpad,
+      GST_DEBUG_FUNCPTR (gst_mprtpplayouter_src_query));
+
   gst_pad_set_chain_function (this->mprtcp_sr_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_mprtcp_sr_sink_chain));
   gst_pad_set_chain_function (this->mprtp_sinkpad,
@@ -278,7 +283,8 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->sysclock = gst_system_clock_obtain ();
   this->pivot_clock_rate = MPRTP_PLAYOUTER_DEFAULT_CLOCKRATE;
   this->pivot_ssrc = MPRTP_PLAYOUTER_DEFAULT_SSRC;
-  this->paths = g_hash_table_new_full (NULL, NULL, NULL, g_free);
+  //this->paths = g_hash_table_new_full (NULL, NULL, NULL, g_free);
+  this->paths = g_hash_table_new_full (NULL, NULL, NULL, mprtpr_path_destroy);
   this->joiner = (StreamJoiner *) g_object_new (STREAM_JOINER_TYPE, NULL);
   stream_joiner_set_sending (this->joiner, (gpointer) this,
       gst_mprtpplayouter_send_mprtp_proxy);
@@ -294,6 +300,10 @@ void
 gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstBuffer * buf)
 {
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (data);
+//    GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+//    gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
+//    g_print("R%lu->",gst_rtp_buffer_get_seq(&rtp));
+//    gst_rtp_buffer_unmap(&rtp);
   gst_pad_push (this->mprtp_srcpad, buf);
 }
 
@@ -501,6 +511,41 @@ _collect_infos (GstMprtpplayouter * this)
 }
 
 
+
+gboolean
+gst_mprtpplayouter_src_query (GstPad * sinkpad, GstObject * parent,
+    GstQuery * query)
+{
+  GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (parent);
+  gboolean result = FALSE;
+  GST_DEBUG_OBJECT (this, "query");
+  switch (GST_QUERY_TYPE (query)) {
+    case GST_QUERY_LATENCY:
+      {
+        gboolean live;
+        GstClockTime min, max;
+        GstPad *peer;
+        peer = gst_pad_get_peer (this->mprtp_sinkpad);
+//        g_print ("PLY GST_QUERY_LATENCY\n");
+        if ((result = gst_pad_query (peer, query))) {
+            gst_query_parse_latency (query, &live, &min, &max);
+            max+= 400*GST_MSECOND;
+//            g_print ("Peer latency: min %"
+//                      GST_TIME_FORMAT " max %" GST_TIME_FORMAT,
+//                      GST_TIME_ARGS (min), GST_TIME_ARGS (max));
+            gst_query_set_latency (query, live, min, max);
+        }
+        gst_object_unref (peer);
+      }
+      break;
+    default:
+      result = gst_pad_peer_query (this->mprtp_srcpad, query);
+      break;
+  }
+  return result;
+}
+
+
 gboolean
 gst_mprtpplayouter_sink_query (GstPad * sinkpad, GstObject * parent,
     GstQuery * query)
@@ -508,6 +553,7 @@ gst_mprtpplayouter_sink_query (GstPad * sinkpad, GstObject * parent,
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (parent);
   gboolean result;
   GST_DEBUG_OBJECT (this, "query");
+  g_print ("PLY SINK QUERY to the element: %s\n", GST_QUERY_TYPE_NAME (query));
   switch (GST_QUERY_TYPE (query)) {
 
     default:
@@ -531,6 +577,7 @@ gst_mprtpplayouter_sink_event (GstPad * pad, GstObject * parent,
   guint guint_value;
 
   GST_DEBUG_OBJECT (this, "sink event");
+  g_print ("PLY EVENT to the sink: %s", GST_EVENT_TYPE_NAME (event));
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_CAPS:
       gst_event_parse_caps (event, &caps);
@@ -610,9 +657,9 @@ _detach_path (GstMprtpplayouter * this, guint8 subflow_id)
         "due to not existed subflow id (%d)", subflow_id);
     goto exit;
   }
-  g_hash_table_remove (this->paths, GINT_TO_POINTER (subflow_id));
   stream_joiner_rem_path (this->joiner, subflow_id);
   this->controller_rem_path (this->controller, subflow_id);
+  g_hash_table_remove (this->paths, GINT_TO_POINTER (subflow_id));
   if (this->pivot_address && subflow_id == this->pivot_address_subflow_id) {
     g_object_unref (this->pivot_address);
     this->pivot_address = NULL;
@@ -669,6 +716,7 @@ gst_mprtpplayouter_query (GstElement * element, GstQuery * query)
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (element);
   gboolean ret = TRUE;
   GstStructure *s;
+  g_print ("PLY QUERY to the element: %s\n", GST_QUERY_TYPE_NAME (query));
   GST_DEBUG_OBJECT (this, "query");
   switch (GST_QUERY_TYPE (query)) {
     case GST_QUERY_CUSTOM:

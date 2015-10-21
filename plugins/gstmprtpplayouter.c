@@ -214,7 +214,7 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           255, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_AUTO_FLOW_RIPORTING,
-      g_param_spec_boolean ("auto-flow-riporting",
+      g_param_spec_boolean ("auto-flow-reporting",
           "Automatic flow riporting means that ",
           "the playouter send RR and XR (if late discarded"
           "packets arrive) to the sender. It also puts extra "

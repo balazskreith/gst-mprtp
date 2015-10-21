@@ -106,33 +106,6 @@ setup_ghost_sink (GstElement * sink, GstBin * bin)
 }
 
 static SessionData *
-make_audio_session (guint sessionNum)
-{
-  SessionData *ret = session_new (sessionNum);
-  GstBin *bin = GST_BIN (gst_bin_new ("audio"));
-  GstElement *queue = gst_element_factory_make ("queue", NULL);
-  GstElement *sink = gst_element_factory_make ("autoaudiosink", NULL);
-  GstElement *audioconvert = gst_element_factory_make ("audioconvert", NULL);
-  GstElement *audioresample = gst_element_factory_make ("audioresample", NULL);
-  GstElement *depayloader = gst_element_factory_make ("rtppcmadepay", NULL);
-  GstElement *decoder = gst_element_factory_make ("alawdec", NULL);
-
-  gst_bin_add_many (bin, queue, depayloader, decoder, audioconvert,
-      audioresample, sink, NULL);
-  gst_element_link_many (queue, depayloader, decoder, audioconvert,
-      audioresample, sink, NULL);
-
-  setup_ghost_sink (queue, bin);
-
-  ret->output = GST_ELEMENT (bin);
-  ret->caps = gst_caps_new_simple ("application/x-rtp",
-      "media", G_TYPE_STRING, "audio",
-      "clock-rate", G_TYPE_INT, 8000,
-      "encoding-name", G_TYPE_STRING, "PCMA", NULL);
-  return ret;
-}
-
-static SessionData *
 make_video_session (guint sessionNum)
 {
   SessionData *ret = session_new (sessionNum);
@@ -325,7 +298,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
 
   g_object_set (mprtpply, "join-subflow", 1, NULL);
   g_object_set (mprtpply, "join-subflow", 2, NULL);
-  g_object_set (mprtpply, "auto-flow-riporting", TRUE, NULL);
+  g_object_set (mprtpply, "auto-flow-reporting", TRUE, NULL);
 
   g_print ("Connecting to %i/%i/%i/%i/%i/%i\n",
       basePort, basePort + 1, basePort + 5,

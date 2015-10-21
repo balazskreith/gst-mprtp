@@ -20,20 +20,7 @@
 #include <gst/gst.h>
 #include <gst/rtp/rtp.h>
 
-/*
- *                                           .------------.
- *                                           | rtpbin     |
- *  .-------.    .---------.    .---------.  |            |       .--------------.    .-------------.
- *  |audiots|    |theoraenc|    |theorapay|  |            |       |   mprtp_sch  |    | mprtp_snd   |      .-------.
- *  |      src->sink      src->sink  src->send_rtp_0 send_rtp_0->rtp_sink mprtp_src->mprtp_src      |      |udpsink|
- *  '-------'    '---------'    '---------'  |            |       |              |    |            src_0->sink     |
- *                                           |            |       |   mprtcp_sr_src->mprtcp_sr_sink |      '-------'
- *                                           |            |       '--------------'    |             |      .-------.
- *                                           |            |                          mprtcp_rr_sink |      |udpsink|
- *                                           |            |                           |           src_1->sink      |
- *                                           '------------'
- *
- */
+
 
 typedef struct _SessionData
 {
@@ -182,81 +169,6 @@ typedef struct _Identities
   guint called;
 } Identities;
 
-
-//
-//gboolean
-//_timeout_callback (gpointer data)
-//{
-//  Identities *ids = data;
-//
-//  //g_print("Called %d\n", ids->called);
-//  switch (ids->called) {
-//    case 0:
-//      g_print ("Subflow 1 dp: 0.2, subflow 2 dp: 0.0\n");
-//      g_object_set (ids->identity_s1, "drop-probability", 0.2, NULL);
-//      g_object_set (ids->identity_s2, "drop-probability", 0.0, NULL);
-//      break;
-//    case 1:
-//      g_print ("Subflow 1 dp: 0.0, subflow 2 dp: 0.2\n");
-//      g_object_set (ids->identity_s1, "drop-probability", 0.0, NULL);
-//      g_object_set (ids->identity_s2, "drop-probability", 0.2, NULL);
-//      break;
-//    case 2:
-//      g_print ("Subflow 1 dp: 0.1, subflow 2 dp: 0.0\n");
-//      g_object_set (ids->identity_s1, "drop-probability", 0.1, NULL);
-//      g_object_set (ids->identity_s2, "drop-probability", 0.0, NULL);
-//      break;
-//    case 3:
-//      g_print ("Subflow 1 dp: 0.0, subflow 2 dp: 0.1\n");
-//      g_object_set (ids->identity_s1, "drop-probability", 0.0, NULL);
-//      g_object_set (ids->identity_s2, "drop-probability", 0.1, NULL);
-//      break;
-//    default:
-//      break;
-//  }
-//  ++ids->called;
-//  return TRUE;
-//}
-
-
-
-static gboolean
-_mprtpsch_bidding_test_cb (gpointer data)
-{
-  Identities *ids = data;
-
-  g_print ("MpRTP Scheduler setup bidding test, called %d\n", ids->called);
-
-  switch (ids->called) {
-    case 0:
-      g_object_set (ids->mprtpsch,
-          "setup-sending-bid", (1 << 24) | 70,
-          "setup-sending-bid", (2 << 24) | 30, NULL);
-      g_print ("subflow 1: 70, subflow 2: 30\n");
-      break;
-    case 1:
-      g_object_set (ids->mprtpsch,
-          "setup-sending-bid", (1 << 24) | 30,
-          "setup-sending-bid", (2 << 24) | 70, NULL);
-      g_print ("subflow 1: 30, subflow 2: 70\n");
-      break;
-    case 2:
-      g_object_set (ids->mprtpsch,
-          "setup-sending-bid", (1 << 24) | 1,
-          "setup-sending-bid", (2 << 24) | 9, NULL);
-      g_print ("subflow 1: 1, subflow 2: 9\n");
-      break;
-    case 3:
-      g_object_set (ids->mprtpsch,
-          "setup-sending-bid", (1 << 24) | 99,
-          "setup-sending-bid", (2 << 24) | 1, NULL);
-      g_print ("subflow 1: 99, subflow 2: 1\n");
-      break;
-    default:
-      break;
-  }
-  return ++ids->called > 3 ? G_SOURCE_REMOVE : G_SOURCE_CONTINUE;
-}
 
 
 

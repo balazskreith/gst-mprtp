@@ -52,13 +52,13 @@ struct _MpRTPReceiverPath
   guint32       total_received_bytes;
   guint32       total_early_discarded;
   guint32       total_duplicated_packet_num;
-  guint16       actual_seq;
+  guint16       highest_seq;
 
   guint64       ext_rtptime;
   guint64       last_packet_skew;
   GstClockTime  last_received_time;
   GstClock*     sysclock;
-  guint16       HSN;
+  guint16       played_highest_seq;
   guint32       total_packet_losts;
   guint64       total_packet_received;
 

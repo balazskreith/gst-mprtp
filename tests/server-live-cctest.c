@@ -19,7 +19,9 @@
  */
 #include <gst/gst.h>
 #include <gst/rtp/rtp.h>
-
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 
 typedef struct _SessionData
@@ -106,20 +108,30 @@ static SessionData *
 make_video_session (guint sessionNum)
 {
   GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
-  GstElement *videoSrc = gst_element_factory_make ("videotestsrc", NULL);
+  //GstElement *videoSrc = gst_element_factory_make ("videotestsrc", NULL);
+  GstElement *videoSrc = gst_element_factory_make ("autovideosrc", NULL);
+  GstElement *videoConv = gst_element_factory_make("videoconvert", NULL);
   GstElement *encoder = gst_element_factory_make ("theoraenc", NULL);
   GstElement *payloader = gst_element_factory_make ("rtptheorapay", NULL);
   GstCaps *videoCaps;
   SessionData *session;
-  g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 1, NULL);
+  //g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 1, NULL);
   g_object_set (payloader, "config-interval", 2, NULL);
+  g_object_set(videoSrc, "name", "videosrc", NULL);
+  g_object_set (videoSrc, "sync", FALSE, NULL);
+  g_object_set (encoder, "bitrate", 1024, NULL);
 
-  gst_bin_add_many (videoBin, videoSrc, encoder, payloader, NULL);
+  gst_bin_add_many (videoBin, videoSrc, videoConv, encoder, payloader, NULL);
   videoCaps = gst_caps_new_simple ("video/x-raw",
       "width", G_TYPE_INT, 352,
-      "height", G_TYPE_INT, 288, "framerate", GST_TYPE_FRACTION, 15, 1, NULL);
-  gst_element_link_filtered (videoSrc, encoder, videoCaps);
+      "height", G_TYPE_INT, 288, "framerate", GST_TYPE_FRACTION, 25, 1, NULL);
+
+  //gst_element_link_filtered (videoSrc, videoConv, videoCaps);
+  gst_element_link(videoSrc, videoConv);
+  gst_element_link(videoConv, encoder);
   gst_element_link (encoder, payloader);
+
+  //g_object_set(videoSrc, "filter-caps", videoCaps, NULL);
 
   setup_ghost (payloader, videoBin);
 
@@ -164,52 +176,106 @@ request_aux_sender (GstElement * rtpbin, guint sessid, SessionData * session)
 typedef struct _Identities
 {
   GstElement *mprtpsch;
-  GstElement *identity_s1;
-  GstElement *identity_s2;
+  GstElement *netsim_s1;
+  GstElement *netsim_s2;
+  guint silence;
   guint called;
+  gchar filename[255];
+  FILE * fp;
+  char * line;
+  size_t len;
+  ssize_t read;
 } Identities;
 
+#define print_boundary(text) g_printf("------------------------------ %s ---------------------\n", text);
+#define print_command(str,...) g_printf("[CMD] "str"\n",__VA_ARGS__)
 
-
+static GstElement *get_netsim_for_subflow(Identities* ids, guint subflow_id)
+{
+  if(subflow_id == 1)
+    return ids->netsim_s1;
+  else
+    return ids->netsim_s2;
+}
 
 static gboolean
-_mprtpsch_path_lossy_test_cb (gpointer data)
+_network_changes (gpointer data)
 {
+  gchar **words, *command;
   Identities *ids = data;
 
-  g_print ("Congestion control losy test %d\n", ids->called);
-
-  switch (ids->called) {
-    case 0:
-      g_print ("Subflow 1 drop: 0.2, subflow 2 dropp: 0.0\n");
-      g_object_set (ids->identity_s1, "drop-probability", 0.2, NULL);
-      g_object_set (ids->identity_s2, "drop-probability", 0.0, NULL);
-      break;
-    case 2:
-      g_print ("Subflow 1 drop: 0.0, subflow 2 dropp: 0.2\n");
-      g_object_set (ids->identity_s1, "drop-probability", 0.0, NULL);
-      g_object_set (ids->identity_s2, "drop-probability", 0.2, NULL);
-      break;
-    case 4:
-      g_print ("Subflow 1 drop: 0., subflow 2 dropp: 0.\n");
-      g_object_set (ids->identity_s1, "drop-probability", 0., NULL);
-      g_object_set (ids->identity_s2, "drop-probability", 0., NULL);
-      break;
-    default:
-      break;
+  if(++ids->called == 1){
+    ids->fp = fopen(ids->filename, "r");
+    g_print("File to open: %s\n", ids->filename);
+    if (ids->fp == NULL) goto end;
+    print_boundary("START");
   }
-  return ++ids->called > 4 ? G_SOURCE_REMOVE : G_SOURCE_CONTINUE;
+  if(ids->silence > 0){
+    --ids->silence;
+    goto next;
+  }
+
+again:
+  ids->read = getline(&ids->line, &ids->len, ids->fp);
+  if(ids->read == -1) goto end;
+  words = g_strsplit(ids->line, ",", 0);
+  if(ids->line[0] == '#') goto again;
+  command = words[0];
+
+  if(!strcmp(command, "silence")){
+    gint times;
+    times = atoi(words[1]);
+    ids->silence = times;
+    print_command("silence will perform for %d times", times);
+    goto next;
+  }
+  if(!strcmp(command, "drop-probability")  ||
+     !strcmp(command, "drop-probability")  ||
+     !strcmp(command, "delay-probability") ||
+     !strcmp(command, "reorder-probability")
+    )
+  {
+    gfloat probability;
+    guint subflow_id;
+    probability = atof(words[1]);
+    subflow_id = atoi(words[2]);
+    g_object_set(get_netsim_for_subflow(ids, subflow_id),
+                 command, probability, NULL);
+    print_command("%s is processed with probability %f on subflow %d",
+                  command, probability, subflow_id);
+    goto next;
+  }
+
+
+  if(!strcmp(command, "min-delay")     ||
+      !strcmp(command, "max-delay")    ||
+      !strcmp(command, "drop-packets") ||
+      !strcmp(command, "bandwidth")){
+    gint value;
+    guint subflow_id;
+    value = atoi(words[1]);
+    subflow_id = atoi(words[2]);
+    g_object_set(get_netsim_for_subflow(ids, subflow_id),
+                 command, value, NULL);
+    print_command("%s is processed with value %d on subflow %d",
+                  command, value, subflow_id);
+    goto next;
+  }
+
+next:
+  return G_SOURCE_CONTINUE;
+
+end:
+  if(ids->fp) fclose(ids->fp);
+  if(ids->line) free(ids->line);
+  print_boundary("END");
+  return G_SOURCE_REMOVE;
 }
 
 
-/*
- * This function sets up the UDP sinks and sources for RTP/RTCP, adds the
- * given session's bin into the pipeline, and links it to the properly numbered
- * pads on the rtpbin
- */
-
 static void
-add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
+add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
+           gchar* file)
 {
 
   GstElement *rtpSink_1 = gst_element_factory_make ("udpsink", NULL);
@@ -221,15 +287,15 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
   GstElement *mprtpsnd = gst_element_factory_make ("mprtpsender", NULL);
   GstElement *mprtprcv = gst_element_factory_make ("mprtpreceiver", NULL);
   GstElement *mprtpsch = gst_element_factory_make ("mprtpscheduler", NULL);
-  GstElement *identity_1 = gst_element_factory_make ("identity", NULL);
-  GstElement *identity_2 = gst_element_factory_make ("identity", NULL);
+  GstElement *identity_1 = gst_element_factory_make ("netsim", NULL);
+  GstElement *identity_2 = gst_element_factory_make ("netsim", NULL);
   Identities *ids = g_malloc0 (sizeof (Identities));
   int basePort;
   gchar *padName;
 
   ids->mprtpsch = mprtpsch;
-  ids->identity_s1 = identity_1;
-  ids->identity_s2 = identity_2;
+  ids->netsim_s1 = identity_1;
+  ids->netsim_s2 = identity_2;
   ids->called = 0;
 
   basePort = 5000 + (session->sessionNum * 20);
@@ -257,23 +323,13 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
   g_object_set (rtpSrc_1, "port", basePort + 11, NULL);
   g_object_set (rtpSrc_2, "port", basePort + 12, NULL);
   g_object_set (rtcpSrc, "port", basePort + 10, NULL);
-//  g_object_set (mprtpsch, "auto-flow-controlling", TRUE, NULL);
-
-
-  /* this is just to drop some rtp packets at random, to demonstrate
-   * that rtprtxsend actually works */
-  //g_object_set (identity, "drop-probability", 0.1, NULL);
-
-  //g_timeout_add (10000, _timeout_callback, ids);
-  //g_timeout_add (10000, _mprtpsch_bidding_test_cb, ids);
-  g_timeout_add (10000, _mprtpsch_path_lossy_test_cb, ids);
+  g_object_set (mprtpsch, "auto-flow-controlling", TRUE, NULL);
 
   padName = g_strdup_printf ("send_rtp_sink_%u", session->sessionNum);
   gst_element_link_pads (session->input, "src", rtpBin, padName);
   g_free (padName);
 
   //MPRTP Sender
-
   padName = g_strdup_printf ("send_rtp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, mprtpsch, "rtp_sink");
   gst_element_link_pads (mprtpsch, "mprtp_src", mprtpsnd, "mprtp_sink");
@@ -285,19 +341,14 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
 
   gst_element_link_pads (mprtpsnd, "src_2", identity_2, "sink");
   gst_element_link (identity_2, rtpSink_2);
-  //gst_element_link_pads (mprtpsnd, "src_2", rtpSink_2, "sink");
-  //gst_element_link_pads (rtpBin, padName, identity, "sink");
 
   g_object_set (mprtpsch, "join-subflow", 1, NULL);
   g_object_set (mprtpsch, "join-subflow", 2, NULL);
-  //g_object_set (mprtprcv, "report-only", TRUE, NULL);
 
+  sprintf(ids->filename, "%s", file);
+  g_timeout_add (1000, _network_changes, ids);
 
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
-  //gst_element_link_pads (rtpBin, padName, try, "sink");
-  //gst_element_link_pads (try, "src", rtcpSink, "sink");
-  //gst_element_link_pads (rtpBin, padName, mprtps, "rtcp_sink");
-  //gst_element_link_pads (mprtps, "rtcp_src", rtcpSink, "sink");
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");
   g_free (padName);
 
@@ -326,6 +377,7 @@ main (int argc, char **argv)
   SessionData *audioSession;
   GstElement *rtpBin;
   GMainLoop *loop;
+  gchar *testfile = NULL;
 
   gst_init (&argc, &argv);
 
@@ -342,10 +394,10 @@ main (int argc, char **argv)
 
   gst_bin_add (GST_BIN (pipe), rtpBin);
 
+  if(argc > 1) testfile = argv[1];
+
   videoSession = make_video_session (0);
-  //audioSession = make_audio_session (1);
-  add_stream (pipe, rtpBin, videoSession);
-  //add_stream (pipe, rtpBin, audioSession);
+  add_stream (pipe, rtpBin, videoSession, testfile);
 
   g_print ("starting server pipeline\n");
   gst_element_set_state (GST_ELEMENT (pipe), GST_STATE_PLAYING);

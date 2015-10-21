@@ -501,6 +501,7 @@ gst_mprtpsender_src_query (GstPad * srcpad, GstObject * parent,
         GstClockTime min, max;
         GstPad *peer;
         peer = gst_pad_get_peer (this->mprtp_sinkpad);
+        if(!peer) break;
 //        g_print ("PLY GST_QUERY_LATENCY\n");
         if ((result = gst_pad_query (peer, query))) {
             gst_query_parse_latency (query, &live, &min, &max);

@@ -126,7 +126,12 @@ make_video_session (guint sessionNum)
   ret->caps = gst_caps_new_simple ("application/x-rtp",
       "media", G_TYPE_STRING, "video",
       "clock-rate", G_TYPE_INT, 90000,
+      "width", G_TYPE_INT, 352,
+      "height", G_TYPE_INT, 288,
+      "framerate", GST_TYPE_FRACTION, 25, 1,
       "encoding-name", G_TYPE_STRING, "THEORA", NULL);
+
+  g_object_set (sink, "sync", FALSE, NULL);
   return ret;
 }
 

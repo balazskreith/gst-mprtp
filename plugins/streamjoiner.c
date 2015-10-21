@@ -189,15 +189,15 @@ stream_joiner_run (void *data)
     path = subflow->path;
     while (mprtpr_path_has_buffer_to_playout (path)) {
       buf = mprtpr_path_pop_buffer_to_playout (path, &seq_num);
+      if(!buf) continue;
       heap_item = _make_heap_item (this, buf, seq_num);
       _heap_push (this->packets_heap, heap_item);
     }
   }
-
   while (this->packets_heap->count) {
     heap_item = heap_front (this->packets_heap);
     _heap_pop (this->packets_heap);
-    //g_print ("%hu->", heap_item->seq_num);
+//    g_print ("OUT:%p-%hu\n", heap_item->buffer, heap_item->seq_num);
     this->send_mprtp_packet_func (this->send_mprtp_packet_data,
         heap_item->buffer);
     _trash_heap_item (this, heap_item);

@@ -220,7 +220,7 @@ mprtpr_path_reset (MpRTPRPath * this)
   this->total_late_discarded_bytes = 0;
   this->total_early_discarded = 0;
   this->total_duplicated_packet_num = 0;
-  this->actual_seq = 0;
+  this->highest_seq = 0;
   this->total_packet_losts = 0;
   this->total_packet_received = 0;
 
@@ -229,7 +229,7 @@ mprtpr_path_reset (MpRTPRPath * this)
 //  this->skews_write_index = 0;
 //  this->skews_read_index = 0;
   this->last_received_time = 0;
-  this->HSN = 0;
+  this->played_highest_seq = 0;
 
 }
 
@@ -248,7 +248,7 @@ mprtpr_path_get_highest_sequence_number (MpRTPRPath * this)
 {
   guint16 result;
   THIS_READLOCK (this);
-  result = this->actual_seq;
+  result = this->highest_seq;
   THIS_READUNLOCK (this);
   return result;
 }
@@ -373,6 +373,9 @@ mprtpr_path_pop_buffer_to_playout (MpRTPRPath * this, guint16 * abs_seq)
   if (!packet)
     goto done;
   result = packet->buffer;
+//  g_print("PLAYOUT: %p-%u<-%d:%u\n",
+//          packet->buffer, packet->abs_seq_num,this->id,
+//          this->highest_seq);
   packet->buffer = NULL;
   chain->play = packet->successor;
   if (packet->gap) {
@@ -382,6 +385,9 @@ mprtpr_path_pop_buffer_to_playout (MpRTPRPath * this, guint16 * abs_seq)
     this->gaps = g_list_remove (this->gaps, gap);
     packet->gap = NULL;
     _trash_gap (this, gap);
+  }
+  if(_cmp_seq(this->played_highest_seq, packet->rel_seq_num) < 0){
+    this->played_highest_seq = packet->rel_seq_num;
   }
   if (abs_seq) {
     *abs_seq = packet->abs_seq_num;
@@ -417,6 +423,7 @@ mprtpr_path_removes_obsolate_packets (MpRTPRPath * this)
 //  g_print("Obsolate next: %p - %d packets\n", next, num);
   _balancing_skew_tree (this);
 done:
+
   THIS_WRITEUNLOCK (this);
 }
 
@@ -490,8 +497,8 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this,
   packet = _make_packet (this, rtp, packet_subflow_seq_num, snd_time);
 
   if (this->seq_initialized == FALSE) {
-    this->actual_seq = packet_subflow_seq_num;
-    this->HSN = packet_subflow_seq_num;
+    this->highest_seq = packet_subflow_seq_num;
+    this->played_highest_seq = packet_subflow_seq_num;
     this->total_packet_received = 1;
     this->seq_initialized = TRUE;
     //this->result = g_list_prepend (this->result, buf);
@@ -502,39 +509,43 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this,
 
   //calculate lost, discarded and received packets
   ++this->total_packet_received;
-  if (0x8000 < this->HSN && packet_subflow_seq_num < 0x8000 &&
+  if (0x8000 < this->played_highest_seq && packet_subflow_seq_num < 0x8000 &&
       this->received_since_cycle_is_increased > 0x8888) {
     this->received_since_cycle_is_increased = 0;
     ++this->cycle_num;
   }
-
-  if (_cmp_seq (this->HSN, packet_subflow_seq_num) > 0) {
+  _add_packet (this, packet);
+  if (_cmp_seq (this->played_highest_seq, packet_subflow_seq_num) > 0) {
     ++this->total_late_discarded;
     this->total_late_discarded_bytes += packet->payload_bytes;
-    goto done;
+//    g_print("LATE DISCARDED: %p-%hu<-%d\n", packet, packet->abs_seq_num, this->id);
+    goto delete_and_done;
   }
 
-  _add_packet (this, packet);
+
 
   this->total_received_bytes += packet->payload_bytes + (28 << 3);
-  if (packet_subflow_seq_num == (guint16) (this->actual_seq + 1)) {
+  if (packet_subflow_seq_num == (guint16) (this->highest_seq + 1)) {
     ++this->received_since_cycle_is_increased;
-    ++this->actual_seq;
+    ++this->highest_seq;
     goto done;
   }
-  if (_cmp_seq (this->actual_seq, packet_subflow_seq_num) < 0) {        //GAP
-    _make_gap (this, packet, this->actual_seq, packet_subflow_seq_num);
-    this->actual_seq = packet_subflow_seq_num;
+  if (_cmp_seq (this->highest_seq, packet_subflow_seq_num) < 0) {        //GAP
+    _make_gap (this, packet, this->highest_seq, packet_subflow_seq_num);
+    this->highest_seq = packet_subflow_seq_num;
     goto done;
   }
-  if (_cmp_seq (this->actual_seq, packet_subflow_seq_num) > 0) {
+  if (_cmp_seq (this->highest_seq, packet_subflow_seq_num) > 0) {
+//    g_print("TRY GAP FILLING: %p-%hu<-%d\n", packet, packet->abs_seq_num, this->id);
     if (_try_fill_a_gap (this, packet))
       goto done;
+//    g_print("GAP FILLING WENT WRONG: %p-%hu<-%d\n", packet, packet->abs_seq_num, this->id);
   }
   ++this->total_duplicated_packet_num;
+
+delete_and_done:
   gst_buffer_unref (packet->buffer);
   packet->buffer = NULL;
-
 done:
   THIS_WRITEUNLOCK (this);
   return;
@@ -571,6 +582,7 @@ _make_packet (MpRTPRPath * this,
   result->snd_time = snd_time;
   result->skew = 0;
   result->delay = GST_CLOCK_DIFF (result->snd_time, result->rcv_time);
+//  g_print("MAKED:%p-%hu<-%d\n", result->buffer, result->abs_seq_num,this->id);
 //
 //  g_print("Packet->buf: %p\n"
 //          "Packet->payload_bytes: %u\n"
@@ -606,7 +618,7 @@ _add_packet (MpRTPRPath * this, Packet * packet)
     chain->counter = 1;
     goto done;
   }
-
+//g_print("CHAINED:%p-%hu<-%d\n",packet->buffer, packet->abs_seq_num,this->id);
   _chain_packets (this, chain->tail, packet);
   chain->tail = chain->tail->successor = packet;
   GST_DEBUG_OBJECT (this, "ADD PACKET CALLED WITH SKEW %lu\n", packet->skew);

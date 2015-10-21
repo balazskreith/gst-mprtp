@@ -65,22 +65,11 @@ static void gst_mprtpscheduler_set_property (GObject * object,
     guint property_id, const GValue * value, GParamSpec * pspec);
 static void gst_mprtpscheduler_get_property (GObject * object,
     guint property_id, GValue * value, GParamSpec * pspec);
-
 static gboolean
-gst_mprtpscheduler_event_handler (GstPad * pad, GstObject * parent,
-    GstEvent * event);
-static gboolean
-gst_mprtpscheduler_sink_eventfunc (GstMprtpscheduler * trans, GstEvent * event);
-static gboolean
-gst_mprtpscheduler_src_eventfunc (GstMprtpscheduler * this, GstEvent * event);
+gst_mprtpplayouter_src_query (GstPad * sinkpad, GstObject * parent,
+    GstQuery * query);
 static void gst_mprtpscheduler_dispose (GObject * object);
 static void gst_mprtpscheduler_finalize (GObject * object);
-
-static void
-_postprocessing_buffer (GstMprtpscheduler *this, GstBuffer *buffer);
-void
-_update_qos (GstMprtpscheduler * this,
-    gdouble proportion, GstClockTimeDiff diff, GstClockTime timestamp);
 
 static GstStateChangeReturn
 gst_mprtpscheduler_change_state (GstElement * element,
@@ -196,34 +185,7 @@ G_DEFINE_TYPE_WITH_CODE (GstMprtpscheduler, gst_mprtpscheduler,
 
 struct _GstMprtpschedulerPrivate
 {
-  gboolean have_same_caps;
 
-  GstBufferPool *pool;
-  gboolean pool_active;
-  GstAllocator *allocator;
-  GstAllocationParams params;
-  GstQuery *query;
-
-  /* Set by sub-class */
-
-   /* QoS *//* with LOCK */
-   gboolean qos_enabled;
-   gdouble proportion;
-   GstClockTime earliest_time;
-   /* previous buffer had a discont */
-//   gboolean discont;
-
-   /* QoS stats */
-   guint64 processed;
-   guint64 dropped;
-
-   GstClockTime position_out;
-
-   GstSegment     segment;
-//
-//   GstAllocator *allocator;
-//   GstAllocationParams params;
-//   GstQuery *query;
 };
 
 static void
@@ -353,9 +315,8 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
 static void
 gst_mprtpscheduler_init (GstMprtpscheduler * this)
 {
-  GstMprtpschedulerPrivate *priv;
-
-  priv = this->priv = GST_MPRTPSCHEDULER_GET_PRIVATE (this);
+//  GstMprtpschedulerPrivate *priv;
+//  priv = this->priv = GST_MPRTPSCHEDULER_GET_PRIVATE (this);
 
   this->rtp_sinkpad =
       gst_pad_new_from_static_template (&gst_mprtpscheduler_rtp_sink_template,
@@ -382,9 +343,6 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   gst_pad_set_query_function (this->rtp_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpscheduler_sink_query));
 
-  gst_pad_set_event_function(this->rtp_sinkpad, gst_mprtpscheduler_event_handler);
-  gst_pad_set_event_function(this->mprtp_srcpad, gst_mprtpscheduler_event_handler);
-
   gst_element_add_pad (GST_ELEMENT (this), this->mprtcp_rr_sinkpad);
 
   this->mprtcp_sr_srcpad =
@@ -402,6 +360,9 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   gst_pad_use_fixed_caps (this->mprtp_srcpad);
   GST_PAD_SET_PROXY_CAPS (this->mprtp_srcpad);
   GST_PAD_SET_PROXY_ALLOCATION (this->mprtp_srcpad);
+
+  gst_pad_set_query_function(this->mprtp_srcpad,
+    GST_DEBUG_FUNCPTR(gst_mprtpplayouter_src_query));
 
   gst_element_add_pad (GST_ELEMENT (this), this->mprtp_srcpad);
 
@@ -426,9 +387,6 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->splitter = (StreamSplitter *) g_object_new (STREAM_SPLITTER_TYPE, NULL);
   this->controller = NULL;
   _change_auto_flow_controlling_mode (this, FALSE);
-
-  priv->processed = 0;
-  priv->dropped = 0;
 }
 
 
@@ -612,154 +570,40 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
   }
 }
 
-gboolean
-gst_mprtpscheduler_event_handler (GstPad * pad, GstObject * parent,
-    GstEvent * event)
-{
-  GstMprtpscheduler *this;
-  gboolean ret = TRUE;
-
-  this = GST_MPRTPSCHEDULER (parent);
-  if(GST_PAD_DIRECTION(pad) == GST_PAD_SINK)
-    ret = gst_mprtpscheduler_sink_eventfunc(this, event);
-  else
-    ret = gst_mprtpscheduler_src_eventfunc(this, event);
-
-  return ret;
-}
-
 
 gboolean
-gst_mprtpscheduler_sink_eventfunc (GstMprtpscheduler * this, GstEvent * event)
+gst_mprtpplayouter_src_query (GstPad * sinkpad, GstObject * parent,
+    GstQuery * query)
 {
-  gboolean ret = TRUE, forward = TRUE;
-  GstMprtpschedulerPrivate *priv = this->priv;
-
-  switch (GST_EVENT_TYPE (event)) {
-    case GST_EVENT_FLUSH_START:
+  GstMprtpscheduler *this = GST_MPRTPSCHEDULER(parent);
+  gboolean result = FALSE;
+  GST_DEBUG_OBJECT (this, "query");
+  switch (GST_QUERY_TYPE (query)) {
+    case GST_QUERY_LATENCY:
+      {
+        gboolean live;
+        GstClockTime min, max;
+        GstPad *peer;
+        peer = gst_pad_get_peer (this->rtp_sinkpad);
+//        g_print ("PLY GST_QUERY_LATENCY\n");
+        if ((result = gst_pad_query (peer, query))) {
+            gst_query_parse_latency (query, &live, &min, &max);
+            max+= 10*GST_MSECOND;
+//            g_print ("Peer latency: min %"
+//                      GST_TIME_FORMAT " max %" GST_TIME_FORMAT,
+//                      GST_TIME_ARGS (min), GST_TIME_ARGS (max));
+            gst_query_set_latency (query, live, min, max);
+        }
+        gst_object_unref (peer);
+      }
       break;
-    case GST_EVENT_FLUSH_STOP:
-      THIS_WRITELOCK(this);
-      /* reset QoS parameters */
-      priv->proportion = 1.0;
-      priv->earliest_time = -1;
-//      priv->discont = FALSE;
-      priv->processed = 0;
-      priv->dropped = 0;
-      THIS_WRITEUNLOCK(this);
-      /* we need new segment info after the flush. */
-      gst_segment_init (&priv->segment, GST_FORMAT_UNDEFINED);
-      priv->position_out = GST_CLOCK_TIME_NONE;
-      break;
-    case GST_EVENT_EOS:
-      break;
-    case GST_EVENT_TAG:
-      break;
-    case GST_EVENT_SEGMENT:
-    {
-      gst_event_copy_segment (event, &priv->segment);
-
-      GST_DEBUG_OBJECT (priv, "received SEGMENT %" GST_SEGMENT_FORMAT,
-          &priv->segment);
-      break;
-    }
     default:
+      result = gst_pad_peer_query (this->mprtp_srcpad, query);
       break;
   }
-
-  if (ret && forward)
-    ret = gst_pad_push_event (this->mprtp_srcpad, event);
-  else
-    gst_event_unref (event);
-
-  return ret;
+  return result;
 }
 
-
-
-
-static void
-_postprocessing_buffer (GstMprtpscheduler *this, GstBuffer *buffer)
-{
-  GstMprtpschedulerPrivate *priv = this->priv;
-  GstClockTime position = GST_CLOCK_TIME_NONE;
-  GstClockTime timestamp, duration;
-  GstClockTime position_out;
-
-  timestamp = GST_BUFFER_TIMESTAMP (buffer);
-  duration = GST_BUFFER_DURATION (buffer);
-
-  /* calculate end position of the incoming buffer */
-  if (timestamp != GST_CLOCK_TIME_NONE) {
-    if (duration != GST_CLOCK_TIME_NONE)
-      position = timestamp + duration;
-    else
-      position = timestamp;
-  }
-
-    /* outbuf can be NULL, this means a dropped buffer, if we have a buffer but
-     * GST_BASE_TRANSFORM_FLOW_DROPPED we will not push either. */
-  position_out = GST_CLOCK_TIME_NONE;
-
-    /* Remember last stop position */
-    if (position != GST_CLOCK_TIME_NONE && priv->segment.format == GST_FORMAT_TIME)
-          priv->segment.position = position;
-
-    if (GST_BUFFER_TIMESTAMP_IS_VALID (buffer)) {
-      position_out = GST_BUFFER_TIMESTAMP (buffer);
-      if (GST_BUFFER_DURATION_IS_VALID (buffer))
-        position_out += GST_BUFFER_DURATION (buffer);
-    } else if (position != GST_CLOCK_TIME_NONE) {
-      position_out = position;
-    }
-    if (position_out != GST_CLOCK_TIME_NONE
-        && priv->segment.format == GST_FORMAT_TIME)
-      priv->position_out = position_out;
-
-    priv->processed++;
-}
-
-void
-_update_qos (GstMprtpscheduler * this,
-    gdouble proportion, GstClockTimeDiff diff, GstClockTime timestamp)
-{
-  g_return_if_fail (GST_IS_MPRTPSCHEDULER (this));
-
-  this->priv->proportion = proportion;
-  this->priv->earliest_time = timestamp + diff;
-}
-
-
-static gboolean
-gst_mprtpscheduler_src_eventfunc (GstMprtpscheduler * this, GstEvent * event)
-{
-  gboolean ret;
-
-  GST_DEBUG_OBJECT (this, "handling event %p %" GST_PTR_FORMAT, event, event);
-
-  switch (GST_EVENT_TYPE (event)) {
-    case GST_EVENT_SEEK:
-      break;
-    case GST_EVENT_NAVIGATION:
-      break;
-    case GST_EVENT_QOS:
-    {
-      gdouble proportion;
-      GstClockTimeDiff diff;
-      GstClockTime timestamp;
-
-      gst_event_parse_qos (event, NULL, &proportion, &diff, &timestamp);
-      _update_qos (this, proportion, diff, timestamp);
-      break;
-    }
-    default:
-      break;
-  }
-
-  ret = gst_pad_push_event (this->rtp_sinkpad, event);
-
-  return ret;
-}
 
 GstStructure *
 _collect_infos (GstMprtpscheduler * this)
@@ -994,7 +838,6 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     this->retained_process_started = FALSE;
   }
 
-  _postprocessing_buffer(this, buffer);
   result = _send_rtp_buffer (this, path, buffer);
   goto done;
 

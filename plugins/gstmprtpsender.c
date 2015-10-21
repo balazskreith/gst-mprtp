@@ -72,7 +72,9 @@ static gboolean gst_mprtpsender_query (GstElement * element, GstQuery * query);
 static GstPadLinkReturn gst_mprtpsender_src_link (GstPad * pad,
     GstObject * parent, GstPad * peer);
 static void gst_mprtpsender_src_unlink (GstPad * pad, GstObject * parent);
-
+static gboolean
+gst_mprtpsender_src_query (GstPad * sinkpad, GstObject * parent,
+    GstQuery * query);
 static GstFlowReturn gst_mprtpsender_mprtp_sink_chain (GstPad * pad,
     GstObject * parent, GstBuffer * buffer);
 
@@ -169,7 +171,7 @@ gst_mprtpsender_mprtp_sink_event_handler (GstPad * pad, GstObject * parent,
   const GstSegment *segment;
   GstCaps *caps;
 
-  g_print ("SND EVENT to the sink: %s", GST_EVENT_TYPE_NAME (event));
+//  g_print ("SND EVENT to the sink: %s", GST_EVENT_TYPE_NAME (event));
 
   this = GST_MPRTPSENDER (parent);
   THIS_WRITELOCK (this);
@@ -287,6 +289,7 @@ gst_mprtpsender_init (GstMprtpsender * mprtpsender)
   gst_pad_set_event_function (mprtpsender->mprtp_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpsender_mprtp_sink_event_handler));
 
+
   gst_element_add_pad (GST_ELEMENT (mprtpsender), mprtpsender->mprtp_sinkpad);
 
 //  GST_PAD_SET_PROXY_CAPS (mprtpsender->mprtp_sinkpad);
@@ -403,6 +406,8 @@ gst_mprtpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
       GST_DEBUG_FUNCPTR (gst_mprtpsender_src_link));
   gst_pad_set_unlink_function (srcpad,
       GST_DEBUG_FUNCPTR (gst_mprtpsender_src_unlink));
+  gst_pad_set_query_function(srcpad,
+      GST_DEBUG_FUNCPTR(gst_mprtpsender_src_query));
   subflow->id = subflow_id;
   subflow->outpad = srcpad;
   subflow->state = 0;
@@ -468,7 +473,7 @@ gst_mprtpsender_query (GstElement * element, GstQuery * query)
   gboolean ret;
 
   GST_DEBUG_OBJECT (mprtpsender, "query");
-  g_print ("SND QUERY to the element: %s\n", GST_QUERY_TYPE_NAME (query));
+//  g_print ("SND QUERY to the element: %s\n", GST_QUERY_TYPE_NAME (query));
   switch (GST_QUERY_TYPE (query)) {
     default:
       ret =
@@ -478,6 +483,41 @@ gst_mprtpsender_query (GstElement * element, GstQuery * query)
   }
 
   return ret;
+}
+
+
+gboolean
+gst_mprtpsender_src_query (GstPad * srcpad, GstObject * parent,
+    GstQuery * query)
+{
+  GstMprtpsender *this = GST_MPRTPSENDER(parent);
+  gboolean result = FALSE;
+  GST_DEBUG_OBJECT (this, "query");
+  switch (GST_QUERY_TYPE (query)) {
+    case GST_QUERY_LATENCY:
+
+      {
+        gboolean live;
+        GstClockTime min, max;
+        GstPad *peer;
+        peer = gst_pad_get_peer (this->mprtp_sinkpad);
+//        g_print ("PLY GST_QUERY_LATENCY\n");
+        if ((result = gst_pad_query (peer, query))) {
+            gst_query_parse_latency (query, &live, &min, &max);
+            max+= 10*GST_MSECOND;
+//            g_print ("Peer latency: min %"
+//                      GST_TIME_FORMAT " max %" GST_TIME_FORMAT,
+//                      GST_TIME_ARGS (min), GST_TIME_ARGS (max));
+            gst_query_set_latency (query, live, min, max);
+        }
+        gst_object_unref (peer);
+      }
+      break;
+    default:
+      result = gst_pad_peer_query (srcpad, query);
+      break;
+  }
+  return result;
 }
 
 

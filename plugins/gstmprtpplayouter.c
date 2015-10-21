@@ -81,7 +81,9 @@ static gboolean gst_mprtpplayouter_src_query (GstPad * sinkpad,
     GstObject * parent, GstQuery * query);
 static gboolean gst_mprtpplayouter_sink_event (GstPad * pad, GstObject * parent,
     GstEvent * event);
-static void gst_mprtpplayouter_mprtcp_sender (gpointer ptr, GstBuffer * buf);
+static void
+gst_mprtpplayouter_mprtcp_sender (gpointer ptr, GstBuffer * buf);
+
 static void _processing_mprtp_packet (GstMprtpplayouter * mprtpr,
     GstBuffer * buf);
 static GstFlowReturn _processing_mprtcp_packet (GstMprtpplayouter * this,
@@ -521,23 +523,24 @@ gst_mprtpplayouter_src_query (GstPad * sinkpad, GstObject * parent,
   GST_DEBUG_OBJECT (this, "query");
   switch (GST_QUERY_TYPE (query)) {
     case GST_QUERY_LATENCY:
-      {
-        gboolean live;
-        GstClockTime min, max;
-        GstPad *peer;
-        peer = gst_pad_get_peer (this->mprtp_sinkpad);
+    {
+      gboolean live;
+      GstClockTime min, max;
+      GstPad *peer;
+      peer = gst_pad_get_peer (this->mprtp_sinkpad);
 //        g_print ("PLY GST_QUERY_LATENCY\n");
-        if ((result = gst_pad_query (peer, query))) {
-            gst_query_parse_latency (query, &live, &min, &max);
-            max+= 400*GST_MSECOND;
+      if ((result = gst_pad_query (peer, query))) {
+          gst_query_parse_latency (query, &live, &min, &max);
+          min+= GST_MSECOND;
+          max+= 400 * GST_MSECOND;
 //            g_print ("Peer latency: min %"
 //                      GST_TIME_FORMAT " max %" GST_TIME_FORMAT,
 //                      GST_TIME_ARGS (min), GST_TIME_ARGS (max));
-            gst_query_set_latency (query, live, min, max);
-        }
-        gst_object_unref (peer);
+          gst_query_set_latency (query, live, min, max);
       }
-      break;
+      gst_object_unref (peer);
+    }
+    break;
     default:
       result = gst_pad_peer_query (this->mprtp_srcpad, query);
       break;

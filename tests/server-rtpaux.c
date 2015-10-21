@@ -21,38 +21,18 @@
 #include <gst/rtp/rtp.h>
 
 /*
- * An RTP server
- *  creates two sessions and streams audio on one, video on the other, with RTCP
- *  on both sessions. The destination is 127.0.0.1.
+ *                                           .------------.
+ *                                           | rtpbin     |
+ *  .-------.    .---------.    .---------.  |            |       .--------------.    .-------------.
+ *  |audiots|    |theoraenc|    |theorapay|  |            |       |   mprtp_sch  |    | mprtp_snd   |      .-------.
+ *  |      src->sink      src->sink  src->send_rtp_0 send_rtp_0->rtp_sink mprtp_src->mprtp_src      |      |udpsink|
+ *  '-------'    '---------'    '---------'  |            |       |              |    |            src_0->sink     |
+ *                                           |            |       |   mprtcp_sr_src->mprtcp_sr_sink |      '-------'
+ *                                           |            |       '--------------'    |             |      .-------.
+ *                                           |            |                          mprtcp_rr_sink |      |udpsink|
+ *                                           |            |                           |           src_1->sink      |
+ *                                           '------------'
  *
- *  In both sessions, we set "rtprtxsend" as the session's "aux" element
- *  in rtpbin, which enables RFC4588 retransmission for that session.
- *
- *  .-------.    .-------.    .-------.      .------------.       .-------.
- *  |audiots|    |alawenc|    |pcmapay|      | rtpbin     |       |udpsink|
- *  |      src->sink    src->sink    src->send_rtp_0 send_rtp_0->sink     |
- *  '-------'    '-------'    '-------'      |            |       '-------'
- *                                           |            |
- *  .-------.    .---------.    .---------.  |            |       .-------.
- *  |audiots|    |theoraenc|    |theorapay|  |            |       |udpsink|
- *  |      src->sink      src->sink  src->send_rtp_1 send_rtp_1->sink     |
- *  '-------'    '---------'    '---------'  |            |       '-------'
- *                                           |            |
- *                               .------.    |            |
- *                               |udpsrc|    |            |       .-------.
- *                               |     src->recv_rtcp_0   |       |udpsink|
- *                               '------'    |       send_rtcp_0->sink    |
- *                                           |            |       '-------'
- *                               .------.    |            |
- *                               |udpsrc|    |            |       .-------.
- *                               |     src->recv_rtcp_1   |       |udpsink|
- *                               '------'    |       send_rtcp_1->sink    |
- *                                           '------------'       '-------'
- *
- * To keep the set of ports consistent across both this server and the
- * corresponding client, a SessionData struct maps a rtpbin session number to
- * a GstBin and is used to create the corresponding udp sinks with correct
- * ports.
  */
 
 typedef struct _SessionData

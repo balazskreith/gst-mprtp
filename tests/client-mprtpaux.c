@@ -24,10 +24,10 @@
 /*
  *
  *             .-------.                                            .----------.
- *  RTCP       |udpsrc |                                            |          |
- *  port=5005  |     src------------------------------------------>recv_rtcp_0 |
- *             '-------'                                            |          |
- *                                                                  |          |
+ *  RTCP       |udpsrc |                                            |          |                                   .-------.
+ *  port=5005  |     src------------------------------------------>recv_rtcp_0 |                                   |udpsink|   RTCP port 5010
+ *             '-------'                                            |   send_rtcp_1------------------------------>sink     |
+ *                                                                  |          |                                   '-------'
  *             .-------.    .------------.    .------------.        |          |               .-----------.   .---------.   .-------------.
  *  RTP        |udpsrc |    | mprtp_rcv  |    | mprtp_ply  |        | rtpbin   |               |theoradepay|   |theoradec|   |autovideosink|
  *  port=5000  |      src->sink_0 mprtp_src->mprtp_sink mprtp_src->rtp_recv_rtp_0 recv_rtp_0->sink       src->sink     src->sink           |

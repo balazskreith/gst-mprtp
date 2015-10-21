@@ -21,28 +21,21 @@
 #include <gst/rtp/rtp.h>
 
 /*
- *
- *  .-------.    .-------.    .-------.      .------------.       .-------.
- *  |audiots|    |alawenc|    |pcmapay|      | rtpbin     |       |udpsink|
- *  |      src->sink    src->sink    src->send_rtp_0 send_rtp_0->sink     |
- *  '-------'    '-------'    '-------'      |            |       '-------'
- *                                           |            |
- *  .-------.    .---------.    .---------.  |            |       .-------.
- *  |audiots|    |theoraenc|    |theorapay|  |            |       |udpsink|
- *  |      src->sink      src->sink  src->send_rtp_1 send_rtp_1->sink     |
- *  '-------'    '---------'    '---------'  |            |       '-------'
- *                                           |            |
- *                               .------.    |            |
- *                               |udpsrc|    |            |       .-------.
- *                               |     src->recv_rtcp_0   |       |udpsink|
- *                               '------'    |       send_rtcp_0->sink    |
- *                                           |            |       '-------'
- *                               .------.    |            |
+ *                                           .------------.
+ *                                           | rtpbin     |
+ *  .-------.    .---------.    .---------.  |            |       .--------------.    .-------------.
+ *  |audiots|    |theoraenc|    |theorapay|  |            |       |   mprtp_sch  |    | mprtp_snd   |      .-------.
+ *  |      src->sink      src->sink  src->send_rtp_0 send_rtp_0->rtp_sink mprtp_src->mprtp_src      |      |udpsink|
+ *  '-------'    '---------'    '---------'  |            |       |              |    |            src_0->sink     |
+ *                                           |            |       |   mprtcp_sr_src->mprtcp_sr_sink |      '-------'
+ *                                           |            |       '--------------'    |             |      .-------.
+ *                                           |            |                          mprtcp_rr_sink |      |udpsink|
+ *                                           |            |                           |           src_1->sink      |
+ *                               .------.    |            |                           '-------------'      '-------'
  *                               |udpsrc|    |            |       .-------.
  *                               |     src->recv_rtcp_1   |       |udpsink|
  *                               '------'    |       send_rtcp_1->sink    |
  *                                           '------------'       '-------'
- *
  */
 
 typedef struct _SessionData

@@ -663,18 +663,15 @@ _chain_packets (MpRTPRPath * this, Packet * actual, Packet * next)
 
   rcv_diff = next->rcv_time - actual->rcv_time;
   if (rcv_diff > 0x8000000000000000) {
-    rcv_diff = 0;
-  }
-
-  snd_diff = next->snd_time - actual->snd_time;
-  if (snd_diff > 0x8000000000000000) {
-    snd_diff = 0;
-  }
-
-  if (snd_diff == 0) {
-    GST_WARNING_OBJECT (this, "The skew between two packets NOT real");
+    GST_WARNING_OBJECT (this, "The skew between two packets NOT real: "
+            "prev snd: %lu act snd: %lu",actual->snd_time, next->snd_time);
     goto done;
   }
+
+  if(actual->snd_time < next->snd_time)
+    snd_diff = next->snd_time - actual->snd_time;
+  else
+    snd_diff = actual->snd_time - next->snd_time;
 
   if (rcv_diff < snd_diff)
     next->skew = snd_diff - rcv_diff;

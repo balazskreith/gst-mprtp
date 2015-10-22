@@ -36,8 +36,8 @@
 
 #define MAX_RIPORT_INTERVAL (5 * GST_SECOND)
 #define RIPORT_TIMEOUT (3 * MAX_RIPORT_INTERVAL)
-#define PATH_RTT_MAX_TRESHOLD (400 * GST_MSECOND)
-#define PATH_RTT_MIN_TRESHOLD (200 * GST_MSECOND)
+#define PATH_RTT_MAX_TRESHOLD (800 * GST_MSECOND)
+#define PATH_RTT_MIN_TRESHOLD (600 * GST_MSECOND)
 GST_DEBUG_CATEGORY_STATIC (sefctrler_debug_category);
 #define GST_CAT_DEFAULT sefctrler_debug_category
 #define _ct0(this) (this->records+this->records_index)

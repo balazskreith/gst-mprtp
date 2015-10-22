@@ -74,6 +74,7 @@ struct _Subflow
   guint8 id;
   MpRTPRPath *path;
   guint32 received_packets;
+  guint64 playout_skew;
 };
 
 //Heap functions
@@ -139,7 +140,7 @@ stream_joiner_init (StreamJoiner * this)
 {
   this->sysclock = gst_system_clock_obtain ();
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, _ruin_subflow);
-  this->playout_delay = 10 * GST_MSECOND;
+  this->max_path_skew = 10 * GST_MSECOND;
   this->packets_heap = g_malloc0 (sizeof (Heap));
   this->heap_items_pool = g_queue_new ();
 
@@ -165,13 +166,15 @@ stream_joiner_run (void *data)
   Subflow *subflow;
   MpRTPRPath *path;
   guint16 seq_num;
+  gboolean new_playout_needed = FALSE;
+  gboolean obsolate_needed = FALSE;
   GList *it;
   HeapItem *heap_item;
   GstClockID clock_id;
+  guint64 max_path_skew = 0;
 
   THIS_WRITELOCK (this);
   now = gst_clock_get_time (this->sysclock);
-
   if (this->subflow_num == 0) {
     next_scheduler_time = now + 100 * GST_MSECOND;
     goto done;
@@ -179,6 +182,14 @@ stream_joiner_run (void *data)
   if (this->queued) {
     for (it = this->queued; it; it = it->next)
       _heap_push (this->packets_heap, (HeapItem *) it->data);
+  }
+  if(this->last_playout_checked < now - GST_MSECOND){
+    this->last_playout_checked = now;
+    new_playout_needed = TRUE;
+  }
+  if(this->last_obsolate_checked < now - GST_SECOND){
+    this->last_obsolate_checked = now;
+    obsolate_needed = TRUE;
   }
 
   g_hash_table_iter_init (&iter, this->subflows);
@@ -193,6 +204,14 @@ stream_joiner_run (void *data)
       heap_item = _make_heap_item (this, buf, seq_num);
       _heap_push (this->packets_heap, heap_item);
     }
+    if(new_playout_needed){
+      subflow->playout_skew = mprtpr_path_get_skew(path);
+      if(max_path_skew < subflow->playout_skew)
+        max_path_skew = subflow->playout_skew;
+    }
+    if(obsolate_needed){
+      mprtpr_path_removes_obsolate_packets(path);
+    }
   }
   while (this->packets_heap->count) {
     heap_item = heap_front (this->packets_heap);
@@ -202,14 +221,19 @@ stream_joiner_run (void *data)
         heap_item->buffer);
     _trash_heap_item (this, heap_item);
   }
-  //g_print("playout: %lu\n", GST_TIME_AS_MSECONDS((guint64)this->playout_delay));
-  next_scheduler_time = now + this->playout_delay;
+
+  if(new_playout_needed){
+    if (!max_path_skew)
+      max_path_skew = this->max_path_skew ? this->max_path_skew : GST_MSECOND;
+    this->max_path_skew = max_path_skew;
+  }
+  g_print("PLAYOUT: %lu\n", GST_TIME_AS_MSECONDS((guint64)this->max_path_skew));
+  next_scheduler_time = now + this->max_path_skew;
 
 done:
+
   THIS_WRITEUNLOCK (this);
-
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
-
   if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
     GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
   }
@@ -273,11 +297,12 @@ exit:
 }
 
 void
-stream_joiner_set_playout_delay (StreamJoiner * this,
+stream_joiner_set_max_path_skew (StreamJoiner * this,
     GstClockTime playout_delay)
 {
   THIS_WRITELOCK (this);
-  this->playout_delay = playout_delay;
+  this->max_path_skew = playout_delay;
+  g_print("PLAYOUT SKEW ON: %lu\n", this->max_path_skew);
   THIS_WRITEUNLOCK (this);
 }
 

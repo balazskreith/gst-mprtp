@@ -36,7 +36,7 @@ struct _StreamJoiner
   GHashTable*       subflows;
   GRWLock           rwmutex;
 
-  GstClockTime      playout_delay;
+  GstClockTime      max_path_skew;
   Heap*             packets_heap;
   GQueue*           heap_items_pool;
 
@@ -44,6 +44,9 @@ struct _StreamJoiner
   GstClock*         sysclock;
   void            (*send_mprtp_packet_func)(gpointer,GstBuffer*);
   gpointer          send_mprtp_packet_data;
+
+  GstClockTime      last_playout_checked;
+  GstClockTime      last_obsolate_checked;
 };
 
 struct _StreamJoinerClass{
@@ -59,7 +62,7 @@ stream_joiner_add_path(StreamJoiner * this, guint8 subflow_id, MpRTPRPath *path)
 void
 stream_joiner_rem_path(StreamJoiner * this, guint8 subflow_id);
 
-void stream_joiner_set_playout_delay(StreamJoiner *this, GstClockTime delay);
+void stream_joiner_set_max_path_skew(StreamJoiner *this, GstClockTime delay);
 
 GType stream_joiner_get_type (void);
 

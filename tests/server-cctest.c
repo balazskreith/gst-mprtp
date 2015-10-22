@@ -94,8 +94,6 @@ make_video_session (guint sessionNum)
   SessionData *session;
   g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 1, NULL);
   g_object_set (payloader, "config-interval", 2, NULL);
-  //g_object_set(videoSrc, "name", "videosrc", NULL);
-  //g_object_set (videoSrc, "sync", FALSE, NULL);
   g_object_set (encoder, "bitrate", 1024, NULL);
 
   gst_bin_add_many (videoBin, videoSrc, encoder, payloader, NULL);
@@ -321,7 +319,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   gst_element_link (identity_2, rtpSink_2);
 
   g_object_set (mprtpsch, "join-subflow", 1, NULL);
-  g_object_set (mprtpsch, "join-subflow", 2, NULL);
+//  g_object_set (mprtpsch, "join-subflow", 2, NULL);
 
   sprintf(ids->filename, "%s", file);
   g_timeout_add (1000, _network_changes, ids);

@@ -60,7 +60,7 @@ struct _Subflow
   gboolean faster_reporting_started_time;
   guint packet_limit_to_riport;
   gboolean urgent_riport_is_requested;
-  guint64 path_skew;
+//  guint64 path_skew;
   GstClockTime LSR;
   guint16 HSN;
 
@@ -164,7 +164,7 @@ refctrler_run (void *data)
   Subflow *subflow;
   GstClockID clock_id;
   MpRTPRPath *path;
-  guint64 max_path_skew = 0;
+//  guint64 max_path_skew = 0;
 
   this = REFCTRLER (data);
   THIS_WRITELOCK (this);
@@ -201,7 +201,6 @@ refctrler_run (void *data)
 
       this->send_mprtcp_packet_func (this->send_mprtcp_packet_data, block);
 
-
       subflow->avg_rtcp_size +=
           ((gfloat) report_length - subflow->avg_rtcp_size) / 4.;
 
@@ -215,16 +214,7 @@ refctrler_run (void *data)
       subflow->last_rr_report_sent_time = now;
       _recalc_report_time (subflow);
     }
-
-    mprtpr_path_removes_obsolate_packets (path);
-    subflow->path_skew = mprtpr_path_get_skew (path);
-    if (max_path_skew < subflow->path_skew)
-      max_path_skew = subflow->path_skew;
   }
-
-  if (!max_path_skew)
-    max_path_skew = GST_MSECOND;
-  stream_joiner_set_playout_delay (this->joiner, max_path_skew);
 
 //done:
   next_scheduler_time = now + 100 * GST_MSECOND;

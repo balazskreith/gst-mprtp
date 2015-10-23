@@ -701,7 +701,7 @@ _riport_processing_rrblock_processor (Subflow * this, GstRTCPRRBlock * rrb)
   _st0 (this)->fraction_lost = fraction_lost;
 
   _st0 (this)->lost_rate = ((gdouble) fraction_lost) / 256.;
-
+//  if(fraction_lost > 0.) g_print("LOST REPORT ARRIVED\n");
 //  g_print("%d", this->id);
 //  gst_print_rtcp_rrb(rrb);
   //Debug print
@@ -720,7 +720,7 @@ _report_processing_xrblock_processor (Subflow * this, GstRTCPXR_RFC7243 * xrb)
   guint8 interval_metric;
   guint32 discarded_bytes;
   gboolean early_bit;
-
+//  g_print("DISCARDED REPORT ARRIVED\n");
   gst_rtcp_xr_rfc7243_getdown (xrb, &interval_metric,
       &early_bit, NULL, &discarded_bytes);
 
@@ -1064,15 +1064,15 @@ _check_state (Subflow * this)
   gboolean consequtive_non_lost;
   MPRTPSPathState path_state;
 
-  alost = !_st0 (this)->lost_packets_num;
+  alost = _st0 (this)->lost_packets_num;
   adiscard = _st0 (this)->late_discarded_bytes
       || _st0 (this)->early_discarded_bytes;
 
   consequtive_lost = alost &&
-      !_st1 (this)->lost_packets_num && !_st2 (this)->lost_packets_num;
+      _st1 (this)->lost_packets_num && _st2 (this)->lost_packets_num;
 
   consequtive_non_lost = !alost &&
-      _st1 (this)->lost_packets_num && _st2 (this)->lost_packets_num;
+      !_st1 (this)->lost_packets_num && !_st2 (this)->lost_packets_num;
 
   any_discards = adiscard ||
       _st1 (this)->late_discarded_bytes ||

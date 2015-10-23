@@ -52,6 +52,8 @@ struct _Subflow
   GstClock *sysclock;
   GstClockTime joined_time;
   GstClockTime normal_report_time;
+  GstClockTime actual_report_interval;
+  GstClockTime last_report_interval;
   GstClockTime last_rr_report_sent_time;
   gboolean first_report_calculated;
   gdouble media_rate;
@@ -70,6 +72,10 @@ struct _Subflow
   guint32 actual_total_late_discarded_bytes;
   guint32 last_total_received_packet_num;
   guint32 actual_total_received_packet_num;
+  guint32 last_total_bytes_received;
+  guint32 actual_total_bytes_received;
+  guint32 last_total_payload_bytes;
+  guint32 actual_total_payload_bytes;
 };
 
 //----------------------------------------------------------------------
@@ -122,7 +128,7 @@ refctrler_class_init (RcvEventBasedControllerClass * klass)
   gobject_class->finalize = refctrler_finalize;
 
   GST_DEBUG_CATEGORY_INIT (refctrler_debug_category, "refctrler", 0,
-      "MpRTP Receiving Event Flow Riporter");
+      "MpRTP Receiving Event Flow Reporter");
 
 }
 
@@ -181,6 +187,12 @@ refctrler_run (void *data)
         mprtpr_path_get_total_packet_losts_num (path);
     subflow->actual_total_received_packet_num =
         mprtpr_path_get_total_received_packets_num (path);
+    subflow->actual_total_bytes_received =
+        mprtpr_path_get_total_bytes_received(path);
+    subflow->actual_total_payload_bytes =
+        mprtpr_path_get_total_payload_bytes(path);
+
+
 
     if (this->riport_is_flowable && _do_report_now (subflow)) {
       guint16 report_length = 0;
@@ -210,8 +222,18 @@ refctrler_run (void *data)
           subflow->actual_total_lost_packet_num;
       subflow->last_total_received_packet_num =
           subflow->actual_total_received_packet_num;
-
+      subflow->last_total_bytes_received =
+          subflow->actual_total_bytes_received;
+      subflow->last_total_payload_bytes =
+          subflow->actual_total_payload_bytes;
       subflow->last_rr_report_sent_time = now;
+
+      if(subflow->last_report_interval){
+        mprtpr_path_removes_obsolate_packets(
+            subflow->path,
+            subflow->last_report_interval + subflow->actual_report_interval
+            );
+      }
       _recalc_report_time (subflow);
     }
   }
@@ -417,6 +439,7 @@ refctrler_setup (gpointer ptr, StreamJoiner * joiner)
   this = REFCTRLER (ptr);
   THIS_WRITELOCK (this);
   this->joiner = joiner;
+  stream_joiner_path_obsolation(this->joiner, FALSE);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -486,6 +509,7 @@ _get_mprtcp_xr_block (RcvEventBasedController * this, Subflow * subflow,
   if (buf_length) {
     *buf_length = length;
   }
+  //gst_print_mprtcp_block(&block, NULL);
   return buf;
 }
 
@@ -505,6 +529,7 @@ _setup_xr_rfc2743_late_discarded_riport (Subflow * this,
       this->actual_total_late_discarded_bytes);
   gst_rtcp_xr_rfc7243_change (xr, &flag, &early_bit, NULL,
       &late_discarded_bytes);
+  g_print("DISCARDED REPORT SETTED UP\n");
 }
 
 void
@@ -537,7 +562,7 @@ _setup_rr_riport (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
       this->actual_total_lost_packet_num);
   fraction_lost =
       (256. * (gfloat) diff_lost_packet_num) / ((gfloat) (expected));
-
+  if(diff_lost_packet_num) g_print("LOST REPORT ASSEMBLED\n");
   ext_hsn = (((guint32) cycle_num) << 16) | ((guint32) HSN);
 
   LSR = (guint32) (this->LSR >> 16);
@@ -552,7 +577,8 @@ _setup_rr_riport (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
       fraction_lost, this->actual_total_lost_packet_num, ext_hsn, jitter, LSR,
       DLSR);
 
-  received_bytes = (gdouble) mprtpr_path_get_total_bytes_received (path);
+  received_bytes = (gdouble) (this->actual_total_payload_bytes
+      - this->last_total_payload_bytes);
   interval =
       (gdouble) GST_TIME_AS_SECONDS (now - this->last_rr_report_sent_time);
   if (interval < 1.) {
@@ -560,10 +586,10 @@ _setup_rr_riport (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
   }
   this->media_rate = received_bytes / interval;
   //reset
-
-  //  g_print("this->media_bw = %f * %f / %f * 1./1000. = %f\n",
-  //                this->avg_rtp_size, (gdouble)this->packet_received,
-  //                (gdouble) (GST_TIME_AS_MSECONDS(ntptime - this->last_riport_sent_time)), this->media_bw_avg);
+//
+//    g_print("this->media_rate = %f / %f = %f\n",
+//                   received_bytes,
+//                   interval, this->media_rate);
 }
 
 
@@ -631,16 +657,17 @@ _recalc_report_time (Subflow * this)
     interval *= 1.5;
   }
 
-
 done:
   if (interval < 1.) {
     interval = 1. + g_random_double ();
   } else if (7.5 < interval) {
     interval = 5. * (g_random_double () + .5);
   }
-//  g_print("Next interval for subflow %d: %f\n", this->id, interval);
-//  this->normal_report_time = now +
-//          (GstClockTime)interval * GST_SECOND;
+  //g_print("Next interval for subflow %d: %f\n", this->id, interval);
+  this->last_report_interval = this->actual_report_interval;
+  this->actual_report_interval = (GstClockTime)interval * GST_SECOND;
+  this->normal_report_time = now + this->actual_report_interval;
+
   return;
 }
 

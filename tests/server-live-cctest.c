@@ -229,10 +229,10 @@ again:
     print_command("silence will perform for %d times", times);
     goto next;
   }
-  if(!strcmp(command, "drop-probability")  ||
-     !strcmp(command, "drop-probability")  ||
-     !strcmp(command, "delay-probability") ||
-     !strcmp(command, "reorder-probability")
+  if(!strcmp(command, "delay-probability")    ||
+     !strcmp(command, "reorder-probability")  ||
+     !strcmp(command, "drop-probability")     ||
+     !strcmp(command, "duplicate-probability")
     )
   {
     gfloat probability;
@@ -247,10 +247,15 @@ again:
   }
 
 
-  if(!strcmp(command, "min-delay")     ||
-      !strcmp(command, "max-delay")    ||
-      !strcmp(command, "drop-packets") ||
-      !strcmp(command, "bandwidth")){
+  if( !strcmp(command, "min-delay")            ||
+      !strcmp(command, "queue-min-delay")      ||
+      !strcmp(command, "queue-drop-policy")    ||
+      !strcmp(command, "queue-max-delay")      ||
+      !strcmp(command, "queue-max-packets")    ||
+      !strcmp(command, "max-delay")            ||
+      !strcmp(command, "pacing-treshold")
+    )
+  {
     gint value;
     guint subflow_id;
     value = atoi(words[1]);
@@ -287,8 +292,8 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   GstElement *mprtpsnd = gst_element_factory_make ("mprtpsender", NULL);
   GstElement *mprtprcv = gst_element_factory_make ("mprtpreceiver", NULL);
   GstElement *mprtpsch = gst_element_factory_make ("mprtpscheduler", NULL);
-  GstElement *identity_1 = gst_element_factory_make ("netsim", NULL);
-  GstElement *identity_2 = gst_element_factory_make ("netsim", NULL);
+  GstElement *identity_1 = gst_element_factory_make ("netsimb", NULL);
+  GstElement *identity_2 = gst_element_factory_make ("netsimb", NULL);
   Identities *ids = g_malloc0 (sizeof (Identities));
   int basePort;
   gchar *padName;

@@ -21,7 +21,9 @@ typedef struct _MpRTPReceiverPathClass MpRTPRPathClass;
 typedef struct _MpRTPRReceivedItem  MpRTPRReceivedItem;
 typedef struct _SkewTree SkewTree;
 typedef struct _SkewChain PacketChain;
+typedef struct _MpRTPRPacket MpRTPRPacket;
 
+#define MPRTPR_PACKET_INIT           {NULL, 0, 0, 0}
 
 #define MPRTPR_PATH_TYPE             (mprtpr_path_get_type())
 #define MPRTPR_PATH(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),MPRTPR_PATH_TYPE,MPRTPRPath))
@@ -50,6 +52,7 @@ struct _MpRTPReceiverPath
   guint32       total_late_discarded;
   guint32       total_late_discarded_bytes;
   guint32       total_received_bytes;
+  guint32       total_payload_bytes;
   guint32       total_early_discarded;
   guint32       total_duplicated_packet_num;
   guint16       highest_seq;
@@ -78,6 +81,13 @@ struct _MpRTPReceiverPathClass
   GObjectClass parent_class;
 };
 
+struct _MpRTPRPacket{
+  GstBuffer *buffer;
+  guint16  seq_num;
+  gboolean frame_start;
+  gboolean frame_end;
+};
+
 
 GType mprtpr_path_get_type (void);
 void mprtpr_path_destroy(gpointer ptr);
@@ -91,6 +101,7 @@ guint32 mprtpr_path_get_total_packet_losts_num (MpRTPRPath * this);
 guint32 mprtpr_path_get_total_late_discarded_num(MpRTPRPath * this);
 guint32 mprtpr_path_get_total_late_discarded_bytes_num(MpRTPRPath * this);
 guint32 mprtpr_path_get_total_bytes_received (MpRTPRPath * this);
+guint32 mprtpr_path_get_total_payload_bytes (MpRTPRPath * this);
 guint32 mprtpr_path_get_total_duplicated_packet_num(MpRTPRPath * this);
 guint64 mprtpr_path_get_total_received_packets_num (MpRTPRPath * this);
 guint32 mprtpr_path_get_total_early_discarded_packets_num (MpRTPRPath * this);
@@ -101,9 +112,11 @@ void mprtpr_path_process_rtp_packet(MpRTPRPath *this,
                                guint16 packet_subflow_seq_num,
                                GstClockTime snd_time);
 
-void mprtpr_path_removes_obsolate_packets(MpRTPRPath *this);
+void mprtpr_path_removes_obsolate_packets(MpRTPRPath *this, GstClockTime treshold);
 guint64 mprtpr_path_get_skew(MpRTPRPath *this);
-GstBuffer* mprtpr_path_pop_buffer_to_playout(MpRTPRPath *this, guint16* abs_seq);
+void
+mprtpr_path_pop_mprtpr_packet_to_playout (MpRTPRPath * this,
+                                   MpRTPRPacket* mprtp_packet);
 gboolean mprtpr_path_has_buffer_to_playout(MpRTPRPath *this);
 
 G_END_DECLS

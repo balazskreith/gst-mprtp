@@ -312,23 +312,43 @@ gst_mprtcp_get_first_block (GstMPRTCPSubflowReport * riport)
 }
 
 GstMPRTCPSubflowBlock *
-gst_mprtcp_get_next_block (GstMPRTCPSubflowReport * riport,
-    GstMPRTCPSubflowBlock * actual)
+gst_mprtcp_get_next_block (GstMPRTCPSubflowReport * report,
+    GstMPRTCPSubflowBlock * actual, guint8 *act_src)
 {
-  guint8 *next = (guint8 *) actual;
-  guint8 *max_ptr = (guint8 *) (&riport->header);
-  guint16 riport_length;
+  guint8 *ptr    = (guint8*) actual;
+  guint8 src;
   guint8 block_length;
-  gst_rtcp_header_getdown (&riport->header, NULL, NULL, NULL, NULL,
-      &riport_length, NULL);
+
+  gst_rtcp_header_getdown (&report->header, NULL, NULL, &src, NULL,
+      NULL, NULL);
   gst_mprtcp_block_getdown (&actual->info, NULL, &block_length, NULL);
-  max_ptr += riport_length << 2;
-  next += (block_length + 1) << 2;
-  if (block_length == 0) {
-    return NULL;
-  }
-  return next < max_ptr ? (GstMPRTCPSubflowBlock *) next : NULL;
+
+  if(src <= ++*act_src) return NULL;
+  ptr += (block_length + 1)<<2;
+  return (GstMPRTCPSubflowBlock*) ptr;
 }
+
+
+//GstMPRTCPSubflowBlock *
+//gst_mprtcp_get_next_block (GstMPRTCPSubflowReport * riport,
+//    GstMPRTCPSubflowBlock * actual)
+//{
+//  guint8 *next = (guint8 *) actual;
+//  guint8 *max_ptr = (guint8 *) (&riport->header);
+//  guint16 riport_length;
+//  guint8 block_length;
+//  gst_rtcp_header_getdown (&riport->header, NULL, NULL, NULL, NULL,
+//      &riport_length, NULL);
+//  gst_mprtcp_block_getdown (&actual->info, NULL, &block_length, NULL);
+//
+//  max_ptr += riport_length << 2;
+//  next += (block_length + 1) << 2;
+//  if (block_length == 0) {
+//    return NULL;
+//  }
+//  g_print("B: %d<%d->%p\n", block_length, riport_length<<2, next < max_ptr ? (GstMPRTCPSubflowBlock *) next : NULL);
+//  return next < max_ptr ? (GstMPRTCPSubflowBlock *) next : NULL;
+//}
 
 /*-------------------- Sender Riport ----------------------*/
 
@@ -777,8 +797,8 @@ gst_print_mprtcp (GstMPRTCPSubflowReport * riport)
     guint8 block_length;
     gst_print_mprtcp_block (block, &block_length);
     block =
-        (GstMPRTCPSubflowBlock *) ((guint8 *) block) + ((block_length +
-            1) << 2);
+        (GstMPRTCPSubflowBlock *)
+        ((guint8 *) block + ((block_length + 1) << 2));
   }
 }
 

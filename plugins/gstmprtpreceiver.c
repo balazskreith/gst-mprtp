@@ -336,7 +336,6 @@ gst_mprtpreceiver_sink_query (GstPad * sinkpad, GstObject * parent,
   GST_DEBUG_OBJECT (this, "query");
 //  g_print ("QUERY to the sink: %s\n", GST_QUERY_TYPE_NAME (query));
   switch (GST_QUERY_TYPE (query)) {
-
     default:
       result = gst_pad_peer_query (this->mprtp_srcpad, query);
       break;
@@ -588,6 +587,7 @@ _send_mprtcp_buffer (GstMprtpreceiver * this, GstBuffer * buf)
   GstBuffer *buffer;
   gpointer data;
   gsize buf_length;
+  guint8 src = 0;
 
   if (G_UNLIKELY (!gst_rtcp_buffer_map (buf, GST_MAP_READ, &rtcp))) {
     GST_WARNING_OBJECT (this, "The RTCP packet is not readable");
@@ -595,8 +595,9 @@ _send_mprtcp_buffer (GstMprtpreceiver * this, GstBuffer * buf)
   }
 
   report = (GstMPRTCPSubflowReport *) gst_rtcp_get_first_header (&rtcp);
+  //gst_print_rtcp(&report->header);
   for (block = gst_mprtcp_get_first_block (report);
-      block != NULL; block = gst_mprtcp_get_next_block (report, block)) {
+      block != NULL; block = gst_mprtcp_get_next_block (report, block, &src)) {
     info = &block->info;
     gst_mprtcp_block_getdown (info, &info_type, &block_length, NULL);
     if (info_type != 0) {
@@ -612,6 +613,7 @@ _send_mprtcp_buffer (GstMprtpreceiver * this, GstBuffer * buf)
     buffer = gst_buffer_new_wrapped (data, buf_length);
     outpad = (block_riport_type == GST_RTCP_TYPE_SR) ? this->mprtcp_sr_srcpad
         : this->mprtcp_rr_srcpad;
+    //g_print("ARRIVED REPORT: %d\n", block_riport_type);
     if ((result = gst_pad_push (outpad, buffer)) != GST_FLOW_OK) {
       goto done;
     }

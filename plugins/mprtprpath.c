@@ -76,8 +76,9 @@ struct _Packet
   GstClockTimeDiff delay;
   guint64 skew;
 
+  gboolean frame_start_flag;
+  gboolean frame_end_flag;
 };
-
 
 static void mprtpr_path_finalize (GObject * object);
 static void mprtpr_path_reset (MpRTPRPath * this);
@@ -223,6 +224,8 @@ mprtpr_path_reset (MpRTPRPath * this)
   this->highest_seq = 0;
   this->total_packet_losts = 0;
   this->total_packet_received = 0;
+  this->total_payload_bytes = 0;
+  this->total_received_bytes = 0;
 
   this->ext_rtptime = -1;
   this->last_packet_skew = 0;
@@ -303,6 +306,16 @@ mprtpr_path_get_total_bytes_received (MpRTPRPath * this)
   return result;
 }
 
+guint32
+mprtpr_path_get_total_payload_bytes (MpRTPRPath * this)
+{
+  guint32 result;
+  THIS_READLOCK (this);
+  result = this->total_payload_bytes;
+  THIS_READUNLOCK (this);
+  return result;
+}
+
 guint64
 mprtpr_path_get_total_received_packets_num (MpRTPRPath * this)
 {
@@ -361,10 +374,11 @@ mprtpr_path_has_buffer_to_playout (MpRTPRPath * this)
   return result;
 }
 
-GstBuffer *
-mprtpr_path_pop_buffer_to_playout (MpRTPRPath * this, guint16 * abs_seq)
+void
+mprtpr_path_pop_mprtpr_packet_to_playout (MpRTPRPath * this,
+                                   MpRTPRPacket* mprtp_packet)
 {
-  GstBuffer *result = NULL;
+  //GstBuffer *result = NULL;
   PacketChain *chain;
   Packet *packet;
   THIS_WRITELOCK (this);
@@ -372,46 +386,46 @@ mprtpr_path_pop_buffer_to_playout (MpRTPRPath * this, guint16 * abs_seq)
   packet = chain->play;
   if (!packet)
     goto done;
-  result = packet->buffer;
+  mprtp_packet->buffer = packet->buffer;
 //  g_print("PLAYOUT: %p-%u<-%d:%u\n",
 //          packet->buffer, packet->abs_seq_num,this->id,
 //          this->highest_seq);
   packet->buffer = NULL;
   chain->play = packet->successor;
-  if (packet->gap) {
-    Gap *gap;
-    gap = packet->gap;
-    this->total_packet_losts += gap->total - gap->filled;
-    this->gaps = g_list_remove (this->gaps, gap);
-    packet->gap = NULL;
-    _trash_gap (this, gap);
-  }
+//  if (packet->gap) {
+//    Gap *gap;
+//    gap = packet->gap;
+//    this->total_packet_losts += gap->total - gap->filled;
+//    this->gaps = g_list_remove (this->gaps, gap);
+//    packet->gap = NULL;
+//    _trash_gap (this, gap);
+//  }
   if(_cmp_seq(this->played_highest_seq, packet->rel_seq_num) < 0){
     this->played_highest_seq = packet->rel_seq_num;
   }
-  if (abs_seq) {
-    *abs_seq = packet->abs_seq_num;
-  }
+  mprtp_packet->seq_num     = packet->abs_seq_num;
+  mprtp_packet->frame_start = packet->frame_start_flag;
+  mprtp_packet->frame_end   = packet->frame_end_flag;
 done:
 //  g_print("packet abs seq: %p %hu packets in chain: %hu\n",
 //          chain->play, packet->abs_seq_num, chain->counter);
   THIS_WRITEUNLOCK (this);
-  return result;
+  return;
 }
 
 void
-mprtpr_path_removes_obsolate_packets (MpRTPRPath * this)
+mprtpr_path_removes_obsolate_packets (MpRTPRPath * this, GstClockTime treshold)
 {
   Packet *actual, *next = NULL;
   PacketChain *chain;
-  GstClockTime treshold;
+  GstClockTime obsolate_margin;
   gint num = 0;
   THIS_WRITELOCK (this);
-  treshold = gst_clock_get_time (this->sysclock) - 2 * GST_SECOND;
+  obsolate_margin = gst_clock_get_time (this->sysclock) - treshold;
   chain = this->packet_chain;
   if (!chain->head)
     goto done;
-  for (actual = chain->head; actual && actual->rcv_time < treshold;) {
+  for (actual = chain->head; actual && actual->rcv_time < obsolate_margin;) {
     if (actual->skew)
       _remove_skew (this, actual->skew);
     next = actual->next;
@@ -516,15 +530,15 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this,
   }
   _add_packet (this, packet);
   if (_cmp_seq (this->played_highest_seq, packet_subflow_seq_num) > 0) {
+    _try_fill_a_gap (this, packet);
     ++this->total_late_discarded;
     this->total_late_discarded_bytes += packet->payload_bytes;
 //    g_print("LATE DISCARDED: %p-%hu<-%d\n", packet, packet->abs_seq_num, this->id);
     goto delete_and_done;
   }
 
-
-
   this->total_received_bytes += packet->payload_bytes + (28 << 3);
+  this->total_payload_bytes += packet->payload_bytes;
   if (packet_subflow_seq_num == (guint16) (this->highest_seq + 1)) {
     ++this->received_since_cycle_is_increased;
     ++this->highest_seq;
@@ -582,6 +596,9 @@ _make_packet (MpRTPRPath * this,
   result->snd_time = snd_time;
   result->skew = 0;
   result->delay = GST_CLOCK_DIFF (result->snd_time, result->rcv_time);
+  result->frame_start_flag =
+      !GST_BUFFER_FLAG_IS_SET (rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT);
+  result->frame_end_flag = gst_rtp_buffer_get_marker(rtp);
 //  g_print("MAKED:%p-%hu<-%d\n", result->buffer, result->abs_seq_num,this->id);
 //
 //  g_print("Packet->buf: %p\n"
@@ -599,6 +616,15 @@ _make_packet (MpRTPRPath * this,
 void
 _trash_packet (MpRTPRPath * this, Packet * packet)
 {
+  if (packet->gap) {
+      Gap *gap;
+      gap = packet->gap;
+      this->total_packet_losts += gap->total - gap->filled;
+      this->gaps = g_list_remove (this->gaps, gap);
+      packet->gap = NULL;
+      _trash_gap (this, gap);
+  }
+
   if (g_queue_get_length (this->packets_pool) < 2048) {
     g_queue_push_tail (this->packets_pool, packet);
 //    g_print("Recycle %d- ", g_queue_get_length (this->packets_pool));
@@ -677,7 +703,8 @@ _chain_packets (MpRTPRPath * this, Packet * actual, Packet * next)
     next->skew = snd_diff - rcv_diff;
   else
     next->skew = rcv_diff - snd_diff;
-
+//    g_print("DELAY: %lu\n",
+//            GST_TIME_AS_MSECONDS(next->rcv_time - next->snd_time));
 //  g_print("RCV_DIFF: %lu SND_DIFF: %lu PACKET SKEW: %lu\n",
 //          rcv_diff, snd_diff, next->skew);
   if (next->skew > 0x8000000000000000) {

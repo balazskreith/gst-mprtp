@@ -315,7 +315,7 @@ gst_mprtpplayouter_finalize (GObject * object)
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (object);
 
   GST_DEBUG_OBJECT (this, "finalize");
-  g_object_unref (G_OBJECT (this->joiner));
+  g_object_unref (this->joiner);
   g_object_unref (this->controller);
   g_object_unref (this->sysclock);
   /* clean up object here */
@@ -603,7 +603,10 @@ gst_mprtpplayouter_sink_event (GstPad * pad, GstObject * parent,
       gst_object_unref (peer);
       break;
     default:
-      result = gst_pad_event_default (pad, parent, event);
+      peer = gst_pad_get_peer (this->mprtp_srcpad);
+            result = gst_pad_send_event (peer, event);
+            gst_object_unref (peer);
+      //result = gst_pad_event_default (pad, parent, event);
       break;
   }
 
@@ -958,6 +961,9 @@ _change_flow_riporting_mode (GstMprtpplayouter * this,
   if (this->controller != NULL) {
     g_object_unref (this->controller);
   }
+
+  stream_joiner_path_obsolation(this->joiner, TRUE);
+
   if (new_flow_riporting_mode) {
     this->controller = g_object_new (REFCTRLER_TYPE, NULL);
     this->mprtcp_receiver = refctrler_setup_mprtcp_exchange (this->controller,
@@ -982,6 +988,7 @@ _change_flow_riporting_mode (GstMprtpplayouter * this,
     subflow_id = (guint8) GPOINTER_TO_INT (key);
     this->controller_add_path (this->controller, subflow_id, path);
   }
+
 }
 
 

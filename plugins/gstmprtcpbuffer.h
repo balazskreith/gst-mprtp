@@ -146,6 +146,20 @@ typedef struct PACKED _GstRTCPXR_RFC7243
 } GstRTCPXR_RFC7243;
 
 
+typedef struct PACKED _GstRTCPXR_StreamCharacteristics
+{
+  GstRTCPHeader header;
+  guint8 block_type;
+  guint8 reserved;
+  guint16 block_length;
+  guint32 ssrc;
+  guint16 skew_median;
+  guint16 delay_median;
+  guint32 packets_num;
+  guint32 payload_bytes;
+} GstRTCPXR_treamCharacteristics;
+
+
 /*MPRTCP struct polymorphism*/
 
 typedef struct PACKED _GstMPRTCPSubflowInfo
@@ -196,7 +210,7 @@ GstRTCPHeader *gst_rtcp_get_first_header (GstRTCPBuffer * rtcp);
 GstMPRTCPSubflowBlock *gst_mprtcp_get_first_block (GstMPRTCPSubflowReport *
     riport);
 GstMPRTCPSubflowBlock *gst_mprtcp_get_next_block (GstMPRTCPSubflowReport *
-    riport, GstMPRTCPSubflowBlock * actual);
+    riport, GstMPRTCPSubflowBlock * actual, guint8 *act_src);
 
 //-------------------------- begin, end, add functions declarations ----------
 GstRTCPHeader *gst_rtcp_add_begin (GstRTCPBuffer * rtcp);

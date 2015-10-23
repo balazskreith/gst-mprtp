@@ -196,16 +196,15 @@ gst_mprtpsender_mprtp_sink_event_handler (GstPad * pad, GstObject * parent,
       }
       gst_event_parse_caps (event, &caps);
       this->event_caps = gst_event_new_caps (caps);
-
-    sending:
+      goto sending;
+    default:
+      sending:
       for (subflow = NULL, it = this->subflows; it != NULL; it = it->next) {
         subflow = it->data;
         result &= gst_pad_push_event (subflow->outpad, gst_event_copy (event));
       }
       result &= gst_pad_event_default (pad, parent, event);
-      break;
-    default:
-      result = gst_pad_event_default (pad, parent, event);
+      //result = gst_pad_event_default (pad, parent, event);
   }
 
   THIS_WRITEUNLOCK (this);
@@ -764,47 +763,99 @@ done:
 GstBuffer *
 _assemble_report (Subflow * this, GstBuffer * blocks)
 {
-  GstBuffer *result;
-  gpointer dataptr;
-  GstMPRTCPSubflowReport report;
+  GstBuffer *result = NULL;
+  gsize report_header_size = 0;
+  gsize blocks_length = 0;
+  GstMPRTCPSubflowReport *report;
   GstMPRTCPSubflowBlock *block;
   guint16 length;
-  guint16 offset;
-  guint8 block_length;
+  guint16 offset = 0;
+  guint8 block_length = 0;
   guint16 subflow_id, prev_subflow_id = 0;
-  guint8 src = 0;
   GstMapInfo map = GST_MAP_INFO_INIT;
-
-  gst_mprtcp_report_init (&report);
-  gst_rtcp_header_getdown (&report.header, NULL, NULL, NULL, NULL, &length,
-      NULL);
-  length = (length + 1) << 2;
-  dataptr = g_malloc0 (length);
-  memcpy (dataptr, &report, length);
-  result = gst_buffer_new_wrapped (dataptr, length);
+  guint8 src = 0;
 
   if (!gst_buffer_map (blocks, &map, GST_MAP_READ)) {
     GST_ERROR_OBJECT (this, "Buffer is not readable");
     goto exit;
   }
-  for (offset = 0, src = 0, block = (GstMPRTCPSubflowBlock *) map.data + offset;
-      offset < map.size; offset += (block_length + 1) << 2, ++src) {
+  report_header_size = sizeof(GstRTCPHeader) + sizeof(guint32);
+  block = (GstMPRTCPSubflowBlock *) (map.data + offset);
+  for (; offset < map.size; offset += (block_length + 1) << 2, ++src) {
 
     gst_mprtcp_block_getdown (&block->info, NULL, &block_length, &subflow_id);
     if (prev_subflow_id > 0 && subflow_id != prev_subflow_id) {
-      GST_WARNING ("MPRTCP block comes from multiple sources subflow");
+      GST_WARNING ("MPRTCP block comes from multiple subflow");
     }
+    blocks_length += (block_length + 1) << 2;
+    block = (GstMPRTCPSubflowBlock *) (map.data + blocks_length);
   }
-  gst_buffer_unmap (blocks, &map);
-  result = gst_buffer_append (result, blocks);
-  gst_buffer_map (result, &map, GST_MAP_WRITE);
-  gst_rtcp_header_change ((GstRTCPHeader *) map.data, NULL, NULL, &src,
-      NULL, NULL, NULL);
+  report = (GstMPRTCPSubflowReport*) g_malloc0(report_header_size + blocks_length);
+  gst_mprtcp_report_init (report);
+  memcpy((gpointer) &report->blocks, (gpointer) map.data, blocks_length);
+  length = (report_header_size + blocks_length - 4)>>2;
 
-  gst_buffer_unmap (result, &map);
+  gst_rtcp_header_change(&report->header, NULL, NULL,
+                         &src, NULL, &length, NULL);
+  gst_buffer_unmap(blocks, &map);
+  result = gst_buffer_new_wrapped ((gpointer)report, (length + 1)<<2);
 exit:
   return result;
 }
+
+//
+//GstBuffer *
+//_assemble_report (Subflow * this, GstBuffer * blocks)
+//{
+//  GstBuffer *result;
+//  gpointer dataptr;
+//  GstMPRTCPSubflowReport report;
+//  GstMPRTCPSubflowBlock *block;
+//  guint16 length;
+//  guint16 offset = 0;
+//  guint8 block_length = 0;
+//  guint16 subflow_id, prev_subflow_id = 0;
+//  guint8 src = 0;
+//  GstMapInfo map = GST_MAP_INFO_INIT;
+//
+//  gst_mprtcp_report_init (&report);
+//  gst_rtcp_header_getdown (&report.header, NULL, NULL, NULL, NULL, &length,
+//      NULL);
+//  length = (length + 1) << 2;
+//  dataptr = g_malloc0 (length);
+//  memcpy (dataptr, &report, length);
+//  result = gst_buffer_new_wrapped (dataptr, length);
+//
+//  if (!gst_buffer_map (blocks, &map, GST_MAP_READ)) {
+//    GST_ERROR_OBJECT (this, "Buffer is not readable");
+//    goto exit;
+//  }
+//  for (offset = 0, src = 0,
+//      block = (GstMPRTCPSubflowBlock *) (map.data + offset);
+//      offset < map.size;
+//      offset += (block_length + 1) << 2,
+//          ++src,
+//          block = (GstMPRTCPSubflowBlock *) (map.data + offset)) {
+//    length += (block_length + 1) << 2;
+//    gst_mprtcp_block_getdown (&block->info, NULL, &block_length, &subflow_id);
+//    if (prev_subflow_id > 0 && subflow_id != prev_subflow_id) {
+//      GST_WARNING ("MPRTCP block comes from multiple subflow");
+//    }
+//    //gst_print_mprtcp_block(block, NULL);
+//  }
+//
+//  gst_buffer_unmap (blocks, &map);
+//  result = gst_buffer_append (result, blocks);
+//  gst_buffer_map (result, &map, GST_MAP_WRITE);
+//  length>>=2;
+//  gst_rtcp_header_change ((GstRTCPHeader *) map.data, NULL, NULL, &src,
+//      NULL, &length, NULL);
+//  g_print("map-size:%lu\n", map.size);
+//  gst_print_rtcp((GstRTCPHeader *) map.data);
+//  gst_buffer_unmap (result, &map);
+//exit:
+//  return result;
+//}
 
 gboolean
 _select_subflow (GstMprtpsender * this, guint8 id, Subflow ** result)

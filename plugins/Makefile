@@ -143,7 +143,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-mprtpspath.lo libgstmprtp_la-streamjoiner.lo \
 	libgstmprtp_la-streamsplitter.lo libgstmprtp_la-rmanctrler.lo \
 	libgstmprtp_la-smanctrler.lo libgstmprtp_la-sefctrler.lo \
-	libgstmprtp_la-refctrler.lo
+	libgstmprtp_la-refctrler.lo libgstmprtp_la-gstnetsimb.lo \
+	libgstmprtp_la-netsimqueue.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -398,7 +399,9 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          rmanctrler.c               \
                          smanctrler.c               \
                          sefctrler.c                \
-                         refctrler.c                
+                         refctrler.c                \
+                         gstnetsimb.c               \
+                         netsimqueue.c              
 
 noinst_HEADERS = mprtpspath.h      \
                  rmanctrler.h      \
@@ -407,7 +410,8 @@ noinst_HEADERS = mprtpspath.h      \
                  refctrler.c       \
                  mprtprpath.h      \
                  streamsplitter.h  \
-                 streamjoiner.h 
+                 streamjoiner.h    \
+                 netsimqueue.h     
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -507,8 +511,10 @@ include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplugin.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
+include ./$(DEPDIR)/libgstmprtp_la-gstnetsimb.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
+include ./$(DEPDIR)/libgstmprtp_la-netsimqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-refctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rmanctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sefctrler.Plo
@@ -634,6 +640,20 @@ libgstmprtp_la-refctrler.lo: refctrler.c
 #	$(AM_V_CC)source='refctrler.c' object='libgstmprtp_la-refctrler.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-refctrler.lo `test -f 'refctrler.c' || echo '$(srcdir)/'`refctrler.c
+
+libgstmprtp_la-gstnetsimb.lo: gstnetsimb.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gstnetsimb.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gstnetsimb.Tpo -c -o libgstmprtp_la-gstnetsimb.lo `test -f 'gstnetsimb.c' || echo '$(srcdir)/'`gstnetsimb.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gstnetsimb.Tpo $(DEPDIR)/libgstmprtp_la-gstnetsimb.Plo
+#	$(AM_V_CC)source='gstnetsimb.c' object='libgstmprtp_la-gstnetsimb.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstnetsimb.lo `test -f 'gstnetsimb.c' || echo '$(srcdir)/'`gstnetsimb.c
+
+libgstmprtp_la-netsimqueue.lo: netsimqueue.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-netsimqueue.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-netsimqueue.Tpo -c -o libgstmprtp_la-netsimqueue.lo `test -f 'netsimqueue.c' || echo '$(srcdir)/'`netsimqueue.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-netsimqueue.Tpo $(DEPDIR)/libgstmprtp_la-netsimqueue.Plo
+#	$(AM_V_CC)source='netsimqueue.c' object='libgstmprtp_la-netsimqueue.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-netsimqueue.lo `test -f 'netsimqueue.c' || echo '$(srcdir)/'`netsimqueue.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

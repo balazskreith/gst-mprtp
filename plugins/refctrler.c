@@ -89,9 +89,9 @@ static GstBuffer *_get_mprtcp_xr_block (RcvEventBasedController * this,
 static GstBuffer *_get_mprtcp_rr_block (RcvEventBasedController * this,
     Subflow * subflow, guint16 * block_length);
 
-void _setup_xr_rfc2743_late_discarded_riport (Subflow * this,
+void _setup_xr_rfc2743_late_discarded_report (Subflow * this,
     GstRTCPXR_RFC7243 * xr, guint32 ssrc);
-void _setup_rr_riport (Subflow * this, GstRTCPRR * rr, guint32 ssrc);
+void _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc);
 static guint16 _uint16_diff (guint16 a, guint16 b);
 static void refctrler_receive_mprtcp (gpointer subflow, GstBuffer * buf);
 static void _report_processing_selector (Subflow * this,
@@ -106,7 +106,7 @@ static void refctrler_rem_path (gpointer controller_ptr, guint8 subflow_id);
 static void refctrler_add_path (gpointer controller_ptr, guint8 subflow_id,
     MpRTPRPath * path);
 
-static void refctrler_riport_can_flow (gpointer subflow);
+static void refctrler_report_can_flow (gpointer subflow);
 //subflow functions
 static Subflow *make_subflow (guint8 id, MpRTPRPath * path);
 static void ruin_subflow (gpointer * subflow);
@@ -300,7 +300,7 @@ refctrler_set_callbacks (void (**riport_can_flow_indicator) (gpointer),
     void (**controller_rem_path) (gpointer, guint8))
 {
   if (riport_can_flow_indicator) {
-    *riport_can_flow_indicator = refctrler_riport_can_flow;
+    *riport_can_flow_indicator = refctrler_report_can_flow;
   }
   if (controller_add_path) {
     *controller_add_path = refctrler_add_path;
@@ -364,7 +364,7 @@ done:
 }
 
 void
-refctrler_riport_can_flow (gpointer ptr)
+refctrler_report_can_flow (gpointer ptr)
 {
   RcvEventBasedController *this;
   this = REFCTRLER (ptr);
@@ -466,7 +466,7 @@ _get_mprtcp_rr_block (RcvEventBasedController * this, Subflow * subflow,
 
   gst_mprtcp_block_init (&block);
   rr = gst_mprtcp_riport_block_add_rr (&block);
-  _setup_rr_riport (subflow, rr, this->ssrc);
+  _setup_rr_report (subflow, rr, this->ssrc);
   gst_rtcp_header_getdown (&rr->header, NULL, NULL, NULL, NULL, &length, NULL);
   block_length = (guint8) length + 1;
   gst_mprtcp_block_setup (&block.info, MPRTCP_BLOCK_TYPE_RIPORT, block_length,
@@ -497,7 +497,7 @@ _get_mprtcp_xr_block (RcvEventBasedController * this, Subflow * subflow,
 
   gst_mprtcp_block_init (&block);
   xr = gst_mprtcp_riport_block_add_xr_rfc2743 (&block);
-  _setup_xr_rfc2743_late_discarded_riport (subflow, xr, this->ssrc);
+  _setup_xr_rfc2743_late_discarded_report (subflow, xr, this->ssrc);
   gst_rtcp_header_getdown (&xr->header, NULL, NULL, NULL, NULL, &length, NULL);
   block_length = (guint8) length + 1;
   gst_mprtcp_block_setup (&block.info, MPRTCP_BLOCK_TYPE_RIPORT, block_length,
@@ -516,7 +516,7 @@ _get_mprtcp_xr_block (RcvEventBasedController * this, Subflow * subflow,
 
 
 void
-_setup_xr_rfc2743_late_discarded_riport (Subflow * this,
+_setup_xr_rfc2743_late_discarded_report (Subflow * this,
     GstRTCPXR_RFC7243 * xr, guint32 ssrc)
 {
   guint8 flag = RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION;
@@ -529,11 +529,11 @@ _setup_xr_rfc2743_late_discarded_riport (Subflow * this,
       this->actual_total_late_discarded_bytes);
   gst_rtcp_xr_rfc7243_change (xr, &flag, &early_bit, NULL,
       &late_discarded_bytes);
-  g_print("DISCARDED REPORT SETTED UP\n");
+//  g_print("DISCARDED REPORT SETTED UP\n");
 }
 
 void
-_setup_rr_riport (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
+_setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
 {
   GstClockTime now;
   guint8 fraction_lost;
@@ -562,7 +562,7 @@ _setup_rr_riport (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
       this->actual_total_lost_packet_num);
   fraction_lost =
       (256. * (gfloat) diff_lost_packet_num) / ((gfloat) (expected));
-  if(diff_lost_packet_num) g_print("LOST REPORT ASSEMBLED\n");
+//  if(diff_lost_packet_num) g_print("LOST REPORT ASSEMBLED\n");
   ext_hsn = (((guint32) cycle_num) << 16) | ((guint32) HSN);
 
   LSR = (guint32) (this->LSR >> 16);

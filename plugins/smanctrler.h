@@ -15,6 +15,7 @@
 typedef struct _SndManualController SndManualController;
 typedef struct _SndManualControllerClass SndManualControllerClass;
 typedef void(*GstBufferReceiverFunc)(gpointer,GstBuffer*);
+typedef void(*GstMpRTPSubflowsNotification)(gpointer);
 
 #define SMANCTRLER_TYPE             (smanctrler_get_type())
 #define SMANCTRLER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),SMANCTRLER_TYPE,SndManualController))

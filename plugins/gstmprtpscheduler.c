@@ -87,9 +87,11 @@ static GstFlowReturn gst_mprtpscheduler_mprtcp_rr_sink_chain (GstPad * pad,
 
 static gboolean gst_mprtpscheduler_sink_query (GstPad * pad, GstObject * parent,
     GstQuery * query);
+static gboolean gst_mprtpscheduler_src_query (GstPad * sinkpad, GstObject * parent,
+    GstQuery * query);
 
 static void gst_mprtpscheduler_mprtcp_sender (gpointer ptr, GstBuffer * buf);
-
+static gboolean gst_mprtpscheduler_controller_notifications(gpointer ptr);
 static void _join_subflow (GstMprtpscheduler * this, guint subflow_id);
 static void _detach_subflow (GstMprtpscheduler * this, guint subflow_id);
 static gboolean
@@ -342,6 +344,9 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   gst_pad_set_query_function (this->rtp_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpscheduler_sink_query));
+
+  gst_pad_set_query_function (this->rtp_sinkpad,
+      GST_DEBUG_FUNCPTR (gst_mprtpscheduler_src_query));
 
   gst_element_add_pad (GST_ELEMENT (this), this->mprtcp_rr_sinkpad);
 
@@ -972,17 +977,64 @@ gst_mprtpscheduler_mprtcp_sender (gpointer ptr, GstBuffer * buf)
   THIS_READUNLOCK (this);
 }
 
+gboolean gst_mprtpscheduler_controller_notifications(gpointer ptr)
+{
+  GstMprtpscheduler *this;
+  this = GST_MPRTPSCHEDULER (ptr);
+  THIS_READLOCK (this);
+  THIS_READUNLOCK (this);
+}
+
 static gboolean
 gst_mprtpscheduler_sink_query (GstPad * sinkpad, GstObject * parent,
     GstQuery * query)
 {
   GstMprtpscheduler *this = GST_MPRTPSCHEDULER (parent);
   gboolean result;
+  GstPad *peer;
   GST_DEBUG_OBJECT (this, "query");
   switch (GST_QUERY_TYPE (query)) {
 
     default:
-      result = gst_pad_peer_query (this->mprtp_srcpad, query);
+      peer = gst_pad_get_peer (this->mprtp_srcpad);
+      result = gst_pad_peer_query (peer, query);
+      gst_object_unref (peer);
+      break;
+  }
+
+  return result;
+}
+
+
+static gboolean
+gst_mprtpscheduler_src_query (GstPad * sinkpad, GstObject * parent,
+    GstQuery * query)
+{
+  GstMprtpscheduler *this = GST_MPRTPSCHEDULER (parent);
+  gboolean result;
+  GstPad *peer;
+
+  GST_DEBUG_OBJECT (this, "query");
+  switch (GST_QUERY_TYPE (query)) {
+    case GST_QUERY_LATENCY:
+    {
+      gboolean live;
+      GstClockTime min, max;
+      GstPad *peer;
+      peer = gst_pad_get_peer (this->rtp_sinkpad);
+      if ((result = gst_pad_query (peer, query))) {
+          gst_query_parse_latency (query, &live, &min, &max);
+          min+= GST_MSECOND;
+          if(max != -1) max += min;
+          gst_query_set_latency (query, live, min, max);
+      }
+      gst_object_unref (peer);
+    }
+    break;
+    default:
+      peer = gst_pad_get_peer (this->mprtp_srcpad);
+      result = gst_pad_peer_query (peer, query);
+      gst_object_unref (peer);
       break;
   }
 
@@ -1149,6 +1201,10 @@ _change_auto_flow_controlling_mode (GstMprtpscheduler * this,
         &this->controller_rem_path,
         &this->controller_pacing,
         &this->controller_is_pacing);
+
+    sefctrler_setup_notifications(this->controller,
+                                  this,
+                                  gst_mprtpscheduler_controller_notifications)
   } else {
     this->controller = g_object_new (SMANCTRLER_TYPE, NULL);
     this->mprtcp_receiver = smanctrler_setup_mprtcp_exchange (this->controller,

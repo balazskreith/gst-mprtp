@@ -365,6 +365,8 @@ stream_splitter_run (void *data)
     } else if (path_state == MPRTPS_PATH_STATE_CONGESTED) {
       bid_c_sum += subflow->actual_bid;
     }
+
+    g_print("Subflow %d actual bid is: %u\n",mprtps_path_get_id(path), subflow->actual_bid);
   }
 
   if (bid_nc_sum > 0) {

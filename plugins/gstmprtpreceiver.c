@@ -78,6 +78,8 @@ static gboolean gst_mprtpreceiver_query (GstElement * element,
     GstQuery * query);
 static gboolean gst_mprtpreceiver_sink_query (GstPad * pad, GstObject * parent,
     GstQuery * query);
+static gboolean gst_mprtpreceiver_src_query (GstPad * pad, GstObject * parent,
+    GstQuery * query);
 static gboolean gst_mprtpreceiver_sink_event (GstPad * pad, GstObject * parent,
     GstEvent * event);
 static GstPadLinkReturn gst_mprtpreceiver_sink_link (GstPad * pad,
@@ -202,6 +204,9 @@ gst_mprtpreceiver_init (GstMprtpreceiver * mprtpreceiver)
       "mprtp_src");
   gst_element_add_pad (GST_ELEMENT (mprtpreceiver),
       mprtpreceiver->mprtp_srcpad);
+
+  gst_pad_set_query_function(mprtpreceiver->mprtp_srcpad,
+      GST_DEBUG_FUNCPTR(gst_mprtpreceiver_src_query));
 
   g_rw_lock_init (&mprtpreceiver->rwmutex);
 
@@ -332,7 +337,7 @@ gst_mprtpreceiver_sink_query (GstPad * sinkpad, GstObject * parent,
 {
   GstMprtpreceiver *this = GST_MPRTPRECEIVER (parent);
   gboolean result;
-  g_print ("RCV QUERY to the element: %s\n", GST_QUERY_TYPE_NAME (query));
+  g_print ("RCV SINK QUERY to the element: %s\n", GST_QUERY_TYPE_NAME (query));
   GST_DEBUG_OBJECT (this, "query");
 //  g_print ("QUERY to the sink: %s\n", GST_QUERY_TYPE_NAME (query));
   switch (GST_QUERY_TYPE (query)) {
@@ -343,6 +348,43 @@ gst_mprtpreceiver_sink_query (GstPad * sinkpad, GstObject * parent,
 
   return result;
 }
+
+
+gboolean
+gst_mprtpreceiver_src_query (GstPad * srcpad, GstObject * parent,
+    GstQuery * query)
+{
+  GstMprtpreceiver *this = GST_MPRTPRECEIVER (parent);
+  gboolean result;
+  g_print ("RCV SRC QUERY to the element: %s\n", GST_QUERY_TYPE_NAME (query));
+  GST_DEBUG_OBJECT (this, "query");
+//  g_print ("QUERY to the sink: %s\n", GST_QUERY_TYPE_NAME (query));
+  switch (GST_QUERY_TYPE (query)) {
+    case GST_QUERY_LATENCY:
+    {
+      gboolean live;
+      GstClockTime min, max;
+      GstPad *peer;
+      if(!g_list_length(this->subflows)) goto default_query;
+      peer = gst_pad_get_peer (((Subflow*)(this->subflows->data))->inpad);
+      if ((result = gst_pad_query (peer, query))) {
+          gst_query_parse_latency (query, &live, &min, &max);
+          min+= GST_MSECOND;
+          if(max != -1) max += min;
+          gst_query_set_latency (query, live, min, max);
+      }
+      gst_object_unref (peer);
+    }
+    break;
+    default:
+    default_query:
+      result = gst_pad_query_default(srcpad, parent, query);
+      break;
+  }
+
+  return result;
+}
+
 
 static gboolean
 gst_mprtpreceiver_sink_event (GstPad * pad, GstObject * parent,

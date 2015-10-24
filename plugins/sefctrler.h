@@ -47,6 +47,8 @@ struct _SndEventBasedController
   gboolean          bids_recalc_requested;
   gboolean          bids_commit_requested;
   guint32           ssrc;
+  void            (*notify_system_func)(gpointer);
+  gpointer          notify_system_data;
   void            (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
   gpointer          send_mprtcp_packet_data;
   gboolean          riport_is_flowable;
@@ -72,6 +74,10 @@ GstBufferReceiverFunc
 sefctrler_setup_mprtcp_exchange(SndEventBasedController * this,
                                 gpointer mprtcp_send_func_data,
                                 GstBufferReceiverFunc mprtcp_send_func );
+GstBufferReceiverFunc
+sefctrler_setup_notifications (SndEventBasedController * this,
+                               gpointer data,
+                               GstMpRTPSubflowsNotification func);
 
 GType sefctrler_get_type (void);
 #endif /* SEFCTRLER_H_ */

@@ -528,14 +528,10 @@ gst_mprtpplayouter_src_query (GstPad * sinkpad, GstObject * parent,
       GstClockTime min, max;
       GstPad *peer;
       peer = gst_pad_get_peer (this->mprtp_sinkpad);
-//        g_print ("PLY GST_QUERY_LATENCY\n");
       if ((result = gst_pad_query (peer, query))) {
           gst_query_parse_latency (query, &live, &min, &max);
           min+= GST_MSECOND;
-          max+= 400 * GST_MSECOND;
-//            g_print ("Peer latency: min %"
-//                      GST_TIME_FORMAT " max %" GST_TIME_FORMAT,
-//                      GST_TIME_ARGS (min), GST_TIME_ARGS (max));
+          if(max != -1) max += min;
           gst_query_set_latency (query, live, min, max);
       }
       gst_object_unref (peer);

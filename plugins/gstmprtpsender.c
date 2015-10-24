@@ -374,7 +374,6 @@ gst_mprtpsender_finalize (GObject * object)
   GST_DEBUG_OBJECT (mprtpsender, "finalize");
 
   /* clean up object here */
-
   G_OBJECT_CLASS (gst_mprtpsender_parent_class)->finalize (object);
 }
 
@@ -494,26 +493,23 @@ gst_mprtpsender_src_query (GstPad * srcpad, GstObject * parent,
   GST_DEBUG_OBJECT (this, "query");
   switch (GST_QUERY_TYPE (query)) {
     case GST_QUERY_LATENCY:
-
       {
         gboolean live;
         GstClockTime min, max;
         GstPad *peer;
         peer = gst_pad_get_peer (this->mprtp_sinkpad);
-        if(!peer) break;
-//        g_print ("PLY GST_QUERY_LATENCY\n");
+        if(!peer) goto default_query;
         if ((result = gst_pad_query (peer, query))) {
             gst_query_parse_latency (query, &live, &min, &max);
-            max+= 10*GST_MSECOND;
-//            g_print ("Peer latency: min %"
-//                      GST_TIME_FORMAT " max %" GST_TIME_FORMAT,
-//                      GST_TIME_ARGS (min), GST_TIME_ARGS (max));
+            min+= GST_MSECOND;
+            if(max != -1) max+=min;
             gst_query_set_latency (query, live, min, max);
         }
         gst_object_unref (peer);
       }
       break;
     default:
+    default_query:
       result = gst_pad_peer_query (srcpad, query);
       break;
   }

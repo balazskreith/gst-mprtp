@@ -41,13 +41,22 @@ struct _RTPAbsTimeExtension
   guint8 time[3];
 };
 
+
+typedef enum
+{
+  MPRTPS_PATH_MARKER_OVERUSED   = -1,
+  MPRTPS_PATH_MARKER_STABLE     =  0,
+  MPRTPS_PATH_MARKER_UNDERUSED  =  1,
+} MPRTPPathMarker;
+
+
 typedef enum
 {
   MPRTPS_PATH_FLAG_TRIAL = 1,
   MPRTPS_PATH_FLAG_NON_LOSSY = 2,
   MPRTPS_PATH_FLAG_NON_CONGESTED = 4,
   MPRTPS_PATH_FLAG_ACTIVE = 8,
-} MPRTPSubflowFlags;
+} MPRTPPathFlags;
 
 typedef enum{
   MPRTPS_PATH_STATE_NON_CONGESTED    = 1,
@@ -114,8 +123,10 @@ guint8 mprtps_path_get_id (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_packets_num (MPRTPSPath * this);
 void mprtps_path_process_rtp_packet (MPRTPSPath * this, guint ext_header_id, GstRTPBuffer * rtp);
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
-
 guint32 mprtps_path_get_sent_octet_sum_for(MPRTPSPath *this, guint32 amount);
+
+void mprtps_path_set_underused(MPRTPSPath * this);
+
 MPRTPSPathState mprtps_path_get_state (MPRTPSPath * this);
 void mprtps_path_set_state (MPRTPSPath * this, MPRTPSPathState state);
 GstClockTime mprtps_path_get_time_sent_to_passive(MPRTPSPath *this);

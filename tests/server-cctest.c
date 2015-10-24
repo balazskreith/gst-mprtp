@@ -250,6 +250,11 @@ end:
   return G_SOURCE_REMOVE;
 }
 
+static void
+changed_event (GstElement * mprtp_sch)
+{
+  g_print("CHANGED EVENT");
+}
 
 static void
 add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
@@ -285,6 +290,9 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   /* enable retransmission by setting rtprtxsend as the "aux" element of rtpbin */
   g_signal_connect (rtpBin, "request-aux-sender",
       (GCallback) request_aux_sender, session);
+
+  g_signal_connect (mprtpsch, "subflows-usage-changed",
+      (GCallback) changed_event, NULL);
 
   g_object_set (rtpSink_1, "port", basePort, "host", "127.0.0.1",
       NULL);

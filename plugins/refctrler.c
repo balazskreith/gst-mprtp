@@ -84,22 +84,22 @@ struct _Subflow
 
 static void refctrler_finalize (GObject * object);
 static void refctrler_run (void *data);
-static GstBuffer *_get_mprtcp_xr_block (RcvEventBasedController * this,
+static GstBuffer *_get_mprtcp_xr_7243_block (RcvEventBasedController * this,
     Subflow * subflow, guint16 * block_length);
 static GstBuffer *_get_mprtcp_rr_block (RcvEventBasedController * this,
     Subflow * subflow, guint16 * block_length);
-
-void _setup_xr_rfc2743_late_discarded_report (Subflow * this,
+static void _setup_xr_skew_report (Subflow * this, GstRTCPXR_Skew * xr, guint32 ssrc);
+static void _setup_xr_rfc2743_late_discarded_report (Subflow * this,
     GstRTCPXR_RFC7243 * xr, guint32 ssrc);
-void _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc);
+static void _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc);
 static guint16 _uint16_diff (guint16 a, guint16 b);
 static void refctrler_receive_mprtcp (gpointer subflow, GstBuffer * buf);
 static void _report_processing_selector (Subflow * this,
     GstMPRTCPSubflowBlock * block);
 static void _report_processing_srblock_processor (Subflow * subflow,
     GstRTCPSRBlock * srb);
-void _recalc_report_time (Subflow * this);
-gboolean _do_report_now (Subflow * subflow);
+static void _recalc_report_time (Subflow * this);
+static gboolean _do_report_now (Subflow * subflow);
 
 static guint32 _uint32_diff (guint32 a, guint32 b);
 static void refctrler_rem_path (gpointer controller_ptr, guint8 subflow_id);
@@ -204,9 +204,14 @@ refctrler_run (void *data)
       if (subflow->actual_total_late_discarded_bytes !=
           subflow->last_total_late_discarded_bytes) {
         GstBuffer *xr;
-        xr = _get_mprtcp_xr_block (this, subflow, &block_length);
+        xr = _get_mprtcp_xr_7243_block (this, subflow, &block_length);
         block = gst_buffer_append (block, xr);
         report_length += block_length;
+      }
+      {
+        GstBuffer *xr;
+        xr = _get_mprtcp_xr_7243_block (this, subflow, &block_length);
+        block = gst_buffer_append (block, xr);
       }
       report_length += 12 /*MPRTCP REPOR HEADER */  +
           (28 << 3) /*UDP Header overhead */ ;
@@ -485,7 +490,7 @@ _get_mprtcp_rr_block (RcvEventBasedController * this, Subflow * subflow,
 
 
 GstBuffer *
-_get_mprtcp_xr_block (RcvEventBasedController * this, Subflow * subflow,
+_get_mprtcp_xr_7243_block (RcvEventBasedController * this, Subflow * subflow,
     guint16 * buf_length)
 {
   GstMPRTCPSubflowBlock block;
@@ -514,6 +519,77 @@ _get_mprtcp_xr_block (RcvEventBasedController * this, Subflow * subflow,
 }
 
 
+GstBuffer *
+_get_mprtcp_xr_skew_block (RcvEventBasedController * this, Subflow * subflow,
+    guint16 * buf_length)
+{
+  GstMPRTCPSubflowBlock block;
+  GstRTCPXR_RFC7243 *xr;
+  gpointer dataptr;
+  guint16 length;
+  guint8 block_length;
+  GstBuffer *buf;
+
+  gst_mprtcp_block_init (&block);
+  xr = gst_mprtcp_riport_block_add_xr_skew (&block);
+  _setup_xr_skew_report(subflow, xr, this->ssrc);
+  gst_rtcp_header_getdown (&xr->header, NULL, NULL, NULL, NULL, &length, NULL);
+  block_length = (guint8) length + 1;
+  gst_mprtcp_block_setup (&block.info, MPRTCP_BLOCK_TYPE_RIPORT, block_length,
+      (guint16) subflow->id);
+  length = (block_length + 1) << 2;
+  dataptr = g_malloc0 (length);
+  memcpy (dataptr, &block, length);
+  buf = gst_buffer_new_wrapped (dataptr, length);
+  if (buf_length) {
+    *buf_length = length;
+  }
+  //gst_print_mprtcp_block(&block, NULL);
+  return buf;
+}
+void
+_setup_xr_skew_report (Subflow * this,
+    GstRTCPXR_Skew * xr, guint32 ssrc)
+{
+  guint64 skew_median;
+  guint64 last_skew;
+  guint16 last_skew_xr_ms;
+  guint16 last_skew_xr;
+  guint16 skew_median_xr_ms;
+  guint16 skew_median_xr;
+  guint32 packets_num;
+  guint32 packet_bytes;
+
+  skew_median = mprtpr_path_get_skew(this->path);
+  last_skew = mprtpr_path_get_last_skew(this->path);
+  packets_num = mprtpr_path_get_skew_packet_num(this->path);
+  packet_bytes = mprtpr_path_get_skew_byte_num(this->path);
+  if(skew_median == 0){
+      skew_median_xr = 0xFF; //unavailable
+  }else{
+      skew_median_xr_ms = GST_TIME_AS_MSECONDS(skew_median);
+      if(skew_median_xr_ms >= 62)
+        skew_median_xr = 0xFE; //overrun
+      else{
+        skew_median_xr = skew_median_xr_ms<<10;
+        skew_median_xr |= GST_TIME_AS_USECONDS(skew_median) / 1024;
+      }
+  }
+  if(last_skew == 0){
+      last_skew_xr = 0xFF; //unavailable
+  }else{
+      last_skew_xr_ms = GST_TIME_AS_MSECONDS(last_skew);
+      if(last_skew_xr_ms >= 62)
+        last_skew_xr = 0xFE; //overrun
+      else{
+        last_skew_xr = last_skew_xr_ms<<10;
+        last_skew_xr |= GST_TIME_AS_USECONDS(last_skew) / 1024;
+      }
+  }
+  gst_rtcp_header_change (&xr->header, NULL, NULL, NULL, NULL, NULL, &ssrc);
+  gst_rtcp_xr_skew_change(xr, &ssrc, &last_skew_xr, &skew_median_xr, &packets_num, &packet_bytes);
+//  g_print("DISCARDED REPORT SETTED UP\n");
+}
 
 void
 _setup_xr_rfc2743_late_discarded_report (Subflow * this,

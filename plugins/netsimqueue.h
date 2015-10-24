@@ -40,6 +40,11 @@ struct _NetsimQueue
   guint16                  buffers_allowed_max_num;
 
   NetsimQueueDropPolicy    drop_policy;
+  gboolean                 smooth_movement;
+  GstClockTime             desired_min_time;
+  GstClockTime             next_min_movement;
+  GstClockTime             desired_max_time;
+  GstClockTime             next_max_movement;
   GstClockTime             max_time;
   GstClockTime             min_time;
   GstClock*                sysclock;
@@ -52,6 +57,7 @@ struct _NetsimQueueClass{
 GType netsimqueue_get_type (void);
 void netsimqueue_push_buffer(NetsimQueue * this, GstBuffer *buffer);
 GstBuffer *netsimqueue_pop_buffer(NetsimQueue * this);
+void netsimqueue_smooth_movement(NetsimQueue * this, gboolean smooth_movement);
 void netsimqueue_set_min_time(NetsimQueue * this, gint min_time_in_ms);
 void netsimqueue_set_max_time(NetsimQueue * this, gint max_time_in_ms);
 void netsimqueue_set_max_packets(NetsimQueue * this, guint16 allowed_max_num);

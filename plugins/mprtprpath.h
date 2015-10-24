@@ -113,7 +113,10 @@ void mprtpr_path_process_rtp_packet(MpRTPRPath *this,
                                GstClockTime snd_time);
 
 void mprtpr_path_removes_obsolate_packets(MpRTPRPath *this, GstClockTime treshold);
+guint64 mprtpr_path_get_last_skew(MpRTPRPath *this);
 guint64 mprtpr_path_get_skew(MpRTPRPath *this);
+guint32 mprtpr_path_get_skew_byte_num(MpRTPRPath *this);
+guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this);
 void
 mprtpr_path_pop_mprtpr_packet_to_playout (MpRTPRPath * this,
                                    MpRTPRPacket* mprtp_packet);

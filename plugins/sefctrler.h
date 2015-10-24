@@ -47,8 +47,6 @@ struct _SndEventBasedController
   gboolean          bids_recalc_requested;
   gboolean          bids_commit_requested;
   guint32           ssrc;
-  void            (*notify_system_func)(gpointer);
-  gpointer          notify_system_data;
   void            (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
   gpointer          send_mprtcp_packet_data;
   gboolean          riport_is_flowable;
@@ -68,16 +66,13 @@ void sefctrler_set_callbacks(void(**riport_can_flow_indicator)(gpointer),
                               void(**controller_add_path)(gpointer,guint8,MPRTPSPath*),
                               void(**controller_rem_path)(gpointer,guint8),
                               void(**controller_pacing)(gpointer, gboolean),
-                              gboolean (**controller_is_pacing)(gpointer));
+                              gboolean (**controller_is_pacing)(gpointer),
+                              GstStructure* (**controller_state)(gpointer));
 
 GstBufferReceiverFunc
 sefctrler_setup_mprtcp_exchange(SndEventBasedController * this,
                                 gpointer mprtcp_send_func_data,
                                 GstBufferReceiverFunc mprtcp_send_func );
-GstBufferReceiverFunc
-sefctrler_setup_notifications (SndEventBasedController * this,
-                               gpointer data,
-                               GstMpRTPSubflowsNotification func);
 
 GType sefctrler_get_type (void);
 #endif /* SEFCTRLER_H_ */

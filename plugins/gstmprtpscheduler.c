@@ -91,7 +91,6 @@ static gboolean gst_mprtpscheduler_src_query (GstPad * sinkpad, GstObject * pare
     GstQuery * query);
 
 static void gst_mprtpscheduler_mprtcp_sender (gpointer ptr, GstBuffer * buf);
-static gboolean gst_mprtpscheduler_controller_notifications(gpointer ptr);
 static void _join_subflow (GstMprtpscheduler * this, guint subflow_id);
 static void _detach_subflow (GstMprtpscheduler * this, guint subflow_id);
 static gboolean
@@ -120,6 +119,8 @@ static gboolean _retain_queue_try_pull (GstMprtpscheduler * this,
     GstBuffer ** result);
 static void _retain_queue_pop (GstMprtpscheduler * this);
 
+static guint _subflows_change_signal;
+
 static gboolean
 _retain_queue_head (GstMprtpscheduler * this, GstBuffer ** result);
 
@@ -137,9 +138,17 @@ enum
   PROP_SET_SENDING_BID,
   PROP_RETAIN_BUFFERS,
   PROP_SUBFLOWS_STATS,
+  PROP_SCHEDULER_STATE,
   PROP_RETAIN_MAX_TIME_IN_MS,
   PROP_SET_MAX_BYTES_PER_MS,
   PROP_PACING_BUFFERS,
+};
+
+/* signals and args */
+enum
+{
+  SIGNAL_SYSTEM_STATE,
+  LAST_SIGNAL
 };
 
 /* pad templates */
@@ -312,6 +321,26 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "Collect subflow statistics and return with "
           "a structure contains it",
           "NULL", G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_SCHEDULER_STATE,
+      g_param_spec_string ("scheduler-state",
+          "Extract scheduler state",
+          "Collect information about the scheduler and return with "
+          "a structure contains it",
+          "NULL", G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  _subflows_change_signal =
+   g_signal_newv ("subflows-usage-changed",
+                  G_TYPE_FROM_CLASS (gobject_class),
+                  G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
+                  NULL /* closure */,
+                  NULL /* accumulator */,
+                  NULL /* accumulator data */,
+                  NULL /* C marshaller */,
+                  G_TYPE_NONE /* return_type */,
+                  0     /* n_params */,
+                  NULL  /* param_types */);
+
 }
 
 static void
@@ -569,6 +598,12 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
           gst_structure_to_string (_collect_infos (this)));
       THIS_READUNLOCK (this);
       break;
+    case PROP_SCHEDULER_STATE:
+      THIS_READLOCK (this);
+      g_value_set_string (value,
+          gst_structure_to_string (this->controller_state (this->controller)));
+      THIS_READUNLOCK (this);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -798,6 +833,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
 
   this = GST_MPRTPSCHEDULER (parent);
 
+//  g_signal_emit (this,_subflows_change_signal, 0 /* details */);
 
   if (gst_buffer_extract (buffer, 0, &first_byte, 1) != 1) {
     GST_WARNING_OBJECT (this, "could not extract first byte from buffer");
@@ -977,13 +1013,7 @@ gst_mprtpscheduler_mprtcp_sender (gpointer ptr, GstBuffer * buf)
   THIS_READUNLOCK (this);
 }
 
-gboolean gst_mprtpscheduler_controller_notifications(gpointer ptr)
-{
-  GstMprtpscheduler *this;
-  this = GST_MPRTPSCHEDULER (ptr);
-  THIS_READLOCK (this);
-  THIS_READUNLOCK (this);
-}
+
 
 static gboolean
 gst_mprtpscheduler_sink_query (GstPad * sinkpad, GstObject * parent,
@@ -1200,11 +1230,9 @@ _change_auto_flow_controlling_mode (GstMprtpscheduler * this,
         &this->controller_add_path,
         &this->controller_rem_path,
         &this->controller_pacing,
-        &this->controller_is_pacing);
+        &this->controller_is_pacing,
+        &this->controller_state);
 
-    sefctrler_setup_notifications(this->controller,
-                                  this,
-                                  gst_mprtpscheduler_controller_notifications)
   } else {
     this->controller = g_object_new (SMANCTRLER_TYPE, NULL);
     this->mprtcp_receiver = smanctrler_setup_mprtcp_exchange (this->controller,
@@ -1214,7 +1242,8 @@ _change_auto_flow_controlling_mode (GstMprtpscheduler * this,
         &this->controller_add_path,
         &this->controller_rem_path,
         &this->controller_pacing,
-        &this->controller_is_pacing);
+        &this->controller_is_pacing,
+        &this->controller_state);
   }
   this->riport_flow_signal_sent = FALSE;
   g_hash_table_iter_init (&iter, this->paths);

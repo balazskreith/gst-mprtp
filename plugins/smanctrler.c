@@ -25,6 +25,7 @@
 #include <gst/rtp/gstrtcpbuffer.h>
 #include "smanctrler.h"
 #include <math.h>
+#include <gst/gst.h>
 
 
 GST_DEBUG_CATEGORY_STATIC (smanctrler_debug_category);
@@ -44,6 +45,7 @@ static void smanctrler_add_path (gpointer controller_ptr, guint8 subflow_id,
 static void smanctrler_rem_path (gpointer controller_ptr, guint8 subflow_id);
 static void smanctrler_pacing (gpointer controller_ptr, gboolean allowed);
 static gboolean smanctrler_is_pacing (gpointer controller_ptr);
+static GstStructure* smanctrler_state(gpointer controller_ptr);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -111,12 +113,21 @@ smanctrler_is_pacing (gpointer controller_ptr)
   return FALSE;
 }
 
+GstStructure* smanctrler_state(gpointer controller_ptr)
+{
+  SndManualController *this;
+  this = SMANCTRLER (controller_ptr);
+  GST_DEBUG_OBJECT (this, "Sending Manual Controller state");
+  return NULL;
+}
+
 void
 smanctrler_set_callbacks (void (**riport_can_flow_indicator) (gpointer),
     void (**controller_add_path) (gpointer, guint8, MPRTPSPath *),
     void (**controller_rem_path) (gpointer, guint8),
     void (**controller_pacing) (gpointer, gboolean),
-    gboolean (**controller_is_pacing)(gpointer))
+    gboolean (**controller_is_pacing)(gpointer),
+    GstStructure* (**controller_state)(gpointer))
 {
   if (riport_can_flow_indicator) {
     *riport_can_flow_indicator = smanctrler_riport_can_flow;
@@ -132,6 +143,9 @@ smanctrler_set_callbacks (void (**riport_can_flow_indicator) (gpointer),
   }
   if(controller_is_pacing){
     *controller_is_pacing = smanctrler_is_pacing;
+  }
+  if(controller_state){
+    *controller_state = smanctrler_state;
   }
 }
 

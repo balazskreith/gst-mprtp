@@ -45,8 +45,10 @@
 #define RTCPHEADER_WORDS (RTCPHEADER_BYTES>>2)
 #define RTCPSRBLOCK_BYTES 20
 #define RTCPSRBLOCK_WORDS (RTCPSRBLOCK_BYTES>>2)
-#define RTCPXRBLOCK_BYTES 12
-#define RTCPXRBLOCK_WORDS (RTCPXRBLOCK_BYTES>>2)
+#define RTCPXR7243BLOCK_BYTES 12
+#define RTCPXR7243BLOCK_WORDS (RTCPXR7243BLOCK_BYTES>>2)
+#define RTCPXRSKEWBLOCK_BYTES 20
+#define RTCPXRSKEWBLOCK_WORDS (RTCPXR7243BLOCK_BYTES>>2)
 #define RTCPRRBLOCK_BYTES 24
 #define RTCPRRBLOCK_WORDS (RTCPRRBLOCK_BYTES>>2)
 #define MPRTCPBLOCK_BYTES 4
@@ -241,6 +243,14 @@ gst_mprtcp_riport_block_add_xr_rfc2743 (GstMPRTCPSubflowBlock * block)
 {
   GstRTCPXR_RFC7243 *result = &block->xr_rfc7243_riport;
   gst_rtcp_xr_rfc7243_init (result);
+  return result;
+}
+
+GstRTCPXR_Skew *
+gst_mprtcp_riport_block_add_xr_skew (GstMPRTCPSubflowBlock * block)
+{
+  GstRTCPXR_Skew *result = &block->xr_skew;
+  gst_rtcp_xr_skew_init(result);
   return result;
 }
 
@@ -478,6 +488,24 @@ gst_rtcp_copy_rrb_ntoh (GstRTCPRRBlock * from, GstRTCPRRBlock * to)
   to->cum_packet_lost = cum_packet_lost;
 }
 
+//----------------- XRBlock ------------------------
+
+void
+gst_rtcp_xr_block_getdown (GstRTCPXR *riport, guint8 *block_type,
+    guint16 * block_length, guint8 *reserved)
+{
+  if (reserved) {
+    *reserved = riport->reserved;
+  }
+  if (block_type) {
+    *block_type = riport->block_type;
+  }
+  if (block_length) {
+    *block_length = g_htons(riport->block_length);
+  }
+}
+
+
 
 //------------------ XR7243 ------------------------
 void
@@ -485,7 +513,7 @@ gst_rtcp_xr_rfc7243_init (GstRTCPXR_RFC7243 * riport)
 {
   gst_rtcp_header_init (&riport->header);
   gst_rtcp_header_setup (&riport->header, FALSE, 0,
-      GST_RTCP_TYPE_XR, RTCPHEADER_WORDS - 1 + RTCPXRBLOCK_WORDS, 0);
+      GST_RTCP_TYPE_XR, RTCPHEADER_WORDS - 1 + RTCPXR7243BLOCK_WORDS, 0);
   gst_rtcp_xr_rfc7243_setup (riport, 0, FALSE, 0, 0);
 }
 
@@ -539,6 +567,71 @@ gst_rtcp_xr_rfc7243_getdown (GstRTCPXR_RFC7243 * riport,
   if (ssrc) {
     *ssrc = g_ntohs (riport->ssrc);
   }
+}
+
+//------------------ XRSkew ------------------------
+void
+gst_rtcp_xr_skew_init (GstRTCPXR_Skew * riport)
+{
+  gst_rtcp_header_init (&riport->header);
+  gst_rtcp_header_setup (&riport->header, FALSE, 0,
+      GST_RTCP_TYPE_XR, RTCPHEADER_WORDS - 1 + RTCPXRSKEWBLOCK_WORDS, 0);
+  gst_rtcp_xr_skew_setup (riport, 0, 0, 0, 0, 0);
+}
+
+
+void
+gst_rtcp_xr_skew_setup (GstRTCPXR_Skew * riport, guint32 ssrc,
+    guint16 last_skew, guint16 median_skew, guint32 packets_num,
+    guint32 payload_bytes)
+{
+  riport->block_length = g_htons (3);
+  riport->block_type = GST_RTCP_XR_SKEW_BLOCK_TYPE_IDENTIFIER;
+  gst_rtcp_xr_skew_change(riport, &ssrc, &last_skew, &median_skew, &packets_num, &payload_bytes);
+}
+
+void
+gst_rtcp_xr_skew_change (GstRTCPXR_Skew * riport, guint32 * ssrc,
+    guint16 * last_skew, guint16 *median_skew, guint32 * packets_num,
+    guint32 * payload_bytes)
+{
+  if (last_skew) {
+    riport->last_skew = g_htons (*last_skew);
+  }
+  if (median_skew) {
+    riport->median_skew = g_htons (*median_skew);
+  }
+  if (packets_num) {
+    riport->packets_num = g_htonl (*packets_num);
+  }
+  if (payload_bytes) {
+    riport->payload_bytes = g_htonl (*payload_bytes);
+  }
+  if (ssrc) {
+    riport->ssrc = g_htonl (*ssrc);
+  }
+}
+
+void
+gst_rtcp_xr_skew_getdown (GstRTCPXR_Skew * riport,guint32 * ssrc,
+    guint16 * last_skew, guint16 *median_skew, guint32 * packets_num,
+    guint32 * payload_bytes)
+{
+  if (ssrc) {
+    *ssrc = g_ntohl (riport->ssrc);
+  }
+  if (last_skew) {
+    *last_skew = g_ntohs (riport->last_skew);
+  }
+  if (median_skew) {
+    *median_skew = g_ntohs (riport->median_skew);
+  }
+  if (packets_num) {
+      *packets_num = g_ntohl (riport->packets_num);
+    }
+  if (payload_bytes) {
+      *payload_bytes = g_ntohl (riport->payload_bytes);
+    }
 }
 
 //------------------ MPRTCP ------------------------
@@ -764,7 +857,14 @@ gst_print_rtcp (GstRTCPHeader * header)
         gst_print_rtcp_rr ((GstRTCPRR *) step);
         break;
       case GST_RTCP_TYPE_XR:
-        gst_print_rtcp_xr ((GstRTCPXR_RFC7243 *) step);
+        {
+          guint16 block_type;
+          gst_rtcp_xr_block_getdown((GstRTCPXR*) step, &block_type, NULL, NULL);
+          if(block_type == GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER)
+            gst_print_rtcp_xr_7243 ((GstRTCPXR_RFC7243 *) step);
+          else if(block_type == GST_RTCP_XR_SKEW_BLOCK_TYPE_IDENTIFIER)
+            gst_print_rtcp_xr_skew (GstRTCPXR_Skew * step);
+        }
         break;
       default:
         ok = FALSE;
@@ -905,7 +1005,7 @@ gst_print_rtcp_rr (GstRTCPRR * riport)
 }
 
 void
-gst_print_rtcp_xr (GstRTCPXR_RFC7243 * riport)
+gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * riport)
 {
   guint8 interval_metric;
   gboolean early_bit;
@@ -924,6 +1024,39 @@ gst_print_rtcp_xr (GstRTCPXR_RFC7243 * riport)
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%63X|\n", riport->block_type, interval_metric, early_bit, 0,
       g_ntohs (riport->block_length), ssrc, discarded_bytes);
+}
+
+
+
+void
+gst_print_rtcp_xr_skew (GstRTCPXR_RFC7243 * riport)
+{
+  guint16 last_skew;
+  guint16 skew_median;
+  guint32 ssrc;
+  guint32 packets_num;
+  guint32 packet_bytes;
+
+  gst_rtcp_header_getdown (&riport->header, NULL, NULL, NULL, NULL, NULL, NULL);
+
+  gst_print_rtcp_header (&riport->header);
+  gst_rtcp_xr_skew_getdown (riport, &ssrc, &last_skew, &skew_median,
+                            &packets_num, &packet_bytes);
+  g_print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+      "|%15d|%15d|%31d|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63X|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%31d|%31d|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63X|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63X|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n",
+
+      riport->block_type, riport->reserved,
+      g_ntohs (riport->block_length), ssrc, last_skew, skew_median,
+      packets_num, packet_bytes);
 }
 
 void

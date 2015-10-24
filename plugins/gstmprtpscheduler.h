@@ -85,6 +85,7 @@ struct _GstMprtpscheduler
   void (*riport_can_flow) (gpointer);
   void (*controller_pacing) (gpointer,gboolean);
   gboolean (*controller_is_pacing) (gpointer);
+  GstStructure* (*controller_state)(gpointer);
 
   guint32 rtcp_sent_octet_sum;
 
@@ -97,6 +98,7 @@ struct _GstMprtpschedulerClass
 };
 
 GType gst_mprtpscheduler_get_type (void);
+
 
 
 G_END_DECLS

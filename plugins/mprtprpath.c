@@ -56,7 +56,8 @@ struct _SkewTree
 struct _SkewChain
 {
   Packet *head, *tail, *play, *tree;
-  gint counter;
+  gint    counter;
+  guint32 tree_bytes;
 };
 
 
@@ -429,6 +430,10 @@ mprtpr_path_removes_obsolate_packets (MpRTPRPath * this, GstClockTime treshold)
     if (actual->skew)
       _remove_skew (this, actual->skew);
     next = actual->next;
+    if(chain->tree == actual){
+      chain->tree_bytes-=actual->payload_bytes;
+      chain->tree = next;
+    }
     _trash_packet (this, actual);
     chain->head = actual = next;
     --chain->counter;
@@ -439,6 +444,38 @@ mprtpr_path_removes_obsolate_packets (MpRTPRPath * this, GstClockTime treshold)
 done:
 
   THIS_WRITEUNLOCK (this);
+}
+
+guint32 mprtpr_path_get_skew_byte_num(MpRTPRPath *this)
+{
+  guint32 result;
+  THIS_READLOCK (this);
+  result = this->packet_chain->counter;
+  THIS_READUNLOCK (this);
+  return result;
+}
+
+guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this)
+{
+  guint32 result;
+  THIS_READLOCK (this);
+  result = this->packet_chain->tree_bytes;
+  THIS_READUNLOCK (this);
+  return result;
+}
+
+
+guint64 mprtpr_path_get_last_skew(MpRTPRPath *this)
+{
+  guint64 result = 0;
+  PacketChain *chain;
+  THIS_READLOCK (this);
+  chain = this->packet_chain;
+  if (chain->counter < 2) goto done;
+  result = chain->tail->skew;
+done:
+  THIS_READUNLOCK (this);
+  return result;
 }
 
 guint64
@@ -653,6 +690,8 @@ _add_packet (MpRTPRPath * this, Packet * packet)
   if (!chain->tree)
     chain->tree = packet;
 
+  chain->tree_bytes += packet->payload_bytes;
+
   if (++chain->counter < 3) {
     GST_DEBUG_OBJECT (this, "CHAIN COUNTER SMALLER THAN 3\n");
     goto done;
@@ -672,6 +711,7 @@ _add_packet (MpRTPRPath * this, Packet * packet)
       _remove_skew (this, actual->skew);
     actual->skew = 0;
     chain->tree = actual->next;
+    chain->tree_bytes -= actual->payload_bytes;
   }
 
 done:

@@ -61,6 +61,7 @@
 #define GST_RTCP_TYPE_XR 207
 #define GST_MPRTCP_BLOCK_TYPE_SUBFLOW_INFO 0
 #define GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER 26
+#define GST_RTCP_XR_SKEW_BLOCK_TYPE_IDENTIFIER 27
 #define RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION 2
 #define RTCP_XR_RFC7243_I_FLAG_SAMPLED_METRIC 1
 #define RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION 3
@@ -125,6 +126,14 @@ typedef struct PACKED _GstRTCPRR
   GstRTCPRRBlock blocks;
 } GstRTCPRR;
 
+typedef struct PACKED _GstRTCPXR
+{
+  GstRTCPHeader header;
+  guint8 block_type;
+  guint8 reserved;
+  guint16 block_length;
+}GstRTCPXR;
+
 typedef struct PACKED _GstRTCPXR_RFC7243
 {                               //RTCP extended riport Discarded bytes
   GstRTCPHeader header;
@@ -146,18 +155,18 @@ typedef struct PACKED _GstRTCPXR_RFC7243
 } GstRTCPXR_RFC7243;
 
 
-typedef struct PACKED _GstRTCPXR_StreamCharacteristics
+typedef struct PACKED _GstRTCPXR_Skew
 {
   GstRTCPHeader header;
   guint8 block_type;
   guint8 reserved;
   guint16 block_length;
   guint32 ssrc;
-  guint16 skew_median;
-  guint16 delay_median;
+  guint16 last_skew;
+  guint16 median_skew;
   guint32 packets_num;
   guint32 payload_bytes;
-} GstRTCPXR_treamCharacteristics;
+} GstRTCPXR_Skew;
 
 
 /*MPRTCP struct polymorphism*/
@@ -189,7 +198,9 @@ typedef struct PACKED _GstMPRTCPSubflowBlock
     GstRTCPHeader block_header;
     GstRTCPRR receiver_riport;
     GstRTCPSR sender_riport;
+    GstRTCPXR xr_header;
     GstRTCPXR_RFC7243 xr_rfc7243_riport;
+    GstRTCPXR_Skew    xr_skew;
   };
 } GstMPRTCPSubflowBlock;
 
@@ -238,7 +249,7 @@ GstRTCPRR *gst_mprtcp_riport_block_add_rr (GstMPRTCPSubflowBlock * block);
 
 GstRTCPXR_RFC7243 *gst_mprtcp_riport_block_add_xr_rfc2743 (GstMPRTCPSubflowBlock
     * block);
-
+GstRTCPXR_RFC7243 *gst_mprtcp_riport_block_add_xr_skew (GstMPRTCPSubflowBlock * block);
 void
 gst_mprtcp_riport_add_block_end (GstMPRTCPSubflowReport * riport,
     GstMPRTCPSubflowBlock * block);
@@ -276,6 +287,8 @@ void gst_rtcp_rrb_setup (GstRTCPRRBlock * block_ptr, guint32 ssrc,
     guint32 ext_hsn, guint32 jitter, guint32 LSR, guint32 DLSR);
 void gst_rtcp_copy_rrb_ntoh (GstRTCPRRBlock * from, GstRTCPRRBlock * to);
 
+void gst_rtcp_xr_block_getdown (GstRTCPXR *riport, guint8 *block_type,
+    guint16 * block_length, guint8 *reserved);
 
 void gst_rtcp_xr_rfc7243_init (GstRTCPXR_RFC7243 * riport);
 void gst_rtcp_xr_rfc7243_setup (GstRTCPXR_RFC7243 * riport,
@@ -287,6 +300,18 @@ void gst_rtcp_xr_rfc7243_change (GstRTCPXR_RFC7243 * riport,
 void gst_rtcp_xr_rfc7243_getdown (GstRTCPXR_RFC7243 * riport,
     guint8 * interval_metric, gboolean * early_bit, guint32 * ssrc,
     guint32 * discarded_bytes);
+
+
+void gst_rtcp_xr_skew_init (GstRTCPXR_Skew * riport);
+void gst_rtcp_xr_skew_setup (GstRTCPXR_Skew * riport, guint32 ssrc,
+    guint16 last_skew, guint16 median_skew, guint32 packets_num,
+    guint32 payload_bytes);
+void gst_rtcp_xr_skew_change (GstRTCPXR_Skew * riport, guint32 * ssrc,
+    guint16 * last_skew, guint16 *median_skew, guint32 * packets_num,
+    guint32 * payload_bytes);
+void gst_rtcp_xr_skew_getdown (GstRTCPXR_Skew * riport,guint32 * ssrc,
+    guint16 * last_skew, guint16 *median_skew, guint32 * packets_num,
+    guint32 * payload_bytes);
 
 void gst_mprtcp_report_init (GstMPRTCPSubflowReport * riport);
 void gst_mprtcp_riport_setup (GstMPRTCPSubflowReport * riport, guint32 ssrc);
@@ -315,7 +340,8 @@ void gst_print_rtcp (GstRTCPHeader * header);
 void gst_print_rtcp_header (GstRTCPHeader * header);
 void gst_print_rtcp_sr (GstRTCPSR * riport);
 void gst_print_rtcp_rr (GstRTCPRR * riport);
-void gst_print_rtcp_xr (GstRTCPXR_RFC7243 * riport);
+void gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * riport);
+void gst_print_rtcp_xr_skew (GstRTCPXR_RFC7243 * riport);
 void gst_print_rtcp_srb (GstRTCPSRBlock * block_ptr);
 void gst_print_rtcp_rrb (GstRTCPRRBlock * block_ptr);
 

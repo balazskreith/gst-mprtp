@@ -46,6 +46,8 @@ static GstBuffer *_pop_buffer(NetsimQueue * this, GstClockTime *received);
 static void _insert_into(NetsimQueueBuffer* location, GstBuffer *buffer);
 static GstBuffer* _extract_from(NetsimQueueBuffer* location, GstClockTime *received);
 static void _unref_location(NetsimQueueBuffer* location);
+void _check_max_time_to_desired_time(NetsimQueue *this);
+void _check_min_time_to_desired_time(NetsimQueue *this);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -87,14 +89,40 @@ netsimqueue_init (NetsimQueue * this)
   this->sysclock = gst_system_clock_obtain();
 }
 
+void netsimqueue_smooth_movement(NetsimQueue * this, gboolean smooth_movement)
+{
+  this->smooth_movement = smooth_movement;
+}
+
 void netsimqueue_set_min_time(NetsimQueue * this, gint min_time_in_ms)
 {
-  this->min_time = min_time_in_ms * GST_MSECOND;
+  GstClockTime now;
+  if(!this->smooth_movement){
+      this->desired_min_time = this->min_time = min_time_in_ms * GST_MSECOND;
+      goto done;
+  }
+  now = gst_clock_get_time(this->sysclock);
+  this->desired_min_time = min_time_in_ms * GST_MSECOND;
+  this->next_min_movement = now + g_random_int_range(1,100) * GST_MSECOND;
+
+done:
+  return;
 }
 
 void netsimqueue_set_max_time(NetsimQueue * this, gint max_time_in_ms)
 {
-  this->max_time = max_time_in_ms * GST_MSECOND;
+  GstClockTime now;
+  if(!this->smooth_movement){
+      this->desired_max_time = this->max_time = max_time_in_ms * GST_MSECOND;
+      goto done;
+  }
+
+  now = gst_clock_get_time(this->sysclock);
+  this->desired_max_time = max_time_in_ms * GST_MSECOND;
+  this->next_max_movement = now + g_random_int_range(1,100) * GST_MSECOND;
+
+done:
+  return;
 }
 
 void netsimqueue_set_drop_policy(NetsimQueue * this, NetsimQueueDropPolicy policy)
@@ -136,6 +164,8 @@ GstBuffer *netsimqueue_pop_buffer(NetsimQueue * this)
   GstClockTime received;
   GstClockTime now;
   NetsimQueueBuffer *location;
+  _check_min_time_to_desired_time(this);
+  _check_max_time_to_desired_time(this);
 again:
   result = NULL;
   now = gst_clock_get_time(this->sysclock);
@@ -199,4 +229,50 @@ void _unref_location(NetsimQueueBuffer* location)
   GstBuffer *buffer;
   buffer = _extract_from(location, NULL);
   if(buffer) gst_buffer_unref(buffer);
+}
+
+void _check_min_time_to_desired_time(NetsimQueue *this)
+{
+  GstClockTime now;
+  if(this->desired_min_time - GST_USECOND * 501 < this->min_time &&
+     this->min_time < this->desired_min_time + GST_USECOND * 501)
+  {
+    if(this->desired_min_time == 0)
+         this->min_time = 0;
+    goto done;
+  }
+  now = gst_clock_get_time(this->sysclock);
+  if(now < this->next_min_movement) goto done;
+  this->next_min_movement = now + g_random_int_range(1,100) * GST_MSECOND;
+  if(this->min_time < this->desired_min_time)
+    this->min_time+= GST_MSECOND;
+  else
+    this->min_time-=GST_MSECOND;
+  done:
+  if(this->min_time < 0)
+    this->min_time = 0;
+  return;
+}
+
+void _check_max_time_to_desired_time(NetsimQueue *this)
+{
+  GstClockTime now;
+  if(this->desired_max_time - GST_USECOND * 501 < this->max_time &&
+     this->max_time < this->desired_max_time + GST_USECOND * 501)
+  {
+    if(this->desired_max_time == 0)
+         this->max_time = 0;
+    goto done;
+  }
+  now = gst_clock_get_time(this->sysclock);
+  if(now < this->next_max_movement) goto done;
+  this->next_max_movement = now + g_random_int_range(1,100) * GST_MSECOND;
+  if(this->max_time < this->desired_max_time)
+    this->max_time+= GST_MSECOND;
+  else
+    this->max_time-=GST_MSECOND;
+  done:
+  if(this->max_time < 0)
+    this->max_time = 0;
+  return;
 }

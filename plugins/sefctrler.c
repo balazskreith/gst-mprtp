@@ -55,12 +55,19 @@ typedef struct _SubflowRecord SubflowRecord;
 
 typedef enum
 {
-  EVENT_FI,
-  EVENT_DISTORTION,
-  EVENT_SETTLED,
-  EVENT_CONGESTION,
-  EVENT_LATE,
-  EVENT_LOSTS,
+  EVENT_LATE       = -4,
+  EVENT_CONGESTION = -3,
+  EVENT_LOSTS      = -2,
+  EVENT_DISTORTION = -1,
+
+  EVENT_OVERUSED   = 11,
+
+  EVENT_FI         =  0,
+  EVENT_SETTLED    =  1,
+
+  EVENT_UNDERUSED  =  2,
+
+
 } Event;
 
 
@@ -209,6 +216,7 @@ static void sefctrler_add_path (gpointer controller_ptr, guint8 subflow_id,
     MPRTPSPath * path);
 static void sefctrler_pacing (gpointer controller_ptr, gboolean allowed);
 static gboolean sefctrler_is_pacing (gpointer controller_ptr);
+static GstStructure* sefctrler_state (gpointer controller_ptr);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -225,6 +233,7 @@ sefctrler_class_init (SndEventBasedControllerClass * klass)
 
   GST_DEBUG_CATEGORY_INIT (sefctrler_debug_category, "sefctrler", 0,
       "MpRTP Sending Event Based Flow Controller");
+
 
 }
 
@@ -312,8 +321,6 @@ sefctrler_run (void *data)
     this->bids_commit_requested = FALSE;
     stream_splitter_commit_changes (this->splitter);
   }
-  //send signal
-  this->notify_system_state();
 
 //done:
   next_scheduler_time = now + 100 * GST_MSECOND;
@@ -411,12 +418,59 @@ sefctrler_is_pacing (gpointer controller_ptr)
   return result;
 }
 
+GstStructure*
+sefctrler_state (gpointer controller_ptr)
+{
+  SndEventBasedController *this;
+  GstStructure *result = NULL;
+//  GHashTableIter iter;
+//  gpointer key, val;
+//  Subflow *subflow;
+//  gint index = 0;
+//  GValue g_value = { 0 };
+//  gchar *field_name;
+
+  this = SEFCTRLER (controller_ptr);
+  THIS_WRITELOCK (this);
+//
+//    result = gst_structure_new ("SchedulerStateReport",
+//        "length", G_TYPE_UINT, this->subflows_num, NULL);
+//    g_value_init (&g_value, G_TYPE_UINT);
+//    g_hash_table_iter_init (&iter, this->subflows);
+//    while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+//      subflow = (Subflow *) val;
+//
+//      field_name = g_strdup_printf ("subflow-%d-id", index);
+//      g_value_set_uint (&g_value, mprtps_path_get_id (subflow->id));
+//      gst_structure_set_value (result, field_name, &g_value);
+//      g_free (field_name);
+//
+//      field_name = g_strdup_printf ("subflow-%d-fractional_lost", index);
+//      g_value_set_uint (&g_value, _st0(subflow)->fraction_lost);
+//      gst_structure_set_value (result, field_name, &g_value);
+//      g_free (field_name);
+//
+//      field_name = g_strdup_printf ("subflow-%d-sent_payload_bytes", index);
+//      g_value_set_uint (&g_value,
+//          mprtps_path_get_total_sent_payload_bytes (path));
+//      gst_structure_set_value (result, field_name, &g_value);
+//      g_free (field_name);
+//
+//      ++index;
+//    }
+//  _ct0(this)->is_it_new = FALSE;
+
+  THIS_WRITEUNLOCK (this);
+  return result;
+}
+
 void
 sefctrler_set_callbacks (void (**riport_can_flow_indicator) (gpointer),
     void (**controller_add_path) (gpointer, guint8, MPRTPSPath *),
     void (**controller_rem_path) (gpointer, guint8),
     void (**controller_pacing) (gpointer, gboolean),
-    gboolean (**controller_is_pacing)(gpointer))
+    gboolean (**controller_is_pacing)(gpointer),
+    GstStructure* (**controller_state)(gpointer))
 {
   if (riport_can_flow_indicator) {
     *riport_can_flow_indicator = sefctrler_riport_can_flow;
@@ -432,6 +486,9 @@ sefctrler_set_callbacks (void (**riport_can_flow_indicator) (gpointer),
   }
   if (controller_is_pacing) {
     *controller_is_pacing = sefctrler_is_pacing;
+  }
+  if (controller_state) {
+    *controller_state = sefctrler_state;
   }
 }
 
@@ -451,19 +508,6 @@ sefctrler_setup_mprtcp_exchange (SndEventBasedController * this,
   THIS_WRITELOCK (this);
   this->send_mprtcp_packet_func = func;
   this->send_mprtcp_packet_data = data;
-  result = sefctrler_receive_mprtcp;
-  THIS_WRITEUNLOCK (this);
-  return result;
-}
-
-GstBufferReceiverFunc
-sefctrler_setup_notifications (SndEventBasedController * this,
-    gpointer data, GstMpRTPSubflowsNotification func)
-{
-  GstBufferReceiverFunc result;
-  THIS_WRITELOCK (this);
-  this->notify_system_func = func;
-  this->notify_system_data = data;
   result = sefctrler_receive_mprtcp;
   THIS_WRITEUNLOCK (this);
   return result;

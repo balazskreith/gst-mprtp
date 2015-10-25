@@ -46,6 +46,9 @@
 #include "streamjoiner.h"
 #include "rmanctrler.h"
 #include "smanctrler.h"
+#include "bintree.h"
+
+
 #include "refctrler.h"
 
 GST_DEBUG_CATEGORY_STATIC (gst_mprtpplayouter_debug_category);
@@ -622,13 +625,13 @@ gst_mprtpplayouter_dispose (GObject * object)
   G_OBJECT_CLASS (gst_mprtpplayouter_parent_class)->dispose (object);
 }
 
-
-
+#include "packetsqueue.h"
 
 void
 _join_path (GstMprtpplayouter * this, guint8 subflow_id)
 {
   MpRTPRPath *path;
+  packetsqueue_test();
   path =
       (MpRTPRPath *) g_hash_table_lookup (this->paths,
       GINT_TO_POINTER (subflow_id));
@@ -842,7 +845,6 @@ _processing_mprtcp_packet (GstMprtpplayouter * this, GstBuffer * buf)
   result = GST_FLOW_OK;
   return result;
 }
-
 
 void
 _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)

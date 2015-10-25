@@ -144,7 +144,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-streamsplitter.lo libgstmprtp_la-rmanctrler.lo \
 	libgstmprtp_la-smanctrler.lo libgstmprtp_la-sefctrler.lo \
 	libgstmprtp_la-refctrler.lo libgstmprtp_la-gstnetsimb.lo \
-	libgstmprtp_la-netsimqueue.lo
+	libgstmprtp_la-netsimqueue.lo libgstmprtp_la-bintree.lo \
+	libgstmprtp_la-packetsqueue.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -401,7 +402,9 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          sefctrler.c                \
                          refctrler.c                \
                          gstnetsimb.c               \
-                         netsimqueue.c              
+                         netsimqueue.c              \
+                         bintree.c                  \
+                         packetsqueue.c
 
 noinst_HEADERS = mprtpspath.h      \
                  rmanctrler.h      \
@@ -411,7 +414,9 @@ noinst_HEADERS = mprtpspath.h      \
                  mprtprpath.h      \
                  streamsplitter.h  \
                  streamjoiner.h    \
-                 netsimqueue.h     
+                 netsimqueue.h     \
+                 bintree.h         \
+                 packetsqueue.h
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -505,6 +510,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+include ./$(DEPDIR)/libgstmprtp_la-bintree.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtcpbuffer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplayouter.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplugin.Plo
@@ -515,6 +521,7 @@ include ./$(DEPDIR)/libgstmprtp_la-gstnetsimb.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-netsimqueue.Plo
+include ./$(DEPDIR)/libgstmprtp_la-packetsqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-refctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rmanctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sefctrler.Plo
@@ -654,6 +661,20 @@ libgstmprtp_la-netsimqueue.lo: netsimqueue.c
 #	$(AM_V_CC)source='netsimqueue.c' object='libgstmprtp_la-netsimqueue.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-netsimqueue.lo `test -f 'netsimqueue.c' || echo '$(srcdir)/'`netsimqueue.c
+
+libgstmprtp_la-bintree.lo: bintree.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-bintree.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-bintree.Tpo -c -o libgstmprtp_la-bintree.lo `test -f 'bintree.c' || echo '$(srcdir)/'`bintree.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-bintree.Tpo $(DEPDIR)/libgstmprtp_la-bintree.Plo
+#	$(AM_V_CC)source='bintree.c' object='libgstmprtp_la-bintree.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-bintree.lo `test -f 'bintree.c' || echo '$(srcdir)/'`bintree.c
+
+libgstmprtp_la-packetsqueue.lo: packetsqueue.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-packetsqueue.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-packetsqueue.Tpo -c -o libgstmprtp_la-packetsqueue.lo `test -f 'packetsqueue.c' || echo '$(srcdir)/'`packetsqueue.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-packetsqueue.Tpo $(DEPDIR)/libgstmprtp_la-packetsqueue.Plo
+#	$(AM_V_CC)source='packetsqueue.c' object='libgstmprtp_la-packetsqueue.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-packetsqueue.lo `test -f 'packetsqueue.c' || echo '$(srcdir)/'`packetsqueue.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

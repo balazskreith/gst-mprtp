@@ -1029,7 +1029,6 @@ _make_gap (MpRTPRPath * this, Packet * at, guint16 start, guint16 end)
       counter != (guint16) (gap->end - 1); ++counter, ++gap->total);
   this->gaps = g_list_prepend (this->gaps, gap);
   at->gap = gap;
-
 }
 
 void

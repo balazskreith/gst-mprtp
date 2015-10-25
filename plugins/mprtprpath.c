@@ -73,7 +73,7 @@ struct _Packet
   guint16 abs_seq_num;
   guint16 rel_seq_num;
   GstClockTime rcv_time;
-  GstClockTime snd_time;
+  guint64 snd_time;
   GstClockTimeDiff delay;
   guint64 skew;
 
@@ -85,7 +85,7 @@ static void mprtpr_path_finalize (GObject * object);
 static void mprtpr_path_reset (MpRTPRPath * this);
 
 static Packet *_make_packet (MpRTPRPath * this,
-    GstRTPBuffer * rtp, guint16 packet_subflow_seq_num, GstClockTime snd_time);
+    GstRTPBuffer * rtp, guint16 packet_subflow_seq_num, guint64 snd_time);
 static void _trash_packet (MpRTPRPath * this, Packet * packet);
 static void _add_packet (MpRTPRPath * this, Packet * packet);
 static void _chain_packets (MpRTPRPath * this, Packet * actual, Packet * next);
@@ -450,7 +450,7 @@ guint32 mprtpr_path_get_skew_byte_num(MpRTPRPath *this)
 {
   guint32 result;
   THIS_READLOCK (this);
-  result = this->packet_chain->counter;
+  result = this->packet_chain->tree_bytes;
   THIS_READUNLOCK (this);
   return result;
 }
@@ -459,7 +459,8 @@ guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this)
 {
   guint32 result;
   THIS_READLOCK (this);
-  result = this->packet_chain->tree_bytes;
+  result = GET_SKEW_TREE_NUM (this->skew_min_tree) +
+           GET_SKEW_TREE_NUM (this->skew_max_tree);
   THIS_READUNLOCK (this);
   return result;
 }
@@ -534,12 +535,13 @@ done:
 //  }
 
   THIS_WRITEUNLOCK (this);
+//  g_print("MEDIAN: %lu\n", result);
   return result;
 }
 
 void
 mprtpr_path_process_rtp_packet (MpRTPRPath * this,
-    GstRTPBuffer * rtp, guint16 packet_subflow_seq_num, GstClockTime snd_time)
+    GstRTPBuffer * rtp, guint16 packet_subflow_seq_num, guint64 snd_time)
 {
   Packet *packet;
 
@@ -605,7 +607,7 @@ done:
 
 Packet *
 _make_packet (MpRTPRPath * this,
-    GstRTPBuffer * rtp, guint16 packet_subflow_seq_num, GstClockTime snd_time)
+    GstRTPBuffer * rtp, guint16 packet_subflow_seq_num, guint64 snd_time)
 {
   Packet *result;
   guint32 rtptime;
@@ -629,8 +631,10 @@ _make_packet (MpRTPRPath * this,
   result->payload_bytes = gst_rtp_buffer_get_payload_len (rtp);
   result->abs_seq_num = gst_rtp_buffer_get_seq (rtp);
   result->rel_seq_num = packet_subflow_seq_num;
-  result->rcv_time = gst_clock_get_time (this->sysclock);
-  result->snd_time = snd_time;
+//  result->rcv_time = NTP_NOW;
+//  result->rcv_time = gst_util_uint64_scale (NTP_NOW, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
+  result->rcv_time = epoch_now_in_ns;
+  result->snd_time = gst_util_uint64_scale (snd_time, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
   result->skew = 0;
   result->delay = GST_CLOCK_DIFF (result->snd_time, result->rcv_time);
   result->frame_start_flag =
@@ -703,8 +707,8 @@ _add_packet (MpRTPRPath * this, Packet * packet)
   }
   //calculate everything
   _add_packet_skew (this, packet->skew);
-  if (GET_SKEW_TREE_NUM (this->skew_max_tree) +
-      GET_SKEW_TREE_NUM (this->skew_min_tree) > 256) {
+  if ((GET_SKEW_TREE_NUM (this->skew_max_tree) +
+      GET_SKEW_TREE_NUM (this->skew_min_tree)) > 256) {
     Packet *actual;
     actual = chain->tree;
     if (actual->skew)
@@ -743,6 +747,18 @@ _chain_packets (MpRTPRPath * this, Packet * actual, Packet * next)
     next->skew = snd_diff - rcv_diff;
   else
     next->skew = rcv_diff - snd_diff;
+  next->skew = g_random_int_range(25000, 50000);
+  //convert to ns
+  //next->skew = gst_util_uint64_scale (next->skew, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
+  //next->skew *= 0.23283064365;
+  g_print("actual->rcv_time: %lu next->rcv_time: %lu\n"
+          "actual->snd_time: %lu next->snd_time: %lu\n"
+          "rcv_diff: %lu         snd_diff: %lu\n"
+          "skew: %lu\n ",
+          actual->rcv_time, next->rcv_time,
+          actual->snd_time, next->snd_time,
+          rcv_diff, snd_diff,
+          next->skew);
 //    g_print("DELAY: %lu\n",
 //            GST_TIME_AS_MSECONDS(next->rcv_time - next->snd_time));
 //  g_print("RCV_DIFF: %lu SND_DIFF: %lu PACKET SKEW: %lu\n",

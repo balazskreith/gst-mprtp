@@ -81,6 +81,8 @@ struct _MPRTPSPath
   guint32   total_sent_packet_num;
   guint32   total_sent_payload_bytes_sum;
 
+  MPRTPPathMarker  marker;
+
   GstClockTime  sent_passive;
   GstClockTime  sent_active;
   GstClockTime  sent_non_congested;
@@ -125,7 +127,8 @@ void mprtps_path_process_rtp_packet (MPRTPSPath * this, guint ext_header_id, Gst
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
 guint32 mprtps_path_get_sent_octet_sum_for(MPRTPSPath *this, guint32 amount);
 
-void mprtps_path_set_underused(MPRTPSPath * this);
+void mprtps_path_set_marker(MPRTPSPath * this, MPRTPPathMarker marker);
+MPRTPPathMarker mprtps_path_get_marker(MPRTPSPath * this);
 
 MPRTPSPathState mprtps_path_get_state (MPRTPSPath * this);
 void mprtps_path_set_state (MPRTPSPath * this, MPRTPSPathState state);

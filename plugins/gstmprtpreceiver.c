@@ -655,12 +655,13 @@ _send_mprtcp_buffer (GstMprtpreceiver * this, GstBuffer * buf)
     buffer = gst_buffer_new_wrapped (data, buf_length);
     outpad = (block_riport_type == GST_RTCP_TYPE_SR) ? this->mprtcp_sr_srcpad
         : this->mprtcp_rr_srcpad;
-    //g_print("ARRIVED REPORT: %d\n", block_riport_type);
+//    g_print("ARRIVED REPORT: %d\n", block_riport_type);
     if ((result = gst_pad_push (outpad, buffer)) != GST_FLOW_OK) {
       goto done;
     }
-  }
 
+  }
+//  g_print("-------------------------\n");
 done:
   return result;
 }

@@ -794,7 +794,9 @@ _assemble_report (Subflow * this, GstBuffer * blocks)
   gst_rtcp_header_change(&report->header, NULL, NULL,
                          &src, NULL, &length, NULL);
   gst_buffer_unmap(blocks, &map);
+//  gst_print_rtcp(&report->header);
   result = gst_buffer_new_wrapped ((gpointer)report, (length + 1)<<2);
+
 exit:
   return result;
 }

@@ -25,6 +25,11 @@ typedef struct _ControllerRecord ControllerRecord;
 #define SEFCTRLER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),SEFCTRLER_TYPE))
 #define SEFCTRLER_CAST(src)        ((SndEventBasedController *)(src))
 
+typedef enum{
+  MPRTP_CC_STATE_UNDERUSED    = -1,
+  MPRTP_CC_STATE_STABLE       =  0,
+  MPRTP_CC_STATE_OVERUSED     =  1,
+}MpRTPCCState;
 
 struct _SndEventBasedController
 {
@@ -43,13 +48,20 @@ struct _SndEventBasedController
   guint64           changed_num;
   gboolean          pacing;
 
-  gboolean          new_report_arrived;
+//  gboolean          new_report_arrived;
   gboolean          bids_recalc_requested;
   gboolean          bids_commit_requested;
   guint32           ssrc;
   void            (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
   gpointer          send_mprtcp_packet_data;
   gboolean          riport_is_flowable;
+  gboolean          suspicious;
+  GstClockTime      suspicious_time;
+
+  MpRTPCCState      cc_state;
+  MpRTPCCState      cc_prev_state;
+  GstClockTime      stability_time;
+  gboolean          stability_started;
 };
 
 struct _SndEventBasedControllerClass{

@@ -50,7 +50,8 @@ enum
   ARG_REORDER_PROBABILITY,
   ARG_DROP_PROBABILITY,
   ARG_DUPLICATE_PROBABILITY,
-  ARG_DROP_PACKETS
+  ARG_DROP_PACKETS,
+  ARG_SMOOTH_DELAY,
 };
 
 struct _GstNetSimbPrivate
@@ -84,6 +85,8 @@ struct _GstNetSimbPrivate
   gsize            actual_bytes;
   GQueue*          buffer_queue;
   GstClock*        sysclock;
+
+  gint             smooth_delay;
 
   NetsimQueue*     queue;
 
@@ -436,6 +439,10 @@ gst_net_simb_set_property (GObject * object,
     case ARG_DROP_PACKETS:
       netsim->priv->drop_packets = g_value_get_uint (value);
       break;
+    case ARG_SMOOTH_DELAY:
+      netsim->priv->smooth_delay = g_value_get_uint (value);
+      netsimqueue_smooth_movement(netsim->priv->queue, netsim->priv->smooth_delay);
+      break;
   }
 }
 
@@ -485,6 +492,9 @@ gst_net_simb_get_property (GObject * object,
     case ARG_DROP_PACKETS:
       g_value_set_uint (value, netsim->priv->drop_packets);
       break;
+    case ARG_SMOOTH_DELAY:
+      g_value_set_uint (value, netsim->priv->smooth_delay);
+      break;
   }
 }
 
@@ -495,6 +505,7 @@ _popper (gpointer data) //pop data from queue
   GstBuffer *buf;
 
   this = data;
+
 again:
   if(!this->priv->pacing_trashold_in_kbs)
     goto pop;
@@ -669,6 +680,13 @@ gst_net_simb_class_init (GstNetSimbClass * klass)
       g_param_spec_uint ("drop-packets", "Drop Packets",
           "Drop the next n packets",
           0, G_MAXUINT, DEFAULT_DROP_PACKETS,
+          G_PARAM_READWRITE | G_PARAM_CONSTRUCT | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, ARG_SMOOTH_DELAY,
+      g_param_spec_uint ("smooth-delay",
+          "Smooth delay increasement in the queue",
+          "Smooth delay increasement in the queue",
+          0, G_MAXUINT, 0,
           G_PARAM_READWRITE | G_PARAM_CONSTRUCT | G_PARAM_STATIC_STRINGS));
 
   GST_DEBUG_CATEGORY_INIT (netsim_debug, "netsim", 0, "Network simulator");

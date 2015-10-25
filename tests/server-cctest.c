@@ -226,7 +226,8 @@ again:
       !strcmp(command, "queue-max-delay")      ||
       !strcmp(command, "queue-max-packets")    ||
       !strcmp(command, "max-delay")            ||
-      !strcmp(command, "pacing-treshold")
+      !strcmp(command, "pacing-treshold")      ||
+      !strcmp(command, "smooth-delay")
     )
   {
     gint value;

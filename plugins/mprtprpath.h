@@ -110,7 +110,7 @@ guint8 mprtpr_path_get_id (MpRTPRPath * this);
 void mprtpr_path_process_rtp_packet(MpRTPRPath *this,
                                GstRTPBuffer *rtp,
                                guint16 packet_subflow_seq_num,
-                               GstClockTime snd_time);
+                               guint64 snd_time);
 
 void mprtpr_path_removes_obsolate_packets(MpRTPRPath *this, GstClockTime treshold);
 guint64 mprtpr_path_get_last_skew(MpRTPRPath *this);

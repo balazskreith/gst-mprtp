@@ -87,6 +87,11 @@ netsimqueue_init (NetsimQueue * this)
   this->buffers_allowed_max_num = MAX_NETSIMQUEUEBUFFERS_NUM;
   this->drop_policy = NETSIMQUEUE_DROP_POLICY_MILK;
   this->sysclock = gst_system_clock_obtain();
+
+  this->min_time = 0;
+  this->max_time = 0;
+  this->desired_max_time = 0;
+  this->desired_min_time = 0;
 }
 
 void netsimqueue_smooth_movement(NetsimQueue * this, gboolean smooth_movement)
@@ -234,20 +239,16 @@ void _unref_location(NetsimQueueBuffer* location)
 void _check_min_time_to_desired_time(NetsimQueue *this)
 {
   GstClockTime now;
-  if(this->desired_min_time - GST_USECOND * 501 < this->min_time &&
-     this->min_time < this->desired_min_time + GST_USECOND * 501)
-  {
-    if(this->desired_min_time == 0)
-         this->min_time = 0;
-    goto done;
-  }
+  gint fluctuation;
+  if(this->desired_min_time == this->min_time) goto done;
   now = gst_clock_get_time(this->sysclock);
   if(now < this->next_min_movement) goto done;
-  this->next_min_movement = now + g_random_int_range(1,100) * GST_MSECOND;
+  this->next_min_movement = now + g_random_int_range(1,600) * GST_MSECOND;
+  fluctuation = g_random_int_range(0,10) < 3 ? -1 : 1;
   if(this->min_time < this->desired_min_time)
-    this->min_time+= GST_MSECOND;
+    this->min_time +=  fluctuation * GST_MSECOND;
   else
-    this->min_time-=GST_MSECOND;
+    this->min_time -= fluctuation * GST_MSECOND;
   done:
   if(this->min_time < 0)
     this->min_time = 0;
@@ -257,20 +258,16 @@ void _check_min_time_to_desired_time(NetsimQueue *this)
 void _check_max_time_to_desired_time(NetsimQueue *this)
 {
   GstClockTime now;
-  if(this->desired_max_time - GST_USECOND * 501 < this->max_time &&
-     this->max_time < this->desired_max_time + GST_USECOND * 501)
-  {
-    if(this->desired_max_time == 0)
-         this->max_time = 0;
-    goto done;
-  }
+  gint fluctuation;
+  if(this->desired_max_time == this->max_time) goto done;
   now = gst_clock_get_time(this->sysclock);
   if(now < this->next_max_movement) goto done;
-  this->next_max_movement = now + g_random_int_range(1,100) * GST_MSECOND;
+  this->next_max_movement = now + g_random_int_range(1,600) * GST_MSECOND;
+  fluctuation = g_random_int_range(0,10) < 3 ? -1 : 1;
   if(this->max_time < this->desired_max_time)
-    this->max_time+= GST_MSECOND;
+    this->max_time +=  fluctuation * GST_MSECOND;
   else
-    this->max_time-=GST_MSECOND;
+    this->max_time -= fluctuation * GST_MSECOND;
   done:
   if(this->max_time < 0)
     this->max_time = 0;

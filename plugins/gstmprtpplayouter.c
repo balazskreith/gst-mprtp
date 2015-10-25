@@ -853,7 +853,7 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
   guint size;
   GstNetAddressMeta *meta;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-  GstClockTime snd_time = 0;
+  guint64 snd_time = 0;
 
   if (G_UNLIKELY (!gst_rtp_buffer_map (buf, GST_MAP_READ, &rtp))) {
     GST_WARNING_OBJECT (this, "The received Buffer is not readable");
@@ -906,7 +906,7 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
   } else {
     memcpy (&snd_time, pointer, 3);
     snd_time <<= 14;
-    snd_time |= gst_clock_get_time (this->sysclock) & 0xffffffC000000000UL;
+    snd_time |= NTP_NOW & 0xffffffC000000000UL;
   }
 
   //to avoid the check_collision problem in rtpsession.

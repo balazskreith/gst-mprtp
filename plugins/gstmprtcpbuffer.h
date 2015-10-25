@@ -66,6 +66,13 @@
 #define RTCP_XR_RFC7243_I_FLAG_SAMPLED_METRIC 1
 #define RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION 3
 
+#define current_unix_time_in_us g_get_real_time ()
+#define current_unix_time_in_ms (current_unix_time_in_us / 1000L)
+#define current_unix_time_in_s  (current_unix_time_in_ms / 1000L)
+#define epoch_now_in_ns ((guint64)((current_unix_time_in_us + 2208988800000000LL) * 1000))
+#define get_ntp_from_epoch_ns(epoch_in_ns) gst_util_uint64_scale (epoch_in_ns, (1LL << 32), GST_SECOND)
+#define NTP_NOW get_ntp_from_epoch_ns(epoch_now_in_ns)
+
 #define MPRTCP_BLOCK_TYPE_RIPORT 0
 
 typedef struct PACKED _GstRTCPRiportHeader
@@ -162,10 +169,9 @@ typedef struct PACKED _GstRTCPXR_Skew
   guint8 reserved;
   guint16 block_length;
   guint32 ssrc;
-  guint16 last_skew;
-  guint16 median_skew;
-  guint32 packets_num;
-  guint32 payload_bytes;
+  guint32 median_skew;
+  guint16 packets_num;
+  guint16 payload_bytes;
 } GstRTCPXR_Skew;
 
 
@@ -249,7 +255,7 @@ GstRTCPRR *gst_mprtcp_riport_block_add_rr (GstMPRTCPSubflowBlock * block);
 
 GstRTCPXR_RFC7243 *gst_mprtcp_riport_block_add_xr_rfc2743 (GstMPRTCPSubflowBlock
     * block);
-GstRTCPXR_RFC7243 *gst_mprtcp_riport_block_add_xr_skew (GstMPRTCPSubflowBlock * block);
+GstRTCPXR_Skew *gst_mprtcp_riport_block_add_xr_skew (GstMPRTCPSubflowBlock * block);
 void
 gst_mprtcp_riport_add_block_end (GstMPRTCPSubflowReport * riport,
     GstMPRTCPSubflowBlock * block);
@@ -303,15 +309,18 @@ void gst_rtcp_xr_rfc7243_getdown (GstRTCPXR_RFC7243 * riport,
 
 
 void gst_rtcp_xr_skew_init (GstRTCPXR_Skew * riport);
-void gst_rtcp_xr_skew_setup (GstRTCPXR_Skew * riport, guint32 ssrc,
-    guint16 last_skew, guint16 median_skew, guint32 packets_num,
-    guint32 payload_bytes);
-void gst_rtcp_xr_skew_change (GstRTCPXR_Skew * riport, guint32 * ssrc,
-    guint16 * last_skew, guint16 *median_skew, guint32 * packets_num,
-    guint32 * payload_bytes);
-void gst_rtcp_xr_skew_getdown (GstRTCPXR_Skew * riport,guint32 * ssrc,
-    guint16 * last_skew, guint16 *median_skew, guint32 * packets_num,
-    guint32 * payload_bytes);
+
+void gst_rtcp_xr_skew_setup(GstRTCPXR_Skew * riport, guint32 ssrc,
+                            guint32 median_skew, guint16 packets_num,
+                            guint16 payload_bytes);
+
+void gst_rtcp_xr_skew_change(GstRTCPXR_Skew * riport, guint32 * ssrc,
+                            guint32 *median_skew, guint16 * packets_num,
+                            guint16 * payload_bytes);
+
+void gst_rtcp_xr_skew_getdown(GstRTCPXR_Skew * riport,guint32 * ssrc,
+                            guint32 *median_skew, guint16 * packets_num,
+                            guint16 * payload_bytes);
 
 void gst_mprtcp_report_init (GstMPRTCPSubflowReport * riport);
 void gst_mprtcp_riport_setup (GstMPRTCPSubflowReport * riport, guint32 ssrc);
@@ -341,7 +350,7 @@ void gst_print_rtcp_header (GstRTCPHeader * header);
 void gst_print_rtcp_sr (GstRTCPSR * riport);
 void gst_print_rtcp_rr (GstRTCPRR * riport);
 void gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * riport);
-void gst_print_rtcp_xr_skew (GstRTCPXR_RFC7243 * riport);
+void gst_print_rtcp_xr_skew (GstRTCPXR_Skew * riport);
 void gst_print_rtcp_srb (GstRTCPSRBlock * block_ptr);
 void gst_print_rtcp_rrb (GstRTCPRRBlock * block_ptr);
 

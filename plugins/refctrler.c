@@ -36,6 +36,8 @@
 #define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
 #define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
 
+
+
 GST_DEBUG_CATEGORY_STATIC (refctrler_debug_category);
 #define GST_CAT_DEFAULT refctrler_debug_category
 
@@ -63,7 +65,7 @@ struct _Subflow
   guint packet_limit_to_riport;
   gboolean urgent_riport_is_requested;
 //  guint64 path_skew;
-  GstClockTime LSR;
+  guint64 sending_report_ntp_time;
   guint16 HSN;
 
   guint16 last_total_lost_packet_num;
@@ -84,6 +86,8 @@ struct _Subflow
 
 static void refctrler_finalize (GObject * object);
 static void refctrler_run (void *data);
+static GstBuffer * _get_mprtcp_xr_skew_block (RcvEventBasedController * this, Subflow * subflow,
+    guint16 * buf_length);
 static GstBuffer *_get_mprtcp_xr_7243_block (RcvEventBasedController * this,
     Subflow * subflow, guint16 * block_length);
 static GstBuffer *_get_mprtcp_rr_block (RcvEventBasedController * this,
@@ -208,10 +212,12 @@ refctrler_run (void *data)
         block = gst_buffer_append (block, xr);
         report_length += block_length;
       }
+
       {
         GstBuffer *xr;
-        xr = _get_mprtcp_xr_7243_block (this, subflow, &block_length);
+        xr = _get_mprtcp_xr_skew_block (this, subflow, &block_length);
         block = gst_buffer_append (block, xr);
+        report_length += block_length;
       }
       report_length += 12 /*MPRTCP REPOR HEADER */  +
           (28 << 3) /*UDP Header overhead */ ;
@@ -433,7 +439,7 @@ reset_subflow (Subflow * this)
   this->faster_reporting_started_time = 0;
   this->packet_limit_to_riport = 10;
   this->urgent_riport_is_requested = FALSE;
-  this->LSR = 0;
+  this->sending_report_ntp_time = 0;
   this->HSN = 0;
 }
 
@@ -524,7 +530,7 @@ _get_mprtcp_xr_skew_block (RcvEventBasedController * this, Subflow * subflow,
     guint16 * buf_length)
 {
   GstMPRTCPSubflowBlock block;
-  GstRTCPXR_RFC7243 *xr;
+  GstRTCPXR_Skew *xr;
   gpointer dataptr;
   guint16 length;
   guint8 block_length;
@@ -552,42 +558,24 @@ _setup_xr_skew_report (Subflow * this,
     GstRTCPXR_Skew * xr, guint32 ssrc)
 {
   guint64 skew_median;
-  guint64 last_skew;
-  guint16 last_skew_xr_ms;
-  guint16 last_skew_xr;
-  guint16 skew_median_xr_ms;
-  guint16 skew_median_xr;
-  guint32 packets_num;
-  guint32 packet_bytes;
+  guint32 skew_median_xr;
+  guint16 packets_num;
+  guint16 packet_bytes;
 
   skew_median = mprtpr_path_get_skew(this->path);
-  last_skew = mprtpr_path_get_last_skew(this->path);
   packets_num = mprtpr_path_get_skew_packet_num(this->path);
   packet_bytes = mprtpr_path_get_skew_byte_num(this->path);
+//  g_print("SKEW MEDIAN: %lu\n", skew_median);
   if(skew_median == 0){
       skew_median_xr = 0xFF; //unavailable
   }else{
-      skew_median_xr_ms = GST_TIME_AS_MSECONDS(skew_median);
-      if(skew_median_xr_ms >= 62)
-        skew_median_xr = 0xFE; //overrun
-      else{
-        skew_median_xr = skew_median_xr_ms<<10;
-        skew_median_xr |= GST_TIME_AS_USECONDS(skew_median) / 1024;
-      }
+      if(skew_median > GST_SECOND)
+        skew_median_xr = 0xFE;
+      else
+        skew_median_xr = skew_median;
   }
-  if(last_skew == 0){
-      last_skew_xr = 0xFF; //unavailable
-  }else{
-      last_skew_xr_ms = GST_TIME_AS_MSECONDS(last_skew);
-      if(last_skew_xr_ms >= 62)
-        last_skew_xr = 0xFE; //overrun
-      else{
-        last_skew_xr = last_skew_xr_ms<<10;
-        last_skew_xr |= GST_TIME_AS_USECONDS(last_skew) / 1024;
-      }
-  }
-  gst_rtcp_header_change (&xr->header, NULL, NULL, NULL, NULL, NULL, &ssrc);
-  gst_rtcp_xr_skew_change(xr, &ssrc, &last_skew_xr, &skew_median_xr, &packets_num, &packet_bytes);
+  gst_rtcp_header_change (&xr->header, NULL,NULL, NULL, NULL, NULL, &ssrc);
+  gst_rtcp_xr_skew_change(xr, &ssrc, &skew_median_xr, &packets_num, &packet_bytes);
 //  g_print("DISCARDED REPORT SETTED UP\n");
 }
 
@@ -612,6 +600,7 @@ void
 _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
 {
   GstClockTime now;
+//  guint64 ntp;
   guint8 fraction_lost;
   guint32 ext_hsn, LSR, DLSR;
   guint16 expected;
@@ -623,13 +612,14 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
   gdouble received_bytes, interval;
 
   gst_rtcp_header_change (&rr->header, NULL, NULL, NULL, NULL, NULL, &ssrc);
-
-  now = gst_clock_get_time (this->sysclock);
+  now = gst_clock_get_time(this->sysclock);
   path = this->path;
-
   cycle_num = mprtpr_path_get_cycle_num (path);
   jitter = mprtpr_path_get_jitter (path);
-
+//  g_print("%lu->%lu->%llu\n",
+//      epoch_now_in_ns - 2208988800000000000UL,
+//      NTP_NOW,
+//      gst_util_uint64_scale (NTP_NOW, GST_SECOND, (G_GINT64_CONSTANT (1) << 32)) - 2208988800000000000LL);
   HSN = mprtpr_path_get_highest_sequence_number (path);
   expected = _uint16_diff (this->HSN, HSN);
   this->HSN = HSN;
@@ -641,13 +631,18 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
 //  if(diff_lost_packet_num) g_print("LOST REPORT ASSEMBLED\n");
   ext_hsn = (((guint32) cycle_num) << 16) | ((guint32) HSN);
 
-  LSR = (guint32) (this->LSR >> 16);
+  LSR = (guint32) (this->sending_report_ntp_time >> 16);
 
-  if (this->LSR == 0 || now < this->LSR) {
+  if (this->sending_report_ntp_time == 0) {
     DLSR = 0;
   } else {
-    DLSR = (guint32) GST_TIME_AS_MSECONDS ((GstClockTime)
-        GST_CLOCK_DIFF (this->LSR, now));
+    DLSR = (guint32)
+           ((epoch_now_in_ns -
+             gst_util_uint64_scale(this->sending_report_ntp_time,
+                                       GST_SECOND,
+                                       (G_GINT64_CONSTANT (1) << 32))
+            )>>16);
+    //DLSR = ((guint32)(NTP_NOW>>16)) - LSR;
   }
   gst_rtcp_rr_add_rrb (rr, 0,
       fraction_lost, this->actual_total_lost_packet_num, ext_hsn, jitter, LSR,
@@ -783,8 +778,10 @@ void
 _report_processing_srblock_processor (Subflow * this, GstRTCPSRBlock * srb)
 {
   GST_DEBUG ("RTCP SR riport arrived for subflow %p->%p", this, srb);
-  this->LSR = gst_clock_get_time (this->sysclock);
+//  this->LSR = gst_clock_get_time (this->sysclock);
+  gst_rtcp_srb_getdown(srb, &this->sending_report_ntp_time, NULL, NULL, NULL);
 }
+
 
 #undef MAX_RIPORT_INTERVAL
 #undef THIS_READLOCK

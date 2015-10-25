@@ -229,7 +229,7 @@ mprtps_path_set_max_bytes_per_ms (MPRTPSPath * this, guint32 bytes_per_ms)
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
   this->max_bytes_per_ms = bytes_per_ms;
-  g_print ("T%d it changed\n", this->id);
+//  g_print ("T%d it changed\n", this->id);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -414,6 +414,22 @@ mprtps_path_get_sent_octet_sum_for (MPRTPSPath * this, guint32 amount)
   }
 done:
   THIS_WRITEUNLOCK (this);
+  return result;
+}
+
+void mprtps_path_set_marker(MPRTPSPath * this, MPRTPPathMarker marker)
+{
+  THIS_WRITELOCK (this);
+  this->marker = marker;
+  THIS_WRITEUNLOCK (this);
+}
+
+MPRTPPathMarker mprtps_path_get_marker(MPRTPSPath * this)
+{
+  MPRTPPathMarker result;
+  THIS_READLOCK (this);
+  result = this->marker;
+  THIS_READUNLOCK (this);
   return result;
 }
 

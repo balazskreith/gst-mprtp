@@ -87,7 +87,7 @@ static GstFlowReturn gst_mprtpscheduler_mprtcp_rr_sink_chain (GstPad * pad,
 
 static gboolean gst_mprtpscheduler_sink_query (GstPad * pad, GstObject * parent,
     GstQuery * query);
-static gboolean gst_mprtpscheduler_src_query (GstPad * sinkpad, GstObject * parent,
+static gboolean gst_mprtpscheduler_src_query (GstPad * srckpad, GstObject * parent,
     GstQuery * query);
 
 static void gst_mprtpscheduler_mprtcp_sender (gpointer ptr, GstBuffer * buf);
@@ -927,7 +927,6 @@ _send_rtp_buffer (GstMprtpscheduler * this,
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   GstBuffer *outbuf;
   RTPAbsTimeExtension data;
-  GstClockTime now;
   guint32 time;
 
   outbuf = gst_buffer_make_writable (buffer);
@@ -938,9 +937,8 @@ _send_rtp_buffer (GstMprtpscheduler * this,
   mprtps_path_process_rtp_packet (path, this->mprtp_ext_header_id, &rtp);
 
   //Absolute sending time
-  now = gst_clock_get_time (this->sysclock);
   //https://tools.ietf.org/html/draft-alvestrand-rmcat-remb-03
-  time = (guint32) (now >> 14) & 0x00ffffff;
+  time = (guint32) ((NTP_NOW >> 14) & 0x00ffffff);
   memcpy (&data, &time, 3);
   gst_rtp_buffer_add_extension_onebyte_header (&rtp,
       this->abs_time_ext_header_id, (gpointer) & data, sizeof (data));
@@ -951,6 +949,7 @@ _send_rtp_buffer (GstMprtpscheduler * this,
     this->riport_flow_signal_sent = TRUE;
     this->riport_can_flow (this->controller);
   }
+
 done:
   return result;
 }
@@ -1037,12 +1036,11 @@ gst_mprtpscheduler_sink_query (GstPad * sinkpad, GstObject * parent,
 
 
 static gboolean
-gst_mprtpscheduler_src_query (GstPad * sinkpad, GstObject * parent,
+gst_mprtpscheduler_src_query (GstPad * srckpad, GstObject * parent,
     GstQuery * query)
 {
   GstMprtpscheduler *this = GST_MPRTPSCHEDULER (parent);
   gboolean result;
-  GstPad *peer;
 
   GST_DEBUG_OBJECT (this, "query");
   switch (GST_QUERY_TYPE (query)) {
@@ -1062,9 +1060,7 @@ gst_mprtpscheduler_src_query (GstPad * sinkpad, GstObject * parent,
     }
     break;
     default:
-      peer = gst_pad_get_peer (this->mprtp_srcpad);
-      result = gst_pad_peer_query (peer, query);
-      gst_object_unref (peer);
+      result = gst_pad_query_default(srckpad, parent, query);
       break;
   }
 

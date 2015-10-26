@@ -116,24 +116,6 @@ static gboolean _try_fill_a_gap (MpRTPRPath * this, Packet * packet);
 static gint _cmp_seq (guint16 x, guint16 y);
 static gint _cmp_for_max (guint64 x, guint64 y);
 static gint _cmp_for_min (guint64 x, guint64 y);
-#define _print_tree(tree, node, level)
-//
-//void static
-//_print_tree (SkewTree * tree, Skew* node, gint level)
-//{
-//  gint i;
-//  if (node == NULL) {
-//    return;
-//  }
-//  if (!level)
-//    g_print ("Tree %p TOP is: %lu \n", tree, tree->top);
-//  for (i = 0; i < level && i < 10; ++i)
-//    g_print ("--");
-//  g_print ("%d->%p->value:%lu ->ref: %u ->left:%p ->right:%p\n",
-//      level, node, node->value, node->ref, node->left, node->right);
-//  _print_tree (tree, node->left, level + 1);
-//  _print_tree (tree, node->right, level + 1);
-//}
 
 
 void
@@ -979,7 +961,7 @@ remove:
 replace:
   GST_DEBUG_OBJECT (this, "ELEMENT FOUND TO REPLACE: %lu->%lu\n", value,
       candidate->value);
-  _print_tree (tree, tree->root, 0);
+//  _print_tree (tree, tree->root, 0);
   replace_value = candidate->value;
   _remove_skew_value_from_tree (this, tree, candidate->value, &replace_ref);
   node->value = replace_value;

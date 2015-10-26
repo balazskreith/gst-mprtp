@@ -60,8 +60,9 @@ static guint64 _get_skew(PacketsQueue *this, PacketsQueueNode* act, PacketsQueue
 static void _make_gap(PacketsQueue *this, PacketsQueueNode* at, guint16 start, guint16 end);
 static guint64 _packetsqueue_add(PacketsQueue *this, guint64 snd_time, guint16 seq_num);
 static gboolean _try_fill_a_gap (PacketsQueue * this, PacketsQueueNode *node);
-static Gap* _try_found_a_gap(PacketsQueue *this, guint16 seq_num);
+static Gap* _try_found_a_gap(PacketsQueue *this, guint16 seq_num, gboolean *duplicated, PacketsQueueNode **insert_after);
 static gint _cmp_seq (guint16 x, guint16 y);
+static void _remove_head(PacketsQueue *this, guint64 *skew);
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -108,35 +109,115 @@ packetsqueue_init (PacketsQueue * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->node_pool = g_queue_new();
+  this->gaps_pool = g_queue_new();
   this->sysclock = gst_system_clock_obtain();
 }
 
 void packetsqueue_test(void)
 {
   PacketsQueue *packets;
-  guint64 skew;
-  g_print("ADD PACKETS");
+  gboolean duplicated;
+  g_print("ADD PACKETS 1,2,3,\n");
   packets = make_packetsqueue();
-  packetsqueue_add(packets, epoch_now_in_ns-100, 1);
-  skew = packetsqueue_add(packets, epoch_now_in_ns-90, 2);
-  g_print("SKEW: %lu\n", skew);
-  packetsqueue_prepare_gap(packets);
-  skew = packetsqueue_add(packets, epoch_now_in_ns-70, 4);
-  g_print("SKEW: %lu\n", skew);
-  g_print("FOUND IN GAP: %d\n", packetsqueue_try_found_a_gap(packets, 3));
-  packetsqueue_prepare_discarded(packets);
-  packetsqueue_add(packets, epoch_now_in_ns - 40, 3);
+  packetsqueue_add(packets, epoch_now_in_ns-300000, 1);
+  packetsqueue_add(packets, epoch_now_in_ns-200000, 2);
+  packetsqueue_add(packets, epoch_now_in_ns-100000, 3);
   {
-    PacketsQueueNode* node;
-    for(node = packets->head; node; node = node->next)
-          g_print("%d->", node->seq_num);
-    g_print("\n");
-    for(node = packets->head; node; node = node->succ)
-          g_print("%d->", node->seq_num);
+      PacketsQueueNode* node;
+      for(node = packets->head; node; node = node->next)
+            g_print("%d->", node->seq_num);
+      g_print("\n");
+      for(node = packets->head; node; node = node->succ)
+            g_print("%d->", node->seq_num);
+  }
+  g_print("COUNTER: %d\n", packets->counter);
+
+  packetsqueue_reset(packets);
+  g_print("AFTER RESET->COUNTER: %d\n", packets->counter);
+  {
+      PacketsQueueNode* node;
+      for(node = packets->head; node; node = node->next)
+            g_print("%d->", node->seq_num);
+      g_print("\n");
+      for(node = packets->head; node; node = node->succ)
+            g_print("%d->", node->seq_num);
+  }
+
+  g_print("ADD PACKETS 1,5,3,2,4\n");
+  packetsqueue_add(packets, epoch_now_in_ns-500000, 1);
+  packetsqueue_prepare_gap(packets);
+  packetsqueue_add(packets, epoch_now_in_ns-400000, 5);
+  packetsqueue_prepare_discarded(packets);
+  packetsqueue_add(packets, epoch_now_in_ns-300000, 3);
+  packetsqueue_prepare_discarded(packets);
+  packetsqueue_add(packets, epoch_now_in_ns-200000, 2);
+  packetsqueue_prepare_discarded(packets);
+  packetsqueue_add(packets, epoch_now_in_ns-100000, 4);
+  {
+      PacketsQueueNode* node;
+      for(node = packets->head; node; node = node->next)
+            g_print("%d->", node->seq_num);
+      g_print("\n");
+      for(node = packets->head; node; node = node->succ)
+            g_print("%d->", node->seq_num);
+  }
+  g_print("COUNTER: %d\n", packets->counter);
+  packetsqueue_head_obsolted(packets, gst_clock_get_time(packets->sysclock), NULL);
+  packetsqueue_head_obsolted(packets, gst_clock_get_time(packets->sysclock), NULL);
+  g_print("AFTER DELETE, COUNTER: %d\n", packets->counter);
+  {
+      PacketsQueueNode* node;
+      for(node = packets->head; node; node = node->next)
+            g_print("%d->", node->seq_num);
+      g_print("\n");
+      for(node = packets->head; node; node = node->succ)
+            g_print("%d->", node->seq_num);
+  }
+  packetsqueue_reset(packets);
+  g_print("AFTER RESET->COUNTER: %d\n", packets->counter);
+  g_print("ADD PACKETS 1,5,3,5,2,2,1,4,3\n");
+  packetsqueue_add(packets, epoch_now_in_ns-500000, 1);
+  packetsqueue_prepare_gap(packets);
+  packetsqueue_add(packets, epoch_now_in_ns-400000, 5);
+  packetsqueue_prepare_discarded(packets);
+  packetsqueue_add(packets, epoch_now_in_ns-300000, 3);
+  packetsqueue_try_found_a_gap(packets, 5, &duplicated);
+  g_print("IF 5 is duplicated? %d\n",duplicated);
+  packetsqueue_prepare_discarded(packets);
+  packetsqueue_add(packets, epoch_now_in_ns-200000, 5);
+  packetsqueue_try_found_a_gap(packets, 2, &duplicated);
+  g_print("IF 2 is duplicated? %d\n",duplicated);
+  packetsqueue_prepare_discarded(packets);
+  packetsqueue_add(packets, epoch_now_in_ns-100000, 2);
+  packetsqueue_try_found_a_gap(packets, 2, &duplicated);
+  g_print("IF 2 is duplicated? %d\n",duplicated);
+  packetsqueue_prepare_discarded(packets);
+  packetsqueue_add(packets, epoch_now_in_ns-100000, 2);
+  packetsqueue_prepare_discarded(packets);
+  packetsqueue_add(packets, epoch_now_in_ns-100000, 1);
+  packetsqueue_prepare_discarded(packets);
+  packetsqueue_add(packets, epoch_now_in_ns-100000, 4);
+  packetsqueue_prepare_discarded(packets);
+  packetsqueue_add(packets, epoch_now_in_ns-100000, 3);
+  {
+      PacketsQueueNode* node;
+      for(node = packets->head; node; node = node->next)
+            g_print("%d->", node->seq_num);
+      g_print("\n");
+      for(node = packets->head; node; node = node->succ)
+            g_print("%d->", node->seq_num);
   }
   packets = NULL;
   packets->counter = 0;
 
+}
+
+void packetsqueue_reset(PacketsQueue *this)
+{
+  THIS_WRITELOCK(this);
+  while(this->head) _remove_head(this, NULL);
+  while(this->gaps) this->gaps = g_list_remove(this->gaps, this->gaps->data);
+  THIS_WRITEUNLOCK(this);
 }
 
 PacketsQueue *make_packetsqueue(void)
@@ -169,59 +250,64 @@ void packetsqueue_prepare_discarded(PacketsQueue *this)
   THIS_WRITEUNLOCK(this);
 }
 
-gboolean packetsqueue_try_found_a_gap(PacketsQueue *this, guint16 seq_num)
+gboolean packetsqueue_try_found_a_gap(PacketsQueue *this, guint16 seq_num, gboolean *duplicated)
 {
   gboolean result;
   THIS_READLOCK(this);
-  result = _try_found_a_gap(this, seq_num) != NULL;
+  result = _try_found_a_gap(this, seq_num, duplicated, NULL) != NULL;
   THIS_READUNLOCK(this);
   return result;
 }
 
 guint64 _packetsqueue_add(PacketsQueue *this, guint64 snd_time, guint16 seq_num)
 {
-  guint64 skew = 0;
+//  guint64 skew = 0;
   PacketsQueueNode* node;
   node = _make_node(this, snd_time, seq_num);
   if(!this->head) {
       this->head = this->tail = node;
-      skew = 0;
+      node->skew  = 0;
       this->counter = 1;
       goto done;
   }
   node->skew = _get_skew(this, this->tail, node);
   node->added = gst_clock_get_time(this->sysclock);
+  this->tail->next = node;
   if(this->gap_arrive){
     _make_gap(this, this->tail, this->tail->seq_num, seq_num);
     this->gap_arrive = FALSE;
-  }
-  this->tail->next = node;
-  if(this->discarded_arrive){
+  }else if(this->discarded_arrive){
     _try_fill_a_gap(this, node);
+    this->discarded_arrive = FALSE;
   }
-  else this->tail->succ = node;
   this->tail = node;
   ++this->counter;
 done:
-  return skew;
+  return node->skew;
 }
 
-gboolean packetsqueue_head_obsolted(PacketsQueue *this, GstClockTime treshold, guint *skew)
+gboolean packetsqueue_head_obsolted(PacketsQueue *this, GstClockTime treshold, guint64 *skew)
 {
   gboolean result = FALSE;
-  PacketsQueueNode* node;
   THIS_WRITELOCK(this);
   if(!this->head) goto done;
-  node = this->head;
-  if(treshold < node->added) goto done;
+  if(treshold < this->head->added) goto done;
   result = TRUE;
-  this->head = node->next;
-  if(skew) *skew = node->skew;
-  _trash_node(this, node);
-  --this->counter;
+  _remove_head(this, skew);
 done:
   THIS_WRITEUNLOCK(this);
   return result;
+}
+
+void _remove_head(PacketsQueue *this, guint64 *skew)
+{
+  PacketsQueueNode *node;
+  node = this->head;
+  this->head = node->next;
+
+  if(skew) *skew = node->skew;
+  _trash_node(this, node);
+  --this->counter;
 }
 
 void _make_gap(PacketsQueue *this, PacketsQueueNode* at, guint16 start, guint16 end)
@@ -242,6 +328,9 @@ void _make_gap(PacketsQueue *this, PacketsQueueNode* at, guint16 start, guint16 
      counter != (guint16) (gap->end - 1); ++counter, ++gap->total);
   this->gaps = g_list_prepend (this->gaps, gap);
   at->gap = gap;
+
+  at->succ = at->next;
+  at->next->pred = at;
 }
 
 
@@ -250,26 +339,16 @@ gboolean _try_fill_a_gap (PacketsQueue * this, PacketsQueueNode *node)
 {
   gboolean result;
   Gap *gap;
-  gint cmp;
-  PacketsQueueNode *pred;
-  PacketsQueueNode *succ;
+  PacketsQueueNode *pred = NULL;
+  PacketsQueueNode *succ = NULL;
 
   result = FALSE;
-  gap = _try_found_a_gap(this, node->seq_num);
+  gap = _try_found_a_gap(this, node->seq_num, NULL, &pred);
 
-  if (!gap)
-    goto done;
+  if (!gap) goto done;
+  g_print("ITT:GAP:%p::node|%p:%d| pred|%p:%d|->succ|%p:%d|\n", gap, node, node->seq_num, pred, pred?pred->seq_num:0, succ, succ?succ->seq_num:0);
+  succ = pred->succ;
 
-  for (pred = gap->at; pred->seq_num != gap->end; pred = pred->succ) {
-    succ = pred->next;
-    cmp = _cmp_seq (node->seq_num, succ->seq_num);
-    if (cmp > 0)
-      break;
-    succ = NULL;
-  }
-g_print("ITT: %p:%d->%p:%d\n", pred, pred?pred->seq_num:0, succ, succ?succ->seq_num:0);
-  if (!succ)
-    goto done;
   pred->succ = node;
   node->succ = succ;
   result = TRUE;
@@ -277,29 +356,52 @@ done:
   return result;
 }
 
-Gap* _try_found_a_gap(PacketsQueue *this, guint16 seq_num)
+Gap* _try_found_a_gap(PacketsQueue *this, guint16 seq_num, gboolean *duplicated, PacketsQueueNode **insert_after)
 {
   GList *it;
-  Gap *gap;
+  Gap *gap = NULL;
   gint cmp;
+  PacketsQueueNode *pred = NULL;
+  PacketsQueueNode *succ;
 
+  if(duplicated) *duplicated = FALSE;
+  if(insert_after) *insert_after = NULL;
   for (it = this->gaps; it; it = it->next, gap = NULL) {
     gap = it->data;
     cmp = _cmp_seq (gap->start, seq_num);
     if (cmp > 0)
       continue;
     if (cmp == 0)
-      goto done;
+      break;
 
     cmp = _cmp_seq (seq_num, gap->end);
     if (cmp > 0)
       continue;
-    if (cmp == 0)
-      goto done;
     break;
   }
 
+  //g_print("MILYEN GAP EZ? %p: KERESETT: %hu at:%p, start:%hu end:%hu\n", gap, seq_num, gap->at, gap->start, gap->end);
+  if(!gap) goto done;
+
+  for (pred = gap->at; pred->seq_num != gap->end; pred = pred->succ) {
+      cmp = _cmp_seq (seq_num, pred->seq_num);
+//      g_print("|pred:%p:%d->%d|", pred, pred->seq_num, cmp);
+      if(cmp == 0){ goto duplicated;}
+      succ = pred->succ;
+      cmp = _cmp_seq (seq_num, succ->seq_num);
+//      g_print("|succ:%p:%d->%d|", succ, succ->seq_num, cmp);
+      if(cmp == 0){ goto duplicated;}
+      if (cmp < 0)
+        break;
+      succ = NULL;
+    }
+  if(!succ) gap = NULL;
+  if(gap && insert_after) *insert_after = pred;
 done:
+  return gap;
+duplicated:
+  if(insert_after) *insert_after = pred;
+  if(duplicated) *duplicated = TRUE;
   return gap;
 }
 
@@ -325,6 +427,12 @@ guint64 _get_skew(PacketsQueue *this, PacketsQueueNode* act, PacketsQueueNode* n
     skew = snd_diff - rcv_diff;
   else
     skew = rcv_diff - snd_diff;
+//  g_print("act->snd_time: %lu nxt->snd_time: %lu;\n"
+//          "act->rcv_time: %lu nxt->rcv_time: %lu;\n"
+//          "skew: %lu\n"
+//          ,act->snd_time, nxt->snd_time,
+//          act->rcv_time, nxt->rcv_time,
+//          skew);
   //nxt->skew = g_random_int_range(25000, 50000);
 done:
   return skew;
@@ -341,6 +449,7 @@ PacketsQueueNode* _make_node(PacketsQueue *this, guint64 snd_time, guint16 seq_n
   result->rcv_time = epoch_now_in_ns;
   result->seq_num = seq_num;
   result->snd_time = snd_time;
+  result->next = result->succ = result->pred = NULL;
   return result;
 }
 

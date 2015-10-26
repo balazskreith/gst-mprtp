@@ -66,6 +66,7 @@ struct _Subflow
   gboolean urgent_riport_is_requested;
 //  guint64 path_skew;
   guint64 sending_report_ntp_time;
+  guint64 sending_report_received_ntp_time;
   guint16 HSN;
 
   guint16 last_total_lost_packet_num;
@@ -175,7 +176,6 @@ refctrler_run (void *data)
   GstClockID clock_id;
   MpRTPRPath *path;
 //  guint64 max_path_skew = 0;
-
   this = REFCTRLER (data);
   THIS_WRITELOCK (this);
   now = gst_clock_get_time (this->sysclock);
@@ -562,7 +562,7 @@ _setup_xr_skew_report (Subflow * this,
   guint16 packets_num;
   guint16 packet_bytes;
 
-  skew_median = mprtpr_path_get_skew(this->path);
+  skew_median = mprtpr_path_get_skew_median(this->path);
   packets_num = mprtpr_path_get_skew_packet_num(this->path);
   packet_bytes = mprtpr_path_get_skew_byte_num(this->path);
 //  g_print("SKEW MEDIAN: %lu\n", skew_median);
@@ -636,20 +636,16 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
   if (this->sending_report_ntp_time == 0) {
     DLSR = 0;
   } else {
-    DLSR = (guint32)
-           ((epoch_now_in_ns -
-             gst_util_uint64_scale(this->sending_report_ntp_time,
-                                       GST_SECOND,
-                                       (G_GINT64_CONSTANT (1) << 32))
-            )>>16);
-    //DLSR = ((guint32)(NTP_NOW>>16)) - LSR;
+    guint64 temp;
+    temp = NTP_NOW - this->sending_report_received_ntp_time;
+    DLSR = (guint32)(temp>>16);
   }
   gst_rtcp_rr_add_rrb (rr, 0,
       fraction_lost, this->actual_total_lost_packet_num, ext_hsn, jitter, LSR,
       DLSR);
 
-  received_bytes = (gdouble) (this->actual_total_payload_bytes
-      - this->last_total_payload_bytes);
+  received_bytes = (gdouble) (this->actual_total_payload_bytes -
+                              this->last_total_payload_bytes);
   interval =
       (gdouble) GST_TIME_AS_SECONDS (now - this->last_rr_report_sent_time);
   if (interval < 1.) {
@@ -780,6 +776,12 @@ _report_processing_srblock_processor (Subflow * this, GstRTCPSRBlock * srb)
   GST_DEBUG ("RTCP SR riport arrived for subflow %p->%p", this, srb);
 //  this->LSR = gst_clock_get_time (this->sysclock);
   gst_rtcp_srb_getdown(srb, &this->sending_report_ntp_time, NULL, NULL, NULL);
+  this->sending_report_received_ntp_time = NTP_NOW;
+//  {
+//    guint64 temp;
+//    temp = NTP_NOW - this->sending_report_ntp_time;
+////    g_print("S Delay: %lu -> %lu\n", temp, get_epoch_time_from_ntp_in_ns(temp));
+//  }
 }
 
 

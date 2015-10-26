@@ -22,6 +22,7 @@ typedef struct _PacketsQueueClass PacketsQueueClass;
 
 typedef struct _PacketsQueueNode PacketsQueueNode;
 typedef struct _Gap Gap;
+typedef struct _GapNode GapNode;
 
 struct _PacketsQueue
 {
@@ -33,6 +34,7 @@ struct _PacketsQueue
   guint32                  counter;
   GRWLock                  rwmutex;
   GQueue*                  node_pool;
+  GQueue*                  gapnodes_pool;
   GQueue*                  gaps_pool;
   GstClock*                sysclock;
   GList*                   gaps;
@@ -41,14 +43,12 @@ struct _PacketsQueue
 struct _PacketsQueueNode
 {
   PacketsQueueNode *next;
-  PacketsQueueNode *succ;
-  PacketsQueueNode *pred;
   guint64 skew;
   guint64 rcv_time;
   guint64 snd_time;
   guint16 seq_num;
   GstClockTime added;
-  Gap *gap;
+  GapNode *gapnode;
 };
 
 struct _PacketsQueueClass{
@@ -64,5 +64,6 @@ void packetsqueue_prepare_gap(PacketsQueue *this);
 void packetsqueue_prepare_discarded(PacketsQueue *this);
 gboolean packetsqueue_try_found_a_gap(PacketsQueue *this, guint16 seq_num, gboolean *duplicated);
 gboolean packetsqueue_try_fill_gap(PacketsQueue *this, guint16 seq_num);
-gboolean packetsqueue_head_obsolted(PacketsQueue *this, GstClockTime treshold, guint64 *skew);
+gboolean packetsqueue_head_obsolted(PacketsQueue *this, GstClockTime treshold);
+void packetsqueue_remove_head(PacketsQueue *this, guint64 *skew);
 #endif /* PACKETSQUEUE_H_ */

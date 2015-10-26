@@ -197,8 +197,9 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  gstmprtcpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h streamjoiner.h \
- mprtprpath.h /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtprpath.h \
+ /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h bintree.h \
+ packetsqueue.h streamjoiner.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h \
  /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
@@ -369,7 +370,7 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  /usr/include/arpa/nameser_compat.h \
  /usr/include/x86_64-linux-gnu/sys/un.h /usr/include/net/if.h \
  /usr/include/arpa/inet.h mprtpspath.h rmanctrler.h smanctrler.h \
- bintree.h refctrler.h streamsplitter.h packetsqueue.h
+ refctrler.h streamsplitter.h
 
 /usr/include/stdc-predef.h:
 
@@ -825,11 +826,15 @@ gstmprtcpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
 
-streamjoiner.h:
-
 mprtprpath.h:
 
 /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h:
+
+bintree.h:
+
+packetsqueue.h:
+
+streamjoiner.h:
 
 /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h:
 
@@ -1217,10 +1222,6 @@ rmanctrler.h:
 
 smanctrler.h:
 
-bintree.h:
-
 refctrler.h:
 
 streamsplitter.h:
-
-packetsqueue.h:

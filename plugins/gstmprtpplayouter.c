@@ -46,7 +46,6 @@
 #include "streamjoiner.h"
 #include "rmanctrler.h"
 #include "smanctrler.h"
-#include "bintree.h"
 
 
 #include "refctrler.h"
@@ -625,13 +624,10 @@ gst_mprtpplayouter_dispose (GObject * object)
   G_OBJECT_CLASS (gst_mprtpplayouter_parent_class)->dispose (object);
 }
 
-#include "packetsqueue.h"
-
 void
 _join_path (GstMprtpplayouter * this, guint8 subflow_id)
 {
   MpRTPRPath *path;
-  packetsqueue_test();
   path =
       (MpRTPRPath *) g_hash_table_lookup (this->paths,
       GINT_TO_POINTER (subflow_id));
@@ -761,6 +757,7 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 
   this = GST_MPRTPPLAYOUTER (parent);
   GST_DEBUG_OBJECT (this, "RTP/RTCP/MPRTP/MPRTCP sink");
+//  g_print("START PROCESSING RTP\n");
   THIS_READLOCK (this);
 
 
@@ -790,6 +787,7 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   }
 done:
   THIS_READUNLOCK (this);
+//  g_print("END PROCESSING RTP\n");
   return result;
 
 }
@@ -856,7 +854,6 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
   GstNetAddressMeta *meta;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   guint64 snd_time = 0;
-
   if (G_UNLIKELY (!gst_rtp_buffer_map (buf, GST_MAP_READ, &rtp))) {
     GST_WARNING_OBJECT (this, "The received Buffer is not readable");
     return;
@@ -922,8 +919,9 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
       gst_buffer_add_net_address_meta (buf, this->pivot_address);
     }
   }
-
+  snd_time = gst_util_uint64_scale (snd_time, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
   mprtpr_path_process_rtp_packet (path, &rtp, subflow_infos->seq, snd_time);
+  stream_joiner_receive_rtp(this->joiner, &rtp);
   gst_rtp_buffer_unmap (&rtp);
 
 }

@@ -302,7 +302,7 @@ sefctrler_run (void *data)
        _ct0(this)->subflows.num == _ct0(this)->report_num_arrived))
  {
     _cstep (this);
-    _ct0(this)->RTT_max = 2 *GST_SECOND;
+    _ct0(this)->RTT_max = 200 * GST_MSECOND;
     new_ct_record = TRUE;
   }
   _ct0(this)->subflows.c =
@@ -571,19 +571,22 @@ sefctrler_receive_mprtcp (gpointer ptr, GstBuffer * buf)
 
   _report_processing_selector (subflow, block, &report_type);
 //  this->new_report_arrived = TRUE;
-  _st0(subflow)->event = event = _check_state (subflow);
   if(report_type == GST_RTCP_TYPE_RR){
     if(!subflow->report_counted){
       ++_ct0(this)->report_num_arrived;
       subflow->report_counted = TRUE;
     }
+    _st0(subflow)->event = event = _check_state (subflow);
+    if (event != EVENT_FI) {
+      _fire (this, subflow, event);
+    }
     _refresh_system_state(this, subflow);
+    _sstep (subflow);
   }
+
 //  g_print ("Subflow: %d Actual state: %d event: %d\n",
 //      subflow->id, mprtps_path_get_state (subflow->path), event);
-  if (event != EVENT_FI) {
-    _fire (this, subflow, event);
-  }
+
 
 done:
   gst_buffer_unmap (buf, &map);
@@ -748,7 +751,6 @@ _report_processing_selector (Subflow * this, GstMPRTCPSubflowBlock * block, guin
       NULL);
 
   if (pt == (guint8) GST_RTCP_TYPE_RR) {
-    _sstep (this);
     _riport_processing_rrblock_processor (this, &block->receiver_riport.blocks);
     this->last_receiver_riport_time = gst_clock_get_time (this->sysclock);
   } else if (pt == (guint8) GST_RTCP_TYPE_XR) {
@@ -768,7 +770,7 @@ _report_processing_selector (Subflow * this, GstMPRTCPSubflowBlock * block, guin
 void
 _riport_processing_rrblock_processor (Subflow * this, GstRTCPRRBlock * rrb)
 {
-  GstClockTime LSR, DLSR;
+  guint64 LSR, DLSR;
 //  GstClockTime now;
   guint32 LSR_read, DLSR_read, HSSN_read;
   guint16 HSSN;
@@ -786,10 +788,18 @@ _riport_processing_rrblock_processor (Subflow * this, GstRTCPRRBlock * rrb)
   _st0 (this)->HSSN = _uint16_diff (this->HSSN, HSSN);
   this->HSSN = HSSN;
   this->cycle_num = (guint16) ((HSSN_read & 0x0000FFFF) >> 16);
-  LSR = (NTP_NOW & 0xFFFF000000000000ULL) | (((guint64) LSR_read) << 16);
-  LSR = gst_util_uint64_scale (LSR, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
-  DLSR = (guint64) (DLSR_read<<16);
-  DLSR = gst_util_uint64_scale (DLSR, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
+  //LSR = (NTP_NOW & 0xFFFF000000000000ULL) | (((guint64) LSR_read) << 16);
+  LSR = (guint64) LSR_read;
+  DLSR = (guint64) DLSR_read;
+
+
+  //LSR = gst_util_uint64_scale (LSR, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
+
+  //  DLSR = (guint64) DLSR_read <<16;
+
+//    g_print("LSR: %lu:%lX DLSR: %lu:%lX\n", LSR, LSR, DLSR, DLSR);
+//  g_print("DLSR: %u:%X->%lu:%lX\n", DLSR_read, DLSR_read, DLSR, DLSR);
+  //DLSR = gst_util_uint64_scale (DLSR, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
 
   if (_st0 (this)->HSSN > 32767) {
     GST_WARNING_OBJECT (this, "Receiver report validation failed "
@@ -803,12 +813,12 @@ _riport_processing_rrblock_processor (Subflow * this, GstRTCPRRBlock * rrb)
   //--------------------------
   //processing
   //--------------------------
-  if (LSR > 0) {
-    guint64 diff = epoch_now_in_ns - LSR;
-   g_print("Diff: %lu, DLSR: %lu\n", diff, DLSR);
-    if (DLSR < diff) {
-      _st0 (this)->RTT = diff - DLSR;
-    }
+  if (LSR > 0 && DLSR > 0) {
+    guint64 diff;
+    diff = ((guint32)(NTP_NOW>>16)) - LSR - DLSR;
+   _st0 (this)->RTT = get_epoch_time_from_ntp_in_ns(diff<<16);
+//    g_print("----------->RTT: %lu<----------------\n",
+//            GST_TIME_AS_MSECONDS(_st0 (this)->RTT));
   }
   _st0 (this)->fraction_lost = fraction_lost;
 
@@ -817,7 +827,7 @@ _riport_processing_rrblock_processor (Subflow * this, GstRTCPRRBlock * rrb)
 //  if(fraction_lost > 0.) g_print("LOST REPORT ARRIVED\n");
 //  g_print("%d", this->id);
 //  gst_print_rtcp_rrb(rrb);
-  //Debug print
+//  Debug print
 //  g_print ("Receiver riport for subflow %d is processed\n"
 //      "lost_rate: %f; "
 //      "RTT (in ms): %lu\n",
@@ -1362,6 +1372,7 @@ stable:
   if(this->stability_started &&
      this->stability_time < now - 3*_ct0(this)->RTT_max)
   {
+//    g_print("Stable for a while\n");
     goto underused;
   }
   return FALSE;
@@ -1393,19 +1404,22 @@ void _refresh_system_state(SndEventBasedController *this, Subflow *subflow)
   else
     goto stable;
 
-overused: _print_system_state(this);
+overused:
   this->stability_started = FALSE;
   this->cc_state = MPRTP_CC_STATE_OVERUSED;
+//  _print_system_state(this);
   return;
-underused: _print_system_state(this);
+underused:
   this->stability_started = FALSE;
   this->cc_state = MPRTP_CC_STATE_UNDERUSED;
+//  _print_system_state(this);
   return;
-stable: _print_system_state(this);
+stable:
   if(!this->stability_started)
     this->stability_time = now;
   this->stability_started = TRUE;
   this->cc_state = MPRTP_CC_STATE_STABLE;
+  _print_system_state(this);
   return;
 }
 

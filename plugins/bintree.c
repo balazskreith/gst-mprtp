@@ -253,6 +253,16 @@ BinTreeNode *bintree_pop_top_node(BinTree *this)
   return result;
 }
 
+guint64 bintree_get_top_value(BinTree *this)
+{
+  guint64 result;
+  THIS_READLOCK (this);
+  if(!this->top) result = 0;
+  else result = this->top->value;
+  THIS_READUNLOCK (this);
+  return result;
+}
+
 void bintree_insert_node(BinTree* this, BinTreeNode* node)
 {
   THIS_WRITELOCK (this);
@@ -275,6 +285,15 @@ void bintree_delete_value(BinTree* this, guint64 value)
   THIS_WRITELOCK (this);
   _deref_from_tree(this, value);
   THIS_WRITEUNLOCK (this);
+}
+
+guint32 bintree_get_num(BinTree *this)
+{
+  guint32 result;
+  THIS_READLOCK(this);
+  result = this->counter;
+  THIS_READUNLOCK(this);
+  return result;
 }
 
 BinTreeNode* bintree_pop_node(BinTree* this, guint64 value)

@@ -10,11 +10,11 @@
 
 #include <gst/gst.h>
 
-#include "mprtprpath.h"
-
 typedef struct _StreamJoiner StreamJoiner;
 typedef struct _StreamJoinerClass StreamJoinerClass;
 typedef struct _Heap Heap;
+
+#include "mprtprpath.h"
 
 #define STREAM_JOINER_TYPE             (stream_joiner_get_type())
 #define STREAM_JOINER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),STREAM_JOINER_TYPE,StreamJoiner))
@@ -28,11 +28,10 @@ typedef struct _Heap Heap;
 
 struct _StreamJoiner
 {
-  GObject          object;
+  GObject           object;
 
   GstTask*          thread;
   GRecMutex         thread_mutex;
-  GList*            queued;
   GHashTable*       subflows;
   GRWLock           rwmutex;
 
@@ -47,7 +46,6 @@ struct _StreamJoiner
   void            (*send_mprtp_packet_func)(gpointer,GstBuffer*);
   gpointer          send_mprtp_packet_data;
 
-  GstClockTime      last_playout_checked;
   GstClockTime      last_obsolate_checked;
 };
 
@@ -70,6 +68,8 @@ stream_joiner_set_max_path_skew(StreamJoiner *this, GstClockTime delay);
 void
 stream_joiner_path_obsolation(StreamJoiner *this, gboolean obsolate_automatically);
 
+void
+stream_joiner_receive_rtp(StreamJoiner * this, GstRTPBuffer *rtp);
 
 GType
 stream_joiner_get_type (void);

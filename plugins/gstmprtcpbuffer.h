@@ -71,6 +71,7 @@
 #define current_unix_time_in_s  (current_unix_time_in_ms / 1000L)
 #define epoch_now_in_ns ((guint64)((current_unix_time_in_us + 2208988800000000LL) * 1000))
 #define get_ntp_from_epoch_ns(epoch_in_ns) gst_util_uint64_scale (epoch_in_ns, (1LL << 32), GST_SECOND)
+#define get_epoch_time_from_ntp_in_ns(ntp_time) gst_util_uint64_scale (ntp_time, GST_SECOND, (1LL << 32))
 #define NTP_NOW get_ntp_from_epoch_ns(epoch_now_in_ns)
 
 #define MPRTCP_BLOCK_TYPE_RIPORT 0

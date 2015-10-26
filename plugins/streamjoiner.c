@@ -106,7 +106,7 @@ static void _heap_init (struct _Heap *restrict h);
 static void _heap_push (struct _Heap *restrict h, HeapItem * value);
 static void _heap_pop (struct _Heap *restrict h);
 static HeapItem *_make_heap_item (StreamJoiner * this,
-                                  MpRTPRPacket *mprtpr_packet);
+                                  GstRTPBuffer *rtp);
 static void _trash_heap_item (StreamJoiner * this, HeapItem * heap_item);
 static void _popback_framequeue(StreamJoiner *this);
 static void _push_framequeue(StreamJoiner *this, HeapItem *item);
@@ -170,27 +170,16 @@ stream_joiner_run (void *data)
   gpointer key, val;
   Subflow *subflow;
   MpRTPRPath *path;
-  gboolean new_playout_needed = FALSE;
   gboolean obsolate_needed = FALSE;
-  GList *it;
   HeapItem *heap_item;
   GstClockID clock_id;
   guint64 max_path_skew = 0;
-  MpRTPRPacket packet = MPRTPR_PACKET_INIT;
 
   THIS_WRITELOCK (this);
   now = gst_clock_get_time (this->sysclock);
   if (this->subflow_num == 0) {
     next_scheduler_time = now + 100 * GST_MSECOND;
     goto done;
-  }
-  if (this->queued) {
-    for (it = this->queued; it; it = it->next)
-      _heap_push (this->packets_heap, (HeapItem *) it->data);
-  }
-  if(this->last_playout_checked < now - GST_MSECOND){
-    this->last_playout_checked = now;
-    new_playout_needed = TRUE;
   }
   if(this->obsolate_automatically &&
      this->last_obsolate_checked < now - GST_SECOND){
@@ -204,21 +193,16 @@ stream_joiner_run (void *data)
     //subflow_id = *((guint8*) key);
     subflow = (Subflow *) val;
     path = subflow->path;
-    while (mprtpr_path_has_buffer_to_playout (path)) {
-      mprtpr_path_pop_mprtpr_packet_to_playout (path, &packet);
-      if(!packet.buffer) continue;
-      heap_item = _make_heap_item (this, &packet);
-      _heap_push (this->packets_heap, heap_item);
-    }
-    if(new_playout_needed){
-      subflow->playout_skew = mprtpr_path_get_skew(path);
-      if(max_path_skew < subflow->playout_skew)
-        max_path_skew = subflow->playout_skew;
-    }
+    mprtpr_path_playout_tick(path);
+    subflow->playout_skew = mprtpr_path_get_skew_median(path);
+    if(max_path_skew < subflow->playout_skew)
+      max_path_skew = subflow->playout_skew;
     if(obsolate_needed){
       mprtpr_path_removes_obsolate_packets(path, 2 * GST_SECOND);
     }
   }
+
+  //g_print("PLAYOUT: %lu\n", max_path_skew);
   while (this->packets_heap->count) {
     heap_item = heap_front (this->packets_heap);
     _heap_pop (this->packets_heap);
@@ -229,11 +213,15 @@ stream_joiner_run (void *data)
 //    _trash_heap_item (this, heap_item);
   }
   _popback_framequeue(this);
-  if(new_playout_needed){
-    if (!max_path_skew)
-      max_path_skew = this->max_path_skew ? this->max_path_skew : GST_MSECOND;
-    this->max_path_skew = max_path_skew;
+  if (!max_path_skew){
+    GST_WARNING_OBJECT(this, "max path skew is 0");
+    max_path_skew = this->max_path_skew ? this->max_path_skew : GST_MSECOND;
+  }else if(max_path_skew > 400 * GST_MSECOND){
+    GST_WARNING_OBJECT(this, "Something wierd going on with this skew calculation");
+    max_path_skew = 10*GST_MSECOND;
   }
+
+  this->max_path_skew = max_path_skew;
 //  g_print("PLAYOUT: %lu\n", GST_TIME_AS_MSECONDS((guint64)this->max_path_skew));
   next_scheduler_time = now + this->max_path_skew;
 
@@ -245,6 +233,16 @@ done:
     GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
   }
   gst_clock_id_unref (clock_id);
+}
+
+void stream_joiner_receive_rtp(StreamJoiner * this, GstRTPBuffer *rtp)
+{
+  HeapItem* heap_item;
+  THIS_WRITELOCK(this);
+  heap_item = _make_heap_item (this, rtp);
+  _heap_push (this->packets_heap, heap_item);
+  THIS_WRITEUNLOCK(this);
+//  g_print("RECEIVED AND PLACED\n");
 }
 
 
@@ -273,9 +271,6 @@ void
 stream_joiner_rem_path (StreamJoiner * this, guint8 subflow_id)
 {
   Subflow *lookup_result;
-  MpRTPRPath *path = NULL;
-  HeapItem *heap_item;
-  MpRTPRPacket packet = MPRTPR_PACKET_INIT;
   THIS_WRITELOCK (this);
   lookup_result =
       (Subflow *) g_hash_table_lookup (this->subflows,
@@ -286,13 +281,6 @@ stream_joiner_rem_path (StreamJoiner * this, guint8 subflow_id)
     goto exit;
   }
   g_hash_table_remove (this->subflows, GINT_TO_POINTER (subflow_id));
-  //if the path has something to say...
-  path = lookup_result->path;
-  while (mprtpr_path_has_buffer_to_playout (path)) {
-    mprtpr_path_pop_mprtpr_packet_to_playout (path, &packet);
-    heap_item = _make_heap_item (this, &packet);
-    this->queued = g_list_prepend (this->queued, heap_item);
-  }
 
   if (--this->subflow_num < 0) {
     this->subflow_num = 0;
@@ -432,7 +420,7 @@ _heap_pop (struct _Heap *restrict h)
 
 HeapItem *
 _make_heap_item (StreamJoiner * this,
-                 MpRTPRPacket *mprtpr_packet)
+                 GstRTPBuffer *rtp)
 {
   HeapItem *result;
   if (g_queue_is_empty (this->heap_items_pool)) {
@@ -440,10 +428,15 @@ _make_heap_item (StreamJoiner * this,
   } else {
     result = (HeapItem *) g_queue_pop_head (this->heap_items_pool);
   }
-  result->buffer = mprtpr_packet->buffer;
-  result->seq_num = mprtpr_packet->seq_num;
-  result->frame_start = mprtpr_packet->frame_start;
-  result->frame_end = mprtpr_packet->frame_end;
+  result->buffer = rtp->buffer;
+  result->seq_num = gst_rtp_buffer_get_seq(rtp);
+
+  if (!GST_BUFFER_FLAG_IS_SET (rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT)) {
+      result->frame_start = TRUE;
+  }else{
+      result->frame_start = FALSE;
+  }
+  result->frame_end = gst_rtp_buffer_get_marker(rtp);
   return result;
 }
 

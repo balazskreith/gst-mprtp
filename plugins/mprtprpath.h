@@ -13,15 +13,16 @@
 #include <gst/rtp/gstrtcpbuffer.h>
 #include <gst/base/gstqueuearray.h>
 #include "gstmprtcpbuffer.h"
+#include "bintree.h"
+#include "packetsqueue.h"
 
 G_BEGIN_DECLS
 
 typedef struct _MpRTPReceiverPath MpRTPRPath;
 typedef struct _MpRTPReceiverPathClass MpRTPRPathClass;
 typedef struct _MpRTPRReceivedItem  MpRTPRReceivedItem;
-typedef struct _SkewTree SkewTree;
-typedef struct _SkewChain PacketChain;
-typedef struct _MpRTPRPacket MpRTPRPacket;
+
+#include "streamjoiner.h"
 
 #define MPRTPR_PACKET_INIT           {NULL, 0, 0, 0}
 
@@ -32,7 +33,7 @@ typedef struct _MpRTPRPacket MpRTPRPacket;
 #define MPRTPR_PATH_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),MPRTPR_PATH_TYPE))
 #define MPRTPR_PATH_CAST(src)        ((MpRTPRPath *)(src))
 
-
+#define SKEWS_ARRAY_LENGTH 256
 
 struct _MpRTPReceiverPath
 {
@@ -48,10 +49,9 @@ struct _MpRTPReceiverPath
   guint16       cycle_num;
   guint32       jitter;
 
-  guint32       received_since_cycle_is_increased;
   guint32       total_late_discarded;
   guint32       total_late_discarded_bytes;
-  guint32       total_received_bytes;
+//  guint32       total_bytes_received;
   guint32       total_payload_bytes;
   guint32       total_early_discarded;
   guint32       total_duplicated_packet_num;
@@ -63,14 +63,14 @@ struct _MpRTPReceiverPath
   GstClock*     sysclock;
   guint16       played_highest_seq;
   guint32       total_packet_losts;
-  guint64       total_packet_received;
-
-  SkewTree*     skew_max_tree;
-  SkewTree*     skew_min_tree;
-  PacketChain*  packet_chain;
-  GQueue*       packets_pool;
-  GstQueueArray*       skews_pool;
-  GQueue*       gaps_pool;
+  guint64       total_packets_received;
+  PacketsQueue *packetsqueue;
+  BinTree*      min_bintree;
+  BinTree*      max_bintree;
+  guint32       skew_bytes;
+  guint8        skews_payload_octets[SKEWS_ARRAY_LENGTH];
+  guint64       skews[SKEWS_ARRAY_LENGTH];
+  guint8        skews_index;
   GstClockTime  last_median;
 
 
@@ -114,13 +114,11 @@ void mprtpr_path_process_rtp_packet(MpRTPRPath *this,
 
 void mprtpr_path_removes_obsolate_packets(MpRTPRPath *this, GstClockTime treshold);
 guint64 mprtpr_path_get_last_skew(MpRTPRPath *this);
-guint64 mprtpr_path_get_skew(MpRTPRPath *this);
+void mprtpr_path_playout_tick(MpRTPRPath *this);
+guint64 mprtpr_path_get_skew_median(MpRTPRPath *this);
 guint32 mprtpr_path_get_skew_byte_num(MpRTPRPath *this);
 guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this);
-void
-mprtpr_path_pop_mprtpr_packet_to_playout (MpRTPRPath * this,
-                                   MpRTPRPacket* mprtp_packet);
-gboolean mprtpr_path_has_buffer_to_playout(MpRTPRPath *this);
+
 
 G_END_DECLS
 #endif /* MPRTPRSUBFLOW_H_ */

@@ -54,6 +54,8 @@
 #define MPRTCPBLOCK_BYTES 4
 #define MPRTCPBLOCK_WORDS (MPRTCPBLOCK_BYTES>>2)
 
+#include <sys/time.h>
+#include <stdint.h>
 
 void
 gst_rtcp_header_init (GstRTCPHeader * header)

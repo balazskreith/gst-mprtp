@@ -66,8 +66,8 @@ mprtpr_path_init (MpRTPRPath * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetsqueue();
-  this->min_bintree = make_bintree(_cmp_for_min);
-  this->max_bintree = make_bintree(_cmp_for_max);
+  this->min_skew_bintree = make_bintree(_cmp_for_min);
+  this->max_skew_bintree = make_bintree(_cmp_for_max);
   this->last_median = GST_MSECOND;
   mprtpr_path_reset (this);
 }
@@ -84,8 +84,8 @@ mprtpr_path_finalize (GObject * object)
   MpRTPRPath *this;
   this = MPRTPR_PATH_CAST (object);
   g_object_unref (this->sysclock);
-  g_object_unref(this->min_bintree);
-  g_object_unref(this->max_bintree);
+  g_object_unref(this->min_skew_bintree);
+  g_object_unref(this->max_skew_bintree);
   g_object_unref(this->packetsqueue);
 }
 
@@ -117,8 +117,7 @@ mprtpr_path_reset (MpRTPRPath * this)
   this->skews_index = 0;
   memset(this->skews, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(guint64));
   memset(this->skews_payload_octets, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(guint8));
-
-
+  memset(this->skews_arrived, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(GstClockTime));
 }
 
 guint16
@@ -272,7 +271,7 @@ guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this)
 {
   guint32 result;
   THIS_READLOCK (this);
-  result = bintree_get_num(this->min_bintree) + bintree_get_num(this->max_bintree);
+  result = bintree_get_num(this->min_skew_bintree) + bintree_get_num(this->max_skew_bintree);
   THIS_READUNLOCK (this);
   return result;
 }
@@ -301,24 +300,24 @@ void mprtpr_path_playout_tick(MpRTPRPath *this)
 }
 
 guint64
-mprtpr_path_get_skew_median (MpRTPRPath * this)
+mprtpr_path_get_drift_window (MpRTPRPath * this)
 {
   guint64 result;
   gint32 max_count, min_count;
 //  g_print("mprtpr_path_get_skew_median begin\n");
   THIS_WRITELOCK (this);
   result = this->last_median;
-  min_count = bintree_get_num(this->min_bintree);
-  max_count = bintree_get_num(this->max_bintree);
+  min_count = bintree_get_num(this->min_skew_bintree);
+  max_count = bintree_get_num(this->max_skew_bintree);
   if(min_count + max_count < 3)
     goto done;
   if(min_count < max_count)
-    result = bintree_get_top_value(this->max_bintree);
+    result = bintree_get_top_value(this->max_skew_bintree);
   else if(max_count < min_count)
-    result = bintree_get_top_value(this->min_bintree);
+    result = bintree_get_top_value(this->min_skew_bintree);
   else{
-      result = (bintree_get_top_value(this->max_bintree) +
-                bintree_get_top_value(this->min_bintree))>>1;
+      result = (bintree_get_top_value(this->max_skew_bintree) +
+                bintree_get_top_value(this->min_skew_bintree))>>1;
   }
 //  g_print("%d-%d\n", min_count, max_count);
 done:
@@ -381,8 +380,14 @@ inspect:
   }
 add:
 //  g_print("ADDING\n");
-  skew = packetsqueue_add(this->packetsqueue, snd_time, packet_subflow_seq_num);
-  _add_skew(this, skew, payload_bytes>>3);
+  skew = packetsqueue_add(this->packetsqueue,
+                          snd_time,
+                          packet_subflow_seq_num);
+
+  if(this->last_rtp_timestamp != gst_rtp_buffer_get_timestamp(rtp)){
+    _add_skew(this, skew, payload_bytes>>3);
+    this->last_rtp_timestamp = gst_rtp_buffer_get_timestamp(rtp);
+  }
 done:
   THIS_WRITEUNLOCK (this);
 //  g_print("mprtpr_path_process_rtp_packet end\n");
@@ -392,24 +397,35 @@ done:
 
 void _add_skew(MpRTPRPath *this, guint64 skew, guint8 payload_octets)
 {
-
-  //elliminate the old one
+  GstClockTime treshold,now,added;
+//  g_print("Subflow %d added skew: %lu\n", this->id, skew);
+  now = gst_clock_get_time(this->sysclock);
+  treshold = now - 2 * GST_SECOND;
+  again:
+  ++this->skews_index;
+  //elliminate the old ones
   this->skew_bytes -= this->skews_payload_octets[this->skews_index]<<3;
+  this->skews_payload_octets[this->skews_index] = 0;
   if(this->skews[this->skews_index] > 0){
-    if(this->skews[this->skews_index] <= bintree_get_top_value(this->max_bintree))
-      bintree_delete_value(this->max_bintree, this->skews[this->skews_index]);
+    if(this->skews[this->skews_index] <= bintree_get_top_value(this->max_skew_bintree))
+      bintree_delete_value(this->max_skew_bintree, this->skews[this->skews_index]);
     else
-      bintree_delete_value(this->min_bintree, this->skews[this->skews_index]);
+      bintree_delete_value(this->min_skew_bintree, this->skews[this->skews_index]);
   }
+  this->skews[this->skews_index] = 0;
+  added = this->skews_arrived[this->skews_index];
+  this->skews_arrived[this->skews_index] = 0;
+  if(0 < added && added < treshold) goto again;
 
   //add new one
   this->skews[this->skews_index] = skew;
+  this->skews_arrived[this->skews_index] = now;
   this->skew_bytes += this->skews_payload_octets[this->skews_index]<<3;
   this->skews_payload_octets[this->skews_index] = payload_octets;
-  if(this->skews[this->skews_index] <= bintree_get_top_value(this->max_bintree))
-    bintree_insert_value(this->max_bintree, this->skews[this->skews_index]);
+  if(this->skews[this->skews_index] <= bintree_get_top_value(this->max_skew_bintree))
+    bintree_insert_value(this->max_skew_bintree, this->skews[this->skews_index]);
   else
-    bintree_insert_value(this->min_bintree, this->skews[this->skews_index]);
+    bintree_insert_value(this->min_skew_bintree, this->skews[this->skews_index]);
 
   _balancing_skew_trees(this);
 
@@ -426,20 +442,21 @@ _balancing_skew_trees (MpRTPRPath * this)
 
 
 balancing:
-  min_count = bintree_get_num(this->min_bintree);
-  max_count = bintree_get_num(this->max_bintree);
+  min_count = bintree_get_num(this->min_skew_bintree);
+  max_count = bintree_get_num(this->max_skew_bintree);
 
-  diff = max_count - min_count;
+  //  diff = (max_count>>1) - min_count;
+  diff = (max_count) - min_count;
 //  g_print("max_tree_num: %d, min_tree_num: %d\n", max_tree_num, min_tree_num);
   if (-2 < diff && diff < 2) {
     goto done;
   }
   if (diff < -1) {
-    top = bintree_pop_top_node(this->min_bintree);
-    bintree_insert_node(this->max_bintree, top);
+    top = bintree_pop_top_node(this->min_skew_bintree);
+    bintree_insert_node(this->max_skew_bintree, top);
   } else if (1 < diff) {
-      top = bintree_pop_top_node(this->max_bintree);
-      bintree_insert_node(this->min_bintree, top);
+      top = bintree_pop_top_node(this->max_skew_bintree);
+      bintree_insert_node(this->min_skew_bintree, top);
   }
   goto balancing;
 

@@ -84,6 +84,9 @@ gst_mprtpsender_mprtcp_sink_chain (GstPad * pad, GstObject * parent,
 
 static gboolean gst_mprtpsender_mprtp_sink_event_handler (GstPad * pad,
     GstObject * parent, GstEvent * event);
+static gboolean
+gst_mprtpsender_mprtp_sink_query_handler (GstPad * pad, GstObject * parent,
+                                          GstQuery * query);
 
 typedef struct
 {
@@ -159,57 +162,86 @@ struct _GstMprtpsenderPrivate
 };
 
 
-gboolean
-gst_mprtpsender_mprtp_sink_event_handler (GstPad * pad, GstObject * parent,
-    GstEvent * event)
+//
+//gboolean
+//gst_mprtpsender_mprtp_sink_event_handler (GstPad * pad, GstObject * parent,
+//    GstEvent * event)
+//{
+//  GstMprtpsender *this;
+//  gboolean result = TRUE;
+//  GList *it;
+//  Subflow *subflow;
+//  const gchar *stream_id;
+//  const GstSegment *segment;
+//  GstCaps *caps;
+//
+////  g_print ("SND EVENT to the sink: %s", GST_EVENT_TYPE_NAME (event));
+//
+//  this = GST_MPRTPSENDER (parent);
+//  THIS_WRITELOCK (this);
+//  switch (GST_EVENT_TYPE (event)) {
+//    case GST_EVENT_STREAM_START:
+//      if (this->event_stream_start != NULL) {
+//        gst_event_unref (this->event_stream_start);
+//      }
+//      gst_event_parse_stream_start (event, &stream_id);
+//      this->event_stream_start = gst_event_new_stream_start (stream_id);
+//      goto sending;
+//    case GST_EVENT_SEGMENT:
+//      if (this->event_segment != NULL) {
+//        gst_event_unref (this->event_segment);
+//      }
+//      gst_event_parse_segment (event, &segment);
+//      this->event_segment = gst_event_new_segment (segment);
+//      goto sending;
+//    case GST_EVENT_CAPS:
+//      if (this->event_caps != NULL) {
+//        gst_event_unref (this->event_caps);
+//      }
+//      gst_event_parse_caps (event, &caps);
+//      this->event_caps = gst_event_new_caps (caps);
+//      goto sending;
+//    default:
+//      sending:
+//      for (subflow = NULL, it = this->subflows; it != NULL; it = it->next) {
+//        subflow = it->data;
+//        result &= gst_pad_push_event (subflow->outpad, gst_event_copy (event));
+//      }
+//      result &= gst_pad_event_default (pad, parent, event);
+//      //result = gst_pad_event_default (pad, parent, event);
+//  }
+//
+//  THIS_WRITEUNLOCK (this);
+//  return result;
+//}
+
+static gboolean
+gst_mprtpsender_mprtp_sink_event_handler (GstPad * pad, GstObject * parent, GstEvent * event)
 {
-  GstMprtpsender *this;
-  gboolean result = TRUE;
-  GList *it;
-  Subflow *subflow;
-  const gchar *stream_id;
-  const GstSegment *segment;
-  GstCaps *caps;
+  gboolean res;
 
-//  g_print ("SND EVENT to the sink: %s", GST_EVENT_TYPE_NAME (event));
-
-  this = GST_MPRTPSENDER (parent);
-  THIS_WRITELOCK (this);
   switch (GST_EVENT_TYPE (event)) {
-    case GST_EVENT_STREAM_START:
-      if (this->event_stream_start != NULL) {
-        gst_event_unref (this->event_stream_start);
-      }
-      gst_event_parse_stream_start (event, &stream_id);
-      this->event_stream_start = gst_event_new_stream_start (stream_id);
-      goto sending;
-    case GST_EVENT_SEGMENT:
-      if (this->event_segment != NULL) {
-        gst_event_unref (this->event_segment);
-      }
-      gst_event_parse_segment (event, &segment);
-      this->event_segment = gst_event_new_segment (segment);
-      goto sending;
-    case GST_EVENT_CAPS:
-      if (this->event_caps != NULL) {
-        gst_event_unref (this->event_caps);
-      }
-      gst_event_parse_caps (event, &caps);
-      this->event_caps = gst_event_new_caps (caps);
-      goto sending;
     default:
-      sending:
-      for (subflow = NULL, it = this->subflows; it != NULL; it = it->next) {
-        subflow = it->data;
-        result &= gst_pad_push_event (subflow->outpad, gst_event_copy (event));
-      }
-      result &= gst_pad_event_default (pad, parent, event);
-      //result = gst_pad_event_default (pad, parent, event);
+      res = gst_pad_event_default (pad, parent, event);
+      break;
   }
 
-  THIS_WRITEUNLOCK (this);
-  return result;
+  return res;
 }
+
+static gboolean
+gst_mprtpsender_mprtp_sink_query_handler (GstPad * pad, GstObject * parent, GstQuery * query)
+{
+  gboolean res;
+
+  switch (GST_QUERY_TYPE (query)) {
+    default:
+      res = gst_pad_query_default (pad, parent, query);
+      break;
+  }
+  return res;
+}
+
 
 
 static void
@@ -277,6 +309,10 @@ gst_mprtpsender_init (GstMprtpsender * mprtpsender)
       (&gst_mprtpsender_mprtcp_sr_sink_template, "mprtcp_sr_sink");
   gst_pad_set_chain_function (mprtpsender->mprtcp_sr_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpsender_mprtcp_sink_chain));
+  gst_pad_set_event_function (mprtpsender->mprtcp_sr_sinkpad,
+       GST_DEBUG_FUNCPTR (gst_mprtpsender_mprtp_sink_event_handler));
+   gst_pad_set_query_function (mprtpsender->mprtcp_sr_sinkpad,
+       GST_DEBUG_FUNCPTR (gst_mprtpsender_mprtp_sink_query_handler));
   gst_element_add_pad (GST_ELEMENT (mprtpsender),
       mprtpsender->mprtcp_sr_sinkpad);
 
@@ -287,6 +323,8 @@ gst_mprtpsender_init (GstMprtpsender * mprtpsender)
       GST_DEBUG_FUNCPTR (gst_mprtpsender_mprtp_sink_chain));
   gst_pad_set_event_function (mprtpsender->mprtp_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpsender_mprtp_sink_event_handler));
+  gst_pad_set_query_function (mprtpsender->mprtp_sinkpad,
+      GST_DEBUG_FUNCPTR (gst_mprtpsender_mprtp_sink_query_handler));
 
 
   gst_element_add_pad (GST_ELEMENT (mprtpsender), mprtpsender->mprtp_sinkpad);
@@ -378,6 +416,20 @@ gst_mprtpsender_finalize (GObject * object)
 }
 
 
+static gboolean
+forward_sticky_events (GstPad * pad, GstEvent ** event, gpointer user_data)
+{
+  GstPad *srcpad = GST_PAD_CAST (user_data);
+  GstFlowReturn ret;
+
+  ret = gst_pad_store_sticky_event (srcpad, *event);
+  if (ret != GST_FLOW_OK) {
+    GST_DEBUG_OBJECT (srcpad, "storing sticky event %p (%s) failed: %s", *event,
+        GST_EVENT_TYPE_NAME (*event), gst_flow_get_name (ret));
+  }
+
+  return TRUE;
+}
 
 static GstPad *
 gst_mprtpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
@@ -406,6 +458,8 @@ gst_mprtpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
       GST_DEBUG_FUNCPTR (gst_mprtpsender_src_unlink));
   gst_pad_set_query_function(srcpad,
       GST_DEBUG_FUNCPTR(gst_mprtpsender_src_query));
+  gst_pad_sticky_events_foreach (this->mprtp_sinkpad,
+                                 forward_sticky_events, srcpad);
   subflow->id = subflow_id;
   subflow->outpad = srcpad;
   subflow->state = 0;
@@ -501,8 +555,9 @@ gst_mprtpsender_src_query (GstPad * srcpad, GstObject * parent,
         if(!peer) goto default_query;
         if ((result = gst_pad_query (peer, query))) {
             gst_query_parse_latency (query, &live, &min, &max);
-            min+= GST_MSECOND;
-            if(max != -1) max+=min;
+            //don't have any latency here. normally... who knows... I think I need to rest...
+//            min+= GST_MSECOND;
+//            if(max != -1) max+=min;
             gst_query_set_latency (query, live, min, max);
         }
         gst_object_unref (peer);
@@ -510,7 +565,7 @@ gst_mprtpsender_src_query (GstPad * srcpad, GstObject * parent,
       break;
     default:
     default_query:
-      result = gst_pad_peer_query (srcpad, query);
+      result = gst_pad_query_default (srcpad, parent, query);
       break;
   }
   return result;
@@ -691,6 +746,7 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   packet_type = _get_packet_mptype (this, buf, &map, &subflow_id);
   if (packet_type != PACKET_IS_NOT_MP &&
       _select_subflow (this, subflow_id, &subflow) != FALSE) {
+//      g_print("%d|", subflow_id);
     outpad = subflow->outpad;
   } else if (this->pivot_outpad != NULL &&
       gst_pad_is_active (this->pivot_outpad) &&
@@ -778,7 +834,19 @@ _assemble_report (Subflow * this, GstBuffer * blocks)
   report_header_size = sizeof(GstRTCPHeader) + sizeof(guint32);
   block = (GstMPRTCPSubflowBlock *) (map.data + offset);
   for (; offset < map.size; offset += (block_length + 1) << 2, ++src) {
-
+//      {
+//            guint8 pt;
+//            gst_rtcp_header_getdown(&block->block_header, NULL, NULL, NULL, &pt, NULL, NULL);
+//            if(pt == GST_RTCP_TYPE_SR){
+//                guint64 ntptime;
+//                GstRTCPSR *sr;
+//                sr = &block->sender_riport;
+//                gst_rtcp_srb_getdown(&sr->sender_block, &ntptime, NULL, NULL, NULL);
+//                g_print("Created NTP time for subflow %d is %lu, but it sent at: "
+//                    "%lu (%lu)\n", this->id, ntptime, NTP_NOW>>32,
+//                    get_epoch_time_from_ntp_in_ns(NTP_NOW - ntptime));
+//            }
+//          }
     gst_mprtcp_block_getdown (&block->info, NULL, &block_length, &subflow_id);
     if (prev_subflow_id > 0 && subflow_id != prev_subflow_id) {
       GST_WARNING ("MPRTCP block comes from multiple subflow");

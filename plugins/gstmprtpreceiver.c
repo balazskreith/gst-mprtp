@@ -569,6 +569,7 @@ _get_packet_mptype (GstMprtpreceiver * this,
       subflow_infos = (MPRTPSubflowHeaderExtension *) pointer;
       *subflow_id = subflow_infos->id;
     }
+//    g_print("%d-%u|", *subflow_id, gst_rtp_buffer_get_timestamp(&rtp));
     gst_rtp_buffer_unmap (&rtp);
     result = PACKET_IS_MPRTP;
     goto done;
@@ -655,6 +656,20 @@ _send_mprtcp_buffer (GstMprtpreceiver * this, GstBuffer * buf)
     buffer = gst_buffer_new_wrapped (data, buf_length);
     outpad = (block_riport_type == GST_RTCP_TYPE_SR) ? this->mprtcp_sr_srcpad
         : this->mprtcp_rr_srcpad;
+//    {
+//      guint16 subflow_id;
+//      gst_mprtcp_block_getdown (info, NULL, NULL, &subflow_id);
+//      if(block_riport_type == GST_RTCP_TYPE_SR){
+//          guint64 ntptime;
+//          GstRTCPSR *sr;
+//          sr = &block->sender_riport;
+//          gst_rtcp_srb_getdown(&sr->sender_block, &ntptime, NULL, NULL, NULL);
+//          g_print("Created NTP time for subflow %d is %lu, but it "
+//              "received at: %lu (%lu)\n",
+//              subflow_id, ntptime, NTP_NOW>>32,
+//              get_epoch_time_from_ntp_in_ns(NTP_NOW - ntptime));
+//      }
+//    }
 //    g_print("ARRIVED REPORT: %d\n", block_riport_type);
     if ((result = gst_pad_push (outpad, buffer)) != GST_FLOW_OK) {
       goto done;

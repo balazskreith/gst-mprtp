@@ -59,7 +59,9 @@ void packetsqueue_test(void);
 GType packetsqueue_get_type (void);
 PacketsQueue *make_packetsqueue(void);
 void packetsqueue_reset(PacketsQueue *this);
-guint64 packetsqueue_add(PacketsQueue *this, guint64 snd_time, guint16 seq_num);
+guint64 packetsqueue_add(PacketsQueue *this,
+                         guint64 snd_time,
+                         guint16 seq_num);
 void packetsqueue_prepare_gap(PacketsQueue *this);
 void packetsqueue_prepare_discarded(PacketsQueue *this);
 gboolean packetsqueue_try_found_a_gap(PacketsQueue *this, guint16 seq_num, gboolean *duplicated);

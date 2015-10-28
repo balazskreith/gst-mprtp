@@ -915,11 +915,10 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
       this->pivot_address_subflow_id = subflow_infos->id;
       this->pivot_address = G_SOCKET_ADDRESS (g_object_ref (meta->addr));
     } else if (subflow_infos->id != this->pivot_address_subflow_id) {
-      g_object_unref (meta->addr);
       gst_buffer_add_net_address_meta (buf, this->pivot_address);
     }
   }
-  snd_time = gst_util_uint64_scale (snd_time, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
+  //snd_time = gst_util_uint64_scale (snd_time, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
   mprtpr_path_process_rtp_packet (path, &rtp, subflow_infos->seq, snd_time);
   stream_joiner_receive_rtp(this->joiner, &rtp);
   gst_rtp_buffer_unmap (&rtp);

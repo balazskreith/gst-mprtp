@@ -111,8 +111,10 @@ make_video_session (guint sessionNum)
   SessionData *ret = session_new (sessionNum);
   GstBin *bin = GST_BIN (gst_bin_new ("video"));
   GstElement *queue = gst_element_factory_make ("queue", NULL);
-  GstElement *depayloader = gst_element_factory_make ("rtptheoradepay", NULL);
-  GstElement *decoder = gst_element_factory_make ("theoradec", NULL);
+//  GstElement *depayloader = gst_element_factory_make ("rtptheoradepay", NULL);
+    GstElement *depayloader = gst_element_factory_make ("rtpjpegdepay", NULL);
+//  GstElement *decoder = gst_element_factory_make ("theoradec", NULL);
+  GstElement *decoder = gst_element_factory_make ("jpegdec", NULL);
   GstElement *converter = gst_element_factory_make ("videoconvert", NULL);
   GstElement *sink = gst_element_factory_make ("autovideosink", NULL);
 
@@ -287,22 +289,22 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
 
   g_object_set (rtcpSrc, "port", basePort + 5, NULL);
 
-  g_object_set (rtcpSink_1, "port", basePort + 11, "host", "127.0.0.1",
+  g_object_set (rtcpSink_1, "port", basePort + 11, "host", "10.0.0.1",
 //      NULL);
       "async", FALSE, NULL);
 
-  g_object_set (rtcpSink_2, "port", basePort + 12, "host", "127.0.0.1",
+  g_object_set (rtcpSink_2, "port", basePort + 12, "host", "10.0.1.1",
 //      NULL);
       "async", FALSE, NULL);
 
-  g_object_set (rtcpSink, "port", basePort + 10, "host", "127.0.0.1",
+  g_object_set (rtcpSink, "port", basePort + 10, "host", "10.0.0.1",
 //                NULL);
         "async", FALSE, NULL);
 
   g_object_set (mprtpply, "pivot-clock-rate", clockrate, NULL);
 
   g_object_set (mprtpply, "join-subflow", 1, NULL);
-//  g_object_set (mprtpply, "join-subflow", 2, NULL);
+  g_object_set (mprtpply, "join-subflow", 2, NULL);
   g_object_set (mprtpply, "auto-flow-reporting", TRUE, NULL);
 
   g_print ("Connecting to %i/%i/%i/%i/%i/%i\n",

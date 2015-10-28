@@ -229,6 +229,7 @@ typedef struct
   GstPad *pad;
   GstBuffer *buf;
   GstNetSimb *netsim;
+  guint64 arrived;
 } PushBufferCtx;
 
 G_INLINE_FUNC PushBufferCtx *
@@ -238,6 +239,7 @@ push_buffer_ctx_new (GstPad * pad, GstBuffer * buf, GstNetSimb *netsim)
   ctx->pad = gst_object_ref (pad);
   ctx->buf = gst_buffer_ref (buf);
   ctx->netsim = netsim;
+  ctx->arrived = g_get_real_time();
   return ctx;
 }
 
@@ -256,6 +258,7 @@ push_buffer_ctx_push (PushBufferCtx * ctx)
 {
   GST_DEBUG_OBJECT (ctx->pad, "Pushing buffer now");
   //gst_pad_push (ctx->pad, gst_buffer_ref (ctx->buf));
+  g_print("delayed packet spent time: %lu\n", g_get_real_time()-   ctx->arrived);
   netsimqueue_push_buffer(ctx->netsim->priv->queue, ctx->buf);
   return FALSE;
 }

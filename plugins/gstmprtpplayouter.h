@@ -24,6 +24,7 @@
 #include "gstmprtcpbuffer.h"
 #include "mprtprpath.h"
 #include "streamjoiner.h"
+#include "playoutwindow.h"
 
 #include <gst/net/gstnetaddressmeta.h>
 
@@ -83,6 +84,7 @@ struct _GstMprtpplayouter
   StreamJoiner *joiner;
   gpointer controller;
   GstClock* sysclock;
+
 
   guint  subflows_num;
 

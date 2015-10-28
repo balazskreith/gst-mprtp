@@ -64,7 +64,9 @@ static void _trash_gap(PacketsQueue *this, Gap* gap);
 static void _trash_gapnode(PacketsQueue *this, GapNode* gapnode);
 static guint64 _get_skew(PacketsQueue *this, PacketsQueueNode* act, PacketsQueueNode* nxt);
 static Gap * _make_gap(PacketsQueue *this, PacketsQueueNode* at, guint16 start, guint16 end);
-static guint64 _packetsqueue_add(PacketsQueue *this, guint64 snd_time, guint16 seq_num);
+static guint64 _packetsqueue_add(PacketsQueue *this,
+                                 guint64 snd_time,
+                                 guint16 seq_num);
 static Gap* _try_found_a_gap(PacketsQueue *this, guint16 seq_num,
                              gboolean *duplicated, GapNode **insert_after);
 static gboolean _try_fill_a_gap (PacketsQueue * this, PacketsQueueNode *node);
@@ -338,7 +340,9 @@ PacketsQueue *make_packetsqueue(void)
   return result;
 }
 
-guint64 packetsqueue_add(PacketsQueue *this, guint64 snd_time, guint16 seq_num)
+guint64 packetsqueue_add(PacketsQueue *this,
+                         guint64 snd_time,
+                         guint16 seq_num)
 {
   guint64 result;
   THIS_WRITELOCK(this);
@@ -370,7 +374,9 @@ gboolean packetsqueue_try_found_a_gap(PacketsQueue *this, guint16 seq_num, gbool
   return result;
 }
 
-guint64 _packetsqueue_add(PacketsQueue *this, guint64 snd_time, guint16 seq_num)
+guint64 _packetsqueue_add(PacketsQueue *this,
+                          guint64 snd_time,
+                          guint16 seq_num)
 {
 //  guint64 skew = 0;
   PacketsQueueNode* node;
@@ -552,7 +558,7 @@ guint64 _get_skew(PacketsQueue *this, PacketsQueueNode* act, PacketsQueueNode* n
   skew = 0;
   if (rcv_diff > 0x8000000000000000) {
     GST_WARNING_OBJECT (this, "The skew between two packets NOT real: "
-            "prev snd: %lu act snd: %lu",act->snd_time, nxt->snd_time);
+            "act rcv: %lu nxt rcv: %lu",act->rcv_time, nxt->rcv_time);
     goto done;
   }
 
@@ -573,6 +579,8 @@ guint64 _get_skew(PacketsQueue *this, PacketsQueueNode* act, PacketsQueueNode* n
 //          skew);
   //nxt->skew = g_random_int_range(25000, 50000);
 done:
+  //convert it to ns base time:
+  skew = get_epoch_time_from_ntp_in_ns(skew);
   return skew;
 }
 
@@ -584,7 +592,9 @@ PacketsQueueNode* _make_node(PacketsQueue *this, guint64 snd_time, guint16 seq_n
   else
     result = g_malloc0(sizeof(PacketsQueueNode));
   memset((gpointer)result, 0, sizeof(PacketsQueueNode));
-  result->rcv_time = epoch_now_in_ns;
+//  result->rcv_time = epoch_now_in_ns;
+  //  result->rcv_time = ((NTP_NOW >> 14) & 0x00ffffff);
+  result->rcv_time = NTP_NOW;
   result->seq_num = seq_num;
   result->snd_time = snd_time;
   result->next = NULL;

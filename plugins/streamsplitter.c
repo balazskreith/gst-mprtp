@@ -146,9 +146,9 @@ stream_splitter_init (StreamSplitter * this)
   this->active_subflow_num = 0;
   this->ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, g_free);
-  this->charge_value = 1;
+  this->charge_value = 100;
   this->thread = gst_task_new (stream_splitter_run, this, NULL);
-
+  this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
 
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
@@ -214,6 +214,16 @@ stream_splitter_set_rtp_ext_header_id (StreamSplitter * this,
   this->ext_header_id = ext_header_id;
   THIS_WRITEUNLOCK (this);
 }
+
+void
+stream_splitter_set_splitting_mode (StreamSplitter * this,
+                                    StreamSplittingMode mode)
+{
+  THIS_WRITELOCK (this);
+  this->splitting_mode = mode;
+  THIS_WRITEUNLOCK (this);
+}
+
 
 void
 stream_splitter_setup_sending_bid (StreamSplitter * this, guint8 subflow_id,
@@ -301,7 +311,6 @@ stream_splitter_get_next_path (StreamSplitter * this, GstBuffer * buf)
     goto done;
   }
   path = _get_next_path (this, &rtp);
-
 done:
   gst_rtp_buffer_unmap (&rtp);
   THIS_WRITEUNLOCK (this);
@@ -366,7 +375,7 @@ stream_splitter_run (void *data)
       bid_c_sum += subflow->actual_bid;
     }
 
-    g_print("Subflow %d actual bid is: %u\n",mprtps_path_get_id(path), subflow->actual_bid);
+//    g_print("Subflow %d actual bid is: %u\n",mprtps_path_get_id(path), subflow->actual_bid);
   }
 
   if (bid_nc_sum > 0) {
@@ -464,21 +473,31 @@ MPRTPSPath *
 _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
 {
   MPRTPSPath *result = NULL;
-  guint32 bytes_to_send;
+  guint32 decision_value;
   guint32 keytree_value, non_keytree_value;
   SchNode *tree;
 
-  bytes_to_send = gst_rtp_buffer_get_payload_len (rtp);
+  if(this->splitting_mode == MPRTP_STREAM_BYTE_BASED_SPLITTING)
+    decision_value = gst_rtp_buffer_get_payload_len (rtp);
+  else if(this->splitting_mode == MPRTP_STREAM_PACKET_BASED_SPLITTING)
+    decision_value = 1;
+  else if(this->last_rtp_timestamp != gst_rtp_buffer_get_timestamp(rtp)){
+    decision_value = 1;
+    this->last_rtp_timestamp = gst_rtp_buffer_get_timestamp(rtp);
+  }else{
+    decision_value = 0;
+  }
+
   if (this->keyframes_tree == NULL) {
-    result = schtree_get_next (this->non_keyframes_tree, bytes_to_send);
+    result = schtree_get_next (this->non_keyframes_tree, decision_value);
     goto done;
   } else if (this->non_keyframes_tree == NULL) {
-    result = schtree_get_next (this->keyframes_tree, bytes_to_send);
+    result = schtree_get_next (this->keyframes_tree, decision_value);
     goto done;
   }
 
   if (!GST_BUFFER_FLAG_IS_SET (rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT)) {
-    result = schtree_get_next (this->keyframes_tree, bytes_to_send);
+      result = schtree_get_next (this->keyframes_tree, decision_value);
     goto done;
   }
 
@@ -489,7 +508,7 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
       keytree_value <=
       non_keytree_value ? this->keyframes_tree : this->non_keyframes_tree;
 
-  result = schtree_get_next (tree, bytes_to_send);
+    result = schtree_get_next (tree, decision_value);
 
 done:
   return result;
@@ -706,6 +725,7 @@ schtree_get_next (SchNode * root, guint32 bytes_to_send)
     selected->sent_bytes += bytes_to_send;
   }
   result = selected->path;
+//  g_print("%d->", result->id);
   return result;
 }
 

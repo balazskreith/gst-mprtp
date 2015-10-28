@@ -24,8 +24,10 @@
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include "streamjoiner.h"
+#include "playoutwindow.h"
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 
 //Copied from gst-plugins-base/gst-libs//gst/video/video-format.c
@@ -64,6 +66,7 @@ GST_DEBUG_CATEGORY_STATIC (stream_joiner_debug_category);
 
 static const unsigned int base_size = 4;
 
+#define _get_max_skew(this) bintree_get_top_value(this->max_skews_tree)
 
 G_DEFINE_TYPE (StreamJoiner, stream_joiner, G_TYPE_OBJECT);
 
@@ -74,7 +77,7 @@ struct _Subflow
   guint8 id;
   MpRTPRPath *path;
   guint32 received_packets;
-  guint64 playout_skew;
+  guint64 path_skew;
 };
 
 //Heap functions
@@ -82,8 +85,10 @@ typedef struct _HeapItem
 {
   GstBuffer *buffer;
   guint16    seq_num;
+  guint32    tried;
   gboolean   frame_end;
   gboolean   frame_start;
+  guint32    rtp_timestamp;
 } HeapItem;
 
 struct _Heap
@@ -102,6 +107,7 @@ static void stream_joiner_run (void *data);
 static Subflow *_make_subflow (MpRTPRPath * path);
 void _ruin_subflow (gpointer data);
 static gint _cmp_seq (guint16 x, guint16 y);
+gint _cmp_skew_for_tree(guint64 x , guint64 y);
 static void _heap_init (struct _Heap *restrict h);
 static void _heap_push (struct _Heap *restrict h, HeapItem * value);
 static void _heap_pop (struct _Heap *restrict h);
@@ -111,6 +117,9 @@ static void _trash_heap_item (StreamJoiner * this, HeapItem * heap_item);
 static void _popback_framequeue(StreamJoiner *this);
 static void _push_framequeue(StreamJoiner *this, HeapItem *item);
 static void _flush_framequeue(StreamJoiner *this);
+
+void _set_new_max_skew(StreamJoiner *this, guint64 new_max_skew);
+static void _playout(StreamJoiner *this);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -145,11 +154,16 @@ stream_joiner_init (StreamJoiner * this)
 {
   this->sysclock = gst_system_clock_obtain ();
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, _ruin_subflow);
-  this->max_path_skew = 10 * GST_MSECOND;
+//  this->max_path_skew = 10 * GST_MSECOND;
+  this->max_skews_index = 0;
+  memset(this->max_skews, 0, MAX_SKEWS_ARRAY_LENGTH * sizeof(guint64));
   this->packets_heap = g_malloc0 (sizeof (Heap));
   this->heap_items_pool = g_queue_new ();
+  this->playoutwindow = make_playoutwindow();
   this->obsolate_automatically = TRUE;
-
+  this->playout_allowed = TRUE;
+  this->playout_halt = FALSE;
+  this->playout_halt_time = 100 * GST_MSECOND;
   _heap_init (this->packets_heap);
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
@@ -157,6 +171,7 @@ stream_joiner_init (StreamJoiner * this)
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
   this->packets_framequeue = g_queue_new();
+  this->max_skews_tree = make_bintree(_cmp_skew_for_tree);
 
 }
 
@@ -186,7 +201,15 @@ stream_joiner_run (void *data)
     this->last_obsolate_checked = now;
     obsolate_needed = TRUE;
   }
-
+  if(!this->playout_allowed){
+    next_scheduler_time = now + GST_MSECOND;
+    goto done;
+  }
+  if(this->playout_halt){
+    next_scheduler_time = now + this->playout_halt_time;
+    this->playout_halt = FALSE;
+    goto done;
+  }
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     //printf("key %u ---> %u\n", (guint8)*subflow_id, (MPRTPSPath*)*subflow);
@@ -194,45 +217,80 @@ stream_joiner_run (void *data)
     subflow = (Subflow *) val;
     path = subflow->path;
     mprtpr_path_playout_tick(path);
-    subflow->playout_skew = mprtpr_path_get_skew_median(path);
-    if(max_path_skew < subflow->playout_skew)
-      max_path_skew = subflow->playout_skew;
+    subflow->path_skew = (mprtpr_path_get_drift_window(path) +
+                          99 * subflow->path_skew) / 100;
+//    g_print("subflow %d drift window: %lu, path_skew: %lu\n",
+//            subflow->id, mprtpr_path_get_drift_window(path), subflow->path_skew);
+    if(max_path_skew < subflow->path_skew)
+      max_path_skew = subflow->path_skew;
     if(obsolate_needed){
       mprtpr_path_removes_obsolate_packets(path, 2 * GST_SECOND);
     }
   }
+  if(0)_push_framequeue(this, heap_item);
+  if(0)_popback_framequeue(this);
+  _playout(this);
 
-  //g_print("PLAYOUT: %lu\n", max_path_skew);
-  while (this->packets_heap->count) {
-    heap_item = heap_front (this->packets_heap);
-    _heap_pop (this->packets_heap);
-    _push_framequeue(this, heap_item);
-//    g_print ("OUT:%p-%hu\n", heap_item->buffer, heap_item->seq_num);
-//    this->send_mprtp_packet_func (this->send_mprtp_packet_data,
-//        heap_item->buffer);
-//    _trash_heap_item (this, heap_item);
-  }
-  _popback_framequeue(this);
   if (!max_path_skew){
     GST_WARNING_OBJECT(this, "max path skew is 0");
-    max_path_skew = this->max_path_skew ? this->max_path_skew : GST_MSECOND;
+    max_path_skew = MAX(_get_max_skew(this), GST_MSECOND);
   }else if(max_path_skew > 400 * GST_MSECOND){
     GST_WARNING_OBJECT(this, "Something wierd going on with this skew calculation");
     max_path_skew = 10*GST_MSECOND;
+  }else{
+    max_path_skew<<=0;
+    _set_new_max_skew(this, max_path_skew);
+    //g_print("The Maximal skew now is: %lu\n", max_path_skew);
   }
 
-  this->max_path_skew = max_path_skew;
 //  g_print("PLAYOUT: %lu\n", GST_TIME_AS_MSECONDS((guint64)this->max_path_skew));
-  next_scheduler_time = now + this->max_path_skew;
-
+  next_scheduler_time = now + (_get_max_skew(this)<<0);
 done:
-
   THIS_WRITEUNLOCK (this);
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
   if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
     GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
   }
   gst_clock_id_unref (clock_id);
+}
+
+
+
+void _set_new_max_skew(StreamJoiner *this, guint64 new_max_skew)
+{
+  bintree_delete_value(this->max_skews_tree, this->max_skews[this->max_skews_index]);
+  this->max_skews[this->max_skews_index] = new_max_skew;
+  bintree_insert_value(this->max_skews_tree, new_max_skew);
+  ++this->max_skews_index;
+}
+
+void _playout(StreamJoiner *this)
+{
+  HeapItem *heap_item;
+  if(!this->packets_heap->count) goto done;
+  heap_item = heap_front (this->packets_heap);
+  do{
+    heap_item = heap_front (this->packets_heap);
+    if((guint16)(this->popped_hsn + 1) == heap_item->seq_num) goto pop;
+    if(heap_item->tried > 0) goto pop;
+    ++heap_item->tried;
+    break;
+  pop:
+    if((guint16)(this->popped_hsn + 1) != heap_item->seq_num)
+      g_print("OUT OF ORDER: exp: %hu rcv: %hu\n", (guint16)(this->popped_hsn + 1), heap_item->seq_num);
+    _heap_pop (this->packets_heap);
+    this->popped_hsn = heap_item->seq_num;
+    this->send_mprtp_packet_func (
+          this->send_mprtp_packet_data,
+          heap_item->buffer);
+    _trash_heap_item (this, heap_item);
+    //g_print("%hu->", heap_item->seq_num);
+    //_trash_heap_item (this, heap_item);
+  }while(this->packets_heap->count);
+//  g_print("\n---\n");
+//  _popback_framequeue(this);
+done:
+  return;
 }
 
 void stream_joiner_receive_rtp(StreamJoiner * this, GstRTPBuffer *rtp)
@@ -289,20 +347,29 @@ exit:
   THIS_WRITEUNLOCK (this);
 }
 
-void
-stream_joiner_set_max_path_skew (StreamJoiner * this,
-    GstClockTime playout_delay)
-{
-  THIS_WRITELOCK (this);
-  this->max_path_skew = playout_delay;
-  THIS_WRITEUNLOCK (this);
-}
 
 void
 stream_joiner_path_obsolation(StreamJoiner *this, gboolean obsolate_automatically)
 {
   THIS_WRITELOCK (this);
   this->obsolate_automatically = obsolate_automatically;
+  THIS_WRITEUNLOCK (this);
+}
+
+void
+stream_joiner_set_playout_allowed(StreamJoiner *this, gboolean playout_permission)
+{
+  THIS_WRITELOCK (this);
+  this->playout_allowed = playout_permission;
+  THIS_WRITEUNLOCK (this);
+}
+
+void
+stream_joiner_set_playout_halt_time(StreamJoiner *this, GstClockTime halt_time)
+{
+  THIS_WRITELOCK (this);
+  this->playout_halt = TRUE;
+  this->playout_halt_time = halt_time;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -316,6 +383,12 @@ stream_joiner_set_sending (StreamJoiner * this, gpointer data,
   THIS_WRITEUNLOCK (this);
 }
 
+gint
+_cmp_skew_for_tree(guint64 x , guint64 y)
+{
+  if(x == y) return 0;
+  return x < y ? -1 : 1;
+}
 
 gint
 _cmp_seq (guint16 x, guint16 y)
@@ -338,6 +411,7 @@ _make_subflow (MpRTPRPath * path)
   result->path = path;
   result->id = mprtpr_path_get_id (path);
   result->received_packets = 0;
+  result->path_skew = 10 * GST_USECOND;
   return result;
 }
 
@@ -428,15 +502,16 @@ _make_heap_item (StreamJoiner * this,
   } else {
     result = (HeapItem *) g_queue_pop_head (this->heap_items_pool);
   }
-  result->buffer = rtp->buffer;
+  result->buffer = gst_buffer_ref(rtp->buffer);
   result->seq_num = gst_rtp_buffer_get_seq(rtp);
-
+  result->tried = 0;
   if (!GST_BUFFER_FLAG_IS_SET (rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT)) {
       result->frame_start = TRUE;
   }else{
       result->frame_start = FALSE;
   }
   result->frame_end = gst_rtp_buffer_get_marker(rtp);
+  result->rtp_timestamp = gst_rtp_buffer_get_timestamp(rtp);
   return result;
 }
 
@@ -465,7 +540,10 @@ void _popback_framequeue(StreamJoiner *this)
 
 void _push_framequeue(StreamJoiner *this, HeapItem *item)
 {
-  if(item->frame_start) _flush_framequeue(this);
+  HeapItem *head;
+  head = g_queue_peek_head(this->packets_framequeue);
+  if(item->frame_start || head->rtp_timestamp != item->rtp_timestamp)
+    _flush_framequeue(this);
   g_queue_push_tail(this->packets_framequeue, item);
   if(item->frame_end) _flush_framequeue(this);
 }
@@ -483,7 +561,7 @@ again:
   _trash_heap_item (this, item);
   goto again;
 done:
-//g_print("&&");
+//  g_print("&&");
   return;
 }
 #undef HEAP_CMP

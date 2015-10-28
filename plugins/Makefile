@@ -145,7 +145,7 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-smanctrler.lo libgstmprtp_la-sefctrler.lo \
 	libgstmprtp_la-refctrler.lo libgstmprtp_la-gstnetsimb.lo \
 	libgstmprtp_la-netsimqueue.lo libgstmprtp_la-bintree.lo \
-	libgstmprtp_la-packetsqueue.lo
+	libgstmprtp_la-packetsqueue.lo libgstmprtp_la-playoutwindow.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -404,7 +404,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          gstnetsimb.c               \
                          netsimqueue.c              \
                          bintree.c                  \
-                         packetsqueue.c
+                         packetsqueue.c             \
+                         playoutwindow.c           
 
 noinst_HEADERS = mprtpspath.h      \
                  rmanctrler.h      \
@@ -416,7 +417,8 @@ noinst_HEADERS = mprtpspath.h      \
                  streamjoiner.h    \
                  netsimqueue.h     \
                  bintree.h         \
-                 packetsqueue.h
+                 packetsqueue.h    \
+                 playoutwindow.h
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -522,6 +524,7 @@ include ./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-netsimqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-packetsqueue.Plo
+include ./$(DEPDIR)/libgstmprtp_la-playoutwindow.Plo
 include ./$(DEPDIR)/libgstmprtp_la-refctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rmanctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sefctrler.Plo
@@ -675,6 +678,13 @@ libgstmprtp_la-packetsqueue.lo: packetsqueue.c
 #	$(AM_V_CC)source='packetsqueue.c' object='libgstmprtp_la-packetsqueue.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-packetsqueue.lo `test -f 'packetsqueue.c' || echo '$(srcdir)/'`packetsqueue.c
+
+libgstmprtp_la-playoutwindow.lo: playoutwindow.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-playoutwindow.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-playoutwindow.Tpo -c -o libgstmprtp_la-playoutwindow.lo `test -f 'playoutwindow.c' || echo '$(srcdir)/'`playoutwindow.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-playoutwindow.Tpo $(DEPDIR)/libgstmprtp_la-playoutwindow.Plo
+#	$(AM_V_CC)source='playoutwindow.c' object='libgstmprtp_la-playoutwindow.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-playoutwindow.lo `test -f 'playoutwindow.c' || echo '$(srcdir)/'`playoutwindow.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

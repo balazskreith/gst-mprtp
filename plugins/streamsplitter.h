@@ -33,29 +33,36 @@ struct _RetainedItem{
   GstBuffer   *buffer;
 };
 
+typedef enum{
+  MPRTP_STREAM_BYTE_BASED_SPLITTING,
+  MPRTP_STREAM_PACKET_BASED_SPLITTING,
+  MPRTP_STREAM_FRAME_BASED_SPLITTING,
+}StreamSplittingMode;
+
 struct _StreamSplitter
 {
   GObject          object;
 
-  gboolean         new_path_added;
-  gboolean         path_is_removed;
-  gboolean         changes_are_committed;
+  gboolean             new_path_added;
+  gboolean             path_is_removed;
+  gboolean             changes_are_committed;
 
-  SchNode*         non_keyframes_tree;
-  SchNode*         keyframes_tree;
+  SchNode*             non_keyframes_tree;
+  SchNode*             keyframes_tree;
+  StreamSplittingMode  splitting_mode;
+  GHashTable*          subflows;
+  guint32              charge_value;
+  guint32              last_rtp_timestamp;
+  guint8               ext_header_id;
+  GRWLock              rwmutex;
 
-  GHashTable*      subflows;
-  guint32          charge_value;
-  guint8           ext_header_id;
-  GRWLock          rwmutex;
+  GstClock*            sysclock;
+  GstTask*             thread;
+  GRecMutex            thread_mutex;
 
-  GstClock*        sysclock;
-  GstTask*         thread;
-  GRecMutex        thread_mutex;
-
-  gfloat           non_keyframe_ratio;
-  gfloat           keyframe_ratio;
-  guint8           active_subflow_num;
+  gfloat               non_keyframe_ratio;
+  gfloat               keyframe_ratio;
+  guint8               active_subflow_num;
 
 };
 
@@ -68,6 +75,7 @@ void stream_splitter_add_path(StreamSplitter * this, guint8 subflow_id, MPRTPSPa
 void stream_splitter_rem_path(StreamSplitter * this, guint8 subflow_id);
 MPRTPSPath* stream_splitter_get_next_path(StreamSplitter* this, GstBuffer* buf);
 void stream_splitter_set_rtp_ext_header_id(StreamSplitter* this, guint8 ext_header_id);
+void stream_splitter_set_splitting_mode (StreamSplitter * this, StreamSplittingMode mode);
 void stream_splitter_setup_sending_bid(StreamSplitter* this, guint8 subflow_id, guint32 bid);
 void stream_splitter_commit_changes(StreamSplitter *this);
 GType stream_splitter_get_type (void);

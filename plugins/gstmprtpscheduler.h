@@ -67,6 +67,9 @@ struct _GstMprtpscheduler
   gboolean         retain_allowed;
   guint            subflows_num;
 
+  GstSegment       segment;
+  GstClockTime     position_out;
+
   GstClock*        sysclock;
   gboolean         retained_process_started;
   GstClockTime     retained_last_popped_item_time;

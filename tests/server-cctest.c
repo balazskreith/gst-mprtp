@@ -88,8 +88,11 @@ make_video_session (guint sessionNum)
 {
   GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
   GstElement *videoSrc = gst_element_factory_make ("videotestsrc", NULL);
-  GstElement *encoder = gst_element_factory_make ("theoraenc", NULL);
-  GstElement *payloader = gst_element_factory_make ("rtptheorapay", NULL);
+  //GstElement *encoder = gst_element_factory_make ("theoraenc", NULL);
+  GstElement *encoder = gst_element_factory_make ("jpegenc", NULL);
+  //GstElement *payloader = gst_element_factory_make ("rtptheorapay", NULL);
+  GstElement *payloader = gst_element_factory_make ("rtpjpegpay", NULL);
+
   GstCaps *videoCaps;
   SessionData *session;
   g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 1, NULL);
@@ -163,93 +166,6 @@ typedef struct _Identities
 #define print_boundary(text) g_printf("------------------------------ %s ---------------------\n", text);
 #define print_command(str,...) g_printf("[CMD] "str"\n",__VA_ARGS__)
 
-static GstElement *get_netsim_for_subflow(Identities* ids, guint subflow_id)
-{
-  if(subflow_id == 1)
-    return ids->netsim_s1;
-  else
-    return ids->netsim_s2;
-}
-
-static gboolean
-_network_changes (gpointer data)
-{
-  gchar **words, *command;
-  Identities *ids = data;
-
-  if(++ids->called == 1){
-    ids->fp = fopen(ids->filename, "r");
-    g_print("File to open: %s\n", ids->filename);
-    if (ids->fp == NULL) goto end;
-    print_boundary("START");
-  }
-  if(ids->silence > 0){
-    --ids->silence;
-    goto next;
-  }
-
-again:
-  ids->read = getline(&ids->line, &ids->len, ids->fp);
-  if(ids->read == -1) goto end;
-  words = g_strsplit(ids->line, ",", 0);
-  if(ids->line[0] == '#') goto again;
-  command = words[0];
-
-  if(!strcmp(command, "silence")){
-    gint times;
-    times = atoi(words[1]);
-    ids->silence = times;
-    print_command("silence will perform for %d times", times);
-    goto next;
-  }
-  if(!strcmp(command, "delay-probability")    ||
-     !strcmp(command, "reorder-probability")  ||
-     !strcmp(command, "drop-probability")     ||
-     !strcmp(command, "duplicate-probability")
-    )
-  {
-    gfloat probability;
-    guint subflow_id;
-    probability = atof(words[1]);
-    subflow_id = atoi(words[2]);
-    g_object_set(get_netsim_for_subflow(ids, subflow_id),
-                 command, probability, NULL);
-    print_command("%s is processed with probability %f on subflow %d",
-                  command, probability, subflow_id);
-    goto next;
-  }
-
-
-  if( !strcmp(command, "min-delay")            ||
-      !strcmp(command, "queue-min-delay")      ||
-      !strcmp(command, "queue-drop-policy")    ||
-      !strcmp(command, "queue-max-delay")      ||
-      !strcmp(command, "queue-max-packets")    ||
-      !strcmp(command, "max-delay")            ||
-      !strcmp(command, "pacing-treshold")      ||
-      !strcmp(command, "smooth-delay")
-    )
-  {
-    gint value;
-    guint subflow_id;
-    value = atoi(words[1]);
-    subflow_id = atoi(words[2]);
-    g_object_set(get_netsim_for_subflow(ids, subflow_id),
-                 command, value, NULL);
-    print_command("%s is processed with value %d on subflow %d",
-                  command, value, subflow_id);
-    goto next;
-  }
-
-next:
-  return G_SOURCE_CONTINUE;
-
-end:
-  if(ids->fp) fclose(ids->fp);
-  if(ids->line) free(ids->line);
-  print_boundary("END");
-  return G_SOURCE_REMOVE;
-}
 
 static void
 changed_event (GstElement * mprtp_sch)
@@ -271,22 +187,22 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   GstElement *mprtpsnd = gst_element_factory_make ("mprtpsender", NULL);
   GstElement *mprtprcv = gst_element_factory_make ("mprtpreceiver", NULL);
   GstElement *mprtpsch = gst_element_factory_make ("mprtpscheduler", NULL);
-  GstElement *identity_1 = gst_element_factory_make ("netsimb", NULL);
-  GstElement *identity_2 = gst_element_factory_make ("netsimb", NULL);
+//  GstElement *identity_1 = gst_element_factory_make ("netsimb", NULL);
+//  GstElement *identity_2 = gst_element_factory_make ("netsimb", NULL);
   Identities *ids = g_malloc0 (sizeof (Identities));
   int basePort;
   gchar *padName;
 
   ids->mprtpsch = mprtpsch;
-  ids->netsim_s1 = identity_1;
-  ids->netsim_s2 = identity_2;
+//  ids->netsim_s1 = identity_1;
+//  ids->netsim_s2 = identity_2;
   ids->called = 0;
 
   basePort = 5000 + (session->sessionNum * 20);
 
   gst_bin_add_many (GST_BIN (pipe), rtpSink_1, rtpSink_2, mprtprcv, mprtpsnd,
-      mprtpsch, rtcpSink, rtcpSrc, rtpSrc_1, rtpSrc_2, identity_1,
-      identity_2, session->input, NULL);
+      mprtpsch, rtcpSink, rtcpSrc, rtpSrc_1, rtpSrc_2,
+      session->input, NULL);
 
   /* enable retransmission by setting rtprtxsend as the "aux" element of rtpbin */
   g_signal_connect (rtpBin, "request-aux-sender",
@@ -295,15 +211,15 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   g_signal_connect (mprtpsch, "subflows-usage-changed",
       (GCallback) changed_event, NULL);
 
-  g_object_set (rtpSink_1, "port", basePort, "host", "127.0.0.1",
-      NULL);
-//      "sync",FALSE, "async", FALSE, NULL);
-
-  g_object_set (rtpSink_2, "port", basePort + 1, "host", "127.0.0.1",
+  g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2",
 //      NULL);
       "sync",FALSE, "async", FALSE, NULL);
 
-  g_object_set (rtcpSink, "port", basePort + 5, "host", "127.0.0.1",
+  g_object_set (rtpSink_2, "port", basePort + 1, "host", "10.0.1.2",
+//      NULL);
+      "sync",FALSE, "async", FALSE, NULL);
+
+  g_object_set (rtcpSink, "port", basePort + 5, "host", "10.0.0.1",
 //      NULL);
        "sync",FALSE, "async", FALSE, NULL);
 
@@ -323,17 +239,19 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   g_free (padName);
   /* link rtpbin to udpsink directly here if you don't want
    * artificial packet loss */
-  gst_element_link_pads (mprtpsnd, "src_1", identity_1, "sink");
-  gst_element_link (identity_1, rtpSink_1);
+//  gst_element_link_pads (mprtpsnd, "src_1", identity_1, "sink");
+  //  gst_element_link (identity_1, rtpSink_1);
+  gst_element_link_pads (mprtpsnd, "src_1", rtpSink_1, "sink");
 
-  gst_element_link_pads (mprtpsnd, "src_2", identity_2, "sink");
-  gst_element_link (identity_2, rtpSink_2);
+//  gst_element_link_pads (mprtpsnd, "src_2", identity_2, "sink");
+//  gst_element_link (identity_2, rtpSink_2);
+  gst_element_link_pads (mprtpsnd, "src_2", rtpSink_2, "sink");
 
   g_object_set (mprtpsch, "join-subflow", 1, NULL);
-//  g_object_set (mprtpsch, "join-subflow", 2, NULL);
+  g_object_set (mprtpsch, "join-subflow", 2, NULL);
 
-  sprintf(ids->filename, "%s", file);
-  g_timeout_add (1000, _network_changes, ids);
+//  sprintf(ids->filename, "%s", file);
+//  g_timeout_add (1000, _network_changes, ids);
 
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");

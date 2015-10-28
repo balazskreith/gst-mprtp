@@ -44,6 +44,7 @@
 #include "gstmprtcpbuffer.h"
 #include "smanctrler.h"
 #include "sefctrler.h"
+#include <sys/timex.h>
 
 GST_DEBUG_CATEGORY_STATIC (gst_mprtpscheduler_debug_category);
 #define GST_CAT_DEFAULT gst_mprtpscheduler_debug_category
@@ -65,9 +66,6 @@ static void gst_mprtpscheduler_set_property (GObject * object,
     guint property_id, const GValue * value, GParamSpec * pspec);
 static void gst_mprtpscheduler_get_property (GObject * object,
     guint property_id, GValue * value, GParamSpec * pspec);
-static gboolean
-gst_mprtpplayouter_src_query (GstPad * sinkpad, GstObject * parent,
-    GstQuery * query);
 static void gst_mprtpscheduler_dispose (GObject * object);
 static void gst_mprtpscheduler_finalize (GObject * object);
 
@@ -85,8 +83,6 @@ static GstFlowReturn gst_mprtpscheduler_rtp_sink_chainlist (GstPad * pad,
 static GstFlowReturn gst_mprtpscheduler_mprtcp_rr_sink_chain (GstPad * pad,
     GstObject * parent, GstBuffer * outbuf);
 
-static gboolean gst_mprtpscheduler_sink_query (GstPad * pad, GstObject * parent,
-    GstQuery * query);
 static gboolean gst_mprtpscheduler_src_query (GstPad * srckpad, GstObject * parent,
     GstQuery * query);
 
@@ -102,6 +98,8 @@ static void _change_auto_flow_controlling_mode (GstMprtpscheduler * this,
     gboolean new_flow_controlling_mode);
 static gboolean gst_mprtpscheduler_mprtp_src_event (GstPad * pad,
     GstObject * parent, GstEvent * event);
+static gboolean gst_mprtpscheduler_sink_eventfunc (GstPad * srckpad, GstObject * parent,
+                                                   GstEvent * event);
 static GstStructure *_collect_infos (GstMprtpscheduler * this);
 static void gst_mprtpscheduler_retain_process_run (void *data);
 static gboolean _retain_buffer (GstMprtpscheduler * this, GstBuffer * buf);
@@ -371,11 +369,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   gst_pad_set_chain_function (this->mprtcp_rr_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpscheduler_mprtcp_rr_sink_chain));
 
-  gst_pad_set_query_function (this->rtp_sinkpad,
-      GST_DEBUG_FUNCPTR (gst_mprtpscheduler_sink_query));
-
-  gst_pad_set_query_function (this->rtp_sinkpad,
-      GST_DEBUG_FUNCPTR (gst_mprtpscheduler_src_query));
+  gst_pad_set_event_function (this->rtp_sinkpad,
+      GST_DEBUG_FUNCPTR (gst_mprtpscheduler_sink_eventfunc));
 
   gst_element_add_pad (GST_ELEMENT (this), this->mprtcp_rr_sinkpad);
 
@@ -396,7 +391,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   GST_PAD_SET_PROXY_ALLOCATION (this->mprtp_srcpad);
 
   gst_pad_set_query_function(this->mprtp_srcpad,
-    GST_DEBUG_FUNCPTR(gst_mprtpplayouter_src_query));
+    GST_DEBUG_FUNCPTR(gst_mprtpscheduler_src_query));
 
   gst_element_add_pad (GST_ELEMENT (this), this->mprtp_srcpad);
 
@@ -454,6 +449,9 @@ gst_mprtpscheduler_finalize (GObject * object)
   G_OBJECT_CLASS (gst_mprtpscheduler_parent_class)->finalize (object);
 }
 
+
+
+
 void
 gst_mprtpscheduler_set_property (GObject * object, guint property_id,
     const GValue * value, GParamSpec * pspec)
@@ -508,11 +506,11 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_RETAIN_BUFFERS:
-      THIS_WRITELOCK (this);
-      gboolean_value = g_value_get_boolean (value);
-      this->retain_allowed = gboolean_value;
-      THIS_WRITEUNLOCK (this);
-      break;
+          THIS_WRITELOCK (this);
+          gboolean_value = g_value_get_boolean (value);
+          this->retain_allowed = gboolean_value;
+          THIS_WRITEUNLOCK (this);
+          break;
     case PROP_PACING_BUFFERS:
       THIS_WRITELOCK (this);
       gboolean_value = g_value_get_boolean (value);
@@ -610,41 +608,6 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
   }
 }
 
-
-gboolean
-gst_mprtpplayouter_src_query (GstPad * sinkpad, GstObject * parent,
-    GstQuery * query)
-{
-  GstMprtpscheduler *this = GST_MPRTPSCHEDULER(parent);
-  gboolean result = FALSE;
-  GST_DEBUG_OBJECT (this, "query");
-  switch (GST_QUERY_TYPE (query)) {
-    case GST_QUERY_LATENCY:
-      {
-        gboolean live;
-        GstClockTime min, max;
-        GstPad *peer;
-        peer = gst_pad_get_peer (this->rtp_sinkpad);
-//        g_print ("PLY GST_QUERY_LATENCY\n");
-        if ((result = gst_pad_query (peer, query))) {
-            gst_query_parse_latency (query, &live, &min, &max);
-            max+= 10*GST_MSECOND;
-//            g_print ("Peer latency: min %"
-//                      GST_TIME_FORMAT " max %" GST_TIME_FORMAT,
-//                      GST_TIME_ARGS (min), GST_TIME_ARGS (max));
-            gst_query_set_latency (query, live, min, max);
-        }
-        gst_object_unref (peer);
-      }
-      break;
-    default:
-      result = gst_pad_peer_query (this->mprtp_srcpad, query);
-      break;
-  }
-  return result;
-}
-
-
 GstStructure *
 _collect_infos (GstMprtpscheduler * this)
 {
@@ -683,6 +646,8 @@ _collect_infos (GstMprtpscheduler * this)
   return result;
 }
 
+
+
 gboolean
 gst_mprtpscheduler_mprtp_src_event (GstPad * pad, GstObject * parent,
     GstEvent * event)
@@ -694,7 +659,8 @@ gst_mprtpscheduler_mprtp_src_event (GstPad * pad, GstObject * parent,
   THIS_READLOCK (this);
   switch (GST_EVENT_TYPE (event)) {
     default:
-      result = gst_pad_event_default (pad, parent, event);
+      result = gst_pad_push_event (this->rtp_sinkpad, event);
+//      result = gst_pad_event_default (pad, parent, event);
   }
   THIS_READUNLOCK (this);
   return result;
@@ -918,6 +884,17 @@ _do_retain_buffer (GstMprtpscheduler * this,
 
   return FALSE;
 }
+//struct ntp_time_t {
+//    guint32   second;
+//    guint32   fraction;
+//};
+//
+//static void convert_unix_time_into_ntp_time(struct timeval *unx, struct ntp_time_t *ntp);
+//void convert_unix_time_into_ntp_time(struct timeval *unx, struct ntp_time_t *ntp)
+//{
+//    ntp->second = unx->tv_sec + 0x83AA7E80;
+//    ntp->fraction = (guint32)( (double)(unx->tv_usec+1) * (double)(1LL<<32) * 1.0e-6 );
+//}
 
 GstFlowReturn
 _send_rtp_buffer (GstMprtpscheduler * this,
@@ -936,9 +913,27 @@ _send_rtp_buffer (GstMprtpscheduler * this,
   }
   mprtps_path_process_rtp_packet (path, this->mprtp_ext_header_id, &rtp);
 
-  //Absolute sending time
+  //Absolute sending time +0x83AA7E80
   //https://tools.ietf.org/html/draft-alvestrand-rmcat-remb-03
   time = (guint32) ((NTP_NOW >> 14) & 0x00ffffff);
+//  {
+//    struct ntptimeval ptr;
+//    struct timeval unx;
+//    struct ntp_time_t ntp;
+//
+//    // get time unix time via gettimeofday
+//    gettimeofday(&unx, NULL);
+//    // convert unix time to ntp time
+//    convert_unix_time_into_ntp_time(&unx, &ntp);
+//
+//    ntp_gettime(&ptr);
+//    //ptr.time.tv_sec += 0x83AA7E80;
+//    g_print("COMPARE: my NTP: %lu your NTP: %lu :%lu - %d\n",
+//            NTP_NOW,
+//            (guint64) (((ptr.time.tv_sec + 0x83AA7E80)<<32) | ptr.time.tv_usec),
+//            (guint64) (((guint64)ntp.second<<32) | ntp.fraction),
+//            ntp_gettime(&ptr));
+//  }
   memcpy (&data, &time, 3);
   gst_rtp_buffer_add_extension_onebyte_header (&rtp,
       this->abs_time_ext_header_id, (gpointer) & data, sizeof (data));
@@ -1013,23 +1008,40 @@ gst_mprtpscheduler_mprtcp_sender (gpointer ptr, GstBuffer * buf)
 }
 
 
-
 static gboolean
-gst_mprtpscheduler_sink_query (GstPad * sinkpad, GstObject * parent,
-    GstQuery * query)
+gst_mprtpscheduler_sink_eventfunc (GstPad * srckpad, GstObject * parent,
+                                   GstEvent * event)
 {
-  GstMprtpscheduler *this = GST_MPRTPSCHEDULER (parent);
-  gboolean result;
-  GstPad *peer;
-  GST_DEBUG_OBJECT (this, "query");
-  switch (GST_QUERY_TYPE (query)) {
-
+  GstMprtpscheduler * this;
+  gboolean result = TRUE, forward = TRUE;
+  this = GST_MPRTPSCHEDULER(parent);
+  switch (GST_EVENT_TYPE (event)) {
+    case GST_EVENT_FLUSH_START:
+      break;
+    case GST_EVENT_FLUSH_STOP:
+      /* we need new segment info after the flush. */
+      gst_segment_init (&this->segment, GST_FORMAT_UNDEFINED);
+      this->position_out = GST_CLOCK_TIME_NONE;
+      break;
+    case GST_EVENT_EOS:
+      break;
+    case GST_EVENT_TAG:
+      break;
+    case GST_EVENT_SEGMENT:
+    {
+      gst_event_copy_segment (event, &this->segment);
+      GST_DEBUG_OBJECT (this, "received SEGMENT %" GST_SEGMENT_FORMAT,
+          &this->segment);
+      break;
+    }
     default:
-      peer = gst_pad_get_peer (this->mprtp_srcpad);
-      result = gst_pad_peer_query (peer, query);
-      gst_object_unref (peer);
       break;
   }
+
+  if (result && forward)
+    result = gst_pad_push_event (this->mprtp_srcpad, event);
+  else
+    gst_event_unref (event);
 
   return result;
 }

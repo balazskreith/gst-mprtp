@@ -111,15 +111,17 @@ make_video_session (guint sessionNum)
   //GstElement *videoSrc = gst_element_factory_make ("videotestsrc", NULL);
   GstElement *videoSrc = gst_element_factory_make ("autovideosrc", NULL);
   GstElement *videoConv = gst_element_factory_make("videoconvert", NULL);
-  GstElement *encoder = gst_element_factory_make ("theoraenc", NULL);
-  GstElement *payloader = gst_element_factory_make ("rtptheorapay", NULL);
+//  GstElement *encoder = gst_element_factory_make ("theoraenc", NULL);
+  GstElement *encoder = gst_element_factory_make ("jpegenc", NULL);
+//  GstElement *payloader = gst_element_factory_make ("rtptheorapay", NULL);
+  GstElement *payloader = gst_element_factory_make ("rtpjpegpay", NULL);
   GstCaps *videoCaps;
   SessionData *session;
   //g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 1, NULL);
   g_object_set (payloader, "config-interval", 2, NULL);
-  g_object_set(videoSrc, "name", "videosrc", NULL);
+  g_object_set (videoSrc, "name", "videosrc", NULL);
   g_object_set (videoSrc, "sync", FALSE, NULL);
-  g_object_set (encoder, "bitrate", 1024, NULL);
+  g_object_set (encoder, "bitrate", 300, NULL);
 
   gst_bin_add_many (videoBin, videoSrc, videoConv, encoder, payloader, NULL);
   videoCaps = gst_caps_new_simple ("video/x-raw",

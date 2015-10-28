@@ -45,7 +45,7 @@ struct _StreamJoiner
   Heap*                packets_heap;
   guint16              popped_hsn;
   GQueue*              heap_items_pool;
-  GQueue*              packets_framequeue;
+//  GQueue*              packets_framequeue;
   PlayoutWindow*       playoutwindow;
   gboolean             obsolate_automatically;
   gboolean             playout_allowed;

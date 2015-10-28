@@ -114,12 +114,10 @@ static void _heap_pop (struct _Heap *restrict h);
 static HeapItem *_make_heap_item (StreamJoiner * this,
                                   GstRTPBuffer *rtp);
 static void _trash_heap_item (StreamJoiner * this, HeapItem * heap_item);
-static void _popback_framequeue(StreamJoiner *this);
-static void _push_framequeue(StreamJoiner *this, HeapItem *item);
-static void _flush_framequeue(StreamJoiner *this);
 
-void _set_new_max_skew(StreamJoiner *this, guint64 new_max_skew);
-static void _playout(StreamJoiner *this);
+static void _set_new_max_skew(StreamJoiner *this, guint64 new_max_skew);
+static void _tick_heap(StreamJoiner *this);
+static void _playout(StreamJoiner * this);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -146,7 +144,7 @@ stream_joiner_finalize (GObject * object)
   gst_task_join (this->thread);
   g_free (this->packets_heap);
   g_object_unref (this->sysclock);
-  g_object_unref(this->packets_framequeue);
+  g_object_unref(this->playoutwindow);
 }
 
 void
@@ -170,9 +168,8 @@ stream_joiner_init (StreamJoiner * this)
   this->thread = gst_task_new (stream_joiner_run, this, NULL);
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
-  this->packets_framequeue = g_queue_new();
   this->max_skews_tree = make_bintree(_cmp_skew_for_tree);
-
+  playoutwindow_set_window_size(this, 20 * GST_MSECOND);
 }
 
 
@@ -227,8 +224,7 @@ stream_joiner_run (void *data)
       mprtpr_path_removes_obsolate_packets(path, 2 * GST_SECOND);
     }
   }
-  if(0)_push_framequeue(this, heap_item);
-  if(0)_popback_framequeue(this);
+  _tick_heap(this);
   _playout(this);
 
   if (!max_path_skew){
@@ -264,7 +260,7 @@ void _set_new_max_skew(StreamJoiner *this, guint64 new_max_skew)
   ++this->max_skews_index;
 }
 
-void _playout(StreamJoiner *this)
+void _tick_heap(StreamJoiner *this)
 {
   HeapItem *heap_item;
   if(!this->packets_heap->count) goto done;
@@ -283,6 +279,12 @@ void _playout(StreamJoiner *this)
     this->send_mprtp_packet_func (
           this->send_mprtp_packet_data,
           heap_item->buffer);
+    {
+      GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+      gst_rtp_buffer_map(heap_item->buffer, GST_MAP_READ, &rtp);
+      playoutwindow_push(this->playoutwindow, &rtp);
+      gst_rtp_buffer_unmap(&rtp);
+    }
     _trash_heap_item (this, heap_item);
     //g_print("%hu->", heap_item->seq_num);
     //_trash_heap_item (this, heap_item);
@@ -291,6 +293,17 @@ void _playout(StreamJoiner *this)
 //  _popback_framequeue(this);
 done:
   return;
+}
+
+void _playout(StreamJoiner * this)
+{
+  GstBuffer *buffer;
+  while(playoutwindow_has_frame_to_playout(this->playoutwindow)){
+    buffer = playoutwindow_pop(this->playoutwindow);
+    this->send_mprtp_packet_func (
+              this->send_mprtp_packet_data,
+              buffer);
+  }
 }
 
 void stream_joiner_receive_rtp(StreamJoiner * this, GstRTPBuffer *rtp)
@@ -526,44 +539,6 @@ _trash_heap_item (StreamJoiner * this, HeapItem * heap_item)
 }
 
 
-void _popback_framequeue(StreamJoiner *this)
-{
-  HeapItem *item;
-  again:
-    if(g_queue_is_empty(this->packets_framequeue)) goto done;
-    item = (HeapItem*) g_queue_pop_head(this->packets_framequeue);
-    _heap_push(this->packets_heap, item);
-    goto again;
-  done:
-    return;
-}
-
-void _push_framequeue(StreamJoiner *this, HeapItem *item)
-{
-  HeapItem *head;
-  head = g_queue_peek_head(this->packets_framequeue);
-  if(item->frame_start || head->rtp_timestamp != item->rtp_timestamp)
-    _flush_framequeue(this);
-  g_queue_push_tail(this->packets_framequeue, item);
-  if(item->frame_end) _flush_framequeue(this);
-}
-
-void _flush_framequeue(StreamJoiner *this)
-{
-  HeapItem *item;
-again:
-  if(g_queue_is_empty(this->packets_framequeue)) goto done;
-  item = (HeapItem*) g_queue_pop_head(this->packets_framequeue);
-//  g_print("<%d|%hu|%d>", item->frame_start, item->seq_num, item->frame_end);
-  this->send_mprtp_packet_func (
-      this->send_mprtp_packet_data,
-      item->buffer);
-  _trash_heap_item (this, item);
-  goto again;
-done:
-//  g_print("&&");
-  return;
-}
 #undef HEAP_CMP
 #undef THIS_READLOCK
 #undef THIS_READUNLOCK

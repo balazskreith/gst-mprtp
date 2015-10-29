@@ -282,6 +282,21 @@ guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this)
   return result;
 }
 
+void mprtpr_path_set_state(MpRTPRPath *this, MPRTPRPathState state)
+{
+  THIS_WRITELOCK (this);
+  this->state = state;
+  THIS_WRITEUNLOCK (this);
+}
+
+MPRTPRPathState mprtpr_path_get_state(MpRTPRPath *this)
+{
+  MPRTPRPathState result;
+  THIS_READLOCK (this);
+  result = this->state;
+  THIS_READUNLOCK (this);
+  return result;
+}
 
 guint64 mprtpr_path_get_last_skew(MpRTPRPath *this)
 {
@@ -445,6 +460,7 @@ void _add_skew(MpRTPRPath *this, guint64 skew, guint8 payload_octets)
   again:
   ++this->skews_index;
   //elliminate the old ones
+//  g_print("Subflow %d current byte num: %u payload bytes: %u\n", this->id, this->skew_bytes, );
   this->skew_bytes -= this->skews_payload_octets[this->skews_index]<<3;
   this->skews_payload_octets[this->skews_index] = 0;
   if(this->skews[this->skews_index] > 0){
@@ -461,7 +477,7 @@ void _add_skew(MpRTPRPath *this, guint64 skew, guint8 payload_octets)
   //add new one
   this->skews[this->skews_index] = skew;
   this->skews_arrived[this->skews_index] = now;
-  this->skew_bytes += this->skews_payload_octets[this->skews_index]<<3;
+  this->skew_bytes += (guint32)payload_octets<<3;
   this->skews_payload_octets[this->skews_index] = payload_octets;
   if(this->skews[this->skews_index] <= bintree_get_top_value(this->max_skew_bintree))
     bintree_insert_value(this->max_skew_bintree, this->skews[this->skews_index]);

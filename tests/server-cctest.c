@@ -219,7 +219,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
 //      NULL);
       "sync",FALSE, "async", FALSE, NULL);
 
-  g_object_set (rtcpSink, "port", basePort + 5, "host", "10.0.0.1",
+  g_object_set (rtcpSink, "port", basePort + 5, "host", "10.0.0.2",
 //      NULL);
        "sync",FALSE, "async", FALSE, NULL);
 

@@ -200,86 +200,6 @@ static GstElement *get_netsim_for_subflow(Identities* ids, guint subflow_id)
     return ids->netsim_s2;
 }
 
-static gboolean
-_network_changes (gpointer data)
-{
-  gchar **words, *command;
-  Identities *ids = data;
-
-  if(++ids->called == 1){
-    ids->fp = fopen(ids->filename, "r");
-    g_print("File to open: %s\n", ids->filename);
-    if (ids->fp == NULL) goto end;
-    print_boundary("START");
-  }
-  if(ids->silence > 0){
-    --ids->silence;
-    goto next;
-  }
-
-again:
-  ids->read = getline(&ids->line, &ids->len, ids->fp);
-  if(ids->read == -1) goto end;
-  words = g_strsplit(ids->line, ",", 0);
-  if(ids->line[0] == '#') goto again;
-  command = words[0];
-
-  if(!strcmp(command, "silence")){
-    gint times;
-    times = atoi(words[1]);
-    ids->silence = times;
-    print_command("silence will perform for %d times", times);
-    goto next;
-  }
-  if(!strcmp(command, "delay-probability")    ||
-     !strcmp(command, "reorder-probability")  ||
-     !strcmp(command, "drop-probability")     ||
-     !strcmp(command, "duplicate-probability")
-    )
-  {
-    gfloat probability;
-    guint subflow_id;
-    probability = atof(words[1]);
-    subflow_id = atoi(words[2]);
-    g_object_set(get_netsim_for_subflow(ids, subflow_id),
-                 command, probability, NULL);
-    print_command("%s is processed with probability %f on subflow %d",
-                  command, probability, subflow_id);
-    goto next;
-  }
-
-
-  if( !strcmp(command, "min-delay")            ||
-      !strcmp(command, "queue-min-delay")      ||
-      !strcmp(command, "queue-drop-policy")    ||
-      !strcmp(command, "queue-max-delay")      ||
-      !strcmp(command, "queue-max-packets")    ||
-      !strcmp(command, "max-delay")            ||
-      !strcmp(command, "pacing-treshold")      ||
-      !strcmp(command, "smooth-delay")
-    )
-  {
-    gint value;
-    guint subflow_id;
-    value = atoi(words[1]);
-    subflow_id = atoi(words[2]);
-    g_object_set(get_netsim_for_subflow(ids, subflow_id),
-                 command, value, NULL);
-    print_command("%s is processed with value %d on subflow %d",
-                  command, value, subflow_id);
-    goto next;
-  }
-
-next:
-  return G_SOURCE_CONTINUE;
-
-end:
-  if(ids->fp) fclose(ids->fp);
-  if(ids->line) free(ids->line);
-  print_boundary("END");
-  return G_SOURCE_REMOVE;
-}
-
 
 static void
 add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
@@ -316,15 +236,15 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   g_signal_connect (rtpBin, "request-aux-sender",
       (GCallback) request_aux_sender, session);
 
-  g_object_set (rtpSink_1, "port", basePort, "host", "127.0.0.1",
+  g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2",
       NULL);
 //      "sync",FALSE, "async", FALSE, NULL);
 
-  g_object_set (rtpSink_2, "port", basePort + 1, "host", "127.0.0.1",
+  g_object_set (rtpSink_2, "port", basePort + 1, "host", "10.0.1.2",
 //      NULL);
       "sync",FALSE, "async", FALSE, NULL);
 
-  g_object_set (rtcpSink, "port", basePort + 5, "host", "127.0.0.1",
+  g_object_set (rtcpSink, "port", basePort + 5, "host", "10.0.0.2",
 //      NULL);
        "sync",FALSE, "async", FALSE, NULL);
 
@@ -353,8 +273,6 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   g_object_set (mprtpsch, "join-subflow", 1, NULL);
   g_object_set (mprtpsch, "join-subflow", 2, NULL);
 
-  sprintf(ids->filename, "%s", file);
-  g_timeout_add (1000, _network_changes, ids);
 
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");

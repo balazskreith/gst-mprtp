@@ -35,51 +35,56 @@ typedef struct _MpRTPRReceivedItem  MpRTPRReceivedItem;
 
 #define SKEWS_ARRAY_LENGTH 256
 
+typedef enum{
+  MPRTPR_PATH_STATE_PASSIVE         = 0,
+  MPRTPR_PATH_STATE_ACTIVE          = 1,
+}MPRTPRPathState;
+
 struct _MpRTPReceiverPath
 {
-  GObject       object;
-  guint8        id;
-  GRWLock       rwmutex;
+  GObject          object;
+  guint8           id;
+  GRWLock          rwmutex;
 
-  GList*        gaps;
-  GList*        result;
+  GList*           gaps;
+  GList*           result;
   //guint8        ext_header_id;
-  gboolean      seq_initialized;
+  gboolean         seq_initialized;
   //gboolean      skew_initialized;
-  guint16       cycle_num;
-  guint32       jitter;
-
-  guint32       total_late_discarded;
-  guint32       total_late_discarded_bytes;
+  guint16          cycle_num;
+  guint32          jitter;
+  MPRTPRPathState  state;
+  guint32          total_late_discarded;
+  guint32          total_late_discarded_bytes;
 //  guint32       total_bytes_received;
-  guint32       total_payload_bytes;
-  guint32       total_early_discarded;
-  guint32       total_duplicated_packet_num;
-  guint16       highest_seq;
+  guint32          total_payload_bytes;
+  guint32          total_early_discarded;
+  guint32          total_duplicated_packet_num;
+  guint16          highest_seq;
 
-  guint64       ext_rtptime;
-  guint64       last_packet_skew;
-  GstClockTime  last_received_time;
-  GstClock*     sysclock;
-  guint16       played_highest_seq;
-  guint32       total_packet_losts;
-  guint64       total_packets_received;
-  PacketsQueue *packetsqueue;
-  guint32       last_rtp_timestamp;
-  BinTree*      min_skew_bintree;
-  BinTree*      max_skew_bintree;
-  BinTree*      min_delay_bintree;
-  BinTree*      max_delay_bintree;
-  guint32       skew_bytes;
-  guint8        skews_payload_octets[SKEWS_ARRAY_LENGTH];
-  guint64       skews[SKEWS_ARRAY_LENGTH];
-  GstClockTime  skews_arrived[SKEWS_ARRAY_LENGTH];
-  guint8        skews_index;
-  guint64       delays[SKEWS_ARRAY_LENGTH];
-  GstClockTime  delays_arrived[SKEWS_ARRAY_LENGTH];
-  guint8        delays_index;
-  GstClockTime  last_drift_window;
-  GstClockTime  last_delay;
+  guint64          ext_rtptime;
+  guint64          last_packet_skew;
+  GstClockTime     last_received_time;
+  GstClock*        sysclock;
+  guint16          played_highest_seq;
+  guint32          total_packet_losts;
+  guint64          total_packets_received;
+  PacketsQueue*    packetsqueue;
+  guint32          last_rtp_timestamp;
+  BinTree*         min_skew_bintree;
+  BinTree*         max_skew_bintree;
+  BinTree*         min_delay_bintree;
+  BinTree*         max_delay_bintree;
+  guint32          skew_bytes;
+  guint8           skews_payload_octets[SKEWS_ARRAY_LENGTH];
+  guint64          skews[SKEWS_ARRAY_LENGTH];
+  GstClockTime     skews_arrived[SKEWS_ARRAY_LENGTH];
+  guint8           skews_index;
+  guint64          delays[SKEWS_ARRAY_LENGTH];
+  GstClockTime     delays_arrived[SKEWS_ARRAY_LENGTH];
+  guint8           delays_index;
+  GstClockTime     last_drift_window;
+  GstClockTime     last_delay;
 
 
 };
@@ -127,7 +132,7 @@ guint64 mprtpr_path_get_drift_window(MpRTPRPath *this);
 GstClockTime mprtpr_path_get_delay (MpRTPRPath * this);
 guint32 mprtpr_path_get_skew_byte_num(MpRTPRPath *this);
 guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this);
-
-
+void mprtpr_path_set_state(MpRTPRPath *this, MPRTPRPathState state);
+MPRTPRPathState mprtpr_path_get_state(MpRTPRPath *this);
 G_END_DECLS
 #endif /* MPRTPRSUBFLOW_H_ */

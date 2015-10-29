@@ -47,7 +47,7 @@ typedef enum
   MPRTPS_PATH_MARKER_OVERUSED   = -1,
   MPRTPS_PATH_MARKER_STABLE     =  0,
   MPRTPS_PATH_MARKER_UNDERUSED  =  1,
-} MPRTPPathMarker;
+} MPRTPSPathMarker;
 
 
 typedef enum
@@ -56,7 +56,7 @@ typedef enum
   MPRTPS_PATH_FLAG_NON_LOSSY = 2,
   MPRTPS_PATH_FLAG_NON_CONGESTED = 4,
   MPRTPS_PATH_FLAG_ACTIVE = 8,
-} MPRTPPathFlags;
+} MPRTPSPathFlags;
 
 typedef enum{
   MPRTPS_PATH_STATE_NON_CONGESTED    = 1,
@@ -81,7 +81,7 @@ struct _MPRTPSPath
   guint32   total_sent_packet_num;
   guint32   total_sent_payload_bytes_sum;
 
-  MPRTPPathMarker  marker;
+  MPRTPSPathMarker  marker;
 
   GstClockTime  sent_passive;
   GstClockTime  sent_active;
@@ -127,8 +127,8 @@ void mprtps_path_process_rtp_packet (MPRTPSPath * this, guint ext_header_id, Gst
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
 guint32 mprtps_path_get_sent_octet_sum_for(MPRTPSPath *this, guint32 amount);
 
-void mprtps_path_set_marker(MPRTPSPath * this, MPRTPPathMarker marker);
-MPRTPPathMarker mprtps_path_get_marker(MPRTPSPath * this);
+void mprtps_path_set_marker(MPRTPSPath * this, MPRTPSPathMarker marker);
+MPRTPSPathMarker mprtps_path_get_marker(MPRTPSPath * this);
 
 MPRTPSPathState mprtps_path_get_state (MPRTPSPath * this);
 void mprtps_path_set_state (MPRTPSPath * this, MPRTPSPathState state);

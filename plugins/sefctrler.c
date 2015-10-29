@@ -898,7 +898,7 @@ _report_processing_xr_skew_block_processor (Subflow * this, GstRTCPXR_Skew * xrb
                            &skew,
                            &delay,
                            &bytes);
-  gst_print_rtcp_xr_skew(xrb);
+//  gst_print_rtcp_xr_skew(xrb);
   _st0(this)->skew_median = skew>>16;
 //  g_print("SKEW MED: %u\n", _st0(this)->skew_median);
   if(_st2(this) < _st1(this) && _st1(this) < _st0(this))

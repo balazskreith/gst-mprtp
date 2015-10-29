@@ -76,7 +76,6 @@ struct _Subflow
 {
   guint8 id;
   MpRTPRPath *path;
-  guint32 received_packets;
   guint64 path_skew;
   GstClockTime path_delay;
 };
@@ -217,6 +216,9 @@ stream_joiner_run (void *data)
     //subflow_id = *((guint8*) key);
     subflow = (Subflow *) val;
     path = subflow->path;
+    if(mprtpr_path_get_state(path) == MPRTPR_PATH_STATE_PASSIVE){
+      continue;
+    }
     mprtpr_path_playout_tick(path);
     subflow->path_skew = (mprtpr_path_get_drift_window(path) +
                           99 * subflow->path_skew) / 100;
@@ -264,10 +266,10 @@ void _set_playoutgate(StreamJoiner *this, GstClockTime min_delay, GstClockTime m
   guint64 window_size = 0;
   if(max_delay < min_delay) goto invalid;
   window_size = (max_delay - min_delay)<<1;
-  window_size = MIN(window_size, 200 * GST_MSECOND);
+  window_size = MIN(window_size, 150 * GST_MSECOND);
 invalid:
   window_size = MAX(window_size, GST_MSECOND);
-  g_print("Window size: %lu\n", window_size);
+//  g_print("Window size: %lu\n", window_size);
   playoutgate_set_window_size(this->playoutgate, window_size);
 }
 
@@ -445,7 +447,6 @@ _make_subflow (MpRTPRPath * path)
   Subflow *result = g_malloc0 (sizeof (Subflow));
   result->path = path;
   result->id = mprtpr_path_get_id (path);
-  result->received_packets = 0;
   result->path_skew = 10 * GST_USECOND;
   return result;
 }

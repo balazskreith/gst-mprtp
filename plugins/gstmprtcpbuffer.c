@@ -612,10 +612,10 @@ gst_rtcp_xr_skew_change (GstRTCPXR_Skew *report,
     report->skew = g_htonl (*skew);
   }
   if (delay) {
-    report->delay = g_htons (*delay);
+    report->delay = g_htonl (*delay);
   }
   if (bytes) {
-    report->bytes = g_htons (*bytes);
+    report->bytes = g_htonl (*bytes);
   }
   if (ssrc) {
     report->ssrc = g_htonl (*ssrc);

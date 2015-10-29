@@ -67,6 +67,8 @@ struct _Subflow
 //  guint64 path_skew;
   guint64 SR_sent_ntp_time;
   guint64 SR_received_ntp_time;
+  guint32 SR_last_packet_count;
+  guint32 SR_actual_packet_count;
   guint16 HSN;
 
   guint16 last_total_lost_packet_num;
@@ -567,6 +569,7 @@ _setup_xr_skew_report (Subflow * this,
   skew = mprtpr_path_get_drift_window(this->path);
   delay = mprtpr_path_get_delay(this->path);
   bytes = mprtpr_path_get_skew_byte_num(this->path);
+  g_print("Byte: %u\n", bytes);
 //  g_print("SKEW MEDIAN: %lu\n", skew_median);
   if(skew == 0){
       skew_xr = 0xFFFF; //unavailable
@@ -804,9 +807,10 @@ void
 _report_processing_srblock_processor (Subflow * this, GstRTCPSRBlock * srb)
 {
   guint64 ntptime;
+  guint32 SR_new_packet_count;
   GST_DEBUG ("RTCP SR riport arrived for subflow %p->%p", this, srb);
 //  this->LSR = gst_clock_get_time (this->sysclock);
-  gst_rtcp_srb_getdown(srb, &ntptime, NULL, NULL, NULL);
+  gst_rtcp_srb_getdown(srb, &ntptime, NULL, &SR_new_packet_count, NULL);
   if(ntptime < this->SR_sent_ntp_time){
       GST_WARNING_OBJECT(this, "Late SR report arrived");
       goto done;
@@ -815,6 +819,14 @@ _report_processing_srblock_processor (Subflow * this, GstRTCPSRBlock * srb)
 //          get_epoch_time_from_ntp_in_ns(NTP_NOW - ntptime));
   this->SR_sent_ntp_time = ntptime;
   this->SR_received_ntp_time = NTP_NOW;
+  if(SR_new_packet_count == this->SR_actual_packet_count &&
+     this->SR_actual_packet_count == this->SR_last_packet_count){
+      mprtpr_path_set_state(this->path, MPRTPR_PATH_STATE_PASSIVE);
+  }else if(mprtpr_path_get_state(this->path) == MPRTPR_PATH_STATE_PASSIVE){
+      mprtpr_path_set_state(this->path, MPRTPR_PATH_STATE_ACTIVE);
+  }
+  this->SR_last_packet_count = this->SR_actual_packet_count;
+  this->SR_actual_packet_count = SR_new_packet_count;
 //  {
 //    guint64 temp;
 //    temp = NTP_NOW - this->sending_report_ntp_time;

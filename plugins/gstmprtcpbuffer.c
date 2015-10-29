@@ -47,7 +47,7 @@
 #define RTCPSRBLOCK_WORDS (RTCPSRBLOCK_BYTES>>2)
 #define RTCPXR7243BLOCK_BYTES 12
 #define RTCPXR7243BLOCK_WORDS (RTCPXR7243BLOCK_BYTES>>2)
-#define RTCPXRSKEWBLOCK_BYTES 16
+#define RTCPXRSKEWBLOCK_BYTES 20
 #define RTCPXRSKEWBLOCK_WORDS (RTCPXRSKEWBLOCK_BYTES>>2)
 #define RTCPRRBLOCK_BYTES 24
 #define RTCPRRBLOCK_WORDS (RTCPRRBLOCK_BYTES>>2)
@@ -573,60 +573,80 @@ gst_rtcp_xr_rfc7243_getdown (GstRTCPXR_RFC7243 * riport,
 
 //------------------ XRSkew ------------------------
 void
-gst_rtcp_xr_skew_init (GstRTCPXR_Skew * riport)
+gst_rtcp_xr_skew_init (GstRTCPXR_Skew * report)
 {
-  gst_rtcp_header_init (&riport->header);
-  gst_rtcp_header_setup (&riport->header, FALSE, 0,
+  gst_rtcp_header_init (&report->header);
+  gst_rtcp_header_setup (&report->header, FALSE, 0,
       GST_RTCP_TYPE_XR, RTCPHEADER_WORDS - 1 + RTCPXRSKEWBLOCK_WORDS, 0);
-  gst_rtcp_xr_skew_setup (riport, 0, 0, 0, 0);
+  gst_rtcp_xr_skew_setup (report, 0, 0, 0, 0, 0);
 }
 
 
 void
-gst_rtcp_xr_skew_setup(GstRTCPXR_Skew * riport, guint32 ssrc,
-      guint32 median_skew, guint16 packets_num,
-      guint16 payload_bytes)
+gst_rtcp_xr_skew_setup(GstRTCPXR_Skew *report,
+                       guint8  interval_metric,
+                       guint32 ssrc,
+                       guint32 skew,
+                       guint32 delay,
+                       guint32 bytes)
 {
-  riport->block_length = g_htons (3);
-  riport->block_type = GST_RTCP_XR_SKEW_BLOCK_TYPE_IDENTIFIER;
-  gst_rtcp_xr_skew_change(riport, &ssrc, &median_skew, &packets_num, &payload_bytes);
+  report->block_length = g_htons (4);
+  report->block_type = GST_RTCP_XR_SKEW_BLOCK_TYPE_IDENTIFIER;
+  gst_rtcp_xr_skew_change(report,
+                          &interval_metric,
+                          &ssrc,
+                          &skew,
+                          &delay,
+                          &bytes);
 }
 
 void
-gst_rtcp_xr_skew_change (GstRTCPXR_Skew * riport, guint32 * ssrc,
-    guint32 *median_skew, guint16 * packets_num,
-    guint16 * payload_bytes)
+gst_rtcp_xr_skew_change (GstRTCPXR_Skew *report,
+    guint8  *interval_metric,
+    guint32 *ssrc,
+    guint32 *skew,
+    guint32 *delay,
+    guint32 *bytes)
 {
-  if (median_skew) {
-    riport->median_skew = g_htonl (*median_skew);
+  if (skew) {
+    report->skew = g_htonl (*skew);
   }
-  if (packets_num) {
-    riport->packets_num = g_htons (*packets_num);
+  if (delay) {
+    report->delay = g_htons (*delay);
   }
-  if (payload_bytes) {
-    riport->payload_bytes = g_htons (*payload_bytes);
+  if (bytes) {
+    report->bytes = g_htons (*bytes);
   }
   if (ssrc) {
-    riport->ssrc = g_htonl (*ssrc);
+    report->ssrc = g_htonl (*ssrc);
+  }
+  if(interval_metric){
+    report->interval_metric = *interval_metric;
   }
 }
 
 void
-gst_rtcp_xr_skew_getdown (GstRTCPXR_Skew * riport,guint32 * ssrc,
-    guint32 *median_skew, guint16 * packets_num,
-    guint16 * payload_bytes)
+gst_rtcp_xr_skew_getdown (GstRTCPXR_Skew * riport,
+                          guint8  *interval_metric,
+                          guint32 *ssrc,
+                          guint32 *skew,
+                          guint32 *delay,
+                          guint32 *bytes)
 {
   if (ssrc) {
     *ssrc = g_ntohl (riport->ssrc);
   }
-  if (median_skew) {
-    *median_skew = g_ntohl (riport->median_skew);
+  if(interval_metric){
+    *interval_metric = riport->interval_metric;
   }
-  if (packets_num) {
-      *packets_num = g_ntohs (riport->packets_num);
+  if (skew) {
+    *skew = g_ntohl (riport->skew);
+  }
+  if (delay) {
+      *delay = g_ntohl (riport->delay);
     }
-  if (payload_bytes) {
-      *payload_bytes = g_ntohs (riport->payload_bytes);
+  if (bytes) {
+      *bytes = g_ntohl (riport->bytes);
     }
 }
 
@@ -1027,30 +1047,31 @@ gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * riport)
 void
 gst_print_rtcp_xr_skew (GstRTCPXR_Skew * riport)
 {
-  guint32 skew_median;
+  guint8 flag;
+  guint32 skew;
   guint32 ssrc;
-  guint16 packets_num;
-  guint16 packet_bytes;
-
-  gst_rtcp_header_getdown (&riport->header, NULL, NULL, NULL, NULL, NULL, NULL);
+  guint32 delay;
+  guint32 bytes;
 
   gst_print_rtcp_header (&riport->header);
-  gst_rtcp_xr_skew_getdown (riport, &ssrc, &skew_median,
-                            &packets_num, &packet_bytes);
+  gst_rtcp_xr_skew_getdown (riport, &flag, &ssrc, &skew,
+                            &delay, &bytes);
   g_print (
       "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
-      "|%15d|%15d|%31d|\n"
+      "|%15d|%2d|%12d|%31d|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%63X|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%63u|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
-      "|%31d|%31d|\n"
+      "|%63u|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63u|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       ,
-      riport->block_type, riport->reserved,
-      g_ntohs (riport->block_length), ssrc, skew_median,
-      packets_num, packet_bytes);
+      riport->block_type, flag, riport->reserved,
+      g_ntohs (riport->block_length), ssrc, skew,
+      delay, bytes);
 }
 
 void

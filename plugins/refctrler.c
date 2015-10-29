@@ -557,25 +557,39 @@ void
 _setup_xr_skew_report (Subflow * this,
     GstRTCPXR_Skew * xr, guint32 ssrc)
 {
-  guint64 skew_median;
-  guint32 skew_median_xr;
-  guint16 packets_num;
-  guint16 packet_bytes;
+  guint8 flag = RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION;
+  guint64 skew;
+  guint32 skew_xr;
+  guint64 delay;
+  guint32 delay_xr;
+  guint32 bytes;
 
-  skew_median = mprtpr_path_get_drift_window(this->path);
-  packets_num = mprtpr_path_get_skew_packet_num(this->path);
-  packet_bytes = mprtpr_path_get_skew_byte_num(this->path);
+  skew = mprtpr_path_get_drift_window(this->path);
+  delay = mprtpr_path_get_delay(this->path);
+  bytes = mprtpr_path_get_skew_byte_num(this->path);
 //  g_print("SKEW MEDIAN: %lu\n", skew_median);
-  if(skew_median == 0){
-      skew_median_xr = 0xFF; //unavailable
+  if(skew == 0){
+      skew_xr = 0xFFFF; //unavailable
   }else{
-      if(skew_median > GST_SECOND)
-        skew_median_xr = 0xFE;
-      else
-        skew_median_xr = skew_median;
+      if(skew > GST_SECOND)
+        skew_xr = 0xFEFF;
+      else{
+        skew_xr = skew;
+//        skew_xr = get_ntp_from_epoch_ns(skew);
+      }
+  }
+  if(delay == 0){
+      delay_xr = 0xFFFF; //unavailable
+  }else{
+      if(delay > GST_SECOND)
+        delay_xr = 0xFEFF;
+      else{
+          delay_xr = delay;
+        //delay_xr = get_ntp_from_epoch_ns(delay);
+      }
   }
   gst_rtcp_header_change (&xr->header, NULL,NULL, NULL, NULL, NULL, &ssrc);
-  gst_rtcp_xr_skew_change(xr, &ssrc, &skew_median_xr, &packets_num, &packet_bytes);
+  gst_rtcp_xr_skew_change(xr, &flag, &ssrc, &skew_xr, &delay_xr, &bytes);
 //  g_print("DISCARDED REPORT SETTED UP\n");
 }
 

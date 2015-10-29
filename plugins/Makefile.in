@@ -143,9 +143,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-mprtpspath.lo libgstmprtp_la-streamjoiner.lo \
 	libgstmprtp_la-streamsplitter.lo libgstmprtp_la-rmanctrler.lo \
 	libgstmprtp_la-smanctrler.lo libgstmprtp_la-sefctrler.lo \
-	libgstmprtp_la-refctrler.lo libgstmprtp_la-gstnetsimb.lo \
-	libgstmprtp_la-netsimqueue.lo libgstmprtp_la-bintree.lo \
-	libgstmprtp_la-packetsqueue.lo libgstmprtp_la-playoutwindow.lo
+	libgstmprtp_la-refctrler.lo libgstmprtp_la-bintree.lo \
+	libgstmprtp_la-packetsqueue.lo libgstmprtp_la-playoutgate.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -401,11 +400,9 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          smanctrler.c               \
                          sefctrler.c                \
                          refctrler.c                \
-                         gstnetsimb.c               \
-                         netsimqueue.c              \
                          bintree.c                  \
                          packetsqueue.c             \
-                         playoutwindow.c           
+                         playoutgate.c           
 
 noinst_HEADERS = mprtpspath.h      \
                  rmanctrler.h      \
@@ -415,10 +412,9 @@ noinst_HEADERS = mprtpspath.h      \
                  mprtprpath.h      \
                  streamsplitter.h  \
                  streamjoiner.h    \
-                 netsimqueue.h     \
                  bintree.h         \
                  packetsqueue.h    \
-                 playoutwindow.h
+                 playoutgate.h
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -519,12 +515,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-gstnetsimb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-netsimqueue.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-packetsqueue.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-playoutwindow.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-playoutgate.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-refctrler.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-rmanctrler.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-sefctrler.Plo@am__quote@
@@ -651,20 +645,6 @@ libgstmprtp_la-refctrler.lo: refctrler.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-refctrler.lo `test -f 'refctrler.c' || echo '$(srcdir)/'`refctrler.c
 
-libgstmprtp_la-gstnetsimb.lo: gstnetsimb.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gstnetsimb.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gstnetsimb.Tpo -c -o libgstmprtp_la-gstnetsimb.lo `test -f 'gstnetsimb.c' || echo '$(srcdir)/'`gstnetsimb.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gstnetsimb.Tpo $(DEPDIR)/libgstmprtp_la-gstnetsimb.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='gstnetsimb.c' object='libgstmprtp_la-gstnetsimb.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstnetsimb.lo `test -f 'gstnetsimb.c' || echo '$(srcdir)/'`gstnetsimb.c
-
-libgstmprtp_la-netsimqueue.lo: netsimqueue.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-netsimqueue.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-netsimqueue.Tpo -c -o libgstmprtp_la-netsimqueue.lo `test -f 'netsimqueue.c' || echo '$(srcdir)/'`netsimqueue.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-netsimqueue.Tpo $(DEPDIR)/libgstmprtp_la-netsimqueue.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='netsimqueue.c' object='libgstmprtp_la-netsimqueue.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-netsimqueue.lo `test -f 'netsimqueue.c' || echo '$(srcdir)/'`netsimqueue.c
-
 libgstmprtp_la-bintree.lo: bintree.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-bintree.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-bintree.Tpo -c -o libgstmprtp_la-bintree.lo `test -f 'bintree.c' || echo '$(srcdir)/'`bintree.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-bintree.Tpo $(DEPDIR)/libgstmprtp_la-bintree.Plo
@@ -679,12 +659,12 @@ libgstmprtp_la-packetsqueue.lo: packetsqueue.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-packetsqueue.lo `test -f 'packetsqueue.c' || echo '$(srcdir)/'`packetsqueue.c
 
-libgstmprtp_la-playoutwindow.lo: playoutwindow.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-playoutwindow.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-playoutwindow.Tpo -c -o libgstmprtp_la-playoutwindow.lo `test -f 'playoutwindow.c' || echo '$(srcdir)/'`playoutwindow.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-playoutwindow.Tpo $(DEPDIR)/libgstmprtp_la-playoutwindow.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='playoutwindow.c' object='libgstmprtp_la-playoutwindow.lo' libtool=yes @AMDEPBACKSLASH@
+libgstmprtp_la-playoutgate.lo: playoutgate.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-playoutgate.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-playoutgate.Tpo -c -o libgstmprtp_la-playoutgate.lo `test -f 'playoutgate.c' || echo '$(srcdir)/'`playoutgate.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-playoutgate.Tpo $(DEPDIR)/libgstmprtp_la-playoutgate.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='playoutgate.c' object='libgstmprtp_la-playoutgate.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-playoutwindow.lo `test -f 'playoutwindow.c' || echo '$(srcdir)/'`playoutwindow.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-playoutgate.lo `test -f 'playoutgate.c' || echo '$(srcdir)/'`playoutgate.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

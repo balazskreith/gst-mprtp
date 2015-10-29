@@ -24,9 +24,8 @@
 #include "gstmprtcpbuffer.h"
 #include "mprtprpath.h"
 #include "streamjoiner.h"
-#include "playoutwindow.h"
-
 #include <gst/net/gstnetaddressmeta.h>
+#include "playoutgate.h"
 
 #if GLIB_CHECK_VERSION (2, 35, 7)
 #include <gio/gnetworking.h>

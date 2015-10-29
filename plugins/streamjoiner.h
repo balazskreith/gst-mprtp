@@ -9,7 +9,8 @@
 #define STREAM_JOINER_H_
 
 #include <gst/gst.h>
-#include "playoutwindow.h"
+
+#include "playoutgate.h"
 
 typedef struct _StreamJoiner StreamJoiner;
 typedef struct _StreamJoinerClass StreamJoinerClass;
@@ -46,7 +47,7 @@ struct _StreamJoiner
   guint16              popped_hsn;
   GQueue*              heap_items_pool;
 //  GQueue*              packets_framequeue;
-  PlayoutWindow*       playoutwindow;
+  PlayoutGate*         playoutgate;
   gboolean             obsolate_automatically;
   gboolean             playout_allowed;
   gboolean             playout_halt;

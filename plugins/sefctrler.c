@@ -889,11 +889,17 @@ _report_processing_xr_7243_block_processor (Subflow * this, GstRTCPXR_RFC7243 * 
 void
 _report_processing_xr_skew_block_processor (Subflow * this, GstRTCPXR_Skew * xrb)
 {
-  guint32 skew_median;
-  guint16 packets_num, payload_bytes;
+  guint32 skew;
+  guint32 delay, bytes;
 
-  gst_rtcp_xr_skew_getdown(xrb, NULL, &skew_median, &packets_num, &payload_bytes);
-  _st0(this)->skew_median = skew_median;
+  gst_rtcp_xr_skew_getdown(xrb,
+                           NULL,
+                           NULL,
+                           &skew,
+                           &delay,
+                           &bytes);
+  gst_print_rtcp_xr_skew(xrb);
+  _st0(this)->skew_median = skew>>16;
 //  g_print("SKEW MED: %u\n", _st0(this)->skew_median);
   if(_st2(this) < _st1(this) && _st1(this) < _st0(this))
     mprtps_path_set_marker(this->path, MPRTPS_PATH_MARKER_OVERUSED);

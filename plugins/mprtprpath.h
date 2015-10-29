@@ -68,12 +68,18 @@ struct _MpRTPReceiverPath
   guint32       last_rtp_timestamp;
   BinTree*      min_skew_bintree;
   BinTree*      max_skew_bintree;
+  BinTree*      min_delay_bintree;
+  BinTree*      max_delay_bintree;
   guint32       skew_bytes;
   guint8        skews_payload_octets[SKEWS_ARRAY_LENGTH];
   guint64       skews[SKEWS_ARRAY_LENGTH];
   GstClockTime  skews_arrived[SKEWS_ARRAY_LENGTH];
   guint8        skews_index;
-  GstClockTime  last_median;
+  guint64       delays[SKEWS_ARRAY_LENGTH];
+  GstClockTime  delays_arrived[SKEWS_ARRAY_LENGTH];
+  guint8        delays_index;
+  GstClockTime  last_drift_window;
+  GstClockTime  last_delay;
 
 
 };
@@ -118,6 +124,7 @@ void mprtpr_path_removes_obsolate_packets(MpRTPRPath *this, GstClockTime treshol
 guint64 mprtpr_path_get_last_skew(MpRTPRPath *this);
 void mprtpr_path_playout_tick(MpRTPRPath *this);
 guint64 mprtpr_path_get_drift_window(MpRTPRPath *this);
+GstClockTime mprtpr_path_get_delay (MpRTPRPath * this);
 guint32 mprtpr_path_get_skew_byte_num(MpRTPRPath *this);
 guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this);
 

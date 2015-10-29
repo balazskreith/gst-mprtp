@@ -26,8 +26,9 @@ G_DEFINE_TYPE (MpRTPRPath, mprtpr_path, G_TYPE_OBJECT);
 static void mprtpr_path_finalize (GObject * object);
 static void mprtpr_path_reset (MpRTPRPath * this);
 
-
 static void _balancing_skew_trees (MpRTPRPath * this);
+static void _add_delay(MpRTPRPath *this, GstClockTime delay);
+static void _balancing_delay_trees (MpRTPRPath * this);
 static void _add_skew(MpRTPRPath *this, guint64 skew, guint8 payload_octets);
 static gint _cmp_seq (guint16 x, guint16 y);
 static gint _cmp_for_max (guint64 x, guint64 y);
@@ -68,7 +69,9 @@ mprtpr_path_init (MpRTPRPath * this)
   this->packetsqueue = make_packetsqueue();
   this->min_skew_bintree = make_bintree(_cmp_for_min);
   this->max_skew_bintree = make_bintree(_cmp_for_max);
-  this->last_median = GST_MSECOND;
+  this->min_delay_bintree = make_bintree(_cmp_for_min);
+  this->max_delay_bintree = make_bintree(_cmp_for_max);
+  this->last_drift_window = GST_MSECOND;
   mprtpr_path_reset (this);
 }
 
@@ -118,6 +121,9 @@ mprtpr_path_reset (MpRTPRPath * this)
   memset(this->skews, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(guint64));
   memset(this->skews_payload_octets, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(guint8));
   memset(this->skews_arrived, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(GstClockTime));
+
+  memset(this->delays, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(GstClockTime));
+  memset(this->delays_arrived, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(GstClockTime));
 }
 
 guint16
@@ -306,7 +312,7 @@ mprtpr_path_get_drift_window (MpRTPRPath * this)
   gint32 max_count, min_count;
 //  g_print("mprtpr_path_get_skew_median begin\n");
   THIS_WRITELOCK (this);
-  result = this->last_median;
+  result = this->last_drift_window;
   min_count = bintree_get_num(this->min_skew_bintree);
   max_count = bintree_get_num(this->max_skew_bintree);
   if(min_count + max_count < 3)
@@ -321,9 +327,39 @@ mprtpr_path_get_drift_window (MpRTPRPath * this)
   }
 //  g_print("%d-%d\n", min_count, max_count);
 done:
-  this->last_median = result;
+  this->last_drift_window = result;
   THIS_WRITEUNLOCK (this);
 //  g_print("mprtpr_path_get_skew_median end\n");
+//  g_print("MEDIAN: %lu\n", result);
+  return result;
+}
+
+
+GstClockTime
+mprtpr_path_get_delay (MpRTPRPath * this)
+{
+  guint64 result;
+  gint32 max_count, min_count;
+//  g_print("mprtpr_path_get_delay_median begin\n");
+  THIS_WRITELOCK (this);
+  result = this->last_delay;
+  min_count = bintree_get_num(this->min_delay_bintree);
+  max_count = bintree_get_num(this->max_delay_bintree);
+  if(min_count + max_count < 3)
+    goto done;
+  if(min_count < max_count)
+    result = bintree_get_top_value(this->max_delay_bintree);
+  else if(max_count < min_count)
+    result = bintree_get_top_value(this->min_delay_bintree);
+  else{
+      result = (bintree_get_top_value(this->max_delay_bintree) +
+                bintree_get_top_value(this->min_delay_bintree))>>1;
+  }
+//  g_print("%d-%d\n", min_count, max_count);
+done:
+  this->last_delay = result;
+  THIS_WRITEUNLOCK (this);
+//  g_print("mprtpr_path_get_delay_median end\n");
 //  g_print("MEDIAN: %lu\n", result);
   return result;
 }
@@ -334,6 +370,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this,
 {
   guint64 skew;
   guint16 payload_bytes;
+  GstClockTime delay;
 //  g_print("mprtpr_path_process_rtp_packet begin\n");
   THIS_WRITELOCK (this);
 
@@ -342,7 +379,10 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this,
     this->played_highest_seq = packet_subflow_seq_num;
     this->total_packets_received = 1;
     this->seq_initialized = TRUE;
-    packetsqueue_add(this->packetsqueue, snd_time, packet_subflow_seq_num);
+    packetsqueue_add(this->packetsqueue,
+                     snd_time,
+                     packet_subflow_seq_num,
+                     &delay);
     goto done;
   }
 
@@ -382,13 +422,14 @@ add:
 //  g_print("ADDING\n");
   skew = packetsqueue_add(this->packetsqueue,
                           snd_time,
-                          packet_subflow_seq_num);
+                          packet_subflow_seq_num, &delay);
 
   if(this->last_rtp_timestamp != gst_rtp_buffer_get_timestamp(rtp)){
     _add_skew(this, skew, payload_bytes>>3);
     this->last_rtp_timestamp = gst_rtp_buffer_get_timestamp(rtp);
   }
 done:
+  _add_delay(this, delay);
   THIS_WRITEUNLOCK (this);
 //  g_print("mprtpr_path_process_rtp_packet end\n");
   return;
@@ -463,6 +504,76 @@ balancing:
 done:
   return;
 }
+
+
+
+void _add_delay(MpRTPRPath *this, GstClockTime delay)
+{
+  GstClockTime treshold,now,added;
+//  g_print("Subflow %d added delay: %lu\n", this->id, delay);
+  now = gst_clock_get_time(this->sysclock);
+  treshold = now - 2 * GST_SECOND;
+  again:
+  ++this->delays_index;
+  //elliminate the old ones
+  if(this->delays[this->delays_index] > 0){
+    if(this->delays[this->delays_index] <= bintree_get_top_value(this->max_delay_bintree))
+      bintree_delete_value(this->max_delay_bintree, this->delays[this->delays_index]);
+    else
+      bintree_delete_value(this->min_delay_bintree, this->delays[this->delays_index]);
+  }
+  this->delays[this->delays_index] = 0;
+  added = this->delays_arrived[this->delays_index];
+  this->delays_arrived[this->delays_index] = 0;
+  if(0 < added && added < treshold) goto again;
+
+  //add new one
+  this->delays[this->delays_index] = delay;
+  this->delays_arrived[this->delays_index] = now;
+  if(this->delays[this->delays_index] <= bintree_get_top_value(this->max_delay_bintree))
+    bintree_insert_value(this->max_delay_bintree, this->delays[this->delays_index]);
+  else
+    bintree_insert_value(this->min_delay_bintree, this->delays[this->delays_index]);
+
+  _balancing_delay_trees(this);
+
+  ++this->delays_index;
+
+}
+
+void
+_balancing_delay_trees (MpRTPRPath * this)
+{
+  gint32 max_count, min_count;
+  gint32 diff;
+  BinTreeNode *top;
+
+
+balancing:
+  min_count = bintree_get_num(this->min_delay_bintree);
+  max_count = bintree_get_num(this->max_delay_bintree);
+
+ //To get the 75 percentile we shift max_count by 1
+  diff = (max_count>>1) - min_count;
+//  g_print("max_tree_num: %d, min_tree_num: %d\n", max_tree_num, min_tree_num);
+  if (-2 < diff && diff < 2) {
+    goto done;
+  }
+  if (diff < -1) {
+    top = bintree_pop_top_node(this->min_delay_bintree);
+    bintree_insert_node(this->max_delay_bintree, top);
+  } else if (1 < diff) {
+      top = bintree_pop_top_node(this->max_delay_bintree);
+      bintree_insert_node(this->min_delay_bintree, top);
+  }
+  goto balancing;
+
+done:
+  return;
+}
+
+
+
 
 
 

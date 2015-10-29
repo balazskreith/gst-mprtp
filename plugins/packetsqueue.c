@@ -57,7 +57,10 @@ struct _GapNode{
 //----------------------------------------------------------------------
 
 static void packetsqueue_finalize (GObject * object);
-static PacketsQueueNode* _make_node(PacketsQueue *this, guint64 snd_time, guint16 seq_num);
+static PacketsQueueNode* _make_node(PacketsQueue *this,
+                                    guint64 snd_time,
+                                    guint16 seq_num,
+                                    GstClockTime *delay);
 static GapNode * _make_gapnode(PacketsQueue *this, PacketsQueueNode* at, Gap *gap);
 static void _trash_node(PacketsQueue *this, PacketsQueueNode* node);
 static void _trash_gap(PacketsQueue *this, Gap* gap);
@@ -66,7 +69,8 @@ static guint64 _get_skew(PacketsQueue *this, PacketsQueueNode* act, PacketsQueue
 static Gap * _make_gap(PacketsQueue *this, PacketsQueueNode* at, guint16 start, guint16 end);
 static guint64 _packetsqueue_add(PacketsQueue *this,
                                  guint64 snd_time,
-                                 guint16 seq_num);
+                                 guint16 seq_num,
+                                 GstClockTime *delay);
 static Gap* _try_found_a_gap(PacketsQueue *this, guint16 seq_num,
                              gboolean *duplicated, GapNode **insert_after);
 static gboolean _try_fill_a_gap (PacketsQueue * this, PacketsQueueNode *node);
@@ -135,9 +139,9 @@ void packetsqueue_test(void)
   gboolean duplicated;
   g_print("ADD PACKETS 1,2,3,\n");
   packets = make_packetsqueue();
-  packetsqueue_add(packets, epoch_now_in_ns-300000, 1);
-  packetsqueue_add(packets, epoch_now_in_ns-200000, 2);
-  packetsqueue_add(packets, epoch_now_in_ns-100000, 3);
+  packetsqueue_add(packets, epoch_now_in_ns-300000, 1, NULL);
+  packetsqueue_add(packets, epoch_now_in_ns-200000, 2, NULL);
+  packetsqueue_add(packets, epoch_now_in_ns-100000, 3, NULL);
   {
       PacketsQueueNode* node;
       for(node = packets->head; node; node = node->next)
@@ -166,15 +170,15 @@ void packetsqueue_test(void)
   }
 
   g_print("ADD PACKETS 1,5,3,2,4\n");
-  packetsqueue_add(packets, epoch_now_in_ns-500000, 1);
+  packetsqueue_add(packets, epoch_now_in_ns-500000, 1, NULL);
   packetsqueue_prepare_gap(packets);
-  packetsqueue_add(packets, epoch_now_in_ns-400000, 5);
+  packetsqueue_add(packets, epoch_now_in_ns-400000, 5, NULL);
   packetsqueue_prepare_discarded(packets);
-  packetsqueue_add(packets, epoch_now_in_ns-300000, 3);
+  packetsqueue_add(packets, epoch_now_in_ns-300000, 3, NULL);
   packetsqueue_prepare_discarded(packets);
-  packetsqueue_add(packets, epoch_now_in_ns-200000, 2);
+  packetsqueue_add(packets, epoch_now_in_ns-200000, 2, NULL);
   packetsqueue_prepare_discarded(packets);
-  packetsqueue_add(packets, epoch_now_in_ns-100000, 4);
+  packetsqueue_add(packets, epoch_now_in_ns-100000, 4, NULL);
   {
       PacketsQueueNode* node;
       GList *it;
@@ -217,19 +221,19 @@ void packetsqueue_test(void)
   packetsqueue_reset(packets);
   g_print("AFTER RESET->COUNTER: %d\n", packets->counter);
   g_print("ADD PACKETS 1,5,5,2\n");
-  packetsqueue_add(packets, epoch_now_in_ns-500000, 1);
+  packetsqueue_add(packets, epoch_now_in_ns-500000, 1, NULL);
   packetsqueue_prepare_gap(packets);
-  packetsqueue_add(packets, epoch_now_in_ns-400000, 5);
+  packetsqueue_add(packets, epoch_now_in_ns-400000, 5, NULL);
 
   packetsqueue_try_found_a_gap(packets, 5, &duplicated);
   g_print("IF 5 is duplicated? %d\n",duplicated);
   packetsqueue_prepare_discarded(packets);
-  packetsqueue_add(packets, epoch_now_in_ns-300000, 5);
+  packetsqueue_add(packets, epoch_now_in_ns-300000, 5, NULL);
 
   packetsqueue_try_found_a_gap(packets, 2, &duplicated);
   g_print("IF 2 is duplicated? %d\n",duplicated);
   packetsqueue_prepare_discarded(packets);
-  packetsqueue_add(packets, epoch_now_in_ns-100000, 2);
+  packetsqueue_add(packets, epoch_now_in_ns-100000, 2, NULL);
   {
       PacketsQueueNode* node;
       GList *it;
@@ -249,14 +253,14 @@ void packetsqueue_test(void)
       g_print("\n");
   }
   g_print("ADD PACKETS 6,3,7,10,9\n");
-  packetsqueue_add(packets, epoch_now_in_ns-50000, 6);
+  packetsqueue_add(packets, epoch_now_in_ns-50000, 6, NULL);
   packetsqueue_prepare_discarded(packets);
-  packetsqueue_add(packets, epoch_now_in_ns-10000, 3);
-  packetsqueue_add(packets, epoch_now_in_ns-9000, 7);
+  packetsqueue_add(packets, epoch_now_in_ns-10000, 3, NULL);
+  packetsqueue_add(packets, epoch_now_in_ns-9000, 7, NULL);
   packetsqueue_prepare_gap(packets);
-  packetsqueue_add(packets, epoch_now_in_ns-8000, 10);
+  packetsqueue_add(packets, epoch_now_in_ns-8000, 10, NULL);
   packetsqueue_prepare_discarded(packets);
-  packetsqueue_add(packets, epoch_now_in_ns-10000, 9);
+  packetsqueue_add(packets, epoch_now_in_ns-10000, 9, NULL);
   {
       PacketsQueueNode* node;
       GList *it;
@@ -342,11 +346,12 @@ PacketsQueue *make_packetsqueue(void)
 
 guint64 packetsqueue_add(PacketsQueue *this,
                          guint64 snd_time,
-                         guint16 seq_num)
+                         guint16 seq_num,
+                         GstClockTime *delay)
 {
   guint64 result;
   THIS_WRITELOCK(this);
-  result = _packetsqueue_add(this, snd_time, seq_num);
+  result = _packetsqueue_add(this, snd_time, seq_num, delay);
   THIS_WRITEUNLOCK(this);
   return result;
 }
@@ -376,11 +381,12 @@ gboolean packetsqueue_try_found_a_gap(PacketsQueue *this, guint16 seq_num, gbool
 
 guint64 _packetsqueue_add(PacketsQueue *this,
                           guint64 snd_time,
-                          guint16 seq_num)
+                          guint16 seq_num,
+                          GstClockTime *delay)
 {
 //  guint64 skew = 0;
   PacketsQueueNode* node;
-  node = _make_node(this, snd_time, seq_num);
+  node = _make_node(this, snd_time, seq_num, delay);
   if(!this->head) {
       this->head = this->tail = node;
       node->skew  = 0;
@@ -584,7 +590,10 @@ done:
   return skew;
 }
 
-PacketsQueueNode* _make_node(PacketsQueue *this, guint64 snd_time, guint16 seq_num)
+PacketsQueueNode* _make_node(PacketsQueue *this,
+                             guint64 snd_time,
+                             guint16 seq_num,
+                             GstClockTime *delay)
 {
   PacketsQueueNode *result;
   if(!g_queue_is_empty(this->node_pool))
@@ -599,6 +608,7 @@ PacketsQueueNode* _make_node(PacketsQueue *this, guint64 snd_time, guint16 seq_n
   result->snd_time = snd_time;
   result->next = NULL;
   result->added = gst_clock_get_time(this->sysclock);
+  if(delay) *delay = get_epoch_time_from_ntp_in_ns(result->rcv_time - result->snd_time);
   return result;
 }
 

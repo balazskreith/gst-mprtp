@@ -193,7 +193,8 @@ libgstmprtp_la-streamjoiner.lo: streamjoiner.c /usr/include/stdc-predef.h \
  /usr/local/include/gstreamer-1.0/gst/gstcompat.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h streamjoiner.h \
- mprtprpath.h /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
+ playoutgate.h mprtprpath.h \
+ /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
  gstmprtcpbuffer.h bintree.h packetsqueue.h /usr/include/math.h \
  /usr/include/x86_64-linux-gnu/bits/huge_val.h \
  /usr/include/x86_64-linux-gnu/bits/huge_valf.h \
@@ -653,6 +654,8 @@ libgstmprtp_la-streamjoiner.lo: streamjoiner.c /usr/include/stdc-predef.h \
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h:
 
 streamjoiner.h:
+
+playoutgate.h:
 
 mprtprpath.h:
 

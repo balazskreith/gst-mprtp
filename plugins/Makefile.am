@@ -15,11 +15,9 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          smanctrler.c               \
                          sefctrler.c                \
                          refctrler.c                \
-                         gstnetsimb.c               \
-                         netsimqueue.c              \
                          bintree.c                  \
                          packetsqueue.c             \
-                         playoutwindow.c           
+                         playoutgate.c           
                     
                     
 noinst_HEADERS = mprtpspath.h      \
@@ -30,10 +28,9 @@ noinst_HEADERS = mprtpspath.h      \
                  mprtprpath.h      \
                  streamsplitter.h  \
                  streamjoiner.h    \
-                 netsimqueue.h     \
                  bintree.h         \
                  packetsqueue.h    \
-                 playoutwindow.h
+                 playoutgate.h
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
 # libgstmprtp_la_CFLAGS = $(GST_CFLAGS) -I/usr/local/include/gstreamer-1.0 -I/home/balazs/gst/master/gst-plugins-base/gst-libs

@@ -197,7 +197,7 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtpspath.h \
  streamsplitter.h gstmprtpsender.h gstmprtpplayouter.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h bintree.h \
- packetsqueue.h streamjoiner.h \
+ packetsqueue.h streamjoiner.h playoutgate.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h \
  /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
@@ -370,7 +370,7 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/include/x86_64-linux-gnu/bits/string.h \
  /usr/include/x86_64-linux-gnu/bits/string2.h /usr/include/stdlib.h \
  /usr/include/x86_64-linux-gnu/bits/string3.h /usr/include/net/if.h \
- /usr/include/arpa/inet.h gstmprtpreceiver.h gstnetsimb.h netsimqueue.h
+ /usr/include/arpa/inet.h gstmprtpreceiver.h
 
 /usr/include/stdc-predef.h:
 
@@ -834,6 +834,8 @@ packetsqueue.h:
 
 streamjoiner.h:
 
+playoutgate.h:
+
 /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h:
 
 /usr/include/glib-2.0/gio/gio.h:
@@ -1225,7 +1227,3 @@ streamjoiner.h:
 /usr/include/arpa/inet.h:
 
 gstmprtpreceiver.h:
-
-gstnetsimb.h:
-
-netsimqueue.h:

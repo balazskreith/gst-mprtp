@@ -204,7 +204,7 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
  gstmprtcpbuffer.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h bintree.h \
- packetsqueue.h streamjoiner.h
+ packetsqueue.h streamjoiner.h playoutgate.h
 
 /usr/include/stdc-predef.h:
 
@@ -687,3 +687,5 @@ bintree.h:
 packetsqueue.h:
 
 streamjoiner.h:
+
+playoutgate.h:

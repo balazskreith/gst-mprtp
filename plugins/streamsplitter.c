@@ -148,7 +148,8 @@ stream_splitter_init (StreamSplitter * this)
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, g_free);
   this->charge_value = 100;
   this->thread = gst_task_new (stream_splitter_run, this, NULL);
-  this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
+    this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
+//  this->splitting_mode = MPRTP_STREAM_BYTE_BASED_SPLITTING;
 
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);

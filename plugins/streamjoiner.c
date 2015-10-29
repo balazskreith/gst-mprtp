@@ -24,7 +24,7 @@
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include "streamjoiner.h"
-#include "playoutwindow.h"
+#include "playoutgate.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -78,6 +78,7 @@ struct _Subflow
   MpRTPRPath *path;
   guint32 received_packets;
   guint64 path_skew;
+  GstClockTime path_delay;
 };
 
 //Heap functions
@@ -85,7 +86,7 @@ typedef struct _HeapItem
 {
   GstBuffer *buffer;
   guint16    seq_num;
-  guint32    tried;
+  GstClockTime  retain_started;
   gboolean   frame_end;
   gboolean   frame_start;
   guint32    rtp_timestamp;
@@ -116,6 +117,8 @@ static HeapItem *_make_heap_item (StreamJoiner * this,
 static void _trash_heap_item (StreamJoiner * this, HeapItem * heap_item);
 
 static void _set_new_max_skew(StreamJoiner *this, guint64 new_max_skew);
+static void _set_playoutgate(StreamJoiner *this, GstClockTime min_delay,
+                             GstClockTime max_delay);
 static void _tick_heap(StreamJoiner *this);
 static void _playout(StreamJoiner * this);
 //----------------------------------------------------------------------
@@ -144,7 +147,7 @@ stream_joiner_finalize (GObject * object)
   gst_task_join (this->thread);
   g_free (this->packets_heap);
   g_object_unref (this->sysclock);
-  g_object_unref(this->playoutwindow);
+  g_object_unref(this->playoutgate);
 }
 
 void
@@ -157,7 +160,7 @@ stream_joiner_init (StreamJoiner * this)
   memset(this->max_skews, 0, MAX_SKEWS_ARRAY_LENGTH * sizeof(guint64));
   this->packets_heap = g_malloc0 (sizeof (Heap));
   this->heap_items_pool = g_queue_new ();
-  this->playoutwindow = make_playoutwindow();
+  this->playoutgate = make_playoutgate();
   this->obsolate_automatically = TRUE;
   this->playout_allowed = TRUE;
   this->playout_halt = FALSE;
@@ -169,7 +172,8 @@ stream_joiner_init (StreamJoiner * this)
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
   this->max_skews_tree = make_bintree(_cmp_skew_for_tree);
-  playoutwindow_set_window_size(this, 20 * GST_MSECOND);
+
+  playoutgate_set_window_size(this->playoutgate, 150 * GST_MSECOND);
 }
 
 
@@ -183,9 +187,9 @@ stream_joiner_run (void *data)
   Subflow *subflow;
   MpRTPRPath *path;
   gboolean obsolate_needed = FALSE;
-  HeapItem *heap_item;
   GstClockID clock_id;
   guint64 max_path_skew = 0;
+  GstClockTime max_delay = 0, min_delay = G_MAXUINT64;
 
   THIS_WRITELOCK (this);
   now = gst_clock_get_time (this->sysclock);
@@ -216,14 +220,19 @@ stream_joiner_run (void *data)
     mprtpr_path_playout_tick(path);
     subflow->path_skew = (mprtpr_path_get_drift_window(path) +
                           99 * subflow->path_skew) / 100;
+    subflow->path_delay = mprtpr_path_get_delay(path);
+//    g_print("subflow %d delay %lu\n", subflow->id, subflow->path_delay);
 //    g_print("subflow %d drift window: %lu, path_skew: %lu\n",
 //            subflow->id, mprtpr_path_get_drift_window(path), subflow->path_skew);
     if(max_path_skew < subflow->path_skew)
       max_path_skew = subflow->path_skew;
+    if(max_delay < subflow->path_delay) max_delay = subflow->path_delay;
+    if(subflow->path_delay < min_delay) min_delay = subflow->path_delay;
     if(obsolate_needed){
       mprtpr_path_removes_obsolate_packets(path, 2 * GST_SECOND);
     }
   }
+  _set_playoutgate(this, min_delay, max_delay);
   _tick_heap(this);
   _playout(this);
 
@@ -250,7 +259,17 @@ done:
   gst_clock_id_unref (clock_id);
 }
 
-
+void _set_playoutgate(StreamJoiner *this, GstClockTime min_delay, GstClockTime max_delay)
+{
+  guint64 window_size = 0;
+  if(max_delay < min_delay) goto invalid;
+  window_size = (max_delay - min_delay)<<1;
+  window_size = MIN(window_size, 200 * GST_MSECOND);
+invalid:
+  window_size = MAX(window_size, GST_MSECOND);
+  g_print("Window size: %lu\n", window_size);
+  playoutgate_set_window_size(this->playoutgate, window_size);
+}
 
 void _set_new_max_skew(StreamJoiner *this, guint64 new_max_skew)
 {
@@ -263,26 +282,29 @@ void _set_new_max_skew(StreamJoiner *this, guint64 new_max_skew)
 void _tick_heap(StreamJoiner *this)
 {
   HeapItem *heap_item;
+//  GstClockTime now;
+//  now = gst_clock_get_time(this->sysclock);
   if(!this->packets_heap->count) goto done;
   heap_item = heap_front (this->packets_heap);
   do{
     heap_item = heap_front (this->packets_heap);
-    if((guint16)(this->popped_hsn + 1) == heap_item->seq_num) goto pop;
-    if(heap_item->tried > 0) goto pop;
-    ++heap_item->tried;
-    break;
-  pop:
-    if((guint16)(this->popped_hsn + 1) != heap_item->seq_num)
-      g_print("OUT OF ORDER: exp: %hu rcv: %hu\n", (guint16)(this->popped_hsn + 1), heap_item->seq_num);
+//    if((guint16)(this->popped_hsn + 1) == heap_item->seq_num) goto pop;
+//    if(heap_item->retain_started == 0) heap_item->retain_started = now;
+//    else if(heap_item->retain_started < now - 20 *GST_MSECOND) goto pop;
+//    break;
+//  pop:
+//    if((guint16)(this->popped_hsn + 1) != heap_item->seq_num)
+      //g_print("OUT OF ORDER: exp: %hu rcv: %hu\n", (guint16)(this->popped_hsn + 1), heap_item->seq_num);
     _heap_pop (this->packets_heap);
-    this->popped_hsn = heap_item->seq_num;
-    this->send_mprtp_packet_func (
-          this->send_mprtp_packet_data,
-          heap_item->buffer);
+//    this->popped_hsn = heap_item->seq_num;
+//    this->send_mprtp_packet_func (
+//          this->send_mprtp_packet_data,
+//          heap_item->buffer);
+
     {
       GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
       gst_rtp_buffer_map(heap_item->buffer, GST_MAP_READ, &rtp);
-      playoutwindow_push(this->playoutwindow, &rtp);
+      playoutgate_push(this->playoutgate, &rtp);
       gst_rtp_buffer_unmap(&rtp);
     }
     _trash_heap_item (this, heap_item);
@@ -298,8 +320,8 @@ done:
 void _playout(StreamJoiner * this)
 {
   GstBuffer *buffer;
-  while(playoutwindow_has_frame_to_playout(this->playoutwindow)){
-    buffer = playoutwindow_pop(this->playoutwindow);
+  while(playoutgate_has_frame_to_playout(this->playoutgate)){
+    buffer = playoutgate_pop(this->playoutgate);
     this->send_mprtp_packet_func (
               this->send_mprtp_packet_data,
               buffer);
@@ -517,7 +539,7 @@ _make_heap_item (StreamJoiner * this,
   }
   result->buffer = gst_buffer_ref(rtp->buffer);
   result->seq_num = gst_rtp_buffer_get_seq(rtp);
-  result->tried = 0;
+  result->retain_started = 0;
   if (!GST_BUFFER_FLAG_IS_SET (rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT)) {
       result->frame_start = TRUE;
   }else{

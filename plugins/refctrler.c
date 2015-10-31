@@ -30,12 +30,14 @@
 #include "streamjoiner.h"
 #include <math.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
 #define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
 #define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
 #define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
 
+#define SR_DELAYS_ARRAY_LENGTH 12
 
 
 GST_DEBUG_CATEGORY_STATIC (refctrler_debug_category);
@@ -70,7 +72,8 @@ struct _Subflow
   guint32 SR_last_packet_count;
   guint32 SR_actual_packet_count;
   guint16 HSN;
-
+  guint64 sr_delays[SR_DELAYS_ARRAY_LENGTH];
+  gint sr_delays_index;
   guint16 last_total_lost_packet_num;
   guint16 actual_total_lost_packet_num;
   guint32 last_total_late_discarded_bytes;
@@ -81,6 +84,9 @@ struct _Subflow
   guint32 actual_total_bytes_received;
   guint32 last_total_payload_bytes;
   guint32 actual_total_payload_bytes;
+
+  //for stat
+  guint32 last_stat_payload_bytes;
 };
 
 //----------------------------------------------------------------------
@@ -98,6 +104,11 @@ static GstBuffer *_get_mprtcp_rr_block (RcvEventBasedController * this,
 static void _setup_xr_skew_report (Subflow * this, GstRTCPXR_Skew * xr, guint32 ssrc);
 static void _setup_xr_rfc2743_late_discarded_report (Subflow * this,
     GstRTCPXR_RFC7243 * xr, guint32 ssrc);
+static GstBuffer *
+_get_mprtcp_xr_owd_block (RcvEventBasedController * this, Subflow * subflow,
+    guint16 * buf_length);
+static void
+_setup_xr_owd_report (Subflow * this, GstRTCPXR_OWD * xr, guint32 ssrc);
 static void _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc);
 static guint16 _uint16_diff (guint16 a, guint16 b);
 static void refctrler_receive_mprtcp (gpointer subflow, GstBuffer * buf);
@@ -107,7 +118,7 @@ static void _report_processing_srblock_processor (Subflow * subflow,
     GstRTCPSRBlock * srb);
 static void _recalc_report_time (Subflow * this);
 static gboolean _do_report_now (Subflow * subflow);
-
+static guint64 _get_sr_delays(Subflow *this, guint64 *min_delay, guint64 *max_delay);
 static guint32 _uint32_diff (guint32 a, guint32 b);
 static void refctrler_rem_path (gpointer controller_ptr, guint8 subflow_id);
 static void refctrler_add_path (gpointer controller_ptr, guint8 subflow_id,
@@ -150,6 +161,9 @@ refctrler_finalize (GObject * object)
   g_object_unref (this->sysclock);
 }
 
+static void
+refctrler_stat_run (void *data);
+
 void
 refctrler_init (RcvEventBasedController * this)
 {
@@ -165,6 +179,46 @@ refctrler_init (RcvEventBasedController * this)
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
 
+  g_rec_mutex_init (&this->stat_thread_mutex);
+  this->stat_thread = gst_task_new (refctrler_stat_run, this, NULL);
+  gst_task_set_lock (this->stat_thread, &this->stat_thread_mutex);
+  gst_task_start (this->stat_thread);
+
+}
+
+
+void
+refctrler_stat_run (void *data)
+{
+  RcvEventBasedController *this;
+  GstClockID clock_id;
+  GHashTableIter iter;
+  gpointer key, val;
+  Subflow *subflow;
+  gboolean started = FALSE;
+  guint32 actual;
+  GstClockTime next_scheduler_time;
+  this = data;
+  THIS_WRITELOCK (this);
+//  g_print("# subflow1, subflow 2\n");
+  g_hash_table_iter_init (&iter, this->subflows);
+  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+    subflow = (Subflow *) val;
+    actual = mprtpr_path_get_total_bytes_received(subflow->path);
+    g_print("%c%u", started?',':' ', actual - subflow->last_stat_payload_bytes);
+    subflow->last_stat_payload_bytes = actual;
+    started = TRUE;
+  }
+  g_print("\n");
+  THIS_WRITEUNLOCK(this);
+
+  next_scheduler_time = gst_clock_get_time(this->sysclock) + GST_SECOND;
+  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
+
+  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
+    GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
+  }
+  gst_clock_id_unref (clock_id);
 }
 
 void
@@ -218,6 +272,12 @@ refctrler_run (void *data)
       {
         GstBuffer *xr;
         xr = _get_mprtcp_xr_skew_block (this, subflow, &block_length);
+        block = gst_buffer_append (block, xr);
+        report_length += block_length;
+      }
+      {
+        GstBuffer *xr;
+        xr = _get_mprtcp_xr_owd_block (this, subflow, &block_length);
         block = gst_buffer_append (block, xr);
         report_length += block_length;
       }
@@ -555,6 +615,7 @@ _get_mprtcp_xr_skew_block (RcvEventBasedController * this, Subflow * subflow,
   //gst_print_mprtcp_block(&block, NULL);
   return buf;
 }
+
 void
 _setup_xr_skew_report (Subflow * this,
     GstRTCPXR_Skew * xr, guint32 ssrc)
@@ -567,9 +628,9 @@ _setup_xr_skew_report (Subflow * this,
   guint32 bytes;
 
   skew = mprtpr_path_get_drift_window(this->path);
-  delay = mprtpr_path_get_delay(this->path);
+  delay = mprtpr_path_get_delay(this->path, NULL, NULL);
   bytes = mprtpr_path_get_skew_byte_num(this->path);
-  g_print("Byte: %u\n", bytes);
+//  g_print("Byte: %u\n", bytes);
 //  g_print("SKEW MEDIAN: %lu\n", skew_median);
   if(skew == 0){
       skew_xr = 0xFFFF; //unavailable
@@ -577,7 +638,7 @@ _setup_xr_skew_report (Subflow * this,
       if(skew > GST_SECOND)
         skew_xr = 0xFEFF;
       else{
-        skew_xr = skew;
+        skew_xr = (guint32) get_ntp_from_epoch_ns(skew);
 //        skew_xr = get_ntp_from_epoch_ns(skew);
       }
   }
@@ -587,13 +648,86 @@ _setup_xr_skew_report (Subflow * this,
       if(delay > GST_SECOND)
         delay_xr = 0xFEFF;
       else{
-          delay_xr = delay;
+          delay_xr = (guint32) get_ntp_from_epoch_ns(delay>>16);
         //delay_xr = get_ntp_from_epoch_ns(delay);
       }
   }
   gst_rtcp_header_change (&xr->header, NULL,NULL, NULL, NULL, NULL, &ssrc);
   gst_rtcp_xr_skew_change(xr, &flag, &ssrc, &skew_xr, &delay_xr, &bytes);
 //  g_print("DISCARDED REPORT SETTED UP\n");
+}
+
+
+GstBuffer *
+_get_mprtcp_xr_owd_block (RcvEventBasedController * this, Subflow * subflow,
+    guint16 * buf_length)
+{
+  GstMPRTCPSubflowBlock block;
+  GstRTCPXR_OWD *xr;
+  gpointer dataptr;
+  guint16 length;
+  guint8 block_length;
+  GstBuffer *buf;
+
+  gst_mprtcp_block_init (&block);
+  xr = gst_mprtcp_riport_block_add_xr_owd (&block);
+  _setup_xr_owd_report(subflow, xr, this->ssrc);
+  gst_rtcp_header_getdown (&xr->header, NULL, NULL, NULL, NULL, &length, NULL);
+  block_length = (guint8) length + 1;
+  gst_mprtcp_block_setup (&block.info, MPRTCP_BLOCK_TYPE_RIPORT, block_length,
+      (guint16) subflow->id);
+  length = (block_length + 1) << 2;
+  dataptr = g_malloc0 (length);
+  memcpy (dataptr, &block, length);
+  buf = gst_buffer_new_wrapped (dataptr, length);
+  if (buf_length) {
+    *buf_length = length;
+  }
+  //gst_print_mprtcp_block(&block, NULL);
+  return buf;
+}
+
+void
+_setup_xr_owd_report (Subflow * this,
+    GstRTCPXR_OWD * xr, guint32 ssrc)
+{
+  guint8 flag = RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION;
+  GstClockTime one_way_delay;
+  GstClockTime min_delay, max_delay;
+  guint32 owd, min, max;
+  guint16 percentile = 75;
+  guint16 invert_percentile = 25;
+
+  if(mprtpr_path_get_state(this->path) == MPRTPR_PATH_STATE_ACTIVE)
+    one_way_delay = mprtpr_path_get_delay(this->path, &min_delay, &max_delay);
+  else
+    one_way_delay = _get_sr_delays(this, &min_delay, &max_delay);
+
+  min = (guint32) min_delay;
+  max = (guint32) max_delay;
+  owd = (guint32) one_way_delay;
+
+  gst_rtcp_header_change (&xr->header, NULL,NULL, NULL, NULL, NULL, &ssrc);
+  gst_rtcp_xr_owd_change(xr, &flag, &ssrc, &percentile, &invert_percentile,
+                         &owd, &min, &max);
+
+//  g_print("DISCARDED REPORT SETTED UP\n");
+}
+static int _cmp64_for_qsort(const void *a, const void *b)
+{
+  if(*((guint64*)a) == *((guint64*)b)) return 0;
+  if(*((guint64*)a) < *((guint64*)b)) return -1;
+  return 1;
+}
+
+guint64 _get_sr_delays(Subflow *this, guint64 *min_delay, guint64 *max_delay)
+{
+  guint64 delays[SR_DELAYS_ARRAY_LENGTH];
+  memcpy(delays, this->sr_delays, sizeof(guint64)*SR_DELAYS_ARRAY_LENGTH);
+  qsort(delays, SR_DELAYS_ARRAY_LENGTH, sizeof(guint64), _cmp64_for_qsort);
+  if(min_delay) *min_delay = delays[0];
+  if(max_delay) *max_delay = delays[SR_DELAYS_ARRAY_LENGTH-1];
+  return delays[8];
 }
 
 void
@@ -827,6 +961,12 @@ _report_processing_srblock_processor (Subflow * this, GstRTCPSRBlock * srb)
   }
   this->SR_last_packet_count = this->SR_actual_packet_count;
   this->SR_actual_packet_count = SR_new_packet_count;
+  {
+    guint64 delay = this->SR_received_ntp_time - this->SR_sent_ntp_time;
+    this->sr_delays[this->sr_delays_index] = get_epoch_time_from_ntp_in_ns(delay);
+    if(++this->sr_delays_index == SR_DELAYS_ARRAY_LENGTH)
+      this->sr_delays_index = 0;
+  }
 //  {
 //    guint64 temp;
 //    temp = NTP_NOW - this->sending_report_ntp_time;

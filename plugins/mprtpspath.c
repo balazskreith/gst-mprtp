@@ -84,6 +84,8 @@ mprtps_path_reset (MPRTPSPath * this)
 
   this->total_sent_packet_num = 0;
   this->total_sent_payload_bytes_sum = 0;
+  this->total_sent_frames_num = 0;
+  this->last_sent_frame_timestamp = 0;
   this->sent_octets_read = 0;
   this->sent_octets_write = 0;
   this->max_bytes_per_ms = 0;
@@ -362,6 +364,16 @@ mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this)
   return result;
 }
 
+guint32
+mprtps_path_get_total_sent_frames_num (MPRTPSPath * this)
+{
+  guint32 result;
+  THIS_READLOCK (this);
+  result = this->total_sent_frames_num;
+  THIS_READUNLOCK (this);
+  return result;
+}
+
 gboolean
 mprtps_path_is_overused (MPRTPSPath * this)
 {
@@ -451,7 +463,10 @@ mprtps_path_process_rtp_packet (MPRTPSPath * this,
   this->last_sent_payload_bytes = payload_bytes;
   this->last_packet_sent_time = gst_clock_get_time (this->sysclock);
   this->total_sent_payload_bytes_sum += payload_bytes;
-
+  if(gst_rtp_buffer_get_timestamp(rtp) != this->last_sent_frame_timestamp){
+      ++this->total_sent_frames_num;
+      this->last_sent_frame_timestamp = gst_rtp_buffer_get_timestamp(rtp);
+  }
   this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
   this->sent_octets_write += 1;
   this->sent_octets_write &= MAX_INT32_POSPART;

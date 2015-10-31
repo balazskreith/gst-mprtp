@@ -49,6 +49,8 @@
 #define RTCPXR7243BLOCK_WORDS (RTCPXR7243BLOCK_BYTES>>2)
 #define RTCPXRSKEWBLOCK_BYTES 20
 #define RTCPXRSKEWBLOCK_WORDS (RTCPXRSKEWBLOCK_BYTES>>2)
+#define RTCPXROWDBLOCK_BYTES 24
+#define RTCPXROWDBLOCK_WORDS (RTCPXROWDBLOCK_BYTES>>2)
 #define RTCPRRBLOCK_BYTES 24
 #define RTCPRRBLOCK_WORDS (RTCPRRBLOCK_BYTES>>2)
 #define MPRTCPBLOCK_BYTES 4
@@ -253,6 +255,14 @@ gst_mprtcp_riport_block_add_xr_skew (GstMPRTCPSubflowBlock * block)
 {
   GstRTCPXR_Skew *result = &block->xr_skew;
   gst_rtcp_xr_skew_init(result);
+  return result;
+}
+
+GstRTCPXR_OWD *
+gst_mprtcp_riport_block_add_xr_owd (GstMPRTCPSubflowBlock * block)
+{
+  GstRTCPXR_OWD *result = &block->xr_owd;
+  gst_rtcp_xr_owd_init(result);
   return result;
 }
 
@@ -650,6 +660,106 @@ gst_rtcp_xr_skew_getdown (GstRTCPXR_Skew * riport,
     }
 }
 
+
+//------------------ XROWD ------------------------
+void
+gst_rtcp_xr_owd_init (GstRTCPXR_OWD * report)
+{
+  gst_rtcp_header_init (&report->header);
+  gst_rtcp_header_setup (&report->header, FALSE, 0,
+      GST_RTCP_TYPE_XR, RTCPHEADER_WORDS - 1 + RTCPXROWDBLOCK_BYTES, 0);
+  gst_rtcp_xr_owd_setup (report, 0, 0, 0, 0, 0, 0, 0);
+}
+
+
+void
+gst_rtcp_xr_owd_setup(GstRTCPXR_OWD *report,
+                      guint8  interval_metric,
+                      guint32 ssrc,
+                      guint16 percentile,
+                      guint16 invert_percentile,
+                      guint32 one_way_delay,
+                      guint32 min_delay,
+                      guint32 max_delay)
+{
+  report->block_length = g_htons (6);
+  report->block_type = GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER;
+  gst_rtcp_xr_owd_change(report,
+                          &interval_metric,
+                          &ssrc,
+                          &percentile,
+                          &invert_percentile,
+                          &one_way_delay,
+                          &min_delay,
+                          &max_delay);
+}
+
+void
+gst_rtcp_xr_owd_change (GstRTCPXR_OWD *report,
+                        guint8  *interval_metric,
+                       guint32 *ssrc,
+                       guint16 *percentile,
+                       guint16 *invert_percentile,
+                       guint32 *one_way_delay,
+                       guint32 *min_delay,
+                       guint32 *max_delay)
+{
+  if (percentile) {
+    report->percentile = g_htons (*percentile);
+  }
+  if (invert_percentile) {
+    report->invert_percentile = g_htons (*invert_percentile);
+  }
+  if (one_way_delay) {
+    report->one_way_delay = g_htonl (*one_way_delay);
+  }
+  if (one_way_delay) {
+    report->min_delay = g_htonl (*min_delay);
+  }
+  if (max_delay) {
+    report->max_delay = g_htonl (*max_delay);
+  }
+  if (ssrc) {
+    report->ssrc = g_htonl (*ssrc);
+  }
+  if(interval_metric){
+    report->interval_metric = *interval_metric;
+  }
+}
+
+void
+gst_rtcp_xr_owd_getdown (GstRTCPXR_OWD *report,
+                         guint8  *interval_metric,
+                        guint32 *ssrc,
+                        guint16 *percentile,
+                        guint16 *invert_percentile,
+                        guint32 *one_way_delay,
+                        guint32 *min_delay,
+                        guint32 *max_delay)
+{
+  if (ssrc) {
+    *ssrc = g_ntohl (report->ssrc);
+  }
+  if(interval_metric){
+    *interval_metric = report->interval_metric;
+  }
+  if (percentile) {
+    *percentile = g_ntohs (report->percentile);
+  }
+  if (invert_percentile) {
+    *invert_percentile = g_ntohs (report->invert_percentile);
+  }
+  if (one_way_delay) {
+    *one_way_delay = g_ntohl (report->one_way_delay);
+  }
+  if (min_delay) {
+      *min_delay = g_ntohl (report->min_delay);
+    }
+  if (max_delay) {
+      *max_delay = g_ntohl (report->max_delay);
+    }
+}
+
 //------------------ MPRTCP ------------------------
 
 
@@ -880,6 +990,8 @@ gst_print_rtcp (GstRTCPHeader * header)
             gst_print_rtcp_xr_7243 ((GstRTCPXR_RFC7243 *) step);
           else if(block_type == GST_RTCP_XR_SKEW_BLOCK_TYPE_IDENTIFIER)
             gst_print_rtcp_xr_skew ((GstRTCPXR_Skew *) step);
+          else if(block_type == GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER)
+            gst_print_rtcp_xr_owd ((GstRTCPXR_OWD *) step);
         }
         break;
       default:
@@ -1074,6 +1186,43 @@ gst_print_rtcp_xr_skew (GstRTCPXR_Skew * riport)
       delay, bytes);
 }
 
+
+void
+gst_print_rtcp_xr_owd (GstRTCPXR_OWD * report)
+{
+  guint8 flag;
+  guint32 one_way_delay;
+  guint32 ssrc;
+  guint32 min_delay;
+  guint32 max_delay;
+  guint16 percentile;
+  guint16 invert_percentile;
+
+  gst_print_rtcp_header (&report->header);
+  gst_rtcp_xr_owd_getdown (report, &flag, &ssrc,
+                           &percentile, &invert_percentile,
+                           &one_way_delay, &min_delay, &max_delay);
+  g_print (
+      "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+      "|%15d|%2d|%12d|%31d|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63X|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%31d|%31d|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63u|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63u|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63u|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      ,
+      report->block_type, flag, report->reserved,
+      g_ntohs (report->block_length), ssrc, percentile, invert_percentile,
+      one_way_delay,
+      min_delay, max_delay);
+}
+
 void
 gst_print_rtcp_rrb (GstRTCPRRBlock * block)
 {
@@ -1256,3 +1405,40 @@ rtcp_interval (gint senders,
   t = t / COMPENSATION;
   return t;
 }
+
+gboolean gst_mprtp_get_subflow_extension(GstRTPBuffer *rtp,
+                                         guint8 ext_header_id,
+                                         MPRTPSubflowHeaderExtension **subflow_info)
+{
+  gpointer pointer;
+  guint size;
+  if (!gst_rtp_buffer_get_extension_onebyte_header (rtp,
+                                                    ext_header_id,
+                                                    0,
+                                                    &pointer,
+                                                    &size)) {
+      return FALSE;
+    }
+
+    if(subflow_info) *subflow_info = (MPRTPSubflowHeaderExtension *) pointer;
+    return TRUE;
+}
+
+gboolean gst_mprtp_get_abs_send_time_extension(GstRTPBuffer *rtp,
+                                               guint8 ext_header_id,
+                                               RTPAbsTimeExtension **abs_time)
+{
+  gpointer pointer;
+  guint size;
+  if (!gst_rtp_buffer_get_extension_onebyte_header (rtp,
+                                                    ext_header_id,
+                                                    0,
+                                                    &pointer,
+                                                    &size)) {
+      return FALSE;
+    }
+
+    if(abs_time) *abs_time = (RTPAbsTimeExtension *) pointer;
+    return TRUE;
+}
+

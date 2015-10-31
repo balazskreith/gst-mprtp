@@ -32,6 +32,7 @@ struct _PacketsQueue
   gboolean                 gap_arrive;
   gboolean                 discarded_arrive;
   guint32                  counter;
+  guint32                  lost;
   GRWLock                  rwmutex;
   GQueue*                  node_pool;
   GQueue*                  gapnodes_pool;

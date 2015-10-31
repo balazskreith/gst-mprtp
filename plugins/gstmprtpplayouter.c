@@ -303,11 +303,17 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
 void
 gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstBuffer * buf)
 {
+  MPRTPSubflowHeaderExtension *subflow;
+  MpRTPRPath *path;
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (data);
-//    GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-//    gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
-//    g_print("R%lu->",gst_rtp_buffer_get_seq(&rtp));
-//    gst_rtp_buffer_unmap(&rtp);
+  gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
+  if(gst_mprtp_get_subflow_extension(&rtp, this->mprtp_ext_header_id, &subflow)){
+    if(_try_get_path(this, subflow->id, &path)){
+      mprtpr_path_set_played_highest_seq(path, subflow->seq);
+    }
+  }
+  gst_rtp_buffer_unmap(&rtp);
   gst_pad_push (this->mprtp_srcpad, buf);
 }
 
@@ -920,7 +926,7 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
   }
   //snd_time = gst_util_uint64_scale (snd_time, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
   mprtpr_path_process_rtp_packet (path, &rtp, subflow_infos->seq, snd_time);
-  stream_joiner_receive_rtp(this->joiner, &rtp);
+  stream_joiner_receive_rtp(this->joiner, &rtp, subflow_infos->id);
   gst_rtp_buffer_unmap (&rtp);
 
 }

@@ -102,7 +102,7 @@ make_video_session (guint sessionNum)
   gst_bin_add_many (videoBin, videoSrc, encoder, payloader, NULL);
   videoCaps = gst_caps_new_simple ("video/x-raw",
       "width", G_TYPE_INT, 352,
-      "height", G_TYPE_INT, 288, "framerate", GST_TYPE_FRACTION, 100, 1, NULL);
+      "height", G_TYPE_INT, 288, "framerate", GST_TYPE_FRACTION, 25, 1, NULL);
 
   gst_element_link_filtered (videoSrc, encoder, videoCaps);
   gst_element_link (encoder, payloader);

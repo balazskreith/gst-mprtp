@@ -11,7 +11,6 @@
 #include <gst/gst.h>
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
-#include "gstmprtcpbuffer.h"
 
 #define MPRTP_DEFAULT_EXTENSION_HEADER_ID 3
 #define ABS_TIME_DEFAULT_EXTENSION_HEADER_ID 8
@@ -20,6 +19,8 @@ G_BEGIN_DECLS typedef struct _MPRTPSPath MPRTPSPath;
 typedef struct _MPRTPSPathClass MPRTPSPathClass;
 typedef struct _MPRTPSubflowHeaderExtension MPRTPSubflowHeaderExtension;
 typedef struct _RTPAbsTimeExtension RTPAbsTimeExtension;
+
+#include "gstmprtcpbuffer.h"
 
 #define MPRTPS_PATH_TYPE             (mprtps_path_get_type())
 #define MPRTPS_PATH(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),MPRTPS_PATH_TYPE,MPRTPSPath))
@@ -80,6 +81,8 @@ struct _MPRTPSPath
   guint8    state;
   guint32   total_sent_packet_num;
   guint32   total_sent_payload_bytes_sum;
+  guint32   total_sent_frames_num;
+  guint32   last_sent_frame_timestamp;
 
   MPRTPSPathMarker  marker;
 
@@ -125,6 +128,7 @@ guint8 mprtps_path_get_id (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_packets_num (MPRTPSPath * this);
 void mprtps_path_process_rtp_packet (MPRTPSPath * this, guint ext_header_id, GstRTPBuffer * rtp);
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
+guint32 mprtps_path_get_total_sent_frames_num (MPRTPSPath * this);
 guint32 mprtps_path_get_sent_octet_sum_for(MPRTPSPath *this, guint32 amount);
 
 void mprtps_path_set_marker(MPRTPSPath * this, MPRTPSPathMarker marker);

@@ -320,6 +320,14 @@ void mprtpr_path_playout_tick(MpRTPRPath *this)
 //  g_print("mprtpr_path_playout_tick end\n");
 }
 
+
+void mprtpr_path_set_played_highest_seq(MpRTPRPath *this, guint16 played_highest_seq)
+{
+  THIS_WRITELOCK (this);
+  this->played_highest_seq = played_highest_seq;
+  THIS_WRITEUNLOCK (this);
+}
+
 guint64
 mprtpr_path_get_drift_window (MpRTPRPath * this)
 {
@@ -351,13 +359,16 @@ done:
 
 
 GstClockTime
-mprtpr_path_get_delay (MpRTPRPath * this)
+mprtpr_path_get_delay (MpRTPRPath * this, GstClockTime *min_delay,
+                       GstClockTime *max_delay)
 {
   guint64 result;
   gint32 max_count, min_count;
 //  g_print("mprtpr_path_get_delay_median begin\n");
   THIS_WRITELOCK (this);
   result = this->last_delay;
+  if(min_delay) *min_delay = result;
+  if(max_delay) *max_delay = result;
   min_count = bintree_get_num(this->min_delay_bintree);
   max_count = bintree_get_num(this->max_delay_bintree);
   if(min_count + max_count < 3)
@@ -370,6 +381,8 @@ mprtpr_path_get_delay (MpRTPRPath * this)
       result = (bintree_get_top_value(this->max_delay_bintree) +
                 bintree_get_top_value(this->min_delay_bintree))>>1;
   }
+  if(min_delay) *min_delay = bintree_get_bottom_value(this->max_delay_bintree);
+  if(max_delay) *max_delay = bintree_get_bottom_value(this->min_delay_bintree);
 //  g_print("%d-%d\n", min_count, max_count);
 done:
   this->last_delay = result;
@@ -403,24 +416,25 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this,
 
   //calculate lost, discarded and received packets
   payload_bytes = gst_rtp_buffer_get_payload_len(rtp);
-//  this->total_bytes_received += payload_bytes + (28 << 3);
   ++this->total_packets_received;
-  this->total_payload_bytes  += payload_bytes;
+  this->total_payload_bytes += payload_bytes;
 
   if (packet_subflow_seq_num == (guint16) (this->highest_seq + 1)) {
     ++this->highest_seq;
     goto add;
   }
-  if (_cmp_seq (this->highest_seq, packet_subflow_seq_num) < 0) {        //GAP
+  if (_cmp_seq (this->highest_seq, packet_subflow_seq_num) < 0) {
     packetsqueue_prepare_gap(this->packetsqueue);
     this->highest_seq = packet_subflow_seq_num;
-    goto inspect;
+    goto add;
   }
 
   if (_cmp_seq (this->highest_seq, packet_subflow_seq_num) > 0) {
       packetsqueue_prepare_discarded(this->packetsqueue);
-      ++this->total_late_discarded;
-      this->total_late_discarded_bytes += payload_bytes;
+      if (_cmp_seq (this->played_highest_seq, packet_subflow_seq_num) > 0) {
+        ++this->total_late_discarded;
+        this->total_late_discarded_bytes += payload_bytes;
+      }
       goto inspect;
   }
 

@@ -202,8 +202,8 @@ libgstmprtp_la-mprtprpath.lo: mprtprpath.c /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/bits/string2.h /usr/include/stdlib.h \
  /usr/include/x86_64-linux-gnu/bits/string3.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
- gstmprtcpbuffer.h bintree.h packetsqueue.h streamjoiner.h playoutgate.h \
- mprtpspath.h
+ gstmprtcpbuffer.h mprtpspath.h bintree.h packetsqueue.h streamjoiner.h \
+ playoutgate.h
 
 /usr/include/stdc-predef.h:
 
@@ -677,6 +677,8 @@ mprtprpath.h:
 
 gstmprtcpbuffer.h:
 
+mprtpspath.h:
+
 bintree.h:
 
 packetsqueue.h:
@@ -684,5 +686,3 @@ packetsqueue.h:
 streamjoiner.h:
 
 playoutgate.h:
-
-mprtpspath.h:

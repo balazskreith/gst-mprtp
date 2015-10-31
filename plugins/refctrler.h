@@ -40,6 +40,10 @@ struct _RcvEventBasedController
   void            (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
   gpointer          send_mprtcp_packet_data;
   gboolean          riport_is_flowable;
+
+  //for stat and plot
+   GstTask*          stat_thread;
+   GRecMutex         stat_thread_mutex;
 };
 
 struct _RcvEventBasedControllerClass{

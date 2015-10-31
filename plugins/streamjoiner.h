@@ -48,6 +48,7 @@ struct _StreamJoiner
   GQueue*              heap_items_pool;
 //  GQueue*              packets_framequeue;
   PlayoutGate*         playoutgate;
+  guint8               playout_gate_factor;
   gboolean             obsolate_automatically;
   gboolean             playout_allowed;
   gboolean             playout_halt;
@@ -78,7 +79,7 @@ void
 stream_joiner_path_obsolation(StreamJoiner *this, gboolean obsolate_automatically);
 
 void
-stream_joiner_receive_rtp(StreamJoiner * this, GstRTPBuffer *rtp);
+stream_joiner_receive_rtp(StreamJoiner * this, GstRTPBuffer *rtp, guint8 subflow_id);
 
 void
 stream_joiner_set_playout_halt_time(StreamJoiner *this, GstClockTime halt_time);

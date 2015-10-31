@@ -128,8 +128,10 @@ void mprtpr_path_process_rtp_packet(MpRTPRPath *this,
 void mprtpr_path_removes_obsolate_packets(MpRTPRPath *this, GstClockTime treshold);
 guint64 mprtpr_path_get_last_skew(MpRTPRPath *this);
 void mprtpr_path_playout_tick(MpRTPRPath *this);
+void mprtpr_path_set_played_highest_seq(MpRTPRPath *this, guint16 seq);
 guint64 mprtpr_path_get_drift_window(MpRTPRPath *this);
-GstClockTime mprtpr_path_get_delay (MpRTPRPath * this);
+GstClockTime mprtpr_path_get_delay (MpRTPRPath * this, GstClockTime *min_delay,
+                       GstClockTime *max_delay);
 guint32 mprtpr_path_get_skew_byte_num(MpRTPRPath *this);
 guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this);
 void mprtpr_path_set_state(MpRTPRPath *this, MPRTPRPathState state);

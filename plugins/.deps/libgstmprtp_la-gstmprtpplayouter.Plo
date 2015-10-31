@@ -195,7 +195,7 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  /usr/include/x86_64-linux-gnu/bits/string2.h /usr/include/stdlib.h \
  /usr/include/x86_64-linux-gnu/bits/string3.h gstmprtpplayouter.h \
  gstmprtcpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h mprtpspath.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h bintree.h \
@@ -369,8 +369,8 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  /usr/include/x86_64-linux-gnu/sys/bitypes.h \
  /usr/include/arpa/nameser_compat.h \
  /usr/include/x86_64-linux-gnu/sys/un.h /usr/include/net/if.h \
- /usr/include/arpa/inet.h mprtpspath.h rmanctrler.h smanctrler.h \
- refctrler.h streamsplitter.h
+ /usr/include/arpa/inet.h rmanctrler.h smanctrler.h refctrler.h \
+ streamsplitter.h
 
 /usr/include/stdc-predef.h:
 
@@ -822,6 +822,8 @@ gstmprtcpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h:
 
+mprtpspath.h:
+
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
@@ -1217,8 +1219,6 @@ playoutgate.h:
 /usr/include/net/if.h:
 
 /usr/include/arpa/inet.h:
-
-mprtpspath.h:
 
 rmanctrler.h:
 

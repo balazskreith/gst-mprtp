@@ -46,8 +46,10 @@ struct _SndEventBasedController
   gint              records_max;
   gint              records_index;
   guint64           changed_num;
+  guint32           min_delay;
   gboolean          pacing;
-
+  GstClockTime      last_recalc_time;
+  GstClockTime      RTT_max;
 //  gboolean          new_report_arrived;
   gboolean          bids_recalc_requested;
   gboolean          bids_commit_requested;
@@ -62,6 +64,11 @@ struct _SndEventBasedController
   MpRTPCCState      cc_prev_state;
   GstClockTime      stability_time;
   gboolean          stability_started;
+
+
+  //for stat and plot
+  GstTask*          stat_thread;
+  GRecMutex         stat_thread_mutex;
 };
 
 struct _SndEventBasedControllerClass{

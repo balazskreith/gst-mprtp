@@ -50,10 +50,11 @@ _search_value(BinTree *this, guint64 value, BinTreeNode **parent);
 static void
 _deref_from_tree (BinTree * this, guint64 value);
 static void _refresh_top(BinTree *this);
+static void _refresh_bottom(BinTree *this);
 static BinTreeNode *
 _pop_from_tree (BinTree * this, guint64 value);
 static BinTreeNode *_get_rightest_value(BinTreeNode *node, BinTreeNode **parent);
-//static BinTreeNode *_get_leftest_value(BinTreeNode *node, BinTreeNode **parent);
+static BinTreeNode *_get_leftest_value(BinTreeNode *node, BinTreeNode **parent);
 static BinTreeNode *_make_bintreenode(BinTree *this, guint64 value);
 static void _trash_bintreenode(BinTree *this, BinTreeNode *node);
 static void _ruin_full(BinTree *this, BinTreeNode *node);
@@ -263,6 +264,16 @@ guint64 bintree_get_top_value(BinTree *this)
   return result;
 }
 
+guint64 bintree_get_bottom_value(BinTree *this)
+{
+  guint64 result;
+  THIS_READLOCK (this);
+  if(!this->bottom) result = 0;
+  else result = this->bottom->value;
+  THIS_READUNLOCK (this);
+  return result;
+}
+
 void bintree_insert_node(BinTree* this, BinTreeNode* node)
 {
   THIS_WRITELOCK (this);
@@ -325,11 +336,13 @@ BinTreeNode * _insert(BinTree *this, BinTreeNode *actual, BinTreeNode *insert)
 {
   BinTreeNode *result;
   result = _insert_into_tree(this, actual, &insert);
-  if(this->counter == 1) this->top = insert;
+  if(this->counter == 1) this->top = this->bottom = insert;
   else {
-    BinTreeNode *top;
+    BinTreeNode *top,*bottom;
     top = this->top;
+    bottom = this->bottom;
     if(this->cmp(top->value, insert->value) < 0) this->top = insert;
+    else if(this->cmp(bottom->value, insert->value) > 0) this->bottom = insert;
   }
   return result;
 }
@@ -455,6 +468,7 @@ remove:
   --this->counter;
   node->left = node->right = NULL;
   if(node == this->top) _refresh_top(this);
+  else if(candidate == this->bottom) _refresh_bottom(this);
   return node;
 replace:
   GST_DEBUG_OBJECT (this, "ELEMENT FOUND TO REPLACE: %lu->%lu\n",
@@ -475,6 +489,7 @@ replace:
       candidate->left = candidate->right = NULL;
   }
   if(candidate == this->top) _refresh_top(this);
+  else if(candidate == this->bottom) _refresh_bottom(this);
   return candidate;
 }
 
@@ -485,13 +500,13 @@ BinTreeNode *_get_rightest_value(BinTreeNode *node, BinTreeNode **parent)
   while(node->right) {*parent = node; node = node->right;}
   return node;
 }
-//
-//BinTreeNode *_get_leftest_value(BinTreeNode *node, BinTreeNode **parent)
-//{
-//  if(!node) return NULL;
-//  while(node->left) {*parent = node; node = node->right;}
-//  return node;
-//}
+
+BinTreeNode *_get_leftest_value(BinTreeNode *node, BinTreeNode **parent)
+{
+  if(!node) return NULL;
+  while(node->left) {*parent = node; node = node->left;}
+  return node;
+}
 
 BinTreeNode *_search_value(BinTree *this, guint64 value, BinTreeNode **parent)
 {
@@ -521,8 +536,9 @@ BinTreeNode *_make_bintreenode(BinTree *this, guint64 value)
 
 void _trash_bintreenode(BinTree *this, BinTreeNode *node)
 {
-  if(node && node == this->top){
-      _refresh_top(this);
+  if(node){
+    if(node == this->top) _refresh_top(this);
+    else if(node == this->bottom) _refresh_bottom(this);
   }
   if(g_queue_get_length(this->node_pool) > 1024){
     g_free(node);
@@ -537,6 +553,14 @@ void _refresh_top(BinTree *this)
   top = this->top;
   if(top->left) this->top = _get_rightest_value(top->left, &parent);
   else this->top = _get_rightest_value(this->root, &parent);
+}
+
+void _refresh_bottom(BinTree *this)
+{
+  BinTreeNode *top, *parent = NULL;
+  top = this->bottom;
+  if(top->right) this->bottom = _get_leftest_value(top->right, &parent);
+  else this->bottom = _get_leftest_value(this->root, &parent);
 }
 
 #undef THIS_WRITELOCK

@@ -55,6 +55,7 @@
 
 #include <gst/gst.h>
 #include <gst/rtp/gstrtcpbuffer.h>
+#include "mprtpspath.h"
 
 #define MPRTCP_PACKET_DEFAULT_MTU 1400
 #define MPRTCP_PACKET_TYPE_IDENTIFIER 212
@@ -62,6 +63,7 @@
 #define GST_MPRTCP_BLOCK_TYPE_SUBFLOW_INFO 0
 #define GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER 26
 #define GST_RTCP_XR_SKEW_BLOCK_TYPE_IDENTIFIER 27
+#define GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER 28
 #define RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION 2
 #define RTCP_XR_RFC7243_I_FLAG_SAMPLED_METRIC 1
 #define RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION 3
@@ -184,6 +186,29 @@ typedef struct PACKED _GstRTCPXR_Skew
 } GstRTCPXR_Skew;
 
 
+typedef struct PACKED _GstRTCPXR_OWD
+{
+  GstRTCPHeader header;
+  guint8 block_type;
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
+  guint8 reserved:6;
+  guint8 interval_metric:2;
+#elif G_BYTE_ORDER == G_BIG_ENDIAN
+  guint8 interval_metric:2;
+  guint8 reserved:6;
+#else
+#error "G_BYTE_ORDER should be big or little endian."
+#endif
+  guint16 block_length;
+  guint32 ssrc;
+  guint16 percentile;
+  guint16 invert_percentile;
+  guint32 one_way_delay;
+  guint32 max_delay;
+  guint32 min_delay;
+} GstRTCPXR_OWD;
+
+
 /*MPRTCP struct polymorphism*/
 
 typedef struct PACKED _GstMPRTCPSubflowInfo
@@ -216,6 +241,7 @@ typedef struct PACKED _GstMPRTCPSubflowBlock
     GstRTCPXR xr_header;
     GstRTCPXR_RFC7243 xr_rfc7243_riport;
     GstRTCPXR_Skew    xr_skew;
+    GstRTCPXR_OWD     xr_owd;
   };
 } GstMPRTCPSubflowBlock;
 
@@ -265,6 +291,9 @@ GstRTCPRR *gst_mprtcp_riport_block_add_rr (GstMPRTCPSubflowBlock * block);
 GstRTCPXR_RFC7243 *gst_mprtcp_riport_block_add_xr_rfc2743 (GstMPRTCPSubflowBlock
     * block);
 GstRTCPXR_Skew *gst_mprtcp_riport_block_add_xr_skew (GstMPRTCPSubflowBlock * block);
+
+GstRTCPXR_OWD *
+gst_mprtcp_riport_block_add_xr_owd (GstMPRTCPSubflowBlock * block);
 void
 gst_mprtcp_riport_add_block_end (GstMPRTCPSubflowReport * report,
     GstMPRTCPSubflowBlock * block);
@@ -340,6 +369,38 @@ void gst_rtcp_xr_skew_getdown(GstRTCPXR_Skew * report,
                               guint32 *delay,
                               guint32 *bytes);
 
+
+void gst_rtcp_xr_owd_init (GstRTCPXR_OWD * report);
+
+void gst_rtcp_xr_owd_setup(GstRTCPXR_OWD *report,
+                            guint8  interval_metric,
+                            guint32 ssrc,
+                            guint16 percentile,
+                            guint16 invert_percentile,
+                            guint32 one_way_delay,
+                            guint32 min_delay,
+                            guint32 max_delay);
+
+void gst_rtcp_xr_owd_change (GstRTCPXR_OWD *report,
+                             guint8  *interval_metric,
+                            guint32 *ssrc,
+                            guint16 *percentile,
+                            guint16 *invert_percentile,
+                            guint32 *one_way_delay,
+                            guint32 *min_delay,
+                            guint32 *max_delay);
+
+void gst_rtcp_xr_owd_getdown(GstRTCPXR_OWD *report,
+                             guint8  *interval_metric,
+                             guint32 *ssrc,
+                             guint16 *percentile,
+                             guint16 *invert_percentile,
+                             guint32 *one_way_delay,
+                             guint32 *min_delay,
+                             guint32 *max_delay);
+
+
+
 void gst_mprtcp_report_init (GstMPRTCPSubflowReport * report);
 void gst_mprtcp_riport_setup (GstMPRTCPSubflowReport * report, guint32 ssrc);
 void gst_mprtcp_riport_getdown (GstMPRTCPSubflowReport * report,
@@ -369,6 +430,7 @@ void gst_print_rtcp_sr (GstRTCPSR * report);
 void gst_print_rtcp_rr (GstRTCPRR * report);
 void gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * report);
 void gst_print_rtcp_xr_skew (GstRTCPXR_Skew * report);
+void gst_print_rtcp_xr_owd (GstRTCPXR_OWD * report);
 void gst_print_rtcp_srb (GstRTCPSRBlock * block_ptr);
 void gst_print_rtcp_rrb (GstRTCPRRBlock * block_ptr);
 
@@ -383,6 +445,13 @@ gdouble rtcp_interval(  gint senders,
                         gint we_sent,
                         gdouble avg_rtcp_size,
                         gint initial);
+
+gboolean gst_mprtp_get_subflow_extension(GstRTPBuffer *rtp,
+                                         guint8 ext_header_id,
+                                         MPRTPSubflowHeaderExtension **subflow_info);
+gboolean gst_mprtp_get_abs_send_time_extension(GstRTPBuffer *rtp,
+                                               guint8 ext_header_id,
+                                               RTPAbsTimeExtension **abs_time);
 #ifdef __WIN32__
 
 #pragma pack(pop)

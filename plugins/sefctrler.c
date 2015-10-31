@@ -385,8 +385,8 @@ sefctrler_run (void *data)
   }
   if(_ct0(this)->min_delay > 0){
     guint32 delay_skew = _ct0(this)->max_delay - _ct0(this)->min_delay;
-    if(delay_skew < 30  *GST_MSECOND){
-      stream_splitter_set_splitting_mode(this->splitter, MPRTP_STREAM_FRAME_BASED_SPLITTING);
+    if(delay_skew < 50  *GST_MSECOND){
+      stream_splitter_set_splitting_mode(this->splitter, MPRTP_STREAM_BYTE_BASED_SPLITTING);
     }else if(delay_skew < 150 * GST_MSECOND){
       stream_splitter_set_splitting_mode(this->splitter, MPRTP_STREAM_FRAME_BASED_SPLITTING);
     }else{

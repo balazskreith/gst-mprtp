@@ -58,7 +58,7 @@ typedef enum
 {
   EVENT_LATE       = -4,
   EVENT_CONGESTION = -3,
-  EVENT_LOSTS      = -2,
+  EVENT_LOST      = -2,
   EVENT_DISTORTION = -1,
   EVENT_FI         =  0,
   EVENT_SETTLED    =  1,
@@ -88,10 +88,13 @@ struct _SubflowRecord
   guint32 delay;
   MPRTPSPathState state;
   Event event;
+
   //derived data
   gdouble goodput;
   gdouble lost_rate;
   GstClockTime RTT;
+  gdouble mitigation;
+  guint32 sending_bid;
 };
 
 struct _Subflow
@@ -239,7 +242,7 @@ static void _sefctrler_recalc (SndEventBasedController * this);
 //    Subflow * subflow);
 //static gfloat _get_reduction (SndEventBasedController * this,
 //    Subflow * subflow);
-static gfloat _get_compensation (SndEventBasedController * this,
+static gfloat _get_gainments (SndEventBasedController * this,
     Subflow * subflow);
 
 
@@ -412,8 +415,9 @@ sefctrler_run (void *data)
 
   if(all_RR_report_arrived || this->last_recalc_time < now - 3 * this->RTT_max)
   {
+      g_print("REFREASH: %d-%lu\n",all_RR_report_arrived, 3 * this->RTT_max);
     this->bids_recalc_requested = TRUE;
-    this->RTT_max = _ct0(this)->RTT_max;
+    this->last_recalc_time = now;
     _cstep(this);
   }
 //done:
@@ -757,13 +761,16 @@ _st (Subflow * this, gint moment)
 void
 _sstep (Subflow * this)
 {
+  if(_st0(this)->RTT) this->RTT = _st0(this)->RTT;
   this->records_index = (this->records_index + 1) % this->records_max;
   memset ((gpointer) _st0 (this), 0, sizeof (SubflowRecord));
 //  _st0(this)->RTT                   = _st1(this)->RTT;
   _st0(this)->goodput               = _st1(this)->goodput;
   _st0(this)->fraction_lost         = _st1(this)->fraction_lost;
   _st0(this)->delay                 = _st1(this)->delay;
-  if(_st0(this)->RTT) this->RTT = _st0(this)->RTT;
+  _st0(this)->mitigation            = MIN(_st1(this)->mitigation + 1., 16.);
+  _st0(this)->sending_bid           = _st1(this)->sending_bid;
+  _st0(this)->moment = gst_clock_get_time(this->sysclock);
 }
 
 void
@@ -826,7 +833,9 @@ _controller_record_add_subflow (SndEventBasedController * this,
       break;
   }
   ++_ct0 (this)->subflows.num;
-  _ct0(this)->RTT_max = MAX(_st0(subflow)->RTT, _ct0(this)->RTT_max);
+
+  _ct0(this)->RTT_max = MAX(subflow->RTT, _ct0(this)->RTT_max);
+  this->RTT_max = MAX(_ct0(this)->RTT_max, (.5 + g_random_double()) * GST_SECOND);
   if(_st0(subflow)->delay){
     _ct0(this)->min_delay = MIN(_ct0(this)->min_delay, _st0(subflow)->delay);
     _ct0(this)->max_delay = MAX(_ct0(this)->max_delay, _st0(subflow)->delay);
@@ -912,6 +921,7 @@ _riport_processing_rrblock_processor (SndEventBasedController *this,
   if (subflow->received_receiver_reports_num && (LSR == 0 || DLSR == 0)) {
     return;
   }
+//  gst_print_rtcp_rrb(rrb);
   //--------------------------
   //processing
   //--------------------------
@@ -919,6 +929,7 @@ _riport_processing_rrblock_processor (SndEventBasedController *this,
     guint64 diff;
     diff = ((guint32)(NTP_NOW>>16)) - LSR - DLSR;
    _st0 (subflow)->RTT = get_epoch_time_from_ntp_in_ns(diff<<16);
+//   g_print("%dRTT: %lu\n", subflow->id, _st0(subflow)->RTT);
 //    g_print("----------->%d:RTT: %lu<----------------\n",
 //            this->id, GST_TIME_AS_MSECONDS(_st0 (this)->RTT));
   }
@@ -1155,7 +1166,7 @@ _refresh_goodput (Subflow * this)
 
     }
     _st0 (this)->goodput = goodput;
-    _st0 (this)->moment = now;
+    g_print("S %d Goodput: %f\n", this->id, goodput);
   }
 }
 
@@ -1167,9 +1178,10 @@ _refresh_goodput (Subflow * this)
 void
 _action_keep (SndEventBasedController * this, Subflow * subflow)
 {
-  subflow->compensation = _get_compensation(this, subflow);
+  subflow->compensation = 1.;
   if (mprtps_path_is_in_trial (subflow->path)){
     this->bids_recalc_requested = TRUE;
+    subflow->compensation = _get_gainments(this, subflow);
   }
   memcpy (&subflow->saved_record_at_keep, _st0 (subflow), sizeof (SubflowRecord));
   subflow->saved_time_at_keep = gst_clock_get_time (this->sysclock);
@@ -1181,19 +1193,9 @@ _action_keep (SndEventBasedController * this, Subflow * subflow)
 void
 _action_restore (SndEventBasedController * this, Subflow * subflow)
 {
-  GstClockTime now;
   this->bids_recalc_requested = TRUE;
-  //load...
-  now = gst_clock_get_time (this->sysclock);
-  if (now - GST_SECOND * 30 < subflow->saved_time_at_keep) {
-    _st0 (subflow)->goodput = subflow->saved_record_at_keep.goodput;
-  }else{
-    //we assume at least 64kbps goodput
-   _st0(subflow)->goodput = 64000.;
-  }
-  subflow->compensation = _get_compensation(this, subflow);
-  GST_DEBUG_OBJECT (this, "Restore action is performed with "
-        "Event based controller on subflow %d", subflow->id);
+  _st0(subflow)->goodput = MAX(64000., _st0(subflow)->goodput);
+  subflow->compensation = _get_gainments(this, subflow);
 }
 
 void
@@ -1218,6 +1220,7 @@ void
 _action_mitigate (SndEventBasedController * this, Subflow * subflow)
 {
   subflow->compensation = .8;
+  _st0(subflow)->mitigation=MAX(_st0(subflow)->mitigation/2., 1);
   this->bids_recalc_requested = TRUE;
   GST_DEBUG_OBJECT (this, "Mitigate action is performed with "
       "Event based controller on subflow %d", subflow->id);
@@ -1227,6 +1230,7 @@ void
 _action_reduce (SndEventBasedController * this, Subflow * subflow)
 {
   subflow->compensation = .5;
+  _st0(subflow)->mitigation=MAX(_st0(subflow)->mitigation/2., 1);
   this->bids_recalc_requested = TRUE;
   GST_DEBUG_OBJECT (this, "Mitigate action is performed with "
       "Event based controller on subflow %d", subflow->id);
@@ -1301,9 +1305,9 @@ _fire (SndEventBasedController * this, Subflow * subflow, Event event)
         break;
       case EVENT_DISTORTION:
         mprtps_path_set_trial_end (path);
-        action = _action_mitigate;
+        action = _action_keep;
         break;
-      case EVENT_LOSTS:
+      case EVENT_LOST:
         mprtps_path_set_lossy (path);
         action = _action_mitigate;
         break;
@@ -1372,13 +1376,8 @@ _sefctrler_recalc (SndEventBasedController * this)
   gpointer key, val;
   Subflow *subflow;
   MPRTPSPath *path;
-  gfloat max_bid = 0.;
-  gfloat sending_bid;
 
 //  g_print ("RECALCULATION STARTED\n");
-  max_bid = _ct0 (this)->goodput.mc +
-      _ct0 (this)->goodput.c +
-      _ct0 (this)->goodput.nc;
 
     g_hash_table_iter_init (&iter, this->subflows);
     while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
@@ -1387,45 +1386,35 @@ _sefctrler_recalc (SndEventBasedController * this)
       if (!mprtps_path_is_active (path)) {
         continue;
       }
-
-      sending_bid = _st0 (subflow)->goodput / max_bid *
-                               subflow->compensation;
+      subflow->new_RR_arrived = FALSE;
+      if(_st0(subflow)->goodput > 0.)
+        _st0(subflow)->sending_bid =
+                    (_st0 (subflow)->sending_bid *
+                     (_st0(subflow)->mitigation-1)  + _st0(subflow)->goodput)
+                    / _st0(subflow)->mitigation * subflow->compensation;
 
       stream_splitter_setup_sending_bid (this->splitter, subflow->id,
-          (guint32) (sending_bid + .5));
-//      g_print("S:%d: %f = %f / %f * %f\n",
-//              subflow->id,
-//              sending_bid,
-//              _st0 (subflow)->goodput,
-//              max_bid,
-//              subflow->compensation);
+          (guint32) (_st0(subflow)->sending_bid  + .5));
+      g_print("S:%d: %u = (prev * %f + %f)/ %f * %f\n",
+              subflow->id,
+              _st0(subflow)->sending_bid,
+              _st0(subflow)->mitigation - 1.,
+              _st0 (subflow)->goodput,
+              _st0(subflow)->mitigation,
+              subflow->compensation);
     }
 }
 
 
 gfloat
-_get_compensation (SndEventBasedController * this, Subflow * subflow)
+_get_gainments (SndEventBasedController * this, Subflow * subflow)
 {
   gfloat result = 1.;
   GST_DEBUG ("get compensation value for subflow %d at controller %p",
       subflow->id, this);
-  if (!mprtps_path_is_in_trial (subflow->path))
-    goto done;
-  if (_ct0 (this)->subflows.nc > 1 &&
-      (_ct0 (this)->subflows.mc + _ct0 (this)->subflows.c) > 0 &&
-      _ct1 (this)->max_nc_goodput <= _st0 (subflow)->goodput) {
-    mprtps_path_set_trial_end (subflow->path);
-    goto done;
-  }
-  if (_ct0 (this)->subflows.nc == 1 &&
-      (_ct0 (this)->subflows.mc + _ct0 (this)->subflows.c) > 0) {
-    //aggressive increasement
-    result += .3;
-  } else {
-    //cautious increasement
-    result += .05;
-  }
-done:
+  subflow->saved_record_at_keep.goodput = MAX(subflow->saved_record_at_keep.goodput, 64000.);
+  result = (subflow->saved_record_at_keep.goodput -
+               _st0(subflow)->goodput) / _st0(subflow)->mitigation;
   return result;
 }
 

@@ -486,8 +486,8 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
   SchNode *tree;
 
   new_frame = this->last_rtp_timestamp != gst_rtp_buffer_get_timestamp(rtp) ? 1 : 0;
-  bytes_to_send = gst_rtp_buffer_get_payload_len (rtp);;
-
+  bytes_to_send = gst_rtp_buffer_get_payload_len (rtp);
+//  g_print("bytes to send: %u\n",bytes_to_send);
   if (this->keyframes_tree == NULL) {
     result = schtree_get_next (this->non_keyframes_tree, bytes_to_send, new_frame);
     goto done;
@@ -544,8 +544,8 @@ _schtree_loadup (SchNode * node,
     node->left->path = max_bid_path;
     node->left->sent_bytes =
         mprtps_path_get_total_sent_payload_bytes (max_bid_path) >> level;
-    node->sent_frames =
-            mprtps_path_get_total_sent_frames_num(node->path) >> level;
+    node->left->sent_frames =
+            mprtps_path_get_total_sent_frames_num(max_bid_path) >> level;
     g_warning ("Schtree is not full");
   } else {
     sent_bytes += _schtree_loadup (node->left, max_bid_path,
@@ -555,8 +555,10 @@ _schtree_loadup (SchNode * node,
   if (node->right == NULL) {
     node->right = _schnode_ctor ();
     node->right->path = max_bid_path;
-    node->left->sent_bytes =
+    node->right->sent_bytes =
         mprtps_path_get_total_sent_payload_bytes (max_bid_path) >> level;
+    node->right->sent_frames =
+            mprtps_path_get_total_sent_frames_num(max_bid_path) >> level;
     g_warning ("Schtree is not full");
   } else {
     sent_bytes += _schtree_loadup (node->right, max_bid_path,
@@ -695,6 +697,7 @@ schtree_get_next (SchNode * root, guint32 bytes_to_send, guint32 frames_to_send)
     selected->sent_frames += frames_to_send;
     selected = (*(left->decision_value) <= *(right->decision_value)) ? left : right;
   }
+//  g_print("selected path: %d bytes: %u\n", selected->path->id, selected->sent_bytes);
   result = selected->path;
 //  g_print("%d->", result->id);
   return result;

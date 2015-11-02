@@ -64,6 +64,10 @@ struct _StreamSplitter
   gfloat               keyframe_ratio;
   guint8               active_subflow_num;
 
+  gboolean             separation_is_possible;
+  gboolean             last_delta_flag;
+  gboolean             first_delta_flag;
+
 };
 
 struct _StreamSplitterClass{

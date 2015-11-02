@@ -144,7 +144,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-streamsplitter.lo libgstmprtp_la-rmanctrler.lo \
 	libgstmprtp_la-smanctrler.lo libgstmprtp_la-sefctrler.lo \
 	libgstmprtp_la-refctrler.lo libgstmprtp_la-bintree.lo \
-	libgstmprtp_la-packetsqueue.lo libgstmprtp_la-playoutgate.lo
+	libgstmprtp_la-packetsqueue.lo libgstmprtp_la-playoutgate.lo \
+	libgstmprtp_la-ricalcer.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -402,7 +403,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          refctrler.c                \
                          bintree.c                  \
                          packetsqueue.c             \
-                         playoutgate.c           
+                         playoutgate.c              \
+                         ricalcer.c
 
 noinst_HEADERS = mprtpspath.h      \
                  rmanctrler.h      \
@@ -414,7 +416,8 @@ noinst_HEADERS = mprtpspath.h      \
                  streamjoiner.h    \
                  bintree.h         \
                  packetsqueue.h    \
-                 playoutgate.h
+                 playoutgate.h     \
+                 ricalcer.h
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -520,6 +523,7 @@ include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-packetsqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-playoutgate.Plo
 include ./$(DEPDIR)/libgstmprtp_la-refctrler.Plo
+include ./$(DEPDIR)/libgstmprtp_la-ricalcer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rmanctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sefctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-smanctrler.Plo
@@ -665,6 +669,13 @@ libgstmprtp_la-playoutgate.lo: playoutgate.c
 #	$(AM_V_CC)source='playoutgate.c' object='libgstmprtp_la-playoutgate.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-playoutgate.lo `test -f 'playoutgate.c' || echo '$(srcdir)/'`playoutgate.c
+
+libgstmprtp_la-ricalcer.lo: ricalcer.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-ricalcer.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-ricalcer.Tpo -c -o libgstmprtp_la-ricalcer.lo `test -f 'ricalcer.c' || echo '$(srcdir)/'`ricalcer.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-ricalcer.Tpo $(DEPDIR)/libgstmprtp_la-ricalcer.Plo
+#	$(AM_V_CC)source='ricalcer.c' object='libgstmprtp_la-ricalcer.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-ricalcer.lo `test -f 'ricalcer.c' || echo '$(srcdir)/'`ricalcer.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

@@ -588,14 +588,14 @@ gst_rtcp_xr_skew_init (GstRTCPXR_Skew * report)
   gst_rtcp_header_init (&report->header);
   gst_rtcp_header_setup (&report->header, FALSE, 0,
       GST_RTCP_TYPE_XR, RTCPHEADER_WORDS - 1 + RTCPXRSKEWBLOCK_WORDS, 0);
-  gst_rtcp_xr_skew_setup (report, 0, 0, 0, 0, 0);
+  gst_rtcp_xr_skew_setup (report, 0, 0, 0, 0, 0, 0, 0, 0);
 }
 
 
 void
 gst_rtcp_xr_skew_setup(GstRTCPXR_Skew *report,
-                       gboolean skew_flag,
                        guint8   interval_metric,
+                       gboolean skew_flag,
                        guint32  ssrc,
                        guint8   percentile_frac,
                        guint32  stream_bytes_num,
@@ -606,8 +606,8 @@ gst_rtcp_xr_skew_setup(GstRTCPXR_Skew *report,
   report->block_length = g_htons (4);
   report->block_type = GST_RTCP_XR_SKEW_BLOCK_TYPE_IDENTIFIER;
   gst_rtcp_xr_skew_change(report,
-                          &skew_flag,
                           &interval_metric,
+                          &skew_flag,
                           &ssrc,
                           &percentile_frac,
                           &stream_bytes_num,
@@ -618,8 +618,8 @@ gst_rtcp_xr_skew_setup(GstRTCPXR_Skew *report,
 
 void
 gst_rtcp_xr_skew_change (GstRTCPXR_Skew *report,
-                          gboolean  *skew_flag,
                           guint8   *interval_metric,
+                          gboolean  *skew_flag,
                           guint32  *ssrc,
                           guint8   *percentile_frac,
                           guint32  *stream_bytes_num,

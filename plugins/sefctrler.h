@@ -13,6 +13,7 @@
 #include "mprtpspath.h"
 #include "streamsplitter.h"
 #include "smanctrler.h"
+#include "bintree.h"
 
 typedef struct _SndEventBasedController SndEventBasedController;
 typedef struct _SndEventBasedControllerClass SndEventBasedControllerClass;

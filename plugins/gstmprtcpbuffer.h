@@ -25,7 +25,6 @@
 #define PACKED
 #pragma pack(push,1)
 
-#define
 
 #else
 
@@ -361,7 +360,7 @@ void gst_rtcp_xr_skew_init (GstRTCPXR_Skew * report);
 
 void gst_rtcp_xr_skew_setup(GstRTCPXR_Skew *report,
                             guint8   interval_metric,
-                            gboolean*skew_flag,
+                            gboolean skew_flag,
                             guint32  ssrc,
                             guint8   percentile_frac,
                             guint32  stream_bytes_num,

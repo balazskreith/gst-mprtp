@@ -154,6 +154,8 @@ stream_splitter_init (StreamSplitter * this)
   this->ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, g_free);
   this->charge_value = 100;
+  this->separation_is_possible = FALSE;
+  this->first_delta_flag = TRUE;
   this->thread = gst_task_new (stream_splitter_run, this, NULL);
     this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
 //  this->splitting_mode = MPRTP_STREAM_BYTE_BASED_SPLITTING;
@@ -260,47 +262,6 @@ stream_splitter_commit_changes (StreamSplitter * this)
   this->changes_are_committed = TRUE;
   THIS_WRITEUNLOCK (this);
 }
-
-//Here the buffer must be writeable and must be rtp
-//gboolean
-//stream_splitter_process_rtp_packet (StreamSplitter * this, GstRTPBuffer * rtp)
-//{
-//  MPRTPSPath *path;
-//  gboolean result = TRUE;
-//  guint32 bytes_to_send;
-//  guint32 keytree_value, non_keytree_value;
-//  SchNode *tree;
-//
-//  THIS_WRITELOCK (this);
-//  bytes_to_send = gst_rtp_buffer_get_payload_len(rtp);
-//  if(this->keyframes_tree == NULL){
-//    path = schtree_get_next (this->non_keyframes_tree, bytes_to_send);
-//    goto process;
-//  }else if(this->non_keyframes_tree == NULL){
-//    path = schtree_get_next (this->keyframes_tree, bytes_to_send);
-//    goto process;
-//  }
-//
-//  if (!GST_BUFFER_FLAG_IS_SET (rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT))
-//  {
-//    path = schtree_get_next (this->keyframes_tree, bytes_to_send);
-//    goto process;
-//  }
-//
-//  keytree_value = this->keyframes_tree->sent_bytes * this->non_keyframe_ratio;
-//  non_keytree_value = this->non_keyframes_tree->sent_bytes * this->keyframe_ratio;
-//  tree = keytree_value <= non_keytree_value ? this->keyframes_tree : this->non_keyframes_tree;
-//
-//  path = schtree_get_next (tree, bytes_to_send);
-//
-//
-//process:
-//  mprtps_path_process_rtp_packet (path, this->ext_header_id, rtp);
-//done:
-//  THIS_WRITEUNLOCK (this);
-//  return result;
-//}
-
 
 MPRTPSPath *
 stream_splitter_get_next_path (StreamSplitter * this, GstBuffer * buf)
@@ -496,14 +457,29 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
     goto done;
   }
 
-  if (!GST_BUFFER_FLAG_IS_SET (rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT)) {
+  //does separation possible?
+  {
+    gboolean actual_delta_flag;
+    actual_delta_flag = GST_BUFFER_FLAG_IS_SET (rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT);
+    if(this->first_delta_flag){
+        this->first_delta_flag = FALSE;
+        goto set_last_delta_flag;
+    }
+    if(actual_delta_flag != this->last_delta_flag){
+      this->separation_is_possible = TRUE;
+    }
+
+  set_last_delta_flag:
+    this->last_delta_flag = actual_delta_flag;
+  }
+
+  if (this->separation_is_possible && !GST_BUFFER_FLAG_IS_SET (rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT)) {
       result = schtree_get_next (this->keyframes_tree, bytes_to_send, new_frame);
     goto done;
   }
 
-  keytree_value = this->keyframes_tree->sent_bytes * this->non_keyframe_ratio;
-  non_keytree_value =
-      this->non_keyframes_tree->sent_bytes * this->keyframe_ratio;
+  keytree_value =     *(this->keyframes_tree->decision_value)     * this->non_keyframe_ratio;
+  non_keytree_value = *(this->non_keyframes_tree->decision_value) * this->keyframe_ratio;
   tree =
       keytree_value <=
       non_keytree_value ? this->keyframes_tree : this->non_keyframes_tree;

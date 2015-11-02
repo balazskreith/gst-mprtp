@@ -39,26 +39,47 @@
 #define RIPORT_TIMEOUT (3 * MAX_RIPORT_INTERVAL)
 #define PATH_RTT_MAX_TRESHOLD (800 * GST_MSECOND)
 #define PATH_RTT_MIN_TRESHOLD (600 * GST_MSECOND)
+#define MAX_SUBFLOW_MOMENT_NUM 4
+
+
 GST_DEBUG_CATEGORY_STATIC (sefctrler_debug_category);
 #define GST_CAT_DEFAULT sefctrler_debug_category
-#define _ct0(this) (this->records+this->records_index)
-#define _ct1(this) (this->records + (this->records_index == 0 ? this->records_max-1 : this->records_index-1))
-#define _st0(this) (this->records+this->records_index)
-#define _st1(this) (this->records + (this->records_index == 0 ? this->records_max-1 : this->records_index-1))
-#define _st2(this) _st(this, -2)
 
+#define _ct0(this) (this->splitctrler_moments + this->splitctrler_moments_index)
+#define _ct1(this) (this->splitctrler_moments + 1 - this->splitctrler_moments_index)
+#define _irt0(this) (this->ir_moments+this->ir_moments_index)
+#define _irt1(this) (this->ir_moments + (this->ir_moments_index == 0 ? MAX_SUBFLOW_MOMENT_NUM-1 : this->ir_moments_index-1))
+#define _irt2(this) _irt(this, -2)
+#define _ort0(this) (this->or_moments+this->or_moments_index)
+#define _ort1(this) (this->or_moments+!this->or_moments_index)
+#define _irt0_get_discarded_bytes(this) (_irt0(this)->early_discarded_bytes + _irt0(this)->late_discarded_bytes)
 
 G_DEFINE_TYPE (SndEventBasedController, sefctrler, G_TYPE_OBJECT);
 
 typedef struct _Subflow Subflow;
-typedef struct _SubflowRecord SubflowRecord;
+typedef struct _IRMoment IRMoment;
+typedef struct _ORMoment ORMoment;
+typedef struct _SubflowState SubflowState;
+
+//                        ^
+//                        | Event
+// .---.    .--------.-----------.
+// |   |    | T | SystemNotifier |
+// |   |    | i |----------------|
+// | I |    | c |      ORP       |->Reports
+// | R |-E->| k |----------------|
+// | P |    | e |   SplitCtrler  |
+// |   |    | r |                |
+// '---'    '---'----------------'
+//                        | Bids
+//                        V
 
 
 typedef enum
 {
   EVENT_LATE       = -4,
   EVENT_CONGESTION = -3,
-  EVENT_LOST      = -2,
+  EVENT_LOSSY       = -2,
   EVENT_DISTORTION = -1,
   EVENT_FI         =  0,
   EVENT_SETTLED    =  1,
@@ -66,175 +87,207 @@ typedef enum
   EVENT_ACTIVATE   =  17,
 } Event;
 
+struct _SplitCtrlerMoment{
+  guint32             delay;
+  guint32             min_delay;
+  guint32             max_delay;
+  guint32             skew;
+  guint32             min_skew;
+  guint32             max_skew;
+};
 
+struct _IRMoment{
+  GstClockTime        time;
+  GstClockTime        RTT;
+  guint32             sending_bid;
+  guint32             stability;
+  gdouble             goodput;
+  guint32             delay;
+  guint32             min_delay;
+  guint32             max_delay;
+  guint32             skew;
+  guint32             min_skew;
+  guint32             max_skew;
+  guint32             early_discarded_bytes;
+  guint32             late_discarded_bytes;
+  guint32             early_discarded_bytes_sum;
+  guint32             late_discarded_bytes_sum;
+  guint16             HSSN;
+  guint16             cycle_num;
+  guint16             expected_packets;
+  guint32             expected_payload_bytes;
+  gdouble             lost_rate;
+  MPRTPSPathState     state;
+};
 
-struct _SubflowRecord
-{
-  GstClockTime moment;
+struct _ORMoment{
+  GstClockTime        time;
+  guint32             sent_packets_num;
+  guint32             sent_payload_bytes;
+  guint16             sent_report_length;
 
-  //Raw data - RR
-  guint8 fraction_lost;
-  //guint32 lost_packets_num;
-  guint32 jitter;
-  guint32 LSR;
-  guint32 DLSR;
+};
 
-  //Delta data
-  guint16 HSSN;
-  guint32 early_discarded_bytes;
-  guint32 late_discarded_bytes;
-
-  guint32 skew;
-  guint32 delay;
-  MPRTPSPathState state;
-  Event event;
-
-  //derived data
-  gdouble goodput;
-  gdouble lost_rate;
-  GstClockTime RTT;
-  gdouble mitigation;
-  guint32 sending_bid;
+struct _SubflowState{
+  gdouble            goodput;
 };
 
 struct _Subflow
 {
-  MPRTPSPath *path;
-  guint8 id;
-  GstClock *sysclock;
-  GstClockTime joined_time;
+  MPRTPSPath*                path;
+  GstClockTime               joined_time;
+  guint8                     id;
+  GstClock*                  sysclock;
+  ReportIntervalCalculator*  ricalcer;
+  gboolean                   deactivated;
+  IRMoment*                  ir_moments;
+  gint                       ir_moments_index;
+  guint32                    ir_moments_num;
+  ORMoment                   or_moments[2];
+  gint                       or_moments_index;
+  guint32                    or_moments_num;
+  SubflowState               stable_state;
+  GstClockTime               stable_time;
+  GstClockTime               RTT;
+  gdouble                    avg_rtcp_size;
 
-  //Records
-  SubflowRecord *records;
-  gint records_index;
-  gint records_max;
-  gboolean deactivated;
-  SubflowRecord saved_record_at_fall;
-  GstClockTime saved_time_at_fall;
-  SubflowRecord saved_record_at_keep;
-  GstClockTime saved_time_at_keep;
-
-  GstClockTime RTT;
-  //Monotonicly inreased data
-  guint16 HSSN;
-  guint16 cycle_num;
-  guint32 late_discarded_bytes_sum;
-  guint32 early_discarded_bytes_sum;
-  guint32 sent_packet_num;
-  guint32 sent_payload_bytes;
-
-  gdouble compensation;
-  //Report calculations
-  guint32 received_receiver_reports_num;
-  GstClockTime last_receiver_riport_time;
-  gdouble avg_rtcp_size;
-  gboolean first_report_calculated;
-  GstClockTime normal_report_time;
-  gboolean new_RR_arrived;
-
-  //for stat
-  guint32 last_stat_payload_bytes;
-
-};
-
-
-
-struct _ControllerRecord
-{
-  struct
-  {
-    gdouble c, mc, nc;
-  } goodput;
-  struct
-  {
-    guint c, mc, nc, num;
-  } subflows;
-  gfloat max_nc_goodput;
-  Subflow*     max_delayed_subflow;
-  guint32      min_delay;
-  guint32      max_delay;
-  GstClockTime moment;
-  GstClockTime RTT_max;
-  guint report_num_arrived;
 };
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
 
-static void sefctrler_finalize (GObject * object);
-static void sefctrler_run (void *data);
-static void _prepare_crecord_refresh(SndEventBasedController *this);
-static guint16 _uint16_diff (guint16 a, guint16 b);
-static guint32 _uint32_diff (guint32 a, guint32 b);
-static void sefctrler_receive_mprtcp (gpointer this, GstBuffer * buf);
-static void _report_processing_selector (SndEventBasedController *this,
-                                         Subflow * subflow,
-                                         GstMPRTCPSubflowBlock * block,
-                                         guint8 *report_type);
-static void
-_riport_processing_rrblock_processor (SndEventBasedController *this,
-                                      Subflow * subflow,
-                                      GstRTCPRRBlock * rrb);
 
-static void _fire_congestion_or_distortion(SndEventBasedController *this,
-                                           Subflow *subflow);
 static void
-_report_processing_xr_7243_block_processor (SndEventBasedController *this,
-                                            Subflow * subflow, GstRTCPXR_RFC7243 * xrb);
+sefctrler_finalize (GObject * object);
 static void
-_report_processing_xr_skew_block_processor (SndEventBasedController *this,
-                                            Subflow * subflow,
-                                            GstRTCPXR_Skew * xrb);
-void
-_report_processing_xr_owd_block_processor (SndEventBasedController *this,
-                                            Subflow * subflow,
-                                            GstRTCPXR_OWD * xrb);
-static gboolean _is_system_overused(SndEventBasedController *this, Subflow *subflow);
-static gboolean _is_system_underused(SndEventBasedController *this, Subflow *subflow);
-static void _refresh_system_state(SndEventBasedController *this, Subflow *subflow);
+sefctrler_rem_path (gpointer controller_ptr, guint8 subflow_id);
+static void
+sefctrler_add_path (gpointer controller_ptr, guint8 subflow_id,MPRTPSPath * path);
+static void
+sefctrler_pacing (gpointer controller_ptr, gboolean allowed);
+static gboolean
+sefctrler_is_pacing (gpointer controller_ptr);
+static GstStructure* sefctrler_state (gpointer controller_ptr);
+
+//---------------------------------- Ticker ----------------------------------
+
+static void
+sefctrler_ticker_run (void *data);
+
+//----------------------------------------------------------------------------
 
 
-static GstBuffer *_get_mprtcp_sr_block (SndEventBasedController * this,
-    Subflow * subflow, guint16 * buf_length);
-static void _setup_sr_riport (Subflow * this, GstRTCPSR * sr, guint32 ssrc);
+//------------------------- Incoming Report Processor -------------------
+
+static IRMoment*
+_irt (Subflow * this, gint moment);
+
+static void
+_step_ir (Subflow * this);
+
+static void sefctrler_receive_mprtcp (
+    gpointer this,
+    GstBuffer * buf);
+
+static void _report_processing_selector (
+    SndEventBasedController *this,
+    Subflow * subflow,
+    GstMPRTCPSubflowBlock * block);
+
+static void
+_riport_processing_rrblock_processor (
+    SndEventBasedController *this,
+    Subflow * subflow,
+    GstRTCPRRBlock * rrb);
+
+static void
+_report_processing_xr_7243_block_processor (
+    SndEventBasedController *this,
+    Subflow * subflow,
+    GstRTCPXR_RFC7243 * xrb);
+
+static void
+_report_processing_xr_skew_block_processor (
+    SndEventBasedController *this,
+    Subflow * subflow,
+    GstRTCPXR_Skew * xrb);
+
+static void
+_refresh_delay_tresholds(
+    SndEventBasedController *this,
+    guint64 delay);
+
+static void
+_refresh_goodput_and_sending_bid (Subflow * this);
+
 static void _fire (SndEventBasedController * this, Subflow * subflow,
     Event event);
+
+//Actions
+typedef void (*Action) (SndEventBasedController *, Subflow *);
+//static void _action_recalc (SndEventBasedController * this, Subflow * subflow);
+static void _perform_restore (SndEventBasedController * this, Subflow * subflow);
+static void _perform_fall (SndEventBasedController * this, Subflow * subflow);;
+static void _perform_load (SndEventBasedController * this, Subflow * subflow);;
+static void _perform_keep (SndEventBasedController * this, Subflow * subflow);;
+static void _perform_mitigate (SndEventBasedController * this, Subflow * subflow);
+static void _perform_reduce (SndEventBasedController * this, Subflow * subflow);
+
+
+//----------------------------------------------------------------------------
+
+//------------------------ Outgoing Report Producer -------------------------
 static void
-_send_mprtcp_sr_block (SndEventBasedController * this, Subflow * subflow);
+_orp_producer_main(SndEventBasedController * this);
+
 static void
-_controller_record_add_subflow (SndEventBasedController * this,
-    Subflow * subflow);
+_send_mprtcp_sr_block (SndEventBasedController * this,
+                       Subflow * subflow);
+static void
+_step_or(Subflow *this);
 
-static gboolean _do_report_now (Subflow * this);
-static void _recalc_report_time (Subflow * this);
+static GstBuffer*
+_get_mprtcp_sr_block (SndEventBasedController* this,
+                      Subflow* subflow,
+                      guint16* buf_length);
+static void _setup_sr_riport (Subflow * this,
+                              GstRTCPSR * sr,
+                              guint32 ssrc);
+//----------------------------------------------------------------------------
 
-static gboolean _check_report_timeout (Subflow * this);
-static void _refresh_goodput (Subflow * this);
-static void sefctrler_riport_can_flow (gpointer this);
-void _cstep (SndEventBasedController * this);
+//----------------------------- System Notifier ------------------------------
+static void
+_system_notifier_main(SndEventBasedController * this);
 
-//----------------------------------------------------------------
-//----------------- subflow specific functions -------------------
-//----------------------------------------------------------------
+//----------------------------------------------------------------------------
+
+//----------------------------- Split Controller -----------------------------
+static void
+_split_controller_main(SndEventBasedController * this);
+
+//----------------------------------------------------------------------------
+
+//------------------------- Utility functions --------------------------------
 static Subflow *_subflow_ctor (void);
 static void _subflow_dtor (Subflow * this);
 static void _ruin_subflow (gpointer * subflow);
 static Subflow *_make_subflow (guint8 id, MPRTPSPath * path);
 static void reset_subflow (Subflow * this);
+static guint16 _uint16_diff (guint16 a, guint16 b);
+static guint32 _uint32_diff (guint32 a, guint32 b);
+static gint _cmp_for_maxtree (guint64 x, guint64 y);
+//----------------------------------------------------------------------------
 
-static SubflowRecord *_st (Subflow * this, gint moment);
-void _sstep (Subflow * this);
 
-//Actions
-typedef void (*Action) (SndEventBasedController *, Subflow *);
-//static void _action_recalc (SndEventBasedController * this, Subflow * subflow);
-static void _action_restore (SndEventBasedController * this, Subflow * subflow);
-static void _action_fall (SndEventBasedController * this, Subflow * subflow);;
-static void _action_load (SndEventBasedController * this, Subflow * subflow);;
-static void _action_keep (SndEventBasedController * this, Subflow * subflow);;
-static void _action_mitigate (SndEventBasedController * this, Subflow * subflow);
-static void _action_reduce (SndEventBasedController * this, Subflow * subflow);
+static gboolean _check_report_timeout (Subflow * this);
+
+static void sefctrler_riport_can_flow (gpointer this);
+
+//----------------------------------------------------------------
+//----------------- subflow specific functions -------------------
+//----------------------------------------------------------------
+
 
 
 static void _sefctrler_recalc (SndEventBasedController * this);
@@ -246,12 +299,7 @@ static gfloat _get_gainments (SndEventBasedController * this,
     Subflow * subflow);
 
 
-static void sefctrler_rem_path (gpointer controller_ptr, guint8 subflow_id);
-static void sefctrler_add_path (gpointer controller_ptr, guint8 subflow_id,
-    MPRTPSPath * path);
-static void sefctrler_pacing (gpointer controller_ptr, gboolean allowed);
-static gboolean sefctrler_is_pacing (gpointer controller_ptr);
-static GstStructure* sefctrler_state (gpointer controller_ptr);
+
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -295,17 +343,19 @@ sefctrler_init (SndEventBasedController * this)
   this->bids_recalc_requested = FALSE;
   this->bids_commit_requested = FALSE;
   this->ssrc = g_random_int ();
-  this->riport_is_flowable = FALSE;
-  this->records_max = 5;
-  this->records =
-      (ControllerRecord *) g_malloc0 (sizeof (ControllerRecord) *
-      this->records_max);
+  this->report_is_flowable = FALSE;
+  this->splitctrler_moments =
+      (SplitCtrlerMoment *) g_malloc0 (sizeof (SplitCtrlerMoment) * 2);
+  this->splitctrler_moments_index = 0;
   this->changed_num = 0;
   this->pacing = FALSE;
-
+  this->RTT_max = 5 * GST_SECOND;
+  this->last_recalc_time = gst_clock_get_time(this->sysclock);
+  this->subflow_delays_tree = make_bintree(_cmp_for_maxtree);
+  this->subflow_delays_index = 0;
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
-  this->thread = gst_task_new (sefctrler_run, this, NULL);
+  this->thread = gst_task_new (sefctrler_ticker_run, this, NULL);
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
 
@@ -324,7 +374,6 @@ sefctrler_stat_run (void *data)
   GHashTableIter iter;
   gpointer key, val;
   Subflow *subflow;
-  gboolean started = FALSE;
   guint32 actual;
   GstClockTime next_scheduler_time;
   this = data;
@@ -333,12 +382,7 @@ sefctrler_stat_run (void *data)
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     subflow = (Subflow *) val;
-    actual = mprtps_path_get_total_sent_payload_bytes(subflow->path);
-    g_print("%c%u", started?',':' ', actual - subflow->last_stat_payload_bytes);
-    subflow->last_stat_payload_bytes = actual;
-    started = TRUE;
   }
-  g_print("\n");
   THIS_WRITEUNLOCK(this);
 
   next_scheduler_time = gst_clock_get_time(this->sysclock) + GST_SECOND;
@@ -348,122 +392,6 @@ sefctrler_stat_run (void *data)
     GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
   }
   gst_clock_id_unref (clock_id);
-}
-
-void
-sefctrler_run (void *data)
-{
-  GstClockTime now, next_scheduler_time;
-  SndEventBasedController *this;
-  GHashTableIter iter;
-  gpointer key, val;
-  Subflow *subflow;
-  GstClockID clock_id;
-  gboolean all_RR_report_arrived = TRUE;
-  this = SEFCTRLER (data);
-  THIS_WRITELOCK (this);
-  now = gst_clock_get_time (this->sysclock);
-
-  _prepare_crecord_refresh(this);
-  g_hash_table_iter_init (&iter, this->subflows);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-    subflow = (Subflow *) val;
-
-    if(0)_refresh_system_state(this, subflow); //elliminate it!
-
-    if (_check_report_timeout (subflow)) {
-      _fire (this, subflow, EVENT_LATE);
-      continue;
-    }else if(!mprtps_path_is_active(subflow->path)){
-      continue;
-    }
-
-    all_RR_report_arrived&=subflow->new_RR_arrived;
-    _controller_record_add_subflow (this, subflow);
-
-    if (this->riport_is_flowable && _do_report_now (subflow)) {
-      _send_mprtcp_sr_block (this, subflow);
-      _recalc_report_time (subflow);
-    }
-  }
-  if(_ct0(this)->min_delay > 0){
-    guint32 delay_skew = _ct0(this)->max_delay - _ct0(this)->min_delay;
-    if(delay_skew < 50  *GST_MSECOND){
-      stream_splitter_set_splitting_mode(this->splitter, MPRTP_STREAM_BYTE_BASED_SPLITTING);
-    }else if(delay_skew < 150 * GST_MSECOND){
-      stream_splitter_set_splitting_mode(this->splitter, MPRTP_STREAM_FRAME_BASED_SPLITTING);
-    }else{
-      stream_splitter_set_splitting_mode(this->splitter, MPRTP_STREAM_FRAME_BASED_SPLITTING);
-      _fire(this, _ct0(this)->max_delayed_subflow, EVENT_DEACTIVATE);
-    }
-  }
-  if (this->bids_recalc_requested) {
-    this->bids_recalc_requested = FALSE;
-    _sefctrler_recalc (this);
-    this->last_recalc_time = now;
-    this->bids_commit_requested = TRUE;
-  }
-  if (this->bids_commit_requested) {
-    this->bids_commit_requested = FALSE;
-    stream_splitter_commit_changes (this->splitter);
-  }
-  if(this->cc_prev_state != this->cc_state &&
-     this->cc_state!= MPRTP_CC_STATE_STABLE)
-  {
-    //Notify the system
-  }
-
-  if(all_RR_report_arrived || this->last_recalc_time < now - 3 * this->RTT_max)
-  {
-      g_print("REFREASH: %d-%lu\n",all_RR_report_arrived, 3 * this->RTT_max);
-    this->bids_recalc_requested = TRUE;
-    this->last_recalc_time = now;
-    _cstep(this);
-  }
-//done:
-  next_scheduler_time = now + 100 * GST_MSECOND;
-  THIS_WRITEUNLOCK (this);
-  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
-
-  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
-    GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
-  }
-  gst_clock_id_unref (clock_id);
-
-  //clockshot;
-}
-
-void _prepare_crecord_refresh(SndEventBasedController *this)
-{
-  _ct0(this)->goodput.c =
-  _ct0(this)->goodput.mc =
-  _ct0(this)->goodput.nc = 0.;
-
-  _ct0(this)->subflows.c   =
-  _ct0(this)->subflows.mc  =
-  _ct0(this)->subflows.nc  =
-  _ct0(this)->subflows.num = 0;
-
-  _ct0(this)->RTT_max = 0;
-  _ct0(this)->min_delay = G_MAXUINT32;
-  _ct0(this)->max_delay = 0;
-}
-
-
-void
-_send_mprtcp_sr_block (SndEventBasedController * this, Subflow * subflow)
-{
-  GstBuffer *buf;
-  guint16 report_length = 0;
-
-  buf = _get_mprtcp_sr_block (this, subflow, &report_length);
-  this->send_mprtcp_packet_func (this->send_mprtcp_packet_data, buf);
-
-  report_length += 12 /*MPRTCP REPOR HEADER */  +
-      (28 << 3) /*UDP Header overhead */ ;
-
-  subflow->avg_rtcp_size +=
-      ((gfloat) report_length - subflow->avg_rtcp_size) / 4.;
 }
 
 
@@ -630,6 +558,82 @@ sefctrler_setup_mprtcp_exchange (SndEventBasedController * this,
 }
 
 void
+sefctrler_riport_can_flow (gpointer ptr)
+{
+  SndEventBasedController *this;
+  this = SEFCTRLER (ptr);
+  GST_DEBUG_OBJECT (this, "RTCP riport can now flowable");
+  THIS_WRITELOCK (this);
+  this->report_is_flowable = TRUE;
+  THIS_WRITEUNLOCK (this);
+}
+
+//---------------------------------- Ticker ----------------------------------
+void
+sefctrler_ticker_run (void *data)
+{
+  GstClockTime now, next_scheduler_time;
+  SndEventBasedController *this;
+  GstClockID clock_id;
+
+  this = SEFCTRLER (data);
+  THIS_WRITELOCK (this);
+  now = gst_clock_get_time (this->sysclock);
+
+  _split_controller_main(this);
+  _orp_producer_main(this);
+  _system_notifier_main(this);
+//done:
+  next_scheduler_time = now + 100 * GST_MSECOND;
+  THIS_WRITEUNLOCK (this);
+  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
+
+  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
+    GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
+  }
+  gst_clock_id_unref (clock_id);
+
+  //clockshot;
+}
+//----------------------------------------------------------------------------
+
+
+//------------------------- Incoming Report Processor -------------------
+
+
+IRMoment *
+_irt (Subflow * this, gint moment)
+{
+  gint index;
+  index = this->ir_moments_index - (moment % MAX_SUBFLOW_MOMENT_NUM);
+  if (index < 0)
+    index = MAX_SUBFLOW_MOMENT_NUM - index;
+  return this->ir_moments + index;
+}
+
+void
+_step_ir (Subflow * this)
+{
+  if(_irt0(this)->RTT) this->RTT = _irt0(this)->RTT;
+  this->ir_moments_index = (this->ir_moments_index + 1) % MAX_SUBFLOW_MOMENT_NUM;
+  memset ((gpointer) _irt0 (this), 0, sizeof (IRMoment));
+//  _st0(this)->RTT                   = _irt1(this)->RTT;
+  _irt0(this)->goodput               = _irt1(this)->goodput;
+
+  _irt0(this)->sending_bid           = (_irt1(this)->sending_bid *
+                                       _irt1(this)->stability +
+                                       _irt1(this)->goodput) /
+                                       (_irt1(this)->stability + 1.);
+
+  _irt0(this)->early_discarded_bytes_sum = _irt1(this)->early_discarded_bytes_sum;
+  _irt0(this)->late_discarded_bytes_sum  = _irt1(this)->late_discarded_bytes_sum;
+  _irt0(this)->time                      = gst_clock_get_time(this->sysclock);
+  _irt0(this)->state                     = _irt1(this)->state;
+  ++this->ir_moments_num;
+}
+
+
+void
 sefctrler_receive_mprtcp (gpointer ptr, GstBuffer * buf)
 {
   GstMPRTCPSubflowBlock *block;
@@ -660,220 +664,65 @@ sefctrler_receive_mprtcp (gpointer ptr, GstBuffer * buf)
         "subflow with the given id: %d", subflow_id);
     goto done;
   }
-
-  _report_processing_selector (this, subflow, block, &report_type);
-//  this->new_report_arrived = TRUE;
+  gst_rtcp_header_getdown (&block->block_header,
+                           NULL, NULL, NULL, &report_type, NULL, NULL);
   if(report_type == GST_RTCP_TYPE_RR){
-    _refresh_goodput (subflow);
-    subflow->new_RR_arrived = TRUE;
-    ++subflow->received_receiver_reports_num;
-    _sstep (subflow);
+    _step_ir (subflow);
   }
-
-//  g_print ("Subflow: %d Actual state: %d event: %d\n",
-//      subflow->id, mprtps_path_get_state (subflow->path), event);
-
+  _report_processing_selector (this, subflow, block);
 
 done:
   gst_buffer_unmap (buf, &map);
   THIS_WRITEUNLOCK (this);
 }
 
-void
-sefctrler_riport_can_flow (gpointer ptr)
-{
-  SndEventBasedController *this;
-  this = SEFCTRLER (ptr);
-  GST_DEBUG_OBJECT (this, "RTCP riport can now flowable");
-  THIS_WRITELOCK (this);
-  this->riport_is_flowable = TRUE;
-  THIS_WRITEUNLOCK (this);
-}
-
-
-//----------------------------------------------
-// -------- Subflow related functions ----------
-//----------------------------------------------
-Subflow *
-_subflow_ctor (void)
-{
-  Subflow *result;
-  result = g_malloc0 (sizeof (Subflow));
-  return result;
-}
-
-void
-_subflow_dtor (Subflow * this)
-{
-  g_return_if_fail (this);
-  g_free (this);
-}
-
-void
-_ruin_subflow (gpointer * subflow)
-{
-  Subflow *this;
-  g_return_if_fail (subflow);
-  this = (Subflow *) subflow;
-  g_object_unref (this->sysclock);
-  g_object_unref (this->path);
-  _subflow_dtor (this);
-}
-
-Subflow *
-_make_subflow (guint8 id, MPRTPSPath * path)
-{
-  Subflow *result = _subflow_ctor ();
-  g_object_ref (path);
-  result->sysclock = gst_system_clock_obtain ();
-  result->path = path;
-  result->id = id;
-  result->joined_time = gst_clock_get_time (result->sysclock);
-  result->records_max = 4;
-  result->records =
-      (SubflowRecord *) g_malloc0 (sizeof (struct _SubflowRecord) *
-      result->records_max);
-  result->records_index = 0;
-  result->compensation = 1.;
-  reset_subflow (result);
-  return result;
-}
-
-void
-reset_subflow (Subflow * this)
-{
-  gint i;
-  for (i = 0; i < this->records_max; ++i) {
-    memset (this->records, 0, sizeof (SubflowRecord) * this->records_max);
-  }
-}
-
-SubflowRecord *
-_st (Subflow * this, gint moment)
-{
-  gint index;
-  index = this->records_index - (moment % this->records_max);
-  if (index < 0)
-    index = this->records_max - index;
-  return this->records + index;
-}
-
-void
-_sstep (Subflow * this)
-{
-  if(_st0(this)->RTT) this->RTT = _st0(this)->RTT;
-  this->records_index = (this->records_index + 1) % this->records_max;
-  memset ((gpointer) _st0 (this), 0, sizeof (SubflowRecord));
-//  _st0(this)->RTT                   = _st1(this)->RTT;
-  _st0(this)->goodput               = _st1(this)->goodput;
-  _st0(this)->fraction_lost         = _st1(this)->fraction_lost;
-  _st0(this)->delay                 = _st1(this)->delay;
-  _st0(this)->mitigation            = MIN(_st1(this)->mitigation + 1., 16.);
-  _st0(this)->sending_bid           = _st1(this)->sending_bid;
-  _st0(this)->moment = gst_clock_get_time(this->sysclock);
-}
-
-void
-_cstep (SndEventBasedController * this)
-{
-  this->records_index = (this->records_index + 1) % this->records_max;
-  memset ((gpointer) _ct0 (this), 0, sizeof (ControllerRecord));
-  _ct0 (this)->moment = gst_clock_get_time(this->sysclock);
-  if(_ct0(this)->min_delay)
-    this->min_delay = _ct0(this)->min_delay;
-  ++this->changed_num;
-}
-
-
-guint32
-_uint32_diff (guint32 start, guint32 end)
-{
-  if (start <= end) {
-    return end - start;
-  }
-  return ~((guint32) (start - end));
-}
-
-
-guint16
-_uint16_diff (guint16 start, guint16 end)
-{
-  if (start <= end) {
-    return end - start;
-  }
-  return ~((guint16) (start - end));
-}
-
-
-
-void
-_controller_record_add_subflow (SndEventBasedController * this,
-    Subflow * subflow)
-{
-  MPRTPSPathState state;
-
-  state = mprtps_path_get_state (subflow->path);
-  switch (state) {
-    case MPRTPS_PATH_STATE_NON_CONGESTED:
-      _ct0 (this)->goodput.nc += _st0 (subflow)->goodput;
-//      if(_ct0(this)->max_nc_goodput < _st0 (subflow)->goodput){
-//          _ct0(this)->max_nc_goodput = _st0 (subflow)->goodput;
-//      }
-      ++_ct0 (this)->subflows.nc;
-      break;
-    case MPRTPS_PATH_STATE_MIDDLY_CONGESTED:
-      _ct0 (this)->goodput.mc += _st0 (subflow)->goodput;
-      ++_ct0 (this)->subflows.mc;
-      break;
-    case MPRTPS_PATH_STATE_CONGESTED:
-      _ct0 (this)->goodput.c += _st0 (subflow)->goodput;
-      ++_ct0 (this)->subflows.c;
-      break;
-    default:
-      break;
-  }
-  ++_ct0 (this)->subflows.num;
-
-  _ct0(this)->RTT_max = MAX(subflow->RTT, _ct0(this)->RTT_max);
-  this->RTT_max = MAX(_ct0(this)->RTT_max, (.5 + g_random_double()) * GST_SECOND);
-  if(_st0(subflow)->delay){
-    _ct0(this)->min_delay = MIN(_ct0(this)->min_delay, _st0(subflow)->delay);
-    _ct0(this)->max_delay = MAX(_ct0(this)->max_delay, _st0(subflow)->delay);
-    if(_st0(subflow)->delay == _ct0(this)->max_delay)
-      _ct0(this)->max_delayed_subflow = subflow;
-  }
-}
-
-
-//------------------ Riport Processing and evaluation -------------------
 
 void
 _report_processing_selector (SndEventBasedController *this,
                              Subflow * subflow,
-                             GstMPRTCPSubflowBlock * block,
-                             guint8 *report_type)
+                             GstMPRTCPSubflowBlock * block)
 {
   guint8 pt;
 
   gst_rtcp_header_getdown (&block->block_header, NULL, NULL, NULL, &pt, NULL,
       NULL);
-
-  if (pt == (guint8) GST_RTCP_TYPE_RR) {
-    _riport_processing_rrblock_processor (this, subflow, &block->receiver_riport.blocks);
-    subflow->last_receiver_riport_time = gst_clock_get_time (subflow->sysclock);
-  } else if (pt == (guint8) GST_RTCP_TYPE_XR) {
-    guint8 xr_block_type;
-    gst_rtcp_xr_block_getdown((GstRTCPXR*) &block->xr_header, &xr_block_type, NULL, NULL);
-    if(xr_block_type == GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER)
-      _report_processing_xr_7243_block_processor (this, subflow, &block->xr_rfc7243_riport);
-    else if(xr_block_type == GST_RTCP_XR_SKEW_BLOCK_TYPE_IDENTIFIER)
-         _report_processing_xr_skew_block_processor (this, subflow, &block->xr_skew);
-    else if(xr_block_type == GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER)
-        _report_processing_xr_owd_block_processor (this, subflow, &block->xr_owd);
-    } else {
-    GST_WARNING ("Sending flow control can not process report type %d.", pt);
+  switch(pt){
+    case GST_RTCP_TYPE_RR:
+      _riport_processing_rrblock_processor (this,
+                                            subflow,
+                                            &block->receiver_riport.blocks);
+    break;
+    case GST_RTCP_TYPE_XR:
+    {
+      guint8 xr_block_type;
+      gst_rtcp_xr_block_getdown((GstRTCPXR*) &block->xr_header,
+                                &xr_block_type, NULL,  NULL);
+      switch(xr_block_type){
+        case GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER:
+          _report_processing_xr_7243_block_processor (this,
+                                                      subflow,
+                                                      &block->xr_rfc7243_riport);
+        break;
+        case GST_RTCP_XR_SKEW_BLOCK_TYPE_IDENTIFIER:
+          _report_processing_xr_skew_block_processor (this,
+                                                      subflow,
+                                                      &block->xr_skew);
+        break;
+        case GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER:
+          _report_processing_xr_owd_block_processor (this,
+                                                     subflow,
+                                                     &block->xr_owd);
+        break;
+        default:
+          GST_WARNING_OBJECT(this, "Unrecognized RTCP XR REPORT");
+        break;
+      }
+    }
+    break;
+    default:
+      GST_WARNING_OBJECT(this, "Unrecognized MPRTCP Report block");
+    break;
   }
-  if(report_type) *report_type = pt;
 }
 
 void
@@ -884,110 +733,59 @@ _riport_processing_rrblock_processor (SndEventBasedController *this,
   guint64 LSR, DLSR;
 //  GstClockTime now;
   guint32 LSR_read, DLSR_read, HSSN_read;
-  guint16 HSSN;
+  guint16 HSSN, last_HSSN = 0;
   guint8 fraction_lost;
-  //RiportProcessorRRProcessor *this_stage = _riport_processing_rrprocessor_;
 
-//  now = gst_clock_get_time (this->sysclock);
   //--------------------------
   //validating
   //--------------------------
   gst_rtcp_rrb_getdown (rrb, NULL, &fraction_lost, NULL, &HSSN_read, NULL,
       &LSR_read, &DLSR_read);
-
-  HSSN = (guint16) (HSSN_read & 0x0000FFFF);
-  _st0 (subflow)->HSSN = _uint16_diff (subflow->HSSN, HSSN);
-  subflow->HSSN = HSSN;
-  subflow->cycle_num = (guint16) ((HSSN_read & 0x0000FFFF) >> 16);
-  //LSR = (NTP_NOW & 0xFFFF000000000000ULL) | (((guint64) LSR_read) << 16);
+  _irt0(subflow)->HSSN = (guint16) (HSSN_read & 0x0000FFFF);
+  _irt0(subflow)->cycle_num = (guint16) (HSSN_read>>16);
+  _irt0(subflow)->expected_packets = _uint16_diff(_irt1(subflow)->HSSN, _irt0(subflow)->HSSN);
   LSR = (guint64) LSR_read;
   DLSR = (guint64) DLSR_read;
 
-
-  //LSR = gst_util_uint64_scale (LSR, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
-
-  //  DLSR = (guint64) DLSR_read <<16;
-
-//    g_print("LSR: %lu:%lX DLSR: %lu:%lX\n", LSR, LSR, DLSR, DLSR);
-//  g_print("DLSR: %u:%X->%lu:%lX\n", DLSR_read, DLSR_read, DLSR, DLSR);
-  //DLSR = gst_util_uint64_scale (DLSR, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
-
-  if (_st0 (subflow)->HSSN > 32767) {
+  if (_irt0(subflow)->expected_packets > 32767) {
     GST_WARNING_OBJECT (subflow, "Receiver report validation failed "
         "on subflow %d " "due to HSN difference inconsistency.", subflow->id);
     return;
   }
-
-  if (subflow->received_receiver_reports_num && (LSR == 0 || DLSR == 0)) {
+  _irt0(subflow)->expected_payload_bytes =
+      mprtps_path_get_sent_octet_sum_for (subflow->path, _irt0 (subflow)->expected_packets)<<3;
+  if (subflow->ir_moments_num > 1 && (LSR == 0 || DLSR == 0)) {
     return;
   }
-//  gst_print_rtcp_rrb(rrb);
   //--------------------------
   //processing
   //--------------------------
   if (LSR > 0 && DLSR > 0) {
     guint64 diff;
     diff = ((guint32)(NTP_NOW>>16)) - LSR - DLSR;
-   _st0 (subflow)->RTT = get_epoch_time_from_ntp_in_ns(diff<<16);
-//   g_print("%dRTT: %lu\n", subflow->id, _st0(subflow)->RTT);
-//    g_print("----------->%d:RTT: %lu<----------------\n",
-//            this->id, GST_TIME_AS_MSECONDS(_st0 (this)->RTT));
+   _irt0 (subflow)->RTT = get_epoch_time_from_ntp_in_ns(diff<<16);
   }
 
-
-  _st0 (subflow)->fraction_lost = fraction_lost;
-
-  _st0 (subflow)->lost_rate = ((gdouble) fraction_lost) / 256.;
-
-//  if(fraction_lost > 0.) g_print("LOST REPORT ARRIVED\n");
-//  g_print("%d", this->id);
-//  gst_print_rtcp_rrb(rrb);
-//  Debug print
-//  g_print ("Receiver riport for subflow %d is processed\n"
-//      "lost_rate: %f; "
-//      "RTT (in ms): %lu\n",
-//      this->id,
-//      _st0 (this)->lost_rate, GST_TIME_AS_MSECONDS (_st0 (this)->RTT));
+  _irt0 (subflow)->lost_rate = ((gdouble) fraction_lost) / 256.;
 
   //--------------------------
   //evaluating
   //--------------------------
-     if(PATH_RTT_MAX_TRESHOLD < _st0(subflow)->RTT){
-       _fire(this, subflow, EVENT_LATE);
-     }else if(_st0(subflow)->state == MPRTPS_PATH_STATE_PASSIVE &&
-              _st0(subflow)->RTT < PATH_RTT_MIN_TRESHOLD)
-     {
-       _fire(this, subflow, EVENT_SETTLED);
-     }
-     else if(_st0(subflow)->lost_rate > 0.){
-         _fire_congestion_or_distortion(this, subflow);
-     }else{
-        _fire(this, subflow, EVENT_FI);
-     }
-}
-
-void _fire_congestion_or_distortion(SndEventBasedController *this, Subflow *subflow)
-{
-  gboolean discard_happened;
-  gboolean consecutive_discard_happened;
-  gboolean consecutive_lost_happened;
-  discard_happened = _st0(subflow)->late_discarded_bytes > 0 ||
-                     _st0(subflow)->early_discarded_bytes > 0;
-  consecutive_discard_happened = discard_happened &&
-      (_st1(subflow)->late_discarded_bytes > 0 || _st1(subflow)->early_discarded_bytes > 0) &&
-      (_st2(subflow)->late_discarded_bytes > 0 || _st2(subflow)->early_discarded_bytes > 0);
-  consecutive_lost_happened = _st0(subflow)->lost_rate != 0. &&
-      _st1(subflow)->lost_rate != 0. &&
-      _st2(subflow)->lost_rate != 0.;
-  //--------------------------
-  //evaluating
-  //--------------------------
-  if(consecutive_lost_happened && consecutive_discard_happened){
-    _fire(this, subflow, EVENT_CONGESTION);
-  }else if(discard_happened){
-    _fire(this, subflow, EVENT_DISTORTION);
+  _refresh_goodput_and_sending_bid (subflow);
+  if(PATH_RTT_MAX_TRESHOLD < _irt0(subflow)->RTT){
+   _fire(this, subflow, EVENT_LATE);
+  }else if(_irt0(subflow)->state == MPRTPS_PATH_STATE_PASSIVE &&
+          _irt0(subflow)->RTT < PATH_RTT_MIN_TRESHOLD)
+  {
+   _fire(this, subflow, EVENT_SETTLED);
+  }
+  else if(_irt0(subflow)->lost_rate > 0.){
+     _fire_congestion_or_distortion(this, subflow);
+  }else{
+    _fire(this, subflow, EVENT_FI);
   }
 }
+
 
 void
 _report_processing_xr_7243_block_processor (SndEventBasedController *this,
@@ -1001,43 +799,31 @@ _report_processing_xr_7243_block_processor (SndEventBasedController *this,
   gst_rtcp_xr_rfc7243_getdown (xrb, &interval_metric,
       &early_bit, NULL, &discarded_bytes);
 
-  if (interval_metric == RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION) {
-    if (early_bit) {
-      _st0 (subflow)->early_discarded_bytes =
-          discarded_bytes - subflow->early_discarded_bytes_sum;
-      subflow->early_discarded_bytes_sum = discarded_bytes;
-    } else {
-      _st0 (subflow)->late_discarded_bytes =
-          discarded_bytes - subflow->late_discarded_bytes_sum;
-      subflow->late_discarded_bytes_sum = discarded_bytes;
-    }
-  } else if (interval_metric == RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION) {
-    if (early_bit) {
-      _st0 (subflow)->early_discarded_bytes = discarded_bytes;
-      subflow->early_discarded_bytes_sum += _st0 (subflow)->early_discarded_bytes;
-    } else {
-      _st0 (subflow)->late_discarded_bytes = discarded_bytes;
-      subflow->late_discarded_bytes_sum += _st0 (subflow)->late_discarded_bytes;
-    }
-  } else if (interval_metric == RTCP_XR_RFC7243_I_FLAG_SAMPLED_METRIC) {
-
-  }
-
-  //--------------------------
-  //evaluating
-  //--------------------------
-  if(!discarded_bytes){
-    //if no discarded bytes, we don't need to check anything
-      goto done;
-  }
-  //evaluation of the report
+  switch(interval_metric)
   {
-    _fire_congestion_or_distortion(this, subflow);
+    case RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION:
+      if (early_bit) {
+        _irt0 (subflow)->early_discarded_bytes = discarded_bytes - _irt1 (subflow)->early_discarded_bytes_sum;
+        _irt0 (subflow)->early_discarded_bytes_sum = discarded_bytes;
+      } else {
+        _irt0 (subflow)->late_discarded_bytes = discarded_bytes - _irt1 (subflow)->late_discarded_bytes_sum;
+        _irt1 (subflow)->late_discarded_bytes_sum = discarded_bytes;
+      }
+    break;
+    case RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION:
+      if (early_bit) {
+        _irt0 (subflow)->early_discarded_bytes = discarded_bytes;
+        _irt0 (subflow)->early_discarded_bytes_sum += discarded_bytes;
+      } else {
+          _irt0 (subflow)->late_discarded_bytes = discarded_bytes;
+          _irt0 (subflow)->late_discarded_bytes_sum += discarded_bytes;
+      }
+    break;
+    case RTCP_XR_RFC7243_I_FLAG_SAMPLED_METRIC:
+    default:
+    break;
   }
-
-done:
-  return;
-
+  _refresh_goodput_and_sending_bid (subflow);
 }
 
 
@@ -1046,108 +832,120 @@ _report_processing_xr_skew_block_processor (SndEventBasedController *this,
                                             Subflow * subflow,
                                             GstRTCPXR_Skew * xrb)
 {
-  guint32 skew;
-  guint32 delay, bytes;
+  gboolean  skew_flag;
+  guint32  characterization_value;
+  guint16  min,max;
 
-  gst_rtcp_xr_skew_getdown(xrb,
-                           NULL,
-                           NULL,
-                           &skew,
-                           &delay,
-                           &bytes);
+  gst_rtcp_xr_skew_getdown (xrb,
+                            NULL,        //interval_metric
+                            &skew_flag,  //is it skew or delay?
+                            NULL,        //ssrc of the stream
+                            NULL,        //percentile of the characterization value
+                            NULL,        //bytes as a base of the characterization
+                            &characterization_value, //the characterization value itself
+                            &min,        //minimum value relatively
+                            &max         //maximum value relatively
+                              );
 //  gst_print_rtcp_xr_skew(xrb);
-  if(skew < 0xFEFF)
-    _st0(subflow)->skew = get_epoch_time_from_ntp_in_ns(skew>>16);
-  if(delay < 0xFEFF)
-    _st0(subflow)->delay = get_epoch_time_from_ntp_in_ns(delay<<16);
 
-  //evaluation of the report
-//  g_print("SKEW MED: %u\n", _st0(this)->skew_median);
-  if(_st2(subflow)->skew < _st1(subflow)->skew &&
-      _st1(subflow)->skew < _st0(subflow)->skew)
+  if(skew_flag){
+    _irt0(subflow)->delay = characterization_value;
+    _irt0(subflow)->min_delay = characterization_value - (min<<16);
+    _irt0(subflow)->max_delay = characterization_value + (max<<16);
+    goto evaluate_delay;
+  }else{
+    _irt0(subflow)->skew = characterization_value;
+    _irt0(subflow)->min_skew = characterization_value - (min<<16);
+    _irt0(subflow)->max_skew = characterization_value + (max<<16);
+    goto evaluate_skew;
+  }
+
+  //--------------------------
+  //evaluating
+  //--------------------------
+evaluate_skew:
+  if(_irt2(subflow)->skew < _irt1(subflow)->skew &&
+     _irt1(subflow)->skew < _irt0(subflow)->skew)
+  {
     mprtps_path_set_marker(subflow->path, MPRTPS_PATH_MARKER_OVERUSED);
-  else if(_st0(subflow)->skew < _st1(subflow)->skew && _st1(subflow)->skew < _st2(subflow)->skew)
+  }
+  else if(_irt0(subflow)->skew < _irt1(subflow)->skew &&
+          _irt1(subflow)->skew < _irt2(subflow)->skew)
+  {
     mprtps_path_set_marker(subflow->path, MPRTPS_PATH_MARKER_UNDERUSED);
+  }
   else
+  {
     mprtps_path_set_marker(subflow->path, MPRTPS_PATH_MARKER_STABLE);
-
-  //--------------------------
-  //evaluating
-  //--------------------------
-
-}
-
-
-void
-_report_processing_xr_owd_block_processor (SndEventBasedController *this,
-                                            Subflow * subflow,
-                                            GstRTCPXR_OWD * xrb)
-{
-  guint32 new_owd;
-
-  gst_rtcp_xr_owd_getdown(xrb,
-                           NULL,
-                           NULL,
-                           NULL,
-                           NULL,
-                           &new_owd,
-                           NULL,
-                           NULL);
-
-  _st0(subflow)->delay = new_owd;
-  //--------------------------
-  //evaluating
-  //--------------------------
-  if(this->min_delay > 0 &&
-        subflow->deactivated &&
-       _st0(subflow)->delay < this->min_delay + 100 * GST_MSECOND)
-  {
-      _fire(this, subflow, EVENT_ACTIVATE);
   }
-  else if(mprtps_path_get_state(subflow->path) == MPRTPS_PATH_STATE_NON_CONGESTED){
-    //do nothing now...
-  }
-  else if(mprtps_path_get_state(subflow->path) != MPRTPS_PATH_STATE_PASSIVE)
+
+  goto done;
+
+evaluate_delay:
   {
-      if(_st0(subflow)->delay < _st1(subflow)->delay &&
-         _st1(subflow)->delay < _st2(subflow)->delay){
-          _fire(this, subflow, EVENT_SETTLED);
+    guint64 min_treshold, max_treshold, delay;
+    delay = get_epoch_time_from_ntp_in_ns(_irt0(subflow)->delay<<16);
+
+    if(subflow->deactivated){
+      max_treshold = bintree_get_bottom_value(this->subflow_delays_tree) + DELAY_SKEW_DEACTIVE_TRESHOLD;
+      min_treshold = bintree_get_top_value(this->subflow_delays_tree) - DELAY_SKEW_DEACTIVE_TRESHOLD;
+      if(delay < min_treshold || max_treshold < delay){
+        goto done;
       }
+      _fire(this, subflow, EVENT_ACTIVATE);
+      _refresh_delay_tresholds(this, delay);
+    }else{
+      max_treshold = bintree_get_bottom_value(this->subflow_delays_tree) + DELAY_SKEW_ACTIVE_TRESHOLD;
+      min_treshold = bintree_get_top_value(this->subflow_delays_tree) - DELAY_SKEW_ACTIVE_TRESHOLD;
+      if(delay < min_treshold || max_treshold < delay){
+        _fire(this, subflow, EVENT_ACTIVATE);
+        goto done;
+      }
+      _refresh_delay_tresholds(this, delay);
+    }
   }
+  goto done;
+done:
+  return;
+}
 
+void _refresh_delay_tresholds(SndEventBasedController *this, guint64 delay)
+{
+  this->subflow_delays[this->subflow_delays_index] = delay;
+  bintree_insert_value(this->subflow_delays_tree, this->subflow_delays[this->subflow_delays_index]);
+  if(this->subflow_delays[++this->subflow_delays_index] > 0){
+    bintree_delete_value(this->subflow_delays_tree, this->subflow_delays[this->subflow_delays_index]);
+  }
 }
 
 
-
 void
-_refresh_goodput (Subflow * this)
+_refresh_goodput_and_sending_bid (Subflow * this)
 {
   //goodput
   {
     GstClockTimeDiff interval;
-    GstClockTime seconds, now;
+    GstClockTime seconds;
     MPRTPSPath *path;
     gfloat payload_bytes_sum = 0.;
     guint32 discarded_bytes;
     gfloat goodput;
     guint32 octet_sum;
 //g_print("RECORD NUM: %d\n", this->records_index);
-    now = gst_clock_get_time (this->sysclock);
-    interval = GST_CLOCK_DIFF (this->last_receiver_riport_time, now);
-    seconds = GST_TIME_AS_SECONDS ((GstClockTime) interval);
-    if (this->last_receiver_riport_time == 0) {
-      seconds = 0;
+    if (_irt1(this)->time == 0) {
+        interval = GST_CLOCK_DIFF (this->joined_time, _irt0(this)->time);
+    }else{
+        interval = GST_CLOCK_DIFF (_irt1(this)->time, _irt0(this)->time);
     }
+    seconds = GST_TIME_AS_SECONDS ((GstClockTime) interval);
     path = this->path;
 
-    octet_sum = mprtps_path_get_sent_octet_sum_for (path, _st0 (this)->HSSN);
-    payload_bytes_sum = (gfloat) (octet_sum << 3);
+    payload_bytes_sum = (gfloat) _irt0(this)->expected_payload_bytes;
 
-    discarded_bytes = _st0 (this)->early_discarded_bytes +
-        _st0 (this)->late_discarded_bytes;
+    discarded_bytes = _irt0_get_discarded_bytes(this);
     if (seconds > 0) {
       goodput = (payload_bytes_sum *
-          (1. - _st0 (this)->lost_rate) -
+          (1. - _irt0 (this)->lost_rate) -
           (gfloat) discarded_bytes) / ((gfloat) seconds);
 
 //            g_print("A%d:%f = (%f * (1.-%f) - %f) / %f\n",
@@ -1157,7 +955,7 @@ _refresh_goodput (Subflow * this)
 
     } else {
       goodput = (payload_bytes_sum *
-          (1. - _st0 (this)->lost_rate) - (gfloat) discarded_bytes);
+          (1. - _irt0 (this)->lost_rate) - (gfloat) discarded_bytes);
 
 //            g_print("B%d:%f = (%f * (1.-%f) - %f)\n",
 //                      this->id, goodput,
@@ -1165,87 +963,16 @@ _refresh_goodput (Subflow * this)
 //                      (gfloat) discarded_bytes);
 
     }
-    _st0 (this)->goodput = goodput;
-    g_print("S %d Goodput: %f\n", this->id, goodput);
+    _irt0 (this)->goodput = goodput;
   }
-}
 
-
-//--------------------------------------------------------------------------
-//--------------------------------- Actions --------------------------------
-//--------------------------------------------------------------------------
-
-void
-_action_keep (SndEventBasedController * this, Subflow * subflow)
-{
-  subflow->compensation = 1.;
-  if (mprtps_path_is_in_trial (subflow->path)){
-    this->bids_recalc_requested = TRUE;
-    subflow->compensation = _get_gainments(this, subflow);
+  //sending_bid
+  {
+    _irt0(this)->sending_bid = (_irt1(this)->sending_bid *
+                                (_irt1(this)->stability - 1) +
+                                _irt1(this)->goodput) /
+                                _irt1(this)->stability;
   }
-  memcpy (&subflow->saved_record_at_keep, _st0 (subflow), sizeof (SubflowRecord));
-  subflow->saved_time_at_keep = gst_clock_get_time (this->sysclock);
-  GST_DEBUG_OBJECT (this, "Keep action is performed with "
-      "Event based controller on subflow %d", subflow->id);
-}
-
-
-void
-_action_restore (SndEventBasedController * this, Subflow * subflow)
-{
-  this->bids_recalc_requested = TRUE;
-  _st0(subflow)->goodput = MAX(64000., _st0(subflow)->goodput);
-  subflow->compensation = _get_gainments(this, subflow);
-}
-
-void
-_action_load (SndEventBasedController * this, Subflow * subflow)
-{
-  GstClockTime now;
-  stream_splitter_add_path (this->splitter, subflow->id, subflow->path);
-  this->bids_recalc_requested = TRUE;
-  //load
-  now = gst_clock_get_time (this->sysclock);
-  if (now - GST_SECOND * 60 < subflow->saved_time_at_fall) {
-    _st0 (subflow)->goodput = subflow->saved_record_at_fall.goodput;
-  }else{
-    //we assume at least 64kbps goodput
-   _st0(subflow)->goodput = 64000.;
-  }
-  GST_DEBUG_OBJECT (this, "Reload action is performed with "
-      "Event based controller on subflow %d", subflow->id);
-}
-
-void
-_action_mitigate (SndEventBasedController * this, Subflow * subflow)
-{
-  subflow->compensation = .8;
-  _st0(subflow)->mitigation=MAX(_st0(subflow)->mitigation/2., 1);
-  this->bids_recalc_requested = TRUE;
-  GST_DEBUG_OBJECT (this, "Mitigate action is performed with "
-      "Event based controller on subflow %d", subflow->id);
-}
-
-void
-_action_reduce (SndEventBasedController * this, Subflow * subflow)
-{
-  subflow->compensation = .5;
-  _st0(subflow)->mitigation=MAX(_st0(subflow)->mitigation/2., 1);
-  this->bids_recalc_requested = TRUE;
-  GST_DEBUG_OBJECT (this, "Mitigate action is performed with "
-      "Event based controller on subflow %d", subflow->id);
-}
-
-void
-_action_fall (SndEventBasedController * this, Subflow * subflow)
-{
-  stream_splitter_rem_path (this->splitter, subflow->id);
-  this->bids_commit_requested = TRUE;
-  //save
-  memcpy (&subflow->saved_record_at_fall, _st0 (subflow), sizeof (SubflowRecord));
-  subflow->saved_time_at_fall = gst_clock_get_time (this->sysclock);
-  GST_DEBUG_OBJECT (this, "Fall action is performed with "
-      "Event based controller on subflow %d", subflow->id);
 }
 
 
@@ -1258,90 +985,89 @@ _fire (SndEventBasedController * this, Subflow * subflow, Event event)
   Action action = NULL;
   if(1) return;
   path = subflow->path;
-  path_state = mprtps_path_get_state (path);
-  now = gst_clock_get_time(this->sysclock);
-  action = _action_keep;
+  action = _perform_keep;
 //  g_print ("FIRE->%d-state:%d:%d\n", subflow->id, path_state, event);
 
   if(!subflow->deactivated && event == EVENT_DEACTIVATE){
     subflow->deactivated = TRUE;
     mprtps_path_set_passive (path);
-    action = _action_fall;
-    goto lets_rock;
+    action = _perform_fall;
+    goto done;
   }else if(subflow->deactivated && event == EVENT_ACTIVATE){
     subflow->deactivated = FALSE;
     mprtps_path_set_active (path);
-    action = _action_load;
-    goto lets_rock;
+    action = _perform_load;
+    goto done;
   }
   if(subflow->deactivated){
-    goto lets_rock;
+    goto done;
   }
+  path_state = mprtps_path_get_state (path);
+  now = gst_clock_get_time(this->sysclock);
   //passive state
   if (path_state == MPRTPS_PATH_STATE_PASSIVE) {
     switch (event) {
       case EVENT_SETTLED:
         mprtps_path_set_active (path);
-        action = _action_load;
+        action = _perform_load;
         break;
       case EVENT_FI:
       default:
         break;
     }
-    goto lets_rock;
+    goto done;
   }
   //whichever state we are the LATE event means the same
   if (event == EVENT_LATE) {
     mprtps_path_set_passive (path);
-    action = _action_fall;
-    goto lets_rock;
+    action = _perform_fall;
+    goto done;
   }
 
   if (path_state == MPRTPS_PATH_STATE_NON_CONGESTED) {
     switch (event) {
       case EVENT_CONGESTION:
         mprtps_path_set_congested (path);
-        action = _action_reduce;
+        action = _perform_reduce;
         break;
       case EVENT_DISTORTION:
         mprtps_path_set_trial_end (path);
-        action = _action_keep;
+        action = _perform_mitigate;
         break;
-      case EVENT_LOST:
+      case EVENT_LOSSY:
         mprtps_path_set_lossy (path);
-        action = _action_mitigate;
         break;
       case EVENT_FI:
       default:
-        action = _action_keep;
+        action = _perform_keep;
         break;
     }
-    goto lets_rock;
+    goto done;
   }
   //lossy path
-  if (path_state == MPRTPS_PATH_STATE_MIDDLY_CONGESTED) {
+  if (path_state == MPRTPS_PATH_STATE_LOSSY) {
     switch (event) {
       case EVENT_SETTLED:
-        if (mprtps_path_get_time_sent_to_middly_congested (subflow->path) <
+        if (mprtps_path_get_time_sent_to_lossy (subflow->path) <
             now - 3 * subflow->RTT)
         {
-            action = _action_mitigate;
-            goto lets_rock;
+            action = _perform_mitigate;
+            goto done;
         }
         mprtps_path_set_non_lossy (path);
         mprtps_path_set_trial_begin (path);
-        action = _action_restore;
+        action = _perform_restore;
         break;
       case EVENT_CONGESTION:
         mprtps_path_set_non_lossy (path);
         mprtps_path_set_congested (path);
-        action = _action_reduce;
+        action = _perform_reduce;
         break;
       default:
-        action = _action_mitigate;
+        action = _perform_keep;
         break;
     }
-    goto lets_rock;
+    goto done;
   }
   //the path is congested
   switch (event) {
@@ -1349,260 +1075,199 @@ _fire (SndEventBasedController * this, Subflow * subflow, Event event)
       if (mprtps_path_get_time_sent_to_congested (subflow->path) <
                   now - 3 * subflow->RTT)
       {
-          action = _action_mitigate;
-          goto lets_rock;
+        action = _perform_mitigate;
+        goto done;
       }
       mprtps_path_set_non_congested (path);
       mprtps_path_set_non_lossy (path);
       mprtps_path_set_trial_begin (path);
-      action = _action_restore;
+      action = _perform_restore;
       break;
     default:
-      action = _action_reduce;
+      action = _perform_reduce;
       break;
   }
 
-lets_rock:
-  _st0(subflow)->state = mprtps_path_get_state (path);
+done:
   if(action) action (this, subflow);
+  _irt0(subflow)->state = mprtps_path_get_state (path);
   return;
 }
 
 
 void
-_sefctrler_recalc (SndEventBasedController * this)
+_perform_keep (SndEventBasedController * this, Subflow * subflow)
 {
+  subflow->compensation = 1.;
+  if(!mprtps_path_is_in_trial (subflow->path)){
+    goto save;
+  }
+  subflow->compensation = _get_gainments(this, subflow);
+  if(subflow->compensation > 1.){
+    this->bids_recalc_requested = TRUE;
+    goto done;
+  }
+
+save:
+  subflow->stable_time = gst_clock_get_time(subflow->sysclock);
+  subflow->stable_state.goodput = _irt0(subflow)->goodput;
+done:
+  return;
+}
+
+
+void
+_perform_restore (SndEventBasedController * this, Subflow * subflow)
+{
+  this->bids_recalc_requested = TRUE;
+  _irt0(subflow)->goodput = MAX(64000., _irt0(subflow)->goodput);
+  _irt0(subflow)->sending_bid *= _get_gainments(this, subflow);
+}
+
+void
+_perform_load (SndEventBasedController * this, Subflow * subflow)
+{
+  GstClockTime now;
+  stream_splitter_add_path (this->splitter, subflow->id, subflow->path);
+  this->bids_recalc_requested = TRUE;
+  //load
+  now = gst_clock_get_time (this->sysclock);
+  if (now - GST_SECOND * 60 < subflow->saved_time_at_fall) {
+    _irt0 (subflow)->goodput = subflow->saved_record_at_fall.goodput;
+  }else{
+    //we assume at least 64kbps goodput
+   _irt0(subflow)->goodput = 64000.;
+  }
+  GST_DEBUG_OBJECT (this, "Reload action is performed with "
+      "Event based controller on subflow %d", subflow->id);
+}
+
+static void _decrease_stability(Subflow *subflow)
+{
+  _irt0(subflow)->stability=MAX((_irt0(subflow)->stability)>>1, 1);;
+}
+
+static void _decrease_sending_bid(SndEventBasedController * this,
+                                  Subflow *subflow,
+                                  gfloat decreasement)
+{
+  this->decreased_bids += _irt0(subflow)->sending_bid * decreasement;
+  _irt0(subflow)->sending_bid *= (1.-decreasement);
+}
+
+static void _increase_stability(Subflow *subflow)
+{
+  _irt0(subflow)->stability = MIN(_irt0(subflow)->stability+1, 15);
+}
+
+static void _increase_sending_bid(SndEventBasedController * this,
+                                  Subflow *subflow,
+                                  gfloat increasement)
+{
+  this->increased_bids += _irt0(subflow)->sending_bid * increasement;
+  _irt0(subflow)->sending_bid *= (1. + increasement);
+}
+
+void
+_perform_mitigate (SndEventBasedController * this, Subflow * subflow)
+{
+  guint32 lost_bids;
+  lost_bids = _decrease_sending_bid(subflow, .2);
+  _decrease_stability(subflow);
+  subflow->lost_bids += lost_bids;
+  this->bids_to_be_redistributed += lost_bids;
+  this->bids_recalc_requested = TRUE;
+  GST_DEBUG_OBJECT (this, "Mitigate action is performed with "
+      "Event based controller on subflow %d", subflow->id);
+}
+
+void
+_perform_reduce (SndEventBasedController * this, Subflow * subflow)
+{
+  guint32 lost_bids;
+  lost_bids = _decrease_sending_bid(subflow, .5);
+  _decrease_stability(subflow);
+  subflow->lost_bids += lost_bids;
+  this->bids_to_be_redistributed += lost_bids;
+  this->bids_recalc_requested = TRUE;
+  GST_DEBUG_OBJECT (this, "Mitigate action is performed with "
+      "Event based controller on subflow %d", subflow->id);
+}
+
+void
+_perform_fall (SndEventBasedController * this, Subflow * subflow)
+{
+  stream_splitter_rem_path (this->splitter, subflow->id);
+  this->bids_commit_requested = TRUE;
+  //save
+  GST_DEBUG_OBJECT (this, "Fall action is performed with "
+      "Event based controller on subflow %d", subflow->id);
+}
+
+
+
+//---------------------------------------------------------------------------
+
+
+//------------------------ Outgoing Report Producer -------------------------
+
+void
+_orp_producer_main(SndEventBasedController * this)
+{
+  ReportIntervalCalculator* ricalcer;
   GHashTableIter iter;
   gpointer key, val;
   Subflow *subflow;
-  MPRTPSPath *path;
 
-//  g_print ("RECALCULATION STARTED\n");
-
-    g_hash_table_iter_init (&iter, this->subflows);
-    while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-      subflow = (Subflow *) val;
-      path = subflow->path;
-      if (!mprtps_path_is_active (path)) {
-        continue;
-      }
-      subflow->new_RR_arrived = FALSE;
-      if(_st0(subflow)->goodput > 0.)
-        _st0(subflow)->sending_bid =
-                    (_st0 (subflow)->sending_bid *
-                     (_st0(subflow)->mitigation-1)  + _st0(subflow)->goodput)
-                    / _st0(subflow)->mitigation * subflow->compensation;
-
-      stream_splitter_setup_sending_bid (this->splitter, subflow->id,
-          (guint32) (_st0(subflow)->sending_bid  + .5));
-      g_print("S:%d: %u = (prev * %f + %f)/ %f * %f\n",
-              subflow->id,
-              _st0(subflow)->sending_bid,
-              _st0(subflow)->mitigation - 1.,
-              _st0 (subflow)->goodput,
-              _st0(subflow)->mitigation,
-              subflow->compensation);
-    }
-}
-
-
-gfloat
-_get_gainments (SndEventBasedController * this, Subflow * subflow)
-{
-  gfloat result = 1.;
-  GST_DEBUG ("get compensation value for subflow %d at controller %p",
-      subflow->id, this);
-  subflow->saved_record_at_keep.goodput = MAX(subflow->saved_record_at_keep.goodput, 64000.);
-  result = (subflow->saved_record_at_keep.goodput -
-               _st0(subflow)->goodput) / _st0(subflow)->mitigation;
-  return result;
-}
-
-
-gboolean
-_check_report_timeout (Subflow * this)
-{
-  MPRTPSPath *path;
-  GstClockTime now;
-  MPRTPSPathState path_state;
-
-  path = this->path;
-  path_state = mprtps_path_get_state (path);
-  now = gst_clock_get_time (this->sysclock);
-  if (path_state == MPRTPS_PATH_STATE_PASSIVE) {
-    goto done;
-  }
-  if (!this->received_receiver_reports_num) {
-    if (this->joined_time < now - RIPORT_TIMEOUT) {
-//      g_print("S:%d->FIRST REPORT WAS NOT ARRIVED\n", this->id);
-      return TRUE;
-    }
-    goto done;
-  }
-  if (this->last_receiver_riport_time < now - RIPORT_TIMEOUT) {
-//    g_print("S:%d->REPORT_TOO_LATE\n", this->id);
-    return TRUE;
-  }
-done:
-  return FALSE;
-}
-
-
-gboolean _is_system_overused(SndEventBasedController *this, Subflow *subflow)
-{
-  GstClockTime now;
-  now = gst_clock_get_time(this->sysclock);
-  if(_ct0(this)->subflows.nc == 0) goto overused;
-  if(_ct0(this)->subflows.nc == 1){
-    if(_st0(subflow)->event != EVENT_FI ||
-       mprtps_path_get_marker(subflow->path) == MPRTPS_PATH_MARKER_OVERUSED)
-    {
-      goto overused;
-    }
-    else goto stable;
-  }
-  if(subflow->received_receiver_reports_num > 1 &&
-     _st1(subflow)->state == MPRTPS_PATH_STATE_NON_CONGESTED &&
-     _st0(subflow)->state != MPRTPS_PATH_STATE_NON_CONGESTED){
-    if(this->suspicious) goto overused;
-    else {
-      this->suspicious = TRUE;
-      this->suspicious_time = now;
-      goto stable;
-    }
-  }
-
-stable:
-  if(this->suspicious && this->suspicious_time < now - 3*_ct0(this)->RTT_max){
-    this->suspicious = FALSE;
-  }
-  return FALSE;
-
-overused:
-  this->suspicious = FALSE;
-  return TRUE;
-}
-
-gboolean _is_system_underused(SndEventBasedController *this, Subflow *subflow)
-{
-  GstClockTime now;
-  now = gst_clock_get_time(this->sysclock);
-  if(_ct0(this)->subflows.num == 1){
-    if(mprtps_path_get_marker(subflow->path) == MPRTPS_PATH_MARKER_UNDERUSED){
-      goto underused;
-    } else goto stable;
-  }
-  if(subflow->received_receiver_reports_num > 0 &&
-      _st1(subflow)->state != MPRTPS_PATH_STATE_NON_CONGESTED &&
-      _st0(subflow)->state == MPRTPS_PATH_STATE_NON_CONGESTED)
-    goto underused;
-
-stable:
-  if(this->stability_started &&
-     this->stability_time < now - 3*_ct0(this)->RTT_max)
+  g_hash_table_iter_init (&iter, this->subflows);
+  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
-//    g_print("Stable for a while\n");
-    goto underused;
-  }
-  return FALSE;
-underused:
-  return TRUE;
+    subflow = (Subflow *) val;
+    ricalcer = subflow->ricalcer;
 
-}
+    if (_check_report_timeout (subflow)) {
+      _fire (this, subflow, EVENT_LATE);
+      continue;
+    }else if(!mprtps_path_is_active(subflow->path)){
+      continue;
+    }
 
-static void _print_system_state(SndEventBasedController *this)
-{
-//    g_print("System state is: %d, "
-//            "RTT_MAX: %lu, "
-//            "subflow_num: %d, "
-//            "report arrived: %d\n",
-//            this->cc_state,_ct0(this)->RTT_max, _ct0(this)->subflows.num,
-//            _ct0(this)->report_num_arrived);
-}
-
-void _refresh_system_state(SndEventBasedController *this, Subflow *subflow)
-{
-  GstClockTime now;
-  now = gst_clock_get_time(this->sysclock);
-  this->cc_prev_state = this->cc_state;
-
-  if(_is_system_overused(this, subflow))
-    goto overused;
-  else if(_is_system_underused(this, subflow))
-    goto underused;
-  else
-    goto stable;
-
-overused:
-  this->stability_started = FALSE;
-  this->cc_state = MPRTP_CC_STATE_OVERUSED;
-//  _print_system_state(this);
-  return;
-underused:
-  this->stability_started = FALSE;
-  this->cc_state = MPRTP_CC_STATE_UNDERUSED;
-//  _print_system_state(this);
-  return;
-stable:
-  if(!this->stability_started)
-    this->stability_time = now;
-  this->stability_started = TRUE;
-  this->cc_state = MPRTP_CC_STATE_STABLE;
-  _print_system_state(this);
-  return;
-}
-
-gboolean
-_do_report_now (Subflow * this)
-{
-  gboolean result;
-  GstClockTime now;
-  gdouble interval;
-
-  now = gst_clock_get_time (this->sysclock);
-  if (!this->first_report_calculated) {
-    interval = rtcp_interval (1,        //senders
-        2,                      //members
-        _st0 (this)->goodput > 0. ? _st0 (this)->goodput : 64000.,      //rtcp_bw
-        1,                      //we_sent
-        this->avg_rtcp_size,    //avg_rtcp_size
-        1);                     //initial
-
-    this->first_report_calculated = TRUE;
-    result = FALSE;
-    this->normal_report_time = now + (GstClockTime) interval *GST_SECOND;
-    goto done;
+    if (this->report_is_flowable && ricalcer_do_report_now(ricalcer)) {
+      _send_mprtcp_sr_block (this, subflow);
+      ricalcer_do_next_report_time(ricalcer);
+    }
   }
 
-  if (this->normal_report_time <= now) {
-    result = TRUE;
-    goto done;
-  }
-  result = FALSE;
-done:
-  return result;
+  return;
 }
 
 void
-_recalc_report_time (Subflow * this)
+_send_mprtcp_sr_block (SndEventBasedController * this, Subflow * subflow)
 {
-  gdouble interval;
-  GstClockTime now;
-  now = gst_clock_get_time (this->sysclock);
+  GstBuffer *buf;
+  _step_or(subflow);
+  buf = _get_mprtcp_sr_block (this,
+                              subflow,
+                              &_ort0(subflow)->sent_report_length);
+  this->send_mprtcp_packet_func (this->send_mprtcp_packet_data, buf);
 
-  interval = rtcp_interval (1,  //senders
-      2,                        //members
-      _st0 (this)->goodput > 0. ? _st0 (this)->goodput : 64000.,        //rtcp_bw
-      1,                        //we_sent
-      this->avg_rtcp_size,      //avg_rtcp_size
-      0);                       //initial
+  _ort0(subflow)->sent_report_length += 12 /*MPRTCP REPOR HEADER */  +
+      (28 << 3) /*UDP Header overhead */ ;
 
-//  g_print("interval: %f, %f, %f\n", this->goodput, this->avg_rtcp_size, interval);
-
-  this->normal_report_time = now + (GstClockTime) interval *GST_SECOND;
-  return;
+  subflow->avg_rtcp_size +=
+      ((gfloat) _ort0(subflow)->sent_report_length - subflow->avg_rtcp_size) / 4.;
 }
 
+void _step_or(Subflow *this)
+{
+  this->or_moments_index = 1 - this->or_moments_index;
+  memset ((gpointer) _ort0 (this), 0, sizeof (ORMoment));
+  ++this->or_moments_num;
+  _ort0(this)->sent_packets_num =
+        mprtps_path_get_total_sent_packets_num(this->path);
+  _ort0(this)->sent_payload_bytes =
+      mprtps_path_get_total_sent_payload_bytes(this->path);
+}
 
 GstBuffer *
 _get_mprtcp_sr_block (SndEventBasedController * this,
@@ -1650,26 +1315,209 @@ _setup_sr_riport (Subflow * this, GstRTCPSR * sr, guint32 ssrc)
   rtptime = (guint32) (gst_rtcp_ntp_to_unix (ntptime) >> 32);   //rtptime
   path = this->path;
 
-  last_sent_packets_num = this->sent_packet_num;
-  this->sent_packet_num = mprtps_path_get_total_sent_packets_num (path);
   packet_count_diff = _uint32_diff (last_sent_packets_num,
-      this->sent_packet_num);
+      _ort0(this)->sent_packets_num - _ort1(this)->sent_packets_num);
 
-  last_sent_payload_bytes = this->sent_payload_bytes;
-  this->sent_payload_bytes = mprtps_path_get_total_sent_payload_bytes (path);
   payload_bytes =
-      _uint32_diff (last_sent_payload_bytes, this->sent_payload_bytes);
+      _uint32_diff (last_sent_payload_bytes,
+                    _ort0(this)->sent_payload_bytes- _ort1(this)->sent_payload_bytes);
 
   gst_rtcp_srb_setup (&sr->sender_block, ntptime, rtptime,
       packet_count_diff, payload_bytes >> 3);
 //  g_print("Created NTP time for subflow %d is %lu\n", this->id, ntptime);
 }
 
+
+//---------------------------------------------------------------------------
+
+//----------------------------- System Notifier ------------------------------
+
+void
+_system_notifier_main(SndEventBasedController * this)
+{
+
+}
+
+//---------------------------------------------------------------------------
+
+
+//----------------------------- Split Controller -----------------------------
+
+void
+_split_controller_main(SndEventBasedController * this)
+{
+  GHashTableIter iter;
+  gpointer key, val;
+  Subflow *subflow;
+
+  if (!this->bids_recalc_requested) goto recalc_done;
+  this->bids_recalc_requested = FALSE;
+  this->bids_commit_requested = TRUE;
+
+recalc_done:
+  if (!this->bids_commit_requested) goto process_done;
+  this->bids_commit_requested = FALSE;
+  stream_splitter_commit_changes (this->splitter);
+process_done:
+  return;
+}
+
+//----------------------------------------------------------------------------
+
+
+//---------------------- Utility functions ----------------------------------
+Subflow *
+_subflow_ctor (void)
+{
+  Subflow *result;
+  result = g_malloc0 (sizeof (Subflow));
+  return result;
+}
+
+void
+_subflow_dtor (Subflow * this)
+{
+  g_return_if_fail (this);
+  g_free (this);
+}
+
+void
+_ruin_subflow (gpointer * subflow)
+{
+  Subflow *this;
+  g_return_if_fail (subflow);
+  this = (Subflow *) subflow;
+  g_object_unref (this->sysclock);
+  g_object_unref (this->path);
+  _subflow_dtor (this);
+}
+
+Subflow *
+_make_subflow (guint8 id, MPRTPSPath * path)
+{
+  Subflow *result = _subflow_ctor ();
+  g_object_ref (path);
+  result->sysclock = gst_system_clock_obtain ();
+  result->path = path;
+  result->id = id;
+  result->joined_time = gst_clock_get_time (result->sysclock);
+
+  result->ir_moments =
+      (IRMoment *) g_malloc0 (sizeof (struct _SubflowRecord) * MAX_SUBFLOW_MOMENT_NUM);
+  result->ir_moments_index = 0;
+  result->compensation = 1.;
+  result->ricalcer = make_ricalcer(TRUE);
+  reset_subflow (result);
+  return result;
+}
+
+void
+reset_subflow (Subflow * this)
+{
+  gint i;
+  for (i = 0; i < MAX_SUBFLOW_MOMENT_NUM; ++i) {
+    memset (this->ir_moments, 0, sizeof (IRMoment) * MAX_SUBFLOW_MOMENT_NUM);
+  }
+}
+
+
+guint16
+_uint16_diff (guint16 start, guint16 end)
+{
+  if (start <= end) {
+    return end - start;
+  }
+  return ~((guint16) (start - end));
+}
+
+
+guint32
+_uint32_diff (guint32 start, guint32 end)
+{
+  if (start <= end) {
+    return end - start;
+  }
+  return ~((guint32) (start - end));
+}
+
+gint
+_cmp_for_maxtree (guint64 x, guint64 y)
+{
+  return x == y ? 0 : x < y ? -1 : 1;
+}
+
+void
+_sefctrler_recalc (SndEventBasedController * this)
+{
+  GHashTableIter iter;
+  gpointer key, val;
+  Subflow *subflow;
+  MPRTPSPath *path;
+
+//  g_print ("RECALCULATION STARTED\n");
+
+    g_hash_table_iter_init (&iter, this->subflows);
+    while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+      subflow = (Subflow *) val;
+      path = subflow->path;
+      if (!mprtps_path_is_active (path)) {
+        continue;
+      }
+
+      stream_splitter_setup_sending_bid (this->splitter, subflow->id,
+          (guint32) (_irt0(subflow)->sending_bid  + .5));
+    }
+}
+
+
+gfloat
+_get_gainments (SndEventBasedController * this, Subflow * subflow)
+{
+  gfloat result = 1.;
+  GST_DEBUG ("get compensation value for subflow %d at controller %p",
+      subflow->id, this);
+  subflow->saved_record_at_keep.goodput = MAX(subflow->saved_record_at_keep.goodput, 64000.);
+  result = (subflow->saved_record_at_keep.goodput -
+               _irt0(subflow)->goodput) / _irt0(subflow)->mitigation;
+  return result;
+}
+
+
+gboolean
+_check_report_timeout (Subflow * this)
+{
+  MPRTPSPath *path;
+  GstClockTime now;
+  MPRTPSPathState path_state;
+
+  path = this->path;
+  path_state = mprtps_path_get_state (path);
+  now = gst_clock_get_time (this->sysclock);
+  if (path_state == MPRTPS_PATH_STATE_PASSIVE) {
+    goto done;
+  }
+  if (!this->received_receiver_reports_num) {
+    if (this->joined_time < now - RIPORT_TIMEOUT) {
+//      g_print("S:%d->FIRST REPORT WAS NOT ARRIVED\n", this->id);
+      return TRUE;
+    }
+    goto done;
+  }
+  if (this->last_receiver_riport_time < now - RIPORT_TIMEOUT) {
+//    g_print("S:%d->REPORT_TOO_LATE\n", this->id);
+    return TRUE;
+  }
+done:
+  return FALSE;
+}
+
+
+
 #undef _ct0
 #undef _ct1
-#undef _st0
-#undef _st1
-#undef _st2
+#undef _irt0
+#undef _irt1
+#undef _irt2
 #undef DEBUG_MODE_ON
 #undef MAX_RIPORT_INTERVAL
 #undef RIPORT_TIMEOUT

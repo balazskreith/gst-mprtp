@@ -16,7 +16,7 @@
 
 typedef struct _SndEventBasedController SndEventBasedController;
 typedef struct _SndEventBasedControllerClass SndEventBasedControllerClass;
-typedef struct _ControllerRecord ControllerRecord;
+typedef struct _SplitCtrlerMoment SplitCtrlerMoment;
 
 #define SEFCTRLER_TYPE             (sefctrler_get_type())
 #define SEFCTRLER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),SEFCTRLER_TYPE,SndEventBasedController))
@@ -25,11 +25,6 @@ typedef struct _ControllerRecord ControllerRecord;
 #define SEFCTRLER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),SEFCTRLER_TYPE))
 #define SEFCTRLER_CAST(src)        ((SndEventBasedController *)(src))
 
-typedef enum{
-  MPRTP_CC_STATE_UNDERUSED    = -1,
-  MPRTP_CC_STATE_STABLE       =  0,
-  MPRTP_CC_STATE_OVERUSED     =  1,
-}MpRTPCCState;
 
 struct _SndEventBasedController
 {
@@ -42,11 +37,12 @@ struct _SndEventBasedController
   StreamSplitter*   splitter;
   GstClock*         sysclock;
   guint             subflow_num;
-  ControllerRecord* records;
-  gint              records_max;
-  gint              records_index;
+  BinTree*          subflow_delays_tree;
+  guint8            subflow_delays_index;
+  guint64           subflow_delays[256];
+  SplitCtrlerMoment*splitctrler_moments;
+  gint              splitctrler_moments_index;
   guint64           changed_num;
-  guint32           min_delay;
   gboolean          pacing;
   GstClockTime      last_recalc_time;
   GstClockTime      RTT_max;
@@ -56,12 +52,10 @@ struct _SndEventBasedController
   guint32           ssrc;
   void            (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
   gpointer          send_mprtcp_packet_data;
-  gboolean          riport_is_flowable;
+  gboolean          report_is_flowable;
   gboolean          suspicious;
   GstClockTime      suspicious_time;
 
-  MpRTPCCState      cc_state;
-  MpRTPCCState      cc_prev_state;
   GstClockTime      stability_time;
   gboolean          stability_started;
 

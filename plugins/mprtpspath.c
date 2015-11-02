@@ -141,7 +141,7 @@ mprtps_path_get_state (MPRTPSPath * this)
     goto done;
   }
   if ((this->state & (guint8) MPRTPS_PATH_FLAG_NON_LOSSY) == 0) {
-    result = MPRTPS_PATH_STATE_MIDDLY_CONGESTED;
+    result = MPRTPS_PATH_STATE_LOSSY;
     goto done;
   }
   result = MPRTPS_PATH_STATE_NON_CONGESTED;
@@ -206,7 +206,7 @@ mprtps_path_get_time_sent_to_non_congested (MPRTPSPath * this)
 }
 
 GstClockTime
-mprtps_path_get_time_sent_to_middly_congested (MPRTPSPath * this)
+mprtps_path_get_time_sent_to_lossy (MPRTPSPath * this)
 {
   GstClockTime result;
   THIS_READLOCK (this);

@@ -14,6 +14,8 @@
 
 #define MPRTP_DEFAULT_EXTENSION_HEADER_ID 3
 #define ABS_TIME_DEFAULT_EXTENSION_HEADER_ID 8
+#define DELAY_SKEW_ACTIVE_TRESHOLD (150 * GST_MSECOND)
+#define DELAY_SKEW_DEACTIVE_TRESHOLD (120 * GST_MSECOND)
 
 G_BEGIN_DECLS typedef struct _MPRTPSPath MPRTPSPath;
 typedef struct _MPRTPSPathClass MPRTPSPathClass;
@@ -61,7 +63,7 @@ typedef enum
 
 typedef enum{
   MPRTPS_PATH_STATE_NON_CONGESTED    = 1,
-  MPRTPS_PATH_STATE_MIDDLY_CONGESTED = 2,
+  MPRTPS_PATH_STATE_LOSSY = 2,
   MPRTPS_PATH_STATE_CONGESTED        = 4,
   MPRTPS_PATH_STATE_PASSIVE          = 8,
 }MPRTPSPathState;
@@ -137,7 +139,7 @@ MPRTPSPathMarker mprtps_path_get_marker(MPRTPSPath * this);
 MPRTPSPathState mprtps_path_get_state (MPRTPSPath * this);
 void mprtps_path_set_state (MPRTPSPath * this, MPRTPSPathState state);
 GstClockTime mprtps_path_get_time_sent_to_passive(MPRTPSPath *this);
-GstClockTime mprtps_path_get_time_sent_to_middly_congested (MPRTPSPath * this);
+GstClockTime mprtps_path_get_time_sent_to_lossy (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_non_congested (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_congested (MPRTPSPath * this);
 void mprtps_path_set_max_bytes_per_ms(MPRTPSPath *this, guint32 bytes);

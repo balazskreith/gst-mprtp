@@ -594,70 +594,100 @@ gst_rtcp_xr_skew_init (GstRTCPXR_Skew * report)
 
 void
 gst_rtcp_xr_skew_setup(GstRTCPXR_Skew *report,
-                       guint8  interval_metric,
-                       guint32 ssrc,
-                       guint32 skew,
-                       guint32 delay,
-                       guint32 bytes)
+                       gboolean skew_flag,
+                       guint8   interval_metric,
+                       guint32  ssrc,
+                       guint8   percentile_frac,
+                       guint32  stream_bytes_num,
+                       guint32  characterization_value,
+                       guint16  min,
+                       guint16  max)
 {
   report->block_length = g_htons (4);
   report->block_type = GST_RTCP_XR_SKEW_BLOCK_TYPE_IDENTIFIER;
   gst_rtcp_xr_skew_change(report,
+                          &skew_flag,
                           &interval_metric,
                           &ssrc,
-                          &skew,
-                          &delay,
-                          &bytes);
+                          &percentile_frac,
+                          &stream_bytes_num,
+                          &characterization_value,
+                          &min,
+                          &max);
 }
 
 void
 gst_rtcp_xr_skew_change (GstRTCPXR_Skew *report,
-    guint8  *interval_metric,
-    guint32 *ssrc,
-    guint32 *skew,
-    guint32 *delay,
-    guint32 *bytes)
+                          gboolean  *skew_flag,
+                          guint8   *interval_metric,
+                          guint32  *ssrc,
+                          guint8   *percentile_frac,
+                          guint32  *stream_bytes_num,
+                          guint32  *characterization_value,
+                          guint16  *min,
+                          guint16  *max)
 {
-  if (skew) {
-    report->skew = g_htonl (*skew);
+  if (skew_flag) {
+    report->skew_flag = skew_flag?1:0;
   }
-  if (delay) {
-    report->delay = g_htonl (*delay);
-  }
-  if (bytes) {
-    report->bytes = g_htonl (*bytes);
+  if (interval_metric) {
+    report->interval_metric = *interval_metric;
   }
   if (ssrc) {
     report->ssrc = g_htonl (*ssrc);
   }
-  if(interval_metric){
-    report->interval_metric = *interval_metric;
+  if (percentile_frac) {
+    report->percentile_frac = *percentile_frac;
   }
+  if(stream_bytes_num){
+      report->stream_bytes_num = g_htonl (*stream_bytes_num);
+    }
+  if(characterization_value){
+      report->characterization_value = g_htonl (*characterization_value);
+    }
+  if(min){
+      report->min = g_htons (*min);
+    }
+  if(max){
+      report->min = g_htons (*max);
+    }
 }
 
 void
-gst_rtcp_xr_skew_getdown (GstRTCPXR_Skew * riport,
-                          guint8  *interval_metric,
-                          guint32 *ssrc,
-                          guint32 *skew,
-                          guint32 *delay,
-                          guint32 *bytes)
+gst_rtcp_xr_skew_getdown (GstRTCPXR_Skew * report,
+                          guint8   *interval_metric,
+                          gboolean  *skew_flag,
+                          guint32  *ssrc,
+                          guint8   *percentile_frac,
+                          guint32  *stream_bytes_num,
+                          guint32  *characterization_value,
+                          guint16  *min,
+                          guint16  *max)
 {
-  if (ssrc) {
-    *ssrc = g_ntohl (riport->ssrc);
-  }
-  if(interval_metric){
-    *interval_metric = riport->interval_metric;
-  }
-  if (skew) {
-    *skew = g_ntohl (riport->skew);
-  }
-  if (delay) {
-      *delay = g_ntohl (riport->delay);
+  if (skew_flag) {
+      *skew_flag = report->skew_flag;
     }
-  if (bytes) {
-      *bytes = g_ntohl (riport->bytes);
+    if (interval_metric) {
+        *interval_metric = report->interval_metric;
     }
+    if (ssrc) {
+        *ssrc = report->ssrc;
+    }
+    if (percentile_frac) {
+        *percentile_frac = report->percentile_frac;
+    }
+    if(stream_bytes_num){
+        *stream_bytes_num = g_ntohl(report->stream_bytes_num);
+      }
+    if(characterization_value){
+        *characterization_value = g_ntohl(report->characterization_value);
+      }
+    if(min){
+        *min = g_ntohs(report->min);
+      }
+    if(max){
+        *max = g_ntohs(report->max);
+      }
 }
 
 
@@ -1159,31 +1189,41 @@ gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * riport)
 void
 gst_print_rtcp_xr_skew (GstRTCPXR_Skew * riport)
 {
-  guint8 flag;
-  guint32 skew;
-  guint32 ssrc;
-  guint32 delay;
-  guint32 bytes;
+  gboolean  skew_flag;
+  guint8   interval_metric;
+  guint32  ssrc;
+  guint8   percentile_frac;
+  guint32  stream_bytes_num;
+  guint32  characterization_value;
+  guint16  min;
+  guint16  max;
 
   gst_print_rtcp_header (&riport->header);
-  gst_rtcp_xr_skew_getdown (riport, &flag, &ssrc, &skew,
-                            &delay, &bytes);
+  gst_rtcp_xr_skew_getdown (riport,
+                            &interval_metric,
+                            &skew_flag,
+                            &ssrc,
+                            &percentile_frac,
+                            &stream_bytes_num,
+                            &characterization_value,
+                            &min,
+                            &max);
   g_print (
       "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
-      "|%15d|%2d|%12d|%31d|\n"
+      "|%15d|%3d|%1d|%9d|%31d|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%63X|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
-      "|%63u|\n"
+      "|%15d|%47u|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%63u|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
-      "|%63u|\n"
+      "|%31d|%31d|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       ,
-      riport->block_type, flag, riport->reserved,
-      g_ntohs (riport->block_length), ssrc, skew,
-      delay, bytes);
+      riport->block_type, interval_metric, skew_flag, 0,
+      g_ntohs (riport->block_length), ssrc, percentile_frac,
+      stream_bytes_num, characterization_value, min, max);
 }
 
 
@@ -1319,110 +1359,6 @@ gst_print_rtp_packet_info (GstRTPBuffer * rtp)
   }
 }
 
-
-//Copied from RFC3550
-gdouble
-rtcp_interval (gint senders,
-    gint members,
-    gdouble rtcp_bw, gint we_sent, gdouble avg_rtcp_size, gint initial)
-{
-  /*
-   * Minimum average time between RTCP packets from this site (in
-   * seconds).  This time prevents the reports from `clumping' when
-   * sessions are small and the law of large numbers isn't helping
-   * to smooth out the traffic.  It also keeps the report interval
-   * from becoming ridiculously small during transient outages like
-   * a network partition.
-   */
-  gdouble const RTCP_MIN_TIME = 5.;
-  /*
-   * Fraction of the RTCP bandwidth to be shared among active
-   * senders.  (This fraction was chosen so that in a typical
-   * session with one or two active senders, the computed report
-   * time would be roughly equal to the minimum report time so that
-   * we don't unnecessarily slow down receiver reports.)  The
-   * receiver fraction must be 1 - the sender fraction.
-   */
-  gdouble const RTCP_SENDER_BW_FRACTION = 0.25;
-  gdouble const RTCP_RCVR_BW_FRACTION = (1 - RTCP_SENDER_BW_FRACTION);
-  /*
-   * To compensate for "timer reconsideration" converging to a
-   * value below the intended average.
-   */
-  gdouble const COMPENSATION = 2.71828 - 1.5;
-
-  gdouble t;                    /* interval */
-  gdouble rtcp_min_time = RTCP_MIN_TIME;
-
-  gint n;                       /* no. of members for computation */
-
-  /*
-   * Very first call at application start-up uses half the min
-   * delay for quicker notification while still allowing some time
-   * before reporting for randomization and to learn about other
-   * sources so the report interval will converge to the correct
-   * interval more quickly.
-
-   */
-  if (initial) {
-    rtcp_min_time /= 2;
-  }
-  /*
-   * Dedicate a fraction of the RTCP bandwidth to senders unless
-   * the number of senders is large enough that their share is
-   * more than that fraction.
-   */
-  n = members;
-  if (senders <= members * RTCP_SENDER_BW_FRACTION) {
-    if (we_sent) {
-      rtcp_bw *= RTCP_SENDER_BW_FRACTION;
-      n = senders;
-    } else {
-      rtcp_bw *= RTCP_RCVR_BW_FRACTION;
-      n -= senders;
-    }
-  }
-
-  /*
-   * The effective number of sites times the average packet size is
-   * the total number of octets sent when each site sends a report.
-   * Dividing this by the effective bandwidth gives the time
-   * interval over which those packets must be sent in order to
-   * meet the bandwidth target, with a minimum enforced.  In that
-   * time interval we send one report so this time is also our
-   * average time between reports.
-   */
-  t = avg_rtcp_size * n / rtcp_bw;
-  if (t < rtcp_min_time)
-    t = rtcp_min_time;
-
-  /*
-   * To avoid traffic bursts from unintended synchronization with
-   * other sites, we then pick our actual next report interval as a
-   * random number uniformly distributed between 0.5*t and 1.5*t.
-   */
-  t = t * (drand48 () + 0.5);
-  t = t / COMPENSATION;
-  return t;
-}
-
-gboolean gst_mprtp_get_subflow_extension(GstRTPBuffer *rtp,
-                                         guint8 ext_header_id,
-                                         MPRTPSubflowHeaderExtension **subflow_info)
-{
-  gpointer pointer;
-  guint size;
-  if (!gst_rtp_buffer_get_extension_onebyte_header (rtp,
-                                                    ext_header_id,
-                                                    0,
-                                                    &pointer,
-                                                    &size)) {
-      return FALSE;
-    }
-
-    if(subflow_info) *subflow_info = (MPRTPSubflowHeaderExtension *) pointer;
-    return TRUE;
-}
 
 gboolean gst_mprtp_get_abs_send_time_extension(GstRTPBuffer *rtp,
                                                guint8 ext_header_id,

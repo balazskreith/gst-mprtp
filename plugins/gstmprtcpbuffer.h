@@ -170,19 +170,30 @@ typedef struct PACKED _GstRTCPXR_Skew
   GstRTCPHeader header;
   guint8 block_type;
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
-  guint8 reserved:6;
+  guint8 reserved:5;
+  guint8 skew_flag:1;
   guint8 interval_metric:2;
 #elif G_BYTE_ORDER == G_BIG_ENDIAN
   guint8 interval_metric:2;
-  guint8 reserved:6;
+  guint8 skew_flag:1;
+  guint8 reserved:5;
 #else
 #error "G_BYTE_ORDER should be big or little endian."
 #endif
   guint16 block_length;
   guint32 ssrc;
-  guint32 skew;
-  guint32 delay;
-  guint32 bytes;
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
+  guint32 stream_bytes_num : 24;
+  guint32 percentile_frac : 8;
+#elif G_BYTE_ORDER == G_BIG_ENDIAN
+  guint32 percentile_frac : 8;
+  guint32 stream_bytes_num : 24;
+#else
+#error "G_BYTE_ORDER should be big or little endian."
+#endif
+  guint32 characterization_value;
+  guint16 min;
+  guint16 max;
 } GstRTCPXR_Skew;
 
 
@@ -349,25 +360,34 @@ void gst_rtcp_xr_rfc7243_getdown (GstRTCPXR_RFC7243 * report,
 void gst_rtcp_xr_skew_init (GstRTCPXR_Skew * report);
 
 void gst_rtcp_xr_skew_setup(GstRTCPXR_Skew *report,
-                            guint8  interval_metric,
-                            guint32 ssrc,
-                            guint32 skew,
-                            guint32 delay,
-                            guint32 bytes);
+                            guint8   interval_metric,
+                            gboolean*skew_flag,
+                            guint32  ssrc,
+                            guint8   percentile_frac,
+                            guint32  stream_bytes_num,
+                            guint32  characterization_value,
+                            guint16  min,
+                            guint16  max);
 
 void gst_rtcp_xr_skew_change (GstRTCPXR_Skew *report,
-                              guint8  *interval_metric,
-                              guint32 *ssrc,
-                              guint32 *skew,
-                              guint32 *delay,
-                              guint32 *bytes);
+                              guint8   *interval_metric,
+                              gboolean  *skew_flag,
+                              guint32  *ssrc,
+                              guint8   *percentile_frac,
+                              guint32  *stream_bytes_num,
+                              guint32  *characterization_value,
+                              guint16  *min,
+                              guint16  *max);
 
 void gst_rtcp_xr_skew_getdown(GstRTCPXR_Skew * report,
-                              guint8  *interval_metric,
-                              guint32 *ssrc,
-                              guint32 *skew,
-                              guint32 *delay,
-                              guint32 *bytes);
+                              guint8   *interval_metric,
+                              gboolean  *skew_flag,
+                              guint32  *ssrc,
+                              guint8   *percentile_frac,
+                              guint32  *stream_bytes_num,
+                              guint32  *characterization_value,
+                              guint16  *min,
+                              guint16  *max);
 
 
 void gst_rtcp_xr_owd_init (GstRTCPXR_OWD * report);
@@ -438,13 +458,6 @@ void gst_print_rtcp_rrb (GstRTCPRRBlock * block_ptr);
 
 #include <gst/rtp/gstrtpbuffer.h>
 void gst_print_rtp_packet_info (GstRTPBuffer * rtp);
-
-gdouble rtcp_interval(  gint senders,
-                        gint members,
-                        gdouble rtcp_bw,
-                        gint we_sent,
-                        gdouble avg_rtcp_size,
-                        gint initial);
 
 gboolean gst_mprtp_get_subflow_extension(GstRTPBuffer *rtp,
                                          guint8 ext_header_id,

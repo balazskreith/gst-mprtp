@@ -377,7 +377,7 @@ stream_splitter_run (void *data)
     path_state = mprtps_path_get_state (path);
     if (path_state == MPRTPS_PATH_STATE_NON_CONGESTED) {
       bid_nc_sum += subflow->actual_bid;
-    } else if (path_state == MPRTPS_PATH_STATE_MIDDLY_CONGESTED) {
+    } else if (path_state == MPRTPS_PATH_STATE_LOSSY) {
       bid_mc_sum += subflow->actual_bid;
     } else if (path_state == MPRTPS_PATH_STATE_CONGESTED) {
       bid_c_sum += subflow->actual_bid;
@@ -396,7 +396,7 @@ stream_splitter_run (void *data)
           "the bid for mc is: %d, for c is: %d", bid_mc_sum, bid_c_sum);
       _tree_commit (this, &this->non_keyframes_tree,
           this->subflows,
-          MPRTPS_PATH_STATE_CONGESTED | MPRTPS_PATH_STATE_MIDDLY_CONGESTED,
+          MPRTPS_PATH_STATE_CONGESTED | MPRTPS_PATH_STATE_LOSSY,
           bid_c_sum + bid_mc_sum);
       this->non_keyframe_ratio = (bid_mc_sum + bid_c_sum) / bid_total_sum;
       this->keyframe_ratio = 1. - this->non_keyframe_ratio;
@@ -412,7 +412,7 @@ stream_splitter_run (void *data)
         "no non-congested available, "
         "the bid is: %d the total bid is: %d", bid_mc_sum, bid_total_sum);
     _tree_commit (this, &this->keyframes_tree, this->subflows,
-        MPRTPS_PATH_STATE_MIDDLY_CONGESTED, bid_mc_sum);
+        MPRTPS_PATH_STATE_LOSSY, bid_mc_sum);
     if (bid_c_sum > 0) {
       GST_DEBUG_OBJECT (this, "Congested paths exists, the bid is: %d",
           bid_c_sum);
@@ -622,6 +622,7 @@ _tree_commit (StreamSplitter *this, SchNode ** tree,
         (gdouble) subflow->actual_bid /
         (gdouble) bid_sum *(gdouble) SCHTREE_MAX_VALUE;
     insert_value = (gint) roundf (actual_value);
+//    g_print("SCHTREE INSERT: %u<-%d\n", subflow->actual_bid, subflow->path->id);
     _schtree_insert (&new_root, path, &insert_value, SCHTREE_MAX_VALUE);
   }
 

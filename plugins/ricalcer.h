@@ -9,8 +9,7 @@
 #define RICALCER_H_
 
 #include <gst/gst.h>
-
-#include "mprtpspath.h"
+//#include "mprtpspath.h"
 
 typedef struct _ReportIntervalCalculator ReportIntervalCalculator;
 typedef struct _ReportIntervalCalculatorClass ReportIntervalCalculatorClass;
@@ -44,11 +43,11 @@ struct _ReportIntervalCalculatorClass{
 };
 
 
-GType ricalcer_get_type (ReportIntervalCalculator *this);
+GType ricalcer_get_type (void);
 ReportIntervalCalculator *make_ricalcer(gboolean sender_side);
 gboolean ricalcer_do_report_now (ReportIntervalCalculator * this);
 void ricalcer_do_next_report_time (ReportIntervalCalculator * this);
-void ricalcer_refresh_parameters(ReportIntervalCalculator * this);
+void ricalcer_refresh_parameters(ReportIntervalCalculator * this, gdouble media_rate, gdouble avg_rtcp_size);
 void ricalcer_urgent_report_request(ReportIntervalCalculator * this);
 GstClockTime ricalcer_get_sum_last_two_interval(ReportIntervalCalculator * this);
 

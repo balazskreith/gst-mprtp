@@ -28,6 +28,7 @@
 #include "gstmprtcpbuffer.h"
 #include "mprtprpath.h"
 #include "streamjoiner.h"
+#include "ricalcer.h"
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
@@ -279,7 +280,6 @@ refctrler_setup (gpointer ptr, StreamJoiner * joiner)
   this = REFCTRLER (ptr);
   THIS_WRITELOCK (this);
   this->joiner = joiner;
-  stream_joiner_path_obsolation(this->joiner, FALSE);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -839,8 +839,6 @@ _setup_xr_rfc2743_late_discarded_report (Subflow * this,
 void
 _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
 {
-  GstClockTime now;
-//  guint64 ntp;
   guint8 fraction_lost;
   guint32 ext_hsn, LSR, DLSR;
   guint16 expected;
@@ -848,7 +846,6 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
   gdouble received_bytes, interval;
 
   gst_rtcp_header_change (&rr->header, NULL, NULL, NULL, NULL, NULL, &ssrc);
-  now = gst_clock_get_time(this->sysclock);
   expected = _uint16_diff (_ort1(this)->HSN, _ort0(this)->HSN);
   diff_lost_packet_num =
       _uint16_diff (_ort1(this)->lost_packet_num,
@@ -901,11 +898,10 @@ _system_notifier_main(RcvEventBasedController * this)
 void
 _play_controller_main(RcvEventBasedController * this)
 {
-  ReportIntervalCalculator* ricalcer;
   GHashTableIter iter;
   gpointer key, val;
   Subflow *subflow;
-  guint64 min_treshold, max_treshold, delay, skew, max_skew;
+  guint64 min_treshold, max_treshold, delay, skew;
 
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
@@ -933,28 +929,30 @@ _play_controller_main(RcvEventBasedController * this)
   }
   min_treshold = bintree_get_bottom_value(this->subflow_delays_tree);
   max_treshold = bintree_get_top_value(this->subflow_delays_tree);
-  max_skew = bintree_get_top_value(this->subflow_skew_tree);
+
   if(!bintree_get_num(this->subflow_delays_tree)){
     goto done;
   }
 
-  stream_joiner_set_stream_delay(this->joiner, max_treshold - min_treshold * 1.2);
-  stream_joiner_set_tick_interval(this->joiner, max_skew);
+  //set playout tick
+  {
+    guint64 max_skew;
+    max_skew = bintree_get_top_value(this->subflow_skew_tree);
+    stream_joiner_set_tick_interval(this->joiner, max_skew);
+  }
+
+  //set playout delay
+  {
+    guint64 diff;
+    diff = max_treshold - min_treshold * 1.2;
+    diff = MAX(diff, 10 * GST_MSECOND);
+    diff = MIN(DELAY_SKEW_ACTIVE_TRESHOLD, diff);
+    stream_joiner_set_stream_delay(this->joiner, diff);
+  }
+
+
 done:
   return;
-}
-
-void _set_playoutgate(StreamJoiner *this, GstClockTime min_delay, GstClockTime max_delay)
-{
-  guint64 window_size = 0;
-  if(max_delay < min_delay) goto invalid;
-  //  window_size = MAX((max_delay - min_delay)<<1, 50 * GST_MSECOND);
-  window_size = MAX((max_delay - min_delay)<<1, 10 * GST_MSECOND);
-  window_size = MIN(window_size, 150 * GST_MSECOND);
-invalid:
-  window_size = MAX(window_size, GST_MSECOND);
-//  g_print("Window size: %lu\n", window_size);
-  playoutgate_set_max_delay(this->playoutgate, window_size);
 }
 
 
@@ -982,6 +980,7 @@ _make_subflow (guint8 id, MpRTPRPath * path)
   result->path = path;
   result->id = id;
   result->joined_time = gst_clock_get_time (result->sysclock);
+  result->ricalcer = make_ricalcer(FALSE);
   _reset_subflow (result);
   return result;
 }

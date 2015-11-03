@@ -258,7 +258,7 @@ _step_or(Subflow *this);
 static GstBuffer*
 _get_mprtcp_sr_block (SndEventBasedController* this,
                       Subflow* subflow,
-                      guint16* buf_length);
+                      guint32* buf_length);
 static void
 _setup_sr_riport (Subflow * this,
                   GstRTCPSR * sr,
@@ -1281,7 +1281,7 @@ _send_mprtcp_sr_block (SndEventBasedController * this, Subflow * subflow, guint3
   _step_or(subflow);
   buf = _get_mprtcp_sr_block (this,
                               subflow,
-                              &sent_report_length);
+                              sent_report_length);
   this->send_mprtcp_packet_func (this->send_mprtcp_packet_data, buf);
   if(sent_report_length) *sent_report_length += 12 /* RTCP HEADER*/ + (28<<3) /*UDP+IP HEADER*/;
 }
@@ -1301,7 +1301,7 @@ void _step_or(Subflow *this)
 
 GstBuffer *
 _get_mprtcp_sr_block (SndEventBasedController * this,
-    Subflow * subflow, guint16 * buf_length)
+    Subflow * subflow, guint32 * buf_length)
 {
   GstMPRTCPSubflowBlock block;
   guint8 block_length;
@@ -1322,7 +1322,7 @@ _get_mprtcp_sr_block (SndEventBasedController * this,
   memcpy (dataptr, &block, length);
   result = gst_buffer_new_wrapped (dataptr, length);
   if (buf_length) {
-    *buf_length += length;
+    *buf_length += (guint32)length;
   }
   return result;
 }

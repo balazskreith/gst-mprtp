@@ -1359,6 +1359,25 @@ gst_print_rtp_packet_info (GstRTPBuffer * rtp)
   }
 }
 
+gboolean gst_mprtp_get_subflow_extension(GstRTPBuffer *rtp,
+                                         guint8 ext_header_id,
+                                         MPRTPSubflowHeaderExtension **subflow_info)
+{
+  gpointer pointer;
+  guint size;
+  if (!gst_rtp_buffer_get_extension_onebyte_header (rtp,
+                                                    ext_header_id,
+                                                    0,
+                                                    &pointer,
+                                                    &size)) {
+      return FALSE;
+    }
+
+    if(subflow_info) *subflow_info = (MPRTPSubflowHeaderExtension *) pointer;
+    return TRUE;
+}
+
+
 
 gboolean gst_mprtp_get_abs_send_time_extension(GstRTPBuffer *rtp,
                                                guint8 ext_header_id,

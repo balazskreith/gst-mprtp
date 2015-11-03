@@ -963,8 +963,6 @@ _change_flow_riporting_mode (GstMprtpplayouter * this,
     g_object_unref (this->controller);
   }
 
-  stream_joiner_path_obsolation(this->joiner, TRUE);
-
   if (new_flow_riporting_mode) {
     this->controller = g_object_new (REFCTRLER_TYPE, NULL);
     this->mprtcp_receiver = refctrler_setup_mprtcp_exchange (this->controller,

@@ -24,8 +24,10 @@
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include "ricalcer.h"
+//#include "mprtpspath.h"
 #include <math.h>
 #include <gst/gst.h>
+#include <stdlib.h>
 
 
 GST_DEBUG_CATEGORY_STATIC (ricalcer_debug_category);
@@ -103,6 +105,8 @@ gboolean ricalcer_do_report_now (ReportIntervalCalculator * this)
   now = gst_clock_get_time (this->sysclock);
   if (!this->initialized) {
     this->urgent = TRUE;
+    this->actual_interval = (GstClockTime)_calc_report_interval(this) * GST_SECOND;
+    this->next_time = now + this->actual_interval;
     this->initialized = TRUE;
     goto done;
   }
@@ -122,19 +126,13 @@ done:
 }
 
 
-void
 void ricalcer_do_next_report_time (ReportIntervalCalculator * this)
 {
   gdouble interval;
   GstClockTime now;
   now = gst_clock_get_time (this->sysclock);
+  interval = _calc_report_interval(this);
 
-  interval = _get_rtcp_interval (1,  //senders
-      2,                        //members
-      this->media_rate > 0. ? this->media_rate : 64000.,        //rtcp_bw
-      0,                        //we_sent
-      this->avg_rtcp_size,      //avg_rtcp_size
-      0);                       //initial
   if (this->urgent) {
     this->urgent_time = now;
     this->urgent = FALSE;
@@ -280,22 +278,3 @@ _get_rtcp_interval (gint senders,
   t = t / COMPENSATION;
   return t;
 }
-
-gboolean gst_mprtp_get_subflow_extension(GstRTPBuffer *rtp,
-                                         guint8 ext_header_id,
-                                         MPRTPSubflowHeaderExtension **subflow_info)
-{
-  gpointer pointer;
-  guint size;
-  if (!gst_rtp_buffer_get_extension_onebyte_header (rtp,
-                                                    ext_header_id,
-                                                    0,
-                                                    &pointer,
-                                                    &size)) {
-      return FALSE;
-    }
-
-    if(subflow_info) *subflow_info = (MPRTPSubflowHeaderExtension *) pointer;
-    return TRUE;
-}
-

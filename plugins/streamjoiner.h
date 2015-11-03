@@ -38,19 +38,11 @@ struct _StreamJoiner
   GRecMutex            thread_mutex;
   GHashTable*          subflows;
   GRWLock              rwmutex;
-
-//  GstClockTime      max_path_skew;
-  BinTree*             max_skews_tree;
-  guint64              max_skews[MAX_SKEWS_ARRAY_LENGTH];
-  guint8               max_skews_index;
   Heap*                packets_heap;
-  guint16              popped_hsn;
   GQueue*              heap_items_pool;
-//  GQueue*              packets_framequeue;
   PlayoutGate*         playoutgate;
-  guint8               playout_gate_factor;
-  gboolean             obsolate_automatically;
   gboolean             playout_allowed;
+  GstClockTime         tick_interval;
   gboolean             playout_halt;
   GstClockTime         playout_halt_time;
   gint                 subflow_num;
@@ -74,10 +66,6 @@ stream_joiner_add_path(StreamJoiner * this, guint8 subflow_id, MpRTPRPath *path)
 void
 stream_joiner_rem_path(StreamJoiner * this, guint8 subflow_id);
 
-
-void
-stream_joiner_path_obsolation(StreamJoiner *this, gboolean obsolate_automatically);
-
 void
 stream_joiner_receive_rtp(StreamJoiner * this, GstRTPBuffer *rtp, guint8 subflow_id);
 
@@ -85,6 +73,10 @@ void
 stream_joiner_set_playout_halt_time(StreamJoiner *this, GstClockTime halt_time);
 void
 stream_joiner_set_playout_allowed(StreamJoiner *this, gboolean playout_permission);
+void
+stream_joiner_set_tick_interval(StreamJoiner *this, GstClockTime tick_interval);
+void
+stream_joiner_set_stream_delay(StreamJoiner *this, GstClockTime stream_delay);
 
 GType
 stream_joiner_get_type (void);

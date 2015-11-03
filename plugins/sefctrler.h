@@ -60,10 +60,10 @@ struct _SndEventBasedController
   GstClockTime      stability_time;
   gboolean          stability_started;
 
-
-  //for stat and plot
-  GstTask*          stat_thread;
-  GRecMutex         stat_thread_mutex;
+//
+//  //for stat and plot
+//  GstTask*          stat_thread;
+//  GRecMutex         stat_thread_mutex;
 };
 
 struct _SndEventBasedControllerClass{

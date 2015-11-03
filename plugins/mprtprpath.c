@@ -329,7 +329,9 @@ void mprtpr_path_set_played_highest_seq(MpRTPRPath *this, guint16 played_highest
 }
 
 guint64
-mprtpr_path_get_drift_window (MpRTPRPath * this)
+mprtpr_path_get_drift_window (MpRTPRPath * this,
+                              GstClockTime *min_skew,
+                              GstClockTime *max_skew)
 {
   guint64 result;
   gint32 max_count, min_count;
@@ -349,6 +351,8 @@ mprtpr_path_get_drift_window (MpRTPRPath * this)
                 bintree_get_top_value(this->min_skew_bintree))>>1;
   }
 //  g_print("%d-%d\n", min_count, max_count);
+  if(min_skew) *min_skew = bintree_get_bottom_value(this->max_skew_bintree);
+  if(max_skew) *max_skew = bintree_get_bottom_value(this->min_skew_bintree);
 done:
   this->last_drift_window = result;
   THIS_WRITEUNLOCK (this);

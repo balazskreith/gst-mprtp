@@ -39,11 +39,17 @@ struct _RcvEventBasedController
   guint32           ssrc;
   void            (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
   gpointer          send_mprtcp_packet_data;
-  gboolean          riport_is_flowable;
+  gboolean          report_is_flowable;
 
-  //for stat and plot
-   GstTask*          stat_thread;
-   GRecMutex         stat_thread_mutex;
+  BinTree*          subflow_skew_tree;
+  BinTree*          subflow_delays_tree;
+  guint8            subflow_delays_index;
+  guint64           subflow_delays[256];
+
+
+//  //for stat and plot
+//   GstTask*          stat_thread;
+//   GRecMutex         stat_thread_mutex;
 };
 
 struct _RcvEventBasedControllerClass{

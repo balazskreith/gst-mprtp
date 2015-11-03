@@ -57,6 +57,7 @@ struct _Frame
   gboolean        sorted;
   gboolean        diversified;
   guint8          source;
+  gboolean        marked;
 };
 
 
@@ -176,10 +177,10 @@ gboolean playoutgate_has_frame_to_playout(PlayoutGate *this)
   return result;
 }
 
-void playoutgate_set_window_size(PlayoutGate *this, GstClockTime window_size)
+void playoutgate_set_max_delay(PlayoutGate *this, GstClockTime max_delay)
 {
   THIS_WRITELOCK(this);
-  this->window_size = window_size;
+  this->max_delay = max_delay;
   THIS_WRITEUNLOCK(this);
 }
 
@@ -203,15 +204,18 @@ gboolean _playoutgate_has_frame_to_playout(PlayoutGate *this)
 {
   Frame *frame;
   GstClockTime treshold;
-  treshold = gst_clock_get_time(this->sysclock) - this->window_size;
+  treshold = gst_clock_get_time(this->sysclock) - this->max_delay;
   frame = this->head;
-again:
+//again:
   if(!frame) goto no;
-  if(!frame->sorted && frame->ready) goto yes;
+  if(frame->marked) goto yes;
+  if(frame->sorted && frame->ready) goto yes;
   if(frame->created < treshold) goto yes;
-  frame = frame->next;
-  goto again;
+  goto no;
+//  frame = frame->next;
+//  goto again;
 yes:
+  frame->marked = TRUE;
   return TRUE;
 no:
   return FALSE;
@@ -435,6 +439,7 @@ Frame* _make_frame(PlayoutGate *this, GstRTPBuffer *rtp, guint8 source)
   result->ready = FALSE;
   result->diversified = FALSE;
   result->source = source;
+  result->marked = FALSE;
   return result;
 }
 

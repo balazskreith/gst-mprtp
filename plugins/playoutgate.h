@@ -28,7 +28,7 @@ struct _PlayoutGate
   GObject                  object;
   Frame*                   head;
   Frame*                   tail;
-  GstClockTime             window_size;
+  GstClockTime             max_delay;
   GRWLock                  rwmutex;
   GQueue*                  framenodes_pool;
   GQueue*                  frames_pool;
@@ -47,5 +47,5 @@ void playoutgate_reset(PlayoutGate *this);
 void playoutgate_push(PlayoutGate *this, GstRTPBuffer *rtp, guint8 subflow_id);
 GstBuffer *playoutgate_pop(PlayoutGate *this);
 gboolean playoutgate_has_frame_to_playout(PlayoutGate *this);
-void playoutgate_set_window_size(PlayoutGate *this, GstClockTime window_size);
+void playoutgate_set_max_delay(PlayoutGate *this, GstClockTime window_size);
 #endif /* PLAYOUTGATE_H_ */

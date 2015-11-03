@@ -37,7 +37,7 @@
 #define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
 
 #define MAX_RIPORT_INTERVAL (5 * GST_SECOND)
-#define RIPORT_TIMEOUT (3 * MAX_RIPORT_INTERVAL)
+#define REPORTTIMEOUT (3 * MAX_RIPORT_INTERVAL)
 #define PATH_RTT_MAX_TRESHOLD (800 * GST_MSECOND)
 #define PATH_RTT_MIN_TRESHOLD (600 * GST_MSECOND)
 #define MAX_SUBFLOW_MOMENT_NUM 4
@@ -125,7 +125,7 @@ struct _ORMoment{
   GstClockTime        time;
   guint32             sent_packets_num;
   guint32             sent_payload_bytes;
-  guint16             sent_report_length;
+  gdouble             media_rate;
 
 };
 
@@ -172,6 +172,9 @@ static gboolean
 sefctrler_is_pacing (gpointer controller_ptr);
 static GstStructure* sefctrler_state (gpointer controller_ptr);
 
+static void
+sefctrler_riport_can_flow (gpointer this);
+
 //---------------------------------- Ticker ----------------------------------
 
 static void
@@ -216,7 +219,7 @@ _report_processing_xr_skew_block_processor (
     GstRTCPXR_Skew * xrb);
 
 static void
-_refresh_delay_tresholds(
+_refresh_subflow_delays(
     SndEventBasedController *this,
     guint64 delay);
 
@@ -247,7 +250,8 @@ _orp_producer_main(SndEventBasedController * this);
 
 static void
 _send_mprtcp_sr_block (SndEventBasedController * this,
-                       Subflow * subflow);
+                       Subflow * subflow,
+                       guint32 *sent_report_length);
 static void
 _step_or(Subflow *this);
 
@@ -255,9 +259,13 @@ static GstBuffer*
 _get_mprtcp_sr_block (SndEventBasedController* this,
                       Subflow* subflow,
                       guint16* buf_length);
-static void _setup_sr_riport (Subflow * this,
-                              GstRTCPSR * sr,
-                              guint32 ssrc);
+static void
+_setup_sr_riport (Subflow * this,
+                  GstRTCPSR * sr,
+                  guint32 ssrc);
+
+static gboolean
+_check_report_timeout (Subflow * this);
 //----------------------------------------------------------------------------
 
 //----------------------------- System Notifier ------------------------------
@@ -285,18 +293,9 @@ static gint _cmp_for_maxtree (guint64 x, guint64 y);
 //----------------------------------------------------------------------------
 
 
-static gboolean _check_report_timeout (Subflow * this);
-
-static void sefctrler_riport_can_flow (gpointer this);
-
-//----------------------------------------------------------------
-//----------------- subflow specific functions -------------------
-//----------------------------------------------------------------
-
-
-
-static gfloat _get_gainments (SndEventBasedController * this,
-    Subflow * subflow);
+static gfloat
+_get_gainments (SndEventBasedController * this,
+                Subflow * subflow);
 
 
 
@@ -331,7 +330,7 @@ sefctrler_finalize (GObject * object)
   g_object_unref (this->sysclock);
 }
 
-static void sefctrler_stat_run (void *data);
+//static void sefctrler_stat_run (void *data);
 
 void
 sefctrler_init (SndEventBasedController * this)
@@ -358,45 +357,45 @@ sefctrler_init (SndEventBasedController * this)
   this->thread = gst_task_new (sefctrler_ticker_run, this, NULL);
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
-
-  g_rec_mutex_init (&this->stat_thread_mutex);
-  this->stat_thread = gst_task_new (sefctrler_stat_run, this, NULL);
-  gst_task_set_lock (this->stat_thread, &this->stat_thread_mutex);
-  gst_task_start (this->stat_thread);
+//
+//  g_rec_mutex_init (&this->stat_thread_mutex);
+//  this->stat_thread = gst_task_new (sefctrler_stat_run, this, NULL);
+//  gst_task_set_lock (this->stat_thread, &this->stat_thread_mutex);
+//  gst_task_start (this->stat_thread);
 
 }
-
-void
-sefctrler_stat_run (void *data)
-{
-  SndEventBasedController *this;
-  GstClockID clock_id;
-  GHashTableIter iter;
-  gpointer key, val;
-  Subflow *subflow;
-//  guint32 actual;
-  GstClockTime next_scheduler_time;
-  this = data;
-  THIS_WRITELOCK (this);
-//  g_print("# subflow1, subflow 2\n");
-  g_hash_table_iter_init (&iter, this->subflows);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-    subflow = (Subflow *) val;
-    if(subflow) goto next;
-    next:
-    continue;
-  }
-  THIS_WRITEUNLOCK(this);
-
-  next_scheduler_time = gst_clock_get_time(this->sysclock) + GST_SECOND;
-  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
-
-  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
-    GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
-  }
-  gst_clock_id_unref (clock_id);
-}
-
+//
+//void
+//sefctrler_stat_run (void *data)
+//{
+//  SndEventBasedController *this;
+//  GstClockID clock_id;
+//  GHashTableIter iter;
+//  gpointer key, val;
+//  Subflow *subflow;
+////  guint32 actual;
+//  GstClockTime next_scheduler_time;
+//  this = data;
+//  THIS_WRITELOCK (this);
+////  g_print("# subflow1, subflow 2\n");
+//  g_hash_table_iter_init (&iter, this->subflows);
+//  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+//    subflow = (Subflow *) val;
+//    if(subflow) goto next;
+//    next:
+//    continue;
+//  }
+//  THIS_WRITEUNLOCK(this);
+//
+//  next_scheduler_time = gst_clock_get_time(this->sysclock) + GST_SECOND;
+//  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
+//
+//  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
+//    GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
+//  }
+//  gst_clock_id_unref (clock_id);
+//}
+//
 
 void
 sefctrler_add_path (gpointer ptr, guint8 subflow_id, MPRTPSPath * path)
@@ -909,7 +908,7 @@ evaluate_delay:
         goto done;
       }
       _fire(this, subflow, EVENT_ACTIVATE);
-      _refresh_delay_tresholds(this, delay);
+      _refresh_subflow_delays(this, delay);
     }else{
       max_treshold = bintree_get_bottom_value(this->subflow_delays_tree) + DELAY_SKEW_ACTIVE_TRESHOLD;
       min_treshold = bintree_get_top_value(this->subflow_delays_tree) - DELAY_SKEW_ACTIVE_TRESHOLD;
@@ -917,7 +916,7 @@ evaluate_delay:
         _fire(this, subflow, EVENT_ACTIVATE);
         goto done;
       }
-      _refresh_delay_tresholds(this, delay);
+      _refresh_subflow_delays(this, delay);
     }
   }
   goto done;
@@ -925,7 +924,7 @@ done:
   return;
 }
 
-void _refresh_delay_tresholds(SndEventBasedController *this, guint64 delay)
+void _refresh_subflow_delays(SndEventBasedController *this, guint64 delay)
 {
   this->subflow_delays[this->subflow_delays_index] = delay;
   bintree_insert_value(this->subflow_delays_tree, this->subflow_delays[this->subflow_delays_index]);
@@ -1205,6 +1204,34 @@ void _reset_stability(Subflow *subflow)
 }
 
 
+gboolean
+_check_report_timeout (Subflow * this)
+{
+  MPRTPSPath *path;
+  GstClockTime now;
+  MPRTPSPathState path_state;
+
+  path = this->path;
+  path_state = mprtps_path_get_state (path);
+  now = gst_clock_get_time (this->sysclock);
+  if (path_state == MPRTPS_PATH_STATE_PASSIVE) {
+    goto done;
+  }
+  if (!this->ir_moments_num) {
+    if (this->joined_time < now - REPORTTIMEOUT) {
+//      g_print("S:%d->FIRST REPORT WAS NOT ARRIVED\n", this->id);
+      return TRUE;
+    }
+    goto done;
+  }
+  if (_irt1(this)->time < now - REPORTTIMEOUT) {
+//    g_print("S:%d->REPORT_TOO_LATE\n", this->id);
+    return TRUE;
+  }
+done:
+  return FALSE;
+}
+
 //---------------------------------------------------------------------------
 
 
@@ -1216,6 +1243,7 @@ _orp_producer_main(SndEventBasedController * this)
   ReportIntervalCalculator* ricalcer;
   GHashTableIter iter;
   gpointer key, val;
+  guint32 sent_report_length = 0;
   Subflow *subflow;
 
   g_hash_table_iter_init (&iter, this->subflows);
@@ -1229,32 +1257,33 @@ _orp_producer_main(SndEventBasedController * this)
       continue;
     }else if(!mprtps_path_is_active(subflow->path)){
       continue;
+    }else if (this->report_is_flowable || !ricalcer_do_report_now(ricalcer)) {
+      continue;
     }
+    _send_mprtcp_sr_block (this, subflow, &sent_report_length);
 
-    if (this->report_is_flowable && ricalcer_do_report_now(ricalcer)) {
-      _send_mprtcp_sr_block (this, subflow);
-      ricalcer_do_next_report_time(ricalcer);
-    }
+    subflow->avg_rtcp_size +=
+        ((gfloat) sent_report_length - subflow->avg_rtcp_size) / 4.;
+
+    ricalcer_do_next_report_time(ricalcer);
+    ricalcer_refresh_parameters(subflow->ricalcer,
+                                _ort0(subflow)->media_rate,
+                                subflow->avg_rtcp_size);
   }
 
   return;
 }
 
 void
-_send_mprtcp_sr_block (SndEventBasedController * this, Subflow * subflow)
+_send_mprtcp_sr_block (SndEventBasedController * this, Subflow * subflow, guint32 *sent_report_length)
 {
   GstBuffer *buf;
   _step_or(subflow);
   buf = _get_mprtcp_sr_block (this,
                               subflow,
-                              &_ort0(subflow)->sent_report_length);
+                              &sent_report_length);
   this->send_mprtcp_packet_func (this->send_mprtcp_packet_data, buf);
-
-  _ort0(subflow)->sent_report_length += 12 /*MPRTCP REPOR HEADER */  +
-      (28 << 3) /*UDP Header overhead */ ;
-
-  subflow->avg_rtcp_size +=
-      ((gfloat) _ort0(subflow)->sent_report_length - subflow->avg_rtcp_size) / 4.;
+  if(sent_report_length) *sent_report_length += 12 /* RTCP HEADER*/ + (28<<3) /*UDP+IP HEADER*/;
 }
 
 void _step_or(Subflow *this)
@@ -1266,6 +1295,8 @@ void _step_or(Subflow *this)
         mprtps_path_get_total_sent_packets_num(this->path);
   _ort0(this)->sent_payload_bytes =
       mprtps_path_get_total_sent_payload_bytes(this->path);
+  _ort1(this)->time = gst_clock_get_time(this->sysclock);
+  _ort0(this)->media_rate = 64000.;
 }
 
 GstBuffer *
@@ -1291,7 +1322,7 @@ _get_mprtcp_sr_block (SndEventBasedController * this,
   memcpy (dataptr, &block, length);
   result = gst_buffer_new_wrapped (dataptr, length);
   if (buf_length) {
-    *buf_length = length;
+    *buf_length += length;
   }
   return result;
 }
@@ -1319,6 +1350,14 @@ _setup_sr_riport (Subflow * this, GstRTCPSR * sr, guint32 ssrc)
 
   gst_rtcp_srb_setup (&sr->sender_block, ntptime, rtptime,
       packet_count_diff, payload_bytes >> 3);
+
+  if(_ort1(this)->time > 0){
+    GstClockTime interval;
+    interval = GST_TIME_AS_SECONDS(_ort1(this)->time - _ort0(this)->time);
+    if(interval < 1) interval = 1;
+    _ort0(this)->media_rate = payload_bytes / interval;
+  }
+
 //  g_print("Created NTP time for subflow %d is %lu\n", this->id, ntptime);
 }
 
@@ -1464,34 +1503,6 @@ _get_gainments (SndEventBasedController * this, Subflow * subflow)
 }
 
 
-gboolean
-_check_report_timeout (Subflow * this)
-{
-  MPRTPSPath *path;
-  GstClockTime now;
-  MPRTPSPathState path_state;
-
-  path = this->path;
-  path_state = mprtps_path_get_state (path);
-  now = gst_clock_get_time (this->sysclock);
-  if (path_state == MPRTPS_PATH_STATE_PASSIVE) {
-    goto done;
-  }
-  if (!this->ir_moments_num) {
-    if (this->joined_time < now - RIPORT_TIMEOUT) {
-//      g_print("S:%d->FIRST REPORT WAS NOT ARRIVED\n", this->id);
-      return TRUE;
-    }
-    goto done;
-  }
-  if (_irt1(this)->time < now - RIPORT_TIMEOUT) {
-//    g_print("S:%d->REPORT_TOO_LATE\n", this->id);
-    return TRUE;
-  }
-done:
-  return FALSE;
-}
-
 
 
 #undef _ct0
@@ -1501,10 +1512,9 @@ done:
 #undef _irt2
 #undef DEBUG_MODE_ON
 #undef MAX_RIPORT_INTERVAL
-#undef RIPORT_TIMEOUT
+#undef REPORTTIMEOUT
 #undef PATH_RTT_MAX_TRESHOLD
 #undef PATH_RTT_MIN_TRESHOLD
-#undef MAX_RIPORT_INTERVAL
 #undef THIS_READLOCK
 #undef THIS_READUNLOCK
 #undef THIS_WRITELOCK

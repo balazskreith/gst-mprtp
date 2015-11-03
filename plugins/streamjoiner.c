@@ -66,7 +66,6 @@ GST_DEBUG_CATEGORY_STATIC (stream_joiner_debug_category);
 
 static const unsigned int base_size = 4;
 
-#define _get_max_skew(this) bintree_get_top_value(this->max_skews_tree)
 
 G_DEFINE_TYPE (StreamJoiner, stream_joiner, G_TYPE_OBJECT);
 
@@ -76,8 +75,6 @@ struct _Subflow
 {
   guint8 id;
   MpRTPRPath *path;
-  guint64 path_skew;
-  GstClockTime path_delay;
 };
 
 //Heap functions
@@ -85,7 +82,6 @@ typedef struct _HeapItem
 {
   GstBuffer    *buffer;
   guint16       seq_num;
-  GstClockTime  retain_started;
   guint32       rtp_timestamp;
   guint8        subflow_id;
 } HeapItem;
@@ -103,6 +99,7 @@ struct _Heap
 
 static void stream_joiner_finalize (GObject * object);
 static void stream_joiner_run (void *data);
+void _obsolate(StreamJoiner *this);
 static Subflow *_make_subflow (MpRTPRPath * path);
 void _ruin_subflow (gpointer data);
 static gint _cmp_seq (guint16 x, guint16 y);
@@ -115,10 +112,7 @@ static HeapItem *_make_heap_item (StreamJoiner * this,
                                   guint8 subflow_id);
 static void _trash_heap_item (StreamJoiner * this, HeapItem * heap_item);
 
-static void _set_new_max_skew(StreamJoiner *this, guint64 new_max_skew);
-static void _set_playoutgate(StreamJoiner *this, GstClockTime min_delay,
-                             GstClockTime max_delay);
-static void _tick_heap(StreamJoiner *this);
+static void _tick(StreamJoiner *this);
 static void _playout(StreamJoiner * this);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -155,25 +149,21 @@ stream_joiner_init (StreamJoiner * this)
   this->sysclock = gst_system_clock_obtain ();
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, _ruin_subflow);
 //  this->max_path_skew = 10 * GST_MSECOND;
-  this->max_skews_index = 0;
-  memset(this->max_skews, 0, MAX_SKEWS_ARRAY_LENGTH * sizeof(guint64));
   this->packets_heap = g_malloc0 (sizeof (Heap));
   this->heap_items_pool = g_queue_new ();
   this->playoutgate = make_playoutgate();
-  this->obsolate_automatically = TRUE;
   this->playout_allowed = TRUE;
   this->playout_halt = FALSE;
-  this->playout_gate_factor = 1;
   this->playout_halt_time = 100 * GST_MSECOND;
+  this->tick_interval = 100 * GST_USECOND;
   _heap_init (this->packets_heap);
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   this->thread = gst_task_new (stream_joiner_run, this, NULL);
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
-  this->max_skews_tree = make_bintree(_cmp_skew_for_tree);
 
-  playoutgate_set_window_size(this->playoutgate, 150 * GST_MSECOND);
+  playoutgate_set_max_delay(this->playoutgate, 20 * GST_MSECOND);
 }
 
 
@@ -182,14 +172,7 @@ stream_joiner_run (void *data)
 {
   GstClockTime now, next_scheduler_time;
   StreamJoiner *this = STREAM_JOINER (data);
-  GHashTableIter iter;
-  gpointer key, val;
-  Subflow *subflow;
-  MpRTPRPath *path;
-  gboolean obsolate_needed = FALSE;
   GstClockID clock_id;
-  guint64 max_path_skew = 0;
-  GstClockTime max_delay = 0, min_delay = G_MAXUINT64;
 
   THIS_WRITELOCK (this);
   now = gst_clock_get_time (this->sysclock);
@@ -197,11 +180,8 @@ stream_joiner_run (void *data)
     next_scheduler_time = now + 100 * GST_MSECOND;
     goto done;
   }
-  if(this->obsolate_automatically &&
-     this->last_obsolate_checked < now - GST_SECOND){
-    this->last_obsolate_checked = now;
-    obsolate_needed = TRUE;
-  }
+  _obsolate(this);
+
   if(!this->playout_allowed){
     next_scheduler_time = now + GST_MSECOND;
     goto done;
@@ -211,48 +191,11 @@ stream_joiner_run (void *data)
     this->playout_halt = FALSE;
     goto done;
   }
-  g_hash_table_iter_init (&iter, this->subflows);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-    //printf("key %u ---> %u\n", (guint8)*subflow_id, (MPRTPSPath*)*subflow);
-    //subflow_id = *((guint8*) key);
-    subflow = (Subflow *) val;
-    path = subflow->path;
-    if(mprtpr_path_get_state(path) == MPRTPR_PATH_STATE_PASSIVE){
-      continue;
-    }
-//    mprtpr_path_playout_tick(path);
-    subflow->path_skew = (mprtpr_path_get_drift_window(path) +
-                          99 * subflow->path_skew) / 100;
-    subflow->path_delay = mprtpr_path_get_delay(path, NULL, NULL);
-//    g_print("subflow %d delay %lu\n", subflow->id, subflow->path_delay);
-//    g_print("subflow %d drift window: %lu, path_skew: %lu\n",
-//            subflow->id, mprtpr_path_get_drift_window(path), subflow->path_skew);
-    if(max_path_skew < subflow->path_skew)
-      max_path_skew = subflow->path_skew;
-    if(max_delay < subflow->path_delay) max_delay = subflow->path_delay;
-    if(subflow->path_delay < min_delay) min_delay = subflow->path_delay;
-    if(obsolate_needed){
-      mprtpr_path_removes_obsolate_packets(path, 2 * GST_SECOND);
-    }
-  }
-  _set_playoutgate(this, min_delay, max_delay);
-  _tick_heap(this);
+
+  _tick(this);
   _playout(this);
 
-  if (!max_path_skew){
-    GST_WARNING_OBJECT(this, "max path skew is 0");
-    max_path_skew = MAX(_get_max_skew(this), GST_MSECOND);
-  }else if(max_path_skew > 400 * GST_MSECOND){
-    GST_WARNING_OBJECT(this, "Something wierd going on with this skew calculation");
-    max_path_skew = 10*GST_MSECOND;
-  }else{
-    max_path_skew<<=0;
-    _set_new_max_skew(this, max_path_skew);
-    //g_print("The Maximal skew now is: %lu\n", max_path_skew);
-  }
-
-//  g_print("PLAYOUT: %lu\n", GST_TIME_AS_MSECONDS((guint64)this->max_path_skew));
-  next_scheduler_time = now + (_get_max_skew(this)<<0);
+  next_scheduler_time = now + this->tick_interval;
 done:
   THIS_WRITEUNLOCK (this);
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
@@ -262,28 +205,30 @@ done:
   gst_clock_id_unref (clock_id);
 }
 
-void _set_playoutgate(StreamJoiner *this, GstClockTime min_delay, GstClockTime max_delay)
+void _obsolate(StreamJoiner *this)
 {
-  guint64 window_size = 0;
-  if(max_delay < min_delay) goto invalid;
-  //  window_size = MAX((max_delay - min_delay)<<1, 50 * GST_MSECOND);
-  window_size = MAX((max_delay - min_delay)<<1, 10 * GST_MSECOND);
-  window_size = MIN(window_size, 150 * GST_MSECOND);
-invalid:
-  window_size = MAX(window_size, GST_MSECOND);
-//  g_print("Window size: %lu\n", window_size);
-  playoutgate_set_window_size(this->playoutgate, window_size);
+  GHashTableIter iter;
+  gpointer key, val;
+  Subflow *subflow;
+  MpRTPRPath *path;
+  GstClockTime now;
+
+  now = gst_clock_get_time(this->sysclock);
+  if(now - 100 * GST_MSECOND < this->last_obsolate_checked){
+    goto done;
+  }
+  g_hash_table_iter_init (&iter, this->subflows);
+  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+    subflow = (Subflow *) val;
+    path = subflow->path;
+    mprtpr_path_removes_obsolate_packets(path, 2 * GST_SECOND);
+  }
+  this->last_obsolate_checked = now;
+done:
+  return;
 }
 
-void _set_new_max_skew(StreamJoiner *this, guint64 new_max_skew)
-{
-  bintree_delete_value(this->max_skews_tree, this->max_skews[this->max_skews_index]);
-  this->max_skews[this->max_skews_index] = new_max_skew;
-  bintree_insert_value(this->max_skews_tree, new_max_skew);
-  ++this->max_skews_index;
-}
-
-void _tick_heap(StreamJoiner *this)
+void _tick(StreamJoiner *this)
 {
   HeapItem *heap_item;
 //  GstClockTime now;
@@ -292,19 +237,7 @@ void _tick_heap(StreamJoiner *this)
   heap_item = heap_front (this->packets_heap);
   do{
     heap_item = heap_front (this->packets_heap);
-//    if((guint16)(this->popped_hsn + 1) == heap_item->seq_num) goto pop;
-//    if(heap_item->retain_started == 0) heap_item->retain_started = now;
-//    else if(heap_item->retain_started < now - 20 *GST_MSECOND) goto pop;
-//    break;
-//  pop:
-//    if((guint16)(this->popped_hsn + 1) != heap_item->seq_num)
-      //g_print("OUT OF ORDER: exp: %hu rcv: %hu\n", (guint16)(this->popped_hsn + 1), heap_item->seq_num);
     _heap_pop (this->packets_heap);
-//    this->popped_hsn = heap_item->seq_num;
-//    this->send_mprtp_packet_func (
-//          this->send_mprtp_packet_data,
-//          heap_item->buffer);
-
     {
       GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
       gst_rtp_buffer_map(heap_item->buffer, GST_MAP_READ, &rtp);
@@ -312,11 +245,7 @@ void _tick_heap(StreamJoiner *this)
       gst_rtp_buffer_unmap(&rtp);
     }
     _trash_heap_item (this, heap_item);
-    //g_print("%hu->", heap_item->seq_num);
-    //_trash_heap_item (this, heap_item);
   }while(this->packets_heap->count);
-//  g_print("\n---\n");
-//  _popback_framequeue(this);
 done:
   return;
 }
@@ -393,18 +322,26 @@ exit:
 
 
 void
-stream_joiner_path_obsolation(StreamJoiner *this, gboolean obsolate_automatically)
-{
-  THIS_WRITELOCK (this);
-  this->obsolate_automatically = obsolate_automatically;
-  THIS_WRITEUNLOCK (this);
-}
-
-void
 stream_joiner_set_playout_allowed(StreamJoiner *this, gboolean playout_permission)
 {
   THIS_WRITELOCK (this);
   this->playout_allowed = playout_permission;
+  THIS_WRITEUNLOCK (this);
+}
+
+void
+stream_joiner_set_tick_interval(StreamJoiner *this, GstClockTime tick_interval)
+{
+  THIS_WRITELOCK (this);
+  this->tick_interval = tick_interval;
+  THIS_WRITEUNLOCK (this);
+}
+
+void
+stream_joiner_set_stream_delay(StreamJoiner *this, GstClockTime stream_delay)
+{
+  THIS_WRITELOCK (this);
+  playoutgate_set_max_delay(this->playoutgate, stream_delay);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -454,7 +391,6 @@ _make_subflow (MpRTPRPath * path)
   Subflow *result = g_malloc0 (sizeof (Subflow));
   result->path = path;
   result->id = mprtpr_path_get_id (path);
-  result->path_skew = 10 * GST_USECOND;
   return result;
 }
 
@@ -509,7 +445,7 @@ _heap_pop (struct _Heap *restrict h)
   // Remove the biggest element
   HeapItem *temp = h->data[--h->count];
 
-  // Resize the heap if it's consuming too much memory
+// Resize the heap if it's consuming too much memory
 //        if ((h->count <= (h->size >> 2)) && (h->size > base_size))
 //        {
 //                h->size >>= 1;
@@ -547,7 +483,6 @@ _make_heap_item (StreamJoiner * this,
   }
   result->buffer = gst_buffer_ref(rtp->buffer);
   result->seq_num = gst_rtp_buffer_get_seq(rtp);
-  result->retain_started = 0;
   result->subflow_id = subflow_id;
   return result;
 }

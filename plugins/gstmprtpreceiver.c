@@ -638,7 +638,7 @@ _send_mprtcp_buffer (GstMprtpreceiver * this, GstBuffer * buf)
   }
 
   report = (GstMPRTCPSubflowReport *) gst_rtcp_get_first_header (&rtcp);
-  //gst_print_rtcp(&report->header);
+  gst_print_rtcp(&report->header);
   for (block = gst_mprtcp_get_first_block (report);
       block != NULL; block = gst_mprtcp_get_next_block (report, block, &src)) {
     info = &block->info;

@@ -537,12 +537,13 @@ _processing_srblock_processor (Subflow * this, GstRTCPSRBlock * srb)
   guint64 ntptime;
   guint32 SR_new_packet_count;
   GST_DEBUG ("RTCP SR riport arrived for subflow %p->%p", this, srb);
-  _step_ir(this);
   gst_rtcp_srb_getdown(srb, &ntptime, NULL, &SR_new_packet_count, NULL);
+//  gst_print_rtcp_srb(srb);
   if(ntptime < _irt0(this)->SR_sent_ntp_time){
       GST_WARNING_OBJECT(this, "Late SR report arrived");
       goto done;
   }
+  _step_ir(this);
 //  g_print("Received NTP time for subflow %d is %lu->%lu\n", this->id, ntptime,
 //          get_epoch_time_from_ntp_in_ns(NTP_NOW - ntptime));
   _irt0(this)->SR_sent_ntp_time = ntptime;
@@ -590,7 +591,10 @@ _orp_main(RcvEventBasedController * this)
     subflow = (Subflow *) val;
     ricalcer = subflow->ricalcer;
 
-    if (!this->report_is_flowable|| !ricalcer_do_report_now(ricalcer)) {
+    if(!_irt0(subflow)->SR_sent_ntp_time){
+      continue;
+    }
+    if (!this->report_is_flowable || !ricalcer_do_report_now(ricalcer)) {
       continue;
     }
 
@@ -666,6 +670,45 @@ _step_or (Subflow * this)
   _ort0(this)->HSN = mprtpr_path_get_highest_sequence_number (this->path);
 
   _ort0(this)->media_rate = 64000.;
+  ++this->or_num;
+//  g_print("ID: %d\n"
+//          "OR NUM: %d\n"
+//          "lost_packet_num: %hu\n"
+//          "time: %lu\n"
+//          "late_discarded_bytes: %u\n"
+//          "received_packet_num %u\n"
+//          "received_bytes %u\n"
+//          "received_payload_bytes %u\n"
+//          "media_rate %f\n"
+//          "median_delay %lu\n"
+//          "min_delay %lu\n"
+//          "max_delay %lu\n"
+//          "median_skew %lu\n"
+//          "skew_bytes %u\n"
+//          "min_skew %lu\n"
+//          "max_skew %lu\n"
+//          "cycle_num %hu\n"
+//          "jitter %u\n"
+//          "HSN: %hu\n",
+//          this->id,
+//          this->or_num,
+//          _ort0(this)->lost_packet_num,
+//          _ort0(this)->time,
+//          _ort0(this)->late_discarded_bytes,
+//          _ort0(this)->received_packet_num,
+//          _ort0(this)->received_bytes,
+//          _ort0(this)->received_payload_bytes,
+//          _ort0(this)->media_rate,
+//          _ort0(this)->median_delay,
+//          _ort0(this)->min_delay,
+//          _ort0(this)->max_delay,
+//          _ort0(this)->median_skew,
+//          _ort0(this)->skew_bytes,
+//          _ort0(this)->min_skew,
+//          _ort0(this)->max_skew,
+//          _ort0(this)->cycle_num,
+//          _ort0(this)->jitter,
+//          _ort0(this)->HSN);
 }
 
 GstBuffer *
@@ -681,7 +724,6 @@ _get_mprtcp_xr_stream_characterization_block (
   guint16 length;
   guint8 block_length;
   GstBuffer *buf;
-
   gst_mprtcp_block_init (&block);
   xr = gst_mprtcp_riport_block_add_xr_skew (&block);
   _setup_xr_stream_characterization_report(subflow, xr, this->ssrc, skew_flag);
@@ -696,7 +738,8 @@ _get_mprtcp_xr_stream_characterization_block (
   if (buf_length) {
     *buf_length = length;
   }
-  //gst_print_mprtcp_block(&block, NULL);
+
+//  gst_print_mprtcp_block(&block, NULL);
   return buf;
 }
 
@@ -758,7 +801,7 @@ _get_mprtcp_rr_block (RcvEventBasedController * this, Subflow * subflow,
     *buf_length = length;
   }
   //gst_print_mprtcp_block(&block, NULL);
-  //gst_print_rtcp_rr(rr);
+//  gst_print_rtcp_rr(rr);
   return buf;
 }
 
@@ -778,16 +821,18 @@ _setup_xr_stream_characterization_report (
   GstClockTime min_diff, max_diff;
   guint16 min_value = 0;
   guint16 max_value = 0;
-  guint8 percentile = 64;
+  guint8 percentile = 0;
 
   if(skew_flag){
     median_ptr = &_ort0(this)->median_skew;
     min_ptr    = &_ort0(this)->min_skew;
     max_ptr    = &_ort0(this)->max_skew;
+    percentile = 64;
   }else{
     median_ptr = &_ort0(this)->median_delay;
     min_ptr    = &_ort0(this)->min_delay;
     max_ptr    = &_ort0(this)->max_delay;
+    percentile = 96;
   }
 
   if(*median_ptr == 0){
@@ -803,8 +848,8 @@ _setup_xr_stream_characterization_report (
   }
   min_diff = (*median_ptr) - (*min_ptr);
   max_diff = (*max_ptr) - (*median_ptr);
-  min_value = (guint16) get_ntp_from_epoch_ns(min_diff>>16);
-  max_value = (guint16) get_ntp_from_epoch_ns(max_diff>>16);
+  min_value = (guint16) (get_ntp_from_epoch_ns(min_diff)>>16);
+  max_value = (guint16) (get_ntp_from_epoch_ns(max_diff)>>16);
 assemble:
   gst_rtcp_header_change (&xr->header, NULL,NULL, NULL, NULL, NULL, &ssrc);
   gst_rtcp_xr_skew_change(xr,
@@ -846,10 +891,12 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
   gdouble received_bytes, interval;
 
   gst_rtcp_header_change (&rr->header, NULL, NULL, NULL, NULL, NULL, &ssrc);
-  expected = _uint16_diff (_ort1(this)->HSN, _ort0(this)->HSN);
+  expected = _uint16_diff (_ort1(this)->HSN,
+                           _ort0(this)->HSN);
   diff_lost_packet_num =
       _uint16_diff (_ort1(this)->lost_packet_num,
                     _ort0(this)->lost_packet_num);
+
   fraction_lost =
       (256. * (gfloat) diff_lost_packet_num) / ((gfloat) (expected));
   ext_hsn = (((guint32) _ort0(this)->cycle_num) << 16) | ((guint32) _ort0(this)->HSN);
@@ -863,9 +910,14 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
     temp = NTP_NOW - _irt0(this)->SR_received_ntp_time;
     DLSR = (guint32)(temp>>16);
   }
-  gst_rtcp_rr_add_rrb (rr, 0,
-      fraction_lost, _ort0(this)->lost_packet_num, ext_hsn, _ort0(this)->jitter, LSR,
-      DLSR);
+  gst_rtcp_rr_add_rrb (rr,
+                       0,
+                       fraction_lost,
+                       _ort0(this)->lost_packet_num,
+                       ext_hsn,
+                       _ort0(this)->jitter,
+                       LSR,
+                       DLSR);
 
   received_bytes = (gdouble) (_ort0(this)->received_payload_bytes -
                               _ort1(this)->received_payload_bytes);
@@ -879,7 +931,8 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
   if(fraction_lost){
     ricalcer_urgent_report_request(this->ricalcer);
   }
-  //reset
+//  gst_print_rtcp_rrb(&rr->blocks);
+//  reset
 //
 //    g_print("this->media_rate = %f / %f = %f\n",
 //                   received_bytes,

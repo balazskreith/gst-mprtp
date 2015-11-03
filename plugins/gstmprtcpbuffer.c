@@ -628,7 +628,7 @@ gst_rtcp_xr_skew_change (GstRTCPXR_Skew *report,
                           guint16  *max)
 {
   if (skew_flag) {
-    report->skew_flag = skew_flag?1:0;
+    report->skew_flag = *skew_flag?1:0;
   }
   if (interval_metric) {
     report->interval_metric = *interval_metric;
@@ -649,7 +649,7 @@ gst_rtcp_xr_skew_change (GstRTCPXR_Skew *report,
       report->min = g_htons (*min);
     }
   if(max){
-      report->min = g_htons (*max);
+      report->max = g_htons (*max);
     }
 }
 

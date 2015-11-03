@@ -38,6 +38,7 @@ struct _PacketsQueue
   GQueue*                  gapnodes_pool;
   GQueue*                  gaps_pool;
   GstClock*                sysclock;
+  guint32                  jitter;
   GList*                   gaps;
 };
 
@@ -69,5 +70,6 @@ void packetsqueue_prepare_discarded(PacketsQueue *this);
 gboolean packetsqueue_try_found_a_gap(PacketsQueue *this, guint16 seq_num, gboolean *duplicated);
 gboolean packetsqueue_try_fill_gap(PacketsQueue *this, guint16 seq_num);
 gboolean packetsqueue_head_obsolted(PacketsQueue *this, GstClockTime treshold);
+guint32 packetsqueue_get_jitter(PacketsQueue *this);
 void packetsqueue_remove_head(PacketsQueue *this, guint64 *skew);
 #endif /* PACKETSQUEUE_H_ */

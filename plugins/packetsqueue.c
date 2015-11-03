@@ -127,6 +127,7 @@ void
 packetsqueue_init (PacketsQueue * this)
 {
   g_rw_lock_init (&this->rwmutex);
+  this->jitter = 0;
   this->node_pool = g_queue_new();
   this->gaps_pool = g_queue_new();
   this->gapnodes_pool = g_queue_new();
@@ -420,6 +421,15 @@ done:
   return result;
 }
 
+guint32 packetsqueue_get_jitter(PacketsQueue *this)
+{
+  guint32 result = FALSE;
+  THIS_READLOCK(this);
+  result = this->jitter;
+  THIS_READUNLOCK(this);
+  return result;
+}
+
 void packetsqueue_remove_head(PacketsQueue *this, guint64 *skew)
 {
   THIS_WRITELOCK(this);
@@ -577,6 +587,8 @@ guint64 _get_skew(PacketsQueue *this, PacketsQueueNode* act, PacketsQueueNode* n
     skew = snd_diff - rcv_diff;
   else
     skew = rcv_diff - snd_diff;
+
+  this->jitter += (skew - this->jitter) / 16.;
 //  g_print("act->snd_time: %lu nxt->snd_time: %lu;\n"
 //          "act->rcv_time: %lu nxt->rcv_time: %lu;\n"
 //          "skew: %lu\n"
@@ -589,6 +601,7 @@ done:
   skew = get_epoch_time_from_ntp_in_ns(skew);
   return skew;
 }
+
 
 PacketsQueueNode* _make_node(PacketsQueue *this,
                              guint64 snd_time,

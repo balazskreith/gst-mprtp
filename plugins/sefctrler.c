@@ -783,7 +783,14 @@ _riport_processing_rrblock_processor (SndEventBasedController *this,
       {
         _fire(this, subflow, EVENT_CONGESTION);
       }else if(_irt0(subflow)->lost_rate > 0.){
-        _fire(this, subflow, EVENT_DISTORTION);
+        if((_irt2(subflow)->lost_rate > 0. || _irt1(subflow)->lost_rate > 0.) &&
+            !_irt2(subflow)->late_discarded_bytes &&
+            !_irt1(subflow)->late_discarded_bytes &&
+            !_irt0(subflow)->late_discarded_bytes){
+          _fire(this, subflow, EVENT_LOSSY);
+        }else{
+          _fire(this, subflow, EVENT_DISTORTION);
+        }
       }
       else
       {
@@ -1252,21 +1259,21 @@ _orp_producer_main(SndEventBasedController * this)
     subflow = (Subflow *) val;
     ricalcer = subflow->ricalcer;
 
-    if (_check_report_timeout (subflow)) {
-      _fire (this, subflow, EVENT_LATE);
-      continue;
-    }else if(!mprtps_path_is_active(subflow->path)){
-      continue;
-    }else if (this->report_is_flowable || !ricalcer_do_report_now(ricalcer)) {
+    if (!this->report_is_flowable || !ricalcer_do_report_now(ricalcer)) {
       continue;
     }
+
+    if (_check_report_timeout (subflow)) {
+      _fire (this, subflow, EVENT_LATE);
+    }
+
     _send_mprtcp_sr_block (this, subflow, &sent_report_length);
 
     subflow->avg_rtcp_size +=
         ((gfloat) sent_report_length - subflow->avg_rtcp_size) / 4.;
 
     ricalcer_do_next_report_time(ricalcer);
-    ricalcer_refresh_parameters(subflow->ricalcer,
+    ricalcer_refresh_parameters(ricalcer,
                                 _ort0(subflow)->media_rate,
                                 subflow->avg_rtcp_size);
   }

@@ -101,7 +101,6 @@ mprtpr_path_reset (MpRTPRPath * this)
   this->seq_initialized = FALSE;
   //this->skew_initialized = FALSE;
   this->cycle_num = 0;
-  this->jitter = 0;
   this->total_late_discarded = 0;
   this->total_late_discarded_bytes = 0;
   this->total_early_discarded = 0;
@@ -151,7 +150,7 @@ mprtpr_path_get_jitter (MpRTPRPath * this)
 {
   guint32 result;
   THIS_READLOCK (this);
-  result = this->jitter;
+  result = packetsqueue_get_jitter(this->packetsqueue);
   THIS_READUNLOCK (this);
   return result;
 }
@@ -505,7 +504,6 @@ void _add_skew(MpRTPRPath *this, guint64 skew, guint8 payload_octets)
   _balancing_skew_trees(this);
 
   ++this->skews_index;
-
 }
 
 void

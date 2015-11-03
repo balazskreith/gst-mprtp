@@ -52,7 +52,7 @@ struct _MpRTPReceiverPath
   gboolean         seq_initialized;
   //gboolean      skew_initialized;
   guint16          cycle_num;
-  guint32          jitter;
+//  guint32          jitter;
   MPRTPRPathState  state;
   guint32          total_late_discarded;
   guint32          total_late_discarded_bytes;

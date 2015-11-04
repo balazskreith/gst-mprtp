@@ -310,7 +310,7 @@ gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstBuffer * buf)
   gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
   if(gst_mprtp_get_subflow_extension(&rtp, this->mprtp_ext_header_id, &subflow)){
     if(_try_get_path(this, subflow->id, &path)){
-      mprtpr_path_set_played_highest_seq(path, subflow->seq);
+      mprtpr_path_set_played_seq_num(path, subflow->seq);
     }
   }
   gst_rtp_buffer_unmap(&rtp);
@@ -464,20 +464,9 @@ _collect_infos (GstMprtpplayouter * this)
     gst_structure_set_value (result, field_name, &g_value);
     g_free (field_name);
 
-    field_name = g_strdup_printf ("subflow-%d-lost_packet_num", index);
-    g_value_set_uint (&g_value, mprtpr_path_get_total_packet_losts_num (path));
-    gst_structure_set_value (result, field_name, &g_value);
-    g_free (field_name);
-
     field_name = g_strdup_printf ("subflow-%d-received_packet_num", index);
     g_value_set_uint (&g_value,
         mprtpr_path_get_total_received_packets_num (path));
-    gst_structure_set_value (result, field_name, &g_value);
-    g_free (field_name);
-
-    field_name = g_strdup_printf ("subflow-%d-duplicated_packet_num", index);
-    g_value_set_uint (&g_value,
-        mprtpr_path_get_total_duplicated_packet_num (path));
     gst_structure_set_value (result, field_name, &g_value);
     g_free (field_name);
 
@@ -499,13 +488,6 @@ _collect_infos (GstMprtpplayouter * this)
 
     field_name = g_strdup_printf ("subflow-%d-cycle_num", index);
     g_value_set_uint (&g_value, mprtpr_path_get_cycle_num (path));
-    gst_structure_set_value (result, field_name, &g_value);
-    g_free (field_name);
-
-    field_name =
-        g_strdup_printf ("subflow-%d-early_discarded_packet_num", index);
-    g_value_set_uint (&g_value,
-        mprtpr_path_get_total_early_discarded_packets_num (path));
     gst_structure_set_value (result, field_name, &g_value);
     g_free (field_name);
 

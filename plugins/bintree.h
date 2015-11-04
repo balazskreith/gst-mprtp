@@ -52,6 +52,7 @@ BinTree *make_bintree(BinTreeCmpFunc cmp);
 BinTreeNode *bintree_pop_top_node(BinTree *this);
 guint64 bintree_get_top_value(BinTree *this);
 guint64 bintree_get_bottom_value(BinTree *this);
+gboolean bintree_has_value(BinTree *this, guint64 value);
 void bintree_insert_node(BinTree* this, BinTreeNode* node);
 BinTreeNode *make_bintreenode(BinTree *this, guint64 value);
 void trash_bintreenode(BinTree *this, BinTreeNode *node);

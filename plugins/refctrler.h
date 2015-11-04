@@ -43,8 +43,9 @@ struct _RcvEventBasedController
 
   BinTree*          subflow_skew_tree;
   BinTree*          subflow_delays_tree;
-  guint8            subflow_delays_index;
+  guint8            subflow_delays_and_skew_index;
   guint64           subflow_delays[256];
+  guint64           subflow_skews[256];
 
 
 //  //for stat and plot

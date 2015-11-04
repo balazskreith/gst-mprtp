@@ -157,8 +157,8 @@ stream_splitter_init (StreamSplitter * this)
   this->separation_is_possible = FALSE;
   this->first_delta_flag = TRUE;
   this->thread = gst_task_new (stream_splitter_run, this, NULL);
-    this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
-//  this->splitting_mode = MPRTP_STREAM_BYTE_BASED_SPLITTING;
+//    this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
+  this->splitting_mode = MPRTP_STREAM_BYTE_BASED_SPLITTING;
 
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
@@ -674,7 +674,10 @@ schtree_get_next (SchNode * root, guint32 bytes_to_send, guint32 frames_to_send)
     selected->sent_frames += frames_to_send;
     selected = (*(left->decision_value) <= *(right->decision_value)) ? left : right;
   }
-//  g_print("selected path: %d bytes: %u\n", selected->path->id, selected->sent_bytes);
+  selected->sent_bytes += bytes_to_send;
+  selected->sent_frames += frames_to_send;
+//  g_print("bytes to send: %u, frame to send: %u\n", bytes_to_send, frames_to_send);
+//  g_print("selected path: %d decision value: %u\n", selected->path->id, *selected->decision_value);
   result = selected->path;
 //  g_print("%d->", result->id);
   return result;

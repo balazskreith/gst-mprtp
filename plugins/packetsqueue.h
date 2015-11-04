@@ -9,6 +9,7 @@
 #define PACKETSQUEUE_H_
 
 #include <gst/gst.h>
+#include "bintree.h"
 
 typedef struct _PacketsQueue PacketsQueue;
 typedef struct _PacketsQueueClass PacketsQueueClass;
@@ -21,43 +22,37 @@ typedef struct _PacketsQueueClass PacketsQueueClass;
 #define PACKETSQUEUE_CAST(src)        ((PacketsQueue *)(src))
 
 typedef struct _PacketsQueueNode PacketsQueueNode;
-typedef struct _Gap Gap;
-typedef struct _GapNode GapNode;
 
 struct _PacketsQueue
 {
   GObject                  object;
   PacketsQueueNode*        head;
   PacketsQueueNode*        tail;
-  gboolean                 gap_arrive;
-  gboolean                 discarded_arrive;
+//  gboolean                 gap_arrive;
+//  gboolean                 discarded_arrive;
   guint32                  counter;
   guint32                  lost;
   GRWLock                  rwmutex;
   GQueue*                  node_pool;
-  GQueue*                  gapnodes_pool;
-  GQueue*                  gaps_pool;
   GstClock*                sysclock;
   guint32                  jitter;
-  GList*                   gaps;
+  BinTree*                 discards_tree;
 };
 
 struct _PacketsQueueNode
 {
-  PacketsQueueNode *next;
-  guint64 skew;
-  guint64 rcv_time;
-  guint64 snd_time;
-  guint16 seq_num;
-  GstClockTime added;
-  GapNode *gapnode;
+  PacketsQueueNode* next;
+  guint64           skew;
+  guint64           rcv_time;
+  guint64           snd_time;
+  guint16           seq_num;
+  GstClockTime      added;
 };
 
 struct _PacketsQueueClass{
   GObjectClass parent_class;
 
 };
-void packetsqueue_test(void);
 GType packetsqueue_get_type (void);
 PacketsQueue *make_packetsqueue(void);
 void packetsqueue_reset(PacketsQueue *this);
@@ -65,10 +60,6 @@ guint64 packetsqueue_add(PacketsQueue *this,
                          guint64 snd_time,
                          guint16 seq_num,
                          GstClockTime *delay);
-void packetsqueue_prepare_gap(PacketsQueue *this);
-void packetsqueue_prepare_discarded(PacketsQueue *this);
-gboolean packetsqueue_try_found_a_gap(PacketsQueue *this, guint16 seq_num, gboolean *duplicated);
-gboolean packetsqueue_try_fill_gap(PacketsQueue *this, guint16 seq_num);
 gboolean packetsqueue_head_obsolted(PacketsQueue *this, GstClockTime treshold);
 guint32 packetsqueue_get_jitter(PacketsQueue *this);
 void packetsqueue_remove_head(PacketsQueue *this, guint64 *skew);

@@ -130,7 +130,7 @@ make_video_session (guint sessionNum)
       "clock-rate", G_TYPE_INT, 90000,
       "width", G_TYPE_INT, 352,
       "height", G_TYPE_INT, 288,
-      "framerate", GST_TYPE_FRACTION, 25, 1,
+      "framerate", GST_TYPE_FRACTION, 50, 1,
       "encoding-name", G_TYPE_STRING, "THEORA", NULL);
 
   g_object_set (sink, "sync", FALSE, NULL);

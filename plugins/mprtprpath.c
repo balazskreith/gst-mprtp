@@ -113,7 +113,7 @@ mprtpr_path_reset (MpRTPRPath * this)
   this->ext_rtptime = -1;
   this->last_packet_skew = 0;
   this->last_received_time = 0;
-  this->played_highest_seq = 0;
+  this->PHSN = 0;
 
   this->skew_bytes = 0;
   this->skews_index = 0;
@@ -151,16 +151,7 @@ mprtpr_path_get_jitter (MpRTPRPath * this)
   guint32 result;
   THIS_READLOCK (this);
   result = packetsqueue_get_jitter(this->packetsqueue);
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-guint32
-mprtpr_path_get_total_packet_losts_num (MpRTPRPath * this)
-{
-  guint16 result;
-  THIS_READLOCK (this);
-  result = this->total_packet_losts;
+//  g_print("Sub-%d jitter: %u\n", this->id, result);
   THIS_READUNLOCK (this);
   return result;
 }
@@ -215,27 +206,6 @@ mprtpr_path_get_total_received_packets_num (MpRTPRPath * this)
   return result;
 }
 
-
-guint32
-mprtpr_path_get_total_duplicated_packet_num (MpRTPRPath * this)
-{
-  guint16 result;
-  THIS_READLOCK (this);
-  result = this->total_duplicated_packet_num;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-
-guint32
-mprtpr_path_get_total_early_discarded_packets_num (MpRTPRPath * this)
-{
-  guint32 result;
-  THIS_READLOCK (this);
-  result = this->total_early_discarded;
-  THIS_READUNLOCK (this);
-  return result;
-}
 
 guint8
 mprtpr_path_get_id (MpRTPRPath * this)
@@ -310,20 +280,16 @@ guint64 mprtpr_path_get_last_skew(MpRTPRPath *this)
   return result;
 }
 
-void mprtpr_path_playout_tick(MpRTPRPath *this)
-{
-//  g_print("mprtpr_path_playout_tick begin\n");
-  THIS_WRITELOCK (this);
-  this->played_highest_seq = this->highest_seq;
-  THIS_WRITEUNLOCK (this);
-//  g_print("mprtpr_path_playout_tick end\n");
-}
 
 
-void mprtpr_path_set_played_highest_seq(MpRTPRPath *this, guint16 played_highest_seq)
+void mprtpr_path_set_played_seq_num(MpRTPRPath *this, guint16 played_seq_num)
 {
   THIS_WRITELOCK (this);
-  this->played_highest_seq = played_highest_seq;
+  if(!this->PHSN) this->PHSN = played_seq_num;
+  else if(_cmp_seq(this->PHSN, played_seq_num) < 0){
+    this->PHSN = played_seq_num;
+  }
+//  g_print("Sub-%d PLAYED: %hu, PHSN: %hu\n", this->id, played_seq_num, this->played_highest_seq);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -407,7 +373,6 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this,
 
   if (this->seq_initialized == FALSE) {
     this->highest_seq = packet_subflow_seq_num;
-    this->played_highest_seq = packet_subflow_seq_num;
     this->total_packets_received = 1;
     this->seq_initialized = TRUE;
     packetsqueue_add(this->packetsqueue,
@@ -421,40 +386,22 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this,
   payload_bytes = gst_rtp_buffer_get_payload_len(rtp);
   ++this->total_packets_received;
   this->total_payload_bytes += payload_bytes;
-
-  if (packet_subflow_seq_num == (guint16) (this->highest_seq + 1)) {
-    ++this->highest_seq;
-    goto add;
-  }
-  if (_cmp_seq (this->highest_seq, packet_subflow_seq_num) < 0) {
-    packetsqueue_prepare_gap(this->packetsqueue);
+//  g_print("Sub-%d SEQ: %hu HSN: %hu\n", this->id, packet_subflow_seq_num, this->highest_seq);
+  if (_cmp_seq (this->highest_seq, packet_subflow_seq_num) <= 0){
     this->highest_seq = packet_subflow_seq_num;
     goto add;
   }
-
-  if (_cmp_seq (this->highest_seq, packet_subflow_seq_num) > 0) {
-      packetsqueue_prepare_discarded(this->packetsqueue);
-      if (_cmp_seq (this->played_highest_seq, packet_subflow_seq_num) > 0) {
-        ++this->total_late_discarded;
-        this->total_late_discarded_bytes += payload_bytes;
-      }
-      goto inspect;
+  if (this->PHSN && _cmp_seq (this->PHSN, packet_subflow_seq_num) >= 0){
+    ++this->total_late_discarded;
+    this->total_late_discarded_bytes+=payload_bytes;
+//    g_print("Sub-%d LATE %hu PHSN: %hu\n", this->id, packet_subflow_seq_num, this->PHSN);
   }
 
-inspect:
-//  g_print("INSPECTING\n");
-  {
-    gboolean duplicated;
-    gboolean found;
-    found = packetsqueue_try_found_a_gap(this->packetsqueue, packet_subflow_seq_num, &duplicated);
-    if(!found) ++this->total_packet_losts;
-    else if(duplicated) ++this->total_duplicated_packet_num;
-  }
 add:
-//  g_print("ADDING\n");
   skew = packetsqueue_add(this->packetsqueue,
                           snd_time,
-                          packet_subflow_seq_num, &delay);
+                          packet_subflow_seq_num,
+                          &delay);
 
   if(this->last_rtp_timestamp != gst_rtp_buffer_get_timestamp(rtp)){
     _add_skew(this, skew, payload_bytes>>3);

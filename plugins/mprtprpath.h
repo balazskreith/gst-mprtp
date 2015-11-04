@@ -66,7 +66,7 @@ struct _MpRTPReceiverPath
   guint64          last_packet_skew;
   GstClockTime     last_received_time;
   GstClock*        sysclock;
-  guint16          played_highest_seq;
+  guint16          PHSN;
   guint32          total_packet_losts;
   guint64          total_packets_received;
   PacketsQueue*    packetsqueue;
@@ -110,14 +110,11 @@ MpRTPRPath *make_mprtpr_path (guint8 id);
 guint16 mprtpr_path_get_cycle_num(MpRTPRPath * this);
 guint16 mprtpr_path_get_highest_sequence_number(MpRTPRPath * this);
 guint32 mprtpr_path_get_jitter(MpRTPRPath * this);
-guint32 mprtpr_path_get_total_packet_losts_num (MpRTPRPath * this);
 guint32 mprtpr_path_get_total_late_discarded_num(MpRTPRPath * this);
 guint32 mprtpr_path_get_total_late_discarded_bytes_num(MpRTPRPath * this);
 guint32 mprtpr_path_get_total_bytes_received (MpRTPRPath * this);
 guint32 mprtpr_path_get_total_payload_bytes (MpRTPRPath * this);
-guint32 mprtpr_path_get_total_duplicated_packet_num(MpRTPRPath * this);
 guint64 mprtpr_path_get_total_received_packets_num (MpRTPRPath * this);
-guint32 mprtpr_path_get_total_early_discarded_packets_num (MpRTPRPath * this);
 guint8 mprtpr_path_get_id (MpRTPRPath * this);
 
 void mprtpr_path_process_rtp_packet(MpRTPRPath *this,
@@ -128,7 +125,7 @@ void mprtpr_path_process_rtp_packet(MpRTPRPath *this,
 void mprtpr_path_removes_obsolate_packets(MpRTPRPath *this, GstClockTime treshold);
 guint64 mprtpr_path_get_last_skew(MpRTPRPath *this);
 void mprtpr_path_playout_tick(MpRTPRPath *this);
-void mprtpr_path_set_played_highest_seq(MpRTPRPath *this, guint16 seq);
+void mprtpr_path_set_played_seq_num(MpRTPRPath *this, guint16 seq);
 guint64 mprtpr_path_get_drift_window(MpRTPRPath *this, GstClockTime *min_delay,
                                      GstClockTime *max_delay);
 GstClockTime mprtpr_path_get_delay (MpRTPRPath * this, GstClockTime *min_delay,

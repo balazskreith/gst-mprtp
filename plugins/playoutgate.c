@@ -58,6 +58,7 @@ struct _Frame
   gboolean        diversified;
   guint8          source;
   gboolean        marked;
+  gboolean        late;
 };
 
 
@@ -79,6 +80,23 @@ static Frame *_try_find(PlayoutGate *this, guint32 timestamp, Frame **predecesso
 static void _trash_frame(PlayoutGate *this, Frame* gap);
 static void _trash_framenode(PlayoutGate *this, FrameNode* framenode);
 static gboolean _check_if_frame_is_ready(Frame *frame);
+
+//#define DEBUG_PRINT_TOOLS
+#ifdef DEBUG_PRINT_TOOLS
+static void _print_frame(Frame *frame)
+{
+  FrameNode *node;
+  g_print("Frame %p created: %lu, srt: %d, rd: %d, m: %d src: %d, h: %p, t: %p\n",
+          frame, frame->created, frame->sorted, frame->ready, frame->marked,
+          frame->source, frame->head, frame->tail);
+  g_print("Items: ")
+  for(node = frame->head; node; node = node->next)
+    g_print("%p(%hu)->%p|", node, node->seq, node->next);
+  g_print("\n");
+}
+#else
+#define _print_frame(frame)
+#endif
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -135,6 +153,7 @@ playoutgate_init (PlayoutGate * this)
   this->frames_pool = g_queue_new();
   this->framenodes_pool = g_queue_new();
   this->sysclock = gst_system_clock_obtain();
+  this->PHSN = 0;
 }
 
 void playoutgate_test(void)
@@ -208,6 +227,7 @@ gboolean _playoutgate_has_frame_to_playout(PlayoutGate *this)
   frame = this->head;
 //again:
   if(!frame) goto no;
+  if(frame->late) goto yes;
   if(frame->marked) goto yes;
   if(frame->sorted && frame->ready) goto yes;
   if(frame->created < treshold) goto yes;
@@ -221,16 +241,6 @@ no:
   return FALSE;
 }
 
-//
-//Frame *_get_the_oldest(PlayoutWindow *this)
-//{
-//  Frame *node, *oldest;
-//  oldest = this->head;
-//  for(node = this->head; node; node = node->next){
-//    if(node->created < oldest->created) oldest = node;
-//  }
-//  return oldest;
-//}
 
 GstBuffer *_playoutgate_pop(PlayoutGate *this)
 {
@@ -239,7 +249,10 @@ GstBuffer *_playoutgate_pop(PlayoutGate *this)
   FrameNode *node;
   if(!this->head) goto done;
   frame = this->head;
+  if(!this->PHSN) {this->PHSN = frame->head->seq;}
+  else if(!frame->late) this->PHSN = frame->head->seq;
   node = frame->head;
+//  g_warning("POPPED: %hu\n", node->seq);
   result = node->buffer;
   _trash_framenode(this, node);
   frame->head = node->next;
@@ -249,43 +262,6 @@ GstBuffer *_playoutgate_pop(PlayoutGate *this)
 done:
   return result;
 }
-//
-//void _playoutgate_push(PlayoutWindow *this,
-//                         GstRTPBuffer *rtp)
-//{
-//  guint32 timestamp;
-//  Frame *frame,*prev = NULL;
-//  if(!this->head) {
-//    this->head = this->tail = frame = _make_frame(this, rtp);
-//    goto done;
-//  }
-//  timestamp = gst_rtp_buffer_get_timestamp(rtp);
-//  frame = this->head;
-//  if(timestamp < frame->timestamp){
-//    this->head = _make_frame(this, rtp);
-//    this->head->next = frame;
-//    goto done;
-//  }
-//  frame = _try_find(this, timestamp, &prev);
-//  if(!frame && !prev){
-//    frame = this->tail;
-//    this->tail->next = _make_frame(this, rtp);
-//    goto done;
-//  }
-//  if(!frame){
-//    Frame *next;
-//    next = prev->next;
-//    frame = _make_frame(this, rtp);
-//    prev->next = frame;
-//    frame->next = next;
-//    goto done;
-//  }
-//  _push_into_frame(this, frame, rtp);
-//done:
-////  _print_frame(frame);
-//  return;
-//}
-
 
 
 void _playoutgate_push(PlayoutGate *this,
@@ -319,6 +295,11 @@ void _playoutgate_push(PlayoutGate *this,
   _push_into_frame(this, frame, rtp, subflow_id);
 done:
   frame->ready = _check_if_frame_is_ready(frame);
+  frame->late = this->PHSN && _cmp_seq(frame->head->seq, this->PHSN) < 0;
+//  if(frame->late){
+//    g_print("PlayoutGate: Late seq %hu, PHSN %hu, max_delay: %lums\n",
+//            frame->head->seq, this->PHSN, GST_TIME_AS_MSECONDS(this->max_delay));
+//  }
 //  _print_frame(frame);
   return;
 }
@@ -440,6 +421,7 @@ Frame* _make_frame(PlayoutGate *this, GstRTPBuffer *rtp, guint8 source)
   result->diversified = FALSE;
   result->source = source;
   result->marked = FALSE;
+  result->late = FALSE;
   return result;
 }
 

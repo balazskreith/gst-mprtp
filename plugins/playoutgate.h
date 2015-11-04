@@ -33,6 +33,7 @@ struct _PlayoutGate
   GQueue*                  framenodes_pool;
   GQueue*                  frames_pool;
   GstClock*                sysclock;
+  guint16                  PHSN;
 };
 
 struct _PlayoutGateClass{
@@ -46,6 +47,8 @@ gboolean playoutgate_is_diversified(PlayoutGate *this);
 void playoutgate_reset(PlayoutGate *this);
 void playoutgate_push(PlayoutGate *this, GstRTPBuffer *rtp, guint8 subflow_id);
 GstBuffer *playoutgate_pop(PlayoutGate *this);
+guint32 playoutgate_get_late_discarded_packets_num(PlayoutGate *this);
+guint32 playoutgate_get_late_discarded_bytes(PlayoutGate *this);
 gboolean playoutgate_has_frame_to_playout(PlayoutGate *this);
 void playoutgate_set_max_delay(PlayoutGate *this, GstClockTime window_size);
 #endif /* PLAYOUTGATE_H_ */

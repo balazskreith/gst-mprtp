@@ -274,6 +274,16 @@ guint64 bintree_get_bottom_value(BinTree *this)
   return result;
 }
 
+gboolean bintree_has_value(BinTree *this, guint64 value)
+{
+  BinTreeNode *node,*parent;
+  THIS_READLOCK (this);
+  node = _search_value(this, value, &parent);
+  THIS_READUNLOCK (this);
+  return node != NULL;
+}
+
+
 void bintree_insert_node(BinTree* this, BinTreeNode* node)
 {
   THIS_WRITELOCK (this);

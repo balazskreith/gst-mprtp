@@ -72,12 +72,13 @@ typedef struct _IRMoment IRMoment;
 
 
 struct _ORMoment{
-  guint16                       lost_packet_num;
   GstClockTime                  time;
+  guint32                       lost_packet_num;
   guint32                       late_discarded_bytes;
   guint32                       received_packet_num;
   guint32                       received_bytes;
   guint32                       received_payload_bytes;
+  guint32                       expected_packet_num;
   gdouble                       media_rate;
   guint64                       median_delay;
   GstClockTime                  min_delay;
@@ -113,7 +114,7 @@ struct _Subflow
   guint8                        or_index;
   guint32                       or_num;
   gdouble                       avg_rtcp_size;
-  gboolean                      late;
+  gboolean                      imprecise;
 
 
 };
@@ -307,7 +308,7 @@ refctrler_init (RcvEventBasedController * this)
   this->report_is_flowable = FALSE;
   this->subflow_delays_tree = make_bintree(_cmp_for_maxtree);
   this->subflow_skew_tree = make_bintree(_cmp_for_maxtree);
-  this->subflow_delays_index = 0;
+  this->subflow_delays_and_skew_index = 0;
 
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
@@ -641,11 +642,9 @@ _step_or (Subflow * this)
   memset ((gpointer) _ort0 (this), 0, sizeof (ORMoment));
 
   _ort0(this)->time = gst_clock_get_time(this->sysclock);
-
+  _ort0(this)->lost_packet_num = _ort1(this)->lost_packet_num;
   _ort0(this)->late_discarded_bytes =
        mprtpr_path_get_total_late_discarded_bytes_num (this->path);
-  _ort0(this)->lost_packet_num =
-       mprtpr_path_get_total_packet_losts_num (this->path);
   _ort0(this)->received_packet_num =
        mprtpr_path_get_total_received_packets_num (this->path);
   _ort0(this)->received_bytes =
@@ -886,19 +885,20 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
 {
   guint8 fraction_lost;
   guint32 ext_hsn, LSR, DLSR;
-  guint16 expected;
-  guint16 diff_lost_packet_num;
+  guint16 expected, received;
+  guint16 lost = 0;
   gdouble received_bytes, interval;
 
   gst_rtcp_header_change (&rr->header, NULL, NULL, NULL, NULL, NULL, &ssrc);
   expected = _uint16_diff (_ort1(this)->HSN,
                            _ort0(this)->HSN);
-  diff_lost_packet_num =
-      _uint16_diff (_ort1(this)->lost_packet_num,
-                    _ort0(this)->lost_packet_num);
-
+  received = _uint16_diff(_ort1(this)->received_packet_num,
+                          _ort0(this)->received_packet_num);
+  if(received < expected){
+      _ort0(this)->lost_packet_num += lost = expected - received;
+  }
   fraction_lost =
-      (256. * (gfloat) diff_lost_packet_num) / ((gfloat) (expected));
+      (256. * (gfloat) lost) / ((gfloat) (expected));
   ext_hsn = (((guint32) _ort0(this)->cycle_num) << 16) | ((guint32) _ort0(this)->HSN);
 
   LSR = (guint32) (_irt0(this)->SR_sent_ntp_time >> 16);
@@ -954,55 +954,69 @@ _play_controller_main(RcvEventBasedController * this)
   GHashTableIter iter;
   gpointer key, val;
   Subflow *subflow;
-  guint64 min_treshold, max_treshold, delay, skew;
-
+  guint64 min_delay, max_delay, delay, skew;
+  guint64 treshold;
+  guint32 max_jitter = 0;
+  guint32 jitter = 0;
+  guint32 min_jitter = G_MAXUINT32;
+//if(1) return;
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
     subflow = (Subflow *) val;
     delay = mprtpr_path_get_delay(subflow->path, NULL, NULL);
     skew = mprtpr_path_get_drift_window(subflow->path, NULL, NULL);
-    if(subflow->late){
-      max_treshold = bintree_get_bottom_value(this->subflow_delays_tree) + DELAY_SKEW_DEACTIVE_TRESHOLD;
-      min_treshold = bintree_get_top_value(this->subflow_delays_tree) - DELAY_SKEW_DEACTIVE_TRESHOLD;
-      if(delay < min_treshold || max_treshold < delay){
-        continue;
-      }
-      subflow->late = FALSE;
-      _refresh_subflow_delay_and_skew(this, delay, skew);
-    }else{
-      max_treshold = bintree_get_bottom_value(this->subflow_delays_tree) + DELAY_SKEW_ACTIVE_TRESHOLD;
-      min_treshold = bintree_get_top_value(this->subflow_delays_tree) - DELAY_SKEW_ACTIVE_TRESHOLD;
-      if(delay < min_treshold || max_treshold < delay){
-        subflow->late = TRUE;
-        continue;
-      }
-      _refresh_subflow_delay_and_skew(this, delay, skew);
+    if(!skew || !delay) {
+      continue;
     }
-  }
-  min_treshold = bintree_get_bottom_value(this->subflow_delays_tree);
-  max_treshold = bintree_get_top_value(this->subflow_delays_tree);
+    if(!bintree_get_num(this->subflow_delays_tree)){
+      _refresh_subflow_delay_and_skew(this, delay, skew);
+      continue;
+    }
 
+    jitter = _ort0(subflow)->jitter>>1;
+    min_delay = bintree_get_bottom_value(this->subflow_delays_tree);
+    max_delay = bintree_get_top_value(this->subflow_delays_tree);
+    treshold = (!subflow->imprecise)?DELAY_SKEW_ACTIVE_TRESHOLD:DELAY_SKEW_DEACTIVE_TRESHOLD;
+    //minimum
+    if(treshold < max_delay && delay + jitter < max_delay - treshold) goto imprecise;
+    //maximum
+    if(min_delay + treshold < delay - jitter) goto imprecise;
+
+    subflow->imprecise = FALSE;
+    _refresh_subflow_delay_and_skew(this, delay, skew);
+    max_jitter = MAX(max_jitter, jitter);
+    min_jitter = MIN(min_jitter, jitter);
+    continue;
+  imprecise:
+    subflow->imprecise = TRUE;
+    continue;
+  }
   if(!bintree_get_num(this->subflow_delays_tree)){
     goto done;
   }
 
-  //set playout tick
+  //set playout skew and delay
   {
-    guint64 max_skew;
-    max_skew = bintree_get_top_value(this->subflow_skew_tree);
-    stream_joiner_set_tick_interval(this->joiner, max_skew);
+    guint64 playout_delay;
+    guint64 playout_skew;
+    min_delay = bintree_get_bottom_value(this->subflow_delays_tree);
+    if(min_jitter < min_delay) min_delay-=min_jitter;
+    max_delay = bintree_get_top_value(this->subflow_delays_tree) + max_jitter;
+    playout_delay = max_delay - min_delay;
+    playout_delay = MAX(playout_delay, 10 * GST_MSECOND);
+    playout_delay = MIN(DELAY_SKEW_ACTIVE_TRESHOLD, playout_delay);
+    playout_skew = bintree_get_top_value(this->subflow_skew_tree);
+    if((playout_delay>>2) < playout_skew){
+      playout_skew = playout_delay>>2;
+    }
+//    g_print("Set playout MIN: %lu MAX: %lu "
+//        "stream delay: %lu tick interval: %lu\n",
+//        min_delay, max_delay,
+//            playout_delay, playout_skew);
+    stream_joiner_set_stream_delay(this->joiner, playout_delay);
+    stream_joiner_set_tick_interval(this->joiner, playout_skew);
   }
-
-  //set playout delay
-  {
-    guint64 diff;
-    diff = max_treshold - min_treshold * 1.2;
-    diff = MAX(diff, 10 * GST_MSECOND);
-    diff = MIN(DELAY_SKEW_ACTIVE_TRESHOLD, diff);
-    stream_joiner_set_stream_delay(this->joiner, diff);
-  }
-
 
 done:
   return;
@@ -1013,12 +1027,13 @@ void _refresh_subflow_delay_and_skew(RcvEventBasedController *this,
                                      guint64 delay,
                                      guint64 skew)
 {
-  this->subflow_delays[this->subflow_delays_index] = delay;
-  bintree_insert_value(this->subflow_delays_tree, this->subflow_delays[this->subflow_delays_index]);
-  bintree_insert_value(this->subflow_skew_tree, this->subflow_delays[this->subflow_delays_index]);
-  if(this->subflow_delays[++this->subflow_delays_index] > 0){
-      bintree_delete_value(this->subflow_delays_tree, this->subflow_delays[this->subflow_delays_index]);
-      bintree_delete_value(this->subflow_skew_tree, this->subflow_delays[this->subflow_delays_index]);
+  this->subflow_delays[this->subflow_delays_and_skew_index] = delay;
+  this->subflow_skews[this->subflow_delays_and_skew_index] = skew;
+  bintree_insert_value(this->subflow_delays_tree, this->subflow_delays[this->subflow_delays_and_skew_index]);
+  bintree_insert_value(this->subflow_skew_tree, this->subflow_skews[this->subflow_delays_and_skew_index]);
+  if(this->subflow_delays[++this->subflow_delays_and_skew_index] > 0){
+      bintree_delete_value(this->subflow_delays_tree, this->subflow_delays[this->subflow_delays_and_skew_index]);
+      bintree_delete_value(this->subflow_skew_tree, this->subflow_skews[this->subflow_delays_and_skew_index]);
   }
 }
 
@@ -1032,6 +1047,7 @@ _make_subflow (guint8 id, MpRTPRPath * path)
   result->sysclock = gst_system_clock_obtain ();
   result->path = path;
   result->id = id;
+  result->imprecise = FALSE;
   result->joined_time = gst_clock_get_time (result->sysclock);
   result->ricalcer = make_ricalcer(FALSE);
   _reset_subflow (result);

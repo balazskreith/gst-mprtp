@@ -41,8 +41,8 @@ struct _SndEventBasedController
   BinTree*          subflow_delays_tree;
   guint8            subflow_delays_index;
   guint64           subflow_delays[256];
-  SplitCtrlerMoment*splitctrler_moments;
-  gint              splitctrler_moments_index;
+  SplitCtrlerMoment splitctrler_moments[2];
+  gint              splitctrler_index;
   guint64           changed_num;
   gboolean          pacing;
   GstClockTime      last_recalc_time;

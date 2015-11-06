@@ -392,7 +392,6 @@ done:
   this->last_delay = result;
   THIS_WRITEUNLOCK (this);
 //  g_print("mprtpr_path_get_delay_median end\n");
-  g_print("MEDIAN: %lu\n", result);
   return result;
 }
 

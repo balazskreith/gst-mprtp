@@ -46,8 +46,8 @@
 GST_DEBUG_CATEGORY_STATIC (sefctrler_debug_category);
 #define GST_CAT_DEFAULT sefctrler_debug_category
 
-#define _ct0(this) (this->splitctrler_moments + this->splitctrler_moments_index)
-#define _ct1(this) (this->splitctrler_moments + 1 - this->splitctrler_moments_index)
+#define _ct0(this) (this->splitctrler_moments + this->splitctrler_index)
+#define _ct1(this) (this->splitctrler_moments + 1 - this->splitctrler_index)
 #define _irt0(this) (this->ir_moments+this->ir_moments_index)
 #define _irt1(this) (this->ir_moments + (this->ir_moments_index == 0 ? MAX_SUBFLOW_MOMENT_NUM-1 : this->ir_moments_index-1))
 #define _irt2(this) _irt(this, -2)
@@ -61,6 +61,7 @@ typedef struct _Subflow Subflow;
 typedef struct _IRMoment IRMoment;
 typedef struct _ORMoment ORMoment;
 typedef struct _SubflowState SubflowState;
+
 
 //                        ^
 //                        | Event
@@ -89,12 +90,9 @@ typedef enum
 } Event;
 
 struct _SplitCtrlerMoment{
-  guint32             delay;
-  guint32             min_delay;
-  guint32             max_delay;
-  guint32             skew;
-  guint32             min_skew;
-  guint32             max_skew;
+  GstClockTime        time;
+  GstClockTime        max_RTT;
+
 };
 
 struct _IRMoment{
@@ -276,6 +274,8 @@ static void
 _split_controller_main(SndEventBasedController * this);
 static void
 _recalc_bids(SndEventBasedController * this);
+static void
+_step_c(SndEventBasedController *this);
 //----------------------------------------------------------------------------
 
 //------------------------- Utility functions --------------------------------
@@ -340,9 +340,8 @@ sefctrler_init (SndEventBasedController * this)
   this->bids_commit_requested = FALSE;
   this->ssrc = g_random_int ();
   this->report_is_flowable = FALSE;
-  this->splitctrler_moments =
-      (SplitCtrlerMoment *) g_malloc0 (sizeof (SplitCtrlerMoment) * 2);
-  this->splitctrler_moments_index = 0;
+  this->splitctrler_index = 0;
+  memset(&this->splitctrler_moments, 0, sizeof(SplitCtrlerMoment) * 2);
   this->changed_num = 0;
   this->pacing = FALSE;
   this->RTT_max = 5 * GST_SECOND;
@@ -812,9 +811,9 @@ _riport_processing_rrblock_processor (SndEventBasedController *this,
             goto fire;
         }
       }else{
-        if(_irt0(subflow)->lost_rate > 0. &&
-           _irt1(subflow)->lost_rate > 0. &&
-           _irt2(subflow)->lost_rate > 0. &&
+        if(_irt0(subflow)->lost_rate == 0. &&
+           _irt1(subflow)->lost_rate == 0. &&
+           _irt2(subflow)->lost_rate == 0. &&
            !_irt1(subflow)->late_discarded_bytes &&
            !_irt2(subflow)->late_discarded_bytes)
         {
@@ -946,15 +945,16 @@ evaluate_delay:
     //minimum
     if(treshold < max_delay && delay + jitter < max_delay - treshold) goto imprecise;
     //maximum
-    if(min_delay + treshold < delay - jitter) goto imprecise;
+    if(jitter < delay){
+      if(min_delay + treshold < delay - jitter) goto imprecise;
+    }
+    else{
+      if(min_delay + treshold < delay) goto imprecise;
+    }
     _refresh_subflow_delays(this, delay);
     if(subflow->imprecise) _fire(this, subflow, EVENT_ACTIVATE);
     goto done;
   imprecise:
-    g_print("MIN_TRESHOLD: %lu DELAY: %lu jitter: %u MAX TRESHOLD: %lu\n",
-            treshold < max_delay ? max_delay - treshold : 0,
-            delay, jitter,
-            min_delay + treshold);
     if(!subflow->imprecise) _fire(this, subflow, EVENT_DEACTIVATE);
 
   }
@@ -1414,6 +1414,27 @@ _system_notifier_main(SndEventBasedController * this)
 void
 _split_controller_main(SndEventBasedController * this)
 {
+  GHashTableIter iter;
+  gpointer key, val;
+  Subflow *subflow;
+  GstClockTime now;
+
+  now = gst_clock_get_time(this->sysclock);
+//refresh ctrl moment data
+  //reset ctrl data <- NA ITT HAGYTAM ABBA MOST!!!!
+  g_hash_table_iter_init (&iter, this->subflows);
+  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
+  {
+    subflow = (Subflow *) val;
+    if(!mprtps_path_is_active(subflow->path)){
+      continue;
+    }
+    _ct0(this)->max_RTT = MAX(_ct0(this)->max_RTT, _irt0(subflow)->RTT);
+    _ct0(this)->max_RTT = MIN(_ct0(this)->max_RTT, 5 * GST_SECOND);
+
+  }
+  if(_ct0(this)->time < now - 3 * _ct0(this)->max_RTT)
+    this->bids_recalc_requested = TRUE;
   if (!this->bids_recalc_requested) goto recalc_done;
   this->bids_recalc_requested = FALSE;
   this->bids_commit_requested = TRUE;
@@ -1438,9 +1459,20 @@ void _recalc_bids(SndEventBasedController * this)
     if(!mprtps_path_is_active(subflow->path)){
       continue;
     }
+    g_print("Subflow %d bid: %f\n", subflow->id, _irt0(subflow)->bid);
 //    _irt0(subflow)->sending_bid *= subflow->compensation;
 //    stream_splitter_setup_sending_bid(this->splitter, subflow->id, _irt0(subflow)->sending_bid);
   }
+  _step_c(this);
+}
+
+
+void _step_c(SndEventBasedController *this)
+{
+  this->splitctrler_moments = 1 - this->splitctrler_index;
+  memset ((gpointer) _ct0 (this), 0, sizeof (SplitCtrlerMoment));
+  _ct0(this)->max_RTT = 2 * GST_SECOND;
+  _ct0(this)->time = gst_clock_get_time(this->sysclock);
 }
 
 //----------------------------------------------------------------------------

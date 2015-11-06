@@ -861,13 +861,13 @@ assemble:
                           &median_value,
                           &min_value,
                           &max_value);
-  if(!skew_flag)
-  g_print("Sub%d %lu < %lu-%X < %lu\n",
-          this->id,
-          get_epoch_time_from_ntp_in_ns(median_value - (min_value<<16)),
-          get_epoch_time_from_ntp_in_ns(median_value),
-          median_value,
-          get_epoch_time_from_ntp_in_ns(median_value + (max_value<<16)));
+//  if(!skew_flag)
+//  g_print("Sub%d %lu < %lu-%X < %lu\n",
+//          this->id,
+//          get_epoch_time_from_ntp_in_ns(median_value - (min_value<<16)),
+//          get_epoch_time_from_ntp_in_ns(median_value),
+//          median_value,
+//          get_epoch_time_from_ntp_in_ns(median_value + (max_value<<16)));
 }
 
 void

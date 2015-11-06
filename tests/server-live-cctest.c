@@ -175,30 +175,6 @@ request_aux_sender (GstElement * rtpbin, guint sessid, SessionData * session)
   return bin;
 }
 
-typedef struct _Identities
-{
-  GstElement *mprtpsch;
-  GstElement *netsim_s1;
-  GstElement *netsim_s2;
-  guint silence;
-  guint called;
-  gchar filename[255];
-  FILE * fp;
-  char * line;
-  size_t len;
-  ssize_t read;
-} Identities;
-
-#define print_boundary(text) g_printf("------------------------------ %s ---------------------\n", text);
-#define print_command(str,...) g_printf("[CMD] "str"\n",__VA_ARGS__)
-
-static GstElement *get_netsim_for_subflow(Identities* ids, guint subflow_id)
-{
-  if(subflow_id == 1)
-    return ids->netsim_s1;
-  else
-    return ids->netsim_s2;
-}
 
 
 static void
@@ -215,22 +191,15 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   GstElement *mprtpsnd = gst_element_factory_make ("mprtpsender", NULL);
   GstElement *mprtprcv = gst_element_factory_make ("mprtpreceiver", NULL);
   GstElement *mprtpsch = gst_element_factory_make ("mprtpscheduler", NULL);
-  GstElement *identity_1 = gst_element_factory_make ("netsimb", NULL);
-  GstElement *identity_2 = gst_element_factory_make ("netsimb", NULL);
-  Identities *ids = g_malloc0 (sizeof (Identities));
   int basePort;
   gchar *padName;
 
-  ids->mprtpsch = mprtpsch;
-  ids->netsim_s1 = identity_1;
-  ids->netsim_s2 = identity_2;
-  ids->called = 0;
 
   basePort = 5000 + (session->sessionNum * 20);
 
   gst_bin_add_many (GST_BIN (pipe), rtpSink_1, rtpSink_2, mprtprcv, mprtpsnd,
-      mprtpsch, rtcpSink, rtcpSrc, rtpSrc_1, rtpSrc_2, identity_1,
-      identity_2, session->input, NULL);
+      mprtpsch, rtcpSink, rtcpSrc, rtpSrc_1, rtpSrc_2,
+      session->input, NULL);
 
   /* enable retransmission by setting rtprtxsend as the "aux" element of rtpbin */
   g_signal_connect (rtpBin, "request-aux-sender",
@@ -264,11 +233,9 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   g_free (padName);
   /* link rtpbin to udpsink directly here if you don't want
    * artificial packet loss */
-  gst_element_link_pads (mprtpsnd, "src_1", identity_1, "sink");
-  gst_element_link (identity_1, rtpSink_1);
+  gst_element_link_pads (mprtpsnd, "src_1", rtpSink_1, "sink");
 
-  gst_element_link_pads (mprtpsnd, "src_2", identity_2, "sink");
-  gst_element_link (identity_2, rtpSink_2);
+  gst_element_link_pads (mprtpsnd, "src_2", rtpSink_2, "sink");
 
   g_object_set (mprtpsch, "join-subflow", 1, NULL);
   g_object_set (mprtpsch, "join-subflow", 2, NULL);

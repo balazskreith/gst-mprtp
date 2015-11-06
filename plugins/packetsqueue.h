@@ -22,7 +22,6 @@ typedef struct _PacketsQueueClass PacketsQueueClass;
 #define PACKETSQUEUE_CAST(src)        ((PacketsQueue *)(src))
 
 typedef struct _PacketsQueueNode PacketsQueueNode;
-typedef struct _Gap Gap;
 
 struct _PacketsQueue
 {
@@ -35,9 +34,9 @@ struct _PacketsQueue
   guint32                  lost;
   GRWLock                  rwmutex;
   GQueue*                  node_pool;
-  GQueue*                  gaps_pool;
-  Gap*                     gaps_head;
-  Gap*                     gaps_tail;
+  BinTree*                 node_tree;
+  gboolean                 last_seq_init;
+  guint16                  last_seq;
   GstClock*                sysclock;
   guint32                  jitter;
 };
@@ -63,10 +62,12 @@ guint64 packetsqueue_add(PacketsQueue *this,
                          guint64 snd_time,
                          guint16 seq_num,
                          GstClockTime *delay);
-void packetsqueue_prepare_gap(PacketsQueue *this);
-void packetsqueue_prepare_discards(PacketsQueue *this);
 gboolean packetsqueue_head_obsolted(PacketsQueue *this, GstClockTime treshold);
-guint32 packetsqueue_get_lost_packets(PacketsQueue *this, GstClockTime treshold);
+void packetsqueue_get_packets_stat_for_obsolation(PacketsQueue *this,
+                                      GstClockTime treshold,
+                                      guint16 *lost,
+                                      guint16 *received,
+                                      guint16 *expected);
 guint32 packetsqueue_get_jitter(PacketsQueue *this);
 void packetsqueue_remove_head(PacketsQueue *this, guint64 *skew);
 #endif /* PACKETSQUEUE_H_ */

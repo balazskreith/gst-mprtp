@@ -156,6 +156,8 @@ done:
 //  g_print("Next interval: %f\n", interval);
   this->last_interval = this->actual_interval;
   this->actual_interval = (GstClockTime)interval * GST_SECOND;
+  this->obsolate_time = this->last_time;
+  this->last_time = now;
   this->next_time = now + this->actual_interval;
 
   return;
@@ -176,6 +178,11 @@ void ricalcer_urgent_report_request(ReportIntervalCalculator * this)
 GstClockTime ricalcer_get_sum_last_two_interval(ReportIntervalCalculator * this)
 {
   return this->actual_interval + this->last_interval;
+}
+
+GstClockTime ricalcer_get_obsolate_time(ReportIntervalCalculator * this)
+{
+  return this->obsolate_time;
 }
 
 gdouble _calc_report_interval(ReportIntervalCalculator * this)

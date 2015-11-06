@@ -253,15 +253,23 @@ guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this)
   return result;
 }
 
-guint32 mprtpr_path_get_total_lost_packets_num(MpRTPRPath *this, GstClockTime treshold)
+ void mprtpr_path_get_obsolate_stat(MpRTPRPath *this,
+                                      GstClockTime treshold,
+                                      guint16 *lost,
+                                      guint16 *received,
+                                      guint16 *expected)
 {
-  guint32 result;
+  guint16 lost_result;
   THIS_WRITELOCK (this);
-  this->total_lost_packets_num +=
-      packetsqueue_get_lost_packets(this->packetsqueue, treshold);
-  result = this->total_lost_packets_num;
+
+  packetsqueue_get_packets_stat_for_obsolation(this->packetsqueue,
+                                                   treshold,
+                                                   &lost_result,
+                                                   received,
+                                                   expected);
+  if(lost) *lost = lost_result;
+  this->total_lost_packets_num += lost_result;
   THIS_WRITEUNLOCK (this);
-  return result;
 }
 
 void mprtpr_path_set_state(MpRTPRPath *this, MPRTPRPathState state)
@@ -413,18 +421,10 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this,
   ++this->total_packets_received;
   this->total_payload_bytes += payload_bytes;
 //  g_print("Sub-%d SEQ: %hu HSN: %hu\n", this->id, packet_subflow_seq_num, this->highest_seq);
-  g_print("SEq %hu came\n", packet_subflow_seq_num);
   if (_cmp_seq (this->highest_seq, packet_subflow_seq_num) <= 0){
-    if((guint16) (this->highest_seq + 1) != packet_subflow_seq_num){
-      g_print("Prepare gap between %hu and %hu\n", this->highest_seq, packet_subflow_seq_num);
-      packetsqueue_prepare_gap(this->packetsqueue);
-    }
     this->highest_seq = packet_subflow_seq_num;
-    g_print("new HSN: %hu\n", this->highest_seq);
     goto add;
   }
-  g_print("Seq %hu is discarded.\n", packet_subflow_seq_num);
-  packetsqueue_prepare_discards(this->packetsqueue);
   if (this->PHSN && _cmp_seq (this->PHSN, packet_subflow_seq_num) >= 0){
     ++this->total_late_discarded;
     this->total_late_discarded_bytes+=payload_bytes;

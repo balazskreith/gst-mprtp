@@ -133,7 +133,11 @@ GstClockTime mprtpr_path_get_delay (MpRTPRPath * this, GstClockTime *min_delay,
                        GstClockTime *max_delay);
 guint32 mprtpr_path_get_skew_byte_num(MpRTPRPath *this);
 guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this);
-guint32 mprtpr_path_get_total_lost_packets_num(MpRTPRPath *this, GstClockTime treshold);
+void mprtpr_path_get_obsolate_stat(MpRTPRPath *this,
+                                      GstClockTime treshold,
+                                      guint16 *lost,
+                                      guint16 *received,
+                                      guint16 *expected);
 void mprtpr_path_set_state(MpRTPRPath *this, MPRTPRPathState state);
 void mprtpr_path_set_delay(MpRTPRPath *this, GstClockTime delay);
 MPRTPRPathState mprtpr_path_get_state(MpRTPRPath *this);

@@ -243,11 +243,6 @@ _subflow_ctor (void);
 static void
 _subflow_dtor (Subflow * this);
 
-static guint16
-_uint16_diff (
-    guint16 a,
-    guint16 b);
-
 static guint32
 _uint32_diff (
     guint32 a,
@@ -643,17 +638,11 @@ _orp_main(RcvEventBasedController * this)
 void
 _step_or (Subflow * this)
 {
-  GstClockTime treshold;
   this->or_index = 1 - this->or_index;
   memset ((gpointer) _ort0 (this), 0, sizeof (ORMoment));
-  treshold = gst_clock_get_time(this->sysclock);
-  if(this->or_num < 3) treshold = 0;
-  else treshold-=ricalcer_get_sum_last_two_interval(this->ricalcer);
-  g_print("OR: %d, interval: %lu\n",
-          this->or_num,
-          GST_TIME_AS_SECONDS(ricalcer_get_sum_last_two_interval(this->ricalcer)));
 
   _ort0(this)->time = gst_clock_get_time(this->sysclock);
+  _ort0(this)->lost_packet_num = _ort1(this)->lost_packet_num;
   _ort0(this)->late_discarded_bytes =
        mprtpr_path_get_total_late_discarded_bytes_num (this->path);
   _ort0(this)->received_packet_num =
@@ -662,8 +651,7 @@ _step_or (Subflow * this)
        mprtpr_path_get_total_bytes_received(this->path);
   _ort0(this)->received_payload_bytes =
        mprtpr_path_get_total_payload_bytes(this->path);
-  _ort0(this)->lost_packet_num =
-      mprtpr_path_get_total_lost_packets_num(this->path, treshold);
+
   _ort0(this)->median_skew =
       mprtpr_path_get_drift_window(this->path,
                                    &_ort0(this)->min_skew,
@@ -898,29 +886,35 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
 {
   guint8 fraction_lost;
   guint32 ext_hsn, LSR, DLSR;
-  guint16 expected, received;
-  guint16 lost = 0;
+  guint16 expected = 0, received = 0, lost = 0;
   gdouble received_bytes, interval;
+  GstClockTime obsolate_treshold;
+  if(this->or_num < 3) obsolate_treshold = 0;
+  else obsolate_treshold=ricalcer_get_obsolate_time(this->ricalcer);
 
   gst_rtcp_header_change (&rr->header, NULL, NULL, NULL, NULL, NULL, &ssrc);
-  expected = _uint16_diff (_ort1(this)->HSN,
-                           _ort0(this)->HSN);
-  received = _uint16_diff(_ort1(this)->received_packet_num,
-                          _ort0(this)->received_packet_num);
-  lost     = _uint16_diff(_ort1(this)->lost_packet_num,
-                          _ort0(this)->lost_packet_num);
-  g_print("Sub%d: HSN:%hu->%hu=%hu - received:%u->%u=%u lost: %u->%u=%u\n",
-          this->id, _ort1(this)->HSN, _ort0(this)->HSN, expected,
-          _ort1(this)->received_packet_num,
-          _ort0(this)->received_packet_num,
-          received,
-          _ort1(this)->lost_packet_num,
-          _ort0(this)->lost_packet_num,
-          lost);
-
-  fraction_lost =
-      (256. * (gfloat) lost) / ((gfloat) (expected));
+  mprtpr_path_get_obsolate_stat(this->path,
+                                obsolate_treshold,
+                                &lost,
+                                &received,
+                                &expected);
+  _ort0(this)->lost_packet_num += lost;
+//  g_print("Sub%d: HSN:%hu->%hu=%hu - received:%u->%u=%u lost: %u->%u=%u\n",
+//          this->id, _ort1(this)->HSN, _ort0(this)->HSN, expected,
+//          _ort1(this)->received_packet_num,
+//          _ort0(this)->received_packet_num,
+//          received,
+//          _ort1(this)->lost_packet_num,
+//          _ort0(this)->lost_packet_num,
+//          lost);
+//  g_print("expected: %hu received: %hu\n", expected, received);
+  if(received < expected)
+    fraction_lost = (256. * (gfloat) lost) / ((gfloat) (received));
+  else
+    fraction_lost = 0;
   ext_hsn = (((guint32) _ort0(this)->cycle_num) << 16) | ((guint32) _ort0(this)->HSN);
+
+  g_print("Fraction lost: %d\n", fraction_lost);
 
   LSR = (guint32) (_irt0(this)->SR_sent_ntp_time >> 16);
 
@@ -1125,16 +1119,6 @@ _subflow_dtor (Subflow * this)
   g_free (this);
 }
 
-
-guint16
-_uint16_diff (guint16 a, guint16 b)
-{
-  if(a == b) return 0;
-  if (a <= b) {
-    return b - a - 1;
-  }
-  return ~((guint16) (a - b));
-}
 
 guint32
 _uint32_diff (guint32 start, guint32 end)

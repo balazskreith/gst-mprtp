@@ -307,12 +307,7 @@ void bintree_insert_value(BinTree* this, guint64 value)
   THIS_WRITELOCK (this);
   node = _make_bintreenode(this, value);
   node->ref = 1;
-  if(this->top && this->cmp(this->top->value, value) < 0)
-    _insert(this, this->top, node);
-  else if(this->bottom && this->cmp(value, this->bottom->value) < 0)
-    _insert(this, this->bottom, node);
-  else
-    this->root = _insert(this, this->root, node);
+  this->root = _insert(this, this->root, node);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -321,6 +316,14 @@ void bintree_delete_value(BinTree* this, guint64 value)
   THIS_WRITELOCK (this);
   _deref_from_tree(this, value);
   THIS_WRITEUNLOCK (this);
+}
+
+void bintree_trash_node(BinTree *this, BinTreeNode *node)
+{
+  THIS_WRITELOCK (this);
+  _trash_bintreenode(this, node);
+  THIS_WRITEUNLOCK (this);
+
 }
 
 guint32 bintree_get_num(BinTree *this)

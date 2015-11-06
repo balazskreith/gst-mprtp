@@ -362,7 +362,8 @@ done:
 
 
 GstClockTime
-mprtpr_path_get_delay (MpRTPRPath * this, GstClockTime *min_delay,
+mprtpr_path_get_delay (MpRTPRPath * this,
+                       GstClockTime *min_delay,
                        GstClockTime *max_delay)
 {
   guint64 result;
@@ -381,8 +382,8 @@ mprtpr_path_get_delay (MpRTPRPath * this, GstClockTime *min_delay,
   else if(max_count < min_count)
     result = bintree_get_top_value(this->min_delay_bintree);
   else{
-      result = (bintree_get_top_value(this->max_delay_bintree) +
-                bintree_get_top_value(this->min_delay_bintree))>>1;
+    result = (bintree_get_top_value(this->max_delay_bintree) +
+              bintree_get_top_value(this->min_delay_bintree))>>1;
   }
   if(min_delay) *min_delay = bintree_get_bottom_value(this->max_delay_bintree);
   if(max_delay) *max_delay = bintree_get_bottom_value(this->min_delay_bintree);
@@ -391,7 +392,7 @@ done:
   this->last_delay = result;
   THIS_WRITEUNLOCK (this);
 //  g_print("mprtpr_path_get_delay_median end\n");
-//  g_print("MEDIAN: %lu\n", result);
+  g_print("MEDIAN: %lu\n", result);
   return result;
 }
 

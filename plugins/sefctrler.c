@@ -805,7 +805,24 @@ _riport_processing_rrblock_processor (SndEventBasedController *this,
       }
     break;
     case MPRTPS_PATH_STATE_LOSSY:
-        break;
+      if(_irt0(subflow)->late_discarded_bytes){
+        if(_irt1(subflow)->late_discarded_bytes ||
+           _irt2(subflow)->late_discarded_bytes){
+            event = EVENT_CONGESTION;
+            goto fire;
+        }
+      }else{
+        if(_irt0(subflow)->lost_rate > 0. &&
+           _irt1(subflow)->lost_rate > 0. &&
+           _irt2(subflow)->lost_rate > 0. &&
+           !_irt1(subflow)->late_discarded_bytes &&
+           !_irt2(subflow)->late_discarded_bytes)
+        {
+            event = EVENT_SETTLED;
+            goto fire;
+        }
+      }
+      break;
     case MPRTPS_PATH_STATE_CONGESTED:
     break;
     default:
@@ -931,9 +948,13 @@ evaluate_delay:
     //maximum
     if(min_delay + treshold < delay - jitter) goto imprecise;
     _refresh_subflow_delays(this, delay);
-    if(subflow->imprecise) _fire(this, subflow, EVENT_ACTIVATE);;
+    if(subflow->imprecise) _fire(this, subflow, EVENT_ACTIVATE);
     goto done;
   imprecise:
+    g_print("MIN_TRESHOLD: %lu DELAY: %lu jitter: %u MAX TRESHOLD: %lu\n",
+            treshold < max_delay ? max_delay - treshold : 0,
+            delay, jitter,
+            min_delay + treshold);
     if(!subflow->imprecise) _fire(this, subflow, EVENT_DEACTIVATE);
 
   }

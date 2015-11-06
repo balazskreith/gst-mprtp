@@ -861,6 +861,13 @@ assemble:
                           &median_value,
                           &min_value,
                           &max_value);
+  if(!skew_flag)
+  g_print("Sub%d %lu < %lu-%X < %lu\n",
+          this->id,
+          get_epoch_time_from_ntp_in_ns(median_value - (min_value<<16)),
+          get_epoch_time_from_ntp_in_ns(median_value),
+          median_value,
+          get_epoch_time_from_ntp_in_ns(median_value + (max_value<<16)));
 }
 
 void
@@ -914,7 +921,7 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
     fraction_lost = 0;
   ext_hsn = (((guint32) _ort0(this)->cycle_num) << 16) | ((guint32) _ort0(this)->HSN);
 
-  g_print("Fraction lost: %d\n", fraction_lost);
+//  g_print("Cum lost: %d\n", _ort0(this)->lost_packet_num);
 
   LSR = (guint32) (_irt0(this)->SR_sent_ntp_time >> 16);
 

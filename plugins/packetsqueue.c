@@ -302,7 +302,6 @@ PacketsQueueNode* _make_node(PacketsQueue *this,
   result->snd_time = snd_time;
   result->next = NULL;
   result->added = gst_clock_get_time(this->sysclock);
-
   if(delay) *delay = get_epoch_time_from_ntp_in_ns(result->rcv_time - result->snd_time);
   return result;
 }

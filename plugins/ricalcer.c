@@ -153,7 +153,7 @@ done:
   } else if (7.5 < interval) {
     interval = 5. * (g_random_double () + .5);
   }
-  //g_print("Next interval for subflow %d: %f\n", this->id, interval);
+//  g_print("Next interval: %f\n", interval);
   this->last_interval = this->actual_interval;
   this->actual_interval = (GstClockTime)interval * GST_SECOND;
   this->next_time = now + this->actual_interval;

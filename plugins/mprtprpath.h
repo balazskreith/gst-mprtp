@@ -50,7 +50,6 @@ struct _MpRTPReceiverPath
   GList*           result;
   //guint8        ext_header_id;
   gboolean         seq_initialized;
-  //gboolean      skew_initialized;
   guint16          cycle_num;
 //  guint32          jitter;
   MPRTPRPathState  state;
@@ -60,6 +59,7 @@ struct _MpRTPReceiverPath
   guint32          total_payload_bytes;
   guint32          total_early_discarded;
   guint32          total_duplicated_packet_num;
+  guint32          total_lost_packets_num;
   guint16          highest_seq;
 
   guint64          ext_rtptime;
@@ -82,7 +82,8 @@ struct _MpRTPReceiverPath
   guint8           skews_index;
   guint64          delays[SKEWS_ARRAY_LENGTH];
   GstClockTime     delays_arrived[SKEWS_ARRAY_LENGTH];
-  guint8           delays_index;
+  guint8           delays_write_index;
+  guint8           delays_read_index;
   GstClockTime     last_drift_window;
   GstClockTime     last_delay;
 
@@ -132,7 +133,9 @@ GstClockTime mprtpr_path_get_delay (MpRTPRPath * this, GstClockTime *min_delay,
                        GstClockTime *max_delay);
 guint32 mprtpr_path_get_skew_byte_num(MpRTPRPath *this);
 guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this);
+guint32 mprtpr_path_get_total_lost_packets_num(MpRTPRPath *this, GstClockTime treshold);
 void mprtpr_path_set_state(MpRTPRPath *this, MPRTPRPathState state);
+void mprtpr_path_set_delay(MpRTPRPath *this, GstClockTime delay);
 MPRTPRPathState mprtpr_path_get_state(MpRTPRPath *this);
 G_END_DECLS
 #endif /* MPRTPRSUBFLOW_H_ */

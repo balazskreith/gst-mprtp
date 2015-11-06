@@ -82,8 +82,9 @@ smanctrler_add_path (gpointer controller_ptr,
 {
   SndManualController *this;
   this = SMANCTRLER (controller_ptr);
-  GST_DEBUG_OBJECT (this, "Receive Manual Controller add path is called"
+  GST_DEBUG_OBJECT (this, "Sending Manual Controller add path is called"
       "for joining subflow %d for path %p", subflow_id, path);
+  stream_splitter_add_path (this->splitter, subflow_id, path, 1000);
 }
 
 void
@@ -93,6 +94,7 @@ smanctrler_rem_path (gpointer controller_ptr, guint8 subflow_id)
   this = SMANCTRLER (controller_ptr);
   GST_DEBUG_OBJECT (this, "Sending Manual Controller add path is called "
       "for detaching subflow %d", subflow_id);
+  stream_splitter_rem_path (this->splitter, subflow_id);
 }
 
 void
@@ -119,6 +121,12 @@ GstStructure* smanctrler_state(gpointer controller_ptr)
   this = SMANCTRLER (controller_ptr);
   GST_DEBUG_OBJECT (this, "Sending Manual Controller state");
   return NULL;
+}
+
+void
+smanctrler_setup (SndManualController * this, StreamSplitter * splitter)
+{
+  this->splitter = splitter;
 }
 
 void

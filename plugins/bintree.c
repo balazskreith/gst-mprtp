@@ -254,6 +254,16 @@ BinTreeNode *bintree_pop_top_node(BinTree *this)
   return result;
 }
 
+BinTreeNode *bintree_pop_bottom_node(BinTree *this)
+{
+  BinTreeNode *result = NULL;
+  THIS_WRITELOCK (this);
+  if(!this->bottom) result = NULL;
+  else result = _pop_from_tree(this, this->bottom->value);
+  THIS_WRITEUNLOCK (this);
+  return result;
+}
+
 guint64 bintree_get_top_value(BinTree *this)
 {
   guint64 result;
@@ -297,7 +307,12 @@ void bintree_insert_value(BinTree* this, guint64 value)
   THIS_WRITELOCK (this);
   node = _make_bintreenode(this, value);
   node->ref = 1;
-  this->root = _insert(this, this->root, node);
+  if(this->top && this->cmp(this->top->value, value) < 0)
+    _insert(this, this->top, node);
+  else if(this->bottom && this->cmp(value, this->bottom->value) < 0)
+    _insert(this, this->bottom, node);
+  else
+    this->root = _insert(this, this->root, node);
   THIS_WRITEUNLOCK (this);
 }
 

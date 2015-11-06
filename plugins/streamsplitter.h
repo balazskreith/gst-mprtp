@@ -75,7 +75,10 @@ struct _StreamSplitterClass{
 };
 
 //class functions
-void stream_splitter_add_path(StreamSplitter * this, guint8 subflow_id, MPRTPSPath *path);
+void stream_splitter_add_path(StreamSplitter * this,
+                              guint8 subflow_id,
+                              MPRTPSPath *path,
+                              guint32 start_bid);
 void stream_splitter_rem_path(StreamSplitter * this, guint8 subflow_id);
 MPRTPSPath* stream_splitter_get_next_path(StreamSplitter* this, GstBuffer* buf);
 void stream_splitter_set_rtp_ext_header_id(StreamSplitter* this, guint8 ext_header_id);

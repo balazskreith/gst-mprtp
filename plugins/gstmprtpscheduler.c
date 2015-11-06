@@ -681,7 +681,6 @@ _join_subflow (GstMprtpscheduler * this, guint subflow_id)
   path = make_mprtps_path ((guint8) subflow_id);
   g_hash_table_insert (this->paths, GINT_TO_POINTER (subflow_id),
       make_mprtps_path (subflow_id));
-  stream_splitter_add_path (this->splitter, subflow_id, path);
   this->controller_add_path (this->controller, subflow_id, path);
   ++this->subflows_num;
 }
@@ -700,7 +699,6 @@ _detach_subflow (GstMprtpscheduler * this, guint subflow_id)
     return;
   }
   g_hash_table_remove (this->paths, GINT_TO_POINTER (subflow_id));
-  stream_splitter_rem_path (this->splitter, subflow_id);
   this->controller_rem_path (this->controller, subflow_id);
   --this->subflows_num;
 }
@@ -1245,7 +1243,7 @@ _change_auto_flow_controlling_mode (GstMprtpscheduler * this,
     this->controller = g_object_new (SMANCTRLER_TYPE, NULL);
     this->mprtcp_receiver = smanctrler_setup_mprtcp_exchange (this->controller,
         this, gst_mprtpscheduler_mprtcp_sender);
-
+    smanctrler_setup (this->controller, this->splitter);
     smanctrler_set_callbacks (&this->riport_can_flow,
         &this->controller_add_path,
         &this->controller_rem_path,

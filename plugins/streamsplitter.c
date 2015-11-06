@@ -153,7 +153,7 @@ stream_splitter_init (StreamSplitter * this)
   this->active_subflow_num = 0;
   this->ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, g_free);
-  this->charge_value = 100;
+  this->charge_value = 64;
   this->separation_is_possible = FALSE;
   this->first_delta_flag = TRUE;
   this->thread = gst_task_new (stream_splitter_run, this, NULL);
@@ -171,7 +171,7 @@ stream_splitter_init (StreamSplitter * this)
 
 void
 stream_splitter_add_path (StreamSplitter * this, guint8 subflow_id,
-    MPRTPSPath * path)
+    MPRTPSPath * path, guint32 start_bid)
 {
   Subflow *lookup_result;
   THIS_WRITELOCK (this);
@@ -187,6 +187,7 @@ stream_splitter_add_path (StreamSplitter * this, guint8 subflow_id,
   g_hash_table_insert (this->subflows, GINT_TO_POINTER (subflow_id),
       lookup_result);
   this->new_path_added = TRUE;
+  lookup_result->new_bid = start_bid;
   ++this->active_subflow_num;
   GST_DEBUG ("Subflow is added, the actual number of subflow is: %d",
       this->active_subflow_num);

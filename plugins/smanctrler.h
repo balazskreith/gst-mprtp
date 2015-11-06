@@ -11,6 +11,7 @@
 #include <gst/gst.h>
 
 #include "mprtpspath.h"
+#include "streamsplitter.h"
 
 typedef struct _SndManualController SndManualController;
 typedef struct _SndManualControllerClass SndManualControllerClass;
@@ -28,12 +29,15 @@ typedef void(*GstMpRTPSubflowsNotification)(gpointer);
 struct _SndManualController
 {
   GObject          object;
+  StreamSplitter*  splitter;
 };
 
 struct _SndManualControllerClass{
   GObjectClass parent_class;
 };
 
+void smanctrler_setup(SndManualController* this,
+                     StreamSplitter* splitter);
 
 void smanctrler_set_callbacks(void(**riport_can_flow_indicator)(gpointer),
                               void(**controller_add_path)(gpointer,guint8,MPRTPSPath*),

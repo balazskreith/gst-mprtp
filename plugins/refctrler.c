@@ -221,6 +221,10 @@ static void
 _refresh_subflow_delay_and_skew(RcvEventBasedController *this,
                                 guint64 delay,
                                 guint64 skew);
+void _refresh_subflow_delay(RcvEventBasedController *this,
+                                     guint64 delay);
+void _refresh_subflow_skew(RcvEventBasedController *this,
+                                     guint64 skew);
 //------------------------- Utility functions --------------------------------
 static Subflow*
 _make_subflow (
@@ -308,7 +312,8 @@ refctrler_init (RcvEventBasedController * this)
   this->report_is_flowable = FALSE;
   this->subflow_delays_tree = make_bintree(_cmp_for_maxtree);
   this->subflow_skew_tree = make_bintree(_cmp_for_maxtree);
-  this->subflow_delays_and_skew_index = 0;
+  this->subflow_delays_index = 0;
+  this->subflow_skew_index = 0;
 
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
@@ -558,7 +563,7 @@ _processing_srblock_processor (Subflow * this, GstRTCPSRBlock * srb)
   }
   _irt0(this)->SR_last_packet_count = _irt0(this)->SR_actual_packet_count;
   _irt0(this)->SR_actual_packet_count = SR_new_packet_count;
-
+  mprtpr_path_set_delay(this->path, get_epoch_time_from_ntp_in_ns(NTP_NOW - ntptime));
 done:
   return;
 }
@@ -638,11 +643,17 @@ _orp_main(RcvEventBasedController * this)
 void
 _step_or (Subflow * this)
 {
+  GstClockTime treshold;
   this->or_index = 1 - this->or_index;
   memset ((gpointer) _ort0 (this), 0, sizeof (ORMoment));
+  treshold = gst_clock_get_time(this->sysclock);
+  if(this->or_num < 3) treshold = 0;
+  else treshold-=ricalcer_get_sum_last_two_interval(this->ricalcer);
+  g_print("OR: %d, interval: %lu\n",
+          this->or_num,
+          GST_TIME_AS_SECONDS(ricalcer_get_sum_last_two_interval(this->ricalcer)));
 
   _ort0(this)->time = gst_clock_get_time(this->sysclock);
-  _ort0(this)->lost_packet_num = _ort1(this)->lost_packet_num;
   _ort0(this)->late_discarded_bytes =
        mprtpr_path_get_total_late_discarded_bytes_num (this->path);
   _ort0(this)->received_packet_num =
@@ -651,7 +662,8 @@ _step_or (Subflow * this)
        mprtpr_path_get_total_bytes_received(this->path);
   _ort0(this)->received_payload_bytes =
        mprtpr_path_get_total_payload_bytes(this->path);
-
+  _ort0(this)->lost_packet_num =
+      mprtpr_path_get_total_lost_packets_num(this->path, treshold);
   _ort0(this)->median_skew =
       mprtpr_path_get_drift_window(this->path,
                                    &_ort0(this)->min_skew,
@@ -831,7 +843,7 @@ _setup_xr_stream_characterization_report (
     median_ptr = &_ort0(this)->median_delay;
     min_ptr    = &_ort0(this)->min_delay;
     max_ptr    = &_ort0(this)->max_delay;
-    percentile = 96;
+    percentile = 64;
   }
 
   if(*median_ptr == 0){
@@ -845,6 +857,7 @@ _setup_xr_stream_characterization_report (
       median_value = (guint32) get_ntp_from_epoch_ns(*median_ptr);
     }
   }
+//  g_print("send-%d: %lu->%u->%lu\n", this->id, *median_ptr, median_value, get_epoch_time_from_ntp_in_ns(median_value));
   min_diff = (*median_ptr) - (*min_ptr);
   max_diff = (*max_ptr) - (*median_ptr);
   min_value = (guint16) (get_ntp_from_epoch_ns(min_diff)>>16);
@@ -894,9 +907,17 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
                            _ort0(this)->HSN);
   received = _uint16_diff(_ort1(this)->received_packet_num,
                           _ort0(this)->received_packet_num);
-  if(received < expected){
-      _ort0(this)->lost_packet_num += lost = expected - received;
-  }
+  lost     = _uint16_diff(_ort1(this)->lost_packet_num,
+                          _ort0(this)->lost_packet_num);
+  g_print("Sub%d: HSN:%hu->%hu=%hu - received:%u->%u=%u lost: %u->%u=%u\n",
+          this->id, _ort1(this)->HSN, _ort0(this)->HSN, expected,
+          _ort1(this)->received_packet_num,
+          _ort0(this)->received_packet_num,
+          received,
+          _ort1(this)->lost_packet_num,
+          _ort0(this)->lost_packet_num,
+          lost);
+
   fraction_lost =
       (256. * (gfloat) lost) / ((gfloat) (expected));
   ext_hsn = (((guint32) _ort0(this)->cycle_num) << 16) | ((guint32) _ort0(this)->HSN);
@@ -1027,15 +1048,31 @@ void _refresh_subflow_delay_and_skew(RcvEventBasedController *this,
                                      guint64 delay,
                                      guint64 skew)
 {
-  this->subflow_delays[this->subflow_delays_and_skew_index] = delay;
-  this->subflow_skews[this->subflow_delays_and_skew_index] = skew;
-  bintree_insert_value(this->subflow_delays_tree, this->subflow_delays[this->subflow_delays_and_skew_index]);
-  bintree_insert_value(this->subflow_skew_tree, this->subflow_skews[this->subflow_delays_and_skew_index]);
-  if(this->subflow_delays[++this->subflow_delays_and_skew_index] > 0){
-      bintree_delete_value(this->subflow_delays_tree, this->subflow_delays[this->subflow_delays_and_skew_index]);
-      bintree_delete_value(this->subflow_skew_tree, this->subflow_skews[this->subflow_delays_and_skew_index]);
+  _refresh_subflow_delay(this, delay);
+  _refresh_subflow_skew(this, skew);
+}
+
+void _refresh_subflow_delay(RcvEventBasedController *this,
+                                     guint64 delay)
+{
+  this->subflow_delays[this->subflow_delays_index] = delay;
+  bintree_insert_value(this->subflow_delays_tree, this->subflow_delays[this->subflow_delays_index]);
+  if(this->subflow_delays[++this->subflow_delays_index] > 0){
+      bintree_delete_value(this->subflow_delays_tree, this->subflow_delays[this->subflow_delays_index]);
   }
 }
+
+void _refresh_subflow_skew(RcvEventBasedController *this,
+                                     guint64 skew)
+{
+  this->subflow_skews[this->subflow_skew_index] = skew;
+  bintree_insert_value(this->subflow_skew_tree, this->subflow_skews[this->subflow_skew_index]);
+  if(this->subflow_skews[++this->subflow_skew_index] > 0){
+      bintree_delete_value(this->subflow_skew_tree, this->subflow_skews[this->subflow_skew_index]);
+  }
+}
+
+
 
 //------------------------- Utility functions --------------------------------
 
@@ -1092,8 +1129,9 @@ _subflow_dtor (Subflow * this)
 guint16
 _uint16_diff (guint16 a, guint16 b)
 {
+  if(a == b) return 0;
   if (a <= b) {
-    return b - a;
+    return b - a - 1;
   }
   return ~((guint16) (a - b));
 }
@@ -1102,7 +1140,7 @@ guint32
 _uint32_diff (guint32 start, guint32 end)
 {
   if (start <= end) {
-    return end - start;
+    return end - start - 1;
   }
   return ~((guint32) (start - end));
 }

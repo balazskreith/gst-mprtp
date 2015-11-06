@@ -121,6 +121,8 @@ mprtpr_path_reset (MpRTPRPath * this)
   memset(this->skews_payload_octets, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(guint8));
   memset(this->skews_arrived, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(GstClockTime));
 
+  this->delays_read_index = 0;
+  this->delays_write_index = 0;
   memset(this->delays, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(GstClockTime));
   memset(this->delays_arrived, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(GstClockTime));
 }
@@ -251,10 +253,34 @@ guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this)
   return result;
 }
 
+guint32 mprtpr_path_get_total_lost_packets_num(MpRTPRPath *this, GstClockTime treshold)
+{
+  guint32 result;
+  THIS_WRITELOCK (this);
+  this->total_lost_packets_num +=
+      packetsqueue_get_lost_packets(this->packetsqueue, treshold);
+  result = this->total_lost_packets_num;
+  THIS_WRITEUNLOCK (this);
+  return result;
+}
+
 void mprtpr_path_set_state(MpRTPRPath *this, MPRTPRPathState state)
 {
   THIS_WRITELOCK (this);
   this->state = state;
+  THIS_WRITEUNLOCK (this);
+}
+
+void mprtpr_path_set_delay(MpRTPRPath *this, GstClockTime delay)
+{
+  THIS_WRITELOCK (this);
+  _add_delay(this, delay);
+//  g_print("Add delay to subflow %d delay %lu-num:%u-%u->index:%d\n",
+//          this->id,
+//          delay,
+//          bintree_get_num(this->min_delay_bintree),
+//          bintree_get_num(this->max_delay_bintree),
+//          this->delays_write_index);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -340,7 +366,7 @@ mprtpr_path_get_delay (MpRTPRPath * this, GstClockTime *min_delay,
   if(max_delay) *max_delay = result;
   min_count = bintree_get_num(this->min_delay_bintree);
   max_count = bintree_get_num(this->max_delay_bintree);
-  if(min_count + max_count < 3)
+  if(min_count + max_count < 1)
     goto done;
   if(min_count < max_count)
     result = bintree_get_top_value(this->max_delay_bintree);
@@ -387,10 +413,18 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this,
   ++this->total_packets_received;
   this->total_payload_bytes += payload_bytes;
 //  g_print("Sub-%d SEQ: %hu HSN: %hu\n", this->id, packet_subflow_seq_num, this->highest_seq);
+  g_print("SEq %hu came\n", packet_subflow_seq_num);
   if (_cmp_seq (this->highest_seq, packet_subflow_seq_num) <= 0){
+    if((guint16) (this->highest_seq + 1) != packet_subflow_seq_num){
+      g_print("Prepare gap between %hu and %hu\n", this->highest_seq, packet_subflow_seq_num);
+      packetsqueue_prepare_gap(this->packetsqueue);
+    }
     this->highest_seq = packet_subflow_seq_num;
+    g_print("new HSN: %hu\n", this->highest_seq);
     goto add;
   }
+  g_print("Seq %hu is discarded.\n", packet_subflow_seq_num);
+  packetsqueue_prepare_discards(this->packetsqueue);
   if (this->PHSN && _cmp_seq (this->PHSN, packet_subflow_seq_num) >= 0){
     ++this->total_late_discarded;
     this->total_late_discarded_bytes+=payload_bytes;
@@ -488,35 +522,42 @@ done:
 
 void _add_delay(MpRTPRPath *this, GstClockTime delay)
 {
-  GstClockTime treshold,now,added;
+  GstClockTime treshold,now;
 //  g_print("Subflow %d added delay: %lu\n", this->id, delay);
   now = gst_clock_get_time(this->sysclock);
-  treshold = now - 2 * GST_SECOND;
+  treshold = now - 10 * GST_SECOND;
   again:
-  ++this->delays_index;
   //elliminate the old ones
-  if(this->delays[this->delays_index] > 0){
-    if(this->delays[this->delays_index] <= bintree_get_top_value(this->max_delay_bintree))
-      bintree_delete_value(this->max_delay_bintree, this->delays[this->delays_index]);
+  if((this->delays[this->delays_read_index] > 0 &&
+      this->delays_arrived[this->delays_read_index] < treshold) ||
+     this->delays_write_index == this->delays_read_index){
+//      g_print("delete at %d delays[%d]=%lu\n",
+//              this->id,
+//              this->delays_index,
+//              this->delays[this->delays_index]);
+    if(this->delays[this->delays_read_index] <= bintree_get_top_value(this->max_delay_bintree))
+      bintree_delete_value(this->max_delay_bintree, this->delays[this->delays_read_index]);
     else
-      bintree_delete_value(this->min_delay_bintree, this->delays[this->delays_index]);
+      bintree_delete_value(this->min_delay_bintree, this->delays[this->delays_read_index]);
+
+    this->delays[this->delays_read_index] = 0;
+    this->delays_arrived[this->delays_read_index] = 0;
+    ++this->delays_read_index;
+    goto again;
   }
-  this->delays[this->delays_index] = 0;
-  added = this->delays_arrived[this->delays_index];
-  this->delays_arrived[this->delays_index] = 0;
-  if(0 < added && added < treshold) goto again;
+
 
   //add new one
-  this->delays[this->delays_index] = delay;
-  this->delays_arrived[this->delays_index] = now;
-  if(this->delays[this->delays_index] <= bintree_get_top_value(this->max_delay_bintree))
-    bintree_insert_value(this->max_delay_bintree, this->delays[this->delays_index]);
+  this->delays[this->delays_write_index] = delay;
+  this->delays_arrived[this->delays_write_index] = now;
+  if(this->delays[this->delays_write_index] <= bintree_get_top_value(this->max_delay_bintree))
+    bintree_insert_value(this->max_delay_bintree, this->delays[this->delays_write_index]);
   else
-    bintree_insert_value(this->min_delay_bintree, this->delays[this->delays_index]);
+    bintree_insert_value(this->min_delay_bintree, this->delays[this->delays_write_index]);
 
   _balancing_delay_trees(this);
 
-  ++this->delays_index;
+  ++this->delays_write_index;
 
 }
 
@@ -533,7 +574,7 @@ balancing:
   max_count = bintree_get_num(this->max_delay_bintree);
 
  //To get the 75 percentile we shift max_count by 1
-  diff = (max_count>>1) - min_count;
+  diff = max_count - min_count;
 //  g_print("max_tree_num: %d, min_tree_num: %d\n", max_tree_num, min_tree_num);
   if (-2 < diff && diff < 2) {
     goto done;

@@ -360,7 +360,7 @@ stream_splitter_run (void *data)
           this->subflows,
           MPRTPS_PATH_STATE_CONGESTED | MPRTPS_PATH_STATE_LOSSY,
           bid_c_sum + bid_mc_sum);
-      this->non_keyframe_ratio = (bid_mc_sum + bid_c_sum) / bid_total_sum;
+      this->non_keyframe_ratio = (gfloat)(bid_mc_sum + bid_c_sum) / (gfloat)bid_total_sum;
       this->keyframe_ratio = 1. - this->non_keyframe_ratio;
     } else {
       GST_DEBUG_OBJECT (this, "Neither middly nor congested paths exists");
@@ -380,7 +380,7 @@ stream_splitter_run (void *data)
           bid_c_sum);
       _tree_commit (this, &this->non_keyframes_tree,
           this->subflows, MPRTPS_PATH_STATE_CONGESTED, bid_c_sum);
-      this->non_keyframe_ratio = bid_c_sum / bid_total_sum;
+      this->non_keyframe_ratio = (gfloat)bid_c_sum / (gfloat)bid_total_sum;
       this->keyframe_ratio = 1. - this->non_keyframe_ratio;
     } else {
       GST_DEBUG_OBJECT (this, "No congested paths exists");
@@ -473,7 +473,6 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
   set_last_delta_flag:
     this->last_delta_flag = actual_delta_flag;
   }
-
   if (this->separation_is_possible && !GST_BUFFER_FLAG_IS_SET (rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT)) {
       result = schtree_get_next (this->keyframes_tree, bytes_to_send, new_frame);
     goto done;
@@ -484,7 +483,7 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
   tree =
       keytree_value <=
       non_keytree_value ? this->keyframes_tree : this->non_keyframes_tree;
-
+//g_print("%p decide %f-%f %s\n", this, this->non_keyframe_ratio, this->keyframe_ratio, tree == this->keyframes_tree?"KEY":"NKEY");
     result = schtree_get_next (tree, bytes_to_send, new_frame);
 
 done:

@@ -445,6 +445,15 @@ MPRTPSPathMarker mprtps_path_get_marker(MPRTPSPath * this)
   return result;
 }
 
+void
+mprtps_path_send_rtp_packet(MPRTPSPath * this,
+                            guint mprtp_ext_header_id,
+                            guint abstime_ext_header_id,
+                            GstRTPBuffer * rtp)
+{
+  mprtps_path_process_rtp_packet (this, mprtp_ext_header_id, rtp);
+
+}
 
 void
 mprtps_path_process_rtp_packet (MPRTPSPath * this,

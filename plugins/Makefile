@@ -144,8 +144,9 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-streamsplitter.lo libgstmprtp_la-rmanctrler.lo \
 	libgstmprtp_la-smanctrler.lo libgstmprtp_la-sefctrler.lo \
 	libgstmprtp_la-refctrler.lo libgstmprtp_la-bintree.lo \
-	libgstmprtp_la-packetsqueue.lo libgstmprtp_la-playoutgate.lo \
-	libgstmprtp_la-ricalcer.lo
+	libgstmprtp_la-packetsrcvqueue.lo \
+	libgstmprtp_la-packetssndqueue.lo \
+	libgstmprtp_la-playoutgate.lo libgstmprtp_la-ricalcer.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -402,7 +403,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          sefctrler.c                \
                          refctrler.c                \
                          bintree.c                  \
-                         packetsqueue.c             \
+                         packetsrcvqueue.c          \
+                         packetssndqueue.c          \
                          playoutgate.c              \
                          ricalcer.c
 
@@ -415,7 +417,8 @@ noinst_HEADERS = mprtpspath.h      \
                  streamsplitter.h  \
                  streamjoiner.h    \
                  bintree.h         \
-                 packetsqueue.h    \
+                 packetsrcvqueue.h \
+                 packetssndqueue.h \
                  playoutgate.h     \
                  ricalcer.h
 
@@ -520,7 +523,8 @@ include ./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
-include ./$(DEPDIR)/libgstmprtp_la-packetsqueue.Plo
+include ./$(DEPDIR)/libgstmprtp_la-packetsrcvqueue.Plo
+include ./$(DEPDIR)/libgstmprtp_la-packetssndqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-playoutgate.Plo
 include ./$(DEPDIR)/libgstmprtp_la-refctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-ricalcer.Plo
@@ -656,12 +660,19 @@ libgstmprtp_la-bintree.lo: bintree.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-bintree.lo `test -f 'bintree.c' || echo '$(srcdir)/'`bintree.c
 
-libgstmprtp_la-packetsqueue.lo: packetsqueue.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-packetsqueue.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-packetsqueue.Tpo -c -o libgstmprtp_la-packetsqueue.lo `test -f 'packetsqueue.c' || echo '$(srcdir)/'`packetsqueue.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-packetsqueue.Tpo $(DEPDIR)/libgstmprtp_la-packetsqueue.Plo
-#	$(AM_V_CC)source='packetsqueue.c' object='libgstmprtp_la-packetsqueue.lo' libtool=yes \
+libgstmprtp_la-packetsrcvqueue.lo: packetsrcvqueue.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-packetsrcvqueue.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-packetsrcvqueue.Tpo -c -o libgstmprtp_la-packetsrcvqueue.lo `test -f 'packetsrcvqueue.c' || echo '$(srcdir)/'`packetsrcvqueue.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-packetsrcvqueue.Tpo $(DEPDIR)/libgstmprtp_la-packetsrcvqueue.Plo
+#	$(AM_V_CC)source='packetsrcvqueue.c' object='libgstmprtp_la-packetsrcvqueue.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-packetsqueue.lo `test -f 'packetsqueue.c' || echo '$(srcdir)/'`packetsqueue.c
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-packetsrcvqueue.lo `test -f 'packetsrcvqueue.c' || echo '$(srcdir)/'`packetsrcvqueue.c
+
+libgstmprtp_la-packetssndqueue.lo: packetssndqueue.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-packetssndqueue.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-packetssndqueue.Tpo -c -o libgstmprtp_la-packetssndqueue.lo `test -f 'packetssndqueue.c' || echo '$(srcdir)/'`packetssndqueue.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-packetssndqueue.Tpo $(DEPDIR)/libgstmprtp_la-packetssndqueue.Plo
+#	$(AM_V_CC)source='packetssndqueue.c' object='libgstmprtp_la-packetssndqueue.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-packetssndqueue.lo `test -f 'packetssndqueue.c' || echo '$(srcdir)/'`packetssndqueue.c
 
 libgstmprtp_la-playoutgate.lo: playoutgate.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-playoutgate.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-playoutgate.Tpo -c -o libgstmprtp_la-playoutgate.lo `test -f 'playoutgate.c' || echo '$(srcdir)/'`playoutgate.c

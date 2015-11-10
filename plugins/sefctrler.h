@@ -27,6 +27,23 @@ typedef struct _SplitCtrlerMoment SplitCtrlerMoment;
 #define SEFCTRLER_CAST(src)        ((SndEventBasedController *)(src))
 
 
+
+typedef enum
+{
+  SPLITCTRLER_EVENT_DISTORTION    = -2,
+  SPLITCTRLER_EVENT_CONGESTION    = -1,
+  SPLITCTRLER_EVENT_FI            =  0,
+  SPLITCTRLER_EVENT_CLEARANCE     =  1,
+  SPLITCTRLER_EVENT_SETTLEMENT    =  2,
+} SplitCtrlerEvent;
+
+typedef enum
+{
+  SPLITCTRLER_STATE_OVERUSED    = -1,
+  SPLITCTRLER_STATE_STABLE      =  0,
+  SPLITCTRLER_STATE_UNDERUSED   =  1,
+} SplitCtrlerState;
+
 struct _SndEventBasedController
 {
   GObject          object;
@@ -59,7 +76,7 @@ struct _SndEventBasedController
 
   GstClockTime      stability_time;
   gboolean          stability_started;
-
+  SplitCtrlerState  state;
 //
 //  //for stat and plot
 //  GstTask*          stat_thread;

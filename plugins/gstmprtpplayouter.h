@@ -69,6 +69,7 @@ struct _GstMprtpplayouter
   guint32 pivot_clock_rate;
   GSocketAddress *pivot_address;
   guint8          pivot_address_subflow_id;
+  guint8          monitor_payload_type;
   guint64 clock_base;
   gboolean auto_flow_riporting;
   gboolean rtp_passthrough;

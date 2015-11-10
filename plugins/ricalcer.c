@@ -156,7 +156,8 @@ done:
 //  g_print("Next interval: %f\n", interval);
   this->last_interval = this->actual_interval;
   this->actual_interval = (GstClockTime)interval * GST_SECOND;
-  this->obsolate_time = this->last_time;
+//  this->obsolate_time = this->last_time;
+  this->obsolate_time = now;
   this->last_time = now;
   this->next_time = now + this->actual_interval;
 

@@ -53,7 +53,6 @@ struct _StreamSplitter
   GHashTable*          subflows;
   guint32              charge_value;
   guint32              last_rtp_timestamp;
-  guint8               ext_header_id;
   GRWLock              rwmutex;
 
   GstClock*            sysclock;
@@ -81,7 +80,7 @@ void stream_splitter_add_path(StreamSplitter * this,
                               guint32 start_bid);
 void stream_splitter_rem_path(StreamSplitter * this, guint8 subflow_id);
 MPRTPSPath* stream_splitter_get_next_path(StreamSplitter* this, GstBuffer* buf);
-void stream_splitter_set_rtp_ext_header_id(StreamSplitter* this, guint8 ext_header_id);
+gboolean stream_splitter_separation_is_possible (StreamSplitter * this);
 void stream_splitter_set_splitting_mode (StreamSplitter * this, StreamSplittingMode mode);
 void stream_splitter_setup_sending_bid(StreamSplitter* this, guint8 subflow_id, guint32 bid);
 void stream_splitter_commit_changes(StreamSplitter *this);

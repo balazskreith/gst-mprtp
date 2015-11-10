@@ -70,17 +70,12 @@ struct _GstMprtpscheduler
   GstSegment       segment;
   GstClockTime     position_out;
 
-  GstClock*        sysclock;
-  gboolean         retained_process_started;
-  GstClockTime     retained_last_popped_item_time;
-  RetainedItem     retained_queue[SCHEDULER_RETAIN_QUEUE_MAX_ITEMS+1];
-  guint16          retained_queue_write_index;
-  guint16          retained_queue_counter;
-  guint16          retained_queue_read_index;
-  GstTask*         retained_thread;
-  GRecMutex        retained_thread_mutex;
+  guint8           monitor_payload_type;
 
-  guint            retain_max_time_in_ms;
+  GstClock*        sysclock;
+  GstTask*         path_ticking_thread;
+  GRecMutex        path_ticking_mutex;
+
 
   void (*controller_add_path) (gpointer, guint8, MPRTPSPath *);
   void (*controller_rem_path) (gpointer, guint8);

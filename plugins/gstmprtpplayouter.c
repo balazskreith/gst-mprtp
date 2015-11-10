@@ -105,6 +105,7 @@ enum
   PROP_0,
   PROP_MPRTP_EXT_HEADER_ID,
   PROP_ABS_TIME_EXT_HEADER_ID,
+  PROP_MONITORING_PAYLOAD_TYPE,
   PROP_PIVOT_SSRC,
   PROP_JOIN_SUBFLOW,
   PROP_DETACH_SUBFLOW,
@@ -205,6 +206,12 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           "Sets or gets the id for the extension header the absolute time based on. The default is 8",
           0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_MONITORING_PAYLOAD_TYPE,
+      g_param_spec_uint ("monitoring-payload-type",
+          "Set or get the payload type of monitoring packets",
+          "Set or get the payload type of monitoring packets. The default is 8",
+          0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_JOIN_SUBFLOW,
       g_param_spec_uint ("join-subflow", "the subflow id requested to join",
           "Join a subflow with a given id.", 0,
@@ -298,6 +305,8 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->pivot_address_subflow_id = 0;
   this->pivot_address = NULL;
   g_rw_lock_init (&this->rwmutex);
+
+  this->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
 }
 
 void
@@ -313,6 +322,7 @@ gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstBuffer * buf)
       mprtpr_path_set_played_seq_num(path, subflow->seq);
     }
   }
+
   gst_rtp_buffer_unmap(&rtp);
   gst_pad_push (this->mprtp_srcpad, buf);
 }
@@ -349,6 +359,11 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
     case PROP_ABS_TIME_EXT_HEADER_ID:
       THIS_WRITELOCK (this);
       this->abs_time_ext_header_id = (guint8) g_value_get_uint (value);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_MONITORING_PAYLOAD_TYPE:
+      THIS_WRITELOCK (this);
+      this->monitor_payload_type = (guint8) g_value_get_uint (value);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_PIVOT_SSRC:
@@ -407,6 +422,11 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
     case PROP_ABS_TIME_EXT_HEADER_ID:
       THIS_READLOCK (this);
       g_value_set_uint (value, (guint) this->abs_time_ext_header_id);
+      THIS_READUNLOCK (this);
+      break;
+    case PROP_MONITORING_PAYLOAD_TYPE:
+      THIS_READLOCK (this);
+      g_value_set_uint (value, (guint) this->monitor_payload_type);
       THIS_READUNLOCK (this);
       break;
     case PROP_PIVOT_CLOCK_RATE:
@@ -908,9 +928,16 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
   }
   //snd_time = gst_util_uint64_scale (snd_time, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
   mprtpr_path_process_rtp_packet (path, &rtp, subflow_infos->seq, snd_time);
+  if(gst_rtp_buffer_get_payload_type(&rtp) == this->monitor_payload_type){
+    goto drop;
+  }
   stream_joiner_receive_rtp(this->joiner, &rtp, subflow_infos->id);
   gst_rtp_buffer_unmap (&rtp);
-
+  return;
+drop:
+g_print("MONITORING PACKET ARRIVED\n");
+  gst_rtp_buffer_unmap (&rtp);
+  gst_buffer_unref(buf);
 }
 
 gboolean

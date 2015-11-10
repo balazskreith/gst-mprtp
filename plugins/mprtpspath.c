@@ -32,6 +32,7 @@
 #define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
 #define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
 
+
 GST_DEBUG_CATEGORY_STATIC (gst_mprtps_path_category);
 #define GST_CAT_DEFAULT gst_mprtps_path_category
 
@@ -39,6 +40,13 @@ G_DEFINE_TYPE (MPRTPSPath, mprtps_path, G_TYPE_OBJECT);
 
 static void mprtps_path_finalize (GObject * object);
 static void mprtps_path_reset (MPRTPSPath * this);
+static void _setup_rtp2mprtp (MPRTPSPath * this, GstBuffer * buffer);
+static void _refresh_stat(MPRTPSPath * this, GstBuffer *buffer);
+static void _send_mprtp_packet(MPRTPSPath * this,
+                               GstBuffer *buffer);
+static gboolean _try_flushing(MPRTPSPath * this);
+static gboolean _is_overused(MPRTPSPath * this);
+static GstBuffer* _create_monitor_packet(MPRTPSPath * this);
 
 void
 mprtps_path_class_init (MPRTPSPathClass * klass)
@@ -54,13 +62,15 @@ mprtps_path_class_init (MPRTPSPathClass * klass)
 }
 
 MPRTPSPath *
-make_mprtps_path (guint8 id)
+make_mprtps_path (guint8 id, void (*send_func)(gpointer, GstBuffer*), gpointer func_this)
 {
   MPRTPSPath *result;
 
   result = g_object_new (MPRTPS_PATH_TYPE, NULL);
   THIS_WRITELOCK (result);
   result->id = id;
+  result->send_mprtp_func_data = func_this;
+  result->send_mprtp_packet_func = send_func;
   THIS_WRITEUNLOCK (result);
   return result;
 
@@ -89,6 +99,11 @@ mprtps_path_reset (MPRTPSPath * this)
   this->sent_octets_read = 0;
   this->sent_octets_write = 0;
   this->max_bytes_per_ms = 0;
+  this->ticknum = 0;
+  this->monitor_payload_type = FALSE;
+  this->monitoring_tick = 0;
+
+  packetssndqueue_reset(this->packetsqueue);
 }
 
 
@@ -97,6 +112,7 @@ mprtps_path_init (MPRTPSPath * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
+  this->packetsqueue = make_packetssndqueue();
   mprtps_path_reset (this);
 }
 
@@ -235,6 +251,22 @@ mprtps_path_set_max_bytes_per_ms (MPRTPSPath * this, guint32 bytes_per_ms)
   THIS_WRITEUNLOCK (this);
 }
 
+void mprtps_path_set_monitor_payload_id(MPRTPSPath *this, guint8 payload_type)
+{
+  g_return_if_fail (this);
+  THIS_WRITELOCK (this);
+  this->monitor_payload_type = payload_type;
+  THIS_WRITEUNLOCK (this);
+}
+
+void mprtps_path_set_mprtp_ext_header_id(MPRTPSPath *this, guint ext_header_id)
+{
+  g_return_if_fail (this);
+  THIS_WRITELOCK (this);
+  this->mprtp_ext_header_id = ext_header_id;
+  THIS_WRITEUNLOCK (this);
+}
+
 gboolean
 mprtps_path_is_non_lossy (MPRTPSPath * this)
 {
@@ -342,7 +374,31 @@ mprtps_path_get_id (MPRTPSPath * this)
   return result;
 }
 
+void mprtps_path_turn_monitoring_on(MPRTPSPath *this)
+{
+  g_return_if_fail (this);
+  THIS_WRITELOCK (this);
+  this->monitoring_tick = 3;
+  THIS_WRITEUNLOCK (this);
+}
 
+void mprtps_path_turn_monitoring_off(MPRTPSPath *this)
+{
+  g_return_if_fail (this);
+  THIS_WRITELOCK (this);
+  this->monitoring_tick = 0;
+  THIS_WRITEUNLOCK (this);
+}
+
+gboolean
+mprtps_path_is_monitoring (MPRTPSPath * this)
+{
+  gboolean result;
+  THIS_READLOCK (this);
+  result = this->monitoring_tick > 0;
+  THIS_READUNLOCK (this);
+  return result;
+}
 
 guint32
 mprtps_path_get_total_sent_packets_num (MPRTPSPath * this)
@@ -378,34 +434,13 @@ gboolean
 mprtps_path_is_overused (MPRTPSPath * this)
 {
   gboolean result;
-  GstClockTime now, delta;
   THIS_READLOCK (this);
-  if (this->max_bytes_per_ms == 0) {
-    result = FALSE;
-    goto done;
-  }
-  now = gst_clock_get_time (this->sysclock);
-  delta = now - this->last_packet_sent_time;
-  if (GST_SECOND < delta) {
-    result = FALSE;
-    goto done;
-  }
-  delta = GST_TIME_AS_MSECONDS (delta);
-  if (delta < 1) {
-    delta = 1;
-  }
-  result =
-      (gfloat) this->last_sent_payload_bytes / (gfloat) delta >
-      (gfloat) this->max_bytes_per_ms;
-//  g_print("|%f / %f = %f > %f|",
-//          (gfloat)this->last_sent_payload_bytes,
-//          (gfloat)delta,
-//          (gfloat)this->last_sent_payload_bytes / delta,
-//          (gfloat)this->max_bytes_per_ms);
-done:
+  result = _is_overused(this);
   THIS_READUNLOCK (this);
   return result;
 }
+
+
 
 guint32
 mprtps_path_get_sent_octet_sum_for (MPRTPSPath * this, guint32 amount)
@@ -446,44 +481,147 @@ MPRTPSPathMarker mprtps_path_get_marker(MPRTPSPath * this)
 }
 
 void
-mprtps_path_send_rtp_packet(MPRTPSPath * this,
-                            guint mprtp_ext_header_id,
-                            guint abstime_ext_header_id,
-                            GstRTPBuffer * rtp)
+mprtps_path_tick(MPRTPSPath *this)
 {
-  mprtps_path_process_rtp_packet (this, mprtp_ext_header_id, rtp);
+
+  THIS_WRITELOCK (this);
+  ++this->ticknum;
+  if(this->monitoring_tick > 0 && this->ticknum % this->monitoring_tick == 0){
+    GstBuffer *buffer;
+    buffer = _create_monitor_packet(this);
+    _setup_rtp2mprtp(this, buffer);
+    _send_mprtp_packet(this, buffer);
+  }
+  if(packetssndqueue_has_buffer(this->packetsqueue)){
+    _try_flushing(this);
+  }
+  THIS_WRITEUNLOCK (this);
+}
+
+void
+mprtps_path_process_rtp_packet(MPRTPSPath * this,
+                               GstBuffer * buffer)
+{
+
+  THIS_WRITELOCK (this);
+  _setup_rtp2mprtp (this, buffer);
+  _send_mprtp_packet(this, buffer);
+  THIS_WRITEUNLOCK (this);
 
 }
 
 void
-mprtps_path_process_rtp_packet (MPRTPSPath * this,
-    guint ext_header_id, GstRTPBuffer * rtp)
+_setup_rtp2mprtp (MPRTPSPath * this,
+                  GstBuffer * buffer)
 {
   MPRTPSubflowHeaderExtension data;
-  guint payload_bytes;
-  THIS_WRITELOCK (this);
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+
+  gst_rtp_buffer_map(buffer, GST_MAP_READWRITE, &rtp);
   data.id = this->id;
   if (++(this->seq) == 0) {
     ++(this->cycle_num);
   }
   data.seq = this->seq;
-  ++(this->total_sent_packet_num);
-  payload_bytes = gst_rtp_buffer_get_payload_len (rtp);
+
+  gst_rtp_buffer_add_extension_onebyte_header (&rtp, this->mprtp_ext_header_id,
+      (gpointer) & data, sizeof (data));
+  gst_rtp_buffer_unmap(&rtp);
+}
+
+void
+_refresh_stat(MPRTPSPath * this,
+              GstBuffer *buffer)
+{
+  guint payload_bytes;
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
+  ++this->total_sent_packet_num;
+  payload_bytes = gst_rtp_buffer_get_payload_len (&rtp);
   this->last_sent_payload_bytes = payload_bytes;
   this->last_packet_sent_time = gst_clock_get_time (this->sysclock);
   this->total_sent_payload_bytes_sum += payload_bytes;
-  if(gst_rtp_buffer_get_timestamp(rtp) != this->last_sent_frame_timestamp){
+  if(gst_rtp_buffer_get_timestamp(&rtp) != this->last_sent_frame_timestamp){
       ++this->total_sent_frames_num;
-      this->last_sent_frame_timestamp = gst_rtp_buffer_get_timestamp(rtp);
+      this->last_sent_frame_timestamp = gst_rtp_buffer_get_timestamp(&rtp);
   }
   this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
   this->sent_octets_write += 1;
   this->sent_octets_write &= MAX_INT32_POSPART;
+  gst_rtp_buffer_unmap(&rtp);
+}
 
-  gst_rtp_buffer_add_extension_onebyte_header (rtp, ext_header_id,
-      (gpointer) & data, sizeof (data));
+void
+_send_mprtp_packet(MPRTPSPath * this,
+                      GstBuffer *buffer)
+{
+  if (_is_overused(this)) {
+    GST_WARNING_OBJECT (this, "Path is overused");
+    packetssndqueue_push(this->packetsqueue, buffer);
+    goto done;
+  }
+  if(packetssndqueue_has_buffer(this->packetsqueue)){
+    packetssndqueue_push(this->packetsqueue, buffer);
+    _try_flushing(this);
+    goto done;
+  }
+  _refresh_stat(this, buffer);
+  this->send_mprtp_packet_func(this->send_mprtp_func_data, buffer);
+done:
+ return;
+}
 
-  THIS_WRITEUNLOCK (this);
+gboolean _try_flushing(MPRTPSPath * this)
+{
+  while(packetssndqueue_has_buffer(this->packetsqueue)){
+    GstBuffer *buffer;
+    buffer = packetssndqueue_pop(this->packetsqueue);
+    _refresh_stat(this, buffer);
+    this->send_mprtp_packet_func(this->send_mprtp_func_data, buffer);
+    if(_is_overused(this)) goto failed;
+  }
+  return TRUE;
+failed:
+  return FALSE;
+}
+
+
+gboolean _is_overused(MPRTPSPath * this)
+{
+  gboolean result;
+  GstClockTime now, delta;
+  if (this->max_bytes_per_ms == 0) {
+    result = FALSE;
+    goto done;
+  }
+  now = gst_clock_get_time (this->sysclock);
+  delta = now - this->last_packet_sent_time;
+  if (GST_SECOND < delta) {
+    result = FALSE;
+    goto done;
+  }
+  delta = GST_TIME_AS_MSECONDS (delta);
+  if (delta < 1) {
+    delta = 1;
+  }
+  result =
+      (gfloat) this->last_sent_payload_bytes / (gfloat) delta >
+      (gfloat) this->max_bytes_per_ms;
+
+done:
+  return result;
+}
+
+GstBuffer* _create_monitor_packet(MPRTPSPath * this)
+{
+  GstBuffer *result;
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+
+  result = gst_rtp_buffer_new_allocate (0, 0, 0);
+  gst_rtp_buffer_map(result, GST_MAP_READWRITE, &rtp);
+  gst_rtp_buffer_set_payload_type(&rtp, this->monitor_payload_type);
+  gst_rtp_buffer_unmap(&rtp);
+  return result;
 }
 
 #undef THIS_READLOCK

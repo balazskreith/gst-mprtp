@@ -16,7 +16,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          sefctrler.c                \
                          refctrler.c                \
                          bintree.c                  \
-                         packetsqueue.c             \
+                         packetsrcvqueue.c          \
+                         packetssndqueue.c          \
                          playoutgate.c              \
                          ricalcer.c
                     
@@ -30,7 +31,8 @@ noinst_HEADERS = mprtpspath.h      \
                  streamsplitter.h  \
                  streamjoiner.h    \
                  bintree.h         \
-                 packetsqueue.h    \
+                 packetsrcvqueue.h \
+                 packetssndqueue.h \
                  playoutgate.h     \
                  ricalcer.h
 

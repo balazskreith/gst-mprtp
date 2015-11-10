@@ -197,9 +197,10 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  gstmprtcpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h mprtpspath.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtprpath.h \
- /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h bintree.h \
- packetsqueue.h streamjoiner.h playoutgate.h \
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
+ packetssndqueue.h bintree.h mprtprpath.h \
+ /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
+ packetsrcvqueue.h streamjoiner.h playoutgate.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h \
  /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
@@ -828,13 +829,15 @@ mprtpspath.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
 
+packetssndqueue.h:
+
+bintree.h:
+
 mprtprpath.h:
 
 /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h:
 
-bintree.h:
-
-packetsqueue.h:
+packetsrcvqueue.h:
 
 streamjoiner.h:
 

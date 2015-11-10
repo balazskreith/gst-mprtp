@@ -151,7 +151,6 @@ stream_splitter_init (StreamSplitter * this)
   this->path_is_removed = FALSE;
   this->sysclock = gst_system_clock_obtain ();
   this->active_subflow_num = 0;
-  this->ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, g_free);
   this->charge_value = 64;
   this->separation_is_possible = FALSE;
@@ -217,14 +216,6 @@ exit:
   THIS_WRITEUNLOCK (this);
 }
 
-void
-stream_splitter_set_rtp_ext_header_id (StreamSplitter * this,
-    guint8 ext_header_id)
-{
-  THIS_WRITELOCK (this);
-  this->ext_header_id = ext_header_id;
-  THIS_WRITEUNLOCK (this);
-}
 
 void
 stream_splitter_set_splitting_mode (StreamSplitter * this,
@@ -262,6 +253,16 @@ stream_splitter_commit_changes (StreamSplitter * this)
   THIS_WRITELOCK (this);
   this->changes_are_committed = TRUE;
   THIS_WRITEUNLOCK (this);
+}
+
+gboolean
+stream_splitter_separation_is_possible (StreamSplitter * this)
+{
+  gboolean result;
+  THIS_READLOCK (this);
+  result = this->separation_is_possible;
+  THIS_READUNLOCK (this);
+  return result;
 }
 
 MPRTPSPath *

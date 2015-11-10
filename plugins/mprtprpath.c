@@ -66,7 +66,7 @@ mprtpr_path_init (MpRTPRPath * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
-  this->packetsqueue = make_packetsqueue();
+  this->packetsqueue = make_packetsrcvqueue();
   this->min_skew_bintree = make_bintree(_cmp_for_min);
   this->max_skew_bintree = make_bintree(_cmp_for_max);
   this->min_delay_bintree = make_bintree(_cmp_for_min);
@@ -152,7 +152,7 @@ mprtpr_path_get_jitter (MpRTPRPath * this)
 {
   guint32 result;
   THIS_READLOCK (this);
-  result = packetsqueue_get_jitter(this->packetsqueue);
+  result = packetsrcvqueue_get_jitter(this->packetsqueue);
 //  g_print("Sub-%d jitter: %u\n", this->id, result);
   THIS_READUNLOCK (this);
   return result;
@@ -226,8 +226,8 @@ mprtpr_path_removes_obsolate_packets (MpRTPRPath * this, GstClockTime treshold)
 //  g_print("mprtpr_path_removes_obsolate_packets begin\n");
   THIS_WRITELOCK (this);
   obsolate_margin = gst_clock_get_time (this->sysclock) - treshold;
-  while(packetsqueue_head_obsolted(this->packetsqueue, obsolate_margin)){
-    packetsqueue_remove_head(this->packetsqueue, NULL);
+  while(packetsrcvqueue_head_obsolted(this->packetsqueue, obsolate_margin)){
+    packetsrcvqueue_remove_head(this->packetsqueue, NULL);
   }
 //  g_print("Obsolate next: %p - %d packets\n", next, num);
   _balancing_skew_trees (this);
@@ -262,7 +262,7 @@ guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this)
   guint16 lost_result;
   THIS_WRITELOCK (this);
 
-  packetsqueue_get_packets_stat_for_obsolation(this->packetsqueue,
+  packetsrcvqueue_get_packets_stat_for_obsolation(this->packetsqueue,
                                                    treshold,
                                                    &lost_result,
                                                    received,
@@ -409,7 +409,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this,
     this->highest_seq = packet_subflow_seq_num;
     this->total_packets_received = 1;
     this->seq_initialized = TRUE;
-    packetsqueue_add(this->packetsqueue,
+    packetsrcvqueue_add(this->packetsqueue,
                      snd_time,
                      packet_subflow_seq_num,
                      &delay);
@@ -432,7 +432,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this,
   }
 
 add:
-  skew = packetsqueue_add(this->packetsqueue,
+  skew = packetsrcvqueue_add(this->packetsqueue,
                           snd_time,
                           packet_subflow_seq_num,
                           &delay);

@@ -14,7 +14,7 @@
 #include <gst/base/gstqueuearray.h>
 #include "gstmprtcpbuffer.h"
 #include "bintree.h"
-#include "packetsqueue.h"
+#include "packetsrcvqueue.h"
 
 G_BEGIN_DECLS
 
@@ -42,50 +42,47 @@ typedef enum{
 
 struct _MpRTPReceiverPath
 {
-  GObject          object;
-  guint8           id;
-  GRWLock          rwmutex;
+  GObject             object;
+  guint8              id;
+  GRWLock             rwmutex;
 
-  GList*           gaps;
-  GList*           result;
-  //guint8        ext_header_id;
-  gboolean         seq_initialized;
-  guint16          cycle_num;
-//  guint32          jitter;
-  MPRTPRPathState  state;
-  guint32          total_late_discarded;
-  guint32          total_late_discarded_bytes;
-//  guint32       total_bytes_received;
-  guint32          total_payload_bytes;
-  guint32          total_early_discarded;
-  guint32          total_duplicated_packet_num;
-  guint32          total_lost_packets_num;
-  guint16          highest_seq;
+  GList*              gaps;
+  GList*              result;
+  gboolean            seq_initialized;
+  guint16             cycle_num;
+  MPRTPRPathState     state;
+  guint32             total_late_discarded;
+  guint32             total_late_discarded_bytes;
+  guint32             total_payload_bytes;
+  guint32             total_early_discarded;
+  guint32             total_duplicated_packet_num;
+  guint32             total_lost_packets_num;
+  guint16             highest_seq;
 
-  guint64          ext_rtptime;
-  guint64          last_packet_skew;
-  GstClockTime     last_received_time;
-  GstClock*        sysclock;
-  guint16          PHSN;
-  guint32          total_packet_losts;
-  guint64          total_packets_received;
-  PacketsQueue*    packetsqueue;
-  guint32          last_rtp_timestamp;
-  BinTree*         min_skew_bintree;
-  BinTree*         max_skew_bintree;
-  BinTree*         min_delay_bintree;
-  BinTree*         max_delay_bintree;
-  guint32          skew_bytes;
-  guint8           skews_payload_octets[SKEWS_ARRAY_LENGTH];
-  guint64          skews[SKEWS_ARRAY_LENGTH];
-  GstClockTime     skews_arrived[SKEWS_ARRAY_LENGTH];
-  guint8           skews_index;
-  guint64          delays[SKEWS_ARRAY_LENGTH];
-  GstClockTime     delays_arrived[SKEWS_ARRAY_LENGTH];
-  guint8           delays_write_index;
-  guint8           delays_read_index;
-  GstClockTime     last_drift_window;
-  GstClockTime     last_delay;
+  guint64             ext_rtptime;
+  guint64             last_packet_skew;
+  GstClockTime        last_received_time;
+  GstClock*           sysclock;
+  guint16             PHSN;
+  guint32             total_packet_losts;
+  guint64             total_packets_received;
+  PacketsRcvQueue*    packetsqueue;
+  guint32             last_rtp_timestamp;
+  BinTree*            min_skew_bintree;
+  BinTree*            max_skew_bintree;
+  BinTree*            min_delay_bintree;
+  BinTree*            max_delay_bintree;
+  guint32             skew_bytes;
+  guint8              skews_payload_octets[SKEWS_ARRAY_LENGTH];
+  guint64             skews[SKEWS_ARRAY_LENGTH];
+  GstClockTime        skews_arrived[SKEWS_ARRAY_LENGTH];
+  guint8              skews_index;
+  guint64             delays[SKEWS_ARRAY_LENGTH];
+  GstClockTime        delays_arrived[SKEWS_ARRAY_LENGTH];
+  guint8              delays_write_index;
+  guint8              delays_read_index;
+  GstClockTime        last_drift_window;
+  GstClockTime        last_delay;
 
 
 };

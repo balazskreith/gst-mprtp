@@ -30,19 +30,10 @@ typedef struct _SplitCtrlerMoment SplitCtrlerMoment;
 
 typedef enum
 {
-  SPLITCTRLER_EVENT_DISTORTION    = -2,
-  SPLITCTRLER_EVENT_CONGESTION    = -1,
-  SPLITCTRLER_EVENT_FI            =  0,
-  SPLITCTRLER_EVENT_CLEARANCE     =  1,
-  SPLITCTRLER_EVENT_SETTLEMENT    =  2,
+  SPLITCTRLER_EVENT_OVERUSED    = -1,
+  SPLITCTRLER_EVENT_FI          =  0,
+  SPLITCTRLER_EVENT_UNDERUSED   =  1,
 } SplitCtrlerEvent;
-
-typedef enum
-{
-  SPLITCTRLER_STATE_OVERUSED    = -1,
-  SPLITCTRLER_STATE_STABLE      =  0,
-  SPLITCTRLER_STATE_UNDERUSED   =  1,
-} SplitCtrlerState;
 
 struct _SndEventBasedController
 {
@@ -80,9 +71,9 @@ struct _SndEventBasedController
   GstClockTime      restore_happened;
   GstClockTime      congestion_happened;
   GstClockTime      distortion_happened;
+  GstClockTime      required_wait;
 
   gboolean          stability_started;
-  SplitCtrlerState  state;
   guint32           consecutive_stable;
   gdouble           rate_diff;
 //

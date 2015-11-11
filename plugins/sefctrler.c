@@ -308,8 +308,6 @@ static void
 _reset_c(SndEventBasedController *this);
 static void
 _refresh_c(SndEventBasedController *this, Subflow *subflow);
-static SplitCtrlerState
-_get_system_state(SndEventBasedController *this);
 static Subflow*
 _get_first_subflow(SndEventBasedController *this, MPRTPSPathState state);
 static Subflow*
@@ -385,7 +383,6 @@ sefctrler_init (SndEventBasedController * this)
   this->splitctrler_moments = g_malloc0(sizeof(SplitCtrlerMoment) * 2);
   this->changed_num = 0;
   this->pacing = FALSE;
-  this->state = SPLITCTRLER_STATE_STABLE;
   this->RTT_max = 5 * GST_SECOND;
   this->last_recalc_time = gst_clock_get_time(this->sysclock);
   this->subflow_delays_tree = make_bintree(_cmp_for_maxtree);
@@ -1697,97 +1694,49 @@ void _refresh_c(SndEventBasedController *this, Subflow *subflow)
   _ct0(this)->goodput += _irt0(subflow)->goodput;
 }
 
-SplitCtrlerState _get_system_state(SndEventBasedController *this)
+SplitCtrlerEvent _get_system_event(SndEventBasedController *this)
 {
   GstClockTime now;
-  Subflow *subflow;
-  MPRTPSPathMarker marker;
   now = gst_clock_get_time(this->sysclock);
-  //check if system is overused
+
   if(!_ct0(this)->subflows.num) {
-//      g_print("SYSTEM STATE CHECK: NO SUBFLOW\n");
-      goto stable;
-  }
-  if(!_ct0(this)->subflows.nc) {
-//      g_print("SYSTEM STATE CHECK: NO NC SUBFLOW\n");
-      goto overused;
-  }
+ //      g_print("SYSTEM STATE CHECK: NO SUBFLOW\n");
+       goto fi;
+   }
+   if(!_ct0(this)->subflows.nc) {
+ //      g_print("SYSTEM STATE CHECK: NO NC SUBFLOW\n");
+       goto overused;
+   }
+   if(now < this->required_wait){
+     goto fi;
+   }
+   if(this->congestion_happened < 15 * GST_SECOND){
+     if(this->congestion_happened < this->distortion_happened &&
+        this->congestion_happened - this->distortion_happened < 3 * GST_SECOND)
+     {
+       goto overused;
+     }
+     goto fi;
+   }
+   if(this->restored_happened < this->restore_happened){
+     goto fi;
+   }
 
-  if(_ct0(this)->ditorted > 1) {
-    g_print("SYSTEM DISTORTED NUM > 1\n");
-    goto overused;
-  }
-  if(_ct0(this)->ditorted > 0){
-    g_print("SYSTEM DISTORTED NUM > 0\n");
-    if(this->suspicious){
-      g_print("SYSTEM WAS SUSPICIOUS\n");
-      this->suspicious = FALSE;
-      goto overused;
-    }
-    g_print("SYSTEM BECAME SUSPICIOUS\n");
-    this->suspicious_time = now;
-    this->suspicious = TRUE;
-    goto stable;
-  }
-  if(this->suspicious){
-    if(this->suspicious_time < now - 16 * GST_SECOND){
-      g_print("SYSTEM SUSPICIOUSLY IS EXPIRED\n");
-      this->suspicious = FALSE;
-    }
-    goto stable;
-  }
-  if(_ct0(this)->subflows.nc < _ct0(this)->subflows.num){
-    g_print("SYSTEM NC < SUBFLOW NUM\n");
-    if(_ct0(this)->subflows.monitored <
-       _ct0(this)->subflows.l + _ct0(this)->subflows.c){
-        g_print("REDUCTION OR MITIGATION IS ONGOING\n");
-      this->suspicious_time = now;
-      goto stable;
-    }
-  }
-  if(_ct0(this)->subflows.nc == 1){
-    g_print("SYSTEM STATE CHECK: ONLY 1 NC SUBFLOW\n");
-    subflow = _get_first_subflow(this, MPRTPS_PATH_STATE_NON_CONGESTED);
-    marker = mprtps_path_get_marker(subflow->path);
-    if(marker == MPRTPS_PATH_MARKER_OVERUSED)  {
-        g_print("THE ONLY ONW SUBFLOW IS OVERUSED\n");
-        goto overused;
-    }
-    if(marker == MPRTPS_PATH_MARKER_UNDERUSED) {
-        g_print("THE ONLY ONW SUBFLOW IS UNDERUSED\n");
-        goto underused;
-    }
-    else goto stable;
-  }
+   if(this->restore_happened < 10 * GST_SECOND){
+     //increase
+   }
 
-  if(_get_first_trialed_subflow(this)){
-      g_print("ONE SYSTEM SUBFLOW IS UNDER TRIAL\n");
-      goto stable;
-  }
+   if(_is_goodput_stable(this) && _is_rate_stable(this)){
+     goto underused;
+   }
 
-  subflow = _get_first_restored_subflow(this);
-  if(!subflow) goto clearance;
-  g_print("ONE SYSTEM SUBFLOW IS JUST RESTORED\n");
-  marker = mprtps_path_get_marker(subflow->path);
-  if(marker == MPRTPS_PATH_MARKER_UNDERUSED){
-    mprtps_path_set_marker(subflow->path, MPRTPS_PATH_MARKER_STABLE);
-    subflow->increasable = TRUE;
-  }
-  goto stable;
-clearance:
-  if(_get_lowest_cons_keep_from_nc_subflow(this) > 2){
-    goto underused;
-  }
-
-stable:
-  ++this->consecutive_stable;
-  return SPLITCTRLER_STATE_STABLE;
-overused:
-  this->consecutive_stable = 0;
-  return SPLITCTRLER_STATE_OVERUSED;
+fi:
+   return SPLITCTRLER_EVENT_FI;
 underused:
-  this->consecutive_stable = 0;
-  return SPLITCTRLER_STATE_UNDERUSED;
+  return SPLITCTRLER_EVENT_FI;
+overused:
+   return SPLITCTRLER_EVENT_FI;
+
 }
 
 void _step_c(SndEventBasedController *this)
@@ -1814,7 +1763,7 @@ done:
   return subflow;
 }
 
-Subflow* _get_first_restored_subflow(SndEventBasedController *this)
+Subflow* _get_first_restored_subflow(SndEventBasedController *this, GstClockTime treshold)
 {
   GHashTableIter iter;
   gpointer key, val;
@@ -1825,7 +1774,7 @@ Subflow* _get_first_restored_subflow(SndEventBasedController *this)
     subflow = (Subflow *) val;
     if(mprtps_path_get_state(subflow->path) != MPRTPS_PATH_STATE_NON_CONGESTED)
       continue;
-    if(gst_clock_get_time(this->sysclock) - 16 * GST_SECOND < subflow->restored)
+    if(gst_clock_get_time(this->sysclock) - treshold < subflow->restored)
       goto done;
   }
   subflow = NULL;

@@ -935,7 +935,6 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
   gst_rtp_buffer_unmap (&rtp);
   return;
 drop:
-g_print("MONITORING PACKET ARRIVED\n");
   gst_rtp_buffer_unmap (&rtp);
   gst_buffer_unref(buf);
 }

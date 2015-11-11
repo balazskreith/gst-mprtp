@@ -102,6 +102,7 @@ mprtps_path_reset (MPRTPSPath * this)
   this->ticknum = 0;
   this->monitor_payload_type = FALSE;
   this->monitoring_tick = 0;
+  this->marker = MPRTPS_PATH_MARKER_STABLE;
 
   packetssndqueue_reset(this->packetsqueue);
 }
@@ -378,7 +379,7 @@ void mprtps_path_turn_monitoring_on(MPRTPSPath *this)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->monitoring_tick = 3;
+  this->monitoring_tick = 2;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -468,6 +469,7 @@ void mprtps_path_set_marker(MPRTPSPath * this, MPRTPSPathMarker marker)
 {
   THIS_WRITELOCK (this);
   this->marker = marker;
+  g_print("S%d: MARKER: %d\n", this->id, marker);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -617,7 +619,7 @@ GstBuffer* _create_monitor_packet(MPRTPSPath * this)
   GstBuffer *result;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
 
-  result = gst_rtp_buffer_new_allocate (0, 0, 0);
+  result = gst_rtp_buffer_new_allocate (1400, 0, 0);
   gst_rtp_buffer_map(result, GST_MAP_READWRITE, &rtp);
   gst_rtp_buffer_set_payload_type(&rtp, this->monitor_payload_type);
   gst_rtp_buffer_unmap(&rtp);

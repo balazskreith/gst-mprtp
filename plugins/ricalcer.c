@@ -148,8 +148,8 @@ void ricalcer_do_next_report_time (ReportIntervalCalculator * this)
   }
 
 done:
-  if (interval < 1.) {
-    interval = 1. + g_random_double ();
+  if (interval < 2.) {
+    interval = 2. + g_random_double ();
   } else if (7.5 < interval) {
     interval = 5. * (g_random_double () + .5);
   }
@@ -183,7 +183,8 @@ GstClockTime ricalcer_get_sum_last_two_interval(ReportIntervalCalculator * this)
 
 GstClockTime ricalcer_get_obsolate_time(ReportIntervalCalculator * this)
 {
-  return this->obsolate_time;
+//  return this->obsolate_time;
+  return gst_clock_get_time (this->sysclock) - GST_SECOND;
 }
 
 gdouble _calc_report_interval(ReportIntervalCalculator * this)

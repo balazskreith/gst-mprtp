@@ -67,6 +67,7 @@ struct _SndEventBasedController
 //  gboolean          new_report_arrived;
   gboolean          bids_recalc_requested;
   gboolean          bids_commit_requested;
+  gboolean          rate_is_state;
   guint32           ssrc;
   void            (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
   gpointer          send_mprtcp_packet_data;
@@ -75,8 +76,15 @@ struct _SndEventBasedController
   GstClockTime      suspicious_time;
 
   GstClockTime      stability_time;
+  GstClockTime      restored_happened;
+  GstClockTime      restore_happened;
+  GstClockTime      congestion_happened;
+  GstClockTime      distortion_happened;
+
   gboolean          stability_started;
   SplitCtrlerState  state;
+  guint32           consecutive_stable;
+  gdouble           rate_diff;
 //
 //  //for stat and plot
 //  GstTask*          stat_thread;

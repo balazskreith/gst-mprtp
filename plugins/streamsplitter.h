@@ -83,6 +83,7 @@ MPRTPSPath* stream_splitter_get_next_path(StreamSplitter* this, GstBuffer* buf);
 gboolean stream_splitter_separation_is_possible (StreamSplitter * this);
 void stream_splitter_set_splitting_mode (StreamSplitter * this, StreamSplittingMode mode);
 void stream_splitter_setup_sending_bid(StreamSplitter* this, guint8 subflow_id, guint32 bid);
+gdouble stream_splitter_get_sending_rate(StreamSplitter* this, guint8 subflow_id);
 void stream_splitter_commit_changes(StreamSplitter *this);
 GType stream_splitter_get_type (void);
 

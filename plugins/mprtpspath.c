@@ -102,7 +102,7 @@ mprtps_path_reset (MPRTPSPath * this)
   this->ticknum = 0;
   this->monitor_payload_type = FALSE;
   this->monitoring_tick = 0;
-  this->marker = MPRTPS_PATH_MARKER_STABLE;
+  this->marker = MPRTPS_PATH_MARKER_NEUTRAL;
 
   packetssndqueue_reset(this->packetsqueue);
 }
@@ -379,7 +379,7 @@ void mprtps_path_turn_monitoring_on(MPRTPSPath *this)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->monitoring_tick = 2;
+  this->monitoring_tick = 1;
   THIS_WRITEUNLOCK (this);
 }
 

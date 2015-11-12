@@ -83,7 +83,7 @@ setup_ghost (GstElement * src, GstBin * bin)
   gst_element_add_pad (GST_ELEMENT (bin), binPad);
 }
 static GstElement *encoder;
-guint bitrate = 1000;
+guint bitrate = 100;
 static SessionData *
 make_video_session (guint sessionNum)
 {

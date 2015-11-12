@@ -81,15 +81,15 @@ typedef struct _SubflowState SubflowState;
 
 typedef enum
 {
-  EVENT_LATE          = -5,
-  EVENT_CONGESTION    = -4,
-  EVENT_LOSSY         = -3,
-  EVENT_INSUFFICIENT  = -2,
-  EVENT_DISTORTION    = -1,
-  EVENT_FI            =  0,
-  EVENT_SETTLEMENT    =  1,
-  EVENT_DEACTIVATE    =  16,
-  EVENT_ACTIVATE      =  17,
+  EVENT_LATE             = -6,
+  EVENT_CONGESTION       = -5,
+  EVENT_LOSSY            = -4,
+  EVENT_INSUFFICIENT     = -3,
+  EVENT_DISTORTION       = -1,
+  EVENT_FI               =  0,
+  EVENT_SETTLEMENT       =  1,
+  EVENT_DEACTIVATE       =  16,
+  EVENT_ACTIVATE         =  17,
 } Event;
 
 
@@ -152,6 +152,7 @@ struct _Subflow
   GstClock*                  sysclock;
   ReportIntervalCalculator*  ricalcer;
   gboolean                   imprecise;
+  guint                      imprecise_counter;
   IRMoment*                  ir_moments;
   gint                       ir_moments_index;
   guint32                    ir_moments_num;
@@ -159,6 +160,7 @@ struct _Subflow
   gint                       or_moments_index;
   guint32                    or_moments_num;
   GstClockTime               RTT;
+  guint                      consecutive_late_RTT;
   gdouble                    avg_rtcp_size;
   gdouble                    control_signal;
   guint32                    consecutive_keep;
@@ -841,10 +843,12 @@ _riport_processing_rrblock_processor (SndEventBasedController *this,
   if(subflow->imprecise){
     goto done;
   }
-  if(PATH_RTT_MAX_TRESHOLD < _irt0(subflow)->RTT){
+  g_print("S%d RTT: %lu\n", subflow->id, _irt0(subflow)->RTT);
+  if(PATH_RTT_MAX_TRESHOLD < _irt0(subflow)->RTT && ++subflow->consecutive_late_RTT> 2){
     event = EVENT_LATE;
     goto fire;
   }
+  subflow->consecutive_late_RTT = 0;
   switch(_irt0(subflow)->state){
     case MPRTPS_PATH_STATE_NON_CONGESTED:
       if(_irt2(subflow)->lost_rate > 0. &&
@@ -1049,6 +1053,24 @@ evaluate_delay:
     guint32 jitter;
 
     delay = _irt0(subflow)->delay;
+    //evaluate path
+    {
+      gdouble gamma1,gamma2;
+      GstClockTime lt_delay, lt_min_dealy, lt_max_delay, prev_delay;
+      mprtps_path_get_delays(subflow->path,
+                             &lt_delay,
+                             &prev_delay,
+                             &lt_min_dealy,
+                             &lt_max_delay);
+      gamma1 = (gdouble)prev_delay / (gdouble)delay;
+      gamma2 = (gdouble)lt_delay / (gdouble)delay;
+//      g_print("S%d: ltd: %lu, ltmn: %lu ltmx: %lu prev: %lu, act: %lu g1: %f g2: %f\n",
+//              subflow->id, lt_delay, lt_min_dealy, lt_max_delay, prev_delay, delay, gamma1, gamma2);
+      if(gamma1 < .75 || gamma2 < .75){
+        _subflow_fire(this, subflow, EVENT_DISTORTION);
+      }
+    }
+    mprtps_path_add_delay(subflow->path, delay);
     if(bintree_get_num(this->subflow_delays_tree) < 2){
       _refresh_subflow_delays(this, delay);
       goto done;
@@ -1067,12 +1089,17 @@ evaluate_delay:
     else{
       if(min_delay + treshold < delay) goto imprecise;
     }
+    subflow->imprecise_counter = 0;
     _refresh_subflow_delays(this, delay);
     if(subflow->imprecise) _subflow_fire(this, subflow, EVENT_ACTIVATE);
     goto done;
   imprecise:
+    if(++subflow->imprecise_counter < 3){
+      GST_WARNING("Imprecise delay");
+      goto done;
+    }
     if(!subflow->imprecise) _subflow_fire(this, subflow, EVENT_DEACTIVATE);
-
+    subflow->imprecise_counter = 0;
   }
   goto done;
 done:
@@ -1595,12 +1622,12 @@ _system_notifier_main(SndEventBasedController * this)
   if(this->event == SPLITCTRLER_EVENT_UNDERUSED) goto underused;
   //overused
 
-  g_print("-------->SYSTEM IS OVERUSED<--------\n");
-  this->scheduler_signaling(this->scheduler, _ct1(this)->goodput * 8);
+//  g_print("-------->SYSTEM IS OVERUSED<--------\n");
+  this->scheduler_signaling(this->scheduler, _ct1(this)->goodput * 8. / 1000.);
   goto done;
 underused:
   this->scheduler_signaling(this->scheduler, 0);
-  g_print("-------->SYSTEM IS UNDERUSED<--------\n");
+//  g_print("-------->SYSTEM IS UNDERUSED<--------\n");
 done:
   this->event = SPLITCTRLER_EVENT_FI;
   return;
@@ -1698,7 +1725,7 @@ gboolean _is_rate_stable(SndEventBasedController * this)
     this->rate_diff = diff;
     subflow->actual_rate = actual_rate;
   }
-  g_print("Rate diff: %f\n", this->rate_diff);
+//  g_print("Rate diff: %f\n", this->rate_diff);
   return this->rate_diff < 0.05 ? TRUE : FALSE;
 }
 

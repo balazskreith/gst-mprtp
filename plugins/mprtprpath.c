@@ -436,7 +436,7 @@ add:
                           snd_time,
                           packet_subflow_seq_num,
                           &delay);
-
+//  if(this->id == 1) g_print("%lu,", delay);
   if(this->last_rtp_timestamp != gst_rtp_buffer_get_timestamp(rtp)){
     _add_skew(this, skew, payload_bytes>>3);
     this->last_rtp_timestamp = gst_rtp_buffer_get_timestamp(rtp);
@@ -574,7 +574,7 @@ balancing:
   max_count = bintree_get_num(this->max_delay_bintree);
 
  //To get the 75 percentile we shift max_count by 1
-  diff = max_count - min_count;
+  diff = (max_count>>1) - min_count;
 //  g_print("max_tree_num: %d, min_tree_num: %d\n", max_tree_num, min_tree_num);
   if (-2 < diff && diff < 2) {
     goto done;

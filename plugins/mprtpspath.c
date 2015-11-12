@@ -47,7 +47,9 @@ static void _send_mprtp_packet(MPRTPSPath * this,
 static gboolean _try_flushing(MPRTPSPath * this);
 static gboolean _is_overused(MPRTPSPath * this);
 static GstBuffer* _create_monitor_packet(MPRTPSPath * this);
-
+static void _balancing_delay_trees (MPRTPSPath * this);
+static gint _cmp_for_max (guint64 x, guint64 y);
+static gint _cmp_for_min (guint64 x, guint64 y);
 void
 mprtps_path_class_init (MPRTPSPathClass * klass)
 {
@@ -114,6 +116,8 @@ mprtps_path_init (MPRTPSPath * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetssndqueue();
+  this->min_delay_bintree = make_bintree(_cmp_for_min);
+  this->max_delay_bintree = make_bintree(_cmp_for_max);
   mprtps_path_reset (this);
 }
 
@@ -481,6 +485,94 @@ MPRTPSPathMarker mprtps_path_get_marker(MPRTPSPath * this)
   return result;
 }
 
+
+
+void mprtps_path_add_delay(MPRTPSPath *this, GstClockTime delay)
+{
+  GstClockTime treshold,now;
+  THIS_WRITELOCK (this);
+//  g_print("Subflow %d added delay: %lu\n", this->id, delay);
+  now = gst_clock_get_time(this->sysclock);
+  treshold = now - 20 * GST_SECOND;
+  again:
+  //elliminate the old ones
+  if((this->delays[this->delays_read_index] > 0 &&
+      this->delays_arrived[this->delays_read_index] < treshold) ||
+     this->delays_write_index == this->delays_read_index){
+//      g_print("delete at %d delays[%d]=%lu\n",
+//              this->id,
+//              this->delays_index,
+//              this->delays[this->delays_index]);
+    if(this->delays[this->delays_read_index] <= bintree_get_top_value(this->max_delay_bintree))
+      bintree_delete_value(this->max_delay_bintree, this->delays[this->delays_read_index]);
+    else
+      bintree_delete_value(this->min_delay_bintree, this->delays[this->delays_read_index]);
+
+    this->delays[this->delays_read_index] = 0;
+    this->delays_arrived[this->delays_read_index] = 0;
+    if(++this->delays_read_index == MAX_DELAY_LENGTH){
+        this->delays_read_index=0;
+    }
+    goto again;
+  }
+
+
+  //add new one
+  this->delays[this->delays_write_index] = delay;
+  this->delays_arrived[this->delays_write_index] = now;
+  if(this->delays[this->delays_write_index] <= bintree_get_top_value(this->max_delay_bintree))
+    bintree_insert_value(this->max_delay_bintree, this->delays[this->delays_write_index]);
+  else
+    bintree_insert_value(this->min_delay_bintree, this->delays[this->delays_write_index]);
+
+  _balancing_delay_trees(this);
+  if(++this->delays_write_index == MAX_DELAY_LENGTH){
+      this->delays_write_index=0;
+  }
+  THIS_WRITEUNLOCK (this);
+}
+
+
+void
+mprtps_path_get_delays (MPRTPSPath * this,
+                             GstClockTime *delay,
+                             GstClockTime *last_delay,
+                             GstClockTime *min_delay,
+                             GstClockTime *max_delay)
+{
+  gint32 max_count, min_count;
+  GstClockTime last_delay_,delay_;
+//  g_print("mprtpr_path_get_delay_median begin\n");
+  THIS_WRITELOCK (this);
+  if(this->delays_write_index == 0){
+    last_delay_ = this->delays[MAX_DELAY_LENGTH-1];
+  }else{
+    last_delay_ = this->delays[this->delays_write_index-1];
+  }
+  delay_ = last_delay_;
+  min_count = bintree_get_num(this->min_delay_bintree);
+  max_count = bintree_get_num(this->max_delay_bintree);
+  if(min_count + max_count < 1)
+    goto done;
+  if(min_count < max_count)
+    delay_ = bintree_get_top_value(this->max_delay_bintree);
+  else if(max_count < min_count)
+    delay_ = bintree_get_top_value(this->min_delay_bintree);
+  else{
+    delay_ = (bintree_get_top_value(this->max_delay_bintree) +
+              bintree_get_top_value(this->min_delay_bintree))>>1;
+  }
+  if(min_delay) *min_delay = bintree_get_bottom_value(this->max_delay_bintree);
+  if(max_delay) *max_delay = bintree_get_bottom_value(this->min_delay_bintree);
+//  g_print("%d-%d\n", min_count, max_count);
+done:
+  if(delay) *delay = delay_;
+  if(last_delay) *last_delay = last_delay_;
+  THIS_WRITEUNLOCK (this);
+//  g_print("mprtpr_path_get_delay_median end\n");
+}
+
+
 void
 mprtps_path_tick(MPRTPSPath *this)
 {
@@ -624,6 +716,50 @@ GstBuffer* _create_monitor_packet(MPRTPSPath * this)
   gst_rtp_buffer_unmap(&rtp);
   return result;
 }
+
+void
+_balancing_delay_trees (MPRTPSPath * this)
+{
+  gint32 max_count, min_count;
+  gint32 diff;
+  BinTreeNode *top;
+
+
+balancing:
+  min_count = bintree_get_num(this->min_delay_bintree);
+  max_count = bintree_get_num(this->max_delay_bintree);
+
+ //To get the 75 percentile we shift max_count by 1
+  diff = (max_count>>1) - min_count;
+//  g_print("max_tree_num: %d, min_tree_num: %d\n", max_tree_num, min_tree_num);
+  if (-2 < diff && diff < 2) {
+    goto done;
+  }
+  if (diff < -1) {
+    top = bintree_pop_top_node(this->min_delay_bintree);
+    bintree_insert_node(this->max_delay_bintree, top);
+  } else if (1 < diff) {
+      top = bintree_pop_top_node(this->max_delay_bintree);
+      bintree_insert_node(this->min_delay_bintree, top);
+  }
+  goto balancing;
+
+done:
+  return;
+}
+
+gint
+_cmp_for_max (guint64 x, guint64 y)
+{
+  return x == y ? 0 : x < y ? -1 : 1;
+}
+
+gint
+_cmp_for_min (guint64 x, guint64 y)
+{
+  return x == y ? 0 : x < y ? 1 : -1;
+}
+
 
 #undef THIS_READLOCK
 #undef THIS_READUNLOCK

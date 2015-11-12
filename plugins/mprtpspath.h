@@ -34,7 +34,7 @@ typedef struct _CCSignalData CCSignalData;
 #define MPRTPS_PATH_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),MPRTPS_PATH_TYPE))
 #define MPRTPS_PATH_CAST(src)        ((MPRTPSPath *)(src))
 
-
+#define MAX_DELAY_LENGTH 16
 
 struct _MPRTPSubflowHeaderExtension
 {
@@ -117,6 +117,13 @@ struct _MPRTPSPath
 
   void                    (*send_mprtp_packet_func)(gpointer, GstBuffer*);
   gpointer                  send_mprtp_func_data;
+
+  BinTree*            max_delay_bintree;
+  BinTree*            min_delay_bintree;
+  guint8              delays_write_index;
+  guint8              delays_read_index;
+  guint64             delays[MAX_DELAY_LENGTH];
+  GstClockTime        delays_arrived[MAX_DELAY_LENGTH];
 };
 
 struct _MPRTPSPathClass
@@ -157,6 +164,12 @@ guint32 mprtps_path_get_sent_octet_sum_for(MPRTPSPath *this, guint32 amount);
 
 void mprtps_path_set_marker(MPRTPSPath * this, MPRTPSPathMarker marker);
 MPRTPSPathMarker mprtps_path_get_marker(MPRTPSPath * this);
+void mprtps_path_add_delay(MPRTPSPath *this, GstClockTime delay);
+void mprtps_path_get_delays (MPRTPSPath * this,
+                             GstClockTime *delay,
+                             GstClockTime *last_delay,
+                             GstClockTime *min_delay,
+                             GstClockTime *max_delay);
 
 MPRTPSPathState mprtps_path_get_state (MPRTPSPath * this);
 void mprtps_path_set_state (MPRTPSPath * this, MPRTPSPathState state);

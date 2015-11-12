@@ -90,6 +90,9 @@ struct _ORMoment{
   guint16                       cycle_num;
   guint32                       jitter;
   guint16                       HSN;
+  guint16                       lost;
+  guint16                       expected;
+  guint16                       received;
 };
 
 struct _IRMoment{
@@ -585,7 +588,10 @@ _orp_main(RcvEventBasedController * this)
   guint16 report_length = 0;
   guint16 block_length = 0;
   GstBuffer *block;
+//  GstClockTime now;
+//  guint16 lost=0,expected=0,received=0;
 
+//  now = gst_clock_get_time(this->sysclock);
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
@@ -595,6 +601,19 @@ _orp_main(RcvEventBasedController * this)
     if(!_irt0(subflow)->SR_sent_ntp_time){
       continue;
     }
+//    mprtpr_path_get_obsolate_stat(subflow->path,
+//                                    now - GST_SECOND,
+//                                    &lost,
+//                                    &received,
+//                                    &expected);
+//    _ort0(subflow)->lost_packet_num += lost;
+//    _ort0(subflow)->received += received;
+//    _ort0(subflow)->expected += expected;
+//    _ort0(subflow)->lost += lost;
+//
+//    if(lost)
+//      ricalcer_urgent_report_request(subflow->ricalcer);
+
     if (!this->report_is_flowable || !ricalcer_do_report_now(ricalcer)) {
       continue;
     }
@@ -906,6 +925,9 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
                                 &received,
                                 &expected);
   _ort0(this)->lost_packet_num += lost;
+  _ort0(this)->received += received;
+  _ort0(this)->expected += expected;
+  _ort0(this)->lost += lost;
 //  g_print("Sub%d: HSN:%hu->%hu=%hu - received:%u->%u=%u lost: %u->%u=%u\n",
 //          this->id, _ort1(this)->HSN, _ort0(this)->HSN, expected,
 //          _ort1(this)->received_packet_num,
@@ -914,11 +936,22 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
 //          _ort1(this)->lost_packet_num,
 //          _ort0(this)->lost_packet_num,
 //          lost);
-//  g_print("expected: %hu received: %hu\n", expected, received);
-  if(received < expected)
-    fraction_lost = (256. * (gfloat) lost) / ((gfloat) (received));
+
+  if(_ort0(this)->received < _ort0(this)->expected)
+    fraction_lost = (256. * ((gdouble) _ort0(this)->lost ) /
+                    ((gdouble) (_ort0(this)->received)));
   else
     fraction_lost = 0;
+//  g_print("%d: expected: %hu received: %hu lost: %hu fraction_lost:256.%f/%f=%d\n",
+//          this->id,
+//          _ort0(this)->expected,
+//          _ort0(this)->received,
+//          _ort0(this)->lost,
+//          (gdouble) _ort0(this)->lost,
+//          (gdouble) _ort0(this)->received,
+//          (guint8)(256. * ((gdouble) _ort0(this)->lost  /
+//          (gdouble) (_ort0(this)->received))));
+
   ext_hsn = (((guint32) _ort0(this)->cycle_num) << 16) | ((guint32) _ort0(this)->HSN);
 
 //  g_print("Cum lost: %d\n", _ort0(this)->lost_packet_num);

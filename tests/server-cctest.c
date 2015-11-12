@@ -82,22 +82,23 @@ setup_ghost (GstElement * src, GstBin * bin)
   GstPad *binPad = gst_ghost_pad_new ("src", srcPad);
   gst_element_add_pad (GST_ELEMENT (bin), binPad);
 }
-
+static GstElement *encoder;
+guint bitrate = 1000;
 static SessionData *
 make_video_session (guint sessionNum)
 {
   GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
   GstElement *videoSrc = gst_element_factory_make ("videotestsrc", NULL);
-  //GstElement *encoder = gst_element_factory_make ("theoraenc", NULL);
-  GstElement *encoder = gst_element_factory_make ("jpegenc", NULL);
-  //GstElement *payloader = gst_element_factory_make ("rtptheorapay", NULL);
-  GstElement *payloader = gst_element_factory_make ("rtpjpegpay", NULL);
+  encoder = gst_element_factory_make ("theoraenc", NULL);
+  //GstElement *encoder = gst_element_factory_make ("jpegenc", NULL);
+  GstElement *payloader = gst_element_factory_make ("rtptheorapay", NULL);
+  //GstElement *payloader = gst_element_factory_make ("rtpjpegpay", NULL);
 
   GstCaps *videoCaps;
   SessionData *session;
   g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 1, NULL);
   g_object_set (payloader, "config-interval", 2, NULL);
-  g_object_set (encoder, "bitrate", 1000, NULL);
+  g_object_set (encoder, "bitrate", bitrate, NULL);
 
   gst_bin_add_many (videoBin, videoSrc, encoder, payloader, NULL);
   videoCaps = gst_caps_new_simple ("video/x-raw",
@@ -168,9 +169,12 @@ typedef struct _Identities
 
 
 static void
-changed_event (GstElement * mprtp_sch)
+changed_event (GstElement * mprtp_sch, guint suggested_bitrate)
 {
-  g_print("CHANGED EVENT");
+  if(suggested_bitrate) bitrate = suggested_bitrate;
+  else bitrate *= 1.1;
+  g_print("CHANGED EVENT: %d\n", bitrate);
+  g_object_set (encoder, "bitrate", bitrate, NULL);
 }
 
 static void

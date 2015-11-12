@@ -93,6 +93,8 @@ struct _GstMprtpscheduler
 struct _GstMprtpschedulerClass
 {
   GstElementClass base_class;
+
+  void  (*subflows_usage_changed) (GstElement *,guint);
 };
 
 GType gst_mprtpscheduler_get_type (void);

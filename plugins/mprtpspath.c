@@ -469,7 +469,6 @@ void mprtps_path_set_marker(MPRTPSPath * this, MPRTPSPathMarker marker)
 {
   THIS_WRITELOCK (this);
   this->marker = marker;
-  g_print("S%d: MARKER: %d\n", this->id, marker);
   THIS_WRITEUNLOCK (this);
 }
 

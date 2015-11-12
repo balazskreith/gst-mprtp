@@ -183,8 +183,8 @@ GstClockTime ricalcer_get_sum_last_two_interval(ReportIntervalCalculator * this)
 
 GstClockTime ricalcer_get_obsolate_time(ReportIntervalCalculator * this)
 {
-//  return this->obsolate_time;
-  return gst_clock_get_time (this->sysclock) - GST_SECOND;
+  return this->obsolate_time;
+  //return gst_clock_get_time (this->sysclock) - GST_SECOND;
 }
 
 gdouble _calc_report_interval(ReportIntervalCalculator * this)

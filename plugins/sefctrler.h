@@ -66,7 +66,8 @@ struct _SndEventBasedController
   gboolean          report_is_flowable;
   gboolean          suspicious;
   GstClockTime      suspicious_time;
-
+  void            (*scheduler_signaling)(gpointer, guint64);
+  gpointer          scheduler;
   GstClockTime      stability_time;
   GstClockTime      restored_happened;
   GstClockTime      restore_happened;
@@ -91,6 +92,7 @@ struct _SndEventBasedControllerClass{
 
 
 
+
 //Class functions
 void sefctrler_setup(SndEventBasedController* this,
                      StreamSplitter* splitter);
@@ -106,6 +108,12 @@ GstBufferReceiverFunc
 sefctrler_setup_mprtcp_exchange(SndEventBasedController * this,
                                 gpointer mprtcp_send_func_data,
                                 GstBufferReceiverFunc mprtcp_send_func );
+
+
+void
+sefctrler_setup_siganling(gpointer ptr,
+                                void(*scheduler_signaling)(gpointer, guint64),
+                                gpointer scheduler);
 
 GType sefctrler_get_type (void);
 #endif /* SEFCTRLER_H_ */

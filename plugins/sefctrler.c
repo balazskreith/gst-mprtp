@@ -110,6 +110,8 @@ struct _IRMoment{
 //  gdouble             goodput;
 //  gdouble             goodput_variation;
   guint32             jitter;
+  guint32             cum_packet_lost;
+  guint32             lost;
   guint64             delay;
   guint64             min_delay;
   guint64             max_delay;
@@ -166,6 +168,7 @@ struct _Subflow
   GstClockTime               marked;
   gdouble                    actual_rate;
 
+  gdouble                    actual_goodput;
   BinTree*                   goodputs;
   guint64                    goodputs_values[16];
   GstClockTime               goodputs_arrived[16];
@@ -553,13 +556,16 @@ sefctrler_state (gpointer controller_ptr)
   return result;
 }
 
+
+
+
 void
-sefctrler_set_callbacks (void (**riport_can_flow_indicator) (gpointer),
-    void (**controller_add_path) (gpointer, guint8, MPRTPSPath *),
-    void (**controller_rem_path) (gpointer, guint8),
-    void (**controller_pacing) (gpointer, gboolean),
-    gboolean (**controller_is_pacing)(gpointer),
-    GstStructure* (**controller_state)(gpointer))
+sefctrler_set_callbacks(void(**riport_can_flow_indicator)(gpointer),
+                              void(**controller_add_path)(gpointer,guint8,MPRTPSPath*),
+                              void(**controller_rem_path)(gpointer,guint8),
+                              void(**controller_pacing)(gpointer, gboolean),
+                              gboolean (**controller_is_pacing)(gpointer),
+                              GstStructure* (**controller_state)(gpointer))
 {
   if (riport_can_flow_indicator) {
     *riport_can_flow_indicator = sefctrler_riport_can_flow;
@@ -576,9 +582,10 @@ sefctrler_set_callbacks (void (**riport_can_flow_indicator) (gpointer),
   if (controller_is_pacing) {
     *controller_is_pacing = sefctrler_is_pacing;
   }
-  if (controller_state) {
+  if(controller_state){
     *controller_state = sefctrler_state;
   }
+
 }
 
 void
@@ -600,6 +607,18 @@ sefctrler_setup_mprtcp_exchange (SndEventBasedController * this,
   result = sefctrler_receive_mprtcp;
   THIS_WRITEUNLOCK (this);
   return result;
+}
+
+void
+sefctrler_setup_siganling(gpointer ptr,
+                                void(*scheduler_signaling)(gpointer, guint64),
+                                gpointer scheduler)
+{
+  SndEventBasedController * this = ptr;
+  THIS_WRITELOCK (this);
+  this->scheduler_signaling = scheduler_signaling;
+  this->scheduler = scheduler;
+  THIS_WRITEUNLOCK (this);
 }
 
 void
@@ -775,13 +794,17 @@ _riport_processing_rrblock_processor (SndEventBasedController *this,
   //--------------------------
   //validating
   //--------------------------
-  gst_rtcp_rrb_getdown (rrb, NULL, &fraction_lost, NULL,
+  gst_rtcp_rrb_getdown (rrb, NULL, &fraction_lost, &_irt0(subflow)->cum_packet_lost,
                         &HSSN_read, &_irt0(subflow)->jitter,
                         &LSR_read, &DLSR_read);
+  _irt0(subflow)->lost = _uint32_diff(_irt1(subflow)->cum_packet_lost,
+                                      _irt0(subflow)->cum_packet_lost);
   _irt0(subflow)->HSSN = (guint16) (HSSN_read & 0x0000FFFF);
   _irt0(subflow)->cycle_num = (guint16) (HSSN_read>>16);
   _irt0(subflow)->expected_packets = _uint16_diff(_irt1(subflow)->HSSN,
                                                   _irt0(subflow)->HSSN);
+
+
   LSR = (guint64) LSR_read;
   DLSR = (guint64) DLSR_read;
 
@@ -806,6 +829,7 @@ _riport_processing_rrblock_processor (SndEventBasedController *this,
 
   _irt0 (subflow)->lost_rate = ((gdouble) fraction_lost) / 256.;
 
+//  g_print("%d: %u:%f\n", subflow->id, _irt0(subflow)->lost, _irt0(subflow)->lost_rate);
 
   //--------------------------
   //evaluating
@@ -1095,7 +1119,7 @@ _refresh_goodput (Subflow * this)
       goodput = (payload_bytes_sum *
           (1. - _irt0 (this)->lost_rate) - (gfloat) discarded_bytes);
     }
-    _irt0(this)->goodput = goodput;
+    this->actual_goodput = _irt0(this)->goodput = goodput;
 //    g_print("Sub %d-GP: %f = (%f * (1.-%f) - %f), jitter: %u\n",
 //                  this->id, goodput,
 //                  payload_bytes_sum, _irt0 (this)->lost_rate,
@@ -1112,6 +1136,7 @@ _refresh_goodput (Subflow * this)
     _obsolate_goodput(this);
     if(!mprtps_path_is_monitoring(this->path)){
       _add_goodput(this, goodput);
+
     }
 //    g_print("Sub-%d-bid: %f =  (%f*%d + %f)/%d\n",
 //                  this->id,
@@ -1369,7 +1394,7 @@ void
 _perform_mitigate (SndEventBasedController * this, Subflow * subflow)
 {
   subflow->consecutive_keep = 0;
-  subflow->control_signal *= .8;
+  subflow->control_signal *= .6;
   this->bids_recalc_requested = TRUE;
   subflow->get_goodput = _get_max_goodput;
   GST_DEBUG_OBJECT (this, "Mitigate action is performed with "
@@ -1380,7 +1405,7 @@ void
 _perform_reduce (SndEventBasedController * this, Subflow * subflow)
 {
   subflow->consecutive_keep = 0;
-  subflow->control_signal *= .5;
+  subflow->control_signal *= .3;
   subflow->get_goodput = _get_max_goodput;
   this->bids_recalc_requested = TRUE;
   GST_DEBUG_OBJECT (this, "Mitigate action is performed with "
@@ -1569,9 +1594,12 @@ _system_notifier_main(SndEventBasedController * this)
   if(this->event == SPLITCTRLER_EVENT_FI)  goto done;
   if(this->event == SPLITCTRLER_EVENT_UNDERUSED) goto underused;
   //overused
+
   g_print("-------->SYSTEM IS OVERUSED<--------\n");
+  this->scheduler_signaling(this->scheduler, _ct1(this)->goodput * 8);
   goto done;
 underused:
+  this->scheduler_signaling(this->scheduler, 0);
   g_print("-------->SYSTEM IS UNDERUSED<--------\n");
 done:
   this->event = SPLITCTRLER_EVENT_FI;
@@ -1676,6 +1704,7 @@ gboolean _is_rate_stable(SndEventBasedController * this)
 
 gboolean _is_goodput_stable(SndEventBasedController * this)
 {
+  if(_ct0(this)->goodput == 0.) return FALSE;
   if(_ct0(this)->goodput < _ct1(this)->goodput * .95) return FALSE;
   if(_ct1(this)->goodput * 1.05 < _ct0(this)->goodput) return FALSE;
   return TRUE;
@@ -1706,7 +1735,7 @@ void _refresh_c(SndEventBasedController *this, Subflow *subflow)
     ++_ct0(this)->subflows.monitored;
   }
   ++_ct0(this)->subflows.num;
-  _ct0(this)->goodput += _irt0(subflow)->goodput;
+  _ct0(this)->goodput += subflow->actual_goodput;
 }
 
 SplitCtrlerEvent _get_system_event(SndEventBasedController *this)

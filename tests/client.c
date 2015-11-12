@@ -111,10 +111,10 @@ make_video_session (guint sessionNum)
   SessionData *ret = session_new (sessionNum);
   GstBin *bin = GST_BIN (gst_bin_new ("video"));
   GstElement *queue = gst_element_factory_make ("queue", NULL);
-//  GstElement *depayloader = gst_element_factory_make ("rtptheoradepay", NULL);
-    GstElement *depayloader = gst_element_factory_make ("rtpjpegdepay", NULL);
-//  GstElement *decoder = gst_element_factory_make ("theoradec", NULL);
-  GstElement *decoder = gst_element_factory_make ("jpegdec", NULL);
+  GstElement *depayloader = gst_element_factory_make ("rtptheoradepay", NULL);
+//    GstElement *depayloader = gst_element_factory_make ("rtpjpegdepay", NULL);
+  GstElement *decoder = gst_element_factory_make ("theoradec", NULL);
+//  GstElement *decoder = gst_element_factory_make ("jpegdec", NULL);
   GstElement *converter = gst_element_factory_make ("videoconvert", NULL);
   GstElement *sink = gst_element_factory_make ("autovideosink", NULL);
 

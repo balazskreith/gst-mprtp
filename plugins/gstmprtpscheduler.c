@@ -308,18 +308,28 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "a structure contains it",
           "NULL", G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
-  _subflows_change_signal =
-   g_signal_newv ("subflows-usage-changed",
-                  G_TYPE_FROM_CLASS (gobject_class),
-                  G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
-                  NULL /* closure */,
-                  NULL /* accumulator */,
-                  NULL /* accumulator data */,
-                  NULL /* C marshaller */,
-                  G_TYPE_NONE /* return_type */,
-                  0     /* n_params */,
-                  NULL  /* param_types */);
+//  _subflows_change_signal =
+//   g_signal_newv ("subflows-usage-changed",
+//                  G_TYPE_FROM_CLASS (gobject_class),
+//                  G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
+//                  NULL /* closure */,
+//                  NULL /* accumulator */,
+//                  NULL /* accumulator data */,
+//                  NULL /* C marshaller */,
+//                  G_TYPE_NONE /* return_type */,
+//                  0     /* n_params */,
+//                  NULL  /* param_types */);
 
+//  _subflows_change_signal =
+//      g_signal_new ("subflows-usage-changed", G_TYPE_FROM_CLASS (klass),
+//      G_SIGNAL_RUN_LAST, NULL,
+//      NULL, NULL, g_cclosure_marshal_generic, G_TYPE_NONE, 1, G_TYPE_UINT);
+
+  _subflows_change_signal =
+      g_signal_new ("subflows-usage-changed", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (GstMprtpschedulerClass, subflows_usage_changed),
+      NULL, NULL, g_cclosure_marshal_generic, G_TYPE_NONE, 1,
+      G_TYPE_UINT);
 }
 
 static void
@@ -551,6 +561,7 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
       THIS_READLOCK (this);
       g_value_set_uint (value, (guint) this->monitor_payload_type);
       THIS_READUNLOCK (this);
+      break;
       break;
     case PROP_AUTO_FLOW_CONTROLLING:
       THIS_READLOCK (this);
@@ -820,6 +831,15 @@ done:
   return;
 }
 
+static void
+gst_mprtpscheduler_emit_signal(gpointer ptr, guint64 data)
+{
+  GstMprtpscheduler *this = ptr;
+  THIS_READLOCK(this);
+  g_signal_emit (this,_subflows_change_signal, 0 /* details */, data);
+  THIS_READUNLOCK(this);
+}
+
 static GstFlowReturn
 gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buffer)
@@ -833,8 +853,6 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   result = GST_FLOW_OK;
 
   this = GST_MPRTPSCHEDULER (parent);
-
-//  g_signal_emit (this,_subflows_change_signal, 0 /* details */);
 
   if (gst_buffer_extract (buffer, 0, &first_byte, 1) != 1 ||
       gst_buffer_extract (buffer, 1, &second_byte, 1) != 1) {
@@ -1045,6 +1063,7 @@ _try_get_path (GstMprtpscheduler * this, guint16 subflow_id,
 }
 
 
+
 void
 _change_auto_flow_controlling_mode (GstMprtpscheduler * this,
     gboolean new_flow_controlling_mode)
@@ -1072,6 +1091,9 @@ _change_auto_flow_controlling_mode (GstMprtpscheduler * this,
         &this->controller_pacing,
         &this->controller_is_pacing,
         &this->controller_state);
+
+    sefctrler_setup_siganling(this->controller,
+                              gst_mprtpscheduler_emit_signal, this);
 
   } else {
     this->controller = g_object_new (SMANCTRLER_TYPE, NULL);

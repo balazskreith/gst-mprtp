@@ -22,6 +22,7 @@ G_BEGIN_DECLS typedef struct _MPRTPSPath MPRTPSPath;
 typedef struct _MPRTPSPathClass MPRTPSPathClass;
 typedef struct _MPRTPSubflowHeaderExtension MPRTPSubflowHeaderExtension;
 typedef struct _RTPAbsTimeExtension RTPAbsTimeExtension;
+typedef struct _CCSignalData CCSignalData;
 
 #include "gstmprtcpbuffer.h"
 #include "packetssndqueue.h"
@@ -46,6 +47,9 @@ struct _RTPAbsTimeExtension
   guint8 time[3];
 };
 
+struct _CCSignalData{
+
+};
 
 typedef enum
 {

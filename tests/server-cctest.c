@@ -83,7 +83,7 @@ setup_ghost (GstElement * src, GstBin * bin)
   gst_element_add_pad (GST_ELEMENT (bin), binPad);
 }
 static GstElement *encoder;
-guint bitrate = 100;
+guint bitrate = 512;
 static SessionData *
 make_video_session (guint sessionNum)
 {
@@ -172,8 +172,8 @@ static void
 changed_event (GstElement * mprtp_sch, guint suggested_bitrate)
 {
   if(suggested_bitrate) bitrate = suggested_bitrate;
-  else bitrate *= 1.1;
-  g_print("CHANGED EVENT: %d\n", bitrate);
+  else bitrate *= 1.;
+//  g_print("CHANGED EVENT: %d\n", bitrate);
   g_object_set (encoder, "bitrate", bitrate, NULL);
 }
 

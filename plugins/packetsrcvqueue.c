@@ -304,7 +304,15 @@ PacketsRcvQueueNode* _make_node(PacketsRcvQueue *this,
   result->snd_time = snd_time;
   result->next = NULL;
   result->added = gst_clock_get_time(this->sysclock);
-  if(delay) *delay = get_epoch_time_from_ntp_in_ns(result->rcv_time - result->snd_time);
+  if(!delay) return result;
+
+  *delay = get_epoch_time_from_ntp_in_ns(result->rcv_time - result->snd_time);
+  if(*delay < 60 * GST_SECOND) return result;
+  g_print("PROBLEM: S: %lu - R: %lu = %lu:%lu\n",
+          result->snd_time,
+          result->rcv_time,
+          (guint64)(result->rcv_time - result->snd_time),
+          *delay);
   return result;
 }
 

@@ -146,7 +146,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-refctrler.lo libgstmprtp_la-bintree.lo \
 	libgstmprtp_la-packetsrcvqueue.lo \
 	libgstmprtp_la-packetssndqueue.lo \
-	libgstmprtp_la-playoutgate.lo libgstmprtp_la-ricalcer.lo
+	libgstmprtp_la-playoutgate.lo libgstmprtp_la-ricalcer.lo \
+	libgstmprtp_la-streamtracker.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -406,7 +407,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          packetsrcvqueue.c          \
                          packetssndqueue.c          \
                          playoutgate.c              \
-                         ricalcer.c
+                         ricalcer.c                 \
+                         streamtracker.c
 
 noinst_HEADERS = mprtpspath.h      \
                  rmanctrler.h      \
@@ -420,7 +422,8 @@ noinst_HEADERS = mprtpspath.h      \
                  packetsrcvqueue.h \
                  packetssndqueue.h \
                  playoutgate.h     \
-                 ricalcer.h
+                 ricalcer.h        \
+                 streamtracker.h
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -533,6 +536,7 @@ include ./$(DEPDIR)/libgstmprtp_la-sefctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-smanctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-streamjoiner.Plo
 include ./$(DEPDIR)/libgstmprtp_la-streamsplitter.Plo
+include ./$(DEPDIR)/libgstmprtp_la-streamtracker.Plo
 
 .c.o:
 	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -687,6 +691,13 @@ libgstmprtp_la-ricalcer.lo: ricalcer.c
 #	$(AM_V_CC)source='ricalcer.c' object='libgstmprtp_la-ricalcer.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-ricalcer.lo `test -f 'ricalcer.c' || echo '$(srcdir)/'`ricalcer.c
+
+libgstmprtp_la-streamtracker.lo: streamtracker.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-streamtracker.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-streamtracker.Tpo -c -o libgstmprtp_la-streamtracker.lo `test -f 'streamtracker.c' || echo '$(srcdir)/'`streamtracker.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-streamtracker.Tpo $(DEPDIR)/libgstmprtp_la-streamtracker.Plo
+#	$(AM_V_CC)source='streamtracker.c' object='libgstmprtp_la-streamtracker.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-streamtracker.lo `test -f 'streamtracker.c' || echo '$(srcdir)/'`streamtracker.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

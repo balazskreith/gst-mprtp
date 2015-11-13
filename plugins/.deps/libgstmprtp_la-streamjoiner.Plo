@@ -196,7 +196,7 @@ libgstmprtp_la-streamjoiner.lo: streamjoiner.c /usr/include/stdc-predef.h \
  playoutgate.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
  gstmprtcpbuffer.h mprtpspath.h packetssndqueue.h bintree.h \
- packetsrcvqueue.h /usr/include/math.h \
+ packetsrcvqueue.h streamtracker.h /usr/include/math.h \
  /usr/include/x86_64-linux-gnu/bits/huge_val.h \
  /usr/include/x86_64-linux-gnu/bits/huge_valf.h \
  /usr/include/x86_64-linux-gnu/bits/huge_vall.h \
@@ -671,6 +671,8 @@ packetssndqueue.h:
 bintree.h:
 
 packetsrcvqueue.h:
+
+streamtracker.h:
 
 /usr/include/math.h:
 

@@ -72,6 +72,7 @@ mprtpr_path_init (MpRTPRPath * this)
   this->min_delay_bintree = make_bintree(_cmp_for_min);
   this->max_delay_bintree = make_bintree(_cmp_for_max);
   this->last_drift_window = GST_MSECOND;
+  this->delaytracker = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 0);
   mprtpr_path_reset (this);
 }
 
@@ -390,6 +391,16 @@ mprtpr_path_get_delay (MpRTPRPath * this,
 //  g_print("%d-%d\n", min_count, max_count);
 done:
   this->last_delay = result;
+  {
+    guint64 min,max,res;
+    //compare:
+    res = streamtracker_get_stats(this->delaytracker, &min, &max);
+    g_print("Median: %lu -%lu; Min: %lu-%lu Max: %lu-%lu\n",
+            res, result,
+            min, min_delay?*min_delay:0,
+            max, max_delay?*max_delay:0);
+
+  }
   THIS_WRITEUNLOCK (this);
 //  g_print("mprtpr_path_get_delay_median end\n");
   return result;
@@ -524,8 +535,10 @@ void _add_delay(MpRTPRPath *this, GstClockTime delay)
 {
   GstClockTime treshold,now;
 //  g_print("Subflow %d added delay: %lu\n", this->id, delay);
+//  if(this->id==1) g_print("%lu,",delay);
   now = gst_clock_get_time(this->sysclock);
-  treshold = now - 10 * GST_SECOND;
+  treshold = now - GST_SECOND;
+  streamtracker_add(this->delaytracker, delay);
   again:
   //elliminate the old ones
   if((this->delays[this->delays_read_index] > 0 &&
@@ -574,7 +587,7 @@ balancing:
   max_count = bintree_get_num(this->max_delay_bintree);
 
  //To get the 75 percentile we shift max_count by 1
-  diff = (max_count>>1) - min_count;
+  diff = max_count - min_count;
 //  g_print("max_tree_num: %d, min_tree_num: %d\n", max_tree_num, min_tree_num);
   if (-2 < diff && diff < 2) {
     goto done;

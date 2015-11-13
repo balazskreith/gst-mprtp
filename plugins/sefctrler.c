@@ -843,7 +843,7 @@ _riport_processing_rrblock_processor (SndEventBasedController *this,
   if(subflow->imprecise){
     goto done;
   }
-  g_print("S%d RTT: %lu\n", subflow->id, _irt0(subflow)->RTT);
+//  g_print("S%d RTT: %lu\n", subflow->id, _irt0(subflow)->RTT);
   if(PATH_RTT_MAX_TRESHOLD < _irt0(subflow)->RTT && ++subflow->consecutive_late_RTT> 2){
     event = EVENT_LATE;
     goto fire;
@@ -1064,8 +1064,6 @@ evaluate_delay:
                              &lt_max_delay);
       gamma1 = (gdouble)prev_delay / (gdouble)delay;
       gamma2 = (gdouble)lt_delay / (gdouble)delay;
-//      g_print("S%d: ltd: %lu, ltmn: %lu ltmx: %lu prev: %lu, act: %lu g1: %f g2: %f\n",
-//              subflow->id, lt_delay, lt_min_dealy, lt_max_delay, prev_delay, delay, gamma1, gamma2);
       if(gamma1 < .75 || gamma2 < .75){
         _subflow_fire(this, subflow, EVENT_DISTORTION);
       }
@@ -1126,7 +1124,6 @@ _refresh_goodput (Subflow * this)
     gfloat payload_bytes_sum = 0.;
     guint32 discarded_bytes;
     gfloat goodput;
-//g_print("RECORD NUM: %d\n", this->records_index);
     if (_irt1(this)->time == 0) {
         interval = GST_CLOCK_DIFF (this->joined_time, _irt0(this)->time);
     }else{
@@ -1158,7 +1155,6 @@ _refresh_goodput (Subflow * this)
 //      diff = _irt1(this)->goodput - _irt0(this)->goodput;
 //      if(diff < 0.) diff*=-1.;
 //      _irt0(this)->goodput_variation = _irt1(this)->goodput_variation + (diff - _irt1(this)->goodput_variation) / 16.;
-//      g_print("variation around the goodput: %f\n", _irt0(this)->goodput_variation);
 //    }
     _obsolate_goodput(this);
     if(!mprtps_path_is_monitoring(this->path)){
@@ -1177,14 +1173,6 @@ _refresh_goodput (Subflow * this)
   //sending_bid
   {
 
-
-//    g_print("Sub %d-Sb: %u = (%u * %u + %f)/%u\n",
-//              this->id,
-//              _irt0(this)->sending_bid,
-//              _irt1(this)->sending_bid,
-//              _irt1(this)->stability,
-//              _irt1(this)->goodput,
-//              _irt0(this)->stability + 1);
   }
 }
 
@@ -1201,7 +1189,7 @@ _subflow_fire (SndEventBasedController * this, Subflow * subflow, Event event)
   if(subflow->ir_moments_num < 2){
     goto done;
   }
-  g_print ("FIRE->%d-state:%d:%d\n", subflow->id, mprtps_path_get_state (path), event);
+//  g_print ("FIRE->%d-state:%d:%d\n", subflow->id, mprtps_path_get_state (path), event);
 
   if(!subflow->imprecise && event == EVENT_DEACTIVATE){
     subflow->imprecise = TRUE;
@@ -1499,7 +1487,6 @@ _orp_producer_main(SndEventBasedController * this)
   {
     subflow = (Subflow *) val;
     ricalcer = subflow->ricalcer;
-
     if (!this->report_is_flowable || !ricalcer_do_report_now(ricalcer)) {
       continue;
     }
@@ -1518,7 +1505,6 @@ _orp_producer_main(SndEventBasedController * this)
                                 _ort0(subflow)->media_rate,
                                 subflow->avg_rtcp_size);
   }
-
   return;
 }
 
@@ -1693,14 +1679,16 @@ void _recalc_bids(SndEventBasedController * this)
       continue;
     }
     sb = subflow->control_signal * subflow->get_goodput(subflow);
-    g_print("Subflow %d sending bid %u =  %f * %u\n",
-            subflow->id,
-            sb,
-            subflow->control_signal,
-            _get_max_goodput(subflow));
+//    g_print("Subflow %d sending bid %u =  %f * %u\n",
+//            subflow->id,
+//            sb,
+//            subflow->control_signal,
+//            _get_max_goodput(subflow));
     stream_splitter_setup_sending_bid(this->splitter,
                                       subflow->id,
                                       sb);
+    //    g_print("%d,",_irt2(subflow)->goodput < _irt1(subflow)->goodput ? 1 : 0);
+//        g_print("%f,",subflow->actual_goodput);
   }
 }
 

@@ -911,9 +911,20 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
         "The received buffer absolute time extension is not processable");
     //snd_time calc by rtp timestamp
   } else {
+    guint32 rcv_chunk = (NTP_NOW >> 14) & 0x00ffffff;
+    guint64 ntp_base = NTP_NOW;
     memcpy (&snd_time, pointer, 3);
+    if(rcv_chunk < snd_time){
+      ntp_base-=0x0000004000000000UL;
+    }
+
+//    g_print("%32lu-%32lu=%32lu\n",
+//            NTP_NOW,
+//            (snd_time << 14) | (ntp_base & 0xFFFFFFC000000000UL),
+//            get_epoch_time_from_ntp_in_ns(NTP_NOW - ((snd_time << 14) | (ntp_base & 0xFFFFFFC000000000UL))));
     snd_time <<= 14;
-    snd_time |= NTP_NOW & 0xffffffC000000000UL;
+//    snd_time |= NTP_NOW & 0xffffffC000000000UL;
+    snd_time |=  (ntp_base & 0xFFFFFFC000000000UL);
   }
 
   //to avoid the check_collision problem in rtpsession.

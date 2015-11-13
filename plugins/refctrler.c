@@ -613,7 +613,7 @@ _orp_main(RcvEventBasedController * this)
 //
 //    if(lost)
 //      ricalcer_urgent_report_request(subflow->ricalcer);
-
+    g_print("%lu,",mprtpr_path_get_delay(subflow->path, NULL, NULL));
     if (!this->report_is_flowable || !ricalcer_do_report_now(ricalcer)) {
       continue;
     }
@@ -651,7 +651,7 @@ _orp_main(RcvEventBasedController * this)
                                 subflow->avg_rtcp_size);
     ricalcer_do_next_report_time(ricalcer);
   }
-
+  g_print("\n");
 }
 
 void

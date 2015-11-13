@@ -811,7 +811,7 @@ gst_mprtpscheduler_mprtp_proxy(gpointer ptr, GstBuffer * buffer)
   }
   //Absolute sending time +0x83AA7E80
   //https://tools.ietf.org/html/draft-alvestrand-rmcat-remb-03
-  time = (guint32) ((NTP_NOW >> 14) & 0x00ffffff);
+  time = (NTP_NOW >> 14) & 0x00ffffff;
 
   memcpy (&data, &time, 3);
   gst_rtp_buffer_add_extension_onebyte_header (&rtp,
@@ -949,6 +949,7 @@ gst_mprtpscheduler_sink_eventfunc (GstPad * srckpad, GstObject * parent,
 {
   GstMprtpscheduler * this;
   gboolean result = TRUE, forward = TRUE;
+
   this = GST_MPRTPSCHEDULER(parent);
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_FLUSH_START:

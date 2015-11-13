@@ -23,6 +23,7 @@ typedef struct _MpRTPReceiverPathClass MpRTPRPathClass;
 typedef struct _MpRTPRReceivedItem  MpRTPRReceivedItem;
 
 #include "streamjoiner.h"
+#include "streamtracker.h"
 
 #define MPRTPR_PACKET_INIT           {NULL, 0, 0, 0}
 
@@ -68,6 +69,9 @@ struct _MpRTPReceiverPath
   guint64             total_packets_received;
   PacketsRcvQueue*    packetsqueue;
   guint32             last_rtp_timestamp;
+
+  StreamTracker*      delaytracker;
+
   BinTree*            min_skew_bintree;
   BinTree*            max_skew_bintree;
   BinTree*            min_delay_bintree;

@@ -51,13 +51,6 @@ struct _CCSignalData{
 
 };
 
-typedef enum
-{
-  MPRTPS_PATH_MARKER_OVERUSED   = -1,
-  MPRTPS_PATH_MARKER_NEUTRAL    =  0,
-  MPRTPS_PATH_MARKER_UNDERUSED  =  1,
-} MPRTPSPathMarker;
-
 
 typedef enum
 {
@@ -94,7 +87,6 @@ struct _MPRTPSPath
   guint                   abs_time_ext_header_id;
   guint                   mprtp_ext_header_id;
 
-  MPRTPSPathMarker        marker;
 
   GstClockTime            sent_passive;
   GstClockTime            sent_active;
@@ -118,12 +110,6 @@ struct _MPRTPSPath
   void                    (*send_mprtp_packet_func)(gpointer, GstBuffer*);
   gpointer                  send_mprtp_func_data;
 
-  BinTree*            max_delay_bintree;
-  BinTree*            min_delay_bintree;
-  guint8              delays_write_index;
-  guint8              delays_read_index;
-  guint64             delays[MAX_DELAY_LENGTH];
-  GstClockTime        delays_arrived[MAX_DELAY_LENGTH];
 };
 
 struct _MPRTPSPathClass
@@ -161,15 +147,6 @@ void mprtps_path_process_rtp_packet(MPRTPSPath * this,
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_frames_num (MPRTPSPath * this);
 guint32 mprtps_path_get_sent_octet_sum_for(MPRTPSPath *this, guint32 amount);
-
-void mprtps_path_set_marker(MPRTPSPath * this, MPRTPSPathMarker marker);
-MPRTPSPathMarker mprtps_path_get_marker(MPRTPSPath * this);
-void mprtps_path_add_delay(MPRTPSPath *this, GstClockTime delay);
-void mprtps_path_get_delays (MPRTPSPath * this,
-                             GstClockTime *delay,
-                             GstClockTime *last_delay,
-                             GstClockTime *min_delay,
-                             GstClockTime *max_delay);
 
 MPRTPSPathState mprtps_path_get_state (MPRTPSPath * this);
 void mprtps_path_set_state (MPRTPSPath * this, MPRTPSPathState state);

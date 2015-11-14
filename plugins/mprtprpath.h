@@ -70,21 +70,9 @@ struct _MpRTPReceiverPath
   PacketsRcvQueue*    packetsqueue;
   guint32             last_rtp_timestamp;
 
-  StreamTracker*      delaytracker;
+  StreamTracker*      delays;
+  StreamTracker*      skews;
 
-  BinTree*            min_skew_bintree;
-  BinTree*            max_skew_bintree;
-  BinTree*            min_delay_bintree;
-  BinTree*            max_delay_bintree;
-  guint32             skew_bytes;
-  guint8              skews_payload_octets[SKEWS_ARRAY_LENGTH];
-  guint64             skews[SKEWS_ARRAY_LENGTH];
-  GstClockTime        skews_arrived[SKEWS_ARRAY_LENGTH];
-  guint8              skews_index;
-  guint64             delays[SKEWS_ARRAY_LENGTH];
-  GstClockTime        delays_arrived[SKEWS_ARRAY_LENGTH];
-  guint8              delays_write_index;
-  guint8              delays_read_index;
   GstClockTime        last_drift_window;
   GstClockTime        last_delay;
 

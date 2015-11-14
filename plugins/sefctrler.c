@@ -151,34 +151,34 @@ struct _Subflow
   guint8                     id;
   GstClock*                  sysclock;
   ReportIntervalCalculator*  ricalcer;
-  gboolean                   imprecise;
-  guint                      imprecise_counter;
+//  gboolean                   imprecise;
+//  guint                      imprecise_counter;
   IRMoment*                  ir_moments;
   gint                       ir_moments_index;
   guint32                    ir_moments_num;
   ORMoment                   or_moments[2];
   gint                       or_moments_index;
   guint32                    or_moments_num;
-  GstClockTime               RTT;
-  guint                      consecutive_late_RTT;
+//  GstClockTime               RTT;
+//  guint                      consecutive_late_RTT;
   gdouble                    avg_rtcp_size;
-  gdouble                    control_signal;
-  guint32                    consecutive_keep;
-  guint32                    (*get_goodput)(Subflow*);
-  guint                      tr;
-  GstClockTime               restored;
-  GstClockTime               marked;
+//  gdouble                    control_signal;
+//  guint32                    consecutive_keep;
+//  guint32                    (*get_goodput)(Subflow*);
+//  guint                      tr;
+//  GstClockTime               restored;
+//  GstClockTime               marked;
   gdouble                    actual_rate;
 
-  gdouble                    actual_goodput;
-  BinTree*                   goodputs;
-  guint64                    goodputs_values[16];
-  GstClockTime               goodputs_arrived[16];
-  guint8                     goodputs_read;
-  guint8                     goodputs_write;
+//  gdouble                    actual_goodput;
+//  BinTree*                   goodputs;
+//  guint64                    goodputs_values[16];
+//  GstClockTime               goodputs_arrived[16];
+//  guint8                     goodputs_read;
+//  guint8                     goodputs_write;
 
-  guint8                     required_wait;
-  gboolean                   increasable;
+//  guint8                     required_wait;
+//  gboolean                   increasable;
 };
 
 //----------------------------------------------------------------------

@@ -26,10 +26,6 @@ G_DEFINE_TYPE (MpRTPRPath, mprtpr_path, G_TYPE_OBJECT);
 static void mprtpr_path_finalize (GObject * object);
 static void mprtpr_path_reset (MpRTPRPath * this);
 
-static void _balancing_skew_trees (MpRTPRPath * this);
-static void _add_delay(MpRTPRPath *this, GstClockTime delay);
-static void _balancing_delay_trees (MpRTPRPath * this);
-static void _add_skew(MpRTPRPath *this, guint64 skew, guint8 payload_octets);
 static gint _cmp_seq (guint16 x, guint16 y);
 static gint _cmp_for_max (guint64 x, guint64 y);
 static gint _cmp_for_min (guint64 x, guint64 y);
@@ -67,12 +63,10 @@ mprtpr_path_init (MpRTPRPath * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetsrcvqueue();
-  this->min_skew_bintree = make_bintree(_cmp_for_min);
-  this->max_skew_bintree = make_bintree(_cmp_for_max);
-  this->min_delay_bintree = make_bintree(_cmp_for_min);
-  this->max_delay_bintree = make_bintree(_cmp_for_max);
   this->last_drift_window = GST_MSECOND;
-  this->delaytracker = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 0);
+  this->delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 0);
+  this->skews = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 0);
+  streamtracker_set_treshold(this->skews, 2 * GST_SECOND);
   mprtpr_path_reset (this);
 }
 
@@ -88,8 +82,8 @@ mprtpr_path_finalize (GObject * object)
   MpRTPRPath *this;
   this = MPRTPR_PATH_CAST (object);
   g_object_unref (this->sysclock);
-  g_object_unref(this->min_skew_bintree);
-  g_object_unref(this->max_skew_bintree);
+  g_object_unref(this->delays);
+  g_object_unref(this->skews);
   g_object_unref(this->packetsqueue);
 }
 
@@ -116,16 +110,6 @@ mprtpr_path_reset (MpRTPRPath * this)
   this->last_received_time = 0;
   this->PHSN = 0;
 
-  this->skew_bytes = 0;
-  this->skews_index = 0;
-  memset(this->skews, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(guint64));
-  memset(this->skews_payload_octets, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(guint8));
-  memset(this->skews_arrived, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(GstClockTime));
-
-  this->delays_read_index = 0;
-  this->delays_write_index = 0;
-  memset(this->delays, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(GstClockTime));
-  memset(this->delays_arrived, 0, sizeof(SKEWS_ARRAY_LENGTH) * sizeof(GstClockTime));
 }
 
 guint16
@@ -240,7 +224,7 @@ guint32 mprtpr_path_get_skew_byte_num(MpRTPRPath *this)
 {
   guint32 result;
   THIS_READLOCK (this);
-  result = this->skew_bytes;
+  result = 0;
   THIS_READUNLOCK (this);
   return result;
 }
@@ -249,7 +233,7 @@ guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this)
 {
   guint32 result;
   THIS_READLOCK (this);
-  result = bintree_get_num(this->min_skew_bintree) + bintree_get_num(this->max_skew_bintree);
+  result = 0;
   THIS_READUNLOCK (this);
   return result;
 }
@@ -283,7 +267,7 @@ void mprtpr_path_set_state(MpRTPRPath *this, MPRTPRPathState state)
 void mprtpr_path_set_delay(MpRTPRPath *this, GstClockTime delay)
 {
   THIS_WRITELOCK (this);
-  _add_delay(this, delay);
+  streamtracker_add(this->delays, delay);
 //  g_print("Add delay to subflow %d delay %lu-num:%u-%u->index:%d\n",
 //          this->id,
 //          delay,
@@ -302,18 +286,6 @@ MPRTPRPathState mprtpr_path_get_state(MpRTPRPath *this)
   return result;
 }
 
-guint64 mprtpr_path_get_last_skew(MpRTPRPath *this)
-{
-  guint64 result = 0;
-  guint8 last_index = 0;
-//  g_print("mprtpr_path_get_last_skew begin\n");
-  THIS_READLOCK (this);
-  last_index = this->skews_index-1;
-  result = this->skews[last_index];
-  THIS_READUNLOCK (this);
-//  g_print("mprtpr_path_get_last_skew end\n");
-  return result;
-}
 
 
 
@@ -335,29 +307,13 @@ mprtpr_path_get_drift_window (MpRTPRPath * this,
 {
   guint64 result;
   gint32 max_count, min_count;
-//  g_print("mprtpr_path_get_skew_median begin\n");
   THIS_WRITELOCK (this);
   result = this->last_drift_window;
-  min_count = bintree_get_num(this->min_skew_bintree);
-  max_count = bintree_get_num(this->max_skew_bintree);
-  if(min_count + max_count < 3)
-    goto done;
-  if(min_count < max_count)
-    result = bintree_get_top_value(this->max_skew_bintree);
-  else if(max_count < min_count)
-    result = bintree_get_top_value(this->min_skew_bintree);
-  else{
-      result = (bintree_get_top_value(this->max_skew_bintree) +
-                bintree_get_top_value(this->min_skew_bintree))>>1;
-  }
-//  g_print("%d-%d\n", min_count, max_count);
-  if(min_skew) *min_skew = bintree_get_bottom_value(this->max_skew_bintree);
-  if(max_skew) *max_skew = bintree_get_bottom_value(this->min_skew_bintree);
+  if(!streamtracker_get_num(this->skews)) goto done;
+  result = streamtracker_get_stats(this->skews, min_skew, max_skew);
 done:
   this->last_drift_window = result;
   THIS_WRITEUNLOCK (this);
-//  g_print("mprtpr_path_get_skew_median end\n");
-//  g_print("MEDIAN: %lu\n", result);
   return result;
 }
 
@@ -369,40 +325,13 @@ mprtpr_path_get_delay (MpRTPRPath * this,
 {
   guint64 result;
   gint32 max_count, min_count;
-//  g_print("mprtpr_path_get_delay_median begin\n");
   THIS_WRITELOCK (this);
   result = this->last_delay;
-  if(min_delay) *min_delay = result;
-  if(max_delay) *max_delay = result;
-  min_count = bintree_get_num(this->min_delay_bintree);
-  max_count = bintree_get_num(this->max_delay_bintree);
-  if(min_count + max_count < 1)
-    goto done;
-  if(min_count < max_count)
-    result = bintree_get_top_value(this->max_delay_bintree);
-  else if(max_count < min_count)
-    result = bintree_get_top_value(this->min_delay_bintree);
-  else{
-    result = (bintree_get_top_value(this->max_delay_bintree) +
-              bintree_get_top_value(this->min_delay_bintree))>>1;
-  }
-  if(min_delay) *min_delay = bintree_get_bottom_value(this->max_delay_bintree);
-  if(max_delay) *max_delay = bintree_get_bottom_value(this->min_delay_bintree);
-//  g_print("%d-%d\n", min_count, max_count);
+  if(!streamtracker_get_num(this->delays)) goto done;
+  result = streamtracker_get_stats(this->delays, min_delay, max_delay);
 done:
   this->last_delay = result;
-  {
-    guint64 min,max,res;
-    //compare:
-    res = streamtracker_get_stats(this->delaytracker, &min, &max);
-    g_print("Median: %lu -%lu; Min: %lu-%lu Max: %lu-%lu\n",
-            res, result,
-            min, min_delay?*min_delay:0,
-            max, max_delay?*max_delay:0);
-
-  }
   THIS_WRITEUNLOCK (this);
-//  g_print("mprtpr_path_get_delay_median end\n");
   return result;
 }
 
@@ -449,165 +378,16 @@ add:
                           &delay);
 //  if(this->id == 1) g_print("%lu,", delay);
   if(this->last_rtp_timestamp != gst_rtp_buffer_get_timestamp(rtp)){
-    _add_skew(this, skew, payload_bytes>>3);
+    streamtracker_add(this->skews, skew);
     this->last_rtp_timestamp = gst_rtp_buffer_get_timestamp(rtp);
   }
 done:
-  _add_delay(this, delay);
+  streamtracker_add(this->delays, delay);
   THIS_WRITEUNLOCK (this);
 //  g_print("mprtpr_path_process_rtp_packet end\n");
   return;
 
 }
-
-void _add_skew(MpRTPRPath *this, guint64 skew, guint8 payload_octets)
-{
-  GstClockTime treshold,now,added;
-//  g_print("Subflow %d added skew: %lu\n", this->id, skew);
-  now = gst_clock_get_time(this->sysclock);
-  treshold = now - 2 * GST_SECOND;
-  again:
-  ++this->skews_index;
-  //elliminate the old ones
-//  g_print("Subflow %d current byte num: %u payload bytes: %u\n", this->id, this->skew_bytes, );
-  this->skew_bytes -= this->skews_payload_octets[this->skews_index]<<3;
-  this->skews_payload_octets[this->skews_index] = 0;
-  if(this->skews[this->skews_index] > 0){
-    if(this->skews[this->skews_index] <= bintree_get_top_value(this->max_skew_bintree))
-      bintree_delete_value(this->max_skew_bintree, this->skews[this->skews_index]);
-    else
-      bintree_delete_value(this->min_skew_bintree, this->skews[this->skews_index]);
-  }
-  this->skews[this->skews_index] = 0;
-  added = this->skews_arrived[this->skews_index];
-  this->skews_arrived[this->skews_index] = 0;
-  if(0 < added && added < treshold) goto again;
-
-  //add new one
-  this->skews[this->skews_index] = skew;
-  this->skews_arrived[this->skews_index] = now;
-  this->skew_bytes += (guint32)payload_octets<<3;
-  this->skews_payload_octets[this->skews_index] = payload_octets;
-  if(this->skews[this->skews_index] <= bintree_get_top_value(this->max_skew_bintree))
-    bintree_insert_value(this->max_skew_bintree, this->skews[this->skews_index]);
-  else
-    bintree_insert_value(this->min_skew_bintree, this->skews[this->skews_index]);
-
-  _balancing_skew_trees(this);
-
-  ++this->skews_index;
-}
-
-void
-_balancing_skew_trees (MpRTPRPath * this)
-{
-  gint32 max_count, min_count;
-  gint32 diff;
-  BinTreeNode *top;
-
-
-balancing:
-  min_count = bintree_get_num(this->min_skew_bintree);
-  max_count = bintree_get_num(this->max_skew_bintree);
-
-  //  diff = (max_count>>1) - min_count;
-  diff = (max_count) - min_count;
-//  g_print("max_tree_num: %d, min_tree_num: %d\n", max_tree_num, min_tree_num);
-  if (-2 < diff && diff < 2) {
-    goto done;
-  }
-  if (diff < -1) {
-    top = bintree_pop_top_node(this->min_skew_bintree);
-    bintree_insert_node(this->max_skew_bintree, top);
-  } else if (1 < diff) {
-      top = bintree_pop_top_node(this->max_skew_bintree);
-      bintree_insert_node(this->min_skew_bintree, top);
-  }
-  goto balancing;
-
-done:
-  return;
-}
-
-
-
-void _add_delay(MpRTPRPath *this, GstClockTime delay)
-{
-  GstClockTime treshold,now;
-//  g_print("Subflow %d added delay: %lu\n", this->id, delay);
-//  if(this->id==1) g_print("%lu,",delay);
-  now = gst_clock_get_time(this->sysclock);
-  treshold = now - GST_SECOND;
-  streamtracker_add(this->delaytracker, delay);
-  again:
-  //elliminate the old ones
-  if((this->delays[this->delays_read_index] > 0 &&
-      this->delays_arrived[this->delays_read_index] < treshold) ||
-     this->delays_write_index == this->delays_read_index){
-//      g_print("delete at %d delays[%d]=%lu\n",
-//              this->id,
-//              this->delays_index,
-//              this->delays[this->delays_index]);
-    if(this->delays[this->delays_read_index] <= bintree_get_top_value(this->max_delay_bintree))
-      bintree_delete_value(this->max_delay_bintree, this->delays[this->delays_read_index]);
-    else
-      bintree_delete_value(this->min_delay_bintree, this->delays[this->delays_read_index]);
-
-    this->delays[this->delays_read_index] = 0;
-    this->delays_arrived[this->delays_read_index] = 0;
-    ++this->delays_read_index;
-    goto again;
-  }
-
-
-  //add new one
-  this->delays[this->delays_write_index] = delay;
-  this->delays_arrived[this->delays_write_index] = now;
-  if(this->delays[this->delays_write_index] <= bintree_get_top_value(this->max_delay_bintree))
-    bintree_insert_value(this->max_delay_bintree, this->delays[this->delays_write_index]);
-  else
-    bintree_insert_value(this->min_delay_bintree, this->delays[this->delays_write_index]);
-
-  _balancing_delay_trees(this);
-
-  ++this->delays_write_index;
-
-}
-
-void
-_balancing_delay_trees (MpRTPRPath * this)
-{
-  gint32 max_count, min_count;
-  gint32 diff;
-  BinTreeNode *top;
-
-
-balancing:
-  min_count = bintree_get_num(this->min_delay_bintree);
-  max_count = bintree_get_num(this->max_delay_bintree);
-
- //To get the 75 percentile we shift max_count by 1
-  diff = max_count - min_count;
-//  g_print("max_tree_num: %d, min_tree_num: %d\n", max_tree_num, min_tree_num);
-  if (-2 < diff && diff < 2) {
-    goto done;
-  }
-  if (diff < -1) {
-    top = bintree_pop_top_node(this->min_delay_bintree);
-    bintree_insert_node(this->max_delay_bintree, top);
-  } else if (1 < diff) {
-      top = bintree_pop_top_node(this->max_delay_bintree);
-      bintree_insert_node(this->min_delay_bintree, top);
-  }
-  goto balancing;
-
-done:
-  return;
-}
-
-
-
-
 
 
 gint

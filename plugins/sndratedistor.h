@@ -43,6 +43,7 @@ struct _SendingRateDistributorClass{
 GType sndrate_distor_get_type (void);
 SendingRateDistributor *make_sndrate_distor(void);
 guint8 sndrate_distor_request_id(SendingRateDistributor *this, MPRTPSPath *path);
+void sndrate_distor_measurement_update(SendingRateDistributor *this, guint8 id, gfloat goodput);
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_undershoot(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_bounce_back(SendingRateDistributor *this, guint8 id);

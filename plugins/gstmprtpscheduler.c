@@ -402,6 +402,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->paths = g_hash_table_new_full (NULL, NULL, NULL, g_free);
   this->splitter = (StreamSplitter *) g_object_new (STREAM_SPLITTER_TYPE, NULL);
   this->controller = NULL;
+  stream_splitter_set_monitor_payload_type(this->splitter, this->monitor_payload_type);
   _change_auto_flow_controlling_mode (this, FALSE);
   _setup_paths(this);
 }
@@ -648,6 +649,7 @@ _setup_paths (GstMprtpscheduler * this)
     mprtps_path_set_monitor_payload_id(path, this->monitor_payload_type);
     mprtps_path_set_mprtp_ext_header_id(path, this->mprtp_ext_header_id);
   }
+  stream_splitter_set_monitor_payload_type(this->splitter, this->monitor_payload_type);
 }
 
 

@@ -102,8 +102,7 @@ struct _MPRTPSPath
   GstClockTime            last_packet_sent_time;
   guint32                 last_sent_payload_bytes;
 
-  guint32                 ticknum;
-  guint32                 monitoring_tick;
+  guint32                 monitoring_interval;
   guint16                 monitor_seq;
   guint8                  monitor_payload_type;
 
@@ -137,8 +136,7 @@ gboolean mprtps_path_is_non_congested (MPRTPSPath * this);
 void mprtps_path_set_congested (MPRTPSPath * this);
 void mprtps_path_set_non_congested (MPRTPSPath * this);
 guint8 mprtps_path_get_id (MPRTPSPath * this);
-void mprtps_path_turn_monitoring_on(MPRTPSPath *this);
-void mprtps_path_turn_monitoring_off(MPRTPSPath *this);
+void mprtps_path_set_monitor_interval(MPRTPSPath *this, guint interval);
 gboolean mprtps_path_is_monitoring (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_packets_num (MPRTPSPath * this);
 void mprtps_path_tick(MPRTPSPath *this);

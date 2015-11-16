@@ -99,9 +99,8 @@ mprtps_path_reset (MPRTPSPath * this)
   this->sent_octets_read = 0;
   this->sent_octets_write = 0;
   this->max_bytes_per_ms = 0;
-  this->ticknum = 0;
   this->monitor_payload_type = FALSE;
-  this->monitoring_tick = 0;
+  this->monitoring_interval = 0;
 
   packetssndqueue_reset(this->packetsqueue);
 }
@@ -374,28 +373,21 @@ mprtps_path_get_id (MPRTPSPath * this)
   return result;
 }
 
-void mprtps_path_turn_monitoring_on(MPRTPSPath *this)
+void mprtps_path_set_monitor_interval(MPRTPSPath *this, guint interval)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->monitoring_tick = 1;
+  this->monitoring_interval = interval;
   THIS_WRITEUNLOCK (this);
 }
 
-void mprtps_path_turn_monitoring_off(MPRTPSPath *this)
-{
-  g_return_if_fail (this);
-  THIS_WRITELOCK (this);
-  this->monitoring_tick = 0;
-  THIS_WRITEUNLOCK (this);
-}
 
 gboolean
 mprtps_path_is_monitoring (MPRTPSPath * this)
 {
   gboolean result;
   THIS_READLOCK (this);
-  result = this->monitoring_tick > 0;
+  result = this->monitoring_interval > 0;
   THIS_READUNLOCK (this);
   return result;
 }
@@ -470,13 +462,6 @@ mprtps_path_tick(MPRTPSPath *this)
 {
 
   THIS_WRITELOCK (this);
-  ++this->ticknum;
-  if(this->monitoring_tick > 0 && this->ticknum % this->monitoring_tick == 0){
-    GstBuffer *buffer;
-    buffer = _create_monitor_packet(this);
-    _setup_rtp2mprtp(this, buffer);
-    _send_mprtp_packet(this, buffer);
-  }
   if(packetssndqueue_has_buffer(this->packetsqueue)){
     _try_flushing(this);
   }
@@ -491,6 +476,15 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
   THIS_WRITELOCK (this);
   _setup_rtp2mprtp (this, buffer);
   _send_mprtp_packet(this, buffer);
+  if(!this->monitoring_interval) goto done;
+  if(this->total_sent_packet_num % this->monitoring_interval != 0) goto done;
+  {
+    GstBuffer *buffer;
+    buffer = _create_monitor_packet(this);
+    _setup_rtp2mprtp(this, buffer);
+    _send_mprtp_packet(this, buffer);
+  }
+done:
   THIS_WRITEUNLOCK (this);
 
 }

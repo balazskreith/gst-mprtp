@@ -17,7 +17,6 @@
 
 typedef struct _SndEventBasedController SndEventBasedController;
 typedef struct _SndEventBasedControllerClass SndEventBasedControllerClass;
-typedef struct _SplitCtrlerMoment SplitCtrlerMoment;
 
 #define SEFCTRLER_TYPE             (sefctrler_get_type())
 #define SEFCTRLER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),SEFCTRLER_TYPE,SndEventBasedController))
@@ -46,8 +45,6 @@ struct _SndEventBasedController
   StreamSplitter*        splitter;
   GstClock*              sysclock;
   guint                  subflow_num;
-  SplitCtrlerMoment*     splitctrler_moments;
-  gint                   splitctrler_index;
   gboolean               pacing;
   GstClockTime           last_recalc_time;
   GstClockTime           RTT_max;
@@ -63,6 +60,7 @@ struct _SndEventBasedController
   void                 (*scheduler_signaling)(gpointer, guint64);
   gpointer               scheduler;
   gboolean               all_subflow_are_checked;
+  GstClockTime           all_subflow_are_checked_time;
   gboolean               stability_started;
   gdouble                rate_diff;
 //

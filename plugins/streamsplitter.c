@@ -141,7 +141,7 @@ stream_splitter_finalize (GObject * object)
   gst_task_stop (this->thread);
   gst_task_join (this->thread);
   gst_object_unref (this->thread);
-
+  g_object_unref(this->sent_bytes);
   g_object_unref (this->sysclock);
 }
 
@@ -158,6 +158,7 @@ stream_splitter_init (StreamSplitter * this)
   this->separation_is_possible = FALSE;
   this->first_delta_flag = TRUE;
   this->thread = gst_task_new (stream_splitter_run, this, NULL);
+  this->sent_bytes = make_streamtracker(_cmp_for_min, _cmp_for_max, 1<<15, 50);
 //    this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
   this->splitting_mode = MPRTP_STREAM_BYTE_BASED_SPLITTING;
 
@@ -247,6 +248,22 @@ stream_splitter_setup_sending_bid (StreamSplitter * this, guint8 subflow_id,
   subflow->new_bid = bid;
 exit:
   THIS_WRITEUNLOCK (this);
+}
+
+guint32 stream_splitter_get_media_rate(StreamSplitter* this)
+{
+  guint32 result;
+  THIS_READLOCK(this);
+  streamtracker_get_stats(this->sent_bytes, NULL, NULL, &result);
+  THIS_READUNLOCK(this);
+  return result;
+}
+
+void stream_splitter_set_monitor_payload_type(StreamSplitter *this, guint8 payload_type)
+{
+  THIS_WRITELOCK(this);
+  this->monitor_payload_type = payload_type;
+  THIS_WRITEUNLOCK(this);
 }
 
 gdouble stream_splitter_get_sending_rate(StreamSplitter* this, guint8 subflow_id)
@@ -443,7 +460,6 @@ done:
 
     GST_DEBUG_OBJECT (this, "Next scheduling interval time is %lu",
         GST_TIME_AS_MSECONDS (interval));
-
   } else {
     next_scheduler_time = now + GST_MSECOND * 10;
   }
@@ -469,6 +485,7 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
 
   new_frame = this->last_rtp_timestamp != gst_rtp_buffer_get_timestamp(rtp) ? 1 : 0;
   bytes_to_send = gst_rtp_buffer_get_payload_len (rtp);
+
 //  g_print("bytes to send: %u\n",bytes_to_send);
   if (this->keyframes_tree == NULL) {
     result = schtree_get_next (this->non_keyframes_tree, bytes_to_send, new_frame);
@@ -507,6 +524,9 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
     result = schtree_get_next (tree, bytes_to_send, new_frame);
 
 done:
+  if(gst_rtp_buffer_get_payload_type(rtp) != this->monitor_payload_type){
+    streamtracker_add(this->sent_bytes, bytes_to_send);
+  }
   return result;
 }
 
@@ -729,6 +749,20 @@ make_subflow (MPRTPSPath * path)
   result->path = path;
   return result;
 }
+
+
+gint
+_cmp_for_max (guint64 x, guint64 y)
+{
+  return x == y ? 0 : x < y ? -1 : 1;
+}
+
+gint
+_cmp_for_min (guint64 x, guint64 y)
+{
+  return x == y ? 0 : x < y ? 1 : -1;
+}
+
 
 #undef THIS_READLOCK
 #undef THIS_READUNLOCK

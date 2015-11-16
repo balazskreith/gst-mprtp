@@ -30,6 +30,7 @@ struct _StreamTracker
   BinTree*                 maxtree;
   GRWLock                  rwmutex;
   StreamTrackerItem*       items;
+  guint64                  sum;
   guint32                  length;
   GstClock*                sysclock;
   GstClockTime             treshold;

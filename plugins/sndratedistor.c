@@ -144,14 +144,28 @@ void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id)
 {
   guint8 i;
   guint8 *free_id;
+  Subflow *subflow;
   free_id = g_malloc(sizeof(guint8));
   *free_id = id;
   for(i=0; i<SNDRATEDISTOR_MAX_NUM; ++i){
     this->SCM[id][i] = this->SCM[i][id] = 0;
   }
+  subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (id));
   this->distorted[id] = 0;
   g_queue_push_tail(this->free_ids, free_id);
   g_hash_table_remove (this->subflows, GINT_TO_POINTER (id));
+}
+
+void sndrate_distor_measurement_update(SendingRateDistributor *this,
+                                       guint8 id,
+                                       gfloat goodput)
+{
+  Subflow *subflow;
+  subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (id));
+  if(!subflow) goto done;
+  streamtracker_add(subflow->goodputs, goodput);
+done:
+  return;
 }
 
 void sndrate_distor_undershoot(SendingRateDistributor *this, guint8 id)

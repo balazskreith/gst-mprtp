@@ -308,7 +308,7 @@ mprtpr_path_get_drift_window (MpRTPRPath * this,
   THIS_WRITELOCK (this);
   result = this->last_drift_window;
   if(!streamtracker_get_num(this->skews)) goto done;
-  result = streamtracker_get_stats(this->skews, min_skew, max_skew);
+  result = streamtracker_get_stats(this->skews, min_skew, max_skew, NULL);
 done:
   this->last_drift_window = result;
   THIS_WRITEUNLOCK (this);
@@ -325,7 +325,7 @@ mprtpr_path_get_delay (MpRTPRPath * this,
   THIS_WRITELOCK (this);
   result = this->last_delay;
   if(!streamtracker_get_num(this->delays)) goto done;
-  result = streamtracker_get_stats(this->delays, min_delay, max_delay);
+  result = streamtracker_get_stats(this->delays, min_delay, max_delay, NULL);
 done:
   this->last_delay = result;
   THIS_WRITEUNLOCK (this);

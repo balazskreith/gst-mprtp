@@ -99,6 +99,7 @@ StreamTracker *make_streamtracker(BinTreeCmpFunc cmp_min,
   result->mintree = make_bintree(cmp_min);
   result->max_multiplier = (gdouble)(100 - percentile) / (gdouble)percentile;
   result->items = g_malloc0(sizeof(StreamTrackerItem)*length);
+  result->sum = 0;
   result->length = length;
   result->sysclock = gst_system_clock_obtain();
   result->treshold = GST_SECOND;
@@ -124,7 +125,7 @@ void streamtracker_test(void)
 
   {
     guint64 min,max,perc;
-    perc = streamtracker_get_stats(tracker, &min, &max);
+    perc = streamtracker_get_stats(tracker, &min, &max, NULL);
     g_print("StreamTracker test for 40th percentile\n"
             "Min: %lu, 40th percentile: %lu Max: %lu\n", min, perc, max);
   }
@@ -138,6 +139,7 @@ void streamtracker_reset(StreamTracker *this)
   bintree_reset(this->mintree);
   memset(this->items, 0, sizeof(StreamTrackerItem) * this->length);
   this->write_index = this->read_index = 0;
+  this->sum = 0;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -169,12 +171,14 @@ guint32 streamtracker_get_num(StreamTracker *this)
 guint64
 streamtracker_get_stats (StreamTracker * this,
                          guint64 *min,
-                         guint64 *max)
+                         guint64 *max,
+                         guint64 *sum)
 {
   guint64 result = 0;
   gint32 max_count, min_count, diff;
 //  g_print("mprtpr_path_get_delay_median begin\n");
   THIS_READLOCK (this);
+  if(sum) *sum = this->sum;
   if(min) *min = 0;
   if(max) *max = 0;
   min_count = bintree_get_num(this->mintree);
@@ -216,7 +220,7 @@ void _add_value(StreamTracker *this, guint64 value)
       bintree_delete_value(this->maxtree, this->items[this->read_index].value);
     else
       bintree_delete_value(this->mintree, this->items[this->read_index].value);
-
+    this->sum -= this->items[this->read_index].value;
     this->items[this->read_index].value = 0;
     this->items[this->read_index].added = 0;
     if(++this->read_index == this->length){
@@ -227,6 +231,7 @@ void _add_value(StreamTracker *this, guint64 value)
 
 
   //add new one
+  this->sum += value;
   this->items[this->write_index].value = value;
   this->items[this->write_index].added = now;
   if(this->items[this->write_index].value <= bintree_get_top_value(this->maxtree))

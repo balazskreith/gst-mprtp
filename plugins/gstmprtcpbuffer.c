@@ -250,13 +250,6 @@ gst_mprtcp_riport_block_add_xr_rfc2743 (GstMPRTCPSubflowBlock * block)
   return result;
 }
 
-GstRTCPXR_Skew *
-gst_mprtcp_riport_block_add_xr_skew (GstMPRTCPSubflowBlock * block)
-{
-  GstRTCPXR_Skew *result = &block->xr_skew;
-  gst_rtcp_xr_skew_init(result);
-  return result;
-}
 
 GstRTCPXR_OWD *
 gst_mprtcp_riport_block_add_xr_owd (GstMPRTCPSubflowBlock * block)
@@ -579,115 +572,6 @@ gst_rtcp_xr_rfc7243_getdown (GstRTCPXR_RFC7243 * riport,
   if (ssrc) {
     *ssrc = g_ntohs (riport->ssrc);
   }
-}
-
-//------------------ XRSkew ------------------------
-void
-gst_rtcp_xr_skew_init (GstRTCPXR_Skew * report)
-{
-  gst_rtcp_header_init (&report->header);
-  gst_rtcp_header_setup (&report->header, FALSE, 0,
-      GST_RTCP_TYPE_XR, RTCPHEADER_WORDS - 1 + RTCPXRSKEWBLOCK_WORDS, 0);
-  gst_rtcp_xr_skew_setup (report, 0, 0, 0, 0, 0, 0, 0, 0);
-}
-
-
-void
-gst_rtcp_xr_skew_setup(GstRTCPXR_Skew *report,
-                       guint8   interval_metric,
-                       gboolean skew_flag,
-                       guint32  ssrc,
-                       guint8   percentile_frac,
-                       guint32  stream_bytes_num,
-                       guint32  characterization_value,
-                       guint16  min,
-                       guint16  max)
-{
-  report->block_length = g_htons (4);
-  report->block_type = GST_RTCP_XR_SKEW_BLOCK_TYPE_IDENTIFIER;
-  gst_rtcp_xr_skew_change(report,
-                          &interval_metric,
-                          &skew_flag,
-                          &ssrc,
-                          &percentile_frac,
-                          &stream_bytes_num,
-                          &characterization_value,
-                          &min,
-                          &max);
-}
-
-void
-gst_rtcp_xr_skew_change (GstRTCPXR_Skew *report,
-                          guint8   *interval_metric,
-                          gboolean  *skew_flag,
-                          guint32  *ssrc,
-                          guint8   *percentile_frac,
-                          guint32  *stream_bytes_num,
-                          guint32  *characterization_value,
-                          guint16  *min,
-                          guint16  *max)
-{
-  if (skew_flag) {
-    report->skew_flag = *skew_flag?1:0;
-  }
-  if (interval_metric) {
-    report->interval_metric = *interval_metric;
-  }
-  if (ssrc) {
-    report->ssrc = g_htonl (*ssrc);
-  }
-  if (percentile_frac) {
-    report->percentile_frac = *percentile_frac;
-  }
-  if(stream_bytes_num){
-      report->stream_bytes_num = g_htonl (*stream_bytes_num);
-    }
-  if(characterization_value){
-      report->characterization_value = g_htonl (*characterization_value);
-    }
-  if(min){
-      report->min = g_htons (*min);
-    }
-  if(max){
-      report->max = g_htons (*max);
-    }
-}
-
-void
-gst_rtcp_xr_skew_getdown (GstRTCPXR_Skew * report,
-                          guint8   *interval_metric,
-                          gboolean  *skew_flag,
-                          guint32  *ssrc,
-                          guint8   *percentile_frac,
-                          guint32  *stream_bytes_num,
-                          guint32  *characterization_value,
-                          guint16  *min,
-                          guint16  *max)
-{
-  if (skew_flag) {
-      *skew_flag = report->skew_flag;
-    }
-    if (interval_metric) {
-        *interval_metric = report->interval_metric;
-    }
-    if (ssrc) {
-        *ssrc = report->ssrc;
-    }
-    if (percentile_frac) {
-        *percentile_frac = report->percentile_frac;
-    }
-    if(stream_bytes_num){
-        *stream_bytes_num = g_ntohl(report->stream_bytes_num);
-      }
-    if(characterization_value){
-        *characterization_value = g_ntohl(report->characterization_value);
-      }
-    if(min){
-        *min = g_ntohs(report->min);
-      }
-    if(max){
-        *max = g_ntohs(report->max);
-      }
 }
 
 
@@ -1018,8 +902,6 @@ gst_print_rtcp (GstRTCPHeader * header)
           gst_rtcp_xr_block_getdown((GstRTCPXR*) step, &block_type, NULL, NULL);
           if(block_type == GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER)
             gst_print_rtcp_xr_7243 ((GstRTCPXR_RFC7243 *) step);
-          else if(block_type == GST_RTCP_XR_SKEW_BLOCK_TYPE_IDENTIFIER)
-            gst_print_rtcp_xr_skew ((GstRTCPXR_Skew *) step);
           else if(block_type == GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER)
             gst_print_rtcp_xr_owd ((GstRTCPXR_OWD *) step);
         }
@@ -1182,48 +1064,6 @@ gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * riport)
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%63X|\n", riport->block_type, interval_metric, early_bit, 0,
       g_ntohs (riport->block_length), ssrc, discarded_bytes);
-}
-
-
-
-void
-gst_print_rtcp_xr_skew (GstRTCPXR_Skew * riport)
-{
-  gboolean  skew_flag;
-  guint8   interval_metric;
-  guint32  ssrc;
-  guint8   percentile_frac;
-  guint32  stream_bytes_num;
-  guint32  characterization_value;
-  guint16  min;
-  guint16  max;
-
-  gst_print_rtcp_header (&riport->header);
-  gst_rtcp_xr_skew_getdown (riport,
-                            &interval_metric,
-                            &skew_flag,
-                            &ssrc,
-                            &percentile_frac,
-                            &stream_bytes_num,
-                            &characterization_value,
-                            &min,
-                            &max);
-  g_print (
-      "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
-      "|%15d|%3d|%1d|%9d|%31d|\n"
-      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
-      "|%63X|\n"
-      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
-      "|%15d|%47u|\n"
-      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
-      "|%63u|\n"
-      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
-      "|%31d|%31d|\n"
-      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
-      ,
-      riport->block_type, interval_metric, skew_flag, 0,
-      g_ntohs (riport->block_length), ssrc, percentile_frac,
-      stream_bytes_num, characterization_value, min, max);
 }
 
 

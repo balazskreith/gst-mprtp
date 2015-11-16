@@ -47,7 +47,10 @@ static void
 _add_value(StreamTracker *this, guint64 value);
 static void
 _balancing_trees (StreamTracker * this);
-
+static gint
+_cmp_for_max (guint64 x, guint64 y);
+static gint
+_cmp_for_min (guint64 x, guint64 y);
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -87,14 +90,14 @@ streamtracker_init (StreamTracker * this)
 StreamTracker *make_streamtracker(BinTreeCmpFunc cmp_min,
                                   BinTreeCmpFunc cmp_max,
                                   guint32 length,
-                                  gint balaning_const)
+                                  guint percentile)
 {
   StreamTracker *result;
   result = g_object_new (STREAMTRACKER_TYPE, NULL);
   THIS_WRITELOCK (result);
   result->maxtree = make_bintree(cmp_max);
   result->mintree = make_bintree(cmp_min);
-  result->balancing_const = balaning_const;
+  result->max_multiplier = (gdouble)(100 - percentile) / (gdouble)percentile;
   result->items = g_malloc0(sizeof(StreamTrackerItem)*length);
   result->length = length;
   result->sysclock = gst_system_clock_obtain();
@@ -102,6 +105,30 @@ StreamTracker *make_streamtracker(BinTreeCmpFunc cmp_min,
   THIS_WRITEUNLOCK (result);
 
   return result;
+}
+
+void streamtracker_test(void)
+{
+  StreamTracker *tracker;
+  tracker = make_streamtracker(_cmp_for_min, _cmp_for_max, 10, 40);
+  streamtracker_add(tracker, 7);
+  streamtracker_add(tracker, 1);
+  streamtracker_add(tracker, 3);
+  streamtracker_add(tracker, 8);
+  streamtracker_add(tracker, 2);
+  streamtracker_add(tracker, 6);
+  streamtracker_add(tracker, 4);
+  streamtracker_add(tracker, 5);
+  streamtracker_add(tracker, 9);
+  streamtracker_add(tracker, 10);
+
+  {
+    guint64 min,max,perc;
+    perc = streamtracker_get_stats(tracker, &min, &max);
+    g_print("StreamTracker test for 40th percentile\n"
+            "Min: %lu, 40th percentile: %lu Max: %lu\n", min, perc, max);
+  }
+
 }
 
 void streamtracker_reset(StreamTracker *this)
@@ -151,12 +178,9 @@ streamtracker_get_stats (StreamTracker * this,
   if(min) *min = 0;
   if(max) *max = 0;
   min_count = bintree_get_num(this->mintree);
-  max_count = bintree_get_num(this->maxtree);
-  if(0 < this->balancing_const)
-     diff = (max_count>>this->balancing_const) - min_count;
-   else if(this->balancing_const < 0)
-     diff = max_count - (min_count>>(-1*this->balancing_const));
-   else diff = max_count - min_count;
+  max_count = (gdouble)bintree_get_num(this->maxtree) * this->max_multiplier + .5;
+  g_print("%f: %u-%u\n", this->max_multiplier, min_count, max_count);
+  diff = max_count - min_count;
 
   if(min_count + max_count < 1)
     goto done;
@@ -225,15 +249,8 @@ _balancing_trees (StreamTracker * this)
 
 balancing:
   min_count = bintree_get_num(this->mintree);
-  max_count = bintree_get_num(this->maxtree);
-
- //To get the 75 percentile we shift max_count by 1
-
-  if(0 < this->balancing_const)
-    diff = (max_count>>this->balancing_const) - min_count;
-  else if(this->balancing_const < 0)
-    diff = max_count - (min_count>>(-1*this->balancing_const));
-  else diff = max_count - min_count;
+  max_count = (gdouble)bintree_get_num(this->maxtree) * this->max_multiplier + .5;
+  diff = max_count - min_count;
 //  g_print("max_tree_num: %d, min_tree_num: %d\n", max_tree_num, min_tree_num);
   if (-2 < diff && diff < 2) {
     goto done;
@@ -251,6 +268,17 @@ done:
   return;
 }
 
+gint
+_cmp_for_max (guint64 x, guint64 y)
+{
+  return x == y ? 0 : x < y ? -1 : 1;
+}
+
+gint
+_cmp_for_min (guint64 x, guint64 y)
+{
+  return x == y ? 0 : x < y ? 1 : -1;
+}
 
 #undef THIS_WRITELOCK
 #undef THIS_WRITEUNLOCK

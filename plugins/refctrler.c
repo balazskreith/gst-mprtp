@@ -176,13 +176,6 @@ void
 _step_or (Subflow * this);
 
 static GstBuffer*
-_get_mprtcp_xr_stream_characterization_block (
-    RcvEventBasedController * this,
-    Subflow * subflow,
-    gboolean skew_flag,
-    guint16 * buf_length);
-
-static GstBuffer*
 _get_mprtcp_xr_7243_block (
     RcvEventBasedController * this,
     Subflow * subflow,
@@ -194,12 +187,11 @@ _get_mprtcp_rr_block (
     Subflow * subflow,
     guint16 * block_length);
 
-static void
-_setup_xr_stream_characterization_report (
-    Subflow * this,
-    GstRTCPXR_Skew * xr,
-    guint32 ssrc,
-    gboolean skew_flag);
+static GstBuffer *
+_get_mprtcp_xr_owd_block (
+    RcvEventBasedController * this,
+    Subflow * subflow,
+    guint16 * buf_length);
 
 static void
 _setup_xr_rfc2743_late_discarded_report (
@@ -211,6 +203,12 @@ static void
 _setup_rr_report (
     Subflow * this,
     GstRTCPRR * rr,
+    guint32 ssrc);
+
+void
+_setup_xr_owd_report (
+    Subflow * this,
+    GstRTCPXR_OWD * xr,
     guint32 ssrc);
 
 //----------------------------- System Notifier ------------------------------
@@ -631,16 +629,11 @@ _orp_main(RcvEventBasedController * this)
 
     {
       GstBuffer *xr;
-      xr = _get_mprtcp_xr_stream_characterization_block (this, subflow, TRUE, &block_length);
+      xr = _get_mprtcp_xr_owd_block(this, subflow, &block_length);
       block = gst_buffer_append (block, xr);
       report_length += block_length;
     }
-    {
-      GstBuffer *xr;
-      xr = _get_mprtcp_xr_stream_characterization_block (this, subflow, FALSE, &block_length);
-      block = gst_buffer_append (block, xr);
-      report_length += block_length;
-    }
+
     report_length += 12 /*MPRTCP REPOR HEADER */  +
         (28 << 3) /*UDP Header overhead */ ;
 
@@ -729,39 +722,6 @@ _step_or (Subflow * this)
 //          _ort0(this)->HSN);
 }
 
-GstBuffer *
-_get_mprtcp_xr_stream_characterization_block (
-                           RcvEventBasedController * this,
-                           Subflow * subflow,
-                           gboolean skew_flag,
-                           guint16 * buf_length)
-{
-  GstMPRTCPSubflowBlock block;
-  GstRTCPXR_Skew *xr;
-  gpointer dataptr;
-  guint16 length;
-  guint8 block_length;
-  GstBuffer *buf;
-  gst_mprtcp_block_init (&block);
-  xr = gst_mprtcp_riport_block_add_xr_skew (&block);
-  _setup_xr_stream_characterization_report(subflow, xr, this->ssrc, skew_flag);
-  gst_rtcp_header_getdown (&xr->header, NULL, NULL, NULL, NULL, &length, NULL);
-  block_length = (guint8) length + 1;
-  gst_mprtcp_block_setup (&block.info, MPRTCP_BLOCK_TYPE_RIPORT, block_length,
-      (guint16) subflow->id);
-  length = (block_length + 1) << 2;
-  dataptr = g_malloc0 (length);
-  memcpy (dataptr, &block, length);
-  buf = gst_buffer_new_wrapped (dataptr, length);
-  if (buf_length) {
-    *buf_length = length;
-  }
-
-//  gst_print_mprtcp_block(&block, NULL);
-  return buf;
-}
-
-
 
 GstBuffer *
 _get_mprtcp_xr_7243_block (RcvEventBasedController * this, Subflow * subflow,
@@ -824,70 +784,37 @@ _get_mprtcp_rr_block (RcvEventBasedController * this, Subflow * subflow,
 }
 
 
-void
-_setup_xr_stream_characterization_report (
-    Subflow * this,
-    GstRTCPXR_Skew * xr,
-    guint32 ssrc,
-    gboolean skew_flag)
+GstBuffer *
+_get_mprtcp_xr_owd_block (
+    RcvEventBasedController * this,
+    Subflow * subflow,
+    guint16 * buf_length)
 {
-  guint8 flag = RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION;
-  guint64 *median_ptr;
-  GstClockTime *min_ptr;
-  GstClockTime *max_ptr;
-  guint32 median_value;
-  GstClockTime min_diff, max_diff;
-  guint16 min_value = 0;
-  guint16 max_value = 0;
-  guint8 percentile = 0;
+  GstMPRTCPSubflowBlock block;
+  GstRTCPXR_OWD *xr;
+  gpointer dataptr;
+  guint16 length;
+  guint8 block_length;
+  GstBuffer *buf;
 
-  if(skew_flag){
-    median_ptr = &_ort0(this)->median_skew;
-    min_ptr    = &_ort0(this)->min_skew;
-    max_ptr    = &_ort0(this)->max_skew;
-    percentile = 64;
-  }else{
-    median_ptr = &_ort0(this)->median_delay;
-    min_ptr    = &_ort0(this)->min_delay;
-    max_ptr    = &_ort0(this)->max_delay;
-    percentile = 64;
+  gst_mprtcp_block_init (&block);
+  xr = gst_mprtcp_riport_block_add_xr_owd (&block);
+  _setup_xr_owd_report(subflow, xr, this->ssrc);
+  gst_rtcp_header_getdown (&xr->header, NULL, NULL, NULL, NULL, &length, NULL);
+  block_length = (guint8) length + 1;
+  gst_mprtcp_block_setup (&block.info, MPRTCP_BLOCK_TYPE_RIPORT, block_length,
+      (guint16) subflow->id);
+  length = (block_length + 1) << 2;
+  dataptr = g_malloc0 (length);
+  memcpy (dataptr, &block, length);
+  buf = gst_buffer_new_wrapped (dataptr, length);
+  if (buf_length) {
+    *buf_length = length;
   }
-
-  if(*median_ptr == 0){
-      median_value = 0xFFFF; //unavailable
-      goto assemble;
-  }else{
-    if(*median_ptr > GST_SECOND){
-      median_value = 0xFEFF;
-      goto assemble;
-    }else{
-      median_value = (guint32) get_ntp_from_epoch_ns(*median_ptr);
-    }
-  }
-//  g_print("send-%d: %lu->%u->%lu\n", this->id, *median_ptr, median_value, get_epoch_time_from_ntp_in_ns(median_value));
-  min_diff = (*median_ptr) - (*min_ptr);
-  max_diff = (*max_ptr) - (*median_ptr);
-  min_value = (guint16) (get_ntp_from_epoch_ns(min_diff)>>16);
-  max_value = (guint16) (get_ntp_from_epoch_ns(max_diff)>>16);
-assemble:
-  gst_rtcp_header_change (&xr->header, NULL,NULL, NULL, NULL, NULL, &ssrc);
-  gst_rtcp_xr_skew_change(xr,
-                          &flag,
-                          &skew_flag,
-                          &ssrc,
-                          &percentile,
-                          &_ort0(this)->skew_bytes,
-                          &median_value,
-                          &min_value,
-                          &max_value);
-//  if(!skew_flag)
-//  g_print("Sub%d %lu < %lu-%X < %lu\n",
-//          this->id,
-//          get_epoch_time_from_ntp_in_ns(median_value - (min_value<<16)),
-//          get_epoch_time_from_ntp_in_ns(median_value),
-//          median_value,
-//          get_epoch_time_from_ntp_in_ns(median_value + (max_value<<16)));
+  //gst_print_mprtcp_block(&block, NULL);
+  return buf;
 }
+
 
 void
 _setup_xr_rfc2743_late_discarded_report (Subflow * this,
@@ -905,7 +832,6 @@ _setup_xr_rfc2743_late_discarded_report (Subflow * this,
       &late_discarded_bytes);
 //  g_print("DISCARDED REPORT SETTED UP\n");
 }
-
 
 void
 _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
@@ -994,6 +920,29 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
 //                   interval, this->media_rate);
 }
 
+
+void
+_setup_xr_owd_report (Subflow * this,
+    GstRTCPXR_OWD * xr, guint32 ssrc)
+{
+  guint8 flag = RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION;
+  GstClockTime one_way_delay = 0;
+  GstClockTime min_delay, max_delay;
+  guint32 owd, min, max;
+  guint16 percentile = 40;
+  guint16 invert_percentile = 25;
+
+  one_way_delay = mprtpr_path_get_delay(this->path, &min_delay, &max_delay);
+
+  min = (guint32) (one_way_delay-min_delay);
+  max = (guint32) (max_delay-one_way_delay);
+  owd = (guint32) (one_way_delay>>16);
+
+  gst_rtcp_header_change (&xr->header, NULL,NULL, NULL, NULL, NULL, &ssrc);
+  gst_rtcp_xr_owd_change(xr, &flag, &ssrc, &percentile, &invert_percentile,
+                         &owd, &min, &max);
+
+}
 
 //----------------------------- System Notifier ------------------------------
 void

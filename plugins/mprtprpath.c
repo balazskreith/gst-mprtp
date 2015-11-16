@@ -64,8 +64,8 @@ mprtpr_path_init (MpRTPRPath * this)
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetsrcvqueue();
   this->last_drift_window = GST_MSECOND;
-  this->delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 0);
-  this->skews = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 0);
+  this->delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 50);
+  this->skews = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 50);
   streamtracker_set_treshold(this->skews, 2 * GST_SECOND);
   mprtpr_path_reset (this);
 }
@@ -215,7 +215,6 @@ mprtpr_path_removes_obsolate_packets (MpRTPRPath * this, GstClockTime treshold)
     packetsrcvqueue_remove_head(this->packetsqueue, NULL);
   }
 //  g_print("Obsolate next: %p - %d packets\n", next, num);
-  _balancing_skew_trees (this);
   THIS_WRITEUNLOCK (this);
 //  g_print("mprtpr_path_removes_obsolate_packets end\n");
 }
@@ -306,7 +305,6 @@ mprtpr_path_get_drift_window (MpRTPRPath * this,
                               GstClockTime *max_skew)
 {
   guint64 result;
-  gint32 max_count, min_count;
   THIS_WRITELOCK (this);
   result = this->last_drift_window;
   if(!streamtracker_get_num(this->skews)) goto done;
@@ -324,7 +322,6 @@ mprtpr_path_get_delay (MpRTPRPath * this,
                        GstClockTime *max_delay)
 {
   guint64 result;
-  gint32 max_count, min_count;
   THIS_WRITELOCK (this);
   result = this->last_delay;
   if(!streamtracker_get_num(this->delays)) goto done;

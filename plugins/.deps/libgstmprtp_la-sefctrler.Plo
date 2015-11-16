@@ -208,7 +208,7 @@ libgstmprtp_la-sefctrler.lo: sefctrler.c /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/bits/string3.h \
  /usr/include/x86_64-linux-gnu/sys/timex.h \
  /usr/include/x86_64-linux-gnu/sys/time.h \
- /usr/include/x86_64-linux-gnu/bits/timex.h ricalcer.h
+ /usr/include/x86_64-linux-gnu/bits/timex.h ricalcer.h streamtracker.h
 
 /usr/include/stdc-predef.h:
 
@@ -699,3 +699,5 @@ smanctrler.h:
 /usr/include/x86_64-linux-gnu/bits/timex.h:
 
 ricalcer.h:
+
+streamtracker.h:

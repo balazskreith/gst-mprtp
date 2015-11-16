@@ -37,49 +37,34 @@ typedef enum
 
 struct _SndEventBasedController
 {
-  GObject          object;
+  GObject                object;
 
-  GstTask*          thread;
-  GRecMutex         thread_mutex;
-  GHashTable*       subflows;
-  GRWLock           rwmutex;
-  StreamSplitter*   splitter;
-  GstClock*         sysclock;
-  guint             subflow_num;
-  BinTree*          subflow_delays_tree;
-  guint8            subflow_delays_index;
-  guint64           subflow_delays[256];
-  SplitCtrlerMoment*splitctrler_moments;
-  gint              splitctrler_index;
-  guint64           changed_num;
-  gboolean          pacing;
-  GstClockTime      last_recalc_time;
-  GstClockTime      RTT_max;
-//  gboolean          new_report_arrived;
-  gboolean          bids_recalc_requested;
-  gboolean          bids_commit_requested;
-  SplitCtrlerEvent  event;
-  gboolean          rate_is_state;
-  guint32           ssrc;
-  void            (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
-  gpointer          send_mprtcp_packet_data;
-  gboolean          report_is_flowable;
-  gboolean          suspicious;
-  GstClockTime      suspicious_time;
-  void            (*scheduler_signaling)(gpointer, guint64);
-  gpointer          scheduler;
-  GstClockTime      stability_time;
-  GstClockTime      restored_happened;
-  GstClockTime      restore_happened;
-  GstClockTime      congestion_happened;
-  gboolean          congestion_is_ongoing;
-  GstClockTime      distortion_happened;
-  GstClockTime      required_fi_wait;
-  GstClockTime      required_underused_wait;
-  GstClockTime      required_overused_wait;
-
-  gboolean          stability_started;
-  gdouble           rate_diff;
+  GstTask*               thread;
+  GRecMutex              thread_mutex;
+  GHashTable*            subflows;
+  GRWLock                rwmutex;
+  StreamSplitter*        splitter;
+  GstClock*              sysclock;
+  guint                  subflow_num;
+  SplitCtrlerMoment*     splitctrler_moments;
+  gint                   splitctrler_index;
+  gboolean               pacing;
+  GstClockTime           last_recalc_time;
+  GstClockTime           RTT_max;
+  gboolean               bids_recalc_requested;
+  gboolean               bids_commit_requested;
+  SplitCtrlerEvent       event;
+  SendingRateDistributor*rate_distor;
+  gboolean               rate_is_state;
+  guint32                ssrc;
+  void                 (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
+  gpointer               send_mprtcp_packet_data;
+  gboolean               report_is_flowable;
+  void                 (*scheduler_signaling)(gpointer, guint64);
+  gpointer               scheduler;
+  gboolean               all_subflow_are_checked;
+  gboolean               stability_started;
+  gdouble                rate_diff;
 //
 //  //for stat and plot
 //  GstTask*          stat_thread;

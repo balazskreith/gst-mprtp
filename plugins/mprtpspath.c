@@ -47,9 +47,7 @@ static void _send_mprtp_packet(MPRTPSPath * this,
 static gboolean _try_flushing(MPRTPSPath * this);
 static gboolean _is_overused(MPRTPSPath * this);
 static GstBuffer* _create_monitor_packet(MPRTPSPath * this);
-static void _balancing_delay_trees (MPRTPSPath * this);
-static gint _cmp_for_max (guint64 x, guint64 y);
-static gint _cmp_for_min (guint64 x, guint64 y);
+
 void
 mprtps_path_class_init (MPRTPSPathClass * klass)
 {
@@ -609,18 +607,6 @@ GstBuffer* _create_monitor_packet(MPRTPSPath * this)
   gst_rtp_buffer_set_payload_type(&rtp, this->monitor_payload_type);
   gst_rtp_buffer_unmap(&rtp);
   return result;
-}
-
-gint
-_cmp_for_max (guint64 x, guint64 y)
-{
-  return x == y ? 0 : x < y ? -1 : 1;
-}
-
-gint
-_cmp_for_min (guint64 x, guint64 y)
-{
-  return x == y ? 0 : x < y ? 1 : -1;
 }
 
 

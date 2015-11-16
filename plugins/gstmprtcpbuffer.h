@@ -164,38 +164,6 @@ typedef struct PACKED _GstRTCPXR_RFC7243
 } GstRTCPXR_RFC7243;
 
 
-typedef struct PACKED _GstRTCPXR_Skew
-{
-  GstRTCPHeader header;
-  guint8 block_type;
-#if G_BYTE_ORDER == G_LITTLE_ENDIAN
-  guint8 reserved:5;
-  guint8 skew_flag:1;
-  guint8 interval_metric:2;
-#elif G_BYTE_ORDER == G_BIG_ENDIAN
-  guint8 interval_metric:2;
-  guint8 skew_flag:1;
-  guint8 reserved:5;
-#else
-#error "G_BYTE_ORDER should be big or little endian."
-#endif
-  guint16 block_length;
-  guint32 ssrc;
-#if G_BYTE_ORDER == G_LITTLE_ENDIAN
-  guint32 stream_bytes_num : 24;
-  guint32 percentile_frac : 8;
-#elif G_BYTE_ORDER == G_BIG_ENDIAN
-  guint32 percentile_frac : 8;
-  guint32 stream_bytes_num : 24;
-#else
-#error "G_BYTE_ORDER should be big or little endian."
-#endif
-  guint32 characterization_value;
-  guint16 min;
-  guint16 max;
-} GstRTCPXR_Skew;
-
-
 typedef struct PACKED _GstRTCPXR_OWD
 {
   GstRTCPHeader header;
@@ -250,7 +218,6 @@ typedef struct PACKED _GstMPRTCPSubflowBlock
     GstRTCPSR sender_riport;
     GstRTCPXR xr_header;
     GstRTCPXR_RFC7243 xr_rfc7243_riport;
-    GstRTCPXR_Skew    xr_skew;
     GstRTCPXR_OWD     xr_owd;
   };
 } GstMPRTCPSubflowBlock;
@@ -300,7 +267,6 @@ GstRTCPRR *gst_mprtcp_riport_block_add_rr (GstMPRTCPSubflowBlock * block);
 
 GstRTCPXR_RFC7243 *gst_mprtcp_riport_block_add_xr_rfc2743 (GstMPRTCPSubflowBlock
     * block);
-GstRTCPXR_Skew *gst_mprtcp_riport_block_add_xr_skew (GstMPRTCPSubflowBlock * block);
 
 GstRTCPXR_OWD *
 gst_mprtcp_riport_block_add_xr_owd (GstMPRTCPSubflowBlock * block);
@@ -355,38 +321,6 @@ void gst_rtcp_xr_rfc7243_getdown (GstRTCPXR_RFC7243 * report,
     guint8 * interval_metric, gboolean * early_bit, guint32 * ssrc,
     guint32 * discarded_bytes);
 
-
-void gst_rtcp_xr_skew_init (GstRTCPXR_Skew * report);
-
-void gst_rtcp_xr_skew_setup(GstRTCPXR_Skew *report,
-                            guint8   interval_metric,
-                            gboolean skew_flag,
-                            guint32  ssrc,
-                            guint8   percentile_frac,
-                            guint32  stream_bytes_num,
-                            guint32  characterization_value,
-                            guint16  min,
-                            guint16  max);
-
-void gst_rtcp_xr_skew_change (GstRTCPXR_Skew *report,
-                              guint8   *interval_metric,
-                              gboolean  *skew_flag,
-                              guint32  *ssrc,
-                              guint8   *percentile_frac,
-                              guint32  *stream_bytes_num,
-                              guint32  *characterization_value,
-                              guint16  *min,
-                              guint16  *max);
-
-void gst_rtcp_xr_skew_getdown(GstRTCPXR_Skew * report,
-                              guint8   *interval_metric,
-                              gboolean  *skew_flag,
-                              guint32  *ssrc,
-                              guint8   *percentile_frac,
-                              guint32  *stream_bytes_num,
-                              guint32  *characterization_value,
-                              guint16  *min,
-                              guint16  *max);
 
 
 void gst_rtcp_xr_owd_init (GstRTCPXR_OWD * report);
@@ -448,7 +382,6 @@ void gst_print_rtcp_header (GstRTCPHeader * header);
 void gst_print_rtcp_sr (GstRTCPSR * report);
 void gst_print_rtcp_rr (GstRTCPRR * report);
 void gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * report);
-void gst_print_rtcp_xr_skew (GstRTCPXR_Skew * report);
 void gst_print_rtcp_xr_owd (GstRTCPXR_OWD * report);
 void gst_print_rtcp_srb (GstRTCPSRBlock * block_ptr);
 void gst_print_rtcp_rrb (GstRTCPRRBlock * block_ptr);

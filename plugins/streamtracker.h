@@ -35,7 +35,7 @@ struct _StreamTracker
   GstClockTime             treshold;
   guint32                  write_index;
   guint32                  read_index;
-  gint                     balancing_const;
+  gdouble                  max_multiplier;
 };
 
 struct _StreamTrackerItem
@@ -53,7 +53,8 @@ GType streamtracker_get_type (void);
 StreamTracker *make_streamtracker(BinTreeCmpFunc cmp_min,
                                   BinTreeCmpFunc cmp_max,
                                   guint32 length,
-                                  gint balaning_const);
+                                  guint percentile);
+void streamtracker_test(void);
 void streamtracker_set_treshold(StreamTracker *this, GstClockTime treshold);
 guint32 streamtracker_get_num(StreamTracker *this);
 guint64

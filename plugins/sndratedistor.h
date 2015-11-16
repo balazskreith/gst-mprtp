@@ -10,6 +10,7 @@
 
 #include <gst/gst.h>
 #include "mprtpspath.h"
+#include "streamtracker.h"
 
 typedef struct _SendingRateDistributor SendingRateDistributor;
 typedef struct _SendingRateDistributorClass SendingRateDistributorClass;
@@ -29,9 +30,15 @@ struct _SendingRateDistributor
   GstClock*         sysclock;
   GHashTable*       subflows;
   guint8            max_id;
+  guint32           media_rate;
   GQueue*           free_ids;
-  gboolean          SCM[SNDRATEDISTOR_MAX_NUM][SNDRATEDISTOR_MAX_NUM];
-  guint8            distorted[SNDRATEDISTOR_MAX_NUM];
+  guint8            SCM[SNDRATEDISTOR_MAX_NUM][SNDRATEDISTOR_MAX_NUM];
+  guint8            undershooted[SNDRATEDISTOR_MAX_NUM];
+  gint64            undershoot_delta[SNDRATEDISTOR_MAX_NUM];
+  guint8            bounced_back[SNDRATEDISTOR_MAX_NUM];
+  gint64            bounced_back_delta[SNDRATEDISTOR_MAX_NUM];
+  guint32           extra_bytes[SNDRATEDISTOR_MAX_NUM];
+  gint32            delta_sending_rates[SNDRATEDISTOR_MAX_NUM];
   guint8            counter;
 };
 
@@ -43,11 +50,14 @@ struct _SendingRateDistributorClass{
 GType sndrate_distor_get_type (void);
 SendingRateDistributor *make_sndrate_distor(void);
 guint8 sndrate_distor_request_id(SendingRateDistributor *this, MPRTPSPath *path);
-void sndrate_distor_measurement_update(SendingRateDistributor *this, guint8 id, gfloat goodput);
+void sndrate_distor_measurement_update(SendingRateDistributor *this,
+                                       guint8 id,
+                                       gfloat goodput,
+                                       gdouble variance);
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_undershoot(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_bounce_back(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_keep(SendingRateDistributor *this, guint8 id);
-void sndrate_distor_time_update(SendingRateDistributor *this);
+void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate);
 guint32 sndrate_distor_get_rate(SendingRateDistributor *this, guint8 id);
 #endif /* SNDRATEDISTOR_H_ */

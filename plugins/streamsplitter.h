@@ -11,6 +11,7 @@
 #include <gst/gst.h>
 
 #include "mprtpspath.h"
+#include "streamtracker.h"
 
 typedef struct _StreamSplitter StreamSplitter;
 typedef struct _StreamSplitterClass StreamSplitterClass;

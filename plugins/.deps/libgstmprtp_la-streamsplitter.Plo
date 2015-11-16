@@ -195,7 +195,7 @@ libgstmprtp_la-streamsplitter.lo: streamsplitter.c \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
  streamsplitter.h mprtpspath.h gstmprtcpbuffer.h packetssndqueue.h \
- bintree.h /usr/include/math.h \
+ bintree.h streamtracker.h /usr/include/math.h \
  /usr/include/x86_64-linux-gnu/bits/huge_val.h \
  /usr/include/x86_64-linux-gnu/bits/huge_valf.h \
  /usr/include/x86_64-linux-gnu/bits/huge_vall.h \
@@ -654,6 +654,8 @@ gstmprtcpbuffer.h:
 packetssndqueue.h:
 
 bintree.h:
+
+streamtracker.h:
 
 /usr/include/math.h:
 

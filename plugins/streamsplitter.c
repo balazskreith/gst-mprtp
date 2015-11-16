@@ -92,7 +92,8 @@ static void stream_splitter_run (void *data);
 //static void _print_tree_stat(SchNode *root);
 
 static Subflow *make_subflow (MPRTPSPath * path);
-
+static gint _cmp_for_max (guint64 x, guint64 y);
+static gint _cmp_for_min (guint64 x, guint64 y);
 
 static MPRTPSPath *_get_next_path (StreamSplitter * this, GstRTPBuffer * rtp);
 //static void _print_tree (SchNode * node, gint top, gint level);
@@ -252,7 +253,7 @@ exit:
 
 guint32 stream_splitter_get_media_rate(StreamSplitter* this)
 {
-  guint32 result;
+  guint64 result;
   THIS_READLOCK(this);
   streamtracker_get_stats(this->sent_bytes, NULL, NULL, &result);
   THIS_READUNLOCK(this);

@@ -58,10 +58,13 @@ StreamTracker *make_streamtracker(BinTreeCmpFunc cmp_min,
 void streamtracker_test(void);
 void streamtracker_set_treshold(StreamTracker *this, GstClockTime treshold);
 guint32 streamtracker_get_num(StreamTracker *this);
+guint64 streamtracker_get_last(StreamTracker *this);
+guint64 streamtracker_get_last_minus_n(StreamTracker *this, guint n);
 guint64
 streamtracker_get_stats (StreamTracker * this,
                          guint64 *min,
-                         guint64 *max);
+                         guint64 *max,
+                         guint64 *sum);
 void streamtracker_reset(StreamTracker *this);
 void streamtracker_add(StreamTracker *this, guint64 value);
 

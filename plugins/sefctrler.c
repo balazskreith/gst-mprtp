@@ -672,6 +672,7 @@ _irp_producer_main(SndEventBasedController * this)
   GstClockTime   now;
   Event          event;
   gfloat         goodput;
+  gdouble        variance;
 
   now = gst_clock_get_time(this->sysclock);
 
@@ -682,9 +683,11 @@ _irp_producer_main(SndEventBasedController * this)
     if(_irt0(subflow)->checked) goto checked;
     if(now - 120 * GST_MSECOND < _irt0(subflow)->time) goto not_checked;
     goodput = _get_subflow_goodput(subflow);
+    variance = (gdouble)streamtracker_get_stats(this->delays, NULL, NULL, NULL) / (gdouble)_irt0(subflow)->jitter;
     sndrate_distor_measurement_update(this->rate_distor,
                                       subflow->rate_calcer_id,
-                                      goodput);
+                                      goodput,
+                                      variance);
     event = subflow->check(subflow);
     subflow->fire(this, subflow, event);
     _irt0(subflow)->checked = TRUE;
@@ -826,7 +829,6 @@ _report_processing_rrblock_processor (SndEventBasedController *this,
 //  GstClockTime now;
   guint32 LSR_read, DLSR_read, HSSN_read;
   guint8 fraction_lost;
-  Event event;
 
   //--------------------------
   //validating
@@ -1020,16 +1022,17 @@ void _subflow_fire_p_state(SndEventBasedController *this,Subflow *subflow,Event 
   subflow->fire = _subflow_fire_p_state;
   if(event != EVENT_SETTLEMENT) goto done;
 
-  mprtps_path_set_active(subflow->path);
-  subflow->rate_calcer_id = sndrate_distor_request_id(this->rate_distor, subflow->path);
+  mprtps_path_set_active(path);
+  subflow->rate_calcer_id = sndrate_distor_request_id(this->rate_distor, path);
   //restore
-  switch(mprtps_path_get_state(subflow->path)){
+  switch(mprtps_path_get_state(path)){
     case MPRTPS_PATH_STATE_CONGESTED:
       subflow->fire = _subflow_fire_c_state;
       break;
     case MPRTPS_PATH_STATE_LOSSY:
       subflow->fire = _subflow_fire_l_state;
       break;
+    default:
     case MPRTPS_PATH_STATE_NON_CONGESTED:
       subflow->fire = _subflow_fire_nc_state;
       break;
@@ -1040,7 +1043,7 @@ done:
 
 void _subflow_fire_nc_state(SndEventBasedController *this,Subflow *subflow,Event event)
 {
-  MPRTPSPath *path = subflow->path;
+//  MPRTPSPath *path = subflow->path;
   subflow->fire = _subflow_fire_nc_state;
   switch (event) {
    case EVENT_LATE:
@@ -1063,7 +1066,7 @@ void _subflow_fire_nc_state(SndEventBasedController *this,Subflow *subflow,Event
 }
 void _subflow_fire_l_state(SndEventBasedController *this,Subflow *subflow,Event event)
 {
-  MPRTPSPath *path = subflow->path;
+//  MPRTPSPath *path = subflow->path;
   subflow->fire = _subflow_fire_nc_state;
   switch (event) {
     case EVENT_LATE:
@@ -1088,7 +1091,7 @@ void _subflow_fire_l_state(SndEventBasedController *this,Subflow *subflow,Event 
 
 void _subflow_fire_c_state(SndEventBasedController *this,Subflow *subflow,Event event)
 {
-  MPRTPSPath *path = subflow->path;
+//  MPRTPSPath *path = subflow->path;
   subflow->fire = _subflow_fire_nc_state;
   switch (event) {
     case EVENT_LATE:
@@ -1159,7 +1162,7 @@ _check_report_timeout (Subflow * this)
     goto done;
   }
   if (_irt1(this)->time < now - REPORTTIMEOUT) {
-//    g_print("S:%d->REPORT_TOO_LATE\n", this->id);
+//    g_print("S:%d->REPORT_TOO_LATE %lu < %lu\n", this->id, _irt1(this)->time, now - REPORTTIMEOUT);
     return TRUE;
   }
 done:
@@ -1323,11 +1326,7 @@ done:
 void
 _split_controller_main(SndEventBasedController * this)
 {
-  GHashTableIter iter;
-  gpointer key, val;
-  Subflow *subflow;
   GstClockTime now;
-  gboolean all_report_arrived = TRUE;
   now = gst_clock_get_time(this->sysclock);
 
   if(this->last_recalc_time < this->all_subflow_are_checked_time ||
@@ -1343,8 +1342,6 @@ recalc_done:
   if (!this->bids_commit_requested) goto process_done;
   this->bids_commit_requested = FALSE;
   stream_splitter_commit_changes (this->splitter);
-  this->rate_is_state = _is_rate_stable(this);
-  _step_c(this);
 
 process_done:
   return;
@@ -1370,6 +1367,7 @@ void _recalc_bids(SndEventBasedController * this)
     if(!mprtps_path_is_active(subflow->path)){
       continue;
     }
+    if(0) g_print("%lu", _irt(subflow, 2)->time);
     sb = sndrate_distor_get_rate(this->rate_distor, subflow->rate_calcer_id);
 //    g_print("Subflow %d sending bid %u =  %f * %u\n",
 //            subflow->id,
@@ -1430,6 +1428,7 @@ _make_subflow (guint8 id, MPRTPSPath * path)
   result->ir_moments_index = 0;
   result->ricalcer = make_ricalcer(TRUE);
   reset_subflow (result);
+  _irt0(result)->time = result->joined_time;
   return result;
 }
 

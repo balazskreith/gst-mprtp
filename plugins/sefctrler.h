@@ -14,6 +14,7 @@
 #include "streamsplitter.h"
 #include "smanctrler.h"
 #include "bintree.h"
+#include "sndratedistor.h"
 
 typedef struct _SndEventBasedController SndEventBasedController;
 typedef struct _SndEventBasedControllerClass SndEventBasedControllerClass;
@@ -52,7 +53,6 @@ struct _SndEventBasedController
   gboolean               bids_commit_requested;
   SplitCtrlerEvent       event;
   SendingRateDistributor*rate_distor;
-  gboolean               rate_is_state;
   guint32                ssrc;
   void                 (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
   gpointer               send_mprtcp_packet_data;

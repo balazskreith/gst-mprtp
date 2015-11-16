@@ -167,6 +167,33 @@ guint32 streamtracker_get_num(StreamTracker *this)
   return result;
 }
 
+guint64 streamtracker_get_last(StreamTracker *this)
+{
+  guint64 result;
+  THIS_READLOCK(this);
+  if(this->read_index == this->write_index) result = 0;
+  else if(this->write_index == 0) result = this->items[this->length-1];
+  else result = this->items[this->write_index-1];
+  THIS_READUNLOCK(this);
+  return result;
+}
+
+guint64 streamtracker_get_last_minus_n(StreamTracker *this, guint n)
+{
+  guint64 result = 0;
+  gint64 index;
+  guint32 counter;
+  THIS_READLOCK(this);
+  counter = bintree_get_num(this->maxtree) + bintree_get_num(this->mintree);
+  if(counter < n) goto done;
+  index = this->write_index - ( n % this->length);
+  if (index < 0) index = this->length + index;
+  result = this->items[index];
+  THIS_READUNLOCK(this);
+done:
+  return result;
+}
+
 
 guint64
 streamtracker_get_stats (StreamTracker * this,
@@ -183,7 +210,6 @@ streamtracker_get_stats (StreamTracker * this,
   if(max) *max = 0;
   min_count = bintree_get_num(this->mintree);
   max_count = (gdouble)bintree_get_num(this->maxtree) * this->max_multiplier + .5;
-  g_print("%f: %u-%u\n", this->max_multiplier, min_count, max_count);
   diff = max_count - min_count;
 
   if(min_count + max_count < 1)
@@ -209,31 +235,11 @@ void _add_value(StreamTracker *this, guint64 value)
 {
   GstClockTime treshold,now;
   now = gst_clock_get_time(this->sysclock);
-  treshold = now - this->treshold;
-  again:
-  //elliminate the old ones
-  if((this->items[this->read_index].value > 0 &&
-      this->items[this->read_index].added < treshold) ||
-      this->write_index == this->read_index)
-  {
-    if(this->items[this->read_index].value <= bintree_get_top_value(this->maxtree))
-      bintree_delete_value(this->maxtree, this->items[this->read_index].value);
-    else
-      bintree_delete_value(this->mintree, this->items[this->read_index].value);
-    this->sum -= this->items[this->read_index].value;
-    this->items[this->read_index].value = 0;
-    this->items[this->read_index].added = 0;
-    if(++this->read_index == this->length){
-        this->read_index=0;
-    }
-    goto again;
-  }
-
-
   //add new one
   this->sum += value;
   this->items[this->write_index].value = value;
   this->items[this->write_index].added = now;
+
   if(this->items[this->write_index].value <= bintree_get_top_value(this->maxtree))
     bintree_insert_value(this->maxtree, this->items[this->write_index].value);
   else
@@ -242,6 +248,31 @@ void _add_value(StreamTracker *this, guint64 value)
   if(++this->write_index == this->length){
       this->write_index=0;
   }
+
+  treshold = now - this->treshold;
+again:
+  if((this->items[this->read_index].value == 0 ||
+      treshold < this->items[this->read_index].added) &&
+      this->write_index != this->read_index)
+    {
+      goto done;
+    }
+  //elliminate the old ones
+
+  if(this->items[this->read_index].value <= bintree_get_top_value(this->maxtree))
+    bintree_delete_value(this->maxtree, this->items[this->read_index].value);
+  else
+    bintree_delete_value(this->mintree, this->items[this->read_index].value);
+  this->sum -= this->items[this->read_index].value;
+  this->items[this->read_index].value = 0;
+  this->items[this->read_index].added = 0;
+  if(++this->read_index == this->length){
+      this->read_index=0;
+  }
+  goto again;
+done:
+  return;
+
 }
 
 void

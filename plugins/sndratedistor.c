@@ -542,7 +542,7 @@ Subflow* _get_next_most_stable(SendingRateDistributor *this, Subflow *act)
   while (g_hash_table_iter_next (&iter, (gpointer) &key, (gpointer) &val))
   {
       subflow = val;
-      if(this->stability[result->id] > 0)
+      if(this->stability[subflow->id] > 0)
         continue;
       if(!result)
         result = subflow;

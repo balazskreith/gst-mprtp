@@ -972,7 +972,7 @@ _play_controller_main(RcvEventBasedController * this)
                           NULL,
                           NULL,
                           NULL);
-//    delay = mprtpr_path_get_delay(subflow->path, NULL, NULL);
+//    delay = 50 * GST_MSECOND;
     skew = mprtpr_path_get_drift_window(subflow->path, NULL, NULL);
     if(!skew || !delay) {
       continue;

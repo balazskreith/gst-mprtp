@@ -64,10 +64,10 @@ mprtpr_path_init (MpRTPRPath * this)
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetsrcvqueue();
   this->last_drift_window = GST_MSECOND;
-  this->low_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 1<<12, 40);
-  streamtracker_set_treshold(this->low_delays, 60 * GST_SECOND);
-  this->high_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 1<<12, 80);
-  streamtracker_set_treshold(this->high_delays, 60 * GST_SECOND);
+  this->low_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 40);
+  streamtracker_set_treshold(this->low_delays, 5 * GST_SECOND);
+  this->high_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 80);
+  streamtracker_set_treshold(this->high_delays, 5 * GST_SECOND);
   this->skews = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 50);
   streamtracker_set_treshold(this->skews, 2 * GST_SECOND);
   mprtpr_path_reset (this);
@@ -329,14 +329,18 @@ mprtpr_path_get_delay (MpRTPRPath   *this,
                        GstClockTime *last_delay)
 {
   THIS_READLOCK (this);
-  if(!streamtracker_get_num(this->low_delays)) goto done;
+//  if(!streamtracker_get_num(this->low_delays)) goto done;
   if(percentile_40)
-      *percentile_40 = streamtracker_get_stats(this->low_delays, min_delay, max_delay, NULL);
+//      *percentile_40 = 50 * GST_MSECOND;
+    *percentile_40 = streamtracker_get_stats(this->low_delays, NULL, NULL, NULL);
   if(percentile_80)
-      *percentile_80 = streamtracker_get_stats(this->high_delays, min_delay, max_delay, NULL);
+      *percentile_80 =
+          //50 * GST_MSECOND;
+          streamtracker_get_stats(this->high_delays, min_delay, max_delay, NULL);
   if(last_delay)
     *last_delay = streamtracker_get_last(this->low_delays);
-done:
+//        streamtracker_get_last(this->low_delays);
+//done:
   THIS_READUNLOCK(this);
   return;
 }

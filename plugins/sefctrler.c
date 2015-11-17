@@ -1049,11 +1049,11 @@ void _subflow_fire_nc_state(SndEventBasedController *this,Subflow *subflow,Event
      _subflow_state_transit_to(subflow, MPRTPS_PATH_STATE_PASSIVE);
    break;
    case EVENT_DISTORTION:
-     sndrate_distor_undershoot(this->rate_distor, subflow->rate_calcer_id);
+//     sndrate_distor_undershoot(this->rate_distor, subflow->rate_calcer_id);
      _subflow_state_transit_to(subflow, MPRTPS_PATH_STATE_CONGESTED);
      break;
    case EVENT_LOST:
-     sndrate_distor_undershoot(this->rate_distor, subflow->rate_calcer_id);
+//     sndrate_distor_undershoot(this->rate_distor, subflow->rate_calcer_id);
      _subflow_state_transit_to(subflow, MPRTPS_PATH_STATE_LOSSY);
      break;
    case EVENT_FI:
@@ -1072,11 +1072,11 @@ void _subflow_fire_l_state(SndEventBasedController *this,Subflow *subflow,Event 
       _subflow_state_transit_to(subflow, MPRTPS_PATH_STATE_PASSIVE);
     break;
     case EVENT_SETTLEMENT:
-      sndrate_distor_bounce_back(this->rate_distor, subflow->rate_calcer_id);
+//      sndrate_distor_bounce_back(this->rate_distor, subflow->rate_calcer_id);
       _subflow_state_transit_to(subflow, MPRTPS_PATH_STATE_NON_CONGESTED);
       break;
     case EVENT_DISTORTION:
-      sndrate_distor_undershoot(this->rate_distor, subflow->rate_calcer_id);
+//      sndrate_distor_undershoot(this->rate_distor, subflow->rate_calcer_id);
       _subflow_state_transit_to(subflow, MPRTPS_PATH_STATE_CONGESTED);
       break;
     case EVENT_FI:
@@ -1098,12 +1098,12 @@ void _subflow_fire_c_state(SndEventBasedController *this,Subflow *subflow,Event 
     break;
     case EVENT_LOST:
     case EVENT_DISTORTION:
-      sndrate_distor_undershoot(this->rate_distor, subflow->rate_calcer_id);
+//      sndrate_distor_undershoot(this->rate_distor, subflow->rate_calcer_id);
       break;
     case EVENT_SETTLEMENT:
     case EVENT_FI:
     default:
-      sndrate_distor_bounce_back(this->rate_distor, subflow->rate_calcer_id);
+//      sndrate_distor_bounce_back(this->rate_distor, subflow->rate_calcer_id);
       _subflow_state_transit_to(subflow, MPRTPS_PATH_STATE_NON_CONGESTED);
       break;
   }
@@ -1352,11 +1352,11 @@ void _recalc_bids(SndEventBasedController * this)
   Subflow *subflow;
   guint32 sb;
   GstClockTime now;
-  guint32 media_rate;
+//  guint32 media_rate;
 
   now = gst_clock_get_time(this->sysclock);
-  media_rate = stream_splitter_get_media_rate(this->splitter);
-  sndrate_distor_time_update(this->rate_distor, media_rate);
+//  media_rate = stream_splitter_get_media_rate(this->splitter);
+//  sndrate_distor_time_update(this->rate_distor, media_rate);
 
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))

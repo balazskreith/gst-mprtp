@@ -14,7 +14,7 @@
 
 typedef struct _SendingRateDistributor SendingRateDistributor;
 typedef struct _SendingRateDistributorClass SendingRateDistributorClass;
-
+typedef struct _ChangeableVector ChangeableVector;
 #define SNDRATEDISTOR_TYPE             (sndrate_distor_get_type())
 #define SNDRATEDISTOR(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),SNDRATEDISTOR_TYPE,SendingRateDistributor))
 #define SNDRATEDISTOR_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass),SNDRATEDISTOR_TYPE,SendingRateDistributorClass))
@@ -26,20 +26,24 @@ typedef struct _SendingRateDistributorClass SendingRateDistributorClass;
 
 struct _SendingRateDistributor
 {
-  GObject           object;
-  GstClock*         sysclock;
-  GHashTable*       subflows;
-  guint8            max_id;
-  guint32           media_rate;
-  GQueue*           free_ids;
-  guint8            SCM[SNDRATEDISTOR_MAX_NUM][SNDRATEDISTOR_MAX_NUM];
-  guint8            undershooted[SNDRATEDISTOR_MAX_NUM];
-  gint64            undershoot_delta[SNDRATEDISTOR_MAX_NUM];
-  guint8            bounced_back[SNDRATEDISTOR_MAX_NUM];
-  gint64            bounced_back_delta[SNDRATEDISTOR_MAX_NUM];
-  guint32           extra_bytes[SNDRATEDISTOR_MAX_NUM];
-  gint32            delta_sending_rates[SNDRATEDISTOR_MAX_NUM];
-  guint8            counter;
+  GObject              object;
+  GstClock*            sysclock;
+  GHashTable*          subflows;
+  guint8               max_id;
+  guint32              media_rate;
+  GQueue*              free_ids;
+  guint8               counter;
+  guint8               SCM[SNDRATEDISTOR_MAX_NUM][SNDRATEDISTOR_MAX_NUM];
+  gint8                stability[SNDRATEDISTOR_MAX_NUM];
+  gint8                restoring[SNDRATEDISTOR_MAX_NUM];
+  guint64              extra_bytes[SNDRATEDISTOR_MAX_NUM];
+  gint64               delta_sending_rates[SNDRATEDISTOR_MAX_NUM];
+  guint32              sending_rates[SNDRATEDISTOR_MAX_NUM];
+  guint8               monitoring_interval[SNDRATEDISTOR_MAX_NUM];
+  guint32              overused_bytes;
+
+  ChangeableVector*    changeable_vector;
+
 };
 
 struct _SendingRateDistributorClass{
@@ -49,7 +53,9 @@ struct _SendingRateDistributorClass{
 
 GType sndrate_distor_get_type (void);
 SendingRateDistributor *make_sndrate_distor(void);
-guint8 sndrate_distor_request_id(SendingRateDistributor *this, MPRTPSPath *path);
+guint8 sndrate_distor_request_id(SendingRateDistributor *this,
+                                 MPRTPSPath *path,
+                                 guint32 sending_rate);
 void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        guint8 id,
                                        gfloat goodput,

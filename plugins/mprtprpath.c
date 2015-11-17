@@ -64,7 +64,10 @@ mprtpr_path_init (MpRTPRPath * this)
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetsrcvqueue();
   this->last_drift_window = GST_MSECOND;
-  this->delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 50);
+  this->low_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 1<<12, 40);
+  streamtracker_set_treshold(this->low_delays, 60 * GST_SECOND);
+  this->high_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 1<<12, 80);
+  streamtracker_set_treshold(this->high_delays, 60 * GST_SECOND);
   this->skews = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 50);
   streamtracker_set_treshold(this->skews, 2 * GST_SECOND);
   mprtpr_path_reset (this);
@@ -82,7 +85,7 @@ mprtpr_path_finalize (GObject * object)
   MpRTPRPath *this;
   this = MPRTPR_PATH_CAST (object);
   g_object_unref (this->sysclock);
-  g_object_unref(this->delays);
+  g_object_unref(this->low_delays);
   g_object_unref(this->skews);
   g_object_unref(this->packetsqueue);
 }
@@ -266,7 +269,8 @@ void mprtpr_path_set_state(MpRTPRPath *this, MPRTPRPathState state)
 void mprtpr_path_set_delay(MpRTPRPath *this, GstClockTime delay)
 {
   THIS_WRITELOCK (this);
-  streamtracker_add(this->delays, delay);
+  streamtracker_add(this->low_delays, delay);
+  streamtracker_add(this->high_delays, delay);
 //  g_print("Add delay to subflow %d delay %lu-num:%u-%u->index:%d\n",
 //          this->id,
 //          delay,
@@ -316,20 +320,25 @@ done:
 }
 
 
-GstClockTime
-mprtpr_path_get_delay (MpRTPRPath * this,
+void
+mprtpr_path_get_delay (MpRTPRPath   *this,
+                       GstClockTime *percentile_40,
+                       GstClockTime *percentile_80,
                        GstClockTime *min_delay,
-                       GstClockTime *max_delay)
+                       GstClockTime *max_delay,
+                       GstClockTime *last_delay)
 {
-  guint64 result;
-  THIS_WRITELOCK (this);
-  result = this->last_delay;
-  if(!streamtracker_get_num(this->delays)) goto done;
-  result = streamtracker_get_stats(this->delays, min_delay, max_delay, NULL);
+  THIS_READLOCK (this);
+  if(!streamtracker_get_num(this->low_delays)) goto done;
+  if(percentile_40)
+      *percentile_40 = streamtracker_get_stats(this->low_delays, min_delay, max_delay, NULL);
+  if(percentile_80)
+      *percentile_80 = streamtracker_get_stats(this->high_delays, min_delay, max_delay, NULL);
+  if(last_delay)
+    *last_delay = streamtracker_get_last(this->low_delays);
 done:
-  this->last_delay = result;
-  THIS_WRITEUNLOCK (this);
-  return result;
+  THIS_READUNLOCK(this);
+  return;
 }
 
 void
@@ -379,7 +388,8 @@ add:
     this->last_rtp_timestamp = gst_rtp_buffer_get_timestamp(rtp);
   }
 done:
-  streamtracker_add(this->delays, delay);
+  streamtracker_add(this->low_delays, delay);
+  streamtracker_add(this->high_delays, delay);
   THIS_WRITEUNLOCK (this);
 //  g_print("mprtpr_path_process_rtp_packet end\n");
   return;

@@ -70,11 +70,11 @@ struct _MpRTPReceiverPath
   PacketsRcvQueue*    packetsqueue;
   guint32             last_rtp_timestamp;
 
-  StreamTracker*      delays;
+  StreamTracker*      low_delays;
+  StreamTracker*      high_delays;
   StreamTracker*      skews;
 
   GstClockTime        last_drift_window;
-  GstClockTime        last_delay;
 
 
 };
@@ -118,8 +118,15 @@ void mprtpr_path_playout_tick(MpRTPRPath *this);
 void mprtpr_path_set_played_seq_num(MpRTPRPath *this, guint16 seq);
 guint64 mprtpr_path_get_drift_window(MpRTPRPath *this, GstClockTime *min_delay,
                                      GstClockTime *max_delay);
-GstClockTime mprtpr_path_get_delay (MpRTPRPath * this, GstClockTime *min_delay,
-                       GstClockTime *max_delay);
+
+void
+mprtpr_path_get_delay (MpRTPRPath   *this,
+                       GstClockTime *percentile_40,
+                       GstClockTime *percentile_80,
+                       GstClockTime *min_delay,
+                       GstClockTime *max_delay,
+                       GstClockTime *last_delay);
+
 guint32 mprtpr_path_get_skew_byte_num(MpRTPRPath *this);
 guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this);
 void mprtpr_path_get_obsolate_stat(MpRTPRPath *this,

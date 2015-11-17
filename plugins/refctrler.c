@@ -80,7 +80,9 @@ struct _ORMoment{
   guint32                       received_payload_bytes;
   guint32                       expected_packet_num;
   gdouble                       media_rate;
-  guint64                       median_delay;
+  guint64                       delay40;
+  guint64                       delay80;
+  guint64                       last_delay;
   GstClockTime                  min_delay;
   GstClockTime                  max_delay;
   guint64                       median_skew;
@@ -667,10 +669,12 @@ _step_or (Subflow * this)
                                    &_ort0(this)->min_skew,
                                    &_ort0(this)->max_skew);
 
-  _ort0(this)->median_delay =
       mprtpr_path_get_delay(this->path,
-                            &_ort0(this)->min_delay,
-                            &_ort0(this)->max_delay);
+                            &_ort0(this)->delay40,
+                            &_ort0(this)->delay80,
+                            NULL,
+                            NULL,
+                            &_ort0(this)->last_delay);
 
   _ort0(this)->skew_bytes = mprtpr_path_get_skew_byte_num(this->path);
 
@@ -924,17 +928,13 @@ _setup_xr_owd_report (Subflow * this,
     GstRTCPXR_OWD * xr, guint32 ssrc)
 {
   guint8 flag = RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION;
-  GstClockTime one_way_delay = 0;
-  GstClockTime min_delay, max_delay;
   guint32 owd, min, max;
   guint16 percentile = 40;
   guint16 invert_percentile = 25;
 
-  one_way_delay = mprtpr_path_get_delay(this->path, &min_delay, &max_delay);
-
-  min = (guint32) (one_way_delay-min_delay);
-  max = (guint32) (max_delay-one_way_delay);
-  owd = (guint32) (one_way_delay>>16);
+  min = (guint32) (get_ntp_from_epoch_ns(_ort0(this)->delay40)>>16);
+  max = (guint32) (get_ntp_from_epoch_ns(_ort0(this)->delay80)>>16);
+  owd = (guint32) (get_ntp_from_epoch_ns(_ort0(this)->last_delay)>>16);
 
   gst_rtcp_header_change (&xr->header, NULL,NULL, NULL, NULL, NULL, &ssrc);
   gst_rtcp_xr_owd_change(xr, &flag, &ssrc, &percentile, &invert_percentile,
@@ -966,7 +966,13 @@ _play_controller_main(RcvEventBasedController * this)
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
     subflow = (Subflow *) val;
-    delay = mprtpr_path_get_delay(subflow->path, NULL, NULL);
+    mprtpr_path_get_delay(subflow->path,
+                          NULL,
+                          &delay,
+                          NULL,
+                          NULL,
+                          NULL);
+//    delay = mprtpr_path_get_delay(subflow->path, NULL, NULL);
     skew = mprtpr_path_get_drift_window(subflow->path, NULL, NULL);
     if(!skew || !delay) {
       continue;

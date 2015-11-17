@@ -95,9 +95,9 @@ struct _IRMoment{
   guint32             jitter;
   guint32             cum_packet_lost;
   guint32             lost;
-  guint64             delay;
-  guint64             min_delay;
-  guint64             max_delay;
+  guint64             delay_last;
+  guint64             delay_40;
+  guint64             delay_80;
   guint64             skew;
   guint64             min_skew;
   guint64             max_skew;
@@ -456,7 +456,7 @@ sefctrler_add_path (gpointer ptr, guint8 subflow_id, MPRTPSPath * path)
                        new_subflow);
   ++this->subflow_num;
   stream_splitter_add_path (this->splitter, subflow_id, path, SUBFLOW_DEFAULT_GOODPUT);
-  new_subflow->rate_calcer_id = sndrate_distor_request_id(this->rate_distor, path);
+  new_subflow->rate_calcer_id = sndrate_distor_request_id(this->rate_distor, path, SUBFLOW_DEFAULT_GOODPUT);
 exit:
   THIS_WRITEUNLOCK (this);
 }
@@ -683,7 +683,8 @@ _irp_producer_main(SndEventBasedController * this)
     if(_irt0(subflow)->checked) goto checked;
     if(now - 120 * GST_MSECOND < _irt0(subflow)->time) goto not_checked;
     goodput = _get_subflow_goodput(subflow);
-    variance = (gdouble)streamtracker_get_stats(this->delays, NULL, NULL, NULL) / (gdouble)_irt0(subflow)->jitter;
+//    variance = (gdouble)streamtracker_get_stats(this->delays, NULL, NULL, NULL) / (gdouble)_irt0(subflow)->jitter;
+    variance = .1;
     sndrate_distor_measurement_update(this->rate_distor,
                                       subflow->rate_calcer_id,
                                       goodput,
@@ -916,18 +917,21 @@ _report_processing_xr_owd_block_processor (SndEventBasedController *this,
                                             Subflow * subflow,
                                             GstRTCPXR_OWD * xrb)
 {
-  guint32 new_owd;
+  guint32 last_delay,min_delay,max_delay;
 
   gst_rtcp_xr_owd_getdown(xrb,
                            NULL,
                            NULL,
                            NULL,
                            NULL,
-                           &new_owd,
-                           NULL,
-                           NULL);
+                           &last_delay,
+                           &min_delay,
+                           &max_delay);
 
-  _irt0(subflow)->delay = new_owd;
+
+  _irt0(subflow)->delay_last = get_epoch_time_from_ntp_in_ns(last_delay<<16);
+  _irt0(subflow)->delay_40 =   get_epoch_time_from_ntp_in_ns(min_delay<<16);
+  _irt0(subflow)->delay_80 =   get_epoch_time_from_ntp_in_ns(max_delay<<16);
   //--------------------------
   //evaluating
   //--------------------------
@@ -1019,24 +1023,18 @@ Event _subflow_check_c_state(Subflow *subflow)
 void _subflow_fire_p_state(SndEventBasedController *this,Subflow *subflow,Event event)
 {
   MPRTPSPath *path = subflow->path;
+  MPRTPSPathState state;
   subflow->fire = _subflow_fire_p_state;
   if(event != EVENT_SETTLEMENT) goto done;
 
   mprtps_path_set_active(path);
-  subflow->rate_calcer_id = sndrate_distor_request_id(this->rate_distor, path);
-  //restore
-  switch(mprtps_path_get_state(path)){
-    case MPRTPS_PATH_STATE_CONGESTED:
-      subflow->fire = _subflow_fire_c_state;
-      break;
-    case MPRTPS_PATH_STATE_LOSSY:
-      subflow->fire = _subflow_fire_l_state;
-      break;
-    default:
-    case MPRTPS_PATH_STATE_NON_CONGESTED:
-      subflow->fire = _subflow_fire_nc_state;
-      break;
-  }
+  state = mprtps_path_get_state(path);
+  subflow->rate_calcer_id = sndrate_distor_request_id(
+      this->rate_distor,
+      path,
+      SUBFLOW_DEFAULT_GOODPUT);
+
+  _subflow_state_transit_to(subflow, state);
 done:
   return;
 }

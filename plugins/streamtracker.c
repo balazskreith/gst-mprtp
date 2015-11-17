@@ -172,8 +172,8 @@ guint64 streamtracker_get_last(StreamTracker *this)
   guint64 result;
   THIS_READLOCK(this);
   if(this->read_index == this->write_index) result = 0;
-  else if(this->write_index == 0) result = this->items[this->length-1];
-  else result = this->items[this->write_index-1];
+  else if(this->write_index == 0) result = this->items[this->length-1].value;
+  else result = this->items[this->write_index-1].value;
   THIS_READUNLOCK(this);
   return result;
 }
@@ -188,7 +188,7 @@ guint64 streamtracker_get_last_minus_n(StreamTracker *this, guint n)
   if(counter < n) goto done;
   index = this->write_index - ( n % this->length);
   if (index < 0) index = this->length + index;
-  result = this->items[index];
+  result = this->items[index].value;
   THIS_READUNLOCK(this);
 done:
   return result;

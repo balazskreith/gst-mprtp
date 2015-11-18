@@ -44,7 +44,6 @@ typedef enum{
   STATE_OVERUSED = -1,
   STATE_STABLE   =  0,
   STATE_MONITORED = 1,
-  STATE_UNDERUSED = 2
 }SubflowState;
 
 struct _Measurement{
@@ -52,6 +51,7 @@ struct _Measurement{
   gdouble         corrl_owd;
   gdouble         corrh_owd;
   guint32         goodput;
+  SubflowState    state;
 };
 
 struct _Subflow{
@@ -61,7 +61,7 @@ struct _Subflow{
   gdouble         fallen_rate;
 
   guint8          joint_subflow_ids[SNDRATEDISTOR_MAX_NUM];
-
+  void          (*procedure)(SendingRateDistributor*,Subflow*);
   guint32         extra_bytes;
   guint           monitoring_interval;
   guint8          stability;
@@ -72,8 +72,13 @@ struct _Subflow{
 };
 
 //----------------------------------------------------------------------
-//-------- Private functions belongs to Scheduler tree object ----------
+//-------- Private functions belongs to the object ----------
 //----------------------------------------------------------------------
+
+static const gdouble ST_ = 1.1; //Stable treshold
+static const gdouble OT_ = 2.;  //Overused treshold
+static const gdouble DT_ = 1.5; //Down Treshold
+static const gdouble MT_ = 1.1; //Monitoring Overused treshold
 
 static void
 sndrate_distor_finalize (
@@ -96,7 +101,7 @@ _assign(
     SendingRateDistributor *this);
 
 static void
-_recalc_monitoring_interval(
+_recalc_monitoring(
     Subflow *subflow);
 
 static Subflow*
@@ -115,7 +120,25 @@ _mt2(Subflow* this);
 static Measurement*
 _m_step(Subflow *this);
 
+static void
+_state_overused(
+    SendingRateDistributor *this,
+    Subflow *subflow);
 
+static void
+_state_stable(
+    SendingRateDistributor *this,
+    Subflow *subflow);
+
+static void
+_state_monitored(
+    SendingRateDistributor *this,
+    Subflow *subflow);
+
+static void
+_transit_to(
+    Subflow *subflow,
+    SubflowState target);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -196,6 +219,7 @@ done:
   _get_subflow(this, *id)->available = TRUE;
   _get_subflow(this, *id)->sending_rate = sending_rate;
   _get_subflow(this, *id)->path = g_object_ref(path);
+  _transit_to(_get_subflow(this, *id), STATE_STABLE);
   ++this->counter;
 exit:
   return result;
@@ -237,7 +261,7 @@ done:
   return;
 }
 
-void sndrate_distor_undershoot(SendingRateDistributor *this, guint8 id)
+void sndrate_distor_reduce(SendingRateDistributor *this, guint8 id)
 {
   guint32 fallen_bytes;
   Subflow *subflow;
@@ -281,7 +305,14 @@ done:
 
 void sndrate_distor_keep(SendingRateDistributor *this, guint8 id)
 {
-
+  Subflow *subflow;
+  subflow = _get_subflow(this, id);
+  if(!subflow->available){
+    g_warning("NOT ADDED SUBFLOW!!!!");
+    goto done;
+  }
+  subflow->procedure(this, subflow);
+done:
   return;
 }
 
@@ -349,7 +380,7 @@ void _divide(SendingRateDistributor *this)
     subflow->extra_bytes -= allocated_bytes;
     subflow->delta_sr += allocated_bytes;
     this->undershooted_sr_sum-=allocated_bytes;
-    _recalc_monitoring_interval(subflow);
+    _recalc_monitoring(subflow);
     if(!this->undershooted_sr_sum) goto done;
   }
 
@@ -383,7 +414,7 @@ void _assign(SendingRateDistributor *this)
 }
 
 
-void _recalc_monitoring_interval(Subflow *subflow)
+void _recalc_monitoring(Subflow *subflow)
 {
   gdouble tsr,mb,hmb,lmb;
   if(!subflow->monitoring_interval) return;
@@ -454,4 +485,91 @@ Measurement* _m_step(Subflow *this)
 }
 
 
+void
+_state_overused(
+    SendingRateDistributor *this,
+    Subflow *subflow)
+{
+  if(_mt0(subflow)->corrh_owd > OT_){
+    _balancing;
+    _pause_rate_controling;
+    goto done;
+  }
+  _transit_to(subflow, STATE_STABLE);
+done:
+  return;
+}
+
+void
+_state_stable(
+    SendingRateDistributor *this,
+    Subflow *subflow)
+{
+  if(subflow->stability < 0)
+    subflow->stability = 0;
+  if(_mt0(subflow)->corrh_owd > ST_){
+    if(_mt1(subflow)->corrh_owd > ST_){
+      _balancing;
+      _pause_rate_controling;
+      _transit_to(subflow, STATE_OVERUSED);
+    }
+    _disable_monitoring;
+    goto done;
+  }
+  _enable_monitoring;
+  if(subflow->sending_rate <_mt0(subflow)->goodput)
+    subflow->delta_sr += _mt0(subflow)->goodput - subflow->sending_rate;
+  _transit_to(subflow, STATE_MONITORED);
+done:
+  return;
+}
+
+void
+_state_monitored(
+    SendingRateDistributor *this,
+    Subflow *subflow)
+{
+  if(_mt0(subflow)->corrh_owd > DT_){
+    _balancing;
+    _disable_monitoring;
+    _pause_rate_controling;
+    _transit_to(subflow, STATE_OVERUSED);
+    goto done;
+  }
+  if(_mt0(subflow)->corrh_owd > ST_){
+    _disable_monitoring;
+    _transit_to(subflow, STATE_STABLE);
+    goto done;
+  }
+  if(_mt0(subflow)->corrl_owd > MT_ && subflow->monitoring_interval < 14){
+    ++subflow->monitoring_interval;
+  }
+  if(_mt1(subflow) != STATE_MONITORED){
+    goto done;
+  }
+  if(subflow->stability < 1) subflow->stability = 1;
+  else if(_mt2(subflow)->state == STATE_MONITORED) subflow->stability = 2;
+  subflow->extra_bytes += 1./(gdouble) subflow->monitoring_interval * (gdouble)subflow->sending_rate;
+done:
+  return;
+}
+
+void
+_transit_to(
+    Subflow *subflow,
+    SubflowState target)
+{
+  _mt0(subflow)->state = target;
+  switch(target){
+    case STATE_MONITORED:
+      subflow->procedure = _state_monitored;
+    break;
+    case STATE_OVERUSED:
+      subflow->procedure = _state_overused;
+    break;
+    case STATE_STABLE:
+      subflow->procedure = _state_stable;
+    break;
+  }
+}
 

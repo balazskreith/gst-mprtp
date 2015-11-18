@@ -60,7 +60,7 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        gdouble corrh_owd,
                                        gdouble corrl_owd);
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
-void sndrate_distor_undershoot(SendingRateDistributor *this, guint8 id);
+void sndrate_distor_reduce(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_bounce_back(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_keep(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate);

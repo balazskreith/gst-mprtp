@@ -64,10 +64,10 @@ mprtpr_path_init (MpRTPRPath * this)
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetsrcvqueue();
   this->last_drift_window = GST_MSECOND;
-  this->ltt_low_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 512, 40);
-  streamtracker_set_treshold(this->ltt_low_delays, 2 * GST_SECOND);
-  this->ltt_high_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 512, 80);
-  streamtracker_set_treshold(this->ltt_high_delays, 2 * GST_SECOND);
+  this->ltt_low_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 1024, 40);
+  streamtracker_set_treshold(this->ltt_low_delays, 30 * GST_SECOND);
+  this->ltt_high_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 1024, 80);
+  streamtracker_set_treshold(this->ltt_high_delays, 30 * GST_SECOND);
   this->skews = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 50);
   streamtracker_set_treshold(this->skews, 2 * GST_SECOND);
   mprtpr_path_reset (this);

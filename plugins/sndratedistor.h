@@ -28,18 +28,15 @@ struct _SendingRateDistributor
 {
   GObject              object;
   GstClock*            sysclock;
-  GHashTable*          subflows;
+  guint8*              subflows;
   guint8               max_id;
   guint32              media_rate;
   GQueue*              free_ids;
   guint8               counter;
-  guint8               SCM[SNDRATEDISTOR_MAX_NUM][SNDRATEDISTOR_MAX_NUM];
-  gint8                stability[SNDRATEDISTOR_MAX_NUM];
-  gint8                restoring[SNDRATEDISTOR_MAX_NUM];
-  guint64              extra_bytes[SNDRATEDISTOR_MAX_NUM];
-  gint64               delta_sending_rates[SNDRATEDISTOR_MAX_NUM];
-  guint32              sending_rates[SNDRATEDISTOR_MAX_NUM];
-  guint8               monitoring_interval[SNDRATEDISTOR_MAX_NUM];
+
+  guint8               changeable[SNDRATEDISTOR_MAX_NUM];
+  guint32              bounced_sr_sum;
+  guint32              undershooted_sr_sum;
   guint32              overused_bytes;
 
   ChangeableVector*    changeable_vector;
@@ -59,7 +56,9 @@ guint8 sndrate_distor_request_id(SendingRateDistributor *this,
 void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        guint8 id,
                                        gfloat goodput,
-                                       gdouble variance);
+                                       gdouble variance,
+                                       gdouble corrh_owd,
+                                       gdouble corrl_owd);
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_undershoot(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_bounce_back(SendingRateDistributor *this, guint8 id);

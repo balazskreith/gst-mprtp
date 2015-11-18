@@ -29,10 +29,16 @@
 #include <string.h>
 #include "bintree.h"
 
-#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
+//#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
+//#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
+//#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
+//#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
+
+#define THIS_READLOCK(this)
+#define THIS_READUNLOCK(this)
+#define THIS_WRITELOCK(this)
+#define THIS_WRITEUNLOCK(this)
+
 #define _cmp_uint16(x,y) ((x==y)?0:((gint16) (x - y)) < 0 ? -1 : 1)
 
 GST_DEBUG_CATEGORY_STATIC (packetsrcvqueue_debug_category);

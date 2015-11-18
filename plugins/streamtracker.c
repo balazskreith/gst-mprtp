@@ -27,10 +27,15 @@
 #include <math.h>
 #include <string.h>
 
-#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
+//#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
+//#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
+//#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
+//#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
+
+#define THIS_READLOCK(this)
+#define THIS_READUNLOCK(this)
+#define THIS_WRITELOCK(this)
+#define THIS_WRITEUNLOCK(this)
 
 
 GST_DEBUG_CATEGORY_STATIC (streamtracker_debug_category);
@@ -287,7 +292,11 @@ balancing:
   min_count = bintree_get_num(this->mintree);
   max_count = (gdouble)bintree_get_num(this->maxtree) * this->max_multiplier + .5;
   diff = max_count - min_count;
-//  g_print("max_tree_num: %d, min_tree_num: %d\n", max_tree_num, min_tree_num);
+//  g_print("%p:%f max_tree_num: %d, min_tree_num: %d\n",
+//          this,
+//          this->max_multiplier,
+//          max_count,
+//          min_count);
   if (-2 < diff && diff < 2) {
     goto done;
   }
@@ -295,8 +304,8 @@ balancing:
     top = bintree_pop_top_node(this->mintree);
     bintree_insert_node(this->maxtree, top);
   } else if (1 < diff) {
-      top = bintree_pop_top_node(this->maxtree);
-      bintree_insert_node(this->mintree, top);
+    top = bintree_pop_top_node(this->maxtree);
+    bintree_insert_node(this->mintree, top);
   }
   goto balancing;
 

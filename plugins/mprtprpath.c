@@ -25,7 +25,7 @@ G_DEFINE_TYPE (MpRTPRPath, mprtpr_path, G_TYPE_OBJECT);
 
 static void mprtpr_path_finalize (GObject * object);
 static void mprtpr_path_reset (MpRTPRPath * this);
-
+static GstClockTime _get_last_delay_abc_median (MpRTPRPath * this);
 static gint _cmp_seq (guint16 x, guint16 y);
 static gint _cmp_for_max (guint64 x, guint64 y);
 static gint _cmp_for_min (guint64 x, guint64 y);
@@ -64,10 +64,10 @@ mprtpr_path_init (MpRTPRPath * this)
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetsrcvqueue();
   this->last_drift_window = GST_MSECOND;
-  this->low_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 40);
-  streamtracker_set_treshold(this->low_delays, 5 * GST_SECOND);
-  this->high_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 80);
-  streamtracker_set_treshold(this->high_delays, 5 * GST_SECOND);
+  this->ltt_low_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 512, 40);
+  streamtracker_set_treshold(this->ltt_low_delays, 2 * GST_SECOND);
+  this->ltt_high_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 512, 80);
+  streamtracker_set_treshold(this->ltt_high_delays, 2 * GST_SECOND);
   this->skews = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 50);
   streamtracker_set_treshold(this->skews, 2 * GST_SECOND);
   mprtpr_path_reset (this);
@@ -85,7 +85,7 @@ mprtpr_path_finalize (GObject * object)
   MpRTPRPath *this;
   this = MPRTPR_PATH_CAST (object);
   g_object_unref (this->sysclock);
-  g_object_unref(this->low_delays);
+  g_object_unref(this->ltt_low_delays);
   g_object_unref(this->skews);
   g_object_unref(this->packetsqueue);
 }
@@ -269,8 +269,11 @@ void mprtpr_path_set_state(MpRTPRPath *this, MPRTPRPathState state)
 void mprtpr_path_set_delay(MpRTPRPath *this, GstClockTime delay)
 {
   THIS_WRITELOCK (this);
-  streamtracker_add(this->low_delays, delay);
-  streamtracker_add(this->high_delays, delay);
+  streamtracker_add(this->ltt_low_delays, delay);
+  streamtracker_add(this->ltt_high_delays, delay);
+  this->last_delay_c = this->last_delay_b;
+  this->last_delay_b = this->last_delay_a;
+  this->last_delay_a = delay;
 //  g_print("Add delay to subflow %d delay %lu-num:%u-%u->index:%d\n",
 //          this->id,
 //          delay,
@@ -332,13 +335,18 @@ mprtpr_path_get_delay (MpRTPRPath   *this,
 //  if(!streamtracker_get_num(this->low_delays)) goto done;
   if(percentile_40)
 //      *percentile_40 = 50 * GST_MSECOND;
-    *percentile_40 = streamtracker_get_stats(this->low_delays, NULL, NULL, NULL);
+    *percentile_40 = streamtracker_get_stats(this->ltt_low_delays, min_delay, max_delay, NULL);
   if(percentile_80)
       *percentile_80 =
           //50 * GST_MSECOND;
-          streamtracker_get_stats(this->high_delays, min_delay, max_delay, NULL);
+          streamtracker_get_stats(this->ltt_high_delays, min_delay, max_delay, NULL);
   if(last_delay)
-    *last_delay = streamtracker_get_last(this->low_delays);
+     *last_delay = _get_last_delay_abc_median(this);
+//  g_print("40th num: %u-%lu 80th num: %u-%lu\n",
+//          streamtracker_get_num(this->ltt_low_delays),
+//          streamtracker_get_stats(this->ltt_low_delays, min_delay, max_delay, NULL),
+//          streamtracker_get_num(this->ltt_high_delays),
+//          streamtracker_get_stats(this->ltt_high_delays, min_delay, max_delay, NULL));
 //        streamtracker_get_last(this->low_delays);
 //done:
   THIS_READUNLOCK(this);
@@ -392,14 +400,28 @@ add:
     this->last_rtp_timestamp = gst_rtp_buffer_get_timestamp(rtp);
   }
 done:
-  streamtracker_add(this->low_delays, delay);
-  streamtracker_add(this->high_delays, delay);
+  streamtracker_add(this->ltt_low_delays, delay);
+  streamtracker_add(this->ltt_high_delays, delay);
+  this->last_delay_c = this->last_delay_b;
+  this->last_delay_b = this->last_delay_a;
+  this->last_delay_a = delay;
   THIS_WRITEUNLOCK (this);
 //  g_print("mprtpr_path_process_rtp_packet end\n");
   return;
 
 }
 
+GstClockTime _get_last_delay_abc_median (MpRTPRPath * this)
+{
+  if(this->last_delay_a < this->last_delay_b){
+    if(this->last_delay_b < this->last_delay_c) return this->last_delay_b;
+    if(this->last_delay_a < this->last_delay_c) return this->last_delay_c;
+    return this->last_delay_a;
+  }
+  if(this->last_delay_a < this->last_delay_c) return this->last_delay_a;
+  if(this->last_delay_b < this->last_delay_c) return this->last_delay_c;
+  return this->last_delay_b;
+}
 
 gint
 _cmp_seq (guint16 x, guint16 y)

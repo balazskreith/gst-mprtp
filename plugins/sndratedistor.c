@@ -53,6 +53,8 @@ struct _Subflow{
   guint8          id;
   StreamTracker*  goodputs;
   gdouble         variance;
+  gdouble         corrl_owd;
+  gdouble         corrh_owd;
   MPRTPSPath*     path;
   StreamTracker*  sending_rates;
   gdouble         fallen_rate;
@@ -237,13 +239,17 @@ done:
 void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        guint8 id,
                                        gfloat goodput,
-                                       gdouble variance)
+                                       gdouble variance,
+                                       gdouble corrh_owd,
+                                       gdouble corrl_owd)
 {
   Subflow *subflow;
   subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (id));
   if(!subflow) goto done;
   streamtracker_add(subflow->goodputs, goodput);
   subflow->variance = variance;
+  subflow->corrh_owd = corrh_owd;
+  subflow->corrl_owd = corrl_owd;
 done:
   return;
 }

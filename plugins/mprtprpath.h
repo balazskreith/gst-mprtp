@@ -70,8 +70,11 @@ struct _MpRTPReceiverPath
   PacketsRcvQueue*    packetsqueue;
   guint32             last_rtp_timestamp;
 
-  StreamTracker*      low_delays;
-  StreamTracker*      high_delays;
+  GstClockTime        last_delay_a;
+  GstClockTime        last_delay_b;
+  GstClockTime        last_delay_c;
+  StreamTracker*      ltt_low_delays;
+  StreamTracker*      ltt_high_delays;
   StreamTracker*      skews;
 
   GstClockTime        last_drift_window;

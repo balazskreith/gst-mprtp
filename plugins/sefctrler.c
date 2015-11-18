@@ -111,6 +111,8 @@ struct _IRMoment{
   guint32             expected_payload_bytes;
   gdouble             lost_rate;
   gdouble             goodput;
+  gdouble             corrl_owd;
+  gdouble             corrh_owd;
   MPRTPSPathState     state;
   gint64              skew_diff;
   gboolean            checked;
@@ -147,6 +149,7 @@ struct _Subflow
   StateFunc                  fire;
   EventFunc                  check;
   guint8                     rate_calcer_id;
+
 //  GstClockTime               RTT;
 //  guint                      consecutive_late_RTT;
   gdouble                    avg_rtcp_size;
@@ -236,6 +239,14 @@ _report_processing_xr_owd_block_processor (SndEventBasedController *this,
 static gfloat
 _get_subflow_goodput (
     Subflow * this);
+
+static gdouble
+_get_subflow_corrh_owd(
+    Subflow *subflow);
+
+static gdouble
+_get_subflow_corrl_owd(
+    Subflow *subflow);
 
 static Event
 _subflow_check_p_state(
@@ -673,6 +684,8 @@ _irp_producer_main(SndEventBasedController * this)
   Event          event;
   gfloat         goodput;
   gdouble        variance;
+  gdouble        corrh_owd;
+  gdouble        corrl_owd;
 
   now = gst_clock_get_time(this->sysclock);
 
@@ -683,12 +696,16 @@ _irp_producer_main(SndEventBasedController * this)
     if(_irt0(subflow)->checked) goto checked;
     if(now - 120 * GST_MSECOND < _irt0(subflow)->time) goto not_checked;
     goodput = _get_subflow_goodput(subflow);
+    corrh_owd = _get_subflow_corrh_owd(subflow);
+    corrl_owd = _get_subflow_corrl_owd(subflow);
 //    variance = (gdouble)streamtracker_get_stats(this->delays, NULL, NULL, NULL) / (gdouble)_irt0(subflow)->jitter;
     variance = .1;
     sndrate_distor_measurement_update(this->rate_distor,
                                       subflow->rate_calcer_id,
                                       goodput,
-                                      variance);
+                                      variance,
+                                      corrh_owd,
+                                      corrl_owd);
     event = subflow->check(subflow);
     subflow->fire(this, subflow, event);
     _irt0(subflow)->checked = TRUE;
@@ -928,10 +945,16 @@ _report_processing_xr_owd_block_processor (SndEventBasedController *this,
                            &min_delay,
                            &max_delay);
 
+  _irt0(subflow)->delay_last = last_delay;
+  _irt0(subflow)->delay_last<<=16;
+  _irt0(subflow)->delay_last = get_epoch_time_from_ntp_in_ns(_irt0(subflow)->delay_last);
+  _irt0(subflow)->delay_40 = min_delay;
+  _irt0(subflow)->delay_40<<=16;
+  _irt0(subflow)->delay_40 = get_epoch_time_from_ntp_in_ns(_irt0(subflow)->delay_40);
+  _irt0(subflow)->delay_80 = max_delay;
+  _irt0(subflow)->delay_80<<=16;
+  _irt0(subflow)->delay_80 = get_epoch_time_from_ntp_in_ns(_irt0(subflow)->delay_80);
 
-  _irt0(subflow)->delay_last = get_epoch_time_from_ntp_in_ns(last_delay<<16);
-  _irt0(subflow)->delay_40 =   get_epoch_time_from_ntp_in_ns(min_delay<<16);
-  _irt0(subflow)->delay_80 =   get_epoch_time_from_ntp_in_ns(max_delay<<16);
   //--------------------------
   //evaluating
   //--------------------------
@@ -998,6 +1021,24 @@ _get_subflow_goodput (Subflow * this)
 //                  goodput,
 //                  ck+1);
   }
+}
+
+gdouble _get_subflow_corrh_owd(Subflow *subflow)
+{
+  gdouble result;
+  result = (gdouble) _irt0(subflow)->delay_last;
+  result/= (gdouble) _irt0(subflow)->delay_80;
+  _irt0(subflow)->corrh_owd = result;
+  return result;
+}
+
+gdouble _get_subflow_corrl_owd(Subflow *subflow)
+{
+  gdouble result;
+  result = (gdouble) _irt0(subflow)->delay_last;
+  result/= (gdouble) _irt0(subflow)->delay_40;
+  _irt0(subflow)->corrl_owd = result;
+  return result;
 }
 
 Event _subflow_check_p_state(Subflow *subflow)
@@ -1193,7 +1234,6 @@ _orp_producer_main(SndEventBasedController * this)
     if (_check_report_timeout (subflow)) {
       subflow->fire (this, subflow, EVENT_LATE);
     }
-
     _send_mprtcp_sr_block (this, subflow, &sent_report_length);
 
     subflow->avg_rtcp_size +=

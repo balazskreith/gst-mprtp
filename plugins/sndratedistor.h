@@ -14,7 +14,6 @@
 
 typedef struct _SendingRateDistributor SendingRateDistributor;
 typedef struct _SendingRateDistributorClass SendingRateDistributorClass;
-typedef struct _ChangeableVector ChangeableVector;
 #define SNDRATEDISTOR_TYPE             (sndrate_distor_get_type())
 #define SNDRATEDISTOR(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),SNDRATEDISTOR_TYPE,SendingRateDistributor))
 #define SNDRATEDISTOR_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass),SNDRATEDISTOR_TYPE,SendingRateDistributorClass))
@@ -35,11 +34,12 @@ struct _SendingRateDistributor
   guint8               counter;
 
   guint8               changeable[SNDRATEDISTOR_MAX_NUM];
-  guint32              bounced_sr_sum;
-  guint32              undershooted_sr_sum;
+  guint32              changeable_sr_sum;
+  guint32              changeable_stability_sum;
+  guint32              requested_bytes;
+  guint32              fallen_bytes;
   guint32              overused_bytes;
 
-  ChangeableVector*    changeable_vector;
 
 };
 
@@ -55,13 +55,13 @@ guint8 sndrate_distor_request_id(SendingRateDistributor *this,
                                  guint32 sending_rate);
 void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        guint8 id,
-                                       gfloat goodput,
+                                       guint32 goodput,
                                        gdouble variance,
                                        gdouble corrh_owd,
                                        gdouble corrl_owd);
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_reduce(SendingRateDistributor *this, guint8 id);
-void sndrate_distor_bounce_back(SendingRateDistributor *this, guint8 id);
+void sndrate_distor_mitigate(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_keep(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate);
 guint32 sndrate_distor_get_rate(SendingRateDistributor *this, guint8 id);

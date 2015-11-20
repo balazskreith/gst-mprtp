@@ -33,9 +33,6 @@ struct _SendingRateDistributor
   GQueue*              free_ids;
   guint8               counter;
 
-  guint8               changeable[SNDRATEDISTOR_MAX_NUM];
-  guint32              changeable_sr_sum;
-  guint32              changeable_stability_sum;
   guint32              requested_bytes;
   guint32              fallen_bytes;
   guint32              overused_bytes;
@@ -60,9 +57,6 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        gdouble corrh_owd,
                                        gdouble corrl_owd);
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
-void sndrate_distor_reduce(SendingRateDistributor *this, guint8 id);
-void sndrate_distor_mitigate(SendingRateDistributor *this, guint8 id);
-void sndrate_distor_keep(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate);
-guint32 sndrate_distor_get_rate(SendingRateDistributor *this, guint8 id);
+guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id);
 #endif /* SNDRATEDISTOR_H_ */

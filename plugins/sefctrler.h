@@ -59,8 +59,6 @@ struct _SndEventBasedController
   gboolean               report_is_flowable;
   void                 (*scheduler_signaling)(gpointer, guint64);
   gpointer               scheduler;
-  gboolean               all_subflow_are_checked;
-  GstClockTime           all_subflow_are_checked_time;
   gboolean               stability_started;
   gdouble                rate_diff;
 //

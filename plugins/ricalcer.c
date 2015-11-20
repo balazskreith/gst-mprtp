@@ -148,8 +148,8 @@ void ricalcer_do_next_report_time (ReportIntervalCalculator * this)
   }
 
 done:
-  if (interval < 2.) {
-    interval = 2. + g_random_double ();
+  if (interval < 1.) {
+    interval = 1. + g_random_double ();
   } else if (7.5 < interval) {
     interval = 5. * (g_random_double () + .5);
   }

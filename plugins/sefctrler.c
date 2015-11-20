@@ -42,7 +42,7 @@
 #define PATH_RTT_MAX_TRESHOLD (800 * GST_MSECOND)
 #define PATH_RTT_MIN_TRESHOLD (600 * GST_MSECOND)
 #define MAX_SUBFLOW_MOMENT_NUM 5
-#define SUBFLOW_DEFAULT_GOODPUT 64000
+#define SUBFLOW_DEFAULT_GOODPUT 6400
 
 GST_DEBUG_CATEGORY_STATIC (sefctrler_debug_category);
 #define GST_CAT_DEFAULT sefctrler_debug_category
@@ -148,6 +148,7 @@ struct _Subflow
   guint32                    or_moments_num;
   StateFunc                  fire;
   EventFunc                  check;
+  gboolean                   ready;
   guint8                     rate_calcer_id;
 
 //  GstClockTime               RTT;
@@ -338,6 +339,8 @@ static void
 _split_controller_main(SndEventBasedController * this);
 static void
 _recalc_bids(SndEventBasedController * this);
+static gboolean
+_subflows_are_ready(SndEventBasedController * this);
 //----------------------------------------------------------------------------
 
 //------------------------- Utility functions --------------------------------
@@ -679,7 +682,6 @@ _irp_producer_main(SndEventBasedController * this)
   GHashTableIter iter;
   gpointer       key, val;
   Subflow*       subflow;
-  gboolean       all_subflow_checked = TRUE;
   GstClockTime   now;
   Event          event;
   gfloat         goodput;
@@ -696,6 +698,7 @@ _irp_producer_main(SndEventBasedController * this)
     if(_irt0(subflow)->checked) goto checked;
     if(now - 120 * GST_MSECOND < _irt0(subflow)->time) goto not_checked;
     goodput = _get_subflow_goodput(subflow);
+    g_print("S%d %f\n",subflow->id, goodput);
     corrh_owd = _get_subflow_corrh_owd(subflow);
     corrl_owd = _get_subflow_corrl_owd(subflow);
 //    variance = (gdouble)streamtracker_get_stats(this->delays, NULL, NULL, NULL) / (gdouble)_irt0(subflow)->jitter;
@@ -709,20 +712,13 @@ _irp_producer_main(SndEventBasedController * this)
     event = subflow->check(subflow);
     subflow->fire(this, subflow, event);
     _irt0(subflow)->checked = TRUE;
+    subflow->ready = TRUE;
   checked:
-    all_subflow_checked&=TRUE;
     continue;
 
   not_checked:
-    all_subflow_checked&=FALSE;
     continue;
   }
-
-  if(!this->all_subflow_are_checked && all_subflow_checked){
-    this->all_subflow_are_checked_time = now;
-  }
-  this->all_subflow_are_checked = all_subflow_checked;
-
 }
 
 IRMoment *
@@ -1025,18 +1021,22 @@ _get_subflow_goodput (Subflow * this)
 
 gdouble _get_subflow_corrh_owd(Subflow *subflow)
 {
-  gdouble result;
+  gdouble result = 1.;
+  if(!_irt0(subflow)->delay_last || !_irt0(subflow)->delay_80) goto done;
   result = (gdouble) _irt0(subflow)->delay_last;
   result/= (gdouble) _irt0(subflow)->delay_80;
+done:
   _irt0(subflow)->corrh_owd = result;
   return result;
 }
 
 gdouble _get_subflow_corrl_owd(Subflow *subflow)
 {
-  gdouble result;
+  gdouble result = 1.;
+  if(!_irt0(subflow)->delay_last || !_irt0(subflow)->delay_80) goto done;
   result = (gdouble) _irt0(subflow)->delay_last;
   result/= (gdouble) _irt0(subflow)->delay_40;
+done:
   _irt0(subflow)->corrl_owd = result;
   return result;
 }
@@ -1367,7 +1367,7 @@ _split_controller_main(SndEventBasedController * this)
   GstClockTime now;
   now = gst_clock_get_time(this->sysclock);
 
-  if(this->last_recalc_time < this->all_subflow_are_checked_time ||
+  if(_subflows_are_ready(this) ||
      this->last_recalc_time < now - 15 * GST_SECOND)
   {
     this->bids_recalc_requested = TRUE;
@@ -1392,11 +1392,11 @@ void _recalc_bids(SndEventBasedController * this)
   Subflow *subflow;
   guint32 sb;
   GstClockTime now;
-//  guint32 media_rate;
+  guint32 media_rate;
 
   now = gst_clock_get_time(this->sysclock);
-//  media_rate = stream_splitter_get_media_rate(this->splitter);
-//  sndrate_distor_time_update(this->rate_distor, media_rate);
+  media_rate = stream_splitter_get_media_rate(this->splitter);
+  sndrate_distor_time_update(this->rate_distor, media_rate);
 
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
@@ -1406,19 +1406,37 @@ void _recalc_bids(SndEventBasedController * this)
       continue;
     }
     if(0) g_print("%lu", _irt(subflow, 2)->time);
-    sb = sndrate_distor_get_rate(this->rate_distor, subflow->rate_calcer_id);
-//    g_print("Subflow %d sending bid %u =  %f * %u\n",
-//            subflow->id,
-//            sb,
-//            subflow->control_signal,
-//            _get_max_goodput(subflow));
+    sb = sndrate_distor_get_sending_rate(this->rate_distor, subflow->rate_calcer_id);
+    g_print("Subflow %d sending bid %u\n",
+            subflow->id,
+            sb);
     stream_splitter_setup_sending_bid(this->splitter,
                                       subflow->id,
                                       sb);
+    subflow->ready = FALSE;
   }
   this->last_recalc_time = now;
 }
 
+
+gboolean _subflows_are_ready(SndEventBasedController * this)
+{
+  GHashTableIter iter;
+  gpointer key, val;
+  Subflow *subflow;
+  gboolean result = TRUE;
+
+  g_hash_table_iter_init (&iter, this->subflows);
+  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
+  {
+    subflow = (Subflow *) val;
+    if(!mprtps_path_is_active(subflow->path)){
+      continue;
+    }
+    result&=subflow->ready;
+  }
+  return result;
+}
 
 
 //----------------------------------------------------------------------------

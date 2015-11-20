@@ -956,29 +956,35 @@ _play_controller_main(RcvEventBasedController * this)
   GHashTableIter iter;
   gpointer key, val;
   Subflow *subflow;
-  guint64 min_delay, max_delay, delay, skew;
+  guint64 min_delay, max_delay, delay80, delay40, last_delay, skew;
   guint64 treshold;
   guint32 max_jitter = 0;
   guint32 jitter = 0;
   guint32 min_jitter = G_MAXUINT32;
+  GstClockTime now;
+  now = gst_clock_get_time(this->sysclock);
 //if(1) return;
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
     subflow = (Subflow *) val;
     mprtpr_path_get_delay(subflow->path,
+                          &delay40,
+                          &delay80,
                           NULL,
-                          &delay,
                           NULL,
-                          NULL,
-                          NULL);
+                          &last_delay);
+
+    if(now - GST_SECOND < _ort0(subflow)->time && last_delay > delay80<<1){
+      ricalcer_urgent_report_request(subflow->ricalcer);
+    }
 //    delay = 50 * GST_MSECOND;
     skew = mprtpr_path_get_drift_window(subflow->path, NULL, NULL);
-    if(!skew || !delay) {
+    if(!skew || !delay80) {
       continue;
     }
     if(!bintree_get_num(this->subflow_delays_tree)){
-      _refresh_subflow_delay_and_skew(this, delay, skew);
+      _refresh_subflow_delay_and_skew(this, delay80, skew);
       continue;
     }
 
@@ -987,12 +993,12 @@ _play_controller_main(RcvEventBasedController * this)
     max_delay = bintree_get_top_value(this->subflow_delays_tree);
     treshold = (!subflow->imprecise)?DELAY_SKEW_ACTIVE_TRESHOLD:DELAY_SKEW_DEACTIVE_TRESHOLD;
     //minimum
-    if(treshold < max_delay && delay + jitter < max_delay - treshold) goto imprecise;
+    if(treshold < max_delay && delay80 + jitter < max_delay - treshold) goto imprecise;
     //maximum
-    if(min_delay + treshold < delay - jitter) goto imprecise;
+    if(min_delay + treshold < delay80 - jitter) goto imprecise;
 
     subflow->imprecise = FALSE;
-    _refresh_subflow_delay_and_skew(this, delay, skew);
+    _refresh_subflow_delay_and_skew(this, delay80, skew);
     max_jitter = MAX(max_jitter, jitter);
     min_jitter = MIN(min_jitter, jitter);
     continue;
@@ -1018,6 +1024,7 @@ _play_controller_main(RcvEventBasedController * this)
     if((playout_delay>>2) < playout_skew){
       playout_skew = playout_delay>>2;
     }
+    playout_skew = MAX(GST_MSECOND, playout_skew);
 //    g_print("Set playout MIN: %lu MAX: %lu "
 //        "stream delay: %lu tick interval: %lu\n",
 //        min_delay, max_delay,

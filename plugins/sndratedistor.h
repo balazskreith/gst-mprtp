@@ -33,6 +33,9 @@ struct _SendingRateDistributor
   GQueue*              free_ids;
   guint8               counter;
 
+  guint32              stable_sr_sum;
+  guint32              taken_bytes;
+  guint32              supplied_bytes;
   guint32              requested_bytes;
   guint32              fallen_bytes;
   guint32              overused_bytes;
@@ -53,6 +56,7 @@ guint8 sndrate_distor_request_id(SendingRateDistributor *this,
 void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        guint8 id,
                                        guint32 goodput,
+                                       guint32 receiver_rate,
                                        gdouble variance,
                                        gdouble corrh_owd,
                                        gdouble corrl_owd);

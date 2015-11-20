@@ -239,7 +239,8 @@ _report_processing_xr_owd_block_processor (SndEventBasedController *this,
 
 static gfloat
 _get_subflow_goodput (
-    Subflow * this);
+    Subflow * this,
+    guint32* receiver_rate);
 
 static gdouble
 _get_subflow_corrh_owd(
@@ -688,6 +689,7 @@ _irp_producer_main(SndEventBasedController * this)
   gdouble        variance;
   gdouble        corrh_owd;
   gdouble        corrl_owd;
+  guint32        receiver_rate;
 
   now = gst_clock_get_time(this->sysclock);
 
@@ -697,7 +699,7 @@ _irp_producer_main(SndEventBasedController * this)
     subflow = (Subflow *) val;
     if(_irt0(subflow)->checked) goto checked;
     if(now - 120 * GST_MSECOND < _irt0(subflow)->time) goto not_checked;
-    goodput = _get_subflow_goodput(subflow);
+    goodput = _get_subflow_goodput(subflow, &receiver_rate);
     g_print("S%d %f\n",subflow->id, goodput);
     corrh_owd = _get_subflow_corrh_owd(subflow);
     corrl_owd = _get_subflow_corrl_owd(subflow);
@@ -706,6 +708,7 @@ _irp_producer_main(SndEventBasedController * this)
     sndrate_distor_measurement_update(this->rate_distor,
                                       subflow->rate_calcer_id,
                                       goodput,
+                                      receiver_rate,
                                       variance,
                                       corrh_owd,
                                       corrl_owd);
@@ -961,7 +964,7 @@ _report_processing_xr_owd_block_processor (SndEventBasedController *this,
 
 
 gfloat
-_get_subflow_goodput (Subflow * this)
+_get_subflow_goodput (Subflow * this, guint32* receiver_rate)
 {
   //goodput
   {
@@ -981,11 +984,15 @@ _get_subflow_goodput (Subflow * this)
 
     discarded_bytes = _irt0_get_discarded_bytes(this);
     if (seconds > 0) {
+      if(receiver_rate)
+        *receiver_rate = (payload_bytes_sum * (1. - _irt0 (this)->lost_rate)) / ((gfloat) seconds);
       goodput = (payload_bytes_sum *
           (1. - _irt0 (this)->lost_rate) -
           (gfloat) discarded_bytes) / ((gfloat) seconds);
 
     } else {
+      if(receiver_rate)
+        *receiver_rate = (payload_bytes_sum * (1. - _irt0 (this)->lost_rate));
       goodput = (payload_bytes_sum *
           (1. - _irt0 (this)->lost_rate) - (gfloat) discarded_bytes);
     }
@@ -1090,16 +1097,13 @@ void _subflow_fire_nc_state(SndEventBasedController *this,Subflow *subflow,Event
      _subflow_state_transit_to(subflow, MPRTPS_PATH_STATE_PASSIVE);
    break;
    case EVENT_DISTORTION:
-//     sndrate_distor_undershoot(this->rate_distor, subflow->rate_calcer_id);
      _subflow_state_transit_to(subflow, MPRTPS_PATH_STATE_CONGESTED);
      break;
    case EVENT_LOST:
-//     sndrate_distor_undershoot(this->rate_distor, subflow->rate_calcer_id);
      _subflow_state_transit_to(subflow, MPRTPS_PATH_STATE_LOSSY);
      break;
    case EVENT_FI:
    default:
-     sndrate_distor_keep(this->rate_distor, subflow->rate_calcer_id);
      break;
  }
 }
@@ -1113,16 +1117,13 @@ void _subflow_fire_l_state(SndEventBasedController *this,Subflow *subflow,Event 
       _subflow_state_transit_to(subflow, MPRTPS_PATH_STATE_PASSIVE);
     break;
     case EVENT_SETTLEMENT:
-//      sndrate_distor_bounce_back(this->rate_distor, subflow->rate_calcer_id);
       _subflow_state_transit_to(subflow, MPRTPS_PATH_STATE_NON_CONGESTED);
       break;
     case EVENT_DISTORTION:
-//      sndrate_distor_undershoot(this->rate_distor, subflow->rate_calcer_id);
       _subflow_state_transit_to(subflow, MPRTPS_PATH_STATE_CONGESTED);
       break;
     case EVENT_FI:
     default:
-      sndrate_distor_keep(this->rate_distor, subflow->rate_calcer_id);
       break;
   }
 }
@@ -1139,12 +1140,10 @@ void _subflow_fire_c_state(SndEventBasedController *this,Subflow *subflow,Event 
     break;
     case EVENT_LOST:
     case EVENT_DISTORTION:
-//      sndrate_distor_undershoot(this->rate_distor, subflow->rate_calcer_id);
       break;
     case EVENT_SETTLEMENT:
     case EVENT_FI:
     default:
-//      sndrate_distor_bounce_back(this->rate_distor, subflow->rate_calcer_id);
       _subflow_state_transit_to(subflow, MPRTPS_PATH_STATE_NON_CONGESTED);
       break;
   }

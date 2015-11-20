@@ -702,8 +702,15 @@ _irp_producer_main(SndEventBasedController * this)
     goodput = _get_subflow_goodput(subflow, &receiver_rate);
     corrh_owd = _get_subflow_corrh_owd(subflow);
     corrl_owd = _get_subflow_corrl_owd(subflow);
-//    variance = (gdouble)streamtracker_get_stats(this->delays, NULL, NULL, NULL) / (gdouble)_irt0(subflow)->jitter;
-    variance = .1;
+    if(0) g_print("%p", _irt(subflow, 0));
+    if(goodput < 1. || !receiver_rate) continue;
+    variance = (gdouble)_irt0(subflow)->jitter / (gdouble)_irt0(subflow)->delay_80;
+//    g_print("S%d jitter: %u, delay: %lu vaiance: %f\n",
+//            subflow->id,
+//            _irt0(subflow)->jitter,
+//            _irt0(subflow)->delay_80,
+//            variance);
+//    variance = .1;
     sndrate_distor_measurement_update(this->rate_distor,
                                       subflow->rate_calcer_id,
                                       goodput,

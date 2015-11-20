@@ -51,6 +51,7 @@ typedef enum{
 struct _Measurement{
   gdouble         corrl_owd;
   gdouble         corrh_owd;
+  gdouble         variance;
   guint32         goodput;
   guint32         jitter;
   guint32         receiver_rate;
@@ -59,6 +60,7 @@ struct _Measurement{
 
 struct _KalmanFilter{
   gdouble P;
+  gdouble P_hat;
   gdouble R;
   gdouble SR;
   gdouble K;
@@ -325,8 +327,10 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
   _mt0(subflow)->corrh_owd = corrh_owd;
   _mt0(subflow)->corrl_owd = corrl_owd;
   _mt0(subflow)->goodput = goodput;
+  //  _mt0(subflow)->variance = variance;
+    _mt0(subflow)->variance = .1;
   _mt0(subflow)->receiver_rate = receiver_rate;
-  _kalman_filter_measurement_update(subflow, receiver_rate, variance);
+  _kalman_filter_measurement_update(subflow, receiver_rate, .1);
 
 //  g_print("Subflow %d-%d<-%p measurement update.\n"
 //          "State: %d, CorrH: %f, CorrL: %f, GP: %u, V: %f\n",
@@ -355,6 +359,7 @@ void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate
   this->stable_sr_sum = 0;
   this->taken_bytes = 0;
   this->supplied_bytes = 0;
+  this->fallen_bytes = 0;
 
   //2. Perform Overused and Underused procedures
   for(id=0; id < SNDRATEDISTOR_MAX_NUM; ++id){
@@ -409,6 +414,7 @@ void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate
     subflow = _get_subflow(this, id);
     if(!subflow->available) continue;
     kf = &subflow->kalman_filter;
+    kf->P+=.1;
     subflow->sending_rate = MAX(0, kf->SR + (gdouble)subflow->delta_sr);
     subflow->delta_sr = 0;
     subflow->given_bytes = 0;
@@ -508,6 +514,7 @@ _state_halt(
 {
   g_print("S%d CHECK HALT\n",
            subflow->id);
+
   subflow->extra_bytes = 0;
   _transit_to(subflow, STATE_STABLE);
   return;
@@ -520,6 +527,7 @@ _state_unstable(
 {
   g_print("S%d CHECK UNSTABLE\n",
            subflow->id);
+
   if(_mt0(subflow)->corrh_owd > ST_){
     subflow->delta_sr-=_undershoot(this, subflow);
     _transit_to(subflow, STATE_OVERUSED);
@@ -547,6 +555,7 @@ void _state_stable(
     _transit_to(subflow, STATE_UNSTABLE);
     goto done;
   }
+  g_print("S%d RB: %u GB: %u FB: %u ")
   if(this->requested_bytes > 0){
     guint32 supplied_bytes;
     supplied_bytes = _supply_bytes(this, subflow);
@@ -743,13 +752,16 @@ void _kalman_filter_measurement_update(Subflow *this, gdouble RR, gdouble R)
   gdouble SR;
   SR = (gdouble)this->sending_rate;
   kf = &this->kalman_filter;
-  g_print("S:%d->KF1: K: %f, SR: %f, P: %f, R: %f, RR: %f",
-          this->id, kf->K, kf->SR, kf->P, R, RR);
-  kf->K = kf->P*(kf->P + R);
+
+//  g_print("S:%d->KF1: K: %f, SR: %f, P: %f, R: %f, RR: %f\n",
+//          this->id, kf->K, kf->SR, kf->P, R, RR);
+
+  kf->K = kf->P/(kf->P + R);
   kf->SR = SR + kf->K * (RR - SR);
-  kf->P = (1-kf->K) * kf->P;
-  g_print("S:%d->KF2: K: %f, SR: %f, P: %f, R: %f, RR: %f",
-          this->id, kf->K, kf->SR, kf->P, R, RR);
+  kf->P = (1.-kf->K) *  kf->P;
+
+//  g_print("S:%d->KF2: K: %f, SR: %f, P: %f, R: %f, RR: %f\n",
+//          this->id, kf->K, kf->SR, kf->P, R, RR);
 }
 
 void _kalman_filter_init(Subflow *this)
@@ -759,5 +771,6 @@ void _kalman_filter_init(Subflow *this)
   kf->K = 0.;
   kf->P = 1.;
   kf->R = 0.;
+  kf->P_hat = 1.;
   kf->SR = 0.;
 }

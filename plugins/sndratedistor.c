@@ -84,6 +84,7 @@ struct _Subflow{
   gdouble         weight;
 
   guint           waited;
+  Procedure       check;
   Procedure       procedure;
   State           state;
 
@@ -106,13 +107,6 @@ static void
 sndrate_distor_finalize (
     GObject * object);
 
-static void
-_request(
-    SendingRateDistributor *this);
-
-static void
-_assign(
-    SendingRateDistributor *this);
 
 //--------------------MEASUREMENTS-----------------------
 static Measurement*
@@ -128,6 +122,17 @@ static Measurement*
 _m_step(Subflow *this);
 
 //----------------------STATES-------------------
+
+static void
+_check_null(
+    SendingRateDistributor *this,
+    Subflow *subflow);
+
+static void
+_check_stablility(
+    SendingRateDistributor *this,
+    Subflow *subflow);
+
 static void
 _state_overused(
     SendingRateDistributor *this,
@@ -361,13 +366,19 @@ void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate
   this->supplied_bytes = 0;
   this->fallen_bytes = 0;
 
-  //2. Perform Overused and Underused procedures
+  //2. Perform Overused and Underused and check and calculate sending rates
+  //regarding to the kalman filter
   for(id=0; id < SNDRATEDISTOR_MAX_NUM; ++id){
+    KalmanFilter *kf;
     subflow = _get_subflow(this, id);
     if(!subflow->available) continue;
-    if((gint)subflow->state > 0) goto collect;
-    subflow->procedure(this, subflow);
-  collect:
+    kf = &subflow->kalman_filter;
+    kf->P+=.1;
+    subflow->sending_rate = kf->SR;
+    if((gint)subflow->state != STATE_STABLE)
+      subflow->procedure(this, subflow);
+    else
+      subflow->check(this, subflow);
     if(subflow->state == STATE_STABLE)
       this->stable_sr_sum+=subflow->sending_rate;
   }
@@ -404,26 +415,25 @@ void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate
   for(id=0; id < SNDRATEDISTOR_MAX_NUM; ++id){
     subflow = _get_subflow(this, id);
     if(!subflow->available) continue;
-    if((gint)subflow->state < 0) continue;
+    if((gint)subflow->state != STATE_STABLE) continue;
     subflow->procedure(this, subflow);
   }
 
   //5. Calculate next sending rates
   for(id=0; id < SNDRATEDISTOR_MAX_NUM; ++id){
-    KalmanFilter *kf;
     subflow = _get_subflow(this, id);
     if(!subflow->available) continue;
-    kf = &subflow->kalman_filter;
-    kf->P+=.1;
-    subflow->sending_rate = MAX(0, kf->SR + (gdouble)subflow->delta_sr);
+    g_print("S%d subflow->SR: %u + %d = %u\n",
+            subflow->id,
+            subflow->sending_rate,
+            subflow->delta_sr,
+            subflow->sending_rate + subflow->delta_sr);
+    subflow->sending_rate = MAX(0, subflow->sending_rate + subflow->delta_sr);
     subflow->delta_sr = 0;
     subflow->given_bytes = 0;
     subflow->measured = FALSE;
   }
 
-
-  _request(this);
-  _assign(this);
 
   return;
 }
@@ -433,23 +443,6 @@ guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id)
   return _get_subflow(this, id)->sending_rate;
 }
 
-
-void _request(SendingRateDistributor *this)
-{
-
-}
-
-void _assign(SendingRateDistributor *this)
-{
-  guint8         id;
-  Subflow*       subflow;
-  for(id=0; id < SNDRATEDISTOR_MAX_NUM; ++id){
-    subflow = _get_subflow(this, id);
-    if(!subflow->available) continue;
-    subflow->sending_rate += subflow->delta_sr;
-    subflow->delta_sr=0;
-  }
-}
 
 
 Measurement* _mt0(Subflow* this)
@@ -484,6 +477,37 @@ Measurement* _m_step(Subflow *this)
   return _mt0(this);
 }
 
+void
+_check_null(
+    SendingRateDistributor *this,
+    Subflow *subflow)
+{
+  //nothing to check
+}
+
+void
+_check_stablility(
+    SendingRateDistributor *this,
+    Subflow *subflow)
+{
+  if(_mt0(subflow)->corrh_owd > DT_){
+    _disable_monitoring(subflow);
+    subflow->delta_sr-=_undershoot(this, subflow);
+    g_print("S%d stable fall, SR: %u DSR: %d\n",
+            subflow->id,
+            subflow->sending_rate,
+            subflow->delta_sr);
+    _transit_to(subflow, STATE_OVERUSED);
+    goto done;
+  }
+  if(_mt0(subflow)->corrh_owd > ST_){
+    _disable_monitoring(subflow);
+    _transit_to(subflow, STATE_UNSTABLE);
+    goto done;
+  }
+done:
+  return;
+}
 
 void
 _state_overused(
@@ -544,18 +568,12 @@ void _state_stable(
     Subflow *subflow)
 {
   gboolean monitoring_controlled = FALSE;
-  if(_mt0(subflow)->corrh_owd > DT_){
-    _disable_monitoring(subflow);
-    subflow->delta_sr-=_undershoot(this, subflow);
-    _transit_to(subflow, STATE_OVERUSED);
-    goto done;
-  }
-  if(_mt0(subflow)->corrh_owd > ST_){
-    _disable_monitoring(subflow);
-    _transit_to(subflow, STATE_UNSTABLE);
-    goto done;
-  }
-  g_print("S%d RB: %u GB: %u FB: %u ")
+
+  g_print("S%d RB: %u GB: %u FB: %u\n",
+          subflow->id,
+          this->requested_bytes,
+          subflow->given_bytes,
+          this->fallen_bytes);
   if(this->requested_bytes > 0){
     guint32 supplied_bytes;
     supplied_bytes = _supply_bytes(this, subflow);
@@ -568,9 +586,9 @@ void _state_stable(
   if(this->fallen_bytes > 0){
     guint32 taken_bytes;
     taken_bytes = _take_bytes(this, subflow);
+    g_print("S%d: Took bytes: %u\n", subflow->id, taken_bytes);
     subflow->delta_sr+=taken_bytes;
     _disable_monitoring(subflow);
-    _transit_to(subflow, STATE_HALT);
     goto done;
   }
   if(_mt1(subflow)->state != STATE_STABLE || monitoring_controlled){
@@ -636,15 +654,19 @@ _transit_to(
   switch(target){
     case STATE_HALT:
       subflow->procedure = _state_halt;
+      subflow->check = _check_null;
     break;
     case STATE_OVERUSED:
       subflow->procedure = _state_overused;
+      subflow->check = _check_null;
     break;
     case STATE_STABLE:
       subflow->procedure = _state_stable;
+      subflow->check = _check_stablility;
     break;
     case STATE_UNSTABLE:
       subflow->procedure = _state_unstable;
+      subflow->check = _check_null;
     break;
   }
   _mt0(subflow)->state = subflow->state = target;
@@ -665,6 +687,7 @@ void _enable_monitoring(Subflow *subflow)
 {
   guint8 monitoring_interval = 8;
   subflow->monitoring_time = 0;
+  if(1) {subflow->monitoring_interval = 0; goto assign;}
   if(!subflow->available) goto done;
   if(subflow->fallen_rate == 0.) goto assign;
   monitoring_interval = MAX(8., -1./(2.*log2(subflow->fallen_rate)));
@@ -677,6 +700,7 @@ done:
 
 void _recalc_monitoring(Subflow *subflow)
 {
+  if(1) goto done;
   if(_mt0(subflow)->corrl_owd > MT_){
     subflow->monitoring_time = 0;
     if(subflow->monitoring_interval < 14)
@@ -711,12 +735,15 @@ gint32 _undershoot(
     SendingRateDistributor *this,
     Subflow *subflow)
 {
-  gint32 fallen_bytes;
+  gint32 fallen_bytes = 0;
+  subflow->fallen_rate = 0.;
+  if(subflow->sending_rate < _mt0(subflow)->goodput) goto done;
   fallen_bytes = subflow->sending_rate-_mt0(subflow)->goodput;
-  if(fallen_bytes < subflow->sending_rate)
-    subflow->fallen_rate = (gdouble)fallen_bytes / (gdouble) subflow->sending_rate;
-  else
-    subflow->fallen_rate = 0.;
+  subflow->fallen_rate = (gdouble)fallen_bytes / (gdouble) subflow->sending_rate;
+  g_print("S%d: Undershooting, SR:%u fallen bytes: %u GP: %u\n",
+          subflow->id, subflow->sending_rate,
+          fallen_bytes, _mt0(subflow)->goodput);
+done:
   if(fallen_bytes > 0) this->fallen_bytes+=fallen_bytes;
   return fallen_bytes;
 }

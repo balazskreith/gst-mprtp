@@ -743,9 +743,13 @@ void _kalman_filter_measurement_update(Subflow *this, gdouble RR, gdouble R)
   gdouble SR;
   SR = (gdouble)this->sending_rate;
   kf = &this->kalman_filter;
+  g_print("S:%d->KF1: K: %f, SR: %f, P: %f, R: %f, RR: %f",
+          this->id, kf->K, kf->SR, kf->P, R, RR);
   kf->K = kf->P*(kf->P + R);
   kf->SR = SR + kf->K * (RR - SR);
   kf->P = (1-kf->K) * kf->P;
+  g_print("S:%d->KF2: K: %f, SR: %f, P: %f, R: %f, RR: %f",
+          this->id, kf->K, kf->SR, kf->P, R, RR);
 }
 
 void _kalman_filter_init(Subflow *this)

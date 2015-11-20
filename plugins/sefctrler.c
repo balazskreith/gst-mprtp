@@ -700,7 +700,6 @@ _irp_producer_main(SndEventBasedController * this)
     if(_irt0(subflow)->checked) goto checked;
     if(now - 120 * GST_MSECOND < _irt0(subflow)->time) goto not_checked;
     goodput = _get_subflow_goodput(subflow, &receiver_rate);
-    g_print("S%d %f\n",subflow->id, goodput);
     corrh_owd = _get_subflow_corrh_owd(subflow);
     corrl_owd = _get_subflow_corrl_owd(subflow);
 //    variance = (gdouble)streamtracker_get_stats(this->delays, NULL, NULL, NULL) / (gdouble)_irt0(subflow)->jitter;
@@ -1404,7 +1403,6 @@ void _recalc_bids(SndEventBasedController * this)
     if(!mprtps_path_is_active(subflow->path)){
       continue;
     }
-    if(0) g_print("%lu", _irt(subflow, 2)->time);
     sb = sndrate_distor_get_sending_rate(this->rate_distor, subflow->rate_calcer_id);
     g_print("Subflow %d sending bid %u\n",
             subflow->id,

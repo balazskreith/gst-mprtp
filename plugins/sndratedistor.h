@@ -40,6 +40,9 @@ struct _SendingRateDistributor
   guint32              fallen_bytes;
   guint32              overused_bytes;
 
+  gboolean             congestion_cue;
+  gboolean             congestion_control;
+
 
 };
 

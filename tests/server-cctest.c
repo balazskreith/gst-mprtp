@@ -23,6 +23,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+typedef struct _Utilization{
+  gint     delta_sr;
+  gboolean accepted;
+}Utilization;
 
 typedef struct _SessionData
 {
@@ -169,12 +173,30 @@ typedef struct _Identities
 
 
 static void
-changed_event (GstElement * mprtp_sch, guint suggested_bitrate)
+mprtp_subflows_utilization (GstElement * mprtp_sch, guint ptr)
 {
-  if(suggested_bitrate) bitrate = suggested_bitrate;
-  else bitrate *= 1.;
+//  Utilization *utilization = ptr;
+  g_print("mprtp_subflows_utilization called");
+//  utilization->accepted = TRUE;
 //  g_print("CHANGED EVENT: %d\n", bitrate);
+  //g_object_set (encoder, "bitrate", bitrate, NULL);
+}
+
+static void
+changed_event (GstElement * mprtp_sch, gpointer ptr)
+{
+  Utilization *utilization = ptr;
+  gint delta, new_bitrate;
+  delta = utilization->delta_sr>>7;
+  new_bitrate = (gint)bitrate + delta;
+  g_print("Current bitrate: %u, delta: %d\n", bitrate, delta);
+  if(new_bitrate < 0) goto done;
+  bitrate = new_bitrate;
+  utilization->accepted = TRUE;
   g_object_set (encoder, "bitrate", bitrate, NULL);
+  g_print("Changed bitrate: %u\n", bitrate);
+done:
+  return;
 }
 
 static void
@@ -212,7 +234,10 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   g_signal_connect (rtpBin, "request-aux-sender",
       (GCallback) request_aux_sender, session);
 
-  g_signal_connect (mprtpsch, "subflows-usage-changed",
+//  g_signal_connect (mprtpsch, "mprtp-subflows-utilization",
+//      (GCallback) mprtp_subflows_utilization, NULL);
+
+  g_signal_connect (mprtpsch, "mprtp-subflows-utilization",
       (GCallback) changed_event, NULL);
 
   g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2",

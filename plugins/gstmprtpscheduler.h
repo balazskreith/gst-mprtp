@@ -94,7 +94,7 @@ struct _GstMprtpschedulerClass
 {
   GstElementClass base_class;
 
-  void  (*subflows_usage_changed) (GstElement *,guint);
+  void  (*mprtp_media_rate_utilization) (GstElement *,gpointer);
 };
 
 GType gst_mprtpscheduler_get_type (void);

@@ -194,7 +194,7 @@ libgstmprtp_la-rmanctrler.lo: rmanctrler.c /usr/include/stdc-predef.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h smanctrler.h \
  mprtpspath.h gstmprtcpbuffer.h packetssndqueue.h bintree.h \
- streamsplitter.h streamtracker.h rmanctrler.h mprtprpath.h \
+ streamtracker.h streamsplitter.h rmanctrler.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
  packetsrcvqueue.h streamjoiner.h playoutgate.h /usr/include/math.h \
  /usr/include/x86_64-linux-gnu/bits/huge_val.h \
@@ -656,9 +656,9 @@ packetssndqueue.h:
 
 bintree.h:
 
-streamsplitter.h:
-
 streamtracker.h:
+
+streamsplitter.h:
 
 rmanctrler.h:
 

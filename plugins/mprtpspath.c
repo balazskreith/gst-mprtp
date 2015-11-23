@@ -47,6 +47,9 @@ static void _send_mprtp_packet(MPRTPSPath * this,
 static gboolean _try_flushing(MPRTPSPath * this);
 static gboolean _is_overused(MPRTPSPath * this);
 static GstBuffer* _create_monitor_packet(MPRTPSPath * this);
+static gint _cmp_for_max (guint64 x, guint64 y);
+static gint _cmp_for_min (guint64 x, guint64 y);
+
 
 void
 mprtps_path_class_init (MPRTPSPathClass * klass)
@@ -103,6 +106,7 @@ mprtps_path_reset (MPRTPSPath * this)
   this->monitoring_interval = 0;
 
   packetssndqueue_reset(this->packetsqueue);
+  streamtracker_reset(this->sent_bytes);
 }
 
 
@@ -112,6 +116,7 @@ mprtps_path_init (MPRTPSPath * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetssndqueue();
+  this->sent_bytes = make_streamtracker(_cmp_for_min, _cmp_for_max, 1024, 50);
   mprtps_path_reset (this);
 }
 
@@ -246,6 +251,16 @@ mprtps_path_set_max_bytes_per_ms (MPRTPSPath * this, guint32 bytes_per_ms)
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
   this->max_bytes_per_ms = bytes_per_ms;
+//  g_print ("T%d it changed\n", this->id);
+  THIS_WRITEUNLOCK (this);
+}
+
+void
+mprtps_path_set_pacing (MPRTPSPath * this, guint32 bytes_per_s)
+{
+  g_return_if_fail (this);
+  THIS_WRITELOCK (this);
+  this->max_bytes_per_s = bytes_per_s;
 //  g_print ("T%d it changed\n", this->id);
   THIS_WRITEUNLOCK (this);
 }
@@ -517,6 +532,8 @@ _refresh_stat(MPRTPSPath * this,
   gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
   ++this->total_sent_packet_num;
   payload_bytes = gst_rtp_buffer_get_payload_len (&rtp);
+  streamtracker_add(this->sent_bytes, payload_bytes);
+
   this->last_sent_payload_bytes = payload_bytes;
   this->last_packet_sent_time = gst_clock_get_time (this->sysclock);
   this->total_sent_payload_bytes_sum += payload_bytes;
@@ -537,6 +554,7 @@ _send_mprtp_packet(MPRTPSPath * this,
   if (_is_overused(this)) {
     GST_WARNING_OBJECT (this, "Path is overused");
     packetssndqueue_push(this->packetsqueue, buffer);
+//    g_print("Overused:%u\n", packetssndqueue_get_num(this->packetsqueue));
     goto done;
   }
   if(packetssndqueue_has_buffer(this->packetsqueue)){
@@ -554,41 +572,54 @@ gboolean _try_flushing(MPRTPSPath * this)
 {
   while(packetssndqueue_has_buffer(this->packetsqueue)){
     GstBuffer *buffer;
+    if(_is_overused(this)) goto failed;
     buffer = packetssndqueue_pop(this->packetsqueue);
     _refresh_stat(this, buffer);
     this->send_mprtp_packet_func(this->send_mprtp_func_data, buffer);
-    if(_is_overused(this)) goto failed;
   }
   return TRUE;
 failed:
   return FALSE;
 }
 
+//
+//gboolean _is_overused(MPRTPSPath * this)
+//{
+//  gboolean result;
+//  GstClockTime now, delta;
+//  if (this->max_bytes_per_ms == 0) {
+//    result = FALSE;
+//    goto done;
+//  }
+//
+//  now = gst_clock_get_time (this->sysclock);
+//  delta = now - this->last_packet_sent_time;
+//  if (GST_SECOND < delta) {
+//    result = FALSE;
+//    goto done;
+//  }
+//  delta = GST_TIME_AS_MSECONDS (delta);
+//  if (delta < 1) {
+//    delta = 1;
+//  }
+//  result =
+//      (gfloat) this->last_sent_payload_bytes / (gfloat) delta >
+//      (gfloat) this->max_bytes_per_ms;
+//
+//done:
+//  return result;
+//}
+//
+
 
 gboolean _is_overused(MPRTPSPath * this)
 {
-  gboolean result;
-  GstClockTime now, delta;
-  if (this->max_bytes_per_ms == 0) {
-    result = FALSE;
-    goto done;
+  guint64 sum;
+  if (this->max_bytes_per_s == 0) {
+    return FALSE;
   }
-  now = gst_clock_get_time (this->sysclock);
-  delta = now - this->last_packet_sent_time;
-  if (GST_SECOND < delta) {
-    result = FALSE;
-    goto done;
-  }
-  delta = GST_TIME_AS_MSECONDS (delta);
-  if (delta < 1) {
-    delta = 1;
-  }
-  result =
-      (gfloat) this->last_sent_payload_bytes / (gfloat) delta >
-      (gfloat) this->max_bytes_per_ms;
-
-done:
-  return result;
+  streamtracker_get_stats(this->sent_bytes, NULL, NULL, &sum);
+  return this->max_bytes_per_s < sum;
 }
 
 GstBuffer* _create_monitor_packet(MPRTPSPath * this)
@@ -603,6 +634,18 @@ GstBuffer* _create_monitor_packet(MPRTPSPath * this)
   return result;
 }
 
+
+gint
+_cmp_for_max (guint64 x, guint64 y)
+{
+  return x == y ? 0 : x < y ? -1 : 1;
+}
+
+gint
+_cmp_for_min (guint64 x, guint64 y)
+{
+  return x == y ? 0 : x < y ? 1 : -1;
+}
 
 #undef THIS_READLOCK
 #undef THIS_READUNLOCK

@@ -22,6 +22,7 @@ typedef struct _SendingRateDistributorClass SendingRateDistributorClass;
 #define SNDRATEDISTOR_CAST(src)        ((SendingRateDistributor *)(src))
 
 #define SNDRATEDISTOR_MAX_NUM 32
+typedef void  (*SignalRequestFunc)(gpointer,gpointer);
 
 struct _SendingRateDistributor
 {
@@ -40,10 +41,11 @@ struct _SendingRateDistributor
   guint32              fallen_bytes;
   guint32              overused_bytes;
 
-  gboolean             congestion_cue;
-  gboolean             congestion_control;
+  guint8               load_controlling;
+  guint8               prev_controlling;
 
-
+  SignalRequestFunc    signal_request;
+  gpointer             signal_controller;
 };
 
 struct _SendingRateDistributorClass{
@@ -52,7 +54,7 @@ struct _SendingRateDistributorClass{
 
 
 GType sndrate_distor_get_type (void);
-SendingRateDistributor *make_sndrate_distor(void);
+SendingRateDistributor *make_sndrate_distor(SignalRequestFunc signal_request, gpointer controller);
 guint8 sndrate_distor_request_id(SendingRateDistributor *this,
                                  MPRTPSPath *path,
                                  guint32 sending_rate);

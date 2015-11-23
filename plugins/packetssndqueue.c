@@ -115,6 +115,15 @@ void packetssndqueue_reset(PacketsSndQueue *this)
   THIS_WRITEUNLOCK(this);
 }
 
+guint32 packetssndqueue_get_num(PacketsSndQueue *this)
+{
+  guint32 result;
+  THIS_READLOCK(this);
+  result = this->counter;
+  THIS_READUNLOCK(this);
+  return result;
+}
+
 PacketsSndQueue *make_packetssndqueue(void)
 {
   PacketsSndQueue *result;

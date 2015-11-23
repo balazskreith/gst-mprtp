@@ -195,7 +195,7 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h mprtpspath.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
- packetssndqueue.h bintree.h streamsplitter.h streamtracker.h \
+ packetssndqueue.h bintree.h streamtracker.h streamsplitter.h \
  gstmprtpsender.h gstmprtpplayouter.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
  packetsrcvqueue.h streamjoiner.h playoutgate.h \
@@ -823,9 +823,9 @@ packetssndqueue.h:
 
 bintree.h:
 
-streamsplitter.h:
-
 streamtracker.h:
+
+streamsplitter.h:
 
 gstmprtpsender.h:
 

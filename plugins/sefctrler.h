@@ -57,8 +57,8 @@ struct _SndEventBasedController
   void                 (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
   gpointer               send_mprtcp_packet_data;
   gboolean               report_is_flowable;
-  void                 (*scheduler_signaling)(gpointer, guint64);
-  gpointer               scheduler;
+  void                 (*utilization_signal_request)(gpointer, gpointer);
+  gpointer               utilization_signal_data;
   gboolean               stability_started;
   gdouble                rate_diff;
 //
@@ -93,7 +93,7 @@ sefctrler_setup_mprtcp_exchange(SndEventBasedController * this,
 
 void
 sefctrler_setup_siganling(gpointer ptr,
-                                void(*scheduler_signaling)(gpointer, guint64),
+                                void(*scheduler_signaling)(gpointer, gpointer),
                                 gpointer scheduler);
 
 GType sefctrler_get_type (void);

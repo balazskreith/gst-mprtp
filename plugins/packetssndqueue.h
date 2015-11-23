@@ -48,6 +48,7 @@ struct _PacketsSndQueueClass{
 GType packetssndqueue_get_type (void);
 PacketsSndQueue *make_packetssndqueue(void);
 void packetssndqueue_reset(PacketsSndQueue *this);
+guint32 packetssndqueue_get_num(PacketsSndQueue *this);
 void packetssndqueue_push(PacketsSndQueue *this,
                           GstBuffer* buffer);
 GstBuffer* packetssndqueue_pop(PacketsSndQueue *this);

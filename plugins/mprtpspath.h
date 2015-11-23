@@ -26,6 +26,7 @@ typedef struct _CCSignalData CCSignalData;
 
 #include "gstmprtcpbuffer.h"
 #include "packetssndqueue.h"
+#include "streamtracker.h"
 
 #define MPRTPS_PATH_TYPE             (mprtps_path_get_type())
 #define MPRTPS_PATH(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),MPRTPS_PATH_TYPE,MPRTPSPath))
@@ -95,10 +96,12 @@ struct _MPRTPSPath
   GstClockTime            sent_congested;
 
   PacketsSndQueue*        packetsqueue;
+  StreamTracker*          sent_bytes;
   guint8                  sent_octets[MAX_INT32_POSPART];
   guint16                 sent_octets_read;
   guint16                 sent_octets_write;
   guint32                 max_bytes_per_ms;
+  guint32                 max_bytes_per_s;
   GstClockTime            last_packet_sent_time;
   guint32                 last_sent_payload_bytes;
 
@@ -153,6 +156,7 @@ GstClockTime mprtps_path_get_time_sent_to_lossy (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_non_congested (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_congested (MPRTPSPath * this);
 void mprtps_path_set_max_bytes_per_ms(MPRTPSPath *this, guint32 bytes);
+void mprtps_path_set_pacing (MPRTPSPath * this, guint32 bytes_per_s);
 void mprtps_path_set_monitor_payload_id(MPRTPSPath *this, guint8 payload_type);
 void mprtps_path_set_mprtp_ext_header_id(MPRTPSPath *this, guint ext_header_id);
 gboolean mprtps_path_is_overused (MPRTPSPath * this);

@@ -105,7 +105,7 @@ static void _setup_paths (GstMprtpscheduler * this);
 static void gst_mprtpscheduler_path_ticking_process_run (void *data);
 
 
-static guint _subflows_change_signal;
+static guint _subflows_utilization;
 
 
 enum
@@ -308,8 +308,8 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "a structure contains it",
           "NULL", G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
-//  _subflows_change_signal =
-//   g_signal_newv ("subflows-usage-changed",
+//  _subflows_utilization =
+//   g_signal_newv ("mprtp-subflows-utilization",
 //                  G_TYPE_FROM_CLASS (gobject_class),
 //                  G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
 //                  NULL /* closure */,
@@ -317,19 +317,33 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
 //                  NULL /* accumulator data */,
 //                  NULL /* C marshaller */,
 //                  G_TYPE_NONE /* return_type */,
-//                  0     /* n_params */,
-//                  NULL  /* param_types */);
+//                  1     /* n_params */,
+//                  G_TYPE_UINT  /* param_types */,
+//                  NULL);
 
-//  _subflows_change_signal =
-//      g_signal_new ("subflows-usage-changed", G_TYPE_FROM_CLASS (klass),
-//      G_SIGNAL_RUN_LAST, NULL,
-//      NULL, NULL, g_cclosure_marshal_generic, G_TYPE_NONE, 1, G_TYPE_UINT);
+//  _subflows_utilization =
+//      g_signal_new ("mprtp-subflows-utilization", G_TYPE_FROM_CLASS (klass),
+//            G_SIGNAL_RUN_LAST, 0, NULL, NULL,
+//            g_cclosure_marshal_generic, G_TYPE_NONE, 1,
+//            G_TYPE_UINT);
 
-  _subflows_change_signal =
-      g_signal_new ("subflows-usage-changed", G_TYPE_FROM_CLASS (klass),
-      G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (GstMprtpschedulerClass, subflows_usage_changed),
+  _subflows_utilization =
+      g_signal_new ("mprtp-subflows-utilization", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (GstMprtpschedulerClass, mprtp_media_rate_utilization),
       NULL, NULL, g_cclosure_marshal_generic, G_TYPE_NONE, 1,
-      G_TYPE_UINT);
+      G_TYPE_POINTER);
+
+//  _subflows_utilization =
+//      g_signal_new ("mprtp-subflows-utilization",
+//                    G_TYPE_FROM_CLASS (klass),
+//                    G_SIGNAL_RUN_LAST,
+//                    G_STRUCT_OFFSET (GstMprtpschedulerClass, mprtp_media_rate_utilization),
+//                    NULL,
+//                    NULL,
+//                    g_cclosure_marshal_generic,
+//                    G_TYPE_NONE,
+//                    1,
+//                    G_TYPE_UINT);
 }
 
 static void
@@ -405,6 +419,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   stream_splitter_set_monitor_payload_type(this->splitter, this->monitor_payload_type);
   _change_auto_flow_controlling_mode (this, FALSE);
   _setup_paths(this);
+
+
 }
 
 
@@ -834,12 +850,11 @@ done:
 }
 
 static void
-gst_mprtpscheduler_emit_signal(gpointer ptr, guint64 data)
+gst_mprtpscheduler_emit_signal(gpointer ptr, gpointer data)
 {
   GstMprtpscheduler *this = ptr;
-  THIS_READLOCK(this);
-  g_signal_emit (this,_subflows_change_signal, 0 /* details */, data);
-  THIS_READUNLOCK(this);
+//  g_signal_emit (this,_subflows_utilization, 0 /* details */, 1);
+  g_signal_emit (this,_subflows_utilization, 0 /* details */, data);
 }
 
 static GstFlowReturn
@@ -1064,7 +1079,6 @@ _try_get_path (GstMprtpscheduler * this, guint16 subflow_id,
   }
   return TRUE;
 }
-
 
 
 void

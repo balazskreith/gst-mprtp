@@ -58,6 +58,7 @@ GST_DEBUG_CATEGORY_STATIC (sefctrler_debug_category);
 
 G_DEFINE_TYPE (SndEventBasedController, sefctrler, G_TYPE_OBJECT);
 
+
 typedef struct _Subflow Subflow;
 typedef struct _IRMoment IRMoment;
 typedef struct _ORMoment ORMoment;
@@ -333,6 +334,8 @@ _check_report_timeout (Subflow * this);
 static void
 _system_notifier_main(SndEventBasedController * this);
 
+static void
+_system_notifier_utilization(gpointer sndrate_distor, gpointer data);
 //----------------------------------------------------------------------------
 
 //----------------------------- Split Controller -----------------------------
@@ -374,7 +377,6 @@ sefctrler_class_init (SndEventBasedControllerClass * klass)
   GST_DEBUG_CATEGORY_INIT (sefctrler_debug_category, "sefctrler", 0,
       "MpRTP Sending Event Based Flow Controller");
 
-
 }
 
 void
@@ -405,12 +407,13 @@ sefctrler_init (SndEventBasedController * this)
   this->RTT_max = 5 * GST_SECOND;
   this->last_recalc_time = gst_clock_get_time(this->sysclock);
   this->event = SPLITCTRLER_EVENT_FI;
-  this->rate_distor = make_sndrate_distor();
+  this->rate_distor = make_sndrate_distor(_system_notifier_utilization, this);
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   this->thread = gst_task_new (sefctrler_ticker_run, this, NULL);
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
+
 //
 //  g_rec_mutex_init (&this->stat_thread_mutex);
 //  this->stat_thread = gst_task_new (sefctrler_stat_run, this, NULL);
@@ -624,13 +627,13 @@ sefctrler_setup_mprtcp_exchange (SndEventBasedController * this,
 
 void
 sefctrler_setup_siganling(gpointer ptr,
-                                void(*scheduler_signaling)(gpointer, guint64),
+                                void(*scheduler_signaling)(gpointer, gpointer),
                                 gpointer scheduler)
 {
   SndEventBasedController * this = ptr;
   THIS_WRITELOCK (this);
-  this->scheduler_signaling = scheduler_signaling;
-  this->scheduler = scheduler;
+  this->utilization_signal_request = scheduler_signaling;
+  this->utilization_signal_data = scheduler;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -865,7 +868,6 @@ _report_processing_rrblock_processor (SndEventBasedController *this,
   _irt0(subflow)->cycle_num = (guint16) (HSSN_read>>16);
   _irt0(subflow)->expected_packets = _uint16_diff(_irt1(subflow)->HSSN,
                                                   _irt0(subflow)->HSSN);
-
 
   LSR = (guint64) LSR_read;
   DLSR = (guint64) DLSR_read;
@@ -1359,6 +1361,13 @@ underused:
 done:
   this->event = SPLITCTRLER_EVENT_FI;
   return;
+}
+
+static void
+_system_notifier_utilization(gpointer controller, gpointer data)
+{
+  SndEventBasedController *this = controller;
+  this->utilization_signal_request(this->utilization_signal_data, data);
 }
 
 //---------------------------------------------------------------------------

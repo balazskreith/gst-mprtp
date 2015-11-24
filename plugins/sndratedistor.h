@@ -41,9 +41,9 @@ struct _SendingRateDistributor
   guint32              fallen_bytes;
   guint32              overused_bytes;
 
-  guint8               overused_subflows_num;
-  guint8               load_controlling;
-  guint8               prev_controlling;
+//  guint8               overused_subflows_num;
+//  guint8               load_controlling;
+//  guint8               prev_controlling;
 
   SignalRequestFunc    signal_request;
   gpointer             signal_controller;

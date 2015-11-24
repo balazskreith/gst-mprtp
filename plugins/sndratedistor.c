@@ -124,8 +124,8 @@ _mt0(Subflow* this);
 static Measurement*
 _mt1(Subflow* this);
 
-//static Measurement*
-//_mt2(Subflow* this);
+static Measurement*
+_mt2(Subflow* this);
 
 static Measurement*
 _m_step(Subflow *this);
@@ -472,14 +472,14 @@ Measurement* _mt1(Subflow* this)
 }
 
 
-//Measurement* _mt2(Subflow* this)
-//{
-//  guint8 index;
-//  if(this->measurements_index == 1) index = MEASUREMENT_LENGTH-1;
-//  else if(this->measurements_index == 0) index = MEASUREMENT_LENGTH-2;
-//  else index = this->measurements_index-2;
-//  return &this->measurements[index];
-//}
+Measurement* _mt2(Subflow* this)
+{
+  guint8 index;
+  if(this->measurements_index == 1) index = MEASUREMENT_LENGTH-1;
+  else if(this->measurements_index == 0) index = MEASUREMENT_LENGTH-2;
+  else index = this->measurements_index-2;
+  return &this->measurements[index];
+}
 
 Measurement* _m_step(Subflow *this)
 {
@@ -529,7 +529,9 @@ _check_unstable(
     _transit_to(subflow, STATE_OVERUSED);
     goto done;
   }
-  if(_mt1(subflow)->state == STATE_OVERUSED){
+  g_print("S%d: Prev: %d\n", subflow->id, _mt1(subflow)->state);
+  if(_mt2(subflow)->state == STATE_OVERUSED){
+      g_print("S%d: Previously the state was overused (Fallen bytes: %d)\n", subflow->id, subflow->fallen_bytes);
     _transit_to(subflow, STATE_STABLE);
     goto done;
   }
@@ -571,7 +573,7 @@ _check_stable(
     SendingRateDistributor *this,
     Subflow *subflow)
 {
-  g_print("S%d: STATE STABLE\n", subflow->id);
+  g_print("S%d: STATE STABLE (Fallen bytes: %d)\n", subflow->id, subflow->fallen_bytes);
   if(_mt0(subflow)->discard && _mt0(subflow)->lost){
     g_print("S%d: Discard and Lost happened\n", subflow->id);
     subflow->supplied_bytes=_action_fall(this, subflow);

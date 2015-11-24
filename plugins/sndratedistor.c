@@ -382,24 +382,28 @@ void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate
     _mt0(subflow)->state = subflow->checking(this, subflow);
   }
 
-  //Underuse detection
-  if(this->supplied_bytes < this->requested_bytes)
-  {
-      guint32 not_supplied_bytes;
-      not_supplied_bytes = this->requested_bytes - this->supplied_bytes;
-      utilization.delta_sr += not_supplied_bytes;
-  }
+  //Utilization
 
-  //Overuse detection
-  if(this->taken_bytes < this->fallen_bytes)
-  {
-    guint32 not_taken_bytes;
-    not_taken_bytes = this->fallen_bytes - this->taken_bytes;
-    utilization.delta_sr -= not_taken_bytes;
-    //Notify the media rate producer. It must be reduced.
-  }
+//
+//  //Underuse detection
+//  if(this->supplied_bytes < this->requested_bytes)
+//  {
+//      guint32 not_supplied_bytes;
+//      not_supplied_bytes = this->requested_bytes - this->supplied_bytes;
+//      utilization.delta_sr += not_supplied_bytes;
+//  }
+//
+//  //Overuse detection
+//  if(this->taken_bytes < this->fallen_bytes)
+//  {
+//    guint32 not_taken_bytes;
+//    not_taken_bytes = this->fallen_bytes - this->taken_bytes;
+//    utilization.delta_sr -= not_taken_bytes;
+//    //Notify the media rate producer. It must be reduced.
+//  }
 
   //signaling
+  utilization.delta_sr = this->requested_bytes - this->fallen_bytes;
   if(utilization.delta_sr != 0)
   {
     this->signal_request(this->signal_controller, &utilization);
@@ -511,7 +515,7 @@ _check_unstable(
     SendingRateDistributor *this,
     Subflow *subflow)
 {
-  g_print("S%d: STATE UNSTATE\n", subflow->id);
+  g_print("S%d: STATE UNSTABLE\n", subflow->id);
   if(_mt0(subflow)->corrh_owd > DT_){
     g_print("S%d: _mt0(subflow)->corrh_owd > DT_\n", subflow->id);
     subflow->supplied_bytes=_action_fall(this, subflow);
@@ -533,17 +537,20 @@ _check_unstable(
   //going up.
   if(subflow->monitoring_interval > 0 &&_mt0(subflow)->corrl_owd > MT_){
     if(++subflow->monitoring_interval == 15){
+      g_print("S%d: subflow->monitoring_interval == 15\n", subflow->id);
       _disable_monitoring(subflow);
       _transit_to(subflow, STATE_STABLE);
       goto done;
     }
     subflow->monitored_bytes = (gdouble)subflow->sending_rate / (gdouble) subflow->monitoring_interval;
+    g_print("S%d: subflow->monitored_bytes %u\n", subflow->id, subflow->monitored_bytes);
     _change_monitoring(subflow, subflow->monitoring_interval);
     goto done;
   }
   if(++subflow->monitoring_time > 2){
-    this->taken_bytes += subflow->monitored_bytes;
-    subflow->taken_bytes+= subflow->monitored_bytes;
+    g_print("S%d: subflow->monitoring_time > 2 %u\n", subflow->id, subflow->monitored_bytes);
+    this->requested_bytes += subflow->monitored_bytes;
+    subflow->taken_bytes += subflow->monitored_bytes;
     _disable_monitoring(subflow);
     _disable_checking(subflow, 1);
     _transit_to(subflow, STATE_STABLE);
@@ -607,7 +614,7 @@ _check_stable(
   if(subflow->fallen_bytes > 0){
     guint32 target;
     g_print("S%d: fallen bytes > 0\n", subflow->id);
-    target = _get_monitoring_bytes(subflow, this->fallen_bytes);
+    target = _get_monitoring_bytes(subflow, subflow->fallen_bytes);
     if(subflow->monitoring_interval > 14){
       subflow->fallen_bytes = 0;
       _disable_monitoring(subflow);

@@ -123,7 +123,7 @@ enum
   PROP_RETAIN_BUFFERS,
   PROP_SUBFLOWS_STATS,
   PROP_SCHEDULER_STATE,
-  PROP_SET_MAX_BYTES_PER_MS,
+  PROP_SET_MAX_BYTES_PER_S,
   PROP_PACING_BUFFERS,
 };
 
@@ -281,9 +281,9 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "A 32bit unsigned integer for setup a bid. The first 8 bit identifies the subflow, the latter the bid for the subflow",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_SET_MAX_BYTES_PER_MS,
-      g_param_spec_uint ("setup-max-byte-per-ms",
-          "set the maximum allowed bytes per millisecond for pacing",
+  g_object_class_install_property (gobject_class, PROP_SET_MAX_BYTES_PER_S,
+      g_param_spec_uint ("setup-max-byte-per-s",
+          "set the maximum allowed bytes per second for pacing",
           "A 32bit unsigned integer for setup the value. The first 8 bit identifies the subflow, the latter the maximum allowed bytes per ms for the subflow",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
@@ -463,7 +463,7 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
   gboolean gboolean_value;
   guint8 subflow_id;
   guint subflow_bid;
-  guint max_bytes_per_ms;
+  guint max_bytes_per_s;
   MPRTPSPath *path;
 
   GST_DEBUG_OBJECT (this, "set_property");
@@ -537,14 +537,14 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       THIS_WRITEUNLOCK (this);
       break;
 
-    case PROP_SET_MAX_BYTES_PER_MS:
+    case PROP_SET_MAX_BYTES_PER_S:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
       subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
       path = NULL;
       _try_get_path (this, subflow_id, &path);
-      max_bytes_per_ms = guint_value & 0x00FFFFFFUL;
-      mprtps_path_set_max_bytes_per_ms (path, max_bytes_per_ms);
+      max_bytes_per_s = guint_value & 0x00FFFFFFUL;
+      mprtps_path_set_pacing (path, max_bytes_per_s);
       THIS_WRITEUNLOCK (this);
       break;
 

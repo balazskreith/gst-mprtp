@@ -46,7 +46,6 @@ struct _SchNode
 {
   SchNode *left;
   SchNode *right;
-  //SchNode*     next;
   MPRTPSPath *path;
   guint32 sent_bytes;
   guint32 sent_frames;

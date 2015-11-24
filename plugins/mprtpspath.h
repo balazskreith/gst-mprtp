@@ -155,7 +155,7 @@ GstClockTime mprtps_path_get_time_sent_to_passive(MPRTPSPath *this);
 GstClockTime mprtps_path_get_time_sent_to_lossy (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_non_congested (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_congested (MPRTPSPath * this);
-void mprtps_path_set_max_bytes_per_ms(MPRTPSPath *this, guint32 bytes);
+guint16 mprtps_path_get_HSN(MPRTPSPath * this);
 void mprtps_path_set_pacing (MPRTPSPath * this, guint32 bytes_per_s);
 void mprtps_path_set_monitor_payload_id(MPRTPSPath *this, guint8 payload_type);
 void mprtps_path_set_mprtp_ext_header_id(MPRTPSPath *this, guint ext_header_id);

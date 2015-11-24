@@ -41,6 +41,7 @@ struct _SendingRateDistributor
   guint32              fallen_bytes;
   guint32              overused_bytes;
 
+  guint8               overused_subflows_num;
   guint8               load_controlling;
   guint8               prev_controlling;
 
@@ -64,8 +65,16 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        guint32 receiver_rate,
                                        gdouble variance,
                                        gdouble corrh_owd,
-                                       gdouble corrl_owd);
+                                       gdouble corrl_owd,
+                                       gdouble corrPiT,
+                                       gboolean lost,
+                                       gboolean discard,
+                                       guint8 lost_history,
+                                       guint8 discard_history);
+
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate);
 guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id);
+gboolean sndrate_distor_congestion_event(SendingRateDistributor *this, guint8 id);
+gboolean sndrate_distor_settlemen_event(SendingRateDistributor *this, guint8 id);
 #endif /* SNDRATEDISTOR_H_ */

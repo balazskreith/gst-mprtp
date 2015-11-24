@@ -109,6 +109,7 @@ struct _IRMoment{
   guint16             HSSN;
   guint16             cycle_num;
   guint16             expected_packets;
+  guint16             PiT;
   guint32             expected_payload_bytes;
   gdouble             lost_rate;
   gdouble             goodput;
@@ -151,7 +152,8 @@ struct _Subflow
   EventFunc                  check;
   gboolean                   ready;
   guint8                     rate_calcer_id;
-
+  guint8                     lost_history;
+  guint8                     late_discarded_history;
 //  GstClockTime               RTT;
 //  guint                      consecutive_late_RTT;
   gdouble                    avg_rtcp_size;
@@ -242,6 +244,10 @@ static gfloat
 _get_subflow_goodput (
     Subflow * this,
     guint32* receiver_rate);
+
+static gdouble
+_get_subflow_corrPiT(
+    Subflow *subflow);
 
 static gdouble
 _get_subflow_corrh_owd(
@@ -693,6 +699,7 @@ _irp_producer_main(SndEventBasedController * this)
   gdouble        corrh_owd;
   gdouble        corrl_owd;
   guint32        receiver_rate;
+  gdouble        corrPiT;
 
   now = gst_clock_get_time(this->sysclock);
 
@@ -705,6 +712,7 @@ _irp_producer_main(SndEventBasedController * this)
     goodput = _get_subflow_goodput(subflow, &receiver_rate);
     corrh_owd = _get_subflow_corrh_owd(subflow);
     corrl_owd = _get_subflow_corrl_owd(subflow);
+    corrPiT = _get_subflow_corrPiT(subflow);
     if(0) g_print("%p", _irt(subflow, 0));
     if(goodput < 1. || !receiver_rate) continue;
     variance = (gdouble)_irt0(subflow)->jitter / (gdouble)_irt0(subflow)->delay_80;
@@ -720,7 +728,13 @@ _irp_producer_main(SndEventBasedController * this)
                                       receiver_rate,
                                       variance,
                                       corrh_owd,
-                                      corrl_owd);
+                                      corrl_owd,
+                                      corrPiT,
+                                      _irt0(subflow)->lost_rate > 0.,
+                                      _irt0(subflow)->late_discarded_bytes > 0,
+                                      subflow->lost_history,
+                                      subflow->late_discarded_history);
+
     event = subflow->check(subflow);
     subflow->fire(this, subflow, event);
     _irt0(subflow)->checked = TRUE;
@@ -755,6 +769,9 @@ _step_ir (Subflow * this)
   _irt0(this)->time                      = gst_clock_get_time(this->sysclock);
   _irt0(this)->state                     = _irt1(this)->state;
   _irt0(this)->checked                   = FALSE;
+
+  this->late_discarded_history<<=1;
+  this->lost_history<<=1;
   ++this->ir_moments_num;
 }
 
@@ -868,7 +885,8 @@ _report_processing_rrblock_processor (SndEventBasedController *this,
   _irt0(subflow)->cycle_num = (guint16) (HSSN_read>>16);
   _irt0(subflow)->expected_packets = _uint16_diff(_irt1(subflow)->HSSN,
                                                   _irt0(subflow)->HSSN);
-
+  _irt0(subflow)->PiT = _uint16_diff(_irt0(subflow)->HSSN,
+                                     mprtps_path_get_HSN(subflow->path));
   LSR = (guint64) LSR_read;
   DLSR = (guint64) DLSR_read;
 
@@ -892,7 +910,7 @@ _report_processing_rrblock_processor (SndEventBasedController *this,
   }
 
   _irt0 (subflow)->lost_rate = ((gdouble) fraction_lost) / 256.;
-
+  subflow->lost_history +=  (_irt0 (subflow)->lost_rate>0.)?1:0;
 //  g_print("%d: %u:%f\n", subflow->id, _irt0(subflow)->lost, _irt0(subflow)->lost_rate);
 
 }
@@ -934,6 +952,7 @@ _report_processing_xr_7243_block_processor (SndEventBasedController *this,
     default:
     break;
   }
+  subflow->late_discarded_history+=(_irt0 (subflow)->late_discarded_bytes>0)?1:0;
 }
 
 void
@@ -1032,6 +1051,17 @@ _get_subflow_goodput (Subflow * this, guint32* receiver_rate)
 //                  goodput,
 //                  ck+1);
   }
+}
+
+gdouble _get_subflow_corrPiT(Subflow *subflow)
+{
+  gdouble PiT_avg = 0.;
+  if(_irt1(subflow)->PiT == 0 ||
+     _irt2(subflow)->PiT == 0)
+    return 0.;
+  PiT_avg = _irt0(subflow)->PiT + _irt1(subflow)->PiT + _irt2(subflow)->PiT;
+  PiT_avg/=3;
+  return PiT_avg / (gdouble)_irt0(subflow)->PiT;
 }
 
 gdouble _get_subflow_corrh_owd(Subflow *subflow)

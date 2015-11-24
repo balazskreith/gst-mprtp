@@ -245,14 +245,13 @@ mprtps_path_get_time_sent_to_congested (MPRTPSPath * this)
   return result;
 }
 
-void
-mprtps_path_set_max_bytes_per_ms (MPRTPSPath * this, guint32 bytes_per_ms)
+guint16 mprtps_path_get_HSN(MPRTPSPath * this)
 {
-  g_return_if_fail (this);
-  THIS_WRITELOCK (this);
-  this->max_bytes_per_ms = bytes_per_ms;
-//  g_print ("T%d it changed\n", this->id);
-  THIS_WRITEUNLOCK (this);
+  guint16 result;
+  THIS_READLOCK (this);
+  result = this->seq;
+  THIS_READUNLOCK (this);
+  return result;
 }
 
 void

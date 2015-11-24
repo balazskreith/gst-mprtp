@@ -1055,13 +1055,14 @@ _get_subflow_goodput (Subflow * this, guint32* receiver_rate)
 
 gdouble _get_subflow_corrPiT(Subflow *subflow)
 {
-  gdouble PiT_avg = 0.;
-  if(_irt1(subflow)->PiT == 0 ||
-     _irt2(subflow)->PiT == 0)
-    return 0.;
-  PiT_avg = _irt0(subflow)->PiT + _irt1(subflow)->PiT + _irt2(subflow)->PiT;
-  PiT_avg/=3;
-  return PiT_avg / (gdouble)_irt0(subflow)->PiT;
+  gdouble PiT_sum = 1.;
+  if(_irt2(subflow)->PiT == 0.){
+     _irt2(subflow)->PiT = 1.;
+     return 1.;
+  }
+  PiT_sum = _irt0(subflow)->PiT + _irt1(subflow)->PiT + _irt2(subflow)->PiT;
+//  g_print("%d PiT: %f\n", subflow->id, PiT_sum / (gdouble)_irt0(subflow)->PiT);
+  return PiT_sum / ((gdouble)_irt0(subflow)->PiT * 3.);
 }
 
 gdouble _get_subflow_corrh_owd(Subflow *subflow)

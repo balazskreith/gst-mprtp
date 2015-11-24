@@ -34,12 +34,12 @@ struct _SendingRateDistributor
   GQueue*              free_ids;
   guint8               counter;
 
-  guint32              stable_sr_sum;
-  guint32              taken_bytes;
-  guint32              supplied_bytes;
-  guint32              requested_bytes;
-  guint32              fallen_bytes;
-  guint32              overused_bytes;
+  gint32              stable_sr_sum;
+  gint32              taken_bytes;
+  gint32              supplied_bytes;
+  gint32              requested_bytes;
+  gint32              fallen_bytes;
+  gint32              overused_bytes;
 
 //  guint8               overused_subflows_num;
 //  guint8               load_controlling;

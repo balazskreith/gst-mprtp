@@ -99,7 +99,7 @@ struct _Subflow{
   guint8          measurements_index;
 
   //Talon
-  guint8          fallen_bytes;
+  gint32          fallen_bytes;
 
 };
 
@@ -404,11 +404,16 @@ void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate
 
   //signaling
   utilization.delta_sr = this->requested_bytes - this->fallen_bytes;
+  g_print("Utilization DSR = %d - %d = %d\n",
+          this->requested_bytes,
+          this->fallen_bytes,
+          utilization.delta_sr);
   if(utilization.delta_sr != 0)
   {
     this->signal_request(this->signal_controller, &utilization);
     if(utilization.accepted)
       this->media_rate += utilization.delta_sr;
+    utilization.delta_sr = 0;
   }
 
 

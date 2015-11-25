@@ -31,6 +31,12 @@ typedef struct _SessionData
   GstElement *input;
 } SessionData;
 
+typedef struct _Utilization{
+  gint     delta_sr;
+  gboolean accepted;
+  gdouble  changing_rate;
+}Utilization;
+
 static SessionData *
 session_ref (SessionData * data)
 {
@@ -104,6 +110,8 @@ make_audio_session (guint sessionNum)
   return session;
 }
 
+static GstElement *encoder;
+guint bitrate = 512;
 static SessionData *
 make_video_session (guint sessionNum)
 {
@@ -111,8 +119,8 @@ make_video_session (guint sessionNum)
   //GstElement *videoSrc = gst_element_factory_make ("videotestsrc", NULL);
   GstElement *videoSrc = gst_element_factory_make ("autovideosrc", NULL);
   GstElement *videoConv = gst_element_factory_make("videoconvert", NULL);
-//  GstElement *encoder = gst_element_factory_make ("theoraenc", NULL);
-  GstElement *encoder = gst_element_factory_make ("jpegenc", NULL);
+  encoder = gst_element_factory_make ("theoraenc", NULL);
+  //encoder = gst_element_factory_make ("jpegenc", NULL);
 //  GstElement *payloader = gst_element_factory_make ("rtptheorapay", NULL);
   GstElement *payloader = gst_element_factory_make ("rtpjpegpay", NULL);
   GstCaps *videoCaps;
@@ -121,7 +129,7 @@ make_video_session (guint sessionNum)
   g_object_set (payloader, "config-interval", 2, NULL);
   g_object_set (videoSrc, "name", "videosrc", NULL);
   g_object_set (videoSrc, "sync", FALSE, NULL);
-  g_object_set (encoder, "bitrate", 300, NULL);
+  g_object_set (encoder, "bitrate", bitrate, NULL);
 
   gst_bin_add_many (videoBin, videoSrc, videoConv, encoder, payloader, NULL);
   videoCaps = gst_caps_new_simple ("video/x-raw",
@@ -142,6 +150,25 @@ make_video_session (guint sessionNum)
 
   return session;
 }
+
+
+static void
+changed_event (GstElement * mprtp_sch, gpointer ptr)
+{
+  Utilization *utilization = ptr;
+  gint delta, new_bitrate, get_bitrate;
+  g_object_get (encoder, "bitrate", &get_bitrate, NULL);
+  new_bitrate = (gdouble)get_bitrate * utilization->changing_rate;
+  g_print("Current bitrate: %d, cr: %f sugested bitrate:: %d\n",
+          get_bitrate,
+          utilization->changing_rate,
+          new_bitrate);
+  utilization->accepted = TRUE;
+  g_object_set (encoder, "bitrate", new_bitrate, NULL);
+done:
+  return;
+}
+
 
 static GstElement *
 request_aux_sender (GstElement * rtpbin, guint sessid, SessionData * session)
@@ -191,9 +218,13 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   GstElement *mprtpsnd = gst_element_factory_make ("mprtpsender", NULL);
   GstElement *mprtprcv = gst_element_factory_make ("mprtpreceiver", NULL);
   GstElement *mprtpsch = gst_element_factory_make ("mprtpscheduler", NULL);
+//  GstElement *identity_1 = gst_element_factory_make ("netsimb", NULL);
+//  GstElement *identity_2 = gst_element_factory_make ("netsimb", NULL);
   int basePort;
   gchar *padName;
 
+//  ids->netsim_s1 = identity_1;
+//  ids->netsim_s2 = identity_2;
 
   basePort = 5000 + (session->sessionNum * 20);
 
@@ -205,9 +236,15 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   g_signal_connect (rtpBin, "request-aux-sender",
       (GCallback) request_aux_sender, session);
 
+//  g_signal_connect (mprtpsch, "mprtp-subflows-utilization",
+//      (GCallback) mprtp_subflows_utilization, NULL);
+
+  g_signal_connect (mprtpsch, "mprtp-subflows-utilization",
+      (GCallback) changed_event, NULL);
+
   g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2",
-      NULL);
-//      "sync",FALSE, "async", FALSE, NULL);
+//      NULL);
+      "sync",FALSE, "async", FALSE, NULL);
 
   g_object_set (rtpSink_2, "port", basePort + 1, "host", "10.0.1.2",
 //      NULL);
@@ -233,13 +270,19 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   g_free (padName);
   /* link rtpbin to udpsink directly here if you don't want
    * artificial packet loss */
+//  gst_element_link_pads (mprtpsnd, "src_1", identity_1, "sink");
+  //  gst_element_link (identity_1, rtpSink_1);
   gst_element_link_pads (mprtpsnd, "src_1", rtpSink_1, "sink");
 
+//  gst_element_link_pads (mprtpsnd, "src_2", identity_2, "sink");
+//  gst_element_link (identity_2, rtpSink_2);
   gst_element_link_pads (mprtpsnd, "src_2", rtpSink_2, "sink");
 
   g_object_set (mprtpsch, "join-subflow", 1, NULL);
   g_object_set (mprtpsch, "join-subflow", 2, NULL);
 
+//  sprintf(ids->filename, "%s", file);
+//  g_timeout_add (1000, _network_changes, ids);
 
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");
@@ -260,6 +303,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
 
   session_unref (session);
 }
+
 
 int
 main (int argc, char **argv)

@@ -26,6 +26,7 @@
 typedef struct _Utilization{
   gint     delta_sr;
   gboolean accepted;
+  gdouble  changing_rate;
 }Utilization;
 
 typedef struct _SessionData
@@ -186,15 +187,15 @@ static void
 changed_event (GstElement * mprtp_sch, gpointer ptr)
 {
   Utilization *utilization = ptr;
-  gint delta, new_bitrate;
-  delta = utilization->delta_sr>>7;
-  new_bitrate = (gint)bitrate + delta;
-  g_print("Current bitrate: %u, delta: %d\n", bitrate, delta);
-  if(new_bitrate < 0) goto done;
-  bitrate = new_bitrate;
+  gint delta, new_bitrate, get_bitrate;
+  g_object_get (encoder, "bitrate", &get_bitrate, NULL);
+  new_bitrate = (gdouble)get_bitrate * utilization->changing_rate;
+  g_print("Current bitrate: %d, cr: %f sugested bitrate:: %d\n",
+          get_bitrate,
+          utilization->changing_rate,
+          new_bitrate);
   utilization->accepted = TRUE;
-  g_object_set (encoder, "bitrate", bitrate, NULL);
-  g_print("Changed bitrate: %u\n", bitrate);
+  g_object_set (encoder, "bitrate", new_bitrate, NULL);
 done:
   return;
 }

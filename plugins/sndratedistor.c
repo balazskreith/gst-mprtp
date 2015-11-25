@@ -56,6 +56,7 @@ typedef State (*Checker)(SendingRateDistributor*,Subflow*);
 typedef struct _Utilization{
   gint     delta_sr;
   gboolean accepted;
+  gdouble  changing_rate;
 }Utilization;
 
 struct _Measurement{
@@ -353,6 +354,7 @@ void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate
   guint8 subflow_ids[SNDRATEDISTOR_MAX_NUM];
   guint8 subflow_ids_length = 0;
   guint32 SR_sum = 0;
+  guint32 new_SR_sum = 0;
   Utilization utilization = {0,FALSE};
   guint32 RR_sum = 0;
 
@@ -404,26 +406,25 @@ void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate
 
   //signaling
   utilization.delta_sr = this->requested_bytes - this->fallen_bytes;
+  this->media_rate += utilization.delta_sr;
   g_print("Utilization DSR = %d - %d = %d\n",
-          this->requested_bytes,
-          this->fallen_bytes,
-          utilization.delta_sr);
-  if(utilization.delta_sr != 0)
-  {
-    this->signal_request(this->signal_controller, &utilization);
-    if(utilization.accepted)
-      this->media_rate += utilization.delta_sr;
-    utilization.delta_sr = 0;
-  }
-
-
+             this->requested_bytes,
+             this->fallen_bytes,
+             utilization.delta_sr);
+   if(utilization.delta_sr != 0)
+   {
+     utilization.changing_rate = (gdouble)this->media_rate / (gdouble)media_rate;
+     this->signal_request(this->signal_controller, &utilization);
+   }
   //5. Calculate next sending rates.
   for(i=0; i < subflow_ids_length; ++i){
     gint32 delta_sr;
     id = subflow_ids[i];
     subflow = _get_subflow(this, id);
     delta_sr = subflow->taken_bytes - subflow->supplied_bytes;
+    g_print("Before: S%d SR:%d+%d\n", subflow->id, subflow->sending_rate, delta_sr);
     subflow->sending_rate+=delta_sr;
+    g_print("After: S%d SR:%d MR: %u\n", subflow->id, subflow->sending_rate, this->media_rate);
     SR_sum += subflow->sending_rate;
     subflow->measured = FALSE;
   }
@@ -435,8 +436,9 @@ void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate
     subflow = _get_subflow(this, id);
     weight = (gdouble)subflow->sending_rate / (gdouble)SR_sum;
     subflow->sending_rate = weight * (gdouble)this->media_rate;
-
+    new_SR_sum += subflow->sending_rate;
   }
+
 
   return;
 }
@@ -554,13 +556,28 @@ _check_unstable(
     _change_monitoring(subflow, subflow->monitoring_interval);
     goto done;
   }
-  if(++subflow->monitoring_time > 2){
+  if(++subflow->monitoring_time > 1){
+    guint32 target;
     g_print("S%d: subflow->monitoring_time > 2 %u\n", subflow->id, subflow->monitored_bytes);
     this->requested_bytes += subflow->monitored_bytes;
     subflow->taken_bytes += subflow->monitored_bytes;
-    _disable_monitoring(subflow);
-    _disable_checking(subflow, 1);
-    _transit_to(subflow, STATE_STABLE);
+    if(!subflow->fallen_bytes){
+      _disable_monitoring(subflow);
+      _disable_checking(subflow, 1);
+      _transit_to(subflow, STATE_STABLE);
+      g_print("S%d: !subflow->fallen_bytes\n", subflow->id);
+      goto done;
+    }
+    target = _get_monitoring_bytes(subflow, subflow->fallen_bytes);
+    if(subflow->monitoring_interval > 14){
+      subflow->fallen_bytes = 0;
+      _disable_monitoring(subflow);
+      _transit_to(subflow, STATE_STABLE);
+      goto done;
+    }
+    subflow->fallen_bytes-= target;
+    _change_monitoring(subflow, subflow->monitoring_interval);
+    goto done;
   }
   //We are going up
 
@@ -681,11 +698,18 @@ done:
 
 guint32 _get_monitoring_bytes(Subflow *this, guint32 limit)
 {
+  if(!limit){
+    this->monitored_bytes = 0;
+    this->monitoring_interval = 0;
+    this->monitoring_time = 0;
+    goto done;
+  }
   this->monitoring_interval = 1;
   do{
     ++this->monitoring_interval;
     this->monitored_bytes = (gdouble)this->sending_rate / (gdouble) this->monitoring_interval;
   }while(limit < this->monitored_bytes);
+done:
   return this->monitored_bytes;
 }
 
@@ -729,7 +753,11 @@ gint32 _action_request(
 {
   gint32 requested_bytes = 0;
   if(_mt1(subflow)->goodput < subflow->sending_rate) goto done;
-  requested_bytes = _mt1(subflow)->goodput - subflow->sending_rate;
+  if(0 < subflow->fallen_bytes && subflow->sending_rate + subflow->fallen_bytes < _mt1(subflow)->goodput)
+    requested_bytes = subflow->fallen_bytes;
+  else
+    requested_bytes = _mt1(subflow)->goodput - subflow->sending_rate;
+  subflow->fallen_bytes = MAX(subflow->fallen_bytes - requested_bytes, 0);
   g_print("S%d: Bounce back, SR:%u GPt1: %u, requested bytes: %u, RRt0: %u\n",
             subflow->id, subflow->sending_rate,
             _mt1(subflow)->goodput,
@@ -746,7 +774,7 @@ gint32 _action_fall(
 {
   gint32 fallen_bytes = 0;
   if(subflow->sending_rate < _mt0(subflow)->goodput)
-    fallen_bytes = subflow->sending_rate * .70710678118; //sqrt(2)/2
+    fallen_bytes = subflow->sending_rate * (1.-.70710678118); //sqrt(2)/2
   else
     fallen_bytes = subflow->sending_rate-_mt0(subflow)->goodput;
   g_print("S%d: Undershooting, SR:%u fallen bytes: %u GP: %u RR %u\n",

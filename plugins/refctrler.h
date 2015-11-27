@@ -42,10 +42,10 @@ struct _RcvEventBasedController
   gboolean          report_is_flowable;
 
   BinTree*          subflow_skew_tree;
-  BinTree*          subflow_delays_tree;
-  guint8            subflow_delays_index;
+//  BinTree*          subflow_delays_tree;
+//  guint8            subflow_delays_index;
   guint8            subflow_skew_index;
-  guint64           subflow_delays[256];
+//  guint64           subflow_delays[256];
   guint64           subflow_skews[256];
 
 

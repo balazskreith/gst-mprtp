@@ -73,8 +73,9 @@ struct _MpRTPReceiverPath
   GstClockTime        last_delay_a;
   GstClockTime        last_delay_b;
   GstClockTime        last_delay_c;
-  StreamTracker*      ltt_low_delays;
-  StreamTracker*      ltt_high_delays;
+  GstClockTime        last_delay_d;
+  StreamTracker*      lt_low_delays;
+  StreamTracker*      lt_high_delays;
   StreamTracker*      skews;
 
   GstClockTime        last_drift_window;
@@ -122,15 +123,15 @@ void mprtpr_path_set_played_seq_num(MpRTPRPath *this, guint16 seq);
 guint64 mprtpr_path_get_drift_window(MpRTPRPath *this, GstClockTime *min_delay,
                                      GstClockTime *max_delay);
 
+GstClockTime mprtpr_path_get_avg_4last_delay(MpRTPRPath *this);
+
 void
-mprtpr_path_get_delay (MpRTPRPath   *this,
+mprtpr_path_get_ltdelays (MpRTPRPath   *this,
                        GstClockTime *percentile_40,
                        GstClockTime *percentile_80,
                        GstClockTime *min_delay,
-                       GstClockTime *max_delay,
-                       GstClockTime *last_delay);
+                       GstClockTime *max_delay);
 
-guint32 mprtpr_path_get_skew_byte_num(MpRTPRPath *this);
 guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this);
 void mprtpr_path_get_obsolate_stat(MpRTPRPath *this,
                                       GstClockTime treshold,

@@ -86,7 +86,6 @@ struct _ORMoment{
   GstClockTime                  min_delay;
   GstClockTime                  max_delay;
   guint64                       median_skew;
-  guint32                       skew_bytes;
   GstClockTime                  min_skew;
   GstClockTime                  max_skew;
   guint16                       cycle_num;
@@ -119,7 +118,6 @@ struct _Subflow
   guint8                        or_index;
   guint32                       or_num;
   gdouble                       avg_rtcp_size;
-  gboolean                      imprecise;
 
 
 };
@@ -220,12 +218,6 @@ _system_notifier_main(RcvEventBasedController * this);
 //----------------------------- Play Controller -----------------------------
 static void
 _play_controller_main(RcvEventBasedController * this);
-static void
-_refresh_subflow_delay_and_skew(RcvEventBasedController *this,
-                                guint64 delay,
-                                guint64 skew);
-void _refresh_subflow_delay(RcvEventBasedController *this,
-                                     guint64 delay);
 void _refresh_subflow_skew(RcvEventBasedController *this,
                                      guint64 skew);
 //------------------------- Utility functions --------------------------------
@@ -308,9 +300,7 @@ refctrler_init (RcvEventBasedController * this)
       NULL, (GDestroyNotify) _ruin_subflow);
   this->ssrc = g_random_int ();
   this->report_is_flowable = FALSE;
-  this->subflow_delays_tree = make_bintree(_cmp_for_maxtree);
   this->subflow_skew_tree = make_bintree(_cmp_for_maxtree);
-  this->subflow_delays_index = 0;
   this->subflow_skew_index = 0;
 
   g_rw_lock_init (&this->rwmutex);
@@ -588,6 +578,7 @@ _orp_main(RcvEventBasedController * this)
   guint16 report_length = 0;
   guint16 block_length = 0;
   GstBuffer *block;
+  GstClockTime last_delay;
 //  GstClockTime now;
 //  guint16 lost=0,expected=0,received=0;
 
@@ -613,6 +604,10 @@ _orp_main(RcvEventBasedController * this)
 //
 //    if(lost)
 //      ricalcer_urgent_report_request(subflow->ricalcer);
+    last_delay = mprtpr_path_get_avg_4last_delay(subflow->path);
+    if(_ort0(subflow)->delay80 * 1.5 < last_delay){
+      ricalcer_urgent_report_request(ricalcer);
+    }
     if (!this->report_is_flowable || !ricalcer_do_report_now(ricalcer)) {
       continue;
     }
@@ -669,14 +664,12 @@ _step_or (Subflow * this)
                                    &_ort0(this)->min_skew,
                                    &_ort0(this)->max_skew);
 
-      mprtpr_path_get_delay(this->path,
+      mprtpr_path_get_ltdelays(this->path,
                             &_ort0(this)->delay40,
                             &_ort0(this)->delay80,
-                            NULL,
-                            NULL,
-                            &_ort0(this)->last_delay);
-
-  _ort0(this)->skew_bytes = mprtpr_path_get_skew_byte_num(this->path);
+                            &_ort0(this)->min_delay,
+                            &_ort0(this)->max_delay);
+  _ort0(this)->last_delay = mprtpr_path_get_avg_4last_delay(this->path);
 
   _ort0(this)->cycle_num = mprtpr_path_get_cycle_num (this->path);
   _ort0(this)->jitter = mprtpr_path_get_jitter (this->path);
@@ -956,79 +949,40 @@ _play_controller_main(RcvEventBasedController * this)
   GHashTableIter iter;
   gpointer key, val;
   Subflow *subflow;
-  guint64 min_delay, max_delay, delay80, delay40, last_delay, skew;
-  guint64 treshold;
-  guint32 max_jitter = 0;
-  guint32 jitter = 0;
-  guint32 min_jitter = G_MAXUINT32;
-  GstClockTime now;
-  now = gst_clock_get_time(this->sysclock);
+  gboolean valid = FALSE;
+  guint64 min_delay = 1<<31, max_delay = 0, skew;
 //if(1) return;
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
     subflow = (Subflow *) val;
-    mprtpr_path_get_delay(subflow->path,
-                          &delay40,
-                          &delay80,
-                          NULL,
-                          NULL,
-                          &last_delay);
-
-    if(now - GST_SECOND < _ort0(subflow)->time && last_delay > delay80<<1){
-      ricalcer_urgent_report_request(subflow->ricalcer);
-    }
-//    delay = 50 * GST_MSECOND;
+    min_delay = MIN(_ort0(subflow)->min_delay, min_delay);
+    max_delay = MAX(_ort0(subflow)->delay80, max_delay);
     skew = mprtpr_path_get_drift_window(subflow->path, NULL, NULL);
-    if(!skew || !delay80) {
+    if(!skew || !max_delay || !min_delay) {
       continue;
     }
-    if(!bintree_get_num(this->subflow_delays_tree)){
-      _refresh_subflow_delay_and_skew(this, delay80, skew);
-      continue;
-    }
-
-    jitter = _ort0(subflow)->jitter>>1;
-    min_delay = bintree_get_bottom_value(this->subflow_delays_tree);
-    max_delay = bintree_get_top_value(this->subflow_delays_tree);
-    treshold = (!subflow->imprecise)?DELAY_SKEW_ACTIVE_TRESHOLD:DELAY_SKEW_DEACTIVE_TRESHOLD;
-    //minimum
-    if(treshold < max_delay && delay80 + jitter < max_delay - treshold) goto imprecise;
-    //maximum
-    if(min_delay + treshold < delay80 - jitter) goto imprecise;
-
-    subflow->imprecise = FALSE;
-    _refresh_subflow_delay_and_skew(this, delay80, skew);
-    max_jitter = MAX(max_jitter, jitter);
-    min_jitter = MIN(min_jitter, jitter);
-    continue;
-  imprecise:
-    subflow->imprecise = TRUE;
-    continue;
+    valid = TRUE;
+    _refresh_subflow_skew(this, skew);
   }
-  if(!bintree_get_num(this->subflow_delays_tree)){
-    goto done;
-  }
+  if(!valid) goto done;
 
   //set playout skew and delay
   {
     guint64 playout_delay;
     guint64 playout_skew;
-    min_delay = bintree_get_bottom_value(this->subflow_delays_tree);
-    if(min_jitter < min_delay) min_delay-=min_jitter;
-    max_delay = bintree_get_top_value(this->subflow_delays_tree) + max_jitter;
     playout_delay = max_delay - min_delay;
     playout_delay = MAX(playout_delay, 10 * GST_MSECOND);
-    playout_delay = MIN(DELAY_SKEW_ACTIVE_TRESHOLD, playout_delay);
+    playout_delay = MIN(DELAY_SKEW_MAX, playout_delay);
     playout_skew = bintree_get_top_value(this->subflow_skew_tree);
+    playout_skew = MIN(500 * GST_USECOND, playout_skew);
     if((playout_delay>>2) < playout_skew){
       playout_skew = playout_delay>>2;
     }
-    playout_skew = MAX(GST_MSECOND, playout_skew);
-//    g_print("Set playout MIN: %lu MAX: %lu "
-//        "stream delay: %lu tick interval: %lu\n",
-//        min_delay, max_delay,
-//            playout_delay, playout_skew);
+    g_print("Set playout MIN: %lu MAX: %lu "
+        "stream delay: %lu tick interval: %lu\n",
+        min_delay, max_delay,
+            playout_delay, playout_skew);
     stream_joiner_set_stream_delay(this->joiner, playout_delay);
     stream_joiner_set_tick_interval(this->joiner, playout_skew);
   }
@@ -1038,23 +992,7 @@ done:
 }
 
 
-void _refresh_subflow_delay_and_skew(RcvEventBasedController *this,
-                                     guint64 delay,
-                                     guint64 skew)
-{
-  _refresh_subflow_delay(this, delay);
-  _refresh_subflow_skew(this, skew);
-}
 
-void _refresh_subflow_delay(RcvEventBasedController *this,
-                                     guint64 delay)
-{
-  this->subflow_delays[this->subflow_delays_index] = delay;
-  bintree_insert_value(this->subflow_delays_tree, this->subflow_delays[this->subflow_delays_index]);
-  if(this->subflow_delays[++this->subflow_delays_index] > 0){
-      bintree_delete_value(this->subflow_delays_tree, this->subflow_delays[this->subflow_delays_index]);
-  }
-}
 
 void _refresh_subflow_skew(RcvEventBasedController *this,
                                      guint64 skew)
@@ -1078,7 +1016,6 @@ _make_subflow (guint8 id, MpRTPRPath * path)
   result->sysclock = gst_system_clock_obtain ();
   result->path = path;
   result->id = id;
-  result->imprecise = FALSE;
   result->joined_time = gst_clock_get_time (result->sysclock);
   result->ricalcer = make_ricalcer(FALSE);
   _reset_subflow (result);

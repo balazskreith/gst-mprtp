@@ -25,7 +25,7 @@ G_DEFINE_TYPE (MpRTPRPath, mprtpr_path, G_TYPE_OBJECT);
 
 static void mprtpr_path_finalize (GObject * object);
 static void mprtpr_path_reset (MpRTPRPath * this);
-static GstClockTime _get_last_delay_abc_median (MpRTPRPath * this);
+//static GstClockTime _get_last_delay_abc_median (MpRTPRPath * this);
 static gint _cmp_seq (guint16 x, guint16 y);
 static gint _cmp_for_max (guint64 x, guint64 y);
 static gint _cmp_for_min (guint64 x, guint64 y);
@@ -64,10 +64,10 @@ mprtpr_path_init (MpRTPRPath * this)
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetsrcvqueue();
   this->last_drift_window = GST_MSECOND;
-  this->ltt_low_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 1024, 40);
-  streamtracker_set_treshold(this->ltt_low_delays, 30 * GST_SECOND);
-  this->ltt_high_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 1024, 80);
-  streamtracker_set_treshold(this->ltt_high_delays, 30 * GST_SECOND);
+  this->lt_low_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 1024, 40);
+  streamtracker_set_treshold(this->lt_low_delays, 30 * GST_SECOND);
+  this->lt_high_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 1024, 80);
+  streamtracker_set_treshold(this->lt_high_delays, 30 * GST_SECOND);
   this->skews = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 50);
   streamtracker_set_treshold(this->skews, 2 * GST_SECOND);
   mprtpr_path_reset (this);
@@ -85,7 +85,7 @@ mprtpr_path_finalize (GObject * object)
   MpRTPRPath *this;
   this = MPRTPR_PATH_CAST (object);
   g_object_unref (this->sysclock);
-  g_object_unref(this->ltt_low_delays);
+  g_object_unref(this->lt_low_delays);
   g_object_unref(this->skews);
   g_object_unref(this->packetsqueue);
 }
@@ -222,14 +222,6 @@ mprtpr_path_removes_obsolate_packets (MpRTPRPath * this, GstClockTime treshold)
 //  g_print("mprtpr_path_removes_obsolate_packets end\n");
 }
 
-guint32 mprtpr_path_get_skew_byte_num(MpRTPRPath *this)
-{
-  guint32 result;
-  THIS_READLOCK (this);
-  result = 0;
-  THIS_READUNLOCK (this);
-  return result;
-}
 
 guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this)
 {
@@ -269,8 +261,8 @@ void mprtpr_path_set_state(MpRTPRPath *this, MPRTPRPathState state)
 void mprtpr_path_set_delay(MpRTPRPath *this, GstClockTime delay)
 {
   THIS_WRITELOCK (this);
-  streamtracker_add(this->ltt_low_delays, delay);
-  streamtracker_add(this->ltt_high_delays, delay);
+  streamtracker_add(this->lt_low_delays, delay);
+  streamtracker_add(this->lt_high_delays, delay);
   this->last_delay_c = this->last_delay_b;
   this->last_delay_b = this->last_delay_a;
   this->last_delay_a = delay;
@@ -322,33 +314,27 @@ done:
   return result;
 }
 
+GstClockTime mprtpr_path_get_avg_4last_delay(MpRTPRPath *this)
+{
+  GstClockTime result;
+  THIS_READLOCK (this);
+  result = (this->last_delay_a + this->last_delay_b + this->last_delay_c + this->last_delay_d)>>2;
+  THIS_READUNLOCK (this);
+  return result;
+}
 
 void
-mprtpr_path_get_delay (MpRTPRPath   *this,
+mprtpr_path_get_ltdelays (MpRTPRPath   *this,
                        GstClockTime *percentile_40,
                        GstClockTime *percentile_80,
                        GstClockTime *min_delay,
-                       GstClockTime *max_delay,
-                       GstClockTime *last_delay)
+                       GstClockTime *max_delay)
 {
   THIS_READLOCK (this);
-//  if(!streamtracker_get_num(this->low_delays)) goto done;
   if(percentile_40)
-//      *percentile_40 = 50 * GST_MSECOND;
-    *percentile_40 = streamtracker_get_stats(this->ltt_low_delays, min_delay, max_delay, NULL);
+    *percentile_40 = streamtracker_get_stats(this->lt_low_delays, min_delay, max_delay, NULL);
   if(percentile_80)
-      *percentile_80 =
-          //50 * GST_MSECOND;
-          streamtracker_get_stats(this->ltt_high_delays, min_delay, max_delay, NULL);
-  if(last_delay)
-     *last_delay = _get_last_delay_abc_median(this);
-//  g_print("40th num: %u-%lu 80th num: %u-%lu\n",
-//          streamtracker_get_num(this->ltt_low_delays),
-//          streamtracker_get_stats(this->ltt_low_delays, min_delay, max_delay, NULL),
-//          streamtracker_get_num(this->ltt_high_delays),
-//          streamtracker_get_stats(this->ltt_high_delays, min_delay, max_delay, NULL));
-//        streamtracker_get_last(this->low_delays);
-//done:
+    *percentile_80 = streamtracker_get_stats(this->lt_high_delays, min_delay, max_delay, NULL);
   THIS_READUNLOCK(this);
   return;
 }
@@ -400,8 +386,9 @@ add:
     this->last_rtp_timestamp = gst_rtp_buffer_get_timestamp(rtp);
   }
 done:
-  streamtracker_add(this->ltt_low_delays, delay);
-  streamtracker_add(this->ltt_high_delays, delay);
+  streamtracker_add(this->lt_low_delays, delay);
+  streamtracker_add(this->lt_high_delays, delay);
+  this->last_delay_d = this->last_delay_c;
   this->last_delay_c = this->last_delay_b;
   this->last_delay_b = this->last_delay_a;
   this->last_delay_a = delay;
@@ -410,18 +397,18 @@ done:
   return;
 
 }
-
-GstClockTime _get_last_delay_abc_median (MpRTPRPath * this)
-{
-  if(this->last_delay_a < this->last_delay_b){
-    if(this->last_delay_b < this->last_delay_c) return this->last_delay_b;
-    if(this->last_delay_a < this->last_delay_c) return this->last_delay_c;
-    return this->last_delay_a;
-  }
-  if(this->last_delay_a < this->last_delay_c) return this->last_delay_a;
-  if(this->last_delay_b < this->last_delay_c) return this->last_delay_c;
-  return this->last_delay_b;
-}
+//
+//GstClockTime _get_last_delay_abc_median (MpRTPRPath * this)
+//{
+//  if(this->last_delay_a < this->last_delay_b){
+//    if(this->last_delay_b < this->last_delay_c) return this->last_delay_b;
+//    if(this->last_delay_a < this->last_delay_c) return this->last_delay_c;
+//    return this->last_delay_a;
+//  }
+//  if(this->last_delay_a < this->last_delay_c) return this->last_delay_a;
+//  if(this->last_delay_b < this->last_delay_c) return this->last_delay_c;
+//  return this->last_delay_b;
+//}
 
 gint
 _cmp_seq (guint16 x, guint16 y)

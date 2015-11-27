@@ -110,6 +110,7 @@ struct _IRMoment{
   guint16             cycle_num;
   guint16             expected_packets;
   guint16             PiT;
+  guint16             PiT_last3_sum;
   guint32             expected_payload_bytes;
   gdouble             lost_rate;
   gdouble             goodput;
@@ -760,7 +761,9 @@ _irt (Subflow * this, gint moment)
 void
 _step_ir (Subflow * this)
 {
+  guint16 PiT_sum;
   this->ir_moments_index = (this->ir_moments_index + 1) % MAX_SUBFLOW_MOMENT_NUM;
+  PiT_sum= _irt2(this)->PiT + _irt1(this)->PiT + _irt0(this)->PiT;
   memset ((gpointer) _irt0 (this), 0, sizeof (IRMoment));
 //  _st0(this)->RTT                   = _irt1(this)->RTT;
 
@@ -769,7 +772,7 @@ _step_ir (Subflow * this)
   _irt0(this)->time                      = gst_clock_get_time(this->sysclock);
   _irt0(this)->state                     = _irt1(this)->state;
   _irt0(this)->checked                   = FALSE;
-
+  _irt0(this)->PiT_last3_sum                   = PiT_sum;
   this->late_discarded_history<<=1;
   this->lost_history<<=1;
   ++this->ir_moments_num;
@@ -1055,14 +1058,9 @@ _get_subflow_goodput (Subflow * this, guint32* receiver_rate)
 
 gdouble _get_subflow_corrPiT(Subflow *subflow)
 {
-  gdouble PiT_sum = 1.;
-  if(_irt2(subflow)->PiT == 0.){
-     _irt2(subflow)->PiT = 1.;
-     return 1.;
-  }
-  PiT_sum = _irt0(subflow)->PiT + _irt1(subflow)->PiT + _irt2(subflow)->PiT;
-//  g_print("%d PiT: %f\n", subflow->id, PiT_sum / (gdouble)_irt0(subflow)->PiT);
-  return PiT_sum / ((gdouble)_irt0(subflow)->PiT * 3.);
+//  g_print("S%d: PiT_t0: %hu, PiT_t1: %hu, PiT_t2: %hu\n",
+//          subflow->id, _irt0(subflow)->PiT, _irt1(subflow)->PiT, _irt2(subflow)->PiT);
+  return (gdouble)_irt0(subflow)->PiT_last3_sum / ((gdouble)_irt0(subflow)->PiT * 3.);
 }
 
 gdouble _get_subflow_corrh_owd(Subflow *subflow)

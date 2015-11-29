@@ -40,7 +40,7 @@ struct _SendingRateDistributor
   gint32              requested_bytes;
   gint32              fallen_bytes;
   gint32              overused_bytes;
-
+  gboolean            monitoring;
   gboolean            pacing;
 
 //  guint8               overused_subflows_num;

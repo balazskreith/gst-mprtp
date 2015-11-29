@@ -86,7 +86,6 @@ struct _ORMoment{
   GstClockTime                  min_delay;
   GstClockTime                  max_delay;
   guint64                       median_skew;
-  GstClockTime                  last_skew;
   GstClockTime                  min_skew;
   GstClockTime                  max_skew;
   guint16                       cycle_num;
@@ -120,9 +119,6 @@ struct _Subflow
   guint32                       or_num;
   gdouble                       avg_rtcp_size;
 
-  GstClockTime                  median_skew1;
-  GstClockTime                  median_skew2;
-  GstClockTime                  median_skew3;
 };
 
 //----------------------------------------------------------------------
@@ -648,10 +644,6 @@ _orp_main(RcvEventBasedController * this)
 void
 _step_or (Subflow * this)
 {
-  this->median_skew3 = this->median_skew2;
-  this->median_skew2 = this->median_skew1;
-  this->median_skew1 = _ort0(this)->median_skew;
-
   this->or_index = 1 - this->or_index;
   memset ((gpointer) _ort0 (this), 0, sizeof (ORMoment));
 
@@ -670,9 +662,6 @@ _step_or (Subflow * this)
       mprtpr_path_get_drift_window(this->path,
                                    &_ort0(this)->min_skew,
                                    &_ort0(this)->max_skew);
-
-
-  _ort0(this)->last_skew = mprtpr_path_get_avg_4last_skew(this->path);
 
       mprtpr_path_get_ltdelays(this->path,
                             &_ort0(this)->delay40,
@@ -942,12 +931,6 @@ _setup_xr_owd_report (Subflow * this,
   gst_rtcp_header_change (&xr->header, NULL,NULL, NULL, NULL, NULL, &ssrc);
   gst_rtcp_xr_owd_change(xr, &flag, &ssrc, &percentile, &invert_percentile,
                          &owd, &min, &max);
-  {
-    gdouble ratio;
-    ratio = (gdouble) (3*_ort0(this)->last_skew) / (gdouble) (this->median_skew1 + this->median_skew2 + this->median_skew3);
-    g_print("S%d Ratio: %f\n",
-            this->id, ratio);
-  }
 }
 
 //----------------------------- System Notifier ------------------------------

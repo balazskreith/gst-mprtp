@@ -324,15 +324,6 @@ GstClockTime mprtpr_path_get_avg_4last_delay(MpRTPRPath *this)
   return result;
 }
 
-GstClockTime mprtpr_path_get_avg_4last_skew(MpRTPRPath *this)
-{
-  GstClockTime result;
-  THIS_READLOCK (this);
-  result = (this->last_skew_a + this->last_skew_b + this->last_skew_c + this->last_skew_d)>>2;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
 void
 mprtpr_path_get_ltdelays (MpRTPRPath   *this,
                        GstClockTime *percentile_40,
@@ -393,10 +384,6 @@ add:
 //  if(this->id == 1) g_print("%lu,", delay);
   if(this->last_rtp_timestamp != gst_rtp_buffer_get_timestamp(rtp)){
     streamtracker_add(this->skews, skew);
-    this->last_skew_d = this->last_skew_c;
-    this->last_skew_c = this->last_skew_b;
-    this->last_skew_b = this->last_skew_a;
-    this->last_skew_a = skew;
     this->last_rtp_timestamp = gst_rtp_buffer_get_timestamp(rtp);
   }
 done:

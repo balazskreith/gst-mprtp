@@ -41,6 +41,8 @@ struct _SendingRateDistributor
   gint32              fallen_bytes;
   gint32              overused_bytes;
 
+  gboolean            pacing;
+
 //  guint8               overused_subflows_num;
 //  guint8               load_controlling;
 //  guint8               prev_controlling;
@@ -63,10 +65,10 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        guint8 id,
                                        guint32 goodput,
                                        guint32 receiver_rate,
-                                       gdouble variance,
+                                       guint32 variance,
                                        gdouble corrh_owd,
                                        gdouble corrl_owd,
-                                       gdouble corrPiT,
+                                       guint16 PiT,
                                        gboolean lost,
                                        gboolean discard,
                                        guint8 lost_history,

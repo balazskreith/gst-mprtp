@@ -42,6 +42,7 @@ G_DEFINE_TYPE (StreamSplitter, stream_splitter, G_TYPE_OBJECT);
 
 typedef struct _Subflow Subflow;
 
+
 struct _SchNode
 {
   SchNode *left;
@@ -60,6 +61,7 @@ struct _Subflow
   gboolean key_path;
   guint32 new_bid;
 };
+
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
@@ -621,6 +623,7 @@ _tree_commit (StreamSplitter *this, SchNode ** tree,
   GHashTableIter iter;
   guint32 min_bytes_sent = 4294967295;
   //guint8 subflow_id;
+  gdouble min_rate = 1. / (gdouble)SCHTREE_MAX_VALUE;
 
   g_hash_table_iter_init (&iter, subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
@@ -636,6 +639,7 @@ _tree_commit (StreamSplitter *this, SchNode ** tree,
     }
     subflow->key_path = key_path;
     subflow->actual_rate = (gdouble) subflow->actual_bid / (gdouble) bid_sum;
+    if(subflow->actual_rate < min_rate) continue;
     actual_value =
         subflow->actual_rate *(gdouble) SCHTREE_MAX_VALUE;
     insert_value = (gint) roundf (actual_value);

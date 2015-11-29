@@ -17,7 +17,6 @@ typedef struct _StreamSplitter StreamSplitter;
 typedef struct _StreamSplitterClass StreamSplitterClass;
 typedef struct _StreamSplitterPrivate StreamSplitterPrivate;
 typedef struct _SchNode SchNode;
-typedef struct _RetainedItem RetainedItem;
 
 #define STREAM_SPLITTER_TYPE             (stream_splitter_get_type())
 #define STREAM_SPLITTER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),STREAM_SPLITTER_TYPE,StreamSplitter))
@@ -29,10 +28,6 @@ typedef struct _RetainedItem RetainedItem;
 
 #define MPRTP_SENDER_STREAM_SPLITTER_MAX_PATH_NUM 32
 
-struct _RetainedItem{
-  GstClockTime time;
-  GstBuffer   *buffer;
-};
 
 typedef enum{
   MPRTP_STREAM_BYTE_BASED_SPLITTING,

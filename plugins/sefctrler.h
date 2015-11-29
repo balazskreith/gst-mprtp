@@ -50,6 +50,7 @@ struct _SndEventBasedController
   GstClockTime           last_recalc_time;
   GstClockTime           RTT_max;
   gboolean               bids_recalc_requested;
+  guint8                 bids_commit_requested_retain_tick;
   gboolean               bids_commit_requested;
   SplitCtrlerEvent       event;
   SendingRateDistributor*rate_distor;

@@ -65,6 +65,7 @@ streamtracker_get_stats (StreamTracker * this,
                          guint64 *min,
                          guint64 *max,
                          guint64 *sum);
+void streamtracker_obsolate (StreamTracker * this);
 void streamtracker_reset(StreamTracker *this);
 void streamtracker_add(StreamTracker *this, guint64 value);
 

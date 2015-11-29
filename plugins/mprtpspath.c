@@ -259,8 +259,9 @@ mprtps_path_set_pacing (MPRTPSPath * this, guint32 bytes_per_s)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->max_bytes_per_s = bytes_per_s;
-//  g_print ("T%d it changed\n", this->id);
+  this->pacing = bytes_per_s ? TRUE : FALSE;
+//  this->max_bytes_per_s = bytes_per_s;
+  g_print ("T%d pacing changed to %d\n", this->id, this->pacing);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -476,6 +477,18 @@ mprtps_path_tick(MPRTPSPath *this)
 {
 
   THIS_WRITELOCK (this);
+  this->outgoing_sum += this->outgoing_bytes[this->outgoing_bytes_index];
+  this->max_bytes_per_s = this->max_bytes_per_s * .93 +  this->incoming_sum * .07;
+
+//  g_print("S%d IS: %d, OS: %d Max: %u\n",
+//          this->id, this->incoming_sum, this->outgoing_sum, this->max_bytes_per_s);
+  if(++this->outgoing_bytes_index == 100) this->outgoing_bytes_index = 0;
+  if(++this->incoming_bytes_index == 100) this->incoming_bytes_index = 0;
+  this->outgoing_sum -= this->outgoing_bytes[this->outgoing_bytes_index];
+  this->incoming_sum -= this->incoming_bytes[this->incoming_bytes_index];
+  this->incoming_bytes[this->incoming_bytes_index] = 0;
+  this->outgoing_bytes[this->outgoing_bytes_index] = 0;
+
   if(packetssndqueue_has_buffer(this->packetsqueue)){
     _try_flushing(this);
   }
@@ -531,7 +544,8 @@ _refresh_stat(MPRTPSPath * this,
   gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
   ++this->total_sent_packet_num;
   payload_bytes = gst_rtp_buffer_get_payload_len (&rtp);
-  streamtracker_add(this->sent_bytes, payload_bytes);
+  this->outgoing_bytes[this->outgoing_bytes_index] += payload_bytes;
+  //streamtracker_add(this->sent_bytes, payload_bytes);
 
   this->last_sent_payload_bytes = payload_bytes;
   this->last_packet_sent_time = gst_clock_get_time (this->sysclock);
@@ -550,6 +564,11 @@ void
 _send_mprtp_packet(MPRTPSPath * this,
                       GstBuffer *buffer)
 {
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
+  this->incoming_bytes[this->incoming_bytes_index] += gst_rtp_buffer_get_payload_len (&rtp);
+  this->incoming_sum += gst_rtp_buffer_get_payload_len (&rtp);
+  gst_rtp_buffer_unmap(&rtp);
   if (_is_overused(this)) {
     GST_WARNING_OBJECT (this, "Path is overused");
     packetssndqueue_push(this->packetsqueue, buffer);
@@ -569,6 +588,7 @@ done:
 
 gboolean _try_flushing(MPRTPSPath * this)
 {
+//  streamtracker_obsolate(this->sent_bytes);
   while(packetssndqueue_has_buffer(this->packetsqueue)){
     GstBuffer *buffer;
     if(_is_overused(this)) goto failed;
@@ -581,44 +601,20 @@ failed:
   return FALSE;
 }
 
-//
-//gboolean _is_overused(MPRTPSPath * this)
-//{
-//  gboolean result;
-//  GstClockTime now, delta;
-//  if (this->max_bytes_per_ms == 0) {
-//    result = FALSE;
-//    goto done;
-//  }
-//
-//  now = gst_clock_get_time (this->sysclock);
-//  delta = now - this->last_packet_sent_time;
-//  if (GST_SECOND < delta) {
-//    result = FALSE;
-//    goto done;
-//  }
-//  delta = GST_TIME_AS_MSECONDS (delta);
-//  if (delta < 1) {
-//    delta = 1;
-//  }
-//  result =
-//      (gfloat) this->last_sent_payload_bytes / (gfloat) delta >
-//      (gfloat) this->max_bytes_per_ms;
-//
-//done:
-//  return result;
-//}
-//
-
-
 gboolean _is_overused(MPRTPSPath * this)
 {
-  guint64 sum;
-  if (this->max_bytes_per_s == 0) {
+//  guint64 sum;
+  if(!this->pacing || !this->max_bytes_per_s){
     return FALSE;
   }
-  streamtracker_get_stats(this->sent_bytes, NULL, NULL, &sum);
-  return this->max_bytes_per_s < sum;
+//  streamtracker_get_stats(this->sent_bytes, NULL, NULL, &sum);
+//  g_print("S%d max_bytes_per_s: %u - outgoing_sum: %d\n",
+//          this->id, this->max_bytes_per_s, this->outgoing_sum);
+  if(this->max_bytes_per_s < this->outgoing_sum){
+//      g_print("Overused\n");
+    return TRUE;
+  }
+  return FALSE;
 }
 
 GstBuffer* _create_monitor_packet(MPRTPSPath * this)

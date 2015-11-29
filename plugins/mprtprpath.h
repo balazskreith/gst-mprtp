@@ -70,6 +70,11 @@ struct _MpRTPReceiverPath
   PacketsRcvQueue*    packetsqueue;
   guint32             last_rtp_timestamp;
 
+  GstClockTime        last_skew_a;
+  GstClockTime        last_skew_b;
+  GstClockTime        last_skew_c;
+  GstClockTime        last_skew_d;
+
   GstClockTime        last_delay_a;
   GstClockTime        last_delay_b;
   GstClockTime        last_delay_c;
@@ -124,7 +129,7 @@ guint64 mprtpr_path_get_drift_window(MpRTPRPath *this, GstClockTime *min_delay,
                                      GstClockTime *max_delay);
 
 GstClockTime mprtpr_path_get_avg_4last_delay(MpRTPRPath *this);
-
+GstClockTime mprtpr_path_get_avg_4last_skew(MpRTPRPath *this);
 void
 mprtpr_path_get_ltdelays (MpRTPRPath   *this,
                        GstClockTime *percentile_40,

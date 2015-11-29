@@ -247,10 +247,6 @@ _get_subflow_goodput (
     guint32* receiver_rate);
 
 static gdouble
-_get_subflow_corrPiT(
-    Subflow *subflow);
-
-static gdouble
 _get_subflow_corrh_owd(
     Subflow *subflow);
 
@@ -696,11 +692,10 @@ _irp_producer_main(SndEventBasedController * this)
   GstClockTime   now;
   Event          event;
   gfloat         goodput;
-  gdouble        variance;
+//  gdouble        variance;
   gdouble        corrh_owd;
   gdouble        corrl_owd;
   guint32        receiver_rate;
-  gdouble        corrPiT;
 
   now = gst_clock_get_time(this->sysclock);
 
@@ -713,10 +708,9 @@ _irp_producer_main(SndEventBasedController * this)
     goodput = _get_subflow_goodput(subflow, &receiver_rate);
     corrh_owd = _get_subflow_corrh_owd(subflow);
     corrl_owd = _get_subflow_corrl_owd(subflow);
-    corrPiT = _get_subflow_corrPiT(subflow);
     if(0) g_print("%p", _irt(subflow, 0));
-    if(goodput < 1. || !receiver_rate) continue;
-    variance = (gdouble)_irt0(subflow)->jitter / (gdouble)_irt0(subflow)->delay_80;
+    //if(goodput < 1. || !receiver_rate) continue;
+//    variance = (gdouble)_irt0(subflow)->jitter / (gdouble)_irt0(subflow)->delay_80;
 //    g_print("S%d jitter: %u, delay: %lu vaiance: %f\n",
 //            subflow->id,
 //            _irt0(subflow)->jitter,
@@ -727,10 +721,10 @@ _irp_producer_main(SndEventBasedController * this)
                                       subflow->rate_calcer_id,
                                       goodput,
                                       receiver_rate,
-                                      variance,
+                                      _irt0(subflow)->jitter,
                                       corrh_owd,
                                       corrl_owd,
-                                      corrPiT,
+                                      _irt0(subflow)->PiT,
                                       _irt0(subflow)->lost_rate > 0.,
                                       _irt0(subflow)->late_discarded_bytes > 0,
                                       subflow->lost_history,
@@ -1056,12 +1050,12 @@ _get_subflow_goodput (Subflow * this, guint32* receiver_rate)
   }
 }
 
-gdouble _get_subflow_corrPiT(Subflow *subflow)
-{
-//  g_print("S%d: PiT_t0: %hu, PiT_t1: %hu, PiT_t2: %hu\n",
-//          subflow->id, _irt0(subflow)->PiT, _irt1(subflow)->PiT, _irt2(subflow)->PiT);
-  return (gdouble)_irt0(subflow)->PiT_last3_sum / ((gdouble)_irt0(subflow)->PiT * 3.);
-}
+//gdouble _get_subflow_corrPiT(Subflow *subflow)
+//{
+////  g_print("S%d: PiT_t0: %hu, PiT_t1: %hu, PiT_t2: %hu\n",
+////          subflow->id, _irt0(subflow)->PiT, _irt1(subflow)->PiT, _irt2(subflow)->PiT);
+//  return (gdouble)_irt0(subflow)->PiT_last3_sum / ((gdouble)_irt0(subflow)->PiT * 3.);
+//}
 
 gdouble _get_subflow_corrh_owd(Subflow *subflow)
 {
@@ -1413,14 +1407,19 @@ _split_controller_main(SndEventBasedController * this)
   if(_subflows_are_ready(this) ||
      this->last_recalc_time < now - 15 * GST_SECOND)
   {
-    this->bids_recalc_requested = TRUE;
+      this->bids_recalc_requested = TRUE;
+  }
+  if(this->bids_commit_requested_retain_tick > 0){
+    if(--this->bids_commit_requested_retain_tick == 0)
+      this->bids_commit_requested = TRUE;
   }
   if (!this->bids_recalc_requested) goto recalc_done;
   this->bids_recalc_requested = FALSE;
-  this->bids_commit_requested = TRUE;
+  this->bids_commit_requested_retain_tick = 2;
   _recalc_bids(this);
 recalc_done:
   if (!this->bids_commit_requested) goto process_done;
+  this->bids_commit_requested_retain_tick = 0;
   this->bids_commit_requested = FALSE;
   stream_splitter_commit_changes (this->splitter);
 

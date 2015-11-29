@@ -51,6 +51,8 @@ static void streamtracker_finalize (GObject * object);
 static void
 _add_value(StreamTracker *this, guint64 value);
 static void
+_obsolate (StreamTracker * this);
+static void
 _balancing_trees (StreamTracker * this);
 static gint
 _cmp_for_max (guint64 x, guint64 y);
@@ -236,9 +238,22 @@ THIS_READUNLOCK (this);
   return result;
 }
 
+
+
+void
+streamtracker_obsolate (StreamTracker * this)
+{
+  THIS_READLOCK (this);
+  _obsolate(this);
+  THIS_READUNLOCK (this);
+}
+
+
+
+
 void _add_value(StreamTracker *this, guint64 value)
 {
-  GstClockTime treshold,now;
+  GstClockTime now;
   now = gst_clock_get_time(this->sysclock);
   //add new one
   this->sum += value;
@@ -254,16 +269,20 @@ void _add_value(StreamTracker *this, guint64 value)
       this->write_index=0;
   }
 
+  _obsolate(this);
+}
+
+void
+_obsolate (StreamTracker * this)
+{
+  GstClockTime treshold,now;
+  now = gst_clock_get_time(this->sysclock);
   treshold = now - this->treshold;
 again:
-  if((this->items[this->read_index].value == 0 ||
-      treshold < this->items[this->read_index].added) &&
-      this->write_index != this->read_index)
-    {
-      goto done;
-    }
-  //elliminate the old ones
-
+  if(this->write_index == this->read_index) goto elliminate;
+  else if(this->items[this->read_index].added < treshold) goto elliminate;
+  else goto done;
+elliminate:
   if(this->items[this->read_index].value <= bintree_get_top_value(this->maxtree))
     bintree_delete_value(this->maxtree, this->items[this->read_index].value);
   else
@@ -277,7 +296,6 @@ again:
   goto again;
 done:
   return;
-
 }
 
 void

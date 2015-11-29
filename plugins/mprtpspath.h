@@ -87,7 +87,6 @@ struct _MPRTPSPath
   guint                   abs_time_ext_header_id;
   guint                   mprtp_ext_header_id;
 
-
   GstClockTime            sent_passive;
   GstClockTime            sent_active;
   GstClockTime            sent_non_congested;
@@ -101,6 +100,14 @@ struct _MPRTPSPath
   guint16                 sent_octets_write;
   guint32                 max_bytes_per_ms;
   guint32                 max_bytes_per_s;
+  gboolean                pacing;
+  gint32                  outgoing_sum;
+  guint8                  outgoing_bytes_index;
+  guint32                 outgoing_bytes[100];
+  gint32                  incoming_sum;
+  guint8                  incoming_bytes_index;
+  guint32                 incoming_bytes[100];
+  guint64                 ticknum;
   GstClockTime            last_packet_sent_time;
   guint32                 last_sent_payload_bytes;
 

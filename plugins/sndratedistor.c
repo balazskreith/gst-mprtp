@@ -35,7 +35,7 @@
 GST_DEBUG_CATEGORY_STATIC (sndrate_distor_debug_category);
 #define GST_CAT_DEFAULT sndrate_distor_debug_category
 #define MEASUREMENT_LENGTH 3
-#define INCREASEMENT_LENGTH 6
+#define INCREASEMENT_LENGTH 16
 G_DEFINE_TYPE (SendingRateDistributor, sndrate_distor, G_TYPE_OBJECT);
 
 
@@ -216,7 +216,7 @@ _action_bounce_back(
     SendingRateDistributor *this,
     Subflow *subflow);
 
-static void
+static gboolean
 _action_explore(
     SendingRateDistributor *this,
     Subflow *subflow);
@@ -628,8 +628,8 @@ _check_stable(
   }
 
   g_print("READY FOR MONITORING (%u)\n", subflow->consecutive_stable);
-  _action_explore(this, subflow);
-  _transit_to(this, subflow, STATE_MONITORED);
+  if(_action_explore(this, subflow))
+    _transit_to(this, subflow, STATE_MONITORED);
 
 done:
   {
@@ -690,6 +690,7 @@ _check_monitored(
 
   if(_mt0(subflow)->corrl_owd > MT_){
     _transit_to(this, subflow, STATE_STABLE);
+    _disable_monitoring(subflow, 1);
     _disable_extra(subflow);
     goto done;
   }
@@ -838,19 +839,7 @@ gint32 _action_mitigate(
     subflow->jump_to = subflow->stable_goodput;
   else
     subflow->jump_to = subflow->sending_rate * .9;
-//
-//  if(subflow->jump_from > 0){
-//    if(subflow->jump_from < subflow->sending_rate){
-//      fallen_bytes=subflow->sending_rate - subflow->jump_from;
-//      subflow->jump_to = subflow->jump_from;
-//    }else{
-//      subflow->jump_to = subflow->sending_rate;
-//    }
-//    fallen_bytes += subflow->jump_from>>1;
-//  }else{
-//    fallen_bytes = subflow->sending_rate>>1;
-//    subflow->jump_to = subflow->sending_rate * .9;
-//  }
+
   g_print("S%d: Mitigating, SR:%u fallen bytes: %u GP: %u RR %u\n",
           subflow->id, subflow->sending_rate,
           fallen_bytes, _mt0(subflow)->goodput, _mt0(subflow)->receiver_rate );
@@ -893,7 +882,7 @@ gint32 _action_bounce_back(
   return requested_bytes;
 }
 
-void _action_explore(
+gboolean _action_explore(
     SendingRateDistributor *this,
     Subflow *subflow)
 {
@@ -905,24 +894,31 @@ void _action_explore(
     target = subflow->jump_from - subflow->sending_rate;
     target *= .9;
   }else{
-    target = subflow->sending_rate*.0625;
+    target = subflow->sending_rate*.2;
   }
-  target = subflow->sending_rate*.0625;
-  subflow->increase_sequence[0] = target * .5;
-  subflow->increase_sequence[1] = target * .5;
-  subflow->increase_sequence[2] = target * .75;
-  subflow->increase_sequence[3] = target * .75;
-  subflow->increase_sequence[4] = target * .90;
-  subflow->increase_sequence[5] = target * .95;
+  target = subflow->sending_rate*.2;
+  subflow->increase_sequence[0] = subflow->sending_rate * 1./14.;
+  subflow->increase_sequence[1] = subflow->sending_rate * 1./13.;
+  subflow->increase_sequence[2] = subflow->sending_rate * 1./12.;
+  subflow->increase_sequence[3] = subflow->sending_rate * 1./11.;
+  subflow->increase_sequence[4] = subflow->sending_rate * 1./10.;
+  subflow->increase_sequence[5] = subflow->sending_rate * 1./9.;
+  subflow->increase_sequence[6] = subflow->sending_rate * 1./8.;
+  subflow->increase_sequence[7] = subflow->sending_rate * 1./8.;
+  subflow->increase_sequence[8] = subflow->sending_rate * 1./7.;
+  subflow->increase_sequence[9] = subflow->sending_rate * 1./7.;
+  subflow->increase_sequence[10] = subflow->sending_rate * 1./6.;
+  subflow->increase_sequence[11] = subflow->sending_rate * 1./6.;
+  subflow->increase_sequence[12] = subflow->sending_rate * 1./6.;
+  subflow->increase_sequence[13] = subflow->sending_rate * 1./5.;
+  subflow->increase_sequence[14] = subflow->sending_rate * 1./5.;
+  subflow->increase_sequence[15] = subflow->sending_rate * 1./5.;
   subflow->increase_index = 0;
-  g_print("Extra Seq: %u|%u|%u|%u|%u|%u\n",
-          subflow->increase_sequence[0],
-          subflow->increase_sequence[1],
-          subflow->increase_sequence[2],
-          subflow->increase_sequence[3],
-          subflow->increase_sequence[4],
-          subflow->increase_sequence[5]);
+
+  if(subflow->increase_sequence[0] < 1400) return FALSE;
+
   _setup_extra(subflow, subflow->increase_sequence[0]);
+  return TRUE;
 }
 
 gint32 _action_bounce_up(
@@ -930,7 +926,7 @@ gint32 _action_bounce_up(
     Subflow *subflow)
 {
   gint32 requested_bytes = 0;
-  requested_bytes = subflow->increase_sequence[INCREASEMENT_LENGTH-1];
+  requested_bytes = subflow->stable_goodput * 0.125;
   this->requested_bytes+=requested_bytes;
   return requested_bytes;
 }

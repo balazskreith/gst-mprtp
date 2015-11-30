@@ -768,7 +768,6 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 //  g_print("START PROCESSING RTP\n");
   THIS_READLOCK (this);
 
-
   if (!gst_buffer_map (buf, &info, GST_MAP_READ)) {
     GST_WARNING ("Buffer is not readable");
     result = GST_FLOW_ERROR;

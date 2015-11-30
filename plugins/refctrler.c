@@ -577,7 +577,7 @@ _orp_main(RcvEventBasedController * this)
   guint16 report_length = 0;
   guint16 block_length = 0;
   GstBuffer *block;
-  GstClockTime last_delay;
+//  GstClockTime last_delay;
 //  GstClockTime now;
 //  guint16 lost=0,expected=0,received=0;
 
@@ -603,14 +603,14 @@ _orp_main(RcvEventBasedController * this)
 //
 //    if(lost)
 //      ricalcer_urgent_report_request(subflow->ricalcer);
-    last_delay = mprtpr_path_get_avg_4last_delay(subflow->path);
-    if(_ort0(subflow)->delay80 * 1.5 < last_delay){
-      ricalcer_urgent_report_request(ricalcer);
-    }
+//    last_delay = mprtpr_path_get_avg_4last_delay(subflow->path);
+//    if(_ort0(subflow)->delay80 < last_delay){
+//
+//    }
     if (!this->report_is_flowable || !ricalcer_do_report_now(ricalcer)) {
       continue;
     }
-
+//    g_print("S%d report time: %lu\n", subflow->id, GST_TIME_AS_MSECONDS(gst_clock_get_time(this->sysclock)));
     _step_or(subflow);
     block = _get_mprtcp_rr_block (this, subflow, &block_length);
     report_length += block_length;
@@ -637,6 +637,7 @@ _orp_main(RcvEventBasedController * this)
     ricalcer_refresh_parameters(subflow->ricalcer,
                                 _ort0(subflow)->media_rate,
                                 subflow->avg_rtcp_size);
+    ricalcer_urgent_report_request(ricalcer);
     ricalcer_do_next_report_time(ricalcer);
   }
 }

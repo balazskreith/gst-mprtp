@@ -32,7 +32,7 @@ struct _SendingRateDistributor
   guint8               max_id;
   guint32              media_rate;
   GQueue*              free_ids;
-  guint8               counter;
+  guint8               controlled_num;
 
   gint32              stable_sr_sum;
   gint32              taken_bytes;
@@ -40,9 +40,12 @@ struct _SendingRateDistributor
   gint32              requested_bytes;
   gint32              fallen_bytes;
   gint32              overused_bytes;
-  gboolean            monitored;
-  gboolean            overused;
+  guint8              monitored;
+  guint8              wait_before_monitoring;
+  guint8              overused;
 
+  guint8              available_ids[SNDRATEDISTOR_MAX_NUM];
+  guint8              available_ids_length;
 //  guint8               overused_subflows_num;
 //  guint8               load_controlling;
 //  guint8               prev_controlling;

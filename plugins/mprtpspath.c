@@ -396,6 +396,22 @@ void mprtps_path_set_monitor_interval(MPRTPSPath *this, guint interval)
   THIS_WRITEUNLOCK (this);
 }
 
+void mprtps_path_set_extra(MPRTPSPath *this, guint32 extra)
+{
+  g_return_if_fail (this);
+  THIS_WRITELOCK (this);
+  this->extra_packets_per_100tick = 0;
+  this->extra_packets_per_10tick = 0;
+  this->extra_packets_per_tick = 0;
+  if(extra < 14000){
+    this->extra_packets_per_100tick = extra / 1400;
+  }else if(extra < 140000){
+    this->extra_packets_per_10tick = extra / 14000;
+  }else{
+    this->extra_packets_per_tick = extra / 140000;
+  }
+  THIS_WRITEUNLOCK (this);
+}
 
 gboolean
 mprtps_path_is_monitoring (MPRTPSPath * this)
@@ -475,11 +491,28 @@ done:
 void
 mprtps_path_tick(MPRTPSPath *this)
 {
-
+  guint generate = 0, generated = 0;
   THIS_WRITELOCK (this);
+  ++this->ticknum;
+  if(this->extra_packets_per_tick > 0){
+    generate = this->extra_packets_per_tick;
+  }
+  else if(this->extra_packets_per_10tick > 0 && this->ticknum % 10 == 0){
+    generate = this->extra_packets_per_10tick;
+  }
+  else if(this->extra_packets_per_100tick > 0 && this->ticknum % 100 == 0){
+    generate = this->extra_packets_per_100tick;
+  }
+  for(generated = 0; generated < generate; ++generated){
+    GstBuffer *buffer;
+    buffer = _create_monitor_packet(this);
+    _setup_rtp2mprtp(this, buffer);
+    _send_mprtp_packet(this, buffer);
+  }
+
+
   this->outgoing_sum += this->outgoing_bytes[this->outgoing_bytes_index];
   this->max_bytes_per_s = this->max_bytes_per_s * .93 +  this->incoming_sum * .07;
-
 //  g_print("S%d IS: %d, OS: %d Max: %u\n",
 //          this->id, this->incoming_sum, this->outgoing_sum, this->max_bytes_per_s);
   if(++this->outgoing_bytes_index == 100) this->outgoing_bytes_index = 0;

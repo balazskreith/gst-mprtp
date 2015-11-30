@@ -115,6 +115,10 @@ struct _MPRTPSPath
   guint16                 monitor_seq;
   guint8                  monitor_payload_type;
 
+  guint32                 extra_packets_per_100tick;
+  guint32                 extra_packets_per_10tick;
+  guint32                 extra_packets_per_tick;
+
   void                    (*send_mprtp_packet_func)(gpointer, GstBuffer*);
   gpointer                  send_mprtp_func_data;
 
@@ -146,6 +150,7 @@ void mprtps_path_set_congested (MPRTPSPath * this);
 void mprtps_path_set_non_congested (MPRTPSPath * this);
 guint8 mprtps_path_get_id (MPRTPSPath * this);
 void mprtps_path_set_monitor_interval(MPRTPSPath *this, guint interval);
+void mprtps_path_set_extra(MPRTPSPath *this, guint32 extra);
 gboolean mprtps_path_is_monitoring (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_packets_num (MPRTPSPath * this);
 void mprtps_path_tick(MPRTPSPath *this);

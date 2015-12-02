@@ -50,7 +50,6 @@ typedef enum{
   STATE_MONITORED       = 1,
 }State;
 
-typedef void (*Controller)(SendingRateDistributor*,Subflow*);
 typedef State (*Checker)(SendingRateDistributor*,Subflow*);
 
 typedef struct _Utilization{
@@ -704,7 +703,7 @@ _transit_to(
       //mprtps_path_set_congested(subflow->path);
       ++this->overused;
       subflow->controlling = _check_overused;
-      subflow->jump_from = subflow->sending_rate;
+      subflow->jump_from = MIN(subflow->sending_rate, _mt0(subflow)->goodput);
       subflow->ping_pong_round = 0;
     break;
     case STATE_STABLE:
@@ -824,20 +823,20 @@ done:
 
 gboolean _is_monitoring_ping_pong_round_end(Subflow *subflow)
 {
-  if(subflow->ping_pong_round < 1){
-    return subflow->monitoring_interval < 7;
-  }
-  if(subflow->ping_pong_round < 3){
+  if(subflow->ping_pong_round < 2){
     return subflow->monitoring_interval < 5;
+  }
+  if(subflow->ping_pong_round < 4){
+    return subflow->monitoring_interval < 6;
   }
   if(subflow->ping_pong_round < 6){
-    return subflow->monitoring_interval < 5;
+    return subflow->monitoring_interval < 7;
   }
   if(subflow->ping_pong_round < 9){
-    return subflow->monitoring_interval < 5;
+    return subflow->monitoring_interval < 8;
   }
 
-  return subflow->monitoring_interval < 5;
+  return subflow->monitoring_interval < 9;
 }
 
 void _continue_monitoring(
@@ -912,8 +911,8 @@ gint32 _action_bounce_back(
   target = MIN(target, subflow->jump_from);
   if(subflow->sending_rate < target)
     requested_bytes = (target - subflow->sending_rate) * .9;
-  else
-    requested_bytes = subflow->jump_from * .505;
+  else if(subflow->sending_rate < subflow->jump_from)
+    requested_bytes = (subflow->jump_from - subflow->sending_rate) * .5;
 
   g_print("S%d: Bounce back, SR:%u GPt1: %u, requested bytes: %u, RRt0: %u\n",
             subflow->id, subflow->sending_rate,

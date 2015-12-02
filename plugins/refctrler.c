@@ -284,7 +284,7 @@ refctrler_finalize (GObject * object)
   g_hash_table_destroy (this->subflows);
   gst_task_stop (this->thread);
   gst_task_join (this->thread);
-
+  g_object_unref (this->ricalcer);
   g_object_unref (this->sysclock);
 }
 
@@ -301,7 +301,7 @@ refctrler_init (RcvEventBasedController * this)
   this->report_is_flowable = FALSE;
   this->subflow_skew_tree = make_bintree(_cmp_for_maxtree);
   this->subflow_skew_index = 0;
-
+  this->ricalcer = make_ricalcer(FALSE);
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   this->thread = gst_task_new (refctrler_ticker, this, NULL);
@@ -394,8 +394,10 @@ refctrler_add_path (gpointer controller_ptr, guint8 subflow_id,
         "due to duplicated subflow id (%d)", subflow_id);
     goto exit;
   }
+  lookup_result = _make_subflow (subflow_id, path);
   g_hash_table_insert (this->subflows, GINT_TO_POINTER (subflow_id),
-      _make_subflow (subflow_id, path));
+                       lookup_result);
+  lookup_result->ricalcer = this->ricalcer;
 exit:
   THIS_WRITEUNLOCK (this);
 }
@@ -577,39 +579,26 @@ _orp_main(RcvEventBasedController * this)
   guint16 report_length = 0;
   guint16 block_length = 0;
   GstBuffer *block;
+  guint subflows_num = 0;
+  gdouble media_rate = 0., avg_rtcp_size = 0.;
 //  GstClockTime last_delay;
 //  GstClockTime now;
 //  guint16 lost=0,expected=0,received=0;
 
 //  now = gst_clock_get_time(this->sysclock);
+  ricalcer = this->ricalcer;
+  if (!this->report_is_flowable || !ricalcer_do_report_now(ricalcer)) {
+      goto done;
+  }
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
     subflow = (Subflow *) val;
-    ricalcer = subflow->ricalcer;
 
     if(!_irt0(subflow)->SR_sent_ntp_time){
       continue;
     }
-//    mprtpr_path_get_obsolate_stat(subflow->path,
-//                                    now - GST_SECOND,
-//                                    &lost,
-//                                    &received,
-//                                    &expected);
-//    _ort0(subflow)->lost_packet_num += lost;
-//    _ort0(subflow)->received += received;
-//    _ort0(subflow)->expected += expected;
-//    _ort0(subflow)->lost += lost;
-//
-//    if(lost)
-//      ricalcer_urgent_report_request(subflow->ricalcer);
-//    last_delay = mprtpr_path_get_avg_4last_delay(subflow->path);
-//    if(_ort0(subflow)->delay80 < last_delay){
-//
-//    }
-    if (!this->report_is_flowable || !ricalcer_do_report_now(ricalcer)) {
-      continue;
-    }
+
 //    g_print("S%d report time: %lu\n", subflow->id, GST_TIME_AS_MSECONDS(gst_clock_get_time(this->sysclock)));
     _step_or(subflow);
     block = _get_mprtcp_rr_block (this, subflow, &block_length);
@@ -634,12 +623,19 @@ _orp_main(RcvEventBasedController * this)
 
     subflow->avg_rtcp_size += (report_length - subflow->avg_rtcp_size) / 4.;
     this->send_mprtcp_packet_func (this->send_mprtcp_packet_data, block);
-    ricalcer_refresh_parameters(subflow->ricalcer,
-                                _ort0(subflow)->media_rate,
-                                subflow->avg_rtcp_size);
-    ricalcer_urgent_report_request(ricalcer);
-    ricalcer_do_next_report_time(ricalcer);
+    media_rate += _ort0(subflow)->media_rate;
+    avg_rtcp_size += subflow->avg_rtcp_size;
+    ++subflows_num;
   }
+  avg_rtcp_size /= (gdouble)subflows_num;
+  ricalcer_refresh_parameters(ricalcer,
+                              media_rate,
+                              avg_rtcp_size);
+  ricalcer_urgent_report_request(ricalcer);
+  ricalcer_do_next_report_time(ricalcer);
+
+done:
+  return;
 }
 
 void
@@ -904,9 +900,6 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
   }
   _ort0(this)->media_rate = received_bytes / interval;
 
-  if(fraction_lost){
-    ricalcer_urgent_report_request(this->ricalcer);
-  }
 //  gst_print_rtcp_rrb(&rr->blocks);
 //  reset
 //
@@ -1016,7 +1009,6 @@ _make_subflow (guint8 id, MpRTPRPath * path)
   result->path = path;
   result->id = id;
   result->joined_time = gst_clock_get_time (result->sysclock);
-  result->ricalcer = make_ricalcer(FALSE);
   _reset_subflow (result);
   return result;
 }

@@ -14,6 +14,7 @@
 #include "streamsplitter.h"
 #include "smanctrler.h"
 #include "streamjoiner.h"
+#include "ricalcer.h"
 
 typedef struct _RcvEventBasedController RcvEventBasedController;
 typedef struct _RcvEventBasedControllerClass RcvEventBasedControllerClass;
@@ -40,6 +41,7 @@ struct _RcvEventBasedController
   void            (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
   gpointer          send_mprtcp_packet_data;
   gboolean          report_is_flowable;
+  ReportIntervalCalculator *ricalcer;
 
   BinTree*          subflow_skew_tree;
 //  BinTree*          subflow_delays_tree;

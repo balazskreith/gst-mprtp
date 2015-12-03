@@ -40,7 +40,6 @@ struct _PlayoutGateClass{
   GObjectClass parent_class;
 
 };
-void playoutgate_test(void);
 GType playoutgate_get_type (void);
 PlayoutGate *make_playoutgate(void);
 gboolean playoutgate_is_diversified(PlayoutGate *this);

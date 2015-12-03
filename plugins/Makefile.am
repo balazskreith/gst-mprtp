@@ -3,6 +3,7 @@ plugin_LTLIBRARIES = libgstmprtp.la
 # sources used to compile this plug-in
 libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          gstmprtcpbuffer.c          \
+                         gstmprtpbuffer.c           \
                          gstmprtpscheduler.c        \
                          gstmprtpplayouter.c        \
                          gstmprtpreceiver.c         \

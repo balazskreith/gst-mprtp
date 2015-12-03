@@ -141,9 +141,7 @@ playoutgate_finalize (GObject * object)
   while(!g_queue_is_empty(this->framenodes_pool)){
     g_free(g_queue_pop_head(this->framenodes_pool));
   }
-
   g_object_unref(this->sysclock);
-
 }
 
 void
@@ -154,11 +152,6 @@ playoutgate_init (PlayoutGate * this)
   this->framenodes_pool = g_queue_new();
   this->sysclock = gst_system_clock_obtain();
   this->PHSN = 0;
-}
-
-void playoutgate_test(void)
-{
-
 }
 
 gboolean playoutgate_is_diversified(PlayoutGate *this)
@@ -467,6 +460,7 @@ _cmp_seq (guint16 x, guint16 y)
   return ((gint16) (x - y)) < 0 ? -1 : 1;
 
 }
+
 
 #undef THIS_WRITELOCK
 #undef THIS_WRITEUNLOCK

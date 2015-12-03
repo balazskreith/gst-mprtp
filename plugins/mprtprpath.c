@@ -25,7 +25,6 @@ G_DEFINE_TYPE (MpRTPRPath, mprtpr_path, G_TYPE_OBJECT);
 
 static void mprtpr_path_finalize (GObject * object);
 static void mprtpr_path_reset (MpRTPRPath * this);
-//static GstClockTime _get_last_delay_abc_median (MpRTPRPath * this);
 static gint _cmp_seq (guint16 x, guint16 y);
 static gint _cmp_for_max (guint64 x, guint64 y);
 static gint _cmp_for_min (guint64 x, guint64 y);
@@ -75,7 +74,6 @@ mprtpr_path_init (MpRTPRPath * this)
 
 void mprtpr_path_destroy(gpointer ptr)
 {
-
   G_OBJECT_CLASS(mprtpr_path_parent_class)->finalize(G_OBJECT(ptr));
 }
 
@@ -398,18 +396,6 @@ done:
   return;
 
 }
-//
-//GstClockTime _get_last_delay_abc_median (MpRTPRPath * this)
-//{
-//  if(this->last_delay_a < this->last_delay_b){
-//    if(this->last_delay_b < this->last_delay_c) return this->last_delay_b;
-//    if(this->last_delay_a < this->last_delay_c) return this->last_delay_c;
-//    return this->last_delay_a;
-//  }
-//  if(this->last_delay_a < this->last_delay_c) return this->last_delay_a;
-//  if(this->last_delay_b < this->last_delay_c) return this->last_delay_c;
-//  return this->last_delay_b;
-//}
 
 gint
 _cmp_seq (guint16 x, guint16 y)

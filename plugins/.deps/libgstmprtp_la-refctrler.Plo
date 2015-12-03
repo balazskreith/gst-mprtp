@@ -194,10 +194,10 @@ libgstmprtp_la-refctrler.lo: refctrler.c /usr/include/stdc-predef.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h refctrler.h \
  mprtprpath.h /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
- gstmprtcpbuffer.h mprtpspath.h packetssndqueue.h bintree.h \
- streamtracker.h packetsrcvqueue.h streamjoiner.h playoutgate.h \
- streamsplitter.h smanctrler.h ricalcer.h /usr/include/math.h \
- /usr/include/x86_64-linux-gnu/bits/huge_val.h \
+ gstmprtcpbuffer.h gstmprtpbuffer.h bintree.h packetsrcvqueue.h \
+ streamjoiner.h playoutgate.h streamtracker.h streamsplitter.h \
+ mprtpspath.h packetssndqueue.h smanctrler.h ricalcer.h \
+ /usr/include/math.h /usr/include/x86_64-linux-gnu/bits/huge_val.h \
  /usr/include/x86_64-linux-gnu/bits/huge_valf.h \
  /usr/include/x86_64-linux-gnu/bits/huge_vall.h \
  /usr/include/x86_64-linux-gnu/bits/inf.h \
@@ -662,13 +662,9 @@ mprtprpath.h:
 
 gstmprtcpbuffer.h:
 
-mprtpspath.h:
-
-packetssndqueue.h:
+gstmprtpbuffer.h:
 
 bintree.h:
-
-streamtracker.h:
 
 packetsrcvqueue.h:
 
@@ -676,7 +672,13 @@ streamjoiner.h:
 
 playoutgate.h:
 
+streamtracker.h:
+
 streamsplitter.h:
+
+mprtpspath.h:
+
+packetssndqueue.h:
 
 smanctrler.h:
 

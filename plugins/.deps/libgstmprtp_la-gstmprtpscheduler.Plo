@@ -204,9 +204,9 @@ libgstmprtp_la-gstmprtpscheduler.lo: gstmprtpscheduler.c \
  /usr/local/include/gstreamer-1.0/gst/gstparse.h \
  /usr/local/include/gstreamer-1.0/gst/gstcompat.h gstmprtpscheduler.h \
  gstmprtcpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h mprtpspath.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
+ gstmprtpbuffer.h /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtpspath.h \
  packetssndqueue.h bintree.h streamtracker.h streamsplitter.h \
  smanctrler.h sefctrler.h sndratedistor.h \
  /usr/include/x86_64-linux-gnu/sys/timex.h \
@@ -691,11 +691,13 @@ gstmprtcpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h:
 
-mprtpspath.h:
+gstmprtpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
+
+mprtpspath.h:
 
 packetssndqueue.h:
 

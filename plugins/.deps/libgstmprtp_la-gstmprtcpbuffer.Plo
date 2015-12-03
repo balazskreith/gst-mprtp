@@ -199,10 +199,9 @@ libgstmprtp_la-gstmprtcpbuffer.lo: gstmprtcpbuffer.c \
  /usr/local/include/gstreamer-1.0/gst/gstparse.h \
  /usr/local/include/gstreamer-1.0/gst/gstcompat.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
- gstmprtcpbuffer.h mprtpspath.h \
+ gstmprtcpbuffer.h gstmprtpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
- packetssndqueue.h bintree.h streamtracker.h \
  /usr/include/x86_64-linux-gnu/sys/time.h \
  /usr/lib/gcc/x86_64-linux-gnu/4.8/include/stdint.h /usr/include/stdint.h \
  /usr/include/x86_64-linux-gnu/bits/wchar.h
@@ -667,17 +666,11 @@ libgstmprtp_la-gstmprtcpbuffer.lo: gstmprtcpbuffer.c \
 
 gstmprtcpbuffer.h:
 
-mprtpspath.h:
+gstmprtpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
-
-packetssndqueue.h:
-
-bintree.h:
-
-streamtracker.h:
 
 /usr/include/x86_64-linux-gnu/sys/time.h:
 

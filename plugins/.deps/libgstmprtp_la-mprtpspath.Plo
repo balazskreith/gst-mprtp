@@ -193,7 +193,8 @@ libgstmprtp_la-mprtpspath.lo: mprtpspath.c /usr/include/stdc-predef.h \
  /usr/local/include/gstreamer-1.0/gst/gstcompat.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h mprtpspath.h \
- gstmprtcpbuffer.h packetssndqueue.h bintree.h streamtracker.h
+ gstmprtcpbuffer.h gstmprtpbuffer.h packetssndqueue.h bintree.h \
+ streamtracker.h
 
 /usr/include/stdc-predef.h:
 
@@ -638,6 +639,8 @@ libgstmprtp_la-mprtpspath.lo: mprtpspath.c /usr/include/stdc-predef.h \
 mprtpspath.h:
 
 gstmprtcpbuffer.h:
+
+gstmprtpbuffer.h:
 
 packetssndqueue.h:
 

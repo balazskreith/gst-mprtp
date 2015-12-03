@@ -155,26 +155,8 @@ struct _Subflow
   guint8                     rate_calcer_id;
   guint8                     lost_history;
   guint8                     late_discarded_history;
-//  GstClockTime               RTT;
-//  guint                      consecutive_late_RTT;
   gdouble                    avg_rtcp_size;
-//  gdouble                    control_signal;
-//  guint32                    consecutive_keep;
-//  guint32                    (*get_goodput)(Subflow*);
-//  guint                      tr;
-//  GstClockTime               restored;
-//  GstClockTime               marked;
   gdouble                    actual_rate;
-
-//  gdouble                    actual_goodput;
-//  BinTree*                   goodputs;
-//  guint64                    goodputs_values[16];
-//  GstClockTime               goodputs_arrived[16];
-//  guint8                     goodputs_read;
-//  guint8                     goodputs_write;
-
-//  guint8                     required_wait;
-//  gboolean                   increasable;
 };
 
 //----------------------------------------------------------------------

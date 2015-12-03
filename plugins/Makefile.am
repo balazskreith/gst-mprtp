@@ -21,6 +21,7 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          playoutgate.c              \
                          ricalcer.c                 \
                          streamtracker.c            \
+                         streamtracker2.c           \
                          sndratedistor.c
                     
                     
@@ -38,6 +39,7 @@ noinst_HEADERS = mprtpspath.h      \
                  playoutgate.h     \
                  ricalcer.h        \
                  streamtracker.h   \
+                 streamtracker2.h  \
                  sndratedistor.h
 
 # compiler and linker flags used to compile this plugin, set in configure.ac

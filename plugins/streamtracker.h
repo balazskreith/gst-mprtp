@@ -34,8 +34,8 @@ struct _StreamTracker
   guint32                  length;
   GstClock*                sysclock;
   GstClockTime             treshold;
-  guint32                  write_index;
-  guint32                  read_index;
+  gint32                   write_index;
+  gint32                   read_index;
   gdouble                  max_multiplier;
 };
 
@@ -59,7 +59,6 @@ void streamtracker_test(void);
 void streamtracker_set_treshold(StreamTracker *this, GstClockTime treshold);
 guint32 streamtracker_get_num(StreamTracker *this);
 guint64 streamtracker_get_last(StreamTracker *this);
-guint64 streamtracker_get_last_minus_n(StreamTracker *this, guint n);
 guint64
 streamtracker_get_stats (StreamTracker * this,
                          guint64 *min,

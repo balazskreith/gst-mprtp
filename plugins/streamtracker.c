@@ -185,22 +185,6 @@ guint64 streamtracker_get_last(StreamTracker *this)
   return result;
 }
 
-guint64 streamtracker_get_last_minus_n(StreamTracker *this, guint n)
-{
-  guint64 result = 0;
-  gint64 index;
-  guint32 counter;
-  THIS_READLOCK(this);
-  counter = bintree_get_num(this->maxtree) + bintree_get_num(this->mintree);
-  if(counter < n) goto done;
-  index = this->write_index - ( n % this->length);
-  if (index < 0) index = this->length + index;
-  result = this->items[index].value;
-  THIS_READUNLOCK(this);
-done:
-  return result;
-}
-
 
 guint64
 streamtracker_get_stats (StreamTracker * this,

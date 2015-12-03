@@ -192,7 +192,7 @@ stream_joiner_run (void *data)
     goto done;
   }
 
-  _tick(this);
+  if(0)_tick(this);
   _playout(this);
 
   next_scheduler_time = now + this->tick_interval;
@@ -268,11 +268,19 @@ done:
 
 void stream_joiner_receive_rtp(StreamJoiner * this, GstRTPBuffer *rtp, guint8 subflow_id)
 {
-  HeapItem* heap_item;
-  THIS_WRITELOCK(this);
-  heap_item = _make_heap_item (this, rtp, subflow_id);
-  _heap_push (this->packets_heap, heap_item);
-  THIS_WRITEUNLOCK(this);
+  //HeapItem* heap_item;
+//  THIS_WRITELOCK(this);
+  //heap_item = _make_heap_item (this, rtp, subflow_id);
+//  _heap_push (this->packets_heap, heap_item);
+//  {
+//    GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+//    gst_rtp_buffer_map(heap_item->buffer, GST_MAP_READ, &rtp);
+  if(0)_heap_push (0, 0);
+  if(0)_make_heap_item(0,0,0);
+    playoutgate_push(this->playoutgate, rtp, subflow_id);
+//    gst_rtp_buffer_unmap(&rtp);
+//  }
+//  THIS_WRITEUNLOCK(this);
 //  g_print("RECEIVED AND PLACED\n");
 }
 

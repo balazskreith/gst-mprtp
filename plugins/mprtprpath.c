@@ -68,7 +68,7 @@ mprtpr_path_init (MpRTPRPath * this)
   streamtracker_set_treshold(this->lt_low_delays, 30 * GST_SECOND);
   this->lt_high_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 1024, 80);
   streamtracker_set_treshold(this->lt_high_delays, 30 * GST_SECOND);
-  this->skews = make_streamtracker(_cmp_for_min, _cmp_for_max, 256, 50);
+  this->skews = make_streamtracker(_cmp_for_min, _cmp_for_max, 100, 50);
   streamtracker_set_treshold(this->skews, 2 * GST_SECOND);
   mprtpr_path_reset (this);
 }

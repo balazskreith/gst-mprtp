@@ -491,24 +491,24 @@ done:
 void
 mprtps_path_tick(MPRTPSPath *this)
 {
-  guint generate = 0, generated = 0;
+//  guint generate = 0, generated = 0;
   THIS_WRITELOCK (this);
   ++this->ticknum;
-  if(this->extra_packets_per_tick > 0){
-    generate = this->extra_packets_per_tick;
-  }
-  else if(this->extra_packets_per_10tick > 0 && this->ticknum % 10 == 0){
-    generate = this->extra_packets_per_10tick;
-  }
-  else if(this->extra_packets_per_100tick > 0 && this->ticknum % 100 == 0){
-    generate = this->extra_packets_per_100tick;
-  }
-  for(generated = 0; generated < generate; ++generated){
-    GstBuffer *buffer;
-    buffer = _create_monitor_packet(this);
-    _setup_rtp2mprtp(this, buffer);
-    _send_mprtp_packet(this, buffer);
-  }
+//  if(this->extra_packets_per_tick > 0){
+//    generate = this->extra_packets_per_tick;
+//  }
+//  else if(this->extra_packets_per_10tick > 0 && this->ticknum % 10 == 0){
+//    generate = this->extra_packets_per_10tick;
+//  }
+//  else if(this->extra_packets_per_100tick > 0 && this->ticknum % 100 == 0){
+//    generate = this->extra_packets_per_100tick;
+//  }
+//  for(generated = 0; generated < generate; ++generated){
+//    GstBuffer *buffer;
+//    buffer = _create_monitor_packet(this);
+//    _setup_rtp2mprtp(this, buffer);
+//    _send_mprtp_packet(this, buffer);
+//  }
 
   if(packetssndqueue_has_buffer(this->packetsqueue)){
     _try_flushing(this);
@@ -572,7 +572,10 @@ _refresh_stat(MPRTPSPath * this,
       ++this->total_sent_frames_num;
       this->last_sent_frame_timestamp = gst_rtp_buffer_get_timestamp(&rtp);
   }
-  this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
+  if(gst_rtp_buffer_get_payload_type(&rtp) != this->monitor_payload_type)
+    this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
+  else
+    this->sent_octets[this->sent_octets_write] = 0;
   this->sent_octets_write += 1;
   this->sent_octets_write &= MAX_INT32_POSPART;
   gst_rtp_buffer_unmap(&rtp);

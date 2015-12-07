@@ -11,7 +11,7 @@
 #include <gst/gst.h>
 
 #include "mprtpspath.h"
-#include "streamtracker.h"
+#include "percentiletracker.h"
 
 typedef struct _StreamSplitter StreamSplitter;
 typedef struct _StreamSplitterClass StreamSplitterClass;
@@ -62,7 +62,7 @@ struct _StreamSplitter
   gboolean             separation_is_possible;
   gboolean             last_delta_flag;
   gboolean             first_delta_flag;
-  StreamTracker*       sent_bytes;
+  PercentileTracker*   sent_bytes;
   guint8               monitor_payload_type;
 
 };

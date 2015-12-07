@@ -47,8 +47,6 @@ static void _send_mprtp_packet(MPRTPSPath * this,
 static gboolean _try_flushing(MPRTPSPath * this);
 static gboolean _is_overused(MPRTPSPath * this);
 static GstBuffer* _create_monitor_packet(MPRTPSPath * this);
-static gint _cmp_for_max (guint64 x, guint64 y);
-static gint _cmp_for_min (guint64 x, guint64 y);
 
 
 void
@@ -106,7 +104,7 @@ mprtps_path_reset (MPRTPSPath * this)
   this->monitoring_interval = 0;
 
   packetssndqueue_reset(this->packetsqueue);
-  streamtracker_reset(this->sent_bytes);
+  percentiletracker_reset(this->sent_bytes);
 }
 
 
@@ -116,7 +114,7 @@ mprtps_path_init (MPRTPSPath * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetssndqueue();
-  this->sent_bytes = make_streamtracker(_cmp_for_min, _cmp_for_max, 1024, 50);
+  this->sent_bytes = make_percentiletracker(1024, 50);
   mprtps_path_reset (this);
 }
 
@@ -524,6 +522,7 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
   THIS_WRITELOCK (this);
   _setup_rtp2mprtp (this, buffer);
   _send_mprtp_packet(this, buffer);
+  goto done;
   if(!this->monitoring_interval) goto done;
   if(this->total_sent_packet_num % this->monitoring_interval != 0) goto done;
   {
@@ -604,7 +603,7 @@ done:
 
 gboolean _try_flushing(MPRTPSPath * this)
 {
-//  streamtracker_obsolate(this->sent_bytes);
+//  percentiletracker_obsolate(this->sent_bytes);
   while(packetssndqueue_has_buffer(this->packetsqueue)){
     GstBuffer *buffer;
     if(_is_overused(this)) goto failed;
@@ -623,7 +622,7 @@ gboolean _is_overused(MPRTPSPath * this)
   if(!this->pacing || !this->max_bytes_per_s){
     return FALSE;
   }
-//  streamtracker_get_stats(this->sent_bytes, NULL, NULL, &sum);
+//  percentiletracker_get_stats(this->sent_bytes, NULL, NULL, &sum);
 //  g_print("S%d max_bytes_per_s: %u - outgoing_sum: %d\n",
 //          this->id, this->max_bytes_per_s, this->outgoing_sum);
 //  if(this->max_bytes_per_s < this->outgoing_sum){
@@ -643,19 +642,6 @@ GstBuffer* _create_monitor_packet(MPRTPSPath * this)
   gst_rtp_buffer_set_payload_type(&rtp, this->monitor_payload_type);
   gst_rtp_buffer_unmap(&rtp);
   return result;
-}
-
-
-gint
-_cmp_for_max (guint64 x, guint64 y)
-{
-  return x == y ? 0 : x < y ? -1 : 1;
-}
-
-gint
-_cmp_for_min (guint64 x, guint64 y)
-{
-  return x == y ? 0 : x < y ? 1 : -1;
 }
 
 #undef THIS_READLOCK

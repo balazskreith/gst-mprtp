@@ -44,16 +44,10 @@ struct _RcvEventBasedController
   ReportIntervalCalculator *ricalcer;
 
   BinTree*          subflow_skew_tree;
-//  BinTree*          subflow_delays_tree;
-//  guint8            subflow_delays_index;
   guint8            subflow_skew_index;
-//  guint64           subflow_delays[256];
   guint64           subflow_skews[256];
 
 
-//  //for stat and plot
-//   GstTask*          stat_thread;
-//   GRecMutex         stat_thread_mutex;
 };
 
 struct _RcvEventBasedControllerClass{

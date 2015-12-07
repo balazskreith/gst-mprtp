@@ -10,7 +10,6 @@
 
 #include <gst/gst.h>
 #include "mprtpspath.h"
-#include "streamtracker.h"
 
 typedef struct _SendingRateDistributor SendingRateDistributor;
 typedef struct _SendingRateDistributorClass SendingRateDistributorClass;

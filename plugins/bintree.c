@@ -83,6 +83,12 @@ _print_tree (BinTree * tree, BinTreeNode* node, gint level)
   _print_tree (tree, node->right, level + 1);
 }
 
+static gpointer _node_ctor(void)
+{
+  return g_malloc0(sizeof(BinTreeNode));
+}
+
+
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -106,9 +112,10 @@ bintree_finalize (GObject * object)
 {
   BinTree *this;
   this = BINTREE(object);
-  while(!g_queue_is_empty(this->node_pool)){
-    g_free(g_queue_pop_head(this->node_pool));
-  }
+//  while(!g_queue_is_empty(this->node_pool)){
+//    g_free(g_queue_pop_head(this->node_pool));
+//  }
+  g_object_unref(this->node_pool);
   _ruin_full(this, this->root);
 }
 
@@ -116,7 +123,8 @@ void
 bintree_init (BinTree * this)
 {
   g_rw_lock_init (&this->rwmutex);
-  this->node_pool = g_queue_new();
+//  this->node_pool = g_queue_new();
+  this->node_pool = make_pointerpool(1024, _node_ctor,g_free);
 }
 
 BinTree *make_bintree(BinTreeCmpFunc cmp)
@@ -558,10 +566,11 @@ BinTreeNode *_search_value(BinTree *this, guint64 value, BinTreeNode **parent)
 BinTreeNode *_make_bintreenode(BinTree *this, guint64 value)
 {
   BinTreeNode *result;
-  if(!g_queue_is_empty(this->node_pool))
-    result = g_queue_pop_head(this->node_pool);
-  else
-    result = g_malloc0(sizeof(BinTreeNode));
+  result = pointerpool_get(this->node_pool);
+//  if(!g_queue_is_empty(this->node_pool))
+//    result = g_queue_pop_head(this->node_pool);
+//  else
+//    result = g_malloc0(sizeof(BinTreeNode));
   memset((gpointer)result, 0, sizeof(BinTreeNode));
   result->value = value;
   return result;
@@ -573,11 +582,13 @@ void _trash_bintreenode(BinTree *this, BinTreeNode *node)
     if(node == this->top) _refresh_top(this);
     else if(node == this->bottom) _refresh_bottom(this);
   }
-  if(g_queue_get_length(this->node_pool) > 1024){
-    g_free(node);
-  }else{
-    g_queue_push_tail(this->node_pool, node);
-  }
+  pointerpool_add(this->node_pool, node);
+//
+//  if(g_queue_get_length(this->node_pool) > 1024){
+//    g_free(node);
+//  }else{
+//    g_queue_push_tail(this->node_pool, node);
+//  }
 }
 
 void _refresh_top(BinTree *this)

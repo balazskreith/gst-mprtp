@@ -25,7 +25,7 @@
 #include "mprtprpath.h"
 #include "streamjoiner.h"
 #include <gst/net/gstnetaddressmeta.h>
-#include "playoutgate.h"
+#include "gstmprtpbuffer.h"
 
 #if GLIB_CHECK_VERSION (2, 35, 7)
 #include <gio/gnetworking.h>
@@ -59,40 +59,42 @@ typedef struct _GstMprtpplayouterClass GstMprtpplayouterClass;
 
 struct _GstMprtpplayouter
 {
-  GstElement base_mprtpreceiver;
+  GstElement       base_mprtpreceiver;
 
-  GRWLock rwmutex;
+  GRWLock          rwmutex;
 
-  guint8 mprtp_ext_header_id;
-  guint8 abs_time_ext_header_id;
-  guint32 pivot_ssrc;
-  guint32 pivot_clock_rate;
+  guint8           mprtp_ext_header_id;
+  guint8           abs_time_ext_header_id;
+  guint32          pivot_ssrc;
+  guint32          pivot_clock_rate;
   GSocketAddress *pivot_address;
   guint8          pivot_address_subflow_id;
   guint8          monitor_payload_type;
-  guint64 clock_base;
-  gboolean auto_flow_riporting;
-  gboolean rtp_passthrough;
+  guint64         clock_base;
+  gboolean        auto_flow_riporting;
+  gboolean        rtp_passthrough;
 
-  GstPad *mprtp_srcpad;
-  GstPad *mprtp_sinkpad;
-  GstPad *mprtcp_sr_sinkpad;
-  GstPad *mprtcp_rr_srcpad;
-  gboolean riport_flow_signal_sent;
+  GstMpRTPBuffer  mprtp_reference;
+  GstPad*         mprtp_srcpad;
+  GstPad*         mprtp_sinkpad;
+  GstPad*         mprtcp_sr_sinkpad;
+  GstPad*         mprtcp_rr_srcpad;
+  gboolean        riport_flow_signal_sent;
 
-  GHashTable *paths;
-  StreamJoiner *joiner;
-  gpointer controller;
-  GstClock* sysclock;
+  GHashTable*     paths;
+  StreamJoiner*   joiner;
+  gpointer        controller;
+  GstClock*       sysclock;
+//  GQueue*         mprtp_buffer_pool;
+  PointerPool*    mprtp_buffer_pool;
 
+  guint           subflows_num;
 
-  guint  subflows_num;
-
-  void (*controller_add_path) (gpointer, guint8, MpRTPRPath *);
-  void (*controller_rem_path) (gpointer, guint8);
-  void (*mprtcp_receiver) (gpointer, GstBuffer *);
-  void (*riport_can_flow) (gpointer);
-  guint32 rtcp_sent_octet_sum;
+  void          (*controller_add_path) (gpointer, guint8, MpRTPRPath *);
+  void          (*controller_rem_path) (gpointer, guint8);
+  void          (*mprtcp_receiver) (gpointer, GstBuffer *);
+  void          (*riport_can_flow) (gpointer);
+  guint32         rtcp_sent_octet_sum;
 
 };
 

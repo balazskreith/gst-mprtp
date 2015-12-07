@@ -22,8 +22,8 @@ typedef struct _MpRTPReceiverPath MpRTPRPath;
 typedef struct _MpRTPReceiverPathClass MpRTPRPathClass;
 typedef struct _MpRTPRReceivedItem  MpRTPRReceivedItem;
 
-#include "streamjoiner.h"
-#include "streamtracker.h"
+#include "gstmprtpbuffer.h"
+#include "percentiletracker.h"
 
 #define MPRTPR_PACKET_INIT           {NULL, 0, 0, 0}
 
@@ -36,50 +36,39 @@ typedef struct _MpRTPRReceivedItem  MpRTPRReceivedItem;
 
 #define SKEWS_ARRAY_LENGTH 256
 
-typedef enum{
-  MPRTPR_PATH_STATE_PASSIVE         = 0,
-  MPRTPR_PATH_STATE_ACTIVE          = 1,
-}MPRTPRPathState;
-
 struct _MpRTPReceiverPath
 {
   GObject             object;
   guint8              id;
   GRWLock             rwmutex;
+  GstClock*           sysclock;
 
-  GList*              gaps;
-  GList*              result;
   gboolean            seq_initialized;
   guint16             cycle_num;
-  MPRTPRPathState     state;
   guint32             total_late_discarded;
   guint32             total_late_discarded_bytes;
   guint32             total_payload_bytes;
-  guint32             total_early_discarded;
-  guint32             total_duplicated_packet_num;
+  gint32              jitter;
   guint32             total_lost_packets_num;
   guint16             highest_seq;
 
   guint64             ext_rtptime;
   guint64             last_packet_skew;
   GstClockTime        last_received_time;
-  GstClock*           sysclock;
-  guint16             PHSN;
+
   guint32             total_packet_losts;
-  guint64             total_packets_received;
-  PacketsRcvQueue*    packetsqueue;
+  guint32             total_packets_received;
   guint32             last_rtp_timestamp;
 
+  gdouble             path_skew;
   GstClockTime        last_delay_a;
   GstClockTime        last_delay_b;
-  GstClockTime        last_delay_c;
-  GstClockTime        last_delay_d;
-  StreamTracker*      lt_low_delays;
-  StreamTracker*      lt_high_delays;
-  StreamTracker*      skews;
-
-  GstClockTime        last_drift_window;
-
+  GstClockTime        sh_delay;
+  GstClockTime        md_delay;
+  GstClockTime        last_mprtp_delay;
+  PercentileTracker*  lt_low_delays;
+  PercentileTracker*  lt_high_delays;
+  PercentileTracker*  skews;
 
 };
 
@@ -101,44 +90,35 @@ void mprtpr_path_destroy(gpointer ptr);
 MpRTPRPath *make_mprtpr_path (guint8 id);
 //guint64 mprtpr_path_get_packet_skew_median (MPRTPRPath * this);
 
-guint16 mprtpr_path_get_cycle_num(MpRTPRPath * this);
-guint16 mprtpr_path_get_highest_sequence_number(MpRTPRPath * this);
-guint32 mprtpr_path_get_jitter(MpRTPRPath * this);
-guint32 mprtpr_path_get_total_late_discarded_num(MpRTPRPath * this);
-guint32 mprtpr_path_get_total_late_discarded_bytes_num(MpRTPRPath * this);
-guint32 mprtpr_path_get_total_bytes_received (MpRTPRPath * this);
-guint32 mprtpr_path_get_total_payload_bytes (MpRTPRPath * this);
-guint64 mprtpr_path_get_total_received_packets_num (MpRTPRPath * this);
 guint8 mprtpr_path_get_id (MpRTPRPath * this);
+void mprtpr_path_get_RR_stats(MpRTPRPath *this,
+                           guint16 *HSN,
+                           guint16 *cycle_num,
+                           guint32 *jitter,
+                           guint32 *received_num,
+                           guint32 *received_bytes);
+
+void mprtpr_path_get_XR7243_stats(MpRTPRPath *this,
+                           guint16 *discarded,
+                           guint32 *discarded_bytes);
+
+void mprtpr_path_get_FBCC_stats(MpRTPRPath *this,
+                           GstClockTime *sh_last_delay,
+                           GstClockTime *md_last_delay,
+                           GstClockTime *lt_40th_delay,
+                           GstClockTime *lt_80th_delay);
+
+void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
+                           GstClockTime *md_last_delay,
+                           gdouble       *path_skew,
+                           guint32       *jitter);
+
+void mprtpr_path_add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp);
+void mprtpr_path_add_delay(MpRTPRPath *this, GstClockTime delay);
 
 void mprtpr_path_process_rtp_packet(MpRTPRPath *this,
-                               GstRTPBuffer *rtp,
-                               guint16 packet_subflow_seq_num,
-                               guint64 snd_time);
+                                    GstMpRTPBuffer *mprtp);
 
-void mprtpr_path_removes_obsolate_packets(MpRTPRPath *this, GstClockTime treshold);
-guint64 mprtpr_path_get_last_skew(MpRTPRPath *this);
-void mprtpr_path_playout_tick(MpRTPRPath *this);
-void mprtpr_path_set_played_seq_num(MpRTPRPath *this, guint16 seq);
-guint64 mprtpr_path_get_drift_window(MpRTPRPath *this, GstClockTime *min_delay,
-                                     GstClockTime *max_delay);
 
-GstClockTime mprtpr_path_get_avg_4last_delay(MpRTPRPath *this);
-void
-mprtpr_path_get_ltdelays (MpRTPRPath   *this,
-                       GstClockTime *percentile_40,
-                       GstClockTime *percentile_80,
-                       GstClockTime *min_delay,
-                       GstClockTime *max_delay);
-
-guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this);
-void mprtpr_path_get_obsolate_stat(MpRTPRPath *this,
-                                      GstClockTime treshold,
-                                      guint16 *lost,
-                                      guint16 *received,
-                                      guint16 *expected);
-void mprtpr_path_set_state(MpRTPRPath *this, MPRTPRPathState state);
-void mprtpr_path_set_delay(MpRTPRPath *this, GstClockTime delay);
-MPRTPRPathState mprtpr_path_get_state(MpRTPRPath *this);
 G_END_DECLS
 #endif /* MPRTPRSUBFLOW_H_ */

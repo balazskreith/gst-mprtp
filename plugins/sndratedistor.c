@@ -28,7 +28,7 @@
 #include <math.h>
 #include <gst/gst.h>
 #include <stdlib.h>
-#include "streamtracker.h"
+#include "percentiletracker.h"
 #include <string.h>
 
 
@@ -237,6 +237,19 @@ static gint32
 _action_bounce_up(
     SendingRateDistributor *this,
     Subflow *subflow);
+
+
+inline static
+gdouble sqr(gdouble x) {
+    return x*x;
+}
+
+static gint linreg(gint n,
+                   const gdouble x[],
+                   const gdouble y[],
+                   gdouble* m,
+                   gdouble* b,
+                   gdouble* r);
 
 #define _get_subflow(this, n) ((Subflow*)(this->subflows + n * sizeof(Subflow)))
 //static Subflow*
@@ -519,7 +532,7 @@ void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate
   if(utilization.delta_sr != 0)
   {
    utilization.changing_rate = (gdouble)this->media_rate / (gdouble)media_rate;
-   this->signal_request(this->signal_controller, &utilization);
+   //this->signal_request(this->signal_controller, &utilization);
   }
 
   //5. Calculate next sending rates.
@@ -1006,5 +1019,47 @@ gint32 _action_bounce_up(
 //  requested_bytes*= .8/(gdouble) subflow->monitoring_interval;
   g_print("S%d requested byte: %u\n", subflow->id, requested_bytes);
   this->requested_bytes+=requested_bytes>>1;
+  if(0) linreg(0,0,0,0,0,0);
   return requested_bytes;
+}
+
+
+//source: http://stackoverflow.com/questions/5083465/fast-efficient-least-squares-fit-algorithm-in-c
+gint linreg(gint n, const gdouble x[], const gdouble y[], gdouble* m, gdouble* b, gdouble* r)
+{
+    gdouble   sumx = 0.0;                        /* sum of x                      */
+    gdouble   sumx2 = 0.0;                       /* sum of x**2                   */
+    gdouble   sumxy = 0.0;                       /* sum of x * y                  */
+    gdouble   sumy = 0.0;                        /* sum of y                      */
+    gdouble   sumy2 = 0.0;                       /* sum of y**2                   */
+    gint i;
+    gdouble denom;
+
+   for (i=0;i<n;i++)
+      {
+      sumx  += x[i];
+      sumx2 += sqr(x[i]);
+      sumxy += x[i] * y[i];
+      sumy  += y[i];
+      sumy2 += sqr(y[i]);
+      }
+
+   denom = (n * sumx2 - sqr(sumx));
+   if (denom == 0) {
+       // singular matrix. can't solve the problem.
+       *m = 0;
+       *b = 0;
+       *r = 0;
+       return 1;
+   }
+
+   *m = (n * sumxy  -  sumx * sumy) / denom;
+   *b = (sumy * sumx2  -  sumx * sumxy) / denom;
+   if (r!=NULL) {
+      *r = (sumxy - sumx * sumy / n) /          /* compute correlation coeff     */
+            sqrt((sumx2 - sqr(sumx)/n) *
+            (sumy2 - sqr(sumy)/n));
+   }
+
+   return 0;
 }

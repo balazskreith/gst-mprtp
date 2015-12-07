@@ -23,7 +23,7 @@
 
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
-#include "streamtracker2.h"
+#include "kalmanfilter.h"
 #include <math.h>
 #include <string.h>
 
@@ -38,60 +38,60 @@
 #define THIS_WRITEUNLOCK(this)
 
 
-GST_DEBUG_CATEGORY_STATIC (streamtracker2_debug_category);
-#define GST_CAT_DEFAULT streamtracker2_debug_category
+GST_DEBUG_CATEGORY_STATIC (kalmanfilter_debug_category);
+#define GST_CAT_DEFAULT kalmanfilter_debug_category
 
-G_DEFINE_TYPE (StreamTracker2, streamtracker2, G_TYPE_OBJECT);
+G_DEFINE_TYPE (KalmanFilter, kalmanfilter, G_TYPE_OBJECT);
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
 
-static void streamtracker2_finalize (GObject * object);
+static void kalmanfilter_finalize (GObject * object);
 static void
-_add_value(StreamTracker2 *this, guint64 value);
+_add_value(KalmanFilter *this, guint64 value);
 static void
-_obsolate (StreamTracker2 * this);
+_obsolate (KalmanFilter * this);
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
 
 void
-streamtracker2_class_init (StreamTracker2Class * klass)
+kalmanfilter_class_init (KalmanFilterClass * klass)
 {
   GObjectClass *gobject_class;
 
   gobject_class = (GObjectClass *) klass;
 
-  gobject_class->finalize = streamtracker2_finalize;
+  gobject_class->finalize = kalmanfilter_finalize;
 
-  GST_DEBUG_CATEGORY_INIT (streamtracker2_debug_category, "streamtracker2", 0,
-      "StreamTracker2");
+  GST_DEBUG_CATEGORY_INIT (kalmanfilter_debug_category, "kalmanfilter", 0,
+      "KalmanFilter");
 
 }
 
 void
-streamtracker2_finalize (GObject * object)
+kalmanfilter_finalize (GObject * object)
 {
-  StreamTracker2 *this;
-  this = STREAMTRACKER2(object);
+  KalmanFilter *this;
+  this = KALMANFILTER(object);
   g_object_unref(this->sysclock);
   g_free(this->items);
 }
 
 void
-streamtracker2_init (StreamTracker2 * this)
+kalmanfilter_init (KalmanFilter * this)
 {
   g_rw_lock_init (&this->rwmutex);
 }
 
-StreamTracker2 *make_streamtracker2(guint32 length)
+KalmanFilter *make_kalmanfilter(guint32 length)
 {
-  StreamTracker2 *result;
-  result = g_object_new (STREAMTRACKER2_TYPE, NULL);
+  KalmanFilter *result;
+  result = g_object_new (KALMANFILTER_TYPE, NULL);
   THIS_WRITELOCK (result);
-  result->items = g_malloc0(sizeof(StreamTracker2Item)*length);
+  result->items = g_malloc0(sizeof(KalmanFilterItem)*length);
   result->sum = 0;
   result->length = length;
   result->sysclock = gst_system_clock_obtain();
@@ -102,30 +102,30 @@ StreamTracker2 *make_streamtracker2(guint32 length)
   return result;
 }
 
-void streamtracker2_reset(StreamTracker2 *this)
+void kalmanfilter_reset(KalmanFilter *this)
 {
   THIS_WRITELOCK (this);
-  memset(this->items, 0, sizeof(StreamTracker2Item) * this->length);
+  memset(this->items, 0, sizeof(KalmanFilterItem) * this->length);
   this->counter = this->write_index = this->read_index = 0;
   this->sum = 0;
   THIS_WRITEUNLOCK (this);
 }
 
-void streamtracker2_add(StreamTracker2 *this, guint64 value)
+void kalmanfilter_add(KalmanFilter *this, guint64 value)
 {
   THIS_WRITELOCK (this);
   _add_value(this, value);
   THIS_WRITEUNLOCK (this);
 }
 
-void streamtracker2_set_treshold(StreamTracker2 *this, GstClockTime treshold)
+void kalmanfilter_set_treshold(KalmanFilter *this, GstClockTime treshold)
 {
   THIS_WRITELOCK (this);
   this->treshold = treshold;
   THIS_WRITEUNLOCK (this);
 }
 
-guint32 streamtracker2_get_num(StreamTracker2 *this)
+guint32 kalmanfilter_get_num(KalmanFilter *this)
 {
   guint32 result;
   THIS_READLOCK(this);
@@ -134,7 +134,7 @@ guint32 streamtracker2_get_num(StreamTracker2 *this)
   return result;
 }
 
-guint64 streamtracker2_get_last(StreamTracker2 *this)
+guint64 kalmanfilter_get_last(KalmanFilter *this)
 {
   guint64 result;
   THIS_READLOCK(this);
@@ -147,7 +147,7 @@ guint64 streamtracker2_get_last(StreamTracker2 *this)
 
 
 void
-streamtracker2_get_stats (StreamTracker2 * this,
+kalmanfilter_get_stats (KalmanFilter * this,
                          guint64 *sum,
                          guint32 *items_num)
 {
@@ -160,7 +160,7 @@ streamtracker2_get_stats (StreamTracker2 * this,
 
 
 void
-streamtracker2_obsolate (StreamTracker2 * this)
+kalmanfilter_obsolate (KalmanFilter * this)
 {
   THIS_READLOCK (this);
   _obsolate(this);
@@ -170,7 +170,7 @@ streamtracker2_obsolate (StreamTracker2 * this)
 
 
 
-void _add_value(StreamTracker2 *this, guint64 value)
+void _add_value(KalmanFilter *this, guint64 value)
 {
   GstClockTime now;
   now = gst_clock_get_time(this->sysclock);
@@ -186,7 +186,7 @@ void _add_value(StreamTracker2 *this, guint64 value)
 }
 
 void
-_obsolate (StreamTracker2 * this)
+_obsolate (KalmanFilter * this)
 {
   GstClockTime treshold,now;
   now = gst_clock_get_time(this->sysclock);

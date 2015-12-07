@@ -30,7 +30,7 @@ struct _PacketsSndQueue
   PacketsSndQueueNode*     tail;
   guint32                  counter;
   GRWLock                  rwmutex;
-  GQueue*                  node_pool;
+  PointerPool*             node_pool;
   GstClock*                sysclock;
 };
 

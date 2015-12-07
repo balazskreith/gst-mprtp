@@ -47,14 +47,15 @@
 #define RTCPSRBLOCK_WORDS (RTCPSRBLOCK_BYTES>>2)
 #define RTCPXR7243BLOCK_BYTES 12
 #define RTCPXR7243BLOCK_WORDS (RTCPXR7243BLOCK_BYTES>>2)
-#define RTCPXRSKEWBLOCK_BYTES 20
-#define RTCPXRSKEWBLOCK_WORDS (RTCPXRSKEWBLOCK_BYTES>>2)
 #define RTCPXROWDBLOCK_BYTES 24
 #define RTCPXROWDBLOCK_WORDS (RTCPXROWDBLOCK_BYTES>>2)
+#define RTCPFBMPCCDBLOCK_BYTES 24
+#define RTCPFBMPCCBLOCK_WORDS (RTCPFBMPCCDBLOCK_BYTES>>2)
 #define RTCPRRBLOCK_BYTES 24
 #define RTCPRRBLOCK_WORDS (RTCPRRBLOCK_BYTES>>2)
 #define MPRTCPBLOCK_BYTES 4
 #define MPRTCPBLOCK_WORDS (MPRTCPBLOCK_BYTES>>2)
+
 
 #include <sys/time.h>
 #include <stdint.h>
@@ -256,6 +257,14 @@ gst_mprtcp_riport_block_add_xr_owd (GstMPRTCPSubflowBlock * block)
 {
   GstRTCPXR_OWD *result = &block->xr_owd;
   gst_rtcp_xr_owd_init(result);
+  return result;
+}
+
+GstRTCPFB_MPCC *
+gst_mprtcp_riport_block_add_fb_mpcc (GstMPRTCPSubflowBlock * block)
+{
+  GstRTCPFB_MPCC *result = &block->fb_mpcc;
+  gst_rtcp_fb_mpcc_init(result);
   return result;
 }
 
@@ -674,6 +683,77 @@ gst_rtcp_xr_owd_getdown (GstRTCPXR_OWD *report,
     }
 }
 
+
+//------------------ FB MPCC ------------------------
+void
+gst_rtcp_fb_mpcc_init (GstRTCPFB_MPCC * report)
+{
+  gst_rtcp_header_init (&report->header);
+  gst_rtcp_header_setup (&report->header, FALSE, 15,
+     GST_RTCP_TYPE_FB, RTCPHEADER_WORDS - 1 + RTCPFBMPCCDBLOCK_BYTES, 0);
+  gst_rtcp_fb_mpcc_setup (report, 0, 0, 0, 0, 0);
+}
+
+
+void
+gst_rtcp_fb_mpcc_setup(GstRTCPFB_MPCC *report,
+                       guint32 media_ssrc,
+                       guint32 lt80_delay,
+                       guint32 lt40_delay,
+                       guint32 md_delay,
+                       guint32 sh_delay)
+{
+  report->identifier = g_htonl (RTCPFB_MPCC_IDENTIFIER);
+  report->media_ssrc = g_htonl(media_ssrc);
+  gst_rtcp_fb_mpcc_change(report,
+                          &lt80_delay,
+                          &lt40_delay,
+                          &md_delay,
+                          &sh_delay);
+}
+
+void
+gst_rtcp_fb_mpcc_change (GstRTCPFB_MPCC *report,
+                         guint32* lt80_delay,
+                         guint32* lt40_delay,
+                         guint32* md_delay,
+                         guint32* sh_delay)
+{
+  if (lt80_delay) {
+    report->lt80_delay = g_htonl (*lt80_delay);
+  }
+  if (lt40_delay) {
+    report->lt40_delay = g_htonl (*lt40_delay);
+  }
+  if (md_delay) {
+    report->md_delay = g_htonl (*md_delay);
+  }
+  if (sh_delay) {
+    report->sh_delay = g_htonl (*sh_delay);
+  }
+}
+
+void
+gst_rtcp_fb_mpcc_getdown (GstRTCPFB_MPCC *report,
+                          guint32* lt80_delay,
+                          guint32* lt40_delay,
+                          guint32* md_delay,
+                          guint32* sh_delay)
+{
+  if (lt80_delay) {
+    *lt80_delay = g_ntohl (report->lt80_delay);
+  }
+  if (lt40_delay) {
+    *lt40_delay = g_ntohl (report->lt40_delay);
+  }
+  if (md_delay) {
+    *md_delay = g_ntohl (report->md_delay);
+  }
+  if (sh_delay) {
+    *sh_delay = g_ntohl (report->sh_delay);
+  }
+}
+
 //------------------ MPRTCP ------------------------
 
 
@@ -896,6 +976,9 @@ gst_print_rtcp (GstRTCPHeader * header)
       case GST_RTCP_TYPE_RR:
         gst_print_rtcp_rr ((GstRTCPRR *) step);
         break;
+      case GST_RTCP_TYPE_FB:
+        gst_print_rtcp_fb_mpcc((GstRTCPFB_MPCC*) step);
+        break;
       case GST_RTCP_TYPE_XR:
         {
           guint8 block_type;
@@ -1101,6 +1184,35 @@ gst_print_rtcp_xr_owd (GstRTCPXR_OWD * report)
       g_ntohs (report->block_length), ssrc, percentile, invert_percentile,
       one_way_delay,
       min_delay, max_delay);
+}
+
+
+void
+gst_print_rtcp_fb_mpcc (GstRTCPFB_MPCC * report)
+{
+  guint32 lt80_delay;
+  guint32 lt40_delay;
+  guint32 md_delay;
+  guint32 sh_delay;
+
+  gst_print_rtcp_header (&report->header);
+  gst_rtcp_fb_mpcc_getdown(report,
+                           &lt80_delay,
+                           &lt40_delay,
+                           &md_delay,
+                           &sh_delay);
+  g_print (
+      "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+      "|%63X|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63X|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63u|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63u|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      ,
+      lt80_delay, lt40_delay, md_delay, sh_delay);
 }
 
 void

@@ -303,7 +303,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
 
   g_object_set (mprtpply, "pivot-clock-rate", clockrate, NULL);
 
-//  g_object_set (mprtpply, "join-subflow", 1, NULL);
+  g_object_set (mprtpply, "join-subflow", 1, NULL);
   g_object_set (mprtpply, "join-subflow", 2, NULL);
   g_object_set (mprtpply, "auto-flow-reporting", TRUE, NULL);
 

@@ -10,11 +10,8 @@
 
 #include <gst/gst.h>
 
-#include "playoutgate.h"
-
 typedef struct _StreamJoiner StreamJoiner;
 typedef struct _StreamJoinerClass StreamJoinerClass;
-typedef struct _Heap Heap;
 
 #include "mprtprpath.h"
 
@@ -28,6 +25,8 @@ typedef struct _Heap Heap;
 #define MPRTP_SENDER_SCHTREE_MAX_PATH_NUM 32
 #define MAX_SKEWS_ARRAY_LENGTH 256
 
+typedef struct _FrameNode FrameNode;
+typedef struct _Frame Frame;
 
 
 struct _StreamJoiner
@@ -38,45 +37,81 @@ struct _StreamJoiner
   GRecMutex            thread_mutex;
   GHashTable*          subflows;
   GRWLock              rwmutex;
-  Heap*                packets_heap;
-  GQueue*              heap_items_pool;
-  PlayoutGate*         playoutgate;
+  guint8               monitor_payload_type;
   gboolean             playout_allowed;
   GstClockTime         tick_interval;
   gboolean             playout_halt;
   GstClockTime         playout_halt_time;
+  GstClockTime         stream_delay;
   gint                 subflow_num;
   GstClock*            sysclock;
-  void               (*send_mprtp_packet_func)(gpointer,GstBuffer*);
-  gpointer             send_mprtp_packet_data;
-
   GstClockTime         last_obsolate_checked;
-};
+  gdouble              skew;
+  gdouble              playout_target;
+  PercentileTracker*       skew_window;
+  PercentileTracker*       delay_window;
+  PercentileTracker*       jitter_window;
+//  GQueue*              framenodes_pool;
+//  GQueue*              frames_pool;
+  PointerPool*         frames_pool;
+  PointerPool*         framenodes_pool;
+  Frame*               head;
+  Frame*               tail;
+  guint16              PHSN;
 
+  void               (*send_mprtp_packet_func)(gpointer,GstMpRTPBuffer*);
+  gpointer             send_mprtp_packet_data;
+};
 struct _StreamJoinerClass{
   GObjectClass parent_class;
 };
 
-//Class functions
-void stream_joiner_set_sending(StreamJoiner* this, gpointer data, void (*func)(gpointer,GstBuffer*));
+StreamJoiner*
+make_stream_joiner(
+    gpointer data,
+    void (*func)(gpointer,GstMpRTPBuffer*));
 
 void
-stream_joiner_add_path(StreamJoiner * this, guint8 subflow_id, MpRTPRPath *path);
+stream_joiner_add_path(
+    StreamJoiner * this,
+    guint8 subflow_id,
+    MpRTPRPath *path);
 
 void
-stream_joiner_rem_path(StreamJoiner * this, guint8 subflow_id);
+stream_joiner_rem_path(
+    StreamJoiner * this,
+    guint8 subflow_id);
 
 void
-stream_joiner_receive_rtp(StreamJoiner * this, GstRTPBuffer *rtp, guint8 subflow_id);
+stream_joiner_receive_mprtp(
+    StreamJoiner * this,
+    GstMpRTPBuffer *rtp);
 
 void
-stream_joiner_set_playout_halt_time(StreamJoiner *this, GstClockTime halt_time);
+stream_joiner_set_monitor_payload_type(
+    StreamJoiner *this,
+    guint8 monitor_payload_type);
+
 void
-stream_joiner_set_playout_allowed(StreamJoiner *this, gboolean playout_permission);
+stream_joiner_set_playout_halt_time(
+    StreamJoiner *this,
+    GstClockTime halt_time);
+
 void
-stream_joiner_set_tick_interval(StreamJoiner *this, GstClockTime tick_interval);
+stream_joiner_set_playout_allowed(
+    StreamJoiner *this,
+    gboolean playout_permission);
+
 void
-stream_joiner_set_stream_delay(StreamJoiner *this, GstClockTime stream_delay);
+stream_joiner_set_tick_interval(
+    StreamJoiner *this,
+    GstClockTime tick_interval);
+
+void
+stream_joiner_set_stream_delay(
+    StreamJoiner *this,
+    GstClockTime stream_delay);
+
 
 GType
 stream_joiner_get_type (void);

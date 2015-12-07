@@ -94,13 +94,15 @@ static GstFlowReturn _processing_mprtcp_packet (GstMprtpplayouter * this,
 static void _join_path (GstMprtpplayouter * this, guint8 subflow_id);
 static void _detach_path (GstMprtpplayouter * this, guint8 subflow_id);
 static void gst_mprtpplayouter_send_mprtp_proxy (gpointer data,
-    GstBuffer * buf);
+                                                 GstMpRTPBuffer * buf);
 static gboolean _try_get_path (GstMprtpplayouter * this, guint16 subflow_id,
     MpRTPRPath ** result);
 static void _change_flow_riporting_mode (GstMprtpplayouter * this,
     guint new_flow_riporting_mode);
 static GstStructure *_collect_infos (GstMprtpplayouter * this);
-
+static GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer);
+//static void _trash_mprtp_buffer(GstMprtpplayouter * this, GstMpRTPBuffer *mprtp);
+#define _trash_mprtp_buffer(this, mprtp) pointerpool_add(this->mprtp_buffer_pool, mprtp);
 enum
 {
   PROP_0,
@@ -148,6 +150,10 @@ GST_STATIC_PAD_TEMPLATE ("mprtcp_rr_src",
     GST_STATIC_CAPS ("application/x-rtcp")
     );
 
+static gpointer _mprtp_ctor(void)
+{
+  return g_malloc0(sizeof(GstMpRTPBuffer));
+}
 
 /* class initialization */
 
@@ -254,7 +260,7 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
 static void
 gst_mprtpplayouter_init (GstMprtpplayouter * this)
 {
-
+  GstMpRTPBuffer mprtp_reference = GST_MPRTP_BUFFER_INIT;
   this->mprtp_sinkpad =
       gst_pad_new_from_static_template (&gst_mprtpplayouter_mprtp_sink_template,
       "mprtp_sink");
@@ -288,6 +294,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   gst_pad_set_event_function (this->mprtp_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_sink_event));
 
+  memcpy(&this->mprtp_reference, &mprtp_reference, sizeof(GstMpRTPBuffer));
   this->rtp_passthrough = TRUE;
   this->riport_flow_signal_sent = FALSE;
   this->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
@@ -297,35 +304,34 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->pivot_ssrc = MPRTP_PLAYOUTER_DEFAULT_SSRC;
   //this->paths = g_hash_table_new_full (NULL, NULL, NULL, g_free);
   this->paths = g_hash_table_new_full (NULL, NULL, NULL, mprtpr_path_destroy);
-  this->joiner = (StreamJoiner *) g_object_new (STREAM_JOINER_TYPE, NULL);
-  stream_joiner_set_sending (this->joiner, (gpointer) this,
-      gst_mprtpplayouter_send_mprtp_proxy);
+  this->joiner = make_stream_joiner(this,gst_mprtpplayouter_send_mprtp_proxy);
   this->controller = NULL;
   _change_flow_riporting_mode (this, FALSE);
 
   this->pivot_address_subflow_id = 0;
   this->pivot_address = NULL;
   g_rw_lock_init (&this->rwmutex);
-
+  this->mprtp_buffer_pool = make_pointerpool(512, _mprtp_ctor, g_free);
   this->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
+  stream_joiner_set_monitor_payload_type(this->joiner, this->monitor_payload_type);
 }
 
+//static GstClockTime out_prev;
 void
-gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstBuffer * buf)
+gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstMpRTPBuffer * mprtp)
 {
-  MPRTPSubflowHeaderExtension *subflow;
-  MpRTPRPath *path;
-  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (data);
-  gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
-  if(gst_mprtp_get_subflow_extension(&rtp, this->mprtp_ext_header_id, &subflow)){
-    if(_try_get_path(this, subflow->id, &path)){
-      mprtpr_path_set_played_seq_num(path, subflow->seq);
-    }
+  gst_mprtp_buffer_read_map(mprtp);
+  if(gst_mprtp_ptr_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
+    goto done;
   }
-
-  gst_rtp_buffer_unmap(&rtp);
-  gst_pad_push (this->mprtp_srcpad, buf);
+//  g_print("%lu: %hu\n", GST_TIME_AS_MSECONDS(gst_clock_get_time(this->sysclock)-out_prev), gst_mprtp_ptr_buffer_get_abs_seq(mprtp));
+  g_print("%lu\n", GST_TIME_AS_MSECONDS(get_epoch_time_from_ntp_in_ns(NTP_NOW - mprtp->abs_snd_ntp_time)));
+//  out_prev = gst_clock_get_time(this->sysclock);
+  gst_pad_push (this->mprtp_srcpad, mprtp->buffer);
+done:
+//  gst_mprtp_buffer_read_unmap(mprtp);
+  _trash_mprtp_buffer(this, mprtp);
 }
 
 void
@@ -340,6 +346,10 @@ gst_mprtpplayouter_finalize (GObject * object)
   /* clean up object here */
   g_hash_table_destroy (this->paths);
   G_OBJECT_CLASS (gst_mprtpplayouter_parent_class)->finalize (object);
+//  while(!g_queue_is_empty(this->mprtp_buffer_pool)){
+//    g_free(g_queue_pop_head(this->mprtp_buffer_pool));
+//  }
+  g_object_unref(this->mprtp_buffer_pool);
 }
 
 
@@ -365,6 +375,7 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
     case PROP_MONITORING_PAYLOAD_TYPE:
       THIS_WRITELOCK (this);
       this->monitor_payload_type = (guint8) g_value_get_uint (value);
+      stream_joiner_set_monitor_payload_type(this->joiner, this->monitor_payload_type);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_PIVOT_SSRC:
@@ -473,6 +484,11 @@ _collect_infos (GstMprtpplayouter * this)
   gint index = 0;
   GValue g_value = { 0 };
   gchar *field_name;
+  guint32 received_num = 0;
+  guint32 jitter = 0;
+  guint16 HSN = 0;
+  guint16 cycle_num = 0;
+  guint32 late_discarded = 0;
   result = gst_structure_new ("PlayoutSubflowReports",
       "length", G_TYPE_UINT, this->subflows_num, NULL);
   g_value_init (&g_value, G_TYPE_UINT);
@@ -487,35 +503,29 @@ _collect_infos (GstMprtpplayouter * this)
 
     field_name = g_strdup_printf ("subflow-%d-received_packet_num", index);
     g_value_set_uint (&g_value,
-        mprtpr_path_get_total_received_packets_num (path));
-    gst_structure_set_value (result, field_name, &g_value);
-    g_free (field_name);
-
-    field_name = g_strdup_printf ("subflow-%d-discarded_bytes", index);
-    g_value_set_uint (&g_value,
-        mprtpr_path_get_total_late_discarded_bytes_num (path));
+        received_num);
     gst_structure_set_value (result, field_name, &g_value);
     g_free (field_name);
 
     field_name = g_strdup_printf ("subflow-%d-jitter", index);
-    g_value_set_uint (&g_value, mprtpr_path_get_jitter (path));
+    g_value_set_uint (&g_value, jitter);
     gst_structure_set_value (result, field_name, &g_value);
     g_free (field_name);
 
     field_name = g_strdup_printf ("subflow-%d-HSN", index);
-    g_value_set_uint (&g_value, mprtpr_path_get_highest_sequence_number (path));
+    g_value_set_uint (&g_value, HSN);
     gst_structure_set_value (result, field_name, &g_value);
     g_free (field_name);
 
     field_name = g_strdup_printf ("subflow-%d-cycle_num", index);
-    g_value_set_uint (&g_value, mprtpr_path_get_cycle_num (path));
+    g_value_set_uint (&g_value, cycle_num);
     gst_structure_set_value (result, field_name, &g_value);
     g_free (field_name);
 
     field_name =
         g_strdup_printf ("subflow-%d-late_discarded_packet_num", index);
     g_value_set_uint (&g_value,
-        mprtpr_path_get_total_late_discarded_bytes_num (path));
+        late_discarded);
     gst_structure_set_value (result, field_name, &g_value);
     g_free (field_name);
     ++index;
@@ -851,132 +861,30 @@ _processing_mprtcp_packet (GstMprtpplayouter * this, GstBuffer * buf)
   result = GST_FLOW_OK;
   return result;
 }
-//
-//void
-//_processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
-//{
-//  gpointer pointer = NULL;
-//  MPRTPSubflowHeaderExtension *subflow_infos = NULL;
-//  MpRTPRPath *path = NULL;
-//  guint size;
-//  GstNetAddressMeta *meta;
-//  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-//  guint64 snd_time = 0;
-//  if (G_UNLIKELY (!gst_rtp_buffer_map (buf, GST_MAP_READ, &rtp))) {
-//    GST_WARNING_OBJECT (this, "The received Buffer is not readable");
-//    return;
-//  }
-////gst_print_rtp_packet_info(&rtp);
-//  if (!gst_rtp_buffer_get_extension (&rtp)) {
-//    //Backward compatibility in a way to process rtp packet must be implemented here!!!
-//
-//    GST_WARNING_OBJECT (this,
-//        "The received buffer extension bit is 0 thus it is not an MPRTP packet.");
-//    gst_rtp_buffer_unmap (&rtp);
-//    if (this->rtp_passthrough) {
-//      gst_mprtpplayouter_send_mprtp_proxy (this, buf);
-//    }
-//    return;
-//  }
-//  if (this->pivot_ssrc != MPRTP_PLAYOUTER_DEFAULT_SSRC &&
-//      gst_rtp_buffer_get_ssrc (&rtp) != this->pivot_ssrc) {
-//    gst_rtp_buffer_unmap (&rtp);
-//    GST_DEBUG_OBJECT (this, "RTP packet ssrc is %u, the pivot ssrc is %u",
-//        this->pivot_ssrc, gst_rtp_buffer_get_ssrc (&rtp));
-//    gst_pad_push (this->mprtp_srcpad, buf);
-//    return;
-//  }
-//  //_print_rtp_packet_info(rtp);
-//
-//  if (!gst_rtp_buffer_get_extension_onebyte_header (&rtp,
-//          this->mprtp_ext_header_id, 0, &pointer, &size)) {
-//    GST_WARNING_OBJECT (this,
-//        "The received buffer extension is not processable");
-//    gst_rtp_buffer_unmap (&rtp);
-//    return;
-//  }
-//  subflow_infos = (MPRTPSubflowHeaderExtension *) pointer;
-//  if (_try_get_path (this, subflow_infos->id, &path) == FALSE) {
-//    _join_path (this, subflow_infos->id);
-//    if (_try_get_path (this, subflow_infos->id, &path) == FALSE) {
-//      GST_WARNING_OBJECT (this, "Subflow not found");
-//      gst_rtp_buffer_unmap (&rtp);
-//      return;
-//    }
-//  }
-//
-//  if (!gst_rtp_buffer_get_extension_onebyte_header (&rtp,
-//          this->abs_time_ext_header_id, 0, &pointer, &size)) {
-//    GST_WARNING_OBJECT (this,
-//        "The received buffer absolute time extension is not processable");
-//    //snd_time calc by rtp timestamp
-//  } else {
-//    guint32 rcv_chunk = (NTP_NOW >> 14) & 0x00ffffff;
-//    guint64 ntp_base = NTP_NOW;
-//    memcpy (&snd_time, pointer, 3);
-//    if(rcv_chunk < snd_time){
-//      ntp_base-=0x0000004000000000UL;
-//    }
-//
-////    g_print("%32lu-%32lu=%32lu\n",
-////            NTP_NOW,
-////            (snd_time << 14) | (ntp_base & 0xFFFFFFC000000000UL),
-////            get_epoch_time_from_ntp_in_ns(NTP_NOW - ((snd_time << 14) | (ntp_base & 0xFFFFFFC000000000UL))));
-//    snd_time <<= 14;
-////    snd_time |= NTP_NOW & 0xffffffC000000000UL;
-//    snd_time |=  (ntp_base & 0xFFFFFFC000000000UL);
-//  }
-//
-//  //to avoid the check_collision problem in rtpsession.
-//  meta = gst_buffer_get_net_address_meta (buf);
-//  if (meta) {
-//    if (!this->pivot_address) {
-//      this->pivot_address_subflow_id = subflow_infos->id;
-//      this->pivot_address = G_SOCKET_ADDRESS (g_object_ref (meta->addr));
-//    } else if (subflow_infos->id != this->pivot_address_subflow_id) {
-//      gst_buffer_add_net_address_meta (buf, this->pivot_address);
-//    }
-//  }
-//  //snd_time = gst_util_uint64_scale (snd_time, GST_SECOND, (G_GINT64_CONSTANT (1) << 32));
-//  mprtpr_path_process_rtp_packet (path, &rtp, subflow_infos->seq, snd_time);
-//  if(gst_rtp_buffer_get_payload_type(&rtp) == this->monitor_payload_type){
-//    goto drop;
-//  }
-//  stream_joiner_receive_rtp(this->joiner, &rtp, subflow_infos->id);
-//  gst_rtp_buffer_unmap (&rtp);
-//  return;
-//drop:
-//  gst_rtp_buffer_unmap (&rtp);
-//  gst_buffer_unref(buf);
-//}
 
-
-
-
+//static GstClockTime in_prev;
 void
 _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
 {
   MpRTPRPath *path = NULL;
   GstNetAddressMeta *meta;
-  GstMpRTPBuffer mprtp = GST_MPRTP_BUFFER_INIT;
+  GstMpRTPBuffer *mprtp = NULL;
 
-  if (G_UNLIKELY (!gst_mprtp_buffer_read_map(buf,
-                                             &mprtp,
-                                             this->mprtp_ext_header_id,
-                                             this->abs_time_ext_header_id)))
+  mprtp = _make_mprtp_buffer(this, buf);
+  if (G_UNLIKELY (!mprtp->initialized))
   {
     GST_WARNING_OBJECT (this, "The received Buffer is not MpRTP");
     if (this->rtp_passthrough) {
-       gst_mprtpplayouter_send_mprtp_proxy (this, buf);
+       gst_mprtpplayouter_send_mprtp_proxy (this, mprtp);
      }
     return;
   }
 
   if (this->pivot_ssrc != MPRTP_PLAYOUTER_DEFAULT_SSRC &&
-      gst_rtp_buffer_get_payload_type (&mprtp.rtp) != this->pivot_ssrc) {
-    gst_mprtp_buffer_unmap (&mprtp);
+      gst_mprtp_ptr_buffer_get_ssrc(mprtp) != this->pivot_ssrc) {
+    _trash_mprtp_buffer(this, mprtp);
     GST_DEBUG_OBJECT (this, "RTP packet ssrc is %u, the pivot ssrc is %u",
-        this->pivot_ssrc, gst_rtp_buffer_get_ssrc (&mprtp.rtp));
+        this->pivot_ssrc, gst_mprtp_ptr_buffer_get_ssrc(mprtp));
     gst_pad_push (this->mprtp_srcpad, buf);
     return;
   }
@@ -985,31 +893,26 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
   meta = gst_buffer_get_net_address_meta (buf);
   if (meta) {
     if (!this->pivot_address) {
-      this->pivot_address_subflow_id = mprtp.subflow_id;
+      this->pivot_address_subflow_id = mprtp->subflow_id;
       this->pivot_address = G_SOCKET_ADDRESS (g_object_ref (meta->addr));
-    } else if (mprtp.subflow_seq != this->pivot_address_subflow_id) {
+    } else if (mprtp->subflow_seq != this->pivot_address_subflow_id) {
       gst_buffer_add_net_address_meta (buf, this->pivot_address);
     }
   }
-  if (_try_get_path (this, mprtp.subflow_id, &path) == FALSE) {
-    _join_path (this, mprtp.subflow_id);
-    if (_try_get_path (this, mprtp.subflow_id, &path) == FALSE) {
+  if (_try_get_path (this, mprtp->subflow_id, &path) == FALSE) {
+    _join_path (this, mprtp->subflow_id);
+    if (_try_get_path (this, mprtp->subflow_id, &path) == FALSE) {
       GST_WARNING_OBJECT (this, "Subflow not found");
-      gst_mprtp_buffer_unmap (&mprtp);
+      _trash_mprtp_buffer(this, mprtp);
       return;
     }
   }
 
-  mprtpr_path_process_rtp_packet (path, &mprtp.rtp, mprtp.subflow_seq, mprtp.abs_snd_time);
-  if(gst_rtp_buffer_get_payload_type(&mprtp.rtp) == this->monitor_payload_type){
-    goto drop;
-  }
-  stream_joiner_receive_rtp(this->joiner, &mprtp.rtp, mprtp.subflow_id);
-  gst_mprtp_buffer_unmap (&mprtp);
+//  g_print("%lu\n",GST_TIME_AS_MSECONDS(gst_clock_get_time(this->sysclock) - in_prev));
+//  in_prev = gst_clock_get_time(this->sysclock);
+  mprtpr_path_process_rtp_packet (path, mprtp);
+  stream_joiner_receive_mprtp(this->joiner, mprtp);
   return;
-drop:
-  gst_mprtp_buffer_unmap (&mprtp);
-  gst_buffer_unref(buf);
 }
 
 gboolean
@@ -1071,6 +974,29 @@ _change_flow_riporting_mode (GstMprtpplayouter * this,
 
 }
 
+
+GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer)
+{
+  GstMpRTPBuffer *result;
+  result = pointerpool_get(this->mprtp_buffer_pool);
+  memcpy(result, &this->mprtp_reference, sizeof(GstMpRTPBuffer));
+//  g_print("%d",
+          gst_mprtp_buffer_init(result,
+                            buffer,
+                            this->mprtp_ext_header_id,
+                            this->abs_time_ext_header_id);
+//  );
+  return result;
+}
+//
+//void _trash_mprtp_buffer(GstMprtpplayouter * this, GstMpRTPBuffer *mprtp)
+//{
+//  if (g_queue_get_length (this->mprtp_buffer_pool) < 10240) {
+//    g_queue_push_head (this->mprtp_buffer_pool, mprtp);
+//  } else {
+//    g_free (mprtp);
+//  }
+//}
 
 #undef THIS_READLOCK
 #undef THIS_READUNLOCK

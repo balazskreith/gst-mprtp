@@ -19,10 +19,10 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          bintree.c                  \
                          packetsrcvqueue.c          \
                          packetssndqueue.c          \
-                         playoutgate.c              \
+                         pointerpool.c              \
                          ricalcer.c                 \
-                         streamtracker.c            \
-                         streamtracker2.c           \
+                         percentiletracker.c            \
+                         variancetracker.c          \
                          sndratedistor.c
                     
                     
@@ -37,10 +37,10 @@ noinst_HEADERS = mprtpspath.h      \
                  bintree.h         \
                  packetsrcvqueue.h \
                  packetssndqueue.h \
-                 playoutgate.h     \
+                 pointerpool.h     \
                  ricalcer.h        \
-                 streamtracker.h   \
-                 streamtracker2.h  \
+                 percentiletracker.h    \
+                 variancetracker.h  \
                  sndratedistor.h
 
 # compiler and linker flags used to compile this plugin, set in configure.ac

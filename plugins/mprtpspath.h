@@ -22,7 +22,7 @@ typedef struct _MPRTPSPathClass MPRTPSPathClass;
 
 #include "gstmprtcpbuffer.h"
 #include "packetssndqueue.h"
-#include "streamtracker.h"
+#include "percentiletracker.h"
 
 #define MPRTPS_PATH_TYPE             (mprtps_path_get_type())
 #define MPRTPS_PATH(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),MPRTPS_PATH_TYPE,MPRTPSPath))
@@ -76,7 +76,7 @@ struct _MPRTPSPath
   GstClockTime            sent_congested;
 
   PacketsSndQueue*        packetsqueue;
-  StreamTracker*          sent_bytes;
+  PercentileTracker*          sent_bytes;
   guint8                  sent_octets[MAX_INT32_POSPART];
   guint16                 sent_octets_read;
   guint16                 sent_octets_write;

@@ -26,9 +26,8 @@ G_DEFINE_TYPE (MpRTPRPath, mprtpr_path, G_TYPE_OBJECT);
 static void mprtpr_path_finalize (GObject * object);
 static void mprtpr_path_reset (MpRTPRPath * this);
 static gint _cmp_seq (guint16 x, guint16 y);
-static gint _cmp_for_max (guint64 x, guint64 y);
-static gint _cmp_for_min (guint64 x, guint64 y);
-
+static void _add_delay(MpRTPRPath *this, GstClockTime delay);
+static gint64 _get_drift_window (MpRTPRPath * this);
 void
 mprtpr_path_class_init (MpRTPRPathClass * klass)
 {
@@ -61,14 +60,12 @@ mprtpr_path_init (MpRTPRPath * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
-  this->packetsqueue = make_packetsrcvqueue();
-  this->last_drift_window = GST_MSECOND;
-  this->lt_low_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 1024, 40);
-  streamtracker_set_treshold(this->lt_low_delays, 30 * GST_SECOND);
-  this->lt_high_delays = make_streamtracker(_cmp_for_min, _cmp_for_max, 1024, 80);
-  streamtracker_set_treshold(this->lt_high_delays, 30 * GST_SECOND);
-  this->skews = make_streamtracker(_cmp_for_min, _cmp_for_max, 100, 50);
-  streamtracker_set_treshold(this->skews, 2 * GST_SECOND);
+  this->lt_low_delays = make_percentiletracker(1024, 40);
+  percentiletracker_set_treshold(this->lt_low_delays, 30 * GST_SECOND);
+  this->lt_high_delays = make_percentiletracker(1024, 80);
+  percentiletracker_set_treshold(this->lt_high_delays, 30 * GST_SECOND);
+  this->skews = make_percentiletracker(100, 50);
+  percentiletracker_set_treshold(this->skews, 2 * GST_SECOND);
   mprtpr_path_reset (this);
 }
 
@@ -85,115 +82,27 @@ mprtpr_path_finalize (GObject * object)
   g_object_unref (this->sysclock);
   g_object_unref(this->lt_low_delays);
   g_object_unref(this->skews);
-  g_object_unref(this->packetsqueue);
 }
 
 
 void
 mprtpr_path_reset (MpRTPRPath * this)
 {
-  this->gaps = NULL;
-  this->result = NULL;
   this->seq_initialized = FALSE;
   //this->skew_initialized = FALSE;
   this->cycle_num = 0;
   this->total_late_discarded = 0;
   this->total_late_discarded_bytes = 0;
-  this->total_early_discarded = 0;
-  this->total_duplicated_packet_num = 0;
   this->highest_seq = 0;
+  this->jitter = 0;
   this->total_packet_losts = 0;
   this->total_packets_received = 0;
   this->total_payload_bytes = 0;
 
-  this->ext_rtptime = -1;
   this->last_packet_skew = 0;
   this->last_received_time = 0;
-  this->PHSN = 0;
 
 }
-
-guint16
-mprtpr_path_get_cycle_num (MpRTPRPath * this)
-{
-  guint16 result;
-  THIS_READLOCK (this);
-  result = this->cycle_num;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-guint16
-mprtpr_path_get_highest_sequence_number (MpRTPRPath * this)
-{
-  guint16 result;
-  THIS_READLOCK (this);
-  result = this->highest_seq;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-guint32
-mprtpr_path_get_jitter (MpRTPRPath * this)
-{
-  guint32 result;
-  THIS_READLOCK (this);
-  result = packetsrcvqueue_get_jitter(this->packetsqueue);
-//  g_print("Sub-%d jitter: %u\n", this->id, result);
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-guint32
-mprtpr_path_get_total_late_discarded_num (MpRTPRPath * this)
-{
-  guint16 result;
-  THIS_READLOCK (this);
-  result = this->total_late_discarded;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-guint32
-mprtpr_path_get_total_late_discarded_bytes_num (MpRTPRPath * this)
-{
-  guint32 result;
-  THIS_READLOCK (this);
-  result = this->total_late_discarded_bytes;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-guint32
-mprtpr_path_get_total_bytes_received (MpRTPRPath * this)
-{
-  guint32 result;
-  THIS_READLOCK (this);
-  result = this->total_payload_bytes + (28<<3) * this->total_packets_received;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-guint32
-mprtpr_path_get_total_payload_bytes (MpRTPRPath * this)
-{
-  guint32 result;
-  THIS_READLOCK (this);
-  result = this->total_payload_bytes;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-guint64
-mprtpr_path_get_total_received_packets_num (MpRTPRPath * this)
-{
-  guint32 result;
-  THIS_READLOCK (this);
-  result = this->total_packets_received;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
 
 guint8
 mprtpr_path_get_id (MpRTPRPath * this)
@@ -205,196 +114,143 @@ mprtpr_path_get_id (MpRTPRPath * this)
   return result;
 }
 
-void
-mprtpr_path_removes_obsolate_packets (MpRTPRPath * this, GstClockTime treshold)
+void mprtpr_path_get_RR_stats(MpRTPRPath *this,
+                           guint16 *HSN,
+                           guint16 *cycle_num,
+                           guint32 *jitter,
+                           guint32 *received_num,
+                           guint32 *received_bytes)
 {
-  GstClockTime obsolate_margin;
-//  g_print("mprtpr_path_removes_obsolate_packets begin\n");
-  THIS_WRITELOCK (this);
-  obsolate_margin = gst_clock_get_time (this->sysclock) - treshold;
-  while(packetsrcvqueue_head_obsolted(this->packetsqueue, obsolate_margin)){
-    packetsrcvqueue_remove_head(this->packetsqueue, NULL);
-  }
-//  g_print("Obsolate next: %p - %d packets\n", next, num);
-  THIS_WRITEUNLOCK (this);
-//  g_print("mprtpr_path_removes_obsolate_packets end\n");
-}
-
-
-guint32 mprtpr_path_get_skew_packet_num(MpRTPRPath *this)
-{
-  guint32 result;
   THIS_READLOCK (this);
-  result = 0;
+  if(HSN) *HSN = this->highest_seq;
+  if(cycle_num) *cycle_num = this->cycle_num;
+  if(jitter) *jitter = this->jitter;
+  if(received_num) *received_num = this->total_packets_received;
+  if(received_bytes) *received_bytes = this->total_payload_bytes;
   THIS_READUNLOCK (this);
-  return result;
 }
 
- void mprtpr_path_get_obsolate_stat(MpRTPRPath *this,
-                                      GstClockTime treshold,
-                                      guint16 *lost,
-                                      guint16 *received,
-                                      guint16 *expected)
+void mprtpr_path_get_XR7243_stats(MpRTPRPath *this,
+                           guint16 *discarded,
+                           guint32 *discarded_bytes)
 {
-  guint16 lost_result;
-  THIS_WRITELOCK (this);
-
-  packetsrcvqueue_get_packets_stat_for_obsolation(this->packetsqueue,
-                                                   treshold,
-                                                   &lost_result,
-                                                   received,
-                                                   expected);
-  if(lost) *lost = lost_result;
-  this->total_lost_packets_num += lost_result;
-  THIS_WRITEUNLOCK (this);
-}
-
-void mprtpr_path_set_state(MpRTPRPath *this, MPRTPRPathState state)
-{
-  THIS_WRITELOCK (this);
-  this->state = state;
-  THIS_WRITEUNLOCK (this);
-}
-
-void mprtpr_path_set_delay(MpRTPRPath *this, GstClockTime delay)
-{
-  THIS_WRITELOCK (this);
-  streamtracker_add(this->lt_low_delays, delay);
-  streamtracker_add(this->lt_high_delays, delay);
-  this->last_delay_d = this->last_delay_c;
-  this->last_delay_c = this->last_delay_b;
-  this->last_delay_b = this->last_delay_a;
-  this->last_delay_a = delay;
-//  g_print("Add delay to subflow %d delay %lu-num:%u-%u->index:%d\n",
-//          this->id,
-//          delay,
-//          bintree_get_num(this->min_delay_bintree),
-//          bintree_get_num(this->max_delay_bintree),
-//          this->delays_write_index);
-  THIS_WRITEUNLOCK (this);
-}
-
-MPRTPRPathState mprtpr_path_get_state(MpRTPRPath *this)
-{
-  MPRTPRPathState result;
   THIS_READLOCK (this);
-  result = this->state;
+  if(discarded) *discarded = this->total_late_discarded;
+  if(discarded_bytes) *discarded_bytes = this->total_late_discarded_bytes;
   THIS_READUNLOCK (this);
-  return result;
 }
 
-
-
-
-void mprtpr_path_set_played_seq_num(MpRTPRPath *this, guint16 played_seq_num)
+void mprtpr_path_get_FBCC_stats(MpRTPRPath *this,
+                           GstClockTime *sh_last_delay,
+                           GstClockTime *md_last_delay,
+                           GstClockTime *lt_40th_delay,
+                           GstClockTime *lt_80th_delay)
 {
-  THIS_WRITELOCK (this);
-  if(!this->PHSN) this->PHSN = played_seq_num;
-  else if(_cmp_seq(this->PHSN, played_seq_num) < 0){
-    this->PHSN = played_seq_num;
-  }
-//  g_print("Sub-%d PLAYED: %hu, PHSN: %hu\n", this->id, played_seq_num, this->played_highest_seq);
-  THIS_WRITEUNLOCK (this);
-}
-
-guint64
-mprtpr_path_get_drift_window (MpRTPRPath * this,
-                              GstClockTime *min_skew,
-                              GstClockTime *max_skew)
-{
-  guint64 result;
-  THIS_WRITELOCK (this);
-  result = this->last_drift_window;
-  if(!streamtracker_get_num(this->skews)) goto done;
-  result = streamtracker_get_stats(this->skews, min_skew, max_skew, NULL);
-done:
-  this->last_drift_window = result;
-  THIS_WRITEUNLOCK (this);
-  return result;
-}
-
-GstClockTime mprtpr_path_get_avg_4last_delay(MpRTPRPath *this)
-{
-  GstClockTime result;
   THIS_READLOCK (this);
-  result = (this->last_delay_a + this->last_delay_b + this->last_delay_c + this->last_delay_d)>>2;
+  if(sh_last_delay) *sh_last_delay = this->sh_delay;
+  if(md_last_delay) *md_last_delay = this->md_delay;
+  if(lt_40th_delay) *lt_40th_delay = percentiletracker_get_stats(this->lt_low_delays, NULL, NULL, NULL);
+  if(lt_80th_delay) *lt_80th_delay = percentiletracker_get_stats(this->lt_high_delays, NULL, NULL, NULL);
   THIS_READUNLOCK (this);
-  return result;
 }
 
-void
-mprtpr_path_get_ltdelays (MpRTPRPath   *this,
-                       GstClockTime *percentile_40,
-                       GstClockTime *percentile_80,
-                       GstClockTime *min_delay,
-                       GstClockTime *max_delay)
+void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
+                           GstClockTime *md_last_delay,
+                           gdouble       *path_skew,
+                           guint32       *jitter)
 {
   THIS_READLOCK (this);
-  if(percentile_40)
-    *percentile_40 = streamtracker_get_stats(this->lt_low_delays, min_delay, max_delay, NULL);
-  if(percentile_80)
-    *percentile_80 = streamtracker_get_stats(this->lt_high_delays, min_delay, max_delay, NULL);
-  THIS_READUNLOCK(this);
-  return;
+  if(md_last_delay) *md_last_delay = this->sh_delay;
+//  if(skew) *skew = _get_drift_window(this);
+  if(path_skew) *path_skew = this->path_skew;
+  if(jitter) *jitter = this->jitter;
+//  g_print("%d: %f\n", this->id, *path_skew);
+  THIS_READUNLOCK (this);
 }
 
-void
-mprtpr_path_process_rtp_packet (MpRTPRPath * this,
-    GstRTPBuffer * rtp, guint16 packet_subflow_seq_num, guint64 snd_time)
+void mprtpr_path_add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp)
+{
+  THIS_WRITELOCK (this);
+//  g_print("Discarded on subflow %d\n", this->id);
+  ++this->total_late_discarded;
+  this->total_late_discarded_bytes+=mprtp->payload_bytes;
+  THIS_WRITEUNLOCK (this);
+}
+
+void mprtpr_path_add_delay(MpRTPRPath *this, GstClockTime delay)
+{
+  THIS_WRITELOCK (this);
+  _add_delay(this, delay);
+  THIS_WRITEUNLOCK (this);
+}
+
+
+gint64
+_get_drift_window (MpRTPRPath * this)
 {
   guint64 skew;
-  guint16 payload_bytes;
-  GstClockTime delay;
-//  g_print("mprtpr_path_process_rtp_packet begin\n");
-  THIS_WRITELOCK (this);
+  skew = percentiletracker_get_stats(this->skews, NULL, NULL, NULL);
+  if((skew & ((guint64)1<<63)) == 0){
+    return (gint64)-1 * ((gint64) skew);
+  }else{
+    return (skew ^ ((guint64)1<<63));
+  }
+}
 
+
+
+void
+mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
+{
+//  g_print("mprtpr_path_process_rtp_packet begin\n");
+  gint64 skew;
+  guint64 uskew;
+
+  THIS_WRITELOCK (this);
+  gst_mprtp_buffer_read_map(mprtp);
   if (this->seq_initialized == FALSE) {
-    this->highest_seq = packet_subflow_seq_num;
+    this->highest_seq = mprtp->subflow_seq;
     this->total_packets_received = 1;
+    this->last_rtp_timestamp = gst_mprtp_ptr_buffer_get_timestamp(mprtp);
+    this->last_mprtp_delay = mprtp->delay;
+    _add_delay(this, mprtp->delay);
     this->seq_initialized = TRUE;
-    packetsrcvqueue_add(this->packetsqueue,
-                     snd_time,
-                     packet_subflow_seq_num,
-                     &delay);
     goto done;
   }
 
-  //calculate lost, discarded and received packets
-  payload_bytes = gst_rtp_buffer_get_payload_len(rtp);
+  skew = ((gint64)mprtp->delay) - ((gint64)this->last_mprtp_delay);
+  this->last_mprtp_delay = mprtp->delay;
   ++this->total_packets_received;
-  this->total_payload_bytes += payload_bytes;
-//  g_print("Sub-%d SEQ: %hu HSN: %hu\n", this->id, packet_subflow_seq_num, this->highest_seq);
-  if (_cmp_seq (this->highest_seq, packet_subflow_seq_num) <= 0){
-    this->highest_seq = packet_subflow_seq_num;
-    goto add;
-  }
-  if (this->PHSN && _cmp_seq (this->PHSN, packet_subflow_seq_num) >= 0){
-    ++this->total_late_discarded;
-    this->total_late_discarded_bytes+=payload_bytes;
-//    g_print("Sub-%d LATE %hu PHSN: %hu\n", this->id, packet_subflow_seq_num, this->PHSN);
-  }
+  this->total_payload_bytes += mprtp->payload_bytes;
+  this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
+//  g_print("J: %d\n", this->jitter);
+  _add_delay(this, mprtp->delay);
 
-add:
-  skew = packetsrcvqueue_add(this->packetsqueue,
-                          snd_time,
-                          packet_subflow_seq_num,
-                          &delay);
-//  if(this->id == 1) g_print("%lu,", delay);
-  if(this->last_rtp_timestamp != gst_rtp_buffer_get_timestamp(rtp)){
-    streamtracker_add(this->skews, skew);
-    this->last_rtp_timestamp = gst_rtp_buffer_get_timestamp(rtp);
+  if(_cmp_seq(this->highest_seq, mprtp->subflow_seq) >= 0){
+    goto done;
   }
+  this->highest_seq = mprtp->subflow_seq;
+  if(this->last_rtp_timestamp == gst_mprtp_ptr_buffer_get_timestamp(mprtp))
+    goto done;
+  if(skew < 0) percentiletracker_add(this->skews, ~(skew-1));
+  else         percentiletracker_add(this->skews, skew | (1UL<<63));
+
+  uskew = percentiletracker_get_stats(this->skews, NULL, NULL, NULL);
+  if((uskew & (3UL<<62)) > 0){
+      uskew = uskew & 0x3FFFFFFFFFFFFFFFUL;
+    this->path_skew = this->path_skew * .99 + (gdouble)uskew * .01;
+  }
+  else{
+    this->path_skew = this->path_skew * .99 - (gdouble)uskew * .01;
+  }
+//  g_print("S%d: %f\n", this->id, this->path_skew);
+  //new frame
+  if(0) _get_drift_window(this);
+  this->last_rtp_timestamp = gst_mprtp_ptr_buffer_get_timestamp(mprtp);
+
 done:
-  streamtracker_add(this->lt_low_delays, delay);
-  streamtracker_add(this->lt_high_delays, delay);
-  this->last_delay_d = this->last_delay_c;
-  this->last_delay_c = this->last_delay_b;
-  this->last_delay_b = this->last_delay_a;
-  this->last_delay_a = delay;
+  gst_mprtp_buffer_read_unmap(mprtp);
   THIS_WRITEUNLOCK (this);
-//  g_print("mprtpr_path_process_rtp_packet end\n");
-  return;
-
 }
 
 gint
@@ -414,16 +270,32 @@ _cmp_seq (guint16 x, guint16 y)
 
 }
 
-gint
-_cmp_for_max (guint64 x, guint64 y)
-{
-  return x == y ? 0 : x < y ? -1 : 1;
-}
 
-gint
-_cmp_for_min (guint64 x, guint64 y)
+void _add_delay(MpRTPRPath *this, GstClockTime delay)
 {
-  return x == y ? 0 : x < y ? 1 : -1;
+  percentiletracker_add(this->lt_low_delays, delay);
+  percentiletracker_add(this->lt_high_delays, delay);
+  if(this->seq_initialized)
+    this->md_delay = (31 * this->md_delay + delay ) / 32;
+  else
+    this->md_delay = delay;
+  if(delay < this->last_delay_a){
+    if(this->last_delay_a < this->last_delay_b)
+      this->sh_delay = this->last_delay_a;
+    else if(this->last_delay_b < delay)
+      this->sh_delay = delay;
+    else
+      this->sh_delay = this->last_delay_b;
+  }else{
+    if(delay < this->last_delay_b)
+      this->sh_delay = delay;
+    else if(this->last_delay_a < this->last_delay_b)
+      this->sh_delay = this->last_delay_a;
+    else
+      this->sh_delay = this->last_delay_b;
+  }
+  this->last_delay_b = this->last_delay_a;
+  this->last_delay_a = delay;
 }
 
 #undef THIS_READLOCK

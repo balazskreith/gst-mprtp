@@ -33,7 +33,7 @@ struct _PacketsRcvQueue
   guint32                  counter;
   guint32                  lost;
   GRWLock                  rwmutex;
-  GQueue*                  node_pool;
+  PointerPool*             node_pool;
   BinTree*                 node_tree;
   gboolean                 last_seq_init;
   guint16                  last_seq;

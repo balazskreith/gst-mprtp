@@ -147,9 +147,9 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-refctrler.lo libgstmprtp_la-bintree.lo \
 	libgstmprtp_la-packetsrcvqueue.lo \
 	libgstmprtp_la-packetssndqueue.lo \
-	libgstmprtp_la-playoutgate.lo libgstmprtp_la-ricalcer.lo \
-	libgstmprtp_la-streamtracker.lo \
-	libgstmprtp_la-streamtracker2.lo \
+	libgstmprtp_la-pointerpool.lo libgstmprtp_la-ricalcer.lo \
+	libgstmprtp_la-percentiletracker.lo \
+	libgstmprtp_la-variancetracker.lo \
 	libgstmprtp_la-sndratedistor.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
@@ -410,10 +410,10 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          bintree.c                  \
                          packetsrcvqueue.c          \
                          packetssndqueue.c          \
-                         playoutgate.c              \
+                         pointerpool.c              \
                          ricalcer.c                 \
-                         streamtracker.c            \
-                         streamtracker2.c           \
+                         percentiletracker.c            \
+                         variancetracker.c          \
                          sndratedistor.c
 
 noinst_HEADERS = mprtpspath.h      \
@@ -427,10 +427,10 @@ noinst_HEADERS = mprtpspath.h      \
                  bintree.h         \
                  packetsrcvqueue.h \
                  packetssndqueue.h \
-                 playoutgate.h     \
+                 pointerpool.h     \
                  ricalcer.h        \
-                 streamtracker.h   \
-                 streamtracker2.h  \
+                 percentiletracker.h    \
+                 variancetracker.h  \
                  sndratedistor.h
 
 
@@ -537,7 +537,8 @@ include ./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-packetsrcvqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-packetssndqueue.Plo
-include ./$(DEPDIR)/libgstmprtp_la-playoutgate.Plo
+include ./$(DEPDIR)/libgstmprtp_la-percentiletracker.Plo
+include ./$(DEPDIR)/libgstmprtp_la-pointerpool.Plo
 include ./$(DEPDIR)/libgstmprtp_la-refctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-ricalcer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rmanctrler.Plo
@@ -546,8 +547,7 @@ include ./$(DEPDIR)/libgstmprtp_la-smanctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndratedistor.Plo
 include ./$(DEPDIR)/libgstmprtp_la-streamjoiner.Plo
 include ./$(DEPDIR)/libgstmprtp_la-streamsplitter.Plo
-include ./$(DEPDIR)/libgstmprtp_la-streamtracker.Plo
-include ./$(DEPDIR)/libgstmprtp_la-streamtracker2.Plo
+include ./$(DEPDIR)/libgstmprtp_la-variancetracker.Plo
 
 .c.o:
 	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -696,12 +696,12 @@ libgstmprtp_la-packetssndqueue.lo: packetssndqueue.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-packetssndqueue.lo `test -f 'packetssndqueue.c' || echo '$(srcdir)/'`packetssndqueue.c
 
-libgstmprtp_la-playoutgate.lo: playoutgate.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-playoutgate.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-playoutgate.Tpo -c -o libgstmprtp_la-playoutgate.lo `test -f 'playoutgate.c' || echo '$(srcdir)/'`playoutgate.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-playoutgate.Tpo $(DEPDIR)/libgstmprtp_la-playoutgate.Plo
-#	$(AM_V_CC)source='playoutgate.c' object='libgstmprtp_la-playoutgate.lo' libtool=yes \
+libgstmprtp_la-pointerpool.lo: pointerpool.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-pointerpool.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-pointerpool.Tpo -c -o libgstmprtp_la-pointerpool.lo `test -f 'pointerpool.c' || echo '$(srcdir)/'`pointerpool.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-pointerpool.Tpo $(DEPDIR)/libgstmprtp_la-pointerpool.Plo
+#	$(AM_V_CC)source='pointerpool.c' object='libgstmprtp_la-pointerpool.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-playoutgate.lo `test -f 'playoutgate.c' || echo '$(srcdir)/'`playoutgate.c
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-pointerpool.lo `test -f 'pointerpool.c' || echo '$(srcdir)/'`pointerpool.c
 
 libgstmprtp_la-ricalcer.lo: ricalcer.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-ricalcer.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-ricalcer.Tpo -c -o libgstmprtp_la-ricalcer.lo `test -f 'ricalcer.c' || echo '$(srcdir)/'`ricalcer.c
@@ -710,19 +710,19 @@ libgstmprtp_la-ricalcer.lo: ricalcer.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-ricalcer.lo `test -f 'ricalcer.c' || echo '$(srcdir)/'`ricalcer.c
 
-libgstmprtp_la-streamtracker.lo: streamtracker.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-streamtracker.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-streamtracker.Tpo -c -o libgstmprtp_la-streamtracker.lo `test -f 'streamtracker.c' || echo '$(srcdir)/'`streamtracker.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-streamtracker.Tpo $(DEPDIR)/libgstmprtp_la-streamtracker.Plo
-#	$(AM_V_CC)source='streamtracker.c' object='libgstmprtp_la-streamtracker.lo' libtool=yes \
+libgstmprtp_la-percentiletracker.lo: percentiletracker.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-percentiletracker.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-percentiletracker.Tpo -c -o libgstmprtp_la-percentiletracker.lo `test -f 'percentiletracker.c' || echo '$(srcdir)/'`percentiletracker.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-percentiletracker.Tpo $(DEPDIR)/libgstmprtp_la-percentiletracker.Plo
+#	$(AM_V_CC)source='percentiletracker.c' object='libgstmprtp_la-percentiletracker.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-streamtracker.lo `test -f 'streamtracker.c' || echo '$(srcdir)/'`streamtracker.c
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-percentiletracker.lo `test -f 'percentiletracker.c' || echo '$(srcdir)/'`percentiletracker.c
 
-libgstmprtp_la-streamtracker2.lo: streamtracker2.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-streamtracker2.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-streamtracker2.Tpo -c -o libgstmprtp_la-streamtracker2.lo `test -f 'streamtracker2.c' || echo '$(srcdir)/'`streamtracker2.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-streamtracker2.Tpo $(DEPDIR)/libgstmprtp_la-streamtracker2.Plo
-#	$(AM_V_CC)source='streamtracker2.c' object='libgstmprtp_la-streamtracker2.lo' libtool=yes \
+libgstmprtp_la-variancetracker.lo: variancetracker.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-variancetracker.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-variancetracker.Tpo -c -o libgstmprtp_la-variancetracker.lo `test -f 'variancetracker.c' || echo '$(srcdir)/'`variancetracker.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-variancetracker.Tpo $(DEPDIR)/libgstmprtp_la-variancetracker.Plo
+#	$(AM_V_CC)source='variancetracker.c' object='libgstmprtp_la-variancetracker.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-streamtracker2.lo `test -f 'streamtracker2.c' || echo '$(srcdir)/'`streamtracker2.c
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-variancetracker.lo `test -f 'variancetracker.c' || echo '$(srcdir)/'`variancetracker.c
 
 libgstmprtp_la-sndratedistor.lo: sndratedistor.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-sndratedistor.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-sndratedistor.Tpo -c -o libgstmprtp_la-sndratedistor.lo `test -f 'sndratedistor.c' || echo '$(srcdir)/'`sndratedistor.c

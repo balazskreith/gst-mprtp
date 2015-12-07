@@ -9,6 +9,7 @@
 #define BINTREE_H_
 
 #include <gst/gst.h>
+#include "pointerpool.h"
 
 typedef struct _BinTree BinTree;
 typedef struct _BinTreeClass BinTreeClass;
@@ -30,7 +31,8 @@ struct _BinTree
   BinTreeNode*             bottom;
   BinTreeCmpFunc           cmp;
   GRWLock                  rwmutex;
-  GQueue*                  node_pool;
+//  GQueue*                  node_pool;
+  PointerPool*             node_pool;
   guint32                  counter;
 
 };

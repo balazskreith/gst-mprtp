@@ -57,7 +57,11 @@ static PacketsRcvQueueNode* _make_node(PacketsRcvQueue *this,
                                     guint64 snd_time,
                                     guint16 seq_num,
                                     GstClockTime *delay);
-static void _trash_node(PacketsRcvQueue *this, PacketsRcvQueueNode* node);
+#define _trash_node(this, node) pointerpool_add(this->node_pool, node)
+static gpointer _node_ctor(void)
+{
+  return g_malloc0(sizeof(PacketsRcvQueueNode));
+}
 
 static guint64 _get_skew(PacketsRcvQueue *this,
                          PacketsRcvQueueNode* act,
@@ -96,10 +100,7 @@ packetsrcvqueue_finalize (GObject * object)
   PacketsRcvQueueNode *next;
 
   this = PACKETSRCVQUEUE(object);
-  while(!g_queue_is_empty(this->node_pool)){
-    g_free(g_queue_pop_head(this->node_pool));
-  }
-
+  g_object_unref(this->node_pool);
   while(this->head){
     next = this->head->next;
     _trash_node(this, this->head);
@@ -114,7 +115,7 @@ packetsrcvqueue_init (PacketsRcvQueue * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->jitter = 0;
-  this->node_pool = g_queue_new();
+  this->node_pool = make_pointerpool(64, _node_ctor, g_free);
   this->node_tree = make_bintree(_cmp_for_bintree);
   this->sysclock = gst_system_clock_obtain();
 }
@@ -300,10 +301,7 @@ PacketsRcvQueueNode* _make_node(PacketsRcvQueue *this,
                              GstClockTime *delay)
 {
   PacketsRcvQueueNode *result;
-  if(!g_queue_is_empty(this->node_pool))
-    result = g_queue_pop_head(this->node_pool);
-  else
-    result = g_malloc0(sizeof(PacketsRcvQueueNode));
+  result = pointerpool_get(this->node_pool);
   memset((gpointer)result, 0, sizeof(PacketsRcvQueueNode));
   result->rcv_time = NTP_NOW;
   result->seq_num = seq_num;
@@ -322,14 +320,6 @@ PacketsRcvQueueNode* _make_node(PacketsRcvQueue *this,
   return result;
 }
 
-
-void _trash_node(PacketsRcvQueue *this, PacketsRcvQueueNode* node)
-{
-  if(g_queue_get_length(this->node_pool) > 4096)
-    g_free(node);
-  else
-    g_queue_push_tail(this->node_pool, node);
-}
 
 
 guint16

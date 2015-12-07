@@ -59,13 +59,15 @@
 #define MPRTCP_PACKET_DEFAULT_MTU 1400
 #define MPRTCP_PACKET_TYPE_IDENTIFIER 212
 #define GST_RTCP_TYPE_XR 207
+#define GST_RTCP_TYPE_FB 205
 #define GST_MPRTCP_BLOCK_TYPE_SUBFLOW_INFO 0
 #define GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER 26
-#define GST_RTCP_XR_SKEW_BLOCK_TYPE_IDENTIFIER 27
 #define GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER 28
 #define RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION 2
 #define RTCP_XR_RFC7243_I_FLAG_SAMPLED_METRIC 1
 #define RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION 3
+//Stands for MPCC in ascii
+#define RTCPFB_MPCC_IDENTIFIER 0x4D504343
 
 #define current_unix_time_in_us g_get_real_time ()
 #define current_unix_time_in_ms (current_unix_time_in_us / 1000L)
@@ -187,6 +189,18 @@ typedef struct PACKED _GstRTCPXR_OWD
 } GstRTCPXR_OWD;
 
 
+typedef struct PACKED _GstRTCPFB_MPCC
+{
+  GstRTCPHeader   header;
+  guint32         media_ssrc;
+  guint32         identifier;
+  guint32         lt80_delay;
+  guint32         lt40_delay;
+  guint32         md_delay;
+  guint32         sh_delay;
+} GstRTCPFB_MPCC;
+
+
 /*MPRTCP struct polymorphism*/
 
 typedef struct PACKED _GstMPRTCPSubflowInfo
@@ -219,6 +233,7 @@ typedef struct PACKED _GstMPRTCPSubflowBlock
     GstRTCPXR xr_header;
     GstRTCPXR_RFC7243 xr_rfc7243_riport;
     GstRTCPXR_OWD     xr_owd;
+    GstRTCPFB_MPCC    fb_mpcc;
   };
 } GstMPRTCPSubflowBlock;
 
@@ -270,6 +285,8 @@ GstRTCPXR_RFC7243 *gst_mprtcp_riport_block_add_xr_rfc2743 (GstMPRTCPSubflowBlock
 
 GstRTCPXR_OWD *
 gst_mprtcp_riport_block_add_xr_owd (GstMPRTCPSubflowBlock * block);
+GstRTCPFB_MPCC *
+gst_mprtcp_riport_block_add_fb_mpcc (GstMPRTCPSubflowBlock * block);
 void
 gst_mprtcp_riport_add_block_end (GstMPRTCPSubflowReport * report,
     GstMPRTCPSubflowBlock * block);
@@ -354,6 +371,29 @@ void gst_rtcp_xr_owd_getdown(GstRTCPXR_OWD *report,
 
 
 
+void gst_rtcp_fb_mpcc_init (GstRTCPFB_MPCC * report);
+
+void gst_rtcp_fb_mpcc_setup(GstRTCPFB_MPCC *report,
+                            guint32 media_ssrc,
+                            guint32 lt80_delay,
+                            guint32 lt40_delay,
+                            guint32 md_delay,
+                            guint32 sh_delay);
+
+void gst_rtcp_fb_mpcc_change (GstRTCPFB_MPCC *report,
+                              guint32* lt80_delay,
+                              guint32* lt40_delay,
+                              guint32* md_delay,
+                              guint32* sh_delay);
+
+void gst_rtcp_fb_mpcc_getdown(GstRTCPFB_MPCC *report,
+                              guint32* lt80_delay,
+                              guint32* lt40_delay,
+                              guint32* md_delay,
+                              guint32* sh_delay);
+
+
+
 void gst_mprtcp_report_init (GstMPRTCPSubflowReport * report);
 void gst_mprtcp_riport_setup (GstMPRTCPSubflowReport * report, guint32 ssrc);
 void gst_mprtcp_riport_getdown (GstMPRTCPSubflowReport * report,
@@ -383,6 +423,7 @@ void gst_print_rtcp_sr (GstRTCPSR * report);
 void gst_print_rtcp_rr (GstRTCPRR * report);
 void gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * report);
 void gst_print_rtcp_xr_owd (GstRTCPXR_OWD * report);
+void gst_print_rtcp_fb_mpcc (GstRTCPFB_MPCC * report);
 void gst_print_rtcp_srb (GstRTCPSRBlock * block_ptr);
 void gst_print_rtcp_rrb (GstRTCPRRBlock * block_ptr);
 

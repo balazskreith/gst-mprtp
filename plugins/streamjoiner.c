@@ -24,7 +24,7 @@
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include "streamjoiner.h"
-#include "playoutgate.h"
+#include "gstmprtpbuffer.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,20 +53,6 @@ GST_DEBUG_CATEGORY_STATIC (stream_joiner_debug_category);
 #define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
 
 
-// Returns the biggest element in the heap
-//Returns the smallest sequence element in the heap
-#define heap_front(h) (*(h)->data)
-
-// Frees the allocated memory
-#define heap_term(h) (g_free((h)->data))
-
-
-//#define CMP(a, b) ((a)->seq_num <= (b)->seq_num)
-#define HEAP_CMP(a, b) ((_cmp_seq((a)->seq_num, (b)->seq_num) < 0))
-
-static const unsigned int base_size = 4;
-
-
 G_DEFINE_TYPE (StreamJoiner, stream_joiner, G_TYPE_OBJECT);
 
 typedef struct _Subflow Subflow;
@@ -74,46 +60,111 @@ typedef struct _Subflow Subflow;
 struct _Subflow
 {
   guint8 id;
-  MpRTPRPath *path;
+  MpRTPRPath  *path;
+  GstClockTime delay;
+  gdouble skew;
 };
 
-//Heap functions
-typedef struct _HeapItem
-{
-  GstBuffer    *buffer;
-  guint16       seq_num;
-  guint32       rtp_timestamp;
-  guint8        subflow_id;
-} HeapItem;
 
-struct _Heap
-{
-  unsigned int size;            // Size of the allocated memory (in number of items)
-  unsigned int count;           // Count of the elements in the heap
-  HeapItem **data;              // Array with the elements
+struct _FrameNode{
+  GstMpRTPBuffer* mprtp;
+  guint16         seq;
+  FrameNode*      next;
 };
+
+struct _Frame
+{
+  Frame          *next;
+  FrameNode      *head;
+  FrameNode      *tail;
+  guint32         timestamp;
+  GstClockTime    playout_time;
+  GstClockTime    created;
+};
+
+static gpointer _frame_ctor(void)
+{
+  return g_malloc0(sizeof(Frame));
+}
+
+static gpointer _framenode_ctor(void)
+{
+  return g_malloc0(sizeof(FrameNode));
+}
+
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
 
-static void stream_joiner_finalize (GObject * object);
-static void stream_joiner_run (void *data);
-void _obsolate(StreamJoiner *this);
-static Subflow *_make_subflow (MpRTPRPath * path);
-void _ruin_subflow (gpointer data);
-static gint _cmp_seq (guint16 x, guint16 y);
-gint _cmp_skew_for_tree(guint64 x , guint64 y);
-static void _heap_init (struct _Heap *restrict h);
-static void _heap_push (struct _Heap *restrict h, HeapItem * value);
-static void _heap_pop (struct _Heap *restrict h);
-static HeapItem *_make_heap_item (StreamJoiner * this,
-                                  GstRTPBuffer *rtp,
-                                  guint8 subflow_id);
-static void _trash_heap_item (StreamJoiner * this, HeapItem * heap_item);
+static void
+stream_joiner_finalize (
+    GObject * object);
 
-static void _tick(StreamJoiner *this);
-static void _playout(StreamJoiner * this);
+static void
+stream_joiner_run (
+    void *data);
+
+static Subflow *
+_make_subflow (
+    MpRTPRPath * path);
+
+static void
+_ruin_subflow (
+    gpointer data);
+
+static gint
+_cmp_seq (
+    guint16 x,
+    guint16 y);
+
+static Frame*
+_make_frame(
+    StreamJoiner *this,
+    GstMpRTPBuffer *mprtp);
+
+static FrameNode *
+_make_framenode(
+    StreamJoiner *this,
+    GstMpRTPBuffer *mprtp);
+
+static void
+_add_mprtp_packet(
+    StreamJoiner *this,
+    GstMpRTPBuffer *mprtp);
+
+static void
+_push_into_frame(
+    StreamJoiner *this,
+    Frame *frame,
+    GstMpRTPBuffer *rtp);
+
+static Frame *_try_find(
+    StreamJoiner *this,
+    guint32 timestamp,
+    Frame **predecessor);
+
+#define _trash_frame(this, frame) pointerpool_add(this->frames_pool, frame)
+#define _trash_framenode(this, frame) pointerpool_add(this->framenodes_pool, node)
+
+
+//#define DEBUG_PRINT_TOOLS
+#ifdef DEBUG_PRINT_TOOLS
+static void _print_frame(Frame *frame)
+{
+  FrameNode *node;
+  g_print("Frame %p created: %lu, srt: %d, rd: %d, m: %d src: %d, h: %p, t: %p\n",
+          frame, frame->created, frame->sorted, frame->ready, frame->marked,
+          frame->source, frame->head, frame->tail);
+  g_print("Items: ")
+  for(node = frame->head; node; node = node->next)
+    g_print("%p(%hu)->%p|", node, node->seq, node->next);
+  g_print("\n");
+}
+#else
+#define _print_frame(frame)
+#endif
+
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -138,9 +189,11 @@ stream_joiner_finalize (GObject * object)
   g_hash_table_destroy (this->subflows);
   gst_task_stop (this->thread);
   gst_task_join (this->thread);
-  g_free (this->packets_heap);
+
   g_object_unref (this->sysclock);
-  g_object_unref(this->playoutgate);
+  g_object_unref (this->frames_pool);
+  g_object_unref (this->framenodes_pool);
+//  g_object_unref(this->playoutgate);
 }
 
 void
@@ -149,23 +202,36 @@ stream_joiner_init (StreamJoiner * this)
   this->sysclock = gst_system_clock_obtain ();
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, _ruin_subflow);
 //  this->max_path_skew = 10 * GST_MSECOND;
-  this->packets_heap = g_malloc0 (sizeof (Heap));
-  this->heap_items_pool = g_queue_new ();
-  this->playoutgate = make_playoutgate();
+  this->frames_pool = make_pointerpool(1024, _frame_ctor, g_free);
+  this->framenodes_pool = make_pointerpool(1024, _framenode_ctor, g_free);
+  this->PHSN = 0;
   this->playout_allowed = TRUE;
   this->playout_halt = FALSE;
   this->playout_halt_time = 100 * GST_MSECOND;
   this->tick_interval = 100 * GST_USECOND;
-  _heap_init (this->packets_heap);
+  this->skew_window = make_percentiletracker(256, 50);
+  percentiletracker_set_treshold(this->skew_window, 2 * GST_SECOND);
+  this->delay_window = make_percentiletracker(1024, 90);
+  percentiletracker_set_treshold(this->delay_window, 5 * GST_SECOND);
+  this->jitter_window = make_percentiletracker(256, 50);
+  percentiletracker_set_treshold(this->jitter_window, 2 * GST_SECOND);
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   this->thread = gst_task_new (stream_joiner_run, this, NULL);
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
-
-  playoutgate_set_max_delay(this->playoutgate, 20 * GST_MSECOND);
 }
 
+StreamJoiner*
+make_stream_joiner(gpointer data, void (*func)(gpointer,GstMpRTPBuffer*))
+{
+  StreamJoiner *result;
+  result = (StreamJoiner *) g_object_new (STREAM_JOINER_TYPE, NULL);
+  result->send_mprtp_packet_data = data;
+  result->send_mprtp_packet_func = func;
+//  result->playoutgate = make_playoutgate(data, func);
+  return result;
+}
 
 void
 stream_joiner_run (void *data)
@@ -173,14 +239,15 @@ stream_joiner_run (void *data)
   GstClockTime now, next_scheduler_time;
   StreamJoiner *this = STREAM_JOINER (data);
   GstClockID clock_id;
+  Frame *frame;
+  FrameNode *node;
 
   THIS_WRITELOCK (this);
   now = gst_clock_get_time (this->sysclock);
   if (this->subflow_num == 0) {
-    next_scheduler_time = now + 100 * GST_MSECOND;
+    next_scheduler_time = now + GST_MSECOND;
     goto done;
   }
-  _obsolate(this);
 
   if(!this->playout_allowed){
     next_scheduler_time = now + GST_MSECOND;
@@ -191,99 +258,83 @@ stream_joiner_run (void *data)
     this->playout_halt = FALSE;
     goto done;
   }
+pop_frame:
+  frame = this->head;
+  if(!frame || now < frame->playout_time) goto next_tick;
+pop_node:
+  node = frame->head;
+  gst_mprtp_buffer_read_map(node->mprtp);
 
-  if(0)_tick(this);
-  _playout(this);
-
+  this->PHSN = gst_mprtp_ptr_buffer_get_abs_seq(node->mprtp);
+  gst_mprtp_buffer_read_unmap(node->mprtp);
+  this->send_mprtp_packet_func(this->send_mprtp_packet_data, node->mprtp);
+  frame->head = node->next;
+  _trash_framenode(this, node);
+  if(frame->head) goto pop_node;
+  this->head = frame->next;
+  _trash_frame(this, frame);
+  goto pop_frame;
+next_tick:
   next_scheduler_time = now + this->tick_interval;
 done:
-  THIS_WRITEUNLOCK (this);
-  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
+  {
+    GstClock *clock = this->sysclock;
+    THIS_WRITEUNLOCK (this);
+    clock_id = gst_clock_new_single_shot_id (clock, next_scheduler_time);
+  }
   if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
     GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
   }
   gst_clock_id_unref (clock_id);
 }
 
-void _obsolate(StreamJoiner *this)
-{
-  GHashTableIter iter;
-  gpointer key, val;
-  Subflow *subflow;
-  MpRTPRPath *path;
-  GstClockTime now;
 
-  now = gst_clock_get_time(this->sysclock);
-  if(now - 100 * GST_MSECOND < this->last_obsolate_checked){
+void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
+{
+  guint16 abs_seq;
+  Subflow *subflow;
+  guint32 jitter;
+  THIS_WRITELOCK(this);
+  gst_mprtp_buffer_read_map(mprtp);
+  abs_seq = gst_mprtp_ptr_buffer_get_abs_seq(mprtp);
+  if(gst_mprtp_ptr_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
+    //now drop it;
+    gst_mprtp_buffer_read_unmap(mprtp);
+    this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
     goto done;
   }
-  g_hash_table_iter_init (&iter, this->subflows);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-    subflow = (Subflow *) val;
-    path = subflow->path;
-    mprtpr_path_removes_obsolate_packets(path, 2 * GST_SECOND);
+  subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (mprtp->subflow_id));
+  mprtpr_path_get_joiner_stats(subflow->path,
+                              &subflow->delay,
+                              &subflow->skew,
+                              &jitter);
+
+//  g_print("S%d: %f->%lu\n", subflow->id, subflow->skew, (guint64)subflow->skew);
+  percentiletracker_add(this->delay_window, subflow->delay);
+  percentiletracker_add(this->jitter_window, jitter);
+  if(1. <= subflow->skew) {percentiletracker_add(this->skew_window, (guint64)subflow->skew);}
+  else percentiletracker_add(this->skew_window, 0);
+
+  if(_cmp_seq(this->PHSN, abs_seq) < 0){
+    _add_mprtp_packet(this, mprtp);
+    gst_mprtp_buffer_read_unmap(mprtp);
+    goto done;
   }
-  this->last_obsolate_checked = now;
+  gst_mprtp_buffer_read_unmap(mprtp);
+//  g_print("Discard happened on subflow %d with seq %hu, PHSN: %hu\n",
+//          subflow->id, abs_seq, this->PHSN);
+  mprtpr_path_add_discard(subflow->path, mprtp);
+  this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
 done:
-  return;
+  THIS_WRITEUNLOCK(this);
 }
 
-void _tick(StreamJoiner *this)
+void stream_joiner_set_monitor_payload_type(StreamJoiner *this, guint8 monitor_payload_type)
 {
-  HeapItem *heap_item;
-//  GstClockTime now;
-//  now = gst_clock_get_time(this->sysclock);
-  if(!this->packets_heap->count) goto done;
-  heap_item = heap_front (this->packets_heap);
-  do{
-    heap_item = heap_front (this->packets_heap);
-    _heap_pop (this->packets_heap);
-    {
-      GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-      gst_rtp_buffer_map(heap_item->buffer, GST_MAP_READ, &rtp);
-      playoutgate_push(this->playoutgate, &rtp, heap_item->subflow_id);
-      gst_rtp_buffer_unmap(&rtp);
-    }
-    _trash_heap_item (this, heap_item);
-  }while(this->packets_heap->count);
-done:
-  return;
+  THIS_WRITELOCK(this);
+  this->monitor_payload_type = monitor_payload_type;
+  THIS_WRITEUNLOCK(this);
 }
-
-void _playout(StreamJoiner * this)
-{
-  GstBuffer *buffer;
-  if(!playoutgate_has_frame_to_playout(this->playoutgate)){
-     goto done;
-  }
-  do{
-      buffer = playoutgate_pop(this->playoutgate);
-          this->send_mprtp_packet_func (
-                    this->send_mprtp_packet_data,
-                    buffer);
-  }while(playoutgate_has_frame_to_playout(this->playoutgate));
-done:
-  return;
-}
-
-void stream_joiner_receive_rtp(StreamJoiner * this, GstRTPBuffer *rtp, guint8 subflow_id)
-{
-  //HeapItem* heap_item;
-//  THIS_WRITELOCK(this);
-  //heap_item = _make_heap_item (this, rtp, subflow_id);
-//  _heap_push (this->packets_heap, heap_item);
-//  {
-//    GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-//    gst_rtp_buffer_map(heap_item->buffer, GST_MAP_READ, &rtp);
-  if(0)_heap_push (0, 0);
-  if(0)_make_heap_item(0,0,0);
-    playoutgate_push(this->playoutgate, rtp, subflow_id);
-//    gst_rtp_buffer_unmap(&rtp);
-//  }
-//  THIS_WRITEUNLOCK(this);
-//  g_print("RECEIVED AND PLACED\n");
-}
-
 
 void
 stream_joiner_add_path (StreamJoiner * this, guint8 subflow_id,
@@ -349,7 +400,7 @@ void
 stream_joiner_set_stream_delay(StreamJoiner *this, GstClockTime stream_delay)
 {
   THIS_WRITELOCK (this);
-  playoutgate_set_max_delay(this->playoutgate, stream_delay);
+  this->stream_delay = stream_delay;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -362,22 +413,7 @@ stream_joiner_set_playout_halt_time(StreamJoiner *this, GstClockTime halt_time)
   THIS_WRITEUNLOCK (this);
 }
 
-void
-stream_joiner_set_sending (StreamJoiner * this, gpointer data,
-    void (*func) (gpointer, GstBuffer *))
-{
-  THIS_WRITELOCK (this);
-  this->send_mprtp_packet_data = data;
-  this->send_mprtp_packet_func = func;
-  THIS_WRITEUNLOCK (this);
-}
 
-gint
-_cmp_skew_for_tree(guint64 x , guint64 y)
-{
-  if(x == y) return 0;
-  return x < y ? -1 : 1;
-}
 
 gint
 _cmp_seq (guint16 x, guint16 y)
@@ -411,99 +447,178 @@ _ruin_subflow (gpointer data)
 }
 
 
-// Prepares the heap for use
-void
-_heap_init (struct _Heap *restrict h)
+void _add_mprtp_packet(StreamJoiner *this,
+                         GstMpRTPBuffer *mprtp)
 {
-  *h = (struct _Heap) {
-    .size = base_size,.count = 0,.data =
-        g_malloc0 (sizeof (HeapItem *) * base_size)
-  };
-  //if (!h->data) _exit(1); // Exit if the memory allocation fails
-}
-
-// Inserts element to the heap
-void
-_heap_push (struct _Heap *restrict h, HeapItem * value)
-{
-  unsigned int index, parent;
-
-  // Resize the heap if it is too small to hold all the data
-  if (h->count == h->size) {
-    h->size <<= 1;
-    h->data = realloc (h->data, sizeof (HeapItem *) * h->size);
-    //if (!h->data) _exit(1); // Exit if the memory allocation fails
+  Frame *frame,*succ,*prev = NULL;
+  guint32 timestamp;
+  if(!this->head) {
+    frame = this->head = this->tail = _make_frame(this, mprtp);
+    goto done;
   }
-  // Find out where to put the element and put it
-  for (index = h->count++; index; index = parent) {
-    parent = (index - 1) >> 1;
-    if HEAP_CMP
-      (h->data[parent], value) break;
-    h->data[index] = h->data[parent];
+  timestamp = gst_mprtp_ptr_buffer_get_timestamp(mprtp);
+  if(timestamp < this->head->timestamp){
+    (frame = _make_frame(this, mprtp))->next = this->head;
+    this->head = frame;
+    goto done;
   }
-  h->data[index] = value;
-}
-
-// Removes the biggest element from the heap
-void
-_heap_pop (struct _Heap *restrict h)
-{
-  unsigned int index, swap, other;
-
-  // Remove the biggest element
-  HeapItem *temp = h->data[--h->count];
-
-// Resize the heap if it's consuming too much memory
-//        if ((h->count <= (h->size >> 2)) && (h->size > base_size))
-//        {
-//                h->size >>= 1;
-//                h->data = realloc(h->data, sizeof(HeapItem*) * h->size);
-//                if (!h->data) _exit(1); // Exit if the memory allocation fails
-//        }
-
-  // Reorder the elements
-  for (index = 0; 1; index = swap) {
-    // Find the child to swap with
-    swap = (index << 1) + 1;
-    if (swap >= h->count)
-      break;                    // If there are no children, the heap is reordered
-    other = swap + 1;
-    if ((other < h->count) && HEAP_CMP (h->data[other], h->data[swap]))
-      swap = other;
-    if HEAP_CMP
-      (temp, h->data[swap]) break;      // If the bigger child is less than or equal to its parent, the heap is reordered
-
-    h->data[index] = h->data[swap];
+  frame = _try_find(this, timestamp, &prev);
+  if(!frame && !prev){
+    this->tail->next = frame = _make_frame(this, mprtp);
+    this->tail = frame;
+    goto done;
   }
-  h->data[index] = temp;
+  if(!frame){
+    succ = prev->next;
+    prev->next = frame = _make_frame(this, mprtp);
+    frame->next = succ;
+    goto done;
+  }
+  _push_into_frame(this, frame, mprtp);
+done:
+  gst_buffer_ref(mprtp->buffer);
+//  if(frame->late){
+//    g_print("PlayoutGate: Late seq %hu, PHSN %hu, max_delay: %lums\n",
+//            frame->head->seq, this->PHSN, GST_TIME_AS_MSECONDS(this->max_delay));
+//  }
+//  _print_frame(frame);
+  return;
 }
 
 
-HeapItem *
-_make_heap_item (StreamJoiner * this,
-                 GstRTPBuffer *rtp, guint8 subflow_id)
+void _push_into_frame(StreamJoiner *this, Frame *frame, GstMpRTPBuffer *mprtp)
 {
-  HeapItem *result;
-  if (g_queue_is_empty (this->heap_items_pool)) {
-    result = g_malloc0 (sizeof (HeapItem));
-  } else {
-    result = (HeapItem *) g_queue_pop_head (this->heap_items_pool);
+  FrameNode *prev,*node, *succ;
+  node = _make_framenode(this, mprtp);
+  if(!frame->head){
+   frame->head = frame->tail = node;
+   goto done;
   }
-  result->buffer = gst_buffer_ref(rtp->buffer);
-  result->seq_num = gst_rtp_buffer_get_seq(rtp);
-  result->subflow_id = subflow_id;
+  if(!frame->head->next){
+    if(_cmp_seq(node->seq, frame->head->seq) <= 0){
+      frame->tail = node->next = frame->head;
+      frame->head = node;
+    }else{
+      frame->tail = frame->head->next = node;
+    }
+    goto done;
+  }
+  if(_cmp_seq(node->seq, frame->head->seq) <= 0){
+    node->next = frame->head;
+    frame->head = node;
+    goto done;
+  }
+  prev = frame->head;
+again:
+  succ = prev->next;
+  if(!succ){
+    prev->next = frame->tail = node;
+    node->next = NULL;
+    goto done;
+  }
+  if(_cmp_seq(node->seq, succ->seq) <= 0){
+    prev->next = node;
+    node->next = succ;
+    goto done;
+  }
+  prev = succ;
+  goto again;
+
+done:
+  return;
+}
+
+Frame *_try_find(StreamJoiner *this, guint32 timestamp, Frame **predecessor)
+{
+  Frame *act, *prev;
+  prev = NULL;
+  act = this->head;
+again:
+  if(!act) goto not_found;
+  if(act->timestamp == timestamp) goto found;
+  if(timestamp < act->timestamp) goto prev_found;
+  prev = act;
+  act = act->next;
+  goto again;
+
+prev_found:
+    if(predecessor) *predecessor = prev;
+not_found:
+  return NULL;
+found:
+  return act;
+
+}
+
+Frame* _make_frame(StreamJoiner *this, GstMpRTPBuffer *mprtp)
+{
+  Frame *result;
+  Subflow *subflow;
+  guint64 uskew;
+  guint64 stream_delay;
+  guint64 max_jitter;
+  GstClockTime latency = 0;
+  result = pointerpool_get(this->frames_pool);
+  memset((gpointer)result, 0, sizeof(Frame));
+  percentiletracker_get_stats(this->skew_window, NULL, &uskew, NULL);
+
+  this->skew = (124. * this->skew + (gdouble) uskew) / 125.;
+  stream_delay = percentiletracker_get_stats(this->delay_window, NULL, NULL, NULL);
+  percentiletracker_get_stats(this->jitter_window, NULL, &max_jitter, NULL);
+  subflow = (Subflow *) g_hash_table_lookup (this->subflows,
+                                             GINT_TO_POINTER (mprtp->subflow_id));
+  this->playout_target = (31. * this->playout_target + stream_delay) / 32.;
+//  g_print("playout_target: %f\n", this->playout_target);
+  if(subflow->delay < this->playout_target)
+    latency = this->playout_target - subflow->delay;
+//  latency += this->skew;
+//  latency += max_jitter;
+//  g_print("Max jitter: %lu, %lu\n", max_jitter, stream_delay);
+//  g_print("skew: %f\n", this->skew);
+  result->head = result->tail = _make_framenode(this, mprtp);
+  result->timestamp = gst_mprtp_ptr_buffer_get_timestamp(mprtp);
+  result->created = gst_clock_get_time(this->sysclock);
+  result->playout_time = gst_clock_get_time(this->sysclock) + latency;
+  if(subflow->id == 1)
+    g_print("%lu+%lu\n",
+            GST_TIME_AS_MSECONDS(subflow->delay),
+            GST_TIME_AS_MSECONDS(latency));
+//  if(uskew)
+//      g_print("delay: %lu (%lu)\n",
+//              GST_TIME_AS_MSECONDS(result->playout_time - gst_clock_get_time(this->sysclock)),
+//              uskew);
+
   return result;
 }
 
-void
-_trash_heap_item (StreamJoiner * this, HeapItem * heap_item)
+FrameNode * _make_framenode(StreamJoiner *this, GstMpRTPBuffer *mprtp)
 {
-  if (g_queue_get_length (this->heap_items_pool) < 256) {
-    g_queue_push_head (this->heap_items_pool, heap_item);
-  } else {
-    g_free (heap_item);
-  }
+  FrameNode *result;
+  result = pointerpool_get(this->framenodes_pool);
+  memset((gpointer)result, 0, sizeof(FrameNode));
+  result->mprtp = mprtp;
+  result->next = NULL;
+  result->seq = gst_mprtp_ptr_buffer_get_abs_seq(mprtp);
+  return result;
 }
+
+//
+//void _trash_frame(StreamJoiner *this, Frame* frame)
+//{
+//  if(g_queue_get_length(this->frames_pool) > 128)
+//    g_free(frame);
+//  else
+//    g_queue_push_tail(this->frames_pool, frame);
+//}
+//
+//void _trash_framenode(StreamJoiner *this, FrameNode* framenode)
+//{
+//  if(g_queue_get_length(this->framenodes_pool) > 4096)
+//    g_free(framenode);
+//  else
+//    g_queue_push_tail(this->framenodes_pool, framenode);
+//}
+
 
 
 #undef HEAP_CMP

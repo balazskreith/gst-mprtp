@@ -93,8 +93,6 @@ static void stream_splitter_run (void *data);
 //static void _print_tree_stat(SchNode *root);
 
 static Subflow *make_subflow (MPRTPSPath * path);
-static gint _cmp_for_max (guint64 x, guint64 y);
-static gint _cmp_for_min (guint64 x, guint64 y);
 
 static MPRTPSPath *_get_next_path (StreamSplitter * this, GstRTPBuffer * rtp);
 //static void _print_tree (SchNode * node, gint top, gint level);
@@ -160,7 +158,7 @@ stream_splitter_init (StreamSplitter * this)
   this->separation_is_possible = FALSE;
   this->first_delta_flag = TRUE;
   this->thread = gst_task_new (stream_splitter_run, this, NULL);
-  this->sent_bytes = make_streamtracker(_cmp_for_min, _cmp_for_max, 1<<15, 50);
+  this->sent_bytes = make_percentiletracker(1<<15, 50);
 //    this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
   this->splitting_mode = MPRTP_STREAM_BYTE_BASED_SPLITTING;
 
@@ -256,7 +254,7 @@ guint32 stream_splitter_get_media_rate(StreamSplitter* this)
 {
   guint64 result;
   THIS_READLOCK(this);
-  streamtracker_get_stats(this->sent_bytes, NULL, NULL, &result);
+  percentiletracker_get_stats(this->sent_bytes, NULL, NULL, &result);
   THIS_READUNLOCK(this);
   return result;
 }
@@ -527,7 +525,7 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
 
 done:
   if(gst_rtp_buffer_get_payload_type(rtp) != this->monitor_payload_type){
-    streamtracker_add(this->sent_bytes, bytes_to_send);
+    percentiletracker_add(this->sent_bytes, bytes_to_send);
   }
   return result;
 }
@@ -754,18 +752,6 @@ make_subflow (MPRTPSPath * path)
   return result;
 }
 
-
-gint
-_cmp_for_max (guint64 x, guint64 y)
-{
-  return x == y ? 0 : x < y ? -1 : 1;
-}
-
-gint
-_cmp_for_min (guint64 x, guint64 y)
-{
-  return x == y ? 0 : x < y ? 1 : -1;
-}
 
 
 #undef THIS_READLOCK

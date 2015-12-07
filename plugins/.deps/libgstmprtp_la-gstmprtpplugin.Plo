@@ -194,11 +194,11 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  gstmprtcpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
  gstmprtpbuffer.h /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtpspath.h \
- packetssndqueue.h bintree.h streamtracker.h streamsplitter.h \
- gstmprtpsender.h gstmprtpplayouter.h mprtprpath.h \
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h pointerpool.h \
+ bintree.h mprtpspath.h packetssndqueue.h percentiletracker.h \
+ streamsplitter.h gstmprtpsender.h gstmprtpplayouter.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
- packetsrcvqueue.h streamjoiner.h playoutgate.h \
+ packetsrcvqueue.h streamjoiner.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h \
  /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
@@ -819,13 +819,15 @@ gstmprtpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
 
+pointerpool.h:
+
+bintree.h:
+
 mprtpspath.h:
 
 packetssndqueue.h:
 
-bintree.h:
-
-streamtracker.h:
+percentiletracker.h:
 
 streamsplitter.h:
 
@@ -840,8 +842,6 @@ mprtprpath.h:
 packetsrcvqueue.h:
 
 streamjoiner.h:
-
-playoutgate.h:
 
 /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h:
 

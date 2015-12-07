@@ -54,7 +54,12 @@ G_DEFINE_TYPE (PacketsSndQueue, packetssndqueue, G_TYPE_OBJECT);
 static void packetssndqueue_finalize (GObject * object);
 static PacketsSndQueueNode* _make_node(PacketsSndQueue *this,
                                        GstBuffer *buffer);
-static void _trash_node(PacketsSndQueue *this, PacketsSndQueueNode* node);
+
+#define _trash_node(this, node) pointerpool_add(this->node_pool, node)
+static gpointer _node_ctor(void)
+{
+  return g_malloc0(sizeof(PacketsSndQueueNode));
+}
 
 
 static void _packetssndqueue_add(PacketsSndQueue *this,
@@ -86,10 +91,7 @@ packetssndqueue_finalize (GObject * object)
   PacketsSndQueueNode *next;
 
   this = PACKETSSNDQUEUE(object);
-  while(!g_queue_is_empty(this->node_pool)){
-    g_free(g_queue_pop_head(this->node_pool));
-  }
-
+  g_object_unref(this->node_pool);
   while(this->head){
     next = this->head->next;
     _trash_node(this, this->head);
@@ -103,7 +105,7 @@ void
 packetssndqueue_init (PacketsSndQueue * this)
 {
   g_rw_lock_init (&this->rwmutex);
-  this->node_pool = g_queue_new();
+  this->node_pool = make_pointerpool(1024, _node_ctor, g_free);
   this->sysclock = gst_system_clock_obtain();
 }
 
@@ -191,24 +193,12 @@ void _remove_head(PacketsSndQueue *this)
 PacketsSndQueueNode* _make_node(PacketsSndQueue *this, GstBuffer *buffer)
 {
   PacketsSndQueueNode *result;
-  if(!g_queue_is_empty(this->node_pool))
-    result = g_queue_pop_head(this->node_pool);
-  else
-    result = g_malloc0(sizeof(PacketsSndQueueNode));
+  result = pointerpool_get(this->node_pool);
   memset((gpointer)result, 0, sizeof(PacketsSndQueueNode));
   result->next = NULL;
   result->added = gst_clock_get_time(this->sysclock);
   result->buffer = gst_buffer_ref(buffer);
   return result;
-}
-
-
-void _trash_node(PacketsSndQueue *this, PacketsSndQueueNode* node)
-{
-  if(g_queue_get_length(this->node_pool) > 4096)
-    g_free(node);
-  else
-    g_queue_push_tail(this->node_pool, node);
 }
 
 

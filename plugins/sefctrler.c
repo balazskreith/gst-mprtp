@@ -30,7 +30,7 @@
 #include <string.h>
 #include <sys/timex.h>
 #include "ricalcer.h"
-#include "streamtracker.h"
+#include "percentiletracker.h"
 
 #define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
 #define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
@@ -125,7 +125,7 @@ struct _ORMoment{
   GstClockTime        time;
   guint32             sent_packets_num;
   guint32             sent_payload_bytes;
-  gdouble             media_rate;
+  gdouble             receiving_rate;
 
 };
 
@@ -1253,7 +1253,7 @@ _orp_producer_main(SndEventBasedController * this)
 
     ricalcer_do_next_report_time(ricalcer);
     ricalcer_refresh_parameters(ricalcer,
-                                _ort0(subflow)->media_rate,
+                                _ort0(subflow)->receiving_rate,
                                 subflow->avg_rtcp_size);
   }
   return;
@@ -1281,7 +1281,7 @@ void _step_or(Subflow *this)
   _ort0(this)->sent_payload_bytes =
       mprtps_path_get_total_sent_payload_bytes(this->path);
   _ort1(this)->time = gst_clock_get_time(this->sysclock);
-  _ort0(this)->media_rate = 64000.;
+  _ort0(this)->receiving_rate = 64000.;
 }
 
 GstBuffer *
@@ -1340,7 +1340,7 @@ _setup_sr_riport (Subflow * this, GstRTCPSR * sr, guint32 ssrc)
     GstClockTime interval;
     interval = GST_TIME_AS_SECONDS(_ort1(this)->time - _ort0(this)->time);
     if(interval < 1) interval = 1;
-    _ort0(this)->media_rate = payload_bytes / interval;
+    _ort0(this)->receiving_rate = payload_bytes / interval;
   }
 
 //  g_print("Created NTP time for subflow %d is %lu\n", this->id, ntptime);

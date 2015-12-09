@@ -7,6 +7,7 @@
 #include <gst/rtp/gstrtcpbuffer.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include "mprtprpath.h"
 #include "mprtpspath.h"
 #include "gstmprtcpbuffer.h"
@@ -27,7 +28,7 @@ static void mprtpr_path_finalize (GObject * object);
 static void mprtpr_path_reset (MpRTPRPath * this);
 static gint _cmp_seq (guint16 x, guint16 y);
 static void _add_delay(MpRTPRPath *this, GstClockTime delay);
-static gint64 _get_drift_window (MpRTPRPath * this);
+static void _add_skew(MpRTPRPath *this, gint64 skew);
 void
 mprtpr_path_class_init (MpRTPRPathClass * klass)
 {
@@ -66,6 +67,8 @@ mprtpr_path_init (MpRTPRPath * this)
   percentiletracker_set_treshold(this->lt_high_delays, 30 * GST_SECOND);
   this->skews = make_percentiletracker(100, 50);
   percentiletracker_set_treshold(this->skews, 2 * GST_SECOND);
+  this->delay_estimator = make_skalmanfilter_full(1024, GST_SECOND, .25);
+  this->skew_estimator = make_skalmanfilter_full(1024, GST_SECOND, .125);
   mprtpr_path_reset (this);
 }
 
@@ -147,24 +150,22 @@ void mprtpr_path_get_FBCC_stats(MpRTPRPath *this,
                            GstClockTime *lt_80th_delay)
 {
   THIS_READLOCK (this);
-  if(sh_last_delay) *sh_last_delay = this->sh_delay;
-  if(md_last_delay) *md_last_delay = this->md_delay;
+  if(sh_last_delay) *sh_last_delay = 0;
+  if(md_last_delay) *md_last_delay = 0;
   if(lt_40th_delay) *lt_40th_delay = percentiletracker_get_stats(this->lt_low_delays, NULL, NULL, NULL);
   if(lt_80th_delay) *lt_80th_delay = percentiletracker_get_stats(this->lt_high_delays, NULL, NULL, NULL);
   THIS_READUNLOCK (this);
 }
 
 void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
-                           GstClockTime *md_last_delay,
+                           gdouble       *path_delay,
                            gdouble       *path_skew,
                            guint32       *jitter)
 {
   THIS_READLOCK (this);
-  if(md_last_delay) *md_last_delay = this->sh_delay;
-//  if(skew) *skew = _get_drift_window(this);
-  if(path_skew) *path_skew = this->path_skew;
+  if(path_delay) *path_delay = this->estimated_delay;
+  if(path_skew) *path_skew = this->estimated_skew;
   if(jitter) *jitter = this->jitter;
-//  g_print("%d: %f\n", this->id, *path_skew);
   THIS_READUNLOCK (this);
 }
 
@@ -185,26 +186,12 @@ void mprtpr_path_add_delay(MpRTPRPath *this, GstClockTime delay)
 }
 
 
-gint64
-_get_drift_window (MpRTPRPath * this)
-{
-  guint64 skew;
-  skew = percentiletracker_get_stats(this->skews, NULL, NULL, NULL);
-  if((skew & ((guint64)1<<63)) == 0){
-    return (gint64)-1 * ((gint64) skew);
-  }else{
-    return (skew ^ ((guint64)1<<63));
-  }
-}
-
-
 
 void
 mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
 {
 //  g_print("mprtpr_path_process_rtp_packet begin\n");
   gint64 skew;
-  guint64 uskew;
 
   THIS_WRITELOCK (this);
   gst_mprtp_buffer_read_map(mprtp);
@@ -225,27 +212,28 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
 //  g_print("J: %d\n", this->jitter);
   _add_delay(this, mprtp->delay);
-
   if(_cmp_seq(this->highest_seq, mprtp->subflow_seq) >= 0){
     goto done;
   }
   this->highest_seq = mprtp->subflow_seq;
   if(this->last_rtp_timestamp == gst_mprtp_ptr_buffer_get_timestamp(mprtp))
     goto done;
-  if(skew < 0) percentiletracker_add(this->skews, ~(skew-1));
-  else         percentiletracker_add(this->skews, skew | (1UL<<63));
 
-  uskew = percentiletracker_get_stats(this->skews, NULL, NULL, NULL);
-  if((uskew & (3UL<<62)) > 0){
-      uskew = uskew & 0x3FFFFFFFFFFFFFFFUL;
-    this->path_skew = this->path_skew * .99 + (gdouble)uskew * .01;
-  }
-  else{
-    this->path_skew = this->path_skew * .99 - (gdouble)uskew * .01;
-  }
-//  g_print("S%d: %f\n", this->id, this->path_skew);
+  _add_skew(this, skew);
+
+  //For Kalman delay and skew estimation test (kalman_simple_test)
+//  if(this->id == 1)
+//    g_print("%lu,%lu,%lu,%lu,%ld,%f,%f\n",
+//            GST_TIME_AS_USECONDS((guint64)mprtp->delay),
+//            GST_TIME_AS_USECONDS((guint64)this->sh_delay),
+//            GST_TIME_AS_USECONDS((guint64)this->md_delay),
+//            GST_TIME_AS_USECONDS((guint64)this->estimated_delay),
+//            skew / 1000,
+//            this->path_skew / 1000.,
+//            this->estimated_skew / 1000.
+//            );
+
   //new frame
-  if(0) _get_drift_window(this);
   this->last_rtp_timestamp = gst_mprtp_ptr_buffer_get_timestamp(mprtp);
 
 done:
@@ -275,27 +263,14 @@ void _add_delay(MpRTPRPath *this, GstClockTime delay)
 {
   percentiletracker_add(this->lt_low_delays, delay);
   percentiletracker_add(this->lt_high_delays, delay);
-  if(this->seq_initialized)
-    this->md_delay = (31 * this->md_delay + delay ) / 32;
-  else
-    this->md_delay = delay;
-  if(delay < this->last_delay_a){
-    if(this->last_delay_a < this->last_delay_b)
-      this->sh_delay = this->last_delay_a;
-    else if(this->last_delay_b < delay)
-      this->sh_delay = delay;
-    else
-      this->sh_delay = this->last_delay_b;
-  }else{
-    if(delay < this->last_delay_b)
-      this->sh_delay = delay;
-    else if(this->last_delay_a < this->last_delay_b)
-      this->sh_delay = this->last_delay_a;
-    else
-      this->sh_delay = this->last_delay_b;
-  }
-  this->last_delay_b = this->last_delay_a;
-  this->last_delay_a = delay;
+  this->estimated_delay = skalmanfilter_measurement_update(this->delay_estimator, delay);
+  this->md_delay = ((gdouble)this->md_delay * 31 + (gdouble) delay) / 32.;
+  this->sh_delay = ((gdouble)this->sh_delay * 3 + (gdouble) delay) / 4.;
+}
+
+void _add_skew(MpRTPRPath *this, gint64 skew)
+{
+  this->estimated_skew = skalmanfilter_measurement_update(this->skew_estimator, skew);
 }
 
 #undef THIS_READLOCK

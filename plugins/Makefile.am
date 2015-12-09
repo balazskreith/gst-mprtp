@@ -21,27 +21,29 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          packetssndqueue.c          \
                          pointerpool.c              \
                          ricalcer.c                 \
-                         percentiletracker.c            \
+                         percentiletracker.c        \
                          variancetracker.c          \
-                         sndratedistor.c
+                         sndratedistor.c            \
+                         skalmanfilter.c
                     
                     
-noinst_HEADERS = mprtpspath.h      \
-                 rmanctrler.h      \
-                 smanctrler.h      \
-                 sefctrler.h       \
-                 refctrler.c       \
-                 mprtprpath.h      \
-                 streamsplitter.h  \
-                 streamjoiner.h    \
-                 bintree.h         \
-                 packetsrcvqueue.h \
-                 packetssndqueue.h \
-                 pointerpool.h     \
-                 ricalcer.h        \
+noinst_HEADERS = mprtpspath.h           \
+                 rmanctrler.h           \
+                 smanctrler.h           \
+                 sefctrler.h            \
+                 refctrler.c            \
+                 mprtprpath.h           \
+                 streamsplitter.h       \
+                 streamjoiner.h         \
+                 bintree.h              \
+                 packetsrcvqueue.h      \
+                 packetssndqueue.h      \
+                 pointerpool.h          \
+                 ricalcer.h             \
                  percentiletracker.h    \
-                 variancetracker.h  \
-                 sndratedistor.h
+                 variancetracker.h      \
+                 sndratedistor.h        \
+                 skalmanfilter.h
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
 # libgstmprtp_la_CFLAGS = $(GST_CFLAGS) -I/usr/local/include/gstreamer-1.0 -I/home/balazs/gst/master/gst-plugins-base/gst-libs

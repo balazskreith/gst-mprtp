@@ -46,19 +46,17 @@ struct _StreamJoiner
   gint                 subflow_num;
   GstClock*            sysclock;
   GstClockTime         last_obsolate_checked;
-  gdouble              skew;
-  gdouble              playout_target;
-  PercentileTracker*       skew_window;
-  PercentileTracker*       delay_window;
-  PercentileTracker*       jitter_window;
-//  GQueue*              framenodes_pool;
-//  GQueue*              frames_pool;
+  GstClockTime         latency;
+  PercentileTracker*   latency_window;
   PointerPool*         frames_pool;
   PointerPool*         framenodes_pool;
   Frame*               head;
   Frame*               tail;
   guint16              PHSN;
+  SKalmanFilter*       tick_estimator;
+  gdouble              estimated_tick;
 
+  guint64              last_snd_ntp_reference;
   void               (*send_mprtp_packet_func)(gpointer,GstMpRTPBuffer*);
   gpointer             send_mprtp_packet_data;
 };

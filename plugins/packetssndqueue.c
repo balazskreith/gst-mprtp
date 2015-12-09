@@ -105,7 +105,7 @@ void
 packetssndqueue_init (PacketsSndQueue * this)
 {
   g_rw_lock_init (&this->rwmutex);
-  this->node_pool = make_pointerpool(1024, _node_ctor, g_free);
+  this->node_pool = make_pointerpool(64, _node_ctor, g_free);
   this->sysclock = gst_system_clock_obtain();
 }
 

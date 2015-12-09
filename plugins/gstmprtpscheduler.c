@@ -856,7 +856,7 @@ gst_mprtpscheduler_emit_signal(gpointer ptr, gpointer data)
 //  g_signal_emit (this,_subflows_utilization, 0 /* details */, 1);
   g_signal_emit (this,_subflows_utilization, 0 /* details */, data);
 }
-static GstClockTime prev;
+//static GstClockTime prev;
 static GstFlowReturn
 gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buffer)
@@ -871,8 +871,8 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
 
   this = GST_MPRTPSCHEDULER (parent);
 
-  g_print("Sent: %lu\n", gst_clock_get_time(this->sysclock)-prev);
-  prev = gst_clock_get_time(this->sysclock);
+//  g_print("Sent: %lu\n", GST_TIME_AS_MSECONDS(gst_clock_get_time(this->sysclock)-prev));
+//  prev = gst_clock_get_time(this->sysclock);
   if (gst_buffer_extract (buffer, 0, &first_byte, 1) != 1 ||
       gst_buffer_extract (buffer, 1, &second_byte, 1) != 1) {
     GST_WARNING_OBJECT (this, "could not extract first byte from buffer");
@@ -902,6 +902,7 @@ done:
   THIS_READUNLOCK (this);
   return result;
 }
+
 
 static GstFlowReturn
 gst_mprtpscheduler_rtp_sink_chainlist (GstPad * pad, GstObject * parent,

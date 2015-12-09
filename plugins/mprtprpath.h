@@ -15,6 +15,8 @@
 #include "gstmprtcpbuffer.h"
 #include "bintree.h"
 #include "packetsrcvqueue.h"
+#include "skalmanfilter.h"
+#include "variancetracker.h"
 
 G_BEGIN_DECLS
 
@@ -61,14 +63,22 @@ struct _MpRTPReceiverPath
   guint32             last_rtp_timestamp;
 
   gdouble             path_skew;
-  GstClockTime        last_delay_a;
-  GstClockTime        last_delay_b;
-  GstClockTime        sh_delay;
-  GstClockTime        md_delay;
+//  GstClockTime        last_delay_a;
+//  GstClockTime        last_delay_b;
+//  GstClockTime        sh_delay;
+//  GstClockTime        md_delay;
   GstClockTime        last_mprtp_delay;
   PercentileTracker*  lt_low_delays;
   PercentileTracker*  lt_high_delays;
   PercentileTracker*  skews;
+  SKalmanFilter*      delay_estimator;
+  gdouble             estimated_delay;
+  SKalmanFilter*      skew_estimator;
+  gdouble             estimated_skew;
+
+  gdouble             md_delay;
+  gdouble             sh_delay;
+
 
 };
 
@@ -109,7 +119,7 @@ void mprtpr_path_get_FBCC_stats(MpRTPRPath *this,
                            GstClockTime *lt_80th_delay);
 
 void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
-                           GstClockTime *md_last_delay,
+                           gdouble       *path_delay,
                            gdouble       *path_skew,
                            guint32       *jitter);
 

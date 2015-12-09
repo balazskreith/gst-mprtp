@@ -200,7 +200,8 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h pointerpool.h \
  bintree.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
- packetsrcvqueue.h percentiletracker.h streamjoiner.h \
+ packetsrcvqueue.h skalmanfilter.h variancetracker.h percentiletracker.h \
+ streamjoiner.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h \
  /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
@@ -838,6 +839,10 @@ mprtprpath.h:
 /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h:
 
 packetsrcvqueue.h:
+
+skalmanfilter.h:
+
+variancetracker.h:
 
 percentiletracker.h:
 

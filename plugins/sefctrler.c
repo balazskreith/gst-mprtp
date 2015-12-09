@@ -1395,6 +1395,7 @@ _split_controller_main(SndEventBasedController * this)
     if(--this->bids_commit_requested_retain_tick == 0)
       this->bids_commit_requested = TRUE;
   }
+  goto recalc_done;
   if (!this->bids_recalc_requested) goto recalc_done;
   this->bids_recalc_requested = FALSE;
 //  this->bids_commit_requested_retain_tick = 0;

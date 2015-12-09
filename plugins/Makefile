@@ -150,7 +150,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-pointerpool.lo libgstmprtp_la-ricalcer.lo \
 	libgstmprtp_la-percentiletracker.lo \
 	libgstmprtp_la-variancetracker.lo \
-	libgstmprtp_la-sndratedistor.lo
+	libgstmprtp_la-sndratedistor.lo \
+	libgstmprtp_la-skalmanfilter.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -412,26 +413,28 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          packetssndqueue.c          \
                          pointerpool.c              \
                          ricalcer.c                 \
-                         percentiletracker.c            \
+                         percentiletracker.c        \
                          variancetracker.c          \
-                         sndratedistor.c
+                         sndratedistor.c            \
+                         skalmanfilter.c
 
-noinst_HEADERS = mprtpspath.h      \
-                 rmanctrler.h      \
-                 smanctrler.h      \
-                 sefctrler.h       \
-                 refctrler.c       \
-                 mprtprpath.h      \
-                 streamsplitter.h  \
-                 streamjoiner.h    \
-                 bintree.h         \
-                 packetsrcvqueue.h \
-                 packetssndqueue.h \
-                 pointerpool.h     \
-                 ricalcer.h        \
+noinst_HEADERS = mprtpspath.h           \
+                 rmanctrler.h           \
+                 smanctrler.h           \
+                 sefctrler.h            \
+                 refctrler.c            \
+                 mprtprpath.h           \
+                 streamsplitter.h       \
+                 streamjoiner.h         \
+                 bintree.h              \
+                 packetsrcvqueue.h      \
+                 packetssndqueue.h      \
+                 pointerpool.h          \
+                 ricalcer.h             \
                  percentiletracker.h    \
-                 variancetracker.h  \
-                 sndratedistor.h
+                 variancetracker.h      \
+                 sndratedistor.h        \
+                 skalmanfilter.h
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -543,6 +546,7 @@ include ./$(DEPDIR)/libgstmprtp_la-refctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-ricalcer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rmanctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sefctrler.Plo
+include ./$(DEPDIR)/libgstmprtp_la-skalmanfilter.Plo
 include ./$(DEPDIR)/libgstmprtp_la-smanctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndratedistor.Plo
 include ./$(DEPDIR)/libgstmprtp_la-streamjoiner.Plo
@@ -730,6 +734,13 @@ libgstmprtp_la-sndratedistor.lo: sndratedistor.c
 #	$(AM_V_CC)source='sndratedistor.c' object='libgstmprtp_la-sndratedistor.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-sndratedistor.lo `test -f 'sndratedistor.c' || echo '$(srcdir)/'`sndratedistor.c
+
+libgstmprtp_la-skalmanfilter.lo: skalmanfilter.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-skalmanfilter.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-skalmanfilter.Tpo -c -o libgstmprtp_la-skalmanfilter.lo `test -f 'skalmanfilter.c' || echo '$(srcdir)/'`skalmanfilter.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-skalmanfilter.Tpo $(DEPDIR)/libgstmprtp_la-skalmanfilter.Plo
+#	$(AM_V_CC)source='skalmanfilter.c' object='libgstmprtp_la-skalmanfilter.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-skalmanfilter.lo `test -f 'skalmanfilter.c' || echo '$(srcdir)/'`skalmanfilter.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

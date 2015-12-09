@@ -24,7 +24,6 @@
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include "sndratedistor.h"
-//#include "mprtpspath.h"
 #include <math.h>
 #include <gst/gst.h>
 #include <stdlib.h>

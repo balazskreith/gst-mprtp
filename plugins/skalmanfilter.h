@@ -36,10 +36,10 @@ struct _SKalmanFilter
   gdouble                  measurement_diff;
   gdouble                  kalman_gain;
   gint32                   counter;
-  gint64                   diff_squere;
+//  gint64                   diff_squere;
   gdouble                  alpha;
-  gdouble                  ewma_1;
-  gdouble                  ewma_2;
+//  gdouble                  ewma_1;
+//  gdouble                  ewma_2;
 };
 
 

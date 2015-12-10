@@ -305,7 +305,7 @@ percentiletracker_get_stats (PercentileTracker * this,
   }
 
 done:
-THIS_READUNLOCK (this);
+  THIS_READUNLOCK (this);
 //  g_print("mprtpr_path_get_delay_median end\n");
   return result;
 }
@@ -429,11 +429,11 @@ void _transit_to_collecting(PercentileTracker *this, guint requested)
   this->state->processor = _collect_value;
   state->requested = requested;
 
-  while(bintree_get_num(state->dispensor)){
-    BinTreeNode* node;
-    node = bintree_pop_top_node(state->dispensor);
-    bintree_insert_node(state->dispensor, node);
-  }
+//  while(bintree_get_num(state->dispensor)){
+//    BinTreeNode* node;
+//    node = bintree_pop_top_node(state->dispensor);
+//    bintree_insert_node(state->dispensor, node);
+//  }
   return;
 }
 

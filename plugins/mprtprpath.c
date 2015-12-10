@@ -65,8 +65,8 @@ mprtpr_path_init (MpRTPRPath * this)
   percentiletracker_set_treshold(this->lt_low_delays, GST_SECOND);
   this->lt_high_delays = make_percentiletracker(1024, 50);
   percentiletracker_set_treshold(this->lt_high_delays, GST_SECOND);
-  this->skews = make_percentiletracker(100, 50);
-  percentiletracker_set_treshold(this->skews, 2 * GST_SECOND);
+//  this->skews = make_percentiletracker(100, 50);
+//  percentiletracker_set_treshold(this->skews, 2 * GST_SECOND);
   this->delay_estimator = make_skalmanfilter_full(1024, GST_SECOND, .25);
   this->skew_estimator = make_skalmanfilter_full(1024, GST_SECOND, .125);
   mprtpr_path_reset (this);
@@ -84,7 +84,8 @@ mprtpr_path_finalize (GObject * object)
   this = MPRTPR_PATH_CAST (object);
   g_object_unref (this->sysclock);
   g_object_unref(this->lt_low_delays);
-  g_object_unref(this->skews);
+  g_object_unref(this->lt_high_delays);
+//  g_object_unref(this->skews);
 }
 
 
@@ -222,19 +223,24 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   _add_skew(this, skew);
 
   //For Kalman delay and skew estimation test (kalman_simple_test)
-  if(this->id == 1)
-    g_print("%lu,%lu,%lu,%lu,%ld,%f,%f,%lu,%lu\n",
-            GST_TIME_AS_USECONDS((guint64)mprtp->delay),
-            GST_TIME_AS_USECONDS((guint64)this->sh_delay),
-            GST_TIME_AS_USECONDS((guint64)this->md_delay),
-            GST_TIME_AS_USECONDS((guint64)this->estimated_delay),
-            skew / 1000,
-            this->path_skew / 1000.,
-            this->estimated_skew / 1000.,
-            GST_TIME_AS_USECONDS(percentiletracker_get_stats(this->lt_low_delays, NULL, NULL, NULL)),
-            GST_TIME_AS_USECONDS(percentiletracker_get_stats(this->lt_high_delays, NULL, NULL, NULL))
-            );
-
+//  if(this->id == 1){
+//    gint64 hskew;
+//    guint64 uskew;
+//    uskew = percentiletracker_get_stats(this->skews, NULL, NULL, NULL);
+//    hskew = uskew > 0x0F00000000000000UL ? -1 * (~uskew & 0x00FFFFFFFFFFFFFF) : uskew;
+//    g_print("%lu,%lu,%lu,%lu,%ld,%f,%f,%lu,%lu,%ld\n",
+//            GST_TIME_AS_USECONDS((guint64)mprtp->delay),
+//            GST_TIME_AS_USECONDS((guint64)this->sh_delay),
+//            GST_TIME_AS_USECONDS((guint64)this->md_delay),
+//            GST_TIME_AS_USECONDS((guint64)this->estimated_delay),
+//            skew / 1000,
+//            this->path_skew / 1000.,
+//            this->estimated_skew / 1000.,
+//            GST_TIME_AS_USECONDS(percentiletracker_get_stats(this->lt_low_delays, NULL, NULL, NULL)),
+//            GST_TIME_AS_USECONDS(percentiletracker_get_stats(this->lt_high_delays, NULL, NULL, NULL)),
+//            hskew
+//            );
+//  }
   //new frame
   this->last_rtp_timestamp = gst_mprtp_ptr_buffer_get_timestamp(mprtp);
 
@@ -266,13 +272,14 @@ void _add_delay(MpRTPRPath *this, GstClockTime delay)
   percentiletracker_add(this->lt_low_delays, delay);
   percentiletracker_add(this->lt_high_delays, delay);
   this->estimated_delay = skalmanfilter_measurement_update(this->delay_estimator, delay);
-  this->md_delay = ((gdouble)this->md_delay * 31 + (gdouble) delay) / 32.;
-  this->sh_delay = ((gdouble)this->sh_delay * 3 + (gdouble) delay) / 4.;
+//  this->md_delay = ((gdouble)this->md_delay * 31 + (gdouble) delay) / 32.;
+//  this->sh_delay = ((gdouble)this->sh_delay * 3 + (gdouble) delay) / 4.;
 }
 
 void _add_skew(MpRTPRPath *this, gint64 skew)
 {
   this->estimated_skew = skalmanfilter_measurement_update(this->skew_estimator, skew);
+//  percentiletracker_add(this->skews, skew);
 }
 
 #undef THIS_READLOCK

@@ -278,7 +278,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   gst_element_link_pads (mprtpsnd, "src_2", rtpSink_2, "sink");
 
   g_object_set (mprtpsch, "join-subflow", 1, NULL);
-//  g_object_set (mprtpsch, "join-subflow", 2, NULL);
+  g_object_set (mprtpsch, "join-subflow", 2, NULL);
 
 //  sprintf(ids->filename, "%s", file);
 //  g_timeout_add (1000, _network_changes, ids);

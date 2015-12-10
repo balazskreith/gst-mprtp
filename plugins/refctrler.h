@@ -33,6 +33,10 @@ struct _RcvEventBasedController
 
   GstTask*          thread;
   GRecMutex         thread_mutex;
+
+  GstTask*          stat_thread;
+  GRecMutex         stat_thread_mutex;
+
   GHashTable*       subflows;
   GRWLock           rwmutex;
   GstClock*         sysclock;

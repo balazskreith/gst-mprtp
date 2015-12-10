@@ -70,7 +70,7 @@ struct _MpRTPReceiverPath
   GstClockTime        last_mprtp_delay;
   PercentileTracker*  lt_low_delays;
   PercentileTracker*  lt_high_delays;
-  PercentileTracker*  skews;
+//  PercentileTracker*  skews;
   SKalmanFilter*      delay_estimator;
   gdouble             estimated_delay;
   SKalmanFilter*      skew_estimator;

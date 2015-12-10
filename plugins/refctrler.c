@@ -337,7 +337,6 @@ refctrler_init (RcvEventBasedController * this)
 //  GHashTableIter iter;
 //  gpointer key, val;
 //  Subflow *subflow;
-//  gboolean started = FALSE;
 //  guint32 actual;
 //  GstClockTime next_scheduler_time;
 //  this = data;
@@ -346,15 +345,12 @@ refctrler_init (RcvEventBasedController * this)
 //  g_hash_table_iter_init (&iter, this->subflows);
 //  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
 //    subflow = (Subflow *) val;
-//    actual = mprtpr_path_get_total_bytes_received(subflow->path);
-//    g_print("%c%u", started?',':' ', actual - subflow->last_stat_payload_bytes);
-//    subflow->last_stat_payload_bytes = actual;
-//    started = TRUE;
+//
 //  }
 //  g_print("\n");
 //  THIS_WRITEUNLOCK(this);
 //
-//  next_scheduler_time = gst_clock_get_time(this->sysclock) + GST_SECOND;
+//  next_scheduler_time = gst_clock_get_time(this->sysclock) + 100 * GST_MSECOND;
 //  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
 //
 //  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {

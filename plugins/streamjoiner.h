@@ -48,13 +48,16 @@ struct _StreamJoiner
   GstClockTime         last_obsolate_checked;
   GstClockTime         latency;
   PercentileTracker*   latency_window;
+  guint32              ssrc;
   PointerPool*         frames_pool;
   PointerPool*         framenodes_pool;
   Frame*               head;
   Frame*               tail;
   guint16              PHSN;
   SKalmanFilter*       tick_estimator;
+  PercentileTracker*   ticks;
   gdouble              estimated_tick;
+  gint32               framecounter;
 
   guint64              last_snd_ntp_reference;
   void               (*send_mprtp_packet_func)(gpointer,GstMpRTPBuffer*);

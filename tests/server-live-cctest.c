@@ -111,7 +111,7 @@ make_audio_session (guint sessionNum)
 }
 
 static GstElement *encoder;
-guint bitrate = 512;
+guint bitrate = 4096;
 static SessionData *
 make_video_session (guint sessionNum)
 {
@@ -121,8 +121,8 @@ make_video_session (guint sessionNum)
   GstElement *videoConv = gst_element_factory_make("videoconvert", NULL);
   encoder = gst_element_factory_make ("theoraenc", NULL);
   //encoder = gst_element_factory_make ("jpegenc", NULL);
-//  GstElement *payloader = gst_element_factory_make ("rtptheorapay", NULL);
-  GstElement *payloader = gst_element_factory_make ("rtpjpegpay", NULL);
+  GstElement *payloader = gst_element_factory_make ("rtptheorapay", NULL);
+//  GstElement *payloader = gst_element_factory_make ("rtpjpegpay", NULL);
   GstCaps *videoCaps;
   SessionData *session;
   //g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 1, NULL);

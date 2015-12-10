@@ -84,13 +84,11 @@ static SchNode *_schnode_ctor (void);
 static void _schtree_insert (SchNode ** node,
     MPRTPSPath * path, gint * change, gint level_value);
 static void _schnode_rdtor (SchNode * node);
-//static void _print_tree (SchNode * root, gint top, gint level);
 //static MPRTPSPath* schtree_get_actual (SchNode * root);
 static MPRTPSPath *schtree_get_next (SchNode * root,
                                      guint32 bytes_to_send,
                                      guint32 frames_to_send);
 static void stream_splitter_run (void *data);
-//static void _print_tree_stat(SchNode *root);
 
 static Subflow *make_subflow (MPRTPSPath * path);
 
@@ -381,8 +379,8 @@ stream_splitter_run (void *data)
     } else if (path_state == MPRTPS_PATH_STATE_CONGESTED) {
       bid_c_sum += subflow->actual_bid;
     }
-
-//    g_print("Subflow %d actual bid is: %u\n",mprtps_path_get_id(path), subflow->actual_bid);
+//    g_print("Ratio for %d is %f\n", subflow->path->id, subflow->actual_rate);
+    //g_print("Subflow %d actual bid is: %u.\n",mprtps_path_get_id(path), subflow->actual_bid);
   }
 
   if (bid_nc_sum > 0) {
@@ -442,10 +440,9 @@ stream_splitter_run (void *data)
     this->non_keyframes_tree = NULL;
   }
 //  g_print ("NON_KEYFRAMES_TREE\n");
-//  _print_tree (this->non_keyframes_tree, 128, 0);
+//if(0)  _print_tree (this->non_keyframes_tree, 128, 0);
 //  g_print ("KEYFRAMES_TREE\n");
 //  _print_tree (this->keyframes_tree, 128, 0);
-//  g_print("full_tree:\n"); _print_tree(this->full_tree, SCHTREE_MAX_VALUE, 0);
 //  g_print("keyframes_tree:\n"); _print_tree(this->keyframes_tree, SCHTREE_MAX_VALUE, 0);
 
   this->new_path_added = FALSE;
@@ -640,8 +637,8 @@ _tree_commit (StreamSplitter *this, SchNode ** tree,
     if(subflow->actual_rate < min_rate) continue;
     actual_value =
         subflow->actual_rate *(gdouble) SCHTREE_MAX_VALUE;
-    insert_value = (gint) roundf (actual_value);
-//    g_print("SCHTREE INSERT: %u<-%d\n", subflow->actual_bid, subflow->path->id);
+    insert_value = (gint) roundf (actual_value) + 1;
+//    g_print("SCHTREE INSERT: %u->%d<-%d\n", subflow->actual_bid, insert_value, subflow->path->id);
     _schtree_insert (&new_root, path, &insert_value, SCHTREE_MAX_VALUE);
   }
 
@@ -673,23 +670,27 @@ void
 _schtree_insert (SchNode ** node, MPRTPSPath * path, gint * change,
     gint level_value)
 {
+
   if (*node == NULL) {
     *node = _schnode_ctor ();
   }
   if ((*node)->path != NULL || level_value < 1) {
-    return;
+    goto done;
   }
   if (*change >= level_value && (*node)->left == NULL && (*node)->right == NULL) {
     *change -= level_value;
     (*node)->path = path;
-    return;
+    goto done;
   }
-
   _schtree_insert (&(*node)->left, path, change, level_value >> 1);
   if (*change < 1) {
-    return;
+    goto done;
   }
   _schtree_insert (&(*node)->right, path, change, level_value >> 1);
+
+done:
+//  g_print("Change: %d->%d\n", path->id, *change);
+  return;
 }
 
 SchNode *

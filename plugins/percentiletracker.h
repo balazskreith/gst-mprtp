@@ -12,7 +12,7 @@
 
 typedef struct _PercentileTracker PercentileTracker;
 typedef struct _PercentileTrackerClass PercentileTrackerClass;
-
+typedef struct _PercentileState PercentileState;
 #include "bintree.h"
 
 #define PERCENTILETRACKER_TYPE             (percentiletracker_get_type())
@@ -31,12 +31,16 @@ struct _PercentileTracker
   GRWLock                  rwmutex;
   PercentileTrackerItem*       items;
   guint64                  sum;
+  guint8                   percentile;
   guint32                  length;
   GstClock*                sysclock;
   GstClockTime             treshold;
   gint32                   write_index;
   gint32                   read_index;
-  gdouble                  max_multiplier;
+  gdouble                  ratio;
+
+  guint                    required;
+  PercentileState*         state;
 };
 
 struct _PercentileTrackerItem

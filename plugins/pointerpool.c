@@ -77,7 +77,7 @@ pointerpool_finalize (GObject * object)
     if(!this->items[i]) continue;
     this->item_dtor(this->items[i]);
   }
-  g_free(this->items);
+  //g_free(this->items);
 }
 
 void

@@ -314,6 +314,12 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->mprtp_buffer_pool = make_pointerpool(512, _mprtp_ctor, g_free);
   this->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
   stream_joiner_set_monitor_payload_type(this->joiner, this->monitor_payload_type);
+
+//  percentiletracker_test();
+//  {
+//    StreamJoiner *s = NULL;
+//    g_print("%hu",s->PHSN);
+//  }
 }
 
 //static GstClockTime out_prev;
@@ -325,10 +331,11 @@ gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstMpRTPBuffer * mprtp)
   if(gst_mprtp_ptr_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
     goto done;
   }
-//  g_print("%lu: %hu-%u\n",
+//  g_print("%lu: %hu-%u<-%d\n",
 //          GST_TIME_AS_MSECONDS(gst_clock_get_time(this->sysclock)-out_prev),
 //          gst_mprtp_ptr_buffer_get_abs_seq(mprtp),
-//          gst_mprtp_ptr_buffer_get_timestamp(mprtp));
+//          gst_mprtp_ptr_buffer_get_timestamp(mprtp),
+//          mprtp->subflow_id);
 //  g_print("%lu\n", GST_TIME_AS_MSECONDS(get_epoch_time_from_ntp_in_ns(NTP_NOW - mprtp->abs_snd_ntp_time)));
 //  out_prev = gst_clock_get_time(this->sysclock);
   gst_pad_push (this->mprtp_srcpad, mprtp->buffer);

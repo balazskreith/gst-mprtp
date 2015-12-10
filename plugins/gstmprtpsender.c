@@ -734,7 +734,6 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     result = GST_FLOW_CUSTOM_ERROR;
     goto exit;
   }
-
   THIS_READLOCK (this);
   n = g_list_length (this->subflows);
   if (n < 1) {

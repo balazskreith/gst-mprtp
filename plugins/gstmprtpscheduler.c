@@ -419,8 +419,6 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   stream_splitter_set_monitor_payload_type(this->splitter, this->monitor_payload_type);
   _change_auto_flow_controlling_mode (this, FALSE);
   _setup_paths(this);
-
-
 }
 
 
@@ -1092,8 +1090,8 @@ _change_auto_flow_controlling_mode (GstMprtpscheduler * this,
   MPRTPSPath *path;
   GHashTableIter iter;
   guint8 subflow_id;
-  if (this->controller
-      && this->flow_controlling_mode == new_flow_controlling_mode) {
+  if (this->controller &&
+      this->flow_controlling_mode == new_flow_controlling_mode) {
     return;
   }
   if (this->controller != NULL) {

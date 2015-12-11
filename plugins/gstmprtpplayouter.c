@@ -322,7 +322,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
 //  }
 }
 
-static GstClockTime out_prev;
+//static GstClockTime out_prev;
 void
 gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstMpRTPBuffer * mprtp)
 {
@@ -331,27 +331,28 @@ gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstMpRTPBuffer * mprtp)
   if(gst_mprtp_ptr_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
     goto done;
   }
-  {
-    GstClockTime now;
-    now = gst_clock_get_time(this->sysclock);
-    if(!out_prev){
-      out_prev = now;
-      goto skip;
-    }
-
-    if(mprtp->subflow_id == 1)
-      g_print("%lu,%lu,%lu\n",
-            GST_TIME_AS_USECONDS(mprtp->delay),
-            0UL,
-            GST_TIME_AS_USECONDS(get_epoch_time_from_ntp_in_ns(NTP_NOW - mprtp->abs_snd_ntp_time)));
-    else
-      g_print("%lu,%lu,%lu\n",
-            0UL,
-            GST_TIME_AS_USECONDS(mprtp->delay),
-            GST_TIME_AS_USECONDS(get_epoch_time_from_ntp_in_ns(NTP_NOW - mprtp->abs_snd_ntp_time))
-            );
-  }
-  skip:
+  //For Playout test
+//  {
+//    GstClockTime now;
+//    now = gst_clock_get_time(this->sysclock);
+//    if(!out_prev){
+//      out_prev = now;
+//      goto skip;
+//    }
+//
+//    if(mprtp->subflow_id == 1)
+//      g_print("%lu,%lu,%lu\n",
+//            GST_TIME_AS_USECONDS(mprtp->delay),
+//            0UL,
+//            GST_TIME_AS_USECONDS(get_epoch_time_from_ntp_in_ns(NTP_NOW - mprtp->abs_snd_ntp_time)));
+//    else
+//      g_print("%lu,%lu,%lu\n",
+//            0UL,
+//            GST_TIME_AS_USECONDS(mprtp->delay),
+//            GST_TIME_AS_USECONDS(get_epoch_time_from_ntp_in_ns(NTP_NOW - mprtp->abs_snd_ntp_time))
+//            );
+//  }
+//  skip:
 //  g_print("%lu: %hu-%u<-%d\n",
 //          GST_TIME_AS_MSECONDS(gst_clock_get_time(this->sysclock)-out_prev),
 //          gst_mprtp_ptr_buffer_get_abs_seq(mprtp),

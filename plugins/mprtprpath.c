@@ -224,11 +224,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
 
   //For Kalman delay and skew estimation test (kalman_simple_test)
 //  if(this->id == 1){
-//    gint64 hskew;
-//    guint64 uskew;
-//    uskew = percentiletracker_get_stats(this->skews, NULL, NULL, NULL);
-//    hskew = uskew > 0x0F00000000000000UL ? -1 * (~uskew & 0x00FFFFFFFFFFFFFF) : uskew;
-//    g_print("%lu,%lu,%lu,%lu,%ld,%f,%f,%lu,%lu,%ld\n",
+//    g_print("%lu,%lu,%lu,%lu,%ld,%f,%f,%lu,%lu\n",
 //            GST_TIME_AS_USECONDS((guint64)mprtp->delay),
 //            GST_TIME_AS_USECONDS((guint64)this->sh_delay),
 //            GST_TIME_AS_USECONDS((guint64)this->md_delay),
@@ -237,8 +233,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
 //            this->path_skew / 1000.,
 //            this->estimated_skew / 1000.,
 //            GST_TIME_AS_USECONDS(percentiletracker_get_stats(this->lt_low_delays, NULL, NULL, NULL)),
-//            GST_TIME_AS_USECONDS(percentiletracker_get_stats(this->lt_high_delays, NULL, NULL, NULL)),
-//            hskew
+//            GST_TIME_AS_USECONDS(percentiletracker_get_stats(this->lt_high_delays, NULL, NULL, NULL))
 //            );
 //  }
   //new frame

@@ -331,7 +331,7 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
 //  g_print("S%d: %f->%lu\n", subflow->id, subflow->skew, (guint64)subflow->skew);
   latency = (guint64)(subflow->delay + subflow->skew + (gdouble)(subflow->jitter<<1));
   percentiletracker_add(this->latency_window, latency);
-
+  this->latency = (31. * this->latency + (gdouble)percentiletracker_get_stats(this->latency_window, NULL, NULL, NULL)) / 32.;
   if(this->ssrc != 0 && this->ssrc != gst_mprtp_ptr_buffer_get_ssrc(mprtp)){
 //    g_print("this->ssrc: %u, gst ssrc: %u\n",
 //            this->ssrc, gst_mprtp_ptr_buffer_get_ssrc(mprtp));
@@ -585,14 +585,15 @@ Frame* _make_frame(StreamJoiner *this, GstMpRTPBuffer *mprtp)
 
   result = pointerpool_get(this->frames_pool);
   memset((gpointer)result, 0, sizeof(Frame));
-  latency = percentiletracker_get_stats(this->latency_window, NULL, NULL, NULL);
-//  g_print("latency: %lu\n", latency);
+//  latency = percentiletracker_get_stats(this->latency_window, NULL, NULL, NULL);
+  latency = this->latency + GST_MSECOND;
+//  g_print("%f,0,0\n", this->latency / 1000.);
   if(mprtp->delay < latency)
     latency = latency - mprtp->delay;
   else
     latency = 0;
 //  latency += percentiletracker_get_stats(this->ticks, NULL, NULL, NULL)>>1;
-  latency += GST_MSECOND;
+//  latency += GST_MSECOND;
   result->head = result->tail = _make_framenode(this, mprtp);
   result->timestamp = gst_mprtp_ptr_buffer_get_timestamp(mprtp);
   result->created = gst_clock_get_time(this->sysclock);

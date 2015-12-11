@@ -46,7 +46,7 @@ struct _StreamJoiner
   gint                 subflow_num;
   GstClock*            sysclock;
   GstClockTime         last_obsolate_checked;
-  GstClockTime         latency;
+  gdouble              latency;
   PercentileTracker*   latency_window;
   guint32              ssrc;
   PointerPool*         frames_pool;

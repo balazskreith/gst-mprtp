@@ -121,9 +121,12 @@ gdouble skalmanfilter_measurement_update(SKalmanFilter *this, gint64 measured_va
   this->estimate_error *= (1.-this->kalman_gain);
   if(this->measurement_error < measurement_diff * this->measurement_diff &&
      this->estimate_error < this->measurement_error){
-    this->estimate_error += this->measurement_error;
+          this->estimate_error += this->measurement_error * .5;
+//      g_print("MEGTORTENIK\n") ;
+//      this->estimate_error *= this->estimate_error;
   }
   this->measurement_diff = measurement_diff * this->alpha;
+//  this->measurement_diff = measurement_diff;
 
 //  g_print("P: %f, R:%f, K:%f X^:%f\n",
 //          this->estimate_error,

@@ -374,97 +374,36 @@ done:
 
 void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        guint8 id,
-                                       guint32 goodput,
-                                       guint32 receiver_rate,
-                                       guint32 jitter,
-                                       gdouble corrh_owd,
-                                       gdouble corrl_owd,
-                                       guint16 PiT,
-                                       gboolean lost,
-                                       gboolean discard,
-                                       guint8 lost_history,
-                                       guint8 discard_history)
+                                       RRMeasurement *measurement)
 {
   Subflow *subflow;
-  gdouble CorrRate;
-  gdouble CorrGP;
-  gint32 jitter_sum;
-  gint32 PiT_sum;
 
   subflow = _get_subflow(this, id);
-  CorrRate = (gdouble)subflow->sending_rate + (gdouble) _mt1(subflow)->sending_rate + (gdouble) _mt2(subflow)->sending_rate;
-  if(subflow->monitoring_interval > 0)
-    CorrRate /= 3. * (gdouble)receiver_rate * (1. - 1./(gdouble)subflow->monitoring_interval);
-  else
-    CorrRate /= 3. * (gdouble)receiver_rate;
-  CorrGP = (gdouble)goodput / (gdouble)receiver_rate;
-  if(subflow->state == STATE_MONITORED || subflow->state == STATE_STABLE){
-    ++subflow->stability;
-  }else{
-    subflow->stability = 0;
-  }
-  subflow->stable_goodput = (subflow->stable_goodput * (gdouble)subflow->stability + (gdouble)goodput) / (gdouble) (subflow->stability + 1);
-  if(subflow->state == STATE_OVERUSED){
-    if(subflow->overused_gooudput > 0)
-      subflow->overused_gooudput = (subflow->overused_gooudput + goodput)>>1;
-    else
-      subflow->overused_gooudput = goodput;
+  _m_step(subflow);
+//
+//  g_print("S%d update."
+//          "State: %d, CorrH: %f, CorrL: %f, GP: %u, J: %d "
+//          "PiT: %hu, L:%d, D: %d, RR: %u MrCorr: %f Jitter_J: %f "
+//          "CorrPit: %f CorrGP: %f CC_cue: %u Stable GP: %f SR: %d, MR: %u\n",
+//          subflow->id,
+//          _mt0(subflow)->state,
+//          _mt0(subflow)->corrh_owd,
+//          _mt0(subflow)->corrl_owd,
+//          _mt0(subflow)->goodput,
+//          _mt0(subflow)->jitter,
+//          _mt0(subflow)->PiT,
+//          _mt0(subflow)->lost,
+//          _mt0(subflow)->discard,
+//          _mt0(subflow)->receiver_rate,
+//          _mt0(subflow)->CorrRate,
+//          _mt0(subflow)->CorrJitter,
+//          _mt0(subflow)->CorrPit,
+//          _mt0(subflow)->CorrGP,
+//          subflow->cc_cue,
+//          subflow->stable_goodput,
+//          subflow->sending_rate,
+//          this->media_rate);
 
-  }
-  if(!subflow->available) goto done;
-  jitter_sum = _mt2(subflow)->jitter;
-  PiT_sum = _mt2(subflow)->PiT;
-  if(!subflow->measured) _m_step(subflow);
-  subflow->measured = TRUE;
-  _mt0(subflow)->state = subflow->state;
-  _mt0(subflow)->PiT = PiT;
-  _mt0(subflow)->corrh_owd = corrh_owd;
-  _mt0(subflow)->corrl_owd = corrl_owd;
-  _mt0(subflow)->goodput = goodput;
-  _mt0(subflow)->lost = lost;
-  _mt0(subflow)->discard = discard;
-  _mt0(subflow)->jitter = jitter;
-  _mt0(subflow)->receiver_rate = receiver_rate;
-  _mt0(subflow)->sending_rate = subflow->sending_rate;
-  _mt0(subflow)->CorrRate = CorrRate;
-  _mt0(subflow)->CorrGP = CorrGP;
-  _mt0(subflow)->max_corrh = MAX(_mt0(subflow)->max_corrh, _mt0(subflow)->corrh_owd);
-  jitter_sum += _mt2(subflow)->jitter + _mt1(subflow)->jitter;
-  PiT_sum += _mt2(subflow)->PiT + _mt1(subflow)->PiT;
-  _mt0(subflow)->CorrJitter = (gdouble)jitter_sum /  (3. * (gdouble) jitter);
-  _mt0(subflow)->CorrPit = (gdouble)PiT_sum /  (3. * (gdouble) _mt0(subflow)->PiT);
-
-  if((_mt0(subflow)->CorrPit < .9 && CorrRate > 1.1)
-      //|| _mt0(subflow)->CorrRate < .5
-      )
-    ++subflow->cc_cue;
-  else if(subflow->cc_cue > 0)
-    --subflow->cc_cue;
-
-  g_print("S%d update."
-          "State: %d, CorrH: %f, CorrL: %f, GP: %u, J: %d "
-          "PiT: %hu, L:%d, D: %d, RR: %u MrCorr: %f Jitter_J: %f "
-          "CorrPit: %f CorrGP: %f CC_cue: %u Stable GP: %f SR: %d, MR: %u\n",
-          subflow->id,
-          _mt0(subflow)->state,
-          _mt0(subflow)->corrh_owd,
-          _mt0(subflow)->corrl_owd,
-          _mt0(subflow)->goodput,
-          _mt0(subflow)->jitter,
-          _mt0(subflow)->PiT,
-          _mt0(subflow)->lost,
-          _mt0(subflow)->discard,
-          _mt0(subflow)->receiver_rate,
-          _mt0(subflow)->CorrRate,
-          _mt0(subflow)->CorrJitter,
-          _mt0(subflow)->CorrPit,
-          _mt0(subflow)->CorrGP,
-          subflow->cc_cue,
-          subflow->stable_goodput,
-          subflow->sending_rate,
-          this->media_rate);
-
-done:
   return;
 }
 

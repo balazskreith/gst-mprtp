@@ -60,7 +60,7 @@ G_DEFINE_TYPE (SndEventBasedController, sefctrler, G_TYPE_OBJECT);
 
 
 typedef struct _Subflow Subflow;
-typedef struct _IRMoment IRMoment;
+//typedef struct _RRMeasurement RRMeasurement;
 typedef struct _ORMoment ORMoment;
 typedef struct _SubflowState SubflowState;
 
@@ -90,36 +90,6 @@ typedef enum
 } Event;
 
 
-struct _IRMoment{
-  GstClockTime        time;
-  GstClockTime        RTT;
-  guint32             jitter;
-  guint32             cum_packet_lost;
-  guint32             lost;
-  guint64             delay_last;
-  guint64             delay_40;
-  guint64             delay_80;
-  guint64             skew;
-  guint64             min_skew;
-  guint64             max_skew;
-  guint32             early_discarded_bytes;
-  guint32             late_discarded_bytes;
-  guint32             early_discarded_bytes_sum;
-  guint32             late_discarded_bytes_sum;
-  guint16             HSSN;
-  guint16             cycle_num;
-  guint16             expected_packets;
-  guint16             PiT;
-  guint16             PiT_last3_sum;
-  guint32             expected_payload_bytes;
-  gdouble             lost_rate;
-  gdouble             goodput;
-  gdouble             corrl_owd;
-  gdouble             corrh_owd;
-  MPRTPSPathState     state;
-  gint64              skew_diff;
-  gboolean            checked;
-};
 
 struct _ORMoment{
   GstClockTime        time;
@@ -143,7 +113,7 @@ struct _Subflow
   guint8                     id;
   GstClock*                  sysclock;
   ReportIntervalCalculator*  ricalcer;
-  IRMoment*                  ir_moments;
+  RRMeasurement*             ir_moments;
   gint                       ir_moments_index;
   guint32                    ir_moments_num;
   ORMoment                   or_moments[2];
@@ -191,7 +161,7 @@ sefctrler_ticker_run (void *data);
 static void
 _irp_producer_main(SndEventBasedController * this);
 
-static IRMoment*
+static RRMeasurement*
 _irt (Subflow * this, gint moment);
 
 static void
@@ -226,15 +196,7 @@ _report_processing_xr_owd_block_processor (SndEventBasedController *this,
 static gfloat
 _get_subflow_goodput (
     Subflow * this,
-    guint32* receiver_rate);
-
-static gdouble
-_get_subflow_corrh_owd(
-    Subflow *subflow);
-
-static gdouble
-_get_subflow_corrl_owd(
-    Subflow *subflow);
+    gdouble* receiver_rate);
 
 static Event
 _subflow_check_p_state(
@@ -673,44 +635,31 @@ _irp_producer_main(SndEventBasedController * this)
   Subflow*       subflow;
   GstClockTime   now;
   Event          event;
-  gfloat         goodput;
-//  gdouble        variance;
-  gdouble        corrh_owd;
-  gdouble        corrl_owd;
-  guint32        receiver_rate;
 
   now = gst_clock_get_time(this->sysclock);
-
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
     subflow = (Subflow *) val;
     if(_irt0(subflow)->checked) goto checked;
     if(now - 120 * GST_MSECOND < _irt0(subflow)->time) goto not_checked;
-    goodput = _get_subflow_goodput(subflow, &receiver_rate);
-    corrh_owd = _get_subflow_corrh_owd(subflow);
-    corrl_owd = _get_subflow_corrl_owd(subflow);
+    _irt0(subflow)->goodput = _get_subflow_goodput(subflow, &_irt0(subflow)->receiver_rate);
     if(0) g_print("%p", _irt(subflow, 0));
     //if(goodput < 1. || !receiver_rate) continue;
 //    variance = (gdouble)_irt0(subflow)->jitter / (gdouble)_irt0(subflow)->delay_80;
-//    g_print("S%d jitter: %u, delay: %lu vaiance: %f\n",
-//            subflow->id,
-//            _irt0(subflow)->jitter,
-//            _irt0(subflow)->delay_80,
-//            variance);
+    g_print("%d,J:%u,De:%lu,Mn:%lu,Mx:%lu,P:%u,Di:%u,GP:%f\n",
+            subflow->id,
+            _irt0(subflow)->jitter,
+            _irt0(subflow)->median_delay,
+            _irt0(subflow)->min_delay,
+            _irt0(subflow)->max_delay,
+            _irt0(subflow)->expected_payload_bytes,
+            _irt0(subflow)->late_discarded_bytes,
+            _irt0(subflow)->goodput);
 //    variance = .1;
     sndrate_distor_measurement_update(this->rate_distor,
                                       subflow->rate_calcer_id,
-                                      goodput,
-                                      receiver_rate,
-                                      _irt0(subflow)->jitter,
-                                      corrh_owd,
-                                      corrl_owd,
-                                      _irt0(subflow)->PiT,
-                                      _irt0(subflow)->lost_rate > 0.,
-                                      _irt0(subflow)->late_discarded_bytes > 0,
-                                      subflow->lost_history,
-                                      subflow->late_discarded_history);
+                                      _irt0(subflow));
 
     event = subflow->check(subflow);
     subflow->fire(this, subflow, event);
@@ -724,7 +673,7 @@ _irp_producer_main(SndEventBasedController * this)
   }
 }
 
-IRMoment *
+RRMeasurement *
 _irt (Subflow * this, gint moment)
 {
   gint index;
@@ -737,10 +686,8 @@ _irt (Subflow * this, gint moment)
 void
 _step_ir (Subflow * this)
 {
-  guint16 PiT_sum;
   this->ir_moments_index = (this->ir_moments_index + 1) % MAX_SUBFLOW_MOMENT_NUM;
-  PiT_sum= _irt2(this)->PiT + _irt1(this)->PiT + _irt0(this)->PiT;
-  memset ((gpointer) _irt0 (this), 0, sizeof (IRMoment));
+  memset ((gpointer) _irt0 (this), 0, sizeof (RRMeasurement));
 //  _st0(this)->RTT                   = _irt1(this)->RTT;
 
   _irt0(this)->early_discarded_bytes_sum = _irt1(this)->early_discarded_bytes_sum;
@@ -748,7 +695,6 @@ _step_ir (Subflow * this)
   _irt0(this)->time                      = gst_clock_get_time(this->sysclock);
   _irt0(this)->state                     = _irt1(this)->state;
   _irt0(this)->checked                   = FALSE;
-  _irt0(this)->PiT_last3_sum                   = PiT_sum;
   this->late_discarded_history<<=1;
   this->lost_history<<=1;
   ++this->ir_moments_num;
@@ -890,7 +836,8 @@ _report_processing_rrblock_processor (SndEventBasedController *this,
 
   _irt0 (subflow)->lost_rate = ((gdouble) fraction_lost) / 256.;
   subflow->lost_history +=  (_irt0 (subflow)->lost_rate>0.)?1:0;
-//  g_print("%d: %u:%f\n", subflow->id, _irt0(subflow)->lost, _irt0(subflow)->lost_rate);
+//  gst_print_rtcp_rrb(rrb);
+//  g_print("%d: \n", subflow->id, _irt0(subflow)->lost);
 
 }
 
@@ -931,6 +878,7 @@ _report_processing_xr_7243_block_processor (SndEventBasedController *this,
     default:
     break;
   }
+//  gst_print_rtcp_xr_7243(xrb);
   subflow->late_discarded_history+=(_irt0 (subflow)->late_discarded_bytes>0)?1:0;
 }
 
@@ -939,27 +887,26 @@ _report_processing_xr_owd_block_processor (SndEventBasedController *this,
                                             Subflow * subflow,
                                             GstRTCPXR_OWD * xrb)
 {
-  guint32 last_delay,min_delay,max_delay;
+  guint32 median_delay,min_delay,max_delay;
 
   gst_rtcp_xr_owd_getdown(xrb,
                            NULL,
                            NULL,
-                           NULL,
-                           NULL,
-                           &last_delay,
+                           &median_delay,
                            &min_delay,
                            &max_delay);
 
-  _irt0(subflow)->delay_last = last_delay;
-  _irt0(subflow)->delay_last<<=16;
-  _irt0(subflow)->delay_last = get_epoch_time_from_ntp_in_ns(_irt0(subflow)->delay_last);
-  _irt0(subflow)->delay_40 = min_delay;
-  _irt0(subflow)->delay_40<<=16;
-  _irt0(subflow)->delay_40 = get_epoch_time_from_ntp_in_ns(_irt0(subflow)->delay_40);
-  _irt0(subflow)->delay_80 = max_delay;
-  _irt0(subflow)->delay_80<<=16;
-  _irt0(subflow)->delay_80 = get_epoch_time_from_ntp_in_ns(_irt0(subflow)->delay_80);
+  _irt0(subflow)->median_delay = median_delay;
+  _irt0(subflow)->median_delay<<=16;
+  _irt0(subflow)->median_delay = get_epoch_time_from_ntp_in_ns(_irt0(subflow)->median_delay);
+  _irt0(subflow)->min_delay = min_delay;
+  _irt0(subflow)->min_delay<<=16;
+  _irt0(subflow)->min_delay = get_epoch_time_from_ntp_in_ns(_irt0(subflow)->min_delay);
+  _irt0(subflow)->max_delay = max_delay;
+  _irt0(subflow)->max_delay<<=16;
+  _irt0(subflow)->max_delay = get_epoch_time_from_ntp_in_ns(_irt0(subflow)->max_delay);
 
+//  gst_print_rtcp_xr_owd(xrb);
   //--------------------------
   //evaluating
   //--------------------------
@@ -970,7 +917,7 @@ _report_processing_xr_owd_block_processor (SndEventBasedController *this,
 
 
 gfloat
-_get_subflow_goodput (Subflow * this, guint32* receiver_rate)
+_get_subflow_goodput (Subflow * this, gdouble* receiver_rate)
 {
   //goodput
   {
@@ -1004,61 +951,7 @@ _get_subflow_goodput (Subflow * this, guint32* receiver_rate)
     }
     _irt0(this)->goodput = goodput;
     return goodput;
-//    this->actual_goodput = _irt0(this)->goodput = goodput;
-//    g_print("Sub %d-GP: %f = (%f * (1.-%f) - %f), jitter: %u\n",
-//                  this->id, goodput,
-//                  payload_bytes_sum, _irt0 (this)->lost_rate,
-//                  (gfloat) discarded_bytes,
-//                  _irt0(this)->jitter);
-//    {
-//      gdouble diff;
-//      _irt0(this)->goodput = goodput;
-//      diff = _irt1(this)->goodput - _irt0(this)->goodput;
-//      if(diff < 0.) diff*=-1.;
-//      _irt0(this)->goodput_variation = _irt1(this)->goodput_variation + (diff - _irt1(this)->goodput_variation) / 16.;
-//    }
-//    _obsolate_goodput(this);
-//    if(!mprtps_path_is_monitoring(this->path)){
-//      _add_goodput(this, goodput);
-//
-//    }
-//    g_print("Sub-%d-bid: %f =  (%f*%d + %f)/%d\n",
-//                  this->id,
-//                  _irt0 (this)->bid,
-//                  _irt1 (this)->bid,
-//                  ck,
-//                  goodput,
-//                  ck+1);
   }
-}
-
-//gdouble _get_subflow_corrPiT(Subflow *subflow)
-//{
-////  g_print("S%d: PiT_t0: %hu, PiT_t1: %hu, PiT_t2: %hu\n",
-////          subflow->id, _irt0(subflow)->PiT, _irt1(subflow)->PiT, _irt2(subflow)->PiT);
-//  return (gdouble)_irt0(subflow)->PiT_last3_sum / ((gdouble)_irt0(subflow)->PiT * 3.);
-//}
-
-gdouble _get_subflow_corrh_owd(Subflow *subflow)
-{
-  gdouble result = 1.;
-  if(!_irt0(subflow)->delay_last || !_irt0(subflow)->delay_80) goto done;
-  result = (gdouble) _irt0(subflow)->delay_last;
-  result/= (gdouble) _irt0(subflow)->delay_80;
-done:
-  _irt0(subflow)->corrh_owd = result;
-  return result;
-}
-
-gdouble _get_subflow_corrl_owd(Subflow *subflow)
-{
-  gdouble result = 1.;
-  if(!_irt0(subflow)->delay_last || !_irt0(subflow)->delay_80) goto done;
-  result = (gdouble) _irt0(subflow)->delay_last;
-  result/= (gdouble) _irt0(subflow)->delay_40;
-done:
-  _irt0(subflow)->corrl_owd = result;
-  return result;
 }
 
 Event _subflow_check_p_state(Subflow *subflow)
@@ -1431,6 +1324,7 @@ void _recalc_bids(SndEventBasedController * this)
     if(!mprtps_path_is_active(subflow->path)){
       continue;
     }
+
     sb = sndrate_distor_get_sending_rate(this->rate_distor, subflow->rate_calcer_id);
     g_print("Subflow %d sending bid %u\n",
             subflow->id,
@@ -1505,7 +1399,7 @@ _make_subflow (guint8 id, MPRTPSPath * path)
   result->joined_time = gst_clock_get_time (result->sysclock);
   _subflow_state_transit_to(result, MPRTPS_PATH_STATE_NON_CONGESTED);
   result->ir_moments =
-      (IRMoment *) g_malloc0 (sizeof (IRMoment) * MAX_SUBFLOW_MOMENT_NUM);
+      (RRMeasurement *) g_malloc0 (sizeof (RRMeasurement) * MAX_SUBFLOW_MOMENT_NUM);
   result->ir_moments_index = 0;
   result->ricalcer = make_ricalcer(TRUE);
   reset_subflow (result);
@@ -1518,7 +1412,7 @@ reset_subflow (Subflow * this)
 {
   gint i;
   for (i = 0; i < MAX_SUBFLOW_MOMENT_NUM; ++i) {
-    memset (this->ir_moments, 0, sizeof (IRMoment) * MAX_SUBFLOW_MOMENT_NUM);
+    memset (this->ir_moments, 0, sizeof (RRMeasurement) * MAX_SUBFLOW_MOMENT_NUM);
   }
 }
 

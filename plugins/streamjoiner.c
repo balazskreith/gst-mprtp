@@ -221,7 +221,7 @@ stream_joiner_init (StreamJoiner * this)
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
   this->ticks = make_percentiletracker(1024, 50);
-  percentiletracker_add(this->ticks, 20 * GST_MSECOND);
+  percentiletracker_add(this->ticks, 2 * GST_MSECOND);
   this->tick_estimator = make_skalmanfilter_full(256, GST_SECOND, .25);
 }
 
@@ -329,9 +329,10 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
                               &subflow->jitter);
 
 //  g_print("S%d: %f->%lu\n", subflow->id, subflow->skew, (guint64)subflow->skew);
-  latency = (guint64)(subflow->delay + subflow->skew + (gdouble)(subflow->jitter<<1));
+  latency = (guint64)(subflow->delay + subflow->skew + (gdouble)(subflow->jitter<<2));
   percentiletracker_add(this->latency_window, latency);
-  this->latency = (31. * this->latency + (gdouble)percentiletracker_get_stats(this->latency_window, NULL, NULL, NULL)) / 32.;
+  latency = MIN(300 * GST_MSECOND, percentiletracker_get_stats(this->latency_window, NULL, NULL, NULL));
+  this->latency = (31. * this->latency + (gdouble)latency) / 32.;
   if(this->ssrc != 0 && this->ssrc != gst_mprtp_ptr_buffer_get_ssrc(mprtp)){
 //    g_print("this->ssrc: %u, gst ssrc: %u\n",
 //            this->ssrc, gst_mprtp_ptr_buffer_get_ssrc(mprtp));
@@ -586,14 +587,14 @@ Frame* _make_frame(StreamJoiner *this, GstMpRTPBuffer *mprtp)
   result = pointerpool_get(this->frames_pool);
   memset((gpointer)result, 0, sizeof(Frame));
 //  latency = percentiletracker_get_stats(this->latency_window, NULL, NULL, NULL);
-  latency = this->latency + GST_MSECOND;
+  latency = this->latency;// + GST_MSECOND;
 //  g_print("%f,0,0\n", this->latency / 1000.);
   if(mprtp->delay < latency)
     latency = latency - mprtp->delay;
   else
     latency = 0;
-//  latency += percentiletracker_get_stats(this->ticks, NULL, NULL, NULL)>>1;
-//  latency += GST_MSECOND;
+  latency += percentiletracker_get_stats(this->ticks, NULL, NULL, NULL)>>1;
+//  latency += 10 * GST_MSECOND;
   result->head = result->tail = _make_framenode(this, mprtp);
   result->timestamp = gst_mprtp_ptr_buffer_get_timestamp(mprtp);
   result->created = gst_clock_get_time(this->sysclock);

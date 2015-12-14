@@ -73,25 +73,13 @@ typedef struct _IRMoment IRMoment;
 
 struct _ORMoment{
   GstClockTime                  time;
-//  guint32                       lost_packet_num;
-//  guint32                       late_discarded_bytes;
-//  guint32                       received_packet_num;
-//  guint32                       received_bytes;
-//  guint32                       received_payload_bytes;
-//  guint32                       expected_packet_num;
   gdouble                       receiving_rate;
-//  guint64                       delay40;
-//  guint64                       delay80;
-//  guint64                       last_delay;
-//  GstClockTime                  min_delay;
-//  GstClockTime                  max_delay;
-//  guint64                       median_skew;
-//  GstClockTime                  min_skew;
-//  GstClockTime                  max_skew;
+  GstClockTime                  median_delay;
+  GstClockTime                  min_delay;
+  GstClockTime                  max_delay;
 
   guint16                       discarded;
   guint32                       discarded_bytes;
-
   guint16                       cycle_num;
   guint32                       jitter;
   guint16                       HSN;
@@ -99,7 +87,6 @@ struct _ORMoment{
   guint16                       missing;
   guint32                       received;
   guint32                       received_bytes;
-
   guint16                       received_diff;
 
 };
@@ -126,6 +113,12 @@ struct _Subflow
   guint8                        or_index;
   guint32                       or_num;
   gdouble                       avg_rtcp_size;
+
+  //for stats
+  guint32 jitter;
+  guint64 estimated_delay;
+  guint32 rcvd_bytes;
+  guint32 discarded_bytes;
 
 };
 
@@ -188,20 +181,20 @@ _get_mprtcp_xr_7243_block (
     Subflow * subflow,
     guint16 * block_length);
 
+static GstBuffer *
+_get_mprtcp_xr_owd_block (
+    RcvEventBasedController * this,
+    Subflow * subflow,
+    guint16 * buf_length);
+
 static GstBuffer*
 _get_mprtcp_rr_block (
     RcvEventBasedController * this,
     Subflow * subflow,
     guint16 * block_length);
 
-static GstBuffer *
-_get_mprtcp_fp_mpcc_block (
-    RcvEventBasedController * this,
-    Subflow * subflow,
-    guint16 * buf_length);
-
 static void
-_setup_xr_rfc2743_late_discarded_report (
+_setup_xr_rfc7243_late_discarded_report (
     Subflow * this,
     GstRTCPXR_RFC7243 *xr,
     guint32 ssrc);
@@ -213,9 +206,9 @@ _setup_rr_report (
     guint32 ssrc);
 
 void
-_setup_fb_mpcc_report (
+_setup_xr_owd (
     Subflow * this,
-    GstRTCPFB_MPCC * fb,
+    GstRTCPXR_OWD * xr,
     guint32 ssrc);
 
 //----------------------------- System Notifier ------------------------------
@@ -320,14 +313,13 @@ refctrler_init (RcvEventBasedController * this)
   this->thread = gst_task_new (refctrler_ticker, this, NULL);
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
-//
+
 //  g_rec_mutex_init (&this->stat_thread_mutex);
 //  this->stat_thread = gst_task_new (refctrler_stat_run, this, NULL);
 //  gst_task_set_lock (this->stat_thread, &this->stat_thread_mutex);
 //  gst_task_start (this->stat_thread);
 
 }
-
 //
 //void
 //refctrler_stat_run (void *data)
@@ -337,20 +329,55 @@ refctrler_init (RcvEventBasedController * this)
 //  GHashTableIter iter;
 //  gpointer key, val;
 //  Subflow *subflow;
-//  guint32 actual;
+//  gdouble goodput;
 //  GstClockTime next_scheduler_time;
 //  this = data;
 //  THIS_WRITELOCK (this);
 ////  g_print("# subflow1, subflow 2\n");
 //  g_hash_table_iter_init (&iter, this->subflows);
 //  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+//    guint32 rcvd_bytes;
+//    guint32 discarded_bytes;
+//    GstClockTime min_delay, max_delay;
 //    subflow = (Subflow *) val;
 //
+//    discarded_bytes = subflow->discarded_bytes;
+//    rcvd_bytes = subflow->rcvd_bytes;
+//
+//    mprtpr_path_get_RR_stats(subflow->path,
+//                             NULL,
+//                             NULL,
+//                             &subflow->jitter,
+//                             NULL,
+//                             &subflow->rcvd_bytes);
+//
+//    mprtpr_path_get_XR7243_stats(subflow->path,
+//                                 NULL,
+//                                 &subflow->discarded_bytes);
+//
+//    mprtpr_path_get_XROWD_stats(subflow->path,
+//                                &subflow->estimated_delay,
+//                                &min_delay,
+//                                &max_delay);
+//
+//    rcvd_bytes = subflow->rcvd_bytes - rcvd_bytes;
+//    discarded_bytes = subflow->discarded_bytes - discarded_bytes;
+//    goodput = (gdouble) (rcvd_bytes - discarded_bytes);
+//
+//    g_print("%d,%u,%lu,%lu,%lu,%u,%u,%f,",
+//            subflow->id,
+//            subflow->jitter,
+//            subflow->estimated_delay,
+//            min_delay,
+//            max_delay,
+//            rcvd_bytes,
+//            discarded_bytes,
+//            goodput);
 //  }
-//  g_print("\n");
+//  g_print("|\n");
 //  THIS_WRITEUNLOCK(this);
 //
-//  next_scheduler_time = gst_clock_get_time(this->sysclock) + 100 * GST_MSECOND;
+//  next_scheduler_time = gst_clock_get_time(this->sysclock) + 1000 * GST_MSECOND;
 //  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
 //
 //  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
@@ -611,16 +638,16 @@ _orp_main(RcvEventBasedController * this)
     report_length += block_length;
     if (_ort0(subflow)->discarded !=
         _ort1(subflow)->discarded) {
-      GstBuffer *xr;
-      xr = _get_mprtcp_xr_7243_block (this, subflow, &block_length);
-      block = gst_buffer_append (block, xr);
-      report_length += block_length;
-    }
+        GstBuffer *xr;
+        xr = _get_mprtcp_xr_7243_block (this, subflow, &block_length);
+        block = gst_buffer_append (block, xr);
+        report_length += block_length;
+      }
 
     {
-      GstBuffer *fb;
-      fb = _get_mprtcp_fp_mpcc_block(this, subflow, &block_length);
-      block = gst_buffer_append (block, fb);
+      GstBuffer *xr;
+      xr = _get_mprtcp_xr_owd_block (this, subflow, &block_length);
+      block = gst_buffer_append (block, xr);
       report_length += block_length;
     }
 
@@ -661,6 +688,11 @@ _step_or (Subflow * this)
   mprtpr_path_get_XR7243_stats(this->path,
                                &_ort0(this)->discarded,
                                &_ort0(this)->discarded_bytes);
+
+  mprtpr_path_get_XROWD_stats(this->path,
+                               &_ort0(this)->median_delay,
+                               &_ort0(this)->min_delay,
+                               &_ort0(this)->max_delay);
   _ort0(this)->total_lost = _ort1(this)->total_lost;
 //  _ort0(this)->receiving_rate = 64000.;
   ++this->or_num;
@@ -718,7 +750,37 @@ _get_mprtcp_xr_7243_block (RcvEventBasedController * this, Subflow * subflow,
 
   gst_mprtcp_block_init (&block);
   xr = gst_mprtcp_riport_block_add_xr_rfc2743 (&block);
-  _setup_xr_rfc2743_late_discarded_report (subflow, xr, this->ssrc);
+  _setup_xr_rfc7243_late_discarded_report (subflow, xr, this->ssrc);
+  gst_rtcp_header_getdown (&xr->header, NULL, NULL, NULL, NULL, &length, NULL);
+  block_length = (guint8) length + 1;
+  gst_mprtcp_block_setup (&block.info, MPRTCP_BLOCK_TYPE_RIPORT, block_length,
+      (guint16) subflow->id);
+  length = (block_length + 1) << 2;
+  dataptr = g_malloc0 (length);
+  memcpy (dataptr, &block, length);
+  buf = gst_buffer_new_wrapped (dataptr, length);
+  if (buf_length) {
+    *buf_length = length;
+  }
+  //gst_print_mprtcp_block(&block, NULL);
+  return buf;
+}
+
+
+GstBuffer *
+_get_mprtcp_xr_owd_block (RcvEventBasedController * this, Subflow * subflow,
+    guint16 * buf_length)
+{
+  GstMPRTCPSubflowBlock block;
+  GstRTCPXR_OWD *xr;
+  gpointer dataptr;
+  guint16 length;
+  guint8 block_length;
+  GstBuffer *buf;
+
+  gst_mprtcp_block_init (&block);
+  xr = gst_mprtcp_riport_block_add_xr_owd (&block);
+  _setup_xr_owd(subflow, xr, this->ssrc);
   gst_rtcp_header_getdown (&xr->header, NULL, NULL, NULL, NULL, &length, NULL);
   block_length = (guint8) length + 1;
   gst_mprtcp_block_setup (&block.info, MPRTCP_BLOCK_TYPE_RIPORT, block_length,
@@ -766,41 +828,10 @@ _get_mprtcp_rr_block (RcvEventBasedController * this, Subflow * subflow,
 }
 
 
-GstBuffer *
-_get_mprtcp_fp_mpcc_block (
-    RcvEventBasedController * this,
-    Subflow * subflow,
-    guint16 * buf_length)
-{
-  GstMPRTCPSubflowBlock block;
-  GstRTCPFB_MPCC *fb;
-  gpointer dataptr;
-  guint16 length;
-  guint8 block_length;
-  GstBuffer *buf;
-
-  gst_mprtcp_block_init (&block);
-  fb = gst_mprtcp_riport_block_add_fb_mpcc(&block);
-  _setup_fb_mpcc_report(subflow, fb, this->ssrc);
-
-  gst_rtcp_header_getdown (&fb->header, NULL, NULL, NULL, NULL, &length, NULL);
-  block_length = (guint8) length + 1;
-  gst_mprtcp_block_setup (&block.info, MPRTCP_BLOCK_TYPE_RIPORT, block_length,
-      (guint16) subflow->id);
-  length = (block_length + 1) << 2;
-  dataptr = g_malloc0 (length);
-  memcpy (dataptr, &block, length);
-  buf = gst_buffer_new_wrapped (dataptr, length);
-  if (buf_length) {
-    *buf_length = length;
-  }
-  //gst_print_mprtcp_block(&block, NULL);
-  return buf;
-}
 
 
 void
-_setup_xr_rfc2743_late_discarded_report (Subflow * this,
+_setup_xr_rfc7243_late_discarded_report (Subflow * this,
     GstRTCPXR_RFC7243 * xr, guint32 ssrc)
 {
   guint8 flag = RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION;
@@ -814,6 +845,25 @@ _setup_xr_rfc2743_late_discarded_report (Subflow * this,
   gst_rtcp_xr_rfc7243_change (xr, &flag, &early_bit, NULL,
       &late_discarded_bytes);
 //  g_print("DISCARDED REPORT SETTED UP\n");
+}
+
+void
+_setup_xr_owd (Subflow * this,
+    GstRTCPXR_OWD * xr, guint32 ssrc)
+{
+  guint8 flag = RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION;
+  guint32 median, min, max;
+
+  median = (guint32)(get_ntp_from_epoch_ns(_ort0(this)->median_delay)>>16);
+  min = (guint32)(get_ntp_from_epoch_ns(_ort0(this)->min_delay)>>16);
+  max = (guint32)(get_ntp_from_epoch_ns(_ort0(this)->max_delay)>>16);
+  gst_rtcp_header_change (&xr->header, NULL, NULL, NULL, NULL, NULL, &ssrc);
+  gst_rtcp_xr_owd_change(xr,
+                         &flag,
+                         &ssrc,
+                         &median,
+                         &min,
+                         &max);
 }
 
 void
@@ -886,48 +936,6 @@ _setup_rr_report (Subflow * this, GstRTCPRR * rr, guint32 ssrc)
 //    g_print("this->media_rate = %f / %f = %f\n",
 //                   received_bytes,
 //                   interval, this->media_rate);
-}
-
-
-void
-_setup_fb_mpcc_report (Subflow * this,
-    GstRTCPFB_MPCC * fb, guint32 ssrc)
-{
-  GstClockTime lt80_delay_read;
-  GstClockTime lt40_delay_read;
-  GstClockTime md_delay_read;
-  GstClockTime sh_delay_read;
-  guint32 lt80_delay;
-  guint32 lt40_delay;
-  guint32 md_delay;
-  guint32 sh_delay;
-
-  mprtpr_path_get_FBCC_stats(this->path,
-                             &sh_delay_read,
-                             &md_delay_read,
-                             &lt40_delay_read,
-                             &lt80_delay_read);
-
-  if(lt80_delay_read > GST_SECOND) lt80_delay = 0xFFFFFFFF;
-  else                             lt80_delay = (guint32)(lt80_delay_read);
-
-  if(lt40_delay_read > GST_SECOND) lt40_delay = 0xFFFFFFFF;
-  else                             lt40_delay = (guint32)(lt40_delay_read);
-
-  if(md_delay_read > GST_SECOND)   md_delay = 0xFFFFFFFF;
-  else                             md_delay = (guint32)(md_delay_read);
-
-  if(sh_delay_read > GST_SECOND)   sh_delay = 0xFFFFFFFF;
-  else                             sh_delay = (guint32)(sh_delay_read);
-
-
-
-  gst_rtcp_header_change (&fb->header, NULL,NULL, NULL, NULL, NULL, &ssrc);
-  gst_rtcp_fb_mpcc_change(fb,
-                          &lt40_delay,
-                          &lt80_delay,
-                          &md_delay,
-                          &sh_delay);
 }
 
 //----------------------------- System Notifier ------------------------------

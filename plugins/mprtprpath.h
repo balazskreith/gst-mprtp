@@ -63,14 +63,11 @@ struct _MpRTPReceiverPath
   guint32             last_rtp_timestamp;
 
   gdouble             path_skew;
-//  GstClockTime        last_delay_a;
-//  GstClockTime        last_delay_b;
-//  GstClockTime        sh_delay;
-//  GstClockTime        md_delay;
   GstClockTime        last_mprtp_delay;
-  PercentileTracker*  lt_low_delays;
-  PercentileTracker*  lt_high_delays;
-//  PercentileTracker*  skews;
+  PercentileTracker*  delays;
+//  PercentileTracker*  lt_low_delays;
+//  PercentileTracker*  lt_high_delays;
+
   SKalmanFilter*      delay_estimator;
   gdouble             estimated_delay;
   SKalmanFilter*      skew_estimator;
@@ -112,11 +109,10 @@ void mprtpr_path_get_XR7243_stats(MpRTPRPath *this,
                            guint16 *discarded,
                            guint32 *discarded_bytes);
 
-void mprtpr_path_get_FBCC_stats(MpRTPRPath *this,
-                           GstClockTime *sh_last_delay,
-                           GstClockTime *md_last_delay,
-                           GstClockTime *lt_40th_delay,
-                           GstClockTime *lt_80th_delay);
+void mprtpr_path_get_XROWD_stats(MpRTPRPath *this,
+                                 GstClockTime *median,
+                                 GstClockTime *min,
+                                 GstClockTime* max);
 
 void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
                            gdouble       *path_delay,

@@ -19,6 +19,8 @@
 typedef struct _SndEventBasedController SndEventBasedController;
 typedef struct _SndEventBasedControllerClass SndEventBasedControllerClass;
 
+
+
 #define SEFCTRLER_TYPE             (sefctrler_get_type())
 #define SEFCTRLER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),SEFCTRLER_TYPE,SndEventBasedController))
 #define SEFCTRLER_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass),SEFCTRLER_TYPE,SndEventBasedControllerClass))
@@ -66,6 +68,32 @@ struct _SndEventBasedController
 //  //for stat and plot
 //  GstTask*          stat_thread;
 //  GRecMutex         stat_thread_mutex;
+};
+
+
+struct _RRMeasurement{
+  GstClockTime        time;
+  GstClockTime        RTT;
+  guint32             jitter;
+  guint32             cum_packet_lost;
+  guint32             lost;
+  guint64             median_delay;
+  guint64             min_delay;
+  guint64             max_delay;
+  guint32             early_discarded_bytes;
+  guint32             late_discarded_bytes;
+  guint32             early_discarded_bytes_sum;
+  guint32             late_discarded_bytes_sum;
+  guint16             HSSN;
+  guint16             cycle_num;
+  guint16             expected_packets;
+  guint16             PiT;
+  guint32             expected_payload_bytes;
+  gdouble             lost_rate;
+  gdouble             goodput;
+  gdouble             receiver_rate;
+  MPRTPSPathState     state;
+  gboolean            checked;
 };
 
 struct _SndEventBasedControllerClass{

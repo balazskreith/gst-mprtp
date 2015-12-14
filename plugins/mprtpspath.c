@@ -552,6 +552,8 @@ _setup_rtp2mprtp (MPRTPSPath * this,
 
   gst_rtp_buffer_add_extension_onebyte_header (&rtp, this->mprtp_ext_header_id,
       (gpointer) & data, sizeof (data));
+  if(this->ssrc_allowed == 0)
+    this->ssrc_allowed = gst_rtp_buffer_get_ssrc(&rtp);
   gst_rtp_buffer_unmap(&rtp);
 }
 
@@ -571,10 +573,12 @@ _refresh_stat(MPRTPSPath * this,
       ++this->total_sent_frames_num;
       this->last_sent_frame_timestamp = gst_rtp_buffer_get_timestamp(&rtp);
   }
-  if(gst_rtp_buffer_get_payload_type(&rtp) != this->monitor_payload_type)
+//  if(gst_rtp_buffer_get_payload_type(&rtp) != this->monitor_payload_type)
+  if(gst_rtp_buffer_get_ssrc(&rtp) == this->ssrc_allowed)
     this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
   else
     this->sent_octets[this->sent_octets_write] = 0;
+
   this->sent_octets_write += 1;
   this->sent_octets_write &= MAX_INT32_POSPART;
   gst_rtp_buffer_unmap(&rtp);

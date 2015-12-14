@@ -61,10 +61,12 @@ mprtpr_path_init (MpRTPRPath * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
-  this->lt_low_delays = make_percentiletracker(1024, 20);
-  percentiletracker_set_treshold(this->lt_low_delays, GST_SECOND);
-  this->lt_high_delays = make_percentiletracker(1024, 50);
-  percentiletracker_set_treshold(this->lt_high_delays, GST_SECOND);
+  this->delays = make_percentiletracker(1024, 50);
+  percentiletracker_set_treshold(this->delays, GST_SECOND);
+//  this->lt_low_delays = make_percentiletracker(1024, 20);
+//  percentiletracker_set_treshold(this->lt_low_delays, GST_SECOND);
+//  this->lt_high_delays = make_percentiletracker(1024, 50);
+//  percentiletracker_set_treshold(this->lt_high_delays, GST_SECOND);
 //  this->skews = make_percentiletracker(100, 50);
 //  percentiletracker_set_treshold(this->skews, 2 * GST_SECOND);
   this->delay_estimator = make_skalmanfilter_full(1024, GST_SECOND, .25);
@@ -83,8 +85,8 @@ mprtpr_path_finalize (GObject * object)
   MpRTPRPath *this;
   this = MPRTPR_PATH_CAST (object);
   g_object_unref (this->sysclock);
-  g_object_unref(this->lt_low_delays);
-  g_object_unref(this->lt_high_delays);
+//  g_object_unref(this->lt_low_delays);
+//  g_object_unref(this->lt_high_delays);
 //  g_object_unref(this->skews);
 }
 
@@ -144,19 +146,19 @@ void mprtpr_path_get_XR7243_stats(MpRTPRPath *this,
   THIS_READUNLOCK (this);
 }
 
-void mprtpr_path_get_FBCC_stats(MpRTPRPath *this,
-                           GstClockTime *sh_last_delay,
-                           GstClockTime *md_last_delay,
-                           GstClockTime *lt_40th_delay,
-                           GstClockTime *lt_80th_delay)
+
+void mprtpr_path_get_XROWD_stats(MpRTPRPath *this,
+                                 GstClockTime *median,
+                                 GstClockTime *min,
+                                 GstClockTime* max)
 {
+  GstClockTime median_delay;
   THIS_READLOCK (this);
-  if(sh_last_delay) *sh_last_delay = 0;
-  if(md_last_delay) *md_last_delay = 0;
-  if(lt_40th_delay) *lt_40th_delay = percentiletracker_get_stats(this->lt_low_delays, NULL, NULL, NULL);
-  if(lt_80th_delay) *lt_80th_delay = percentiletracker_get_stats(this->lt_high_delays, NULL, NULL, NULL);
+  median_delay = percentiletracker_get_stats(this->delays, min, max, NULL);
+  if(median) *median = median_delay;
   THIS_READUNLOCK (this);
 }
+
 
 void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
                            gdouble       *path_delay,
@@ -264,8 +266,9 @@ _cmp_seq (guint16 x, guint16 y)
 
 void _add_delay(MpRTPRPath *this, GstClockTime delay)
 {
-  percentiletracker_add(this->lt_low_delays, delay);
-  percentiletracker_add(this->lt_high_delays, delay);
+//  percentiletracker_add(this->lt_low_delays, delay);
+//  percentiletracker_add(this->lt_high_delays, delay);
+  percentiletracker_add(this->delays, delay);
   this->estimated_delay = skalmanfilter_measurement_update(this->delay_estimator, delay);
 //  this->md_delay = ((gdouble)this->md_delay * 31 + (gdouble) delay) / 32.;
 //  this->sh_delay = ((gdouble)this->sh_delay * 3 + (gdouble) delay) / 4.;

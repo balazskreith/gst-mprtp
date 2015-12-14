@@ -181,9 +181,7 @@ typedef struct PACKED _GstRTCPXR_OWD
 #endif
   guint16 block_length;
   guint32 ssrc;
-  guint16 percentile;
-  guint16 invert_percentile;
-  guint32 one_way_delay;
+  guint32 median_delay;
   guint32 max_delay;
   guint32 min_delay;
 } GstRTCPXR_OWD;
@@ -285,8 +283,7 @@ GstRTCPXR_RFC7243 *gst_mprtcp_riport_block_add_xr_rfc2743 (GstMPRTCPSubflowBlock
 
 GstRTCPXR_OWD *
 gst_mprtcp_riport_block_add_xr_owd (GstMPRTCPSubflowBlock * block);
-GstRTCPFB_MPCC *
-gst_mprtcp_riport_block_add_fb_mpcc (GstMPRTCPSubflowBlock * block);
+
 void
 gst_mprtcp_riport_add_block_end (GstMPRTCPSubflowReport * report,
     GstMPRTCPSubflowBlock * block);
@@ -345,52 +342,24 @@ void gst_rtcp_xr_owd_init (GstRTCPXR_OWD * report);
 void gst_rtcp_xr_owd_setup(GstRTCPXR_OWD *report,
                             guint8  interval_metric,
                             guint32 ssrc,
-                            guint16 percentile,
-                            guint16 invert_percentile,
-                            guint32 one_way_delay,
+                            guint32 median_delay,
                             guint32 min_delay,
                             guint32 max_delay);
 
 void gst_rtcp_xr_owd_change (GstRTCPXR_OWD *report,
                              guint8  *interval_metric,
                             guint32 *ssrc,
-                            guint16 *percentile,
-                            guint16 *invert_percentile,
-                            guint32 *one_way_delay,
+                            guint32 *median_delay,
                             guint32 *min_delay,
                             guint32 *max_delay);
 
 void gst_rtcp_xr_owd_getdown(GstRTCPXR_OWD *report,
                              guint8  *interval_metric,
                              guint32 *ssrc,
-                             guint16 *percentile,
-                             guint16 *invert_percentile,
-                             guint32 *one_way_delay,
+                             guint32 *median_delay,
                              guint32 *min_delay,
                              guint32 *max_delay);
 
-
-
-void gst_rtcp_fb_mpcc_init (GstRTCPFB_MPCC * report);
-
-void gst_rtcp_fb_mpcc_setup(GstRTCPFB_MPCC *report,
-                            guint32 media_ssrc,
-                            guint32 lt80_delay,
-                            guint32 lt40_delay,
-                            guint32 md_delay,
-                            guint32 sh_delay);
-
-void gst_rtcp_fb_mpcc_change (GstRTCPFB_MPCC *report,
-                              guint32* lt80_delay,
-                              guint32* lt40_delay,
-                              guint32* md_delay,
-                              guint32* sh_delay);
-
-void gst_rtcp_fb_mpcc_getdown(GstRTCPFB_MPCC *report,
-                              guint32* lt80_delay,
-                              guint32* lt40_delay,
-                              guint32* md_delay,
-                              guint32* sh_delay);
 
 
 
@@ -423,7 +392,6 @@ void gst_print_rtcp_sr (GstRTCPSR * report);
 void gst_print_rtcp_rr (GstRTCPRR * report);
 void gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * report);
 void gst_print_rtcp_xr_owd (GstRTCPXR_OWD * report);
-void gst_print_rtcp_fb_mpcc (GstRTCPFB_MPCC * report);
 void gst_print_rtcp_srb (GstRTCPSRBlock * block_ptr);
 void gst_print_rtcp_rrb (GstRTCPRRBlock * block_ptr);
 

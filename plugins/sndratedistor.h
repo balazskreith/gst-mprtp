@@ -45,13 +45,11 @@ struct _SendingRateDistributor
 
   guint8              available_ids[SNDRATEDISTOR_MAX_NUM];
   guint8              available_ids_length;
-//  guint8               overused_subflows_num;
-//  guint8               load_controlling;
-//  guint8               prev_controlling;
 
   SignalRequestFunc    signal_request;
   gpointer             signal_controller;
 };
+
 
 struct _SendingRateDistributorClass{
   GObjectClass parent_class;
@@ -65,16 +63,7 @@ guint8 sndrate_distor_request_id(SendingRateDistributor *this,
                                  guint32 sending_rate);
 void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        guint8 id,
-                                       guint32 goodput,
-                                       guint32 receiver_rate,
-                                       guint32 variance,
-                                       gdouble corrh_owd,
-                                       gdouble corrl_owd,
-                                       guint16 PiT,
-                                       gboolean lost,
-                                       gboolean discard,
-                                       guint8 lost_history,
-                                       guint8 discard_history);
+                                       RRMeasurement *measurement);
 
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate);

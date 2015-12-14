@@ -19,6 +19,7 @@
 
 G_BEGIN_DECLS typedef struct _MPRTPSPath MPRTPSPath;
 typedef struct _MPRTPSPathClass MPRTPSPathClass;
+typedef struct _RRMeasurement RRMeasurement;
 
 #include "gstmprtcpbuffer.h"
 #include "packetssndqueue.h"
@@ -76,7 +77,8 @@ struct _MPRTPSPath
   GstClockTime            sent_congested;
 
   PacketsSndQueue*        packetsqueue;
-  PercentileTracker*          sent_bytes;
+  PercentileTracker*      sent_bytes;
+  guint32                 ssrc_allowed;
   guint8                  sent_octets[MAX_INT32_POSPART];
   guint16                 sent_octets_read;
   guint16                 sent_octets_write;

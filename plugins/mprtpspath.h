@@ -19,7 +19,7 @@
 
 G_BEGIN_DECLS typedef struct _MPRTPSPath MPRTPSPath;
 typedef struct _MPRTPSPathClass MPRTPSPathClass;
-typedef struct _RRMeasurement RRMeasurement;
+
 
 #include "gstmprtcpbuffer.h"
 #include "packetssndqueue.h"
@@ -106,6 +106,32 @@ struct _MPRTPSPathClass
   GObjectClass parent_class;
 };
 
+typedef struct _RRMeasurement RRMeasurement;
+struct _RRMeasurement{
+  GstClockTime        time;
+  GstClockTime        RTT;
+  guint32             jitter;
+  guint32             cum_packet_lost;
+  guint32             lost;
+  guint64             median_delay;
+  guint64             min_delay;
+  guint64             max_delay;
+  guint32             early_discarded_bytes;
+  guint32             late_discarded_bytes;
+  guint32             early_discarded_bytes_sum;
+  guint32             late_discarded_bytes_sum;
+  guint16             HSSN;
+  guint16             cycle_num;
+  guint16             expected_packets;
+  guint16             PiT;
+  guint32             expected_payload_bytes;
+  gdouble             lost_rate;
+  gdouble             goodput;
+  gdouble             sending_rate;
+  gdouble             receiver_rate;
+  MPRTPSPathState     state;
+  gboolean            checked;
+};
 
 
 GType mprtps_path_get_type (void);

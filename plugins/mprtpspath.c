@@ -573,8 +573,8 @@ _refresh_stat(MPRTPSPath * this,
       ++this->total_sent_frames_num;
       this->last_sent_frame_timestamp = gst_rtp_buffer_get_timestamp(&rtp);
   }
-//  if(gst_rtp_buffer_get_payload_type(&rtp) != this->monitor_payload_type)
-  if(gst_rtp_buffer_get_ssrc(&rtp) == this->ssrc_allowed)
+  if(gst_rtp_buffer_get_payload_type(&rtp) != this->monitor_payload_type)
+//  if(gst_rtp_buffer_get_ssrc(&rtp) == this->ssrc_allowed)
     this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
   else
     this->sent_octets[this->sent_octets_write] = 0;

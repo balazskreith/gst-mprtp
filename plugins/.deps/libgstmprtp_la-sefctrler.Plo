@@ -194,8 +194,8 @@ libgstmprtp_la-sefctrler.lo: sefctrler.c /usr/include/stdc-predef.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h sefctrler.h \
  mprtpspath.h gstmprtcpbuffer.h gstmprtpbuffer.h pointerpool.h bintree.h \
- packetssndqueue.h percentiletracker.h streamsplitter.h smanctrler.h \
- sndratedistor.h /usr/include/math.h \
+ packetssndqueue.h percentiletracker.h streamsplitter.h variancetracker.h \
+ smanctrler.h sndratedistor.h /usr/include/math.h \
  /usr/include/x86_64-linux-gnu/bits/huge_val.h \
  /usr/include/x86_64-linux-gnu/bits/huge_valf.h \
  /usr/include/x86_64-linux-gnu/bits/huge_vall.h \
@@ -668,6 +668,8 @@ packetssndqueue.h:
 percentiletracker.h:
 
 streamsplitter.h:
+
+variancetracker.h:
 
 smanctrler.h:
 

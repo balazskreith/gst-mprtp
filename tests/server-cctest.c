@@ -190,7 +190,7 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
   gint delta, new_bitrate, get_bitrate;
   g_object_get (encoder, "bitrate", &get_bitrate, NULL);
   new_bitrate = (gdouble)get_bitrate * utilization->changing_rate;
-  g_print("Current bitrate: %d, cr: %f sugested bitrate:: %d\n",
+  g_print("Current bitrate: %d, cr: %f suggested bitrate:: %d\n",
           get_bitrate,
           utilization->changing_rate,
           new_bitrate);

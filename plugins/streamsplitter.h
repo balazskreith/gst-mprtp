@@ -12,6 +12,7 @@
 
 #include "mprtpspath.h"
 #include "percentiletracker.h"
+#include "variancetracker.h"
 
 typedef struct _StreamSplitter StreamSplitter;
 typedef struct _StreamSplitterClass StreamSplitterClass;
@@ -25,6 +26,7 @@ typedef struct _SchNode SchNode;
 #define STREAM_SPLITTER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),STREAM_SPLITTER_TYPE))
 #define STREAM_SPLITTER_CAST(src)        ((StreamSplitter *)(src))
 
+#define SCHTREE_MAX_VALUE 128
 
 #define MPRTP_SENDER_STREAM_SPLITTER_MAX_PATH_NUM 32
 
@@ -62,7 +64,7 @@ struct _StreamSplitter
   gboolean             separation_is_possible;
   gboolean             last_delta_flag;
   gboolean             first_delta_flag;
-  PercentileTracker*   sent_bytes;
+  VarianceTracker*     sent_bytes;
   guint8               monitor_payload_type;
 
 };

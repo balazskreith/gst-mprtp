@@ -29,22 +29,23 @@ struct _SendingRateDistributor
   GstClock*            sysclock;
   guint8*              subflows;
   guint8               max_id;
-  guint32              media_rate;
   GQueue*              free_ids;
   guint8               controlled_num;
 
-  gint32              stable_sr_sum;
-  gint32              taken_bytes;
-  gint32              supplied_bytes;
-  gint32              requested_bytes;
-  gint32              fallen_bytes;
-  gint32              overused_bytes;
-  guint8              monitored;
-  guint8              wait_before_monitoring;
-  guint8              overused;
+//  gint32              taken_bytes;
+//  gint32              supplied_bytes;
+//  gint32              requested_bytes;
+//  gint32              fallen_bytes;
+//  gint32              overused_bytes;
+
+  guint32             target_media_rate;
+  guint32             actual_media_rate;
 
   guint8              available_ids[SNDRATEDISTOR_MAX_NUM];
   guint8              available_ids_length;
+
+  guint               monitored;
+  guint               overused;
 
   SignalRequestFunc    signal_request;
   gpointer             signal_controller;
@@ -66,8 +67,8 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        RRMeasurement *measurement);
 
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
-void sndrate_distor_time_update(SendingRateDistributor *this, guint32 media_rate);
-guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id);
+void sndrate_distor_time_update(SendingRateDistributor *this);
+gdouble sndrate_distor_get_sending_weight(SendingRateDistributor *this, guint8 id);
 gboolean sndrate_distor_congestion_event(SendingRateDistributor *this, guint8 id);
 gboolean sndrate_distor_settlemen_event(SendingRateDistributor *this, guint8 id);
 #endif /* SNDRATEDISTOR_H_ */

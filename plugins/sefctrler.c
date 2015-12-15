@@ -42,7 +42,7 @@
 #define PATH_RTT_MAX_TRESHOLD (800 * GST_MSECOND)
 #define PATH_RTT_MIN_TRESHOLD (600 * GST_MSECOND)
 #define MAX_SUBFLOW_MOMENT_NUM 5
-#define SUBFLOW_DEFAULT_GOODPUT 6400
+#define SUBFLOW_DEFAULT_SENDING_RATE 512
 
 GST_DEBUG_CATEGORY_STATIC (sefctrler_debug_category);
 #define GST_CAT_DEFAULT sefctrler_debug_category
@@ -99,6 +99,7 @@ struct _ORMoment{
 
 };
 
+
 struct _SubflowState{
   gdouble            goodput;
 };
@@ -113,7 +114,7 @@ struct _Subflow
   guint8                     id;
   GstClock*                  sysclock;
   ReportIntervalCalculator*  ricalcer;
-  RRMeasurement*             ir_moments;
+  RRMeasurement*                  ir_moments;
   gint                       ir_moments_index;
   guint32                    ir_moments_num;
   ORMoment                   or_moments[2];
@@ -420,8 +421,8 @@ sefctrler_add_path (gpointer ptr, guint8 subflow_id, MPRTPSPath * path)
   g_hash_table_insert (this->subflows, GINT_TO_POINTER (subflow_id),
                        new_subflow);
   ++this->subflow_num;
-  stream_splitter_add_path (this->splitter, subflow_id, path, SUBFLOW_DEFAULT_GOODPUT);
-  new_subflow->rate_calcer_id = sndrate_distor_request_id(this->rate_distor, path, SUBFLOW_DEFAULT_GOODPUT);
+  stream_splitter_add_path (this->splitter, subflow_id, path, SUBFLOW_DEFAULT_SENDING_RATE);
+  new_subflow->rate_calcer_id = sndrate_distor_request_id(this->rate_distor, path, SUBFLOW_DEFAULT_SENDING_RATE);
 exit:
   THIS_WRITEUNLOCK (this);
 }
@@ -635,6 +636,10 @@ _irp_producer_main(SndEventBasedController * this)
   Subflow*       subflow;
   GstClockTime   now;
   Event          event;
+  gdouble        weight;
+  gdouble        media_rate;
+
+  media_rate = (gdouble)stream_splitter_get_media_rate(this->splitter);
 
   now = gst_clock_get_time(this->sysclock);
   g_hash_table_iter_init (&iter, this->subflows);
@@ -647,16 +652,18 @@ _irp_producer_main(SndEventBasedController * this)
     if(0) g_print("%p", _irt(subflow, 0));
     //if(goodput < 1. || !receiver_rate) continue;
 //    variance = (gdouble)_irt0(subflow)->jitter / (gdouble)_irt0(subflow)->delay_80;
-    g_print("%d,J:%u,De:%lu,Mn:%lu,Mx:%lu,P:%u,Di:%u,GP:%f\n",
-            subflow->id,
-            _irt0(subflow)->jitter,
-            _irt0(subflow)->median_delay,
-            _irt0(subflow)->min_delay,
-            _irt0(subflow)->max_delay,
-            _irt0(subflow)->expected_payload_bytes,
-            _irt0(subflow)->late_discarded_bytes,
-            _irt0(subflow)->goodput);
+//    g_print("%d,J:%u,De:%lu,Mn:%lu,Mx:%lu,P:%u,Di:%u,GP:%f\n",
+//            subflow->id,
+//            _irt0(subflow)->jitter,
+//            _irt0(subflow)->median_delay,
+//            _irt0(subflow)->min_delay,
+//            _irt0(subflow)->max_delay,
+//            _irt0(subflow)->expected_payload_bytes,
+//            _irt0(subflow)->late_discarded_bytes,
+//            _irt0(subflow)->goodput);
 //    variance = .1;
+
+    _irt0(subflow)->sending_rate = media_rate * weight;
     sndrate_distor_measurement_update(this->rate_distor,
                                       subflow->rate_calcer_id,
                                       _irt0(subflow));
@@ -986,7 +993,7 @@ void _subflow_fire_p_state(SndEventBasedController *this,Subflow *subflow,Event 
   subflow->rate_calcer_id = sndrate_distor_request_id(
       this->rate_distor,
       path,
-      SUBFLOW_DEFAULT_GOODPUT);
+      SUBFLOW_DEFAULT_SENDING_RATE);
 
   _subflow_state_transit_to(subflow, state);
 done:
@@ -1288,7 +1295,7 @@ _split_controller_main(SndEventBasedController * this)
     if(--this->bids_commit_requested_retain_tick == 0)
       this->bids_commit_requested = TRUE;
   }
-  goto recalc_done;
+//  goto recalc_done;
   if (!this->bids_recalc_requested) goto recalc_done;
   this->bids_recalc_requested = FALSE;
 //  this->bids_commit_requested_retain_tick = 0;
@@ -1304,19 +1311,24 @@ process_done:
   return;
 }
 
+
+typedef struct _Utilization{
+  gint     delta_sr;
+  gboolean accepted;
+  gdouble  changing_rate;
+}Utilization;
+
 void _recalc_bids(SndEventBasedController * this)
 {
   GHashTableIter iter;
   gpointer key, val;
   Subflow *subflow;
-  guint32 sb;
+  gdouble weight, sum_weight = 0.;
+  guint sb;
   GstClockTime now;
-  guint32 media_rate;
 
   now = gst_clock_get_time(this->sysclock);
-  media_rate = stream_splitter_get_media_rate(this->splitter);
-  sndrate_distor_time_update(this->rate_distor, media_rate);
-
+  sndrate_distor_time_update(this->rate_distor);
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
@@ -1325,15 +1337,19 @@ void _recalc_bids(SndEventBasedController * this)
       continue;
     }
 
-    sb = sndrate_distor_get_sending_rate(this->rate_distor, subflow->rate_calcer_id);
-    g_print("Subflow %d sending bid %u\n",
+    weight = sndrate_distor_get_sending_weight(this->rate_distor, subflow->rate_calcer_id);
+    sb = weight * 1000;
+    sum_weight += weight;
+    g_print("Subflow %d sending weight %f, bid: %u\n",
             subflow->id,
+            weight,
             sb);
     stream_splitter_setup_sending_bid(this->splitter,
                                       subflow->id,
                                       sb);
     subflow->ready = FALSE;
   }
+
   this->last_recalc_time = now;
 }
 

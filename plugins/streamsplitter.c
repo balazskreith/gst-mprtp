@@ -31,7 +31,7 @@
 GST_DEBUG_CATEGORY_STATIC (stream_splitter_debug_category);
 #define GST_CAT_DEFAULT stream_splitter_debug_category
 
-#define SCHTREE_MAX_VALUE 128
+
 #define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
 #define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
 #define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
@@ -156,7 +156,7 @@ stream_splitter_init (StreamSplitter * this)
   this->separation_is_possible = FALSE;
   this->first_delta_flag = TRUE;
   this->thread = gst_task_new (stream_splitter_run, this, NULL);
-  this->sent_bytes = make_percentiletracker(1<<15, 50);
+  this->sent_bytes = make_variancetracker(1<<15, GST_SECOND);
 //    this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
   this->splitting_mode = MPRTP_STREAM_BYTE_BASED_SPLITTING;
 
@@ -250,9 +250,9 @@ exit:
 
 guint32 stream_splitter_get_media_rate(StreamSplitter* this)
 {
-  guint64 result;
+  gint64 result;
   THIS_READLOCK(this);
-  percentiletracker_get_stats(this->sent_bytes, NULL, NULL, &result);
+  variancetracker_get_stats(this->sent_bytes, &result, NULL);
   THIS_READUNLOCK(this);
   return result;
 }
@@ -522,7 +522,7 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
 
 done:
   if(gst_rtp_buffer_get_payload_type(rtp) != this->monitor_payload_type){
-    percentiletracker_add(this->sent_bytes, bytes_to_send);
+    variancetracker_add(this->sent_bytes, bytes_to_send);
   }
   return result;
 }

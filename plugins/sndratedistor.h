@@ -33,8 +33,8 @@ struct _SendingRateDistributor
   guint8               controlled_num;
 
 //  gint32              taken_bytes;
-//  gint32              supplied_bytes;
-//  gint32              requested_bytes;
+  gint32              supplied_bytes;
+  gint32              requested_bytes;
 //  gint32              fallen_bytes;
 //  gint32              overused_bytes;
 

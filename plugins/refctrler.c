@@ -218,7 +218,7 @@ _system_notifier_main(RcvEventBasedController * this);
 //----------------------------- Play Controller -----------------------------
 static void
 _play_controller_main(RcvEventBasedController * this);
-void _refresh_subflow_skew(RcvEventBasedController *this,
+static void _refresh_subflow_skew(RcvEventBasedController *this,
                                      guint64 skew);
 //------------------------- Utility functions --------------------------------
 static Subflow*

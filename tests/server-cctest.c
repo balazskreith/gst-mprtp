@@ -23,11 +23,11 @@
 #include <string.h>
 #include <stdlib.h>
 
-typedef struct _Utilization{
-  gint     delta_sr;
-  gboolean accepted;
-  gdouble  changing_rate;
-}Utilization;
+typedef struct _UtilizationReport{
+  guint32  target;
+  guint32  actual_rate;
+  guint32  desired_rate;
+}UtilizationReport;
 
 typedef struct _SessionData
 {
@@ -183,18 +183,45 @@ mprtp_subflows_utilization (GstElement * mprtp_sch, guint ptr)
   //g_object_set (encoder, "bitrate", bitrate, NULL);
 }
 
+static gint32 stability = 0;
 static void
 changed_event (GstElement * mprtp_sch, gpointer ptr)
 {
-  Utilization *utilization = ptr;
+  UtilizationReport *ur = ptr;
   gint delta, new_bitrate, get_bitrate;
   g_object_get (encoder, "bitrate", &get_bitrate, NULL);
-  new_bitrate = (gdouble)get_bitrate * utilization->changing_rate;
-  g_print("Current bitrate: %d, cr: %f suggested bitrate:: %d\n",
+  if(ur->desired_rate < get_bitrate){
+    new_bitrate = ur->desired_rate;
+    --stability;
+  }else if(get_bitrate < ur->desired_rate){
+    if(ur->desired_rate < ur->target){
+      new_bitrate = ur->desired_rate;
+      --stability;
+    }else{
+      new_bitrate = ur->target;
+      ++stability;
+    }
+  }else{
+    new_bitrate = get_bitrate;
+    if(get_bitrate == ur->target){
+      ++stability;
+    }
+    else{
+      --stability;
+    }
+  }
+  if(stability < -20){
+    g_print("So unstable, it must be changed\n");
+    ur->target *= .8;
+    stability = 0;
+  }else if(stability > 10){
+    g_print("So stable it must be changed\n");
+    //ur->target *= 1.1;
+    stability = 0;
+  }
+  g_print("Current bitrate: %d, suggested bitrate:: %d\n",
           get_bitrate,
-          utilization->changing_rate,
           new_bitrate);
-  utilization->accepted = TRUE;
   g_object_set (encoder, "bitrate", new_bitrate, NULL);
 done:
   return;

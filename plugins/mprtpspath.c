@@ -522,7 +522,7 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
   THIS_WRITELOCK (this);
   _setup_rtp2mprtp (this, buffer);
   _send_mprtp_packet(this, buffer);
-  goto done;
+//  goto done;
   if(!this->monitoring_interval) goto done;
   if(this->total_sent_packet_num % this->monitoring_interval != 0) goto done;
   {

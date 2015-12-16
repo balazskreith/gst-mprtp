@@ -1336,10 +1336,10 @@ void _recalc_bids(SndEventBasedController * this)
     weight = sndrate_distor_get_sending_weight(this->rate_distor, subflow->rate_calcer_id);
     sb = weight * 1000;
     sum_weight += weight;
-    g_print("Subflow %d sending weight %f, bid: %u\n",
-            subflow->id,
-            weight,
-            sb);
+//    g_print("Subflow %d sending weight %f, bid: %u\n",
+//            subflow->id,
+//            weight,
+//            sb);
     stream_splitter_setup_sending_bid(this->splitter,
                                       subflow->id,
                                       sb);

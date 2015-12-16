@@ -113,6 +113,10 @@ stream_joiner_set_stream_delay(
     StreamJoiner *this,
     GstClockTime stream_delay);
 
+guint32
+stream_joiner_get_monitored_bytes(
+    StreamJoiner *this,
+    guint8 subflow_id);
 
 GType
 stream_joiner_get_type (void);

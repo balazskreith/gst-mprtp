@@ -114,6 +114,8 @@ struct _Subflow
   guint32                       or_num;
   gdouble                       avg_rtcp_size;
 
+  guint32                       monitored_bytes;
+
   //for stats
   guint32 jitter;
   guint64 estimated_delay;
@@ -294,8 +296,8 @@ refctrler_finalize (GObject * object)
   g_object_unref (this->sysclock);
 }
 
-//static void
-//refctrler_stat_run (void *data);
+static void
+refctrler_stat_run (void *data);
 
 void
 refctrler_init (RcvEventBasedController * this)
@@ -314,77 +316,81 @@ refctrler_init (RcvEventBasedController * this)
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
 
-//  g_rec_mutex_init (&this->stat_thread_mutex);
-//  this->stat_thread = gst_task_new (refctrler_stat_run, this, NULL);
-//  gst_task_set_lock (this->stat_thread, &this->stat_thread_mutex);
-//  gst_task_start (this->stat_thread);
+  g_rec_mutex_init (&this->stat_thread_mutex);
+  this->stat_thread = gst_task_new (refctrler_stat_run, this, NULL);
+  gst_task_set_lock (this->stat_thread, &this->stat_thread_mutex);
+  gst_task_start (this->stat_thread);
 
 }
-//
-//void
-//refctrler_stat_run (void *data)
-//{
-//  RcvEventBasedController *this;
-//  GstClockID clock_id;
-//  GHashTableIter iter;
-//  gpointer key, val;
-//  Subflow *subflow;
-//  gdouble goodput;
-//  GstClockTime next_scheduler_time;
-//  this = data;
-//  THIS_WRITELOCK (this);
-////  g_print("# subflow1, subflow 2\n");
-//  g_hash_table_iter_init (&iter, this->subflows);
-//  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-//    guint32 rcvd_bytes;
-//    guint32 discarded_bytes;
-//    GstClockTime min_delay, max_delay;
-//    subflow = (Subflow *) val;
-//
-//    discarded_bytes = subflow->discarded_bytes;
-//    rcvd_bytes = subflow->rcvd_bytes;
-//
-//    mprtpr_path_get_RR_stats(subflow->path,
-//                             NULL,
-//                             NULL,
-//                             &subflow->jitter,
-//                             NULL,
-//                             &subflow->rcvd_bytes);
-//
-//    mprtpr_path_get_XR7243_stats(subflow->path,
-//                                 NULL,
-//                                 &subflow->discarded_bytes);
-//
-//    mprtpr_path_get_XROWD_stats(subflow->path,
-//                                &subflow->estimated_delay,
-//                                &min_delay,
-//                                &max_delay);
-//
-//    rcvd_bytes = subflow->rcvd_bytes - rcvd_bytes;
-//    discarded_bytes = subflow->discarded_bytes - discarded_bytes;
-//    goodput = (gdouble) (rcvd_bytes - discarded_bytes);
-//
-//    g_print("%d,%u,%lu,%lu,%lu,%u,%u,%f,",
-//            subflow->id,
-//            subflow->jitter,
-//            subflow->estimated_delay,
-//            min_delay,
-//            max_delay,
-//            rcvd_bytes,
-//            discarded_bytes,
-//            goodput);
-//  }
-//  g_print("|\n");
-//  THIS_WRITEUNLOCK(this);
-//
-//  next_scheduler_time = gst_clock_get_time(this->sysclock) + 1000 * GST_MSECOND;
-//  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
-//
-//  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
-//    GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
-//  }
-//  gst_clock_id_unref (clock_id);
-//}
+
+void
+refctrler_stat_run (void *data)
+{
+  RcvEventBasedController *this;
+  GstClockID clock_id;
+  GHashTableIter iter;
+  gpointer key, val;
+  Subflow *subflow;
+  guint32 monitored_bytes;
+  gdouble goodput;
+  GstClockTime next_scheduler_time;
+  this = data;
+  THIS_WRITELOCK (this);
+//  g_print("# subflow1, subflow 2\n");
+  g_hash_table_iter_init (&iter, this->subflows);
+  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+    guint32 rcvd_bytes;
+    guint32 discarded_bytes;
+    GstClockTime min_delay, max_delay;
+    subflow = (Subflow *) val;
+
+    discarded_bytes = subflow->discarded_bytes;
+    rcvd_bytes = subflow->rcvd_bytes;
+
+    mprtpr_path_get_RR_stats(subflow->path,
+                             NULL,
+                             NULL,
+                             &subflow->jitter,
+                             NULL,
+                             &subflow->rcvd_bytes);
+
+    mprtpr_path_get_XR7243_stats(subflow->path,
+                                 NULL,
+                                 &subflow->discarded_bytes);
+
+    mprtpr_path_get_XROWD_stats(subflow->path,
+                                &subflow->estimated_delay,
+                                &min_delay,
+                                &max_delay);
+
+    monitored_bytes = stream_joiner_get_monitored_bytes(this->joiner, subflow->id);
+    rcvd_bytes = subflow->rcvd_bytes - rcvd_bytes;
+    discarded_bytes = subflow->discarded_bytes - discarded_bytes;
+    goodput = (gdouble) (rcvd_bytes - discarded_bytes);
+
+    g_print("%d,%u,%lu,%lu,%lu,%u,%u,%f,%u,",
+            subflow->id,
+            subflow->jitter,
+            subflow->estimated_delay,
+            min_delay,
+            max_delay,
+            rcvd_bytes,
+            discarded_bytes,
+            goodput,
+            monitored_bytes - subflow->monitored_bytes);
+    subflow->monitored_bytes = monitored_bytes;
+  }
+  g_print("|\n");
+  THIS_WRITEUNLOCK(this);
+
+  next_scheduler_time = gst_clock_get_time(this->sysclock) + 1000 * GST_MSECOND;
+  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
+
+  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
+    GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
+  }
+  gst_clock_id_unref (clock_id);
+}
 
 void
 refctrler_ticker (void *data)

@@ -941,6 +941,7 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
 
 //  g_print("%lu\n",GST_TIME_AS_MSECONDS(gst_clock_get_time(this->sysclock) - in_prev));
 //  in_prev = gst_clock_get_time(this->sysclock);
+  mprtp->buffer = gst_buffer_ref(mprtp->buffer);
   mprtpr_path_process_rtp_packet (path, mprtp);
   stream_joiner_receive_mprtp(this->joiner, mprtp);
   return;

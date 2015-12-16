@@ -614,12 +614,24 @@ _orp_main(RcvEventBasedController * this)
   GstBuffer *block;
   guint subflows_num = 0;
   gdouble media_rate = 0., avg_rtcp_size = 0.;
-//  GstClockTime last_delay;
+  guint16 discarded;
+  GstClockTime median_delay;
 //  GstClockTime now;
-//  guint16 lost=0,expected=0,received=0;
 
 //  now = gst_clock_get_time(this->sysclock);
   ricalcer = this->ricalcer;
+  g_hash_table_iter_init (&iter, this->subflows);
+  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
+  {
+    subflow = (Subflow *) val;
+
+    mprtpr_path_get_XR7243_stats(subflow->path, &discarded, NULL);
+    mprtpr_path_get_XROWD_stats(subflow->path, &median_delay, NULL, NULL);
+    if (discarded == _ort1(subflow)->discarded) continue;
+    if(median_delay < _ort1(subflow)->median_delay<<2) continue;
+    ricalcer_urgent_report_request(ricalcer);
+  }
+
   if (!this->report_is_flowable || !ricalcer_do_report_now(ricalcer)) {
       goto done;
   }
@@ -636,13 +648,13 @@ _orp_main(RcvEventBasedController * this)
     _step_or(subflow);
     block = _get_mprtcp_rr_block (this, subflow, &block_length);
     report_length += block_length;
-    if (_ort0(subflow)->discarded !=
-        _ort1(subflow)->discarded) {
-        GstBuffer *xr;
-        xr = _get_mprtcp_xr_7243_block (this, subflow, &block_length);
-        block = gst_buffer_append (block, xr);
-        report_length += block_length;
-      }
+    if (_ort0(subflow)->discarded != _ort1(subflow)->discarded)
+    {
+      GstBuffer *xr;
+      xr = _get_mprtcp_xr_7243_block (this, subflow, &block_length);
+      block = gst_buffer_append (block, xr);
+      report_length += block_length;
+    }
 
     {
       GstBuffer *xr;
@@ -664,7 +676,6 @@ _orp_main(RcvEventBasedController * this)
   ricalcer_refresh_parameters(ricalcer,
                               media_rate,
                               avg_rtcp_size);
-  ricalcer_urgent_report_request(ricalcer);
   ricalcer_do_next_report_time(ricalcer);
 
 done:

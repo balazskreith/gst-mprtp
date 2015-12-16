@@ -28,10 +28,10 @@
 
 typedef struct _GstMpRTPBuffer GstMpRTPBuffer;
 
-#define GST_MPRTP_BUFFER_INIT {GST_RTP_BUFFER_INIT, FALSE, NULL, 0, 0, 0, 0, 0, 0}
+#define GST_MPRTP_BUFFER_INIT {FALSE, NULL, 0, 0, 0, 0, 0, 0}
 
 struct _GstMpRTPBuffer{
-  GstRTPBuffer   rtp;
+//  GstRTPBuffer   rtp;
   gboolean       initialized;
   GstBuffer     *buffer;
   guint          payload_bytes;
@@ -58,16 +58,20 @@ struct _RTPAbsTimeExtension
   guint8 time[3];
 };
 
-#define gst_mprtp_ptr_buffer_get_ssrc(mprtp) gst_rtp_buffer_get_ssrc(&mprtp->rtp)
-#define gst_mprtp_ptr_buffer_get_timestamp(mprtp) gst_rtp_buffer_get_timestamp(&mprtp->rtp)
-#define gst_mprtp_ptr_buffer_get_abs_seq(mprtp) gst_rtp_buffer_get_seq(&mprtp->rtp)
-#define gst_mprtp_ptr_buffer_get_payload_type(mprtp) gst_rtp_buffer_get_payload_type(&mprtp->rtp)
-
 gboolean gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
                                GstBuffer *buffer,
                                guint8 mprtp_ext_header_id,
                                guint8 abs_time_ext_header_id);
-gboolean gst_mprtp_buffer_read_map(GstMpRTPBuffer *mprtp);
-void gst_mprtp_buffer_read_unmap(GstMpRTPBuffer *mprtp);
+
+guint32 gst_mprtp_buffer_get_ssrc(GstMpRTPBuffer *mprtp);
+guint32 gst_mprtp_buffer_get_timestamp(GstMpRTPBuffer *mprtp);
+guint16 gst_mprtp_buffer_get_abs_seq(GstMpRTPBuffer *mprtp);
+guint8 gst_mprtp_buffer_get_payload_type(GstMpRTPBuffer *mprtp);
+guint gst_mprtp_buffer_get_payload_len(GstMpRTPBuffer *mprtp);
+gboolean gst_mprtp_buffer_get_extension_onebyte_header(
+    GstMpRTPBuffer *mprtp,
+    guint8 id,
+    gpointer* data,
+    guint *size);
 
 #endif //_GST_MPRTPBUFFER_H_

@@ -51,33 +51,26 @@ gboolean gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
   guint size;
   MPRTPSubflowHeaderExtension *subflow_infos;
   guint64 snd_time = 0;
-  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   g_return_val_if_fail(mprtp, FALSE);
-  memcpy(&mprtp->rtp, &rtp, sizeof(GstRTPBuffer));
   mprtp->buffer = buffer;
-  if(!gst_mprtp_buffer_read_map(mprtp)){
-    return FALSE;
-  }
-  if (!gst_rtp_buffer_get_extension_onebyte_header (&mprtp->rtp,
+
+  if (!gst_mprtp_buffer_get_extension_onebyte_header (mprtp,
                                                     mprtp_ext_header_id,
-                                                    0,
                                                     &pointer,
                                                     &size))
   {
-    gst_mprtp_buffer_read_unmap(mprtp);
     return FALSE;
   }
   subflow_infos = (MPRTPSubflowHeaderExtension *) pointer;
   mprtp->subflow_id = subflow_infos->id;
   mprtp->subflow_seq = subflow_infos->seq;
-  mprtp->payload_bytes = gst_rtp_buffer_get_payload_len(&mprtp->rtp);
+  mprtp->payload_bytes = gst_mprtp_buffer_get_payload_len(mprtp);
   if(abs_time_ext_header_id == 0 || abs_time_ext_header_id > 15)
     goto done;
 
-  if (!gst_rtp_buffer_get_extension_onebyte_header (&mprtp->rtp,
-            abs_time_ext_header_id, 0, &pointer, &size))
+  if (!gst_mprtp_buffer_get_extension_onebyte_header (mprtp,
+            abs_time_ext_header_id, &pointer, &size))
   {
-    gst_mprtp_buffer_read_unmap(mprtp);
     return FALSE;
   }
   else
@@ -99,20 +92,67 @@ gboolean gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
   }
 done:
   mprtp->initialized = TRUE;
-  gst_mprtp_buffer_read_unmap(mprtp);
+  return TRUE;
+}
+
+guint32 gst_mprtp_buffer_get_ssrc(GstMpRTPBuffer *mprtp)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  guint32 result;
+  g_return_val_if_fail(gst_rtp_buffer_map(mprtp->buffer, GST_MAP_READ, &rtp), 0);
+  result = gst_rtp_buffer_get_ssrc(&rtp);
+  gst_rtp_buffer_unmap(&rtp);
+  return result;
+}
+
+guint32 gst_mprtp_buffer_get_timestamp(GstMpRTPBuffer *mprtp)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  guint32 result;
+  g_return_val_if_fail(gst_rtp_buffer_map(mprtp->buffer, GST_MAP_READ, &rtp), 0);
+  result = gst_rtp_buffer_get_timestamp(&rtp);
+  gst_rtp_buffer_unmap(&rtp);
+  return result;
+}
+
+guint16 gst_mprtp_buffer_get_abs_seq(GstMpRTPBuffer *mprtp)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  guint16 result;
+  g_return_val_if_fail(gst_rtp_buffer_map(mprtp->buffer, GST_MAP_READ, &rtp), 0);
+  result = gst_rtp_buffer_get_seq(&rtp);
+  gst_rtp_buffer_unmap(&rtp);
+  return result;
+}
+
+guint8 gst_mprtp_buffer_get_payload_type(GstMpRTPBuffer *mprtp)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  guint8 result;
+  g_return_val_if_fail(gst_rtp_buffer_map(mprtp->buffer, GST_MAP_READ, &rtp), 0);
+  result = gst_rtp_buffer_get_payload_type(&rtp);
+  gst_rtp_buffer_unmap(&rtp);
+  return result;
+}
+
+guint gst_mprtp_buffer_get_payload_len(GstMpRTPBuffer *mprtp)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  guint result;
+  g_return_val_if_fail(gst_rtp_buffer_map(mprtp->buffer, GST_MAP_READ, &rtp), 0);
+  result = gst_rtp_buffer_get_payload_len(&rtp);
+  gst_rtp_buffer_unmap(&rtp);
+  return result;
+}
+
+gboolean gst_mprtp_buffer_get_extension_onebyte_header(
+    GstMpRTPBuffer *mprtp, guint8 id, gpointer* data, guint *size)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  g_return_val_if_fail(gst_rtp_buffer_map(mprtp->buffer, GST_MAP_READ, &rtp), FALSE);
+  gst_rtp_buffer_get_extension_onebyte_header(&rtp, id, 0, data, size);
+  gst_rtp_buffer_unmap(&rtp);
   return TRUE;
 }
 
 
-gboolean gst_mprtp_buffer_read_map(GstMpRTPBuffer *mprtp)
-{
-
-  g_return_val_if_fail(mprtp, FALSE);
-  return gst_rtp_buffer_map(mprtp->buffer, GST_MAP_READ, &mprtp->rtp);
-}
-
-void gst_mprtp_buffer_read_unmap(GstMpRTPBuffer *mprtp)
-{
-  g_return_if_fail(mprtp);
-  gst_rtp_buffer_unmap(&mprtp->rtp);
-}

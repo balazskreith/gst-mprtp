@@ -327,8 +327,7 @@ void
 gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstMpRTPBuffer * mprtp)
 {
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (data);
-  gst_mprtp_buffer_read_map(mprtp);
-  if(gst_mprtp_ptr_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
+  if(gst_mprtp_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
     goto done;
   }
   //For Playout test
@@ -911,12 +910,12 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
      }
     return;
   }
-
   if (this->pivot_ssrc != MPRTP_PLAYOUTER_DEFAULT_SSRC &&
-      gst_mprtp_ptr_buffer_get_ssrc(mprtp) != this->pivot_ssrc) {
+      gst_mprtp_buffer_get_ssrc(mprtp) != this->pivot_ssrc) {
+
     _trash_mprtp_buffer(this, mprtp);
     GST_DEBUG_OBJECT (this, "RTP packet ssrc is %u, the pivot ssrc is %u",
-        this->pivot_ssrc, gst_mprtp_ptr_buffer_get_ssrc(mprtp));
+        this->pivot_ssrc, gst_mprtp_buffer_get_ssrc(mprtp));
     gst_pad_push (this->mprtp_srcpad, buf);
     return;
   }

@@ -194,25 +194,15 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
     new_bitrate = ur->desired_rate;
     --stability;
   }else if(get_bitrate < ur->desired_rate){
-    if(ur->desired_rate < ur->target){
-      new_bitrate = ur->desired_rate;
-      --stability;
-    }else{
-      new_bitrate = ur->target;
-      ++stability;
-    }
+    new_bitrate = ur->desired_rate;
   }else{
     new_bitrate = get_bitrate;
-    if(get_bitrate == ur->target){
-      ++stability;
-    }
-    else{
-      --stability;
-    }
+    ++stability;
   }
+  ur->actual_rate = new_bitrate;
   if(stability < -20){
     g_print("So unstable, it must be changed\n");
-    ur->target *= .8;
+//    ur->target *= .8;
     stability = 0;
   }else if(stability > 10){
     g_print("So stable it must be changed\n");

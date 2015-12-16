@@ -42,7 +42,7 @@
 #define PATH_RTT_MAX_TRESHOLD (800 * GST_MSECOND)
 #define PATH_RTT_MIN_TRESHOLD (600 * GST_MSECOND)
 #define MAX_SUBFLOW_MOMENT_NUM 5
-#define SUBFLOW_DEFAULT_SENDING_RATE 512
+#define SUBFLOW_DEFAULT_SENDING_RATE 64000
 
 GST_DEBUG_CATEGORY_STATIC (sefctrler_debug_category);
 #define GST_CAT_DEFAULT sefctrler_debug_category
@@ -636,10 +636,6 @@ _irp_producer_main(SndEventBasedController * this)
   Subflow*       subflow;
   GstClockTime   now;
   Event          event;
-  gdouble        weight;
-  gdouble        media_rate;
-
-  media_rate = (gdouble)stream_splitter_get_media_rate(this->splitter);
 
   now = gst_clock_get_time(this->sysclock);
   g_hash_table_iter_init (&iter, this->subflows);
@@ -663,7 +659,7 @@ _irp_producer_main(SndEventBasedController * this)
 //            _irt0(subflow)->goodput);
 //    variance = .1;
 
-    _irt0(subflow)->sending_rate = media_rate * weight;
+    _irt0(subflow)->sending_rate = stream_splitter_get_sending_rate(this->splitter, subflow->id);
     sndrate_distor_measurement_update(this->rate_distor,
                                       subflow->rate_calcer_id,
                                       _irt0(subflow));

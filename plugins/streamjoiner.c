@@ -313,12 +313,10 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
   Subflow *subflow;
   guint64 latency;
   THIS_WRITELOCK(this);
-  gst_mprtp_buffer_read_map(mprtp);
 //  g_print("Receive a packet with timestamp: %u\n", gst_mprtp_ptr_buffer_get_timestamp(mprtp));
-  abs_seq = gst_mprtp_ptr_buffer_get_abs_seq(mprtp);
-  if(gst_mprtp_ptr_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
+  abs_seq = gst_mprtp_buffer_get_abs_seq(mprtp);
+  if(gst_mprtp_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
     //now drop it;
-    gst_mprtp_buffer_read_unmap(mprtp);
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
     goto done;
   }
@@ -330,27 +328,26 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
 
 //  g_print("S%d: %f->%lu\n", subflow->id, subflow->skew, (guint64)subflow->skew);
   latency = (guint64)(subflow->delay + subflow->skew + (gdouble)(subflow->jitter<<2));
-  percentiletracker_add(this->latency_window, latency);
-  latency = MIN(300 * GST_MSECOND, percentiletracker_get_stats(this->latency_window, NULL, NULL, NULL));
+
+  if(latency < 300 * GST_MSECOND) percentiletracker_add(this->latency_window, latency);
+
+  latency = percentiletracker_get_stats(this->latency_window, NULL, NULL, NULL);
   this->latency = (31. * this->latency + (gdouble)latency) / 32.;
-  if(this->ssrc != 0 && this->ssrc != gst_mprtp_ptr_buffer_get_ssrc(mprtp)){
+  if(this->ssrc != 0 && this->ssrc != gst_mprtp_buffer_get_ssrc(mprtp)){
 //    g_print("this->ssrc: %u, gst ssrc: %u\n",
 //            this->ssrc, gst_mprtp_ptr_buffer_get_ssrc(mprtp));
-    gst_mprtp_buffer_read_unmap(mprtp);
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
     goto done;
   }
 //g_print("%f+%f+%u=%lu\n", subflow->delay, subflow->skew, subflow->jitter, latency);
   if(_cmp_seq(this->PHSN, abs_seq) < 0){
-    this->ssrc = gst_mprtp_ptr_buffer_get_ssrc(mprtp);
+    this->ssrc = gst_mprtp_buffer_get_ssrc(mprtp);
     _add_mprtp_packet(this, mprtp);
-    gst_mprtp_buffer_read_unmap(mprtp);
     goto done;
   }
 
 //  g_print("Discard happened on subflow %d with seq %hu, PHSN: %hu\n",
 //          subflow->id, abs_seq, this->PHSN);
-  gst_mprtp_buffer_read_unmap(mprtp);
   mprtpr_path_add_discard(subflow->path, mprtp);
   this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
 done:
@@ -484,7 +481,7 @@ void _add_mprtp_packet(StreamJoiner *this,
     frame = this->head = this->tail = _make_frame(this, mprtp);
     goto done;
   }
-  timestamp = gst_mprtp_ptr_buffer_get_timestamp(mprtp);
+  timestamp = gst_mprtp_buffer_get_timestamp(mprtp);
   if(timestamp < this->head->timestamp){
     (frame = _make_frame(this, mprtp))->next = this->head;
     this->head = frame;
@@ -593,10 +590,10 @@ Frame* _make_frame(StreamJoiner *this, GstMpRTPBuffer *mprtp)
     latency = latency - mprtp->delay;
   else
     latency = 0;
-  latency += percentiletracker_get_stats(this->ticks, NULL, NULL, NULL)>>1;
+  latency += percentiletracker_get_stats(this->ticks, NULL, NULL, NULL);
 //  latency += 10 * GST_MSECOND;
   result->head = result->tail = _make_framenode(this, mprtp);
-  result->timestamp = gst_mprtp_ptr_buffer_get_timestamp(mprtp);
+  result->timestamp = gst_mprtp_buffer_get_timestamp(mprtp);
   result->created = gst_clock_get_time(this->sysclock);
   result->playout_time = gst_clock_get_time(this->sysclock) + latency;
 //  if(subflow->id == 1)
@@ -618,7 +615,7 @@ FrameNode * _make_framenode(StreamJoiner *this, GstMpRTPBuffer *mprtp)
   memset((gpointer)result, 0, sizeof(FrameNode));
   result->mprtp = mprtp;
   result->next = NULL;
-  result->seq = gst_mprtp_ptr_buffer_get_abs_seq(mprtp);
+  result->seq = gst_mprtp_buffer_get_abs_seq(mprtp);
   return result;
 }
 

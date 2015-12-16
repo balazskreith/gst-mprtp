@@ -134,7 +134,6 @@ void ricalcer_do_next_report_time (ReportIntervalCalculator * this)
   interval = _calc_report_interval(this);
 
   if (this->urgent) {
-    this->urgent_time = now;
     this->urgent = FALSE;
     interval /= 2.;
     if (4. < interval) {

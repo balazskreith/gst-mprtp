@@ -197,11 +197,10 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   gint64 skew;
 
   THIS_WRITELOCK (this);
-  gst_mprtp_buffer_read_map(mprtp);
   if (this->seq_initialized == FALSE) {
     this->highest_seq = mprtp->subflow_seq;
     this->total_packets_received = 1;
-    this->last_rtp_timestamp = gst_mprtp_ptr_buffer_get_timestamp(mprtp);
+    this->last_rtp_timestamp = gst_mprtp_buffer_get_timestamp(mprtp);
     this->last_mprtp_delay = mprtp->delay;
     _add_delay(this, mprtp->delay);
     this->seq_initialized = TRUE;
@@ -219,7 +218,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
     goto done;
   }
   this->highest_seq = mprtp->subflow_seq;
-  if(this->last_rtp_timestamp == gst_mprtp_ptr_buffer_get_timestamp(mprtp))
+  if(this->last_rtp_timestamp == gst_mprtp_buffer_get_timestamp(mprtp))
     goto done;
 
   _add_skew(this, skew);
@@ -239,10 +238,9 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
 //            );
 //  }
   //new frame
-  this->last_rtp_timestamp = gst_mprtp_ptr_buffer_get_timestamp(mprtp);
+  this->last_rtp_timestamp = gst_mprtp_buffer_get_timestamp(mprtp);
 
 done:
-  gst_mprtp_buffer_read_unmap(mprtp);
   THIS_WRITEUNLOCK (this);
 }
 

@@ -814,6 +814,7 @@ guint32 _action_undershoot(
   }
   subflow->fallen_point = subflow->sending_rate;
   this->supplied_bytes += supplied_bytes;
+  g_print("Undershoot on S%d. SR: %d SB:%u", subflow->id, subflow->sending_rate, supplied_bytes);
   return supplied_bytes;
 }
 
@@ -833,6 +834,7 @@ guint32 _action_bounce_back(
   if(subflow->sending_rate < goodput)
     requested_bytes = goodput - subflow->sending_rate;
   this->requested_bytes += requested_bytes;
+  g_print("BounceBack on S%d. SR: %d RB:%u", subflow->id, subflow->sending_rate, requested_bytes);
   return requested_bytes;
 }
 
@@ -844,6 +846,7 @@ guint32 _action_bounce_up(
   guint32 requested_bytes = 0;
   requested_bytes = subflow->sending_rate * (1./(gdouble) subflow->monitoring_interval);
   this->requested_bytes += requested_bytes;
+  g_print("BounceUp on S%d. SR: %d RB:%u", subflow->id, subflow->sending_rate, requested_bytes);
   return requested_bytes;
 }
 

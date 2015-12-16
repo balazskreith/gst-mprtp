@@ -56,6 +56,9 @@ typedef struct _UtilizationReport{
   guint32  target;
   guint32  actual_rate;
   guint32  desired_rate;
+  struct{
+    guint32 target_rate;
+  }subflows[32];
 }UtilizationReport;
 
 
@@ -75,6 +78,7 @@ struct _Measurement{
   gdouble         goodput;
   guint32         lost;
   guint32         discard;
+  gdouble         discard_rate;
   guint32         receiver_rate;
 
   State           state;
@@ -398,6 +402,7 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
   _mt0(subflow)->delay = measurement->median_delay;
   _mt0(subflow)->corrd = (gdouble)_mt1(subflow)->delay / (gdouble)_mt0(subflow)->delay;
   _mt0(subflow)->discard = measurement->late_discarded_bytes;
+  _mt0(subflow)->discard_rate = (gdouble)measurement->late_discarded_bytes / measurement->goodput;
   _mt0(subflow)->lost = measurement->lost;
   _mt0(subflow)->goodput = measurement->goodput;
   _mt0(subflow)->receiver_rate = measurement->receiver_rate;
@@ -489,6 +494,7 @@ void _refresh_signal_data(SendingRateDistributor* this)
 
   if(this->target_media_rate != ur.target)
     this->target_media_rate = ur.target * 125;
+
 }
 
 void _refresh_available_ids(SendingRateDistributor* this)
@@ -518,15 +524,14 @@ void _refresh_weights(SendingRateDistributor* this)
     diff_mr = sum_sr - this->target_media_rate;
   }
 
-  g_print("sum_sr: %u, target: %u\n", sum_sr, this->target_media_rate);
   foreach_subflows(this, i, subflow)
   {
     subflow->weight = (gdouble) subflow->sending_rate / (gdouble) sum_sr;
     g_print("S%d: %f/%f=%f\n",subflow->id, (gdouble) subflow->sending_rate ,(gdouble) sum_sr, subflow->weight);
     if(diff_mr == 0) continue;
-    subflow->sending_rate-=subflow->weight * diff_mr + 1;
+    subflow->sending_rate-=subflow->weight * diff_mr;
   }
-
+  sum_sr-=diff_mr;
   this->actual_media_rate = sum_sr;
 }
 
@@ -568,10 +573,9 @@ _check_overused(
     Subflow *subflow)
 {
   g_print("S%d: STATE OVERUSED\n", subflow->id);
-  if(_mt0(subflow)->discard && _mt0(subflow)->lost){
+  if(_mt0(subflow)->discard_rate > .3){
     g_print("S%d: Discard and Lost happened\n", subflow->id);
     subflow->supplied_bytes += _action_undershoot(this, subflow);
-    _disable_controlling(subflow, 1);
     _disable_monitoring(subflow);
     goto done;
   }
@@ -581,7 +585,6 @@ _check_overused(
     _disable_monitoring(subflow);
     goto done;
   }
-  _disable_controlling(subflow, 1);
   subflow->requested_bytes += _action_bounce_back(this, subflow);
   _transit_to(this, subflow, STATE_STABLE);
 done:
@@ -595,27 +598,28 @@ _check_stable(
     Subflow *subflow)
 {
   g_print("S%d: STATE STABLE\n", subflow->id);
-  if(_mt0(subflow)->discard || _mt0(subflow)->corrh_owd > DT_){
-    if(_mt0(subflow)->corrh_owd > ST_ ||
-       _mt0(subflow)->lost > 0)
-    {
+  if(_mt0(subflow)->discard_rate > .1 || _mt0(subflow)->corrh_owd > DT_){
         g_print("_mt0(subflow)->discard  _mt0(subflow)->corrh_owd > ST_\n");
        subflow->supplied_bytes += _action_undershoot(this, subflow);
        _transit_to(this, subflow, STATE_OVERUSED);
        _disable_controlling(subflow, 1);
-    }
-    goto done;
+  }
+
+  if(_mt0(subflow)->corrh_owd > ST_)
+  {
+     if(_mt1(subflow)->state != STATE_STABLE)
+       goto done;
+     subflow->supplied_bytes += _action_undershoot(this, subflow);
+     _transit_to(this, subflow, STATE_OVERUSED);
+     _disable_controlling(subflow, 1);
+     goto done;
   }
 
   if(_mt1(subflow)->state != STATE_STABLE ||
-     _mt0(subflow)->corrh_owd > ST_ ||
-     _mt1(subflow)->corrh_owd > ST_)
+     _mt0(subflow)->corrh_owd > 1. ||
+     _mt1(subflow)->corrh_owd > 1.)
     goto done;
 
-  g_print("READY FOR MONITORING\n");
-  if(1. < _mt0(subflow)->corrh_owd) {
-    goto done;
-  }
   if(this->target_media_rate <= this->actual_media_rate){
     g_print("Target MR: %u, Actual MR: %u\n",
             this->target_media_rate,
@@ -637,8 +641,7 @@ _check_monitored(
 
   g_print("S%d: STATE MONITORED\n", subflow->id);
 
-  if(_mt0(subflow)->corrh_owd > ST_){
-      g_print("_mt0(subflow)->corrh_owd > DT_\n");
+  if(_mt0(subflow)->corrh_owd > ST_ || _mt0(subflow)->discard_rate > .1){
       subflow->supplied_bytes +=_action_undershoot(this, subflow);
       _transit_to(this, subflow, STATE_OVERUSED);
       _disable_controlling(subflow, 1);
@@ -727,20 +730,12 @@ gboolean _is_monitoring_done(
         Subflow *subflow)
 {
   if(!subflow->available) goto yes;
-  if(8 < subflow->monitoring_interval) goto yes;
-  if(1 < subflow->monitoring_interval){
-    if(++subflow->monitoring_time < 2) goto no;
-    else goto yes;
-  }
-  if(1 < subflow->monitoring_interval){
-    if(++subflow->monitoring_time < 3) goto no;
-    else goto yes;
-  }
-  goto no;
+  if(5 < subflow->monitoring_interval) goto yes;
+  if(1 < ++subflow->monitoring_time) goto yes;
+
+  return FALSE;
 yes:
   return TRUE;
-no:
-  return FALSE;
 }
 
 
@@ -751,34 +746,39 @@ void _enable_monitoring(
 {
   gdouble rate;
   gdouble target;
+  gdouble actual;
   if(!subflow->available) goto done;
+  actual = subflow->sending_rate;
   subflow->monitoring_interval = 14;
   if(subflow->fallen_point > 0){
     target = subflow->fallen_point;
+    if(subflow->fallen_point < subflow->sending_rate * .75)
+      subflow->fallen_point = 0;
     goto determine_rate;
   }
   if(subflow->target_rate == 0 ||
      subflow->target_rate < subflow->sending_rate)
   {
-    goto done;
+    target = this->target_media_rate;
+    actual = this->actual_media_rate;
   }else{
     target = subflow->target_rate;
   }
 
 determine_rate:
-  rate = target / (gdouble) subflow->sending_rate;
-  if(rate > 2.) subflow->monitoring_interval = 2;
-  else if(rate > 1.5) subflow->monitoring_interval = 3;
-  else if(rate > 1.) subflow->monitoring_interval = 4;
-  else if(rate > .9) subflow->monitoring_interval = 5;
-  else if(rate > .8) subflow->monitoring_interval = 6;
-  else if(rate > .7) subflow->monitoring_interval = 7;
-  else if(rate > .6) subflow->monitoring_interval = 8;
-  else if(rate > .5) subflow->monitoring_interval = 9;
-  else if(rate > .4) subflow->monitoring_interval = 10;
-  else if(rate > .3) subflow->monitoring_interval = 11;
-  else if(rate > .2) subflow->monitoring_interval = 12;
-  else if(rate > .1) subflow->monitoring_interval = 13;
+  rate = target / actual;
+  if(rate > 3.) subflow->monitoring_interval = 2;
+  else if(rate > 2.) subflow->monitoring_interval = 3;
+  else if(rate > 1.7) subflow->monitoring_interval = 4;
+  else if(rate > 1.6) subflow->monitoring_interval = 5;
+  else if(rate > 1.55) subflow->monitoring_interval = 6;
+  else if(rate > 1.4) subflow->monitoring_interval = 7;
+  else if(rate > 1.35) subflow->monitoring_interval = 8;
+  else if(rate > 1.3) subflow->monitoring_interval = 9;
+  else if(rate > 1.25) subflow->monitoring_interval = 10;
+  else if(rate > 1.2) subflow->monitoring_interval = 11;
+  else if(rate > 1.15) subflow->monitoring_interval = 12;
+  else if(rate > 1.1) subflow->monitoring_interval = 13;
   else subflow->monitoring_interval = 14;
 done:
   _setup_monitoring(subflow, subflow->monitoring_interval);
@@ -830,7 +830,6 @@ guint32 _action_bounce_back(
 //  subflow->weight *= 1.1;
   goodput = MAX(_mt0(subflow)->goodput, _mt1(subflow)->goodput);
   goodput = MIN(goodput, subflow->fallen_point) * .9;
-  subflow->fallen_point = 0;
   if(subflow->sending_rate < goodput)
     requested_bytes = goodput - subflow->sending_rate;
   this->requested_bytes += requested_bytes;

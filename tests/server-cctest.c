@@ -27,6 +27,9 @@ typedef struct _UtilizationReport{
   guint32  target;
   guint32  actual_rate;
   guint32  desired_rate;
+  struct{
+    guint32 target_rate;
+  }subflows[32];
 }UtilizationReport;
 
 typedef struct _SessionData
@@ -199,6 +202,9 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
     new_bitrate = get_bitrate;
     ++stability;
   }
+  if(ur->target < new_bitrate){
+    new_bitrate = ur->target;
+  }
   ur->actual_rate = new_bitrate;
   if(stability < -20){
     g_print("So unstable, it must be changed\n");
@@ -231,8 +237,6 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   GstElement *mprtpsnd = gst_element_factory_make ("mprtpsender", NULL);
   GstElement *mprtprcv = gst_element_factory_make ("mprtpreceiver", NULL);
   GstElement *mprtpsch = gst_element_factory_make ("mprtpscheduler", NULL);
-//  GstElement *identity_1 = gst_element_factory_make ("netsimb", NULL);
-//  GstElement *identity_2 = gst_element_factory_make ("netsimb", NULL);
   Identities *ids = g_malloc0 (sizeof (Identities));
   int basePort;
   gchar *padName;
@@ -295,7 +299,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   gst_element_link_pads (mprtpsnd, "src_2", rtpSink_2, "sink");
 
   g_object_set (mprtpsch, "join-subflow", 1, NULL);
-  g_object_set (mprtpsch, "join-subflow", 2, NULL);
+//  g_object_set (mprtpsch, "join-subflow", 2, NULL);
 
 //  sprintf(ids->filename, "%s", file);
 //  g_timeout_add (1000, _network_changes, ids);

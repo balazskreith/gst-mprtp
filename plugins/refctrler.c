@@ -374,10 +374,10 @@ refctrler_stat_run (void *data)
             subflow->estimated_delay,
             min_delay,
             max_delay,
-            rcvd_bytes,
-            discarded_bytes,
-            goodput,
-            monitored_bytes - subflow->monitored_bytes);
+            rcvd_bytes/125,
+            discarded_bytes/125,
+            goodput/125,
+            (monitored_bytes - subflow->monitored_bytes)/125);
     subflow->monitored_bytes = monitored_bytes;
   }
   g_print("|\n");
@@ -620,32 +620,33 @@ _orp_main(RcvEventBasedController * this)
   GstBuffer *block;
   guint subflows_num = 0;
   gdouble media_rate = 0., avg_rtcp_size = 0.;
-  guint16 discarded;
-  GstClockTime median_delay;
+//  guint16 discarded;
+//  GstClockTime median_delay;
 //  GstClockTime now;
 
 //  now = gst_clock_get_time(this->sysclock);
   ricalcer = this->ricalcer;
-  g_hash_table_iter_init (&iter, this->subflows);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
-  {
-    subflow = (Subflow *) val;
-
-    mprtpr_path_get_XR7243_stats(subflow->path, &discarded, NULL);
-    mprtpr_path_get_XROWD_stats(subflow->path, &median_delay, NULL, NULL);
-    if (discarded == _ort1(subflow)->discarded) continue;
-    if(median_delay < _ort1(subflow)->median_delay<<2) continue;
-    ricalcer_urgent_report_request(ricalcer);
-  }
+//  g_hash_table_iter_init (&iter, this->subflows);
+//  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
+//  {
+//    subflow = (Subflow *) val;
+//
+//    mprtpr_path_get_XR7243_stats(subflow->path, &discarded, NULL);
+//    mprtpr_path_get_XROWD_stats(subflow->path, &median_delay, NULL, NULL);
+//    if (discarded == _ort1(subflow)->discarded) continue;
+//    if(median_delay < _ort1(subflow)->median_delay * 1.5) continue;
+//    ricalcer_urgent_report_request(ricalcer);
+//  }
 
   if (!this->report_is_flowable || !ricalcer_do_report_now(ricalcer)) {
       goto done;
   }
+
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
     subflow = (Subflow *) val;
-
+//    g_print("Report time: %lu\n", GST_TIME_AS_MSECONDS(_ort0(subflow)->time - _ort1(subflow)->time));
     if(!_irt0(subflow)->SR_sent_ntp_time){
       continue;
     }

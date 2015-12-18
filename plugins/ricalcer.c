@@ -137,7 +137,7 @@ void ricalcer_do_next_report_time (ReportIntervalCalculator * this)
     this->urgent = FALSE;
     interval /= 2.;
     if (3. < interval) {
-      interval = 4. * (g_random_double () + .5);
+      interval = 1. + g_random_double ();
     }
     goto done;
   }else{
@@ -147,8 +147,8 @@ void ricalcer_do_next_report_time (ReportIntervalCalculator * this)
 done:
   if (interval < 1.) {
     interval = 1. + g_random_double ();
-  } else if (3. < interval) {
-    interval = 2. * (g_random_double () + .5);
+  } else if (2. < interval) {
+    interval = 1. + g_random_double ();
   }
 //  g_print("Next interval: %f\n", interval);
   this->last_interval = this->actual_interval;

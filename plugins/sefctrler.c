@@ -947,6 +947,7 @@ _get_subflow_goodput (Subflow * this, gdouble* receiver_rate)
           (gfloat) discarded_bytes) / ((gfloat) seconds);
 
     } else {
+        //g_print("S%d PB: %f ->%lu\n", this->id, payload_bytes_sum, GST_TIME_AS_MSECONDS(_irt0(this)->time - _irt1(this)->time));
       if(receiver_rate)
         *receiver_rate = (payload_bytes_sum * (1. - _irt0 (this)->lost_rate));
       goodput = (payload_bytes_sum *

@@ -64,6 +64,7 @@ struct _MPRTPSPath
   guint16                 cycle_num;
   guint8                  state;
   guint32                 total_sent_packet_num;
+  guint32                 total_sent_normal_packet_num;
   guint32                 total_sent_payload_bytes_sum;
   guint32                 total_sent_frames_num;
   guint32                 last_sent_frame_timestamp;

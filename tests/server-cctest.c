@@ -24,11 +24,14 @@
 #include <stdlib.h>
 
 typedef struct _UtilizationReport{
-  guint32  target;
+  guint32  actual_target;
+  guint32  desired_target;
   guint32  actual_rate;
   guint32  desired_rate;
   struct{
     guint32 target_rate;
+    guint8 overused_history;
+    gboolean available;
   }subflows[32];
 }UtilizationReport;
 
@@ -194,18 +197,40 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
   gint delta, new_bitrate, get_bitrate;
   g_object_get (encoder, "bitrate", &get_bitrate, NULL);
   if(ur->desired_rate < get_bitrate){
-    new_bitrate = ur->desired_rate;
     --stability;
   }else if(get_bitrate < ur->desired_rate){
-    new_bitrate = ur->desired_rate;
+    stability = 0;
   }else{
-    new_bitrate = get_bitrate;
     ++stability;
   }
-  if(ur->target < new_bitrate){
-    new_bitrate = ur->target;
+  //new_bitrate = ur->desired_rate * 1./125.;
+  if(get_bitrate < ur->desired_rate * 1./125.){
+    new_bitrate = ur->desired_rate * 1./125.;
+    ur->actual_target = new_bitrate;
+  }else if(ur->desired_rate * 1./125. < get_bitrate){
+    gboolean movable = FALSE;
+    gint i = 0;
+    for(i=0; i<32; ++i){
+      if(!ur->subflows[i].available) continue;
+      g_print("S%d:%X\n", i, ur->subflows[i].overused_history);
+      if(ur->subflows[i].overused_history == 0) movable = TRUE;
+    }
+    g_print("HERE movable: %d\n", movable);
+    if(!movable){
+      new_bitrate = ur->desired_rate * 1./125.;
+    }else{
+      new_bitrate = get_bitrate;
+    }
+  }else{
+    new_bitrate = get_bitrate;
+    ur->actual_target = new_bitrate;
   }
-  ur->actual_rate = new_bitrate;
+  ur->desired_target = ur->actual_target;
+  if(ur->actual_target < new_bitrate){
+    new_bitrate = ur->actual_target * 1./125.;
+  }
+  ur->actual_rate = new_bitrate * 125;
+  g_print("actual rate: %u\n", ur->actual_rate);
   if(stability < -20){
     g_print("So unstable, it must be changed\n");
 //    ur->target *= .8;
@@ -299,7 +324,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   gst_element_link_pads (mprtpsnd, "src_2", rtpSink_2, "sink");
 
   g_object_set (mprtpsch, "join-subflow", 1, NULL);
-//  g_object_set (mprtpsch, "join-subflow", 2, NULL);
+  g_object_set (mprtpsch, "join-subflow", 2, NULL);
 
 //  sprintf(ids->filename, "%s", file);
 //  g_timeout_add (1000, _network_changes, ids);

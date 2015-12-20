@@ -35,6 +35,7 @@ struct _SendingRateDistributor
 //  gint32              taken_bytes;
   gint32              supplied_bytes;
   gint32              requested_bytes;
+  gint32              movable_bytes;
 //  gint32              fallen_bytes;
 //  gint32              overused_bytes;
 
@@ -68,7 +69,7 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
 
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_time_update(SendingRateDistributor *this);
-gdouble sndrate_distor_get_sending_weight(SendingRateDistributor *this, guint8 id);
+guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id);
 gboolean sndrate_distor_congestion_event(SendingRateDistributor *this, guint8 id);
 gboolean sndrate_distor_settlemen_event(SendingRateDistributor *this, guint8 id);
 #endif /* SNDRATEDISTOR_H_ */

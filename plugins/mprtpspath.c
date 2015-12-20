@@ -94,6 +94,7 @@ mprtps_path_reset (MPRTPSPath * this)
       MPRTPS_PATH_FLAG_NON_CONGESTED | MPRTPS_PATH_FLAG_NON_LOSSY;
 
   this->total_sent_packet_num = 0;
+  this->total_sent_normal_packet_num = 0;
   this->total_sent_payload_bytes_sum = 0;
   this->total_sent_frames_num = 0;
   this->last_sent_frame_timestamp = 0;
@@ -524,7 +525,7 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
   _send_mprtp_packet(this, buffer);
 //  goto done;
   if(!this->monitoring_interval) goto done;
-  if(this->total_sent_packet_num % this->monitoring_interval != 0) goto done;
+  if(this->total_sent_normal_packet_num % this->monitoring_interval != 0) goto done;
   {
     GstBuffer *buffer;
     buffer = _create_monitor_packet(this);
@@ -564,8 +565,8 @@ _refresh_stat(MPRTPSPath * this,
   guint payload_bytes;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
-  ++this->total_sent_packet_num;
   payload_bytes = gst_rtp_buffer_get_payload_len (&rtp);
+  ++this->total_sent_packet_num;
   this->last_sent_payload_bytes = payload_bytes;
   this->last_packet_sent_time = gst_clock_get_time (this->sysclock);
   this->total_sent_payload_bytes_sum += payload_bytes;
@@ -573,11 +574,13 @@ _refresh_stat(MPRTPSPath * this,
       ++this->total_sent_frames_num;
       this->last_sent_frame_timestamp = gst_rtp_buffer_get_timestamp(&rtp);
   }
-  if(gst_rtp_buffer_get_payload_type(&rtp) != this->monitor_payload_type)
+  if(gst_rtp_buffer_get_payload_type(&rtp) != this->monitor_payload_type){
 //  if(gst_rtp_buffer_get_ssrc(&rtp) == this->ssrc_allowed)
     this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
-  else
+    ++this->total_sent_normal_packet_num;
+  } else {
     this->sent_octets[this->sent_octets_write] = 0;
+  }
 
   this->sent_octets_write += 1;
   this->sent_octets_write &= MAX_INT32_POSPART;

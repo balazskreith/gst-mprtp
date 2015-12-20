@@ -1320,8 +1320,7 @@ void _recalc_bids(SndEventBasedController * this)
   GHashTableIter iter;
   gpointer key, val;
   Subflow *subflow;
-  gdouble weight, sum_weight = 0.;
-  guint sb;
+  guint32 sending_rate;
   GstClockTime now;
 
   now = gst_clock_get_time(this->sysclock);
@@ -1334,16 +1333,14 @@ void _recalc_bids(SndEventBasedController * this)
       continue;
     }
 
-    weight = sndrate_distor_get_sending_weight(this->rate_distor, subflow->rate_calcer_id);
-    sb = weight * 1000;
-    sum_weight += weight;
+    sending_rate = sndrate_distor_get_sending_rate(this->rate_distor, subflow->rate_calcer_id);
 //    g_print("Subflow %d sending weight %f, bid: %u\n",
 //            subflow->id,
 //            weight,
 //            sb);
     stream_splitter_setup_sending_bid(this->splitter,
                                       subflow->id,
-                                      sb);
+                                      sending_rate);
     subflow->ready = FALSE;
   }
 

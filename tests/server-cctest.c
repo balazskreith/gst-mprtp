@@ -28,9 +28,9 @@ typedef struct _UtilizationReport{
   guint32  desired_target;
   guint32  actual_rate;
   guint32  desired_rate;
+  gboolean greedy;
   struct{
     guint32 target_rate;
-    guint8 overused_history;
     gboolean available;
   }subflows[32];
 }UtilizationReport;
@@ -203,33 +203,46 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
   }else{
     ++stability;
   }
-  //new_bitrate = ur->desired_rate * 1./125.;
-  if(get_bitrate < ur->desired_rate * 1./125.){
+
+  {
+    gint i;
     new_bitrate = ur->desired_rate * 1./125.;
-    ur->actual_target = new_bitrate;
-  }else if(ur->desired_rate * 1./125. < get_bitrate){
-    gboolean movable = FALSE;
-    gint i = 0;
+    ur->greedy = TRUE;
     for(i=0; i<32; ++i){
       if(!ur->subflows[i].available) continue;
-      g_print("S%d:%X\n", i, ur->subflows[i].overused_history);
-      if(ur->subflows[i].overused_history == 0) movable = TRUE;
+      ur->subflows[i].target_rate=128000;
+      ur->subflows[i].target_rate=0;
     }
-    g_print("HERE movable: %d\n", movable);
-    if(!movable){
-      new_bitrate = ur->desired_rate * 1./125.;
-    }else{
-      new_bitrate = get_bitrate;
-    }
-  }else{
-    new_bitrate = get_bitrate;
-    ur->actual_target = new_bitrate;
   }
-  ur->desired_target = ur->actual_target;
-  if(ur->actual_target < new_bitrate){
-    new_bitrate = ur->actual_target * 1./125.;
-  }
+
+//  if(get_bitrate < ur->desired_rate * 1./125.){
+//    new_bitrate = ur->desired_rate * 1./125.;
+//    ur->actual_target = new_bitrate;
+//  }else if(ur->desired_rate * 1./125. < get_bitrate){
+//    gboolean movable = FALSE;
+//    gint i = 0;
+//    for(i=0; i<32; ++i){
+//      if(!ur->subflows[i].available) continue;
+//      g_print("S%d:%X\n", i, ur->subflows[i].overused_history);
+//      if(ur->subflows[i].overused_history == 0) movable = TRUE;
+//    }
+//    g_print("HERE movable: %d\n", movable);
+//    if(!movable){
+//      new_bitrate = ur->desired_rate * 1./125.;
+//    }else{
+//      new_bitrate = get_bitrate;
+//    }
+//  }else{
+//    new_bitrate = get_bitrate;
+//    ur->actual_target = new_bitrate;
+//  }
+//  ur->desired_target = ur->actual_target;
+//  if(ur->actual_target < new_bitrate){
+//    new_bitrate = ur->actual_target * 1./125.;
+//  }
   ur->actual_rate = new_bitrate * 125;
+  ur->desired_target = 0;
+//  ur->desired_target = 1024 * 125;
   g_print("actual rate: %u\n", ur->actual_rate);
   if(stability < -20){
     g_print("So unstable, it must be changed\n");
@@ -240,7 +253,7 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
     //ur->target *= 1.1;
     stability = 0;
   }
-  g_print("Current bitrate: %d, suggested bitrate:: %d\n",
+  g_print("get bitrate: %d, new bitrate:: %d\n",
           get_bitrate,
           new_bitrate);
   g_object_set (encoder, "bitrate", new_bitrate, NULL);

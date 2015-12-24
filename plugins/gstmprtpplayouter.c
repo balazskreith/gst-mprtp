@@ -47,6 +47,7 @@
 #include "rmanctrler.h"
 #include "smanctrler.h"
 #include "gstmprtpbuffer.h"
+#include "nlms.h"
 
 
 #include "refctrler.h"
@@ -327,6 +328,9 @@ void
 gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstMpRTPBuffer * mprtp)
 {
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (data);
+  if(!GST_IS_BUFFER(mprtp->buffer)){
+    goto done;
+  }
   if(gst_mprtp_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
     goto done;
   }

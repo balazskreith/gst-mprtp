@@ -1334,10 +1334,9 @@ void _recalc_bids(SndEventBasedController * this)
     }
 
     sending_rate = sndrate_distor_get_sending_rate(this->rate_distor, subflow->rate_calcer_id);
-//    g_print("Subflow %d sending weight %f, bid: %u\n",
-//            subflow->id,
-//            weight,
-//            sb);
+    g_print("Subflow %d sending rate %u\n",
+            subflow->id,
+            sending_rate);
     stream_splitter_setup_sending_bid(this->splitter,
                                       subflow->id,
                                       sending_rate);

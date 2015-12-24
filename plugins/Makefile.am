@@ -24,7 +24,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          percentiletracker.c        \
                          variancetracker.c          \
                          sndratedistor.c            \
-                         skalmanfilter.c
+                         skalmanfilter.c            \
+                         nlms.c
                     
                     
 noinst_HEADERS = mprtpspath.h           \
@@ -43,7 +44,8 @@ noinst_HEADERS = mprtpspath.h           \
                  percentiletracker.h    \
                  variancetracker.h      \
                  sndratedistor.h        \
-                 skalmanfilter.h
+                 skalmanfilter.h        \
+                 nlms.h                 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
 # libgstmprtp_la_CFLAGS = $(GST_CFLAGS) -I/usr/local/include/gstreamer-1.0 -I/home/balazs/gst/master/gst-plugins-base/gst-libs

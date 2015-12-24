@@ -319,6 +319,10 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
   abs_seq = gst_mprtp_buffer_get_abs_seq(mprtp);
   subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (mprtp->subflow_id));
 //  g_print("%d|", this->monitor_payload_type);
+  if(!GST_IS_BUFFER(mprtp->buffer)){
+    this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
+    goto done;
+  }
   if(gst_mprtp_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
     subflow->monitored_bytes += mprtp->payload_bytes;
     //now drop it;

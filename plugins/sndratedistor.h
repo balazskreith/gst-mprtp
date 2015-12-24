@@ -34,6 +34,7 @@ struct _SendingRateDistributor
 
 //  gint32              taken_bytes;
   gint32              supplied_bytes;
+  gboolean            greedy;
   gint32              requested_bytes;
   gint32              movable_bytes;
 //  gint32              fallen_bytes;

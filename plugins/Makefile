@@ -151,7 +151,7 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-percentiletracker.lo \
 	libgstmprtp_la-variancetracker.lo \
 	libgstmprtp_la-sndratedistor.lo \
-	libgstmprtp_la-skalmanfilter.lo
+	libgstmprtp_la-skalmanfilter.lo libgstmprtp_la-nlms.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -416,7 +416,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          percentiletracker.c        \
                          variancetracker.c          \
                          sndratedistor.c            \
-                         skalmanfilter.c
+                         skalmanfilter.c            \
+                         nlms.c
 
 noinst_HEADERS = mprtpspath.h           \
                  rmanctrler.h           \
@@ -434,7 +435,8 @@ noinst_HEADERS = mprtpspath.h           \
                  percentiletracker.h    \
                  variancetracker.h      \
                  sndratedistor.h        \
-                 skalmanfilter.h
+                 skalmanfilter.h        \
+                 nlms.h                 
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -538,6 +540,7 @@ include ./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
+include ./$(DEPDIR)/libgstmprtp_la-nlms.Plo
 include ./$(DEPDIR)/libgstmprtp_la-packetsrcvqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-packetssndqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-percentiletracker.Plo
@@ -741,6 +744,13 @@ libgstmprtp_la-skalmanfilter.lo: skalmanfilter.c
 #	$(AM_V_CC)source='skalmanfilter.c' object='libgstmprtp_la-skalmanfilter.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-skalmanfilter.lo `test -f 'skalmanfilter.c' || echo '$(srcdir)/'`skalmanfilter.c
+
+libgstmprtp_la-nlms.lo: nlms.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-nlms.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-nlms.Tpo -c -o libgstmprtp_la-nlms.lo `test -f 'nlms.c' || echo '$(srcdir)/'`nlms.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-nlms.Tpo $(DEPDIR)/libgstmprtp_la-nlms.Plo
+#	$(AM_V_CC)source='nlms.c' object='libgstmprtp_la-nlms.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-nlms.lo `test -f 'nlms.c' || echo '$(srcdir)/'`nlms.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

@@ -67,6 +67,10 @@ guint8 sndrate_distor_request_id(SendingRateDistributor *this,
 void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        guint8 id,
                                        RRMeasurement *measurement);
+void sndrate_distor_extract_stats(SendingRateDistributor *this,
+                                  guint8 id,
+                                  gdouble *bandwidth_estimation,
+                                  gdouble *bandwidth_estimation_error);
 
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_time_update(SendingRateDistributor *this);

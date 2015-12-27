@@ -111,10 +111,13 @@ make_video_session (guint sessionNum)
   SessionData *ret = session_new (sessionNum);
   GstBin *bin = GST_BIN (gst_bin_new ("video"));
   GstElement *queue = gst_element_factory_make ("queue", NULL);
-  GstElement *depayloader = gst_element_factory_make ("rtptheoradepay", NULL);
+  //GstElement *depayloader = gst_element_factory_make ("rtptheoradepay", NULL);
+  GstElement *depayloader = gst_element_factory_make ("rtpvp8depay", NULL);
 //    GstElement *depayloader = gst_element_factory_make ("rtpjpegdepay", NULL);
-  GstElement *decoder = gst_element_factory_make ("theoradec", NULL);
-//  GstElement *decoder = gst_element_factory_make ("jpegdec", NULL);
+//  GstElement *decoder = gst_element_factory_make ("theoradec", NULL);
+  //  GstElement *decoder = gst_element_factory_make ("jpegdec", NULL);
+  GstElement *decoder = gst_element_factory_make ("vp8dec", NULL);
+
   GstElement *converter = gst_element_factory_make ("videoconvert", NULL);
   GstElement *sink = gst_element_factory_make ("autovideosink", NULL);
 
@@ -131,7 +134,9 @@ make_video_session (guint sessionNum)
       "width", G_TYPE_INT, 352,
       "height", G_TYPE_INT, 288,
       "framerate", GST_TYPE_FRACTION, 50, 1,
-      "encoding-name", G_TYPE_STRING, "THEORA", NULL);
+      //"encoding-name", G_TYPE_STRING, "THEORA", NULL
+      "encoding-name", G_TYPE_STRING, "VP8", NULL
+      );
 
   g_object_set (sink, "sync", FALSE, NULL);
   return ret;
@@ -255,7 +260,6 @@ request_aux_receiver (GstElement * rtpbin, guint sessid, SessionData * session)
   return bin;
 }
 
-#define SUBFLOW_2
 
 static void
 join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
@@ -304,7 +308,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
   g_object_set (mprtpply, "pivot-clock-rate", clockrate, NULL);
 
   g_object_set (mprtpply, "join-subflow", 1, NULL);
-  g_object_set (mprtpply, "join-subflow", 2, NULL);
+//  g_object_set (mprtpply, "join-subflow", 2, NULL);
   g_object_set (mprtpply, "auto-flow-reporting", TRUE, NULL);
 
   g_print ("Connecting to %i/%i/%i/%i/%i/%i\n",

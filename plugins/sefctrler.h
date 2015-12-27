@@ -66,8 +66,8 @@ struct _SndEventBasedController
   gdouble                rate_diff;
 //
 //  //for stat and plot
-//  GstTask*          stat_thread;
-//  GRecMutex         stat_thread_mutex;
+  GstTask*          stat_thread;
+  GRecMutex         stat_thread_mutex;
 };
 
 struct _SndEventBasedControllerClass{

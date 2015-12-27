@@ -338,7 +338,7 @@ sefctrler_finalize (GObject * object)
   g_object_unref (this->sysclock);
 }
 
-//static void sefctrler_stat_run (void *data);
+static void sefctrler_stat_run (void *data);
 
 void
 sefctrler_init (SndEventBasedController * this)
@@ -363,44 +363,53 @@ sefctrler_init (SndEventBasedController * this)
   gst_task_start (this->thread);
 
 //
-//  g_rec_mutex_init (&this->stat_thread_mutex);
-//  this->stat_thread = gst_task_new (sefctrler_stat_run, this, NULL);
-//  gst_task_set_lock (this->stat_thread, &this->stat_thread_mutex);
-//  gst_task_start (this->stat_thread);
+  g_rec_mutex_init (&this->stat_thread_mutex);
+  this->stat_thread = gst_task_new (sefctrler_stat_run, this, NULL);
+  gst_task_set_lock (this->stat_thread, &this->stat_thread_mutex);
+  gst_task_start (this->stat_thread);
 
 }
-//
-//void
-//sefctrler_stat_run (void *data)
-//{
-//  SndEventBasedController *this;
-//  GstClockID clock_id;
-//  GHashTableIter iter;
-//  gpointer key, val;
-//  Subflow *subflow;
-////  guint32 actual;
-//  GstClockTime next_scheduler_time;
-//  this = data;
-//  THIS_WRITELOCK (this);
-////  g_print("# subflow1, subflow 2\n");
-//  g_hash_table_iter_init (&iter, this->subflows);
-//  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-//    subflow = (Subflow *) val;
-//    if(subflow) goto next;
-//    next:
-//    continue;
-//  }
-//  THIS_WRITEUNLOCK(this);
-//
-//  next_scheduler_time = gst_clock_get_time(this->sysclock) + GST_SECOND;
-//  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
-//
-//  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
-//    GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
-//  }
-//  gst_clock_id_unref (clock_id);
-//}
-//
+
+
+void
+sefctrler_stat_run (void *data)
+{
+  SndEventBasedController *this;
+  GstClockID clock_id;
+  GHashTableIter iter;
+  gpointer key, val;
+  Subflow *subflow;
+
+//  guint32 actual;
+  GstClockTime next_scheduler_time;
+  this = data;
+  THIS_WRITELOCK (this);
+//  g_print("# subflow1, subflow 2\n");
+  g_hash_table_iter_init (&iter, this->subflows);
+  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+    gdouble bandwidth_estimation, bandwidth_estimation_error;
+    subflow = (Subflow *) val;
+    if(!subflow) goto next;
+    sndrate_distor_extract_stats(this->rate_distor,
+                                 subflow->rate_calcer_id,
+                                 &bandwidth_estimation,
+                                 &bandwidth_estimation_error);
+    g_print("%f,%f,",bandwidth_estimation/125.,bandwidth_estimation_error/125.);
+  next:
+    continue;
+  }
+  g_print("|\n");
+  THIS_WRITEUNLOCK(this);
+
+  next_scheduler_time = gst_clock_get_time(this->sysclock) + GST_SECOND;
+  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
+
+  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
+    GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
+  }
+  gst_clock_id_unref (clock_id);
+}
+
 
 void
 sefctrler_add_path (gpointer ptr, guint8 subflow_id, MPRTPSPath * path)
@@ -1334,9 +1343,9 @@ void _recalc_bids(SndEventBasedController * this)
     }
 
     sending_rate = sndrate_distor_get_sending_rate(this->rate_distor, subflow->rate_calcer_id);
-    g_print("Subflow %d sending rate %u\n",
-            subflow->id,
-            sending_rate);
+//    g_print("Subflow %d sending rate %u\n",
+//            subflow->id,
+//            sending_rate);
     stream_splitter_setup_sending_bid(this->splitter,
                                       subflow->id,
                                       sending_rate);

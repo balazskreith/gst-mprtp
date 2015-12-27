@@ -117,13 +117,17 @@ struct _Subflow{
   guint              disable_controlling;
   Checker            controlling;
   guint              turning_point;
-  gboolean           monitoring_allowed;
+  guint              monitoring_disabled;
 
   //need for state transitions
   State              state;
   PercentileTracker *delays;
+  PercentileTracker *goodputs;
   NormalizedLeastMeanSquere *falls;
   gint32             falling_point;
+
+  gdouble            bandwidth_estimation;
+  gdouble            bandwidth_estimation_error;
 
   //Need for measurements
   gboolean           measured;
@@ -362,11 +366,14 @@ done:
   _get_subflow(this, *id)->path = g_object_ref(path);
   if(!_get_subflow(this, *id)->delays){
     _get_subflow(this, *id)->delays = make_percentiletracker(256, 80);
+    _get_subflow(this, *id)->goodputs = make_percentiletracker(32, 90);
     percentiletracker_set_treshold(_get_subflow(this, *id)->delays, 30 * GST_SECOND);
-    _get_subflow(this, *id)->falls = make_nlms(3, 1., 1.);
+    percentiletracker_set_treshold(_get_subflow(this, *id)->goodputs, 30 * GST_SECOND);
+    _get_subflow(this, *id)->falls = make_nlms(10, .01, 1.);
   }
   else{
-    percentiletracker_reset(_get_subflow(this, *id)->delays);
+      percentiletracker_reset(_get_subflow(this, *id)->delays);
+      percentiletracker_reset(_get_subflow(this, *id)->goodputs);
   }
   _get_subflow(this, *id)->disable_controlling = 0;
   _get_subflow(this, *id)->measured = FALSE;
@@ -416,6 +423,7 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
   percentiletracker_add(subflow->delays, measurement->min_delay);
 //  percentiletracker_add(subflow->delays, measurement->max_delay);
   percentiletracker_add(subflow->delays, measurement->median_delay);
+  percentiletracker_add(subflow->goodputs, measurement->goodput);
   _mt0(subflow)->corrh_owd = (gdouble)measurement->median_delay / (gdouble) percentiletracker_get_stats(subflow->delays, NULL, NULL, NULL);
   _mt0(subflow)->delay = measurement->median_delay;
   _mt0(subflow)->corrd = (gdouble)_mt1(subflow)->delay / (gdouble)_mt0(subflow)->delay;
@@ -428,6 +436,7 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
   _mt0(subflow)->delay_ratio = (gdouble)_mt1(subflow)->delay / (gdouble)_mt0(subflow)->delay;
   _mt0(subflow)->goodput_ratio = (gdouble)_mt0(subflow)->goodput / _mt1(subflow)->goodput;
 
+  subflow->bandwidth_estimation = percentiletracker_get_stats(subflow->goodputs, NULL, NULL, NULL);
 //  g_print("S%d update."
 //          "State: %d, CorrH: %f, GP: %f, J: %d "
 //          "PiT: %hu, L:%d, D: %d, RR: %u "
@@ -448,6 +457,20 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
   return;
 }
 
+void sndrate_distor_extract_stats(SendingRateDistributor *this,
+                                  guint8 id,
+                                  gdouble *bandwidth_estimation,
+                                  gdouble *bandwidth_estimation_error)
+{
+  Subflow *subflow;
+  subflow = _get_subflow(this, id);
+  if(!subflow->available) return;
+  if(bandwidth_estimation)
+    *bandwidth_estimation = subflow->bandwidth_estimation;
+  if(bandwidth_estimation_error)
+    *bandwidth_estimation_error = subflow->bandwidth_estimation_error;
+
+}
 
 void sndrate_distor_time_update(SendingRateDistributor *this)
 {
@@ -605,7 +628,7 @@ void _refresh_rates(SendingRateDistributor* this)
   {
     gint32 total = 0;
     gdouble weight;
-   g_print("Post correction: AR: %u DR: %u\n",ur.actual_rate, desired_media_rate);
+//   g_print("Post correction: AR: %u DR: %u\n",ur.actual_rate, desired_media_rate);
     reminded_media_rate = ur.actual_rate - desired_media_rate;
     foreach_subflows(this, i, subflow)
     {
@@ -728,12 +751,12 @@ _check_stable(
   if(_mt0(subflow)->corrh_owd > 1. || _mt1(subflow)->corrh_owd > 1.)
   {
     if(subflow->turning_point < 6) ++subflow->turning_point;
-    else subflow->monitoring_allowed = FALSE;
+    else ++subflow->monitoring_disabled;
     goto done;
   }
 
-  if(subflow->monitoring_allowed){
-    subflow->monitoring_allowed = TRUE;
+  if(0 < subflow->monitoring_disabled){
+    --subflow->monitoring_disabled;
     goto done;
   }
 
@@ -765,7 +788,7 @@ _check_monitored(
     _disable_monitoring(subflow);
     _transit_to(this, subflow, STATE_STABLE);
     if(subflow->turning_point < 6) ++subflow->turning_point;
-    else subflow->monitoring_allowed = FALSE;
+    else ++subflow->monitoring_disabled;
     goto done;
   }
 
@@ -773,7 +796,7 @@ _check_monitored(
     _disable_monitoring(subflow);
     _transit_to(this, subflow, STATE_STABLE);
     if(subflow->turning_point < 6) ++subflow->turning_point;
-    else subflow->monitoring_allowed = FALSE;
+    else ++subflow->monitoring_disabled;
     goto done;
   }
 
@@ -842,7 +865,7 @@ void _setup_monitoring(Subflow *subflow, guint interval)
   if(!subflow->available) goto done;
 //  subflow->monitoring_interval = interval;
   subflow->monitoring_time = 0;
-  g_print("S%d Monitoring changed with %u\n", subflow->id, subflow->monitoring_interval);
+//  g_print("S%d Monitoring changed with %u\n", subflow->id, subflow->monitoring_interval);
   mprtps_path_set_monitor_interval(subflow->path, interval);
 done:
   return;
@@ -873,11 +896,16 @@ gboolean _enable_monitoring(
   subflow->monitoring_interval = 0;
   if(!subflow->available) goto exit;
 
-  if(0 < subflow->step_rate){
-    if(subflow->step_rate <= subflow->sending_rate) {
+//  if(subflow->sending_rate < subflow->bandwidth_estimation){
+//    target = subflow->bandwidth_estimation;
+//    actual = subflow->sending_rate;
+//    goto determine;
+//  }
+  if(0 < subflow->target_rate){
+    if(subflow->target_rate <= subflow->sending_rate) {
       goto exit;
     }
-    target = subflow->step_rate;
+    target = subflow->target_rate;
     actual = subflow->sending_rate;
 //    g_print("Going Target point: target:%f actual: %f\n", target, actual);
     goto determine;
@@ -891,13 +919,7 @@ gboolean _enable_monitoring(
 //    g_print("Going Media Rate point: target:%f actual: %f\n", target, actual);
     goto determine;
   }
-  if(subflow->sending_rate < subflow->falling_point){
-    target = subflow->falling_point * 1.1;
-    actual = this->actual_media_rate;
-    goto determine;
-  }else{
-    subflow->falling_point = 0;
-  }
+
   subflow->monitoring_interval = 5;
   goto exit;
 determine:
@@ -973,12 +995,7 @@ guint32 _action_undershoot(
   supplied_bytes = subflow->sending_rate * (1.-shooter);
   subflow->bounce_point = subflow->sending_rate - supplied_bytes;
   subflow->falling_point = subflow->sending_rate;
-//  {
-//    gdouble estimation, error;
-//    estimation = nlms_measurement_update(subflow->falls, subflow->sending_rate, &error);
-//    g_print("Falling point: %d est: %f err: %f\n",
-//            subflow->sending_rate, estimation, error);
-//  }
+  subflow->bandwidth_estimation = subflow->sending_rate;
 //  if(subflow->sending_rate * .75 < _mt0(subflow)->goodput &&
 //     _mt0(subflow)->discard < subflow->sending_rate * .25 &&
 //     _mt0(subflow)->corrh_owd < 2.)
@@ -999,8 +1016,8 @@ guint32 _action_undershoot(
 //  }
 
   this->supplied_bytes += supplied_bytes;
-  g_print("Undershoot on S%d. SR: %d SB:%u (%f)\n",
-          subflow->id, subflow->sending_rate, supplied_bytes, shooter);
+//  g_print("Undershoot on S%d. SR: %d SB:%u (%f)\n",
+//          subflow->id, subflow->sending_rate, supplied_bytes, shooter);
   return supplied_bytes;
 }
 
@@ -1025,7 +1042,7 @@ guint32 _action_bounce_back(
   requested_bytes *= .9;
   subflow->turning_point = 3;
   this->requested_bytes += requested_bytes;
-  g_print("BounceBack on S%d. SR: %d RB:%u\n", subflow->id, subflow->sending_rate, requested_bytes);
+//  g_print("BounceBack on S%d. SR: %d RB:%u\n", subflow->id, subflow->sending_rate, requested_bytes);
   return requested_bytes;
 }
 
@@ -1038,7 +1055,7 @@ guint32 _action_bounce_up(
   requested_bytes = subflow->sending_rate * (1./(gdouble) subflow->monitoring_interval);
   this->requested_bytes += requested_bytes;
   if(0 < subflow->turning_point) --subflow->turning_point;
-  g_print("BounceUp on S%d. SR: %d RB:%u\n", subflow->id, subflow->sending_rate, requested_bytes);
+//  g_print("BounceUp on S%d. SR: %d RB:%u\n", subflow->id, subflow->sending_rate, requested_bytes);
   return requested_bytes;
 }
 

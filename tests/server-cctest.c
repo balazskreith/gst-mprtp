@@ -100,26 +100,35 @@ make_video_session (guint sessionNum)
 {
   GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
   GstElement *videoSrc = gst_element_factory_make ("videotestsrc", NULL);
-  encoder = gst_element_factory_make ("theoraenc", NULL);
-  //GstElement *encoder = gst_element_factory_make ("jpegenc", NULL);
-  GstElement *payloader = gst_element_factory_make ("rtptheorapay", NULL);
-  //GstElement *payloader = gst_element_factory_make ("rtpjpegpay", NULL);
+//  encoder = gst_element_factory_make ("theoraenc", NULL);
+//  GstElement *encoder = gst_element_factory_make ("jpegenc", NULL);
+  encoder = gst_element_factory_make ("vp8enc", NULL);
+//  GstElement *payloader = gst_element_factory_make ("rtptheorapay", NULL);
+//  GstElement *payloader = gst_element_factory_make ("rtpjpegpay", NULL);
+  GstElement *payloader = gst_element_factory_make ("rtpvp8pay", NULL);
+
 
   GstCaps *videoCaps;
   SessionData *session;
   g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 1, NULL);
-  g_object_set (payloader, "config-interval", 2, NULL);
-  g_object_set (encoder, "bitrate", bitrate, NULL);
+  //g_object_set (payloader, "config-interval", 2, NULL);
+  g_object_set (encoder, "target-bitrate", 50000, NULL);
+  g_object_set (encoder, "keyframe-max-dist", 20, NULL);
+  g_object_set (encoder, "threads", 4, NULL);
+  g_object_set (encoder, "deadline", 1, NULL);
+  g_object_set (encoder, "cpu-used", 5, NULL);
 
   gst_bin_add_many (videoBin, videoSrc, encoder, payloader, NULL);
-  videoCaps = gst_caps_new_simple ("video/x-raw",
+  videoCaps = gst_caps_new_simple (
+      "video/x-raw",
       "width", G_TYPE_INT, 352,
-      "height", G_TYPE_INT, 288, "framerate", GST_TYPE_FRACTION, 50, 1, NULL);
+      "height", G_TYPE_INT, 288,
+      "framerate", GST_TYPE_FRACTION, 50, 1, NULL);
 
   gst_element_link_filtered (videoSrc, encoder, videoCaps);
   gst_element_link (encoder, payloader);
 
-  //g_object_set(videoSrc, "filter-caps", videoCaps, NULL);
+//  g_object_set(videoSrc, "filter-caps", videoCaps, NULL);
 
   setup_ghost (payloader, videoBin);
 
@@ -195,7 +204,8 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
 {
   UtilizationReport *ur = ptr;
   gint delta, new_bitrate, get_bitrate;
-  g_object_get (encoder, "bitrate", &get_bitrate, NULL);
+  g_object_get (encoder, "target-bitrate", &get_bitrate, NULL);
+  get_bitrate/=8;
   if(ur->desired_rate < get_bitrate){
     --stability;
   }else if(get_bitrate < ur->desired_rate){
@@ -206,7 +216,8 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
 
   {
     gint i;
-    new_bitrate = ur->desired_rate * 1./125.;
+    //    new_bitrate = ur->desired_rate * 1./125.;
+    new_bitrate = ur->desired_rate * 8;
     ur->greedy = TRUE;
     for(i=0; i<32; ++i){
       if(!ur->subflows[i].available) continue;
@@ -240,23 +251,23 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
 //  if(ur->actual_target < new_bitrate){
 //    new_bitrate = ur->actual_target * 1./125.;
 //  }
-  ur->actual_rate = new_bitrate * 125;
+  ur->actual_rate = new_bitrate/8;
   ur->desired_target = 0;
 //  ur->desired_target = 1024 * 125;
-  g_print("actual rate: %u\n", ur->actual_rate);
+//  g_print("actual rate: %u\n", ur->actual_rate);
   if(stability < -20){
-    g_print("So unstable, it must be changed\n");
+//    g_print("So unstable, it must be changed\n");
 //    ur->target *= .8;
     stability = 0;
   }else if(stability > 10){
-    g_print("So stable it must be changed\n");
+//    g_print("So stable it must be changed\n");
     //ur->target *= 1.1;
     stability = 0;
   }
   g_print("get bitrate: %d, new bitrate:: %d\n",
           get_bitrate,
           new_bitrate);
-  g_object_set (encoder, "bitrate", new_bitrate, NULL);
+//  g_object_set (encoder, "target-bitrate", new_bitrate, NULL);
 done:
   return;
 }
@@ -337,7 +348,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   gst_element_link_pads (mprtpsnd, "src_2", rtpSink_2, "sink");
 
   g_object_set (mprtpsch, "join-subflow", 1, NULL);
-  g_object_set (mprtpsch, "join-subflow", 2, NULL);
+//  g_object_set (mprtpsch, "join-subflow", 2, NULL);
 
 //  sprintf(ids->filename, "%s", file);
 //  g_timeout_add (1000, _network_changes, ids);

@@ -482,7 +482,7 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
 
   new_frame = this->last_rtp_timestamp != gst_rtp_buffer_get_timestamp(rtp) ? 1 : 0;
   bytes_to_send = gst_rtp_buffer_get_payload_len (rtp);
-
+//g_print("%d", GST_BUFFER_FLAG_IS_SET (rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT));
 //  g_print("bytes to send: %u\n",bytes_to_send);
   if (this->keyframes_tree == NULL) {
     result = schtree_get_next (this->non_keyframes_tree, bytes_to_send, new_frame);
@@ -506,6 +506,7 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
 
   set_last_delta_flag:
     this->last_delta_flag = actual_delta_flag;
+//    g_print("Separation possibility is %d and last flag deltability is: %d\n", this->separation_is_possible, actual_delta_flag);
   }
   if (this->separation_is_possible && !GST_BUFFER_FLAG_IS_SET (rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT)) {
       result = schtree_get_next (this->keyframes_tree, bytes_to_send, new_frame);

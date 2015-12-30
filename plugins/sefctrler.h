@@ -9,6 +9,8 @@
 #define SEFCTRLER_H_
 
 #include <gst/gst.h>
+#include <gio/gio.h>
+#include <stdio.h>
 
 #include "mprtpspath.h"
 #include "streamsplitter.h"

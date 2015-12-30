@@ -601,8 +601,6 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
       break;
     case PROP_SCHEDULER_STATE:
       THIS_READLOCK (this);
-      g_value_set_string (value,
-          gst_structure_to_string (this->controller_state (this->controller)));
       THIS_READUNLOCK (this);
       break;
     default:

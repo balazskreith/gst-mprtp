@@ -131,6 +131,15 @@ PercentileTracker *make_percentiletracker(
     return make_percentiletracker_full(_cmp_for_min, _cmp_for_max, length, percentile);
 }
 
+PercentileTracker *make_percentiletracker_debug(
+                                  guint32 length,
+                                  guint percentile)
+{
+  PercentileTracker *this = make_percentiletracker_full(_cmp_for_min, _cmp_for_max, length, percentile);
+  this->debug = TRUE;
+  return this;
+}
+
 PercentileTracker *make_percentiletracker_full(BinTreeCmpFunc cmp_min,
                                   BinTreeCmpFunc cmp_max,
                                   guint32 length,
@@ -197,8 +206,19 @@ void percentiletracker_test(void)
     guint64 min,max,perc;
     perc = percentiletracker_get_stats(tracker, &min, &max, NULL);
     g_print("PercentileTracker test for 50th percentile\n"
-            "Min: %lu, 50th percentile: %lu Max: %lu\n", min, perc, max);
+              "Min: %lu, 50th percentile: %lu Max: %lu\n", min, perc, max);
   }
+  {
+    guint64 min,max,perc,i;
+    for(i=0; i<100; ++i){
+      percentiletracker_add(tracker, (g_random_int() % 100) + 50);
+      perc = percentiletracker_get_stats(tracker, &min, &max, NULL);
+      g_print("PercentileTracker test for 50th percentile\n"
+              "Min: %lu, 50th percentile: %lu Max: %lu\n", min, perc, max);
+    }
+
+  }
+
   g_object_unref(tracker);
 
   tracker = make_percentiletracker(20, 10);
@@ -334,15 +354,30 @@ void _add_value(PercentileTracker *this, guint64 value)
 guint64 _get_median(PercentileTracker * this)
 {
   gint32 max_count,min_count;
+  guint64 result;
   max_count = bintree_get_num(this->maxtree);
   min_count = bintree_get_num(this->mintree);
 
   if(min_count == max_count)
-    return (bintree_get_top_value(this->maxtree) + bintree_get_top_value(this->mintree))>>1;
-  if(min_count < max_count)
-    return bintree_get_top_value(this->maxtree);
+    result = (bintree_get_top_value(this->maxtree) + bintree_get_top_value(this->mintree))>>1;
+  else if(min_count < max_count)
+    result = bintree_get_top_value(this->maxtree);
   else
-    return bintree_get_top_value(this->mintree);
+    result = bintree_get_top_value(this->mintree);
+
+  if(this->debug){
+//      g_print("_get_median debug, item num: %u <-> R:%d-W:%d\n",
+//              percentiletracker_get_num(this),
+//              this->read_index,
+//              this->write_index);
+//      g_print("maxtree top: %lu (%u), mintree top: %lu (%u) result is: %lu\n",
+//              bintree_get_top_value(this->maxtree),
+//              bintree_get_num(this->maxtree),
+//              bintree_get_top_value(this->mintree),
+//              bintree_get_num(this->mintree),
+//              result);
+    }
+  return result;
 }
 
 guint64 _get_nmedian(PercentileTracker * this)

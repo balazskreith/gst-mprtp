@@ -30,6 +30,7 @@ struct _PercentileTracker
   BinTree*                 maxtree;
   GRWLock                  rwmutex;
   PercentileTrackerItem*       items;
+  gboolean                 debug;
   guint64                  sum;
   guint8                   percentile;
   guint32                  length;
@@ -56,6 +57,10 @@ struct _PercentileTrackerClass{
 
 GType percentiletracker_get_type (void);
 PercentileTracker *make_percentiletracker(
+                                  guint32 length,
+                                  guint percentile);
+
+PercentileTracker *make_percentiletracker_debug(
                                   guint32 length,
                                   guint percentile);
 

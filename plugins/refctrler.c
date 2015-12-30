@@ -32,6 +32,7 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
 #define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
@@ -323,6 +324,7 @@ refctrler_init (RcvEventBasedController * this)
 
 }
 
+static FILE *file = NULL;
 void
 refctrler_stat_run (void *data)
 {
@@ -336,7 +338,8 @@ refctrler_stat_run (void *data)
   GstClockTime next_scheduler_time;
   this = data;
   THIS_WRITELOCK (this);
-//  g_print("# subflow1, subflow 2\n");
+  if(!file) file=fopen("refctrler.log", "w");
+  else      file=fopen("refctrler.log", "a");
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     guint32 rcvd_bytes;
@@ -368,7 +371,7 @@ refctrler_stat_run (void *data)
     discarded_bytes = subflow->discarded_bytes - discarded_bytes;
     goodput = (gdouble) (rcvd_bytes - discarded_bytes);
 
-    g_print("%d,%u,%lu,%lu,%lu,%u,%u,%f,%u,",
+    fprintf(file,"%d,%u,%lu,%lu,%lu,%u,%u,%f,%u,",
             subflow->id,
             subflow->jitter,
             subflow->estimated_delay,
@@ -380,7 +383,8 @@ refctrler_stat_run (void *data)
             (monitored_bytes - subflow->monitored_bytes)/125);
     subflow->monitored_bytes = monitored_bytes;
   }
-  g_print("|\n");
+  fprintf(file, "|\n");
+  fclose(file);
   THIS_WRITEUNLOCK(this);
 
   next_scheduler_time = gst_clock_get_time(this->sysclock) + 1000 * GST_MSECOND;

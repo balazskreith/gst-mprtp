@@ -336,6 +336,7 @@ sefctrler_finalize (GObject * object)
   gst_task_join (this->thread);
 
   g_object_unref (this->sysclock);
+
 }
 
 static void sefctrler_stat_run (void *data);
@@ -362,7 +363,7 @@ sefctrler_init (SndEventBasedController * this)
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
 
-//
+//  fprintf(this->stat_file, "f");
   g_rec_mutex_init (&this->stat_thread_mutex);
   this->stat_thread = gst_task_new (sefctrler_stat_run, this, NULL);
   gst_task_set_lock (this->stat_thread, &this->stat_thread_mutex);
@@ -371,6 +372,7 @@ sefctrler_init (SndEventBasedController * this)
 }
 
 
+static FILE *file = NULL;
 void
 sefctrler_stat_run (void *data)
 {
@@ -379,26 +381,29 @@ sefctrler_stat_run (void *data)
   GHashTableIter iter;
   gpointer key, val;
   Subflow *subflow;
-
-//  guint32 actual;
   GstClockTime next_scheduler_time;
+
   this = data;
   THIS_WRITELOCK (this);
-//  g_print("# subflow1, subflow 2\n");
+  if(!file) file=fopen("sefctrler.log", "w");
+  else      file=fopen("sefctrler.log", "a");
   g_hash_table_iter_init (&iter, this->subflows);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-    gdouble bandwidth_estimation, bandwidth_estimation_error;
+  while (g_hash_table_iter_next (&iter, (gpointer) &key, (gpointer) & val)) {
+    gdouble bandwidth_estimation = 0., goodput, bandwidth_estimation_error;
     subflow = (Subflow *) val;
     if(!subflow) goto next;
     sndrate_distor_extract_stats(this->rate_distor,
                                  subflow->rate_calcer_id,
                                  &bandwidth_estimation,
+                                 &goodput,
                                  &bandwidth_estimation_error);
-    g_print("%f,%f,",bandwidth_estimation/125.,bandwidth_estimation_error/125.);
+    fprintf(file, "%f,%f,",bandwidth_estimation/125., bandwidth_estimation_error/125.);
+    //g_print("%f,%f,",bandwidth_estimation/125., bandwidth_estimation_error/125.);
   next:
     continue;
   }
-  g_print("|\n");
+  fprintf(file, "|\n");
+  fclose(file);
   THIS_WRITEUNLOCK(this);
 
   next_scheduler_time = gst_clock_get_time(this->sysclock) + GST_SECOND;

@@ -424,7 +424,7 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
   _m_step(subflow);
   _mt0(subflow)->state = _mt1(subflow)->state;
 
-  if(subflow->state == STATE_OVERUSED){
+  if(subflow->state != STATE_OVERUSED){
     percentiletracker_add(subflow->delays, measurement->min_delay);
     percentiletracker_add(subflow->delays, measurement->median_delay);
   }
@@ -440,14 +440,12 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
   _mt0(subflow)->delay_ratio = (gdouble)_mt1(subflow)->delay / (gdouble)_mt0(subflow)->delay;
   _mt0(subflow)->goodput_ratio = (gdouble)_mt0(subflow)->goodput / _mt1(subflow)->goodput;
 
-//  if(subflow->id == 0) g_print("Added: %f", MAX(measurement->goodput,0.));
   if(subflow->state == STATE_OVERUSED)
    percentiletracker_add(subflow->goodputs, subflow->bandwidth_estimation);
   else
    percentiletracker_add(subflow->goodputs, MAX(measurement->goodput,0.));
-//  if(subflow->id == 0) g_print("estimated: %f\n", (gdouble) percentiletracker_get_stats(subflow->goodputs, NULL, NULL, NULL));
   subflow->bandwidth_estimation = (gdouble) percentiletracker_get_stats(subflow->goodputs, NULL, NULL, NULL);
-//if(subflow->id == 0) g_print("%f,%f\n", measurement->goodput,subflow->bandwidth_estimation);
+
 //  g_print("S%d update."
 //          "State: %d, CorrH: %f, GP: %f, J: %d "
 //          "PiT: %hu, L:%d, D: %d, RR: %u "
@@ -470,6 +468,8 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
 
 void sndrate_distor_extract_stats(SendingRateDistributor *this,
                                   guint8 id,
+                                  guint64 *median_delay,
+                                  gint32  *sending_rate,
                                   gdouble *bandwidth_estimation,
                                   gdouble *goodput,
                                   gdouble *bandwidth_estimation_error)
@@ -477,6 +477,10 @@ void sndrate_distor_extract_stats(SendingRateDistributor *this,
   Subflow *subflow;
   subflow = _get_subflow(this, id);
   if(!subflow->available) return;
+  if(median_delay)
+    *median_delay = percentiletracker_get_stats(subflow->delays, NULL, NULL, NULL);
+  if(sending_rate)
+    *sending_rate = subflow->sending_rate;
   if(bandwidth_estimation)
     *bandwidth_estimation = subflow->bandwidth_estimation;
   if(goodput)

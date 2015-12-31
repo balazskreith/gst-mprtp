@@ -382,6 +382,8 @@ sefctrler_stat_run (void *data)
   gpointer key, val;
   Subflow *subflow;
   GstClockTime next_scheduler_time;
+  guint64 median_delay;
+  gint32 sending_rate;
 
   this = data;
   THIS_WRITELOCK (this);
@@ -394,10 +396,18 @@ sefctrler_stat_run (void *data)
     if(!subflow) goto next;
     sndrate_distor_extract_stats(this->rate_distor,
                                  subflow->rate_calcer_id,
+                                 &median_delay,
+                                 &sending_rate,
                                  &bandwidth_estimation,
                                  &goodput,
                                  &bandwidth_estimation_error);
-    fprintf(file, "%f,%f,",bandwidth_estimation/125., bandwidth_estimation_error/125.);
+    fprintf(file, "%d,%d,%lu,%lu,%f,%f,",
+            subflow->id,
+            sending_rate,
+            median_delay,
+            _irt0(subflow)->median_delay,
+            bandwidth_estimation/125.,
+            bandwidth_estimation_error/125.);
     //g_print("%f,%f,",bandwidth_estimation/125., bandwidth_estimation_error/125.);
   next:
     continue;

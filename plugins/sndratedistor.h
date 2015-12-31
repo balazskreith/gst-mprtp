@@ -69,6 +69,8 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        RRMeasurement *measurement);
 void sndrate_distor_extract_stats(SendingRateDistributor *this,
                                   guint8 id,
+                                  guint64 *median_delay,
+                                  gint32  *sending_rate,
                                   gdouble *bandwidth_estimation,
                                   gdouble *goodput,
                                   gdouble *bandwidth_estimation_error);

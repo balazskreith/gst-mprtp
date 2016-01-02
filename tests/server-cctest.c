@@ -23,6 +23,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+
 typedef struct _UtilizationReport{
   guint32  actual_target;
   guint32  desired_target;
@@ -30,7 +31,7 @@ typedef struct _UtilizationReport{
   guint32  desired_rate;
   gboolean greedy;
   struct{
-    guint32 target_rate;
+    gdouble  target_weight;
     gboolean available;
   }subflows[32];
 }UtilizationReport;
@@ -203,7 +204,7 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
     ur->greedy = TRUE;
     for(i=0; i<32; ++i){
       if(!ur->subflows[i].available) continue;
-      ur->subflows[i].target_rate=0;
+      ur->subflows[i].target_weight=0.;
     }
   }
 

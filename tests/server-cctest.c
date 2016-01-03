@@ -115,10 +115,11 @@ make_video_session (guint sessionNum)
   //g_object_set (payloader, "config-interval", 2, NULL);
   g_object_set (encoder, "target-bitrate", 50000, NULL);
   g_object_set (encoder, "keyframe-max-dist", 10, NULL);
-  g_object_set (encoder, "end-usage", 0, NULL);
-  g_object_set (encoder, "threads", 4, NULL);
+  g_object_set (encoder, "end-usage", 1, NULL);
+  g_object_set (encoder, "threads", 1, NULL);
   g_object_set (encoder, "deadline", 1, NULL);
   g_object_set (encoder, "cpu-used", 5, NULL);
+//  g_object_set (encoder, "keyframe-mode", 0, NULL);
 
   gst_bin_add_many (videoBin, videoSrc, encoder, payloader, NULL);
   videoCaps = gst_caps_new_simple (
@@ -197,7 +198,6 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
   UtilizationReport *ur = ptr;
   gint delta, new_bitrate, get_bitrate;
   g_object_get (encoder, "target-bitrate", &get_bitrate, NULL);
-  get_bitrate/=8;
   {
     gint i;
     new_bitrate = ur->desired_rate * 8;
@@ -210,7 +210,7 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
 
   ur->actual_rate = new_bitrate/8;
   ur->desired_target = 0;
-  get_bitrate*=8;
+//  g_print("get_bitrate: %d new_bitrate: %d\n", get_bitrate, new_bitrate);
   g_object_set (encoder, "target-bitrate", new_bitrate, NULL);
 done:
   return;

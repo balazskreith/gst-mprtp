@@ -401,14 +401,16 @@ sefctrler_stat_run (void *data)
                                  &bandwidth_estimation,
                                  &goodput,
                                  &bandwidth_estimation_error);
-    fprintf(file, "%d,%d,%lu,%lu,%f,%f,",
+    fprintf(file, "%d,%d,%lu,%lu,%f,%f,%f,%f,",
             subflow->id,
             sending_rate,
             median_delay,
             _irt0(subflow)->median_delay,
             bandwidth_estimation/125.,
-            bandwidth_estimation_error/125.);
-    //g_print("%f,%f,",bandwidth_estimation/125., bandwidth_estimation_error/125.);
+            bandwidth_estimation_error/125.,
+            _irt0(subflow)->receiver_rate / 125.,
+            _irt0(subflow)->late_discarded_bytes / 125.);
+//
   next:
     continue;
   }

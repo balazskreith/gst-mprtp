@@ -104,6 +104,8 @@ struct _Subflow{
 
   guint8             overused_history;
 
+  gdouble            ewma_goodput;
+
   gdouble            weight;
   gdouble            target_weight;
   gdouble            bounce_point;
@@ -124,7 +126,7 @@ struct _Subflow{
   State              state;
   PercentileTracker *delays;
   PercentileTracker *goodputs;
-  NormalizedLeastMeanSquere *falls;
+  NormalizedLeastMeanSquere *nlms_goodputs;
   gint32             falling_point;
 
   gdouble            bandwidth_estimation;
@@ -247,6 +249,11 @@ _action_undershoot(
     SendingRateDistributor *this,
     Subflow *subflow);
 //
+
+static guint32
+_action_mitigate(
+    SendingRateDistributor *this,
+    Subflow *subflow);
 
 static guint32
 _action_bounce_back(
@@ -386,8 +393,8 @@ done:
     else
       _get_subflow(this, *id)->goodputs = make_percentiletracker(32, 50);
     percentiletracker_set_treshold(_get_subflow(this, *id)->delays, 30 * GST_SECOND);
-    percentiletracker_set_treshold(_get_subflow(this, *id)->goodputs, 30 * GST_SECOND);
-    _get_subflow(this, *id)->falls = make_nlms(10, .01, 1.);
+    percentiletracker_set_treshold(_get_subflow(this, *id)->goodputs, 10 * GST_SECOND);
+    _get_subflow(this, *id)->nlms_goodputs = make_nlms(18, .01, 1.);
   }
   else{
       percentiletracker_reset(_get_subflow(this, *id)->delays);
@@ -442,6 +449,7 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
   if(subflow->state != STATE_OVERUSED){
     percentiletracker_add(subflow->delays, measurement->min_delay);
     percentiletracker_add(subflow->delays, measurement->median_delay);
+    subflow->bandwidth_estimation = nlms_measurement_update(subflow->nlms_goodputs, measurement->goodput, &subflow->bandwidth_estimation_error);
   }
   _mt0(subflow)->corrh_owd = (gdouble)measurement->median_delay / (gdouble) percentiletracker_get_stats(subflow->delays, NULL, NULL, NULL);
   _mt0(subflow)->delay = measurement->median_delay;
@@ -454,17 +462,19 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
   _mt0(subflow)->jitter = measurement->jitter;
   _mt0(subflow)->delay_ratio = (gdouble)_mt1(subflow)->delay / (gdouble)_mt0(subflow)->delay;
   _mt0(subflow)->goodput_ratio = (gdouble)_mt0(subflow)->goodput / _mt1(subflow)->goodput;
+  subflow->ewma_goodput =  subflow->ewma_goodput * .75 + (gdouble)_mt0(subflow)->goodput * .25;
+  percentiletracker_add(subflow->goodputs, MAX(measurement->goodput,0.));
 
-  if(subflow->state == STATE_OVERUSED)
-   percentiletracker_add(subflow->goodputs, subflow->bandwidth_estimation);
-  else
-   percentiletracker_add(subflow->goodputs, MAX(measurement->goodput,0.));
-  subflow->bandwidth_estimation = (gdouble) percentiletracker_get_stats(subflow->goodputs, NULL, NULL, NULL);
+//
+//  if(subflow->state == STATE_OVERUSED)
+//   percentiletracker_add(subflow->goodputs, subflow->bandwidth_estimation);
+//  else
+//   percentiletracker_add(subflow->goodputs, MAX(measurement->goodput,0.));
 
 //  g_print("S%d update."
 //          "State: %d, CorrH: %f, GP: %f, J: %d "
 //          "PiT: %hu, L:%d, D: %d, RR: %u "
-//          "SR: %d DR: %f GR: %f\n",
+//          "SR: %d DR: %f GR: %f MI: %d EGP: %f\n",
 //          subflow->id,
 //          _mt0(subflow)->state,
 //          _mt0(subflow)->corrh_owd,
@@ -476,7 +486,9 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
 //          _mt0(subflow)->receiver_rate,
 //          subflow->sending_rate,
 //          _mt0(subflow)->delay_ratio,
-//          _mt0(subflow)->goodput_ratio);
+//          _mt0(subflow)->goodput_ratio,
+//          subflow->monitoring_interval,
+//          subflow->ewma_goodput);
 
   return;
 }
@@ -742,24 +754,20 @@ _check_overused(
     SendingRateDistributor *this,
     Subflow *subflow)
 {
-  if(_mt0(subflow)->discard_rate > .2){
-    if(_mt1(subflow)->state == STATE_OVERUSED){
-      subflow->supplied_bytes += _action_undershoot(this, subflow);
-      _disable_monitoring(subflow);
-      _disable_controlling(subflow, 1);
-      goto done;
-    }
-  }
+
   if(_mt0(subflow)->corrh_owd > OT_){
-    if(_mt0(subflow)->corrh_owd > _mt1(subflow)->corrh_owd){
-      subflow->supplied_bytes += _action_undershoot(this, subflow);
-      _disable_monitoring(subflow);
-      _disable_controlling(subflow, 1);
-      goto done;
-    }
-    if(_mt1(subflow)->state != STATE_OVERUSED) goto done;
+    if(subflow->sending_rate < _mt0(subflow)->goodput * .9) goto done;
     subflow->supplied_bytes += _action_undershoot(this, subflow);
-    _disable_monitoring(subflow);
+    _disable_controlling(subflow, 1);
+    goto done;
+  }
+
+  if(_mt0(subflow)->discard_rate > .05){
+    gint min_rate;
+    min_rate = MAX(6400, subflow->target_rate * .05);
+    if(subflow->sending_rate < _mt0(subflow)->goodput * .9) goto done;
+    if(subflow->sending_rate < min_rate) goto done;
+    subflow->supplied_bytes += subflow->sending_rate * .1;
     goto done;
   }
 
@@ -794,11 +802,14 @@ _check_stable(
      goto done;
   }
 
+  if(_mt0(subflow)->corrh_owd > 1. && _mt1(subflow)->corrh_owd > 1.){
+    subflow->monitoring_disabled = 0;
+    subflow->supplied_bytes += subflow->sending_rate * .05;
+    goto done;
+  }
 
-  if(_mt0(subflow)->corrh_owd > 1. || _mt1(subflow)->corrh_owd > 1.)
-  {
+  if(_mt0(subflow)->corrh_owd > 1. || _mt1(subflow)->corrh_owd > 1.){
     ++subflow->turning_point;
-    subflow->monitoring_disabled = 1;
     goto done;
   }
 
@@ -824,7 +835,7 @@ _check_monitored(
 //  g_print("S%d: STATE MONITORED\n", subflow->id);
 
   if(_mt0(subflow)->corrh_owd > ST_ || _mt0(subflow)->discard_rate > .1){
-      subflow->supplied_bytes +=_action_undershoot(this, subflow);
+      subflow->supplied_bytes +=_action_mitigate(this, subflow);
       _transit_to(this, subflow, STATE_OVERUSED);
       _disable_controlling(subflow, 1);
       _disable_monitoring(subflow);
@@ -939,29 +950,42 @@ gboolean _enable_monitoring(
   subflow->monitoring_interval = 0;
   if(!subflow->available) goto exit;
 
-  if(subflow->sending_rate < subflow->bandwidth_estimation){
-    target = subflow->bandwidth_estimation * 1.1;
+  if(subflow->sending_rate < subflow->falling_point){
+    target = subflow->falling_point * 1.1;
     actual = subflow->sending_rate;
+//    g_print("Falling point\n");
     goto determine;
   }
+  subflow->falling_point = 0;
+  if(subflow->ewma_goodput < subflow->sending_rate * .9){
+//    g_print("ewma_goodput point %f\n", subflow->ewma_goodput);
+//    goto exit;
+    target = subflow->sending_rate;
+    actual = subflow->ewma_goodput;
+    goto determine;
+  }
+
   if(0 < subflow->target_rate){
     if(subflow->target_rate <= subflow->sending_rate) {
       goto exit;
     }
+//    g_print("target_rate point %d\n", subflow->target_rate);
     target = subflow->target_rate;
     actual = subflow->sending_rate;
     goto determine;
   }
+
   if(0 < this->target_media_rate){
     if(this->target_media_rate <= this->actual_media_rate){
       goto exit;
     }
+    g_print("target_media_rate point %d\n", this->target_media_rate);
     target = this->target_media_rate - subflow->sending_rate;
     actual = this->actual_media_rate;
     goto determine;
   }
 
-  subflow->monitoring_interval = 7;
+  subflow->monitoring_interval = 3;
   goto determined;
 
 determine:
@@ -1037,10 +1061,10 @@ guint32 _action_undershoot(
       else
         shooter = .505;
   }
-  else if(shooter < .25) shooter*=.5;
-  else if(shooter < .5) shooter *= .5;
-  else if(shooter < .75) shooter *= .5;
-  else if(shooter < 1.) shooter *= .75;
+//  else if(shooter < .25) shooter*=.5;
+//  else if(shooter < .5) shooter *= .5;
+//  else if(shooter < .75) shooter *= .5;
+//  else if(shooter < 1.) shooter *= .75;
 
   supplied_bytes = subflow->sending_rate * (1.-shooter);
   if(subflow->sending_rate - supplied_bytes < min_rate){
@@ -1050,7 +1074,7 @@ guint32 _action_undershoot(
       supplied_bytes = 0;
   }
   subflow->falling_point = subflow->sending_rate;
-  subflow->bounce_point = _mt0(subflow)->goodput;
+
 
 //  g_print("Undershoot on S%d. SR: %d SB:%u (%f)\n",
 //          subflow->id, subflow->sending_rate, supplied_bytes, shooter);
@@ -1058,6 +1082,27 @@ guint32 _action_undershoot(
 }
 
 
+
+guint32 _action_mitigate(
+    SendingRateDistributor *this,
+    Subflow *subflow)
+{
+  guint32 supplied_bytes = 0;
+  gint32 min_rate;
+  min_rate = MAX(6400, subflow->target_rate * .05);
+
+  supplied_bytes = (gdouble) subflow->sending_rate / (gdouble) subflow->monitoring_interval;
+
+  if(subflow->sending_rate - supplied_bytes < min_rate){
+    if(min_rate < subflow->sending_rate)
+      supplied_bytes = subflow->sending_rate - min_rate;
+    else
+      supplied_bytes = 0;
+  }
+  subflow->falling_point = subflow->sending_rate;
+
+  return supplied_bytes;
+}
 
 
 guint32 _action_bounce_back(
@@ -1074,7 +1119,7 @@ guint32 _action_bounce_back(
   bounce_point = MAX(bounce_point_mt0, bounce_point_mt1);
   bounce_point = MAX(1., bounce_point);
   bounce_point = MIN(bounce_point, 2.) - 1.;
-  requested_bytes = MAX(bounce_point * subflow->sending_rate, subflow->bounce_point);
+  requested_bytes = bounce_point * subflow->sending_rate;
   requested_bytes *= .9;
 //  g_print("BounceBack on S%d. SR: %d RB:%u\n", subflow->id, subflow->sending_rate, requested_bytes);
   return requested_bytes;

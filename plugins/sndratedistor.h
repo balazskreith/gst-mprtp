@@ -40,8 +40,9 @@ struct _SendingRateDistributor
 //  gint32              fallen_bytes;
 //  gint32              overused_bytes;
 
-  guint32             target_media_rate;
-  guint32             actual_media_rate;
+  guint32             max_rate;
+  guint32             min_rate;
+  guint32             target_rate;
 
   guint8              available_ids[SNDRATEDISTOR_MAX_NUM];
   guint8              available_ids_length;
@@ -73,7 +74,8 @@ void sndrate_distor_extract_stats(SendingRateDistributor *this,
                                   gint32  *sending_rate,
                                   gdouble *bandwidth_estimation,
                                   gdouble *goodput,
-                                  gdouble *bandwidth_estimation_error);
+                                  gdouble *bandwidth_estimation_error,
+                                  gdouble *media_target);
 
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_time_update(SendingRateDistributor *this);

@@ -126,9 +126,11 @@ struct _RRMeasurement{
   guint16             expected_packets;
   guint16             PiT;
   guint32             expected_payload_bytes;
+  guint32             sent_payload_bytes;
   gdouble             lost_rate;
   gdouble             goodput;
-  gdouble             sending_rate;
+  gdouble             sending_weight;
+  gdouble             sender_rate;
   gdouble             receiver_rate;
   MPRTPSPathState     state;
   gboolean            checked;

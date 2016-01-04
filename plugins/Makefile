@@ -140,7 +140,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-gstmprtpscheduler.lo \
 	libgstmprtp_la-gstmprtpplayouter.lo \
 	libgstmprtp_la-gstmprtpreceiver.lo \
-	libgstmprtp_la-gstmprtpsender.lo libgstmprtp_la-mprtprpath.lo \
+	libgstmprtp_la-gstmprtpsender.lo \
+	libgstmprtp_la-kalmanfilter.lo libgstmprtp_la-mprtprpath.lo \
 	libgstmprtp_la-mprtpspath.lo libgstmprtp_la-streamjoiner.lo \
 	libgstmprtp_la-streamsplitter.lo libgstmprtp_la-rmanctrler.lo \
 	libgstmprtp_la-smanctrler.lo libgstmprtp_la-sefctrler.lo \
@@ -400,6 +401,7 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          gstmprtpplayouter.c        \
                          gstmprtpreceiver.c         \
                          gstmprtpsender.c           \
+                         kalmanfilter.c             \
                          mprtprpath.c               \
                          mprtpspath.c               \
                          streamjoiner.c             \
@@ -436,6 +438,7 @@ noinst_HEADERS = mprtpspath.h           \
                  variancetracker.h      \
                  sndratedistor.h        \
                  skalmanfilter.h        \
+                 kalmanfilter.h         \
                  nlms.h                 
 
 
@@ -538,6 +541,7 @@ include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplugin.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
+include ./$(DEPDIR)/libgstmprtp_la-kalmanfilter.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-nlms.Plo
@@ -625,6 +629,13 @@ libgstmprtp_la-gstmprtpsender.lo: gstmprtpsender.c
 #	$(AM_V_CC)source='gstmprtpsender.c' object='libgstmprtp_la-gstmprtpsender.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtpsender.lo `test -f 'gstmprtpsender.c' || echo '$(srcdir)/'`gstmprtpsender.c
+
+libgstmprtp_la-kalmanfilter.lo: kalmanfilter.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-kalmanfilter.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-kalmanfilter.Tpo -c -o libgstmprtp_la-kalmanfilter.lo `test -f 'kalmanfilter.c' || echo '$(srcdir)/'`kalmanfilter.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-kalmanfilter.Tpo $(DEPDIR)/libgstmprtp_la-kalmanfilter.Plo
+#	$(AM_V_CC)source='kalmanfilter.c' object='libgstmprtp_la-kalmanfilter.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-kalmanfilter.lo `test -f 'kalmanfilter.c' || echo '$(srcdir)/'`kalmanfilter.c
 
 libgstmprtp_la-mprtprpath.lo: mprtprpath.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-mprtprpath.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-mprtprpath.Tpo -c -o libgstmprtp_la-mprtprpath.lo `test -f 'mprtprpath.c' || echo '$(srcdir)/'`mprtprpath.c

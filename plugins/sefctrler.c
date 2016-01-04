@@ -383,7 +383,7 @@ sefctrler_stat_run (void *data)
   Subflow *subflow;
   GstClockTime next_scheduler_time;
   guint64 median_delay;
-  gint32 sending_rate;
+  gint32 sender_rate;
   gdouble media_target;
 
   this = data;
@@ -392,24 +392,24 @@ sefctrler_stat_run (void *data)
   else      file=fopen("sefctrler.log", "a");
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) &key, (gpointer) & val)) {
-    gdouble bandwidth_estimation = 0., goodput, bandwidth_estimation_error;
+    gdouble target_rate = 0., goodput, next_target;
     subflow = (Subflow *) val;
     if(!subflow) goto next;
     sndrate_distor_extract_stats(this->rate_distor,
                                  subflow->rate_calcer_id,
                                  &median_delay,
-                                 &sending_rate,
-                                 &bandwidth_estimation,
+                                 &sender_rate,
+                                 &target_rate,
                                  &goodput,
-                                 &bandwidth_estimation_error,
+                                 &next_target,
                                  &media_target);
     fprintf(file, "%d,%d,%lu,%lu,%f,%f,%f,%f,",
             subflow->id,
-            sending_rate,
+            sender_rate,
             median_delay,
             _irt0(subflow)->median_delay,
-            bandwidth_estimation/125.,
-            bandwidth_estimation_error/125.,
+            target_rate/125.,
+            next_target/125.,
             _irt0(subflow)->receiver_rate / 125.,
             _irt0(subflow)->late_discarded_bytes / 125.);
 //
@@ -729,8 +729,7 @@ _step_ir (Subflow * this)
   _irt0(this)->time                      = gst_clock_get_time(this->sysclock);
   _irt0(this)->state                     = _irt1(this)->state;
   _irt0(this)->checked                   = FALSE;
-  _irt0(this)->sent_payload_bytes        = mprtps_path_get_total_sent_payload_bytes(this->path) -
-                                           _irt1(this)->sent_payload_bytes;
+  _irt0(this)->sent_payload_bytes_sum    = mprtps_path_get_total_sent_payload_bytes(this->path);
   this->late_discarded_history<<=1;
   this->lost_history<<=1;
   ++this->ir_moments_num;
@@ -960,10 +959,10 @@ _get_subflow_goodput (Subflow * this, gdouble* receiver_rate)
     GstClockTimeDiff interval;
     GstClockTime seconds;
     gfloat expected_payload_bytes = 0.;
-
     guint32 discarded_bytes;
-    gdouble sender_rate;
     gfloat goodput;
+    gdouble sent_payload_bytes;
+
     if (_irt1(this)->time == 0) {
         interval = GST_CLOCK_DIFF (this->joined_time, _irt0(this)->time);
     }else{
@@ -972,6 +971,7 @@ _get_subflow_goodput (Subflow * this, gdouble* receiver_rate)
     seconds = GST_TIME_AS_SECONDS ((GstClockTime) interval);
 
     expected_payload_bytes = (gfloat) _irt0(this)->expected_payload_bytes;
+    sent_payload_bytes = _irt0(this)->sent_payload_bytes_sum - _irt1(this)->sent_payload_bytes_sum;
 
     discarded_bytes = _irt0_get_discarded_bytes(this);
     if (seconds > 0) {
@@ -980,7 +980,7 @@ _get_subflow_goodput (Subflow * this, gdouble* receiver_rate)
       goodput = (expected_payload_bytes *
           (1. - _irt0 (this)->lost_rate) -
           (gfloat) discarded_bytes) / ((gfloat) seconds);
-      _irt0(this)->sender_rate = (gdouble)_irt0(this)->sent_payload_bytes / (gdouble)seconds;
+      _irt0(this)->sender_rate = sent_payload_bytes / (gdouble)seconds;
 
     } else {
         //g_print("S%d PB: %f ->%lu\n", this->id, payload_bytes_sum, GST_TIME_AS_MSECONDS(_irt0(this)->time - _irt1(this)->time));
@@ -988,7 +988,7 @@ _get_subflow_goodput (Subflow * this, gdouble* receiver_rate)
         *receiver_rate = (expected_payload_bytes * (1. - _irt0 (this)->lost_rate));
       goodput = (expected_payload_bytes *
           (1. - _irt0 (this)->lost_rate) - (gfloat) discarded_bytes);
-      _irt0(this)->sender_rate = _irt0(this)->sent_payload_bytes;
+      _irt0(this)->sender_rate = sent_payload_bytes;
     }
     _irt0(this)->goodput = goodput;
     return goodput;

@@ -47,6 +47,11 @@ struct _StreamSplitter
 
   SchNode*             non_keyframes_tree;
   SchNode*             keyframes_tree;
+
+  SchNode*             next_non_keyframes_tree;
+  SchNode*             next_keyframes_tree;
+  gdouble              transition_ratio;
+
   StreamSplittingMode  splitting_mode;
   GHashTable*          subflows;
   guint32              charge_value;

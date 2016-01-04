@@ -126,7 +126,7 @@ struct _RRMeasurement{
   guint16             expected_packets;
   guint16             PiT;
   guint32             expected_payload_bytes;
-  guint32             sent_payload_bytes;
+  guint32             sent_payload_bytes_sum;
   gdouble             lost_rate;
   gdouble             goodput;
   gdouble             sending_weight;

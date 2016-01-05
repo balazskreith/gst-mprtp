@@ -45,7 +45,7 @@ struct _SendingRateDistributor
   guint32             target_rate;
   guint32             actual_rate;
 
-  guint8              available_ids[SNDRATEDISTOR_MAX_NUM];
+  guint8              available_ids[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   guint8              available_ids_length;
 
   guint               monitored;

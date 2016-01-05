@@ -39,9 +39,6 @@ typedef struct _GstMprtpscheduler GstMprtpscheduler;
 typedef struct _GstMprtpschedulerClass GstMprtpschedulerClass;
 typedef struct _GstMprtpschedulerPrivate GstMprtpschedulerPrivate;
 
-#define SCHEDULER_RETAIN_QUEUE_MAX_ITEMS 255
-
-
 struct _GstMprtpscheduler
 {
   GstElement base_object;

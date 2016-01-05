@@ -28,6 +28,8 @@
 
 typedef struct _GstMpRTPBuffer GstMpRTPBuffer;
 
+#define MPRTP_PLUGIN_MAX_SUBFLOW_NUM 32
+
 #define GST_MPRTP_BUFFER_INIT {FALSE, NULL, 0, 0, 0, 0, 0, 0}
 
 struct _GstMpRTPBuffer{

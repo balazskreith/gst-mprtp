@@ -54,6 +54,7 @@ G_BEGIN_DECLS
 #define GST_IS_MPRTPPLAYOUTER_CLASS(obj)   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_MPRTPPLAYOUTER))
 #define GST_MPRTCP_PLAYOUTER_SENT_BYTES_STRUCTURE_NAME "GstCustomQueryMpRTCPPlayouter"
 #define GST_MPRTCP_PLAYOUTER_SENT_OCTET_SUM_FIELD "RTCPPlayouterSentBytes"
+
 typedef struct _GstMprtpplayouter GstMprtpplayouter;
 typedef struct _GstMprtpplayouterClass GstMprtpplayouterClass;
 

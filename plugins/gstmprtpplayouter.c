@@ -223,12 +223,12 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
   g_object_class_install_property (gobject_class, PROP_JOIN_SUBFLOW,
       g_param_spec_uint ("join-subflow", "the subflow id requested to join",
           "Join a subflow with a given id.", 0,
-          255, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_DETACH_SUBFLOW,
       g_param_spec_uint ("detach-subflow", "the subflow id requested to detach",
           "Detach a subflow with a given id.", 0,
-          255, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_AUTO_FLOW_RIPORTING,
       g_param_spec_boolean ("auto-flow-reporting",

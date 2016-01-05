@@ -196,7 +196,7 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  gstmprtpbuffer.h /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h pointerpool.h \
  bintree.h mprtpspath.h packetssndqueue.h percentiletracker.h \
- streamsplitter.h variancetracker.h gstmprtpsender.h gstmprtpplayouter.h \
+ variancetracker.h streamsplitter.h gstmprtpsender.h gstmprtpplayouter.h \
  mprtprpath.h /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
  packetsrcvqueue.h skalmanfilter.h streamjoiner.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h \
@@ -829,9 +829,9 @@ packetssndqueue.h:
 
 percentiletracker.h:
 
-streamsplitter.h:
-
 variancetracker.h:
+
+streamsplitter.h:
 
 gstmprtpsender.h:
 

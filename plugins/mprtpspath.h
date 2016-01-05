@@ -24,6 +24,7 @@ typedef struct _MPRTPSPathClass MPRTPSPathClass;
 #include "gstmprtcpbuffer.h"
 #include "packetssndqueue.h"
 #include "percentiletracker.h"
+#include "variancetracker.h"
 
 #define MPRTPS_PATH_TYPE             (mprtps_path_get_type())
 #define MPRTPS_PATH(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),MPRTPS_PATH_TYPE,MPRTPSPath))
@@ -31,8 +32,6 @@ typedef struct _MPRTPSPathClass MPRTPSPathClass;
 #define MPRTPS_PATH_IS_SOURCE(src)          (G_TYPE_CHECK_INSTANCE_TYPE((src),MPRTPS_PATH_TYPE))
 #define MPRTPS_PATH_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),MPRTPS_PATH_TYPE))
 #define MPRTPS_PATH_CAST(src)        ((MPRTPSPath *)(src))
-
-#define MAX_DELAY_LENGTH 16
 
 
 typedef enum
@@ -78,7 +77,7 @@ struct _MPRTPSPath
   GstClockTime            sent_congested;
 
   PacketsSndQueue*        packetsqueue;
-  PercentileTracker*      sent_bytes;
+  VarianceTracker*        sent_bytes;
   guint32                 ssrc_allowed;
   guint8                  sent_octets[MAX_INT32_POSPART];
   guint16                 sent_octets_read;
@@ -92,6 +91,7 @@ struct _MPRTPSPath
   guint32                 monitoring_interval;
   guint16                 monitor_seq;
   guint8                  monitor_payload_type;
+  guint8                  pivot_payload_type;
 
   guint32                 extra_packets_per_100tick;
   guint32                 extra_packets_per_10tick;

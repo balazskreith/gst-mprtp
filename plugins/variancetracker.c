@@ -209,10 +209,12 @@ _obsolate (VarianceTracker * this)
   now = gst_clock_get_time(this->sysclock);
   treshold = now - this->treshold;
 again:
+  if(this->counter < 1) goto done;
   if(this->write_index == this->read_index) goto elliminate;
   else if(this->items[this->read_index].added < treshold) goto elliminate;
   else goto done;
 elliminate:
+//  g_print("%d\n", this->counter);
   value = this->items[this->read_index].value;
   squere = this->items[this->read_index].squere;
   this->value_sum -= value;

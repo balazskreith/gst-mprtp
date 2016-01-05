@@ -148,7 +148,7 @@ done:
   if (interval < 1.) {
     interval = 1. + g_random_double ();
   } else if (2. < interval) {
-    interval = 1. + g_random_double ();
+    interval = 1.5 + g_random_double ();
   }
 //  g_print("Next interval: %f\n", interval);
   this->last_interval = this->actual_interval;

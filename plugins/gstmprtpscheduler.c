@@ -233,29 +233,28 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
       g_param_spec_uint ("monitoring-payload-type",
           "Set or get the payload type of monitoring packets",
           "Set or get the payload type of monitoring packets. The default is 8",
-          0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
+          0, 127, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_JOIN_SUBFLOW,
       g_param_spec_uint ("join-subflow", "the subflow id requested to join",
           "Join a subflow with a given id.", 0,
-          255, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_DETACH_SUBFLOW,
       g_param_spec_uint ("detach-subflow", "the subflow id requested to detach",
           "Detach a subflow with a given id.", 0,
-          255, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SET_SUBFLOW_CONGESTED,
       g_param_spec_uint ("congested-subflow", "set the subflow congested",
           "Set the subflow congested", 0,
-          255, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class,
       PROP_SET_SUBFLOW_NON_CONGESTED,
       g_param_spec_uint ("non-congested-subflow",
           "set the subflow non-congested", "Set the subflow non-congested", 0,
-          255, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_AUTO_FLOW_CONTROLLING,
       g_param_spec_boolean ("auto-flow-controlling",
@@ -513,11 +512,11 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_RETAIN_BUFFERS:
-          THIS_WRITELOCK (this);
-          gboolean_value = g_value_get_boolean (value);
-          this->retain_allowed = gboolean_value;
-          THIS_WRITEUNLOCK (this);
-          break;
+      THIS_WRITELOCK (this);
+      gboolean_value = g_value_get_boolean (value);
+      this->retain_allowed = gboolean_value;
+      THIS_WRITEUNLOCK (this);
+      break;
     case PROP_PACING_BUFFERS:
       THIS_WRITELOCK (this);
       gboolean_value = g_value_get_boolean (value);
@@ -576,7 +575,6 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
       THIS_READLOCK (this);
       g_value_set_uint (value, (guint) this->monitor_payload_type);
       THIS_READUNLOCK (this);
-      break;
       break;
     case PROP_AUTO_FLOW_CONTROLLING:
       THIS_READLOCK (this);

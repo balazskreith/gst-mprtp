@@ -25,14 +25,19 @@
 
 
 typedef struct _UtilizationReport{
-  guint32  actual_target;
-  guint32  desired_target;
-  guint32  actual_rate;
-  guint32  desired_rate;
+  guint32  target_rate;
+  guint32  min_rate;
+  guint32  max_rate;
   gboolean greedy;
   struct{
-    gdouble  target_weight;
     gboolean available;
+    gdouble  target_weight;
+    gint32   max_rate;
+    gint32   min_rate;
+    gint32   lost_bytes;
+    gint32   discarded_bytes;
+    guint64  owd;
+    gint8    shareability;
   }subflows[32];
 }UtilizationReport;
 
@@ -116,8 +121,8 @@ make_video_session (guint sessionNum)
   g_object_set (encoder, "target-bitrate", 50000, NULL);
   g_object_set (encoder, "keyframe-max-dist", 10, NULL);
   g_object_set (encoder, "end-usage", 1, NULL);
-  g_object_set (encoder, "threads", 1, NULL);
-  g_object_set (encoder, "deadline", 1, NULL);
+  g_object_set (encoder, "deadline", 20000, NULL);
+  g_object_set (encoder, "cq-level", 5, NULL);
   g_object_set (encoder, "cpu-used", 5, NULL);
 //  g_object_set (encoder, "keyframe-mode", 0, NULL);
 
@@ -153,8 +158,8 @@ request_aux_sender (GstElement * rtpbin, guint sessid, SessionData * session)
   bin = gst_bin_new (NULL);
   rtx = gst_element_factory_make ("rtprtxsend", NULL);
   pt_map = gst_structure_new ("application/x-rtp-pt-map",
-      "8", G_TYPE_UINT, 98, "96", G_TYPE_UINT, 99, NULL);
-  g_object_set (rtx, "payload-type-map", pt_map, NULL);
+       "96", G_TYPE_UINT, 99, NULL);
+//  g_object_set (rtx, "payload-type-map", pt_map, NULL);
   gst_structure_free (pt_map);
   gst_bin_add (GST_BIN (bin), rtx);
 
@@ -169,7 +174,6 @@ request_aux_sender (GstElement * rtpbin, guint sessid, SessionData * session)
   gst_element_add_pad (bin, gst_ghost_pad_new (name, pad));
   g_free (name);
   gst_object_unref (pad);
-
   return bin;
 }
 
@@ -200,16 +204,15 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
   g_object_get (encoder, "target-bitrate", &get_bitrate, NULL);
   {
     gint i;
-    new_bitrate = ur->desired_rate * 8;
+    new_bitrate = ur->target_rate * 8;
     ur->greedy = TRUE;
     for(i=0; i<32; ++i){
       if(!ur->subflows[i].available) continue;
       ur->subflows[i].target_weight=0.;
     }
+    ur->subflows[1].max_rate=50000;
   }
 
-  ur->actual_rate = new_bitrate/8;
-  ur->desired_target = 0;
 //  g_print("get_bitrate: %d new_bitrate: %d\n", get_bitrate, new_bitrate);
   g_object_set (encoder, "target-bitrate", new_bitrate, NULL);
 done:

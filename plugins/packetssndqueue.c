@@ -155,9 +155,16 @@ done:
 
 gboolean packetssndqueue_has_buffer(PacketsSndQueue *this)
 {
-  gboolean result;
+  gboolean result = FALSE;
   THIS_READLOCK(this);
-  result = this->head != NULL;
+again:
+  if(!this->head) goto done;
+  if(this->head->added < gst_clock_get_time(this->sysclock) - GST_SECOND){
+    _remove_head(this);
+    goto again;
+  }
+  result = TRUE;
+done:
   THIS_READUNLOCK(this);
   return result;
 }

@@ -694,7 +694,6 @@ _irp_producer_main(SndEventBasedController * this)
     sndrate_distor_measurement_update(this->rate_distor,
                                       subflow->rate_calcer_id,
                                       _irt0(subflow));
-
     event = subflow->check(subflow);
     subflow->fire(this, subflow, event);
     _irt0(subflow)->checked = TRUE;
@@ -1319,20 +1318,20 @@ _split_controller_main(SndEventBasedController * this)
 {
   GstClockTime now;
   now = gst_clock_get_time(this->sysclock);
-
+  if(this->bids_commit_requested_retain_tick > 0){
+    if(--this->bids_commit_requested_retain_tick == 0)
+      this->bids_commit_requested = TRUE;
+    goto recalc_done;
+  }
   if(_subflows_are_ready(this) ||
      this->last_recalc_time < now - 15 * GST_SECOND)
   {
       this->bids_recalc_requested = TRUE;
   }
-  if(this->bids_commit_requested_retain_tick > 0){
-    if(--this->bids_commit_requested_retain_tick == 0)
-      this->bids_commit_requested = TRUE;
-  }
 //  goto recalc_done;
   if (!this->bids_recalc_requested) goto recalc_done;
   this->bids_recalc_requested = FALSE;
-//  this->bids_commit_requested_retain_tick = 0;
+  this->bids_commit_requested_retain_tick = 0;
   this->bids_commit_requested = TRUE;
   _recalc_bids(this);
 recalc_done:

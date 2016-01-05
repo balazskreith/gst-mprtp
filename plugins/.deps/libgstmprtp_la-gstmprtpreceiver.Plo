@@ -203,9 +203,9 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
  gstmprtcpbuffer.h gstmprtpbuffer.h pointerpool.h bintree.h \
- packetssndqueue.h percentiletracker.h mprtprpath.h \
+ packetssndqueue.h percentiletracker.h variancetracker.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
- packetsrcvqueue.h skalmanfilter.h variancetracker.h
+ packetsrcvqueue.h skalmanfilter.h
 
 /usr/include/stdc-predef.h:
 
@@ -689,6 +689,8 @@ packetssndqueue.h:
 
 percentiletracker.h:
 
+variancetracker.h:
+
 mprtprpath.h:
 
 /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h:
@@ -696,5 +698,3 @@ mprtprpath.h:
 packetsrcvqueue.h:
 
 skalmanfilter.h:
-
-variancetracker.h:

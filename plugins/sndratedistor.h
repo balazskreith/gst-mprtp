@@ -20,7 +20,6 @@ typedef struct _SendingRateDistributorClass SendingRateDistributorClass;
 #define SNDRATEDISTOR_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),SNDRATEDISTOR_TYPE))
 #define SNDRATEDISTOR_CAST(src)        ((SendingRateDistributor *)(src))
 
-#define SNDRATEDISTOR_MAX_NUM 32
 typedef void  (*SignalRequestFunc)(gpointer,gpointer);
 
 struct _SendingRateDistributor
@@ -28,28 +27,19 @@ struct _SendingRateDistributor
   GObject              object;
   GstClock*            sysclock;
   guint8*              subflows;
-  guint8               max_id;
-  GQueue*              free_ids;
   guint8               controlled_num;
 
-//  gint32              taken_bytes;
-  gint32              supplied_bytes;
-  gboolean            greedy;
-  gint32              requested_bytes;
-  gint32              movable_bytes;
-//  gint32              fallen_bytes;
-//  gint32              overused_bytes;
+  guint8               available_ids[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  guint8               available_ids_length;
 
-  guint32             max_rate;
-  guint32             min_rate;
-  guint32             target_rate;
-  guint32             actual_rate;
+  gint32               supplied_bytes;
+  gint32               requested_bytes;
+  gint32               movable_bytes;
 
-  guint8              available_ids[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  guint8              available_ids_length;
-
-  guint               monitored;
-  guint               overused;
+  guint32              max_rate;
+  guint32              min_rate;
+  guint32              target_rate;
+  guint32              actual_rate;
 
   SignalRequestFunc    signal_request;
   gpointer             signal_controller;
@@ -63,7 +53,7 @@ struct _SendingRateDistributorClass{
 
 GType sndrate_distor_get_type (void);
 SendingRateDistributor *make_sndrate_distor(SignalRequestFunc signal_request, gpointer controller);
-guint8 sndrate_distor_request_id(SendingRateDistributor *this,
+void sndrate_distor_add_controllable_path(SendingRateDistributor *this,
                                  MPRTPSPath *path,
                                  guint32 sending_rate);
 void sndrate_distor_measurement_update(SendingRateDistributor *this,

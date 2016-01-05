@@ -123,7 +123,7 @@ struct _Subflow
   StateFunc                  fire;
   EventFunc                  check;
   gboolean                   ready;
-  guint8                     rate_calcer_id;
+//  guint8                     rate_calcer_id;
   guint8                     lost_history;
   guint8                     late_discarded_history;
   gdouble                    avg_rtcp_size;
@@ -396,7 +396,7 @@ sefctrler_stat_run (void *data)
     subflow = (Subflow *) val;
     if(!subflow) goto next;
     sndrate_distor_extract_stats(this->rate_distor,
-                                 subflow->rate_calcer_id,
+                                 subflow->id,
                                  &median_delay,
                                  &sender_rate,
                                  &target_rate,
@@ -453,7 +453,7 @@ sefctrler_add_path (gpointer ptr, guint8 subflow_id, MPRTPSPath * path)
                        new_subflow);
   ++this->subflow_num;
   stream_splitter_add_path (this->splitter, subflow_id, path, SUBFLOW_DEFAULT_SENDING_RATE);
-  new_subflow->rate_calcer_id = sndrate_distor_request_id(this->rate_distor, path, SUBFLOW_DEFAULT_SENDING_RATE);
+  new_subflow->id = sndrate_distor_add_controllable_path(this->rate_distor, path, SUBFLOW_DEFAULT_SENDING_RATE);
 exit:
   THIS_WRITEUNLOCK (this);
 }
@@ -473,7 +473,7 @@ sefctrler_rem_path (gpointer ptr, guint8 subflow_id)
         "due to not existed subflow id (%d)", subflow_id);
     goto exit;
   }
-  sndrate_distor_remove_id(this->rate_distor, lookup_result->rate_calcer_id);
+  sndrate_distor_remove_id(this->rate_distor, lookup_result->id);
   stream_splitter_rem_path (this->splitter, subflow_id);
   g_hash_table_remove (this->subflows, GINT_TO_POINTER (subflow_id));
   if (--this->subflow_num < 0) {
@@ -692,7 +692,7 @@ _irp_producer_main(SndEventBasedController * this)
 
     _irt0(subflow)->sending_weight = stream_splitter_get_sending_rate(this->splitter, subflow->id);
     sndrate_distor_measurement_update(this->rate_distor,
-                                      subflow->rate_calcer_id,
+                                      subflow->id,
                                       _irt0(subflow));
     event = subflow->check(subflow);
     subflow->fire(this, subflow, event);
@@ -1023,7 +1023,7 @@ void _subflow_fire_p_state(SndEventBasedController *this,Subflow *subflow,Event 
 
   mprtps_path_set_active(path);
   state = mprtps_path_get_state(path);
-  subflow->rate_calcer_id = sndrate_distor_request_id(
+  sndrate_distor_add_controllable_path(
       this->rate_distor,
       path,
       SUBFLOW_DEFAULT_SENDING_RATE);
@@ -1122,7 +1122,7 @@ void _subflow_fall_action(SndEventBasedController *this, Subflow *subflow)
 {
   mprtps_path_set_passive(subflow->path);
   stream_splitter_rem_path(this->splitter, subflow->id);
-  sndrate_distor_remove_id(this->rate_distor, subflow->rate_calcer_id);
+  sndrate_distor_remove_id(this->rate_distor, subflow->id);
 }
 
 gboolean
@@ -1369,7 +1369,7 @@ void _recalc_bids(SndEventBasedController * this)
       continue;
     }
 
-    sending_rate = sndrate_distor_get_sending_rate(this->rate_distor, subflow->rate_calcer_id);
+    sending_rate = sndrate_distor_get_sending_rate(this->rate_distor, subflow->id);
 //    g_print("Subflow %d sending rate %u\n",
 //            subflow->id,
 //            sending_rate);

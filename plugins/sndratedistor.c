@@ -66,7 +66,6 @@ typedef struct _UtilizationReport{
   guint32  target_rate;
   guint32  min_rate;
   guint32  max_rate;
-  gboolean greedy;
   struct{
     gboolean available;
     gdouble  target_weight;
@@ -344,9 +343,6 @@ sndrate_distor_finalize (GObject * object)
   this = SNDRATEDISTOR(object);
   g_object_unref(this->sysclock);
   g_free(this->subflows);
-  while(!g_queue_is_empty(this->free_ids)){
-    g_free(g_queue_pop_head(this->free_ids));
-  }
 }
 
 
@@ -355,10 +351,9 @@ sndrate_distor_init (SendingRateDistributor * this)
 {
   gint i;
   this->sysclock = gst_system_clock_obtain();
-  this->free_ids = g_queue_new();
   this->controlled_num = 0;
-  this->subflows = g_malloc0(sizeof(Subflow)*SNDRATEDISTOR_MAX_NUM);
-  for(i=0; i<SNDRATEDISTOR_MAX_NUM; ++i){
+  this->subflows = g_malloc0(sizeof(Subflow)*MPRTP_PLUGIN_MAX_SUBFLOW_NUM);
+  for(i=0; i<MPRTP_PLUGIN_MAX_SUBFLOW_NUM; ++i){
     _get_subflow(this, i)->id = i;
     _get_subflow(this, i)->available = FALSE;
 //    _get_subflow(this, i)->joint_subflow_ids[i] = 1;
@@ -379,68 +374,46 @@ SendingRateDistributor *make_sndrate_distor(SignalRequestFunc signal_request,
   return result;
 }
 
-guint8 sndrate_distor_request_id(SendingRateDistributor *this,
+void sndrate_distor_add_controllable_path(SendingRateDistributor *this,
                                  MPRTPSPath *path,
                                  guint32 sending_target)
 {
-  guint8 result = 0;
-  guint8* id;
-  if(this->controlled_num > SNDRATEDISTOR_MAX_NUM){
-    g_error("TOO MANY SUBFLOW IN CONTROLLER. ERROR!");
-    goto exit;
-  }
-  if(g_queue_is_empty(this->free_ids)){
-    result = this->max_id;
-    id = &result;
-    ++this->max_id;
-    goto done;
-  }
-  id = g_queue_pop_head(this->free_ids);
-  result = *id;
-  g_free(id);
-done:
-  //Reset subflow
-//  memset(_get_subflow(this, *id), 0, sizeof(Subflow));
-  _get_subflow(this, *id)->id = *id;
-  _get_subflow(this, *id)->available = TRUE;
-  _get_subflow(this, *id)->target_rate = sending_target;
-  _get_subflow(this, *id)->max_rate = 0;
-  _get_subflow(this, *id)->min_rate = sending_target * .1;
-  _get_subflow(this, *id)->path = g_object_ref(path);
-  if(!_get_subflow(this, *id)->delays){
-    _get_subflow(this, *id)->delays = make_percentiletracker(256, 80);
-    percentiletracker_set_treshold(_get_subflow(this, *id)->delays, 30 * GST_SECOND);
+  Subflow *subflow;
+  subflow =  _get_subflow(this, mprtps_path_get_id(path));
+
+  subflow->available = TRUE;
+  subflow->target_rate = sending_target;
+  subflow->max_rate = 0;
+  subflow->min_rate = sending_target * .1;
+  subflow->path = g_object_ref(path);
+  if(!subflow->delays){
+    subflow->delays = make_percentiletracker(256, 80);
+    percentiletracker_set_treshold(subflow->delays, 30 * GST_SECOND);
   }
   else{
-    percentiletracker_reset(_get_subflow(this, *id)->delays);
+    percentiletracker_reset(subflow->delays);
   }
-  _get_subflow(this, *id)->disable_controlling = 0;
-  _get_subflow(this, *id)->measured = FALSE;
-  memset(_get_subflow(this, *id)->measurements, 0, sizeof(Measurement) * 3);
-  _get_subflow(this, *id)->measurements_index = 0;
-  _get_subflow(this, *id)->monitoring_time = 0;
-  _get_subflow(this, *id)->monitoring_interval = 0;
-  _transit_to(this, _get_subflow(this, *id), STATE_STABLE);
-  _disable_controlling(_get_subflow(this, *id), 2);
+  subflow->disable_controlling = 0;
+  subflow->measured = FALSE;
+  memset(subflow->measurements, 0, sizeof(Measurement) * 3);
+  subflow->measurements_index = 0;
+  subflow->monitoring_time = 0;
+  subflow->monitoring_interval = 0;
+  _transit_to(this, subflow, STATE_STABLE);
+  _disable_controlling(subflow, 2);
+
   ++this->controlled_num;
   _refresh_available_ids(this);
-exit:
-  return result;
 }
 
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id)
 {
-  guint8 *free_id;
-  if(!_get_subflow(this, id)->available) goto done;
-  free_id = g_malloc(sizeof(guint8));
-  *free_id = id;
-  if(_get_subflow(this, id)->monitoring_interval){
-    mprtps_path_set_monitor_interval(_get_subflow(this, id)->path, 0);
-  }
-  g_object_unref(_get_subflow(this, id)->path);
+  Subflow *subflow;
+  subflow = _get_subflow(this, id);
+  if(!subflow->available) goto done;
   _setup_monitoring(_get_subflow(this, id), 0);
-  _get_subflow(this, id)->available = FALSE;
-  g_queue_push_tail(this->free_ids, free_id);
+  g_object_unref(_get_subflow(this, id)->path);
+  subflow->available = FALSE;
   --this->controlled_num;
   _refresh_available_ids(this);
 done:
@@ -603,11 +576,12 @@ void _time_update_correction(SendingRateDistributor* this)
   gint32 total = 0, moved_bytes = 0;
   gdouble weight;
 
-  if(this->greedy || 0 == this->supplied_bytes) goto movability;
+  if(!this->supplied_bytes) goto movability;
 
   foreach_subflows(this, i, subflow)
   {
     if(subflow->overused_history > 0) continue;
+    if(subflow->shareability != SHAREABILITY_OPENED) continue;
     total += subflow->target_rate;
   }
 
@@ -699,7 +673,6 @@ void _time_update_requestion(SendingRateDistributor* this)
   ur.target_rate = target_rate;
   ur.max_rate = this->max_rate;
   ur.min_rate = this->min_rate;
-  ur.greedy = this->greedy;
 
   if(this->signal_request && this->signal_controller)
     this->signal_request(this->signal_controller, &ur);
@@ -711,14 +684,19 @@ void _time_update_requestion(SendingRateDistributor* this)
 
   this->max_rate = ur.max_rate;
   this->min_rate = ur.min_rate;
-  this->greedy = ur.greedy;
   this->target_rate = ur.target_rate;
 
   foreach_subflows(this, i, subflow){
     subflow->target_weight = ur.subflows[subflow->id].target_weight;
     subflow->max_rate      = ur.subflows[subflow->id].max_rate;
     subflow->min_rate      = ur.subflows[subflow->id].min_rate;
-    subflow->shareability  = ur.subflows[subflow->id].shareability;
+
+    if(0 < ur.subflows[subflow->id].shareability)
+      subflow->shareability  = SHAREABILITY_OPENED;
+    else if(ur.subflows[subflow->id].shareability < 0)
+      subflow->shareability  = SHAREABILITY_CLOSED;
+    else
+      subflow->shareability  = SHAREABILITY_NORMAL;
   }
 
 }
@@ -791,7 +769,7 @@ void _refresh_available_ids(SendingRateDistributor* this)
   gint id;
   Subflow *subflow;
   this->available_ids_length = 0;
-  for(id=0; id < SNDRATEDISTOR_MAX_NUM; ++id){
+  for(id=0; id < MPRTP_PLUGIN_MAX_SUBFLOW_NUM; ++id){
     subflow = _get_subflow(this, id);
     if(!subflow->available) continue;
     this->available_ids[this->available_ids_length++] = subflow->id;
@@ -959,19 +937,19 @@ _transit_to(
     Subflow *subflow,
     State target)
 {
-  if(subflow->state == STATE_MONITORED && target != subflow->state){
-    --this->monitored;
-  }
-
-  if(subflow->state == STATE_OVERUSED && target != subflow->state){
-    --this->overused;
-  }
+//  if(subflow->state == STATE_MONITORED && target != subflow->state){
+//    --this->monitored;
+//  }
+//
+//  if(subflow->state == STATE_OVERUSED && target != subflow->state){
+//    --this->overused;
+//  }
 
 
   switch(target){
     case STATE_OVERUSED:
       mprtps_path_set_congested(subflow->path);
-      ++this->overused;
+//      ++this->overused;
       subflow->controlling = _check_overused;
       subflow->monitoring_interval = 0;
     break;
@@ -981,7 +959,7 @@ _transit_to(
 
     break;
     case STATE_MONITORED:
-      ++this->monitored;
+//      ++this->monitored;
       subflow->controlling = _check_monitored;
       subflow->monitoring_time = 0;
     break;

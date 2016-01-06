@@ -355,14 +355,14 @@ stream_splitter_run (void *data)
     gboolean switch_ = FALSE;
     variancetracker_obsolate(this->sent_bytes);
     variancetracker_get_stats(this->sent_bytes, &media_rate, NULL);
-    g_print("Media rate: %ld, Target Rate: %u\n", media_rate, this->switch_target);
+//    g_print("Media rate: %ld, Target Rate: %u\n", media_rate, this->switch_target);
     switch_ = media_rate == 0;
     if(0 < this->switch_target)
       switch_ |= media_rate <= this->switch_target;
     if(0 < this->switch_time)
       switch_ |= this->switch_time < now;
     if(switch_){
-      g_print("Change\n");
+//      g_print("Change\n");
       this->keyframes_tree = this->next_keyframes_tree;
       this->non_keyframes_tree = this->next_non_keyframes_tree;
       this->next_keyframes_tree = NULL;

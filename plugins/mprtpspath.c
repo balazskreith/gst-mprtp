@@ -596,8 +596,9 @@ _send_mprtp_packet(MPRTPSPath * this,
   variancetracker_obsolate(this->sent_bytes);
   if (_is_overused(this)) {
     GST_WARNING_OBJECT (this, "Path is overused");
-    packetssndqueue_push(this->packetsqueue, buffer);
-//    g_print("Overused:%u\n", packetssndqueue_get_num(this->packetsqueue));
+    g_object_unref(buffer);
+    //packetssndqueue_push(this->packetsqueue, buffer);
+    //g_print("Overused:%u\n", packetssndqueue_get_num(this->packetsqueue));
     goto done;
   }
   if(packetssndqueue_has_buffer(this->packetsqueue)){
@@ -629,7 +630,7 @@ failed:
 
 gboolean _is_overused(MPRTPSPath * this)
 {
-  gint64 sum;
+  gint64 sum = 0;
   if(!this->pacing || !this->max_bytes_per_s){
     return FALSE;
   }

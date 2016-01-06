@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <glib.h>
 
 
 typedef struct _UtilizationReport{
@@ -46,6 +47,24 @@ typedef struct _SessionData
   guint sessionNum;
   GstElement *input;
 } SessionData;
+
+
+static gint32 subflow1_max_rate = 0;
+static gint32 subflow1_shareability = 0;
+static gint32 subflow2_max_rate = 0;
+static gint32 subflow2_shareability = 0;
+static gint32 profile;
+
+static GOptionEntry entries[] =
+{
+  { "profile", 0, 0, G_OPTION_ARG_INT, &profile, "Argument", NULL },
+  { "sub1-max-rate", 0, 0, G_OPTION_ARG_INT, &subflow1_max_rate, "Argument", NULL },
+  { "sub2-max-rate", 0, 0, G_OPTION_ARG_INT, &subflow2_max_rate, "Argument", NULL },
+  { "sub1-bw-sharing", 0, 0, G_OPTION_ARG_INT, &subflow1_shareability, "Argument", NULL },
+  { "sub2-bw-sharing", 0, 0, G_OPTION_ARG_INT, &subflow2_shareability, "Argument", NULL },
+  { NULL }
+};
+
 
 static SessionData *
 session_ref (SessionData * data)
@@ -208,7 +227,10 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
       if(!ur->subflows[i].available) continue;
       ur->subflows[i].target_weight=0.;
     }
-    ur->subflows[2].max_rate=50000;
+    ur->subflows[1].max_rate=subflow1_max_rate;
+    ur->subflows[1].shareability = subflow1_shareability;
+    ur->subflows[2].max_rate=subflow2_max_rate;
+    ur->subflows[2].shareability = subflow2_shareability;
   }
 
 //  g_print("get_bitrate: %d new_bitrate: %d\n", get_bitrate, new_bitrate);
@@ -318,6 +340,8 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   session_unref (session);
 }
 
+
+
 int
 main (int argc, char **argv)
 {
@@ -329,7 +353,37 @@ main (int argc, char **argv)
   GMainLoop *loop;
   gchar *testfile = NULL;
 
-  gst_init (&argc, &argv);
+  GError *error = NULL;
+  GOptionContext *context;
+
+  context = g_option_context_new ("- test tree model performance");
+  g_option_context_add_main_entries (context, entries, NULL);
+//  g_option_context_add_group (context, gtk_get_option_group (TRUE));
+//  gst_init (&argc, &argv);
+  g_option_context_parse (context, &argc, &argv, &error);
+  if(profile==0){
+      subflow1_max_rate = 0;
+      subflow2_max_rate = 0;
+      subflow1_shareability = 0;
+      subflow2_shareability = 0;
+  }else if(profile==1){
+      subflow1_max_rate = 0;
+      subflow2_max_rate = 0;
+      subflow1_shareability = 1;
+      subflow2_shareability = 1;
+  }else if(profile==2){
+      subflow1_max_rate = 0;
+      subflow2_max_rate = 64000;
+      subflow1_shareability = 0;
+      subflow2_shareability = 0;
+  }else if(profile==3){
+      subflow1_max_rate = 0;
+      subflow2_max_rate = 0;
+      subflow1_shareability = 64000;
+      subflow2_shareability = 1;
+  }
+  g_print("--------------------- %d-%d-%d-%d---------------\n", subflow1_max_rate, subflow1_shareability, subflow2_max_rate, subflow2_shareability);
+  gst_init (NULL, NULL);
 
   loop = g_main_loop_new (NULL, FALSE);
 

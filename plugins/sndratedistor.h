@@ -58,7 +58,8 @@ void sndrate_distor_add_controllable_path(SendingRateDistributor *this,
                                  guint32 sending_rate);
 void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        guint8 id,
-                                       RRMeasurement *measurement);
+                                       RRMeasurement *measurement,
+                                       guint32 media_rate);
 void sndrate_distor_extract_stats(SendingRateDistributor *this,
                                   guint8 id,
                                   guint64 *median_delay,

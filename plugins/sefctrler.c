@@ -668,7 +668,9 @@ _irp_producer_main(SndEventBasedController * this)
   Subflow*       subflow;
   GstClockTime   now;
   Event          event;
+  guint32        media_rate;
 
+  media_rate = stream_splitter_get_media_rate(this->splitter);
   now = gst_clock_get_time(this->sysclock);
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
@@ -694,7 +696,8 @@ _irp_producer_main(SndEventBasedController * this)
     _irt0(subflow)->sending_weight = stream_splitter_get_sending_rate(this->splitter, subflow->id);
     sndrate_distor_measurement_update(this->rate_distor,
                                       subflow->id,
-                                      _irt0(subflow));
+                                      _irt0(subflow),
+                                      media_rate);
     event = subflow->check(subflow);
     subflow->fire(this, subflow, event);
     _irt0(subflow)->checked = TRUE;
@@ -1339,7 +1342,7 @@ recalc_done:
   if (!this->bids_commit_requested) goto process_done;
   this->bids_commit_requested_retain_tick = 0;
   this->bids_commit_requested = FALSE;
-  stream_splitter_commit_changes (this->splitter, this->target_rate, GST_SECOND);
+  stream_splitter_commit_changes (this->splitter, this->target_rate, GST_SECOND * .5);
 
 process_done:
   return;

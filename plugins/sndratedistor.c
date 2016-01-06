@@ -389,7 +389,8 @@ done:
 
 void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        guint8 id,
-                                       RRMeasurement *measurement)
+                                       RRMeasurement *measurement,
+                                       guint32 media_rate)
 {
   Subflow *subflow;
   subflow = _get_subflow(this, id);
@@ -411,6 +412,7 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
     numstracker_add(subflow->targets, subflow->target_rate);
   }
 
+  this->actual_rate = media_rate;
   return;
 }
 
@@ -716,6 +718,12 @@ gboolean _enable_monitoring(
 
   subflow->monitoring_interval = 0;
   if(!subflow->available) goto exit;
+  if(this->actual_rate < subflow->target_rate * .95){
+    goto exit;
+  }
+  if(subflow->target_rate < this->actual_rate * 1.05){
+    goto exit;
+  }
   if(subflow->estimated_gp_rate < subflow->target_rate * .9){
     goto exit;
   }

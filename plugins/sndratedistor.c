@@ -205,33 +205,6 @@ static void
 sndrate_distor_finalize (
     GObject * object);
 
-//--------------------UTILITIES-----------------------
-//static void
-//_refresh_targets(
-//    SendingRateDistributor* this,
-//    Subflow *subflow);
-
-
-static void
-_time_update_preparation(
-    SendingRateDistributor* this);
-
-static void
-_time_update_correction(
-    SendingRateDistributor* this);
-
-static void
-_time_update_requestion(
-    SendingRateDistributor* this);
-
-static void
-_time_update_compilation(
-    SendingRateDistributor* this);
-
-static void
-_refresh_available_ids(
-    SendingRateDistributor* this);
-
 
 //--------------------MEASUREMENTS-----------------------
 static Measurement*
@@ -275,9 +248,8 @@ _disable_controlling(
     Subflow* subflow,
     guint disable_ticks);
 
-//#define _disable_monitoring(subflow) _setup_monitoring(subflow, 0);
-
 #define _disable_monitoring(subflow) _setup_monitoring(subflow, 0)
+
 static void
 _setup_monitoring(
     Subflow *subflow,
@@ -292,11 +264,6 @@ static gboolean
 _enable_monitoring(
         SendingRateDistributor *this,
         Subflow *subflow);
-
-//static void
-//_reset_monitoring(
-//        SendingRateDistributor *this,
-//        Subflow *subflow);
 
 static guint32
 _action_undershoot(
@@ -314,20 +281,35 @@ _action_bounce_up(
     SendingRateDistributor *this,
     Subflow *subflow);
 
-//
-//inline static
-//gdouble sqr(gdouble x) {
-//    return x*x;
-//}
+//--------------------UTILITIES-----------------------
+//static void
+//_refresh_targets(
+//    SendingRateDistributor* this,
+//    Subflow *subflow);
 
-//source: http://stackoverflow.com/questions/5083465/fast-efficient-least-squares-fit-algorithm-in-c
-//
-//static gint linreg(gint n,
-//                   const gdouble x[],
-//                   const gdouble y[],
-//                   gdouble* m,
-//                   gdouble* b,
-//                   gdouble* r);
+
+static void
+_time_update_preparation(
+    SendingRateDistributor* this);
+
+static void
+_time_update_evaluation(
+    SendingRateDistributor* this);
+
+static void
+_time_update_requestion(
+    SendingRateDistributor* this);
+
+static void
+_time_update_application(
+    SendingRateDistributor* this);
+
+static void
+_refresh_available_ids(
+    SendingRateDistributor* this);
+
+
+
 //
 #define _get_subflow(this, n) ((Subflow*)(this->subflows + n * sizeof(Subflow)))
 
@@ -336,10 +318,7 @@ _action_bounce_up(
   for(i=0, subflow = _get_subflow(this, this->available_ids[0]); i < this->available_ids_length; subflow = _get_subflow(this,  this->available_ids[++i]))
 #define _get_next_sending_target(subflow) \
   (subflow->target_rate + subflow->requested_bytes - subflow->supplied_bytes)
-//static Subflow*
-//_get_subflow(
-//    SendingRateDistributor *this,
-//    guint8 id);
+
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -542,224 +521,24 @@ void sndrate_distor_extract_stats(SendingRateDistributor *this,
 
 }
 
-void sndrate_distor_time_update(SendingRateDistributor *this)
+guint32 sndrate_distor_time_update(SendingRateDistributor *this)
 {
   //1. Initialize and reset variable for updating
   _time_update_preparation(this);
 
   //2. mitigate the effect of byte requesting and supplying by
   //moving the bytes between the subflows
-  _time_update_correction(this);
+  _time_update_evaluation(this);
 
   //3. Requesting the media source for new media rate
   _time_update_requestion(this);
 
   //4. Applying the new rate on the rate distributor
-  _time_update_compilation(this);
+  _time_update_application(this);
 
-  return;
+  return this->target_rate;
 }
 
-
-void _time_update_preparation(SendingRateDistributor* this)
-{
-  gint i;
-  Subflow *subflow;
-
-  this->supplied_bytes = 0;
-  this->requested_bytes = 0;
-  this->movable_bytes = 0;
-
-  foreach_subflows(this, i, subflow)
-  {
-    subflow->requested_bytes = 0;
-    subflow->supplied_bytes = 0;
-    subflow->movable_bytes = 0;
-
-    subflow->overused_history<<=1;
-    if(++subflow->change_index == CHANGE_HISTORY_LENGTH)
-      subflow->change_index = 0;
-    subflow->change_sum-=subflow->change_history[subflow->change_index];
-
-    if(subflow->disable_controlling > 0){
-      --subflow->disable_controlling;
-      continue;
-    }
-    subflow->state = subflow->controlling(this, subflow);
-    if(subflow->state == STATE_OVERUSED) subflow->overused_history+=1;
-//    if(subflow->state == STATE_MONITORED) subflow->monitored_history+=1;
-
-    this->supplied_bytes+=subflow->supplied_bytes;
-    this->requested_bytes+=subflow->requested_bytes;
-
-    if(0 < subflow->max_rate && subflow->max_rate < subflow->estimated_rate){
-      subflow->movable_bytes=subflow->estimated_rate-subflow->max_rate;
-      this->movable_bytes+=subflow->movable_bytes;
-    }
-  }
-}
-
-void _time_update_correction(SendingRateDistributor* this)
-{
-  Subflow *subflow, *target, *source;
-  gint i,j;
-  gint32 total = 0, moved_bytes = 0;
-  gdouble weight;
-
-  if(!this->supplied_bytes) goto movability;
-
-  foreach_subflows(this, i, subflow)
-  {
-    if(subflow->overused_history > 0) continue;
-    if(subflow->shareability != SHAREABILITY_OPENED) continue;
-    total += subflow->target_rate;
-  }
-
-  if(0 == total) goto movability;
-
-  foreach_subflows(this, i, subflow){
-    if(subflow->overused_history > 0) continue;
-    weight = (gdouble)subflow->target_rate / (gdouble)total;
-    subflow->requested_bytes += weight * (gdouble) this->supplied_bytes;
-  }
-  this->supplied_bytes = 0;
-
-movability:
-  if(!this->movable_bytes || !this->requested_bytes) goto minability;
-
-  foreach_subflows(this, i, source){
-    if(source->movable_bytes == 0) continue;
-    foreach_subflows(this, j, target){
-      if(target->requested_bytes == 0) continue;
-      if(target->requested_bytes <= source->movable_bytes){
-        source->movable_bytes -= moved_bytes = target->requested_bytes;
-        source->supplied_bytes+=target->requested_bytes;
-      }else{
-        source->supplied_bytes+= moved_bytes = source->movable_bytes;
-        source->movable_bytes = 0;
-      }
-    }
-  }
-
-minability:
-  if(!this->supplied_bytes) goto estimatibility;
-
-  foreach_subflows(this, i, subflow){
-    gint32 next_sending_target;
-    gint32 requested_bytes;
-    if(!subflow->supplied_bytes) continue;
-    next_sending_target = _get_next_sending_target(subflow);
-    if(subflow->min_rate < next_sending_target) continue;
-
-    requested_bytes = subflow->min_rate - next_sending_target;
-    subflow->requested_bytes += requested_bytes;
-    this->requested_bytes+= requested_bytes;
-  }
-
-estimatibility:
-  goto exit;
-//  foreach_subflows(this, i, subflow){
-//    if(subflow->target_rate < _mt0(subflow)->goodput){
-//      subflow->correction = _mt0(subflow)->goodput - subflow->target_rate;
-//      this->correction =
-//    }
-//  }
-
-exit:
-  return;
-}
-
-void _time_update_requestion(SendingRateDistributor* this)
-{
-  UtilizationReport ur;
-  gint32 target_rate = 0;
-  gint32 delta_rate;
-  gint i;
-  Subflow *subflow;
-  gint32 check_requested_bytes = 0,check_supplied_bytes = 0;
-
-  foreach_subflows(this, i, subflow){
-    ur.subflows[subflow->id].available = TRUE;
-    ur.subflows[subflow->id].lost_bytes = _mt0(subflow)->lost;
-    ur.subflows[subflow->id].discarded_bytes = _mt0(subflow)->discard;
-    ur.subflows[subflow->id].owd = _mt0(subflow)->delay;
-    ur.subflows[subflow->id].shareability = subflow->shareability;
-    ur.subflows[subflow->id].max_rate = subflow->max_rate;
-    ur.subflows[subflow->id].min_rate = subflow->min_rate;
-    target_rate += subflow->target_rate;
-    check_requested_bytes+=subflow->requested_bytes;
-    check_supplied_bytes+=subflow->supplied_bytes;
-//    g_print("S%d target rate :%d, delta: %d\n", subflow->id,
-//            subflow->target_rate, subflow->requested_bytes-subflow->supplied_bytes);
-  }
-  if(check_requested_bytes != this->requested_bytes){
-    g_print("RB: %d CRB: %d\n", this->requested_bytes, check_requested_bytes);
-    g_print("SB: %d CSB: %d\n", this->supplied_bytes, check_supplied_bytes);
-  }
-  delta_rate = this->requested_bytes - this->supplied_bytes;
-//  g_print("target rate :%d, delta: %d\n", target_rate, delta_rate);
-  target_rate += delta_rate;
-
-  ur.target_rate = target_rate;
-  ur.max_rate = this->max_rate;
-  ur.min_rate = this->min_rate;
-
-  if(this->signal_request && this->signal_controller)
-    this->signal_request(this->signal_controller, &ur);
-
-  if(ur.target_rate == 0) {
-    g_warning("The actual media rate must be greater than 0");
-    ur.target_rate = target_rate;
-  }
-
-  this->max_rate = ur.max_rate;
-  this->min_rate = ur.min_rate;
-  this->target_rate = ur.target_rate;
-
-  foreach_subflows(this, i, subflow){
-    subflow->target_weight = ur.subflows[subflow->id].target_weight;
-    subflow->max_rate      = ur.subflows[subflow->id].max_rate;
-    subflow->min_rate      = ur.subflows[subflow->id].min_rate;
-
-    if(0 < ur.subflows[subflow->id].shareability)
-      subflow->shareability  = SHAREABILITY_OPENED;
-    else if(ur.subflows[subflow->id].shareability < 0)
-      subflow->shareability  = SHAREABILITY_CLOSED;
-    else
-      subflow->shareability  = SHAREABILITY_NORMAL;
-  }
-
-}
-
-void _time_update_compilation(SendingRateDistributor* this)
-{
-  gint i;
-  Subflow *subflow;
-  gint32 delta;
-
-  foreach_subflows(this, i, subflow)
-  {
-//    subflow->actual_rate = kalmanfilter_time_update(subflow->estimator, 1., subflow->requested_bytes - subflow->supplied_bytes, 1.);
-    delta = subflow->requested_bytes - subflow->supplied_bytes;
-    subflow->change_sum+=delta;
-    subflow->change_history[subflow->change_index] = delta;
-    subflow->target_rate += delta;
-    subflow->weight = (gdouble) subflow->target_rate / this->target_rate;
-    subflow->measured=FALSE;
-
-//    mprtps_path_set_pacing(subflow->path, subflow->target_rate);
-
-    if(0. < subflow->target_weight){
-      if(0 < this->max_rate)
-        subflow->max_rate = subflow->target_weight * this->max_rate;
-      else if(subflow->target_weight < subflow->weight * .95 || subflow->target_weight < subflow->weight  * 1.05)
-        subflow->max_rate = subflow->target_weight * this->target_rate;
-      else
-        subflow->target_weight = 0.;
-    }
-  }
-
-}
 
 
 guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id)
@@ -1249,5 +1028,208 @@ guint32 _action_bounce_up(
     --subflow->turning_point;
 //  g_print("BounceUp on S%d. SR: %d RB:%u\n", subflow->id, subflow->sending_rate, requested_bytes);
   return requested_bytes;
+}
+
+
+
+
+void _time_update_preparation(SendingRateDistributor* this)
+{
+  gint i;
+  Subflow *subflow;
+
+  this->supplied_bytes = 0;
+  this->requested_bytes = 0;
+  this->movable_bytes = 0;
+
+  foreach_subflows(this, i, subflow)
+  {
+    subflow->requested_bytes = 0;
+    subflow->supplied_bytes = 0;
+    subflow->movable_bytes = 0;
+
+    subflow->overused_history<<=1;
+    if(++subflow->change_index == CHANGE_HISTORY_LENGTH)
+      subflow->change_index = 0;
+    subflow->change_sum-=subflow->change_history[subflow->change_index];
+
+    if(subflow->disable_controlling > 0){
+      --subflow->disable_controlling;
+      continue;
+    }
+    subflow->state = subflow->controlling(this, subflow);
+    if(subflow->state == STATE_OVERUSED) subflow->overused_history+=1;
+//    if(subflow->state == STATE_MONITORED) subflow->monitored_history+=1;
+
+    this->supplied_bytes+=subflow->supplied_bytes;
+    this->requested_bytes+=subflow->requested_bytes;
+
+    if(0 < subflow->max_rate && subflow->max_rate < subflow->estimated_rate){
+      subflow->movable_bytes=subflow->estimated_rate-subflow->max_rate;
+      this->movable_bytes+=subflow->movable_bytes;
+    }
+  }
+}
+
+void _time_update_evaluation(SendingRateDistributor* this)
+{
+  Subflow *subflow, *target, *source;
+  gint i,j;
+  gint32 total = 0, moved_bytes = 0;
+  gdouble weight;
+
+  if(!this->supplied_bytes) goto movability;
+
+  foreach_subflows(this, i, subflow)
+  {
+    if(subflow->overused_history > 0) continue;
+    if(subflow->shareability != SHAREABILITY_OPENED) continue;
+    total += subflow->target_rate;
+  }
+
+  if(0 == total) goto movability;
+
+  foreach_subflows(this, i, subflow){
+    if(subflow->overused_history > 0) continue;
+    weight = (gdouble)subflow->target_rate / (gdouble)total;
+    subflow->requested_bytes += weight * (gdouble) this->supplied_bytes;
+  }
+  this->supplied_bytes = 0;
+
+movability:
+  if(!this->movable_bytes || !this->requested_bytes) goto minability;
+
+  foreach_subflows(this, i, source){
+    if(source->movable_bytes == 0) continue;
+    foreach_subflows(this, j, target){
+      if(target->requested_bytes == 0) continue;
+      if(target->requested_bytes <= source->movable_bytes){
+        source->movable_bytes -= moved_bytes = target->requested_bytes;
+        source->supplied_bytes+=target->requested_bytes;
+      }else{
+        source->supplied_bytes+= moved_bytes = source->movable_bytes;
+        source->movable_bytes = 0;
+      }
+    }
+  }
+
+minability:
+  if(!this->supplied_bytes) goto estimatibility;
+
+  foreach_subflows(this, i, subflow){
+    gint32 next_sending_target;
+    gint32 requested_bytes;
+    if(!subflow->supplied_bytes) continue;
+    next_sending_target = _get_next_sending_target(subflow);
+    if(subflow->min_rate < next_sending_target) continue;
+
+    requested_bytes = subflow->min_rate - next_sending_target;
+    subflow->requested_bytes += requested_bytes;
+    this->requested_bytes+= requested_bytes;
+  }
+
+estimatibility:
+  goto exit;
+//  foreach_subflows(this, i, subflow){
+//    if(subflow->target_rate < _mt0(subflow)->goodput){
+//      subflow->correction = _mt0(subflow)->goodput - subflow->target_rate;
+//      this->correction =
+//    }
+//  }
+
+exit:
+  return;
+}
+
+void _time_update_requestion(SendingRateDistributor* this)
+{
+  UtilizationReport ur;
+  gint32 target_rate = 0;
+  gint32 delta_rate;
+  gint i;
+  Subflow *subflow;
+  gint32 check_requested_bytes = 0,check_supplied_bytes = 0;
+
+  foreach_subflows(this, i, subflow){
+    ur.subflows[subflow->id].available = TRUE;
+    ur.subflows[subflow->id].lost_bytes = _mt0(subflow)->lost;
+    ur.subflows[subflow->id].discarded_bytes = _mt0(subflow)->discard;
+    ur.subflows[subflow->id].owd = _mt0(subflow)->delay;
+    ur.subflows[subflow->id].shareability = subflow->shareability;
+    ur.subflows[subflow->id].max_rate = subflow->max_rate;
+    ur.subflows[subflow->id].min_rate = subflow->min_rate;
+    target_rate += subflow->target_rate;
+    check_requested_bytes+=subflow->requested_bytes;
+    check_supplied_bytes+=subflow->supplied_bytes;
+//    g_print("S%d target rate :%d, delta: %d\n", subflow->id,
+//            subflow->target_rate, subflow->requested_bytes-subflow->supplied_bytes);
+  }
+  if(check_requested_bytes != this->requested_bytes){
+    g_print("RB: %d CRB: %d\n", this->requested_bytes, check_requested_bytes);
+    g_print("SB: %d CSB: %d\n", this->supplied_bytes, check_supplied_bytes);
+  }
+  delta_rate = this->requested_bytes - this->supplied_bytes;
+//  g_print("target rate :%d, delta: %d\n", target_rate, delta_rate);
+  target_rate += delta_rate;
+
+  ur.target_rate = target_rate;
+  ur.max_rate = this->max_rate;
+  ur.min_rate = this->min_rate;
+
+  if(this->signal_request && this->signal_controller)
+    this->signal_request(this->signal_controller, &ur);
+
+  if(ur.target_rate == 0) {
+    g_warning("The actual media rate must be greater than 0");
+    ur.target_rate = target_rate;
+  }
+
+  this->max_rate = ur.max_rate;
+  this->min_rate = ur.min_rate;
+  this->target_rate = ur.target_rate;
+
+  foreach_subflows(this, i, subflow){
+    subflow->target_weight = ur.subflows[subflow->id].target_weight;
+    subflow->max_rate      = ur.subflows[subflow->id].max_rate;
+    subflow->min_rate      = ur.subflows[subflow->id].min_rate;
+
+    if(0 < ur.subflows[subflow->id].shareability)
+      subflow->shareability  = SHAREABILITY_OPENED;
+    else if(ur.subflows[subflow->id].shareability < 0)
+      subflow->shareability  = SHAREABILITY_CLOSED;
+    else
+      subflow->shareability  = SHAREABILITY_NORMAL;
+  }
+
+}
+
+void _time_update_application(SendingRateDistributor* this)
+{
+  gint i;
+  Subflow *subflow;
+  gint32 delta;
+
+  foreach_subflows(this, i, subflow)
+  {
+//    subflow->actual_rate = kalmanfilter_time_update(subflow->estimator, 1., subflow->requested_bytes - subflow->supplied_bytes, 1.);
+    delta = subflow->requested_bytes - subflow->supplied_bytes;
+    subflow->change_sum+=delta;
+    subflow->change_history[subflow->change_index] = delta;
+    subflow->target_rate += delta;
+    subflow->weight = (gdouble) subflow->target_rate / this->target_rate;
+    subflow->measured=FALSE;
+
+//    mprtps_path_set_pacing(subflow->path, subflow->target_rate);
+
+    if(0. < subflow->target_weight){
+      if(0 < this->max_rate)
+        subflow->max_rate = subflow->target_weight * this->max_rate;
+      else if(subflow->target_weight < subflow->weight * .95 || subflow->target_weight < subflow->weight  * 1.05)
+        subflow->max_rate = subflow->target_weight * this->target_rate;
+      else
+        subflow->target_weight = 0.;
+    }
+  }
+
 }
 

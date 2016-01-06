@@ -69,7 +69,7 @@ void sndrate_distor_extract_stats(SendingRateDistributor *this,
                                   gdouble *media_target);
 
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
-void sndrate_distor_time_update(SendingRateDistributor *this);
+guint32 sndrate_distor_time_update(SendingRateDistributor *this);
 guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id);
 gboolean sndrate_distor_congestion_event(SendingRateDistributor *this, guint8 id);
 gboolean sndrate_distor_settlemen_event(SendingRateDistributor *this, guint8 id);

@@ -50,7 +50,9 @@ struct _StreamSplitter
 
   SchNode*             next_non_keyframes_tree;
   SchNode*             next_keyframes_tree;
-  gdouble              transition_ratio;
+
+  GstClockTime         switch_time;
+  guint32              switch_target;
 
   StreamSplittingMode  splitting_mode;
   GHashTable*          subflows;
@@ -91,7 +93,7 @@ void stream_splitter_setup_sending_bid(StreamSplitter* this, guint8 subflow_id, 
 guint32 stream_splitter_get_media_rate(StreamSplitter* this);
 void stream_splitter_set_monitor_payload_type(StreamSplitter *this, guint8 playload_type);
 gdouble stream_splitter_get_sending_rate(StreamSplitter* this, guint8 subflow_id);
-void stream_splitter_commit_changes(StreamSplitter *this);
+stream_splitter_commit_changes (StreamSplitter * this, guint32 switch_rate, GstClockTime switch_max_time);
 GType stream_splitter_get_type (void);
 
 #endif /* STREAM_SPLITTER_H_ */

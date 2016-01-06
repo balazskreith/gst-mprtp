@@ -289,7 +289,7 @@ _system_notifier_utilization(gpointer sndrate_distor, gpointer data);
 //----------------------------- Split Controller -----------------------------
 static void
 _split_controller_main(SndEventBasedController * this);
-static void
+static guint32
 _recalc_bids(SndEventBasedController * this);
 static gboolean
 _subflows_are_ready(SndEventBasedController * this);
@@ -1338,7 +1338,7 @@ recalc_done:
   if (!this->bids_commit_requested) goto process_done;
   this->bids_commit_requested_retain_tick = 0;
   this->bids_commit_requested = FALSE;
-  stream_splitter_commit_changes (this->splitter);
+  stream_splitter_commit_changes (this->splitter, 0, GST_SECOND);
 
 process_done:
   return;
@@ -1351,16 +1351,17 @@ typedef struct _Utilization{
   gdouble  changing_rate;
 }Utilization;
 
-void _recalc_bids(SndEventBasedController * this)
+guint32 _recalc_bids(SndEventBasedController * this)
 {
   GHashTableIter iter;
   gpointer key, val;
   Subflow *subflow;
   guint32 sending_rate;
+  guint32 target_rate;
   GstClockTime now;
 
   now = gst_clock_get_time(this->sysclock);
-  sndrate_distor_time_update(this->rate_distor);
+  target_rate = sndrate_distor_time_update(this->rate_distor);
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
@@ -1380,6 +1381,7 @@ void _recalc_bids(SndEventBasedController * this)
   }
 
   this->last_recalc_time = now;
+  return target_rate;
 }
 
 

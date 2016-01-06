@@ -530,7 +530,7 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       subflow_bid = guint_value & 0x00FFFFFFUL;
       stream_splitter_setup_sending_bid (this->splitter, subflow_id,
           subflow_bid);
-      stream_splitter_commit_changes (this->splitter);
+      stream_splitter_commit_changes (this->splitter, 0, 0);
       THIS_WRITEUNLOCK (this);
       break;
 

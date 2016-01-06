@@ -282,10 +282,12 @@ done:
 
 
 void
-stream_splitter_commit_changes (StreamSplitter * this)
+stream_splitter_commit_changes (StreamSplitter * this, guint32 switch_rate, GstClockTime switch_max_time)
 {
   THIS_WRITELOCK (this);
   this->changes_are_committed = TRUE;
+  this->switch_rate = switch_rate;
+  if(0 < switch_max_time) this->switch_time = gst_clock_get_time(this->sysclock) + switch_max_time;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -346,23 +348,34 @@ stream_splitter_run (void *data)
 
   THIS_WRITELOCK (this);
 
-  if(this->next_keyframes_tree || this->next_non_keyframes_tree){
-    if(1. <= this->transition_ratio){
-      _schnode_rdtor(this->keyframes_tree);
-      _schnode_rdtor(this->non_keyframes_tree);
+  if(0 < this->switch_target || 0 < this->switch_time)
+  {
+    guint64 media_rate;
+    gboolean switch_ = FALSE;
+    variancetracker_get_stats(this->sent_bytes, &media_rate, NULL);
+    if(0 < this->switch_target)
+      switch_ |= media_rate <= this->switch_target * 1.05 || this->switch_target * .95 < media_rate;
+    if(0 < this->switch_time)
+      switch_ |= now < this->switch_time;
+    if(switch_){
       this->keyframes_tree = this->next_keyframes_tree;
       this->non_keyframes_tree = this->next_non_keyframes_tree;
       this->next_keyframes_tree = NULL;
       this->next_non_keyframes_tree = NULL;
-      this->transition_ratio = 0.;
-    }else{
-      this->transition_ratio+=.05;
     }
   }
 
   if (!this->new_path_added &&
       !this->path_is_removed && !this->changes_are_committed) {
     goto done;
+  }
+
+  //do trees already exists?
+  if(this->next_non_keyframes_tree || this->next_keyframes_tree){
+    _schnode_rdtor(this->next_keyframes_tree);
+    this->next_keyframes_tree = NULL;
+    _schnode_rdtor(this->next_non_keyframes_tree);
+    this->next_non_keyframes_tree = NULL;
   }
 
   g_hash_table_iter_init (&iter, this->subflows);
@@ -466,17 +479,23 @@ stream_splitter_run (void *data)
   if(this->non_keyframes_tree) this->next_non_keyframes_tree = non_keyframes_tree;
   else this->non_keyframes_tree = non_keyframes_tree;
 
-  if(this->next_non_keyframes_tree || this->next_keyframes_tree)
-    this->transition_ratio+=.01;
+  if(this->next_non_keyframes_tree || this->next_keyframes_tree){
+    if(this->switch_target == 0 && this->switch_time == 0){
+      this->keyframes_tree = this->next_keyframes_tree;
+      this->next_keyframes_tree = NULL;
+      this->non_keyframes_tree = this->next_non_keyframes_tree;
+      this->next_non_keyframes_tree = NULL;
+    }
 
+  }
   this->new_path_added = FALSE;
   this->path_is_removed = FALSE;
   this->changes_are_committed = FALSE;
 
 done:
-  if (this->active_subflow_num > 0 && this->transition_ratio == 0.) {
-    rand = g_random_double ();
-    interval = GST_SECOND * (0.5 + rand);
+  if (this->active_subflow_num > 0) {
+    rand = g_random_double () * 100.;
+    interval = GST_MSECOND * (100 + rand);
     next_scheduler_time = now + interval;
 
     GST_DEBUG_OBJECT (this, "Next scheduling interval time is %lu",
@@ -505,15 +524,8 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
   SchNode *tree;
   SchNode *keyframes_tree, *non_keyframes_tree;
 
-  if(0. < this->transition_ratio && g_random_double() < this->transition_ratio){
-//    keyframes_tree = this->next_keyframes_tree;
-//    non_keyframes_tree = this->next_non_keyframes_tree;
-    keyframes_tree = this->keyframes_tree;
-    non_keyframes_tree = this->non_keyframes_tree;
-  }else{
-    keyframes_tree = this->keyframes_tree;
-    non_keyframes_tree = this->non_keyframes_tree;
-  }
+  keyframes_tree = this->keyframes_tree;
+  non_keyframes_tree = this->non_keyframes_tree;
 
   new_frame = this->last_rtp_timestamp != gst_rtp_buffer_get_timestamp(rtp) ? 1 : 0;
   bytes_to_send = gst_rtp_buffer_get_payload_len (rtp);

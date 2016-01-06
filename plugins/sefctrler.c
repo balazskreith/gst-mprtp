@@ -350,6 +350,7 @@ sefctrler_init (SndEventBasedController * this)
   this->subflow_num = 0;
   this->bids_recalc_requested = FALSE;
   this->bids_commit_requested = FALSE;
+  this->target_rate = 128000;
   this->ssrc = g_random_int ();
   this->report_is_flowable = FALSE;
   this->pacing = FALSE;
@@ -1333,12 +1334,12 @@ _split_controller_main(SndEventBasedController * this)
   this->bids_recalc_requested = FALSE;
   this->bids_commit_requested_retain_tick = 0;
   this->bids_commit_requested = TRUE;
-  _recalc_bids(this);
+  this->target_rate = _recalc_bids(this);
 recalc_done:
   if (!this->bids_commit_requested) goto process_done;
   this->bids_commit_requested_retain_tick = 0;
   this->bids_commit_requested = FALSE;
-  stream_splitter_commit_changes (this->splitter, 0, GST_SECOND);
+  stream_splitter_commit_changes (this->splitter, this->target_rate, GST_SECOND);
 
 process_done:
   return;

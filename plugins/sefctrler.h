@@ -56,6 +56,7 @@ struct _SndEventBasedController
   gboolean               bids_recalc_requested;
   guint8                 bids_commit_requested_retain_tick;
   gboolean               bids_commit_requested;
+  guint32                target_rate;
   SplitCtrlerEvent       event;
   SendingRateDistributor*rate_distor;
   guint32                ssrc;

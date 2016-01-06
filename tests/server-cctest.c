@@ -208,7 +208,7 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
       if(!ur->subflows[i].available) continue;
       ur->subflows[i].target_weight=0.;
     }
-    ur->subflows[1].max_rate=50000;
+    ur->subflows[2].max_rate=50000;
   }
 
 //  g_print("get_bitrate: %d new_bitrate: %d\n", get_bitrate, new_bitrate);

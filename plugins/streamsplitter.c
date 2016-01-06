@@ -287,7 +287,8 @@ stream_splitter_commit_changes (StreamSplitter * this, guint32 switch_rate, GstC
   THIS_WRITELOCK (this);
   this->changes_are_committed = TRUE;
   this->switch_target = switch_rate;
-  if(0 < switch_max_time) this->switch_time = gst_clock_get_time(this->sysclock) + switch_max_time;
+  if(0 < switch_max_time)
+    this->switch_time = gst_clock_get_time(this->sysclock) + switch_max_time;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -350,18 +351,27 @@ stream_splitter_run (void *data)
 
   if(0 < this->switch_target || 0 < this->switch_time)
   {
-    gint64 media_rate;
+    gint64 media_rate = 0;
     gboolean switch_ = FALSE;
+    variancetracker_obsolate(this->sent_bytes);
     variancetracker_get_stats(this->sent_bytes, &media_rate, NULL);
+    g_print("Media rate: %ld, Target Rate: %u\n", media_rate, this->switch_target);
+    switch_ = media_rate == 0;
+    g_print("media rate is 0, %d\n", switch_);
     if(0 < this->switch_target)
-      switch_ |= media_rate <= this->switch_target * 1.05 || this->switch_target * .95 < media_rate;
+      switch_ |= media_rate <= this->switch_target;
+    g_print("media rate < switch target, %d\n", switch_);
     if(0 < this->switch_time)
-      switch_ |= now < this->switch_time;
+      switch_ |= this->switch_time < now;
+    g_print("media rate < switch time, %d\n", switch_);
     if(switch_){
+      g_print("Change\n");
       this->keyframes_tree = this->next_keyframes_tree;
       this->non_keyframes_tree = this->next_non_keyframes_tree;
       this->next_keyframes_tree = NULL;
       this->next_non_keyframes_tree = NULL;
+      this->switch_target = 0;
+      this->switch_time = 0;
     }
   }
 

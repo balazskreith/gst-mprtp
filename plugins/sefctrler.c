@@ -453,7 +453,7 @@ sefctrler_add_path (gpointer ptr, guint8 subflow_id, MPRTPSPath * path)
                        new_subflow);
   ++this->subflow_num;
   stream_splitter_add_path (this->splitter, subflow_id, path, SUBFLOW_DEFAULT_SENDING_RATE);
-  new_subflow->id = sndrate_distor_add_controllable_path(this->rate_distor, path, SUBFLOW_DEFAULT_SENDING_RATE);
+  sndrate_distor_add_controllable_path(this->rate_distor, path, SUBFLOW_DEFAULT_SENDING_RATE);
 exit:
   THIS_WRITEUNLOCK (this);
 }

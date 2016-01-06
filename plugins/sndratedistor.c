@@ -106,7 +106,34 @@ struct _Measurement{
   State           state;
 };
 
+typedef struct _Moment Moment;
+struct _Moment{
+  guint16         PiT;
+  guint64         delay;
+  guint32         jitter;
+  guint32         lost;
+  guint32         discard;
+  guint32         receiver_rate;
+  guint32         sender_rate;
+  guint32         goodput;
 
+  guint16         delta_PiT;
+  guint64         delta_delay;
+  guint32         delta_jitter;
+  guint32         delta_discard;
+  guint32         delta_receiver_rate;
+  guint32         delta_sender_rate;
+  guint32         delta_goodput;
+
+  State           state;
+};
+
+#define _tpn(num) ((0 < num ? num : CHANGE_HISTORY_LENGTH)-1)
+#define _th(subflow, index) (Moment*) (subflow->history[index])
+#define _t0(subflow) _th(subflow, subflow->history_index)
+#define _t1(subflow) _th(subflow, _tpn(subflow->history_index))
+#define _t2(subflow) _th(subflow, _tpn(_tpn(subflow->history_index)))
+#define _t3(subflow) _th(subflow, _tpn(_tpn(_tpn(subflow->history_index))))
 
 struct _Subflow{
   guint8             id;
@@ -130,6 +157,9 @@ struct _Subflow{
   gint32             next_target;
   gint32             max_rate;
   gint32             min_rate;
+
+  Moment             history[CHANGE_HISTORY_LENGTH];
+  gint               history_index;
 
   gint32             change_history[CHANGE_HISTORY_LENGTH];
   gint               change_index;

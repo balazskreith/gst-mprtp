@@ -26,7 +26,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          variancetracker.c          \
                          sndratedistor.c            \
                          skalmanfilter.c            \
-                         nlms.c
+                         nlms.c                     \
+                         numstracker.c
                     
                     
 noinst_HEADERS = mprtpspath.h           \
@@ -47,7 +48,8 @@ noinst_HEADERS = mprtpspath.h           \
                  sndratedistor.h        \
                  skalmanfilter.h        \
                  kalmanfilter.h         \
-                 nlms.h                 
+                 nlms.h                 \
+                 numstracker.h
                           
 
 # compiler and linker flags used to compile this plugin, set in configure.ac

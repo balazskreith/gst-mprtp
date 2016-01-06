@@ -28,7 +28,6 @@ typedef struct _UtilizationReport{
   guint32  target_rate;
   guint32  min_rate;
   guint32  max_rate;
-  gboolean greedy;
   struct{
     gboolean available;
     gdouble  target_weight;
@@ -205,7 +204,6 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
   {
     gint i;
     new_bitrate = ur->target_rate * 8;
-    ur->greedy = TRUE;
     for(i=0; i<32; ++i){
       if(!ur->subflows[i].available) continue;
       ur->subflows[i].target_weight=0.;

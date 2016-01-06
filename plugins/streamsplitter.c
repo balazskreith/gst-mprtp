@@ -286,7 +286,7 @@ stream_splitter_commit_changes (StreamSplitter * this, guint32 switch_rate, GstC
 {
   THIS_WRITELOCK (this);
   this->changes_are_committed = TRUE;
-  this->switch_rate = switch_rate;
+  this->switch_target = switch_rate;
   if(0 < switch_max_time) this->switch_time = gst_clock_get_time(this->sysclock) + switch_max_time;
   THIS_WRITEUNLOCK (this);
 }
@@ -350,7 +350,7 @@ stream_splitter_run (void *data)
 
   if(0 < this->switch_target || 0 < this->switch_time)
   {
-    guint64 media_rate;
+    gint64 media_rate;
     gboolean switch_ = FALSE;
     variancetracker_get_stats(this->sent_bytes, &media_rate, NULL);
     if(0 < this->switch_target)

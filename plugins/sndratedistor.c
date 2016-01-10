@@ -46,16 +46,6 @@ G_DEFINE_TYPE (SendingRateDistributor, sndrate_distor, G_TYPE_OBJECT);
 typedef struct _Subflow Subflow;
 typedef struct _Moment Moment;
 
-
-typedef enum{
-  SHAREABILITY_CLOSED       = -1,
-  SHAREABILITY_NORMAL       =  0,
-  SHAREABILITY_OPENED       = 1,
-}Shareability;
-
-
-typedef State (*Checker)(SendingRateDistributor*,Subflow*);
-
 typedef struct _UtilizationReport{
   guint32  target_rate;
   guint32  min_rate;
@@ -88,50 +78,6 @@ static void
 sndrate_distor_finalize (
     GObject * object);
 
-
-//--------------------MEASUREMENTS-----------------------
-
-//----------------------STATES-------------------
-
-//-----------------------ACTIONS------------------
-
-
-static void
-_disable_controlling(
-    Subflow* subflow,
-    guint disable_ticks);
-
-#define _disable_monitoring(subflow) _setup_monitoring(subflow, 0)
-
-static void
-_setup_monitoring(
-    Subflow *subflow,
-    guint interval);
-
-static gboolean
-_is_monitoring_done(
-        SendingRateDistributor *this,
-        Subflow *subflow);
-
-static gboolean
-_enable_monitoring(
-        SendingRateDistributor *this,
-        Subflow *subflow);
-
-static guint32
-_action_undershoot(
-    SendingRateDistributor *this,
-    Subflow *subflow);
-//
-
-static guint32
-_action_bounce_back(
-    SendingRateDistributor *this,
-    Subflow *subflow);
-
-static guint32
-_action_bounce_up(
-    SubflowRateController *this);
 
 //--------------------UTILITIES-----------------------
 //static void

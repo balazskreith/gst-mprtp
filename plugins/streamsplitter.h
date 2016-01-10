@@ -51,13 +51,17 @@ struct _StreamSplitter
   SchNode*             next_non_keyframes_tree;
   SchNode*             next_keyframes_tree;
 
-  GstClockTime         switch_time;
-  guint32              switch_target;
+  GstClockTime         max_skipping_time;
+  guint32              sending_target;
+
+  guint32              skip_interval;
+  guint32              skip_tick;
 
   StreamSplittingMode  splitting_mode;
   GHashTable*          subflows;
   guint32              charge_value;
   guint32              last_rtp_timestamp;
+  gboolean             new_frame;
   GRWLock              rwmutex;
 
   GstClock*            sysclock;
@@ -71,7 +75,7 @@ struct _StreamSplitter
   gboolean             separation_is_possible;
   gboolean             last_delta_flag;
   gboolean             first_delta_flag;
-  VarianceTracker*     sent_bytes;
+  VarianceTracker*     taken_bytes;
   guint8               monitor_payload_type;
 
 };
@@ -86,7 +90,7 @@ void stream_splitter_add_path(StreamSplitter * this,
                               MPRTPSPath *path,
                               guint32 start_bid);
 void stream_splitter_rem_path(StreamSplitter * this, guint8 subflow_id);
-MPRTPSPath* stream_splitter_get_next_path(StreamSplitter* this, GstBuffer* buf);
+MPRTPSPath* stream_splitter_get_next_path(StreamSplitter* this, GstBuffer* buf, gboolean *suggest_to_skip);
 gboolean stream_splitter_separation_is_possible (StreamSplitter * this);
 void stream_splitter_set_splitting_mode (StreamSplitter * this, StreamSplittingMode mode);
 void stream_splitter_setup_sending_bid(StreamSplitter* this, guint8 subflow_id, guint32 bid);

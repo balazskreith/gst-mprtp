@@ -45,7 +45,7 @@ static void _refresh_stat(MPRTPSPath * this, GstBuffer *buffer);
 static void _send_mprtp_packet(MPRTPSPath * this,
                                GstBuffer *buffer);
 static gboolean _cwnd_flushing(MPRTPSPath * this);
-static gboolean _is_overused(MPRTPSPath * this);
+//static gboolean _is_overused(MPRTPSPath * this);
 static GstBuffer* _create_monitor_packet(MPRTPSPath * this);
 
 #define MIN_PACE_INTERVAL 1
@@ -103,7 +103,7 @@ mprtps_path_reset (MPRTPSPath * this)
   this->monitor_payload_type = FALSE;
   this->monitoring_interval = 0;
   this->cwnd_enabled = FALSE;
-
+  this->bytes_in_flight_history = make_numstracker_with_tree(4, 10 * GST_SECOND);
   packetssndqueue_reset(this->packetsqueue);
 }
 
@@ -458,8 +458,28 @@ mprtps_path_get_sent_octet_sum_for (MPRTPSPath * this, guint32 amount)
     this->sent_octets_read &= MAX_INT32_POSPART;
   }
   this->bytes_in_flight-= result<<3;
+  numstracker_add(this->bytes_in_flight_history, this->bytes_in_flight);
 done:
   THIS_WRITEUNLOCK (this);
+  return result;
+}
+
+guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this, guint32 *max_bytes_in_flight)
+{
+  guint32 result;
+  THIS_READLOCK(this);
+  result = this->bytes_in_flight;
+  numstracker_get_stats(this->bytes_in_flight_history, NULL, max_bytes_in_flight, NULL);
+  THIS_READUNLOCK(this);
+  return result;
+}
+
+guint32 mprtps_path_get_bytes_in_queue(MPRTPSPath *this)
+{
+  guint32 result;
+  THIS_READLOCK(this);
+  packetssndqueue_get_num(this, &result);
+  THIS_READUNLOCK(this);
   return result;
 }
 

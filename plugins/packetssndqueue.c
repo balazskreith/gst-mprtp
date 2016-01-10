@@ -119,11 +119,12 @@ void packetssndqueue_reset(PacketsSndQueue *this)
   THIS_WRITEUNLOCK(this);
 }
 
-guint32 packetssndqueue_get_num(PacketsSndQueue *this)
+guint32 packetssndqueue_get_num(PacketsSndQueue *this, guint32 *bytes_in_queue)
 {
   guint32 result;
   THIS_READLOCK(this);
   result = this->counter;
+  if(bytes_in_queue) *bytes_in_queue = this->bytes_in_queue;
   THIS_READUNLOCK(this);
   return result;
 }
@@ -185,11 +186,13 @@ void _packetssndqueue_add(PacketsSndQueue *this,
   if(!this->head) {
       this->head = this->tail = node;
       this->counter = 1;
+      this->bytes_in_queue = payload_bytes;
       goto done;
   }
   this->tail->next = node;
   this->tail = node;
   ++this->counter;
+  this->bytes_in_queue += payload_bytes;
 done:
   return;
 }
@@ -197,9 +200,12 @@ done:
 void _remove_head(PacketsSndQueue *this)
 {
   PacketsSndQueueNode *node;
+  guint32 payload_bytes;
   node = this->head;
+  payload_bytes = node->payload_bytes;
   this->head = node->next;
   _trash_node(this, node);
+  this->bytes_in_queue-=payload_bytes;
   --this->counter;
 }
 

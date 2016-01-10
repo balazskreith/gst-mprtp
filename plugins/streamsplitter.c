@@ -78,6 +78,7 @@ static void
 _tree_commit (StreamSplitter *this,
               SchNode ** tree, GHashTable * subflows,
               guint filter, guint32 bid_sum, gboolean key_path);
+static void _determine_skipping(StreamSplitter *this);
 static void _schnode_reduction (SchNode * node, guint reduction);
 //Functions related to tree
 static SchNode *_schnode_ctor (void);
@@ -139,7 +140,7 @@ stream_splitter_finalize (GObject * object)
   gst_task_stop (this->thread);
   gst_task_join (this->thread);
   gst_object_unref (this->thread);
-  g_object_unref(this->sent_bytes);
+  g_object_unref(this->taken_bytes);
   g_object_unref (this->sysclock);
 }
 
@@ -156,7 +157,7 @@ stream_splitter_init (StreamSplitter * this)
   this->separation_is_possible = FALSE;
   this->first_delta_flag = TRUE;
   this->thread = gst_task_new (stream_splitter_run, this, NULL);
-  this->sent_bytes = make_variancetracker(1<<15, GST_SECOND);
+  this->taken_bytes = make_variancetracker(1<<15, GST_SECOND);
 //    this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
   this->splitting_mode = MPRTP_STREAM_BYTE_BASED_SPLITTING;
 
@@ -252,7 +253,7 @@ guint32 stream_splitter_get_media_rate(StreamSplitter* this)
 {
   gint64 result;
   THIS_READLOCK(this);
-  variancetracker_get_stats(this->sent_bytes, &result, NULL);
+  variancetracker_get_stats(this->taken_bytes, &result, NULL);
   THIS_READUNLOCK(this);
   return result;
 }
@@ -282,15 +283,15 @@ done:
 
 
 void
-stream_splitter_commit_changes (StreamSplitter * this, guint32 switch_rate, GstClockTime switch_max_time)
+stream_splitter_commit_changes (StreamSplitter * this, guint32 sending_target, GstClockTime max_skipping_time)
 {
   THIS_WRITELOCK (this);
   this->changes_are_committed = TRUE;
-  this->switch_target = switch_rate;
-  if(0 < switch_max_time)
-    this->switch_time = gst_clock_get_time(this->sysclock) + switch_max_time;
+  this->sending_target = sending_target;
+  if(0 < max_skipping_time)
+    this->max_skipping_time = gst_clock_get_time(this->sysclock) + max_skipping_time;
   else
-    this->switch_time = 0;
+    this->max_skipping_time = 0;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -305,7 +306,7 @@ stream_splitter_separation_is_possible (StreamSplitter * this)
 }
 
 MPRTPSPath *
-stream_splitter_get_next_path (StreamSplitter * this, GstBuffer * buf)
+stream_splitter_get_next_path (StreamSplitter * this, GstBuffer * buf, gboolean *suggest_to_skip)
 {
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   MPRTPSPath *path = NULL;
@@ -322,6 +323,12 @@ stream_splitter_get_next_path (StreamSplitter * this, GstBuffer * buf)
   }
   path = _get_next_path (this, &rtp);
 done:
+  if(suggest_to_skip) *suggest_to_skip = FALSE;
+  if(0 < this->skip_interval && this->new_frame){
+    ++this->skip_tick;
+    if(*suggest_to_skip)
+      *suggest_to_skip = this->skip_tick % this->skip_interval == 0;
+  }
   gst_rtp_buffer_unmap (&rtp);
   THIS_WRITEUNLOCK (this);
 exit:
@@ -351,26 +358,30 @@ stream_splitter_run (void *data)
 
   THIS_WRITELOCK (this);
 
-  if(0 < this->switch_target || 0 < this->switch_time)
+  if(0 < this->sending_target || 0 < this->max_skipping_time)
   {
     gint64 media_rate = 0;
     gboolean switch_ = FALSE;
-    variancetracker_obsolate(this->sent_bytes);
-    variancetracker_get_stats(this->sent_bytes, &media_rate, NULL);
+    variancetracker_obsolate(this->taken_bytes);
+    variancetracker_get_stats(this->taken_bytes, &media_rate, NULL);
 //    g_print("Media rate: %ld, Target Rate: %u\n", media_rate, this->switch_target);
     switch_ = media_rate == 0;
-    if(0 < this->switch_target)
-      switch_ |= media_rate <= this->switch_target;
-    if(0 < this->switch_time)
-      switch_ |= this->switch_time < now;
+    if(0 < this->sending_target)
+      switch_ |= media_rate <= this->sending_target;
+    if(0 < this->max_skipping_time)
+      switch_ |= this->max_skipping_time < now;
     if(switch_){
 //      g_print("Change\n");
       this->keyframes_tree = this->next_keyframes_tree;
       this->non_keyframes_tree = this->next_non_keyframes_tree;
       this->next_keyframes_tree = NULL;
       this->next_non_keyframes_tree = NULL;
-      this->switch_target = 0;
-      this->switch_time = 0;
+      this->sending_target = 0;
+      this->max_skipping_time = 0;
+      this->skip_interval = 0;
+      this->skip_tick = 0;
+    }else{
+      _determine_skipping(this);
     }
   }
 
@@ -379,7 +390,7 @@ stream_splitter_run (void *data)
     goto done;
   }
 
-  //do trees already exists?
+  //do next trees already exists?
   if(this->next_non_keyframes_tree || this->next_keyframes_tree){
     _schnode_rdtor(this->next_keyframes_tree);
     this->next_keyframes_tree = NULL;
@@ -489,11 +500,13 @@ stream_splitter_run (void *data)
   else this->non_keyframes_tree = non_keyframes_tree;
 
   if(this->next_non_keyframes_tree || this->next_keyframes_tree){
-    if(this->switch_target == 0 && this->switch_time == 0){
+    if(this->sending_target == 0 || this->max_skipping_time == 0){
       this->keyframes_tree = this->next_keyframes_tree;
       this->next_keyframes_tree = NULL;
       this->non_keyframes_tree = this->next_non_keyframes_tree;
       this->next_non_keyframes_tree = NULL;
+    }else{
+      _determine_skipping(this);
     }
   }
   this->new_path_added = FALSE;
@@ -527,7 +540,7 @@ MPRTPSPath *
 _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
 {
   MPRTPSPath *result = NULL;
-  guint32 new_frame, bytes_to_send;
+  guint32 bytes_to_send;
   guint32 keytree_value, non_keytree_value;
   SchNode *tree;
   SchNode *keyframes_tree, *non_keyframes_tree;
@@ -535,15 +548,16 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
   keyframes_tree = this->keyframes_tree;
   non_keyframes_tree = this->non_keyframes_tree;
 
-  new_frame = this->last_rtp_timestamp != gst_rtp_buffer_get_timestamp(rtp) ? 1 : 0;
+  this->new_frame = this->last_rtp_timestamp != gst_rtp_buffer_get_timestamp(rtp) ? 1 : 0;
+  this->last_rtp_timestamp = gst_rtp_buffer_get_timestamp(rtp);
   bytes_to_send = gst_rtp_buffer_get_payload_len (rtp);
 //g_print("%d", GST_BUFFER_FLAG_IS_SET (rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT));
 //  g_print("bytes to send: %u\n",bytes_to_send);
   if (keyframes_tree == NULL) {
-    result = schtree_get_next (non_keyframes_tree, bytes_to_send, new_frame);
+    result = schtree_get_next (non_keyframes_tree, bytes_to_send, this->new_frame);
     goto done;
   } else if (non_keyframes_tree == NULL) {
-    result = schtree_get_next (keyframes_tree, bytes_to_send, new_frame);
+    result = schtree_get_next (keyframes_tree, bytes_to_send, this->new_frame);
     goto done;
   }
 
@@ -564,7 +578,7 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
 //    g_print("Separation possibility is %d and last flag deltability is: %d\n", this->separation_is_possible, actual_delta_flag);
   }
   if (this->separation_is_possible && !GST_BUFFER_FLAG_IS_SET (rtp->buffer, GST_BUFFER_FLAG_DELTA_UNIT)) {
-      result = schtree_get_next (keyframes_tree, bytes_to_send, new_frame);
+      result = schtree_get_next (keyframes_tree, bytes_to_send, this->new_frame);
     goto done;
   }
 
@@ -574,11 +588,11 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
       keytree_value <=
       non_keytree_value ? keyframes_tree : non_keyframes_tree;
 //g_print("%p decide %f-%f %s\n", this, this->non_keyframe_ratio, this->keyframe_ratio, tree == this->keyframes_tree?"KEY":"NKEY");
-    result = schtree_get_next (tree, bytes_to_send, new_frame);
+    result = schtree_get_next (tree, bytes_to_send, this->new_frame);
 
 done:
   if(gst_rtp_buffer_get_payload_type(rtp) != this->monitor_payload_type){
-    variancetracker_add(this->sent_bytes, bytes_to_send);
+    variancetracker_add(this->taken_bytes, bytes_to_send);
   }
   return result;
 }
@@ -710,6 +724,21 @@ _tree_commit (StreamSplitter *this, SchNode ** tree,
   _schtree_set_scheduling_mode(new_root, this->splitting_mode);
 }
 
+void _determine_skipping(StreamSplitter *this)
+{
+  guint32 actual_rate;
+  gdouble ratio;
+  this->skip_tick = 0;
+  this->skip_interval = 0;
+  if(this->sending_target == 0 || this->max_skipping_time == 0) goto done;
+
+  variancetracker_get_stats(this->taken_bytes, &actual_rate, NULL);
+  if(this->sending_target < actual_rate * 1.1) goto done;
+  ratio = (gdouble) actual_rate / (gdouble)this->sending_target;
+  this->skip_interval = MAX(2, 1./(1.-ratio));
+done:
+  return;
+}
 
 void
 _schnode_rdtor (SchNode * node)

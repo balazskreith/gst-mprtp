@@ -860,6 +860,9 @@ _report_processing_rrblock_processor (SndEventBasedController *this,
   }
   _irt0(subflow)->expected_payload_bytes =
       mprtps_path_get_sent_octet_sum_for (subflow->path, _irt0 (subflow)->expected_packets)<<3;
+
+  _irt0(subflow)->bytes_in_flight = mprtps_path_get_bytes_in_flight(subflow->path, &_irt0(subflow)->max_bytes_in_flight);
+  _irt0(subflow)->bytes_in_queue = mprtps_path_get_bytes_in_queue(subflow->path);
   if (subflow->ir_moments_num > 1 && (LSR == 0 || DLSR == 0)) {
     return;
   }
@@ -1342,7 +1345,7 @@ recalc_done:
   if (!this->bids_commit_requested) goto process_done;
   this->bids_commit_requested_retain_tick = 0;
   this->bids_commit_requested = FALSE;
-  stream_splitter_commit_changes (this->splitter, 0, 0 * GST_MSECOND);
+  stream_splitter_commit_changes (this->splitter, 0 * this->target_rate, 0 * GST_MSECOND);
 
 process_done:
   return;

@@ -38,8 +38,6 @@ struct _SendingRateDistributor
 
   guint32              max_rate;
   guint32              min_rate;
-  guint32              target_rate;
-  guint32              actual_rate;
 
   SignalRequestFunc    signal_request;
   gpointer             signal_controller;

@@ -860,6 +860,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   GstFlowReturn result;
   guint8 first_byte;
   guint8 second_byte;
+  gboolean suggest_to_skip;
   GstBuffer *outbuf;
   result = GST_FLOW_OK;
 
@@ -884,7 +885,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   }
   //the packet is rtp
   THIS_READLOCK (this);
-  path = stream_splitter_get_next_path(this->splitter, buffer);
+  path = stream_splitter_get_next_path(this->splitter, buffer, &suggest_to_skip);
   if(!path){
     GST_WARNING_OBJECT(this, "No active subflow");
     goto done;

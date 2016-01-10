@@ -105,30 +105,7 @@ struct _MPRTPSPath
   //cwnd implementation
   gboolean                cwnd_enabled;
   PacketsSndQueue*        packetsqueue;
-
-  //Maximum segment size
-  gint32                  mss;
-  //Minimum congestion window [byte]. Initial value: 2*MSS
-  gint32                  min_cwnd;
-  //True if in fast start state. Initial value: TRUE
-  gboolean                in_fast_start;
-  //COngestion window
-  gint32                  cwnd;
-  //Congestion window inflection point. Initial value: 1
-  gint32                  cwnd_i;
-  //The number of bytes that was acknowledged with the
-  //last received acknowledgement. i.e.: Bytes acknowledged
-  //since the last CWND update [byte].
-  //Reset after a CWND update. Initial value: 0
-  gint32                  bytes_newly_acked;
-  //Upper limit of how many bytes that can be transmitted [byte].
-  //Updated when CWND is updated and when RTP packet is transmitted.
-  //Initial value: 0
-  gint32                  send_wnd;
-  //Approximate estimate of interpacket transmission
-  //itnerval [ms], updated when RTP packet transmitted. Initial value: 1
-  gint64                  t_pace;
-
+  NumsTracker*            bytes_in_flight_history;
 };
 
 struct _MPRTPSPathClass
@@ -165,6 +142,10 @@ struct _RRMeasurement{
   gdouble             receiver_rate;
   MPRTPSPathState     state;
   gboolean            checked;
+
+  guint32             bytes_in_flight;
+  guint32             bytes_in_queue;
+  guint32             max_bytes_in_flight;
 };
 
 
@@ -193,7 +174,8 @@ void mprtps_path_process_rtp_packet(MPRTPSPath * this,
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_frames_num (MPRTPSPath * this);
 guint32 mprtps_path_get_sent_octet_sum_for(MPRTPSPath *this, guint32 amount);
-
+guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this, guint32 *max_bytes_in_flight);
+guint32 mprtps_path_get_bytes_in_queue(MPRTPSPath *this);
 MPRTPSPathState mprtps_path_get_state (MPRTPSPath * this);
 void mprtps_path_set_state (MPRTPSPath * this, MPRTPSPathState state);
 GstClockTime mprtps_path_get_time_sent_to_passive(MPRTPSPath *this);

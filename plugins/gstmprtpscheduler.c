@@ -541,7 +541,7 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       path = NULL;
       _try_get_path (this, subflow_id, &path);
       max_bytes_per_s = guint_value & 0x00FFFFFFUL;
-      mprtps_path_set_pacing (path, max_bytes_per_s);
+      mprtps_path_setup_cwnd (path, max_bytes_per_s);
       THIS_WRITEUNLOCK (this);
       break;
 
@@ -1049,7 +1049,7 @@ gst_mprtpscheduler_path_ticking_process_run (void *data)
     path = (MPRTPSPath *) val;
     mprtps_path_tick(path);
   }
-  next_scheduler_time = now + 10 * GST_MSECOND;
+  next_scheduler_time = now + 1 * GST_MSECOND;
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
   THIS_WRITEUNLOCK (this);
 

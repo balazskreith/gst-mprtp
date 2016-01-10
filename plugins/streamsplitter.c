@@ -289,6 +289,8 @@ stream_splitter_commit_changes (StreamSplitter * this, guint32 switch_rate, GstC
   this->switch_target = switch_rate;
   if(0 < switch_max_time)
     this->switch_time = gst_clock_get_time(this->sysclock) + switch_max_time;
+  else
+    this->switch_time = 0;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -493,7 +495,6 @@ stream_splitter_run (void *data)
       this->non_keyframes_tree = this->next_non_keyframes_tree;
       this->next_non_keyframes_tree = NULL;
     }
-
   }
   this->new_path_added = FALSE;
   this->path_is_removed = FALSE;

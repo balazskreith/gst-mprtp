@@ -141,6 +141,7 @@ make_video_session (guint sessionNum)
   g_object_set (encoder, "end-usage", 1, NULL);
   g_object_set (encoder, "deadline", 20000, NULL);
   g_object_set (encoder, "cq-level", 5, NULL);
+  g_object_set (encoder, "undershoot", 100, NULL);
   g_object_set (encoder, "cpu-used", 5, NULL);
 //  g_object_set (encoder, "keyframe-mode", 0, NULL);
 
@@ -378,11 +379,12 @@ main (int argc, char **argv)
       subflow2_shareability = 0;
   }else if(profile==3){
       subflow1_max_rate = 0;
-      subflow2_max_rate = 0;
-      subflow1_shareability = 64000;
+      subflow2_max_rate = 64000;
+      subflow1_shareability = 0;
       subflow2_shareability = 1;
   }
-  g_print("--------------------- %d-%d-%d-%d---------------\n", subflow1_max_rate, subflow1_shareability, subflow2_max_rate, subflow2_shareability);
+  g_print("--------------------- %d-%d-%d-%d---------------\n",
+          subflow1_max_rate, subflow1_shareability, subflow2_max_rate, subflow2_shareability);
   gst_init (NULL, NULL);
 
   loop = g_main_loop_new (NULL, FALSE);

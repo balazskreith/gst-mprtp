@@ -43,7 +43,6 @@ struct _NumsTracker
 struct _NumsTrackerItem
 {
   gint64        value;
-  gint64        squere;
   GstClockTime  added;
 };
 

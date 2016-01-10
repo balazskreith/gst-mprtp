@@ -1342,7 +1342,7 @@ recalc_done:
   if (!this->bids_commit_requested) goto process_done;
   this->bids_commit_requested_retain_tick = 0;
   this->bids_commit_requested = FALSE;
-  stream_splitter_commit_changes (this->splitter, this->target_rate, GST_SECOND * .05);
+  stream_splitter_commit_changes (this->splitter, 0, 0 * GST_MSECOND);
 
 process_done:
   return;

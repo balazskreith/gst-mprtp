@@ -36,10 +36,9 @@ typedef struct _MPRTPSPathClass MPRTPSPathClass;
 
 typedef enum
 {
-  MPRTPS_PATH_FLAG_TRIAL         = 1,
-  MPRTPS_PATH_FLAG_NON_LOSSY     = 2,
-  MPRTPS_PATH_FLAG_NON_CONGESTED = 4,
-  MPRTPS_PATH_FLAG_ACTIVE        = 8,
+  MPRTPS_PATH_FLAG_NON_LOSSY     = 1,
+  MPRTPS_PATH_FLAG_NON_CONGESTED = 2,
+  MPRTPS_PATH_FLAG_ACTIVE        = 4,
 } MPRTPSPathFlags;
 
 typedef enum{
@@ -76,15 +75,12 @@ struct _MPRTPSPath
   GstClockTime            sent_middly_congested;
   GstClockTime            sent_congested;
 
-  PacketsSndQueue*        packetsqueue;
-  VarianceTracker*        sent_bytes;
+
   guint32                 ssrc_allowed;
   guint8                  sent_octets[MAX_INT32_POSPART];
   guint16                 sent_octets_read;
   guint16                 sent_octets_write;
-  guint32                 max_bytes_per_ms;
-  guint32                 max_bytes_per_s;
-  gboolean                pacing;
+
   GstClockTime            last_packet_sent_time;
   guint32                 last_sent_payload_bytes;
   guint64                 ticknum;
@@ -100,11 +96,46 @@ struct _MPRTPSPath
   void                    (*send_mprtp_packet_func)(gpointer, GstBuffer*);
   gpointer                  send_mprtp_func_data;
 
+  guint32                 bytes_in_flight;
+  guint32                 cwnd_size;
+  guint32                 cwnd_slack;
+  gboolean                cwnd_slack_allowed;
+  guint32                 srtt_ms;
+  guint32                 pacing_tick;
+  //cwnd implementation
+  gboolean                cwnd_enabled;
+  PacketsSndQueue*        packetsqueue;
+
+  //Maximum segment size
+  gint32                  mss;
+  //Minimum congestion window [byte]. Initial value: 2*MSS
+  gint32                  min_cwnd;
+  //True if in fast start state. Initial value: TRUE
+  gboolean                in_fast_start;
+  //COngestion window
+  gint32                  cwnd;
+  //Congestion window inflection point. Initial value: 1
+  gint32                  cwnd_i;
+  //The number of bytes that was acknowledged with the
+  //last received acknowledgement. i.e.: Bytes acknowledged
+  //since the last CWND update [byte].
+  //Reset after a CWND update. Initial value: 0
+  gint32                  bytes_newly_acked;
+  //Upper limit of how many bytes that can be transmitted [byte].
+  //Updated when CWND is updated and when RTP packet is transmitted.
+  //Initial value: 0
+  gint32                  send_wnd;
+  //Approximate estimate of interpacket transmission
+  //itnerval [ms], updated when RTP packet transmitted. Initial value: 1
+  gint64                  t_pace;
+
 };
 
 struct _MPRTPSPathClass
 {
   GObjectClass parent_class;
+
+  guint32      max_sent_timestamp;
 };
 
 typedef struct _RRMeasurement RRMeasurement;
@@ -142,9 +173,6 @@ MPRTPSPath *make_mprtps_path (guint8 id, void (*send_func)(gpointer, GstBuffer*)
 
 gboolean mprtps_path_is_new (MPRTPSPath * this);
 void mprtps_path_set_not_new(MPRTPSPath * this);
-void mprtps_path_set_trial_end (MPRTPSPath * this);
-void mprtps_path_set_trial_begin (MPRTPSPath * this);
-gboolean mprtps_path_is_in_trial (MPRTPSPath * this);
 gboolean mprtps_path_is_active (MPRTPSPath * this);
 void mprtps_path_set_active (MPRTPSPath * this);
 void mprtps_path_set_passive (MPRTPSPath * this);
@@ -173,7 +201,10 @@ GstClockTime mprtps_path_get_time_sent_to_lossy (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_non_congested (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_congested (MPRTPSPath * this);
 guint16 mprtps_path_get_HSN(MPRTPSPath * this);
-void mprtps_path_set_pacing (MPRTPSPath * this, guint32 bytes_per_s);
+void mprtps_path_setup_cwnd (MPRTPSPath * this,
+                             guint32 cwnd_size,
+                             gdouble slack_size,
+                             guint32 srtt_ms);
 void mprtps_path_set_monitor_payload_id(MPRTPSPath *this, guint8 payload_type);
 void mprtps_path_set_mprtp_ext_header_id(MPRTPSPath *this, guint ext_header_id);
 gboolean mprtps_path_is_overused (MPRTPSPath * this);

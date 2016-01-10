@@ -196,13 +196,10 @@ numstracker_obsolate (NumsTracker * this)
 void _add_value(NumsTracker *this, gint64 value)
 {
   GstClockTime now;
-  gint64 squere;
-  squere = value * value;
   now = gst_clock_get_time(this->sysclock);
   //add new one
   ++this->counter;
   this->items[this->write_index].value = value;
-  this->items[this->write_index].squere = squere;
   this->items[this->write_index].added = now;
   this->value_sum += value;
   if(++this->write_index == this->length){
@@ -233,7 +230,6 @@ elliminate:
   value = this->items[this->read_index].value;
   this->value_sum -= value;
   this->items[this->read_index].value = 0;
-  this->items[this->read_index].squere = 0;
   this->items[this->read_index].added = 0;
   if(this->tree) bintree_delete_value(this->tree, value);
   if(++this->read_index == this->length){

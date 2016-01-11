@@ -25,20 +25,17 @@
 #include <glib.h>
 
 
+typedef struct _UtilizationSubflowReport{
+  gboolean controlled;
+  gint32   max_rate;
+  gint32   lost_bytes;
+  gint32   discarded_bytes;
+  guint64  owd;
+}UtilizationSubflowReport;
+
 typedef struct _UtilizationReport{
-  guint32  target_rate;
-  guint32  min_rate;
-  guint32  max_rate;
-  struct{
-    gboolean available;
-    gdouble  target_weight;
-    gint32   max_rate;
-    gint32   min_rate;
-    gint32   lost_bytes;
-    gint32   discarded_bytes;
-    guint64  owd;
-    gint8    shareability;
-  }subflows[32];
+  guint32                  target_rate;
+  UtilizationSubflowReport subflows[32];
 }UtilizationReport;
 
 typedef struct _SessionData
@@ -222,16 +219,16 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
   gint delta, new_bitrate, get_bitrate;
   g_object_get (encoder, "target-bitrate", &get_bitrate, NULL);
   {
-    gint i;
-    new_bitrate = ur->target_rate * 8;
-    for(i=0; i<32; ++i){
-      if(!ur->subflows[i].available) continue;
-      ur->subflows[i].target_weight=0.;
-    }
-    ur->subflows[1].max_rate=subflow1_max_rate;
-    ur->subflows[1].shareability = subflow1_shareability;
-    ur->subflows[2].max_rate=subflow2_max_rate;
-    ur->subflows[2].shareability = subflow2_shareability;
+//    gint i;
+    new_bitrate = ur->target_rate;
+//    for(i=0; i<32; ++i){
+//      if(!ur->subflows[i].available) continue;
+//      ur->subflows[i].target_weight=0.;
+//    }
+//    ur->subflows[1].max_rate=subflow1_max_rate;
+//    ur->subflows[1].shareability = subflow1_shareability;
+//    ur->subflows[2].max_rate=subflow2_max_rate;
+//    ur->subflows[2].shareability = subflow2_shareability;
   }
 
 //  g_print("get_bitrate: %d new_bitrate: %d\n", get_bitrate, new_bitrate);
@@ -316,7 +313,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   gst_element_link_pads (mprtpsnd, "src_2", rtpSink_2, "sink");
 
   g_object_set (mprtpsch, "join-subflow", 1, NULL);
-  g_object_set (mprtpsch, "join-subflow", 2, NULL);
+//  g_object_set (mprtpsch, "join-subflow", 2, NULL);
 
 //  sprintf(ids->filename, "%s", file);
 //  g_timeout_add (1000, _network_changes, ids);

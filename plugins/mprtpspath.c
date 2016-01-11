@@ -78,6 +78,67 @@ make_mprtps_path (guint8 id, void (*send_func)(gpointer, GstBuffer*), gpointer f
   return result;
 }
 
+void g_print_rrmeasurement(RRMeasurement *measurement)
+{
+  g_print("+=+=+=+=+=+=+=+=+=+=+ RRMeasurement dump =+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+  "|Time: %29lu|\n"
+  "|RTT: %29lu|\n"
+  "|jitter: %29u|\n"
+  "|cum_packet_lost: %29u|\n"
+  "|lost: %29u|\n"
+  "|median_delay: %29lu|\n"
+  "|min_delay: %29lu|\n"
+  "|max_delay: %29lu|\n"
+  "|early_discarded_bytes: %29u|\n"
+  "|late_discarded_bytes: %29u|\n"
+  "|early_discarded_bytes_sum: %29u|\n"
+  "|late_discarded_bytes_sum: %29u|\n"
+  "|HSSN: %29hu|\n"
+  "|cycle_num: %29hu|\n"
+  "|expected_packets: %29hu|\n"
+  "|PiT: %29hu|\n"
+  "|expected_payload_bytes: %29u|\n"
+  "|sent_payload_bytes_sum: %29u|\n"
+  "|lost_rate: %29f|\n"
+  "|goodput: %29f|\n"
+  "|sending_weight: %29f|\n"
+  "|sender_rate: %29f|\n"
+  "|receiver_rate: %29f|\n"
+  "|state: %29d|\n"
+  "|checked: %29d|\n"
+  "|bytes_in_flight: %29u|\n"
+  "|bytes_in_queue: %29u|\n"
+  "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n",
+  measurement->time,
+  measurement->RTT,
+  measurement->jitter,
+  measurement->cum_packet_lost,
+  measurement->lost,
+  measurement->median_delay,
+  measurement->min_delay,
+  measurement->max_delay,
+  measurement->early_discarded_bytes,
+  measurement->late_discarded_bytes,
+  measurement->early_discarded_bytes_sum,
+  measurement->late_discarded_bytes_sum,
+  measurement->HSSN,
+  measurement->cycle_num,
+  measurement->expected_packets,
+  measurement->PiT,
+  measurement->expected_payload_bytes,
+  measurement->sent_payload_bytes_sum,
+  measurement->lost_rate,
+  measurement->goodput,
+  measurement->sending_weight,
+  measurement->sender_rate,
+  measurement->receiver_rate,
+  measurement->state,
+  measurement->checked,
+  measurement->bytes_in_flight,
+  measurement->bytes_in_queue );
+
+}
+
 /**
  * mprtps_path_reset:
  * @src: an #MPRTPSPath
@@ -427,18 +488,6 @@ mprtps_path_get_total_sent_frames_num (MPRTPSPath * this)
   return result;
 }
 
-gboolean
-mprtps_path_is_overused (MPRTPSPath * this)
-{
-  gboolean result;
-  THIS_READLOCK (this);
-  result = _is_overused(this);
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-
-
 guint32
 mprtps_path_get_sent_octet_sum_for (MPRTPSPath * this, guint32 amount)
 {
@@ -472,9 +521,16 @@ guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this)
   return result;
 }
 
+void mprtps_path_clear_queue(MPRTPSPath *this)
+{
+  THIS_WRITELOCK(this);
+  packetssndqueue_reset(this->packetsqueue);
+  THIS_WRITEUNLOCK(this);
+}
+
 guint32 mprtps_path_get_sender_rate(MPRTPSPath *this)
 {
-  guint32 result;
+  gint64 result;
   THIS_READLOCK(this);
   numstracker_get_stats(this->sent_bytes, &result, NULL, NULL);
   THIS_READUNLOCK(this);
@@ -485,7 +541,7 @@ guint32 mprtps_path_get_bytes_in_queue(MPRTPSPath *this)
 {
   guint32 result;
   THIS_READLOCK(this);
-  packetssndqueue_get_num(this, &result);
+  packetssndqueue_get_num(this->packetsqueue, &result);
   THIS_READUNLOCK(this);
   return result;
 }
@@ -514,9 +570,7 @@ mprtps_path_tick(MPRTPSPath *this)
 //  }
   if(!this->cwnd_enabled) goto done;
   if(this->ticknum != this->pacing_tick) goto done;
-  if(packetssndqueue_has_buffer(this->packetsqueue)){
-    _cwnd_flushing(this);
-  }
+  _cwnd_flushing(this);
 
 done:
   THIS_WRITEUNLOCK (this);
@@ -622,7 +676,7 @@ gboolean _cwnd_flushing(MPRTPSPath * this)
 {
   GstBuffer *buffer;
   guint32 payload_bytes, new_bytes_in_flight;
-  gdouble pace_interval, pacing_bitrate;
+  gdouble pacing_bitrate;
   while(packetssndqueue_has_buffer(this->packetsqueue, &payload_bytes)){
     new_bytes_in_flight = this->bytes_in_flight + payload_bytes;
     if(this->cwnd_size < new_bytes_in_flight){
@@ -637,7 +691,7 @@ gboolean _cwnd_flushing(MPRTPSPath * this)
 
     pacing_bitrate = MAX(MINIMUM_PACE_BANDWIDTH,
                          this->cwnd_size * 8 / MAX(0.001, (gdouble)this->srtt_ms / 1000.));
-    this->pacing_tick = this->ticknum + MAX(MIN_PACE_INTERVAL, (gdouble)(payload_bytes * 8) / (gdouble)pacing_bitrate * 1000.);
+    this->pacing_tick = this->ticknum + MAX(MIN_PACE_INTERVAL, (gdouble)(payload_bytes * 8) / (gdouble)pacing_bitrate);
   }
   return TRUE;
 failed:

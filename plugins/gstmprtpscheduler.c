@@ -123,8 +123,6 @@ enum
   PROP_RETAIN_BUFFERS,
   PROP_SUBFLOWS_STATS,
   PROP_SCHEDULER_STATE,
-  PROP_SET_MAX_BYTES_PER_S,
-  PROP_PACING_BUFFERS,
 };
 
 /* signals and args */
@@ -280,18 +278,6 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "A 32bit unsigned integer for setup a bid. The first 8 bit identifies the subflow, the latter the bid for the subflow",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_SET_MAX_BYTES_PER_S,
-      g_param_spec_uint ("setup-max-byte-per-s",
-          "set the maximum allowed bytes per second for pacing",
-          "A 32bit unsigned integer for setup the value. The first 8 bit identifies the subflow, the latter the maximum allowed bytes per ms for the subflow",
-          0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_PACING_BUFFERS,
-      g_param_spec_boolean ("pacing",
-          "Indicate weather the scheduler pacing the traffic or not",
-          "Indicate weather the scheduler pacing the traffic or not if"
-          "suflows overuse the paths regarding to the goodputs",
-          FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SUBFLOWS_STATS,
       g_param_spec_string ("subflow-stats",
@@ -460,8 +446,6 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
   gboolean gboolean_value;
   guint8 subflow_id;
   guint subflow_bid;
-  guint max_bytes_per_s;
-  MPRTPSPath *path;
 
   GST_DEBUG_OBJECT (this, "set_property");
 
@@ -517,12 +501,6 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       this->retain_allowed = gboolean_value;
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_PACING_BUFFERS:
-      THIS_WRITELOCK (this);
-      gboolean_value = g_value_get_boolean (value);
-      this->controller_pacing (this->controller, gboolean_value);
-      THIS_WRITEUNLOCK (this);
-      break;
     case PROP_SET_SENDING_BID:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
@@ -531,17 +509,6 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       stream_splitter_setup_sending_bid (this->splitter, subflow_id,
           subflow_bid);
       stream_splitter_commit_changes (this->splitter, 0, 0);
-      THIS_WRITEUNLOCK (this);
-      break;
-
-    case PROP_SET_MAX_BYTES_PER_S:
-      THIS_WRITELOCK (this);
-      guint_value = g_value_get_uint (value);
-      subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
-      path = NULL;
-      _try_get_path (this, subflow_id, &path);
-      max_bytes_per_s = guint_value & 0x00FFFFFFUL;
-      mprtps_path_setup_cwnd (path, max_bytes_per_s);
       THIS_WRITEUNLOCK (this);
       break;
 
@@ -584,11 +551,6 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
     case PROP_RETAIN_BUFFERS:
       THIS_READLOCK (this);
       g_value_set_boolean (value, this->retain_allowed);
-      THIS_READUNLOCK (this);
-      break;
-    case PROP_PACING_BUFFERS:
-      THIS_READLOCK (this);
-      g_value_set_boolean (value, this->controller_is_pacing(this->controller));
       THIS_READUNLOCK (this);
       break;
     case PROP_SUBFLOWS_STATS:

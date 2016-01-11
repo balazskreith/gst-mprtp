@@ -10,6 +10,7 @@
 
 #include <gst/gst.h>
 #include "mprtpspath.h"
+#include "subratectrler.h"
 
 typedef struct _SendingRateDistributor SendingRateDistributor;
 typedef struct _SendingRateDistributorClass SendingRateDistributorClass;
@@ -32,13 +33,11 @@ struct _SendingRateDistributor
   guint8               available_ids[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   guint8               available_ids_length;
 
-  gint32               supplied_bytes;
-  gint32               requested_bytes;
-  gint32               movable_bytes;
+  gint32               extra_rate;
+  gint32               target_bitrate;
+  gint32               delta_rate;
 
-  guint32              max_rate;
-  guint32              min_rate;
-
+  UtilizationReport    ur;
   SignalRequestFunc    signal_request;
   gpointer             signal_controller;
 };
@@ -51,23 +50,15 @@ struct _SendingRateDistributorClass{
 
 GType sndrate_distor_get_type (void);
 SendingRateDistributor *make_sndrate_distor(SignalRequestFunc signal_request, gpointer controller);
-void sndrate_distor_add_controllable_path(SendingRateDistributor *this,
+SubflowRateController*  sndrate_distor_add_controllable_path(SendingRateDistributor *this,
                                  MPRTPSPath *path,
                                  guint32 sending_rate);
 void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        guint8 id,
                                        RRMeasurement *measurement,
                                        guint32 media_rate);
-void sndrate_distor_extract_stats(SendingRateDistributor *this,
-                                  guint8 id,
-                                  guint64 *median_delay,
-                                  gint32  *sender_rate,
-                                  gdouble *target_rate,
-                                  gdouble *goodput,
-                                  gdouble *next_target,
-                                  gdouble *media_target);
 
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
-guint32 sndrate_distor_time_update(SendingRateDistributor *this);
+void sndrate_distor_time_update(SendingRateDistributor *this);
 guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id);
 #endif /* SNDRATEDISTOR_H_ */

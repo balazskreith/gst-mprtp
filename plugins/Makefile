@@ -140,8 +140,7 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-gstmprtpscheduler.lo \
 	libgstmprtp_la-gstmprtpplayouter.lo \
 	libgstmprtp_la-gstmprtpreceiver.lo \
-	libgstmprtp_la-gstmprtpsender.lo \
-	libgstmprtp_la-kalmanfilter.lo libgstmprtp_la-mprtprpath.lo \
+	libgstmprtp_la-gstmprtpsender.lo libgstmprtp_la-mprtprpath.lo \
 	libgstmprtp_la-mprtpspath.lo libgstmprtp_la-streamjoiner.lo \
 	libgstmprtp_la-streamsplitter.lo libgstmprtp_la-rmanctrler.lo \
 	libgstmprtp_la-smanctrler.lo libgstmprtp_la-sefctrler.lo \
@@ -153,7 +152,9 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-variancetracker.lo \
 	libgstmprtp_la-sndratedistor.lo \
 	libgstmprtp_la-skalmanfilter.lo libgstmprtp_la-nlms.lo \
-	libgstmprtp_la-numstracker.lo
+	libgstmprtp_la-numstracker.lo \
+	libgstmprtp_la-floatnumstracker.lo \
+	libgstmprtp_la-subratectrler.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -402,7 +403,6 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          gstmprtpplayouter.c        \
                          gstmprtpreceiver.c         \
                          gstmprtpsender.c           \
-                         kalmanfilter.c             \
                          mprtprpath.c               \
                          mprtpspath.c               \
                          streamjoiner.c             \
@@ -421,7 +421,9 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          sndratedistor.c            \
                          skalmanfilter.c            \
                          nlms.c                     \
-                         numstracker.c
+                         numstracker.c              \
+                         floatnumstracker.c         \
+                         subratectrler.c        
 
 noinst_HEADERS = mprtpspath.h           \
                  rmanctrler.h           \
@@ -440,9 +442,10 @@ noinst_HEADERS = mprtpspath.h           \
                  variancetracker.h      \
                  sndratedistor.h        \
                  skalmanfilter.h        \
-                 kalmanfilter.h         \
                  nlms.h                 \
-                 numstracker.h
+                 numstracker.h          \
+                 floatnumstracker.h     \
+                 subratectrler.h        
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -537,6 +540,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 include ./$(DEPDIR)/libgstmprtp_la-bintree.Plo
+include ./$(DEPDIR)/libgstmprtp_la-floatnumstracker.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtcpbuffer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpbuffer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplayouter.Plo
@@ -544,7 +548,6 @@ include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplugin.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
-include ./$(DEPDIR)/libgstmprtp_la-kalmanfilter.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-nlms.Plo
@@ -562,6 +565,7 @@ include ./$(DEPDIR)/libgstmprtp_la-smanctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndratedistor.Plo
 include ./$(DEPDIR)/libgstmprtp_la-streamjoiner.Plo
 include ./$(DEPDIR)/libgstmprtp_la-streamsplitter.Plo
+include ./$(DEPDIR)/libgstmprtp_la-subratectrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-variancetracker.Plo
 
 .c.o:
@@ -633,13 +637,6 @@ libgstmprtp_la-gstmprtpsender.lo: gstmprtpsender.c
 #	$(AM_V_CC)source='gstmprtpsender.c' object='libgstmprtp_la-gstmprtpsender.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtpsender.lo `test -f 'gstmprtpsender.c' || echo '$(srcdir)/'`gstmprtpsender.c
-
-libgstmprtp_la-kalmanfilter.lo: kalmanfilter.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-kalmanfilter.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-kalmanfilter.Tpo -c -o libgstmprtp_la-kalmanfilter.lo `test -f 'kalmanfilter.c' || echo '$(srcdir)/'`kalmanfilter.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-kalmanfilter.Tpo $(DEPDIR)/libgstmprtp_la-kalmanfilter.Plo
-#	$(AM_V_CC)source='kalmanfilter.c' object='libgstmprtp_la-kalmanfilter.lo' libtool=yes \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-kalmanfilter.lo `test -f 'kalmanfilter.c' || echo '$(srcdir)/'`kalmanfilter.c
 
 libgstmprtp_la-mprtprpath.lo: mprtprpath.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-mprtprpath.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-mprtprpath.Tpo -c -o libgstmprtp_la-mprtprpath.lo `test -f 'mprtprpath.c' || echo '$(srcdir)/'`mprtprpath.c
@@ -773,6 +770,20 @@ libgstmprtp_la-numstracker.lo: numstracker.c
 #	$(AM_V_CC)source='numstracker.c' object='libgstmprtp_la-numstracker.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-numstracker.lo `test -f 'numstracker.c' || echo '$(srcdir)/'`numstracker.c
+
+libgstmprtp_la-floatnumstracker.lo: floatnumstracker.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-floatnumstracker.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-floatnumstracker.Tpo -c -o libgstmprtp_la-floatnumstracker.lo `test -f 'floatnumstracker.c' || echo '$(srcdir)/'`floatnumstracker.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-floatnumstracker.Tpo $(DEPDIR)/libgstmprtp_la-floatnumstracker.Plo
+#	$(AM_V_CC)source='floatnumstracker.c' object='libgstmprtp_la-floatnumstracker.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-floatnumstracker.lo `test -f 'floatnumstracker.c' || echo '$(srcdir)/'`floatnumstracker.c
+
+libgstmprtp_la-subratectrler.lo: subratectrler.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-subratectrler.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-subratectrler.Tpo -c -o libgstmprtp_la-subratectrler.lo `test -f 'subratectrler.c' || echo '$(srcdir)/'`subratectrler.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-subratectrler.Tpo $(DEPDIR)/libgstmprtp_la-subratectrler.Plo
+#	$(AM_V_CC)source='subratectrler.c' object='libgstmprtp_la-subratectrler.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-subratectrler.lo `test -f 'subratectrler.c' || echo '$(srcdir)/'`subratectrler.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

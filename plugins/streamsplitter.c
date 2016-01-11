@@ -728,7 +728,7 @@ _tree_commit (StreamSplitter *this, SchNode ** tree,
 
 void _determine_skipping(StreamSplitter *this)
 {
-  guint32 actual_rate;
+  gint64 actual_rate;
   gdouble ratio;
   this->skip_tick = 0;
   this->skip_interval = 0;

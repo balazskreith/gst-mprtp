@@ -64,11 +64,11 @@ G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 //CWND scale factor due to loss event. Default value: 0.6
 #define BETA 0.6
 // Target rate scale factor due to loss event. Default value: 0.8
-#define BETA_R 0.9
+#define BETA_R 0.6
 //Additional slack [%]  to the congestion window. Default value: 10%
 #define BYTES_IN_FLIGHT_SLACK .1
-//Interval between video bitrate adjustments. Default value: 0.1s ->100ms
-#define RATE_ADJUST_INTERVAL 100
+//Interval between video bitrate adjustments. Default value: 0.2s ->200ms
+#define RATE_ADJUST_INTERVAL 200 * GST_MSECOND /* ms */
 //Video coder frame period [s]
 #define FRAME_PERIOD 0
 //Min target_bitrate [bps]
@@ -114,7 +114,7 @@ struct _Moment{
   guint32         bytes_newly_acked;
   guint32         bytes_in_flight;
   guint32         bytes_in_queue;
-  guint32         max_bytes_in_flight;
+  guint64         max_bytes_in_flight;
   gboolean        ECN;
   gboolean        ECN_acked;
 
@@ -136,8 +136,6 @@ struct _Moment{
 
   //application
   GstClockTime    time;
-  gint32          target_rate;
-  gint32          delta;
   State           state;
 
 };
@@ -159,16 +157,47 @@ static const gdouble DT_ = 1.5; //Down Treshold
 //--------------------MEASUREMENTS-----------------------
 
 #define _actual_rate(this) (MAX(_mt0(this)->sender_rate, _mt0(this)->receiver_rate))
+#define _ramp_up_speed(this) (MIN(RAMP_UP_SPEED, this->target_bitrate))
 #define _now(this) (gst_clock_get_time(this->sysclock))
 #define _get_moment(this, n) ((Moment*)(this->moments + n * sizeof(Moment)))
 #define _pmtn(index) (index == MOMENTS_LENGTH ? MOMENTS_LENGTH - 1 : index - 1)
 #define _mt0(this) _get_moment(this, this->moments_index)
 #define _mt1(this) _get_moment(this, _pmtn(this->moments_index))
+#define _mt2(this) _get_moment(this, _pmtn(_pmtn(this->moments_index)))
 
 static Moment*
 _m_step(SubflowRateController *this);
 
-//----------------------STATES-------------------
+static void
+_set_owd_trend(
+    SubflowRateController *this);
+
+static gdouble
+_get_cwnd_scl_i(
+    SubflowRateController *this);
+
+static gdouble
+_get_bitrate_scl_i(
+    SubflowRateController *this);
+
+static gdouble
+_get_off_target(
+    SubflowRateController *this);
+
+static gboolean
+_cwnd_can_increase(SubflowRateController *this);
+
+static void
+_bitrate_overused_state(
+    SubflowRateController *this);
+
+static void
+_bitrate_stable_state(
+    SubflowRateController *this);
+
+static void
+_bitrate_monitored_state(
+    SubflowRateController *this);
 
 static void
 _cwnd_overused_state(
@@ -178,15 +207,48 @@ static void
 _cwnd_stable_state(
     SubflowRateController *this);
 
-static void
-_check_monitored(
-    SubflowRateController *this);
+#define _cwnd_monitored_state _cwnd_stable_state
+//static void
+//_cwnd_monitored_state(
+//    SubflowRateController *this);
 
 //-----------------------ACTIONS------------------
 static void
 _transit_to(
     SubflowRateController *this,
     State target);
+
+static void
+_validate_and_set_cwnd(
+    SubflowRateController *this);
+
+static void
+_reduce_bitrate(
+    SubflowRateController *this);
+
+static void
+_reduce_cwnd(
+    SubflowRateController *this);
+
+static void
+_raise_bitrate(
+    SubflowRateController *this);
+
+static void
+_raise_cwnd(
+    SubflowRateController *this);
+
+static gdouble
+_adjust_bitrate(
+    SubflowRateController *this);
+
+static void
+_gain_up_cwnd(
+    SubflowRateController *this);
+
+static void
+_gain_down_cwnd(
+    SubflowRateController *this);
 
 #define _disable_monitoring(this) _setup_monitoring(this, 0)
 
@@ -195,6 +257,15 @@ _setup_monitoring(
     SubflowRateController *this,
     guint interval);
 
+static guint32
+_reduce_monitoring(
+    SubflowRateController *this,
+    guint32 requested_bitrate);
+
+static void
+_calculate_monitoring_interval(
+    SubflowRateController *this,
+    guint32 desired_bitrate);
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -255,10 +326,11 @@ void subratectrler_set(SubflowRateController *this,
   this->path = g_object_ref(path);
   memset(this->moments, 0, sizeof(Moment) * MOMENTS_LENGTH);
 
+  this->id = mprtps_path_get_id(this->path);
+
   this->owd_target = OWD_TARGET_LO;
   this->owd_fraction_avg = 0.;
   //Vector of the last 20 owd_fraction
-  this->owd_fraction_hist;
   this->mss = 1400;
   this->cwnd_min = 3 * this->mss;
   this->in_fast_start = TRUE;
@@ -278,33 +350,64 @@ void subratectrler_set(SubflowRateController *this,
 void subratectrler_unset(SubflowRateController *this)
 {
   THIS_WRITELOCK(this);
-  this->path = g_object_unref(this->path);
+  g_object_unref(this->path);
+  this->path = NULL;
   THIS_WRITEUNLOCK(this);
+}
+
+void subratectrler_extract_stats(SubflowRateController *this,
+                                  guint64 *median_delay,
+                                  gint32  *sender_rate,
+                                  gdouble *target_rate,
+                                  gdouble *goodput,
+                                  gdouble *next_target)
+{
+  if(median_delay)
+    *median_delay = percentiletracker_get_stats(this->ltt_delays_th, NULL, NULL, NULL);
+  if(sender_rate)
+    *sender_rate = _mt0(this)->sender_rate;
+  if(target_rate)
+    *target_rate = this->target_bitrate / 8;
+  if(goodput)
+    *goodput = _mt0(this)->goodput;
+  if(next_target)
+    *next_target = 0;
 }
 
 void subratectrler_time_update(
                          SubflowRateController *this,
-                         gint32 *delta_bitrate)
+                         gint32 *target_bitrate,
+                         gint32 *extra_bitrate,
+                         UtilizationSubflowReport *rep)
 {
 
   _mt0(this)->bytes_in_flight     = mprtps_path_get_bytes_in_flight(this->path);
   numstracker_add(this->bytes_in_flight_history, _mt0(this)->bytes_in_flight);
   numstracker_get_stats(this->bytes_in_flight_history, NULL, &_mt0(this)->max_bytes_in_flight, NULL);
 
-  _mt0(this)->sender_rate         = mprtps_path_get_sender_rate(this->path);
+  _mt0(this)->sender_rate         = mprtps_path_get_sender_rate(this->path) * 8;
   _mt0(this)->bytes_in_queue      = mprtps_path_get_bytes_in_queue(this->path);
 
   if(this->moments_num == 0){
-      this->bytes_in_flight_avg = _mt0(this)->bytes_in_flight;
+      this->bytes_in_queue_avg = _mt0(this)->bytes_in_queue;
   }else{
-    this->bytes_in_flight_avg *= .5;
-    this->bytes_in_flight_avg += _mt0(this)->bytes_in_flight * .5;
+    this->bytes_in_queue_avg *= .5;
+    this->bytes_in_queue_avg += _mt0(this)->bytes_in_queue * .5;
   }
 
+  this->rate_controller(this);
 
+  if(rep){
+    rep->lost_bytes = _mt0(this)->lost;
+    rep->discarded_bytes = _mt0(this)->discard;
+    rep->owd = _mt0(this)->delay;
+    rep->max_rate = this->max_rate;
+  }
+  if(target_bitrate)
+    *target_bitrate = this->target_bitrate;
+  if(extra_bitrate)
+    *extra_bitrate = this->monitored_bitrate * 8;
 
-
-done:
   return;
 }
 
@@ -312,18 +415,19 @@ void subratectrler_measurement_update(
                          SubflowRateController *this,
                          RRMeasurement * measurement)
 {
+//  g_print_rrmeasurement(measurement);
+  if(measurement->goodput <= 0.) goto done;
   _m_step(this);
-  _mt0(this)->state = _mt1(this)->state;
 
   _mt0(this)->delay               = measurement->median_delay;
   _mt0(this)->discard             = measurement->late_discarded_bytes;
   _mt0(this)->lost                = measurement->lost;
   _mt0(this)->goodput             = measurement->goodput;
-  _mt0(this)->receiver_rate       = measurement->receiver_rate;
+  _mt0(this)->receiver_rate       = measurement->receiver_rate * 8;
   _mt0(this)->jitter              = measurement->jitter;
   _mt0(this)->bytes_newly_acked   = measurement->expected_payload_bytes;
 
-  _mt0(this)->sender_rate         = _mt1(this)->sender_rate;
+  _mt0(this)->sender_rate         = _mt1(this)->sender_rate * 8;
   _mt0(this)->bytes_in_flight     = _mt1(this)->bytes_in_flight;
   _mt0(this)->bytes_in_queue      = _mt1(this)->bytes_in_queue;
   _mt0(this)->max_bytes_in_flight = _mt1(this)->max_bytes_in_flight;
@@ -341,15 +445,25 @@ void subratectrler_measurement_update(
   else
     this->s_rtt = measurement->RTT;
 
-  if(!percentiletracker_get_num(this->ltt_delays_th)){
-    _mt0(this)->ltt_delays_th = measurement->max_delay;
+  if(percentiletracker_get_num(this->ltt_delays_th) < 1){
+    _mt0(this)->ltt_delays_th = measurement->median_delay;
     _mt0(this)->ltt_delays_target = measurement->median_delay;
   }else{
     _mt0(this)->ltt_delays_th = percentiletracker_get_stats(this->ltt_delays_th, NULL, NULL, NULL);
     _mt0(this)->ltt_delays_target = percentiletracker_get_stats(this->ltt_delays_target, NULL, NULL, NULL);
   }
 
-  _mt0(this)->corrh_owd = _mt0(this)->delay / _mt0(this)->ltt_delays_target;
+  if(!_mt0(this)->ltt_delays_th){
+      g_warning("ltt_delays_th value should be greater then 0");
+      _mt0(this)->ltt_delays_th = OWD_TARGET_LO;
+    }
+
+  if(!_mt0(this)->ltt_delays_target){
+      g_warning("ltt_delays_target value should be greater then 0");
+      _mt0(this)->ltt_delays_target = OWD_TARGET_LO;
+    }
+
+  _mt0(this)->corrh_owd = (gdouble)_mt0(this)->delay / (gdouble)_mt0(this)->ltt_delays_th;
   //Weather the subflow is overused or not.
   this->cwnd_controller(this);
 
@@ -358,14 +472,34 @@ void subratectrler_measurement_update(
     percentiletracker_add(this->ltt_delays_target, measurement->median_delay);
   }
 
+done:
+  return;
+
 }
 
+gint32 subratectrler_get_target_bitrate(SubflowRateController *this)
+{
+  return this->target_bitrate;
+}
+
+void subratectrler_add_extra_rate(SubflowRateController *this,
+                                  gint32 extra_rate)
+{
+  this->target_bitrate += extra_rate;
+  this->extra_bitrate += extra_rate;
+  if(0 < this->monitored_bitrate){
+    _reduce_monitoring(this, extra_rate);
+    if(this->monitoring_interval < 1)
+      _transit_to(this, STATE_STABLE);
+  }
+}
 
 Moment* _m_step(SubflowRateController *this)
 {
   if(++this->moments_index == MOMENTS_LENGTH){
     this->moments_index = 0;
   }
+  ++this->moments_num;
   memset(_mt0(this), 0, sizeof(Moment));
   return _mt0(this);
 }
@@ -387,7 +521,7 @@ void _set_owd_trend(SubflowRateController *this)
   rdata.a0 = rdata.a1 = rdata.x1 = 0.;
   floatnumstracker_get_stats(this->owd_fraction_hist, NULL, &rdata.avg);
   floatnumstracker_iterate(this->owd_fraction_hist, _iterator_process, &rdata);
-  if(rdata <= 0.) goto done;
+  if(rdata.a0 <= 0.) goto done;
 
   _mt0(this)->owd_trend = MAX(0.0f, MIN(1.0f, (rdata.a1 / rdata.a0)*this->owd_fraction_avg));
 
@@ -420,7 +554,7 @@ gdouble _get_off_target(SubflowRateController *this)
   return off_target;
 }
 
-gboolean _can_increase(SubflowRateController *this)
+gboolean _cwnd_can_increase(SubflowRateController *this)
 {
   gfloat alpha = 1.25f+2.75f*(1.0f-this->owd_trend_mem);
   return this->cwnd <= alpha*_mt0(this)->bytes_in_flight;
@@ -431,12 +565,23 @@ void
 _bitrate_overused_state(
     SubflowRateController *this)
 {
+  gdouble queue_ratio;
+  g_print("S%d: bitrate: OVERUSED\n", this->id);
   if(_mt0(this)->ECN && !_mt0(this)->ECN_acked){
-    _reduce_bitrate(this);
     _mt0(this)->ECN_acked = TRUE;
+    _disable_monitoring(this);
+    _reduce_bitrate(this);
     goto done;
   }
-
+  if (_now(this) - RATE_ADJUST_INTERVAL < this->last_target_bitrate_adjust) {
+      return;
+  }
+  queue_ratio = (gdouble)(this->bytes_in_queue_avg * 8) / (gdouble) this->target_bitrate;
+  //check weather queue is full and empty it.
+  if(.5 < queue_ratio && this->last_queue_clear < _now(this) - 5 * GST_SECOND ){
+    mprtps_path_clear_queue(this->path);
+    this->last_queue_clear = _now(this);
+  }
 done:
   return;
 }
@@ -448,34 +593,25 @@ _bitrate_stable_state(
   //if explicit congestion occured it is at overused state;
 
   gdouble queue_rate;
-  guint32 target_bitrate_was;
-  guint32 delta_bitrate;
-  guint32 extra_bytes = 0;
+  gdouble delta_bitrate;
 
+  g_print("S%d: bitrate: STABLE\n", this->id);
   queue_rate = (gdouble)_mt0(this)->bytes_in_queue / (gdouble) this->target_bitrate;
-
+  g_print("bytes_in_queue: %u target_bitrate: %d queue_rate: %f\n",
+          _mt0(this)->bytes_in_queue, this->target_bitrate, queue_rate);
   if(this->in_fast_start && queue_rate < .1){
     _raise_bitrate(this);
     goto done;
   }
-  target_bitrate_was = this->target_bitrate;
-  _adjust_bitrate(this);
-  delta_bitrate = this->target_bitrate - target_bitrate_was;
-  if(this->target_bitrate == target_bitrate_was) goto done;
 
-  if(this->target_bitrate < target_bitrate_was){
-    if(0 < this->monitored_bytes)
-      extra_bytes = _reduce_monitoring(this, delta_bitrate / 8);
-    this->target_bitrate += extra_bytes * 8;
+  delta_bitrate = _adjust_bitrate(this);
+  if(delta_bitrate <= 0. || this->in_fast_start) {
     goto done;
   }
 
-  if(this->in_fast_start) goto done;
-
-  _calculate_monitoring_interval(this, this->monitored_bytes + delta_bitrate);
-
+  _calculate_monitoring_interval(this, this->monitored_bitrate + delta_bitrate);
   if(0 < this->monitoring_interval){
-    this->target_bitrate = target_bitrate_was;
+    this->target_bitrate -= delta_bitrate;
     _transit_to(this, STATE_MONITORED);
   }
 done:
@@ -486,7 +622,30 @@ void
 _bitrate_monitored_state(
     SubflowRateController *this)
 {
+  gdouble delta_bitrate;
+  //one measurment time...
+  g_print("S%d: bitrate: MONITORED\n", this->id);
+  delta_bitrate = _adjust_bitrate(this);
+  if(delta_bitrate < 0){
+    this->target_bitrate += _reduce_monitoring(this, delta_bitrate);
+    if(this->monitoring_interval < 1){
+      _transit_to(this, STATE_STABLE);
+      goto done;
+    }
+  }
 
+  if(_actual_rate(this) * 1.1 < this->max_rate){
+    this->target_bitrate-=delta_bitrate;
+    _calculate_monitoring_interval(this, this->monitored_bitrate + delta_bitrate);
+    goto done;
+  }
+
+  if(_now(this) - GST_SECOND < this->monitoring_started){
+    goto done;
+  }
+  this->target_bitrate += this->monitored_bitrate * 8;
+  _disable_monitoring(this);
+  _transit_to(this, STATE_STABLE);
 done:
   return;
 }
@@ -517,12 +676,13 @@ _cwnd_stable_state(
   //explicit congestion check
 
   if(_mt0(this)->discard_rate > 0.25 || _mt0(this)->corrh_owd > DT_){
+    g_print("S%d corrh_owd: %f, discarded rate: %f\n", this->id, _mt0(this)->corrh_owd, _mt0(this)->discard_rate);
     _reduce_cwnd(this);
     _transit_to(this, STATE_OVERUSED);
     goto done;
   }
   _mt0(this)->off_target = _get_off_target(this);
-  _mt0(this)->can_increase = _can_increase(this);
+  _mt0(this)->can_increase = _cwnd_can_increase(this);
 
   if(this->in_fast_start){
     //In fast start we ramp up the rate directly.
@@ -558,25 +718,11 @@ _transit_to(
       this->rate_controller = _bitrate_stable_state;
     break;
     case STATE_MONITORED:
-      this->cwnd_controller = _cwnd_stable_state;
+      this->cwnd_controller = _cwnd_monitored_state;
       this->rate_controller = _bitrate_monitored_state;
     break;
   }
   _mt0(this)->state = target;
-}
-
-
-void _use_monitored_bytes(SubflowRateController *this)
-{
-
-  if(0 < this->max_rate){
-    if(this->max_rate < _actual_rate(this) * .9)
-      goto done;
-  }
-  _mt0(this)->delta_cwnd = this->monitored_bytes;
-  _validate_and_set_cwnd(this);
-done:
-  return;
 }
 
 
@@ -592,10 +738,11 @@ void _validate_and_set_cwnd(SubflowRateController *this)
   }
 
   this->cwnd = MAX(this->cwnd_min, this->cwnd);
-  mprtps_path_setup_cwnd(this->path,
-                         this->cwnd,
-                         _mt0(this)->off_target > 0,
-                         GST_TIME_AS_MSECONDS(this->s_rtt));
+//  mprtps_path_setup_cwnd(this->path,
+//                         this->cwnd,
+//                         _mt0(this)->off_target > 0,
+//                         GST_TIME_AS_MSECONDS(this->s_rtt));
+  mprtps_path_setup_cwnd(this->path, 0, 0, 0);
   /*
   * Make possible to enter fast start if OWD has been low for a while
   */
@@ -604,10 +751,6 @@ void _validate_and_set_cwnd(SubflowRateController *this)
 
 void _reduce_bitrate(SubflowRateController *this)
 {
-  if(_mt0(this)->ECN_acked){
-    goto done;
-  }
-  _mt0(this)->ECN_acked = TRUE;
   if(this->last_target_bitrate_i_adjust + 5 * GST_SECOND < _now(this))
   {
       this->target_bitrate_i = _mt0(this)->receiver_rate;
@@ -617,7 +760,6 @@ void _reduce_bitrate(SubflowRateController *this)
   this->last_target_bitrate_adjust  = _now(this);
   goto done;
 done:
-  _validate_and_update_bitrate;
   return;
 }
 
@@ -638,12 +780,12 @@ void _raise_bitrate(SubflowRateController *this)
 {
   gdouble increment = 0., scl_i, ramp_up_speed, tmp = 1.;
 
-  ramp_up_speed = MIN(RAMP_UP_SPEED, this->target_bitrate);
+  ramp_up_speed = _ramp_up_speed(this);
   scl_i = _get_bitrate_scl_i(this);
   /*
    * Compute rate increment
   */
-  increment = ramp_up_speed * (RATE_ADJUST_INTERVAL/1000000.0) *
+  increment = ramp_up_speed * ((gdouble)RATE_ADJUST_INTERVAL/(gdouble)GST_SECOND) *
       (1.0f - MIN(1.0f, _mt0(this)->owd_trend /0.2f * tmp));
   /*
    * Limit increase rate near the last known highest bitrate
@@ -659,6 +801,7 @@ void _raise_bitrate(SubflowRateController *this)
    */
   this->target_bitrate *= 1.0f - PRE_CONGESTION_GUARD * _mt0(this)->owd_trend * tmp;
   this->was_fast_start = TRUE;
+  this->last_target_bitrate_adjust = _now(this);
 }
 
 void _raise_cwnd(SubflowRateController *this)
@@ -685,13 +828,14 @@ void _raise_cwnd(SubflowRateController *this)
   _validate_and_set_cwnd(this);
 }
 
-void _adjust_bitrate(SubflowRateController *this)
+gdouble _adjust_bitrate(SubflowRateController *this)
 {
   gdouble increment = 0., scl, scl_i, ramp_up_speed, tmp = 1.;
 
-  ramp_up_speed = MIN(RAMP_UP_SPEED, this->target_bitrate);
+  ramp_up_speed = _ramp_up_speed(this);
   scl_i = _get_bitrate_scl_i(this);
-  increment = 0.0f;
+
+  increment = 0.;
   if (this->was_fast_start) {
     this->was_fast_start = FALSE;
     if (this->last_target_bitrate_i_adjust < _now(this) - 5 * GST_SECOND) {
@@ -722,18 +866,19 @@ void _adjust_bitrate(SubflowRateController *this)
 
   this->was_fast_start = TRUE;
   increment *= scl_i;
-  increment = MIN(increment,(gfloat)(ramp_up_speed*(RATE_ADJUST_INTERVAL/1000000.0)));
-  _calculate_monitoring_interval(this, increment / 8.);
+  increment = MIN(increment,(gfloat)(ramp_up_speed*((gdouble)RATE_ADJUST_INTERVAL/(gdouble)GST_SECOND)));
+  _calculate_monitoring_interval(this, increment);
   increment = 0;
 done:
   this->target_bitrate += increment;
+  this->last_target_bitrate_adjust = _now(this);
+  return increment;
 }
 
 void _gain_up_cwnd(SubflowRateController *this)
 {
   gfloat gain;
   gdouble scl_i;
-  gboolean result = FALSE;
 
   _mt0(this)->delta_cwnd = 0;
   _mt0(this)->increased = TRUE;
@@ -753,7 +898,7 @@ void _gain_up_cwnd(SubflowRateController *this)
 
 void _gain_down_cwnd(SubflowRateController *this)
 {
-  gint32 delta_bytes = 0;
+  gint32 delta_rate = 0;
   /*
    * OWD above target
    */
@@ -761,9 +906,9 @@ void _gain_down_cwnd(SubflowRateController *this)
   if (_mt1(this)->increased) {
       this->cwnd_i = this->cwnd;
   }
-  delta_bytes = (gint)(GAIN_DOWN * _mt0(this)->off_target * _mt0(this)->bytes_newly_acked * this->mss / this->cwnd);
+  delta_rate = (gint)(GAIN_DOWN * _mt0(this)->off_target * _mt0(this)->bytes_newly_acked * this->mss / this->cwnd);
   this->last_congestion_detected = _now(this);
-  _mt0(this)->delta_cwnd = delta_bytes;
+  _mt0(this)->delta_cwnd = delta_rate;
   _validate_and_set_cwnd(this);
 }
 
@@ -771,36 +916,37 @@ void _gain_down_cwnd(SubflowRateController *this)
 
 void _setup_monitoring(SubflowRateController *this, guint interval)
 {
-  this->monitoring_time = 0;
+  this->monitoring_started = _now(this);
   this->monitoring_interval = interval;
-  this->monitored_bytes = (gdouble)_actual_rate(this) / (gdouble)interval;
+  this->monitored_bitrate = (gdouble)_actual_rate(this) / (gdouble)interval;
   mprtps_path_set_monitor_interval(this->path, interval);
-done:
   return;
 }
 
-void _reduce_monitoring(SubflowRateController *this, guint32 requested_bytes)
+guint32 _reduce_monitoring(SubflowRateController *this, guint32 requested_bitrate)
 {
-  gboolean result = FALSE;
+  guint32 result = 0;
   if(this->monitoring_interval < 1) goto done;
-  if(this->monitored_bytes < requested_bytes){
+  if(this->monitored_bitrate < requested_bitrate){
     _disable_monitoring(this);
+    result = this->monitored_bitrate;
     goto done;
   }
-  _calculate_monitoring_interval(this, this->monitored_bytes - requested_bytes * 1.1);
+  _calculate_monitoring_interval(this, this->monitored_bitrate - requested_bitrate);
+  result = requested_bitrate;
 done:
-  return;
+  return result;
 }
 
-void _calculate_monitoring_interval(SubflowRateController *this, guint32 desired_bytes)
+void _calculate_monitoring_interval(SubflowRateController *this, guint32 desired_bitrate)
 {
   gdouble actual, target, rate;
   guint monitoring_interval = 0;
-  if(desired_bytes <= 0){
+  if(desired_bitrate <= 0){
      goto exit;
    }
   actual = _actual_rate(this);
-  target = actual + (gdouble) desired_bytes;
+  target = actual + (gdouble) desired_bitrate;
   rate = target / actual;
 
   if(rate > 2.) monitoring_interval = 2;

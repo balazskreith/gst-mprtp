@@ -31,6 +31,7 @@
 #include <sys/timex.h>
 #include "ricalcer.h"
 #include "percentiletracker.h"
+#include "subratectrler.h"
 
 #define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
 #define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
@@ -128,6 +129,8 @@ struct _Subflow
   guint8                     late_discarded_history;
   gdouble                    avg_rtcp_size;
   gdouble                    actual_rate;
+
+  SubflowRateController*     rate_controller;
 };
 
 //----------------------------------------------------------------------
@@ -383,9 +386,9 @@ sefctrler_stat_run (void *data)
   gpointer key, val;
   Subflow *subflow;
   GstClockTime next_scheduler_time;
-  guint64 median_delay;
+  guint64 th80_delay;
   gint32 sender_rate;
-  gdouble media_target;
+  gdouble media_target = 0.;
 
   this = data;
   THIS_WRITELOCK (this);
@@ -396,18 +399,18 @@ sefctrler_stat_run (void *data)
     gdouble target_rate = 0., goodput, next_target;
     subflow = (Subflow *) val;
     if(!subflow) goto next;
-    sndrate_distor_extract_stats(this->rate_distor,
-                                 subflow->id,
-                                 &median_delay,
-                                 &sender_rate,
-                                 &target_rate,
-                                 &goodput,
-                                 &next_target,
-                                 &media_target);
+    ;
+    subratectrler_extract_stats(subflow->rate_controller,
+                                &th80_delay,
+                                &sender_rate,
+                                &target_rate,
+                                &goodput,
+                                &next_target);
+
     fprintf(file, "%d,%d,%lu,%lu,%f,%f,%f,%f,",
             subflow->id,
             sender_rate,
-            median_delay,
+            th80_delay,
             _irt0(subflow)->median_delay,
             target_rate/125.,
             next_target/125.,
@@ -454,7 +457,7 @@ sefctrler_add_path (gpointer ptr, guint8 subflow_id, MPRTPSPath * path)
                        new_subflow);
   ++this->subflow_num;
   stream_splitter_add_path (this->splitter, subflow_id, path, SUBFLOW_DEFAULT_SENDING_RATE);
-  sndrate_distor_add_controllable_path(this->rate_distor, path, SUBFLOW_DEFAULT_SENDING_RATE);
+  new_subflow->rate_controller = sndrate_distor_add_controllable_path(this->rate_distor, path, SUBFLOW_DEFAULT_SENDING_RATE);
 exit:
   THIS_WRITEUNLOCK (this);
 }
@@ -645,6 +648,7 @@ sefctrler_ticker_run (void *data)
   _system_notifier_main(this);
 //done:
   next_scheduler_time = now + 100 * GST_MSECOND;
+  ++this->ticknum;
   THIS_WRITEUNLOCK (this);
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
 
@@ -668,9 +672,7 @@ _irp_producer_main(SndEventBasedController * this)
   Subflow*       subflow;
   GstClockTime   now;
   Event          event;
-  guint32        media_rate;
 
-  media_rate = stream_splitter_get_media_rate(this->splitter);
   now = gst_clock_get_time(this->sysclock);
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
@@ -680,24 +682,10 @@ _irp_producer_main(SndEventBasedController * this)
     if(now - 120 * GST_MSECOND < _irt0(subflow)->time) goto not_checked;
     _irt0(subflow)->goodput = _get_subflow_goodput(subflow, &_irt0(subflow)->receiver_rate);
     if(0) g_print("%p", _irt(subflow, 0));
-    //if(goodput < 1. || !receiver_rate) continue;
-//    variance = (gdouble)_irt0(subflow)->jitter / (gdouble)_irt0(subflow)->delay_80;
-//    g_print("%d,J:%u,De:%lu,Mn:%lu,Mx:%lu,P:%u,Di:%u,GP:%f\n",
-//            subflow->id,
-//            _irt0(subflow)->jitter,
-//            _irt0(subflow)->median_delay,
-//            _irt0(subflow)->min_delay,
-//            _irt0(subflow)->max_delay,
-//            _irt0(subflow)->expected_payload_bytes,
-//            _irt0(subflow)->late_discarded_bytes,
-//            _irt0(subflow)->goodput);
-//    variance = .1;
 
     _irt0(subflow)->sending_weight = stream_splitter_get_sending_rate(this->splitter, subflow->id);
-    sndrate_distor_measurement_update(this->rate_distor,
-                                      subflow->id,
-                                      _irt0(subflow),
-                                      media_rate);
+    subratectrler_measurement_update(subflow->rate_controller, _irt0(subflow));
+
     event = subflow->check(subflow);
     subflow->fire(this, subflow, event);
     _irt0(subflow)->checked = TRUE;
@@ -861,7 +849,7 @@ _report_processing_rrblock_processor (SndEventBasedController *this,
   _irt0(subflow)->expected_payload_bytes =
       mprtps_path_get_sent_octet_sum_for (subflow->path, _irt0 (subflow)->expected_packets)<<3;
 
-  _irt0(subflow)->bytes_in_flight = mprtps_path_get_bytes_in_flight(subflow->path, &_irt0(subflow)->max_bytes_in_flight);
+  _irt0(subflow)->bytes_in_flight = mprtps_path_get_bytes_in_flight(subflow->path);
   _irt0(subflow)->bytes_in_queue = mprtps_path_get_bytes_in_queue(subflow->path);
   if (subflow->ir_moments_num > 1 && (LSR == 0 || DLSR == 0)) {
     return;
@@ -1030,7 +1018,7 @@ void _subflow_fire_p_state(SndEventBasedController *this,Subflow *subflow,Event 
 
   mprtps_path_set_active(path);
   state = mprtps_path_get_state(path);
-  sndrate_distor_add_controllable_path(
+  subflow->rate_controller = sndrate_distor_add_controllable_path(
       this->rate_distor,
       path,
       SUBFLOW_DEFAULT_SENDING_RATE);
@@ -1325,11 +1313,10 @@ _split_controller_main(SndEventBasedController * this)
 {
   GstClockTime now;
   now = gst_clock_get_time(this->sysclock);
-  if(this->bids_commit_requested_retain_tick > 0){
-    if(--this->bids_commit_requested_retain_tick == 0)
-      this->bids_commit_requested = TRUE;
-    goto recalc_done;
-  }
+
+  if(this->ticknum % 2 == 1)
+    sndrate_distor_time_update(this->rate_distor);
+
   if(_subflows_are_ready(this) ||
      this->last_recalc_time < now - 15 * GST_SECOND)
   {
@@ -1338,12 +1325,10 @@ _split_controller_main(SndEventBasedController * this)
 //  goto recalc_done;
   if (!this->bids_recalc_requested) goto recalc_done;
   this->bids_recalc_requested = FALSE;
-  this->bids_commit_requested_retain_tick = 0;
   this->bids_commit_requested = TRUE;
   this->target_rate = _recalc_bids(this);
 recalc_done:
   if (!this->bids_commit_requested) goto process_done;
-  this->bids_commit_requested_retain_tick = 0;
   this->bids_commit_requested = FALSE;
   stream_splitter_commit_changes (this->splitter, 0 * this->target_rate, 0 * GST_MSECOND);
 
@@ -1363,12 +1348,11 @@ guint32 _recalc_bids(SndEventBasedController * this)
   GHashTableIter iter;
   gpointer key, val;
   Subflow *subflow;
-  guint32 sending_rate;
-  guint32 target_rate;
+  guint32 sending_bitrate;
+  guint32 target_byterate = 0;
   GstClockTime now;
 
   now = gst_clock_get_time(this->sysclock);
-  target_rate = sndrate_distor_time_update(this->rate_distor);
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
@@ -1377,18 +1361,19 @@ guint32 _recalc_bids(SndEventBasedController * this)
       continue;
     }
 
-    sending_rate = sndrate_distor_get_sending_rate(this->rate_distor, subflow->id);
+    sending_bitrate = subratectrler_get_target_bitrate(subflow->rate_controller);
+    target_byterate += sending_bitrate>>3;
 //    g_print("Subflow %d sending rate %u\n",
 //            subflow->id,
 //            sending_rate);
     stream_splitter_setup_sending_bid(this->splitter,
                                       subflow->id,
-                                      sending_rate);
+                                      sending_bitrate);
     subflow->ready = FALSE;
   }
 
   this->last_recalc_time = now;
-  return target_rate;
+  return target_byterate;
 }
 
 
@@ -1408,6 +1393,7 @@ gboolean _subflows_are_ready(SndEventBasedController * this)
     }
     result&=subflow->ready;
   }
+
   return result;
 }
 

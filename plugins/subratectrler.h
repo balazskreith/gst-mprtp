@@ -9,7 +9,10 @@
 #define SUBRATECTRLER_H_
 
 #include <gst/gst.h>
+#include "mprtpspath.h"
 #include "bintree.h"
+#include "floatnumstracker.h"
+
 
 typedef struct _SubflowRateController SubflowRateController;
 typedef struct _SubflowRateControllerClass SubflowRateControllerClass;
@@ -21,7 +24,7 @@ typedef struct _SubflowRateControllerClass SubflowRateControllerClass;
 #define SUBRATECTRLER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),SUBRATECTRLER_TYPE))
 #define SUBRATECTRLER_CAST(src)        ((SubflowRateController *)(src))
 
-typedef void (*SubRateProc)(SendingRateDistributor*);
+typedef void (*SubRateProc)(SubflowRateController*);
 
 struct _SubflowRateController
 {
@@ -31,26 +34,25 @@ struct _SubflowRateController
   guint8                   id;
   MPRTPSPath*              path;
 
-  gint32                   requested_bytes;
-  gint32                   supplied_bytes;
-  gint32                   monitored_bytes;
+  gint32                   monitored_bitrate;
+  gint32                   target_bitrate;
+  gint32                   extra_bitrate;
+
+  //Video target bitrate inflection point i.e. the last known highest
+  //target_bitrate during fast start. Used to limit bitrate increase
+  //close to the last know congestion point. Initial value: 1
+  gint                     target_bitrate_i;
+
 
   NumsTracker*             bytes_in_flight_history;
-  guint32                  bytes_in_flight_avg;
-
-//further development
-// gdouble                target_weight;
-// gboolean               bw_is_shared;
-//  gdouble               weight;
-
-  gdouble                  bounce_point;
+  guint32                  bytes_in_queue_avg;
 
   gint32                   max_rate;
   gint32                   min_rate;
 
   //Need for monitoring
   guint                    monitoring_interval;
-  guint                    monitoring_time;
+  GstClockTime             monitoring_started;
 
   SubRateProc              cwnd_controller;
   SubRateProc              rate_controller;
@@ -62,6 +64,7 @@ struct _SubflowRateController
   gboolean                 was_fast_start;
   GstClockTime             last_target_bitrate_i_adjust;
   GstClockTime             last_target_bitrate_adjust;
+  GstClockTime             last_queue_clear;
 
   PercentileTracker*       ltt_delays_th;
   PercentileTracker*       ltt_delays_target;
@@ -86,13 +89,6 @@ struct _SubflowRateController
   //Congestion window inflection point. Initial value: 1
   gint                     cwnd_i;
   GstClockTime             last_congestion_detected;
-
-  //Video target bitrate [bps]
-  gint32                   target_bitrate;
-  //Video target bitrate inflection point i.e. the last known highest
-  //target_bitrate during fast start. Used to limit bitrate increase
-  //close to the last know congestion point. Initial value: 1
-  gint                     target_bitrate_i;
   //Smoothed RTT [s], computed similar to method depicted in [RFC6298].
   //Initial value: 0.0
   gdouble                  s_rtt;
@@ -105,16 +101,28 @@ struct _SubflowRateControllerClass{
 
 };
 GType subratectrler_get_type (void);
-SubflowRateController *make_subratectrler(MPRTPSPath *path);
+SubflowRateController *make_subratectrler(void);
 void subratectrler_set(SubflowRateController *this,
                               MPRTPSPath *path,
                               guint32 sending_target);
 void subratectrler_unset(SubflowRateController *this);
+void subratectrler_extract_stats(SubflowRateController *this,
+                                  guint64 *median_delay,
+                                  gint32  *sender_rate,
+                                  gdouble *target_rate,
+                                  gdouble *goodput,
+                                  gdouble *next_target);
 void subratectrler_time_update(
                          SubflowRateController *this,
-                         gint32 *delta_bitrate);
-guint64 subratectrler_measurement_update(
+                         gint32 *target_bitrate,
+                         gint32 *extra_bitrate,
+                         UtilizationSubflowReport *rep);
+
+void subratectrler_measurement_update(
                          SubflowRateController *this,
                          RRMeasurement * measurement);
+gint32 subratectrler_get_target_bitrate(SubflowRateController *this);
+void subratectrler_add_extra_rate(SubflowRateController *this,
+                                  gint32 extra_rate);
 
 #endif /* SUBRATECTRLER_H_ */

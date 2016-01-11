@@ -25,6 +25,7 @@ typedef struct _MPRTPSPathClass MPRTPSPathClass;
 #include "packetssndqueue.h"
 #include "percentiletracker.h"
 #include "variancetracker.h"
+#include "numstracker.h"
 
 #define MPRTPS_PATH_TYPE             (mprtps_path_get_type())
 #define MPRTPS_PATH(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),MPRTPS_PATH_TYPE,MPRTPSPath))
@@ -116,6 +117,7 @@ struct _MPRTPSPathClass
 };
 
 typedef struct _RRMeasurement RRMeasurement;
+void g_print_rrmeasurement(RRMeasurement *measurement);
 struct _RRMeasurement{
   GstClockTime        time;
   GstClockTime        RTT;
@@ -148,6 +150,20 @@ struct _RRMeasurement{
 };
 
 
+typedef struct _UtilizationSubflowReport{
+  gboolean controlled;
+  gint32   max_rate;
+  gint32   lost_bytes;
+  gint32   discarded_bytes;
+  guint64  owd;
+}UtilizationSubflowReport;
+
+typedef struct _UtilizationReport{
+  guint32                  target_rate;
+  UtilizationSubflowReport subflows[32];
+}UtilizationReport;
+
+
 GType mprtps_path_get_type (void);
 MPRTPSPath *make_mprtps_path (guint8 id, void (*send_func)(gpointer, GstBuffer*), gpointer func_this);
 
@@ -174,6 +190,7 @@ guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_frames_num (MPRTPSPath * this);
 guint32 mprtps_path_get_sent_octet_sum_for(MPRTPSPath *this, guint32 amount);
 guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this);
+void mprtps_path_clear_queue(MPRTPSPath *this);
 guint32 mprtps_path_get_sender_rate(MPRTPSPath *this);
 guint32 mprtps_path_get_bytes_in_queue(MPRTPSPath *this);
 MPRTPSPathState mprtps_path_get_state (MPRTPSPath * this);
@@ -189,6 +206,5 @@ void mprtps_path_setup_cwnd (MPRTPSPath * this,
                              guint32 srtt_ms);
 void mprtps_path_set_monitor_payload_id(MPRTPSPath *this, guint8 payload_type);
 void mprtps_path_set_mprtp_ext_header_id(MPRTPSPath *this, guint ext_header_id);
-gboolean mprtps_path_is_overused (MPRTPSPath * this);
 G_END_DECLS
 #endif /* MPRTPSPATH_H_ */

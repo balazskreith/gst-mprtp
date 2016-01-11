@@ -8,7 +8,6 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          gstmprtpplayouter.c        \
                          gstmprtpreceiver.c         \
                          gstmprtpsender.c           \
-                         kalmanfilter.c             \
                          mprtprpath.c               \
                          mprtpspath.c               \
                          streamjoiner.c             \
@@ -27,7 +26,9 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          sndratedistor.c            \
                          skalmanfilter.c            \
                          nlms.c                     \
-                         numstracker.c
+                         numstracker.c              \
+                         floatnumstracker.c         \
+                         subratectrler.c        
                     
                     
 noinst_HEADERS = mprtpspath.h           \
@@ -47,9 +48,10 @@ noinst_HEADERS = mprtpspath.h           \
                  variancetracker.h      \
                  sndratedistor.h        \
                  skalmanfilter.h        \
-                 kalmanfilter.h         \
                  nlms.h                 \
-                 numstracker.h
+                 numstracker.h          \
+                 floatnumstracker.h     \
+                 subratectrler.h        
                           
 
 # compiler and linker flags used to compile this plugin, set in configure.ac

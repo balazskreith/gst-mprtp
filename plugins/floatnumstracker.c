@@ -157,17 +157,16 @@ done:
 
 void
 floatnumstracker_iterate (FloatNumsTracker * this,
-                            void(*process)(gpointer,gdouble),
+                            void (*process)(gpointer,gdouble),
                             gpointer data)
 {
   gint32 c,i;
   THIS_READLOCK (this);
   for(c = 0, i = this->read_index; c < this->counter; ++c){
-    process(data, this->items[i]);
+    process(data, this->items[i].value);
     if(++i == this->length) i = 0;
   }
   THIS_READUNLOCK (this);
-done:
   return;
 }
 

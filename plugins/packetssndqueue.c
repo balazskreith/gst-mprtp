@@ -162,7 +162,7 @@ gboolean packetssndqueue_has_buffer(PacketsSndQueue *this,
 {
   gboolean result = FALSE;
   THIS_READLOCK(this);
-again:
+//again:
   if(!this->head) goto done;
   if(!payload_bytes) *payload_bytes = this->head->payload_bytes;
 

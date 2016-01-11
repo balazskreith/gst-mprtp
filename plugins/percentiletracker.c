@@ -273,7 +273,7 @@ guint32 percentiletracker_get_num(PercentileTracker *this)
 {
   guint32 result;
   THIS_READLOCK(this);
-  if(this->read_index < this->write_index)
+  if(this->read_index <= this->write_index)
     result = this->write_index - this->read_index;
   else
     result = this->length - this->read_index + this->write_index;
@@ -384,7 +384,6 @@ guint64 _get_nmedian(PercentileTracker * this)
 {
   gint32 max_count,min_count;
   gdouble ratio;
-
   max_count = bintree_get_num(this->maxtree);
   min_count = bintree_get_num(this->mintree);
   if(!min_count)
@@ -432,7 +431,6 @@ void _collect_value(PercentileTracker* this, guint64 value)
   BinTreeNode *node;
   gint32 c_was, c_is;
   state = &this->state->collecting;
-
   c_was = _counter(this);
   _add_value(this, value);
   bintree_insert_value(state->collector, value);
@@ -514,7 +512,8 @@ void _nmedian_balancer(PercentileTracker *this)
   BinTreeNode *top;
   max_count = bintree_get_num(this->maxtree);
   min_count = bintree_get_num(this->mintree);
-  ratio = (gdouble) max_count / (gdouble) min_count;
+  if(!min_count) ratio = .001;
+  else ratio = (gdouble) max_count / (gdouble) min_count;
   if(ratio < this->ratio)
     goto balancing_mintree;
   else

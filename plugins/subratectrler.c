@@ -465,6 +465,7 @@ void subratectrler_measurement_update(
 
   _mt0(this)->corrh_owd = (gdouble)_mt0(this)->delay / (gdouble)_mt0(this)->ltt_delays_th;
   //Weather the subflow is overused or not.
+  g_print("2*median / (min+max): %f\n", (gdouble)(_mt0(this)->delay) / (gdouble)(_mt0(this)->ltt_delays_target));
   this->cwnd_controller(this);
 
   if(_mt0(this)->state == STATE_STABLE){
@@ -799,6 +800,9 @@ void _raise_bitrate(SubflowRateController *this)
   /*
    * Put an extra cap in case the OWD starts to increase
    */
+  g_print("Raise bitrate: scl_i: %f, ramp_up_speed: %f, increment: %f, owd trend: %f\n",
+          scl_i, ramp_up_speed, increment, _mt0(this)->owd_trend);
+
   this->target_bitrate *= 1.0f - PRE_CONGESTION_GUARD * _mt0(this)->owd_trend * tmp;
   this->was_fast_start = TRUE;
   this->last_target_bitrate_adjust = _now(this);
@@ -851,6 +855,8 @@ gdouble _adjust_bitrate(SubflowRateController *this)
       TX_QUEUE_SIZE_FACTOR * _mt0(this)->bytes_in_queue * tmp -
       this->target_bitrate;
 
+  g_print("Adjust bitrate: scl: %f, ramp_up_speed: %f, increment: %f, owd trend: %f\n",
+          scl, ramp_up_speed, increment, _mt0(this)->owd_trend);
 
   if (increment < 0) {
       if (this->was_fast_start) {
@@ -867,6 +873,8 @@ gdouble _adjust_bitrate(SubflowRateController *this)
   this->was_fast_start = TRUE;
   increment *= scl_i;
   increment = MIN(increment,(gfloat)(ramp_up_speed*((gdouble)RATE_ADJUST_INTERVAL/(gdouble)GST_SECOND)));
+  g_print("Adjust bitrate increment: scl_i: %f, ramp_up_speed: %f, increment: %f, owd trend: %f\n",
+          scl_i, ramp_up_speed, increment, _mt0(this)->owd_trend);
   _calculate_monitoring_interval(this, increment);
   increment = 0;
 done:

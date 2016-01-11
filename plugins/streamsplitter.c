@@ -140,7 +140,7 @@ stream_splitter_finalize (GObject * object)
   gst_task_stop (this->thread);
   gst_task_join (this->thread);
   gst_object_unref (this->thread);
-  g_object_unref(this->taken_bytes);
+  g_object_unref(this->incoming_bytes);
   g_object_unref (this->sysclock);
 }
 
@@ -157,7 +157,7 @@ stream_splitter_init (StreamSplitter * this)
   this->separation_is_possible = FALSE;
   this->first_delta_flag = TRUE;
   this->thread = gst_task_new (stream_splitter_run, this, NULL);
-  this->taken_bytes = make_variancetracker(1<<15, GST_SECOND);
+  this->incoming_bytes = make_variancetracker(1<<15, GST_SECOND);
 //    this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
   this->splitting_mode = MPRTP_STREAM_BYTE_BASED_SPLITTING;
 
@@ -253,7 +253,7 @@ guint32 stream_splitter_get_media_rate(StreamSplitter* this)
 {
   gint64 result;
   THIS_READLOCK(this);
-  variancetracker_get_stats(this->taken_bytes, &result, NULL);
+  variancetracker_get_stats(this->incoming_bytes, &result, NULL);
   THIS_READUNLOCK(this);
   return result;
 }
@@ -324,8 +324,10 @@ stream_splitter_get_next_path (StreamSplitter * this, GstBuffer * buf, gboolean 
   path = _get_next_path (this, &rtp);
 done:
   if(suggest_to_skip) *suggest_to_skip = FALSE;
-  if(0 < this->skip_interval && this->new_frame){
-    ++this->skip_tick;
+  if(0 < this->skip_interval){
+    if(this->new_frame)
+      ++this->skip_tick;
+
     if(*suggest_to_skip)
       *suggest_to_skip = this->skip_tick % this->skip_interval == 0;
   }
@@ -362,8 +364,8 @@ stream_splitter_run (void *data)
   {
     gint64 media_rate = 0;
     gboolean switch_ = FALSE;
-    variancetracker_obsolate(this->taken_bytes);
-    variancetracker_get_stats(this->taken_bytes, &media_rate, NULL);
+    variancetracker_obsolate(this->incoming_bytes);
+    variancetracker_get_stats(this->incoming_bytes, &media_rate, NULL);
 //    g_print("Media rate: %ld, Target Rate: %u\n", media_rate, this->switch_target);
     switch_ = media_rate == 0;
     if(0 < this->sending_target)
@@ -592,7 +594,7 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
 
 done:
   if(gst_rtp_buffer_get_payload_type(rtp) != this->monitor_payload_type){
-    variancetracker_add(this->taken_bytes, bytes_to_send);
+    variancetracker_add(this->incoming_bytes, bytes_to_send);
   }
   return result;
 }
@@ -732,7 +734,7 @@ void _determine_skipping(StreamSplitter *this)
   this->skip_interval = 0;
   if(this->sending_target == 0 || this->max_skipping_time == 0) goto done;
 
-  variancetracker_get_stats(this->taken_bytes, &actual_rate, NULL);
+  variancetracker_get_stats(this->incoming_bytes, &actual_rate, NULL);
   if(this->sending_target < actual_rate * 1.1) goto done;
   ratio = (gdouble) actual_rate / (gdouble)this->sending_target;
   this->skip_interval = MAX(2, 1./(1.-ratio));

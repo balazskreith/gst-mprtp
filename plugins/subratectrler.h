@@ -35,6 +35,8 @@ struct _SubflowRateController
   gint32                   supplied_bytes;
   gint32                   monitored_bytes;
 
+  NumsTracker*             bytes_in_flight_history;
+  guint32                  bytes_in_flight_avg;
 
 //further development
 // gdouble                target_weight;
@@ -50,62 +52,50 @@ struct _SubflowRateController
   guint                    monitoring_interval;
   guint                    monitoring_time;
 
-  SubRateProc              controller;
+  SubRateProc              cwnd_controller;
+  SubRateProc              rate_controller;
 
   guint8*                  moments;
   gint                     moments_index;
   guint32                  moments_num;
 
-  PercentileTracker*     ltt_delays_th;
-  PercentileTracker*     ltt_delays_target;
+  gboolean                 was_fast_start;
+  GstClockTime             last_target_bitrate_i_adjust;
+  GstClockTime             last_target_bitrate_adjust;
+
+  PercentileTracker*       ltt_delays_th;
+  PercentileTracker*       ltt_delays_target;
 
   //OWD target. Initial value: OWD_TARGET_LO
-  guint64                owd_target;
+  guint64                  owd_target;
   //EWMA filtered owd fraction.Initial value:  0.0
-  gdouble                owd_fraction_avg;
+  gdouble                  owd_fraction_avg;
   //Vector of the last 20 owd_fraction
-  FloatNumsTracker      *owd_fraction_hist;
+  FloatNumsTracker*        owd_fraction_hist;
   //OWD trend indicates incipient congestion. Initial value: 0.0
-  gdouble                owd_trend_mem;
+  gdouble                  owd_trend_mem;
   //True if in fast start state. Initial value: TRUE
-  gint                   in_fast_start;
-  gint                   n_fast_start;
+  gint                     in_fast_start;
+  gint                     n_fast_start;
   //Maximum segment size
-  gint                   mss;
+  gint                     mss;
   //Minimum congestion window [byte]. Initial value: 2*MSS
-  gint                   cwnd_min;
+  gint                     cwnd_min;
   //COngestion window
-  gint                   cwnd;
+  gint                     cwnd;
   //Congestion window inflection point. Initial value: 1
-  gint                   cwnd_i;
-  GstClockTime           last_congestion_detected;
+  gint                     cwnd_i;
+  GstClockTime             last_congestion_detected;
 
-  //Skip encoding of video frame if true. gint false
-  gboolean               frame_skip;
-  //Indicates the intensity of the frame skips. Initial value: 0.0
-  gdouble                frame_skip_intensity;
-  //Number of video  frames since the last skip.Initial value:  0
-  gint                   since_last_frame_skip;
-  //Number of consecutive frame skips.Initial value:  0
-  gint                   consecutive_frame_skips;
   //Video target bitrate [bps]
-  gint                   target_bitrate;
+  gint32                   target_bitrate;
   //Video target bitrate inflection point i.e. the last known highest
   //target_bitrate during fast start. Used to limit bitrate increase
   //close to the last know congestion point. Initial value: 1
-  gint                   target_bitrate_i;
-  //Measured transmit bitrate [bps]. Initial value: 0.0
-  gdouble                rate_transmit;
-  //Measured throughput based on received acknowledgements [bps].
-  //Initial value: 0.0
-  gdouble                rate_acked;
+  gint                     target_bitrate_i;
   //Smoothed RTT [s], computed similar to method depicted in [RFC6298].
   //Initial value: 0.0
-  gdouble                s_rtt;
-  //Size of RTP packets in queue [bits].
-  gint                   rtp_queue_size;
-  //Size of the last transmitted RTP packets [byte]. Initial value: 0
-  gint                   rtp_size;
+  gdouble                  s_rtt;
 
 };
 
@@ -120,6 +110,9 @@ void subratectrler_set(SubflowRateController *this,
                               MPRTPSPath *path,
                               guint32 sending_target);
 void subratectrler_unset(SubflowRateController *this);
+void subratectrler_time_update(
+                         SubflowRateController *this,
+                         gint32 *delta_bitrate);
 guint64 subratectrler_measurement_update(
                          SubflowRateController *this,
                          RRMeasurement * measurement);

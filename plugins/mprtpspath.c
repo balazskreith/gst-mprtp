@@ -103,7 +103,6 @@ mprtps_path_reset (MPRTPSPath * this)
   this->monitor_payload_type = FALSE;
   this->monitoring_interval = 0;
   this->cwnd_enabled = FALSE;
-  this->bytes_in_flight_history = make_numstracker_with_tree(4, 10 * GST_SECOND);
   packetssndqueue_reset(this->packetsqueue);
 }
 
@@ -114,6 +113,7 @@ mprtps_path_init (MPRTPSPath * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetssndqueue();
+  this->sent_bytes = make_numstracker(2048, GST_SECOND);
   mprtps_path_reset (this);
 }
 
@@ -458,18 +458,25 @@ mprtps_path_get_sent_octet_sum_for (MPRTPSPath * this, guint32 amount)
     this->sent_octets_read &= MAX_INT32_POSPART;
   }
   this->bytes_in_flight-= result<<3;
-  numstracker_add(this->bytes_in_flight_history, this->bytes_in_flight);
 done:
   THIS_WRITEUNLOCK (this);
   return result;
 }
 
-guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this, guint32 *max_bytes_in_flight)
+guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this)
 {
   guint32 result;
   THIS_READLOCK(this);
   result = this->bytes_in_flight;
-  numstracker_get_stats(this->bytes_in_flight_history, NULL, max_bytes_in_flight, NULL);
+  THIS_READUNLOCK(this);
+  return result;
+}
+
+guint32 mprtps_path_get_sender_rate(MPRTPSPath *this)
+{
+  guint32 result;
+  THIS_READLOCK(this);
+  numstracker_get_stats(this->sent_bytes, &result, NULL, NULL);
   THIS_READUNLOCK(this);
   return result;
 }
@@ -577,6 +584,7 @@ _refresh_stat(MPRTPSPath * this,
     this->total_sent_payload_bytes_sum += payload_bytes;
     this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
     this->bytes_in_flight += payload_bytes;
+    numstracker_add(this->sent_bytes, payload_bytes);
     ++this->total_sent_normal_packet_num;
   } else {
     this->sent_octets[this->sent_octets_write] = 0;

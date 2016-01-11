@@ -75,7 +75,7 @@ struct _StreamSplitter
   gboolean             separation_is_possible;
   gboolean             last_delta_flag;
   gboolean             first_delta_flag;
-  VarianceTracker*     taken_bytes;
+  VarianceTracker*     incoming_bytes;
   guint8               monitor_payload_type;
 
 };

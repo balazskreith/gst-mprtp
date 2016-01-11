@@ -105,7 +105,7 @@ struct _MPRTPSPath
   //cwnd implementation
   gboolean                cwnd_enabled;
   PacketsSndQueue*        packetsqueue;
-  NumsTracker*            bytes_in_flight_history;
+  NumsTracker*            sent_bytes;
 };
 
 struct _MPRTPSPathClass
@@ -145,7 +145,6 @@ struct _RRMeasurement{
 
   guint32             bytes_in_flight;
   guint32             bytes_in_queue;
-  guint32             max_bytes_in_flight;
 };
 
 
@@ -174,7 +173,8 @@ void mprtps_path_process_rtp_packet(MPRTPSPath * this,
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_frames_num (MPRTPSPath * this);
 guint32 mprtps_path_get_sent_octet_sum_for(MPRTPSPath *this, guint32 amount);
-guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this, guint32 *max_bytes_in_flight);
+guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this);
+guint32 mprtps_path_get_sender_rate(MPRTPSPath *this);
 guint32 mprtps_path_get_bytes_in_queue(MPRTPSPath *this);
 MPRTPSPathState mprtps_path_get_state (MPRTPSPath * this);
 void mprtps_path_set_state (MPRTPSPath * this, MPRTPSPathState state);

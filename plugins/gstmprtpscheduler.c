@@ -890,6 +890,10 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     GST_WARNING_OBJECT(this, "No active subflow");
     goto done;
   }
+  if(suggest_to_skip){
+    gst_buffer_unref(buffer);
+    goto done;
+  }
   outbuf = gst_buffer_make_writable (buffer);
   mprtps_path_process_rtp_packet(path, outbuf);
   result = GST_FLOW_OK;

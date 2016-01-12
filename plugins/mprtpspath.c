@@ -44,7 +44,7 @@ static void _setup_rtp2mprtp (MPRTPSPath * this, GstBuffer * buffer);
 static void _refresh_stat(MPRTPSPath * this, GstBuffer *buffer);
 static void _send_mprtp_packet(MPRTPSPath * this,
                                GstBuffer *buffer);
-static guint32 _cwnd_pacing(MPRTPSPath * this);
+static guint32 _pacing(MPRTPSPath * this);
 //static gboolean _is_overused(MPRTPSPath * this);
 static GstBuffer* _create_monitor_packet(MPRTPSPath * this);
 
@@ -163,7 +163,6 @@ mprtps_path_reset (MPRTPSPath * this)
   this->sent_octets_write = 0;
   this->monitor_payload_type = FALSE;
   this->monitoring_interval = 0;
-  this->cwnd_enabled = FALSE;
   packetssndqueue_reset(this->packetsqueue);
 }
 
@@ -313,18 +312,23 @@ guint16 mprtps_path_get_HSN(MPRTPSPath * this)
 }
 
 void
-mprtps_path_setup_cwnd (MPRTPSPath * this,
-                        guint32 cwnd_size,
-                        gdouble slack_size,
-                        guint32 srtt_ms)
+mprtps_path_set_target_bitrate(MPRTPSPath * this, guint32 target_bitrate)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->cwnd_enabled = cwnd_size ? TRUE : FALSE;
-  this->cwnd_size = cwnd_size;
-  this->cwnd_slack_allowed = slack_size > 0.;
-  this->cwnd_slack = slack_size;
-  this->srtt_ms = srtt_ms;
+  this->target_bitrate = target_bitrate;
+  THIS_WRITEUNLOCK (this);
+}
+
+void
+mprtps_path_set_pacing (MPRTPSPath * this, gboolean pacing)
+{
+  g_return_if_fail (this);
+  THIS_WRITELOCK (this);
+  if(this->pacing ^ pacing){
+    this->pacing_tick = this->ticknum + 1;
+  }
+  this->pacing = pacing;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -567,9 +571,9 @@ mprtps_path_tick(MPRTPSPath *this)
 //    _setup_rtp2mprtp(this, buffer);
 //    _send_mprtp_packet(this, buffer);
 //  }
-  if(!this->cwnd_enabled) goto done;
   if(this->ticknum < this->pacing_tick) goto done;
-  this->pacing_tick+=_cwnd_pacing(this);
+  if(!this->pacing && !packetssndqueue_has_buffer(this->packetsqueue, NULL)) goto done;
+  this->pacing_tick = this->ticknum + _pacing(this);
 done:
   THIS_WRITEUNLOCK (this);
 }
@@ -652,7 +656,7 @@ _send_mprtp_packet(MPRTPSPath * this,
                       GstBuffer *buffer)
 {
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-  if(!this->cwnd_enabled){
+  if(!this->pacing && !packetssndqueue_has_buffer(this->packetsqueue, NULL)){
     goto send;
   }
   gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
@@ -670,38 +674,34 @@ send:
   this->send_mprtp_packet_func(this->send_mprtp_func_data, buffer);
 }
 
-guint32 _cwnd_pacing(MPRTPSPath * this)
+guint32 _pacing(MPRTPSPath * this)
 {
   GstBuffer *buffer;
-  guint32 payload_bytes = 0, new_bytes_in_flight = 0;
-  gdouble pacing_bitrate = 0;
+  guint32 sent_payload_bytes = 0, payload_bytes = 0, new_bytes_in_flight = 0;
+  gdouble pace_interval;
+  gdouble pacing_bitrate = this->target_bitrate;
   guint32 pacing_tick = MIN_PACE_INTERVAL;
+
+  if(!this->pacing) pacing_bitrate *= 2;
+
+again:
   if(!packetssndqueue_has_buffer(this->packetsqueue, &payload_bytes)){
     goto done;
-  }
-//again:
-  new_bytes_in_flight = this->bytes_in_flight + payload_bytes;
-  if(this->cwnd_size < new_bytes_in_flight){
-    if(!this->cwnd_slack_allowed)
-      goto done;
-    if(this->cwnd_size * (1. + this->cwnd_slack) < new_bytes_in_flight)
-      goto done;
   }
   buffer = packetssndqueue_pop(this->packetsqueue);
   _refresh_stat(this, buffer);
   this->send_mprtp_packet_func(this->send_mprtp_func_data, buffer);
-  pacing_bitrate = MAX(MINIMUM_PACE_BANDWIDTH,
-                       (gdouble)(this->cwnd_size * 8) /
-                         MAX(0.001, (gdouble)this->srtt_ms / 1000.));
-  pacing_tick = MAX(MIN_PACE_INTERVAL, (gdouble)(payload_bytes * 8) / (gdouble)pacing_bitrate * 1000.);
+  sent_payload_bytes+=payload_bytes;
+  pace_interval = (gdouble)(sent_payload_bytes * 8) / (gdouble)pacing_bitrate * 1000.;
+  if(!this->pacing && pace_interval <= 1.){
+    goto again;
+  }
+  pacing_tick = MAX(MIN_PACE_INTERVAL, (gdouble)(sent_payload_bytes * 8) / (gdouble)pacing_bitrate * 1000.);
 done:
 if(pacing_bitrate > 0.)
-  g_print("payload: %u, cwnd: %u, srtt: %f, BinF: %u, p_interval: %f, p_bitrate: %f, p_tick: %u\n",
+  g_print("payload: %u, BinF: %u, %f, p_bitrate: %f, p_tick: %u\n",
           payload_bytes,
-          this->cwnd_size,
-          (gdouble) this->srtt_ms,
           new_bytes_in_flight,
-          (gdouble)(payload_bytes * 8) / (gdouble)pacing_bitrate,
           pacing_bitrate,
           pacing_tick);
   return pacing_tick;

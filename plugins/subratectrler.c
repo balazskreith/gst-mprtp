@@ -527,6 +527,7 @@ _update_bitrate(SubflowRateController *this)
   _adjust_bitrate(this);
 done:
   this->last_target_bitrate_adjust = _now(this);
+  mprtps_path_set_target_bitrate(this->path, this->target_bitrate);
 exit:
   return;
 }
@@ -611,10 +612,7 @@ void _validate_and_set_cwnd(SubflowRateController *this)
 
   this->cwnd = MAX(this->cwnd_min, this->cwnd);
   g_print("CWND bitrate: %d, target bitrate: %d\n", this->cwnd * 8, this->target_bitrate);
-  mprtps_path_setup_cwnd(this->path,
-                         this->cwnd,
-                         _mt0(this)->off_target > 0,
-                         GST_TIME_AS_MSECONDS(this->s_rtt));
+  mprtps_path_set_pacing(this->path, TRUE);
 //  mprtps_path_setup_cwnd(this->path, 0, 0, 0);
   /*
   * Make possible to enter fast start if OWD has been low for a while

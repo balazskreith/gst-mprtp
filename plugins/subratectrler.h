@@ -55,13 +55,13 @@ struct _SubflowRateController
   GstClockTime             monitoring_started;
 
   SubRateProc              cwnd_controller;
-  SubRateProc              rate_controller;
 
   guint8*                  moments;
   gint                     moments_index;
   guint32                  moments_num;
 
-  gboolean                 was_fast_start;
+  gboolean                 cwnd_was_increased;
+  gboolean                 bitrate_was_incrased;
   GstClockTime             last_target_bitrate_i_adjust;
   GstClockTime             last_target_bitrate_adjust;
   GstClockTime             last_queue_clear;
@@ -70,7 +70,7 @@ struct _SubflowRateController
   PercentileTracker*       ltt_delays_target;
 
   //OWD target. Initial value: OWD_TARGET_LO
-  guint64                  owd_target;
+//  guint64                  owd_target;
   //EWMA filtered owd fraction.Initial value:  0.0
   gdouble                  owd_fraction_avg;
   //Vector of the last 20 owd_fraction

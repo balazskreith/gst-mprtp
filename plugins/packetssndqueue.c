@@ -164,7 +164,7 @@ gboolean packetssndqueue_has_buffer(PacketsSndQueue *this,
   THIS_READLOCK(this);
 //again:
   if(!this->head) goto done;
-  if(!payload_bytes) *payload_bytes = this->head->payload_bytes;
+  if(payload_bytes) *payload_bytes = this->head->payload_bytes;
 
 //  if(this->head->added < gst_clock_get_time(this->sysclock) - 200 * GST_MSECOND){
 //    _remove_head(this);

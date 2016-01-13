@@ -109,6 +109,7 @@ packetssndqueue_init (PacketsSndQueue * this)
   g_rw_lock_init (&this->rwmutex);
   this->node_pool = make_pointerpool(64, _node_ctor, g_free);
   this->sysclock = gst_system_clock_obtain();
+  this->obsolation_treshold = 0;
 }
 
 
@@ -157,19 +158,28 @@ done:
   return result;
 }
 
+void packetssndqueue_set_obsolation_treshold(PacketsSndQueue *this,
+                                    GstClockTime obsolation_treshold)
+{
+  THIS_WRITELOCK(this);
+  this->obsolation_treshold = obsolation_treshold;
+  THIS_WRITEUNLOCK(this);
+}
+
 gboolean packetssndqueue_has_buffer(PacketsSndQueue *this,
                                     guint32 *payload_bytes)
 {
   gboolean result = FALSE;
   THIS_READLOCK(this);
-//again:
+again:
   if(!this->head) goto done;
   if(payload_bytes) *payload_bytes = this->head->payload_bytes;
-
-//  if(this->head->added < gst_clock_get_time(this->sysclock) - 200 * GST_MSECOND){
-//    _remove_head(this);
-//    goto again;
-//  }
+  if(0 < this->obsolation_treshold){
+    if(this->head->added < gst_clock_get_time(this->sysclock) - this->obsolation_treshold){
+      _remove_head(this);
+      goto again;
+    }
+  }
   result = TRUE;
 done:
   THIS_READUNLOCK(this);

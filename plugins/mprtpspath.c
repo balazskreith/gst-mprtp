@@ -312,11 +312,12 @@ guint16 mprtps_path_get_HSN(MPRTPSPath * this)
 }
 
 void
-mprtps_path_set_target_bitrate(MPRTPSPath * this, guint32 target_bitrate)
+mprtps_path_set_pacing_bitrate(MPRTPSPath * this, guint32 target_bitrate, GstClockTime obsolation_treshold)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
   this->target_bitrate = target_bitrate;
+  packetssndqueue_set_obsolation_treshold(this->packetsqueue, obsolation_treshold);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -509,7 +510,7 @@ mprtps_path_get_sent_octet_sum_for (MPRTPSPath * this, guint32 amount)
     this->sent_octets_read += 1;
     this->sent_octets_read &= MAX_INT32_POSPART;
   }
-  this->bytes_in_flight-= result<<3;
+  this->octets_in_flight-= result;
 done:
   THIS_WRITEUNLOCK (this);
   return result;
@@ -519,7 +520,7 @@ guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this)
 {
   guint32 result;
   THIS_READLOCK(this);
-  result = this->bytes_in_flight;
+  result = this->octets_in_flight<<3;
   THIS_READUNLOCK(this);
   return result;
 }
@@ -639,7 +640,7 @@ _refresh_stat(MPRTPSPath * this,
   if(gst_rtp_buffer_get_payload_type(&rtp) != this->monitor_payload_type){
     this->total_sent_payload_bytes_sum += payload_bytes;
     this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
-    this->bytes_in_flight += payload_bytes;
+    this->octets_in_flight += payload_bytes>>3;
     numstracker_add(this->sent_bytes, payload_bytes);
     ++this->total_sent_normal_packet_num;
   } else {
@@ -677,7 +678,7 @@ send:
 guint32 _pacing(MPRTPSPath * this)
 {
   GstBuffer *buffer;
-  guint32 sent_payload_bytes = 0, payload_bytes = 0, new_bytes_in_flight = 0;
+  guint32 sent_payload_bytes = 0, payload_bytes = 0;
   gdouble pace_interval;
   gdouble pacing_bitrate = this->target_bitrate;
   guint32 pacing_tick = MIN_PACE_INTERVAL;
@@ -698,12 +699,6 @@ again:
   }
   pacing_tick = MAX(MIN_PACE_INTERVAL, (gdouble)(sent_payload_bytes * 8) / (gdouble)pacing_bitrate * 1000.);
 done:
-if(pacing_bitrate > 0.)
-  g_print("payload: %u, BinF: %u, %f, p_bitrate: %f, p_tick: %u\n",
-          payload_bytes,
-          new_bytes_in_flight,
-          pacing_bitrate,
-          pacing_tick);
   return pacing_tick;
 }
 

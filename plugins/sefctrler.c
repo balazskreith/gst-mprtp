@@ -952,6 +952,7 @@ _get_subflow_goodput (Subflow * this, gdouble* receiver_rate)
   {
     GstClockTimeDiff interval;
     GstClockTime seconds;
+    gdouble secondsd;
     gfloat expected_payload_bytes = 0.;
     guint32 discarded_bytes;
     gfloat goodput;
@@ -969,12 +970,13 @@ _get_subflow_goodput (Subflow * this, gdouble* receiver_rate)
 
     discarded_bytes = _irt0_get_discarded_bytes(this);
     if (seconds > 0) {
+      secondsd = (gdouble) GST_TIME_AS_MSECONDS ((GstClockTime) interval) / 1000.;
       if(receiver_rate)
-        *receiver_rate = (expected_payload_bytes * (1. - _irt0 (this)->lost_rate)) / ((gfloat) seconds);
+        *receiver_rate = (expected_payload_bytes * (1. - _irt0 (this)->lost_rate)) / (secondsd);
       goodput = (expected_payload_bytes *
           (1. - _irt0 (this)->lost_rate) -
-          (gfloat) discarded_bytes) / ((gfloat) seconds);
-      _irt0(this)->sender_rate = sent_payload_bytes / (gdouble)seconds;
+          (gfloat) discarded_bytes) / (secondsd);
+      _irt0(this)->sender_rate = sent_payload_bytes / secondsd;
 
     } else {
         //g_print("S%d PB: %f ->%lu\n", this->id, payload_bytes_sum, GST_TIME_AS_MSECONDS(_irt0(this)->time - _irt1(this)->time));

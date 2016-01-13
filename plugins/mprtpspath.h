@@ -101,7 +101,7 @@ struct _MPRTPSPath
   guint32                 target_bitrate;
   gboolean                pacing;
 
-  guint32                 bytes_in_flight;
+  guint32                 octets_in_flight;
 //  guint32                 cwnd_size;
 //  guint32                 cwnd_slack;
 //  gboolean                cwnd_slack_allowed;
@@ -204,7 +204,7 @@ GstClockTime mprtps_path_get_time_sent_to_lossy (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_non_congested (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_congested (MPRTPSPath * this);
 guint16 mprtps_path_get_HSN(MPRTPSPath * this);
-void mprtps_path_set_target_bitrate(MPRTPSPath * this, guint32 target_bitrate);
+void mprtps_path_set_pacing_bitrate(MPRTPSPath * this, guint32 target_bitrate, GstClockTime obsolation_treshold);
 void mprtps_path_set_pacing (MPRTPSPath * this, gboolean pacing);
 void mprtps_path_set_monitor_payload_id(MPRTPSPath *this, guint8 payload_type);
 void mprtps_path_set_mprtp_ext_header_id(MPRTPSPath *this, guint ext_header_id);

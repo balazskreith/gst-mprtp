@@ -57,6 +57,26 @@ static gint
 _cmp_for_max (guint64 x, guint64 y);
 
 //----------------------------------------------------------------------
+//--------- Private functions for MinMax Plugin --------
+//----------------------------------------------------------------------
+static void
+_destroy_minmax_plugin(gpointer data);
+static void
+_minmax_add_activator(gpointer pdata, gint64 value);
+static void
+_minmax_rem_activator(gpointer pdata, gint64 value);
+
+static void
+_ewma_add_activator(gpointer pdata, gint64 value);
+
+static void
+_variance_add_activator(gpointer pdata, gint64 value);
+
+static void
+_variance_rem_activator(gpointer pdata, gint64 value);
+
+
+//----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
 
@@ -78,8 +98,14 @@ void
 numstracker_finalize (GObject * object)
 {
   NumsTracker *this;
+  GList *it;
+  NumsTrackerPlugin *plugin;
   this = NUMSTRACKER(object);
   g_object_unref(this->sysclock);
+  for(it = this->plugins; it != NULL; it = it->next){
+    plugin = it->data;
+    plugin->destroyer(plugin);
+  }
   g_free(this->items);
 }
 
@@ -126,6 +152,7 @@ NumsTracker *make_numstracker_with_tree(
   return result;
 }
 
+
 void numstracker_reset(NumsTracker *this)
 {
   THIS_WRITELOCK (this);
@@ -133,6 +160,21 @@ void numstracker_reset(NumsTracker *this)
   this->counter = this->write_index = this->read_index = 0;
   this->value_sum = 0;
   bintree_reset(this->tree);
+  THIS_WRITEUNLOCK (this);
+}
+
+void numstracker_add_plugin(NumsTracker *this, NumsTrackerPlugin *plugin)
+{
+  THIS_WRITELOCK (this);
+  this->plugins = g_list_prepend(this->plugins, plugin);
+  THIS_WRITEUNLOCK (this);
+}
+
+void numstracker_rem_plugin(NumsTracker *this, NumsTrackerPlugin *plugin)
+{
+  THIS_WRITELOCK (this);
+  plugin->destroyer(plugin);
+  this->plugins = g_list_remove(this->plugins, plugin);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -206,6 +248,16 @@ void _add_value(NumsTracker *this, gint64 value)
       this->write_index=0;
   }
 
+  {
+    GList *it;
+    NumsTrackerPlugin *plugin;
+    for(it = this->plugins; it != NULL; it = it->next){
+      plugin = it->data;
+      if(!plugin->add_activator) continue;
+      plugin->add_activator(plugin, value);
+    }
+  }
+
   if(this->tree && value < 0)
     g_warning("numtracker with tree only allows positive values");
   else if(this->tree)
@@ -236,6 +288,16 @@ elliminate:
       this->read_index=0;
   }
   --this->counter;
+
+  {
+    GList *it;
+    NumsTrackerPlugin *plugin;
+    for(it = this->plugins; it != NULL; it = it->next){
+      plugin = it->data;
+      if(!plugin->rem_activator) continue;
+      plugin->rem_activator(plugin, value);
+    }
+  }
   goto again;
 done:
   return;
@@ -245,6 +307,169 @@ gint
 _cmp_for_max (guint64 x, guint64 y)
 {
   return x == y ? 0 : x < y ? -1 : 1;
+}
+
+//-----------------------------------------------------------------------------
+//-------------------------------- P L U G I N S ------------------------------
+//-----------------------------------------------------------------------------
+
+NumsTrackerMinMaxPlugin *
+make_numstracker_minmax_plugin(void (*max_pipe)(gpointer,guint64), gpointer max_data,
+                               void (*min_pipe)(gpointer,guint64), gpointer min_data)
+{
+  NumsTrackerMinMaxPlugin *this = g_malloc0(sizeof(NumsTrackerMinMaxPlugin));
+  this->base.add_activator = _minmax_add_activator;
+  this->base.rem_activator = _minmax_rem_activator;
+  this->max_pipe = max_pipe;
+  this->max_pipe_data = max_data;
+  this->min_pipe = min_pipe;
+  this->min_pipe_data = min_data;
+  this->tree = make_bintree(_cmp_for_max);
+  this->base.destroyer = _destroy_minmax_plugin;
+  return this;
+}
+
+void get_numstracker_minmax_plugin_stats(NumsTrackerMinMaxPlugin *this, gint64 *max, gint64 *min)
+{
+  if(max) *max = bintree_get_top_value(this->tree);
+  if(min) *min = bintree_get_bottom_value(this->tree);
+}
+
+void
+_destroy_minmax_plugin(gpointer data)
+{
+  NumsTrackerMinMaxPlugin *this = data;
+  g_object_unref(this->tree);
+}
+
+static void _minmax_pipe(NumsTrackerMinMaxPlugin *this)
+{
+  if(this->max_pipe){
+   guint64 top;
+   top = bintree_get_top_value(this->tree);
+   this->max_pipe(this->max_pipe_data, top);
+ }
+
+ if(this->min_pipe){
+   guint64 bottom;
+   bottom = bintree_get_bottom_value(this->tree);
+   this->min_pipe(this->min_pipe_data, bottom);
+ }
+}
+
+void
+_minmax_add_activator(gpointer pdata, gint64 value)
+{
+  NumsTrackerMinMaxPlugin *this = pdata;
+  if(this->tree && value < 0){
+    g_warning("numtracker with tree only allows positive values");
+    goto done;
+  }
+  bintree_insert_value(this->tree, value);
+  _minmax_pipe(this);
+
+done:
+  return;
+
+}
+void
+_minmax_rem_activator(gpointer pdata, gint64 value)
+{
+  NumsTrackerMinMaxPlugin *this = pdata;
+  if(this->tree && value < 0){
+    g_warning("numtracker with tree only allows positive values");
+    goto done;
+  }
+  bintree_delete_value(this->tree, value);
+  _minmax_pipe(this);
+
+  done:
+    return;
+}
+
+
+NumsTrackerEWMAPlugin *
+make_numstracker_ewma_plugin(void (*avg_pipe)(gpointer,gdouble), gpointer avg_data,
+                               gdouble factor)
+{
+  NumsTrackerEWMAPlugin *this = g_malloc0(sizeof(NumsTrackerEWMAPlugin));;
+  this->base.add_activator = _ewma_add_activator;
+  this->base.rem_activator = NULL;
+  this->avg_pipe = avg_pipe;
+  this->avg_pipe_data = avg_data;
+  this->factor = factor;
+  this->base.destroyer = g_free;
+  return this;
+}
+
+void get_numstracker_ewma_plugin_stats(NumsTrackerEWMAPlugin *this, gdouble *avg, gdouble *dev)
+{
+  if(avg) *avg = this->avg;
+}
+
+
+void
+_ewma_add_activator(gpointer pdata, gint64 value)
+{
+  NumsTrackerEWMAPlugin *this = pdata;
+  this->avg = this->factor * (gdouble) value + (1.-this->factor) * this->avg;
+  if(this->avg_pipe){
+     this->avg_pipe(this->avg_pipe_data, this->avg);
+   }
+}
+
+
+NumsTrackerVariancePlugin *
+make_numstracker_variance_plugin(void (*var_pipe)(gpointer,gdouble), gpointer var_data)
+{
+  NumsTrackerVariancePlugin *this = g_malloc0(sizeof(NumsTrackerVariancePlugin));;
+  this->base.add_activator = _variance_add_activator;
+  this->base.rem_activator = _variance_rem_activator;
+  this->var_pipe = var_pipe;
+  this->var_pipe_data = var_data;
+  this->base.destroyer = g_free;
+  return this;
+}
+
+void get_numstracker_variance_plugin_stats(NumsTrackerVariancePlugin *this, gdouble *variance)
+{
+  gdouble counter, sum_squere;
+  if(this->counter < 2) goto done;
+  sum_squere = (gdouble)this->sum * (gdouble)this->sum;
+  counter = this->counter;
+  //V = (N * SX2 - (SX1 * SX1)) / (N * (N - 1))
+  if(variance)
+    *variance = (counter * (gdouble)this->squere_sum - sum_squere) / (counter * (counter - 1.));
+done:
+  return;
+}
+
+static void _variance_pipe(NumsTrackerVariancePlugin *this)
+{
+  gdouble variance;
+  if(!this->var_pipe) return;
+  get_numstracker_variance_plugin_stats(this, &variance);
+  this->var_pipe(this->var_pipe_data, variance);
+}
+
+void
+_variance_add_activator(gpointer pdata, gint64 value)
+{
+  NumsTrackerVariancePlugin *this = pdata;
+  this->squere_sum += value * value;
+  this->sum += value;
+  ++this->counter;
+  _variance_pipe(this);
+
+}
+void
+_variance_rem_activator(gpointer pdata, gint64 value)
+{
+  NumsTrackerVariancePlugin *this = pdata;
+  this->squere_sum -= value * value;
+  this->sum -= value;
+  --this->counter;
+  _variance_pipe(this);
 }
 
 #undef THIS_WRITELOCK

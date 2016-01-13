@@ -45,6 +45,7 @@ struct _SubflowRateController
 
 
   NumsTracker*             bytes_in_flight_history;
+  NumsTracker*             receiver_rate_history;
   guint32                  bytes_in_queue_avg;
 
   gint32                   max_rate;
@@ -65,6 +66,8 @@ struct _SubflowRateController
   GstClockTime             last_target_bitrate_i_adjust;
   GstClockTime             last_target_bitrate_adjust;
   GstClockTime             last_queue_clear;
+
+  GstClockTime             packet_obsolation_treshold;
 
   PercentileTracker*       ltt_delays_th;
   PercentileTracker*       ltt_delays_target;

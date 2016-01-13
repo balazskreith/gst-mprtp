@@ -67,6 +67,13 @@ struct _PercentileState{
 static void percentiletracker_finalize (GObject * object);
 static void
 _add_value(PercentileTracker *this, guint64 value);
+static void _pipe_stats(PercentileTracker * this);
+static guint64
+_get_stats (PercentileTracker * this,
+                         guint64 *min,
+                         guint64 *max,
+                         guint64 *sum);
+
 static void
 _obsolate (PercentileTracker * this);
 static gint
@@ -269,6 +276,14 @@ void percentiletracker_set_treshold(PercentileTracker *this, GstClockTime tresho
   THIS_WRITEUNLOCK (this);
 }
 
+void percentiletracker_set_stats_pipe(PercentileTracker *this, void(*stats_pipe)(gpointer, PercentileTrackerPipeData*),gpointer stats_pipe_data)
+{
+  THIS_WRITELOCK (this);
+  this->stats_pipe = stats_pipe;
+  this->stats_pipe_data = stats_pipe_data;
+  THIS_WRITEUNLOCK (this);
+}
+
 guint32 percentiletracker_get_num(PercentileTracker *this)
 {
   guint32 result;
@@ -301,32 +316,9 @@ percentiletracker_get_stats (PercentileTracker * this,
                          guint64 *sum)
 {
   guint64 result = 0;
-  gint32 max_count, min_count;
-//  g_print("mprtpr_path_get_delay_median begin\n");
   THIS_READLOCK (this);
-  if(sum) *sum = this->sum;
-  result = this->state->producer(this);
-  if(!min && !max) goto done;
-  if(min) *min = 0;
-  if(max) *max = 0;
-
-  min_count = bintree_get_num(this->mintree);
-  max_count = bintree_get_num(this->maxtree);
-  if(!min_count && !max_count) goto done;
-  if(!max_count){
-    if(min) *min = bintree_get_top_value(this->mintree);
-    if(max) *max = bintree_get_bottom_value(this->mintree);
-  }else if(!min_count){
-    if(min) *min = bintree_get_bottom_value(this->maxtree);
-    if(max) *max = bintree_get_top_value(this->maxtree);
-  }else{
-    if(min) *min = bintree_get_bottom_value(this->maxtree);
-    if(max) *max = bintree_get_bottom_value(this->mintree);
-  }
-
-done:
+  result = _get_stats(this, min, max, sum);
   THIS_READUNLOCK (this);
-//  g_print("mprtpr_path_get_delay_median end\n");
   return result;
 }
 
@@ -348,7 +340,46 @@ void _add_value(PercentileTracker *this, guint64 value)
   if(++this->write_index == this->length){
     this->write_index=0;
   }
+  _pipe_stats(this);
+}
 
+void _pipe_stats(PercentileTracker * this)
+{
+  PercentileTrackerPipeData pdata;
+  if(!this->stats_pipe) return;
+  pdata.percentile = _get_stats(this, &pdata.min, &pdata.max, &pdata.sum);
+  this->stats_pipe(this->stats_pipe_data, &pdata);
+}
+
+guint64
+_get_stats (PercentileTracker * this,
+                         guint64 *min,
+                         guint64 *max,
+                         guint64 *sum)
+{
+  guint64 result = 0;
+  gint32 max_count, min_count;
+  if(sum) *sum = this->sum;
+  result = this->state->producer(this);
+  if(!min && !max) goto done;
+  if(min) *min = 0;
+  if(max) *max = 0;
+
+  min_count = bintree_get_num(this->mintree);
+  max_count = bintree_get_num(this->maxtree);
+  if(!min_count && !max_count) goto done;
+  if(!max_count){
+    if(min) *min = bintree_get_top_value(this->mintree);
+    if(max) *max = bintree_get_bottom_value(this->mintree);
+  }else if(!min_count){
+    if(min) *min = bintree_get_bottom_value(this->maxtree);
+    if(max) *max = bintree_get_top_value(this->maxtree);
+  }else{
+    if(min) *min = bintree_get_bottom_value(this->maxtree);
+    if(max) *max = bintree_get_bottom_value(this->mintree);
+  }
+  done:
+  return result;
 }
 
 guint64 _get_median(PercentileTracker * this)
@@ -566,6 +597,7 @@ elliminate:
   }
   goto again;
 done:
+  _pipe_stats(this);
   return;
 }
 

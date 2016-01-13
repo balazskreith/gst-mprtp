@@ -136,7 +136,7 @@ void ricalcer_do_next_report_time (ReportIntervalCalculator * this)
   if (this->urgent) {
     this->urgent = FALSE;
     interval /= 2.;
-    if (3. < interval) {
+    if (2. < interval) {
       interval = 1. + g_random_double ();
     }
     goto done;

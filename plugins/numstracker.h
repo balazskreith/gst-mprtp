@@ -38,6 +38,7 @@ struct _NumsTracker
   gint32                   write_index;
   gint32                   read_index;
   gint32                   counter;
+  GList*                   plugins;
 };
 
 struct _NumsTrackerItem
@@ -51,11 +52,51 @@ struct _NumsTrackerClass{
 
 };
 
+typedef struct _NumsTrackerPlugin NumsTrackerPlugin;
+typedef struct _NumsTrackerMinMaxPlugin NumsTrackerMinMaxPlugin;
+typedef struct _NumsTrackerEWMAPlugin NumsTrackerEWMAPlugin ;
+typedef struct _NumsTrackerVariancePlugin NumsTrackerVariancePlugin;
+typedef struct _NumsTrackerKalmanFilterPlugin NumsTrackerKalmanFilterPlugin ;
+
+struct _NumsTrackerPlugin{
+  void (*add_activator)(gpointer, gint64);
+  void (*rem_activator)(gpointer, gint64);
+  void (*destroyer)(gpointer);
+};
+
+
+struct _NumsTrackerMinMaxPlugin{
+  NumsTrackerPlugin base;
+  BinTree          *tree;
+  void            (*max_pipe)(gpointer, guint64);
+  void            (*min_pipe)(gpointer, guint64);
+  gpointer          max_pipe_data;
+  gpointer          min_pipe_data;
+};
+
+struct _NumsTrackerEWMAPlugin{
+  NumsTrackerPlugin base;
+  gdouble           factor;
+  gdouble           avg;
+  void            (*avg_pipe)(gpointer, gdouble);
+  gpointer          avg_pipe_data;
+};
+
+struct _NumsTrackerVariancePlugin{
+  NumsTrackerPlugin base;
+  gint64            sum;
+  gint64            squere_sum;
+  guint32           counter;
+  void            (*var_pipe)(gpointer, gdouble);
+  gpointer          var_pipe_data;
+};
+
 GType numstracker_get_type (void);
 NumsTracker *make_numstracker(guint32 length, GstClockTime obsolation_treshold);
 NumsTracker *make_numstracker_with_tree(guint32 length, GstClockTime obsolation_treshold);
 guint32 numstracker_get_num(NumsTracker *this);
 guint64 numstracker_get_last(NumsTracker *this);
+
 
 void
 numstracker_get_stats (NumsTracker * this,
@@ -66,5 +107,29 @@ numstracker_get_stats (NumsTracker * this,
 void numstracker_obsolate (NumsTracker * this);
 void numstracker_reset(NumsTracker *this);
 void numstracker_add(NumsTracker *this, gint64 value);
+
+void numstracker_add_plugin(NumsTracker *this, NumsTrackerPlugin *plugin);
+void numstracker_rem_plugin(NumsTracker *this, NumsTrackerPlugin *plugin);
+
+
+NumsTrackerMinMaxPlugin *
+make_numstracker_minmax_plugin(void (*max_pipe)(gpointer,guint64), gpointer max_data,
+                               void (*min_pipe)(gpointer,guint64), gpointer min_data);
+
+void get_numstracker_minmax_plugin_stats(NumsTrackerMinMaxPlugin *this, gint64 *max, gint64 *min);
+
+
+NumsTrackerEWMAPlugin *
+make_numstracker_ewma_plugin(void (*avg_pipe)(gpointer,gdouble), gpointer avg_data,
+                               gdouble factor);
+
+void get_numstracker_ewma_plugin_stats(NumsTrackerEWMAPlugin *this,
+                                       gdouble *avg, gdouble *dev);
+
+
+NumsTrackerVariancePlugin *
+make_numstracker_variance_plugin(void (*var_pipe)(gpointer,gdouble), gpointer var_data);
+
+void get_numstracker_variance_plugin_stats(NumsTrackerVariancePlugin *this, gdouble *variance);
 
 #endif /* NUMSTRACKER_H_ */

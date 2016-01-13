@@ -249,7 +249,7 @@ void _time_update_evaluation(SendingRateDistributor* this)
 {
   Subflow *target, *source;
   gint i,j;
-
+goto done;
   if(0 < this->delta_rate || this->extra_rate < 1) goto done;
 
   //moving bytes

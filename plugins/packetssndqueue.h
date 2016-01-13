@@ -33,6 +33,7 @@ struct _PacketsSndQueue
   GRWLock                  rwmutex;
   PointerPool*             node_pool;
   GstClock*                sysclock;
+  GstClockTime             obsolation_treshold;
 };
 
 struct _PacketsSndQueueNode
@@ -55,5 +56,7 @@ void packetssndqueue_push(PacketsSndQueue *this,
                           GstBuffer* buffer,
                           guint32 payload_bytes);
 GstBuffer* packetssndqueue_pop(PacketsSndQueue *this);
+void packetssndqueue_set_obsolation_treshold(PacketsSndQueue *this,
+                                    GstClockTime obsolation_treshold);
 gboolean packetssndqueue_has_buffer(PacketsSndQueue *this, guint32 *payload_bytes);
 #endif /* PACKETSSNDQUEUE_H_ */

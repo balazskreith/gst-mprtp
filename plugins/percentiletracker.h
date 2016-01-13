@@ -23,13 +23,17 @@ typedef struct _PercentileState PercentileState;
 #define PERCENTILETRACKER_CAST(src)        ((PercentileTracker *)(src))
 
 typedef struct _PercentileTrackerItem PercentileTrackerItem;
+typedef struct _PercentileTrackerPipeData{
+  guint64 min,max,sum,percentile;
+}PercentileTrackerPipeData;
+
 struct _PercentileTracker
 {
   GObject                  object;
   BinTree*                 mintree;
   BinTree*                 maxtree;
   GRWLock                  rwmutex;
-  PercentileTrackerItem*       items;
+  PercentileTrackerItem*   items;
   gboolean                 debug;
   guint64                  sum;
   guint8                   percentile;
@@ -42,6 +46,9 @@ struct _PercentileTracker
 
   guint                    required;
   PercentileState*         state;
+
+  void                   (*stats_pipe)(gpointer, PercentileTrackerPipeData*);
+  gpointer                 stats_pipe_data;
 };
 
 struct _PercentileTrackerItem
@@ -71,6 +78,7 @@ PercentileTracker *make_percentiletracker_full(BinTreeCmpFunc cmp_min,
 
 void percentiletracker_test(void);
 void percentiletracker_set_treshold(PercentileTracker *this, GstClockTime treshold);
+void percentiletracker_set_stats_pipe(PercentileTracker *this, void(*stats_pipe)(gpointer, PercentileTrackerPipeData*),gpointer stats_pipe_data);
 guint32 percentiletracker_get_num(PercentileTracker *this);
 guint64 percentiletracker_get_last(PercentileTracker *this);
 guint64

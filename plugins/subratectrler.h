@@ -42,7 +42,7 @@ struct _SubflowRateController
   //target_bitrate during fast start. Used to limit bitrate increase
   //close to the last know congestion point. Initial value: 1
   gint                     target_bitrate_i;
-
+  NumsTracker*             target_bitrate_i_history;
 
   NumsTracker*             bytes_in_flight_history;
   NumsTracker*             receiver_rate_history;
@@ -81,7 +81,8 @@ struct _SubflowRateController
   //OWD trend indicates incipient congestion. Initial value: 0.0
   gdouble                  owd_trend_mem;
   //True if in fast start state. Initial value: TRUE
-  gint                     in_fast_start;
+  gboolean                 in_fast_start;
+  gboolean                 in_gain_up;
   gint                     n_fast_start;
   //Maximum segment size
   gint                     mss;

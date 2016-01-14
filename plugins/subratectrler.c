@@ -113,7 +113,8 @@ struct _Moment{
   guint32         sender_rate;
   guint32         goodput;
   guint32         bytes_newly_acked;
-  guint32         bytes_in_flight;
+  guint32         bytes_in_flight_ack;
+  gint64          bytes_in_flight_ested;
   guint32         bytes_in_queue;
   guint64         max_bytes_in_flight;
 
@@ -127,6 +128,7 @@ struct _Moment{
   gdouble         corr_rate;
   gdouble         corr_rate_dev;
   gdouble         owd_fraction;
+  gdouble         BiF_off_target;
   gboolean        can_cwnd_increase;
   gboolean        can_bitrate_increase;
   gdouble         off_target;
@@ -345,6 +347,7 @@ subratectrler_init (SubflowRateController * this)
                                    _ltt_delays_target_stats_pipe, this);
 
   this->owd_fraction_hist = make_floatnumstracker(20, 60 * GST_SECOND);
+
   this->bytes_in_flight_history = make_numstracker(16, 10 * GST_SECOND);
   numstracker_add_plugin(this->bytes_in_flight_history,
                          (NumsTrackerPlugin*) make_numstracker_minmax_plugin(_bights_in_flight_max_pipe, this, NULL, NULL));
@@ -382,6 +385,7 @@ void subratectrler_set(SubflowRateController *this,
 
 //  this->owd_target = OWD_TARGET_LO;
   this->owd_fraction_avg = 0.;
+  this->BiF_off_avg = 0.;
   //Vector of the last 20 owd_fraction
   this->mss = 1400;
   this->cwnd_min = 3 * this->mss;
@@ -446,6 +450,15 @@ void subratectrler_time_update(
       this->bytes_in_queue_avg *= .5;
       this->bytes_in_queue_avg += _mt0(this)->bytes_in_queue * .5;
   }
+
+  mprtps_path_get_bytes_in_flight(this->path, NULL, &_mt0(this)->bytes_in_flight_ested);
+  if(0 < _mt0(this)->bytes_in_flight_ested){
+    this->BiF_off_avg = .8* this->BiF_off_avg + .2* (gdouble)(_mt0(this)->bytes_in_flight_ested -_mt0(this)->bytes_in_flight_ack) / (gdouble)_mt0(this)->bytes_in_flight_ested;
+    _mt0(this)->BiF_off_target =    MAX(-1., MIN(1., this->BiF_off_avg));
+    g_print("BiF off: %f\n",_mt0(this)->BiF_off_target);
+  }
+
+
   _update_bitrate(this);
   if(rep){
     rep->lost_bytes = _mt0(this)->lost;
@@ -477,7 +490,7 @@ void subratectrler_measurement_update(
   _mt0(this)->receiver_rate       = measurement->receiver_rate * 8;
   _mt0(this)->jitter              = measurement->jitter;
   _mt0(this)->bytes_newly_acked   = measurement->expected_payload_bytes;
-  _mt0(this)->bytes_in_flight     = measurement->bytes_in_flight;
+  _mt0(this)->bytes_in_flight_ack = measurement->bytes_in_flight_acked;
 
   _mt0(this)->sender_rate         = _mt1(this)->sender_rate;
   _mt0(this)->bytes_in_queue      = _mt1(this)->bytes_in_queue;
@@ -487,7 +500,6 @@ void subratectrler_measurement_update(
   _mt0(this)->state               = _mt1(this)->state;
 
   _mt0(this)->discard_rate        = 1. - measurement->goodput / measurement->receiver_rate;
-
   numstracker_add(this->receiver_rate_history, _mt0(this)->receiver_rate);
 
   if(1 < this->moments_num)
@@ -496,7 +508,7 @@ void subratectrler_measurement_update(
     this->s_rtt = measurement->RTT;
 
   if(numstracker_get_num(this->bytes_in_flight_history) < 1){
-      _mt0(this)->max_bytes_in_flight = measurement->bytes_in_flight;
+      _mt0(this)->max_bytes_in_flight = measurement->bytes_in_flight_acked;
   }
 
   if(!_mt0(this)->ltt_delays_th){
@@ -507,6 +519,7 @@ void subratectrler_measurement_update(
       _mt0(this)->ltt_delays_target = OWD_TARGET_LO;
     }
 
+  mprtps_path_set_delay(this->path, _mt0(this)->ltt_delays_target);
   _mt0(this)->owd_fraction        = _mt0(this)->delay/_mt0(this)->ltt_delays_target;
   this->owd_fraction_avg = .9* this->owd_fraction_avg + .1* _mt0(this)->owd_fraction;
 
@@ -522,12 +535,12 @@ void subratectrler_measurement_update(
 
   _mt0(this)->off_target = _get_off_target(this);
 
-  g_print("TB: %u, TBi: %u, BiF: %u cwnd: %d "
+  g_print("TB: %u, TBi: %u, BiF: %u, cwnd: %d "
       "d: %lu td: %lu thd: %lu trend: %f, can_b_up: %d, RR: %u, RRD: %u"
       "off: %f\n",
           this->target_bitrate,
           this->target_bitrate_i,
-          _mt0(this)->bytes_in_flight,
+          _mt0(this)->bytes_in_flight_ack,
           this->cwnd,
           _mt0(this)->delay,
           _mt0(this)->ltt_delays_target,
@@ -543,7 +556,7 @@ void subratectrler_measurement_update(
   if(_mt0(this)->state == STATE_STABLE){
     percentiletracker_add(this->ltt_delays_th, measurement->median_delay);
     percentiletracker_add(this->ltt_delays_target, measurement->median_delay);
-    numstracker_add(this->bytes_in_flight_history, measurement->bytes_in_flight);
+    numstracker_add(this->bytes_in_flight_history, measurement->bytes_in_flight_acked);
     this->packet_obsolation_treshold = OWD_TARGET_HI - _mt0(this)->ltt_delays_target;
   }
 
@@ -930,10 +943,10 @@ gdouble _adjust_bitrate(SubflowRateController *this)
   scl += _mt0(this)->owd_trend;
 //  scl = MIN(1.0, (this->owd_fraction_avg - 0.3f) / 0.7f + _mt0(this)->owd_trend);
   g_print("adjusted ");
+
   increment = _actual_rate(this)*(1.0f - PRE_CONGESTION_GUARD * scl * tmp)-
-      TX_QUEUE_SIZE_FACTOR * (gdouble)(this->bytes_in_queue_avg * 8) * tmp +
-      mprtps_path_get_bytes_in_flight(this->path) * tmp -
-      this->target_bitrate * (1. - _mt0(this)->off_target);
+      TX_QUEUE_SIZE_FACTOR * (gdouble)(this->bytes_in_queue_avg * 8) * tmp -
+      this->target_bitrate;
   if (increment < 0) {
     _adjust_bitrate_inflection(this);
     increment *= MIN(1.0f,this->owd_fraction_avg);
@@ -1057,7 +1070,7 @@ gdouble _get_off_target(SubflowRateController *this)
 gboolean _cwnd_can_increase(SubflowRateController *this)
 {
   gfloat alpha = 1.25f+2.75f*(1.0f-this->owd_trend_mem);
-  return this->cwnd <= alpha*_mt0(this)->bytes_in_flight;
+  return this->cwnd <= alpha*_mt0(this)->bytes_in_flight_ack;
 
 }
 
@@ -1075,6 +1088,7 @@ void _adjust_bitrate_inflection(SubflowRateController *this)
 void _change_target_bitrate(SubflowRateController *this, gint32 delta)
 {
   gint32 new_target = this->target_bitrate;
+//  delta = 0;
   new_target+=delta;
   if(0 < this->max_rate){
     new_target = MIN(new_target, this->max_rate);
@@ -1137,7 +1151,7 @@ void _print_overused_state(SubflowRateController *this)
         this->id,
         _mt0(this)->corrh_owd,
         _mt0(this)->owd_trend,
-        _mt0(this)->bytes_in_flight,
+        _mt0(this)->bytes_in_flight_ack,
         _mt0(this)->bytes_in_queue);
 done:
   return;

@@ -76,6 +76,7 @@ struct _SubflowRateController
 //  guint64                  owd_target;
   //EWMA filtered owd fraction.Initial value:  0.0
   gdouble                  owd_fraction_avg;
+  gdouble                  BiF_off_avg;
   //Vector of the last 20 owd_fraction
   FloatNumsTracker*        owd_fraction_hist;
   //OWD trend indicates incipient congestion. Initial value: 0.0

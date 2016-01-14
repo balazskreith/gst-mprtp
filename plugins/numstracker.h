@@ -45,6 +45,7 @@ struct _NumsTrackerItem
 {
   gint64        value;
   GstClockTime  added;
+  GstClockTime  remove;
 };
 
 struct _NumsTrackerClass{
@@ -54,9 +55,10 @@ struct _NumsTrackerClass{
 
 typedef struct _NumsTrackerPlugin NumsTrackerPlugin;
 typedef struct _NumsTrackerMinMaxPlugin NumsTrackerMinMaxPlugin;
-typedef struct _NumsTrackerEWMAPlugin NumsTrackerEWMAPlugin ;
+typedef struct _NumsTrackerEWMAPlugin NumsTrackerEWMAPlugin;
 typedef struct _NumsTrackerVariancePlugin NumsTrackerVariancePlugin;
 typedef struct _NumsTrackerKalmanFilterPlugin NumsTrackerKalmanFilterPlugin ;
+typedef struct _NumsTrackerSumPlugin NumsTrackerSumPlugin;
 
 struct _NumsTrackerPlugin{
   void (*add_activator)(gpointer, gint64);
@@ -91,6 +93,13 @@ struct _NumsTrackerVariancePlugin{
   gpointer          var_pipe_data;
 };
 
+struct _NumsTrackerSumPlugin{
+  NumsTrackerPlugin base;
+  gint64            sum;
+  void            (*sum_pipe)(gpointer, gint64);
+  gpointer          sum_pipe_data;
+};
+
 GType numstracker_get_type (void);
 NumsTracker *make_numstracker(guint32 length, GstClockTime obsolation_treshold);
 NumsTracker *make_numstracker_with_tree(guint32 length, GstClockTime obsolation_treshold);
@@ -107,6 +116,7 @@ numstracker_get_stats (NumsTracker * this,
 void numstracker_obsolate (NumsTracker * this);
 void numstracker_reset(NumsTracker *this);
 void numstracker_add(NumsTracker *this, gint64 value);
+void numstracker_add_with_removal(NumsTracker *this, gint64 value, GstClockTime removal);
 
 void numstracker_add_plugin(NumsTracker *this, NumsTrackerPlugin *plugin);
 void numstracker_rem_plugin(NumsTracker *this, NumsTrackerPlugin *plugin);
@@ -131,5 +141,11 @@ NumsTrackerVariancePlugin *
 make_numstracker_variance_plugin(void (*var_pipe)(gpointer,gdouble), gpointer var_data);
 
 void get_numstracker_variance_plugin_stats(NumsTrackerVariancePlugin *this, gdouble *variance);
+
+
+NumsTrackerSumPlugin *
+make_numstracker_sum_plugin(void (*sum_pipe)(gpointer,gint64), gpointer sum_data);
+
+void get_numstracker_sum_plugin_stats(NumsTrackerSumPlugin *this, gint64 *variance);
 
 #endif /* NUMSTRACKER_H_ */

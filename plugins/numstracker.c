@@ -49,7 +49,7 @@ G_DEFINE_TYPE (NumsTracker, numstracker, G_TYPE_OBJECT);
 
 static void numstracker_finalize (GObject * object);
 static void
-_add_value(NumsTracker *this, gint64 value);
+_add_value(NumsTracker *this, gint64 value, GstClockTime removal);
 static void
 _obsolate (NumsTracker * this);
 
@@ -74,6 +74,12 @@ _variance_add_activator(gpointer pdata, gint64 value);
 
 static void
 _variance_rem_activator(gpointer pdata, gint64 value);
+
+static void
+_sum_add_activator(gpointer pdata, gint64 value);
+
+static void
+_sum_rem_activator(gpointer pdata, gint64 value);
 
 
 //----------------------------------------------------------------------
@@ -181,7 +187,14 @@ void numstracker_rem_plugin(NumsTracker *this, NumsTrackerPlugin *plugin)
 void numstracker_add(NumsTracker *this, gint64 value)
 {
   THIS_WRITELOCK (this);
-  _add_value(this, value);
+  _add_value(this, value, 0);
+  THIS_WRITEUNLOCK (this);
+}
+
+void numstracker_add_with_removal(NumsTracker *this, gint64 value, GstClockTime removal)
+{
+  THIS_WRITELOCK (this);
+  _add_value(this, value, removal);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -235,7 +248,7 @@ numstracker_obsolate (NumsTracker * this)
 
 
 
-void _add_value(NumsTracker *this, gint64 value)
+void _add_value(NumsTracker *this, gint64 value, GstClockTime removal)
 {
   GstClockTime now;
   now = gst_clock_get_time(this->sysclock);
@@ -243,6 +256,7 @@ void _add_value(NumsTracker *this, gint64 value)
   ++this->counter;
   this->items[this->write_index].value = value;
   this->items[this->write_index].added = now;
+  this->items[this->write_index].remove = removal;
   this->value_sum += value;
   if(++this->write_index == this->length){
       this->write_index=0;
@@ -265,24 +279,29 @@ void _add_value(NumsTracker *this, gint64 value)
 
   _obsolate(this);
 }
-
+#define _removal(this, index) this->items[index].remove
 void
 _obsolate (NumsTracker * this)
 {
-  GstClockTime treshold,now;
+  GstClockTime treshold,now, removal;
   guint64 value;
   now = gst_clock_get_time(this->sysclock);
   treshold = now - this->treshold;
+
 again:
   if(this->counter < 1) goto done;
+
+  removal = this->items[this->read_index].remove;
   if(this->write_index == this->read_index) goto elliminate;
   else if(this->items[this->read_index].added < treshold) goto elliminate;
+  else if(0 < removal && removal < now) goto elliminate;
   else goto done;
 elliminate:
   value = this->items[this->read_index].value;
   this->value_sum -= value;
   this->items[this->read_index].value = 0;
   this->items[this->read_index].added = 0;
+  this->items[this->read_index].remove = 0;
   if(this->tree) bintree_delete_value(this->tree, value);
   if(++this->read_index == this->length){
       this->read_index=0;
@@ -470,6 +489,48 @@ _variance_rem_activator(gpointer pdata, gint64 value)
   this->sum -= value;
   --this->counter;
   _variance_pipe(this);
+}
+
+
+
+NumsTrackerSumPlugin *
+make_numstracker_sum_plugin(void (*sum_pipe)(gpointer,gint64), gpointer sum_data)
+{
+  NumsTrackerSumPlugin *this = g_malloc0(sizeof(NumsTrackerSumPlugin));;
+  this->base.add_activator = _sum_add_activator;
+  this->base.rem_activator = _sum_rem_activator;
+  this->sum_pipe = sum_pipe;
+  this->sum_pipe_data = sum_data;
+  this->base.destroyer = g_free;
+  return this;
+}
+
+
+void get_numstracker_sum_plugin_stats(NumsTrackerSumPlugin *this, gint64 *sum)
+{
+  if(sum) *sum = this->sum;
+}
+
+static void _sum_pipe(NumsTrackerSumPlugin *this)
+{
+  if(!this->sum_pipe) return;
+  this->sum_pipe(this->sum_pipe_data, this->sum);
+}
+
+void
+_sum_add_activator(gpointer pdata, gint64 value)
+{
+  NumsTrackerSumPlugin *this = pdata;
+  this->sum += value;
+  _sum_pipe(this);
+
+}
+void
+_sum_rem_activator(gpointer pdata, gint64 value)
+{
+  NumsTrackerSumPlugin *this = pdata;
+  this->sum -= value;
+  _sum_pipe(this);
 }
 
 #undef THIS_WRITELOCK

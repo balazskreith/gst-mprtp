@@ -97,11 +97,13 @@ struct _MPRTPSPath
   void                    (*send_mprtp_packet_func)(gpointer, GstBuffer*);
   gpointer                  send_mprtp_func_data;
 
-  guint32                 bytes_in_flight_hat;
-  guint32                 target_bitrate;
+  GstClockTime            path_delay;
+  guint32                 pacing_bitrate;
   gboolean                pacing;
 
-  guint32                 octets_in_flight;
+  guint32                 octets_in_flight_acked;
+  NumsTracker*            octets_in_flight_exped_history;
+  NumsTrackerSumPlugin*   octets_in_flight_exped_history_sum_plugin;
 //  guint32                 cwnd_size;
 //  guint32                 cwnd_slack;
 //  gboolean                cwnd_slack_allowed;
@@ -149,7 +151,7 @@ struct _RRMeasurement{
   MPRTPSPathState     state;
   gboolean            checked;
 
-  guint32             bytes_in_flight;
+  guint32             bytes_in_flight_acked;
   guint32             bytes_in_queue;
 };
 
@@ -193,7 +195,7 @@ void mprtps_path_process_rtp_packet(MPRTPSPath * this,
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_frames_num (MPRTPSPath * this);
 guint32 mprtps_path_get_sent_octet_sum_for(MPRTPSPath *this, guint32 amount);
-guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this);
+void mprtps_path_get_bytes_in_flight(MPRTPSPath *this, guint32 *acked, gint64* ested);
 void mprtps_path_clear_queue(MPRTPSPath *this);
 guint32 mprtps_path_get_sender_rate(MPRTPSPath *this);
 guint32 mprtps_path_get_bytes_in_queue(MPRTPSPath *this);
@@ -204,6 +206,7 @@ GstClockTime mprtps_path_get_time_sent_to_lossy (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_non_congested (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_congested (MPRTPSPath * this);
 guint16 mprtps_path_get_HSN(MPRTPSPath * this);
+void mprtps_path_set_delay(MPRTPSPath * this, GstClockTime delay);
 void mprtps_path_set_pacing_bitrate(MPRTPSPath * this, guint32 target_bitrate, GstClockTime obsolation_treshold);
 void mprtps_path_set_pacing (MPRTPSPath * this, gboolean pacing);
 void mprtps_path_set_monitor_payload_id(MPRTPSPath *this, guint8 payload_type);

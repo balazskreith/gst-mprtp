@@ -134,7 +134,7 @@ void g_print_rrmeasurement(RRMeasurement *measurement)
   measurement->receiver_rate,
   measurement->state,
   measurement->checked,
-  measurement->bytes_in_flight,
+  measurement->bytes_in_flight_acked,
   measurement->bytes_in_queue );
 
 }
@@ -174,6 +174,10 @@ mprtps_path_init (MPRTPSPath * this)
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetssndqueue();
   this->sent_bytes = make_numstracker(2048, GST_SECOND);
+  this->octets_in_flight_exped_history = make_numstracker(2048, 400 * GST_MSECOND);
+  this->octets_in_flight_exped_history_sum_plugin = make_numstracker_sum_plugin(NULL, NULL);
+  numstracker_add_plugin(this->octets_in_flight_exped_history,
+                         (NumsTrackerPlugin*)this->octets_in_flight_exped_history_sum_plugin);
   mprtps_path_reset (this);
 }
 
@@ -312,11 +316,20 @@ guint16 mprtps_path_get_HSN(MPRTPSPath * this)
 }
 
 void
+mprtps_path_set_delay(MPRTPSPath * this, GstClockTime delay)
+{
+  g_return_if_fail (this);
+  THIS_WRITELOCK (this);
+  this->path_delay = delay;
+  THIS_WRITEUNLOCK (this);
+}
+
+void
 mprtps_path_set_pacing_bitrate(MPRTPSPath * this, guint32 target_bitrate, GstClockTime obsolation_treshold)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->target_bitrate = target_bitrate;
+  this->pacing_bitrate = target_bitrate;
   packetssndqueue_set_obsolation_treshold(this->packetsqueue, obsolation_treshold);
   THIS_WRITEUNLOCK (this);
 }
@@ -510,19 +523,19 @@ mprtps_path_get_sent_octet_sum_for (MPRTPSPath * this, guint32 amount)
     this->sent_octets_read += 1;
     this->sent_octets_read &= MAX_INT32_POSPART;
   }
-  this->octets_in_flight-= result;
+  this->octets_in_flight_acked-= result;
 done:
   THIS_WRITEUNLOCK (this);
   return result;
 }
 
-guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this)
+void mprtps_path_get_bytes_in_flight(MPRTPSPath *this, guint32 *acked, gint64* ested)
 {
-  guint32 result;
   THIS_READLOCK(this);
-  result = this->octets_in_flight<<3;
+  if(acked) *acked = this->octets_in_flight_acked<<3;
+  get_numstracker_sum_plugin_stats(this->octets_in_flight_exped_history_sum_plugin, ested);
+  if(ested) *ested <<= 3;
   THIS_READUNLOCK(this);
-  return result;
 }
 
 void mprtps_path_clear_queue(MPRTPSPath *this)
@@ -640,7 +653,12 @@ _refresh_stat(MPRTPSPath * this,
   if(gst_rtp_buffer_get_payload_type(&rtp) != this->monitor_payload_type){
     this->total_sent_payload_bytes_sum += payload_bytes;
     this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
-    this->octets_in_flight += payload_bytes>>3;
+    this->octets_in_flight_acked += payload_bytes>>3;
+
+    numstracker_add_with_removal(this->octets_in_flight_exped_history,
+                                 payload_bytes>>3,
+                                 gst_clock_get_time(this->sysclock) + this->path_delay);
+
     numstracker_add(this->sent_bytes, payload_bytes);
     ++this->total_sent_normal_packet_num;
   } else {
@@ -680,7 +698,7 @@ guint32 _pacing(MPRTPSPath * this)
   GstBuffer *buffer;
   guint32 sent_payload_bytes = 0, payload_bytes = 0;
   gdouble pace_interval;
-  gdouble pacing_bitrate = this->target_bitrate;
+  gdouble pacing_bitrate = this->pacing_bitrate;
   guint32 pacing_tick = MIN_PACE_INTERVAL;
 
   if(!this->pacing) pacing_bitrate *= 2;

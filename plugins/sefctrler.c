@@ -849,7 +849,7 @@ _report_processing_rrblock_processor (SndEventBasedController *this,
   _irt0(subflow)->expected_payload_bytes =
       mprtps_path_get_sent_octet_sum_for (subflow->path, _irt0 (subflow)->expected_packets)<<3;
 
-  _irt0(subflow)->bytes_in_flight = mprtps_path_get_bytes_in_flight(subflow->path);
+  mprtps_path_get_bytes_in_flight(subflow->path, &_irt0(subflow)->bytes_in_flight_acked, NULL);
   _irt0(subflow)->bytes_in_queue = mprtps_path_get_bytes_in_queue(subflow->path);
   if (subflow->ir_moments_num > 1 && (LSR == 0 || DLSR == 0)) {
     return;

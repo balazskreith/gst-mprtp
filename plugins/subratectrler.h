@@ -36,7 +36,7 @@ struct _SubflowRateController
 
   gint32                   monitored_bitrate;
   gint32                   target_bitrate;
-  gint32                   extra_bitrate;
+  gint32                   acked_monitored_bitrate;
 
   //Video target bitrate inflection point i.e. the last known highest
   //target_bitrate during fast start. Used to limit bitrate increase
@@ -80,10 +80,11 @@ struct _SubflowRateController
   FloatNumsTracker*        owd_fraction_hist;
   //OWD trend indicates incipient congestion. Initial value: 0.0
   gdouble                  owd_trend_mem;
+  NumsTracker*             owd_trend_history;
   //True if in fast start state. Initial value: TRUE
   gboolean                 in_fast_start;
-  gboolean                 in_gain_up;
   gint                     n_fast_start;
+  gint32                   rise_up_max;
   //Maximum segment size
   gint                     mss;
   //Minimum congestion window [byte]. Initial value: 2*MSS

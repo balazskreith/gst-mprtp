@@ -32,6 +32,7 @@
 #define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
 #define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
 
+#define _now(this) (gst_clock_get_time(this->sysclock))
 
 GST_DEBUG_CATEGORY_STATIC (gst_mprtps_path_category);
 #define GST_CAT_DEFAULT gst_mprtps_path_category
@@ -324,6 +325,14 @@ mprtps_path_set_delay(MPRTPSPath * this, GstClockTime delay)
   THIS_WRITEUNLOCK (this);
 }
 
+void mprtps_path_turn_off(MPRTPSPath * this, GstClockTime duration)
+{
+  g_return_if_fail (this);
+  THIS_WRITELOCK (this);
+  this->turn_off_until = _now(this) + duration;
+  THIS_WRITEUNLOCK (this);
+}
+
 void
 mprtps_path_set_pacing_bitrate(MPRTPSPath * this, guint32 target_bitrate, GstClockTime obsolation_treshold)
 {
@@ -598,6 +607,13 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
 {
 
   THIS_WRITELOCK (this);
+  if(0 < this->turn_off_until){
+    if(_now(this) < this->turn_off_until){
+      gst_buffer_unref(buffer);
+      goto done;
+    }
+    this->turn_off_until = 0;
+  }
   _setup_rtp2mprtp (this, buffer);
   _send_mprtp_packet(this, buffer);
 //  goto done;

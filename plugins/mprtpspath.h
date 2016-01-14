@@ -75,7 +75,7 @@ struct _MPRTPSPath
   GstClockTime            sent_non_congested;
   GstClockTime            sent_middly_congested;
   GstClockTime            sent_congested;
-
+  GstClockTime            turn_off_until;
 
   guint32                 ssrc_allowed;
   guint8                  sent_octets[MAX_INT32_POSPART];
@@ -207,6 +207,7 @@ GstClockTime mprtps_path_get_time_sent_to_non_congested (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_congested (MPRTPSPath * this);
 guint16 mprtps_path_get_HSN(MPRTPSPath * this);
 void mprtps_path_set_delay(MPRTPSPath * this, GstClockTime delay);
+void mprtps_path_turn_off(MPRTPSPath * this, GstClockTime duration);
 void mprtps_path_set_pacing_bitrate(MPRTPSPath * this, guint32 target_bitrate, GstClockTime obsolation_treshold);
 void mprtps_path_set_pacing (MPRTPSPath * this, gboolean pacing);
 void mprtps_path_set_monitor_payload_id(MPRTPSPath *this, guint8 payload_type);

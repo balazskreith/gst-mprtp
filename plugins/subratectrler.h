@@ -36,12 +36,15 @@ struct _SubflowRateController
 
   gint32                   monitored_bitrate;
   gint32                   target_bitrate;
-  gint32                   acked_monitored_bitrate;
+
+  guint                    overusing_indicator;
+  GstClockTime             disable_controlling;
 
   //Video target bitrate inflection point i.e. the last known highest
   //target_bitrate during fast start. Used to limit bitrate increase
   //close to the last know congestion point. Initial value: 1
-  gint                     target_bitrate_i;
+  gint32                   target_bitrate_i_max;
+  gint32                   target_bitrate_i_min;
   NumsTracker*             target_bitrate_i_history;
 
   NumsTracker*             bytes_in_flight_history;
@@ -55,7 +58,7 @@ struct _SubflowRateController
   guint                    monitoring_interval;
   GstClockTime             monitoring_started;
 
-  SubRateProc              cwnd_controller;
+  SubRateProc              controller;
 
   guint8*                  moments;
   gint                     moments_index;
@@ -83,9 +86,9 @@ struct _SubflowRateController
   gdouble                  owd_trend_mem;
   NumsTracker*             owd_trend_history;
   //True if in fast start state. Initial value: TRUE
-  gboolean                 in_fast_start;
-  gint                     n_fast_start;
-  gint32                   rise_up_max;
+//  gboolean                 in_fast_start;
+//  gint                     n_fast_start;
+//  gint32                   rise_up_max;
   //Maximum segment size
   gint                     mss;
   //Minimum congestion window [byte]. Initial value: 2*MSS

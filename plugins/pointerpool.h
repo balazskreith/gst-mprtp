@@ -13,6 +13,8 @@
 typedef struct _PointerPool PointerPool;
 typedef struct _PointerPoolClass PointerPoolClass;
 
+#define DISABLE_LINE if(0)
+
 #include "bintree.h"
 
 #define POINTERPOOL_TYPE             (pointerpool_get_type())

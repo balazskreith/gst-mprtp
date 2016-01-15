@@ -650,11 +650,11 @@ _orp_main(RcvEventBasedController * this)
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
     subflow = (Subflow *) val;
+    mprtpr_path_tick(subflow->path);
 //    g_print("Report time: %lu\n", GST_TIME_AS_MSECONDS(_ort0(subflow)->time - _ort1(subflow)->time));
     if(!_irt0(subflow)->SR_sent_ntp_time){
       continue;
     }
-
 //    g_print("S%d report time: %lu\n", subflow->id, GST_TIME_AS_MSECONDS(gst_clock_get_time(this->sysclock)));
     _step_or(subflow);
     block = _get_mprtcp_rr_block (this, subflow, &block_length);

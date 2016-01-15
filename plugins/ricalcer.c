@@ -141,18 +141,20 @@ void ricalcer_do_next_report_time (ReportIntervalCalculator * this)
     }
     goto done;
   }else{
-    interval *=1.5;
+    //Right now we just report in very frequently
+//    interval *=1.5;
+    interval = .7 * g_random_double() + .8;
   }
 
 done:
-  if (interval < 1.) {
-    interval = 1. + g_random_double ();
-  } else if (2. < interval) {
-    interval = 1.5 + g_random_double ();
-  }
+//  if (interval < 1.) {
+//    interval = 1. + g_random_double ();
+//  } else if (2. < interval) {
+//    interval = 1.5 + g_random_double ();
+//  }
 //  g_print("Next interval: %f\n", interval);
   this->last_interval = this->actual_interval;
-  this->actual_interval = (GstClockTime)interval * GST_SECOND;
+  this->actual_interval = (GstClockTime)(interval * (gdouble)GST_SECOND);
 //  this->obsolate_time = this->last_time;
   this->obsolate_time = now;
   this->last_time = now;

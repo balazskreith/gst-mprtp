@@ -25,6 +25,7 @@
 #include <gst/rtp/gstrtpbuffer.h>
 #include "pointerpool.h"
 
+#define DISABLE if(0)
 
 typedef struct _GstMpRTPBuffer GstMpRTPBuffer;
 

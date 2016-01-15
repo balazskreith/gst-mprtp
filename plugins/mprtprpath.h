@@ -38,6 +38,23 @@ typedef struct _MpRTPRReceivedItem  MpRTPRReceivedItem;
 
 #define SKEWS_ARRAY_LENGTH 256
 
+typedef struct _RunningLengthEncodingBlock RLEBlock;
+struct _RunningLengthEncodingBlock{
+  guint16      start_seq;
+  guint16      discards;
+  GstClockTime median_delay;
+  guint32      bytes_in_flight;
+};
+
+#define RLE_MAX_LENGTH 10
+typedef struct _RunningLengthEncoding RLE;
+struct _RunningLengthEncoding{
+  RLEBlock     blocks[10];
+  guint        actual;
+  guint        reported;
+  GstClockTime stepped;
+};
+
 struct _MpRTPReceiverPath
 {
   GObject             object;
@@ -51,12 +68,13 @@ struct _MpRTPReceiverPath
   guint32             total_late_discarded_bytes;
   guint32             total_payload_bytes;
   gint32              jitter;
-  guint32             total_lost_packets_num;
   guint16             highest_seq;
 
   guint64             ext_rtptime;
   guint64             last_packet_skew;
   GstClockTime        last_received_time;
+
+  RLE                 rle;
 
   guint32             total_packet_losts;
   guint32             total_packets_received;
@@ -119,12 +137,12 @@ void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
                            gdouble       *path_skew,
                            guint32       *jitter);
 
+void mprtpr_path_tick(MpRTPRPath *this);
 void mprtpr_path_add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp);
 void mprtpr_path_add_delay(MpRTPRPath *this, GstClockTime delay);
 
 void mprtpr_path_process_rtp_packet(MpRTPRPath *this,
                                     GstMpRTPBuffer *mprtp);
-
 
 G_END_DECLS
 #endif /* MPRTPRSUBFLOW_H_ */

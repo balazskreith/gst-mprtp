@@ -61,6 +61,7 @@
 #define GST_RTCP_TYPE_XR 207
 #define GST_RTCP_TYPE_FB 205
 #define GST_MPRTCP_BLOCK_TYPE_SUBFLOW_INFO 0
+#define GST_RTCP_XR_RFC7097_BLOCK_TYPE_IDENTIFIER 25
 #define GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER 26
 #define GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER 28
 #define RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION 2
@@ -186,18 +187,41 @@ typedef struct PACKED _GstRTCPXR_OWD
   guint32 min_delay;
 } GstRTCPXR_OWD;
 
+typedef struct PACKED _GstRTCPXR_Chunk{
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
+  guint16 chucnk_type:1;
+  guint16 run_type:1;
+  guint16 run_length:14;
+#elif G_BYTE_ORDER == G_BIG_ENDIAN
+  guint16 run_length:14;
+  guint16 run_type:1;
+  guint16 chucnk_type:1;
+#else
+#error "G_BYTE_ORDER should be big or little endian."
+#endif
+}GstRTCPXR_Chunk;
 
-typedef struct PACKED _GstRTCPFB_MPCC
-{
-  GstRTCPHeader   header;
-  guint32         media_ssrc;
-  guint32         identifier;
-  guint32         lt80_delay;
-  guint32         lt40_delay;
-  guint32         md_delay;
-  guint32         sh_delay;
-} GstRTCPFB_MPCC;
-
+typedef struct PACKED _GstRTCPXR_RFC7097
+{                               //RTCP extended riport Discarded bytes
+  GstRTCPHeader header;
+  guint8 block_type;
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
+  guint8 reserved:3;
+  guint8 early_bit:1;
+  guint8 thinning:4;
+#elif G_BYTE_ORDER == G_BIG_ENDIAN
+  guint8 thinning:4;
+  guint8 early_bit:1;
+  guint8 reserved:3;
+#else
+#error "G_BYTE_ORDER should be big or little endian."
+#endif
+  guint16 block_length;
+  guint32 ssrc;
+  guint16 begin_seq;
+  guint16 end_seq;
+  GstRTCPXR_Chunk chunks;
+} GstRTCPXR_RFC7097;
 
 /*MPRTCP struct polymorphism*/
 
@@ -225,13 +249,12 @@ typedef struct PACKED _GstMPRTCPSubflowBlock
   GstMPRTCPSubflowInfo info;
   union
   {
-    GstRTCPHeader block_header;
-    GstRTCPRR receiver_riport;
-    GstRTCPSR sender_riport;
-    GstRTCPXR xr_header;
-    GstRTCPXR_RFC7243 xr_rfc7243_riport;
+    GstRTCPHeader     block_header;
+    GstRTCPRR         receiver_report;
+    GstRTCPSR         sender_report;
+    GstRTCPXR         xr_header;
+    GstRTCPXR_RFC7243 xr_rfc7243_report;
     GstRTCPXR_OWD     xr_owd;
-    GstRTCPFB_MPCC    fb_mpcc;
   };
 } GstMPRTCPSubflowBlock;
 
@@ -336,6 +359,8 @@ void gst_rtcp_xr_rfc7243_getdown (GstRTCPXR_RFC7243 * report,
     guint32 * discarded_bytes);
 
 
+//For further development
+void gst_rtcp_xr_rfc7097_init (GstRTCPXR_RFC7097 * report);
 
 void gst_rtcp_xr_owd_init (GstRTCPXR_OWD * report);
 

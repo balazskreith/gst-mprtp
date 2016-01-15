@@ -24,11 +24,15 @@ G_DEFINE_TYPE (MpRTPRPath, mprtpr_path, G_TYPE_OBJECT);
 #define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
 #define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
 
+#define _actual_RLEBlock(this) ((RLEBlock*)(this->rle.blocks + this->rle.actual))
+#define _now(this) (gst_clock_get_time(this->sysclock))
 static void mprtpr_path_finalize (GObject * object);
 static void mprtpr_path_reset (MpRTPRPath * this);
 static gint _cmp_seq (guint16 x, guint16 y);
 static void _add_delay(MpRTPRPath *this, GstClockTime delay);
 static void _add_skew(MpRTPRPath *this, gint64 skew);
+static void _refresh_RLE(MpRTPRPath *this);
+static void _delays_stats_pipe(gpointer *data, PercentileTrackerPipeData *pdata);
 void
 mprtpr_path_class_init (MpRTPRPathClass * klass)
 {
@@ -63,12 +67,9 @@ mprtpr_path_init (MpRTPRPath * this)
   this->sysclock = gst_system_clock_obtain ();
   this->delays = make_percentiletracker(1024, 50);
   percentiletracker_set_treshold(this->delays, GST_SECOND);
-//  this->lt_low_delays = make_percentiletracker(1024, 20);
-//  percentiletracker_set_treshold(this->lt_low_delays, GST_SECOND);
-//  this->lt_high_delays = make_percentiletracker(1024, 50);
-//  percentiletracker_set_treshold(this->lt_high_delays, GST_SECOND);
-//  this->skews = make_percentiletracker(100, 50);
-//  percentiletracker_set_treshold(this->skews, 2 * GST_SECOND);
+  percentiletracker_set_stats_pipe(this->delays, _delays_stats_pipe, this);
+  this->rle.actual = this->rle.reported = 0;
+  this->rle.stepped = _now(this);
   this->delay_estimator = make_skalmanfilter_full(1024, GST_SECOND, .25);
   this->skew_estimator = make_skalmanfilter_full(1024, GST_SECOND, .125);
   mprtpr_path_reset (this);
@@ -101,7 +102,6 @@ mprtpr_path_reset (MpRTPRPath * this)
   this->total_late_discarded_bytes = 0;
   this->highest_seq = 0;
   this->jitter = 0;
-  this->total_packet_losts = 0;
   this->total_packets_received = 0;
   this->total_payload_bytes = 0;
 
@@ -172,12 +172,20 @@ void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
   THIS_READUNLOCK (this);
 }
 
+void mprtpr_path_tick(MpRTPRPath *this)
+{
+  //ToDO: OWD_DISC_RLE_DEVELOPMENT
+  DISABLE_LINE _refresh_RLE(this);
+}
+
 void mprtpr_path_add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp)
 {
   THIS_WRITELOCK (this);
 //  g_print("Discarded on subflow %d\n", this->id);
   ++this->total_late_discarded;
   this->total_late_discarded_bytes+=mprtp->payload_bytes;
+  //ToDO: OWD_DISC_RLE_DEVELOPMENT
+  DISABLE_LINE ++_actual_RLEBlock(this)->discards;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -276,6 +284,27 @@ void _add_skew(MpRTPRPath *this, gint64 skew)
 {
   this->estimated_skew = skalmanfilter_measurement_update(this->skew_estimator, skew);
 //  percentiletracker_add(this->skews, skew);
+}
+
+
+
+void _refresh_RLE(MpRTPRPath *this)
+{
+  RLE *rle;
+  rle = this->rle;
+again:
+  if(_now(this) - GST_SECOND < rle->stepped) return;
+  if(rle->actual == RLE_MAX_LENGTH) rle->actual = 0;
+  else ++rle->actual;
+  rle->stepped+=GST_SECOND;
+  goto again;
+}
+
+void _delays_stats_pipe(gpointer *data, PercentileTrackerPipeData *pdata)
+{
+  MpRTPRPath *this = data;
+  //ToDO: OWD_DISC_RLE_DEVELOPMENT
+  DISABLE_LINE _actual_RLEBlock(this)->median_delay = pdata->percentile;
 }
 
 #undef THIS_READLOCK

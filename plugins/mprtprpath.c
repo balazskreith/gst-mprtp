@@ -169,7 +169,8 @@ mprtpr_path_set_chunks_reported(MpRTPRPath *this)
 }
 
 GstRTCPXR_Chunk *
-mprtpr_path_get_XR7097_chunks(MpRTPRPath *this,
+mprtpr_path_get_chunks(MpRTPRPath *this,
+                              guint chunks_get_type,
                               guint *chunks_num,
                               guint16 *begin_seq,
                               guint16 *end_seq)
@@ -181,6 +182,8 @@ mprtpr_path_get_XR7097_chunks(MpRTPRPath *this,
   guint16 begin_seq_, end_seq_;
   gint i,chunks_num_;
   guint16 *read;
+  guint16 running_length;
+
   chunks_num_ = 0;
   THIS_READLOCK (this);
   for(i=this->rle.read_index; ;){
@@ -196,7 +199,20 @@ mprtpr_path_get_XR7097_chunks(MpRTPRPath *this,
   {
     end_seq_ = block->end_seq;
     run_type = i != this->rle.write_index;
-    read = &this->rle.blocks[i].discards;
+
+    if(chunks_get_type == 0){
+      read = &this->rle.blocks[i].discards;
+    }
+    else if(chunks_get_type == 1){
+      GstClockTime median_delay;
+      median_delay = this->rle.blocks[i].median_delay;
+      if(median_delay > GST_SECOND)
+        running_length = 0x3F;
+      else
+        running_length = (guint16)((get_ntp_from_epoch_ns(median_delay)>>18) & 0x3F);
+      read = &running_length;
+    }
+
     gst_rtcp_xr_chunk_change(chunk,
                              &chunk_type,
                              &run_type,

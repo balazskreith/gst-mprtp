@@ -139,6 +139,14 @@ mprtpr_path_get_XR7097_chunks(MpRTPRPath *this,
                               guint *chunks_num,
                               guint16 *begin_seq,
                               guint16 *end_seq);
+#define mprtpr_path_get_XR7097_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 0, chunks_num, begin_seq, end_seq)
+#define mprtpr_path_get_owd_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 1, chunks_num, begin_seq, end_seq)
+GstRTCPXR_Chunk *
+mprtpr_path_get_chunks(MpRTPRPath *this,
+                              guint chunks_get_type,
+                              guint *chunks_num,
+                              guint16 *begin_seq,
+                              guint16 *end_seq);
 
 void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
                            gdouble       *path_delay,

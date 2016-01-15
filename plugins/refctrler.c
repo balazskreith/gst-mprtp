@@ -226,6 +226,12 @@ _setup_xr_rfc7097 (Subflow * this,
                    guint32 ssrc,
                    guint *chunks_num);
 
+GstRTCPXR_OWD_RLE *
+_setup_xr_owd_rle (Subflow * this,
+                   GstRTCPXR_OWD_RLE * xr,
+                   guint32 ssrc,
+                   guint *chunks_num);
+
 //----------------------------- System Notifier ------------------------------
 static void
 _system_notifier_main(RcvEventBasedController * this);
@@ -863,7 +869,7 @@ _get_mprtcp_xr_owd_rle_block (RcvEventBasedController * this, Subflow * subflow,
 {
   GstMPRTCPSubflowBlock block;
   GstMPRTCPSubflowBlock *new_block;
-  GstRTCPXR_RFC7097 *new_xr,*xr;
+  GstRTCPXR_OWD_RLE *new_xr,*xr;
   guint16 length = 0;
   guint8 block_length;
   guint8 new_block_length;
@@ -871,7 +877,7 @@ _get_mprtcp_xr_owd_rle_block (RcvEventBasedController * this, Subflow * subflow,
   guint chunks_num;
 
   gst_mprtcp_block_init (&block);
-  xr = gst_mprtcp_riport_block_add_xr_rfc7097(&block);
+  xr = gst_mprtcp_riport_block_add_xr_owd_rle(&block);
   new_xr = _setup_xr_rfc7097(subflow, xr, this->ssrc, &chunks_num);
   new_block_length = sizeof(GstMPRTCPSubflowInfo) + sizeof(GstRTCPXR_RFC7097) + ((chunks_num-2)<<1);
   new_block = g_malloc0(new_block_length);
@@ -977,6 +983,39 @@ _setup_xr_rfc7097 (Subflow * this,
   chunks = mprtpr_path_get_XR7097_chunks(this->path, &chunks_num_, &begin_seq, &end_seq);
   result = g_malloc0(sizeof(*xr) + (chunks_num_ - 2) * 2);
 //  g_print("chunks num: %u, size of bytes xr: %lu, total: %lu\n",
+//          chunks_num, sizeof(*xr), sizeof(*xr) + (chunks_num - 2) * 2);
+  memcpy(result, xr, sizeof(*xr));
+  memcpy(result->chunks, chunks, chunks_num_ * 2);
+  g_free(chunks);
+  gst_rtcp_header_getdown(&result->header, NULL, NULL, NULL, NULL, &header_length, NULL);
+  gst_rtcp_xr_block_getdown((GstRTCPXR*) result, NULL, &block_length, NULL);
+  block_length+=(chunks_num_-2)>>1;
+  header_length+=(chunks_num_-2)>>1;
+  gst_rtcp_xr_rfc7097_change(result, &early_bit, &thinning, &ssrc, &begin_seq, &end_seq);
+  gst_rtcp_xr_block_change((GstRTCPXR*) result, NULL, &block_length, NULL);
+  gst_rtcp_header_change(&result->header, NULL, NULL, NULL, NULL, &header_length, NULL);
+  if(chunks_num) *chunks_num = chunks_num_;
+  return result;
+}
+
+
+GstRTCPXR_OWD_RLE *
+_setup_xr_owd_rle (Subflow * this,
+                   GstRTCPXR_OWD_RLE * xr,
+                   guint32 ssrc,
+                   guint *chunks_num)
+{
+  GstRTCPXR_OWD_RLE *result;
+  GstRTCPXR_Chunk *chunks;
+  guint chunks_num_;
+  guint16 begin_seq, end_seq;
+  guint16 header_length, block_length;
+  gboolean early_bit = FALSE;
+  guint8 thinning = 0;
+
+  chunks = mprtpr_path_get_owd_chunks(this->path, &chunks_num_, &begin_seq, &end_seq);
+  result = g_malloc0(sizeof(*xr) + (chunks_num_ - 2) * 2);
+//  g_print("chunks numb: %u, size of bytes xr: %lu, total: %lu\n",
 //          chunks_num, sizeof(*xr), sizeof(*xr) + (chunks_num - 2) * 2);
   memcpy(result, xr, sizeof(*xr));
   memcpy(result->chunks, chunks, chunks_num_ * 2);

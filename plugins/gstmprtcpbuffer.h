@@ -64,6 +64,7 @@
 #define GST_RTCP_XR_RFC7097_BLOCK_TYPE_IDENTIFIER 25
 #define GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER 26
 #define GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER 28
+#define GST_RTCP_XR_OWD_RLE_BLOCK_TYPE_IDENTIFIER 29
 #define RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION 2
 #define RTCP_XR_RFC7243_I_FLAG_SAMPLED_METRIC 1
 #define RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION 3
@@ -290,7 +291,7 @@ typedef struct PACKED _GstMPRTCPSubflowBlock
     GstRTCPXR xr_header;
     GstRTCPXR_RFC7243 xr_rfc7243_riport;
     GstRTCPXR_RFC7097 xr_rfc7097_report;
-    GstRTCPXR_OWD_RLE xr_owd_rle;
+    GstRTCPXR_OWD_RLE xr_owd_rle_report;
     GstRTCPXR_OWD     xr_owd;
     GstRTCPFB_MPCC    fb_mpcc;
   };
@@ -435,6 +436,33 @@ void gst_rtcp_xr_rfc7097_change (GstRTCPXR_RFC7097 *report,
 
 guint gst_rtcp_xr_rfc7097_get_chunks_num(GstRTCPXR_RFC7097 *report);
 GstRTCPXR_Chunk *gst_rtcp_xr_rfc7097_get_chunk(GstRTCPXR_RFC7097 *report,
+                                               guint chunk_index);
+
+
+
+void gst_rtcp_xr_owd_rle_init (GstRTCPXR_OWD_RLE * report);
+void
+gst_rtcp_xr_owd_rle_setup(GstRTCPXR_OWD_RLE *report,
+                      gboolean early_bit,
+                      guint8 thinning,
+                      guint32 ssrc,
+                      guint16 begin_seq,
+                      guint16 end_seq);
+void gst_rtcp_xr_owd_rle_getdown (GstRTCPXR_OWD_RLE *report,
+                                       gboolean *early_bit,
+                                       guint8 *thinning,
+                                       guint32 *ssrc,
+                                       guint16 *begin_seq,
+                                       guint16 *end_seq);
+void gst_rtcp_xr_owd_rle_change (GstRTCPXR_OWD_RLE *report,
+                             gboolean *early_bit,
+                             guint8 *thinning,
+                             guint32 *ssrc,
+                             guint16 *begin_seq,
+                             guint16 *end_seq);
+
+guint gst_rtcp_xr_owd_rle_get_chunks_num(GstRTCPXR_OWD_RLE *report);
+GstRTCPXR_Chunk *gst_rtcp_xr_owd_rle_get_chunk(GstRTCPXR_OWD_RLE *report,
                                                guint chunk_index);
 
 void gst_rtcp_xr_owd_init (GstRTCPXR_OWD * report);

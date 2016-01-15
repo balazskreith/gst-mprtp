@@ -784,6 +784,7 @@ gst_mprtpsender_mprtcp_sink_chain (GstPad * pad, GstObject * parent,
   if (!subflow) {
     goto done;
   }
+//  g_print("############################ SENT (%lu)################################\n", GST_TIME_AS_MSECONDS(gst_clock_get_time(subflow->sysclock)));
   result = gst_pad_push (subflow->outpad, _assemble_report (subflow, buf));
 
 done:

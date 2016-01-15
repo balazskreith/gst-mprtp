@@ -45,7 +45,7 @@ struct _RcvEventBasedController
   void            (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
   gpointer          send_mprtcp_packet_data;
   gboolean          report_is_flowable;
-  ReportIntervalCalculator *ricalcer;
+//  ReportIntervalCalculator *ricalcer;
 
   BinTree*          subflow_skew_tree;
   guint8            subflow_skew_index;

@@ -166,36 +166,15 @@ typedef struct PACKED _GstRTCPXR_RFC7243
   guint32 discarded_bytes;
 } GstRTCPXR_RFC7243;
 
-
-typedef struct PACKED _GstRTCPXR_OWD
-{
-  GstRTCPHeader header;
-  guint8 block_type;
-#if G_BYTE_ORDER == G_LITTLE_ENDIAN
-  guint8 reserved:6;
-  guint8 interval_metric:2;
-#elif G_BYTE_ORDER == G_BIG_ENDIAN
-  guint8 interval_metric:2;
-  guint8 reserved:6;
-#else
-#error "G_BYTE_ORDER should be big or little endian."
-#endif
-  guint16 block_length;
-  guint32 ssrc;
-  guint32 median_delay;
-  guint32 max_delay;
-  guint32 min_delay;
-} GstRTCPXR_OWD;
-
 typedef struct PACKED _GstRTCPXR_Chunk{
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
-  guint16 chucnk_type:1;
+  guint16 chunk_type:1;
   guint16 run_type:1;
   guint16 run_length:14;
 #elif G_BYTE_ORDER == G_BIG_ENDIAN
   guint16 run_length:14;
   guint16 run_type:1;
-  guint16 chucnk_type:1;
+  guint16 chunk_type:1;
 #else
 #error "G_BYTE_ORDER should be big or little endian."
 #endif
@@ -220,8 +199,64 @@ typedef struct PACKED _GstRTCPXR_RFC7097
   guint32 ssrc;
   guint16 begin_seq;
   guint16 end_seq;
-  GstRTCPXR_Chunk chunks;
+  GstRTCPXR_Chunk chunks[2];
 } GstRTCPXR_RFC7097;
+
+
+typedef struct PACKED _GstRTCPXR_OWDRLE
+{                               //RTCP extended riport Discarded bytes
+  GstRTCPHeader header;
+  guint8 block_type;
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
+  guint8 reserved:3;
+  guint8 early_bit:1;
+  guint8 thinning:4;
+#elif G_BYTE_ORDER == G_BIG_ENDIAN
+  guint8 thinning:4;
+  guint8 early_bit:1;
+  guint8 reserved:3;
+#else
+#error "G_BYTE_ORDER should be big or little endian."
+#endif
+  guint16 block_length;
+  guint32 ssrc;
+  guint16 begin_seq;
+  guint16 end_seq;
+  GstRTCPXR_Chunk chunks[2];
+} GstRTCPXR_OWD_RLE;
+
+typedef struct PACKED _GstRTCPXR_OWD
+{
+  GstRTCPHeader header;
+  guint8 block_type;
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
+  guint8 reserved:6;
+  guint8 interval_metric:2;
+#elif G_BYTE_ORDER == G_BIG_ENDIAN
+  guint8 interval_metric:2;
+  guint8 reserved:6;
+#else
+#error "G_BYTE_ORDER should be big or little endian."
+#endif
+  guint16 block_length;
+  guint32 ssrc;
+  guint32 median_delay;
+  guint32 max_delay;
+  guint32 min_delay;
+} GstRTCPXR_OWD;
+
+
+typedef struct PACKED _GstRTCPFB_MPCC
+{
+  GstRTCPHeader   header;
+  guint32         media_ssrc;
+  guint32         identifier;
+  guint32         lt80_delay;
+  guint32         lt40_delay;
+  guint32         md_delay;
+  guint32         sh_delay;
+} GstRTCPFB_MPCC;
+
 
 /*MPRTCP struct polymorphism*/
 
@@ -249,12 +284,15 @@ typedef struct PACKED _GstMPRTCPSubflowBlock
   GstMPRTCPSubflowInfo info;
   union
   {
-    GstRTCPHeader     block_header;
-    GstRTCPRR         receiver_report;
-    GstRTCPSR         sender_report;
-    GstRTCPXR         xr_header;
-    GstRTCPXR_RFC7243 xr_rfc7243_report;
+    GstRTCPHeader block_header;
+    GstRTCPRR receiver_riport;
+    GstRTCPSR sender_riport;
+    GstRTCPXR xr_header;
+    GstRTCPXR_RFC7243 xr_rfc7243_riport;
+    GstRTCPXR_RFC7097 xr_rfc7097_report;
+    GstRTCPXR_OWD_RLE xr_owd_rle;
     GstRTCPXR_OWD     xr_owd;
+    GstRTCPFB_MPCC    fb_mpcc;
   };
 } GstMPRTCPSubflowBlock;
 
@@ -307,6 +345,8 @@ GstRTCPXR_RFC7243 *gst_mprtcp_riport_block_add_xr_rfc2743 (GstMPRTCPSubflowBlock
 GstRTCPXR_OWD *
 gst_mprtcp_riport_block_add_xr_owd (GstMPRTCPSubflowBlock * block);
 
+GstRTCPXR_RFC7097 *
+gst_mprtcp_riport_block_add_xr_rfc7097 (GstMPRTCPSubflowBlock * block);
 void
 gst_mprtcp_riport_add_block_end (GstMPRTCPSubflowReport * report,
     GstMPRTCPSubflowBlock * block);
@@ -346,6 +386,9 @@ void gst_rtcp_copy_rrb_ntoh (GstRTCPRRBlock * from, GstRTCPRRBlock * to);
 
 void gst_rtcp_xr_block_getdown (GstRTCPXR *report, guint8 *block_type,
     guint16 * block_length, guint8 *reserved);
+void
+gst_rtcp_xr_block_change (GstRTCPXR *riport, guint8 *block_type,
+    guint16 * block_length, guint8 *reserved);
 
 void gst_rtcp_xr_rfc7243_init (GstRTCPXR_RFC7243 * report);
 void gst_rtcp_xr_rfc7243_setup (GstRTCPXR_RFC7243 * report,
@@ -358,9 +401,41 @@ void gst_rtcp_xr_rfc7243_getdown (GstRTCPXR_RFC7243 * report,
     guint8 * interval_metric, gboolean * early_bit, guint32 * ssrc,
     guint32 * discarded_bytes);
 
+void
+gst_rtcp_xr_chunk_getdown (GstRTCPXR_Chunk *chunk,
+                           gboolean *chunk_type,
+                           gboolean *run_type,
+                           guint16  *run_length);
+void
+gst_rtcp_xr_chunk_change (GstRTCPXR_Chunk *chunk,
+                           gboolean *chunk_type,
+                           gboolean *run_type,
+                           guint16  *run_length);
 
-//For further development
 void gst_rtcp_xr_rfc7097_init (GstRTCPXR_RFC7097 * report);
+void
+gst_rtcp_xr_rfc7097_setup(GstRTCPXR_RFC7097 *report,
+                      gboolean early_bit,
+                      guint8 thinning,
+                      guint32 ssrc,
+                      guint16 begin_seq,
+                      guint16 end_seq);
+void gst_rtcp_xr_rfc7097_getdown (GstRTCPXR_RFC7097 *report,
+                                       gboolean *early_bit,
+                                       guint8 *thinning,
+                                       guint32 *ssrc,
+                                       guint16 *begin_seq,
+                                       guint16 *end_seq);
+void gst_rtcp_xr_rfc7097_change (GstRTCPXR_RFC7097 *report,
+                             gboolean *early_bit,
+                             guint8 *thinning,
+                             guint32 *ssrc,
+                             guint16 *begin_seq,
+                             guint16 *end_seq);
+
+guint gst_rtcp_xr_rfc7097_get_chunks_num(GstRTCPXR_RFC7097 *report);
+GstRTCPXR_Chunk *gst_rtcp_xr_rfc7097_get_chunk(GstRTCPXR_RFC7097 *report,
+                                               guint chunk_index);
 
 void gst_rtcp_xr_owd_init (GstRTCPXR_OWD * report);
 
@@ -417,6 +492,8 @@ void gst_print_rtcp_sr (GstRTCPSR * report);
 void gst_print_rtcp_rr (GstRTCPRR * report);
 void gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * report);
 void gst_print_rtcp_xr_owd (GstRTCPXR_OWD * report);
+void gst_print_rtcp_xrchunks(GstRTCPXR_Chunk * chunk1, GstRTCPXR_Chunk * chunk2);
+void gst_print_rtcp_xr_7097(GstRTCPXR_RFC7097 * report);
 void gst_print_rtcp_srb (GstRTCPSRBlock * block_ptr);
 void gst_print_rtcp_rrb (GstRTCPRRBlock * block_ptr);
 

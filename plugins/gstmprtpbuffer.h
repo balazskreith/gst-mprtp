@@ -25,9 +25,10 @@
 #include <gst/rtp/gstrtpbuffer.h>
 #include "pointerpool.h"
 
-#define DISABLE if(0)
 
 typedef struct _GstMpRTPBuffer GstMpRTPBuffer;
+
+#define MPRTP_PLUGIN_MAX_RLE_LENGTH 10
 
 #define MPRTP_PLUGIN_MAX_SUBFLOW_NUM 32
 

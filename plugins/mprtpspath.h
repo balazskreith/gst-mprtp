@@ -122,6 +122,13 @@ struct _MPRTPSPathClass
   guint32      max_sent_timestamp;
 };
 
+
+typedef struct _RunningLengthEncodingRR RLERR;
+struct _RunningLengthEncodingRR{
+  guint16      values[MPRTP_PLUGIN_MAX_RLE_LENGTH];
+  guint        length;
+};
+
 typedef struct _RRMeasurement RRMeasurement;
 void g_print_rrmeasurement(RRMeasurement *measurement);
 struct _RRMeasurement{
@@ -150,6 +157,12 @@ struct _RRMeasurement{
   gdouble             receiver_rate;
   MPRTPSPathState     state;
   gboolean            checked;
+
+  gboolean            rfc7097_arrived;
+  gboolean            rfc7243_arrived;
+
+  RLERR               rle_discards;
+  guint32             recent_discard;
 
   guint32             bytes_in_flight_acked;
   guint32             bytes_in_queue;

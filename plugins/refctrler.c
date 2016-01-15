@@ -190,6 +190,12 @@ _get_mprtcp_xr_owd_block (
     Subflow * subflow,
     guint16 * buf_length);
 
+static GstBuffer *
+_get_mprtcp_xr_rfc7097_block (
+    RcvEventBasedController * this,
+    Subflow * subflow,
+    guint16 * buf_length);
+
 static GstBuffer*
 _get_mprtcp_rr_block (
     RcvEventBasedController * this,
@@ -208,21 +214,27 @@ _setup_rr_report (
     GstRTCPRR * rr,
     guint32 ssrc);
 
-void
+static void
 _setup_xr_owd (
     Subflow * this,
     GstRTCPXR_OWD * xr,
     guint32 ssrc);
 
+GstRTCPXR_RFC7097 *
+_setup_xr_rfc7097 (Subflow * this,
+                   GstRTCPXR_RFC7097 * xr,
+                   guint32 ssrc,
+                   guint *chunks_num);
+
 //----------------------------- System Notifier ------------------------------
 static void
 _system_notifier_main(RcvEventBasedController * this);
 
-//----------------------------- Play Controller -----------------------------
+//----------------------------- Path Ticker Main -----------------------------
 static void
-_play_controller_main(RcvEventBasedController * this);
-static void _refresh_subflow_skew(RcvEventBasedController *this,
-                                     guint64 skew);
+_path_ticker_main(RcvEventBasedController * this);
+//static void _refresh_subflow_skew(RcvEventBasedController *this,
+//                                     guint64 skew);
 //------------------------- Utility functions --------------------------------
 static Subflow*
 _make_subflow (
@@ -293,7 +305,7 @@ refctrler_finalize (GObject * object)
   g_hash_table_destroy (this->subflows);
   gst_task_stop (this->thread);
   gst_task_join (this->thread);
-  g_object_unref (this->ricalcer);
+//  g_object_unref (this->ricalcer);
   g_object_unref (this->sysclock);
 }
 
@@ -310,7 +322,7 @@ refctrler_init (RcvEventBasedController * this)
   this->report_is_flowable = FALSE;
   this->subflow_skew_tree = make_bintree(_cmp_for_maxtree);
   this->subflow_skew_index = 0;
-  this->ricalcer = make_ricalcer(FALSE);
+//  this->ricalcer = make_ricalcer(FALSE);
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   this->thread = gst_task_new (refctrler_ticker, this, NULL);
@@ -407,7 +419,7 @@ refctrler_ticker (void *data)
   THIS_WRITELOCK (this);
   now = gst_clock_get_time (this->sysclock);
 
-  _play_controller_main(this);
+  _path_ticker_main(this);
   _orp_main(this);
   _system_notifier_main(this);
 
@@ -443,7 +455,7 @@ refctrler_add_path (gpointer controller_ptr, guint8 subflow_id,
   lookup_result = _make_subflow (subflow_id, path);
   g_hash_table_insert (this->subflows, GINT_TO_POINTER (subflow_id),
                        lookup_result);
-  lookup_result->ricalcer = this->ricalcer;
+//  lookup_result->ricalcer = this->ricalcer;
 exit:
   THIS_WRITEUNLOCK (this);
 }
@@ -622,27 +634,9 @@ _orp_main(RcvEventBasedController * this)
   guint16 report_length = 0;
   guint16 block_length = 0;
   GstBuffer *block;
-  guint subflows_num = 0;
-  gdouble media_rate = 0., avg_rtcp_size = 0.;
-//  guint16 discarded;
-//  GstClockTime median_delay;
-//  GstClockTime now;
 
-//  now = gst_clock_get_time(this->sysclock);
-  ricalcer = this->ricalcer;
-//  g_hash_table_iter_init (&iter, this->subflows);
-//  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
-//  {
-//    subflow = (Subflow *) val;
-//
-//    mprtpr_path_get_XR7243_stats(subflow->path, &discarded, NULL);
-//    mprtpr_path_get_XROWD_stats(subflow->path, &median_delay, NULL, NULL);
-//    if (discarded == _ort1(subflow)->discarded) continue;
-//    if(median_delay < _ort1(subflow)->median_delay * 1.5) continue;
-//    ricalcer_urgent_report_request(ricalcer);
-//  }
 
-  if (!this->report_is_flowable || !ricalcer_do_report_now(ricalcer)) {
+  if (!this->report_is_flowable) {
       goto done;
   }
 
@@ -650,7 +644,10 @@ _orp_main(RcvEventBasedController * this)
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
     subflow = (Subflow *) val;
-    mprtpr_path_tick(subflow->path);
+    ricalcer = subflow->ricalcer;
+    if(!ricalcer_do_report_now(ricalcer)){
+        goto done;
+    }
 //    g_print("Report time: %lu\n", GST_TIME_AS_MSECONDS(_ort0(subflow)->time - _ort1(subflow)->time));
     if(!_irt0(subflow)->SR_sent_ntp_time){
       continue;
@@ -659,13 +656,6 @@ _orp_main(RcvEventBasedController * this)
     _step_or(subflow);
     block = _get_mprtcp_rr_block (this, subflow, &block_length);
     report_length += block_length;
-    if (_ort0(subflow)->discarded != _ort1(subflow)->discarded)
-    {
-      GstBuffer *xr;
-      xr = _get_mprtcp_xr_7243_block (this, subflow, &block_length);
-      block = gst_buffer_append (block, xr);
-      report_length += block_length;
-    }
 
     {
       GstBuffer *xr;
@@ -674,21 +664,36 @@ _orp_main(RcvEventBasedController * this)
       report_length += block_length;
     }
 
+    //Note: We can calculate the total discarded packet num
+    //by using RLE
+
+    if (_ort0(subflow)->discarded != _ort1(subflow)->discarded)
+    {
+      GstBuffer *xr;
+      DISABLE_LINE xr = _get_mprtcp_xr_7243_block (this, subflow, &block_length);
+      DISABLE_LINE block = gst_buffer_append (block, xr);
+      DISABLE_LINE report_length += block_length;
+    }
+
+    if (_ort0(subflow)->discarded != _ort1(subflow)->discarded)
+    {
+      GstBuffer *xr;
+      xr = _get_mprtcp_xr_rfc7097_block (this, subflow, &block_length);
+      block = gst_buffer_append (block, xr);
+      report_length += block_length;
+    }
+
+    mprtpr_path_set_chunks_reported(subflow->path);
+
     report_length += 12 /*MPRTCP REPOR HEADER */  +
         (28 << 3) /*UDP Header overhead */ ;
 
     subflow->avg_rtcp_size += (report_length - subflow->avg_rtcp_size) / 4.;
     this->send_mprtcp_packet_func (this->send_mprtcp_packet_data, block);
-    media_rate += _ort0(subflow)->receiving_rate;
-    avg_rtcp_size += subflow->avg_rtcp_size;
-    ++subflows_num;
+    ricalcer_refresh_parameters(ricalcer,
+                                _ort0(subflow)->receiving_rate,
+                                subflow->avg_rtcp_size);
   }
-  avg_rtcp_size /= (gdouble)subflows_num;
-  ricalcer_refresh_parameters(ricalcer,
-                              media_rate,
-                              avg_rtcp_size);
-  ricalcer_do_next_report_time(ricalcer);
-
 done:
   return;
 }
@@ -818,6 +823,72 @@ _get_mprtcp_xr_owd_block (RcvEventBasedController * this, Subflow * subflow,
   return buf;
 }
 
+GstBuffer *
+_get_mprtcp_xr_rfc7097_block (RcvEventBasedController * this, Subflow * subflow,
+    guint16 * buf_length)
+{
+  GstMPRTCPSubflowBlock block;
+  GstMPRTCPSubflowBlock *new_block;
+  GstRTCPXR_RFC7097 *new_xr,*xr;
+  guint16 length = 0;
+  guint8 block_length;
+  guint8 new_block_length;
+  GstBuffer *buf = NULL;
+  guint chunks_num;
+
+  gst_mprtcp_block_init (&block);
+  xr = gst_mprtcp_riport_block_add_xr_rfc7097(&block);
+  new_xr = _setup_xr_rfc7097(subflow, xr, this->ssrc, &chunks_num);
+  new_block_length = sizeof(GstMPRTCPSubflowInfo) + sizeof(GstRTCPXR_RFC7097) + ((chunks_num-2)<<1);
+  new_block = g_malloc0(new_block_length);
+  memcpy(new_block, &block, sizeof(GstMPRTCPSubflowInfo));
+  memcpy(&new_block->xr_rfc7097_report, new_xr, sizeof(GstRTCPXR_RFC7097) + ((chunks_num-2)<<1));
+  gst_rtcp_header_getdown (&new_xr->header, NULL, NULL, NULL, NULL, &length, NULL);
+  g_free(new_xr);
+  block_length = (guint8) length + 1;
+  gst_mprtcp_block_setup (&new_block->info, MPRTCP_BLOCK_TYPE_RIPORT, block_length, (guint16) subflow->id);
+  length = (block_length + 1) << 2;
+  buf = gst_buffer_new_wrapped (new_block, length);
+  if (buf_length) {
+    *buf_length = length;
+  }
+//  gst_print_mprtcp_block(new_block, NULL);
+  return buf;
+}
+
+
+GstBuffer *
+_get_mprtcp_xr_owd_rle_block (RcvEventBasedController * this, Subflow * subflow,
+    guint16 * buf_length)
+{
+  GstMPRTCPSubflowBlock block;
+  GstMPRTCPSubflowBlock *new_block;
+  GstRTCPXR_RFC7097 *new_xr,*xr;
+  guint16 length = 0;
+  guint8 block_length;
+  guint8 new_block_length;
+  GstBuffer *buf = NULL;
+  guint chunks_num;
+
+  gst_mprtcp_block_init (&block);
+  xr = gst_mprtcp_riport_block_add_xr_rfc7097(&block);
+  new_xr = _setup_xr_rfc7097(subflow, xr, this->ssrc, &chunks_num);
+  new_block_length = sizeof(GstMPRTCPSubflowInfo) + sizeof(GstRTCPXR_RFC7097) + ((chunks_num-2)<<1);
+  new_block = g_malloc0(new_block_length);
+  memcpy(new_block, &block, sizeof(GstMPRTCPSubflowInfo));
+  memcpy(&new_block->xr_rfc7097_report, new_xr, sizeof(GstRTCPXR_RFC7097) + ((chunks_num-2)<<1));
+  gst_rtcp_header_getdown (&new_xr->header, NULL, NULL, NULL, NULL, &length, NULL);
+  g_free(new_xr);
+  block_length = (guint8) length + 1;
+  gst_mprtcp_block_setup (&new_block->info, MPRTCP_BLOCK_TYPE_RIPORT, block_length, (guint16) subflow->id);
+  length = (block_length + 1) << 2;
+  buf = gst_buffer_new_wrapped (new_block, length);
+  if (buf_length) {
+    *buf_length = length;
+  }
+//  gst_print_mprtcp_block(new_block, NULL);
+  return buf;
+}
 
 GstBuffer *
 _get_mprtcp_rr_block (RcvEventBasedController * this, Subflow * subflow,
@@ -886,6 +957,39 @@ _setup_xr_owd (Subflow * this,
                          &median,
                          &min,
                          &max);
+}
+
+
+GstRTCPXR_RFC7097 *
+_setup_xr_rfc7097 (Subflow * this,
+                   GstRTCPXR_RFC7097 * xr,
+                   guint32 ssrc,
+                   guint *chunks_num)
+{
+  GstRTCPXR_RFC7097 *result;
+  GstRTCPXR_Chunk *chunks;
+  guint chunks_num_;
+  guint16 begin_seq, end_seq;
+  guint16 header_length, block_length;
+  gboolean early_bit = FALSE;
+  guint8 thinning = 0;
+
+  chunks = mprtpr_path_get_XR7097_chunks(this->path, &chunks_num_, &begin_seq, &end_seq);
+  result = g_malloc0(sizeof(*xr) + (chunks_num_ - 2) * 2);
+//  g_print("chunks num: %u, size of bytes xr: %lu, total: %lu\n",
+//          chunks_num, sizeof(*xr), sizeof(*xr) + (chunks_num - 2) * 2);
+  memcpy(result, xr, sizeof(*xr));
+  memcpy(result->chunks, chunks, chunks_num_ * 2);
+  g_free(chunks);
+  gst_rtcp_header_getdown(&result->header, NULL, NULL, NULL, NULL, &header_length, NULL);
+  gst_rtcp_xr_block_getdown((GstRTCPXR*) result, NULL, &block_length, NULL);
+  block_length+=(chunks_num_-2)>>1;
+  header_length+=(chunks_num_-2)>>1;
+  gst_rtcp_xr_rfc7097_change(result, &early_bit, &thinning, &ssrc, &begin_seq, &end_seq);
+  gst_rtcp_xr_block_change((GstRTCPXR*) result, NULL, &block_length, NULL);
+  gst_rtcp_header_change(&result->header, NULL, NULL, NULL, NULL, &header_length, NULL);
+  if(chunks_num) *chunks_num = chunks_num_;
+  return result;
 }
 
 void
@@ -967,66 +1071,30 @@ _system_notifier_main(RcvEventBasedController * this)
 
 }
 
-//----------------------------- Play Controller -----------------------------
+//----------------------------- Path Ticker Main -----------------------------
 void
-_play_controller_main(RcvEventBasedController * this)
+_path_ticker_main(RcvEventBasedController * this)
 {
   GHashTableIter iter;
   gpointer key, val;
   Subflow *subflow;
-  gboolean valid = FALSE;
-  guint64 min_delay = 1<<31, max_delay = 0, skew;
-  if(1) goto done;
-//if(1) return;
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
     subflow = (Subflow *) val;
-    skew = subflow->id;
-    if(!skew || !max_delay || !min_delay) {
-      continue;
-    }
-    valid = TRUE;
-    _refresh_subflow_skew(this, skew);
-  }
-  if(!valid) goto done;
-
-  //set playout skew and delay
-  {
-    guint64 playout_delay;
-    guint64 playout_skew;
-    playout_delay = max_delay - min_delay;
-    playout_delay = MAX(playout_delay, 10 * GST_MSECOND);
-    playout_delay = MIN(DELAY_SKEW_MAX, playout_delay);
-    playout_skew = bintree_get_top_value(this->subflow_skew_tree);
-    playout_skew = MIN(500 * GST_USECOND, playout_skew);
-    if((playout_delay>>2) < playout_skew){
-      playout_skew = playout_delay>>2;
-    }
-//    g_print("Set playout MIN: %lu MAX: %lu "
-//        "stream delay: %lu tick interval: %lu\n",
-//        min_delay, max_delay,
-//            playout_delay, playout_skew);
-    stream_joiner_set_stream_delay(this->joiner, playout_delay);
-    stream_joiner_set_tick_interval(this->joiner, playout_skew);
-  }
-
-done:
-  return;
-}
-
-
-
-
-void _refresh_subflow_skew(RcvEventBasedController *this,
-                                     guint64 skew)
-{
-  this->subflow_skews[this->subflow_skew_index] = skew;
-  bintree_insert_value(this->subflow_skew_tree, this->subflow_skews[this->subflow_skew_index]);
-  if(this->subflow_skews[++this->subflow_skew_index] > 0){
-      bintree_delete_value(this->subflow_skew_tree, this->subflow_skews[this->subflow_skew_index]);
+    mprtpr_path_tick(subflow->path);
   }
 }
+
+//void _refresh_subflow_skew(RcvEventBasedController *this,
+//                                     guint64 skew)
+//{
+//  this->subflow_skews[this->subflow_skew_index] = skew;
+//  bintree_insert_value(this->subflow_skew_tree, this->subflow_skews[this->subflow_skew_index]);
+//  if(this->subflow_skews[++this->subflow_skew_index] > 0){
+//      bintree_delete_value(this->subflow_skew_tree, this->subflow_skews[this->subflow_skew_index]);
+//  }
+//}
 
 
 
@@ -1041,6 +1109,7 @@ _make_subflow (guint8 id, MpRTPRPath * path)
   result->path = path;
   result->id = id;
   result->joined_time = gst_clock_get_time (result->sysclock);
+  result->ricalcer = make_ricalcer(FALSE);
   _reset_subflow (result);
   return result;
 }
@@ -1054,6 +1123,7 @@ _ruin_subflow (gpointer * subflow)
   this = (Subflow *) subflow;
   g_object_unref (this->sysclock);
   g_object_unref (this->path);
+  g_object_unref (this->ricalcer);
   _subflow_dtor (this);
 }
 

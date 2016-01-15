@@ -32,7 +32,6 @@ struct _ReportIntervalCalculator
   gboolean         allow_early;
   gboolean         urgent;
   GstClock*        sysclock;
-  GstClockTime     obsolate_time;
   GstClockTime     last_time;
   GstClockTime     next_time;
   GstClockTime     actual_interval;
@@ -51,7 +50,5 @@ gboolean ricalcer_do_report_now (ReportIntervalCalculator * this);
 void ricalcer_do_next_report_time (ReportIntervalCalculator * this);
 void ricalcer_refresh_parameters(ReportIntervalCalculator * this, gdouble media_rate, gdouble avg_rtcp_size);
 void ricalcer_urgent_report_request(ReportIntervalCalculator * this);
-GstClockTime ricalcer_get_sum_last_two_interval(ReportIntervalCalculator * this);
-GstClockTime ricalcer_get_obsolate_time(ReportIntervalCalculator * this);
 
 #endif /* RICALCER_H_ */

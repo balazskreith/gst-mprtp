@@ -33,6 +33,8 @@
 GST_DEBUG_CATEGORY_STATIC (ricalcer_debug_category);
 #define GST_CAT_DEFAULT ricalcer_debug_category
 
+#define _now(this) (gst_clock_get_time (this->sysclock))
+
 G_DEFINE_TYPE (ReportIntervalCalculator, ricalcer, G_TYPE_OBJECT);
 
 //----------------------------------------------------------------------
@@ -96,72 +98,67 @@ ReportIntervalCalculator *make_ricalcer(gboolean sender_side)
 }
 
 
+//
+//gboolean ricalcer_do_report_now (ReportIntervalCalculator * this)
+//{
+//  gboolean result = FALSE;
+//  GstClockTime now;
+//
+//  now = gst_clock_get_time (this->sysclock);
+//  if (!this->initialized) {
+//    this->urgent = TRUE;
+//    this->actual_interval = (GstClockTime)_calc_report_interval(this) * GST_SECOND;
+//    this->next_time = now + this->actual_interval;
+//    this->initialized = TRUE;
+//    goto done;
+//  }
+//  if (this->urgent && this->allow_early) {
+//    this->allow_early = FALSE;
+//    result = TRUE;
+//    goto done;
+//  }
+//
+//  if (now < this->next_time) {
+//    goto done;
+//  }
+//  this->allow_early = TRUE;
+//  result = TRUE;
+//done:
+//  return result;
+//}
+
 
 gboolean ricalcer_do_report_now (ReportIntervalCalculator * this)
 {
   gboolean result = FALSE;
-  GstClockTime now;
-
-  now = gst_clock_get_time (this->sysclock);
+  gdouble interval;
   if (!this->initialized) {
     this->urgent = TRUE;
-    this->actual_interval = (GstClockTime)_calc_report_interval(this) * GST_SECOND;
-    this->next_time = now + this->actual_interval;
+    this->actual_interval = (GstClockTime)(_calc_report_interval(this) * (gdouble)GST_SECOND);
+    this->next_time = _now(this) + this->actual_interval;
     this->initialized = TRUE;
     goto done;
   }
   if (this->urgent && this->allow_early) {
     this->allow_early = FALSE;
+    this->urgent = FALSE;
     result = TRUE;
     goto done;
   }
-
-  if (now < this->next_time) {
+  if(_now(this) < this->next_time){
     goto done;
   }
+  this->last_interval = this->actual_interval;
+  this->last_time = _now(this);
+  interval = .8 * g_random_double() + .7;
+  this->actual_interval = interval * (gdouble)GST_SECOND;
+  this->next_time = _now(this) + this->actual_interval;
   this->allow_early = TRUE;
   result = TRUE;
 done:
   return result;
 }
 
-
-void ricalcer_do_next_report_time (ReportIntervalCalculator * this)
-{
-  gdouble interval;
-  GstClockTime now;
-  now = gst_clock_get_time (this->sysclock);
-  interval = _calc_report_interval(this);
-
-  if (this->urgent) {
-    this->urgent = FALSE;
-    interval /= 2.;
-    if (2. < interval) {
-      interval = 1. + g_random_double ();
-    }
-    goto done;
-  }else{
-    //Right now we just report in very frequently
-//    interval *=1.5;
-    interval = .7 * g_random_double() + .8;
-  }
-
-done:
-//  if (interval < 1.) {
-//    interval = 1. + g_random_double ();
-//  } else if (2. < interval) {
-//    interval = 1.5 + g_random_double ();
-//  }
-//  g_print("Next interval: %f\n", interval);
-  this->last_interval = this->actual_interval;
-  this->actual_interval = (GstClockTime)(interval * (gdouble)GST_SECOND);
-//  this->obsolate_time = this->last_time;
-  this->obsolate_time = now;
-  this->last_time = now;
-  this->next_time = now + this->actual_interval;
-
-  return;
-}
 
 
 void ricalcer_refresh_parameters(ReportIntervalCalculator * this, gdouble media_rate, gdouble avg_rtcp_size)
@@ -173,17 +170,6 @@ void ricalcer_refresh_parameters(ReportIntervalCalculator * this, gdouble media_
 void ricalcer_urgent_report_request(ReportIntervalCalculator * this)
 {
   this->urgent = TRUE;
-}
-
-GstClockTime ricalcer_get_sum_last_two_interval(ReportIntervalCalculator * this)
-{
-  return this->actual_interval + this->last_interval;
-}
-
-GstClockTime ricalcer_get_obsolate_time(ReportIntervalCalculator * this)
-{
-  return this->obsolate_time;
-  //return gst_clock_get_time (this->sysclock) - GST_SECOND;
 }
 
 gdouble _calc_report_interval(ReportIntervalCalculator * this)
@@ -215,7 +201,8 @@ _get_rtcp_interval (gint senders,
    * from becoming ridiculously small during transient outages like
    * a network partition.
    */
-  gdouble const RTCP_MIN_TIME = 5.;
+//  gdouble const RTCP_MIN_TIME = 5.;
+  gdouble const RTCP_MIN_TIME = 1.;
   /*
    * Fraction of the RTCP bandwidth to be shared among active
    * senders.  (This fraction was chosen so that in a typical

@@ -41,17 +41,17 @@ typedef struct _MpRTPRReceivedItem  MpRTPRReceivedItem;
 typedef struct _RunningLengthEncodingBlock RLEBlock;
 struct _RunningLengthEncodingBlock{
   guint16      start_seq;
+  guint16      end_seq;
   guint16      discards;
   GstClockTime median_delay;
   guint32      bytes_in_flight;
 };
 
-#define RLE_MAX_LENGTH 10
 typedef struct _RunningLengthEncoding RLE;
 struct _RunningLengthEncoding{
   RLEBlock     blocks[10];
-  guint        actual;
-  guint        reported;
+  guint        write_index;
+  guint        read_index;
   GstClockTime stepped;
 };
 
@@ -131,6 +131,14 @@ void mprtpr_path_get_XROWD_stats(MpRTPRPath *this,
                                  GstClockTime *median,
                                  GstClockTime *min,
                                  GstClockTime* max);
+void
+mprtpr_path_set_chunks_reported(MpRTPRPath *this);
+
+GstRTCPXR_Chunk *
+mprtpr_path_get_XR7097_chunks(MpRTPRPath *this,
+                              guint *chunks_num,
+                              guint16 *begin_seq,
+                              guint16 *end_seq);
 
 void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
                            gdouble       *path_delay,

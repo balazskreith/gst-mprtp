@@ -597,7 +597,8 @@ _overused_state(
 {
   gdouble owd_th = .5;
   gdouble disc_th = .25;
-  guint64 min_wait = MAX(3 * _mt0(this)->RTT, 2 * GST_SECOND);
+//  guint64 min_wait = MAX(3 * _mt0(this)->RTT, 2 * GST_SECOND);
+  DISABLE_LINE _disable_controlling(this);
 g_print("STATE OVERUSED");
 
   if(owd_th < _mt0(this)->owd_trend){

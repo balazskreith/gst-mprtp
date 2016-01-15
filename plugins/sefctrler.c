@@ -171,6 +171,11 @@ _irt (Subflow * this, gint moment);
 static void
 _step_ir (Subflow * this);
 
+static void
+_assemble_measurement(
+    SndEventBasedController * this,
+    Subflow *subflow);
+
 static void sefctrler_receive_mprtcp (
     gpointer this,
     GstBuffer * buf);
@@ -196,7 +201,10 @@ static void
 _report_processing_xr_owd_block_processor (SndEventBasedController *this,
                                             Subflow * subflow,
                                             GstRTCPXR_OWD * xrb);
-
+static void
+_report_processing_xr_rfc7097_block_processor (SndEventBasedController *this,
+                                            Subflow * subflow,
+                                            GstRTCPXR_RFC7097 * xrb);
 static gfloat
 _get_subflow_goodput (
     Subflow * this,
@@ -680,8 +688,11 @@ _irp_producer_main(SndEventBasedController * this)
     subflow = (Subflow *) val;
     if(_irt0(subflow)->checked) goto checked;
     if(now - 120 * GST_MSECOND < _irt0(subflow)->time) goto not_checked;
+
+    _assemble_measurement(this, subflow);
     _irt0(subflow)->goodput = _get_subflow_goodput(subflow, &_irt0(subflow)->receiver_rate);
     if(0) g_print("%p", _irt(subflow, 0));
+
 
     _irt0(subflow)->sending_weight = stream_splitter_get_sending_rate(this->splitter, subflow->id);
     subratectrler_measurement_update(subflow->rate_controller, _irt0(subflow));
@@ -726,6 +737,31 @@ _step_ir (Subflow * this)
   ++this->ir_moments_num;
 }
 
+void _assemble_measurement(SndEventBasedController * this, Subflow *subflow)
+{
+  guint chunks_num, chunk_index;
+
+  if(_irt0(subflow)->rfc7243_arrived) goto total_discarded_done;
+  if(!_irt0(subflow)->rfc7097_arrived) goto total_discarded_done;
+    chunks_num = _irt0(subflow)->rle_discards.length;
+    for(chunk_index = 0; chunk_index < chunks_num; ++chunk_index)
+    {
+       _irt0(subflow)->late_discarded_bytes +=
+       _irt0(subflow)->rle_discards.values[chunk_index];
+    }
+    _irt0(subflow)->late_discarded_bytes_sum +=
+       _irt0(subflow)->late_discarded_bytes;
+
+total_discarded_done:
+  if(!_irt0(subflow)->rfc7097_arrived) goto recent_discarded_done;
+
+  chunk_index = _irt0(subflow)->rle_discards.length - 1;
+  _irt0(subflow)->recent_discard = _irt0(subflow)->rle_discards.values[chunk_index];
+
+recent_discarded_done:
+
+  return;
+}
 
 void
 sefctrler_receive_mprtcp (gpointer ptr, GstBuffer * buf)
@@ -802,6 +838,11 @@ _report_processing_selector (SndEventBasedController *this,
                                                     subflow,
                                                     &block->xr_owd);
         break;
+        case GST_RTCP_XR_RFC7097_BLOCK_TYPE_IDENTIFIER:
+          _report_processing_xr_rfc7097_block_processor(this,
+                                                        subflow,
+                                                        &block->xr_rfc7097_report);
+          break;
         default:
           GST_WARNING_OBJECT(this, "Unrecognized RTCP XR REPORT");
         break;
@@ -882,7 +923,7 @@ _report_processing_xr_7243_block_processor (SndEventBasedController *this,
 //  g_print("DISCARDED REPORT ARRIVED\n");
   gst_rtcp_xr_rfc7243_getdown (xrb, &interval_metric,
       &early_bit, NULL, &discarded_bytes);
-
+  _irt0 (subflow)->rfc7243_arrived = TRUE;
   switch(interval_metric)
   {
     case RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION:
@@ -939,8 +980,31 @@ _report_processing_xr_owd_block_processor (SndEventBasedController *this,
   //--------------------------
   //evaluating
   //--------------------------
+}
 
 
+
+void
+_report_processing_xr_rfc7097_block_processor (SndEventBasedController *this,
+                                            Subflow * subflow,
+                                            GstRTCPXR_RFC7097 * xrb)
+{
+  guint chunks_num, chunk_index;
+  GstRTCPXR_Chunk *chunk;
+
+  _irt0 (subflow)->rfc7097_arrived = TRUE;
+  chunks_num = gst_rtcp_xr_rfc7097_get_chunks_num(xrb);
+  for(chunk_index = 0;
+      chunk_index < chunks_num;
+      ++chunk_index)
+  {
+      chunk = gst_rtcp_xr_rfc7097_get_chunk(xrb, chunk_index);
+
+      //Terminate chunk
+      if(*((guint16*)chunk) == 0) break;
+      _irt0(subflow)->rle_discards.values[chunk_index] = chunk->run_length;
+      ++_irt0(subflow)->rle_discards.length;
+  }
 }
 
 
@@ -1181,7 +1245,6 @@ _orp_producer_main(SndEventBasedController * this)
     subflow->avg_rtcp_size +=
         ((gfloat) sent_report_length - subflow->avg_rtcp_size) / 4.;
 
-    ricalcer_do_next_report_time(ricalcer);
     ricalcer_refresh_parameters(ricalcer,
                                 _ort0(subflow)->receiving_rate,
                                 subflow->avg_rtcp_size);

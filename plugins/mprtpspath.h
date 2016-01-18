@@ -75,7 +75,7 @@ struct _MPRTPSPath
   GstClockTime            sent_non_congested;
   GstClockTime            sent_middly_congested;
   GstClockTime            sent_congested;
-  GstClockTime            turn_off_until;
+  GstClockTime            skip_until;
 
   guint32                 ssrc_allowed;
   guint8                  sent_octets[MAX_INT32_POSPART];
@@ -125,7 +125,7 @@ struct _MPRTPSPathClass
 
 typedef struct _RunningLengthEncodingRR RLERR;
 struct _RunningLengthEncodingRR{
-  guint16      values[MPRTP_PLUGIN_MAX_RLE_LENGTH];
+  guint64      values[MPRTP_PLUGIN_MAX_RLE_LENGTH];
   guint        length;
 };
 
@@ -137,7 +137,6 @@ struct _RRMeasurement{
   guint32             jitter;
   guint32             cum_packet_lost;
   guint32             lost;
-  guint64             median_delay;
   guint64             min_delay;
   guint64             max_delay;
   guint32             early_discarded_bytes;
@@ -159,10 +158,17 @@ struct _RRMeasurement{
   gboolean            checked;
 
   gboolean            rfc7097_arrived;
+  gboolean            rfc3611_arrived;
   gboolean            rfc7243_arrived;
+  gboolean            owd_rle_arrived;
 
   RLERR               rle_discards;
+  RLERR               rle_losts;
+  RLERR               rle_delays;
   guint32             recent_discard;
+  GstClockTime        recent_delay;
+  guint16             recent_lost;
+  guint16             rfc3611_cum_lost;
 
   guint32             bytes_in_flight_acked;
   guint32             bytes_in_queue;
@@ -220,7 +226,7 @@ GstClockTime mprtps_path_get_time_sent_to_non_congested (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_congested (MPRTPSPath * this);
 guint16 mprtps_path_get_HSN(MPRTPSPath * this);
 void mprtps_path_set_delay(MPRTPSPath * this, GstClockTime delay);
-void mprtps_path_turn_off(MPRTPSPath * this, GstClockTime duration);
+void mprtps_path_set_skip_duration(MPRTPSPath * this, GstClockTime duration);
 void mprtps_path_set_pacing_bitrate(MPRTPSPath * this, guint32 target_bitrate, GstClockTime obsolation_treshold);
 void mprtps_path_set_pacing (MPRTPSPath * this, gboolean pacing);
 void mprtps_path_set_monitor_payload_id(MPRTPSPath *this, guint8 payload_type);

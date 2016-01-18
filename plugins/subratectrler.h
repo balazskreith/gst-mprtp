@@ -33,6 +33,7 @@ struct _SubflowRateController
   GstClock*                sysclock;
   guint8                   id;
   MPRTPSPath*              path;
+  gboolean                 path_is_paced;
 
   gint32                   monitored_bitrate;
   gint32                   target_bitrate;
@@ -43,16 +44,17 @@ struct _SubflowRateController
   //Video target bitrate inflection point i.e. the last known highest
   //target_bitrate during fast start. Used to limit bitrate increase
   //close to the last know congestion point. Initial value: 1
-  gint32                   target_bitrate_i_max;
-  gint32                   target_bitrate_i_min;
-  NumsTracker*             target_bitrate_i_history;
+  gint32                   max_target_point;
+  gint32                   min_target_point;
+  NumsTracker*             target_points;
 
   NumsTracker*             bytes_in_flight_history;
-  NumsTracker*             receiver_rate_history;
   guint32                  bytes_in_queue_avg;
 
   gint32                   max_rate;
   gint32                   min_rate;
+
+  gint32                   last_congestion_point;
 
   //Need for monitoring
   guint                    monitoring_interval;
@@ -69,6 +71,7 @@ struct _SubflowRateController
   GstClockTime             last_target_bitrate_i_adjust;
   GstClockTime             last_target_bitrate_adjust;
   GstClockTime             last_queue_clear;
+  GstClockTime             last_skip_time;
 
   GstClockTime             packet_obsolation_treshold;
 
@@ -79,12 +82,12 @@ struct _SubflowRateController
 //  guint64                  owd_target;
   //EWMA filtered owd fraction.Initial value:  0.0
   gdouble                  owd_fraction_avg;
+  gdouble                  BiF_ested_avg;
+  gdouble                  BiF_acked_avg;
   gdouble                  BiF_off_avg;
   //Vector of the last 20 owd_fraction
   FloatNumsTracker*        owd_fraction_hist;
   //OWD trend indicates incipient congestion. Initial value: 0.0
-  gdouble                  owd_trend_mem;
-  NumsTracker*             owd_trend_history;
   //True if in fast start state. Initial value: TRUE
 //  gboolean                 in_fast_start;
 //  gint                     n_fast_start;
@@ -94,13 +97,19 @@ struct _SubflowRateController
   //Minimum congestion window [byte]. Initial value: 2*MSS
   gint                     cwnd_min;
   //COngestion window
-  gint                     cwnd;
+  gint                     pacing_bitrate;
   //Congestion window inflection point. Initial value: 1
   gint                     cwnd_i;
   GstClockTime             last_congestion_detected;
   //Smoothed RTT [s], computed similar to method depicted in [RFC6298].
   //Initial value: 0.0
   gdouble                  s_rtt;
+  gdouble                  s_SR;
+
+  gdouble                  delay_t0;
+  gdouble                  delay_t1;
+  gdouble                  delay_t2;
+  gdouble                  delay_t3;
 
 };
 

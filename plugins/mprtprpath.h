@@ -17,6 +17,7 @@
 #include "packetsrcvqueue.h"
 #include "skalmanfilter.h"
 #include "variancetracker.h"
+#include "numstracker.h"
 
 G_BEGIN_DECLS
 
@@ -43,7 +44,9 @@ struct _RunningLengthEncodingBlock{
   guint16      start_seq;
   guint16      end_seq;
   guint16      discards;
+  guint16      losts;
   GstClockTime median_delay;
+  guint16      median_delay_counter;
   guint32      bytes_in_flight;
 };
 
@@ -90,6 +93,9 @@ struct _MpRTPReceiverPath
   gdouble             estimated_delay;
   SKalmanFilter*      skew_estimator;
   gdouble             estimated_skew;
+
+  NumsTracker*        gaps;
+  NumsTracker*        lates;
 
   gdouble             md_delay;
   gdouble             sh_delay;
@@ -141,6 +147,7 @@ mprtpr_path_get_XR7097_chunks(MpRTPRPath *this,
                               guint16 *end_seq);
 #define mprtpr_path_get_XR7097_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 0, chunks_num, begin_seq, end_seq)
 #define mprtpr_path_get_owd_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 1, chunks_num, begin_seq, end_seq)
+#define mprtpr_path_get_XR3611_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 2, chunks_num, begin_seq, end_seq)
 GstRTCPXR_Chunk *
 mprtpr_path_get_chunks(MpRTPRPath *this,
                               guint chunks_get_type,

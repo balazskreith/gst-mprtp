@@ -200,8 +200,8 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h pointerpool.h \
  bintree.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
- packetsrcvqueue.h skalmanfilter.h variancetracker.h percentiletracker.h \
- streamjoiner.h \
+ packetsrcvqueue.h skalmanfilter.h variancetracker.h numstracker.h \
+ percentiletracker.h streamjoiner.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h \
  /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
@@ -371,8 +371,8 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  /usr/include/x86_64-linux-gnu/sys/bitypes.h \
  /usr/include/arpa/nameser_compat.h \
  /usr/include/x86_64-linux-gnu/sys/un.h /usr/include/net/if.h \
- /usr/include/arpa/inet.h mprtpspath.h packetssndqueue.h numstracker.h \
- rmanctrler.h smanctrler.h streamsplitter.h nlms.h refctrler.h ricalcer.h
+ /usr/include/arpa/inet.h mprtpspath.h packetssndqueue.h rmanctrler.h \
+ smanctrler.h streamsplitter.h nlms.h refctrler.h ricalcer.h
 
 /usr/include/stdc-predef.h:
 
@@ -844,6 +844,8 @@ skalmanfilter.h:
 
 variancetracker.h:
 
+numstracker.h:
+
 percentiletracker.h:
 
 streamjoiner.h:
@@ -1231,8 +1233,6 @@ streamjoiner.h:
 mprtpspath.h:
 
 packetssndqueue.h:
-
-numstracker.h:
 
 rmanctrler.h:
 

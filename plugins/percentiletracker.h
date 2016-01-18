@@ -42,6 +42,7 @@ struct _PercentileTracker
   GstClockTime             treshold;
   gint32                   write_index;
   gint32                   read_index;
+  gint32                   counter;
   gdouble                  ratio;
 
   guint                    required;

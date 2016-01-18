@@ -115,7 +115,7 @@ void g_print_rrmeasurement(RRMeasurement *measurement)
   measurement->jitter,
   measurement->cum_packet_lost,
   measurement->lost,
-  measurement->median_delay,
+  measurement->recent_delay,
   measurement->min_delay,
   measurement->max_delay,
   measurement->early_discarded_bytes,
@@ -325,11 +325,11 @@ mprtps_path_set_delay(MPRTPSPath * this, GstClockTime delay)
   THIS_WRITEUNLOCK (this);
 }
 
-void mprtps_path_turn_off(MPRTPSPath * this, GstClockTime duration)
+void mprtps_path_set_skip_duration(MPRTPSPath * this, GstClockTime duration)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->turn_off_until = _now(this) + duration;
+  this->skip_until = _now(this) + duration;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -339,6 +339,7 @@ mprtps_path_set_pacing_bitrate(MPRTPSPath * this, guint32 target_bitrate, GstClo
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
   this->pacing_bitrate = target_bitrate;
+//  g_print("this->pacing_bitrate: %u\n", target_bitrate);
   packetssndqueue_set_obsolation_treshold(this->packetsqueue, obsolation_treshold);
   THIS_WRITEUNLOCK (this);
 }
@@ -558,7 +559,7 @@ guint32 mprtps_path_get_sender_rate(MPRTPSPath *this)
 {
   gint64 result;
   THIS_READLOCK(this);
-  numstracker_get_stats(this->sent_bytes, &result, NULL, NULL);
+  numstracker_get_stats(this->sent_bytes, &result);
   THIS_READUNLOCK(this);
   return result;
 }
@@ -607,12 +608,12 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
 {
 
   THIS_WRITELOCK (this);
-  if(0 < this->turn_off_until){
-    if(_now(this) < this->turn_off_until){
+  if(0 < this->skip_until){
+    if(_now(this) < this->skip_until){
       gst_buffer_unref(buffer);
       goto done;
     }
-    this->turn_off_until = 0;
+    this->skip_until = 0;
   }
   _setup_rtp2mprtp (this, buffer);
   _send_mprtp_packet(this, buffer);
@@ -708,6 +709,35 @@ send:
   _refresh_stat(this, buffer);
   this->send_mprtp_packet_func(this->send_mprtp_func_data, buffer);
 }
+//
+//guint32 _pacing(MPRTPSPath * this)
+//{
+//  GstBuffer *buffer;
+//  guint32 sent_payload_bytes = 0, payload_bytes = 0;
+//  gdouble pace_interval;
+//  gdouble pacing_bitrate = this->pacing_bitrate;
+//  guint32 pacing_tick = MIN_PACE_INTERVAL;
+//
+//  if(!this->pacing) pacing_bitrate *= 2;
+//
+//again:
+//  if(!packetssndqueue_has_buffer(this->packetsqueue, &payload_bytes)){
+//    goto done;
+//  }
+//  buffer = packetssndqueue_pop(this->packetsqueue);
+//  _refresh_stat(this, buffer);
+//  this->send_mprtp_packet_func(this->send_mprtp_func_data, buffer);
+//  sent_payload_bytes+=payload_bytes;
+//  pace_interval = (gdouble)(sent_payload_bytes * 8) / (gdouble)pacing_bitrate * 1000.;
+//  if(!this->pacing && pace_interval <= 1.){
+//    goto again;
+//  }
+//  pacing_tick = MAX(MIN_PACE_INTERVAL, (gdouble)(sent_payload_bytes * 8) / (gdouble)pacing_bitrate * 1000.);
+//done:
+//  return pacing_tick;
+//}
+
+
 
 guint32 _pacing(MPRTPSPath * this)
 {
@@ -716,8 +746,10 @@ guint32 _pacing(MPRTPSPath * this)
   gdouble pace_interval;
   gdouble pacing_bitrate = this->pacing_bitrate;
   guint32 pacing_tick = MIN_PACE_INTERVAL;
+  guint32 bytes_in_queue;
 
-  if(!this->pacing) pacing_bitrate *= 2;
+//  if(!this->pacing) pacing_bitrate *= 2;
+  packetssndqueue_get_num(this->packetsqueue, &bytes_in_queue);
 
 again:
   if(!packetssndqueue_has_buffer(this->packetsqueue, &payload_bytes)){
@@ -727,7 +759,8 @@ again:
   _refresh_stat(this, buffer);
   this->send_mprtp_packet_func(this->send_mprtp_func_data, buffer);
   sent_payload_bytes+=payload_bytes;
-  pace_interval = (gdouble)(sent_payload_bytes * 8) / (gdouble)pacing_bitrate * 1000.;
+  pace_interval = (gdouble)(sent_payload_bytes * 8000) / (gdouble)pacing_bitrate;
+//  g_print("Pace interval: %f\n", pace_interval);
   if(!this->pacing && pace_interval <= 1.){
     goto again;
   }

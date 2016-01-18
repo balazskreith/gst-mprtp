@@ -34,6 +34,7 @@ static void _add_skew(MpRTPRPath *this, gint64 skew);
 static void _refresh_RLEBlock(MpRTPRPath *this);
 static void _refresh_RLE(MpRTPRPath *this);
 static void _delays_stats_pipe(gpointer data, PercentileTrackerPipeData *pdata);
+static void _gaps_obsolation_pipe(gpointer data, gint64 seq);
 void
 mprtpr_path_class_init (MpRTPRPathClass * klass)
 {
@@ -67,12 +68,15 @@ mprtpr_path_init (MpRTPRPath * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
   this->delays = make_percentiletracker(1024, 50);
-  percentiletracker_set_treshold(this->delays, GST_SECOND);
+  percentiletracker_set_treshold(this->delays, 3 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->delays, _delays_stats_pipe, this);
   this->rle.write_index = this->rle.read_index = 0;
   this->rle.stepped = _now(this);
   this->delay_estimator = make_skalmanfilter_full(1024, GST_SECOND, .25);
   this->skew_estimator = make_skalmanfilter_full(1024, GST_SECOND, .125);
+  this->gaps = make_numstracker(128, GST_SECOND);
+  numstracker_add_rem_pipe(this->gaps, _gaps_obsolation_pipe, this);
+  this->lates = make_numstracker(128, GST_SECOND);
   mprtpr_path_reset (this);
 }
 
@@ -204,13 +208,28 @@ mprtpr_path_get_chunks(MpRTPRPath *this,
       read = &this->rle.blocks[i].discards;
     }
     else if(chunks_get_type == 1){
-      GstClockTime median_delay;
-      median_delay = this->rle.blocks[i].median_delay;
-      if(median_delay > GST_SECOND)
-        running_length = 0x3F;
+      GstClockTime owd;
+      owd = this->rle.blocks[i].median_delay;
+      owd = GST_TIME_AS_MSECONDS(owd);
+      if(owd > 0x3FFF)
+        running_length = 0x3FFF;
       else
-        running_length = (guint16)((get_ntp_from_epoch_ns(median_delay)>>18) & 0x3F);
+        running_length = owd;
+//            g_print("MEDIAN: %lu VALUE: %hu\n", owd, running_length);
       read = &running_length;
+//      g_print("READ: %hu-", *read);
+//
+//      if(owd > GST_SECOND)
+//        running_length = 0x3FFF;
+//      else
+//        running_length = (guint16)((get_ntp_from_epoch_ns(owd)>>18) & 0x3FFF);
+//      g_print("MEDIAN: %lu VALUE: %hu->%lu\n", owd, running_length,
+//              get_epoch_time_from_ntp_in_ns(running_length<<18));
+//      read = &running_length;
+    }else if(chunks_get_type == 2){
+        read = &this->rle.blocks[i].losts;
+    }else{
+        read = &this->rle.blocks[i].discards;
     }
 
     gst_rtcp_xr_chunk_change(chunk,
@@ -244,6 +263,8 @@ void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
 void mprtpr_path_tick(MpRTPRPath *this)
 {
   _refresh_RLE(this);
+  numstracker_obsolate(this->gaps);
+  numstracker_obsolate(this->lates);
 }
 
 void mprtpr_path_add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp)
@@ -289,8 +310,17 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
 //  g_print("J: %d\n", this->jitter);
   _add_delay(this, mprtp->delay);
-  if(_cmp_seq(this->highest_seq, mprtp->subflow_seq) >= 0){
+  if(_cmp_seq(mprtp->subflow_seq, this->highest_seq) <= 0){
+    //probably found in missing;
+    numstracker_add(this->lates, mprtp->subflow_seq);
     goto done;
+  }
+  if(_cmp_seq(this->highest_seq + 1, mprtp->subflow_seq) < 0){
+    guint16 seq = this->highest_seq + 1;
+    for(; _cmp_seq(seq, mprtp->subflow_seq) < 0; ++seq){
+      numstracker_add(this->gaps, seq);
+    }
+    //add to missing;
   }
   this->highest_seq = mprtp->subflow_seq;
   if(this->last_rtp_timestamp == gst_mprtp_buffer_get_timestamp(mprtp))
@@ -389,6 +419,14 @@ void _delays_stats_pipe(gpointer data, PercentileTrackerPipeData *pdata)
 {
   MpRTPRPath *this = data;
   _actual_RLEBlock(this)->median_delay = pdata->percentile;
+  ++_actual_RLEBlock(this)->median_delay_counter;
+}
+
+void _gaps_obsolation_pipe(gpointer data, gint64 seq)
+{
+  MpRTPRPath *this = data;
+  if(numstracker_find(this->lates, seq)) return;
+  ++_actual_RLEBlock(this)->losts;
 }
 
 #undef THIS_READLOCK

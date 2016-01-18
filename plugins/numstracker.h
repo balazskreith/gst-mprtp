@@ -31,13 +31,14 @@ struct _NumsTracker
   GRWLock                  rwmutex;
   NumsTrackerItem*         items;
   gint64                   value_sum;
-  BinTree*                 tree;
   guint32                  length;
   GstClock*                sysclock;
   GstClockTime             treshold;
   gint32                   write_index;
   gint32                   read_index;
   gint32                   counter;
+  void                    (*rem_pipe)(gpointer, gint64);
+  gpointer                 rem_pipe_data;
   GList*                   plugins;
 };
 
@@ -102,20 +103,19 @@ struct _NumsTrackerSumPlugin{
 
 GType numstracker_get_type (void);
 NumsTracker *make_numstracker(guint32 length, GstClockTime obsolation_treshold);
-NumsTracker *make_numstracker_with_tree(guint32 length, GstClockTime obsolation_treshold);
 guint32 numstracker_get_num(NumsTracker *this);
 guint64 numstracker_get_last(NumsTracker *this);
 
 
 void
 numstracker_get_stats (NumsTracker * this,
-                         gint64 *sum,
-                         guint64 *max,
-                         guint64 *min);
+                         gint64 *sum);
 
 void numstracker_obsolate (NumsTracker * this);
 void numstracker_reset(NumsTracker *this);
+gboolean numstracker_find(NumsTracker *this, gint64 value);
 void numstracker_add(NumsTracker *this, gint64 value);
+void numstracker_add_rem_pipe(NumsTracker *this, void (*rem_pipe)(gpointer, gint64), gpointer rem_pipe_data);
 void numstracker_add_with_removal(NumsTracker *this, gint64 value, GstClockTime removal);
 
 void numstracker_add_plugin(NumsTracker *this, NumsTrackerPlugin *plugin);

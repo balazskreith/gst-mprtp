@@ -340,6 +340,7 @@ void _add_value(PercentileTracker *this, guint64 value)
   if(++this->write_index == this->length){
     this->write_index=0;
   }
+  this->counter = MIN(this->counter + 1, this->length);
   _pipe_stats(this);
 }
 
@@ -389,24 +390,24 @@ guint64 _get_median(PercentileTracker * this)
   max_count = bintree_get_num(this->maxtree);
   min_count = bintree_get_num(this->mintree);
 
-  if(min_count == max_count)
+  if(min_count == max_count){
     result = (bintree_get_top_value(this->maxtree) + bintree_get_top_value(this->mintree))>>1;
-  else if(min_count < max_count)
+  } else if(min_count < max_count)
     result = bintree_get_top_value(this->maxtree);
   else
     result = bintree_get_top_value(this->mintree);
 
   if(this->debug){
-//      g_print("_get_median debug, item num: %u <-> R:%d-W:%d\n",
-//              percentiletracker_get_num(this),
-//              this->read_index,
-//              this->write_index);
-//      g_print("maxtree top: %lu (%u), mintree top: %lu (%u) result is: %lu\n",
-//              bintree_get_top_value(this->maxtree),
-//              bintree_get_num(this->maxtree),
-//              bintree_get_top_value(this->mintree),
-//              bintree_get_num(this->mintree),
-//              result);
+      g_print("_get_median debug, item num: %u <-> R:%d-W:%d\n",
+              percentiletracker_get_num(this),
+              this->read_index,
+              this->write_index);
+      g_print("maxtree top: %lu (%u), mintree top: %lu (%u) result is: %lu\n",
+              bintree_get_top_value(this->maxtree),
+              bintree_get_num(this->maxtree),
+              bintree_get_top_value(this->mintree),
+              bintree_get_num(this->mintree),
+              result);
     }
   return result;
 }
@@ -581,6 +582,7 @@ _obsolate (PercentileTracker * this)
   now = gst_clock_get_time(this->sysclock);
   treshold = now - this->treshold;
 again:
+  if(this->counter < 1) goto done;
   if(this->write_index == this->read_index) goto elliminate;
   else if(this->items[this->read_index].added < treshold) goto elliminate;
   else goto done;
@@ -595,6 +597,7 @@ elliminate:
   if(++this->read_index == this->length){
       this->read_index=0;
   }
+  this->counter = MAX(0, this->counter - 1);
   goto again;
 done:
   _pipe_stats(this);

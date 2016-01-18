@@ -43,7 +43,7 @@
 #define PATH_RTT_MAX_TRESHOLD (800 * GST_MSECOND)
 #define PATH_RTT_MIN_TRESHOLD (600 * GST_MSECOND)
 #define MAX_SUBFLOW_MOMENT_NUM 5
-#define SUBFLOW_DEFAULT_SENDING_RATE 64000
+#define SUBFLOW_DEFAULT_SENDING_RATE 128000
 
 GST_DEBUG_CATEGORY_STATIC (sefctrler_debug_category);
 #define GST_CAT_DEFAULT sefctrler_debug_category
@@ -198,13 +198,28 @@ _report_processing_xr_7243_block_processor (
     GstRTCPXR_RFC7243 * xrb);
 
 static void
-_report_processing_xr_owd_block_processor (SndEventBasedController *this,
-                                            Subflow * subflow,
-                                            GstRTCPXR_OWD * xrb);
+_report_processing_xr_owd_block_processor (
+    SndEventBasedController *this,
+    Subflow * subflow,
+    GstRTCPXR_OWD * xrb);
 static void
-_report_processing_xr_rfc7097_block_processor (SndEventBasedController *this,
-                                            Subflow * subflow,
-                                            GstRTCPXR_RFC7097 * xrb);
+_report_processing_xr_rfc7097_block_processor (
+    SndEventBasedController *this,
+    Subflow * subflow,
+    GstRTCPXR_RFC7097 * xrb);
+
+static void
+_report_processing_xr_rfc3611_block_processor (
+    SndEventBasedController *this,
+    Subflow * subflow,
+    GstRTCPXR_RFC3611 * xrb);
+
+static void
+_report_processing_xr_owd_rle_block_processor (
+    SndEventBasedController *this,
+    Subflow * subflow,
+    GstRTCPXR_OWD_RLE * xrb);
+
 static gfloat
 _get_subflow_goodput (
     Subflow * this,
@@ -419,7 +434,7 @@ sefctrler_stat_run (void *data)
             subflow->id,
             sender_rate,
             th80_delay,
-            _irt0(subflow)->median_delay,
+            _irt0(subflow)->recent_delay,
             target_rate/125.,
             next_target/125.,
             _irt0(subflow)->receiver_rate / 125.,
@@ -743,14 +758,15 @@ void _assemble_measurement(SndEventBasedController * this, Subflow *subflow)
 
   if(_irt0(subflow)->rfc7243_arrived) goto total_discarded_done;
   if(!_irt0(subflow)->rfc7097_arrived) goto total_discarded_done;
-    chunks_num = _irt0(subflow)->rle_discards.length;
-    for(chunk_index = 0; chunk_index < chunks_num; ++chunk_index)
-    {
-       _irt0(subflow)->late_discarded_bytes +=
-       _irt0(subflow)->rle_discards.values[chunk_index];
-    }
-    _irt0(subflow)->late_discarded_bytes_sum +=
-       _irt0(subflow)->late_discarded_bytes;
+
+  chunks_num = _irt0(subflow)->rle_discards.length;
+  for(chunk_index = 0; chunk_index < chunks_num; ++chunk_index)
+  {
+     _irt0(subflow)->late_discarded_bytes +=
+     _irt0(subflow)->rle_discards.values[chunk_index];
+  }
+  _irt0(subflow)->late_discarded_bytes_sum +=
+     _irt0(subflow)->late_discarded_bytes;
 
 total_discarded_done:
   if(!_irt0(subflow)->rfc7097_arrived) goto recent_discarded_done;
@@ -759,7 +775,24 @@ total_discarded_done:
   _irt0(subflow)->recent_discard = _irt0(subflow)->rle_discards.values[chunk_index];
 
 recent_discarded_done:
+  if(!_irt0(subflow)->owd_rle_arrived) goto recent_delay_done;
 
+  chunk_index = _irt0(subflow)->rle_delays.length - 1;
+  _irt0(subflow)->recent_delay = _irt0(subflow)->rle_delays.values[chunk_index];
+
+recent_delay_done:
+  if(!_irt0(subflow)->rfc3611_arrived) goto recent_losts_done;
+
+  chunk_index = _irt0(subflow)->rle_losts.length - 1;
+  _irt0(subflow)->recent_lost = _irt0(subflow)->rle_losts.values[chunk_index];
+  chunks_num = _irt0(subflow)->rle_losts.length;
+  for(chunk_index = 0; chunk_index < chunks_num; ++chunk_index)
+  {
+    _irt0(subflow)->rfc3611_cum_lost +=
+    _irt0(subflow)->rle_losts.values[chunk_index];
+  }
+
+recent_losts_done:
   return;
 }
 
@@ -828,6 +861,11 @@ _report_processing_selector (SndEventBasedController *this,
       gst_rtcp_xr_block_getdown((GstRTCPXR*) &block->xr_header,
                                 &xr_block_type, NULL,  NULL);
       switch(xr_block_type){
+        case GST_RTCP_XR_RFC3611_BLOCK_TYPE_IDENTIFIER:
+          _report_processing_xr_rfc3611_block_processor (this,
+                                                      subflow,
+                                                      &block->xr_rfc3611_report);
+        break;
         case GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER:
           _report_processing_xr_7243_block_processor (this,
                                                       subflow,
@@ -842,6 +880,11 @@ _report_processing_selector (SndEventBasedController *this,
           _report_processing_xr_rfc7097_block_processor(this,
                                                         subflow,
                                                         &block->xr_rfc7097_report);
+          break;
+        case GST_RTCP_XR_OWD_RLE_BLOCK_TYPE_IDENTIFIER:
+          _report_processing_xr_owd_rle_block_processor(this,
+                                                        subflow,
+                                                        &block->xr_owd_rle_report);
           break;
         default:
           GST_WARNING_OBJECT(this, "Unrecognized RTCP XR REPORT");
@@ -966,9 +1009,9 @@ _report_processing_xr_owd_block_processor (SndEventBasedController *this,
                            &min_delay,
                            &max_delay);
 
-  _irt0(subflow)->median_delay = median_delay;
-  _irt0(subflow)->median_delay<<=16;
-  _irt0(subflow)->median_delay = get_epoch_time_from_ntp_in_ns(_irt0(subflow)->median_delay);
+  _irt0(subflow)->recent_delay = median_delay;
+  _irt0(subflow)->recent_delay<<=16;
+  _irt0(subflow)->recent_delay = get_epoch_time_from_ntp_in_ns(_irt0(subflow)->recent_delay);
   _irt0(subflow)->min_delay = min_delay;
   _irt0(subflow)->min_delay<<=16;
   _irt0(subflow)->min_delay = get_epoch_time_from_ntp_in_ns(_irt0(subflow)->min_delay);
@@ -990,6 +1033,7 @@ _report_processing_xr_rfc7097_block_processor (SndEventBasedController *this,
                                             GstRTCPXR_RFC7097 * xrb)
 {
   guint chunks_num, chunk_index;
+  guint16 running_length;
   GstRTCPXR_Chunk *chunk;
 
   _irt0 (subflow)->rfc7097_arrived = TRUE;
@@ -1002,8 +1046,68 @@ _report_processing_xr_rfc7097_block_processor (SndEventBasedController *this,
 
       //Terminate chunk
       if(*((guint16*)chunk) == 0) break;
-      _irt0(subflow)->rle_discards.values[chunk_index] = chunk->run_length;
+      gst_rtcp_xr_chunk_getdown(chunk, NULL, NULL, &running_length);
+      _irt0(subflow)->rle_discards.values[chunk_index] = running_length;
       ++_irt0(subflow)->rle_discards.length;
+  }
+}
+
+
+void
+_report_processing_xr_rfc3611_block_processor (SndEventBasedController *this,
+                                            Subflow * subflow,
+                                            GstRTCPXR_RFC3611 * xrb)
+{
+  guint chunks_num, chunk_index;
+  guint16 running_length;
+  GstRTCPXR_Chunk *chunk;
+
+  _irt0 (subflow)->rfc3611_arrived = TRUE;
+  chunks_num = gst_rtcp_xr_rfc3611_get_chunks_num(xrb);
+  for(chunk_index = 0;
+      chunk_index < chunks_num;
+      ++chunk_index)
+  {
+      chunk = gst_rtcp_xr_rfc3611_get_chunk(xrb, chunk_index);
+
+      //Terminate chunk
+      if(*((guint16*)chunk) == 0) break;
+      gst_rtcp_xr_chunk_getdown(chunk, NULL, NULL, &running_length);
+      _irt0(subflow)->rle_losts.values[chunk_index] = running_length;
+      ++_irt0(subflow)->rle_losts.length;
+  }
+}
+
+
+
+void
+_report_processing_xr_owd_rle_block_processor (SndEventBasedController *this,
+                                            Subflow * subflow,
+                                            GstRTCPXR_OWD_RLE * xrb)
+{
+  guint chunks_num, chunk_index;
+  guint16 running_length;
+  GstRTCPXR_Chunk *chunk;
+
+  _irt0 (subflow)->owd_rle_arrived = TRUE;
+//gst_print_rtcp_xr_owd_rle(xrb);
+  chunks_num = gst_rtcp_xr_owd_rle_get_chunks_num(xrb);
+  for(chunk_index = 0;
+      chunk_index < chunks_num;
+      ++chunk_index)
+  {
+      chunk = gst_rtcp_xr_owd_rle_get_chunk(xrb, chunk_index);
+
+      //Terminate chunk
+      if(*((guint16*)chunk) == 0) break;
+      gst_rtcp_xr_chunk_getdown(chunk, NULL, NULL, &running_length);
+      _irt0(subflow)->rle_delays.values[chunk_index] = (GstClockTime)running_length * GST_MSECOND;
+      if(_irt0(subflow)->rle_delays.values[chunk_index] == 0){
+        if(_irt0(subflow)->rle_delays.length == 0)
+          g_warning("OWD delay at first index should not be 0");
+        else break;
+      }
+      ++_irt0(subflow)->rle_delays.length;
   }
 }
 

@@ -51,6 +51,8 @@ static void numstracker_finalize (GObject * object);
 static void
 _add_value(NumsTracker *this, gint64 value, GstClockTime removal);
 static void
+_rem_value(NumsTracker *this);
+static void
 _obsolate (NumsTracker * this);
 
 static gint
@@ -139,34 +141,32 @@ NumsTracker *make_numstracker(
   return result;
 }
 
-NumsTracker *make_numstracker_with_tree(
-    guint32 length,
-    GstClockTime obsolation_treshold)
-{
-  NumsTracker *result;
-  result = g_object_new (NUMSTRACKER_TYPE, NULL);
-  THIS_WRITELOCK (result);
-  result->items = g_malloc0(sizeof(NumsTrackerItem)*length);
-  result->value_sum = 0;
-  result->length = length;
-  result->sysclock = gst_system_clock_obtain();
-  result->treshold = obsolation_treshold;
-  result->counter = 0;
-  result->tree = make_bintree(_cmp_for_max);
-  THIS_WRITEUNLOCK (result);
-
-  return result;
-}
-
 
 void numstracker_reset(NumsTracker *this)
 {
   THIS_WRITELOCK (this);
-  memset(this->items, 0, sizeof(NumsTrackerItem) * this->length);
-  this->counter = this->write_index = this->read_index = 0;
-  this->value_sum = 0;
-  bintree_reset(this->tree);
+  while(0 < this->counter) _rem_value(this);
   THIS_WRITEUNLOCK (this);
+}
+
+gboolean numstracker_find(NumsTracker *this, gint64 value)
+{
+  gboolean result = FALSE;
+  guint32 read_index;
+  THIS_READLOCK(this);
+  read_index = this->read_index;
+  if(this->counter < 1) goto done;
+again:
+  if(this->items[read_index].value == value){
+    result = TRUE;
+    goto done;
+  }
+  if(read_index == this->write_index) goto done;
+  if(++read_index == this->length) read_index = 0;
+  goto again;
+done:
+  THIS_READUNLOCK(this);
+  return result;
 }
 
 void numstracker_add_plugin(NumsTracker *this, NumsTrackerPlugin *plugin)
@@ -188,6 +188,16 @@ void numstracker_add(NumsTracker *this, gint64 value)
 {
   THIS_WRITELOCK (this);
   _add_value(this, value, 0);
+  THIS_WRITEUNLOCK (this);
+}
+
+void numstracker_add_rem_pipe(NumsTracker *this,
+                              void (*rem_pipe)(gpointer, gint64),
+                              gpointer rem_pipe_data)
+{
+  THIS_WRITELOCK (this);
+  this->rem_pipe = rem_pipe;
+  this->rem_pipe_data = rem_pipe_data;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -221,15 +231,11 @@ guint64 numstracker_get_last(NumsTracker *this)
 
 void
 numstracker_get_stats (NumsTracker * this,
-                         gint64 *sum,
-                         guint64 *max,
-                         guint64 *min)
+                         gint64 *sum)
 {
   THIS_READLOCK (this);
   if(this->counter < 1) goto done;
   if(sum) *sum = this->value_sum;
-  if(this->tree && max) *max = bintree_get_top_value(this->tree);
-  if(this->tree && min) *min = bintree_get_top_value(this->tree);
   THIS_READUNLOCK (this);
 done:
   return;
@@ -271,20 +277,42 @@ void _add_value(NumsTracker *this, gint64 value, GstClockTime removal)
       plugin->add_activator(plugin, value);
     }
   }
-
-  if(this->tree && value < 0)
-    g_warning("numtracker with tree only allows positive values");
-  else if(this->tree)
-    bintree_insert_value(this->tree, value);
-
   _obsolate(this);
 }
+
+void _rem_value(NumsTracker *this)
+{
+  gint64 value;
+  value = this->items[this->read_index].value;
+  this->value_sum -= value;
+  this->items[this->read_index].value = 0;
+  this->items[this->read_index].added = 0;
+  this->items[this->read_index].remove = 0;
+  if(++this->read_index == this->length){
+      this->read_index=0;
+  }
+  --this->counter;
+
+  if(this->rem_pipe){
+    this->rem_pipe(this->rem_pipe_data, value);
+  }
+
+  {
+    GList *it;
+    NumsTrackerPlugin *plugin;
+    for(it = this->plugins; it != NULL; it = it->next){
+      plugin = it->data;
+      if(!plugin->rem_activator) continue;
+      plugin->rem_activator(plugin, value);
+    }
+  }
+}
+
 #define _removal(this, index) this->items[index].remove
 void
 _obsolate (NumsTracker * this)
 {
   GstClockTime treshold,now, removal;
-  guint64 value;
   now = gst_clock_get_time(this->sysclock);
   treshold = now - this->treshold;
 
@@ -297,26 +325,7 @@ again:
   else if(0 < removal && removal < now) goto elliminate;
   else goto done;
 elliminate:
-  value = this->items[this->read_index].value;
-  this->value_sum -= value;
-  this->items[this->read_index].value = 0;
-  this->items[this->read_index].added = 0;
-  this->items[this->read_index].remove = 0;
-  if(this->tree) bintree_delete_value(this->tree, value);
-  if(++this->read_index == this->length){
-      this->read_index=0;
-  }
-  --this->counter;
-
-  {
-    GList *it;
-    NumsTrackerPlugin *plugin;
-    for(it = this->plugins; it != NULL; it = it->next){
-      plugin = it->data;
-      if(!plugin->rem_activator) continue;
-      plugin->rem_activator(plugin, value);
-    }
-  }
+  _rem_value(this);
   goto again;
 done:
   return;

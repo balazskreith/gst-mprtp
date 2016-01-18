@@ -889,10 +889,11 @@ void _reduce_bitrate(SubflowRateController *this, gboolean disable_controlling)
   pacing_bitrate-=undershoot_rate;
 done:
   this->last_congestion_point = _RR(this);
-  _change_target_bitrate(this, new_target);
+  _add_target_point(this, pacing_bitrate);
+  DISABLE_LINE _change_target_bitrate(this, new_target);
   _set_pacing_bitrate(this, pacing_bitrate, TRUE);
   _change_overused_stage_to(this, STAGE_RESTRICTED);
-  _set_adjustment_aim(this, BITRATE_STAY);
+  _set_adjustment_aim(this, BITRATE_DOWN);
   if(disable_controlling){
     _disable_controlling(this);
   }

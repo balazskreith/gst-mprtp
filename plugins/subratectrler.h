@@ -61,6 +61,7 @@ struct _SubflowRateController
   GstClockTime             monitoring_started;
 
   SubRateProc              controller;
+  SubRateProc              stage;
 
   guint8*                  moments;
   gint                     moments_index;

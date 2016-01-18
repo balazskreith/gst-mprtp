@@ -37,9 +37,10 @@ typedef struct _MPRTPSPathClass MPRTPSPathClass;
 
 typedef enum
 {
-  MPRTPS_PATH_FLAG_NON_LOSSY     = 1,
-  MPRTPS_PATH_FLAG_NON_CONGESTED = 2,
-  MPRTPS_PATH_FLAG_ACTIVE        = 4,
+  MPRTPS_PATH_FLAG_NOT_SLOW      = 1,
+  MPRTPS_PATH_FLAG_NON_LOSSY     = 2,
+  MPRTPS_PATH_FLAG_NON_CONGESTED = 4,
+  MPRTPS_PATH_FLAG_ACTIVE        = 8,
 } MPRTPSPathFlags;
 
 typedef enum{
@@ -200,6 +201,9 @@ void mprtps_path_set_passive (MPRTPSPath * this);
 gboolean mprtps_path_is_non_lossy (MPRTPSPath * this);
 void mprtps_path_set_lossy (MPRTPSPath * this);
 void mprtps_path_set_non_lossy (MPRTPSPath * this);
+gboolean mprtps_path_is_not_slow (MPRTPSPath * this);
+void mprtps_path_set_slow (MPRTPSPath * this);
+void mprtps_path_set_not_slow (MPRTPSPath * this);
 gboolean mprtps_path_is_non_congested (MPRTPSPath * this);
 void mprtps_path_set_congested (MPRTPSPath * this);
 void mprtps_path_set_non_congested (MPRTPSPath * this);

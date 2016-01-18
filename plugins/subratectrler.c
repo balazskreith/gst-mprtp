@@ -99,6 +99,11 @@ typedef enum{
   STATE_MONITORED      =  1,
 }State;
 
+typedef enum{
+  STAGE_CONGESTED      = 4,
+  STAGE_EASED          = 5,
+}Stage;
+
 //ToDO Apply it
 typedef enum{
   BITRATE_UP           =  1,
@@ -125,17 +130,17 @@ struct _Moment{
   gdouble         BiF_off;
   guint32         bytes_in_queue;
   guint64         max_bytes_in_flight;
-  gdouble         sending_rate_corr;
 
   gboolean        recent_discard;
   gboolean        recent_lost;
   gboolean        path_is_lossy;
+  gboolean        path_is_slow;
 
   //derivatives
   guint32         receiver_rate_std;
   gdouble         discard_rate;
   gdouble         corrh_owd;
-  gdouble         rate_corr;
+//  gdouble         rate_corr;
   gdouble         del_corr;
 //  gdouble         BiF_off_target;
   gboolean        can_bitrate_increase;
@@ -194,9 +199,9 @@ static void subratectrler_finalize (GObject * object);
 #define _RR_t1(this) _mt1(this)->receiver_rate
 #define _SR(this) _mt0(this)->sender_rate
 #define _TR(this) this->target_bitrate
-#define _rateCorr(this) _mt0(this)->rate_corr
+#define _rateCorr(this) (gdouble)_SR(this) / (gdouble)_RR(this)
 #define _maxCorr(this) (gdouble)_RR(this) / (gdouble)this->max_target_point
-#define _sCorr(this) _mt0(this)->sending_rate_corr
+#define _sCorr(this)  (gdouble) _SR(this) / (gdouble) _TR(this)
 #define _tCorr(this) (gdouble)_TR(this) / (gdouble)this->max_target_point
 #define _delcorr(this) _mt0(this)->del_corr
 #define _delcorr_t1(this) _mt1(this)->del_corr
@@ -505,6 +510,7 @@ void subratectrler_measurement_update(
   _mt0(this)->recent_lost         = measurement->recent_lost;
   _mt0(this)->recent_discard      = measurement->recent_discard;
   _mt0(this)->path_is_lossy       = !mprtps_path_is_non_lossy(this->path);
+  _mt0(this)->path_is_slow        = !mprtps_path_is_not_slow(this->path);
   _mt0(this)->goodput             = measurement->goodput * 8;
   _mt0(this)->receiver_rate       = measurement->receiver_rate * 8;
   _mt0(this)->jitter              = measurement->jitter;
@@ -522,10 +528,9 @@ void subratectrler_measurement_update(
   _mt0(this)->state               = _mt1(this)->state;
 
   _mt0(this)->discard_rate        = 1. - measurement->goodput / measurement->receiver_rate;
-  _mt0(this)->sending_rate_corr   = (gdouble) _SR(this) / (gdouble) _TR(this);
 //  _mt0(this)->max_corr            = MIN((gdouble) _RR(this) / (gdouble)_SR(this), (gdouble) _RR_t1(this) / (gdouble) _SR(this));
 //  _mt0(this)->max_corr            = (gdouble)(_RR(this) + _RR_t1(this)) / (this->s_SR * 2.);
-  _mt0(this)->rate_corr            = (gdouble)(_RR(this) ) / (this->s_SR * 1.);
+//  _mt0(this)->rate_corr            = (gdouble)(_RR(this) ) / (this->s_SR);
 
   if(1 < this->moments_num)
     this->s_rtt = measurement->RTT * .125 + this->s_rtt * .875;
@@ -581,6 +586,7 @@ void subratectrler_measurement_update(
   _set_owd_trend(this);
   mprtps_path_set_delay(this->path, _mt0(this)->ltt_delays_target);
 
+  if(!_mt0(this)->ltt_delays_th) _mt0(this)->ltt_delays_th = OWD_TARGET_HI;
   _mt0(this)->corrh_owd = (gdouble)_mt0(this)->recent_delay / (gdouble)_mt0(this)->ltt_delays_th;
   _mt0(this)->can_bitrate_increase = _mt0(this)->state != STATE_OVERUSED;
   _mt0(this)->can_bitrate_increase &= this->target_bitrate < _mt0(this)->receiver_rate * 1.1;
@@ -608,7 +614,7 @@ void subratectrler_measurement_update(
       if(!measurement->rle_delays.values[i]) continue;
       //Percentiletracker has a tiny problem with similar value handling.
       //That is why we add some random ns value, in order to
-      //get a reasonable target value
+      //get a reasonable median target value
       delay+= g_random_int_range(0, 1000);
       percentiletracker_add(this->ltt_delays_th, delay);
       percentiletracker_add(this->ltt_delays_target, delay);
@@ -671,9 +677,73 @@ exit:
 
 
 void
+_congested_stage(
+    SubflowRateController *this)
+{
+  //check weather delay reached the inflection point
+  if(2. < _corrH(this)){
+    if(1. <= _dCorr(this)){
+      _undershoot(this, TRUE);
+    }
+    goto done;
+  }
+
+  //Check weather sending rate correlate to the target rate
+  if(1.1 < _sCorr(this)){
+    goto done;
+  }
+
+  //Check weather sender and receiver rates are correlated
+  if(1.1 < _rateCorr(this)){
+    goto done;
+  }
+
+  //increase pacing bitrate
+  _add_target_point(this, _RR(this));
+  _set_pacing_bitrate(this, this->pacing_bitrate * 1.2, TRUE);
+  _change_overused_stage_to(this, STAGE_EASED);
+done:
+  return;
+}
+
+void
+_eased_stage(
+    SubflowRateController *this)
+{
+  //send back to congested stage
+  if(2. < _corrH(this)){
+    _reduce;
+    _change_overused_stage_to(this, STAGE_EASED);
+    goto done;
+  }
+
+  //until it not goes down below to 1.5 not open it further
+  if(1.5 < _corrH(this)){
+    goto done;
+  }
+
+  //open it more if we have bytes in the queue
+  if(_mt0(this)->bytes_in_queue){
+    _set_pacing_bitrate(this, this->pacing_bitrate * 1.2, TRUE);
+    goto done;
+  }
+  _disable_pacing(this);
+  _set_adjustment_aim(this, BITRATE_UP);
+  _transit_to(this, STATE_STABLE);
+done:
+  _add_target_point(this, _RR(this));
+}
+
+void _change_overused_stage_to(SubflowRateController *this, Stage next_stage)
+{
+
+}
+
+void
 _overused_state(
     SubflowRateController *this)
 {
+  //common conditions
   if(_rlost(this) || _discard(this)){
     if(_state_t1(this) == STATE_OVERUSED){
       _transit_to(this, STATE_STABLE);
@@ -686,6 +756,9 @@ _overused_state(
     }
     goto done;
   }
+
+  //Execute stage
+  this->SubController(this);
 
   if(2. < _corrH(this)){
     //the inflection was not happened
@@ -750,7 +823,10 @@ _stable_state(
   }
 
   //  if(_rateCorr(this) < .9 || _maxCorr(this) < .9){
-  if(_rateCorr(this) < .9 || _maxCorr(this) < .9 || _tCorr(this) < .9){
+  if(_rateCorr(this) < .9 || _maxCorr(this) < .9){
+    goto done;
+  }
+  if(_tCorr(this) < .9 || 1.1 < _tCorr(this)){
     goto done;
   }
   _set_adjustment_aim(this, BITRATE_STAY);
@@ -801,6 +877,7 @@ done:
   _disable_monitoring(this);
   return;
 }
+
 
 void _undershoot(SubflowRateController *this, gboolean disable_controlling)
 {

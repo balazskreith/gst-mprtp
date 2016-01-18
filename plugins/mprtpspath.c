@@ -395,6 +395,28 @@ mprtps_path_set_lossy (MPRTPSPath * this)
   THIS_WRITEUNLOCK (this);
 }
 
+
+gboolean
+mprtps_path_is_not_slow (MPRTPSPath * this)
+{
+  gboolean result;
+  THIS_READLOCK (this);
+  result = (this->state & (guint8) MPRTPS_PATH_FLAG_NOT_SLOW) ? TRUE : FALSE;
+  THIS_READUNLOCK (this);
+  return result;
+
+}
+
+void
+mprtps_path_set_slow (MPRTPSPath * this)
+{
+  g_return_if_fail (this);
+  THIS_WRITELOCK (this);
+  this->state &= (guint8) 255 ^ (guint8) MPRTPS_PATH_FLAG_NOT_SLOW;
+  THIS_WRITEUNLOCK (this);
+}
+
+
 void
 mprtps_path_set_non_lossy (MPRTPSPath * this)
 {

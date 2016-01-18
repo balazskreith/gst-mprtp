@@ -120,7 +120,7 @@ struct _Moment{
   guint64         ltt_delays_target;
   guint32         jitter;
   guint32         lost;
-  guint32         discard;
+  guint32         discarded_bits;
   gint32          receiver_rate;
   gint32          sender_rate;
   gint32          goodput;
@@ -187,6 +187,7 @@ static void subratectrler_finalize (GObject * object);
 #define _rdiscard(this) (0 && _mt0(this)->recent_discard)
 //FixME: apply trend calculation instead of recent discard
 #define _discard(this) (0 && _mt0(this)->discard_rate > .1)
+#define _discard_rate(this) _mt0(this)->discard_rate
 #define _lost(this) (_mt0(this)->path_is_lossy && _mt0(this)->lost)
 #define _rlost(this) (_mt0(this)->path_is_lossy && _mt0(this)->recent_lost)
 #define _corrH(this) (_mt0(this)->corrh_owd)
@@ -211,6 +212,7 @@ static void subratectrler_finalize (GObject * object);
 
 #define _set_adjustment_aim(this, aim) _mt0(this)->bitrate_aim = aim
 #define _bitrate_aim(this) _mt0(this)->bitrate_aim
+#define _bitrate_aim_t1(this) _mt1(this)->bitrate_aim
 
 
 static Moment*
@@ -245,12 +247,7 @@ _monitored_state(
     SubflowRateController *this);
 
 static void
-_reduce(
-    SubflowRateController *this,
-    gboolean disable_controlling);
-
-static void
-_undershoot(
+_reduce_bitrate(
     SubflowRateController *this,
     gboolean disable_controlling);
 
@@ -339,10 +336,6 @@ _bights_in_flight_max_pipe(gpointer data, guint64 value);
 static void
 _print_mupdate_state(SubflowRateController *this);
 
-static void
-_print_undershoot(SubflowRateController *this,
-                       gint32 picked_GP,
-                       gint32 drate);
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -498,7 +491,7 @@ void subratectrler_time_update(
 
   if(rep){
     rep->lost_bytes = _mt0(this)->lost;
-    rep->discarded_bytes = _mt0(this)->discard;
+    rep->discarded_bytes = _mt0(this)->discarded_bits;
     rep->owd = _mt0(this)->recent_delay;
     rep->max_rate = this->max_rate;
   }
@@ -522,7 +515,7 @@ void subratectrler_measurement_update(
   _mt0(this)->time                = measurement->time;
   _mt0(this)->recent_delay        = measurement->recent_delay;
   _mt0(this)->RTT                 = measurement->RTT;
-  _mt0(this)->discard             = measurement->late_discarded_bytes;
+  _mt0(this)->discarded_bits      = measurement->late_discarded_bytes * 8;
   _mt0(this)->lost                = measurement->lost;
   _mt0(this)->recent_lost         = measurement->recent_lost;
   _mt0(this)->recent_discard      = measurement->recent_discard;
@@ -700,8 +693,7 @@ _restricted_stage(
   //check weather delay reached the inflection point
   if(2. < _corrH(this)){
     if(1. <= _dCorr(this)){
-      _reduce(this, TRUE);
-      DISABLE_LINE _undershoot(this, TRUE);
+      _reduce_bitrate(this, TRUE);
     }
     goto done;
   }
@@ -730,7 +722,7 @@ _released_stage(
 {
   //send back to congested stage
   if(2. < _corrH(this)){
-    _reduce(this, TRUE);
+    _reduce_bitrate(this, TRUE);
     _change_overused_stage_to(this, STAGE_RELEASED);
     goto done;
   }
@@ -745,6 +737,7 @@ _released_stage(
     _set_pacing_bitrate(this, this->pacing_bitrate * 1.2, TRUE);
     goto done;
   }
+  _reset_monitoring(this);
   _disable_pacing(this);
   _set_adjustment_aim(this, BITRATE_UP);
   _transit_to(this, STATE_STABLE);
@@ -777,11 +770,9 @@ _overused_state(
       goto done;
     }
     if(_discard(this) && _lost(this)){
-      _reduce(this, TRUE);
-      DISABLE_LINE  _undershoot(this, TRUE);
+      _reduce_bitrate(this, TRUE);
     }else{
-      _reduce(this, TRUE);
-      DISABLE_LINE  _undershoot(this, FALSE);
+      _reduce_bitrate(this, TRUE);
     }
     goto done;
   }
@@ -789,31 +780,6 @@ _overused_state(
   //Execute stage
   this->stage(this);
 
-//
-//  if(2. < _corrH(this)){
-//    //the inflection was not happened
-//    if(1. <= _dCorr(this)){
-//      _undershoot(this, TRUE);
-//    }
-//    goto done;
-//  }
-//
-//
-//  if(1.1 < _sCorr(this) || 1.2 < (gdouble)_RR(this) / (gdouble)_SR(this)){
-//    //Too many bytes sent regarding to the sending rate;
-//    //Either we mitigate the bytes must be sent or increase the pacing rate
-//    goto done;
-//  }
-//
-//  if(_mt0(this)->bytes_in_queue){
-//    _set_pacing_bitrate(this, this->pacing_bitrate * 1.2, TRUE);
-//    goto done;
-//  }
-//
-//  _disable_pacing(this);
-//  _add_target_point(this, _RR(this));
-//  _set_adjustment_aim(this, BITRATE_UP);
-//  _transit_to(this, STATE_STABLE);
 done:
   return;
 }
@@ -824,24 +790,26 @@ _stable_state(
 {
   if(_lost(this)){
     if(_rlost(this)){
-      _reduce(this, TRUE);
-      DISABLE_LINE  _undershoot(this, TRUE);
+      _reduce_bitrate(this, TRUE);
       _transit_to(this, STATE_OVERUSED);
     }
     goto done;
   }
   if(_rdiscard(this)){
-    _reduce(this, TRUE);
-    DISABLE_LINE  _undershoot(this, TRUE);
+    _reduce_bitrate(this, TRUE);
     _transit_to(this, STATE_OVERUSED);
     goto done;
   }
   if(_corrH(this) > 1.1){
-    if(_state_t1(this) != STATE_OVERUSED){
-      _reduce(this, TRUE);
-      DISABLE_LINE   _undershoot(this, TRUE);
-      _transit_to(this, STATE_OVERUSED);
+    if(_state_t1(this) == STATE_OVERUSED){
+      goto done;
     }
+    if(_bitrate_aim_t1(this) == BITRATE_UP && _corrH(this) < 1.5){
+      _set_adjustment_aim(this, BITRATE_DOWN);
+      goto done;
+    }
+    _reduce_bitrate(this, TRUE);
+    _transit_to(this, STATE_OVERUSED);
     goto done;
   }
 
@@ -850,7 +818,7 @@ _stable_state(
     goto done;
   }
 
-  if(_mt0(this)->bitrate_aim != BITRATE_UP){
+  if(_bitrate_aim(this) != BITRATE_UP){
     _set_adjustment_aim(this, BITRATE_UP);
     goto done;
   }
@@ -874,8 +842,7 @@ _monitored_state(
     SubflowRateController *this)
 {
   if(_rlost(this) || _rdiscard(this)){
-    _reduce(this, TRUE);
-    DISABLE_LINE  _undershoot(this, TRUE);
+    _reduce_bitrate(this, TRUE);
     _transit_to(this, STATE_OVERUSED);
     goto done;
   }
@@ -885,8 +852,7 @@ _monitored_state(
     goto done;
   }
   if(_corrH(this) > 1.5){
-    _reduce(this, TRUE);
-    DISABLE_LINE _undershoot(this, TRUE);
+    _reduce_bitrate(this, TRUE);
     _transit_to(this, STATE_OVERUSED);
     goto done;
   }
@@ -904,80 +870,41 @@ done:
   return;
 }
 
-void _reduce(SubflowRateController *this, gboolean disable_controlling)
+void _reduce_bitrate(SubflowRateController *this, gboolean disable_controlling)
 {
   gint32 undershoot_rate = 0;
-  if(_state(this) == STATE_OVERUSED){
-    _change_target_bitrate(this, _SR(this) * BETA);
-    _set_pacing_bitrate(this, _SR(this) * BETA, TRUE);
-    goto exit;
+  gint32 new_target, pacing_bitrate;
+
+  if(_state(this) == STATE_OVERUSED || .5 < _discard_rate(this)){
+    new_target = pacing_bitrate = _SR(this) * BETA;
+    goto done;
   }
 
-  _change_target_bitrate(this, _RR(this));
-  undershoot_rate = _mt0(this)->discard * 2;
+  pacing_bitrate = new_target = MIN(_RR(this), _RR_t1(this));
+  undershoot_rate = _mt0(this)->discarded_bits * 2;
   if(undershoot_rate < this->monitored_bitrate){
     undershoot_rate = 0;
     goto done;
   }
-  if(_SR(this) < undershoot_rate){
-    undershoot_rate = _SR(this) * .5;
-    goto done;
-  }
+  pacing_bitrate-=undershoot_rate;
 done:
-  _set_pacing_bitrate(this, _RR(this) - undershoot_rate, TRUE);
-exit:
+  this->last_congestion_point = _RR(this);
+  _change_target_bitrate(this, new_target);
+  _set_pacing_bitrate(this, pacing_bitrate, TRUE);
   _change_overused_stage_to(this, STAGE_RESTRICTED);
   _set_adjustment_aim(this, BITRATE_STAY);
   if(disable_controlling){
     _disable_controlling(this);
   }
-
-  return;
-}
-
-void _undershoot(SubflowRateController *this, gboolean disable_controlling)
-{
-  gint32 dSR = 0; //delta SR;
-//  gint32 TSR = 0; //Target SR;
-  gint32 pGP = 0; //Picked GP
-  gint32 max_dSR, min_dSR;
-  min_dSR = _SR(this) * .1;
-  max_dSR = (_SR(this) + this->monitored_bitrate) * (1.-BETA);
-  //
-  if(_GP_t1(this) < _SR(this)){
-    dSR = _SR(this) - _GP_t1(this);
-    pGP = _GP_t1(this);
-  }else if(_GP(this) < _SR(this)){
-    dSR = _SR(this) - _GP(this);
-    pGP = _GP(this);
-  }else{
-    dSR = .1 * _SR(this);
-  }
-
-  dSR*=2;
-  if(_SR(this) < dSR){
-    if(_state(this) == STATE_OVERUSED){
-      dSR = max_dSR;
-    }else{
-      dSR = 0;
-    }
-  }
-
-  numstracker_reset(this->target_points);
-  if(pGP){
-    _add_target_point(this, pGP);
-  }
-//done:
-  dSR = MAX(min_dSR, MIN(max_dSR, dSR)) + (_TR(this) - _SR(this));
-  _print_undershoot(this, pGP, dSR);
-  _reset_monitoring(this);
-  _set_adjustment_aim(this, BITRATE_STAY);
-//  g_print("Undershooting dSR: %d\n", dSR);
-  _change_target_bitrate(this, -1*dSR);
-  _set_pacing_bitrate(this, _TR(this), TRUE);
-  if(disable_controlling){
-    _disable_controlling(this);
-  }
+  g_print (
+          "############################### S%d Undershooted #######################################\n"
+          "lc_point: %-10d| undershoot rate: %-10d| target rate:   %-10d|\n"
+          "######################################################################################\n",
+          this->id,
+          this->last_congestion_point,
+          undershoot_rate,
+          _TR(this)
+          );
   return;
 }
 
@@ -1291,25 +1218,6 @@ void _print_mupdate_state(SubflowRateController *this)
           this->monitored_bitrate, this->monitoring_interval,
           _maxCorr(this), this->last_congestion_point
 
-          );
-
-  //ToDO: elliminate this
-  if(0 && _monitoring_is_allowed(this)) g_print("HAHA");
-}
-
-
-void _print_undershoot(SubflowRateController *this,
-                       gint32 picked_GP,
-                       gint32 drate)
-{
-  g_print (
-          "############################### S%d Undershooted #######################################\n"
-          "lc_point: %-10d| pickd_GP: %-10d| dRate:   %-10d|\n"
-          "######################################################################################\n",
-          this->id,
-          this->last_congestion_point,
-          picked_GP,
-          drate
           );
 
   //ToDO: elliminate this

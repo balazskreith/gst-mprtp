@@ -42,6 +42,7 @@ struct _SubflowRateController
   gdouble                 delay_fluctuation_avg;
   gdouble                 delay_fluctuation_var_avg;
   gboolean                stabilize;
+  gboolean                extra_added;
   gboolean                steady;
   gboolean                settled;
 

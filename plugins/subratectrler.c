@@ -53,7 +53,7 @@ G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 #define OWD_TARGET_HI 400 * GST_MSECOND
 #define INIT_CWND 500000
 // Max video rampup speed in bps/s (bits per second increase per second)
-#define RAMP_UP_SPEED 200000.0f // bps/s
+#define RAMP_UP_SPEED 100000.0f // bps/s
 //CWND scale factor due to loss event. Default value: 0.6
 #define BETA 0.6
 // Target rate scale factor due to loss event. Default value: 0.8
@@ -68,8 +68,8 @@ G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 #define RAMP_UP_TIME 10000
 //Guard factor against early congestion onset.
 //A higher value gives less jitter possibly at the
-//expense of a lower video bitrate. Default value: 0.0..0.2
-#define PRE_CONGESTION_GUARD 0.0
+//expense of a lower video bitrate. Default value: 0.0..0.95
+#define PRE_CONGESTION_GUARD .0
 //Guard factor against RTP queue buildup. Default value: 0.0..2.0
 #define TX_QUEUE_SIZE_FACTOR 1.0
 
@@ -120,10 +120,12 @@ struct _Moment{
   guint32         lost;
   guint32         discarded_bits;
   gint32          receiver_rate;
+  gint32          dreceiver_rate;
   gint32          sender_rate;
   gint32          goodput;
-  guint32         bytes_newly_acked;
-  guint32         bytes_in_flight_ack;
+  gint32          bytes_newly_acked;
+  gint32          bytes_in_flight_ack;
+  gint32          dbytes_in_flight_ack;
   gint64          bytes_in_flight_ested;
   gdouble         BiF_off;
   guint32         bytes_in_queue;
@@ -182,6 +184,7 @@ static void subratectrler_finalize (GObject * object);
 #define _mt0(this) _get_moment(this, this->moments_index)
 #define _mt1(this) _get_moment(this, _pmtn(this->moments_index))
 #define _mt2(this) _get_moment(this, _pmtn(_pmtn(this->moments_index)))
+#define _mt3(this) _get_moment(this, _pmtn(_pmtn(_pmtn(this->moments_index))))
 
 //FixME: apply trend calculation instead of recent discard
 #define _rdiscard(this) (0 && _mt0(this)->recent_discard)
@@ -206,9 +209,11 @@ static void subratectrler_finalize (GObject * object);
 #define _RR(this) _mt0(this)->receiver_rate
 #define _RR_t1(this) _mt1(this)->receiver_rate
 #define _RR_t2(this) _mt2(this)->receiver_rate
+#define _RR_t3(this) _mt3(this)->receiver_rate
 #define _SR(this) _mt0(this)->sender_rate
 #define _SR_t1(this) _mt1(this)->sender_rate
 #define _SR_t2(this) _mt2(this)->sender_rate
+#define _SR_t3(this) _mt3(this)->sender_rate
 #define _TR(this) this->target_bitrate
 #define _TR_t1(this) this->target_bitrate
 #define _CI(this) _mt0(this)->congestion_indicator
@@ -477,8 +482,8 @@ void subratectrler_set(SubflowRateController *this,
   this->s_rtt = 0.;
   this->min_rate = TARGET_BITRATE_MIN;
   this->max_rate = TARGET_BITRATE_MAX;
-
   _transit_state_to(this, STATE_STABLE);
+  this->disable_controlling = _now(this) + 10 * GST_SECOND;
   THIS_WRITEUNLOCK(this);
 }
 
@@ -619,6 +624,10 @@ void subratectrler_measurement_update(
 //  _mt0(this)->rate_corr            = (gdouble)(_RR(this) ) / (this->s_SR);
 
 //  _mt0(this)->rr_fluctuation      = log(_RR(this)) - log(_RR_t1(this));
+
+  _mt0(this)->dbytes_in_flight_ack = _mt0(this)->bytes_in_flight_ack - _mt1(this)->bytes_in_flight_ack;
+//  _mt0(this)->dbytes_in_flight_ack *=8;
+  _mt0(this)->dreceiver_rate = _mt0(this)->receiver_rate - _mt1(this)->receiver_rate;
   if(1 < this->moments_num)
     this->s_rtt = measurement->RTT * .125 + this->s_rtt * .875;
   else
@@ -850,14 +859,14 @@ _scheck_stage(
 //    goto done;
 //  }
 
-  if((1. < _delcorr2_t1(this) && _delcorr2(this) < 1.) ||
-     (_delcorr2_t1(this) < 1. && 1. < _delcorr2(this))){
+  if(1. < _delcorr2_t1(this) && _delcorr2(this) < 1.){
     _add_congestion_point(this, _SR(this));
     _add_target_point(this, (_SR(this) + _SR_t1(this)) / 2);
   }
 
-  if(1. < _delcorr2(this)){
-    _set_pacing_bitrate(this, _SR(this) * 1.1, TRUE);
+  if(1. < _delcorr2(this) ||  1.1 < _sCorr(this) || _CI(this) < PRE_CONGESTION_GUARD){
+    _set_pacing_bitrate(this, _SR(this)  * 1.2, TRUE);
+    _add_target_point(this, _SR(this));
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
     goto done;
   }
@@ -868,7 +877,7 @@ _scheck_stage(
   }
 
   _set_bitrate_aim(this, BITRATE_SLOW_UP);
-  if(_maxCorr(this) < .9){
+  if(_maxCorr(this) < .9 || 1.1 < _rateCorr(this)){
     goto done;
   }
 
@@ -891,22 +900,30 @@ _mitigate_stage(
 //    _set_bitrate_aim(this, BITRATE_FAST_DOWN);
 //    goto done;
 //  }
-  if(1. < _delcorr2(this)){
+  if(1. < _delcorr2(this) || 1.1 < _sCorr(this) || _CI(this) < PRE_CONGESTION_GUARD){
     if(1.025 < _delcorr2(this)){
       _set_bitrate_aim(this, BITRATE_FAST_DOWN);
     }else{
       _set_bitrate_aim(this, BITRATE_SLOW_DOWN);
     }
+//    _set_pacing_bitrate(this, this->pacing_bitrate * .8, TRUE);
     goto done;
   }
 
-  _set_bitrate_aim(this, BITRATE_SLOW_UP);
+  if(1. < _delcorr2(this)){
+    _set_bitrate_aim(this, BITRATE_SLOW_DOWN);
+  }else{
+    _set_bitrate_aim(this, BITRATE_SLOW_UP);
+  }
   //open it more if we have bytes in the queue
   if(0 < _mt0(this)->bytes_in_queue){
-    _set_pacing_bitrate(this, this->pacing_bitrate * 1.2, TRUE);
+      gdouble pacing_increasement;
+//      pacing_increasement = this->pacing_bitrate + MIN(this->pacing_bitrate * .1, RAMP_UP_SPEED * .2);
+      pacing_increasement = _SR(this) * 1.1;
+    _set_pacing_bitrate(this, pacing_increasement, TRUE);
     goto done;
   }
-
+  _set_bitrate_aim(this, BITRATE_SLOW_UP);
   _disable_pacing(this);
   _switch_stage_to(this, STAGE_SCHECK, TRUE);
   //determine mitigation speed
@@ -926,13 +943,21 @@ _mcheck_stage(
      goto stabilize;
   }
 
-  if(1. < _corrH(this) || 1.01 < _delcorr2(this)){
+  if(1. < _corrH(this) || 1. < _delcorr2(this)){
     _add_congestion_point(this, _SR(this));
     _set_bitrate_aim(this, BITRATE_FAST_DOWN);
     ++this->monitoring_interval;
     goto stabilize;
   }
 
+  if(_CI(this) < PRE_CONGESTION_GUARD){
+    _add_congestion_point(this, _SR(this));
+    _set_bitrate_aim(this, BITRATE_FAST_DOWN);
+    ++this->monitoring_interval;
+    goto stabilize;
+  }
+
+  this->extra_added = FALSE;
   _switch_stage_to(this, STAGE_RAISE, TRUE);
   goto done;
 stabilize:
@@ -951,17 +976,23 @@ _raise_stage(
 //    _switch_stage_to(this, STAGE_MITIGATE, TRUE);
 //    goto done;
 //  }
-
-  _add_target_point(this, MIN(_SR(this), _TR(this)) + this->monitored_bitrate);
+  if(this->extra_added){
+    this->extra_added = FALSE;
+    this->stabilize = TRUE;
+  }else{
+    _add_target_point(this, MIN(_SR(this), _TR(this)) + this->monitored_bitrate);
+    _disable_monitoring(this);
+    this->extra_added = TRUE;
+  }
   //determine raising speed
-  if(1. < _delcorr2(this)){
+  if(0. < this->BiF_off_avg){
     _set_bitrate_aim(this, BITRATE_SLOW_UP);
   }else{
     _set_bitrate_aim(this, BITRATE_FAST_UP);
   }
 
   //check weather we reached the maximum target
-  this->stabilize = TRUE;
+
 //done:
   return;
 }
@@ -1219,7 +1250,9 @@ gdouble _adjust_bitrate(SubflowRateController *this)
   gdouble drate = 0; //delta rate
   gdouble actual_rate, target_rate;
   gdouble speed = 1.;
+  gdouble max_increasement = RAMP_UP_SPEED * .25;
   gdouble min_target_rate, max_target_rate;
+
   max_target_rate = MAX(this->min_target_point * 1.1, this->max_target_point);
   min_target_rate = MIN(this->max_target_point * .9, this->min_target_point);
 
@@ -1267,7 +1300,7 @@ gdouble _adjust_bitrate(SubflowRateController *this)
   drate *= speed;
   drate *= (1 - MAX(-.1, MIN(.1, this->BiF_off_avg)));
 //  g_print("dRate * correction %f = %f\n", (1 - MAX(-.1, MIN(.1, this->BiF_off_avg))), drate);
-
+  drate = MIN(max_increasement, drate);
   return actual_rate + drate;
 }
 
@@ -1414,62 +1447,76 @@ gdouble _get_off_target(SubflowRateController *this)
 void _calculate_congestion_indicator(SubflowRateController *this)
 {
   gdouble ci;
-  gdouble rr_delay_cc, rr_delay_cc_abs, rr_delay_cc_norm; //crosscorrelation between RR and delay
-  gdouble BiF_delay_cc, BiF_delay_cc_abs, BiF_delay_cc_norm; //crosscorrelation between BiF and delay
+  gdouble x1,x2,x3,y1,y2,y3;
+  gdouble w1,w2,w3;
+//  gdouble rr_delay_cc, rr_delay_cc_abs, rr_delay_cc_norm; //crosscorrelation between RR and delay
+//  gdouble BiF_delay_cc, BiF_delay_cc_abs, BiF_delay_cc_norm; //crosscorrelation between BiF and delay
 
-  gdouble rr_BiF_abs, rr_BiF_norm;
+  gdouble cc_abs, cc_norm,cc;
+  w1 = .5; w2 = .25; w3 = .25;
+  //  x1 = w1 * _mt0(this)->BiF_corr;
+  //  x2 = w2 * _mt1(this)->BiF_corr;
+  //  x3 = w3 * _mt2(this)->BiF_corr;
+//  x1 = w1 * (log(_SR(this)) - log(_SR_t1(this)));
+//  x2 = w2 * (log(_SR_t1(this)) - log(_SR_t2(this)));
+//  x3 = w3 * (log(_SR_t2(this)) - log(_SR_t3(this)));
+  x1 = w1 * (gdouble)_SR(this);
+  x2 = w2 * (gdouble)_SR_t1(this);
+  x3 = w3 * (gdouble)_SR_t2(this);
+//  x1 = w1 * _mt0(this)->sender_rate;
+//  x2 = w2 * _mt1(this)->sender_rate;
+//  x3 = w3 * _mt2(this)->sender_rate;
+  //  y1 = w1 * _mt0(this)->receiver_rate;
+  //  y2 = w2 * _mt1(this)->receiver_rate;
+  //  y3 = w3 * _mt2(this)->receiver_rate;
+//  y1 = w1 /_rateCorr(this);
+//  y2 = w2 / _rateCorr_t1(this);
+//  y3 = w3 / _rateCorr_t2(this);
+  //  y1 = w1 * (log(_RR(this)) - log(_RR_t1(this)));
+  //  y2 = w2 * (log(_RR_t1(this)) - log(_RR_t2(this)));
+  //  y3 = w3 * (log(_RR_t2(this)) - log(_RR_t3(this)));
+    y1 = w1 * (gdouble)_RR(this);
+    y2 = w2 * (gdouble)_RR_t1(this);
+    y3 = w3 * (gdouble)_RR_t2(this);
 
-  rr_BiF_abs  = _RR(this) * _BiF(this);
-  rr_BiF_abs += _RR_t1(this) * _BiF_t1(this);
-  rr_BiF_abs += _RR_t2(this) * _BiF_t2(this);
-  rr_BiF_abs /= 3.;
-
-  rr_BiF_norm  = _RR(this) + _RR_t1(this) + _RR_t2(this);
-  rr_BiF_norm *= _BiF(this) + _BiF_t1(this) + _BiF_t2(this);
-  rr_BiF_norm /= 9.;
-
-  rr_delay_cc_abs /= 3.;
-
-  rr_delay_cc_norm = _rateCorr(this) + _rateCorr_t1(this) + _rateCorr_t2(this);
-  rr_delay_cc_norm *= _delcorr(this) + _delcorr_t1(this) + _delcorr_t2(this);
-  rr_delay_cc_norm /= 9.;
-  rr_delay_cc = rr_delay_cc_abs / rr_delay_cc_norm - 1.;
-
-  BiF_delay_cc_abs =  _BiFCorr(this) * _delcorr(this);
-  BiF_delay_cc_abs += _BiFCorr_t1(this) * _delcorr_t1(this);
-  BiF_delay_cc_abs += _BiFCorr_t2(this) * _delcorr_t2(this);
-  BiF_delay_cc_abs /= 3.;
-
-  BiF_delay_cc_norm = _BiFCorr(this) + _BiFCorr_t1(this) + _BiFCorr_t2(this);
-  BiF_delay_cc_norm *= _delcorr(this) + _delcorr_t1(this) + _delcorr_t2(this);
-  BiF_delay_cc_norm /= 9.;
-  BiF_delay_cc = rr_delay_cc_abs / rr_delay_cc_norm - 1.;
-
-  ci = fabs(rr_delay_cc) * 100. + fabs(BiF_delay_cc) * 100.;
+//  cc_abs = x1 * y1 + x2 * y2 + x3 * y3;
+//
+//  cc_norm = x1 * x1 + x2 * x2 + x3 * x3;
+//  cc_norm *= y1 * y1 + y2 * y2 + y3 * y3;
+//  cc_norm = sqrt(cc_norm);
+  cc_abs = y1 + y2 + y3;
+  cc_norm = x1 + x2 + x3;
+  cc = cc_abs / cc_norm;
+  ci = 0. != cc_norm ? cc : 1.;
 
   //congestion indicator is a value btw -1 and 1.
   //crosscorrelation btw rr and delay
 
-//  g_print (
-//            "################### S%d | Congestion Indicator #################\n"
-//            "cc_abs:   %-10.3f| cc_norm: %-10.3f| cc:      %-10.3f| <- Delay and RR\n"
-//            "cc_abs:   %-10.3f| cc_norm: %-10.3f| cc:      %-10.3f| <- Delay and BiF\n"
-//            "ci:   %-10.3f|\n"
-//            "#####################################################################\n",
-//            this->id,
-//
-//            rr_delay_cc_abs, rr_delay_cc_norm, rr_delay_cc,
-//
-//            BiF_delay_cc_abs, BiF_delay_cc_norm, BiF_delay_cc,
-//
-//            ci
-//          );
-  if(_CI_t1(this) * 2. < ci) ci+=.1;
+  g_print (
+            "################### S%d | Congestion Indicator #################\n"
+      "dBiF0:   %-10d| dBif1:   %-10d| dBif2:   %-10d| abs:  %-10.3f\n"
+      "dRR0:    %-10d| dRR1:    %-10d| dRR2:    %-10d| norm: %-10.3f\n"
+      "ci:      %-10.3f|\n"
+            "#####################################################################\n",
+            this->id,
+            _mt0(this)->dbytes_in_flight_ack,
+            _mt1(this)->dbytes_in_flight_ack,
+            _mt2(this)->dbytes_in_flight_ack,
+            cc_abs,
 
-  if(!_get_congestion_pont(this)) ci/=2;
+            _mt0(this)->dreceiver_rate,
+            _mt1(this)->dreceiver_rate,
+            _mt2(this)->dreceiver_rate,
+            cc_norm,
 
-done:
-  ci = MIN(1.,MAX(-1.,ci));
+            ci
+
+          );
+//  if(_CI_t1(this) * 2. < ci) ci+=.1;
+
+//  if(!_get_congestion_pont(this)) ci/=2;
+
+//  ci = MIN(1.,MAX(-1.,ci));
   _CI(this) = ci;
 }
 //

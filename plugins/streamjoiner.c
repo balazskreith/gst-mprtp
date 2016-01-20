@@ -315,14 +315,14 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
   Subflow *subflow;
   guint64 latency;
   THIS_WRITELOCK(this);
-//  g_print("Receive a packet with timestamp: %u\n", gst_mprtp_ptr_buffer_get_timestamp(mprtp));
-  abs_seq = gst_mprtp_buffer_get_abs_seq(mprtp);
-  subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (mprtp->subflow_id));
-//  g_print("%d|", this->monitor_payload_type);
   if(!GST_IS_BUFFER(mprtp->buffer)){
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
     goto done;
   }
+//  g_print("Receive a packet with timestamp: %u\n", gst_mprtp_ptr_buffer_get_timestamp(mprtp));
+  abs_seq = gst_mprtp_buffer_get_abs_seq(mprtp);
+  subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (mprtp->subflow_id));
+//  g_print("%d|", this->monitor_payload_type);
   if(gst_mprtp_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
     subflow->monitored_bytes += mprtp->payload_bytes;
     //now drop it;
@@ -448,6 +448,16 @@ stream_joiner_get_monitored_bytes(StreamJoiner *this, guint8 subflow_id)
   result = subflow->monitored_bytes;
   THIS_READUNLOCK(this);
   return result;
+}
+
+void
+stream_joiner_get_stats(StreamJoiner *this,
+                        gdouble *latency)
+{
+  THIS_READLOCK(this);
+  if(latency) *latency = this->latency;
+
+  THIS_READUNLOCK(this);
 }
 
 void

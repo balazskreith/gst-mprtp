@@ -34,9 +34,16 @@ struct _SubflowRateController
   guint8                   id;
   MPRTPSPath*              path;
   gboolean                 path_is_paced;
+//  gdouble                  pace_factor;
 
   gint32                   monitored_bitrate;
   gint32                   target_bitrate;
+
+  gdouble                 delay_fluctuation_avg;
+  gdouble                 delay_fluctuation_var_avg;
+  gboolean                stabilize;
+  gboolean                steady;
+  gboolean                settled;
 
   guint                    overusing_indicator;
   GstClockTime             disable_controlling;
@@ -56,12 +63,14 @@ struct _SubflowRateController
 
   gint32                   last_congestion_point;
 
+  GstClockTime             setup_time;
+
   //Need for monitoring
   guint                    monitoring_interval;
   GstClockTime             monitoring_started;
 
   SubRateProc              controller;
-  SubRateProc              stage;
+  SubRateProc              action;
 
   guint8*                  moments;
   gint                     moments_index;
@@ -125,12 +134,16 @@ void subratectrler_set(SubflowRateController *this,
                               MPRTPSPath *path,
                               guint32 sending_target);
 void subratectrler_unset(SubflowRateController *this);
+
 void subratectrler_extract_stats(SubflowRateController *this,
-                                  guint64 *median_delay,
-                                  gint32  *sender_rate,
-                                  gdouble *target_rate,
-                                  gdouble *goodput,
-                                  gdouble *next_target);
+                                  gint32 *sender_bitrate,
+                                  gint32 *goodput,
+                                  gint32  *monitored_bits,
+                                  gint32 *target_bitrate,
+                                  guint32 *queued_bits,
+                                  guint64 *target_delay,
+                                  guint64 *ltt80th_delay,
+                                  guint64 *recent_delay);
 void subratectrler_time_update(
                          SubflowRateController *this,
                          gint32 *target_bitrate,

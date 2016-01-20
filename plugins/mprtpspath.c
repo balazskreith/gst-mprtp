@@ -577,7 +577,7 @@ void mprtps_path_clear_queue(MPRTPSPath *this)
   THIS_WRITEUNLOCK(this);
 }
 
-guint32 mprtps_path_get_sender_rate(MPRTPSPath *this)
+guint32 mprtps_path_get_sent_bytes_in1s(MPRTPSPath *this)
 {
   gint64 result;
   THIS_READLOCK(this);
@@ -765,7 +765,7 @@ guint32 _pacing(MPRTPSPath * this)
 {
   GstBuffer *buffer;
   guint32 sent_payload_bytes = 0, payload_bytes = 0;
-  gdouble pace_interval;
+//  gdouble pace_interval;
   gdouble pacing_bitrate = this->pacing_bitrate;
   guint32 pacing_tick = MIN_PACE_INTERVAL;
   guint32 bytes_in_queue;
@@ -780,10 +780,13 @@ again:
   buffer = packetssndqueue_pop(this->packetsqueue);
   _refresh_stat(this, buffer);
   this->send_mprtp_packet_func(this->send_mprtp_func_data, buffer);
+  //flushing
   sent_payload_bytes+=payload_bytes;
-  pace_interval = (gdouble)(sent_payload_bytes * 8000) / (gdouble)pacing_bitrate;
+//  pace_interval = (gdouble)(sent_payload_bytes * 8000) / (gdouble)pacing_bitrate;
 //  g_print("Pace interval: %f\n", pace_interval);
-  if(!this->pacing && pace_interval <= 1.){
+
+  //flushing
+  if(!this->pacing){
     goto again;
   }
   pacing_tick = MAX(MIN_PACE_INTERVAL, (gdouble)(sent_payload_bytes * 8) / (gdouble)pacing_bitrate * 1000.);

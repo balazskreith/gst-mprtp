@@ -45,20 +45,17 @@ typedef struct _SessionData
   GstElement *input;
 } SessionData;
 
+typedef struct _TestParams{
+  gboolean subflow1_active;
+  gboolean subflow2_active;
+}TestParams;
 
-static gint32 subflow1_max_rate = 0;
-static gint32 subflow1_shareability = 0;
-static gint32 subflow2_max_rate = 0;
-static gint32 subflow2_shareability = 0;
+static TestParams test_parameters_;
 static gint32 profile;
 
 static GOptionEntry entries[] =
 {
-  { "profile", 0, 0, G_OPTION_ARG_INT, &profile, "Argument", NULL },
-  { "sub1-max-rate", 0, 0, G_OPTION_ARG_INT, &subflow1_max_rate, "Argument", NULL },
-  { "sub2-max-rate", 0, 0, G_OPTION_ARG_INT, &subflow2_max_rate, "Argument", NULL },
-  { "sub1-bw-sharing", 0, 0, G_OPTION_ARG_INT, &subflow1_shareability, "Argument", NULL },
-  { "sub2-bw-sharing", 0, 0, G_OPTION_ARG_INT, &subflow2_shareability, "Argument", NULL },
+  { "profile", 0, 0, G_OPTION_ARG_INT, &profile, "Profile", NULL },
   { NULL }
 };
 
@@ -193,20 +190,6 @@ request_aux_sender (GstElement * rtpbin, guint sessid, SessionData * session)
   return bin;
 }
 
-typedef struct _Identities
-{
-  GstElement *mprtpsch;
-  GstElement *netsim_s1;
-  GstElement *netsim_s2;
-  guint silence;
-  guint called;
-  gchar filename[255];
-  FILE * fp;
-  char * line;
-  size_t len;
-  ssize_t read;
-} Identities;
-
 #define print_boundary(text) g_printf("------------------------------ %s ---------------------\n", text);
 #define print_command(str,...) g_printf("[CMD] "str"\n",__VA_ARGS__)
 
@@ -251,14 +234,8 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   GstElement *mprtpsnd = gst_element_factory_make ("mprtpsender", NULL);
   GstElement *mprtprcv = gst_element_factory_make ("mprtpreceiver", NULL);
   GstElement *mprtpsch = gst_element_factory_make ("mprtpscheduler", NULL);
-  Identities *ids = g_malloc0 (sizeof (Identities));
   int basePort;
   gchar *padName;
-
-  ids->mprtpsch = mprtpsch;
-//  ids->netsim_s1 = identity_1;
-//  ids->netsim_s2 = identity_2;
-  ids->called = 0;
 
   basePort = 5000 + (session->sessionNum * 20);
 
@@ -269,9 +246,6 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   /* enable retransmission by setting rtprtxsend as the "aux" element of rtpbin */
   g_signal_connect (rtpBin, "request-aux-sender",
       (GCallback) request_aux_sender, session);
-
-//  g_signal_connect (mprtpsch, "mprtp-subflows-utilization",
-//      (GCallback) mprtp_subflows_utilization, NULL);
 
   g_signal_connect (mprtpsch, "mprtp-subflows-utilization",
       (GCallback) changed_event, NULL);
@@ -302,31 +276,20 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   gst_element_link_pads (rtpBin, padName, mprtpsch, "rtp_sink");
   gst_element_link_pads (mprtpsch, "mprtp_src", mprtpsnd, "mprtp_sink");
   g_free (padName);
-  /* link rtpbin to udpsink directly here if you don't want
-   * artificial packet loss */
-//  gst_element_link_pads (mprtpsnd, "src_1", identity_1, "sink");
-  //  gst_element_link (identity_1, rtpSink_1);
   gst_element_link_pads (mprtpsnd, "src_1", rtpSink_1, "sink");
 
-//  gst_element_link_pads (mprtpsnd, "src_2", identity_2, "sink");
-//  gst_element_link (identity_2, rtpSink_2);
   gst_element_link_pads (mprtpsnd, "src_2", rtpSink_2, "sink");
 
   g_object_set (mprtpsch, "join-subflow", 1, NULL);
 //  g_object_set (mprtpsch, "join-subflow", 2, NULL);
 
-//  sprintf(ids->filename, "%s", file);
-//  g_timeout_add (1000, _network_changes, ids);
-
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");
   g_free (padName);
 
-
   padName = g_strdup_printf ("recv_rtcp_sink_%u", session->sessionNum);
   gst_element_link_pads (rtpSrc_1, "src", mprtprcv, "sink_1");
   gst_element_link_pads (rtpSrc_2, "src", mprtprcv, "sink_2");
-  //gst_element_link_pads(mprtprecv, "rtcp_src", rtpBin, padName);
   gst_element_link_pads (mprtprcv, "mprtcp_rr_src", mprtpsch, "mprtcp_rr_sink");
   gst_element_link_pads (mprtpsch, "mprtcp_sr_src", mprtpsnd, "mprtcp_sr_sink");
   gst_element_link_pads (rtcpSrc, "src", rtpBin, padName);
@@ -338,7 +301,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   session_unref (session);
 }
 
-
+static void _setup_test_params(guint profile);
 
 int
 main (int argc, char **argv)
@@ -359,29 +322,7 @@ main (int argc, char **argv)
 //  g_option_context_add_group (context, gtk_get_option_group (TRUE));
 //  gst_init (&argc, &argv);
   g_option_context_parse (context, &argc, &argv, &error);
-  if(profile==0){
-      subflow1_max_rate = 0;
-      subflow2_max_rate = 0;
-      subflow1_shareability = 0;
-      subflow2_shareability = 0;
-  }else if(profile==1){
-      subflow1_max_rate = 0;
-      subflow2_max_rate = 0;
-      subflow1_shareability = 1;
-      subflow2_shareability = 1;
-  }else if(profile==2){
-      subflow1_max_rate = 0;
-      subflow2_max_rate = 64000;
-      subflow1_shareability = 0;
-      subflow2_shareability = 0;
-  }else if(profile==3){
-      subflow1_max_rate = 0;
-      subflow2_max_rate = 64000;
-      subflow1_shareability = 0;
-      subflow2_shareability = 1;
-  }
-  g_print("--------------------- %d-%d-%d-%d---------------\n",
-          subflow1_max_rate, subflow1_shareability, subflow2_max_rate, subflow2_shareability);
+  _setup_test_params(profile);
   gst_init (NULL, NULL);
 
   loop = g_main_loop_new (NULL, FALSE);
@@ -414,4 +355,21 @@ main (int argc, char **argv)
   g_main_loop_unref (loop);
 
   return 0;
+}
+
+
+void _setup_test_params(guint profile)
+{
+  g_print("Selected test profile: %d\n", profile);
+  switch(profile){
+    case 1:
+    g_print("Congestion control test "
+            "with fixed bandwidth, no limitation\n");
+    test_parameters_.subflow1_active = TRUE;
+    test_parameters_.subflow2_active = FALSE;
+    break;
+    default:
+      g_print("Profile was not recognized for testing.\n");
+      break;
+  }
 }

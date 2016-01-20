@@ -258,6 +258,7 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
   element_class->query = GST_DEBUG_FUNCPTR (gst_mprtpplayouter_query);
 }
 
+
 static void
 gst_mprtpplayouter_init (GstMprtpplayouter * this)
 {

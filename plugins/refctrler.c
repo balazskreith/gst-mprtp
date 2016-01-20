@@ -360,7 +360,11 @@ refctrler_init (RcvEventBasedController * this)
 
 }
 
-static FILE *file = NULL;
+static gboolean file_init = FALSE;
+static gchar file_names[10][255];
+static FILE *files[10];
+static FILE *main_file = NULL;
+
 void
 refctrler_stat_run (void *data)
 {
@@ -369,19 +373,36 @@ refctrler_stat_run (void *data)
   GHashTableIter iter;
   gpointer key, val;
   Subflow *subflow;
-  guint32 monitored_bytes;
-  gdouble goodput;
+  gdouble latency;
   GstClockTime next_scheduler_time;
+  FILE *file;
+
   this = data;
   THIS_WRITELOCK (this);
-  if(!file) file=fopen("refctrler.log", "w");
-  else      file=fopen("refctrler.log", "a");
+
+  if(!this->joiner) goto done;
+
+  if(!file_init){
+    gint i = 0;
+    for(i=0; i<10; ++i) {
+        files[i] = NULL;
+        sprintf(file_names[i], "sub_%d_rcv.csv", i);
+    }
+    file_init = TRUE;
+  }
+
+  if( !main_file) main_file=fopen("sub_rcv_sum.csv", "w");
+  else main_file=fopen("sub_rcv_sum.csv", "a");
+
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     guint32 rcvd_bytes;
     guint32 discarded_bytes;
-    GstClockTime min_delay, max_delay;
     subflow = (Subflow *) val;
+    if( !files[subflow->id]) files[subflow->id]=fopen(file_names[subflow->id], "w");
+    else files[subflow->id]=fopen(file_names[subflow->id], "a");
+
+    file = files[subflow->id];
 
     discarded_bytes = subflow->discarded_bytes;
     rcvd_bytes = subflow->rcvd_bytes;
@@ -399,28 +420,27 @@ refctrler_stat_run (void *data)
 
     mprtpr_path_get_XROWD_stats(subflow->path,
                                 &subflow->estimated_delay,
-                                &min_delay,
-                                &max_delay);
+                                NULL,
+                                NULL);
 
-    monitored_bytes = stream_joiner_get_monitored_bytes(this->joiner, subflow->id);
     rcvd_bytes = subflow->rcvd_bytes - rcvd_bytes;
     discarded_bytes = subflow->discarded_bytes - discarded_bytes;
-    goodput = (gdouble) (rcvd_bytes - discarded_bytes);
 
-    fprintf(file,"%d,%u,%lu,%lu,%lu,%u,%u,%f,%u,",
-            subflow->id,
-            subflow->jitter,
+    fprintf(file,"%u,%u,%lu,%u\n",
+            rcvd_bytes * 8,
+            discarded_bytes * 8,
             subflow->estimated_delay,
-            min_delay,
-            max_delay,
-            rcvd_bytes/125,
-            discarded_bytes/125,
-            goodput/125,
-            (monitored_bytes - subflow->monitored_bytes)/125);
-    subflow->monitored_bytes = monitored_bytes;
+            subflow->jitter);
+
+    fclose(file);
   }
-  fprintf(file, "|\n");
-  fclose(file);
+
+  stream_joiner_get_stats(this->joiner, &latency);
+  fprintf(main_file,"%f\n", latency);
+
+  fclose(main_file);
+
+done:
   THIS_WRITEUNLOCK(this);
 
   next_scheduler_time = gst_clock_get_time(this->sysclock) + 1000 * GST_MSECOND;

@@ -398,8 +398,9 @@ sefctrler_init (SndEventBasedController * this)
 
 }
 
-
-static FILE *file = NULL;
+static gboolean file_init = FALSE;
+static gchar file_names[10][255];
+static FILE *files[10], *main_file = NULL;
 void
 sefctrler_stat_run (void *data)
 {
@@ -409,45 +410,74 @@ sefctrler_stat_run (void *data)
   gpointer key, val;
   Subflow *subflow;
   GstClockTime next_scheduler_time;
-  guint64 th80_delay;
-  gint32 sender_rate;
-  gdouble media_target = 0.;
+//  gdouble media_target = 0.;
+  FILE *file = NULL;
+  gint32 sender_bitrate;
+  gint32 goodput;
+  gint32 monitored_bits;
+  gint32 target_bitrate;
+  guint32 queued_bits;
+  guint64 target_delay;
+  guint64 ltt80th_delay;
+  guint64 recent_delay;
 
   this = data;
   THIS_WRITELOCK (this);
-  if(!file) file=fopen("sefctrler.log", "w");
-  else      file=fopen("sefctrler.log", "a");
+  if(!file_init){
+    gint i = 0;
+    for(i=0; i<10; ++i) {
+        files[i] = NULL;
+        sprintf(file_names[i], "sub_%d_snd.csv", i);
+    }
+    file_init = TRUE;
+  }
+
+  if( !main_file) main_file=fopen("sub_snd_sum.csv", "w");
+  else main_file=fopen("sub_snd_sum.csv", "a");
+
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) &key, (gpointer) & val)) {
-    gdouble target_rate = 0., goodput, next_target;
     subflow = (Subflow *) val;
     if(!subflow) goto next;
-    ;
-    subratectrler_extract_stats(subflow->rate_controller,
-                                &th80_delay,
-                                &sender_rate,
-                                &target_rate,
-                                &goodput,
-                                &next_target);
+    if( !files[subflow->id]) files[subflow->id]=fopen(file_names[subflow->id], "w");
+    else files[subflow->id]=fopen(file_names[subflow->id], "a");
 
-    fprintf(file, "%d,%d,%lu,%lu,%f,%f,%f,%f,",
-            subflow->id,
-            sender_rate,
-            th80_delay,
-            _irt0(subflow)->recent_delay,
-            target_rate/125.,
-            next_target/125.,
-            _irt0(subflow)->receiver_rate / 125.,
-            _irt0(subflow)->late_discarded_bytes / 125.);
+    file = files[subflow->id];
+    ;
+
+    subratectrler_extract_stats(subflow->rate_controller,
+                                      &sender_bitrate,
+                                      &goodput,
+                                      &monitored_bits,
+                                      &target_bitrate,
+                                      &queued_bits,
+                                      &target_delay,
+                                      &ltt80th_delay,
+                                      &recent_delay);
+
+    fprintf(file, "%d,%d,%d,%d,%d,%lu,%lu,%lu\n",
+            sender_bitrate,
+            goodput,
+            monitored_bits,
+            target_bitrate,
+            queued_bits,
+            target_delay,
+            ltt80th_delay,
+            recent_delay);
+//    fprintf(file, "%f,%f,",
+//            media_target / 125.,
+//            stream_splitter_get_media_rate(this->splitter) / 125.);
+//    fprintf(file, "|\n");
+    fclose(file);
 //
   next:
     continue;
   }
-  fprintf(file, "%f,%f,",
-          media_target / 125.,
-          stream_splitter_get_media_rate(this->splitter) / 125.);
-  fprintf(file, "|\n");
-  fclose(file);
+
+  fprintf(main_file,"%f\n", 0.);
+
+  fclose(main_file);
+
   THIS_WRITEUNLOCK(this);
 
   next_scheduler_time = gst_clock_get_time(this->sysclock) + GST_SECOND;

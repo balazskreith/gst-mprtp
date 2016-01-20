@@ -94,6 +94,11 @@ stream_joiner_set_monitor_payload_type(
     guint8 monitor_payload_type);
 
 void
+stream_joiner_get_stats(
+    StreamJoiner *this,
+    gdouble *latency);
+
+void
 stream_joiner_set_playout_halt_time(
     StreamJoiner *this,
     GstClockTime halt_time);

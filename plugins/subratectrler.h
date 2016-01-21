@@ -38,6 +38,7 @@ struct _SubflowRateController
 
   gint32                   monitored_bitrate;
   gint32                   target_bitrate;
+  gboolean                 bitrate_aim_is_reached;
 
   gdouble                 delay_fluctuation_avg;
   gdouble                 delay_fluctuation_var_avg;
@@ -70,8 +71,9 @@ struct _SubflowRateController
   guint                    monitoring_interval;
   GstClockTime             monitoring_started;
 
-  SubRateProc              controller;
-  SubRateProc              action;
+  SubRateProc              state_controller;
+  SubRateProc              state_action;
+  SubRateProc              rate_controller;
 
   guint8*                  moments;
   gint                     moments_index;
@@ -109,6 +111,7 @@ struct _SubflowRateController
   gint                     cwnd_min;
   //COngestion window
   gint                     pacing_bitrate;
+  gboolean                 init_rate_ctrler;
   //Congestion window inflection point. Initial value: 1
   gint                     cwnd_i;
   GstClockTime             last_congestion_detected;

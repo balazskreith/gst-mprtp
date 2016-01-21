@@ -122,6 +122,9 @@ struct _Moment{
   gint32          receiver_rate;
   gint32          dreceiver_rate;
   gint32          sender_rate;
+  gint32          dsender_rate;
+  gint32          incoming_rate;
+  gint32          dincoming_rate;
   gint32          goodput;
   gint32          bytes_newly_acked;
   gint32          bytes_in_flight_ack;
@@ -137,13 +140,11 @@ struct _Moment{
   gboolean        path_is_slow;
 
   //derivatives
-  guint32         receiver_rate_std;
   gdouble         discard_rate;
   gdouble         corrh_owd;
 //  gdouble         rate_corr;
   gdouble         del_corr;
 //  gdouble         BiF_off_target;
-  gboolean        can_bitrate_increase;
   gdouble         off_target;
   BitrateAim      bitrate_aim;
   //OWD trend indicates incipient congestion. Initial value: 0.0
@@ -214,6 +215,7 @@ static void subratectrler_finalize (GObject * object);
 #define _SR_t1(this) _mt1(this)->sender_rate
 #define _SR_t2(this) _mt2(this)->sender_rate
 #define _SR_t3(this) _mt3(this)->sender_rate
+#define _dSR(this) _mt0(this)->dsender_rate
 #define _TR(this) this->target_bitrate
 #define _TR_t1(this) this->target_bitrate
 #define _CI(this) _mt0(this)->congestion_indicator
@@ -249,6 +251,10 @@ _m_step(
 
 static void
 _update_bitrate(
+    SubflowRateController *this);
+
+static void
+_update_cwnd(
     SubflowRateController *this);
 
 static void
@@ -506,7 +512,7 @@ void subratectrler_extract_stats(SubflowRateController *this,
                                   guint64 *recent_delay)
 {
   if(sender_bitrate){
-    *sender_bitrate = mprtps_path_get_sent_bytes_in1s(this->path) * 8;
+    *sender_bitrate = mprtps_path_get_sent_bytes_in1s(this->path, NULL) * 8;
   }
   if(goodput){
     *goodput = _mt0(this)->goodput * 8.;
@@ -538,8 +544,15 @@ void subratectrler_time_update(
                          UtilizationSubflowReport *rep)
 {
 
+  gint32 new_sender_rate;
+  guint32 new_incoming_rate;
+  new_sender_rate = mprtps_path_get_sent_bytes_in1s(this->path, &new_incoming_rate) * 8;
+  new_incoming_rate *= 8;
 
-  _mt0(this)->sender_rate         = mprtps_path_get_sent_bytes_in1s(this->path) * 8;
+  _mt0(this)->dsender_rate        = new_sender_rate - _mt0(this)->sender_rate;
+  _mt0(this)->sender_rate         = new_sender_rate;
+  _mt0(this)->dincoming_rate      = new_incoming_rate - _mt0(this)->incoming_rate;
+  _mt0(this)->incoming_rate       = new_incoming_rate;
   _mt0(this)->bytes_in_queue      = mprtps_path_get_bytes_in_queue(this->path);
 
   if(this->moments_num == 0){
@@ -568,6 +581,7 @@ void subratectrler_time_update(
   }
 
   _update_bitrate(this);
+  DISABLE_LINE _update_cwnd(this);
 
   if(rep){
     rep->lost_bytes = _mt0(this)->lost;
@@ -690,8 +704,6 @@ void subratectrler_measurement_update(
 
   if(!_mt0(this)->ltt_delays_th) _mt0(this)->ltt_delays_th = OWD_TARGET_HI;
   _mt0(this)->corrh_owd = (gdouble)_mt0(this)->recent_delay / (gdouble)_mt0(this)->ltt_delays_th;
-  _mt0(this)->can_bitrate_increase = _mt0(this)->state != STATE_OVERUSED;
-  _mt0(this)->can_bitrate_increase &= this->target_bitrate < _mt0(this)->receiver_rate * 1.1;
 
   _mt0(this)->off_target = _get_off_target(this);
 
@@ -775,6 +787,13 @@ exit:
   return;
 }
 
+void
+_update_cwnd(
+    SubflowRateController *this)
+{
+
+}
+
 
 void
 _restricted_stage(
@@ -853,11 +872,6 @@ _scheck_stage(
     SubflowRateController *this)
 {
   //check signs of congestion
-//  if(.1 < _CI(this)){
-//    _set_pacing_bitrate(this, _SR(this) * 1.1, TRUE);
-//    _switch_stage_to(this, STAGE_MITIGATE, TRUE);
-//    goto done;
-//  }
 
   if(1. < _delcorr2_t1(this) && _delcorr2(this) < 1.){
     _add_congestion_point(this, _SR(this));
@@ -876,16 +890,14 @@ _scheck_stage(
     goto done;
   }
 
-  _set_bitrate_aim(this, BITRATE_SLOW_UP);
+  DISABLE_LINE _set_bitrate_aim(this, BITRATE_SLOW_UP);
   if(_maxCorr(this) < .9 || 1.1 < _rateCorr(this)){
     goto done;
   }
 
-  this->steady = TRUE;
-  //check fluctuation
-//  if(.05 < this->delay_fluctuation_var_avg){
-//    goto done;
-//  }
+  DISABLE_LINE this->steady = TRUE;
+  _set_pacing_bitrate(this, this->target_bitrate, TRUE);
+
 
 done:
   return;
@@ -896,10 +908,6 @@ _mitigate_stage(
     SubflowRateController *this)
 {
   //check signs of congestion
-//  if(.1 < _CI(this)){
-//    _set_bitrate_aim(this, BITRATE_FAST_DOWN);
-//    goto done;
-//  }
   if(1. < _delcorr2(this) || 1.1 < _sCorr(this) || _CI(this) < PRE_CONGESTION_GUARD){
     if(1.025 < _delcorr2(this)){
       _set_bitrate_aim(this, BITRATE_FAST_DOWN);
@@ -1057,10 +1065,10 @@ _stable_state(
   this->action(this);
   if(this->steady){
     this->steady = FALSE;
-    _setup_monitoring(this);
-    _add_target_point(this, _SR(this));
-    _set_bitrate_aim(this, BITRATE_SLOW_UP);
-    _transit_state_to(this, STATE_MONITORED);
+    DISABLE_LINE _setup_monitoring(this);
+    DISABLE_LINE _add_target_point(this, _SR(this));
+    DISABLE_LINE _set_bitrate_aim(this, BITRATE_SLOW_UP);
+    DISABLE_LINE _transit_state_to(this, STATE_MONITORED);
   }
 done:
   return;
@@ -1609,7 +1617,7 @@ void _print_mupdate_state(SubflowRateController *this)
           "target_br:  %-10d| min_tbr: %-10d| max_tbr: %-10d| sCorr:   %-10.3f|\n"
           "br_aim:     %-10d| q_bits:  %-10d| BiFCorr: %-10.3f| dCorr:   %-10.6f|\n"
           "mon_br:     %-10d| mon_int: %-10d| maxCorr: %-10.3f| lc_rate: %-10d|\n"
-          "del_flc_avg:%-10.6f| del_vavg:%-10.6f| stage:   %-10d| CI:      %-10.6f|\n"
+          "pacing_br:  %-10d| inc_br:  %-10df| stage:   %-10d| CI:      %-10.6f|\n"
           "############################ Seconds since setup: %lu ##########################################\n",
           this->id, _state(this),
           this->disable_controlling > 0 ? GST_TIME_AS_MSECONDS(this->disable_controlling - _now(this)) : 0,
@@ -1637,7 +1645,7 @@ void _print_mupdate_state(SubflowRateController *this)
           this->monitored_bitrate, this->monitoring_interval,
           _maxCorr(this), _get_congestion_pont(this),
 
-          this->delay_fluctuation_avg, this->delay_fluctuation_var_avg,
+          this->pacing_bitrate, _mt0(this)->incoming_rate,
           _stage(this), _CI(this),
 
           GST_TIME_AS_SECONDS(_now(this) - this->setup_time)

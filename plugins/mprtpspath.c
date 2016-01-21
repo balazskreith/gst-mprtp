@@ -174,7 +174,8 @@ mprtps_path_init (MPRTPSPath * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetssndqueue();
-  this->sent_bytes = make_numstracker(2048, GST_SECOND);
+  this->sent_bytes = make_numstracker(4096, GST_SECOND);
+  this->incoming_bytes = make_numstracker(4096, GST_SECOND);
   this->octets_in_flight_exped_history = make_numstracker(2048, 400 * GST_MSECOND);
   this->octets_in_flight_exped_history_sum_plugin = make_numstracker_sum_plugin(NULL, NULL);
   numstracker_add_plugin(this->octets_in_flight_exped_history,
@@ -577,11 +578,12 @@ void mprtps_path_clear_queue(MPRTPSPath *this)
   THIS_WRITEUNLOCK(this);
 }
 
-guint32 mprtps_path_get_sent_bytes_in1s(MPRTPSPath *this)
+guint32 mprtps_path_get_sent_bytes_in1s(MPRTPSPath *this, guint32 *incoming_bytes)
 {
   gint64 result;
   THIS_READLOCK(this);
   numstracker_get_stats(this->sent_bytes, &result);
+  numstracker_get_stats(this->incoming_bytes, incoming_bytes);
   THIS_READUNLOCK(this);
   return result;
 }
@@ -628,8 +630,12 @@ void
 mprtps_path_process_rtp_packet(MPRTPSPath * this,
                                GstBuffer * buffer)
 {
-
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   THIS_WRITELOCK (this);
+  gst_rtp_buffer_map(buffer, GST_MAP_READWRITE, &rtp);
+  numstracker_add(this->incoming_bytes, gst_rtp_buffer_get_payload_len(&rtp));
+  gst_rtp_buffer_unmap(&rtp);
+
   if(0 < this->skip_until){
     if(_now(this) < this->skip_until){
       gst_buffer_unref(buffer);
@@ -637,6 +643,7 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
     }
     this->skip_until = 0;
   }
+
   _setup_rtp2mprtp (this, buffer);
   _send_mprtp_packet(this, buffer);
 //  goto done;

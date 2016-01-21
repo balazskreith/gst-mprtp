@@ -114,6 +114,7 @@ struct _MPRTPSPath
 //  gboolean                cwnd_enabled;
   PacketsSndQueue*        packetsqueue;
   NumsTracker*            sent_bytes;
+  NumsTracker*            incoming_bytes;
 };
 
 struct _MPRTPSPathClass
@@ -220,7 +221,7 @@ guint32 mprtps_path_get_total_sent_frames_num (MPRTPSPath * this);
 guint32 mprtps_path_get_sent_octet_sum_for(MPRTPSPath *this, guint32 amount);
 void mprtps_path_get_bytes_in_flight(MPRTPSPath *this, guint32 *acked, gint64* ested);
 void mprtps_path_clear_queue(MPRTPSPath *this);
-guint32 mprtps_path_get_sent_bytes_in1s(MPRTPSPath *this);
+guint32 mprtps_path_get_sent_bytes_in1s(MPRTPSPath *this, guint32 *incoming_bytes);
 guint32 mprtps_path_get_bytes_in_queue(MPRTPSPath *this);
 MPRTPSPathState mprtps_path_get_state (MPRTPSPath * this);
 void mprtps_path_set_state (MPRTPSPath * this, MPRTPSPathState state);

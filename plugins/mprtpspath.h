@@ -112,6 +112,7 @@ struct _MPRTPSPath
   guint32                 pacing_tick;
   //cwnd implementation
 //  gboolean                cwnd_enabled;
+  gboolean                expected_lost;
   PacketsSndQueue*        packetsqueue;
   NumsTracker*            sent_bytes;
   NumsTracker*            incoming_bytes;
@@ -216,6 +217,7 @@ guint32 mprtps_path_get_total_sent_packets_num (MPRTPSPath * this);
 void mprtps_path_tick(MPRTPSPath *this);
 void mprtps_path_process_rtp_packet(MPRTPSPath * this,
                                GstBuffer * buffer);
+gboolean mprtps_path_has_expected_lost(MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_frames_num (MPRTPSPath * this);
 guint32 mprtps_path_get_sent_octet_sum_for(MPRTPSPath *this, guint32 amount);

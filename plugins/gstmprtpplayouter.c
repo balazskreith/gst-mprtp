@@ -808,13 +808,16 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   GstMprtpplayouter *this;
   GstMapInfo info;
   guint8 *data;
-  GstFlowReturn result;
+  GstFlowReturn result = GST_FLOW_OK;
 
   this = GST_MPRTPPLAYOUTER (parent);
   GST_DEBUG_OBJECT (this, "RTP/RTCP/MPRTP/MPRTCP sink");
 //  g_print("START PROCESSING RTP\n");
   THIS_READLOCK (this);
-
+  if(!GST_IS_BUFFER(buf)){
+    GST_WARNING("The arrived buffer is not a buffer.");
+    goto done;
+  }
   if (!gst_buffer_map (buf, &info, GST_MAP_READ)) {
     GST_WARNING ("Buffer is not readable");
     result = GST_FLOW_ERROR;
@@ -829,7 +832,8 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   }
   //the packet is either rtcp or mprtp
   if (*data > 192 && *data < 223) {
-    result = gst_pad_push (this->mprtp_srcpad, buf);
+    if(GST_IS_BUFFER(buf))
+      result = gst_pad_push (this->mprtp_srcpad, buf);
     goto done;
   }
 
@@ -921,7 +925,8 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
     _trash_mprtp_buffer(this, mprtp);
     GST_DEBUG_OBJECT (this, "RTP packet ssrc is %u, the pivot ssrc is %u",
         this->pivot_ssrc, gst_mprtp_buffer_get_ssrc(mprtp));
-    gst_pad_push (this->mprtp_srcpad, buf);
+    if(GST_IS_BUFFER(buf))
+      gst_pad_push (this->mprtp_srcpad, buf);
     return;
   }
 

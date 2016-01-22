@@ -167,7 +167,8 @@ void packetssndqueue_set_obsolation_treshold(PacketsSndQueue *this,
 }
 
 gboolean packetssndqueue_has_buffer(PacketsSndQueue *this,
-                                    guint32 *payload_bytes)
+                                    guint32 *payload_bytes,
+                                    gboolean *expected_lost)
 {
   gboolean result = FALSE;
   THIS_READLOCK(this);
@@ -177,6 +178,7 @@ again:
   if(0 < this->obsolation_treshold){
     if(this->head->added < gst_clock_get_time(this->sysclock) - this->obsolation_treshold){
       _remove_head(this);
+      if(expected_lost) *expected_lost = TRUE;
       goto again;
     }
   }

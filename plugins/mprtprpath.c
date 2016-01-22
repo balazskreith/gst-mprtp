@@ -76,7 +76,7 @@ mprtpr_path_init (MpRTPRPath * this)
   this->skew_estimator = make_skalmanfilter_full(1024, GST_SECOND, .125);
   this->gaps = make_numstracker(128, GST_SECOND);
   numstracker_add_rem_pipe(this->gaps, _gaps_obsolation_pipe, this);
-  this->lates = make_numstracker(128, GST_SECOND);
+  this->lates = make_numstracker(128, 1500 * GST_MSECOND);
   mprtpr_path_reset (this);
 }
 
@@ -313,11 +313,14 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   if(_cmp_seq(mprtp->subflow_seq, this->highest_seq) <= 0){
     //probably found in missing;
     numstracker_add(this->lates, mprtp->subflow_seq);
+    g_print("add sequence number %hu to lates\n", mprtp->subflow_seq);
     goto done;
   }
   if(_cmp_seq(this->highest_seq + 1, mprtp->subflow_seq) < 0){
     guint16 seq = this->highest_seq + 1;
+    g_print("highest seen sequence number is %hu\n", this->highest_seq);
     for(; _cmp_seq(seq, mprtp->subflow_seq) < 0; ++seq){
+      g_print("add sequence number %hu to gaps\n", seq);
       numstracker_add(this->gaps, seq);
     }
     //add to missing;
@@ -425,7 +428,9 @@ void _delays_stats_pipe(gpointer data, PercentileTrackerPipeData *pdata)
 void _gaps_obsolation_pipe(gpointer data, gint64 seq)
 {
   MpRTPRPath *this = data;
+  g_print("obsolate sequence nr. %hu from gaps\n", (guint16) seq);
   if(numstracker_find(this->lates, seq)) return;
+  g_print("sequence number %hu not found in lates\n", (guint16) seq);
   ++_actual_RLEBlock(this)->losts;
 }
 

@@ -58,5 +58,7 @@ void packetssndqueue_push(PacketsSndQueue *this,
 GstBuffer* packetssndqueue_pop(PacketsSndQueue *this);
 void packetssndqueue_set_obsolation_treshold(PacketsSndQueue *this,
                                     GstClockTime obsolation_treshold);
-gboolean packetssndqueue_has_buffer(PacketsSndQueue *this, guint32 *payload_bytes);
+gboolean packetssndqueue_has_buffer(PacketsSndQueue *this,
+                                    guint32 *payload_bytes,
+                                    gboolean *expected_lost);
 #endif /* PACKETSSNDQUEUE_H_ */

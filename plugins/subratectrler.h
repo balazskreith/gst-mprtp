@@ -53,6 +53,8 @@ struct _SubflowRateController
   //Video target bitrate inflection point i.e. the last known highest
   //target_bitrate during fast start. Used to limit bitrate increase
   //close to the last know congestion point. Initial value: 1
+  guint                    consecutive_undershoot;
+  gboolean                 min_rate_mitigated;
   gint32                   max_target_point;
   gint32                   min_target_point;
   NumsTracker*             target_points;
@@ -125,6 +127,10 @@ struct _SubflowRateController
   gdouble                  delay_t2;
   gdouble                  delay_t3;
 
+  gboolean                 log_enabled;
+  guint                    logtick;
+  gchar                    log_filename[255];
+
 };
 
 
@@ -134,6 +140,8 @@ struct _SubflowRateControllerClass{
 };
 GType subratectrler_get_type (void);
 SubflowRateController *make_subratectrler(void);
+void subratectrler_enable_logging(SubflowRateController *this, const gchar *filename);
+void subratectrler_disable_logging(SubflowRateController *this);
 void subratectrler_set(SubflowRateController *this,
                               MPRTPSPath *path,
                               guint32 sending_target);

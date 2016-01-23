@@ -326,6 +326,16 @@ mprtps_path_set_delay(MPRTPSPath * this, GstClockTime delay)
   THIS_WRITEUNLOCK (this);
 }
 
+GstClockTime
+mprtps_path_get_delay(MPRTPSPath * this)
+{
+  GstClockTime result;
+  THIS_READLOCK (this);
+  result = this->path_delay;
+  THIS_READUNLOCK (this);
+  return result;
+}
+
 void mprtps_path_set_skip_duration(MPRTPSPath * this, GstClockTime duration)
 {
   g_return_if_fail (this);
@@ -655,6 +665,7 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
 
   if(0 < this->skip_until){
     if(_now(this) < this->skip_until){
+      this->expected_lost|=TRUE;
       gst_buffer_unref(buffer);
       goto done;
     }
@@ -796,13 +807,13 @@ guint32 _pacing(MPRTPSPath * this)
 //  gdouble pace_interval;
   gdouble pacing_bitrate = this->pacing_bitrate;
   guint32 pacing_tick = MIN_PACE_INTERVAL;
-  guint32 bytes_in_queue;
+//  guint32 bytes_in_queue;
   gboolean expected_lost = FALSE;
-  gint64 incoming_rate;
-  numstracker_get_stats(this->incoming_bytes, &incoming_rate);
-  incoming_rate *= 8;
+//  gint64 incoming_rate;
+//  numstracker_get_stats(this->incoming_bytes, &incoming_rate);
+//  incoming_rate *= 8;
 //  if(!this->pacing) pacing_bitrate *= 2;
-  packetssndqueue_get_num(this->packetsqueue, &bytes_in_queue);
+//  packetssndqueue_get_num(this->packetsqueue, &bytes_in_queue);
 
 again:
   if(!packetssndqueue_has_buffer(this->packetsqueue, &payload_bytes, &expected_lost)){
@@ -822,11 +833,13 @@ again:
   if(!this->pacing){
     goto again;
   }
-  if(incoming_rate < this->pacing_bitrate * .8){
-    pacing_tick = 1;
-  }else{
-    pacing_tick = MAX(MIN_PACE_INTERVAL, (gdouble)(sent_payload_bytes * 8) / (gdouble)pacing_bitrate * 1000.);
-  }
+  pacing_tick = MAX(MIN_PACE_INTERVAL, (gdouble)(sent_payload_bytes * 8) / (gdouble)pacing_bitrate * 1000.);
+//
+//  if(incoming_rate < this->pacing_bitrate * .8){
+//    pacing_tick = 1;
+//  }else{
+//    pacing_tick = MAX(MIN_PACE_INTERVAL, (gdouble)(sent_payload_bytes * 8) / (gdouble)pacing_bitrate * 1000.);
+//  }
 done:
   return pacing_tick;
 }

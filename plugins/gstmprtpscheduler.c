@@ -1068,10 +1068,7 @@ _change_auto_flow_controlling_mode (GstMprtpscheduler * this,
 
     sefctrler_set_callbacks (&this->riport_can_flow,
         &this->controller_add_path,
-        &this->controller_rem_path,
-        &this->controller_pacing,
-        &this->controller_is_pacing,
-        &this->controller_state);
+        &this->controller_rem_path);
 
     sefctrler_setup_siganling(this->controller,
                               gst_mprtpscheduler_emit_signal, this);
@@ -1083,10 +1080,7 @@ _change_auto_flow_controlling_mode (GstMprtpscheduler * this,
     smanctrler_setup (this->controller, this->splitter);
     smanctrler_set_callbacks (&this->riport_can_flow,
         &this->controller_add_path,
-        &this->controller_rem_path,
-        &this->controller_pacing,
-        &this->controller_is_pacing,
-        &this->controller_state);
+        &this->controller_rem_path);
   }
   this->riport_flow_signal_sent = FALSE;
   g_hash_table_iter_init (&iter, this->paths);

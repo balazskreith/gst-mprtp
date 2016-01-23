@@ -32,12 +32,12 @@ typedef struct _SndEventBasedControllerClass SndEventBasedControllerClass;
 
 
 
-typedef enum
-{
-  SPLITCTRLER_EVENT_OVERUSED    = -1,
-  SPLITCTRLER_EVENT_FI          =  0,
-  SPLITCTRLER_EVENT_UNDERUSED   =  1,
-} SplitCtrlerEvent;
+//typedef enum
+//{
+//  SPLITCTRLER_EVENT_OVERUSED    = -1,
+//  SPLITCTRLER_EVENT_FI          =  0,
+//  SPLITCTRLER_EVENT_UNDERUSED   =  1,
+//} SplitCtrlerEvent;
 
 struct _SndEventBasedController
 {
@@ -57,7 +57,7 @@ struct _SndEventBasedController
   gboolean               bids_recalc_requested;
   gboolean               bids_commit_requested;
   guint32                target_rate;
-  SplitCtrlerEvent       event;
+//  SplitCtrlerEvent       event;
   SendingRateDistributor*rate_distor;
   guint32                ssrc;
   void                 (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
@@ -86,10 +86,7 @@ void sefctrler_setup(SndEventBasedController* this,
 
 void sefctrler_set_callbacks(void(**riport_can_flow_indicator)(gpointer),
                               void(**controller_add_path)(gpointer,guint8,MPRTPSPath*),
-                              void(**controller_rem_path)(gpointer,guint8),
-                              void(**controller_pacing)(gpointer, gboolean),
-                              gboolean (**controller_is_pacing)(gpointer),
-                              GstStructure* (**controller_state)(gpointer));
+                              void(**controller_rem_path)(gpointer,guint8));
 
 GstBufferReceiverFunc
 sefctrler_setup_mprtcp_exchange(SndEventBasedController * this,

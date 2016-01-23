@@ -34,6 +34,8 @@ typedef struct _GstMpRTPBuffer GstMpRTPBuffer;
 
 #define GST_MPRTP_BUFFER_INIT {FALSE, NULL, 0, 0, 0, 0, 0, 0}
 
+#define CONSTRAIN(min,max,value) MAX(min, MIN(max, value))
+
 struct _GstMpRTPBuffer{
 //  GstRTPBuffer   rtp;
   gboolean       initialized;

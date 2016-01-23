@@ -224,7 +224,6 @@ stream_joiner_init (StreamJoiner * this)
   gst_task_start (this->thread);
   this->ticks = make_percentiletracker(1024, 50);
   percentiletracker_add(this->ticks, 2 * GST_MSECOND);
-  this->tick_estimator = make_skalmanfilter_full(256, GST_SECOND, .25);
 }
 
 StreamJoiner*
@@ -336,7 +335,13 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
                               &subflow->jitter);
 
 //  g_print("S%d: %f->%lu\n", subflow->id, subflow->skew, (guint64)subflow->skew);
-  latency = (guint64)(subflow->delay + subflow->skew + (gdouble)(subflow->jitter<<2));
+  {
+    guint64 jitter,delay,skew;
+    delay = MIN(400 * GST_MSECOND, subflow->delay);
+    jitter = MIN(delay * .1, subflow->jitter);
+    skew = MIN(jitter * .5, subflow->skew);
+    latency = (guint64)(delay + skew + (gdouble)(jitter<<2));
+  }
 
   if(latency < 300 * GST_MSECOND) percentiletracker_add(this->latency_window, latency);
 

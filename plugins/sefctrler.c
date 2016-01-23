@@ -50,9 +50,9 @@ GST_DEBUG_CATEGORY_STATIC (sefctrler_debug_category);
 
 #define _irt0(this) (this->ir_moments+this->ir_moments_index)
 #define _irt1(this) (this->ir_moments + (this->ir_moments_index == 0 ? MAX_SUBFLOW_MOMENT_NUM-1 : this->ir_moments_index-1))
-#define _irt2(this) _irt(this, -2)
-#define _irt3(this) _irt(this, -3)
-#define _irt4(this) _irt(this, -4)
+#define _irt2(this) _irt(this, 2)
+#define _irt3(this) _irt(this, 3)
+#define _irt4(this) _irt(this, 4)
 #define _ort0(this) (this->or_moments+this->or_moments_index)
 #define _ort1(this) (this->or_moments+!this->or_moments_index)
 #define _irt0_get_discarded_bytes(this) (_irt0(this)->early_discarded_bytes + _irt0(this)->late_discarded_bytes)
@@ -144,12 +144,6 @@ static void
 sefctrler_rem_path (gpointer controller_ptr, guint8 subflow_id);
 static void
 sefctrler_add_path (gpointer controller_ptr, guint8 subflow_id,MPRTPSPath * path);
-static void
-sefctrler_pacing (gpointer controller_ptr, gboolean allowed);
-static gboolean
-sefctrler_is_pacing (gpointer controller_ptr);
-static GstStructure* sefctrler_state (gpointer controller_ptr);
-
 static void
 sefctrler_riport_can_flow (gpointer this);
 
@@ -305,8 +299,8 @@ _check_report_timeout (Subflow * this);
 //----------------------------------------------------------------------------
 
 //----------------------------- System Notifier ------------------------------
-static void
-_system_notifier_main(SndEventBasedController * this);
+//static void
+//_system_notifier_main(SndEventBasedController * this);
 
 static void
 _system_notifier_utilization(gpointer sndrate_distor, gpointer data);
@@ -382,7 +376,7 @@ sefctrler_init (SndEventBasedController * this)
   this->pacing = FALSE;
   this->RTT_max = 5 * GST_SECOND;
   this->last_recalc_time = gst_clock_get_time(this->sysclock);
-  this->event = SPLITCTRLER_EVENT_FI;
+//  this->event = SPLITCTRLER_EVENT_FI;
   this->rate_distor = make_sndrate_distor(_system_notifier_utilization, this);
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
@@ -511,9 +505,10 @@ sefctrler_add_path (gpointer ptr, guint8 subflow_id, MPRTPSPath * path)
   ++this->subflow_num;
   stream_splitter_add_path (this->splitter, subflow_id, path, SUBFLOW_DEFAULT_SENDING_RATE);
   new_subflow->rate_controller = sndrate_distor_add_controllable_path(this->rate_distor, path, SUBFLOW_DEFAULT_SENDING_RATE);
+
   {
     gchar filename[255];
-    sprintf(filename, "server_rctrler_%d.log", new_subflow->id);
+    sprintf(filename, "subratectrler_%d.log", new_subflow->id);
     subratectrler_enable_logging(new_subflow->rate_controller, filename);
   }
 
@@ -546,84 +541,12 @@ exit:
   THIS_WRITEUNLOCK (this);
 }
 
-void
-sefctrler_pacing (gpointer controller_ptr, gboolean allowed)
-{
-  SndEventBasedController *this;
-  this = SEFCTRLER (controller_ptr);
-  THIS_WRITELOCK (this);
-  this->pacing = allowed;
-  THIS_WRITEUNLOCK (this);
-}
-
-gboolean
-sefctrler_is_pacing (gpointer controller_ptr)
-{
-  SndEventBasedController *this;
-  gboolean result;
-  this = SEFCTRLER (controller_ptr);
-  THIS_READLOCK (this);
-  result = this->pacing;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-GstStructure*
-sefctrler_state (gpointer controller_ptr)
-{
-  SndEventBasedController *this;
-  GstStructure *result = NULL;
-//  GHashTableIter iter;
-//  gpointer key, val;
-//  Subflow *subflow;
-//  gint index = 0;
-//  GValue g_value = { 0 };
-//  gchar *field_name;
-
-  this = SEFCTRLER (controller_ptr);
-  THIS_WRITELOCK (this);
-//
-//    result = gst_structure_new ("SchedulerStateReport",
-//        "length", G_TYPE_UINT, this->subflows_num, NULL);
-//    g_value_init (&g_value, G_TYPE_UINT);
-//    g_hash_table_iter_init (&iter, this->subflows);
-//    while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-//      subflow = (Subflow *) val;
-//
-//      field_name = g_strdup_printf ("subflow-%d-id", index);
-//      g_value_set_uint (&g_value, mprtps_path_get_id (subflow->id));
-//      gst_structure_set_value (result, field_name, &g_value);
-//      g_free (field_name);
-//
-//      field_name = g_strdup_printf ("subflow-%d-fractional_lost", index);
-//      g_value_set_uint (&g_value, _st0(subflow)->fraction_lost);
-//      gst_structure_set_value (result, field_name, &g_value);
-//      g_free (field_name);
-//
-//      field_name = g_strdup_printf ("subflow-%d-sent_payload_bytes", index);
-//      g_value_set_uint (&g_value,
-//          mprtps_path_get_total_sent_payload_bytes (path));
-//      gst_structure_set_value (result, field_name, &g_value);
-//      g_free (field_name);
-//
-//      ++index;
-//    }
-//  _ct0(this)->is_it_new = FALSE;
-
-  THIS_WRITEUNLOCK (this);
-  return result;
-}
-
-
 
 
 void
 sefctrler_set_callbacks(void(**riport_can_flow_indicator)(gpointer),
                               void(**controller_add_path)(gpointer,guint8,MPRTPSPath*),
-                              void(**controller_rem_path)(gpointer,guint8),
-                              void(**controller_pacing)(gpointer, gboolean),
-                              gboolean (**controller_is_pacing)(gpointer),
-                              GstStructure* (**controller_state)(gpointer))
+                              void(**controller_rem_path)(gpointer,guint8))
 {
   if (riport_can_flow_indicator) {
     *riport_can_flow_indicator = sefctrler_riport_can_flow;
@@ -634,16 +557,6 @@ sefctrler_set_callbacks(void(**riport_can_flow_indicator)(gpointer),
   if (controller_rem_path) {
     *controller_rem_path = sefctrler_rem_path;
   }
-  if (controller_pacing) {
-    *controller_pacing = sefctrler_pacing;
-  }
-  if (controller_is_pacing) {
-    *controller_is_pacing = sefctrler_is_pacing;
-  }
-  if(controller_state){
-    *controller_state = sefctrler_state;
-  }
-
 }
 
 void
@@ -704,7 +617,7 @@ sefctrler_ticker_run (void *data)
   _irp_producer_main(this);
   _split_controller_main(this);
   _orp_producer_main(this);
-  _system_notifier_main(this);
+//  _system_notifier_main(this);
 //done:
   next_scheduler_time = now + 100 * GST_MSECOND;
   ++this->ticknum;
@@ -731,6 +644,8 @@ _irp_producer_main(SndEventBasedController * this)
   Subflow*       subflow;
   GstClockTime   now;
   Event          event;
+  MPRTPSPath*    slowest_path = NULL;
+  GstClockTime   delay, slowest_delay = 0;
 
   now = gst_clock_get_time(this->sysclock);
   g_hash_table_iter_init (&iter, this->subflows);
@@ -744,9 +659,13 @@ _irp_producer_main(SndEventBasedController * this)
     _irt0(subflow)->goodput = _get_subflow_goodput(subflow, &_irt0(subflow)->receiver_rate);
     if(0) g_print("%p", _irt(subflow, 0));
 
-
     _irt0(subflow)->sending_weight = stream_splitter_get_sending_rate(this->splitter, subflow->id);
     subratectrler_measurement_update(subflow->rate_controller, _irt0(subflow));
+
+    delay = mprtps_path_get_delay(subflow->path);
+    if(slowest_delay < delay){
+      slowest_path = subflow->path;
+    }
 
     event = subflow->check(subflow);
     subflow->fire(this, subflow, event);
@@ -758,16 +677,35 @@ _irp_producer_main(SndEventBasedController * this)
   not_checked:
     continue;
   }
+
+  if(slowest_path) {
+    mprtps_path_set_slow(slowest_path);
+  }
+  return;
+
 }
 
 RRMeasurement *
 _irt (Subflow * this, gint moment)
 {
   gint index;
-  index = this->ir_moments_index - (moment % MAX_SUBFLOW_MOMENT_NUM);
-  if (index < 0)
-    index = MAX_SUBFLOW_MOMENT_NUM - index;
-  return this->ir_moments + index;
+  RRMeasurement *result;
+//  index = this->ir_moments_index - (moment % MAX_SUBFLOW_MOMENT_NUM);
+//  if (index < 0)
+//    index = MAX_SUBFLOW_MOMENT_NUM - index;
+//  return this->ir_moments + index;
+//  index = this->ir_moments_index;
+again:
+  if(moment <= 0){
+    result = this->ir_moments + this->ir_moments_index;
+    goto done;
+  }
+  if(index == 0) index = MAX_SUBFLOW_MOMENT_NUM - 1;
+  else --index;
+  --moment;
+  goto again;
+done:
+  return result;
 }
 
 void
@@ -829,6 +767,23 @@ recent_delay_done:
   }
 
 recent_losts_done:
+  _irt0(subflow)->expected_lost = mprtps_path_has_expected_lost(subflow->path);
+
+  //Determine if path is lossy
+  {
+    guint losts = 0;
+    losts += _irt0(subflow)->lost && !_irt0(subflow)->expected_lost? 1 : 0;
+    losts += _irt1(subflow)->lost && !_irt1(subflow)->expected_lost ? 1 : 0;
+    losts += _irt2(subflow)->lost && !_irt2(subflow)->expected_lost ? 1 : 0;
+    losts += _irt3(subflow)->lost && !_irt3(subflow)->expected_lost ? 1 : 0;
+    losts += _irt4(subflow)->lost && !_irt4(subflow)->expected_lost ? 1 : 0;
+
+    if(losts == 0){
+      mprtps_path_set_non_lossy(subflow->path);
+    }else if(losts > 2){
+      mprtps_path_set_lossy(subflow->path);
+    }
+  }
   return;
 }
 
@@ -1483,23 +1438,23 @@ _setup_sr_riport (Subflow * this, GstRTCPSR * sr, guint32 ssrc)
 //---------------------------------------------------------------------------
 
 //----------------------------- System Notifier ------------------------------
-
-void
-_system_notifier_main(SndEventBasedController * this)
-{
-
-  if(this->event == SPLITCTRLER_EVENT_FI)  goto done;
-  if(this->event == SPLITCTRLER_EVENT_UNDERUSED) goto underused;
-  //overused
-
-//  g_print("-------->SYSTEM IS OVERUSED<--------\n");
-  goto done;
-underused:
-//  g_print("-------->SYSTEM IS UNDERUSED<--------\n");
-done:
-  this->event = SPLITCTRLER_EVENT_FI;
-  return;
-}
+//
+//void
+//_system_notifier_main(SndEventBasedController * this)
+//{
+//
+//  if(this->event == SPLITCTRLER_EVENT_FI)  goto done;
+//  if(this->event == SPLITCTRLER_EVENT_UNDERUSED) goto underused;
+//  //overused
+//
+////  g_print("-------->SYSTEM IS OVERUSED<--------\n");
+//  goto done;
+//underused:
+////  g_print("-------->SYSTEM IS UNDERUSED<--------\n");
+//done:
+//  this->event = SPLITCTRLER_EVENT_FI;
+//  return;
+//}
 
 static void
 _system_notifier_utilization(gpointer controller, gpointer data)

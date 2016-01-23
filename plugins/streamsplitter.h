@@ -92,7 +92,9 @@ void stream_splitter_add_path(StreamSplitter * this,
 void stream_splitter_rem_path(StreamSplitter * this, guint8 subflow_id);
 MPRTPSPath* stream_splitter_get_next_path(StreamSplitter* this, GstBuffer* buf, gboolean *suggest_to_skip);
 gboolean stream_splitter_separation_is_possible (StreamSplitter * this);
-void stream_splitter_set_splitting_mode (StreamSplitter * this, StreamSplittingMode mode);
+
+//void stream_splitter_set_splitting_mode (StreamSplitter * this, StreamSplittingMode mode);
+
 void stream_splitter_setup_sending_bid(StreamSplitter* this, guint8 subflow_id, guint32 bid);
 guint32 stream_splitter_get_media_rate(StreamSplitter* this);
 void stream_splitter_set_monitor_payload_type(StreamSplitter *this, guint8 playload_type);

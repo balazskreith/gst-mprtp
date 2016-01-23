@@ -219,14 +219,14 @@ exit:
 }
 
 
-void
-stream_splitter_set_splitting_mode (StreamSplitter * this,
-                                    StreamSplittingMode mode)
-{
-  THIS_WRITELOCK (this);
-  this->splitting_mode = mode;
-  THIS_WRITEUNLOCK (this);
-}
+//void
+//stream_splitter_set_splitting_mode (StreamSplitter * this,
+//                                    StreamSplittingMode mode)
+//{
+//  THIS_WRITELOCK (this);
+//  this->splitting_mode = mode;
+//  THIS_WRITEUNLOCK (this);
+//}
 
 
 void

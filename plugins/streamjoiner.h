@@ -54,7 +54,7 @@ struct _StreamJoiner
   Frame*               head;
   Frame*               tail;
   guint16              PHSN;
-  SKalmanFilter*       tick_estimator;
+//  SKalmanFilter*       tick_estimator;
   PercentileTracker*   ticks;
   gdouble              estimated_tick;
   gint32               framecounter;

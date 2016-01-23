@@ -43,9 +43,6 @@ static void smanctrler_riport_can_flow (gpointer this);
 static void smanctrler_add_path (gpointer controller_ptr, guint8 subflow_id,
     MPRTPSPath * path);
 static void smanctrler_rem_path (gpointer controller_ptr, guint8 subflow_id);
-static void smanctrler_pacing (gpointer controller_ptr, gboolean allowed);
-static gboolean smanctrler_is_pacing (gpointer controller_ptr);
-static GstStructure* smanctrler_state(gpointer controller_ptr);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -98,32 +95,6 @@ smanctrler_rem_path (gpointer controller_ptr, guint8 subflow_id)
 }
 
 void
-smanctrler_pacing (gpointer controller_ptr, gboolean allowed)
-{
-  SndManualController *this;
-  this = SMANCTRLER (controller_ptr);
-  GST_DEBUG_OBJECT (this, "Sending Manual Controller pacing is%s allowed ",
-      allowed ? " " : " NOT");
-}
-
-gboolean
-smanctrler_is_pacing (gpointer controller_ptr)
-{
-  SndManualController *this;
-  this = SMANCTRLER (controller_ptr);
-  GST_DEBUG_OBJECT (this, "Sending Manual Controller is pacing");
-  return FALSE;
-}
-
-GstStructure* smanctrler_state(gpointer controller_ptr)
-{
-  SndManualController *this;
-  this = SMANCTRLER (controller_ptr);
-  GST_DEBUG_OBJECT (this, "Sending Manual Controller state");
-  return NULL;
-}
-
-void
 smanctrler_setup (SndManualController * this, StreamSplitter * splitter)
 {
   this->splitter = splitter;
@@ -132,10 +103,7 @@ smanctrler_setup (SndManualController * this, StreamSplitter * splitter)
 void
 smanctrler_set_callbacks (void (**riport_can_flow_indicator) (gpointer),
     void (**controller_add_path) (gpointer, guint8, MPRTPSPath *),
-    void (**controller_rem_path) (gpointer, guint8),
-    void (**controller_pacing) (gpointer, gboolean),
-    gboolean (**controller_is_pacing)(gpointer),
-    GstStructure* (**controller_state)(gpointer))
+    void (**controller_rem_path) (gpointer, guint8))
 {
   if (riport_can_flow_indicator) {
     *riport_can_flow_indicator = smanctrler_riport_can_flow;
@@ -145,15 +113,6 @@ smanctrler_set_callbacks (void (**riport_can_flow_indicator) (gpointer),
   }
   if (controller_rem_path) {
     *controller_rem_path = smanctrler_rem_path;
-  }
-  if (controller_pacing) {
-    *controller_pacing = smanctrler_pacing;
-  }
-  if(controller_is_pacing){
-    *controller_is_pacing = smanctrler_is_pacing;
-  }
-  if(controller_state){
-    *controller_state = smanctrler_state;
   }
 }
 

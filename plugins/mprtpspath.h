@@ -140,6 +140,7 @@ struct _RRMeasurement{
   guint32             jitter;
   guint32             cum_packet_lost;
   guint32             lost;
+  gboolean            expected_lost;
   guint64             min_delay;
   guint64             max_delay;
   guint32             early_discarded_bytes;
@@ -233,6 +234,7 @@ GstClockTime mprtps_path_get_time_sent_to_non_congested (MPRTPSPath * this);
 GstClockTime mprtps_path_get_time_sent_to_congested (MPRTPSPath * this);
 guint16 mprtps_path_get_HSN(MPRTPSPath * this);
 void mprtps_path_set_delay(MPRTPSPath * this, GstClockTime delay);
+GstClockTime mprtps_path_get_delay(MPRTPSPath * this);
 void mprtps_path_set_skip_duration(MPRTPSPath * this, GstClockTime duration);
 void mprtps_path_set_pacing_bitrate(MPRTPSPath * this, guint32 target_bitrate, GstClockTime obsolation_treshold);
 void mprtps_path_set_pacing (MPRTPSPath * this, gboolean pacing);

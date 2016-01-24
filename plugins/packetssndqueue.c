@@ -103,11 +103,18 @@ packetssndqueue_finalize (GObject * object)
 
 }
 
+static void _node_reset(gpointer inc_data)
+{
+  PacketsSndQueueNode *casted_data = inc_data;
+  memset(casted_data, 0, sizeof(PacketsSndQueueNode));
+}
+
+
 void
 packetssndqueue_init (PacketsSndQueue * this)
 {
   g_rw_lock_init (&this->rwmutex);
-  this->node_pool = make_pointerpool(64, _node_ctor, g_free);
+  this->node_pool = make_pointerpool(64, _node_ctor, g_free, _node_reset);
   this->sysclock = gst_system_clock_obtain();
   this->obsolation_treshold = 0;
 }

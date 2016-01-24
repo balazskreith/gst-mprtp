@@ -404,6 +404,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   stream_splitter_set_monitor_payload_type(this->splitter, this->monitor_payload_type);
   _change_auto_flow_controlling_mode (this, FALSE);
   _setup_paths(this);
+
+
 }
 
 

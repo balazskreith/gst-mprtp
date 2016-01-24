@@ -110,12 +110,19 @@ packetsrcvqueue_finalize (GObject * object)
 
 }
 
+static void _node_reset(gpointer inc_data)
+{
+  PacketsRcvQueueNode *casted_data = inc_data;
+  memset(casted_data, 0, sizeof(PacketsRcvQueueNode));
+}
+
+
 void
 packetsrcvqueue_init (PacketsRcvQueue * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->jitter = 0;
-  this->node_pool = make_pointerpool(64, _node_ctor, g_free);
+  this->node_pool = make_pointerpool(64, _node_ctor, g_free, _node_reset);
   this->node_tree = make_bintree(_cmp_for_bintree);
   this->sysclock = gst_system_clock_obtain();
 }

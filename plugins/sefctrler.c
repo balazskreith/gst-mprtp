@@ -512,6 +512,10 @@ sefctrler_add_path (gpointer ptr, guint8 subflow_id, MPRTPSPath * path)
     subratectrler_enable_logging(new_subflow->rate_controller, filename);
   }
 
+  this->splitter2 = (StreamSplitter2 *) g_object_new (STREAM_SPLITTER2_TYPE, NULL);
+  stream_splitter2_add_path(this->splitter2, 2, path, 64000);
+//  stream_splitter2_add_path(this->splitter2, 3, path, 64000);
+
 exit:
   THIS_WRITEUNLOCK (this);
 }
@@ -564,6 +568,7 @@ sefctrler_setup (SndEventBasedController * this, StreamSplitter * splitter)
 {
   THIS_WRITELOCK (this);
   this->splitter = splitter;
+  this->splitter2 = (StreamSplitter2 *) g_object_new (STREAM_SPLITTER2_TYPE, NULL);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -1490,6 +1495,11 @@ _split_controller_main(SndEventBasedController * this)
 recalc_done:
   if (!this->bids_commit_requested) goto process_done;
   this->bids_commit_requested = FALSE;
+
+  stream_splitter2_setup_sending_rate(this->splitter2, 2, g_random_int_range(1,1000));
+//  stream_splitter2_setup_sending_rate(this->splitter2, 3, g_random_int_range(1,1000));
+  stream_splitter2_commit_changes(this->splitter2);
+
   stream_splitter_commit_changes (this->splitter, 0 * this->target_rate, 0 * GST_MSECOND);
 
 process_done:

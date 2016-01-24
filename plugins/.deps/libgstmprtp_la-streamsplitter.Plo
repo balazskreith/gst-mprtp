@@ -195,8 +195,11 @@ libgstmprtp_la-streamsplitter.lo: streamsplitter.c \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
  streamsplitter.h mprtpspath.h gstmprtcpbuffer.h gstmprtpbuffer.h \
- pointerpool.h bintree.h packetssndqueue.h percentiletracker.h \
- variancetracker.h numstracker.h /usr/include/math.h \
+ pointerpool.h /usr/include/string.h \
+ /usr/include/x86_64-linux-gnu/bits/string.h \
+ /usr/include/x86_64-linux-gnu/bits/string2.h /usr/include/stdlib.h \
+ /usr/include/x86_64-linux-gnu/bits/string3.h bintree.h packetssndqueue.h \
+ percentiletracker.h variancetracker.h numstracker.h /usr/include/math.h \
  /usr/include/x86_64-linux-gnu/bits/huge_val.h \
  /usr/include/x86_64-linux-gnu/bits/huge_valf.h \
  /usr/include/x86_64-linux-gnu/bits/huge_vall.h \
@@ -655,6 +658,16 @@ gstmprtcpbuffer.h:
 gstmprtpbuffer.h:
 
 pointerpool.h:
+
+/usr/include/string.h:
+
+/usr/include/x86_64-linux-gnu/bits/string.h:
+
+/usr/include/x86_64-linux-gnu/bits/string2.h:
+
+/usr/include/stdlib.h:
+
+/usr/include/x86_64-linux-gnu/bits/string3.h:
 
 bintree.h:
 

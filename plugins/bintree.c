@@ -119,12 +119,18 @@ bintree_finalize (GObject * object)
   _ruin_full(this, this->root);
 }
 
+static void _node_reset(gpointer data)
+{
+  BinTreeNode *node = data;
+  memset(node, 0, sizeof(BinTreeNode));
+}
+
 void
 bintree_init (BinTree * this)
 {
   g_rw_lock_init (&this->rwmutex);
 //  this->node_pool = g_queue_new();
-  this->node_pool = make_pointerpool(1024, _node_ctor,g_free);
+  this->node_pool = make_pointerpool(1024, _node_ctor,g_free,_node_reset);
 }
 
 BinTree *make_bintree(BinTreeCmpFunc cmp)

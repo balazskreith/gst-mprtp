@@ -156,6 +156,12 @@ static gpointer _mprtp_ctor(void)
   return g_malloc0(sizeof(GstMpRTPBuffer));
 }
 
+static void _mprtp_reset(gpointer inc_data)
+{
+  GstMpRTPBuffer *casted_data = inc_data;
+  memset(casted_data, 0, sizeof(GstMpRTPBuffer));
+}
+
 /* class initialization */
 
 G_DEFINE_TYPE_WITH_CODE (GstMprtpplayouter, gst_mprtpplayouter,
@@ -313,7 +319,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->pivot_address_subflow_id = 0;
   this->pivot_address = NULL;
   g_rw_lock_init (&this->rwmutex);
-  this->mprtp_buffer_pool = make_pointerpool(512, _mprtp_ctor, g_free);
+  this->mprtp_buffer_pool = make_pointerpool(512, _mprtp_ctor, g_free, _mprtp_reset);
   this->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
   stream_joiner_set_monitor_payload_type(this->joiner, this->monitor_payload_type);
 

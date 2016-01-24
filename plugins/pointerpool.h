@@ -9,6 +9,7 @@
 #define POINTERPOOL_H_
 
 #include <gst/gst.h>
+#include <string.h>
 
 typedef struct _PointerPool PointerPool;
 typedef struct _PointerPoolClass PointerPoolClass;
@@ -31,6 +32,7 @@ struct _PointerPool
   gpointer**               items;
   gpointer               (*item_ctor)(void);
   void                   (*item_dtor)(gpointer);
+  void                   (*item_reset)(gpointer);
   guint32                  length;
   gint32                   write_index;
   gint32                   read_index;
@@ -45,7 +47,8 @@ struct _PointerPoolClass{
 GType pointerpool_get_type (void);
 PointerPool *make_pointerpool(guint32 length,
                               gpointer (*item_maker)(void),
-                              void (*item_dtor)(gpointer));
+                              void (*item_dtor)(gpointer),
+                              void (*item_reset)(gpointer));
 void pointerpool_add(PointerPool *this, gpointer item);
 gpointer pointerpool_get(PointerPool* this);
 void pointerpool_reset(PointerPool *this);

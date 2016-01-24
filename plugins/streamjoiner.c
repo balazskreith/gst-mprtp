@@ -202,14 +202,26 @@ stream_joiner_finalize (GObject * object)
 //  g_object_unref(this->playoutgate);
 }
 
+static void _frame_reset(gpointer inc_data)
+{
+  Frame *casted_data = inc_data;
+  memset(casted_data, 0, sizeof(Frame));
+}
+
+static void _framenode_reset(gpointer inc_data)
+{
+  FrameNode *casted_data = inc_data;
+  memset(casted_data, 0, sizeof(FrameNode));
+}
+
 void
 stream_joiner_init (StreamJoiner * this)
 {
   this->sysclock = gst_system_clock_obtain ();
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, _ruin_subflow);
 //  this->max_path_skew = 10 * GST_MSECOND;
-  this->frames_pool = make_pointerpool(1024, _frame_ctor, g_free);
-  this->framenodes_pool = make_pointerpool(1024, _framenode_ctor, g_free);
+  this->frames_pool = make_pointerpool(1024, _frame_ctor, g_free, _frame_reset);
+  this->framenodes_pool = make_pointerpool(1024, _framenode_ctor, g_free, _framenode_reset);
   this->PHSN = 0;
   this->playout_allowed = TRUE;
   this->playout_halt = FALSE;

@@ -88,7 +88,8 @@ pointerpool_init (PointerPool * this)
 
 PointerPool *make_pointerpool(guint32 length,
                               gpointer (*item_ctor)(void),
-                              void (*item_dtor)(gpointer))
+                              void (*item_dtor)(gpointer),
+                              void (*item_reset)(gpointer))
 {
   PointerPool *result;
   result = g_object_new (POINTERPOOL_TYPE, NULL);
@@ -96,6 +97,7 @@ PointerPool *make_pointerpool(guint32 length,
   result->items = g_malloc0(sizeof(gpointer)*length);
   result->item_ctor = item_ctor;
   result->item_dtor = item_dtor;
+  result->item_reset = item_reset;
   result->length = length;
   result->counter = 0;
   THIS_WRITEUNLOCK (result);
@@ -132,6 +134,9 @@ gpointer pointerpool_get(PointerPool* this)
       this->read_index=0;
   }
   --this->counter;
+
+  if(this->item_reset) this->item_reset(result);
+
 done:
   THIS_WRITEUNLOCK (this);
   return result;

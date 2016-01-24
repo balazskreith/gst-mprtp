@@ -193,9 +193,12 @@ libgstmprtp_la-rmanctrler.lo: rmanctrler.c /usr/include/stdc-predef.h \
  /usr/local/include/gstreamer-1.0/gst/gstcompat.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h smanctrler.h \
- mprtpspath.h gstmprtcpbuffer.h gstmprtpbuffer.h pointerpool.h bintree.h \
- packetssndqueue.h percentiletracker.h variancetracker.h numstracker.h \
- streamsplitter.h rmanctrler.h mprtprpath.h \
+ mprtpspath.h gstmprtcpbuffer.h gstmprtpbuffer.h pointerpool.h \
+ /usr/include/string.h /usr/include/x86_64-linux-gnu/bits/string.h \
+ /usr/include/x86_64-linux-gnu/bits/string2.h /usr/include/stdlib.h \
+ /usr/include/x86_64-linux-gnu/bits/string3.h bintree.h packetssndqueue.h \
+ percentiletracker.h variancetracker.h numstracker.h streamsplitter.h \
+ rmanctrler.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
  packetsrcvqueue.h skalmanfilter.h streamjoiner.h /usr/include/math.h \
  /usr/include/x86_64-linux-gnu/bits/huge_val.h \
@@ -656,6 +659,16 @@ gstmprtcpbuffer.h:
 gstmprtpbuffer.h:
 
 pointerpool.h:
+
+/usr/include/string.h:
+
+/usr/include/x86_64-linux-gnu/bits/string.h:
+
+/usr/include/x86_64-linux-gnu/bits/string2.h:
+
+/usr/include/stdlib.h:
+
+/usr/include/x86_64-linux-gnu/bits/string3.h:
 
 bintree.h:
 

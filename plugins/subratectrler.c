@@ -606,7 +606,10 @@ void subratectrler_extract_stats(SubflowRateController *this,
                                   guint64 *recent_delay)
 {
   if(sender_bitrate){
-    *sender_bitrate = mprtps_path_get_sent_bytes_in1s(this->path, NULL) * 8;
+    if(this->path)
+      *sender_bitrate = mprtps_path_get_sent_bytes_in1s(this->path, NULL) * 8;
+    else
+      g_warning("No Path at Subratectrler");
   }
   if(goodput){
     *goodput = _mt0(this)->goodput * 8.;
@@ -618,7 +621,10 @@ void subratectrler_extract_stats(SubflowRateController *this,
     *target_bitrate = this->target_bitrate;
   }
   if(queued_bits){
-    *queued_bits = mprtps_path_get_bytes_in_queue(this->path) * 8;
+      if(this->path)
+        *queued_bits = mprtps_path_get_bytes_in_queue(this->path) * 8;
+      else
+        g_warning("No Path at Subratectrler");
   }
   if(target_delay){
     *target_delay = _mt0(this)->ltt_delays_target;

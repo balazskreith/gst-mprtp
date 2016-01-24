@@ -372,7 +372,7 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  /usr/include/arpa/nameser_compat.h \
  /usr/include/x86_64-linux-gnu/sys/un.h /usr/include/net/if.h \
  /usr/include/arpa/inet.h mprtpspath.h packetssndqueue.h rmanctrler.h \
- smanctrler.h streamsplitter.h nlms.h refctrler.h ricalcer.h
+ smanctrler.h streamsplitter.h refctrler.h ricalcer.h
 
 /usr/include/stdc-predef.h:
 
@@ -1239,8 +1239,6 @@ rmanctrler.h:
 smanctrler.h:
 
 streamsplitter.h:
-
-nlms.h:
 
 refctrler.h:
 

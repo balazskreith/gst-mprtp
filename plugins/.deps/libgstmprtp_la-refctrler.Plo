@@ -199,7 +199,7 @@ libgstmprtp_la-refctrler.lo: refctrler.c /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/bits/string2.h /usr/include/stdlib.h \
  /usr/include/x86_64-linux-gnu/bits/string3.h bintree.h packetsrcvqueue.h \
  skalmanfilter.h variancetracker.h numstracker.h percentiletracker.h \
- streamsplitter.h mprtpspath.h packetssndqueue.h smanctrler.h \
+ smanctrler.h mprtpspath.h packetssndqueue.h streamsplitter.h \
  streamjoiner.h ricalcer.h /usr/include/math.h \
  /usr/include/x86_64-linux-gnu/bits/huge_val.h \
  /usr/include/x86_64-linux-gnu/bits/huge_valf.h \
@@ -694,13 +694,13 @@ numstracker.h:
 
 percentiletracker.h:
 
-streamsplitter.h:
+smanctrler.h:
 
 mprtpspath.h:
 
 packetssndqueue.h:
 
-smanctrler.h:
+streamsplitter.h:
 
 streamjoiner.h:
 

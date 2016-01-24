@@ -13,11 +13,10 @@
 #include <stdio.h>
 
 #include "mprtpspath.h"
-#include "streamsplitter.h"
-#include "streamsplitter2.h"
 #include "smanctrler.h"
 #include "bintree.h"
 #include "sndratedistor.h"
+#include "streamsplitter.h"
 
 
 typedef struct _SndEventBasedController SndEventBasedController;
@@ -49,8 +48,6 @@ struct _SndEventBasedController
   GHashTable*            subflows;
   GRWLock                rwmutex;
   StreamSplitter*        splitter;
-
-  StreamSplitter2*       splitter2;
 
   GstClock*              sysclock;
   guint64                ticknum;

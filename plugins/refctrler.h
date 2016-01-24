@@ -11,10 +11,10 @@
 #include <gst/gst.h>
 
 #include "mprtprpath.h"
-#include "streamsplitter.h"
 #include "smanctrler.h"
 #include "streamjoiner.h"
 #include "ricalcer.h"
+#include "streamsplitter.h"
 
 typedef struct _RcvEventBasedController RcvEventBasedController;
 typedef struct _RcvEventBasedControllerClass RcvEventBasedControllerClass;

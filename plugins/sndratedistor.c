@@ -31,7 +31,6 @@
 #include <string.h>
 #include "streamsplitter.h"
 #include "sefctrler.h"
-#include "nlms.h"
 #include "numstracker.h"
 
 

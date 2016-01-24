@@ -508,9 +508,9 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       guint_value = g_value_get_uint (value);
       subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
       subflow_bid = guint_value & 0x00FFFFFFUL;
-      stream_splitter_setup_sending_bid (this->splitter, subflow_id,
+      stream_splitter_setup_sending_rate (this->splitter, subflow_id,
           subflow_bid);
-      stream_splitter_commit_changes (this->splitter, 0, 0);
+      stream_splitter_commit_changes (this->splitter);
       THIS_WRITEUNLOCK (this);
       break;
 
@@ -824,7 +824,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   GstFlowReturn result;
   guint8 first_byte;
   guint8 second_byte;
-  gboolean suggest_to_skip;
+  gboolean suggest_to_skip = FALSE;
   GstBuffer *outbuf;
   result = GST_FLOW_OK;
 
@@ -849,7 +849,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   }
   //the packet is rtp
   THIS_READLOCK (this);
-  path = stream_splitter_get_next_path(this->splitter, buffer, &suggest_to_skip);
+  path = stream_splitter_get_next_path(this->splitter, buffer);
   if(!path){
     GST_WARNING_OBJECT(this, "No active subflow");
     goto done;

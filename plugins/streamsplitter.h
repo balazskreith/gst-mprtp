@@ -5,14 +5,13 @@
  *      Author: balazs
  */
 
-#ifndef STREAM_SPLITTER_H_
-#define STREAM_SPLITTER_H_
+#ifndef STREAM_SPLITTERN_H_
+#define STREAM_SPLITTERN_H_
 
 #include <gst/gst.h>
 
 #include "mprtpspath.h"
-#include "percentiletracker.h"
-#include "variancetracker.h"
+#include "numstracker.h"
 
 typedef struct _StreamSplitter StreamSplitter;
 typedef struct _StreamSplitterClass StreamSplitterClass;
@@ -28,55 +27,35 @@ typedef struct _SchNode SchNode;
 
 #define SCHTREE_MAX_VALUE 128
 
-#define MPRTP_SENDER_STREAM_SPLITTER_MAX_PATH_NUM 32
-
-
-typedef enum{
-  MPRTP_STREAM_BYTE_BASED_SPLITTING,
-  MPRTP_STREAM_PACKET_BASED_SPLITTING,
-  MPRTP_STREAM_FRAME_BASED_SPLITTING,
-}StreamSplittingMode;
-
 struct _StreamSplitter
 {
-  GObject          object;
+  GObject              object;
 
   gboolean             new_path_added;
   gboolean             path_is_removed;
   gboolean             changes_are_committed;
 
-  SchNode*             non_keyframes_tree;
-  SchNode*             keyframes_tree;
+  SchNode*             tree;
+  SchNode*             next_tree;
 
-  SchNode*             next_non_keyframes_tree;
-  SchNode*             next_keyframes_tree;
-
-  GstClockTime         max_skipping_time;
   guint32              sending_target;
 
-  guint32              skip_interval;
-  guint32              skip_tick;
-
-  StreamSplittingMode  splitting_mode;
   GHashTable*          subflows;
-  guint32              charge_value;
-  guint32              last_rtp_timestamp;
-  gboolean             new_frame;
   GRWLock              rwmutex;
 
   GstClock*            sysclock;
   GstTask*             thread;
   GRecMutex            thread_mutex;
 
-  gfloat               non_keyframe_ratio;
-  gfloat               keyframe_ratio;
   guint8               active_subflow_num;
 
   gboolean             separation_is_possible;
   gboolean             last_delta_flag;
   gboolean             first_delta_flag;
-  VarianceTracker*     incoming_bytes;
+  NumsTracker*         incoming_bytes;
   guint8               monitor_payload_type;
+
+  PointerPool*         pointerpool;
 
 };
 
@@ -88,18 +67,36 @@ struct _StreamSplitterClass{
 void stream_splitter_add_path(StreamSplitter * this,
                               guint8 subflow_id,
                               MPRTPSPath *path,
-                              guint32 start_bid);
-void stream_splitter_rem_path(StreamSplitter * this, guint8 subflow_id);
-MPRTPSPath* stream_splitter_get_next_path(StreamSplitter* this, GstBuffer* buf, gboolean *suggest_to_skip);
-gboolean stream_splitter_separation_is_possible (StreamSplitter * this);
+                              gint32 sending_rate);
 
-//void stream_splitter_set_splitting_mode (StreamSplitter * this, StreamSplittingMode mode);
+void stream_splitter_rem_path(
+    StreamSplitter * this,
+    guint8 subflow_id);
 
-void stream_splitter_setup_sending_bid(StreamSplitter* this, guint8 subflow_id, guint32 bid);
-guint32 stream_splitter_get_media_rate(StreamSplitter* this);
-void stream_splitter_set_monitor_payload_type(StreamSplitter *this, guint8 playload_type);
-gdouble stream_splitter_get_sending_rate(StreamSplitter* this, guint8 subflow_id);
-void stream_splitter_commit_changes (StreamSplitter * this, guint32 switch_rate, GstClockTime switch_max_time);
+MPRTPSPath*
+stream_splitter_get_next_path(
+    StreamSplitter* this,
+    GstBuffer* buf);
+
+void stream_splitter_setup_sending_rate(
+    StreamSplitter* this,
+    guint8 subflow_id,
+    gint32 sending_target);
+
+guint32 stream_splitter_get_media_rate(
+    StreamSplitter* this);
+
+void stream_splitter_set_monitor_payload_type(
+    StreamSplitter *this,
+    guint8 playload_type);
+
+gdouble stream_splitter_get_sending_rate(
+    StreamSplitter* this,
+    guint8 subflow_id);
+
+void stream_splitter_commit_changes (
+    StreamSplitter * this);
+
 GType stream_splitter_get_type (void);
 
-#endif /* STREAM_SPLITTER_H_ */
+#endif /* STREAM_SPLITTERN_H_ */

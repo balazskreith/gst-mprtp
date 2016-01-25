@@ -407,6 +407,8 @@ sefctrler_stat_run (void *data)
 //  gdouble media_target = 0.;
   FILE *file = NULL;
   gint32 sender_bitrate;
+  gint32 media_target = 0;
+  gint32 media_rate = 0;
   gint32 goodput;
   gint32 monitored_bits;
   gint32 target_bitrate;
@@ -458,6 +460,8 @@ sefctrler_stat_run (void *data)
             target_delay,
             ltt80th_delay,
             recent_delay);
+    media_rate += sender_bitrate;
+    media_target += target_bitrate;
 //    fprintf(file, "%f,%f,",
 //            media_target / 125.,
 //            stream_splitter_get_media_rate(this->splitter) / 125.);
@@ -468,8 +472,11 @@ sefctrler_stat_run (void *data)
     continue;
   }
 
-  fprintf(main_file,"%f\n", 0.);
-
+  {
+    gint32 encoder_rate = 0;
+    encoder_rate = stream_splitter_get_encoder_rate(this->splitter);
+    fprintf(main_file,"%d,%d,%d\n", media_rate,media_target,encoder_rate);
+  }
   fclose(main_file);
 
   THIS_WRITEUNLOCK(this);
@@ -736,8 +743,10 @@ void _assemble_measurement(SndEventBasedController * this, Subflow *subflow)
   chunks_num = _irt0(subflow)->rle_discards.length;
   for(chunk_index = 0; chunk_index < chunks_num; ++chunk_index)
   {
+      g_print("Late discarded chunk: %lu\n", _irt0(subflow)->rle_discards.values[chunk_index]);
      _irt0(subflow)->late_discarded_bytes +=
-     _irt0(subflow)->rle_discards.values[chunk_index];
+         _irt0(subflow)->rle_discards.values[chunk_index];
+
   }
   _irt0(subflow)->late_discarded_bytes_sum +=
      _irt0(subflow)->late_discarded_bytes;
@@ -1531,6 +1540,7 @@ guint32 _recalc_bids(SndEventBasedController * this)
     stream_splitter_setup_sending_rate(this->splitter,
                                       subflow->id,
                                       sending_bitrate);
+
     subflow->ready = FALSE;
   }
 

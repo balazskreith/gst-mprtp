@@ -712,20 +712,21 @@ _orp_main(RcvEventBasedController * this)
 
     //Note: We can calculate the total discarded packet num
     //by using RLE with RFC7097
+    if (_ort0(subflow)->discarded != _ort1(subflow)->discarded)
     {
       GstBuffer *xr;
-      DISABLE_LINE xr = _get_mprtcp_xr_7243_block (this, subflow, &block_length);
-      DISABLE_LINE block = gst_buffer_append (block, xr);
-      DISABLE_LINE report_length += block_length;
+      xr = _get_mprtcp_xr_7243_block (this, subflow, &block_length);
+      block = gst_buffer_append (block, xr);
+      report_length += block_length;
     }
 
 
     if (_ort0(subflow)->discarded != _ort1(subflow)->discarded)
     {
       GstBuffer *xr;
-      xr = _get_mprtcp_xr_rfc7097_block (this, subflow, &block_length);
-      block = gst_buffer_append (block, xr);
-      report_length += block_length;
+      DISABLE_LINE xr = _get_mprtcp_xr_rfc7097_block (this, subflow, &block_length);
+      DISABLE_LINE block = gst_buffer_append (block, xr);
+      DISABLE_LINE report_length += block_length;
     }
 
     {

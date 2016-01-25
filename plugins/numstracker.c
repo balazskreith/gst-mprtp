@@ -235,7 +235,9 @@ numstracker_get_stats (NumsTracker * this,
 {
   THIS_READLOCK (this);
   if(this->counter < 1) goto done;
-  if(sum) *sum = this->value_sum;
+  if(sum){
+      *sum = this->value_sum;
+  }
   THIS_READUNLOCK (this);
 done:
   return;

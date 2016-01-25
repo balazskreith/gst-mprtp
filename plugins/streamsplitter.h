@@ -83,7 +83,7 @@ void stream_splitter_setup_sending_rate(
     guint8 subflow_id,
     gint32 sending_target);
 
-guint32 stream_splitter_get_media_rate(
+gint32 stream_splitter_get_encoder_rate(
     StreamSplitter* this);
 
 void stream_splitter_set_monitor_payload_type(

@@ -248,10 +248,10 @@ stream_splitter_init (StreamSplitter * this)
   this->separation_is_possible = FALSE;
   this->first_delta_flag = TRUE;
   this->thread = gst_task_new (stream_splitter_run, this, NULL);
-  this->incoming_bytes = make_numstracker(1<15, GST_SECOND);
+  this->incoming_bytes = make_numstracker(1<<15, GST_SECOND);
   this->pointerpool = make_pointerpool(128, _schnode_ctor, g_free, _schnode_reset);
 //    this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
-
+  numstracker_reset(this->incoming_bytes);
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
 
@@ -332,13 +332,13 @@ exit:
   THIS_WRITEUNLOCK (this);
 }
 
-guint32 stream_splitter_get_media_rate(StreamSplitter* this)
+gint32 stream_splitter_get_encoder_rate(StreamSplitter* this)
 {
-  gint64 result;
+  gint64 result = 0;
   THIS_READLOCK(this);
   numstracker_get_stats(this->incoming_bytes, &result);
   THIS_READUNLOCK(this);
-  return result;
+  return result * 8;
 }
 
 void stream_splitter_set_monitor_payload_type(StreamSplitter *this, guint8 payload_type)
@@ -412,6 +412,7 @@ stream_splitter_run (void *data)
 
   THIS_WRITELOCK (this);
 
+  numstracker_obsolate(this->incoming_bytes);
   if (!this->new_path_added &&
       !this->path_is_removed && !this->changes_are_committed) {
     goto done;
@@ -419,6 +420,7 @@ stream_splitter_run (void *data)
 
   if(!this->active_subflow_num){
     _schnode_rdtor(this, this->tree);
+    this->tree = NULL;
     goto done;
   }
 
@@ -631,7 +633,8 @@ _schnode_rdtor (StreamSplitter *this,SchNode * node)
   }
   _schnode_rdtor (this, node->left);
   _schnode_rdtor (this, node->right);
-  pointerpool_add(this->pointerpool, node);
+//  pointerpool_add(this->pointerpool, node);
+  g_free(node);
 }
 
 void

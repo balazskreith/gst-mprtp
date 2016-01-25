@@ -113,7 +113,7 @@ struct _SubflowRateController
   gint                     cwnd_min;
   //COngestion window
   gint                     pacing_bitrate;
-  gboolean                 init_rate_ctrler;
+  gboolean                 rate_ctrler_initialized;
   //Congestion window inflection point. Initial value: 1
   gint                     cwnd_i;
   GstClockTime             last_congestion_detected;

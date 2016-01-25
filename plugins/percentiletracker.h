@@ -35,7 +35,7 @@ struct _PercentileTracker
   GRWLock                  rwmutex;
   PercentileTrackerItem*   items;
   gboolean                 debug;
-  guint64                  sum;
+  gint64                   sum;
   guint8                   percentile;
   guint32                  length;
   GstClock*                sysclock;
@@ -54,7 +54,7 @@ struct _PercentileTracker
 
 struct _PercentileTrackerItem
 {
-  guint64       value;
+  gint64        value;
   GstClockTime  added;
 };
 
@@ -84,9 +84,9 @@ guint32 percentiletracker_get_num(PercentileTracker *this);
 guint64 percentiletracker_get_last(PercentileTracker *this);
 guint64
 percentiletracker_get_stats (PercentileTracker * this,
-                         guint64 *min,
-                         guint64 *max,
-                         guint64 *sum);
+                             guint64 *min,
+                             guint64 *max,
+                             guint64 *sum);
 void percentiletracker_obsolate (PercentileTracker * this);
 void percentiletracker_reset(PercentileTracker *this);
 void percentiletracker_add(PercentileTracker *this, guint64 value);

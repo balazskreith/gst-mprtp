@@ -145,10 +145,11 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-streamsplitter.lo libgstmprtp_la-rmanctrler.lo \
 	libgstmprtp_la-smanctrler.lo libgstmprtp_la-sefctrler.lo \
 	libgstmprtp_la-refctrler.lo libgstmprtp_la-bintree.lo \
-	libgstmprtp_la-packetsrcvqueue.lo \
+	libgstmprtp_la-bintree2.lo libgstmprtp_la-packetsrcvqueue.lo \
 	libgstmprtp_la-packetssndqueue.lo \
 	libgstmprtp_la-pointerpool.lo libgstmprtp_la-ricalcer.lo \
 	libgstmprtp_la-percentiletracker.lo \
+	libgstmprtp_la-percentiletracker2.lo \
 	libgstmprtp_la-variancetracker.lo \
 	libgstmprtp_la-sndratedistor.lo \
 	libgstmprtp_la-skalmanfilter.lo libgstmprtp_la-numstracker.lo \
@@ -411,11 +412,13 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          sefctrler.c                \
                          refctrler.c                \
                          bintree.c                  \
+                         bintree2.c                 \
                          packetsrcvqueue.c          \
                          packetssndqueue.c          \
                          pointerpool.c              \
                          ricalcer.c                 \
                          percentiletracker.c        \
+                         percentiletracker2.c       \
                          variancetracker.c          \
                          sndratedistor.c            \
                          skalmanfilter.c            \
@@ -432,11 +435,13 @@ noinst_HEADERS = mprtpspath.h           \
                  streamsplitter.h       \
                  streamjoiner.h         \
                  bintree.h              \
+                 bintree2.h             \
                  packetsrcvqueue.h      \
                  packetssndqueue.h      \
                  pointerpool.h          \
                  ricalcer.h             \
                  percentiletracker.h    \
+                 percentiletracker2.h   \
                  variancetracker.h      \
                  sndratedistor.h        \
                  skalmanfilter.h        \
@@ -537,6 +542,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 include ./$(DEPDIR)/libgstmprtp_la-bintree.Plo
+include ./$(DEPDIR)/libgstmprtp_la-bintree2.Plo
 include ./$(DEPDIR)/libgstmprtp_la-floatnumstracker.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtcpbuffer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpbuffer.Plo
@@ -551,6 +557,7 @@ include ./$(DEPDIR)/libgstmprtp_la-numstracker.Plo
 include ./$(DEPDIR)/libgstmprtp_la-packetsrcvqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-packetssndqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-percentiletracker.Plo
+include ./$(DEPDIR)/libgstmprtp_la-percentiletracker2.Plo
 include ./$(DEPDIR)/libgstmprtp_la-pointerpool.Plo
 include ./$(DEPDIR)/libgstmprtp_la-refctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-ricalcer.Plo
@@ -697,6 +704,13 @@ libgstmprtp_la-bintree.lo: bintree.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-bintree.lo `test -f 'bintree.c' || echo '$(srcdir)/'`bintree.c
 
+libgstmprtp_la-bintree2.lo: bintree2.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-bintree2.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-bintree2.Tpo -c -o libgstmprtp_la-bintree2.lo `test -f 'bintree2.c' || echo '$(srcdir)/'`bintree2.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-bintree2.Tpo $(DEPDIR)/libgstmprtp_la-bintree2.Plo
+#	$(AM_V_CC)source='bintree2.c' object='libgstmprtp_la-bintree2.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-bintree2.lo `test -f 'bintree2.c' || echo '$(srcdir)/'`bintree2.c
+
 libgstmprtp_la-packetsrcvqueue.lo: packetsrcvqueue.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-packetsrcvqueue.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-packetsrcvqueue.Tpo -c -o libgstmprtp_la-packetsrcvqueue.lo `test -f 'packetsrcvqueue.c' || echo '$(srcdir)/'`packetsrcvqueue.c
 	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-packetsrcvqueue.Tpo $(DEPDIR)/libgstmprtp_la-packetsrcvqueue.Plo
@@ -731,6 +745,13 @@ libgstmprtp_la-percentiletracker.lo: percentiletracker.c
 #	$(AM_V_CC)source='percentiletracker.c' object='libgstmprtp_la-percentiletracker.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-percentiletracker.lo `test -f 'percentiletracker.c' || echo '$(srcdir)/'`percentiletracker.c
+
+libgstmprtp_la-percentiletracker2.lo: percentiletracker2.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-percentiletracker2.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-percentiletracker2.Tpo -c -o libgstmprtp_la-percentiletracker2.lo `test -f 'percentiletracker2.c' || echo '$(srcdir)/'`percentiletracker2.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-percentiletracker2.Tpo $(DEPDIR)/libgstmprtp_la-percentiletracker2.Plo
+#	$(AM_V_CC)source='percentiletracker2.c' object='libgstmprtp_la-percentiletracker2.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-percentiletracker2.lo `test -f 'percentiletracker2.c' || echo '$(srcdir)/'`percentiletracker2.c
 
 libgstmprtp_la-variancetracker.lo: variancetracker.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-variancetracker.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-variancetracker.Tpo -c -o libgstmprtp_la-variancetracker.lo `test -f 'variancetracker.c' || echo '$(srcdir)/'`variancetracker.c

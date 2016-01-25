@@ -44,13 +44,8 @@ struct _BinTreeNode
   guint ref;
 };
 
-struct _BinTreeValue{
-  guint64 value;
-};
-
 struct _BinTreeClass{
   GObjectClass parent_class;
-
 };
 
 GType bintree_get_type (void);

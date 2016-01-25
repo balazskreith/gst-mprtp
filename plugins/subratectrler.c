@@ -983,7 +983,7 @@ void _undershoot(SubflowRateController *this, gboolean disable_controlling)
           );
 
   if(undershoot_target < _SR(this) * .65){
-    _skip_frames_for(this, 250 * GST_MSECOND);
+    DISABLE_LINE _skip_frames_for(this, 250 * GST_MSECOND);
   }
 
   _reset_target_points(this);

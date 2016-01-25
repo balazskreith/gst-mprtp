@@ -310,19 +310,14 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
 //  g_print("J: %d\n", this->jitter);
   _add_delay(this, mprtp->delay);
   if(_cmp_seq(mprtp->subflow_seq, this->highest_seq) <= 0){
-    //probably found in missing;
     numstracker_add(this->lates, mprtp->subflow_seq);
-//    g_print("add sequence number %hu to lates\n", mprtp->subflow_seq);
     goto done;
   }
   if(_cmp_seq(this->highest_seq + 1, mprtp->subflow_seq) < 0){
     guint16 seq = this->highest_seq + 1;
-//    g_print("highest seen sequence number is %hu\n", this->highest_seq);
     for(; _cmp_seq(seq, mprtp->subflow_seq) < 0; ++seq){
-//      g_print("add sequence number %hu to gaps\n", seq);
       numstracker_add(this->gaps, seq);
     }
-    //add to missing;
   }
   this->highest_seq = mprtp->subflow_seq;
   if(this->last_rtp_timestamp == gst_mprtp_buffer_get_timestamp(mprtp))

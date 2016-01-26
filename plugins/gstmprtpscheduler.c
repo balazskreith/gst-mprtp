@@ -42,8 +42,7 @@
 #include "mprtpspath.h"
 #include "streamsplitter.h"
 #include "gstmprtcpbuffer.h"
-#include "smanctrler.h"
-#include "sefctrler.h"
+#include "sndctrler.h"
 #include <sys/timex.h>
 
 GST_DEBUG_CATEGORY_STATIC (gst_mprtpscheduler_debug_category);
@@ -75,6 +74,8 @@ static gboolean gst_mprtpscheduler_query (GstElement * element,
     GstQuery * query);
 static void
 gst_mprtpscheduler_mprtp_proxy(gpointer ptr, GstBuffer * buffer);
+static void
+gst_mprtpscheduler_emit_signal(gpointer ptr, gpointer data);
 static GstFlowReturn gst_mprtpscheduler_rtp_sink_chain (GstPad * pad,
     GstObject * parent, GstBuffer * buffer);
 static GstFlowReturn gst_mprtpscheduler_rtp_sink_chainlist (GstPad * pad,
@@ -94,8 +95,8 @@ _try_get_path (GstMprtpscheduler * this, guint16 subflow_id,
     MPRTPSPath ** result);
 static void _change_path_state (GstMprtpscheduler * this, guint8 subflow_id,
     gboolean set_congested, gboolean set_lossy);
-static void _change_auto_flow_controlling_mode (GstMprtpscheduler * this,
-    gboolean new_flow_controlling_mode);
+static void _change_auto_rate_and_cc (GstMprtpscheduler * this,
+    gboolean auto_rate_and_cc);
 static gboolean gst_mprtpscheduler_mprtp_src_event (GstPad * pad,
     GstObject * parent, GstEvent * event);
 static gboolean gst_mprtpscheduler_sink_eventfunc (GstPad * srckpad, GstObject * parent,
@@ -118,11 +119,9 @@ enum
   PROP_DETACH_SUBFLOW,
   PROP_SET_SUBFLOW_NON_CONGESTED,
   PROP_SET_SUBFLOW_CONGESTED,
-  PROP_AUTO_FLOW_CONTROLLING,
-  PROP_SET_SENDING_BID,
-  PROP_RETAIN_BUFFERS,
+  PROP_AUTO_RATE_AND_CC,
+  PROP_SET_SENDING_TARGET,
   PROP_SUBFLOWS_STATS,
-  PROP_SCHEDULER_STATE,
 };
 
 /* signals and args */
@@ -254,28 +253,16 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "set the subflow non-congested", "Set the subflow non-congested", 0,
           MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_AUTO_FLOW_CONTROLLING,
-      g_param_spec_boolean ("auto-flow-controlling",
-          "Automatic flow controlling means that ",
-          "the scheduler makes decision"
-          "based on receiver and XR riports for properly"
-          "distribute the flow considering their capacities and "
-          "events (losts, discards, etc...) It also puts extra "
-          "bytes on the network because of the generated "
-          "sender riports.",
+  g_object_class_install_property (gobject_class, PROP_AUTO_RATE_AND_CC,
+      g_param_spec_boolean ("auto-rate-and-cc",
+          "Enables automatic rate and congestion controller",
+          "Enables automatic rate and congestion controller",
           FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_RETAIN_BUFFERS,
-      g_param_spec_boolean ("retaining",
-          "Indicate weather the scheduler retain buffers",
-          "Indicate weather the schdeuler retain buffers if "
-          "no active suflows or if the subflows are overused",
-          FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_SET_SENDING_BID,
-      g_param_spec_uint ("setup-sending-bid",
-          "set the sending bid for a subflow",
-          "A 32bit unsigned integer for setup a bid. The first 8 bit identifies the subflow, the latter the bid for the subflow",
+  g_object_class_install_property (gobject_class, PROP_SET_SENDING_TARGET,
+      g_param_spec_uint ("setup-sending-target",
+          "set the sending target of the subflow",
+          "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the target",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
 
@@ -286,49 +273,13 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "a structure contains it",
           "NULL", G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_SCHEDULER_STATE,
-      g_param_spec_string ("scheduler-state",
-          "Extract scheduler state",
-          "Collect information about the scheduler and return with "
-          "a structure contains it",
-          "NULL", G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
-
-//  _subflows_utilization =
-//   g_signal_newv ("mprtp-subflows-utilization",
-//                  G_TYPE_FROM_CLASS (gobject_class),
-//                  G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
-//                  NULL /* closure */,
-//                  NULL /* accumulator */,
-//                  NULL /* accumulator data */,
-//                  NULL /* C marshaller */,
-//                  G_TYPE_NONE /* return_type */,
-//                  1     /* n_params */,
-//                  G_TYPE_UINT  /* param_types */,
-//                  NULL);
-
-//  _subflows_utilization =
-//      g_signal_new ("mprtp-subflows-utilization", G_TYPE_FROM_CLASS (klass),
-//            G_SIGNAL_RUN_LAST, 0, NULL, NULL,
-//            g_cclosure_marshal_generic, G_TYPE_NONE, 1,
-//            G_TYPE_UINT);
-
   _subflows_utilization =
       g_signal_new ("mprtp-subflows-utilization", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (GstMprtpschedulerClass, mprtp_media_rate_utilization),
       NULL, NULL, g_cclosure_marshal_generic, G_TYPE_NONE, 1,
       G_TYPE_POINTER);
 
-//  _subflows_utilization =
-//      g_signal_new ("mprtp-subflows-utilization",
-//                    G_TYPE_FROM_CLASS (klass),
-//                    G_SIGNAL_RUN_LAST,
-//                    G_STRUCT_OFFSET (GstMprtpschedulerClass, mprtp_media_rate_utilization),
-//                    NULL,
-//                    NULL,
-//                    g_cclosure_marshal_generic,
-//                    G_TYPE_NONE,
-//                    1,
-//                    G_TYPE_UINT);
+
 }
 
 static void
@@ -385,11 +336,6 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   gst_element_add_pad (GST_ELEMENT (this), this->mprtp_srcpad);
 
-  this->alpha_value = MPRTP_SENDER_DEFAULT_ALPHA_VALUE;
-  this->beta_value = MPRTP_SENDER_DEFAULT_BETA_VALUE;
-  this->gamma_value = MPRTP_SENDER_DEFAULT_GAMMA_VALUE;
-  this->retain_allowed = TRUE;
-
   this->path_ticking_thread =
       gst_task_new (gst_mprtpscheduler_path_ticking_process_run, this, NULL);
   this->sysclock = gst_system_clock_obtain ();
@@ -400,12 +346,15 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
   this->paths = g_hash_table_new_full (NULL, NULL, NULL, g_free);
   this->splitter = (StreamSplitter *) g_object_new (STREAM_SPLITTER_TYPE, NULL);
-  this->controller = NULL;
+  this->controller = (SndController*) g_object_new(SNDCTRLER_TYPE, NULL);
+  sndctrler_setup(this->controller, this->splitter);
+  sndctrler_setup_callbacks(this->controller,
+                            this, gst_mprtpscheduler_mprtcp_sender,
+                            this, gst_mprtpscheduler_emit_signal
+                            );
   stream_splitter_set_monitor_payload_type(this->splitter, this->monitor_payload_type);
-  _change_auto_flow_controlling_mode (this, FALSE);
+  _change_auto_rate_and_cc (this, FALSE);
   _setup_paths(this);
-
-
 }
 
 
@@ -491,19 +440,13 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       _change_path_state (this, (guint8) guint_value, FALSE, FALSE);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_AUTO_FLOW_CONTROLLING:
+    case PROP_AUTO_RATE_AND_CC:
       THIS_WRITELOCK (this);
       gboolean_value = g_value_get_boolean (value);
-      _change_auto_flow_controlling_mode (this, gboolean_value);
+      _change_auto_rate_and_cc (this, gboolean_value);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_RETAIN_BUFFERS:
-      THIS_WRITELOCK (this);
-      gboolean_value = g_value_get_boolean (value);
-      this->retain_allowed = gboolean_value;
-      THIS_WRITEUNLOCK (this);
-      break;
-    case PROP_SET_SENDING_BID:
+    case PROP_SET_SENDING_TARGET:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
       subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
@@ -545,24 +488,15 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
       g_value_set_uint (value, (guint) this->monitor_payload_type);
       THIS_READUNLOCK (this);
       break;
-    case PROP_AUTO_FLOW_CONTROLLING:
+    case PROP_AUTO_RATE_AND_CC:
       THIS_READLOCK (this);
-      g_value_set_boolean (value, this->flow_controlling_mode);
-      THIS_READUNLOCK (this);
-      break;
-    case PROP_RETAIN_BUFFERS:
-      THIS_READLOCK (this);
-      g_value_set_boolean (value, this->retain_allowed);
+      g_value_set_boolean (value, this->auto_rate_and_cc);
       THIS_READUNLOCK (this);
       break;
     case PROP_SUBFLOWS_STATS:
       THIS_READLOCK (this);
       g_value_set_string (value,
           gst_structure_to_string (_collect_infos (this)));
-      THIS_READUNLOCK (this);
-      break;
-    case PROP_SCHEDULER_STATE:
-      THIS_READLOCK (this);
       THIS_READUNLOCK (this);
       break;
     default:
@@ -661,7 +595,7 @@ _join_subflow (GstMprtpscheduler * this, guint subflow_id)
   g_hash_table_insert (this->paths, GINT_TO_POINTER (subflow_id), path);
   mprtps_path_set_monitor_payload_id(path, this->monitor_payload_type);
   mprtps_path_set_mprtp_ext_header_id(path, this->mprtp_ext_header_id);
-  this->controller_add_path (this->controller, subflow_id, path);
+  sndctrler_add_path(this->controller, subflow_id, path);
   ++this->subflows_num;
 }
 
@@ -679,7 +613,7 @@ _detach_subflow (GstMprtpscheduler * this, guint subflow_id)
     return;
   }
   g_hash_table_remove (this->paths, GINT_TO_POINTER (subflow_id));
-  this->controller_rem_path (this->controller, subflow_id);
+  sndctrler_rem_path(this->controller, subflow_id);
   --this->subflows_num;
 }
 
@@ -737,7 +671,6 @@ gst_mprtpscheduler_query (GstElement * element, GstQuery * query)
   GstStructure *s = NULL;
 
   GST_DEBUG_OBJECT (this, "query");
-  g_print("QUERY::: %s|",GST_QUERY_TYPE_NAME(query));
   switch (GST_QUERY_TYPE (query)) {
     case GST_QUERY_CUSTOM:
       THIS_READLOCK (this);
@@ -800,14 +733,14 @@ gst_mprtpscheduler_mprtp_proxy(gpointer ptr, GstBuffer * buffer)
   gst_pad_push (this->mprtp_srcpad, outbuf);
   if (!this->riport_flow_signal_sent) {
     this->riport_flow_signal_sent = TRUE;
-    this->riport_can_flow (this->controller);
+    sndctrler_riport_can_flow(this->controller);
   }
 
 done:
   return;
 }
 
-static void
+void
 gst_mprtpscheduler_emit_signal(gpointer ptr, gpointer data)
 {
   GstMprtpscheduler *this = ptr;
@@ -907,7 +840,7 @@ gst_mprtpscheduler_mprtcp_rr_sink_chain (GstPad * pad, GstObject * parent,
   GST_DEBUG_OBJECT (this, "RTCP/MPRTCP sink");
   THIS_READLOCK (this);
 
-  this->mprtcp_receiver (this->controller, buf);
+  sndctrler_receive_mprtcp(this->controller, buf);
 
   result = GST_FLOW_OK;
   THIS_READUNLOCK (this);
@@ -1048,50 +981,14 @@ _try_get_path (GstMprtpscheduler * this, guint16 subflow_id,
 
 
 void
-_change_auto_flow_controlling_mode (GstMprtpscheduler * this,
-    gboolean new_flow_controlling_mode)
+_change_auto_rate_and_cc (GstMprtpscheduler * this,
+    gboolean auto_rate_and_cc)
 {
-  gpointer key, val;
-  MPRTPSPath *path;
-  GHashTableIter iter;
-  guint8 subflow_id;
-  if (this->controller &&
-      this->flow_controlling_mode == new_flow_controlling_mode) {
-    return;
+  if(this->auto_rate_and_cc ^ auto_rate_and_cc){
+    if(auto_rate_and_cc) sndctrler_enable_auto_rate_and_cc(this->controller);
+    else sndctrler_disable_auto_rate_and_congestion_control(this->controller);
   }
-  if (this->controller != NULL) {
-    g_object_unref (this->controller);
-  }
-  if (new_flow_controlling_mode) {
-    this->controller = g_object_new (SEFCTRLER_TYPE, NULL);
-    sefctrler_setup (this->controller, this->splitter);
-    this->mprtcp_receiver = sefctrler_setup_mprtcp_exchange (this->controller,
-        this, gst_mprtpscheduler_mprtcp_sender);
-
-    sefctrler_set_callbacks (&this->riport_can_flow,
-        &this->controller_add_path,
-        &this->controller_rem_path);
-
-    sefctrler_setup_siganling(this->controller,
-                              gst_mprtpscheduler_emit_signal, this);
-
-  } else {
-    this->controller = g_object_new (SMANCTRLER_TYPE, NULL);
-    this->mprtcp_receiver = smanctrler_setup_mprtcp_exchange (this->controller,
-        this, gst_mprtpscheduler_mprtcp_sender);
-    smanctrler_setup (this->controller, this->splitter);
-    smanctrler_set_callbacks (&this->riport_can_flow,
-        &this->controller_add_path,
-        &this->controller_rem_path);
-  }
-  this->riport_flow_signal_sent = FALSE;
-  g_hash_table_iter_init (&iter, this->paths);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-    path = (MPRTPSPath *) val;
-    subflow_id = (guint8) GPOINTER_TO_INT (key);
-    this->controller_add_path (this->controller, subflow_id, path);
-  }
-
+  this->auto_rate_and_cc = auto_rate_and_cc;
 }
 
 

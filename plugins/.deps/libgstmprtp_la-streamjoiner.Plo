@@ -198,8 +198,9 @@ libgstmprtp_la-streamjoiner.lo: streamjoiner.c /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/bits/string.h \
  /usr/include/x86_64-linux-gnu/bits/string2.h /usr/include/stdlib.h \
  /usr/include/x86_64-linux-gnu/bits/string3.h bintree.h packetsrcvqueue.h \
- skalmanfilter.h variancetracker.h numstracker.h percentiletracker.h \
- /usr/include/math.h /usr/include/x86_64-linux-gnu/bits/huge_val.h \
+ variancetracker.h numstracker.h bintree2.h percentiletracker2.h \
+ percentiletracker.h /usr/include/math.h \
+ /usr/include/x86_64-linux-gnu/bits/huge_val.h \
  /usr/include/x86_64-linux-gnu/bits/huge_valf.h \
  /usr/include/x86_64-linux-gnu/bits/huge_vall.h \
  /usr/include/x86_64-linux-gnu/bits/inf.h \
@@ -679,11 +680,13 @@ bintree.h:
 
 packetsrcvqueue.h:
 
-skalmanfilter.h:
-
 variancetracker.h:
 
 numstracker.h:
+
+bintree2.h:
+
+percentiletracker2.h:
 
 percentiletracker.h:
 

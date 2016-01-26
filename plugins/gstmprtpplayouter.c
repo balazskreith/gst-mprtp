@@ -44,12 +44,10 @@
 #include "mprtprpath.h"
 #include "mprtpspath.h"
 #include "streamjoiner.h"
-#include "rmanctrler.h"
-#include "smanctrler.h"
 #include "gstmprtpbuffer.h"
 
 
-#include "refctrler.h"
+#include "rcvctrler.h"
 
 GST_DEBUG_CATEGORY_STATIC (gst_mprtpplayouter_debug_category);
 #define GST_CAT_DEFAULT gst_mprtpplayouter_debug_category
@@ -97,8 +95,8 @@ static void gst_mprtpplayouter_send_mprtp_proxy (gpointer data,
                                                  GstMpRTPBuffer * buf);
 static gboolean _try_get_path (GstMprtpplayouter * this, guint16 subflow_id,
     MpRTPRPath ** result);
-static void _change_flow_riporting_mode (GstMprtpplayouter * this,
-    guint new_flow_riporting_mode);
+static void _change_auto_rate_and_cc (GstMprtpplayouter * this,
+                                 gboolean auto_rate_and_cc);
 static GstStructure *_collect_infos (GstMprtpplayouter * this);
 static GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer);
 //static void _trash_mprtp_buffer(GstMprtpplayouter * this, GstMpRTPBuffer *mprtp);
@@ -113,7 +111,7 @@ enum
   PROP_JOIN_SUBFLOW,
   PROP_DETACH_SUBFLOW,
   PROP_PIVOT_CLOCK_RATE,
-  PROP_AUTO_FLOW_RIPORTING,
+  PROP_AUTO_RATE_AND_CC,
   PROP_RTP_PASSTHROUGH,
   PROP_SUBFLOWS_STATS,
 };
@@ -235,13 +233,11 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           "Detach a subflow with a given id.", 0,
           MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_AUTO_FLOW_RIPORTING,
-      g_param_spec_boolean ("auto-flow-reporting",
-          "Automatic flow riporting means that ",
-          "the playouter send RR and XR (if late discarded"
-          "packets arrive) to the sender. It also puts extra "
-          "bytes on the network because of the generated "
-          "riports.", FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (gobject_class, PROP_AUTO_RATE_AND_CC,
+      g_param_spec_boolean ("auto-rate-and-cc",
+                            "Automatic rate and congestion controll",
+                            "Automatic rate and congestion controll",
+                            FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
 
   g_object_class_install_property (gobject_class, PROP_RTP_PASSTHROUGH,
@@ -312,8 +308,11 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   //this->paths = g_hash_table_new_full (NULL, NULL, NULL, g_free);
   this->paths = g_hash_table_new_full (NULL, NULL, NULL, mprtpr_path_destroy);
   this->joiner = make_stream_joiner(this,gst_mprtpplayouter_send_mprtp_proxy);
-  this->controller = NULL;
-  _change_flow_riporting_mode (this, FALSE);
+  this->controller = g_object_new(RCVCTRLER_TYPE, NULL);
+  rcvctrler_setup(this->controller, this->joiner);
+  rcvctrler_setup_callbacks(this->controller,
+                            this, gst_mprtpplayouter_mprtcp_sender);
+  _change_auto_rate_and_cc (this, FALSE);
 
   this->pivot_address_subflow_id = 0;
   this->pivot_address = NULL;
@@ -445,10 +444,10 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       this->rtp_passthrough = gboolean_value;
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_AUTO_FLOW_RIPORTING:
+    case PROP_AUTO_RATE_AND_CC:
       THIS_WRITELOCK (this);
       gboolean_value = g_value_get_boolean (value);
-      _change_flow_riporting_mode (this, gboolean_value);
+      _change_auto_rate_and_cc (this, gboolean_value);
       THIS_WRITEUNLOCK (this);
       break;
     default:
@@ -492,9 +491,9 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
       g_value_set_uint (value, this->pivot_ssrc);
       THIS_READUNLOCK (this);
       break;
-    case PROP_AUTO_FLOW_RIPORTING:
+    case PROP_AUTO_RATE_AND_CC:
       THIS_READLOCK (this);
-      g_value_set_boolean (value, this->auto_flow_riporting);
+      g_value_set_boolean (value, this->auto_rate_and_cc);
       THIS_READUNLOCK (this);
       break;
     case PROP_RTP_PASSTHROUGH:
@@ -699,7 +698,7 @@ _join_path (GstMprtpplayouter * this, guint8 subflow_id)
   path = make_mprtpr_path (subflow_id);
   g_hash_table_insert (this->paths, GINT_TO_POINTER (subflow_id), path);
   stream_joiner_add_path (this->joiner, subflow_id, path);
-  this->controller_add_path (this->controller, subflow_id, path);
+  rcvctrler_add_path(this->controller, subflow_id, path);
   ++this->subflows_num;
 exit:
   return;
@@ -719,7 +718,7 @@ _detach_path (GstMprtpplayouter * this, guint8 subflow_id)
     goto exit;
   }
   stream_joiner_rem_path (this->joiner, subflow_id);
-  this->controller_rem_path (this->controller, subflow_id);
+  rcvctrler_rem_path(this->controller, subflow_id);
   g_hash_table_remove (this->paths, GINT_TO_POINTER (subflow_id));
   if (this->pivot_address && subflow_id == this->pivot_address_subflow_id) {
     g_object_unref (this->pivot_address);
@@ -846,7 +845,7 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   result = GST_FLOW_OK;
   if (!this->riport_flow_signal_sent) {
     this->riport_flow_signal_sent = TRUE;
-    this->riport_can_flow (this->controller);
+    rcvctrler_report_can_flow(this->controller);
   }
 done:
   THIS_READUNLOCK (this);
@@ -879,7 +878,7 @@ gst_mprtpplayouter_mprtcp_sr_sink_chain (GstPad * pad, GstObject * parent,
 
   if (!this->riport_flow_signal_sent) {
     this->riport_flow_signal_sent = TRUE;
-    this->riport_can_flow (this->controller);
+    rcvctrler_report_can_flow(this->controller);
   }
 done:
   THIS_READUNLOCK (this);
@@ -902,7 +901,7 @@ GstFlowReturn
 _processing_mprtcp_packet (GstMprtpplayouter * this, GstBuffer * buf)
 {
   GstFlowReturn result;
-  this->mprtcp_receiver (this->controller, buf);
+  rcvctrler_receive_mprtcp(this->controller, buf);
   result = GST_FLOW_OK;
   return result;
 }
@@ -980,45 +979,14 @@ _try_get_path (GstMprtpplayouter * this, guint16 subflow_id,
 }
 
 void
-_change_flow_riporting_mode (GstMprtpplayouter * this,
-    guint new_flow_riporting_mode)
+_change_auto_rate_and_cc (GstMprtpplayouter * this,
+    gboolean auto_rate_and_cc)
 {
-  gpointer key, val;
-  MpRTPRPath *path;
-  GHashTableIter iter;
-  guint8 subflow_id;
-  if (this->controller && this->auto_flow_riporting == new_flow_riporting_mode) {
-    return;
+  if(this->auto_rate_and_cc ^ auto_rate_and_cc){
+    if(auto_rate_and_cc) rcvctrler_enable_auto_rate_and_cc(this->controller);
+    else rcvctrler_disable_auto_rate_and_congestion_control(this->controller);
   }
-  if (this->controller != NULL) {
-    g_object_unref (this->controller);
-  }
-
-  if (new_flow_riporting_mode) {
-    this->controller = g_object_new (REFCTRLER_TYPE, NULL);
-    this->mprtcp_receiver = refctrler_setup_mprtcp_exchange (this->controller,
-        this, gst_mprtpplayouter_mprtcp_sender);
-
-    refctrler_set_callbacks (&this->riport_can_flow,
-        &this->controller_add_path, &this->controller_rem_path);
-    refctrler_setup (this->controller, this->joiner);
-  } else {
-    this->controller = g_object_new (RMANCTRLER_TYPE, NULL);
-    this->mprtcp_receiver = rmanctrler_setup_mprtcp_exchange (this->controller,
-        this, gst_mprtpplayouter_mprtcp_sender);
-
-    rmanctrler_set_callbacks (&this->riport_can_flow,
-        &this->controller_add_path, &this->controller_rem_path);
-    rmanctrler_setup (this->controller, this->joiner);
-  }
-
-  g_hash_table_iter_init (&iter, this->paths);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-    path = (MpRTPRPath *) val;
-    subflow_id = (guint8) GPOINTER_TO_INT (key);
-    this->controller_add_path (this->controller, subflow_id, path);
-  }
-
+  this->auto_rate_and_cc = auto_rate_and_cc;
 }
 
 
@@ -1035,15 +1003,6 @@ GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer)
 //  );
   return result;
 }
-//
-//void _trash_mprtp_buffer(GstMprtpplayouter * this, GstMpRTPBuffer *mprtp)
-//{
-//  if (g_queue_get_length (this->mprtp_buffer_pool) < 10240) {
-//    g_queue_push_head (this->mprtp_buffer_pool, mprtp);
-//  } else {
-//    g_free (mprtp);
-//  }
-//}
 
 #undef THIS_READLOCK
 #undef THIS_READUNLOCK

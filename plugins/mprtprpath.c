@@ -70,10 +70,12 @@ mprtpr_path_init (MpRTPRPath * this)
   this->delays = make_percentiletracker(1024, 50);
   percentiletracker_set_treshold(this->delays, 3 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->delays, _delays_stats_pipe, this);
+
+  this->skews = make_percentiletracker2(100, 50);
+  percentiletracker2_set_treshold(this->skews, 2 * GST_SECOND);
+
   this->rle.write_index = this->rle.read_index = 0;
   this->rle.stepped = _now(this);
-  this->delay_estimator = make_skalmanfilter_full(1024, GST_SECOND, .25);
-  this->skew_estimator = make_skalmanfilter_full(1024, GST_SECOND, .125);
   this->gaps = make_numstracker(128, GST_SECOND);
   numstracker_add_rem_pipe(this->gaps, _gaps_obsolation_pipe, this);
   this->lates = make_numstracker(128, 1500 * GST_MSECOND);
@@ -254,8 +256,9 @@ void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
                            guint32       *jitter)
 {
   THIS_READLOCK (this);
-  if(path_delay) *path_delay = this->estimated_delay;
-  if(path_skew) *path_skew = this->estimated_skew;
+//  if(path_delay) *path_delay = this->estimated_delay;
+  if(path_delay) *path_delay = percentiletracker_get_stats(this->delays, NULL, NULL, NULL);
+  if(path_skew)  *path_skew = this->path_skew; //this->estimated_skew;
   if(jitter) *jitter = this->jitter;
   THIS_READUNLOCK (this);
 }
@@ -302,7 +305,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
     this->seq_initialized = TRUE;
     goto done;
   }
-  skew = ((gint64)mprtp->delay) - ((gint64)this->last_mprtp_delay);
+  skew = (((gint64)this->last_mprtp_delay - (gint64)mprtp->delay));
   this->last_mprtp_delay = mprtp->delay;
   ++this->total_packets_received;
   this->total_payload_bytes += mprtp->payload_bytes;
@@ -367,17 +370,16 @@ _cmp_seq (guint16 x, guint16 y)
 
 void _add_delay(MpRTPRPath *this, GstClockTime delay)
 {
-//  percentiletracker_add(this->lt_low_delays, delay);
-//  percentiletracker_add(this->lt_high_delays, delay);
   percentiletracker_add(this->delays, delay);
-  this->estimated_delay = skalmanfilter_measurement_update(this->delay_estimator, delay);
-//  this->md_delay = ((gdouble)this->md_delay * 31 + (gdouble) delay) / 32.;
-//  this->sh_delay = ((gdouble)this->sh_delay * 3 + (gdouble) delay) / 4.;
 }
 
 void _add_skew(MpRTPRPath *this, gint64 skew)
 {
-  this->estimated_skew = skalmanfilter_measurement_update(this->skew_estimator, skew);
+  percentiletracker2_add(this->skews, skew);
+//  this->estimated_skew = skalmanfilter_measurement_update(this->skew_estimator, skew);
+  this->path_skew = this->path_skew * .99 + (gdouble)percentiletracker2_get_stats(this->skews, NULL, NULL, NULL) * .01;
+//  g_print("%f,%f,%ld\n", this->path_skew,this->estimated_skew,
+//          percentiletracker2_get_stats(this->skews, NULL, NULL, NULL));
 //  percentiletracker_add(this->skews, skew);
 }
 

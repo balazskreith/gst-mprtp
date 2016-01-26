@@ -56,7 +56,7 @@ static void
 _obsolate (NumsTracker * this);
 
 static gint
-_cmp_for_max (guint64 x, guint64 y);
+_cmp_for_max (gint64 x, gint64 y);
 
 //----------------------------------------------------------------------
 //--------- Private functions for MinMax Plugin --------
@@ -334,7 +334,7 @@ done:
 }
 
 gint
-_cmp_for_max (guint64 x, guint64 y)
+_cmp_for_max (gint64 x, gint64 y)
 {
   return x == y ? 0 : x < y ? -1 : 1;
 }
@@ -344,8 +344,8 @@ _cmp_for_max (guint64 x, guint64 y)
 //-----------------------------------------------------------------------------
 
 NumsTrackerMinMaxPlugin *
-make_numstracker_minmax_plugin(void (*max_pipe)(gpointer,guint64), gpointer max_data,
-                               void (*min_pipe)(gpointer,guint64), gpointer min_data)
+make_numstracker_minmax_plugin(void (*max_pipe)(gpointer,gint64), gpointer max_data,
+                               void (*min_pipe)(gpointer,gint64), gpointer min_data)
 {
   NumsTrackerMinMaxPlugin *this = g_malloc0(sizeof(NumsTrackerMinMaxPlugin));
   this->base.add_activator = _minmax_add_activator;
@@ -354,15 +354,15 @@ make_numstracker_minmax_plugin(void (*max_pipe)(gpointer,guint64), gpointer max_
   this->max_pipe_data = max_data;
   this->min_pipe = min_pipe;
   this->min_pipe_data = min_data;
-  this->tree = make_bintree(_cmp_for_max);
+  this->tree = make_bintree2(_cmp_for_max);
   this->base.destroyer = _destroy_minmax_plugin;
   return this;
 }
 
 void get_numstracker_minmax_plugin_stats(NumsTrackerMinMaxPlugin *this, gint64 *max, gint64 *min)
 {
-  if(max) *max = bintree_get_top_value(this->tree);
-  if(min) *min = bintree_get_bottom_value(this->tree);
+  if(max) *max = bintree2_get_top_value(this->tree);
+  if(min) *min = bintree2_get_bottom_value(this->tree);
 }
 
 void
@@ -375,14 +375,14 @@ _destroy_minmax_plugin(gpointer data)
 static void _minmax_pipe(NumsTrackerMinMaxPlugin *this)
 {
   if(this->max_pipe){
-   guint64 top;
-   top = bintree_get_top_value(this->tree);
+   gint64 top;
+   top = bintree2_get_top_value(this->tree);
    this->max_pipe(this->max_pipe_data, top);
  }
 
  if(this->min_pipe){
-   guint64 bottom;
-   bottom = bintree_get_bottom_value(this->tree);
+   gint64 bottom;
+   bottom = bintree2_get_bottom_value(this->tree);
    this->min_pipe(this->min_pipe_data, bottom);
  }
 }
@@ -391,14 +391,8 @@ void
 _minmax_add_activator(gpointer pdata, gint64 value)
 {
   NumsTrackerMinMaxPlugin *this = pdata;
-  if(this->tree && value < 0){
-    g_warning("numtracker with tree only allows positive values");
-    goto done;
-  }
-  bintree_insert_value(this->tree, value);
+  bintree2_insert_value(this->tree, value);
   _minmax_pipe(this);
-
-done:
   return;
 
 }
@@ -406,15 +400,9 @@ void
 _minmax_rem_activator(gpointer pdata, gint64 value)
 {
   NumsTrackerMinMaxPlugin *this = pdata;
-  if(this->tree && value < 0){
-    g_warning("numtracker with tree only allows positive values");
-    goto done;
-  }
-  bintree_delete_value(this->tree, value);
+  bintree2_delete_value(this->tree, value);
   _minmax_pipe(this);
-
-  done:
-    return;
+  return;
 }
 
 

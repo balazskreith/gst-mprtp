@@ -151,6 +151,7 @@ static Frame *_try_find(
   pointerpool_add(this->frames_pool, frame); \
   --this->framecounter;
 
+
 #define _trash_framenode(this, frame) pointerpool_add(this->framenodes_pool, node)
 
 
@@ -214,6 +215,12 @@ static void _framenode_reset(gpointer inc_data)
   memset(casted_data, 0, sizeof(FrameNode));
 }
 
+static void _skew_max_pipe(gpointer data, gint64 value)
+{
+  StreamJoiner* this = data;
+  this->max_skew = value;
+}
+
 void
 stream_joiner_init (StreamJoiner * this)
 {
@@ -223,12 +230,16 @@ stream_joiner_init (StreamJoiner * this)
   this->frames_pool = make_pointerpool(1024, _frame_ctor, g_free, _frame_reset);
   this->framenodes_pool = make_pointerpool(1024, _framenode_ctor, g_free, _framenode_reset);
   this->PHSN = 0;
+  this->flushing = FALSE;
   this->playout_allowed = TRUE;
   this->playout_halt = FALSE;
   this->playout_halt_time = 100 * GST_MSECOND;
   this->tick_interval = 20 * GST_USECOND;
-  this->latency_window = make_percentiletracker(256, 90);
-  percentiletracker_set_treshold(this->latency_window, 10 * GST_SECOND);
+  this->skews = make_numstracker(256, GST_SECOND);
+  numstracker_add_plugin(this->skews,
+                         (NumsTrackerPlugin*)make_numstracker_minmax_plugin(_skew_max_pipe, this, NULL, NULL));
+//  this->latency_window = make_percentiletracker(256, 90);
+//  percentiletracker_set_treshold(this->latency_window, 10 * GST_SECOND);
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   this->thread = gst_task_new (stream_joiner_run, this, NULL);
@@ -295,15 +306,19 @@ pop_frame:
 pop_node:
   node = frame->head;
   this->PHSN = node->seq;
-  this->send_mprtp_packet_func(this->send_mprtp_packet_data, node->mprtp);
+  if(node->mprtp){
+    this->bytes_in_queue -= node->mprtp->payload_bytes;
+    this->send_mprtp_packet_func(this->send_mprtp_packet_data, node->mprtp);
+  }
   frame->head = node->next;
   _trash_framenode(this, node);
   if(frame->head) goto pop_node;
   this->head = frame->next;
   _trash_frame(this, frame);
-  goto pop_frame;
+  //if we want to flush then goto pop_frame
+  if(this->flushing) goto pop_frame;
 next_tick:
-  next_scheduler_time = now + GST_MSECOND;
+  next_scheduler_time = now + 500 * GST_USECOND;
 //  next_scheduler_time = now + (guint64)this->estimated_tick;
 //  g_print("%lu-%lu\n", now + GST_MSECOND, now + (guint64)this->estimated_tick);
 done:
@@ -324,19 +339,17 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
 {
   guint16 abs_seq;
   Subflow *subflow;
-  guint64 latency;
   THIS_WRITELOCK(this);
   if(!GST_IS_BUFFER(mprtp->buffer)){
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
     goto done;
   }
-//  g_print("Receive a packet with timestamp: %u\n", gst_mprtp_ptr_buffer_get_timestamp(mprtp));
   abs_seq = gst_mprtp_buffer_get_abs_seq(mprtp);
   subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (mprtp->subflow_id));
-//  g_print("%d|", this->monitor_payload_type);
+
   if(gst_mprtp_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
+    //Todo: FEC packet processing here,
     subflow->monitored_bytes += mprtp->payload_bytes;
-    //now drop it;
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
     goto done;
   }
@@ -346,26 +359,17 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
                               &subflow->skew,
                               &subflow->jitter);
 
-//  g_print("S%d: %f->%lu\n", subflow->id, subflow->skew, (guint64)subflow->skew);
-  {
-    guint64 jitter,delay,skew;
-    delay = MIN(400 * GST_MSECOND, subflow->delay);
-    jitter = MIN(delay * .1, subflow->jitter);
-    skew = MIN(jitter * .5, subflow->skew);
-    latency = (guint64)(delay + skew + (gdouble)(jitter<<2));
-  }
+  numstracker_add(this->skews, subflow->skew);
+  this->playout_delay *= 124.;
+  this->playout_delay += this->max_skew;
+  this->playout_delay /= 125.;
 
-  if(latency < 300 * GST_MSECOND) percentiletracker_add(this->latency_window, latency);
-
-  latency = percentiletracker_get_stats(this->latency_window, NULL, NULL, NULL);
-  this->latency = (31. * this->latency + (gdouble)latency) / 32.;
+  //ssrc filter
   if(this->ssrc != 0 && this->ssrc != gst_mprtp_buffer_get_ssrc(mprtp)){
-//    g_print("this->ssrc: %u, gst ssrc: %u\n",
-//            this->ssrc, gst_mprtp_ptr_buffer_get_ssrc(mprtp));
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
     goto done;
   }
-//g_print("%f+%f+%u=%lu\n", subflow->delay, subflow->skew, subflow->jitter, latency);
+
   if(_cmp_seq(this->PHSN, abs_seq) < 0){
     this->ssrc = gst_mprtp_buffer_get_ssrc(mprtp);
     _add_mprtp_packet(this, mprtp);
@@ -469,11 +473,12 @@ stream_joiner_get_monitored_bytes(StreamJoiner *this, guint8 subflow_id)
 
 void
 stream_joiner_get_stats(StreamJoiner *this,
-                        gdouble *latency)
+                        gdouble *playout_delay,
+                        gint32 *playout_buffer_size)
 {
   THIS_READLOCK(this);
-  if(latency) *latency = this->latency;
-
+  if(playout_delay) *playout_delay = this->playout_delay;
+  if(playout_buffer_size) *playout_buffer_size = this->bytes_in_queue;
   THIS_READUNLOCK(this);
 }
 
@@ -525,6 +530,7 @@ void _add_mprtp_packet(StreamJoiner *this,
 {
   Frame *frame,*succ,*prev = NULL;
   guint32 timestamp;
+  this->bytes_in_queue += mprtp->payload_bytes;
   if(!this->head) {
     frame = this->head = this->tail = _make_frame(this, mprtp);
     goto done;
@@ -550,11 +556,6 @@ void _add_mprtp_packet(StreamJoiner *this,
   _push_into_frame(this, frame, mprtp);
 done:
   gst_buffer_ref(mprtp->buffer);
-//  if(frame->late){
-//    g_print("PlayoutGate: Late seq %hu, PHSN %hu, max_delay: %lums\n",
-//            frame->head->seq, this->PHSN, GST_TIME_AS_MSECONDS(this->max_delay));
-//  }
-//  _print_frame(frame);
   return;
 }
 
@@ -598,7 +599,6 @@ again:
   goto again;
 
 done:
-//g_print("Push into frame\n");
   return;
 }
 
@@ -627,31 +627,12 @@ found:
 Frame* _make_frame(StreamJoiner *this, GstMpRTPBuffer *mprtp)
 {
   Frame *result;
-  GstClockTime latency = 0;
-
   result = pointerpool_get(this->frames_pool);
   memset((gpointer)result, 0, sizeof(Frame));
-//  latency = percentiletracker_get_stats(this->latency_window, NULL, NULL, NULL);
-  latency = this->latency;// + GST_MSECOND;
-//  g_print("%f,0,0\n", this->latency / 1000.);
-  if(mprtp->delay < latency)
-    latency = latency - mprtp->delay;
-  else
-    latency = 0;
-  latency += percentiletracker_get_stats(this->ticks, NULL, NULL, NULL);
-//  latency += 10 * GST_MSECOND;
   result->head = result->tail = _make_framenode(this, mprtp);
   result->timestamp = gst_mprtp_buffer_get_timestamp(mprtp);
   result->created = gst_clock_get_time(this->sysclock);
-  result->playout_time = gst_clock_get_time(this->sysclock) + latency;
-//  if(subflow->id == 1)
-//    g_print("%lu+%lu\n",
-//            GST_TIME_AS_MSECONDS(subflow->delay),
-//            GST_TIME_AS_MSECONDS(latency));
-//  if(uskew)
-//      g_print("delay: %lu (%lu)\n",
-//              GST_TIME_AS_MSECONDS(result->playout_time - gst_clock_get_time(this->sysclock)),
-//              uskew);
+  result->playout_time = gst_clock_get_time(this->sysclock) + this->playout_delay;
   ++this->framecounter;
   return result;
 }
@@ -666,23 +647,6 @@ FrameNode * _make_framenode(StreamJoiner *this, GstMpRTPBuffer *mprtp)
   result->seq = gst_mprtp_buffer_get_abs_seq(mprtp);
   return result;
 }
-
-//
-//void _trash_frame(StreamJoiner *this, Frame* frame)
-//{
-//  if(g_queue_get_length(this->frames_pool) > 128)
-//    g_free(frame);
-//  else
-//    g_queue_push_tail(this->frames_pool, frame);
-//}
-//
-//void _trash_framenode(StreamJoiner *this, FrameNode* framenode)
-//{
-//  if(g_queue_get_length(this->framenodes_pool) > 4096)
-//    g_free(framenode);
-//  else
-//    g_queue_push_tail(this->framenodes_pool, framenode);
-//}
 
 
 

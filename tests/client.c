@@ -20,45 +20,31 @@
 #include <gst/gst.h>
 #include <gst/rtp/rtp.h>
 #include <stdlib.h>
+#include "test.h"
 
 /*
- * RTP receiver with RFC4588 retransmission handling enabled
  *
- *  In this example we have two RTP sessions, one for video and one for audio.
- *  Video is received on port 5000, with its RTCP stream received on port 5001
- *  and sent on port 5005. Audio is received on port 5005, with its RTCP stream
- *  received on port 5006 and sent on port 5011.
+ *             .-------.                                            .----------.
+ *  RTCP       |udpsrc |                                            |          |                                   .-------.
+ *  port=5005  |     src------------------------------------------>recv_rtcp_0 |                                   |udpsink|   RTCP port 5010
+ *             '-------'                                            |   send_rtcp_1------------------------------>sink     |
+ *                                                                  |          |                                   '-------'
+ *             .-------.    .------------.    .------------.        |          |               .-----------.   .---------.   .-------------.
+ *  RTP        |udpsrc |    | mprtp_rcv  |    | mprtp_ply  |        | rtpbin   |               |theoradepay|   |theoradec|   |autovideosink|
+ *  port=5000  |      src->sink_0 mprtp_src->mprtp_sink mprtp_src->rtp_recv_rtp_0 recv_rtp_0->sink       src->sink     src->sink           |
+ *             '-------'    |            |    |            |        '----------'               '-----------'   '---------'   '-------------'
+ *                          | mprtcp_sr_src->mprtcp_sr_sink|
+ *             .-------.    |            |    '------------'
+ *  RTP        |udpsrc |    |            |
+ *  port=5001  |      src->sink_1        |
+ *             '-------'    |            |
+ *                          |            |
+ *                          | mprtcp_rr_src-> MPRTCP RR,XR reports blocks
+ *                          '------------'
  *
- *  In both sessions, we set "rtprtxreceive" as the session's "aux" element
- *  in rtpbin, which enables RFC4588 retransmission handling for that session.
- *
- *             .-------.      .----------.        .-----------.   .---------.   .-------------.
- *  RTP        |udpsrc |      | rtpbin   |        |theoradepay|   |theoradec|   |autovideosink|
- *  port=5000  |      src->recv_rtp_0 recv_rtp_0->sink       src->sink     src->sink          |
- *             '-------'      |          |        '-----------'   '---------'   '-------------'
- *                            |          |
- *                            |          |     .-------.
- *                            |          |     |udpsink|  RTCP
- *                            |  send_rtcp_0->sink     | port=5005
- *             .-------.      |          |     '-------' sync=false
- *  RTCP       |udpsrc |      |          |               async=false
- *  port=5001  |     src->recv_rtcp_0    |
- *             '-------'      |          |
- *                            |          |
- *             .-------.      |          |        .---------.   .-------.   .-------------.
- *  RTP        |udpsrc |      |          |        |pcmadepay|   |alawdec|   |autoaudiosink|
- *  port=5006  |      src->recv_rtp_1 recv_rtp_1->sink     src->sink   src->sink          |
- *             '-------'      |          |        '---------'   '-------'   '-------------'
- *                            |          |
- *                            |          |     .-------.
- *                            |          |     |udpsink|  RTCP
- *                            |  send_rtcp_1->sink     | port=5011
- *             .-------.      |          |     '-------' sync=false
- *  RTCP       |udpsrc |      |          |               async=false
- *  port=5007  |     src->recv_rtcp_1    |
- *             '-------'      '----------'
  *
  */
+
 
 GMainLoop *loop = NULL;
 
@@ -111,11 +97,7 @@ make_video_session (guint sessionNum)
   SessionData *ret = session_new (sessionNum);
   GstBin *bin = GST_BIN (gst_bin_new ("video"));
   GstElement *queue = gst_element_factory_make ("queue", NULL);
-  //GstElement *depayloader = gst_element_factory_make ("rtptheoradepay", NULL);
   GstElement *depayloader = gst_element_factory_make ("rtpvp8depay", NULL);
-//    GstElement *depayloader = gst_element_factory_make ("rtpjpegdepay", NULL);
-//  GstElement *decoder = gst_element_factory_make ("theoradec", NULL);
-  //  GstElement *decoder = gst_element_factory_make ("jpegdec", NULL);
   GstElement *decoder = gst_element_factory_make ("vp8dec", NULL);
 
   GstElement *converter = gst_element_factory_make ("videoconvert", NULL);
@@ -265,9 +247,9 @@ static void
 join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
     guint32 clockrate)
 {
-  GstElement *rtpSrc_1, *rtpSrc_2;
+  GstElement *rtpSrc_1, *rtpSrc_2, *rtpSrc_3;
   GstElement *rtcpSrc;
-  GstElement *rtcpSink, *rtcpSink_1, *rtcpSink_2;
+  GstElement *rtcpSink, *rtcpSink_1, *rtcpSink_2, *rtcpSink_3;
   GstElement *mprtprcv, *mprtpsnd, *mprtpply;
   gchar *padName, *padname2;
   guint basePort;
@@ -280,16 +262,19 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
 
   rtpSrc_1 = gst_element_factory_make ("udpsrc", NULL);
   rtpSrc_2 = gst_element_factory_make ("udpsrc", NULL);
+  rtpSrc_3 = gst_element_factory_make ("udpsrc", NULL);
   rtcpSrc = gst_element_factory_make ("udpsrc", NULL);
   rtcpSink = gst_element_factory_make ("udpsink", NULL);
   rtcpSink_1 = gst_element_factory_make ("udpsink", NULL);
   rtcpSink_2 = gst_element_factory_make ("udpsink", NULL);
+  rtcpSink_3 = gst_element_factory_make ("udpsink", NULL);
   mprtprcv = gst_element_factory_make ("mprtpreceiver", NULL);
   mprtpply = gst_element_factory_make ("mprtpplayouter", NULL);
   mprtpsnd = gst_element_factory_make ("mprtpsender", NULL);
 
   g_object_set (rtpSrc_1, "port", basePort, "caps", session->caps, NULL);
   g_object_set (rtpSrc_2, "port", basePort + 1, "caps", session->caps, NULL);
+  g_object_set (rtpSrc_3, "port", basePort + 2, "caps", session->caps, NULL);
 
   g_object_set (rtcpSrc, "port", basePort + 5, NULL);
 
@@ -301,15 +286,22 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
 //      NULL);
       "async", FALSE, NULL);
 
+  g_object_set (rtcpSink_3, "port", basePort + 13, "host", "10.0.2.1",
+//      NULL);
+      "async", FALSE, NULL);
+
   g_object_set (rtcpSink, "port", basePort + 10, "host", "10.0.0.1",
 //                NULL);
         "async", FALSE, NULL);
 
   g_object_set (mprtpply, "pivot-clock-rate", clockrate, NULL);
 
-  g_object_set (mprtpply, "join-subflow", 1, NULL);
-//  g_object_set (mprtpply, "join-subflow", 2, NULL);
-  g_object_set (mprtpply, "auto-flow-reporting", TRUE, NULL);
+  if(test_parameters_.subflow1_active)
+    g_object_set (mprtpply, "join-subflow", 1, NULL);
+  if(test_parameters_.subflow2_active)
+    g_object_set (mprtpply, "join-subflow", 2, NULL);
+  if(test_parameters_.subflow3_active)
+    g_object_set (mprtpply, "join-subflow", 3, NULL);
 
   g_print ("Connecting to %i/%i/%i/%i/%i/%i\n",
       basePort, basePort + 1, basePort + 5,
@@ -320,8 +312,9 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
   g_signal_connect (rtpBin, "request-aux-receiver",
       (GCallback) request_aux_receiver, session);
 
-  gst_bin_add_many (GST_BIN (pipeline), rtpSrc_1, rtpSrc_2, rtcpSrc, rtcpSink,
-      mprtpsnd, mprtprcv, mprtpply, rtcpSink_1, rtcpSink_2, NULL);
+  gst_bin_add_many (GST_BIN (pipeline), rtpSrc_1, rtpSrc_2,
+                    rtpSrc_3, rtcpSrc, rtcpSink,
+      mprtpsnd, mprtprcv, mprtpply, rtcpSink_1, rtcpSink_2, rtcpSink_3, NULL);
 
   g_signal_connect_data (rtpBin, "pad-added", G_CALLBACK (handle_new_stream),
       session_ref (session), (GClosureNotify) session_unref, 0);
@@ -331,6 +324,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
 
   gst_element_link_pads (rtpSrc_1, "src", mprtprcv, "sink_1");
   gst_element_link_pads (rtpSrc_2, "src", mprtprcv, "sink_2");
+  gst_element_link_pads (rtpSrc_3, "src", mprtprcv, "sink_3");
 
   padName = g_strdup_printf ("recv_rtp_sink_%u", session->sessionNum);
   gst_element_link_pads (mprtprcv, "mprtp_src", mprtpply, "mprtp_sink");
@@ -348,6 +342,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");
   gst_element_link_pads (mprtpsnd, "src_1", rtcpSink_1, "sink");
   gst_element_link_pads (mprtpsnd, "src_2", rtcpSink_2, "sink");
+  gst_element_link_pads (mprtpsnd, "src_3", rtcpSink_3, "sink");
   g_free (padName);
 
   session_unref (session);
@@ -362,7 +357,18 @@ main (int argc, char **argv)
   GstElement *rtpBin;
   GstBus *bus;
 
-  gst_init (&argc, &argv);
+  GError *error = NULL;
+  GOptionContext *context;
+
+  context = g_option_context_new ("- test tree model performance");
+  g_option_context_add_main_entries (context, entries, NULL);
+  g_option_context_parse (context, &argc, &argv, &error);
+  if(info){
+    _print_info();
+    return 0;
+  }
+  _setup_test_params(profile);
+  gst_init (NULL, NULL);
 
   loop = g_main_loop_new (NULL, FALSE);
   pipe = GST_PIPELINE (gst_pipeline_new (NULL));
@@ -380,11 +386,15 @@ main (int argc, char **argv)
   g_object_set (rtpBin, "latency", 200, "do-retransmission", TRUE,
       "rtp-profile", GST_RTP_PROFILE_AVPF, NULL);
 
-  videoSession = make_video_session (0);
-  //audioSession = make_audio_session (1);
+  switch(test_parameters_.video_session){
+    case TEST_SOURCE:
+    default:
+      videoSession = make_video_session (0);
+    break;
+  }
+
 
   join_session (GST_ELEMENT (pipe), rtpBin, videoSession, 90000);
-  //join_session (GST_ELEMENT (pipe), rtpBin, audioSession, 8000);
 
   g_print ("starting client pipeline\n");
   gst_element_set_state (GST_ELEMENT (pipe), GST_STATE_PLAYING);

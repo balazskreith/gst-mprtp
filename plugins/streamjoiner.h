@@ -46,14 +46,19 @@ struct _StreamJoiner
   gint                 subflow_num;
   GstClock*            sysclock;
   GstClockTime         last_obsolate_checked;
-  gdouble              latency;
-  PercentileTracker*   latency_window;
+//  gdouble              latency;
+  gdouble              playout_delay;
+  NumsTracker*         skews;
+  gint64               max_skew;
+//  PercentileTracker*   latency_window;
   guint32              ssrc;
   PointerPool*         frames_pool;
   PointerPool*         framenodes_pool;
   Frame*               head;
   Frame*               tail;
   guint16              PHSN;
+  gint32               bytes_in_queue;
+  gboolean             flushing;
 //  SKalmanFilter*       tick_estimator;
   PercentileTracker*   ticks;
   gdouble              estimated_tick;
@@ -96,7 +101,8 @@ stream_joiner_set_monitor_payload_type(
 void
 stream_joiner_get_stats(
     StreamJoiner *this,
-    gdouble *latency);
+    gdouble *playout_delay,
+    gint32 *playout_buffer_size);
 
 void
 stream_joiner_set_playout_halt_time(

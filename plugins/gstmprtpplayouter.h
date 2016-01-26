@@ -26,6 +26,7 @@
 #include "streamjoiner.h"
 #include <gst/net/gstnetaddressmeta.h>
 #include "gstmprtpbuffer.h"
+#include "rcvctrler.h"
 
 #if GLIB_CHECK_VERSION (2, 35, 7)
 #include <gio/gnetworking.h>
@@ -72,7 +73,7 @@ struct _GstMprtpplayouter
   guint8          pivot_address_subflow_id;
   guint8          monitor_payload_type;
   guint64         clock_base;
-  gboolean        auto_flow_riporting;
+  gboolean        auto_rate_and_cc;
   gboolean        rtp_passthrough;
 
   GstMpRTPBuffer  mprtp_reference;
@@ -84,17 +85,17 @@ struct _GstMprtpplayouter
 
   GHashTable*     paths;
   StreamJoiner*   joiner;
-  gpointer        controller;
+  RcvController*    controller;
   GstClock*       sysclock;
 //  GQueue*         mprtp_buffer_pool;
   PointerPool*    mprtp_buffer_pool;
 
   guint           subflows_num;
 
-  void          (*controller_add_path) (gpointer, guint8, MpRTPRPath *);
-  void          (*controller_rem_path) (gpointer, guint8);
-  void          (*mprtcp_receiver) (gpointer, GstBuffer *);
-  void          (*riport_can_flow) (gpointer);
+//  void          (*controller_add_path) (gpointer, guint8, MpRTPRPath *);
+//  void          (*controller_rem_path) (gpointer, guint8);
+//  void          (*mprtcp_receiver) (gpointer, GstBuffer *);
+//  void          (*riport_can_flow) (gpointer);
   guint32         rtcp_sent_octet_sum;
 
 };

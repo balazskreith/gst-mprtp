@@ -14,7 +14,7 @@ typedef struct _NumsTracker NumsTracker;
 typedef struct _NumsTrackerClass NumsTrackerClass;
 
 
-#include "bintree.h"
+#include "bintree2.h"
 
 #define NUMSTRACKER_TYPE             (numstracker_get_type())
 #define NUMSTRACKER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),NUMSTRACKER_TYPE,NumsTracker))
@@ -70,9 +70,9 @@ struct _NumsTrackerPlugin{
 
 struct _NumsTrackerMinMaxPlugin{
   NumsTrackerPlugin base;
-  BinTree          *tree;
-  void            (*max_pipe)(gpointer, guint64);
-  void            (*min_pipe)(gpointer, guint64);
+  BinTree2         *tree;
+  void            (*max_pipe)(gpointer, gint64);
+  void            (*min_pipe)(gpointer, gint64);
   gpointer          max_pipe_data;
   gpointer          min_pipe_data;
 };
@@ -123,8 +123,8 @@ void numstracker_rem_plugin(NumsTracker *this, NumsTrackerPlugin *plugin);
 
 
 NumsTrackerMinMaxPlugin *
-make_numstracker_minmax_plugin(void (*max_pipe)(gpointer,guint64), gpointer max_data,
-                               void (*min_pipe)(gpointer,guint64), gpointer min_data);
+make_numstracker_minmax_plugin(void (*max_pipe)(gpointer,gint64), gpointer max_data,
+                               void (*min_pipe)(gpointer,gint64), gpointer min_data);
 
 void get_numstracker_minmax_plugin_stats(NumsTrackerMinMaxPlugin *this, gint64 *max, gint64 *min);
 

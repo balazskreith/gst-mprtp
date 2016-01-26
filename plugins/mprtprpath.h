@@ -15,9 +15,9 @@
 #include "gstmprtcpbuffer.h"
 #include "bintree.h"
 #include "packetsrcvqueue.h"
-#include "skalmanfilter.h"
 #include "variancetracker.h"
 #include "numstracker.h"
+#include "percentiletracker2.h"
 
 G_BEGIN_DECLS
 
@@ -86,13 +86,7 @@ struct _MpRTPReceiverPath
   gdouble             path_skew;
   GstClockTime        last_mprtp_delay;
   PercentileTracker*  delays;
-//  PercentileTracker*  lt_low_delays;
-//  PercentileTracker*  lt_high_delays;
-
-  SKalmanFilter*      delay_estimator;
-  gdouble             estimated_delay;
-  SKalmanFilter*      skew_estimator;
-  gdouble             estimated_skew;
+  PercentileTracker2* skews;
 
   NumsTracker*        gaps;
   NumsTracker*        lates;

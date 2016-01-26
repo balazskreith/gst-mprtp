@@ -12,10 +12,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          mprtpspath.c               \
                          streamjoiner.c             \
                          streamsplitter.c           \
-                         rmanctrler.c               \
-                         smanctrler.c               \
-                         sefctrler.c                \
-                         refctrler.c                \
+                         sndctrler.c                \
+                         rcvctrler.c                \
                          bintree.c                  \
                          bintree2.c                 \
                          packetsrcvqueue.c          \
@@ -26,17 +24,14 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          percentiletracker2.c       \
                          variancetracker.c          \
                          sndratedistor.c            \
-                         skalmanfilter.c            \
                          numstracker.c              \
                          floatnumstracker.c         \
                          subratectrler.c        
                     
                     
 noinst_HEADERS = mprtpspath.h           \
-                 rmanctrler.h           \
-                 smanctrler.h           \
-                 sefctrler.h            \
-                 refctrler.c            \
+                 sndctrler.h            \
+                 rcvctrler.c            \
                  mprtprpath.h           \
                  streamsplitter.h       \
                  streamjoiner.h         \
@@ -50,7 +45,6 @@ noinst_HEADERS = mprtpspath.h           \
                  percentiletracker2.h   \
                  variancetracker.h      \
                  sndratedistor.h        \
-                 skalmanfilter.h        \
                  numstracker.h          \
                  floatnumstracker.h     \
                  subratectrler.h        

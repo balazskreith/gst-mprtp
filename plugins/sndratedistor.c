@@ -30,7 +30,7 @@
 #include "percentiletracker.h"
 #include <string.h>
 #include "streamsplitter.h"
-#include "sefctrler.h"
+#include "sndctrler.h"
 #include "numstracker.h"
 
 

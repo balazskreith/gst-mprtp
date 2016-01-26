@@ -341,8 +341,8 @@ libgstmprtp_la-sefctrler.lo: sefctrler.c /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/bits/string.h \
  /usr/include/x86_64-linux-gnu/bits/string2.h /usr/include/stdlib.h \
  /usr/include/x86_64-linux-gnu/bits/string3.h bintree.h packetssndqueue.h \
- percentiletracker.h variancetracker.h numstracker.h smanctrler.h \
- streamsplitter.h sndratedistor.h subratectrler.h floatnumstracker.h \
+ percentiletracker.h variancetracker.h numstracker.h bintree2.h \
+ sndratedistor.h subratectrler.h floatnumstracker.h streamsplitter.h \
  /usr/include/math.h /usr/include/x86_64-linux-gnu/bits/huge_val.h \
  /usr/include/x86_64-linux-gnu/bits/huge_valf.h \
  /usr/include/x86_64-linux-gnu/bits/huge_vall.h \
@@ -1137,15 +1137,15 @@ variancetracker.h:
 
 numstracker.h:
 
-smanctrler.h:
-
-streamsplitter.h:
+bintree2.h:
 
 sndratedistor.h:
 
 subratectrler.h:
 
 floatnumstracker.h:
+
+streamsplitter.h:
 
 /usr/include/math.h:
 

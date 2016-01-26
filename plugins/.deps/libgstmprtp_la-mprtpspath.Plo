@@ -197,7 +197,7 @@ libgstmprtp_la-mprtpspath.lo: mprtpspath.c /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/bits/string.h \
  /usr/include/x86_64-linux-gnu/bits/string2.h /usr/include/stdlib.h \
  /usr/include/x86_64-linux-gnu/bits/string3.h bintree.h packetssndqueue.h \
- percentiletracker.h variancetracker.h numstracker.h
+ percentiletracker.h variancetracker.h numstracker.h bintree2.h
 
 /usr/include/stdc-predef.h:
 
@@ -666,3 +666,5 @@ percentiletracker.h:
 variancetracker.h:
 
 numstracker.h:
+
+bintree2.h:

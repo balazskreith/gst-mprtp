@@ -24,6 +24,7 @@
 
 #include "gstmprtcpbuffer.h"
 #include "mprtpspath.h"
+#include "sndctrler.h"
 #include "streamsplitter.h"
 
 G_BEGIN_DECLS
@@ -41,43 +42,34 @@ typedef struct _GstMprtpschedulerPrivate GstMprtpschedulerPrivate;
 
 struct _GstMprtpscheduler
 {
-  GstElement base_object;
+  GstElement                    base_object;
 
-  GstPad *rtp_sinkpad;
-  GstPad *mprtp_srcpad;
+  GstPad*                       rtp_sinkpad;
+  GstPad*                       mprtp_srcpad;
   //GstPad        *rtcp_sinkpad;
   //GstPad        *rtcp_srcpad;
-  GstPad *mprtcp_rr_sinkpad;
-  GstPad *mprtcp_sr_srcpad;
+  GstPad*                       mprtcp_rr_sinkpad;
+  GstPad*                       mprtcp_sr_srcpad;
 
-  gfloat           alpha_value;
-  gfloat           beta_value;
-  gfloat           gamma_value;
-  guint8           mprtp_ext_header_id;
-  guint8           abs_time_ext_header_id;
-  guint            flow_controlling_mode;
-  GHashTable*      paths;
-  GRWLock          rwmutex;
-  StreamSplitter*  splitter;
-  gpointer         controller;
-  gboolean         riport_flow_signal_sent;
-  gboolean         retain_allowed;
-  guint            subflows_num;
+  guint8                        mprtp_ext_header_id;
+  guint8                        abs_time_ext_header_id;
+  guint                         auto_rate_and_cc;
+  GHashTable*                   paths;
+  GRWLock                       rwmutex;
+  StreamSplitter*               splitter;
+  SndController*                controller;
+  gboolean                      riport_flow_signal_sent;
+  guint                         subflows_num;
 
-  GstSegment       segment;
-  GstClockTime     position_out;
+  GstSegment                    segment;
+  GstClockTime                  position_out;
 
-  guint8           monitor_payload_type;
+  guint8                        monitor_payload_type;
 
-  GstClock*        sysclock;
-  GstTask*         path_ticking_thread;
-  GRecMutex        path_ticking_mutex;
+  GstClock*                     sysclock;
+  GstTask*                      path_ticking_thread;
+  GRecMutex                     path_ticking_mutex;
 
-
-  void (*controller_add_path) (gpointer, guint8, MPRTPSPath *);
-  void (*controller_rem_path) (gpointer, guint8);
-  void (*mprtcp_receiver) (gpointer, GstBuffer *);
-  void (*riport_can_flow) (gpointer);
 //  void (*controller_pacing) (gpointer,gboolean);
 //  gboolean (*controller_is_pacing) (gpointer);
 //  GstStructure* (*controller_state)(gpointer);

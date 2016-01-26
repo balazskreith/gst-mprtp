@@ -51,16 +51,16 @@ static void bintree_finalize (GObject * object);
 static BinTreeNode * _insert(BinTree *this, BinTreeNode *actual, BinTreeNode *insert);
 static BinTreeNode * _insert_into_tree(BinTree *this, BinTreeNode *actual, BinTreeNode **insert);
 static BinTreeNode *
-_search_value(BinTree *this, guint64 value, BinTreeNode **parent);
+_search_value(BinTree *this, gint64 value, BinTreeNode **parent);
 static void
-_deref_from_tree (BinTree * this, guint64 value);
+_deref_from_tree (BinTree * this, gint64 value);
 static void _refresh_top(BinTree *this);
 static void _refresh_bottom(BinTree *this);
 static BinTreeNode *
-_pop_from_tree (BinTree * this, guint64 value);
+_pop_from_tree (BinTree * this, gint64 value);
 static BinTreeNode *_get_rightest_value(BinTreeNode *node, BinTreeNode **parent);
 static BinTreeNode *_get_leftest_value(BinTreeNode *node, BinTreeNode **parent);
-static BinTreeNode *_make_bintreenode(BinTree *this, guint64 value);
+static BinTreeNode *_make_bintreenode(BinTree *this, gint64 value);
 static void _trash_bintreenode(BinTree *this, BinTreeNode *node);
 static void _ruin_full(BinTree *this, BinTreeNode *node);
 
@@ -283,7 +283,7 @@ BinTreeNode *bintree_pop_bottom_node(BinTree *this)
   return result;
 }
 
-guint64 bintree_get_top_value(BinTree *this)
+gint64 bintree_get_top_value(BinTree *this)
 {
   guint64 result;
   THIS_READLOCK (this);
@@ -293,7 +293,7 @@ guint64 bintree_get_top_value(BinTree *this)
   return result;
 }
 
-guint64 bintree_get_bottom_value(BinTree *this)
+gint64 bintree_get_bottom_value(BinTree *this)
 {
   guint64 result;
   THIS_READLOCK (this);
@@ -303,7 +303,7 @@ guint64 bintree_get_bottom_value(BinTree *this)
   return result;
 }
 
-gboolean bintree_has_value(BinTree *this, guint64 value)
+gboolean bintree_has_value(BinTree *this, gint64 value)
 {
   BinTreeNode *node,*parent;
   THIS_READLOCK (this);
@@ -320,7 +320,7 @@ void bintree_insert_node(BinTree* this, BinTreeNode* node)
   THIS_WRITEUNLOCK (this);
 }
 
-void bintree_insert_value(BinTree* this, guint64 value)
+void bintree_insert_value(BinTree* this, gint64 value)
 {
   BinTreeNode* node;
   THIS_WRITELOCK (this);
@@ -330,7 +330,7 @@ void bintree_insert_value(BinTree* this, guint64 value)
   THIS_WRITEUNLOCK (this);
 }
 
-void bintree_delete_value(BinTree* this, guint64 value)
+void bintree_delete_value(BinTree* this, gint64 value)
 {
   THIS_WRITELOCK (this);
   _deref_from_tree(this, value);
@@ -354,7 +354,7 @@ guint32 bintree_get_num(BinTree *this)
   return result;
 }
 
-BinTreeNode* bintree_pop_node(BinTree* this, guint64 value)
+BinTreeNode* bintree_pop_node(BinTree* this, gint64 value)
 {
   BinTreeNode* result;
   THIS_WRITELOCK (this);
@@ -363,7 +363,7 @@ BinTreeNode* bintree_pop_node(BinTree* this, guint64 value)
   return result;
 }
 
-BinTreeNode *make_bintreenode(BinTree *this, guint64 value)
+BinTreeNode *make_bintreenode(BinTree *this, gint64 value)
 {
   BinTreeNode *result;
   THIS_WRITELOCK (this);
@@ -414,7 +414,7 @@ BinTreeNode * _insert_into_tree(BinTree *this, BinTreeNode *actual, BinTreeNode 
 
 
 void
-_deref_from_tree (BinTree * this, guint64 value)
+_deref_from_tree (BinTree * this, gint64 value)
 {
   BinTreeNode *candidate = NULL, *candidate_parent = NULL;
   BinTreeNode *node = NULL, *parent = NULL;
@@ -480,7 +480,7 @@ replace:
 
 
 BinTreeNode *
-_pop_from_tree (BinTree * this, guint64 value)
+_pop_from_tree (BinTree * this, gint64 value)
 {
   BinTreeNode *candidate = NULL, *candidate_parent = NULL;
   BinTreeNode *node, *parent;
@@ -524,7 +524,7 @@ replace:
   candidate = _pop_from_tree (this, candidate->value);
   {
       guint32 ref;
-      guint64 value;
+      gint64 value;
 
       //copy values
       ref = node->ref;
@@ -555,7 +555,7 @@ BinTreeNode *_get_leftest_value(BinTreeNode *node, BinTreeNode **parent)
   return node;
 }
 
-BinTreeNode *_search_value(BinTree *this, guint64 value, BinTreeNode **parent)
+BinTreeNode *_search_value(BinTree *this, gint64 value, BinTreeNode **parent)
 {
   BinTreeNode *node = this->root;
   gint cmp;
@@ -569,7 +569,7 @@ BinTreeNode *_search_value(BinTree *this, guint64 value, BinTreeNode **parent)
   return node;
 }
 
-BinTreeNode *_make_bintreenode(BinTree *this, guint64 value)
+BinTreeNode *_make_bintreenode(BinTree *this, gint64 value)
 {
   BinTreeNode *result;
   result = pointerpool_get(this->node_pool);

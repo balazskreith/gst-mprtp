@@ -22,7 +22,7 @@ typedef struct _BinTreeClass BinTreeClass;
 #define BINTREE_CAST(src)        ((BinTree *)(src))
 
 typedef struct _BinTreeNode BinTreeNode;
-typedef gint (*BinTreeCmpFunc)(guint64, guint64);
+typedef gint (*BinTreeCmpFunc)(gint64, gint64);
 struct _BinTree
 {
   GObject                  object;
@@ -40,7 +40,7 @@ struct _BinTree
 struct _BinTreeNode
 {
   BinTreeNode *left, *right;
-  guint64 value;
+  gint64 value;
   guint ref;
 };
 
@@ -52,15 +52,15 @@ GType bintree_get_type (void);
 BinTree *make_bintree(BinTreeCmpFunc cmp);
 BinTreeNode *bintree_pop_top_node(BinTree *this);
 BinTreeNode *bintree_pop_bottom_node(BinTree *this);
-guint64 bintree_get_top_value(BinTree *this);
-guint64 bintree_get_bottom_value(BinTree *this);
-gboolean bintree_has_value(BinTree *this, guint64 value);
+gint64 bintree_get_top_value(BinTree *this);
+gint64 bintree_get_bottom_value(BinTree *this);
+gboolean bintree_has_value(BinTree *this, gint64 value);
 void bintree_insert_node(BinTree* this, BinTreeNode* node);
-BinTreeNode *make_bintreenode(BinTree *this, guint64 value);
+BinTreeNode *make_bintreenode(BinTree *this, gint64 value);
 void trash_bintreenode(BinTree *this, BinTreeNode *node);
-void bintree_insert_value(BinTree* this, guint64 value);
-BinTreeNode* bintree_pop_node(BinTree* this, guint64 value);
-void bintree_delete_value(BinTree* this, guint64 value);
+void bintree_insert_value(BinTree* this, gint64 value);
+BinTreeNode* bintree_pop_node(BinTree* this, gint64 value);
+void bintree_delete_value(BinTree* this, gint64 value);
 void bintree_trash_node(BinTree *this, BinTreeNode *node);
 guint32 bintree_get_num(BinTree *this);
 

@@ -22,7 +22,7 @@ typedef struct _BinTreeClass BinTreeClass;
 #define BINTREE_CAST(src)        ((BinTree *)(src))
 
 typedef struct _BinTreeNode BinTreeNode;
-typedef gint (*BinTreeCmpFunc)(gint64, gint64);
+typedef gint (*BinTreeCmpFunc)(guint64, guint64);
 struct _BinTree
 {
   GObject                  object;

@@ -78,7 +78,7 @@ stream_splitter_get_next_path(
     StreamSplitter* this,
     GstBuffer* buf);
 
-void stream_splitter_setup_sending_rate(
+void stream_splitter_setup_sending_target(
     StreamSplitter* this,
     guint8 subflow_id,
     gint32 sending_target);
@@ -90,7 +90,7 @@ void stream_splitter_set_monitor_payload_type(
     StreamSplitter *this,
     guint8 playload_type);
 
-gdouble stream_splitter_get_sending_rate(
+gdouble stream_splitter_get_sending_target(
     StreamSplitter* this,
     guint8 subflow_id);
 

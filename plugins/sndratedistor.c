@@ -53,7 +53,7 @@ struct _Subflow{
 
   gint32                 extra_rate;
   gint32                 delta_rate;
-  gint32                 sending_rate;
+  gint32                 sending_target;
 };
 
 //----------------------------------------------------------------------
@@ -202,7 +202,7 @@ void sndrate_distor_time_update(SendingRateDistributor *this)
 
 guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id)
 {
-  return _get_subflow(this, id)->sending_rate;
+  return _get_subflow(this, id)->sending_target;
 }
 
 
@@ -231,13 +231,13 @@ void _time_update_preparation(SendingRateDistributor* this)
   foreach_subflows(this, i, subflow)
   {
     ur->subflows[subflow->id].controlled = TRUE;
-    prev_sending_target = subflow->sending_rate;
+    prev_sending_target = subflow->sending_target;
     subratectrler_time_update(subflow->controller,
-                              &subflow->sending_rate,
+                              &subflow->sending_target,
                               &subflow->extra_rate,
                               &this->ur.subflows[subflow->id]);
 
-    subflow->delta_rate =subflow->sending_rate - prev_sending_target;
+    subflow->delta_rate =subflow->sending_target - prev_sending_target;
     this->delta_rate += subflow->delta_rate;
     this->extra_rate += subflow->extra_rate;
 

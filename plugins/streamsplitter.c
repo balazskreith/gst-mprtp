@@ -57,7 +57,7 @@ struct _Subflow
   guint8      id;
   MPRTPSPath *path;
   gint32      sent_bytes;
-  gint32      sending_rate;
+  gint32      sending_target;
   gint        weight;
   gboolean    key_path;
   guint32     target_rate;
@@ -279,7 +279,7 @@ stream_splitter_add_path (StreamSplitter * this, guint8 subflow_id,
   g_hash_table_insert (this->subflows, GINT_TO_POINTER (subflow_id),
       lookup_result);
   this->new_path_added = TRUE;
-  lookup_result->sending_rate = sending_rate;
+  lookup_result->sending_target = sending_rate;
   lookup_result->id = subflow_id;
   ++this->active_subflow_num;
   GST_DEBUG ("Subflow is added, the actual number of subflow is: %d",
@@ -312,8 +312,8 @@ exit:
 
 
 void
-stream_splitter_setup_sending_rate (StreamSplitter * this, guint8 subflow_id,
-    gint32 sending_rate)
+stream_splitter_setup_sending_target (StreamSplitter * this, guint8 subflow_id,
+    gint32 sending_target)
 {
   Subflow *subflow;
   THIS_WRITELOCK (this);
@@ -327,7 +327,7 @@ stream_splitter_setup_sending_rate (StreamSplitter * this, guint8 subflow_id,
     goto exit;
   }
 //  g_print("setup %d sending rate for subflow %d\n", sending_rate, subflow_id);
-  subflow->sending_rate = sending_rate;
+  subflow->sending_target = sending_target;
 exit:
   THIS_WRITEUNLOCK (this);
 }
@@ -348,7 +348,7 @@ void stream_splitter_set_monitor_payload_type(StreamSplitter *this, guint8 paylo
   THIS_WRITEUNLOCK(this);
 }
 
-gdouble stream_splitter_get_sending_rate(StreamSplitter* this, guint8 subflow_id)
+gdouble stream_splitter_get_sending_target(StreamSplitter* this, guint8 subflow_id)
 {
   Subflow *subflow;
   gdouble result = 0.;
@@ -357,7 +357,7 @@ gdouble stream_splitter_get_sending_rate(StreamSplitter* this, guint8 subflow_id
         (Subflow *) g_hash_table_lookup (this->subflows,
         GINT_TO_POINTER (subflow_id));
   if(!subflow) goto done;
-  result = subflow->sending_rate;
+  result = subflow->sending_target;
 done:
   THIS_READUNLOCK(this);
   return result;
@@ -500,11 +500,11 @@ void _check_pathes(Subflow *subflow, gpointer data)
   path_state = mprtps_path_get_state (path);
 
   if (path_state == MPRTPS_PATH_STATE_NON_CONGESTED) {
-    pdata->nc_sum += subflow->sending_rate;
+    pdata->nc_sum += subflow->sending_target;
   } else if (path_state == MPRTPS_PATH_STATE_LOSSY) {
-    pdata->mc_sum += subflow->sending_rate;
+    pdata->mc_sum += subflow->sending_target;
   } else if (path_state == MPRTPS_PATH_STATE_CONGESTED) {
-    pdata->c_sum += subflow->sending_rate;
+    pdata->c_sum += subflow->sending_target;
   }
 
   subflow->valid = FALSE;
@@ -572,11 +572,11 @@ static void _setup_node(SchNode * node, guint level)
 void _validate_sending_rates(Subflow *subflow, gpointer data)
 {
   SumData *sumd = data;
-  gdouble exp_ratio = (gdouble) subflow->sending_rate / (gdouble)sumd->total;
+  gdouble exp_ratio = (gdouble) subflow->sending_target / (gdouble)sumd->total;
   gdouble treshold = 1. / (gdouble) SCHTREE_MAX_VALUE;
   if(exp_ratio < treshold) return;
   subflow->valid = TRUE;
-  sumd->valid += subflow->sending_rate;
+  sumd->valid += subflow->sending_target;
 }
 
 
@@ -585,7 +585,7 @@ void _setup_sending_weights(Subflow *subflow, gpointer data)
   WeightData *wdata = data;
   gdouble weight;
   if(!subflow->valid) return;
-  weight = (gdouble) subflow->sending_rate / (gdouble) wdata->valid_sum;
+  weight = (gdouble) subflow->sending_target / (gdouble) wdata->valid_sum;
   weight *= (gdouble) SCHTREE_MAX_VALUE;
   wdata->total_weight+=subflow->weight = weight;
 }

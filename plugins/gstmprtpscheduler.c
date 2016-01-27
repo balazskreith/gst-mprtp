@@ -396,7 +396,7 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
   guint guint_value;
   gboolean gboolean_value;
   guint8 subflow_id;
-  guint subflow_bid;
+  guint subflow_target;
 
   GST_DEBUG_OBJECT (this, "set_property");
 
@@ -450,9 +450,9 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
       subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
-      subflow_bid = guint_value & 0x00FFFFFFUL;
-      stream_splitter_setup_sending_rate (this->splitter, subflow_id,
-          subflow_bid);
+      subflow_target = guint_value & 0x00FFFFFFUL;
+      stream_splitter_setup_sending_target (this->splitter, subflow_id,
+          subflow_target);
       stream_splitter_commit_changes (this->splitter);
       THIS_WRITEUNLOCK (this);
       break;

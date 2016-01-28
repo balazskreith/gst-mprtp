@@ -28,6 +28,8 @@ typedef struct _TestParams{
   gboolean     subflow1_active;
   gboolean     subflow2_active;
   gboolean     subflow3_active;
+
+  gboolean     other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time;
 }TestParams;
 
 static TestParams test_parameters_;
@@ -107,6 +109,7 @@ static void _setup_test_params(guint profile)
         break;
     }
 
+  test_parameters_.other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time = (profile & 128) > 0 ? TRUE : FALSE;
 }
 
 

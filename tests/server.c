@@ -236,7 +236,7 @@ make_video_foreman_session (guint sessionNum)
   g_object_set (videoParse,
       "width", 352,
       "height", 288,
-      "framerate", 15, 1,
+      "framerate", 25, 1,
       "format", 2,
       NULL);
 
@@ -352,9 +352,9 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
            gchar* file)
 {
 
-  GstElement *rtpSink_1 = gst_element_factory_make ("udpsink", NULL);
-  GstElement *rtpSink_2 = gst_element_factory_make ("udpsink", NULL);
-  GstElement *rtpSink_3 = gst_element_factory_make ("udpsink", NULL);
+  GstElement *rtpSink_1 = gst_element_factory_make ("udpsink", "rtpsink_1");
+  GstElement *rtpSink_2 = gst_element_factory_make ("udpsink", "rtpsink_2");
+  GstElement *rtpSink_3 = gst_element_factory_make ("udpsink", "rtpsink_3");
   GstElement *rtcpSink = gst_element_factory_make ("udpsink", NULL);
   GstElement *rtcpSrc = gst_element_factory_make ("udpsrc", NULL);
   GstElement *rtpSrc_1 = gst_element_factory_make ("udpsrc", NULL);
@@ -363,6 +363,9 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   GstElement *mprtpsnd = gst_element_factory_make ("mprtpsender", NULL);
   GstElement *mprtprcv = gst_element_factory_make ("mprtpreceiver", NULL);
   GstElement *mprtpsch = gst_element_factory_make ("mprtpscheduler", NULL);
+  GstElement *q1 = gst_element_factory_make ("queue", "rtpq_1");
+  GstElement *q2 = gst_element_factory_make ("queue", "rtpq_2");
+  GstElement *q3 = gst_element_factory_make ("queue", "rtpq_3");
   int basePort;
   gchar *padName;
 
@@ -370,7 +373,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
 
   gst_bin_add_many (GST_BIN (pipe), rtpSink_1, rtpSink_2, rtpSink_3,
       mprtprcv, mprtpsnd, mprtpsch, rtcpSink, rtcpSrc, rtpSrc_1,
-      rtpSrc_2, rtpSrc_3,
+      rtpSrc_2, rtpSrc_3, q1, q2, q3,
       session->input, NULL);
 
   /* enable retransmission by setting rtprtxsend as the "aux" element of rtpbin */
@@ -380,17 +383,27 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   g_signal_connect (mprtpsch, "mprtp-subflows-utilization",
       (GCallback) changed_event, NULL);
 
-  g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2",
-//      NULL);
-      "sync",FALSE, "async", FALSE, NULL);
+//  if(test_parameters_.other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time)
+//    g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2", NULL);
+//  else
+//    g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2", "sync", FALSE, "async", FALSE, NULL);
+////      "sync",FALSE, "async", FALSE, NULL);
 
-  g_object_set (rtpSink_2, "port", basePort + 1, "host", "10.0.1.2",
-//      NULL);
-      "sync",FALSE, "async", FALSE, NULL);
+  if(test_parameters_.other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time)
+    g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2", NULL);
+  else
+    g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2", NULL);
 
-  g_object_set (rtpSink_3, "port", basePort + 2, "host", "10.0.2.2",
-//      NULL);
-      "sync",FALSE, "async", FALSE, NULL);
+  if(test_parameters_.other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time)
+    g_object_set (rtpSink_2, "port", basePort + 1, "host", "10.0.1.2", NULL);
+  else
+    g_object_set (rtpSink_2, "port", basePort + 1, "host", "10.0.1.2", "sync",FALSE, "async", FALSE, NULL);
+
+  if(test_parameters_.other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time)
+    g_object_set (rtpSink_3, "port", basePort + 2, "host", "10.0.2.2", NULL);
+  else
+    g_object_set (rtpSink_3, "port", basePort + 2, "host", "10.0.2.2", "sync",FALSE, "async", FALSE, NULL);
+//      );
 
   g_object_set (rtcpSink, "port", basePort + 5, "host", "10.0.0.2",
 //      NULL);
@@ -414,11 +427,14 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   gst_element_link_pads (rtpBin, padName, mprtpsch, "rtp_sink");
   gst_element_link_pads (mprtpsch, "mprtp_src", mprtpsnd, "mprtp_sink");
   g_free (padName);
-  gst_element_link_pads (mprtpsnd, "src_1", rtpSink_1, "sink");
+  gst_element_link_pads (mprtpsnd, "src_1", q1, "sink");
+  gst_element_link_pads (q1, "src", rtpSink_1, "sink");
 
-  gst_element_link_pads (mprtpsnd, "src_2", rtpSink_2, "sink");
+  gst_element_link_pads (mprtpsnd, "src_2", q2, "sink");
+  gst_element_link_pads (q2, "src", rtpSink_2, "sink");
 
-  gst_element_link_pads (mprtpsnd, "src_3", rtpSink_3, "sink");
+  gst_element_link_pads (mprtpsnd, "src_3", q3, "sink");
+  gst_element_link_pads (q3, "src", rtpSink_3, "sink");
 
   if(test_parameters_.subflow1_active)
     g_object_set (mprtpsch, "join-subflow", 1, NULL);
@@ -502,8 +518,14 @@ main (int argc, char **argv)
   add_stream (pipe, rtpBin, videoSession, testfile);
 
   g_print ("starting server pipeline\n");
-  gst_element_set_state (GST_ELEMENT (pipe), GST_STATE_PLAYING);
-
+  {
+    GstStateChangeReturn changeresult;
+    GstState actual, pending;
+    changeresult = gst_element_set_state (GST_ELEMENT (pipe), GST_STATE_PLAYING);
+//    g_print("changeresult: %d\n", changeresult);
+    changeresult = gst_element_get_state(GST_ELEMENT (pipe), &actual, &pending, 0);
+    g_print("actual state: %d, pending: %d, changeresult: %d\n", actual, pending, changeresult);
+  }
   g_main_loop_run (loop);
 
   g_print ("stopping server pipeline\n");

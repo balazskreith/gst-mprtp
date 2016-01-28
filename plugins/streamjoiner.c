@@ -72,6 +72,7 @@ struct _Subflow
 struct _FrameNode{
   GstMpRTPBuffer* mprtp;
   guint16         seq;
+  gboolean        marker;
   FrameNode*      next;
 };
 
@@ -81,6 +82,8 @@ struct _Frame
   FrameNode      *head;
   FrameNode      *tail;
   guint32         timestamp;
+  gboolean        ready;
+  guint32         last_seq;
   GstClockTime    playout_time;
   GstClockTime    created;
 };
@@ -117,6 +120,11 @@ _ruin_subflow (
     gpointer data);
 
 static gint
+_cmp_seq32 (
+    guint32 x,
+    guint32 y);
+
+static gint
 _cmp_seq (
     guint16 x,
     guint16 y);
@@ -124,14 +132,14 @@ _cmp_seq (
 static Frame*
 _make_frame(
     StreamJoiner *this,
-    GstMpRTPBuffer *mprtp);
+    FrameNode *node);
 
 static FrameNode *
 _make_framenode(
     StreamJoiner *this,
     GstMpRTPBuffer *mprtp);
 
-static void
+static gboolean
 _add_mprtp_packet(
     StreamJoiner *this,
     GstMpRTPBuffer *mprtp);
@@ -141,11 +149,6 @@ _push_into_frame(
     StreamJoiner *this,
     Frame *frame,
     GstMpRTPBuffer *rtp);
-
-static Frame *_try_find(
-    StreamJoiner *this,
-    guint32 timestamp,
-    Frame **predecessor);
 
 #define _trash_frame(this, frame)  \
   pointerpool_add(this->frames_pool, frame); \
@@ -163,7 +166,7 @@ static void _print_frame(Frame *frame)
   g_print("Frame %p created: %lu, srt: %d, rd: %d, m: %d src: %d, h: %p, t: %p\n",
           frame, frame->created, frame->sorted, frame->ready, frame->marked,
           frame->source, frame->head, frame->tail);
-  g_print("Items: ")
+  g_print("Items: ");
   for(node = frame->head; node; node = node->next)
     g_print("%p(%hu)->%p|", node, node->seq, node->next);
   g_print("\n");
@@ -271,15 +274,11 @@ stream_joiner_run (void *data)
 
   THIS_WRITELOCK (this);
   now = gst_clock_get_time (this->sysclock);
-  if (this->subflow_num == 0) {
+  if (this->subflow_num == 0 || !this->playout_allowed) {
     next_scheduler_time = now + GST_MSECOND;
     goto done;
   }
 
-  if(!this->playout_allowed){
-    next_scheduler_time = now + GST_MSECOND;
-    goto done;
-  }
   if(this->playout_halt){
     next_scheduler_time = now + this->playout_halt_time;
     this->playout_halt = FALSE;
@@ -308,15 +307,29 @@ pop_node:
   this->PHSN = node->seq;
   if(node->mprtp){
     this->bytes_in_queue -= node->mprtp->payload_bytes;
+    {
+      GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+      gst_rtp_buffer_map(node->mprtp->buffer, GST_MAP_READ, &rtp);
+      g_print("Playout Abs-Seq: %u Payload-ln: %u, Timestamp: %u - IFrame: %d Ready: %d\n",
+              gst_rtp_buffer_get_seq(&rtp),
+              gst_rtp_buffer_get_payload_len(&rtp),
+              gst_rtp_buffer_get_timestamp(&rtp),
+              !GST_BUFFER_FLAG_IS_SET (rtp.buffer, GST_BUFFER_FLAG_DELTA_UNIT),
+              frame->ready);
+      gst_rtp_buffer_unmap(&rtp);
+    }
+//    g_print("Playout %u\n", gst_mprtp_buffer_get_abs_seq(node->mprtp));
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, node->mprtp);
   }
   frame->head = node->next;
   _trash_framenode(this, node);
   if(frame->head) goto pop_node;
+  this->last_played_timestamp = frame->timestamp;
   this->head = frame->next;
   _trash_frame(this, frame);
   //if we want to flush then goto pop_frame
   if(this->flushing) goto pop_frame;
+  g_print("------------------------------------------------\n");
 next_tick:
   next_scheduler_time = now + 500 * GST_USECOND;
 //  next_scheduler_time = now + (guint64)this->estimated_tick;
@@ -337,14 +350,15 @@ done:
 
 void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
 {
-  guint16 abs_seq;
   Subflow *subflow;
   THIS_WRITELOCK(this);
   if(!GST_IS_BUFFER(mprtp->buffer)){
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
     goto done;
+  }else{
+    this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
+    goto done;
   }
-  abs_seq = gst_mprtp_buffer_get_abs_seq(mprtp);
   subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (mprtp->subflow_id));
 
   if(gst_mprtp_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
@@ -370,16 +384,11 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
     goto done;
   }
 
-  if(_cmp_seq(this->PHSN, abs_seq) < 0){
-    this->ssrc = gst_mprtp_buffer_get_ssrc(mprtp);
-    _add_mprtp_packet(this, mprtp);
-    goto done;
+  if(!_add_mprtp_packet(this, mprtp)){
+    g_print("Discarded packet arrived. Seq: %hu\n", gst_mprtp_buffer_get_abs_seq(mprtp));
+    mprtpr_path_add_discard(subflow->path, mprtp);
+    this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
   }
-
-//  g_print("Discard happened on subflow %d with seq %hu, PHSN: %hu\n",
-//          subflow->id, abs_seq, this->PHSN);
-  mprtpr_path_add_discard(subflow->path, mprtp);
-  this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
 done:
   THIS_WRITEUNLOCK(this);
 }
@@ -496,15 +505,24 @@ stream_joiner_set_playout_halt_time(StreamJoiner *this, GstClockTime halt_time)
 gint
 _cmp_seq (guint16 x, guint16 y)
 {
-  if (x == y) {
-    return 0;
-  }
-  if (x < y || (0x8000 < x && y < 0x8000)) {
-    return -1;
-  }
-  return 1;
+  if(x == y) return 0;
+  if(x < y && y - x < 32768) return -1;
+  if(x > y && x - y > 32768) return -1;
+  if(x < y && y - x > 32768) return 1;
+  if(x > y && x - y < 32768) return 1;
+  return 0;
+}
 
-  //return ((gint16) (x - y)) < 0 ? -1 : 1;
+//x < y:-1; x == y: 0; x > y: 1
+gint
+_cmp_seq32 (guint32 x, guint32 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 2147483648) return -1;
+  if(x > y && x - y > 2147483648) return -1;
+  if(x < y && y - x > 2147483648) return 1;
+  if(x > y && x - y < 2147483648) return 1;
+  return 0;
 }
 
 Subflow *
@@ -525,114 +543,136 @@ _ruin_subflow (gpointer data)
 }
 
 
-void _add_mprtp_packet(StreamJoiner *this,
+gboolean _add_mprtp_packet(StreamJoiner *this,
                          GstMpRTPBuffer *mprtp)
 {
-  Frame *frame,*succ,*prev = NULL;
+  Frame *frame,*prev = NULL;
   guint32 timestamp;
-  this->bytes_in_queue += mprtp->payload_bytes;
-  if(!this->head) {
-    frame = this->head = this->tail = _make_frame(this, mprtp);
-    goto done;
-  }
+  gint cmp;
+  gboolean result = FALSE;
+  //If frame timestamp smaller than the last timestamp the packet is discarded.
+  //the frame timestamp comparsion muzst be considering the wrap around
   timestamp = gst_mprtp_buffer_get_timestamp(mprtp);
-  if(timestamp < this->head->timestamp){
-    (frame = _make_frame(this, mprtp))->next = this->head;
-    this->head = frame;
+  cmp = _cmp_seq32(timestamp, this->last_played_timestamp);
+  if(this->last_played_timestamp != 0 && cmp <= 0){
+    //The packet should be forwarded and discarded
+    goto exit;
+  }
+  if(!this->head) {
+    frame = this->head = this->tail = _make_frame(this, _make_framenode(this, mprtp));
     goto done;
   }
-  frame = _try_find(this, timestamp, &prev);
-  if(!frame && !prev){
-    this->tail->next = frame = _make_frame(this, mprtp);
-    this->tail = frame;
+  frame = this->head;
+  cmp = _cmp_seq32(timestamp, frame->timestamp);
+  //a frame arrived should be played out before the head,
+  //but it is older than the last played out timestamp.
+  if(cmp < 0){
+    this->head = _make_frame(this, _make_framenode(this, mprtp));
+    this->head->next = frame;
     goto done;
   }
+  if(cmp == 0){
+    _push_into_frame(this, frame, mprtp);
+    goto done;
+  }
+again:
+  prev = frame;
+  frame = frame->next;
+  //we reached the end
   if(!frame){
-    succ = prev->next;
-    prev->next = frame = _make_frame(this, mprtp);
-    frame->next = succ;
+    frame = _make_frame(this, _make_framenode(this, mprtp));
+    prev->next = frame;
     goto done;
   }
-  _push_into_frame(this, frame, mprtp);
+  cmp = _cmp_seq32(timestamp, frame->timestamp);
+  //so the actual frame timestamp is smaller than what we have. Great!
+  //Prev must exists since the first frame is checked
+  //we insert the node into a new frame
+  if(cmp < 0){
+    prev->next = _make_frame(this, _make_framenode(this, mprtp));
+    prev->next->next = frame;
+    goto done;
+  }
+  //is it the right one?
+  if(cmp == 0){
+    _push_into_frame(this, frame, mprtp);
+    goto done;
+  }
+  goto again;
 done:
+  result = TRUE;
+  this->bytes_in_queue += mprtp->payload_bytes;
   gst_buffer_ref(mprtp->buffer);
-  return;
+exit:
+  return result;
 }
 
 
 void _push_into_frame(StreamJoiner *this, Frame *frame, GstMpRTPBuffer *mprtp)
 {
-  FrameNode *prev,*node, *succ;
-  node = _make_framenode(this, mprtp);
+  FrameNode *prev,*act, *node;
+  gint cmp;
   if(!frame->head){
-   frame->head = frame->tail = node;
-   goto done;
+    //cannot be happened.
+   g_warning("Something wrong with the playoutbuffer");
+   goto exit;
   }
-  if(!frame->head->next){
-    if(_cmp_seq(node->seq, frame->head->seq) <= 0){
-      frame->tail = node->next = frame->head;
-      frame->head = node;
-    }else{
-      frame->tail = frame->head->next = node;
-    }
-    goto done;
-  }
-  if(_cmp_seq(node->seq, frame->head->seq) <= 0){
-    node->next = frame->head;
+  act = frame->head;
+  node = _make_framenode(this, mprtp);
+  //x < y: -1; x == y: 0; x > y: 1
+  cmp = _cmp_seq(node->seq, act->seq);
+  //check weather the head is the smallest
+  if(cmp < 0){
+    //new head.
     frame->head = node;
+    node->next = act;
     goto done;
   }
-  prev = frame->head;
 again:
-  succ = prev->next;
-  if(!succ){
-    prev->next = frame->tail = node;
-    node->next = NULL;
-    goto done;
-  }
-  if(_cmp_seq(node->seq, succ->seq) <= 0){
+  prev = act;
+  act = act->next;
+  if(!act){
     prev->next = node;
-    node->next = succ;
+    frame->tail = node;
     goto done;
   }
-  prev = succ;
+  cmp = _cmp_seq(node->seq, act->seq);
+  if(cmp == 0){
+    //do nothing, but its a duplicated packet.
+  }
+  if(cmp <= 0){
+    prev->next = node;
+    node->next = act;
+    goto done;
+  }
   goto again;
-
 done:
+
+  //Check weather the frame is ready or not
+  if(node->marker)
+    frame->last_seq = node->seq;
+  if(frame->last_seq){
+    for(prev = frame->head, act = frame->head->next;
+        !act && (guint16)(prev->seq + 1) == act->seq;
+        prev = act, act = act->next);
+    frame->ready = !act;
+  }
+exit:
   return;
 }
 
-Frame *_try_find(StreamJoiner *this, guint32 timestamp, Frame **predecessor)
-{
-  Frame *act, *prev;
-  prev = NULL;
-  act = this->head;
-again:
-  if(!act) goto not_found;
-  if(act->timestamp == timestamp) goto found;
-  if(timestamp < act->timestamp) goto prev_found;
-  prev = act;
-  act = act->next;
-  goto again;
-
-prev_found:
-    if(predecessor) *predecessor = prev;
-not_found:
-  return NULL;
-found:
-  return act;
-
-}
-
-Frame* _make_frame(StreamJoiner *this, GstMpRTPBuffer *mprtp)
+Frame* _make_frame(StreamJoiner *this, FrameNode *node)
 {
   Frame *result;
   result = pointerpool_get(this->frames_pool);
   memset((gpointer)result, 0, sizeof(Frame));
-  result->head = result->tail = _make_framenode(this, mprtp);
-  result->timestamp = gst_mprtp_buffer_get_timestamp(mprtp);
+  result->head = result->tail = node;
+  result->timestamp = gst_mprtp_buffer_get_timestamp(node->mprtp);
   result->created = gst_clock_get_time(this->sysclock);
-  result->playout_time = gst_clock_get_time(this->sysclock) + this->playout_delay;
+  result->ready = node->marker;
+  result->last_seq = result->ready ? node->seq : 0;
+  //Todo: Considering the playout delay calculations here.
+  result->playout_time = gst_clock_get_time(this->sysclock) + 10 * GST_MSECOND + this->playout_delay;
   ++this->framecounter;
   return result;
 }
@@ -645,6 +685,7 @@ FrameNode * _make_framenode(StreamJoiner *this, GstMpRTPBuffer *mprtp)
   result->mprtp = mprtp;
   result->next = NULL;
   result->seq = gst_mprtp_buffer_get_abs_seq(mprtp);
+  result->marker = gst_mprtp_buffer_get_marker_bit(mprtp);
   return result;
 }
 

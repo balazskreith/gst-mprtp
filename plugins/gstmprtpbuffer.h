@@ -71,6 +71,7 @@ gboolean gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
 
 guint32 gst_mprtp_buffer_get_ssrc(GstMpRTPBuffer *mprtp);
 guint32 gst_mprtp_buffer_get_timestamp(GstMpRTPBuffer *mprtp);
+gboolean gst_mprtp_buffer_get_marker_bit(GstMpRTPBuffer *mprtp);
 guint16 gst_mprtp_buffer_get_abs_seq(GstMpRTPBuffer *mprtp);
 guint8 gst_mprtp_buffer_get_payload_type(GstMpRTPBuffer *mprtp);
 guint gst_mprtp_buffer_get_payload_len(GstMpRTPBuffer *mprtp);

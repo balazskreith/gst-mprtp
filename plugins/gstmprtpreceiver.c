@@ -605,7 +605,6 @@ gst_mprtpreceiver_sink_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
     gst_buffer_unmap (buf, &map);
   } else {
     gst_buffer_unmap (buf, &map);
-
     result = gst_pad_push (this->mprtp_srcpad, buf);
   }
 

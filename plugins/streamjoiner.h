@@ -58,6 +58,7 @@ struct _StreamJoiner
   Frame*               tail;
   guint16              PHSN;
   gint32               bytes_in_queue;
+  guint32              last_played_timestamp;
   gboolean             flushing;
 //  SKalmanFilter*       tick_estimator;
   PercentileTracker*   ticks;

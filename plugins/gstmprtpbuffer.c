@@ -115,6 +115,16 @@ guint32 gst_mprtp_buffer_get_timestamp(GstMpRTPBuffer *mprtp)
   return result;
 }
 
+gboolean gst_mprtp_buffer_get_marker_bit(GstMpRTPBuffer *mprtp)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  gboolean result;
+  g_return_val_if_fail(gst_rtp_buffer_map(mprtp->buffer, GST_MAP_READ, &rtp), 0);
+  result = gst_rtp_buffer_get_marker(&rtp);
+  gst_rtp_buffer_unmap(&rtp);
+  return result;
+}
+
 guint16 gst_mprtp_buffer_get_abs_seq(GstMpRTPBuffer *mprtp)
 {
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;

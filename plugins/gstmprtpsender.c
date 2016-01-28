@@ -93,6 +93,7 @@ typedef struct
   GstPad *outpad;
   guint8 state;
   guint8 id;
+  gboolean segment_init;
 
   GstClock *sysclock;
 } Subflow;
@@ -215,17 +216,47 @@ struct _GstMprtpsenderPrivate
 //  return result;
 //}
 
+static void _iterate_subflows(GstMprtpsender *this, void (*process)(Subflow*,gpointer),gpointer data)
+{
+  GList *it;
+  Subflow *subflow;
+  for(it = this->subflows; it; it = it->next)
+  {
+    subflow = it->data;
+    process(subflow, data);
+  }
+}
+
+static void _forward_event(Subflow *subflow, gpointer data)
+{
+  GstEvent *ev = data;
+//  gst_pad_push_event(subflow->outpad, ev);
+  gst_event_ref(ev);
+  gst_element_send_event (GST_ELEMENT(subflow->outpad), ev);
+}
+
 static gboolean
 gst_mprtpsender_mprtp_sink_event_handler (GstPad * pad, GstObject * parent, GstEvent * event)
 {
   gboolean res;
+  GstMprtpsender *this;
+
+  this = GST_MPRTPSENDER (parent);
 
   switch (GST_EVENT_TYPE (event)) {
+    case GST_EVENT_SEGMENT:
+    {
+      gst_event_copy_segment (event, &this->segment);
+      GST_DEBUG_OBJECT (this, "configured SEGMENT %" GST_SEGMENT_FORMAT,
+          &this->segment);
+      /* fall through */
+      g_print("Segment event\n");
+      DISABLE_LINE _iterate_subflows(this, _forward_event, event);
+    }
     default:
       res = gst_pad_event_default (pad, parent, event);
       break;
   }
-
   return res;
 }
 
@@ -325,13 +356,14 @@ gst_mprtpsender_init (GstMprtpsender * mprtpsender)
       GST_DEBUG_FUNCPTR (gst_mprtpsender_mprtp_sink_event_handler));
   gst_pad_set_query_function (mprtpsender->mprtp_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpsender_mprtp_sink_query_handler));
-
+  //GST_OBJECT_FLAG_SET (mprtpsender->mprtp_sinkpad, GST_PAD_FLAG_PROXY_CAPS);
 
   gst_element_add_pad (GST_ELEMENT (mprtpsender), mprtpsender->mprtp_sinkpad);
 
 //  GST_PAD_SET_PROXY_CAPS (mprtpsender->mprtp_sinkpad);
 //  GST_PAD_SET_PROXY_ALLOCATION (mprtpsender->mprtp_sinkpad);
 
+  gst_segment_init (&mprtpsender->segment, GST_FORMAT_UNDEFINED);
   mprtpsender->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
   mprtpsender->pivot_outpad = NULL;
   mprtpsender->event_segment = NULL;
@@ -431,6 +463,39 @@ forward_sticky_events (GstPad * pad, GstEvent ** event, gpointer user_data)
   return TRUE;
 }
 
+
+static gboolean
+gst_mprtpsender_src_activate_mode (GstPad * pad, GstObject * parent, GstPadMode mode,
+    gboolean active)
+{
+  GstMprtpsender *this;
+  gboolean res;
+
+  this = GST_MPRTPSENDER (parent);
+
+  switch (mode) {
+    case GST_PAD_MODE_PULL:
+    {
+      goto not_supported;
+      break;
+    }
+    default:
+      res = TRUE;
+      break;
+  }
+
+  return res;
+
+  /* ERRORS */
+not_supported:
+  {
+    GST_OBJECT_UNLOCK (this);
+    GST_INFO_OBJECT (this, "PULL mode is not supported");
+    return FALSE;
+  }
+}
+
+
 static GstPad *
 gst_mprtpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
     const gchar * name, const GstCaps * caps)
@@ -466,8 +531,11 @@ gst_mprtpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
   subflow->sysclock = gst_system_clock_obtain ();
   this->subflows = g_list_prepend (this->subflows, subflow);
   THIS_WRITEUNLOCK (this);
+  GST_OBJECT_FLAG_SET (srcpad, GST_PAD_FLAG_PROXY_CAPS);
 
-  gst_pad_set_active (srcpad, TRUE);
+  gst_pad_set_activatemode_function (srcpad,
+      GST_DEBUG_FUNCPTR (gst_mprtpsender_src_activate_mode));
+//  gst_pad_set_active (srcpad, TRUE);
 
   gst_element_add_pad (GST_ELEMENT (this), srcpad);
 
@@ -503,6 +571,7 @@ gst_mprtpsender_change_state (GstElement * element, GstStateChange transition)
   ret =
       GST_ELEMENT_CLASS (gst_mprtpsender_parent_class)->change_state (element,
       transition);
+  g_print("Change state: %d\n", ret);
 
   switch (transition) {
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
@@ -726,6 +795,8 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   Subflow *subflow;
   gint n, r;
   GstPad *outpad;
+  GstClockTime position, duration;
+
 
   this = GST_MPRTPSENDER (parent);
   GST_DEBUG_OBJECT (this, "RTP/MPRTP/OTHER sink");
@@ -745,7 +816,26 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   packet_type = _get_packet_mptype (this, buf, &map, &subflow_id);
   if (packet_type != PACKET_IS_NOT_MP &&
       _select_subflow (this, subflow_id, &subflow) != FALSE) {
-//      g_print("%d|", subflow_id);
+//      g_print("%d->%p|", subflow_id, subflow->outpad);
+      if(!subflow->segment_init && this->segment.format != GST_FORMAT_UNDEFINED)
+      {
+          GstSegment *seg;
+          GstEvent *ev;
+          subflow->segment_init = TRUE;
+          seg = &this->segment;
+          /* If resending then mark segment start and position accordingly */
+          if (GST_BUFFER_TIMESTAMP_IS_VALID (buf)) {
+            seg->position = GST_BUFFER_TIMESTAMP (buf);
+          }
+          g_print("Segment position: %lu to %d outpad\n", this->segment.position, subflow->id);
+          ev = gst_event_new_segment (seg);
+
+          if (!gst_pad_push_event (subflow->outpad, ev)) {
+            GST_WARNING_OBJECT (this,
+                "newsegment handling failed in %" GST_PTR_FORMAT,
+                subflow->outpad);
+          }
+      }
     outpad = subflow->outpad;
   } else if (this->pivot_outpad != NULL &&
       gst_pad_is_active (this->pivot_outpad) &&
@@ -762,6 +852,19 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     }
   }
   gst_buffer_unmap (buf, &map);
+
+  /* Keep track of last stop and use it in SEGMENT start after
+     switching to a new src pad */
+  position = GST_BUFFER_TIMESTAMP (buf);
+  if (GST_CLOCK_TIME_IS_VALID (position)) {
+    duration = GST_BUFFER_DURATION (buf);
+    if (GST_CLOCK_TIME_IS_VALID (duration)) {
+      position += duration;
+    }
+    GST_LOG_OBJECT (this, "setting last stop %" GST_TIME_FORMAT,
+        GST_TIME_ARGS (position));
+    this->segment.position = position;
+  }
   result = gst_pad_push (outpad, buf);
 done:
   THIS_READUNLOCK (this);

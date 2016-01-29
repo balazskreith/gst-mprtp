@@ -373,7 +373,7 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/include/x86_64-linux-gnu/sys/bitypes.h \
  /usr/include/arpa/nameser_compat.h \
  /usr/include/x86_64-linux-gnu/sys/un.h /usr/include/net/if.h \
- /usr/include/arpa/inet.h gstmprtpreceiver.h gstmprtpsender2.h
+ /usr/include/arpa/inet.h gstmprtpreceiver.h
 
 /usr/include/stdc-predef.h:
 
@@ -1256,5 +1256,3 @@ ricalcer.h:
 /usr/include/arpa/inet.h:
 
 gstmprtpreceiver.h:
-
-gstmprtpsender2.h:

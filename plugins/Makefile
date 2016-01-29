@@ -152,7 +152,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-variancetracker.lo \
 	libgstmprtp_la-sndratedistor.lo libgstmprtp_la-numstracker.lo \
 	libgstmprtp_la-floatnumstracker.lo \
-	libgstmprtp_la-subratectrler.lo
+	libgstmprtp_la-subratectrler.lo \
+	libgstmprtp_la-gstmprtpsender2.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -419,7 +420,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          sndratedistor.c            \
                          numstracker.c              \
                          floatnumstracker.c         \
-                         subratectrler.c        
+                         subratectrler.c            \
+                         gstmprtpsender2.c 
 
 noinst_HEADERS = mprtpspath.h           \
                  sndctrler.h            \
@@ -439,7 +441,8 @@ noinst_HEADERS = mprtpspath.h           \
                  sndratedistor.h        \
                  numstracker.h          \
                  floatnumstracker.h     \
-                 subratectrler.h        
+                 subratectrler.h        \
+                 gstmprtpsender2.h 
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -543,6 +546,7 @@ include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplugin.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
+include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender2.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-numstracker.Plo
@@ -762,6 +766,13 @@ libgstmprtp_la-subratectrler.lo: subratectrler.c
 #	$(AM_V_CC)source='subratectrler.c' object='libgstmprtp_la-subratectrler.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-subratectrler.lo `test -f 'subratectrler.c' || echo '$(srcdir)/'`subratectrler.c
+
+libgstmprtp_la-gstmprtpsender2.lo: gstmprtpsender2.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gstmprtpsender2.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gstmprtpsender2.Tpo -c -o libgstmprtp_la-gstmprtpsender2.lo `test -f 'gstmprtpsender2.c' || echo '$(srcdir)/'`gstmprtpsender2.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gstmprtpsender2.Tpo $(DEPDIR)/libgstmprtp_la-gstmprtpsender2.Plo
+#	$(AM_V_CC)source='gstmprtpsender2.c' object='libgstmprtp_la-gstmprtpsender2.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtpsender2.lo `test -f 'gstmprtpsender2.c' || echo '$(srcdir)/'`gstmprtpsender2.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

@@ -38,6 +38,7 @@ struct _GstMprtpsender
   GRWLock rwmutex;
   guint8 mprtp_ext_header_id;
   GList *subflows;
+  gboolean dirty;
   GstSegment segment;
   GstPad *mprtcp_rr_sinkpad;
   GstPad *mprtp_sinkpad;

@@ -363,9 +363,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   GstElement *mprtpsnd = gst_element_factory_make ("mprtpsender", NULL);
   GstElement *mprtprcv = gst_element_factory_make ("mprtpreceiver", NULL);
   GstElement *mprtpsch = gst_element_factory_make ("mprtpscheduler", NULL);
-  GstElement *q1 = gst_element_factory_make ("queue", "rtpq_1");
-  GstElement *q2 = gst_element_factory_make ("queue", "rtpq_2");
-  GstElement *q3 = gst_element_factory_make ("queue", "rtpq_3");
+  GstElement *mq = gst_element_factory_make ("multiqueue", "rtpq");
   int basePort;
   gchar *padName;
 
@@ -373,7 +371,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
 
   gst_bin_add_many (GST_BIN (pipe), rtpSink_1, rtpSink_2, rtpSink_3,
       mprtprcv, mprtpsnd, mprtpsch, rtcpSink, rtcpSrc, rtpSrc_1,
-      rtpSrc_2, rtpSrc_3, q1, q2, q3,
+      rtpSrc_2, rtpSrc_3, mq,
       session->input, NULL);
 
   /* enable retransmission by setting rtprtxsend as the "aux" element of rtpbin */
@@ -382,7 +380,6 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
 
   g_signal_connect (mprtpsch, "mprtp-subflows-utilization",
       (GCallback) changed_event, NULL);
-
 //  if(test_parameters_.other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time)
 //    g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2", NULL);
 //  else
@@ -427,14 +424,14 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   gst_element_link_pads (rtpBin, padName, mprtpsch, "rtp_sink");
   gst_element_link_pads (mprtpsch, "mprtp_src", mprtpsnd, "mprtp_sink");
   g_free (padName);
-  gst_element_link_pads (mprtpsnd, "src_1", q1, "sink");
-  gst_element_link_pads (q1, "src", rtpSink_1, "sink");
+  gst_element_link_pads (mprtpsnd, "src_1", mq, "sink_1");
+  gst_element_link_pads (mq, "src_1", rtpSink_1, "sink");
 
-  gst_element_link_pads (mprtpsnd, "src_2", q2, "sink");
-  gst_element_link_pads (q2, "src", rtpSink_2, "sink");
+  gst_element_link_pads (mprtpsnd, "src_2", mq, "sink_2");
+  gst_element_link_pads (mq, "src_2", rtpSink_2, "sink");
 
-  gst_element_link_pads (mprtpsnd, "src_3", q3, "sink");
-  gst_element_link_pads (q3, "src", rtpSink_3, "sink");
+  gst_element_link_pads (mprtpsnd, "src_3", mq, "sink_3");
+  gst_element_link_pads (mq, "src_3", rtpSink_3, "sink");
 
   if(test_parameters_.subflow1_active)
     g_object_set (mprtpsch, "join-subflow", 1, NULL);

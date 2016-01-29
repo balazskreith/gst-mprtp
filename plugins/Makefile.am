@@ -26,7 +26,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          sndratedistor.c            \
                          numstracker.c              \
                          floatnumstracker.c         \
-                         subratectrler.c        
+                         subratectrler.c            \
+                         gstmprtpsender2.c 
                     
                     
 noinst_HEADERS = mprtpspath.h           \
@@ -47,7 +48,8 @@ noinst_HEADERS = mprtpspath.h           \
                  sndratedistor.h        \
                  numstracker.h          \
                  floatnumstracker.h     \
-                 subratectrler.h        
+                 subratectrler.h        \
+                 gstmprtpsender2.h 
                           
 
 # compiler and linker flags used to compile this plugin, set in configure.ac

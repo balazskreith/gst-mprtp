@@ -93,7 +93,7 @@ typedef struct
   GstPad *outpad;
   guint8 state;
   guint8 id;
-  gboolean segment_init;
+  gboolean initialized;
 
   GstClock *sysclock;
 } Subflow;
@@ -489,7 +489,6 @@ gst_mprtpsender_src_activate_mode (GstPad * pad, GstObject * parent, GstPadMode 
   /* ERRORS */
 not_supported:
   {
-    GST_OBJECT_UNLOCK (this);
     GST_INFO_OBJECT (this, "PULL mode is not supported");
     return FALSE;
   }
@@ -530,6 +529,7 @@ gst_mprtpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
   subflow->state = 0;
   subflow->sysclock = gst_system_clock_obtain ();
   this->subflows = g_list_prepend (this->subflows, subflow);
+  this->dirty = TRUE;
   THIS_WRITEUNLOCK (this);
   GST_OBJECT_FLAG_SET (srcpad, GST_PAD_FLAG_PROXY_CAPS);
 
@@ -783,6 +783,56 @@ done:
   return result;
 }
 
+static void _init_all_subflows(GstMprtpsender *this, GstBuffer *buf)
+{
+  GList *it;
+  Subflow *subflow;
+  for(it = this->subflows; it; it = it->next)
+  {
+    GstSegment *seg;
+    GstEvent *ev;
+    subflow = it->data;
+    if(subflow->initialized) continue;
+    subflow->initialized = TRUE;
+    seg = &this->segment;
+    /* If resending then mark segment start and position accordingly */
+    if (GST_BUFFER_TIMESTAMP_IS_VALID (buf)) {
+      seg->position = GST_BUFFER_TIMESTAMP (buf);
+    }
+    ev = gst_event_new_segment (seg);
+    if (!gst_pad_push_event (subflow->outpad, ev)) {
+      GST_WARNING_OBJECT (this,
+          "newsegment handling failed in %" GST_PTR_FORMAT,
+          subflow->outpad);
+    }
+
+    //also push an empty buffer so for the prerolling not blocking everything
+    //-----------------------------------------------------------------------
+    //if you are a gstreamer developer
+    //you might have some idea how many hours I spent
+    //to figure out why it doesn't change the state,
+    //figure out how the gstreamer creature under the hood really works,
+    //what kind of messages it sends and I can continue it, not
+    //mentioned about the forums on the internet I digged out to get an answer,
+    //so I can continue it infinitively but I just simply almost crying
+    //when it finally changed the state to PLAYING.
+    //Anyway, if you are not a gstreamer developer you have probably no idea
+    //how much it hurts me that one possible solution for that problem
+    //is so simple that this anecdote is longer in lines.
+    {
+      GstBuffer *result;
+      GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+
+      result = gst_rtp_buffer_new_allocate (1400, 0, 0);
+      gst_rtp_buffer_map(result, GST_MAP_READWRITE, &rtp);
+      gst_rtp_buffer_set_payload_type(&rtp, MONITOR_PAYLOAD_DEFAULT_ID);
+      gst_rtp_buffer_unmap(&rtp);
+      gst_pad_push(subflow->outpad, result);
+    }
+  }
+  return;
+}
+
 static GstFlowReturn
 gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buf)
@@ -806,6 +856,10 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     goto exit;
   }
   THIS_READLOCK (this);
+  if(this->dirty) {
+    _init_all_subflows(this, buf);
+    this->dirty = FALSE;
+  }
   n = g_list_length (this->subflows);
   if (n < 1) {
     GST_ERROR_OBJECT (this, "No appropiate subflow");
@@ -817,25 +871,6 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   if (packet_type != PACKET_IS_NOT_MP &&
       _select_subflow (this, subflow_id, &subflow) != FALSE) {
 //      g_print("%d->%p|", subflow_id, subflow->outpad);
-      if(!subflow->segment_init && this->segment.format != GST_FORMAT_UNDEFINED)
-      {
-          GstSegment *seg;
-          GstEvent *ev;
-          subflow->segment_init = TRUE;
-          seg = &this->segment;
-          /* If resending then mark segment start and position accordingly */
-          if (GST_BUFFER_TIMESTAMP_IS_VALID (buf)) {
-            seg->position = GST_BUFFER_TIMESTAMP (buf);
-          }
-          g_print("Segment position: %lu to %d outpad\n", this->segment.position, subflow->id);
-          ev = gst_event_new_segment (seg);
-
-          if (!gst_pad_push_event (subflow->outpad, ev)) {
-            GST_WARNING_OBJECT (this,
-                "newsegment handling failed in %" GST_PTR_FORMAT,
-                subflow->outpad);
-          }
-      }
     outpad = subflow->outpad;
   } else if (this->pivot_outpad != NULL &&
       gst_pad_is_active (this->pivot_outpad) &&

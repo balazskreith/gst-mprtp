@@ -61,14 +61,14 @@ typedef struct _GstMprtpplayouterClass GstMprtpplayouterClass;
 
 struct _GstMprtpplayouter
 {
-  GstElement       base_mprtpreceiver;
+  GstElement      base_mprtpreceiver;
+  GRWLock         rwmutex;
 
-  GRWLock          rwmutex;
-
-  guint8           mprtp_ext_header_id;
-  guint8           abs_time_ext_header_id;
-  guint32          pivot_ssrc;
-  guint32          pivot_clock_rate;
+  guint8          mprtp_ext_header_id;
+  guint8          abs_time_ext_header_id;
+  guint32         pivot_ssrc;
+  guint32         pivot_clock_rate;
+  GstClockTime    delay_offset;
   GSocketAddress *pivot_address;
   guint8          pivot_address_subflow_id;
   guint8          monitor_payload_type;
@@ -76,7 +76,6 @@ struct _GstMprtpplayouter
   gboolean        auto_rate_and_cc;
   gboolean        rtp_passthrough;
 
-  GstMpRTPBuffer  mprtp_reference;
   GstPad*         mprtp_srcpad;
   GstPad*         mprtp_sinkpad;
   GstPad*         mprtcp_sr_sinkpad;

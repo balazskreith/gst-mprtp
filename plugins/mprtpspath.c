@@ -44,7 +44,8 @@ static void mprtps_path_reset (MPRTPSPath * this);
 static void _setup_rtp2mprtp (MPRTPSPath * this, GstBuffer * buffer);
 static void _refresh_stat(MPRTPSPath * this, GstBuffer *buffer);
 static void _send_mprtp_packet(MPRTPSPath * this,
-                               GstBuffer *buffer);
+                               GstBuffer *buffer,
+                               gboolean bypass);
 static guint32 _pacing(MPRTPSPath * this);
 //static gboolean _is_overused(MPRTPSPath * this);
 static GstBuffer* _create_monitor_packet(MPRTPSPath * this);
@@ -485,30 +486,16 @@ mprtps_path_get_id (MPRTPSPath * this)
   return result;
 }
 
-void mprtps_path_set_monitor_interval(MPRTPSPath *this, guint interval)
+void mprtps_path_set_monitor_interval_and_duration(
+    MPRTPSPath *this, guint interval, GstClockTime max_idle)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
   this->monitoring_interval = interval;
+  this->monitoring_max_idle = max_idle;
   THIS_WRITEUNLOCK (this);
 }
 
-void mprtps_path_set_extra(MPRTPSPath *this, guint32 extra)
-{
-  g_return_if_fail (this);
-  THIS_WRITELOCK (this);
-  this->extra_packets_per_100tick = 0;
-  this->extra_packets_per_10tick = 0;
-  this->extra_packets_per_tick = 0;
-  if(extra < 14000){
-    this->extra_packets_per_100tick = extra / 1400;
-  }else if(extra < 140000){
-    this->extra_packets_per_10tick = extra / 14000;
-  }else{
-    this->extra_packets_per_tick = extra / 140000;
-  }
-  THIS_WRITEUNLOCK (this);
-}
 
 gboolean
 mprtps_path_is_monitoring (MPRTPSPath * this)
@@ -643,6 +630,14 @@ mprtps_path_tick(MPRTPSPath *this)
 //    _setup_rtp2mprtp(this, buffer);
 //    _send_mprtp_packet(this, buffer);
 //  }
+  if(0 < this->monitoring_max_idle){
+    if(this->monitoring_max_idle < _now(this) - this->last_monitoring_sent_time){
+      GstBuffer *buffer;
+      buffer = _create_monitor_packet(this);
+      _refresh_stat(this, buffer);
+      _send_mprtp_packet(this, buffer, TRUE);
+    }
+  }
   numstracker_obsolate(this->sent_bytes);
   numstracker_obsolate(this->incoming_bytes);
   if(this->ticknum < this->pacing_tick) goto done;
@@ -673,7 +668,7 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
   }
 
   _setup_rtp2mprtp (this, buffer);
-  _send_mprtp_packet(this, buffer);
+  _send_mprtp_packet(this, buffer, FALSE);
 //  goto done;
   if(!this->monitoring_interval) goto done;
   if(this->total_sent_normal_packet_num % this->monitoring_interval != 0) goto done;
@@ -681,7 +676,8 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
     GstBuffer *buffer;
     buffer = _create_monitor_packet(this);
     _setup_rtp2mprtp(this, buffer);
-    _send_mprtp_packet(this, buffer);
+    _send_mprtp_packet(this, buffer, FALSE);
+    this->last_monitoring_sent_time = _now(this);
   }
 done:
   THIS_WRITEUNLOCK (this);
@@ -746,10 +742,15 @@ _refresh_stat(MPRTPSPath * this,
 
 void
 _send_mprtp_packet(MPRTPSPath * this,
-                      GstBuffer *buffer)
+                      GstBuffer *buffer,
+                      gboolean bypass)
 {
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   gboolean expected_lost = FALSE;
+
+  if(bypass){
+    goto send;
+  }
 
   if(!this->pacing && !packetssndqueue_has_buffer(this->packetsqueue, NULL, &expected_lost)){
     this->expected_lost |=expected_lost;
@@ -862,6 +863,7 @@ GstBuffer* _create_monitor_packet(MPRTPSPath * this)
   result = gst_rtp_buffer_new_allocate (1400, 0, 0);
   gst_rtp_buffer_map(result, GST_MAP_READWRITE, &rtp);
   gst_rtp_buffer_set_payload_type(&rtp, this->monitor_payload_type);
+
   gst_rtp_buffer_unmap(&rtp);
   return result;
 }

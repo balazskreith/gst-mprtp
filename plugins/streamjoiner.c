@@ -83,6 +83,8 @@ struct _Frame
   FrameNode      *tail;
   guint32         timestamp;
   gboolean        ready;
+  gboolean        marked;
+  gboolean        sorted;
   guint32         last_seq;
   GstClockTime    playout_time;
   GstClockTime    created;
@@ -224,6 +226,20 @@ static void _skew_max_pipe(gpointer data, gint64 value)
   this->max_skew = value;
 }
 
+static void _delay_max_pipe(gpointer data, gint64 value)
+{
+  StreamJoiner* this = data;
+  this->max_delay = MIN(value, this->min_delay + this->max_delay_diff);
+//  g_print("Max delay: %ld, %lu\n", value, this->max_delay);
+}
+
+static void _delay_min_pipe(gpointer data, gint64 value)
+{
+  StreamJoiner* this = data;
+  this->min_delay = value;
+//  g_print("Max delay: %ld, %lu\n", value, this->max_delay);
+}
+
 void
 stream_joiner_init (StreamJoiner * this)
 {
@@ -237,7 +253,12 @@ stream_joiner_init (StreamJoiner * this)
   this->playout_allowed = TRUE;
   this->playout_halt = FALSE;
   this->playout_halt_time = 100 * GST_MSECOND;
-  this->tick_interval = 20 * GST_USECOND;
+  this->max_delay_diff = 50 * GST_MSECOND;
+  this->min_delay = this->max_delay = 100 * GST_MSECOND;
+  this->forced_delay = 150 * GST_MSECOND;
+  this->delays = make_numstracker(256, GST_SECOND);
+  numstracker_add_plugin(this->delays,
+                           (NumsTrackerPlugin*)make_numstracker_minmax_plugin(_delay_max_pipe, this, _delay_min_pipe, this));
   this->skews = make_numstracker(256, GST_SECOND);
   numstracker_add_plugin(this->skews,
                          (NumsTrackerPlugin*)make_numstracker_minmax_plugin(_skew_max_pipe, this, NULL, NULL));
@@ -307,17 +328,18 @@ pop_node:
   this->PHSN = node->seq;
   if(node->mprtp){
     this->bytes_in_queue -= node->mprtp->payload_bytes;
-    {
-      GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-      gst_rtp_buffer_map(node->mprtp->buffer, GST_MAP_READ, &rtp);
-      g_print("Playout Abs-Seq: %u Payload-ln: %u, Timestamp: %u - IFrame: %d Ready: %d\n",
-              gst_rtp_buffer_get_seq(&rtp),
-              gst_rtp_buffer_get_payload_len(&rtp),
-              gst_rtp_buffer_get_timestamp(&rtp),
-              !GST_BUFFER_FLAG_IS_SET (rtp.buffer, GST_BUFFER_FLAG_DELTA_UNIT),
-              frame->ready);
-      gst_rtp_buffer_unmap(&rtp);
-    }
+//    {
+//      GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+//      gst_rtp_buffer_map(node->mprtp->buffer, GST_MAP_READ, &rtp);
+//      g_print("Playout Abs-Seq: %u Payload-ln: %u, Timestamp: %u - IFrame: %d Ready: %d Originated: %d\n",
+//              gst_rtp_buffer_get_seq(&rtp),
+//              gst_rtp_buffer_get_payload_len(&rtp),
+//              gst_rtp_buffer_get_timestamp(&rtp),
+//              !GST_BUFFER_FLAG_IS_SET (rtp.buffer, GST_BUFFER_FLAG_DELTA_UNIT),
+//              frame->ready,
+//              node->mprtp->subflow_id);
+//      gst_rtp_buffer_unmap(&rtp);
+//    }
 //    g_print("Playout %u\n", gst_mprtp_buffer_get_abs_seq(node->mprtp));
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, node->mprtp);
   }
@@ -329,9 +351,9 @@ pop_node:
   _trash_frame(this, frame);
   //if we want to flush then goto pop_frame
   if(this->flushing) goto pop_frame;
-  g_print("------------------------------------------------\n");
+//  g_print("----------------------%d-------------------------\n", this->framecounter);
 next_tick:
-  next_scheduler_time = now + 500 * GST_USECOND;
+  next_scheduler_time = now +  GST_MSECOND;
 //  next_scheduler_time = now + (guint64)this->estimated_tick;
 //  g_print("%lu-%lu\n", now + GST_MSECOND, now + (guint64)this->estimated_tick);
 done:
@@ -355,13 +377,10 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
   if(!GST_IS_BUFFER(mprtp->buffer)){
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
     goto done;
-  }else{
-    this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
-    goto done;
   }
   subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (mprtp->subflow_id));
 
-  if(gst_mprtp_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
+  if(mprtp->payload_type == this->monitor_payload_type){
     //Todo: FEC packet processing here,
     subflow->monitored_bytes += mprtp->payload_bytes;
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
@@ -374,19 +393,28 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
                               &subflow->jitter);
 
   numstracker_add(this->skews, subflow->skew);
+//  g_print("Subflow %d delay: %f\n", subflow->id, subflow->delay);
+  numstracker_add(this->delays, subflow->delay);
   this->playout_delay *= 124.;
   this->playout_delay += this->max_skew;
   this->playout_delay /= 125.;
 
   //ssrc filter
-  if(this->ssrc != 0 && this->ssrc != gst_mprtp_buffer_get_ssrc(mprtp)){
+  if(this->ssrc != 0 && this->ssrc != mprtp->ssrc){
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
     goto done;
   }
 
   if(!_add_mprtp_packet(this, mprtp)){
-    g_print("Discarded packet arrived. Seq: %hu\n", gst_mprtp_buffer_get_abs_seq(mprtp));
-    mprtpr_path_add_discard(subflow->path, mprtp);
+//    g_print("Discarded packet arrived. Seq: %hu Subflow: %d live:%d<-delay:%lu-dur:%lu-ts:%lu-offs:%lu\n",
+//            mprtp->abs_seq,
+//            mprtp->subflow_id,
+//            GST_BUFFER_FLAG_IS_SET (mprtp->buffer, GST_BUFFER_FLAG_LIVE),
+//            mprtp->delay,
+//            GST_BUFFER_DURATION(mprtp->buffer),
+//            GST_BUFFER_TIMESTAMP(mprtp->buffer),
+//            GST_BUFFER_OFFSET(mprtp->buffer));
+//            mprtpr_path_add_discard(subflow->path, mprtp);
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
   }
 done:
@@ -453,10 +481,10 @@ stream_joiner_set_playout_allowed(StreamJoiner *this, gboolean playout_permissio
 }
 
 void
-stream_joiner_set_tick_interval(StreamJoiner *this, GstClockTime tick_interval)
+stream_joiner_set_forced_delay(StreamJoiner *this, GstClockTime forced_delay)
 {
   THIS_WRITELOCK (this);
-  this->tick_interval = tick_interval;
+  this->forced_delay = forced_delay;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -552,7 +580,7 @@ gboolean _add_mprtp_packet(StreamJoiner *this,
   gboolean result = FALSE;
   //If frame timestamp smaller than the last timestamp the packet is discarded.
   //the frame timestamp comparsion muzst be considering the wrap around
-  timestamp = gst_mprtp_buffer_get_timestamp(mprtp);
+  timestamp = mprtp->timestamp;
   cmp = _cmp_seq32(timestamp, this->last_played_timestamp);
   if(this->last_played_timestamp != 0 && cmp <= 0){
     //The packet should be forwarded and discarded
@@ -560,6 +588,7 @@ gboolean _add_mprtp_packet(StreamJoiner *this,
   }
   if(!this->head) {
     frame = this->head = this->tail = _make_frame(this, _make_framenode(this, mprtp));
+    prev = NULL;
     goto done;
   }
   frame = this->head;
@@ -569,9 +598,12 @@ gboolean _add_mprtp_packet(StreamJoiner *this,
   if(cmp < 0){
     this->head = _make_frame(this, _make_framenode(this, mprtp));
     this->head->next = frame;
+    frame = this->head;
+    prev = NULL;
     goto done;
   }
   if(cmp == 0){
+    prev = NULL;
     _push_into_frame(this, frame, mprtp);
     goto done;
   }
@@ -591,6 +623,7 @@ again:
   if(cmp < 0){
     prev->next = _make_frame(this, _make_framenode(this, mprtp));
     prev->next->next = frame;
+    frame = prev->next;
     goto done;
   }
   //is it the right one?
@@ -603,6 +636,8 @@ done:
   result = TRUE;
   this->bytes_in_queue += mprtp->payload_bytes;
   gst_buffer_ref(mprtp->buffer);
+  frame->ready = frame->sorted && frame->marked;
+  if(prev) frame->ready&=prev->marked;
 exit:
   return result;
 }
@@ -648,15 +683,14 @@ again:
   goto again;
 done:
 
-  //Check weather the frame is ready or not
-  if(node->marker)
-    frame->last_seq = node->seq;
-  if(frame->last_seq){
-    for(prev = frame->head, act = frame->head->next;
-        !act && (guint16)(prev->seq + 1) == act->seq;
-        prev = act, act = act->next);
-    frame->ready = !act;
-  }
+  //Check weather the frame is marked
+  frame->marked |= node->marker;
+
+  //Check weather the frame is sorted
+  for(prev = frame->head, act = frame->head->next;
+            !act && (guint16)(prev->seq + 1) == act->seq;
+            prev = act, act = act->next);
+  frame->sorted = !act;
 exit:
   return;
 }
@@ -664,15 +698,25 @@ exit:
 Frame* _make_frame(StreamJoiner *this, FrameNode *node)
 {
   Frame *result;
+  GstClockTime delay_diff;
+
   result = pointerpool_get(this->frames_pool);
   memset((gpointer)result, 0, sizeof(Frame));
   result->head = result->tail = node;
-  result->timestamp = gst_mprtp_buffer_get_timestamp(node->mprtp);
+  result->timestamp = node->mprtp->timestamp;
   result->created = gst_clock_get_time(this->sysclock);
   result->ready = node->marker;
   result->last_seq = result->ready ? node->seq : 0;
   //Todo: Considering the playout delay calculations here.
-  result->playout_time = gst_clock_get_time(this->sysclock) + 10 * GST_MSECOND + this->playout_delay;
+  delay_diff = 0;
+  if(0 < this->forced_delay){
+    if(node->mprtp->delay < this->forced_delay){
+      delay_diff = this->forced_delay - node->mprtp->delay;
+    }
+  }else if(node->mprtp->delay < this->max_delay){
+    delay_diff = this->max_delay - node->mprtp->delay;
+  }
+  result->playout_time = gst_clock_get_time(this->sysclock) + delay_diff +  this->playout_delay;
   ++this->framecounter;
   return result;
 }
@@ -684,8 +728,8 @@ FrameNode * _make_framenode(StreamJoiner *this, GstMpRTPBuffer *mprtp)
   memset((gpointer)result, 0, sizeof(FrameNode));
   result->mprtp = mprtp;
   result->next = NULL;
-  result->seq = gst_mprtp_buffer_get_abs_seq(mprtp);
-  result->marker = gst_mprtp_buffer_get_marker_bit(mprtp);
+  result->seq = mprtp->abs_seq;
+  result->marker = mprtp->marker;
   return result;
 }
 

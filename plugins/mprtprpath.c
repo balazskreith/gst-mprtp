@@ -299,9 +299,10 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   if (this->seq_initialized == FALSE) {
     this->highest_seq = mprtp->subflow_seq;
     this->total_packets_received = 1;
-    this->last_rtp_timestamp = gst_mprtp_buffer_get_timestamp(mprtp);
+    this->last_rtp_timestamp = mprtp->timestamp;
     this->last_mprtp_delay = mprtp->delay;
-    _add_delay(this, mprtp->delay);
+    if(0 < mprtp->delay)
+      _add_delay(this, mprtp->delay);
     this->seq_initialized = TRUE;
     goto done;
   }
@@ -311,7 +312,9 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   this->total_payload_bytes += mprtp->payload_bytes;
   this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
 //  g_print("J: %d\n", this->jitter);
-  _add_delay(this, mprtp->delay);
+  if(0 < mprtp->delay)
+    _add_delay(this, mprtp->delay);
+
   if(_cmp_seq(mprtp->subflow_seq, this->highest_seq) <= 0){
     numstracker_add(this->lates, mprtp->subflow_seq);
     goto done;
@@ -323,7 +326,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
     }
   }
   this->highest_seq = mprtp->subflow_seq;
-  if(this->last_rtp_timestamp == gst_mprtp_buffer_get_timestamp(mprtp))
+  if(this->last_rtp_timestamp == mprtp->timestamp)
     goto done;
 
   _add_skew(this, skew);
@@ -343,7 +346,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
 //            );
 //  }
   //new frame
-  this->last_rtp_timestamp = gst_mprtp_buffer_get_timestamp(mprtp);
+  this->last_rtp_timestamp = mprtp->timestamp;
 
 done:
   _refresh_RLEBlock(this);

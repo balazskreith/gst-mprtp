@@ -39,7 +39,6 @@ struct _StreamJoiner
   GRWLock              rwmutex;
   guint8               monitor_payload_type;
   gboolean             playout_allowed;
-  GstClockTime         tick_interval;
   gboolean             playout_halt;
   GstClockTime         playout_halt_time;
   GstClockTime         stream_delay;
@@ -49,7 +48,12 @@ struct _StreamJoiner
 //  gdouble              latency;
   gdouble              playout_delay;
   NumsTracker*         skews;
+  NumsTracker*         delays;
   gint64               max_skew;
+  GstClockTime         max_delay_diff;
+  GstClockTime         max_delay;
+  GstClockTime         min_delay;
+  GstClockTime         forced_delay;
 //  PercentileTracker*   latency_window;
   guint32              ssrc;
   PointerPool*         frames_pool;
@@ -116,7 +120,7 @@ stream_joiner_set_playout_allowed(
     gboolean playout_permission);
 
 void
-stream_joiner_set_tick_interval(
+stream_joiner_set_forced_delay(
     StreamJoiner *this,
     GstClockTime tick_interval);
 

@@ -90,12 +90,11 @@ gst_mprtpsender_mprtp_sink_query_handler (GstPad * pad, GstObject * parent,
 
 typedef struct
 {
-  GstPad *outpad;
-  guint8 state;
-  guint8 id;
-  gboolean initialized;
-
-  GstClock *sysclock;
+  GstPad    *outpad;
+  GstPad    *async_outpad;
+  guint8     id;
+  gboolean   initialized;
+  GstClock  *sysclock;
 } Subflow;
 
 
@@ -109,6 +108,7 @@ enum
 {
   PROP_0,
   PROP_MPRTP_EXT_HEADER_ID,
+  PROP_MONITORING_PAYLOAD_TYPE,
   PROP_PIVOT_OUTPAD,
 };
 
@@ -116,6 +116,12 @@ enum
 
 static GstStaticPadTemplate gst_mprtpsender_src_template =
 GST_STATIC_PAD_TEMPLATE ("src_%u",
+    GST_PAD_SRC,
+    GST_PAD_REQUEST,
+    GST_STATIC_CAPS_ANY);
+
+static GstStaticPadTemplate gst_mprtpsender_async_src_template =
+GST_STATIC_PAD_TEMPLATE ("async_src_%u",
     GST_PAD_SRC,
     GST_PAD_REQUEST,
     GST_STATIC_CAPS_ANY);
@@ -250,7 +256,6 @@ gst_mprtpsender_mprtp_sink_event_handler (GstPad * pad, GstObject * parent, GstE
       GST_DEBUG_OBJECT (this, "configured SEGMENT %" GST_SEGMENT_FORMAT,
           &this->segment);
       /* fall through */
-      g_print("Segment event\n");
       DISABLE_LINE _iterate_subflows(this, _forward_event, event);
     }
     default:
@@ -287,6 +292,8 @@ gst_mprtpsender_class_init (GstMprtpsenderClass * klass)
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&gst_mprtpsender_src_template));
   gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&gst_mprtpsender_async_src_template));
+  gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&gst_mprtpsender_mprtcp_sr_sink_template));
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&gst_mprtpsender_mprtcp_rr_sink_template));
@@ -319,6 +326,12 @@ gst_mprtpsender_class_init (GstMprtpsenderClass * klass)
           "The id of the subflow sets to pivot for non-mp packets.",
           "The id of the subflow sets to pivot for non-mp packets. (DTLS, RTCP, Others)",
           0, 255, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MONITORING_PAYLOAD_TYPE,
+      g_param_spec_uint ("monitoring-payload-type",
+          "Set or get the payload type of monitoring packets",
+          "Set or get the payload type of monitoring packets. The default is 8",
+          0, 127, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
 
 
@@ -369,6 +382,7 @@ gst_mprtpsender_init (GstMprtpsender * mprtpsender)
   mprtpsender->event_segment = NULL;
   mprtpsender->event_caps = NULL;
   mprtpsender->event_stream_start = NULL;
+  mprtpsender->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
   //mprtpsender->events = g_queue_new();
   g_rw_lock_init (&mprtpsender->rwmutex);
 }
@@ -398,6 +412,11 @@ gst_mprtpsender_set_property (GObject * object, guint property_id,
       }
       THIS_WRITEUNLOCK (this);
       break;
+    case PROP_MONITORING_PAYLOAD_TYPE:
+      THIS_WRITELOCK (this);
+      this->monitor_payload_type = (guint8) g_value_get_uint (value);
+      THIS_WRITEUNLOCK (this);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -418,6 +437,11 @@ gst_mprtpsender_get_property (GObject * object, guint property_id,
       g_value_set_uint (value, (guint) this->mprtp_ext_header_id);
       THIS_READUNLOCK (this);
       break;
+    case PROP_MONITORING_PAYLOAD_TYPE:
+     THIS_READLOCK (this);
+     g_value_set_uint (value, (guint) this->monitor_payload_type);
+     THIS_READUNLOCK (this);
+     break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -504,13 +528,33 @@ gst_mprtpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
   GstMprtpsender *this;
   guint8 subflow_id;
   Subflow *subflow;
+  gboolean async = FALSE;
+  GList *it;
 
   this = GST_MPRTPSENDER (element);
   GST_DEBUG_OBJECT (this, "requesting pad");
 
-  sscanf (name, "src_%hhu", &subflow_id);
+//  sscanf (name, "src_%hhu", &subflow_id);
+  if(sscanf (name, "src_%hhu", &subflow_id)){
+      async = FALSE;
+  }else if(sscanf (name, "async_src_%hhu", &subflow_id)){
+      async = TRUE;
+  }
   THIS_WRITELOCK (this);
-  subflow = (Subflow *) g_malloc0 (sizeof (Subflow));
+
+  for(it = this->subflows; it; it = it->next){
+    subflow = it->data;
+    if(subflow->id == subflow_id) break;
+    subflow = NULL;
+  }
+
+  if(!subflow) {
+      subflow = (Subflow *) g_malloc0 (sizeof (Subflow));
+      subflow->id           = subflow_id;
+      subflow->sysclock     = gst_system_clock_obtain ();
+      subflow->async_outpad = subflow->outpad = NULL;
+      this->subflows        = g_list_prepend (this->subflows, subflow);
+  }
 
   srcpad = gst_pad_new_from_template (templ, name);
 //  GST_PAD_SET_PROXY_CAPS (srcpad);
@@ -524,12 +568,13 @@ gst_mprtpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
       GST_DEBUG_FUNCPTR(gst_mprtpsender_src_query));
   gst_pad_sticky_events_foreach (this->mprtp_sinkpad,
                                  forward_sticky_events, srcpad);
-  subflow->id = subflow_id;
-  subflow->outpad = srcpad;
-  subflow->state = 0;
-  subflow->sysclock = gst_system_clock_obtain ();
-  this->subflows = g_list_prepend (this->subflows, subflow);
-  this->dirty = TRUE;
+
+  if(!async){
+    subflow->outpad   = srcpad;
+    this->dirty       = TRUE;
+  }else{
+    subflow->async_outpad = srcpad;
+  }
   THIS_WRITEUNLOCK (this);
   GST_OBJECT_FLAG_SET (srcpad, GST_PAD_FLAG_PROXY_CAPS);
 
@@ -624,9 +669,8 @@ gst_mprtpsender_src_query (GstPad * srcpad, GstObject * parent,
         if(!peer) goto default_query;
         if ((result = gst_pad_query (peer, query))) {
             gst_query_parse_latency (query, &live, &min, &max);
-            //don't have any latency here. normally... who knows... I think I need to rest...
-//            min+= GST_MSECOND;
-//            if(max != -1) max+=min;
+            min= GST_MSECOND;
+            max = -1;
             gst_query_set_latency (query, live, min, max);
         }
         gst_object_unref (peer);
@@ -663,7 +707,6 @@ gst_mprtpsender_src_link (GstPad * pad, GstObject * parent, GstPad * peer)
   if (subflow == NULL) {
     goto gst_mprtpsender_src_link_done;
   }
-  subflow->state = 0;
   if (this->event_stream_start != NULL) {
     gst_pad_push_event (subflow->outpad,
         gst_event_copy (this->event_stream_start));
@@ -709,7 +752,8 @@ gst_mprtpsender_src_unlink_done:
 
 typedef enum
 {
-  PACKET_IS_MPRTP,
+  PACKET_IS_MPRTP_SYNC,
+  PACKET_IS_MPRTP_ASYNC,
   PACKET_IS_MPRTCP,
   PACKET_IS_NOT_MP,
 } PacketTypes;
@@ -758,7 +802,6 @@ _get_packet_mptype (GstMprtpsender * this,
       gst_rtp_buffer_unmap (&rtp);
       goto done;
     }
-
     if (!gst_rtp_buffer_get_extension_onebyte_header (&rtp,
             this->mprtp_ext_header_id, 0, &pointer, &size)) {
       gst_rtp_buffer_unmap (&rtp);
@@ -773,8 +816,13 @@ _get_packet_mptype (GstMprtpsender * this,
 //      gst_rtp_buffer_add_extension_onebyte_header (&rtp, 2,
 //            (gpointer) subflow_infos, sizeof (*subflow_infos));
     }
+
+    if(gst_rtp_buffer_get_payload_type(&rtp) == this->monitor_payload_type){
+      result = PACKET_IS_MPRTP_ASYNC;
+    }else{
+      result = PACKET_IS_MPRTP_SYNC;
+    }
     gst_rtp_buffer_unmap (&rtp);
-    result = PACKET_IS_MPRTP;
     goto done;
   }
 
@@ -871,7 +919,10 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   if (packet_type != PACKET_IS_NOT_MP &&
       _select_subflow (this, subflow_id, &subflow) != FALSE) {
 //      g_print("%d->%p|", subflow_id, subflow->outpad);
-    outpad = subflow->outpad;
+    if(packet_type == PACKET_IS_MPRTP_ASYNC || packet_type == PACKET_IS_MPRTCP)
+      outpad = subflow->async_outpad ? subflow->async_outpad : subflow->outpad;
+    else
+      outpad = subflow->outpad;
   } else if (this->pivot_outpad != NULL &&
       gst_pad_is_active (this->pivot_outpad) &&
       gst_pad_is_linked (this->pivot_outpad)) {
@@ -923,7 +974,10 @@ gst_mprtpsender_mprtcp_sink_chain (GstPad * pad, GstObject * parent,
     goto done;
   }
 //  g_print("############################ SENT (%lu)################################\n", GST_TIME_AS_MSECONDS(gst_clock_get_time(subflow->sysclock)));
-  result = gst_pad_push (subflow->outpad, _assemble_report (subflow, buf));
+  if(subflow->async_outpad)
+    result = gst_pad_push (subflow->async_outpad, _assemble_report (subflow, buf));
+  else
+    result = gst_pad_push (subflow->outpad, _assemble_report (subflow, buf));
 
 done:
   THIS_READUNLOCK (this);

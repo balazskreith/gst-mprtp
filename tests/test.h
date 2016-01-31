@@ -5,10 +5,77 @@
  *      Author: balazs
  */
 
+
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * +     +              10.0.0.0/24                   +     +
+ * +     +--------------------------------------------+     +
+ * +     +          .1     sync         .2            +     +
+ * +     +     .----o------------------>¤ :5000       +     +
+ * +  P  +     | TX |     async                       +  P  +
+ * +  E  +     '----o------------------>¤ :5001       +  E  +
+ * +  E  +                                            +  E  +
+ * +  R  +                 sync                       +  R  +
+ * +     +    :5002 ¤<------------------o----.        +     +
+ * +  1  +                async         | RX |        +  2  +
+ * +     +    :5003 ¤<------------------o----'        +     +
+ * +     +                                            +     +
+ * +     +--------------------------------------------+     +
+ * +     +              10.0.0.1/24                   +     +
+ * +     +--------------------------------------------+     +
+ * +     +          .1     sync         .2            +     +
+ * +     +     .----o------------------>¤ :5004       +     +
+ * +  P  +     | TX |     async                       +  P  +
+ * +  E  +     '----o------------------>¤ :5005       +  E  +
+ * +  E  +                                            +  E  +
+ * +  R  +                 sync                       +  R  +
+ * +     +    :5006 ¤<------------------o----.        +     +
+ * +  1  +                async         | RX |        +  2  +
+ * +     +    :5007 ¤<------------------o----'        +     +
+ * +     +                                            +     +
+ * +     +--------------------------------------------+     +
+ * +     +              10.0.0.2/24                   +     +
+ * +     +--------------------------------------------+     +
+ * +     +          .1     sync         .2            +     +
+ * +     +     .----o------------------>¤ :5008       +     +
+ * +  P  +     | TX |     async                       +  P  +
+ * +  E  +     '----o------------------>¤ :5009       +  E  +
+ * +  E  +                                            +  E  +
+ * +  R  +                 sync                       +  R  +
+ * +     +    :5010 ¤<------------------o----.        +     +
+ * +  1  +                async         | RX |        +  2  +
+ * +     +    :5011 ¤<------------------o----'        +     +
+ * +     +                                            +     +
+ * +     +--------------------------------------------+     +
+ * +                                                        +
+ * +                       RTCP                             +
+ * +        TX o----------------------------->¤ :5013       +
+ * +                       RTCP                             +
+ * +     :5015 ¤<-----------------------------o RX          +
+ * +                                                        +
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ */
 #ifndef TESTS_TEST_H_
 #define TESTS_TEST_H_
 
 #include <string.h>
+
+static const int path1_tx_rtp_port  = 5000;
+static const int path1_tx_rtcp_port = 5001;
+static const int path1_rx_rtp_port  = 5002;
+static const int path1_rx_rtcp_port = 5003;
+
+static const int path2_tx_rtp_port  = 5004;
+static const int path2_tx_rtcp_port = 5005;
+static const int path2_rx_rtp_port  = 5006;
+static const int path2_rx_rtcp_port = 5007;
+
+static const int path3_tx_rtp_port  = 5008;
+static const int path3_tx_rtcp_port = 5009;
+static const int path3_rx_rtp_port  = 5010;
+static const int path3_rx_rtcp_port = 5011;
+
+static const int rtpbin_tx_rtcp_port = 5013;
+static const int rtpbin_rx_rtcp_port = 5015;
 
 typedef enum{
   NO_CONTROLLING               = 0,

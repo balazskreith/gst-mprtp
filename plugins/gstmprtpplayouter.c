@@ -114,6 +114,7 @@ enum
   PROP_AUTO_RATE_AND_CC,
   PROP_RTP_PASSTHROUGH,
   PROP_SUBFLOWS_STATS,
+  PROP_DELAY_OFFSET,
 };
 
 /* pad templates */
@@ -229,16 +230,21 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_DETACH_SUBFLOW,
-      g_param_spec_uint ("detach-subflow", "the subflow id requested to detach",
-          "Detach a subflow with a given id.", 0,
-          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+       g_param_spec_uint ("detach-subflow", "the subflow id requested to detach",
+           "Detach a subflow with a given id.", 0,
+           MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_DELAY_OFFSET,
+       g_param_spec_uint64 ("delay-offset",
+                          "In non living sources a delay offset can be configured",
+                          "In non living sources a delay offset can be configured", 0,
+           100 * GST_SECOND, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_AUTO_RATE_AND_CC,
       g_param_spec_boolean ("auto-rate-and-cc",
                             "Automatic rate and congestion controll",
                             "Automatic rate and congestion controll",
                             FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
 
   g_object_class_install_property (gobject_class, PROP_RTP_PASSTHROUGH,
       g_param_spec_boolean ("rtp-passthrough",
@@ -263,7 +269,6 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
 static void
 gst_mprtpplayouter_init (GstMprtpplayouter * this)
 {
-  GstMpRTPBuffer mprtp_reference = GST_MPRTP_BUFFER_INIT;
   this->mprtp_sinkpad =
       gst_pad_new_from_static_template (&gst_mprtpplayouter_mprtp_sink_template,
       "mprtp_sink");
@@ -286,6 +291,8 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
 
   gst_pad_set_query_function (this->mprtp_srcpad,
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_src_query));
+  gst_pad_set_query_function (this->mprtcp_rr_srcpad,
+      GST_DEBUG_FUNCPTR (gst_mprtpplayouter_src_query));
 
   gst_pad_set_chain_function (this->mprtcp_sr_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_mprtcp_sr_sink_chain));
@@ -297,7 +304,6 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   gst_pad_set_event_function (this->mprtp_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_sink_event));
 
-  memcpy(&this->mprtp_reference, &mprtp_reference, sizeof(GstMpRTPBuffer));
   this->rtp_passthrough = TRUE;
   this->riport_flow_signal_sent = FALSE;
   this->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
@@ -336,7 +342,7 @@ gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstMpRTPBuffer * mprtp)
   if(!GST_IS_BUFFER(mprtp->buffer)){
     goto done;
   }
-  if(gst_mprtp_buffer_get_payload_type(mprtp) == this->monitor_payload_type){
+  if(mprtp->payload_type == this->monitor_payload_type){
     goto done;
   }
   //For Playout test
@@ -436,6 +442,11 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
     case PROP_DETACH_SUBFLOW:
       THIS_WRITELOCK (this);
       _detach_path (this, g_value_get_uint (value));
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_DELAY_OFFSET:
+      THIS_WRITELOCK (this);
+      this->delay_offset = g_value_get_uint64 (value);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_RTP_PASSTHROUGH:
@@ -591,8 +602,8 @@ gst_mprtpplayouter_src_query (GstPad * sinkpad, GstObject * parent,
       peer = gst_pad_get_peer (this->mprtp_sinkpad);
       if ((result = gst_pad_query (peer, query))) {
           gst_query_parse_latency (query, &live, &min, &max);
-          min+= GST_MSECOND;
-          if(max != -1) max += min;
+          min= GST_MSECOND;
+          max = -1;
           gst_query_set_latency (query, live, min, max);
       }
       gst_object_unref (peer);
@@ -639,6 +650,12 @@ gst_mprtpplayouter_sink_event (GstPad * pad, GstObject * parent,
   GST_DEBUG_OBJECT (this, "sink event");
   g_print ("PLY EVENT to the sink: %s", GST_EVENT_TYPE_NAME (event));
   switch (GST_EVENT_TYPE (event)) {
+    case GST_EVENT_LATENCY:
+      {
+        GstClockTime latency;
+        gst_event_parse_latency(event, &latency);
+      }
+      goto default_;
     case GST_EVENT_CAPS:
       gst_event_parse_caps (event, &caps);
       s = gst_caps_get_structure (caps, 0);
@@ -654,12 +671,9 @@ gst_mprtpplayouter_sink_event (GstPad * pad, GstObject * parent,
         this->clock_base = -1;
       }
       THIS_WRITEUNLOCK (this);
-
-      peer = gst_pad_get_peer (this->mprtp_srcpad);
-      result = gst_pad_send_event (peer, event);
-      gst_object_unref (peer);
-      break;
+      goto default_;
     default:
+    default_:
       peer = gst_pad_get_peer (this->mprtp_srcpad);
             result = gst_pad_send_event (peer, event);
             gst_object_unref (peer);
@@ -834,12 +848,20 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     result = _processing_mprtcp_packet (this, buf);
     goto done;
   }
-  //the packet is either rtcp or mprtp
+  //check weather the packet is rtcp or mprtp
   if (*data > 192 && *data < 223) {
     if(GST_IS_BUFFER(buf))
       result = gst_pad_push (this->mprtp_srcpad, buf);
     goto done;
   }
+
+  //check weather the packet is mprtp
+  if(!gst_buffer_is_mprtp(buf, this->mprtp_ext_header_id)){
+    if(GST_IS_BUFFER(buf))
+      result = gst_pad_push (this->mprtp_srcpad, buf);
+    goto done;
+  }
+  //init mprtp buffer
 
   _processing_mprtp_packet (this, buf);
   result = GST_FLOW_OK;
@@ -862,6 +884,7 @@ gst_mprtpplayouter_mprtcp_sr_sink_chain (GstPad * pad, GstObject * parent,
   GstMprtpplayouter *this;
   GstMapInfo info;
   GstFlowReturn result;
+  guint8 *data;
 
   this = GST_MPRTPPLAYOUTER (parent);
   GST_DEBUG_OBJECT (this, "RTCP/MPRTCP sink");
@@ -872,9 +895,16 @@ gst_mprtpplayouter_mprtcp_sr_sink_chain (GstPad * pad, GstObject * parent,
     goto done;
   }
 
-  result = _processing_mprtcp_packet (this, buf);
-
+  data = info.data + 1;
   gst_buffer_unmap (buf, &info);
+  //demultiplexing based on RFC5761
+  if (*data != this->monitor_payload_type) {
+    result = _processing_mprtcp_packet (this, buf);
+  }else{
+    g_print("Monitoring packet\n");
+    _processing_mprtp_packet(this, buf);
+    result = GST_FLOW_OK;
+  }
 
   if (!this->riport_flow_signal_sent) {
     this->riport_flow_signal_sent = TRUE;
@@ -915,20 +945,12 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
   GstMpRTPBuffer *mprtp = NULL;
 
   mprtp = _make_mprtp_buffer(this, buf);
-  if (G_UNLIKELY (!mprtp->initialized))
-  {
-    GST_WARNING_OBJECT (this, "The received Buffer is not MpRTP");
-    if (this->rtp_passthrough) {
-       gst_mprtpplayouter_send_mprtp_proxy (this, mprtp);
-     }
-    return;
-  }
   if (this->pivot_ssrc != MPRTP_PLAYOUTER_DEFAULT_SSRC &&
-      gst_mprtp_buffer_get_ssrc(mprtp) != this->pivot_ssrc) {
+      mprtp->ssrc != this->pivot_ssrc) {
 
     _trash_mprtp_buffer(this, mprtp);
     GST_DEBUG_OBJECT (this, "RTP packet ssrc is %u, the pivot ssrc is %u",
-        this->pivot_ssrc, gst_mprtp_buffer_get_ssrc(mprtp));
+        this->pivot_ssrc, mprtp->ssrc);
     if(GST_IS_BUFFER(buf))
       gst_pad_push (this->mprtp_srcpad, buf);
     return;
@@ -952,9 +974,6 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
       return;
     }
   }
-
-//  g_print("%lu\n",GST_TIME_AS_MSECONDS(gst_clock_get_time(this->sysclock) - in_prev));
-//  in_prev = gst_clock_get_time(this->sysclock);
   mprtp->buffer = gst_buffer_ref(mprtp->buffer);
   mprtpr_path_process_rtp_packet (path, mprtp);
   stream_joiner_receive_mprtp(this->joiner, mprtp);
@@ -994,13 +1013,11 @@ GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer)
 {
   GstMpRTPBuffer *result;
   result = pointerpool_get(this->mprtp_buffer_pool);
-  memcpy(result, &this->mprtp_reference, sizeof(GstMpRTPBuffer));
-//  g_print("%d",
-          gst_mprtp_buffer_init(result,
-                            buffer,
-                            this->mprtp_ext_header_id,
-                            this->abs_time_ext_header_id);
-//  );
+  gst_mprtp_buffer_init(result,
+                    buffer,
+                    this->mprtp_ext_header_id,
+                    this->abs_time_ext_header_id,
+                    this->delay_offset);
   return result;
 }
 

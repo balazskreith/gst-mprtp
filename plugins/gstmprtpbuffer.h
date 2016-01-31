@@ -38,14 +38,18 @@ typedef struct _GstMpRTPBuffer GstMpRTPBuffer;
 
 struct _GstMpRTPBuffer{
 //  GstRTPBuffer   rtp;
-  gboolean       initialized;
   GstBuffer     *buffer;
   guint          payload_bytes;
   guint8         subflow_id;
   guint16        subflow_seq;
+  guint32        timestamp;
+  guint32        ssrc;
   guint64        abs_snd_ntp_time;
   guint64        abs_rcv_ntp_time;
   GstClockTime   delay;
+  guint8         payload_type;
+  guint16        abs_seq;
+  gboolean       marker;
 };
 
 
@@ -64,21 +68,12 @@ struct _RTPAbsTimeExtension
   guint8 time[3];
 };
 
-gboolean gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
+gboolean gst_buffer_is_mprtp(GstBuffer *buffer, guint8 mprtp_ext_header_id);
+
+void gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
                                GstBuffer *buffer,
                                guint8 mprtp_ext_header_id,
-                               guint8 abs_time_ext_header_id);
-
-guint32 gst_mprtp_buffer_get_ssrc(GstMpRTPBuffer *mprtp);
-guint32 gst_mprtp_buffer_get_timestamp(GstMpRTPBuffer *mprtp);
-gboolean gst_mprtp_buffer_get_marker_bit(GstMpRTPBuffer *mprtp);
-guint16 gst_mprtp_buffer_get_abs_seq(GstMpRTPBuffer *mprtp);
-guint8 gst_mprtp_buffer_get_payload_type(GstMpRTPBuffer *mprtp);
-guint gst_mprtp_buffer_get_payload_len(GstMpRTPBuffer *mprtp);
-gboolean gst_mprtp_buffer_get_extension_onebyte_header(
-    GstMpRTPBuffer *mprtp,
-    guint8 id,
-    gpointer* data,
-    guint *size);
+                               guint8 abs_time_ext_header_id,
+                               GstClockTime delay_offset);
 
 #endif //_GST_MPRTPBUFFER_H_

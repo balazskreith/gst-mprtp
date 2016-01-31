@@ -37,6 +37,7 @@ struct _GstMprtpsender
   GstElement base_mprtpsender;
   GRWLock rwmutex;
   guint8 mprtp_ext_header_id;
+  guint8 monitor_payload_type;
   GList *subflows;
   gboolean dirty;
   GstSegment segment;

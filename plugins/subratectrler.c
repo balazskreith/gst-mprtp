@@ -598,7 +598,7 @@ void subratectrler_set(SubflowRateController *this,
   this->max_target_point = MAX(TARGET_BITRATE_MAX, sending_target * 8);
   _transit_state_to(this, STATE_STABLE);
   _set_rate_controller(this, BITRATE_DIRECT_UP, TRUE);
-  this->disable_controlling = _now(this) + 5 * GST_SECOND;
+  this->disable_controlling = _now(this) + 20 * GST_SECOND;
   THIS_WRITEUNLOCK(this);
 }
 
@@ -1633,7 +1633,7 @@ void _set_monitoring_interval(SubflowRateController *this, guint interval)
     this->monitored_bitrate = (gdouble)_actual_rate(this) / (gdouble)interval;
   else
     this->monitored_bitrate = 0;
-  mprtps_path_set_monitor_interval(this->path, interval);
+  mprtps_path_set_monitor_interval_and_duration(this->path, interval, 200 * GST_MSECOND);
   return;
 }
 

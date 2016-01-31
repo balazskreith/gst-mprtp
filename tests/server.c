@@ -146,7 +146,7 @@ make_video_testsrc_session (guint sessionNum)
       "video/x-raw",
       "width", G_TYPE_INT, 352,
       "height", G_TYPE_INT, 288,
-      "framerate", GST_TYPE_FRACTION, 50, 1, NULL);
+      "framerate", GST_TYPE_FRACTION, 25, 1, NULL);
 
   gst_element_link_filtered (videoSrc, encoder, videoCaps);
   gst_element_link (encoder, payloader);
@@ -175,7 +175,7 @@ make_video_vl2src_session (guint sessionNum)
   encoder = gst_element_factory_make ("vp8enc", NULL);
   //g_object_set (payloader, "config-interval", 2, NULL);
 
-  g_object_set (encoder, "target-bitrate", 500000, NULL);
+  g_object_set (encoder, "target-bitrate", 1000000, NULL);
   g_object_set (encoder, "keyframe-max-dist", 20, NULL);
   g_object_set (encoder, "end-usage", 1, NULL);
   g_object_set (encoder, "deadline", 20000, NULL);
@@ -188,7 +188,7 @@ make_video_vl2src_session (guint sessionNum)
       "video/x-raw",
       "width", G_TYPE_INT, 352,
       "height", G_TYPE_INT, 288,
-      "framerate", GST_TYPE_FRACTION, 50, 1, NULL);
+      "framerate", GST_TYPE_FRACTION, 25, 1, NULL);
 
   gst_element_link (videoSrc, videoConv);
   gst_element_link (videoConv, encoder);
@@ -224,12 +224,11 @@ make_video_foreman_session (guint sessionNum)
   encoder = gst_element_factory_make ("vp8enc", NULL);
   //g_object_set (payloader, "config-interval", 2, NULL);
 
-  g_object_set (encoder, "target-bitrate", 500000, NULL);
-  g_object_set (encoder, "keyframe-max-dist", 20, NULL);
-  g_object_set (encoder, "end-usage", 1, NULL);
+  g_object_set (encoder, "target-bitrate", 1000000, NULL);
+  g_object_set (encoder, "end-usage", 0, NULL);
   g_object_set (encoder, "deadline", 20000, NULL);
   g_object_set (encoder, "undershoot", 100, NULL);
-  g_object_set (encoder, "cpu-used", 2, NULL);
+  g_object_set (encoder, "cpu-used", 0, NULL);
 //  g_object_set (encoder, "keyframe-mode", 0, NULL);
 
   gst_bin_add_many (videoBin, videoConv, videoSrc, videoParse, encoder, payloader, NULL);
@@ -346,7 +345,6 @@ go_on:
 }
 
 
-
 static void
 add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
            gchar* file)
@@ -355,11 +353,14 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   GstElement *rtpSink_1 = gst_element_factory_make ("udpsink", "rtpsink_1");
   GstElement *rtpSink_2 = gst_element_factory_make ("udpsink", "rtpsink_2");
   GstElement *rtpSink_3 = gst_element_factory_make ("udpsink", "rtpsink_3");
+  GstElement *async_tx_rtcpSink_1 = gst_element_factory_make ("udpsink", "async_tx_rtpsink_1");
+  GstElement *async_tx_rtcpSink_2 = gst_element_factory_make ("udpsink", "async_tx_rtpsink_2");
+  GstElement *async_tx_rtcpSink_3 = gst_element_factory_make ("udpsink", "async_tx_rtpsink_3");
   GstElement *rtcpSink = gst_element_factory_make ("udpsink", NULL);
   GstElement *rtcpSrc = gst_element_factory_make ("udpsrc", NULL);
-  GstElement *rtpSrc_1 = gst_element_factory_make ("udpsrc", NULL);
-  GstElement *rtpSrc_2 = gst_element_factory_make ("udpsrc", NULL);
-  GstElement *rtpSrc_3 = gst_element_factory_make ("udpsrc", NULL);
+  GstElement *async_rx_rtcpSrc_1 = gst_element_factory_make ("udpsrc", "async_rx_rtpsink_1");
+  GstElement *async_rx_rtcpSrc_2 = gst_element_factory_make ("udpsrc", "async_rx_rtpsink_2");
+  GstElement *async_rx_rtcpSrc_3 = gst_element_factory_make ("udpsrc", "async_rx_rtpsink_3");
   GstElement *mprtpsnd = gst_element_factory_make ("mprtpsender", NULL);
   GstElement *mprtprcv = gst_element_factory_make ("mprtpreceiver", NULL);
   GstElement *mprtpsch = gst_element_factory_make ("mprtpscheduler", NULL);
@@ -367,12 +368,19 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   int basePort;
   gchar *padName;
 
-  basePort = 5000 + (session->sessionNum * 20);
+  basePort = 5000;
 
   gst_bin_add_many (GST_BIN (pipe), rtpSink_1, rtpSink_2, rtpSink_3,
-      mprtprcv, mprtpsnd, mprtpsch, rtcpSink, rtcpSrc, rtpSrc_1,
-      rtpSrc_2, rtpSrc_3, mq,
-      session->input, NULL);
+      mprtprcv, mprtpsnd, mprtpsch, rtcpSink, rtcpSrc,
+      mq, session->input, NULL);
+
+
+  if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING){
+    gst_bin_add_many (GST_BIN (pipe),
+                      async_tx_rtcpSink_1, async_tx_rtcpSink_2, async_tx_rtcpSink_3,
+                      async_rx_rtcpSrc_1, async_rx_rtcpSrc_2, async_rx_rtcpSrc_3,
+                      NULL);
+  }
 
   /* enable retransmission by setting rtprtxsend as the "aux" element of rtpbin */
   g_signal_connect (rtpBin, "request-aux-sender",
@@ -386,29 +394,25 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
 //    g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2", "sync", FALSE, "async", FALSE, NULL);
 ////      "sync",FALSE, "async", FALSE, NULL);
 
-  if(test_parameters_.other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time)
-    g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2", NULL);
-  else
-    g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2", NULL);
+    g_object_set (mq, "max-size-buffers", 1, NULL);
+    g_object_set (rtpSink_1, "port", path1_tx_rtp_port, "host", "10.0.0.2", NULL);
+    g_object_set (rtpSink_2, "port", path2_tx_rtp_port, "host", "10.0.1.2", NULL);
+    g_object_set (rtpSink_3, "port", path3_tx_rtp_port, "host", "10.0.2.2", NULL);
 
-  if(test_parameters_.other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time)
-    g_object_set (rtpSink_2, "port", basePort + 1, "host", "10.0.1.2", NULL);
-  else
-    g_object_set (rtpSink_2, "port", basePort + 1, "host", "10.0.1.2", "sync",FALSE, "async", FALSE, NULL);
+    if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING){
+        g_object_set (async_tx_rtcpSink_1, "port", path1_tx_rtcp_port, "host", "10.0.0.2", "sync", FALSE, "async", FALSE, NULL);
+        g_object_set (async_tx_rtcpSink_2, "port", path2_tx_rtcp_port, "host", "10.0.1.2", "sync", FALSE, "async", FALSE, NULL);
+        g_object_set (async_tx_rtcpSink_3, "port", path3_tx_rtcp_port, "host", "10.0.2.2", "sync", FALSE, "async", FALSE, NULL);
+        g_object_set (async_rx_rtcpSrc_1, "port",  path1_rx_rtcp_port, NULL);
+        g_object_set (async_rx_rtcpSrc_2, "port",  path2_rx_rtcp_port, NULL);
+        g_object_set (async_rx_rtcpSrc_3, "port",  path3_rx_rtcp_port, NULL);
+    }
 
-  if(test_parameters_.other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time)
-    g_object_set (rtpSink_3, "port", basePort + 2, "host", "10.0.2.2", NULL);
-  else
-    g_object_set (rtpSink_3, "port", basePort + 2, "host", "10.0.2.2", "sync",FALSE, "async", FALSE, NULL);
-//      );
+    g_object_set (rtcpSink, "port", rtpbin_tx_rtcp_port, "host", "10.0.0.2",
+//        NULL);
+         "sync",FALSE, "async", FALSE, NULL);
 
-  g_object_set (rtcpSink, "port", basePort + 5, "host", "10.0.0.2",
-//      NULL);
-       "sync",FALSE, "async", FALSE, NULL);
-
-  g_object_set (rtpSrc_1, "port", basePort + 11, NULL);
-  g_object_set (rtpSrc_2, "port", basePort + 12, NULL);
-  g_object_set (rtcpSrc, "port", basePort + 10, NULL);
+    g_object_set (rtcpSrc, "port", rtpbin_rx_rtcp_port, NULL);
 
   if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING)
     g_object_set (mprtpsch, "auto-rate-and-cc", TRUE, NULL);
@@ -433,6 +437,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   gst_element_link_pads (mprtpsnd, "src_3", mq, "sink_3");
   gst_element_link_pads (mq, "src_3", rtpSink_3, "sink");
 
+
   if(test_parameters_.subflow1_active)
     g_object_set (mprtpsch, "join-subflow", 1, NULL);
   if(test_parameters_.subflow2_active)
@@ -445,16 +450,16 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   g_free (padName);
 
   padName = g_strdup_printf ("recv_rtcp_sink_%u", session->sessionNum);
-  gst_element_link_pads (rtpSrc_1, "src", mprtprcv, "sink_1");
-  gst_element_link_pads (rtpSrc_2, "src", mprtprcv, "sink_2");
-  gst_element_link_pads (rtpSrc_3, "src", mprtprcv, "sink_3");
+  if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING){
+      gst_element_link_pads (async_rx_rtcpSrc_1, "src", mprtprcv, "async_sink_1");
+      gst_element_link_pads (async_rx_rtcpSrc_2, "src", mprtprcv, "async_sink_2");
+      gst_element_link_pads (async_rx_rtcpSrc_3, "src", mprtprcv, "async_sink_3");
+  }
+
   gst_element_link_pads (mprtprcv, "mprtcp_rr_src", mprtpsch, "mprtcp_rr_sink");
   gst_element_link_pads (mprtpsch, "mprtcp_sr_src", mprtpsnd, "mprtcp_sr_sink");
   gst_element_link_pads (rtcpSrc, "src", rtpBin, padName);
   g_free (padName);
-
-  g_print ("New RTP stream on %i/%i/%i\n", basePort, basePort + 1,
-      basePort + 5);
 
   session_unref (session);
 }

@@ -700,7 +700,15 @@ gst_mprtpscheduler_query (GstElement * element, GstQuery * query)
 static void _setup_monitor_packet(GstMprtpscheduler *this, GstRTPBuffer *rtp);
 void _setup_monitor_packet(GstMprtpscheduler *this, GstRTPBuffer *rtp)
 {
+  RTPAbsTimeExtension data;
+  guint32 time;
 
+  //Absolute sending time +0x83AA7E80
+  //https://tools.ietf.org/html/draft-alvestrand-rmcat-remb-03
+  time = (NTP_NOW >> 14) & 0x00ffffff;
+  memcpy (&data, &time, 3);
+  gst_rtp_buffer_add_extension_onebyte_header (rtp,
+      this->abs_time_ext_header_id, (gpointer) &data, sizeof (data));
 }
 
 void
@@ -709,8 +717,6 @@ gst_mprtpscheduler_mprtp_proxy(gpointer ptr, GstBuffer * buffer)
   GstMprtpscheduler *this;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   GstBuffer *outbuf;
-  RTPAbsTimeExtension data;
-  guint32 time;
 
   this = GST_MPRTPSCHEDULER(ptr);
   outbuf = gst_buffer_make_writable (buffer);
@@ -718,13 +724,7 @@ gst_mprtpscheduler_mprtp_proxy(gpointer ptr, GstBuffer * buffer)
     GST_WARNING_OBJECT (this, "The RTP packet is not writeable");
     goto done;
   }
-  //Absolute sending time +0x83AA7E80
-  //https://tools.ietf.org/html/draft-alvestrand-rmcat-remb-03
-  time = (NTP_NOW >> 14) & 0x00ffffff;
 
-  memcpy (&data, &time, 3);
-  gst_rtp_buffer_add_extension_onebyte_header (&rtp,
-      this->abs_time_ext_header_id, (gpointer) &data, sizeof (data));
   if(gst_rtp_buffer_get_payload_type(&rtp) == this->monitor_payload_type){
     _setup_monitor_packet(this, &rtp);
   }
@@ -917,8 +917,8 @@ gst_mprtpscheduler_src_query (GstPad * srckpad, GstObject * parent,
       peer = gst_pad_get_peer (this->rtp_sinkpad);
       if ((result = gst_pad_query (peer, query))) {
           gst_query_parse_latency (query, &live, &min, &max);
-          min+= GST_MSECOND;
-          if(max != -1) max += min;
+          min= GST_MSECOND;
+          max = -1;
           gst_query_set_latency (query, live, min, max);
       }
       gst_object_unref (peer);

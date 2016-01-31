@@ -58,6 +58,7 @@ GST_DEBUG_CATEGORY_STATIC (gst_mprtpreceiver_debug_category);
 typedef struct
 {
   GstPad *inpad;
+  GstPad *async_inpad;
   guint8 id;
 } Subflow;
 
@@ -94,6 +95,7 @@ enum
   PROP_0,
   PROP_MPRTP_EXT_HEADER_ID,
   PROP_REPORT_ONLY,
+  PROP_MONITORING_PAYLOAD_TYPE,
 };
 
 
@@ -106,12 +108,20 @@ GST_STATIC_PAD_TEMPLATE ("sink_%u",
     GST_STATIC_CAPS ("ANY")
     );
 
+static GstStaticPadTemplate gst_mprtpreceiver_async_sink_template =
+GST_STATIC_PAD_TEMPLATE ("async_sink_%u",
+    GST_PAD_SINK,
+    GST_PAD_REQUEST,
+    GST_STATIC_CAPS ("ANY")
+    );
+
 static GstStaticPadTemplate gst_mprtpreceiver_mprtcp_rr_src_template =
 GST_STATIC_PAD_TEMPLATE ("mprtcp_rr_src",
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS ("application/x-rtcp")
     );
+
 
 static GstStaticPadTemplate gst_mprtpreceiver_mprtcp_sr_src_template =
 GST_STATIC_PAD_TEMPLATE ("mprtcp_sr_src",
@@ -146,6 +156,8 @@ gst_mprtpreceiver_class_init (GstMprtpreceiverClass * klass)
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&gst_mprtpreceiver_sink_template));
   gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&gst_mprtpreceiver_async_sink_template));
+  gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&gst_mprtpreceiver_mprtcp_rr_src_template));
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&gst_mprtpreceiver_mprtcp_sr_src_template));
@@ -153,8 +165,8 @@ gst_mprtpreceiver_class_init (GstMprtpreceiverClass * klass)
       gst_static_pad_template_get (&gst_mprtpreceiver_mprtp_src_template));
 
   gst_element_class_set_static_metadata (GST_ELEMENT_CLASS (klass),
-      "FIXME Long name", "Generic", "FIXME Description",
-      "FIXME <fixme@example.com>");
+      "MpRTP Receiver plugin", "Generic", "FIXME Description",
+      "Balázs Kreith <balazskreith@gmail.com>");
 
   gobject_class->set_property = gst_mprtpreceiver_set_property;
   gobject_class->get_property = gst_mprtpreceiver_get_property;
@@ -172,6 +184,12 @@ gst_mprtpreceiver_class_init (GstMprtpreceiverClass * klass)
           "Indicate weather the receiver only receive reports on its subflows",
           "Indicate weather the receiver only receive reports on its subflows",
           FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MONITORING_PAYLOAD_TYPE,
+      g_param_spec_uint ("monitoring-payload-type",
+          "Set or get the payload type of monitoring packets",
+          "Set or get the payload type of monitoring packets. The default is 8",
+          0, 127, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   element_class->request_new_pad =
       GST_DEBUG_FUNCPTR (gst_mprtpreceiver_request_new_pad);
@@ -212,6 +230,7 @@ gst_mprtpreceiver_init (GstMprtpreceiver * mprtpreceiver)
 
   mprtpreceiver->only_report_receiving = FALSE;
   mprtpreceiver->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
+  mprtpreceiver->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
 }
 
 void
@@ -225,6 +244,11 @@ gst_mprtpreceiver_set_property (GObject * object, guint property_id,
     case PROP_MPRTP_EXT_HEADER_ID:
       THIS_WRITELOCK (this);
       this->mprtp_ext_header_id = (guint8) g_value_get_uint (value);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_MONITORING_PAYLOAD_TYPE:
+      THIS_WRITELOCK (this);
+      this->monitor_payload_type = (guint8) g_value_get_uint (value);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_REPORT_ONLY:
@@ -252,6 +276,11 @@ gst_mprtpreceiver_get_property (GObject * object, guint property_id,
       g_value_set_uint (value, (guint) this->mprtp_ext_header_id);
       THIS_READUNLOCK (this);
       break;
+    case PROP_MONITORING_PAYLOAD_TYPE:
+       THIS_READLOCK (this);
+       g_value_set_uint (value, (guint) this->monitor_payload_type);
+       THIS_READUNLOCK (this);
+       break;
     case PROP_REPORT_ONLY:
       THIS_READLOCK (this);
       g_value_set_boolean (value, this->only_report_receiving);
@@ -298,11 +327,17 @@ gst_mprtpreceiver_request_new_pad (GstElement * element, GstPadTemplate * templ,
   GstMprtpreceiver *this;
   guint8 subflow_id;
   Subflow *subflow;
+  gboolean async = FALSE;
+  GList *it;
 
   this = GST_MPRTPRECEIVER (element);
   GST_DEBUG_OBJECT (this, "requesting pad");
 
-  sscanf (name, "sink_%hhu", &subflow_id);
+  if(sscanf (name, "sink_%hhu", &subflow_id)){
+    async = FALSE;
+  }else if(sscanf (name, "async_sink_%hhu", &subflow_id)){
+    async = TRUE;
+  }
 
   THIS_WRITELOCK (this);
 
@@ -317,10 +352,24 @@ gst_mprtpreceiver_request_new_pad (GstElement * element, GstPadTemplate * templ,
       GST_DEBUG_FUNCPTR (gst_mprtpreceiver_sink_unlink));
   gst_pad_set_chain_function (sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpreceiver_sink_chain));
-  subflow = (Subflow *) g_malloc0 (sizeof (Subflow));
-  subflow->id = subflow_id;
-  subflow->inpad = sinkpad;
-  this->subflows = g_list_prepend (this->subflows, subflow);
+
+  for(it = this->subflows; it; it = it->next){
+    subflow = it->data;
+    if(subflow->id == subflow_id) break;
+    subflow = NULL;
+  }
+
+  if(!subflow){
+      subflow = (Subflow *) g_malloc0 (sizeof (Subflow));
+      subflow->id = subflow_id;
+      this->subflows = g_list_prepend (this->subflows, subflow);
+  }
+
+  if(async){
+    subflow->async_inpad = sinkpad;
+  }else{
+    subflow->inpad = sinkpad;
+  }
   THIS_WRITEUNLOCK (this);
 
   gst_pad_set_active (sinkpad, TRUE);
@@ -369,8 +418,8 @@ gst_mprtpreceiver_src_query (GstPad * srcpad, GstObject * parent,
       peer = gst_pad_get_peer (((Subflow*)(this->subflows->data))->inpad);
       if ((result = gst_pad_query (peer, query))) {
           gst_query_parse_latency (query, &live, &min, &max);
-          min+= GST_MSECOND;
-          if(max != -1) max += min;
+          min= GST_MSECOND;
+          max = -1;
           gst_query_set_latency (query, live, min, max);
       }
       gst_object_unref (peer);
@@ -512,6 +561,7 @@ typedef enum
   PACKET_IS_MPRTP,
   PACKET_IS_MPRTCP,
   PACKET_IS_NOT_MP,
+  PACKET_IS_MPRTP_MONITORING,
 } PacketTypes;
 
 static PacketTypes
@@ -558,7 +608,6 @@ _get_packet_mptype (GstMprtpreceiver * this,
       gst_rtp_buffer_unmap (&rtp);
       goto done;
     }
-
     if (!gst_rtp_buffer_get_extension_onebyte_header (&rtp,
             this->mprtp_ext_header_id, 0, &pointer, &size)) {
       gst_rtp_buffer_unmap (&rtp);
@@ -569,12 +618,15 @@ _get_packet_mptype (GstMprtpreceiver * this,
       subflow_infos = (MPRTPSubflowHeaderExtension *) pointer;
       *subflow_id = subflow_infos->id;
     }
+    if(gst_rtp_buffer_get_payload_type(&rtp) == this->monitor_payload_type){
+      result = PACKET_IS_MPRTP_MONITORING;
+    }else{
+      result = PACKET_IS_MPRTP;
+    }
 //    g_print("%d-%u|", *subflow_id, gst_rtp_buffer_get_timestamp(&rtp));
     gst_rtp_buffer_unmap (&rtp);
-    result = PACKET_IS_MPRTP;
     goto done;
   }
-
 
 done:
   return result;
@@ -603,7 +655,10 @@ gst_mprtpreceiver_sink_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
   if (packet_type == PACKET_IS_MPRTCP) {
     result = _send_mprtcp_buffer (this, buf);
     gst_buffer_unmap (buf, &map);
-  } else {
+  } else if(packet_type == PACKET_IS_MPRTP_MONITORING){
+    gst_buffer_unmap (buf, &map);
+    result = gst_pad_push (this->mprtcp_sr_srcpad, buf);
+  }else{
     gst_buffer_unmap (buf, &map);
     result = gst_pad_push (this->mprtp_srcpad, buf);
   }

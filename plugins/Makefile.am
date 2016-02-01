@@ -22,10 +22,9 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          ricalcer.c                 \
                          percentiletracker.c        \
                          percentiletracker2.c       \
-                         variancetracker.c          \
                          sndratedistor.c            \
                          numstracker.c              \
-                         floatnumstracker.c         \
+                         floatsbuffer.c             \
                          subratectrler.c            
                     
                     
@@ -43,10 +42,9 @@ noinst_HEADERS = mprtpspath.h           \
                  ricalcer.h             \
                  percentiletracker.h    \
                  percentiletracker2.h   \
-                 variancetracker.h      \
                  sndratedistor.h        \
                  numstracker.h          \
-                 floatnumstracker.h     \
+                 floatsbuffer.h         \
                  subratectrler.h        
                           
 

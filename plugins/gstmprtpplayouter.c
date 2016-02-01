@@ -901,7 +901,6 @@ gst_mprtpplayouter_mprtcp_sr_sink_chain (GstPad * pad, GstObject * parent,
   if (*data != this->monitor_payload_type) {
     result = _processing_mprtcp_packet (this, buf);
   }else{
-    g_print("Monitoring packet\n");
     _processing_mprtp_packet(this, buf);
     result = GST_FLOW_OK;
   }

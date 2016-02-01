@@ -149,10 +149,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-pointerpool.lo libgstmprtp_la-ricalcer.lo \
 	libgstmprtp_la-percentiletracker.lo \
 	libgstmprtp_la-percentiletracker2.lo \
-	libgstmprtp_la-variancetracker.lo \
 	libgstmprtp_la-sndratedistor.lo libgstmprtp_la-numstracker.lo \
-	libgstmprtp_la-floatnumstracker.lo \
-	libgstmprtp_la-subratectrler.lo
+	libgstmprtp_la-floatsbuffer.lo libgstmprtp_la-subratectrler.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -415,10 +413,9 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          ricalcer.c                 \
                          percentiletracker.c        \
                          percentiletracker2.c       \
-                         variancetracker.c          \
                          sndratedistor.c            \
                          numstracker.c              \
-                         floatnumstracker.c         \
+                         floatsbuffer.c             \
                          subratectrler.c            
 
 noinst_HEADERS = mprtpspath.h           \
@@ -435,10 +432,9 @@ noinst_HEADERS = mprtpspath.h           \
                  ricalcer.h             \
                  percentiletracker.h    \
                  percentiletracker2.h   \
-                 variancetracker.h      \
                  sndratedistor.h        \
                  numstracker.h          \
-                 floatnumstracker.h     \
+                 floatsbuffer.h         \
                  subratectrler.h        
 
 
@@ -535,7 +531,7 @@ distclean-compile:
 
 include ./$(DEPDIR)/libgstmprtp_la-bintree.Plo
 include ./$(DEPDIR)/libgstmprtp_la-bintree2.Plo
-include ./$(DEPDIR)/libgstmprtp_la-floatnumstracker.Plo
+include ./$(DEPDIR)/libgstmprtp_la-floatsbuffer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtcpbuffer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpbuffer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplayouter.Plo
@@ -558,7 +554,6 @@ include ./$(DEPDIR)/libgstmprtp_la-sndratedistor.Plo
 include ./$(DEPDIR)/libgstmprtp_la-streamjoiner.Plo
 include ./$(DEPDIR)/libgstmprtp_la-streamsplitter.Plo
 include ./$(DEPDIR)/libgstmprtp_la-subratectrler.Plo
-include ./$(DEPDIR)/libgstmprtp_la-variancetracker.Plo
 
 .c.o:
 	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -728,13 +723,6 @@ libgstmprtp_la-percentiletracker2.lo: percentiletracker2.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-percentiletracker2.lo `test -f 'percentiletracker2.c' || echo '$(srcdir)/'`percentiletracker2.c
 
-libgstmprtp_la-variancetracker.lo: variancetracker.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-variancetracker.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-variancetracker.Tpo -c -o libgstmprtp_la-variancetracker.lo `test -f 'variancetracker.c' || echo '$(srcdir)/'`variancetracker.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-variancetracker.Tpo $(DEPDIR)/libgstmprtp_la-variancetracker.Plo
-#	$(AM_V_CC)source='variancetracker.c' object='libgstmprtp_la-variancetracker.lo' libtool=yes \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-variancetracker.lo `test -f 'variancetracker.c' || echo '$(srcdir)/'`variancetracker.c
-
 libgstmprtp_la-sndratedistor.lo: sndratedistor.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-sndratedistor.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-sndratedistor.Tpo -c -o libgstmprtp_la-sndratedistor.lo `test -f 'sndratedistor.c' || echo '$(srcdir)/'`sndratedistor.c
 	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-sndratedistor.Tpo $(DEPDIR)/libgstmprtp_la-sndratedistor.Plo
@@ -749,12 +737,12 @@ libgstmprtp_la-numstracker.lo: numstracker.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-numstracker.lo `test -f 'numstracker.c' || echo '$(srcdir)/'`numstracker.c
 
-libgstmprtp_la-floatnumstracker.lo: floatnumstracker.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-floatnumstracker.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-floatnumstracker.Tpo -c -o libgstmprtp_la-floatnumstracker.lo `test -f 'floatnumstracker.c' || echo '$(srcdir)/'`floatnumstracker.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-floatnumstracker.Tpo $(DEPDIR)/libgstmprtp_la-floatnumstracker.Plo
-#	$(AM_V_CC)source='floatnumstracker.c' object='libgstmprtp_la-floatnumstracker.lo' libtool=yes \
+libgstmprtp_la-floatsbuffer.lo: floatsbuffer.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-floatsbuffer.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-floatsbuffer.Tpo -c -o libgstmprtp_la-floatsbuffer.lo `test -f 'floatsbuffer.c' || echo '$(srcdir)/'`floatsbuffer.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-floatsbuffer.Tpo $(DEPDIR)/libgstmprtp_la-floatsbuffer.Plo
+#	$(AM_V_CC)source='floatsbuffer.c' object='libgstmprtp_la-floatsbuffer.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-floatnumstracker.lo `test -f 'floatnumstracker.c' || echo '$(srcdir)/'`floatnumstracker.c
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-floatsbuffer.lo `test -f 'floatsbuffer.c' || echo '$(srcdir)/'`floatsbuffer.c
 
 libgstmprtp_la-subratectrler.lo: subratectrler.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-subratectrler.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-subratectrler.Tpo -c -o libgstmprtp_la-subratectrler.lo `test -f 'subratectrler.c' || echo '$(srcdir)/'`subratectrler.c

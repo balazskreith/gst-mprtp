@@ -35,6 +35,7 @@ static void _refresh_RLEBlock(MpRTPRPath *this);
 static void _refresh_RLE(MpRTPRPath *this);
 static void _delays_stats_pipe(gpointer data, PercentileTrackerPipeData *pdata);
 static void _gaps_obsolation_pipe(gpointer data, gint64 seq);
+
 void
 mprtpr_path_class_init (MpRTPRPathClass * klass)
 {
@@ -67,7 +68,7 @@ mprtpr_path_init (MpRTPRPath * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
-  this->delays = make_percentiletracker(1024, 50);
+  this->delays = make_percentiletracker(32, 50);
   percentiletracker_set_treshold(this->delays, 3 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->delays, _delays_stats_pipe, this);
 

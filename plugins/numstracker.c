@@ -48,6 +48,10 @@ G_DEFINE_TYPE (NumsTracker, numstracker, G_TYPE_OBJECT);
 //----------------------------------------------------------------------
 
 static void numstracker_finalize (GObject * object);
+void _iterate (NumsTracker * this,
+               void (*process)(gpointer,gint64),
+               gpointer data);
+
 static void
 _add_value(NumsTracker *this, gint64 value, GstClockTime removal);
 static void
@@ -82,6 +86,12 @@ _sum_add_activator(gpointer pdata, gint64 value);
 
 static void
 _sum_rem_activator(gpointer pdata, gint64 value);
+
+static void
+_trend_add_activator(gpointer pdata, gint64 value);
+
+static void
+_trend_rem_activator(gpointer pdata, gint64 value);
 
 
 //----------------------------------------------------------------------
@@ -184,6 +194,18 @@ void numstracker_rem_plugin(NumsTracker *this, NumsTrackerPlugin *plugin)
   THIS_WRITEUNLOCK (this);
 }
 
+
+void
+numstracker_iterate (NumsTracker * this,
+                            void (*process)(gpointer,gint64),
+                            gpointer data)
+{
+  THIS_READLOCK (this);
+  _iterate(this, process, data);
+  THIS_READUNLOCK (this);
+  return;
+}
+
 void numstracker_add(NumsTracker *this, gint64 value)
 {
   THIS_WRITELOCK (this);
@@ -254,7 +276,17 @@ numstracker_obsolate (NumsTracker * this)
 }
 
 
-
+void
+_iterate (NumsTracker * this,
+          void (*process)(gpointer,gint64),
+          gpointer data)
+{
+  gint32 c,i;
+  for(c = 0, i = this->read_index; c < this->counter; ++c){
+    process(data, this->items[i].value);
+    if(++i == this->length) i = 0;
+  }
+}
 
 void _add_value(NumsTracker *this, gint64 value, GstClockTime removal)
 {
@@ -530,6 +562,58 @@ _sum_rem_activator(gpointer pdata, gint64 value)
   NumsTrackerSumPlugin *this = pdata;
   this->sum -= value;
   _sum_pipe(this);
+}
+
+
+
+
+NumsTrackerTrendPlugin *
+make_numstracker_trend_plugin(void (*trend_pipe)(gpointer,gdouble), gpointer trend_data)
+{
+  NumsTrackerTrendPlugin *this = g_malloc0(sizeof(NumsTrackerTrendPlugin));;
+  this->base.add_activator = _trend_add_activator;
+  this->base.rem_activator = _trend_rem_activator;
+  this->trend_pipe = trend_pipe;
+  this->trend_pipe_data = trend_data;
+  this->base.destroyer = g_free;
+  return this;
+}
+
+
+void get_numstracker_trend_plugin_stats(NumsTrackerTrendPlugin *this, gint64 *trend)
+{
+  if(trend) *trend = this->trend;
+}
+
+static void _trend_pipe(NumsTrackerTrendPlugin *this)
+{
+  gdouble avg, I0, I1;
+  if(!this->trend_pipe) return;
+  avg = (gdouble) this->sum / (gdouble) this->counter;
+  I0 = this->last_added;
+  I0/=avg;
+  I1 = this->last_obsolated;
+  I1/=avg;
+  this->trend = ((I0 - avg) * (I1 - avg)) / ((I0 - avg) * (I0 - avg));
+  this->trend_pipe(this->trend_pipe_data, this->trend);
+}
+
+void
+_trend_add_activator(gpointer pdata, gint64 value)
+{
+  NumsTrackerTrendPlugin *this = pdata;
+  this->sum += value;
+  ++this->counter;
+  this->last_added = value;
+}
+void
+_trend_rem_activator(gpointer pdata, gint64 value)
+{
+  NumsTrackerTrendPlugin *this = pdata;
+  this->sum -= value;
+  --this->counter;
+  this->last_obsolated = value;
+  _trend_pipe(this);
 }
 
 #undef THIS_WRITELOCK

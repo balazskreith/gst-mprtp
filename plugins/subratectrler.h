@@ -11,7 +11,7 @@
 #include <gst/gst.h>
 #include "mprtpspath.h"
 #include "bintree.h"
-#include "floatnumstracker.h"
+#include "floatsbuffer.h"
 
 
 typedef struct _SubflowRateController SubflowRateController;
@@ -101,7 +101,7 @@ struct _SubflowRateController
   gdouble                  BiF_acked_avg;
   gdouble                  BiF_off_avg;
   //Vector of the last 20 owd_fraction
-  FloatNumsTracker*        owd_fraction_hist;
+  FloatsBuffer*        owd_fraction_hist;
   //OWD trend indicates incipient congestion. Initial value: 0.0
   //True if in fast start state. Initial value: TRUE
 //  gboolean                 in_fast_start;

@@ -353,6 +353,10 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");
   if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING){
+      gst_element_link_pads (async_tx_rtcpSrc_1, "src", mprtprcv, "async_sink_1");
+      gst_element_link_pads (async_tx_rtcpSrc_2, "src", mprtprcv, "async_sink_2");
+      gst_element_link_pads (async_tx_rtcpSrc_3, "src", mprtprcv, "async_sink_3");
+
       gst_element_link_pads (mprtpsnd, "async_src_1", async_rx_rtcpSink_1, "sink");
       gst_element_link_pads (mprtpsnd, "async_src_2", async_rx_rtcpSink_2, "sink");
       gst_element_link_pads (mprtpsnd, "async_src_3", async_rx_rtcpSink_3, "sink");

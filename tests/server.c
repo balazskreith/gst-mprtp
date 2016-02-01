@@ -454,6 +454,10 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
       gst_element_link_pads (async_rx_rtcpSrc_1, "src", mprtprcv, "async_sink_1");
       gst_element_link_pads (async_rx_rtcpSrc_2, "src", mprtprcv, "async_sink_2");
       gst_element_link_pads (async_rx_rtcpSrc_3, "src", mprtprcv, "async_sink_3");
+
+      gst_element_link_pads (mprtpsnd, "async_src_1", async_tx_rtcpSink_1, "sink");
+      gst_element_link_pads (mprtpsnd, "async_src_2", async_tx_rtcpSink_2, "sink");
+      gst_element_link_pads (mprtpsnd, "async_src_3", async_tx_rtcpSink_3, "sink");
   }
 
   gst_element_link_pads (mprtprcv, "mprtcp_rr_src", mprtpsch, "mprtcp_rr_sink");

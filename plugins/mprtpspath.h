@@ -24,7 +24,6 @@ typedef struct _MPRTPSPathClass MPRTPSPathClass;
 #include "gstmprtcpbuffer.h"
 #include "packetssndqueue.h"
 #include "percentiletracker.h"
-#include "variancetracker.h"
 #include "numstracker.h"
 
 #define MPRTPS_PATH_TYPE             (mprtps_path_get_type())

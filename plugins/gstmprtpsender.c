@@ -816,7 +816,6 @@ _get_packet_mptype (GstMprtpsender * this,
 //      gst_rtp_buffer_add_extension_onebyte_header (&rtp, 2,
 //            (gpointer) subflow_infos, sizeof (*subflow_infos));
     }
-
     if(gst_rtp_buffer_get_payload_type(&rtp) == this->monitor_payload_type){
       result = PACKET_IS_MPRTP_ASYNC;
     }else{
@@ -918,10 +917,9 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   packet_type = _get_packet_mptype (this, buf, &map, &subflow_id);
   if (packet_type != PACKET_IS_NOT_MP &&
       _select_subflow (this, subflow_id, &subflow) != FALSE) {
-//      g_print("%d->%p|", subflow_id, subflow->outpad);
-    if(packet_type == PACKET_IS_MPRTP_ASYNC || packet_type == PACKET_IS_MPRTCP)
+    if(packet_type == PACKET_IS_MPRTP_ASYNC || packet_type == PACKET_IS_MPRTCP){
       outpad = subflow->async_outpad ? subflow->async_outpad : subflow->outpad;
-    else
+    }else
       outpad = subflow->outpad;
   } else if (this->pivot_outpad != NULL &&
       gst_pad_is_active (this->pivot_outpad) &&

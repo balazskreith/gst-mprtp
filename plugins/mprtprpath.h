@@ -15,7 +15,6 @@
 #include "gstmprtcpbuffer.h"
 #include "bintree.h"
 #include "packetsrcvqueue.h"
-#include "variancetracker.h"
 #include "numstracker.h"
 #include "percentiletracker2.h"
 

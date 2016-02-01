@@ -208,8 +208,8 @@ libgstmprtp_la-gstmprtpscheduler.lo: gstmprtpscheduler.c \
  gstmprtpbuffer.h /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h pointerpool.h \
  bintree.h mprtpspath.h packetssndqueue.h percentiletracker.h \
- variancetracker.h numstracker.h bintree2.h sndctrler.h \
- /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
+ numstracker.h bintree2.h sndctrler.h /usr/include/glib-2.0/gio/gio.h \
+ /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
  /usr/include/glib-2.0/gio/gactiongroup.h \
  /usr/include/glib-2.0/gio/gactiongroupexporter.h \
@@ -348,7 +348,7 @@ libgstmprtp_la-gstmprtpscheduler.lo: gstmprtpscheduler.c \
  /usr/include/glib-2.0/gio/gmenuexporter.h \
  /usr/include/glib-2.0/gio/gdbusmenumodel.h \
  /usr/include/glib-2.0/gio/gnotification.h sndratedistor.h \
- subratectrler.h floatnumstracker.h streamsplitter.h \
+ subratectrler.h floatsbuffer.h streamsplitter.h \
  /usr/include/x86_64-linux-gnu/sys/timex.h \
  /usr/include/x86_64-linux-gnu/sys/time.h \
  /usr/include/x86_64-linux-gnu/bits/timex.h
@@ -847,8 +847,6 @@ packetssndqueue.h:
 
 percentiletracker.h:
 
-variancetracker.h:
-
 numstracker.h:
 
 bintree2.h:
@@ -1155,7 +1153,7 @@ sndratedistor.h:
 
 subratectrler.h:
 
-floatnumstracker.h:
+floatsbuffer.h:
 
 streamsplitter.h:
 

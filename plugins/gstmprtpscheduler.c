@@ -726,8 +726,11 @@ gst_mprtpscheduler_mprtp_proxy(gpointer ptr, GstBuffer * buffer)
   }
 
   if(gst_rtp_buffer_get_payload_type(&rtp) == this->monitor_payload_type){
+    if(!this->riport_flow_signal_sent)
+      goto done;
     _setup_monitor_packet(this, &rtp);
   }
+  _setup_monitor_packet(this, &rtp);
 //  g_print("Send: %u\n", gst_rtp_buffer_get_seq(&rtp));
   gst_rtp_buffer_unmap (&rtp);
 

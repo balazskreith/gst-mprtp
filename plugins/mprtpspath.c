@@ -634,8 +634,10 @@ mprtps_path_tick(MPRTPSPath *this)
     if(this->monitoring_max_idle < _now(this) - this->last_monitoring_sent_time){
       GstBuffer *buffer;
       buffer = _create_monitor_packet(this);
+      _setup_rtp2mprtp (this, buffer);
       _refresh_stat(this, buffer);
       _send_mprtp_packet(this, buffer, TRUE);
+      this->last_monitoring_sent_time = _now(this);
     }
   }
   numstracker_obsolate(this->sent_bytes);

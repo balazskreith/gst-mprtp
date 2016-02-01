@@ -85,7 +85,7 @@ typedef struct{
 typedef struct _Moment Moment;
 
 typedef enum{
-  STATE_OVERUSED      = -1,
+  STATE_OVERUSED       = -1,
   STATE_STABLE         =  0,
   STATE_MONITORED      =  1,
 }State;
@@ -105,7 +105,7 @@ typedef enum{
   BITRATE_DIRECT_UP       =  4,
   BITRATE_FAST_UP         =  3,
   BITRATE_SLOW_UP         =  2,
-  BITRATE_LIMITED_SLOW_UP = 1,
+  BITRATE_LIMITED_SLOW_UP =  1,
   BITRATE_STAY            =  0,
   BITRATE_DRIVEN_DOWN     = -1,
   BITRATE_FORCED_DOWN     = -2,
@@ -526,7 +526,7 @@ subratectrler_init (SubflowRateController * this)
   percentiletracker_set_stats_pipe(this->ltt_delays_target,
                                    _ltt_delays_target_stats_pipe, this);
 
-  this->owd_fraction_hist = make_floatnumstracker(20, 5 * GST_SECOND);
+  this->owd_fraction_hist = make_floatsbuffer(20, 5 * GST_SECOND);
 
   this->bytes_in_flight_history = make_numstracker(16, 10 * GST_SECOND);
   numstracker_add_plugin(this->bytes_in_flight_history,
@@ -596,15 +596,17 @@ void subratectrler_set(SubflowRateController *this,
   _add_target_point(this, MAX(sending_target * 8, TARGET_BITRATE_MAX));
   this->min_target_point = MIN(TARGET_BITRATE_MIN, sending_target * 8);
   this->max_target_point = MAX(TARGET_BITRATE_MAX, sending_target * 8);
+  mprtps_path_set_monitor_interval_and_duration(this->path, 0, 200 * GST_MSECOND);
   _transit_state_to(this, STATE_STABLE);
   _set_rate_controller(this, BITRATE_DIRECT_UP, TRUE);
-  this->disable_controlling = _now(this) + 20 * GST_SECOND;
+  this->disable_controlling = _now(this) + 100 * GST_SECOND;
   THIS_WRITEUNLOCK(this);
 }
 
 void subratectrler_unset(SubflowRateController *this)
 {
   THIS_WRITELOCK(this);
+  mprtps_path_set_monitor_interval_and_duration(this->path, 0, 0);
   g_object_unref(this->path);
   this->path = NULL;
   THIS_WRITEUNLOCK(this);
@@ -799,7 +801,7 @@ void subratectrler_measurement_update(
 
     delay = measurement->rle_delays.values[i];
     owd_fraction = delay/(gdouble)_mt0(this)->ltt_delays_target;
-    floatnumstracker_add(this->owd_fraction_hist, owd_fraction);
+    floatsbuffer_add(this->owd_fraction_hist, owd_fraction);
     this->owd_fraction_avg = .9* this->owd_fraction_avg + .1* owd_fraction;
     this->delay_t3 = this->delay_t2;
     this->delay_t2 = this->delay_t1;
@@ -820,7 +822,7 @@ void subratectrler_measurement_update(
     gdouble owd_fraction;
     owd_fraction = (gdouble)measurement->recent_delay/(gdouble)_mt0(this)->ltt_delays_target;
     this->owd_fraction_avg = .9* this->owd_fraction_avg + .1* owd_fraction;
-    floatnumstracker_add(this->owd_fraction_hist, owd_fraction);
+    floatsbuffer_add(this->owd_fraction_hist, owd_fraction);
   }
 
   if(1. < _delcorr2(this)){
@@ -1682,8 +1684,8 @@ void _set_owd_trend(SubflowRateController *this)
   RData rdata;
   gdouble trend;
   rdata.a0 = rdata.a1 = rdata.x1 = 0.;
-  floatnumstracker_get_stats(this->owd_fraction_hist, NULL, &rdata.avg);
-  floatnumstracker_iterate(this->owd_fraction_hist, _iterator_process, &rdata);
+  floatsbuffer_get_stats(this->owd_fraction_hist, NULL, &rdata.avg);
+  floatsbuffer_iterate(this->owd_fraction_hist, _iterator_process, &rdata);
   if(rdata.a0 <= 0.) goto done;
   trend = MAX(0.0f, MIN(1.0f, (rdata.a1 / rdata.a0)*this->owd_fraction_avg));
   _mt0(this)->owd_trend = trend;

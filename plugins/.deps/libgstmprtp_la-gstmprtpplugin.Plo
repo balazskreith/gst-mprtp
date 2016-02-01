@@ -198,8 +198,8 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/include/string.h /usr/include/x86_64-linux-gnu/bits/string.h \
  /usr/include/x86_64-linux-gnu/bits/string2.h /usr/include/stdlib.h \
  /usr/include/x86_64-linux-gnu/bits/string3.h bintree.h mprtpspath.h \
- packetssndqueue.h percentiletracker.h variancetracker.h numstracker.h \
- bintree2.h sndctrler.h /usr/include/glib-2.0/gio/gio.h \
+ packetssndqueue.h percentiletracker.h numstracker.h bintree2.h \
+ sndctrler.h /usr/include/glib-2.0/gio/gio.h \
  /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
  /usr/include/glib-2.0/gio/gactiongroup.h \
@@ -344,7 +344,7 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/include/x86_64-linux-gnu/bits/sys_errlist.h \
  /usr/include/x86_64-linux-gnu/bits/stdio.h \
  /usr/include/x86_64-linux-gnu/bits/stdio2.h sndratedistor.h \
- subratectrler.h floatnumstracker.h streamsplitter.h gstmprtpsender.h \
+ subratectrler.h floatsbuffer.h streamsplitter.h gstmprtpsender.h \
  gstmprtpplayouter.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
  packetsrcvqueue.h percentiletracker2.h streamjoiner.h \
@@ -841,8 +841,6 @@ packetssndqueue.h:
 
 percentiletracker.h:
 
-variancetracker.h:
-
 numstracker.h:
 
 bintree2.h:
@@ -1165,7 +1163,7 @@ sndratedistor.h:
 
 subratectrler.h:
 
-floatnumstracker.h:
+floatsbuffer.h:
 
 streamsplitter.h:
 

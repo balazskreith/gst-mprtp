@@ -42,12 +42,12 @@ typedef enum
   MPRTPS_PATH_FLAG_ACTIVE        = 8,
 } MPRTPSPathFlags;
 
-typedef enum{
-  MPRTPS_PATH_STATE_NON_CONGESTED    = 4,
-  MPRTPS_PATH_STATE_LOSSY            = 3,
-  MPRTPS_PATH_STATE_CONGESTED        = 2,
-  MPRTPS_PATH_STATE_PASSIVE          = 1,
-}MPRTPSPathState;
+//typedef enum{
+//  MPRTPS_PATH_STATE_NON_CONGESTED    = 4,
+//  MPRTPS_PATH_STATE_LOSSY            = 3,
+//  MPRTPS_PATH_STATE_CONGESTED        = 2,
+//  MPRTPS_PATH_STATE_PASSIVE          = 1,
+//}MPRTPSPathState;
 
 #define MAX_INT32_POSPART 32767
 
@@ -61,7 +61,7 @@ struct _MPRTPSPath
   guint8                  id;
   guint16                 seq;
   guint16                 cycle_num;
-  guint8                  state;
+  guint8                  flags;
   guint32                 total_sent_packet_num;
   guint32                 total_sent_normal_packet_num;
   guint32                 total_sent_payload_bytes_sum;
@@ -104,8 +104,6 @@ struct _MPRTPSPath
   gboolean                pacing;
 
   guint32                 octets_in_flight_acked;
-  NumsTracker*            octets_in_flight_exped_history;
-  NumsTrackerSumPlugin*   octets_in_flight_exped_history_sum_plugin;
 //  guint32                 cwnd_size;
 //  guint32                 cwnd_slack;
 //  gboolean                cwnd_slack_allowed;
@@ -154,12 +152,13 @@ struct _RRMeasurement{
   guint16             PiT;
   guint32             expected_payload_bytes;
   guint32             sent_payload_bytes_sum;
+  guint32             sent_payload_bytes;
+  guint32             received_payload_bytes;
   gdouble             lost_rate;
   gdouble             goodput;
-  gdouble             sending_weight;
   gdouble             sender_rate;
+  gint64              incoming_rate;
   gdouble             receiver_rate;
-  MPRTPSPathState     state;
   gboolean            checked;
 
   gboolean            rfc7097_arrived;
@@ -222,16 +221,11 @@ gboolean mprtps_path_has_expected_lost(MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_frames_num (MPRTPSPath * this);
 guint32 mprtps_path_get_sent_octet_sum_for(MPRTPSPath *this, guint32 amount);
-void mprtps_path_get_bytes_in_flight(MPRTPSPath *this, guint32 *acked, gint64* ested);
+void mprtps_path_get_bytes_in_flight(MPRTPSPath *this, guint32 *acked);
 void mprtps_path_clear_queue(MPRTPSPath *this);
 guint32 mprtps_path_get_sent_bytes_in1s(MPRTPSPath *this, gint64 *incoming_bytes);
 guint32 mprtps_path_get_bytes_in_queue(MPRTPSPath *this);
-MPRTPSPathState mprtps_path_get_state (MPRTPSPath * this);
-void mprtps_path_set_state (MPRTPSPath * this, MPRTPSPathState state);
-GstClockTime mprtps_path_get_time_sent_to_passive(MPRTPSPath *this);
-GstClockTime mprtps_path_get_time_sent_to_lossy (MPRTPSPath * this);
-GstClockTime mprtps_path_get_time_sent_to_non_congested (MPRTPSPath * this);
-GstClockTime mprtps_path_get_time_sent_to_congested (MPRTPSPath * this);
+guint8 mprtps_path_get_flags (MPRTPSPath * this);
 guint16 mprtps_path_get_HSN(MPRTPSPath * this);
 void mprtps_path_set_delay(MPRTPSPath * this, GstClockTime delay);
 GstClockTime mprtps_path_get_delay(MPRTPSPath * this);

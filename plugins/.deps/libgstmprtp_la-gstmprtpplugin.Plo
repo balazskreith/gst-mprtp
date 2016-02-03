@@ -344,8 +344,8 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/include/x86_64-linux-gnu/bits/sys_errlist.h \
  /usr/include/x86_64-linux-gnu/bits/stdio.h \
  /usr/include/x86_64-linux-gnu/bits/stdio2.h sndratedistor.h \
- subratectrler.h floatsbuffer.h streamsplitter.h gstmprtpsender.h \
- gstmprtpplayouter.h mprtprpath.h \
+ subratectrler.h floatsbuffer.h subanalyser.h streamsplitter.h \
+ gstmprtpsender.h gstmprtpplayouter.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
  packetsrcvqueue.h percentiletracker2.h streamjoiner.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h rcvctrler.h \
@@ -1164,6 +1164,8 @@ sndratedistor.h:
 subratectrler.h:
 
 floatsbuffer.h:
+
+subanalyser.h:
 
 streamsplitter.h:
 

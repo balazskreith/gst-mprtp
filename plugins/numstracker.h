@@ -59,7 +59,8 @@ typedef struct _NumsTrackerMinMaxPlugin NumsTrackerMinMaxPlugin;
 typedef struct _NumsTrackerEWMAPlugin NumsTrackerEWMAPlugin;
 typedef struct _NumsTrackerVariancePlugin NumsTrackerVariancePlugin;
 typedef struct _NumsTrackerKalmanFilterPlugin NumsTrackerKalmanFilterPlugin ;
-typedef struct _NumsTrackerSumPlugin NumsTrackerSumPlugin;
+typedef struct _NumsTrackerStatPlugin NumsTrackerStatPlugin;
+typedef struct _NumsTrackerStatData NumsTrackerStatData;
 typedef struct _NumsTrackerTrendPlugin NumsTrackerTrendPlugin;
 typedef struct _NumsTrackerEvaluatorPlugin NumsTrackerEvaluatorPlugin;
 
@@ -96,11 +97,23 @@ struct _NumsTrackerVariancePlugin{
   gpointer          var_pipe_data;
 };
 
-struct _NumsTrackerSumPlugin{
+struct _NumsTrackerStatPlugin{
   NumsTrackerPlugin base;
   gint64            sum;
-  void            (*sum_pipe)(gpointer, gint64);
-  gpointer          sum_pipe_data;
+  gdouble           avg;
+  gdouble           var;
+  gdouble           dev;
+  gint64            sq_sum;
+  guint32           counter;
+  void            (*stat_pipe)(gpointer, NumsTrackerStatData*);
+  gpointer          stat_pipe_data;
+};
+
+struct _NumsTrackerStatData{
+  gint64            sum;
+  gdouble           avg;
+  gdouble           dev;
+  gdouble           var;
 };
 
 struct _NumsTrackerTrendPlugin{
@@ -135,6 +148,8 @@ void numstracker_iterate (NumsTracker * this,
                           void(*process)(gpointer,gint64),
                           gpointer data);
 
+gint64* numstracker_evaluate(NumsTracker * this, guint *length);
+
 void numstracker_add_plugin(NumsTracker *this, NumsTrackerPlugin *plugin);
 void numstracker_rem_plugin(NumsTracker *this, NumsTrackerPlugin *plugin);
 
@@ -154,16 +169,10 @@ void get_numstracker_ewma_plugin_stats(NumsTrackerEWMAPlugin *this,
                                        gdouble *avg, gdouble *dev);
 
 
-NumsTrackerVariancePlugin *
-make_numstracker_variance_plugin(void (*var_pipe)(gpointer,gdouble), gpointer var_data);
+NumsTrackerStatPlugin *
+make_numstracker_stat_plugin(void (*sum_pipe)(gpointer,NumsTrackerStatData*), gpointer sum_data);
 
-void get_numstracker_variance_plugin_stats(NumsTrackerVariancePlugin *this, gdouble *variance);
-
-
-NumsTrackerSumPlugin *
-make_numstracker_sum_plugin(void (*sum_pipe)(gpointer,gint64), gpointer sum_data);
-
-void get_numstracker_sum_plugin_stats(NumsTrackerSumPlugin *this, gint64 *variance);
+void get_numstracker_stat_plugin_stats(NumsTrackerStatPlugin *this, gint64 *variance);
 
 
 NumsTrackerTrendPlugin *

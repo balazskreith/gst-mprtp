@@ -76,16 +76,10 @@ static void
 _ewma_add_activator(gpointer pdata, gint64 value);
 
 static void
-_variance_add_activator(gpointer pdata, gint64 value);
+_stat_add_activator(gpointer pdata, gint64 value);
 
 static void
-_variance_rem_activator(gpointer pdata, gint64 value);
-
-static void
-_sum_add_activator(gpointer pdata, gint64 value);
-
-static void
-_sum_rem_activator(gpointer pdata, gint64 value);
+_stat_rem_activator(gpointer pdata, gint64 value);
 
 static void
 _trend_add_activator(gpointer pdata, gint64 value);
@@ -204,6 +198,21 @@ numstracker_iterate (NumsTracker * this,
   _iterate(this, process, data);
   THIS_READUNLOCK (this);
   return;
+}
+
+gint64* numstracker_evaluate(NumsTracker * this, guint *length)
+{
+  gint64 *result;
+  gint32 c,i;
+  THIS_READLOCK (this);
+  result = g_malloc0(sizeof(gint64) * this->counter);
+  for(c = 0, i = this->read_index; c < this->counter; ++c){
+    result[c] = this->items[i].value;
+    if(++i == this->length) i = 0;
+  }
+  *length = c;
+  THIS_READUNLOCK (this);
+  return result;
 }
 
 void numstracker_add(NumsTracker *this, gint64 value)
@@ -469,99 +478,74 @@ _ewma_add_activator(gpointer pdata, gint64 value)
 }
 
 
-NumsTrackerVariancePlugin *
-make_numstracker_variance_plugin(void (*var_pipe)(gpointer,gdouble), gpointer var_data)
+NumsTrackerStatPlugin *
+make_numstracker_stat_plugin(void (*stat_pipe)(gpointer,NumsTrackerStatData*), gpointer stat_data)
 {
-  NumsTrackerVariancePlugin *this = g_malloc0(sizeof(NumsTrackerVariancePlugin));;
-  this->base.add_activator = _variance_add_activator;
-  this->base.rem_activator = _variance_rem_activator;
-  this->var_pipe = var_pipe;
-  this->var_pipe_data = var_data;
+  NumsTrackerStatPlugin *this = g_malloc0(sizeof(NumsTrackerStatPlugin));;
+  this->base.add_activator = _stat_add_activator;
+  this->base.rem_activator = _stat_rem_activator;
+  this->stat_pipe = stat_pipe;
+  this->stat_pipe_data = stat_data;
   this->base.destroyer = g_free;
-  return this;
-}
-
-void get_numstracker_variance_plugin_stats(NumsTrackerVariancePlugin *this, gdouble *variance)
-{
-  gdouble counter, sum_squere;
-  if(this->counter < 2) goto done;
-  sum_squere = (gdouble)this->sum * (gdouble)this->sum;
-  counter = this->counter;
-  //V = (N * SX2 - (SX1 * SX1)) / (N * (N - 1))
-  if(variance)
-    *variance = (counter * (gdouble)this->squere_sum - sum_squere) / (counter * (counter - 1.));
-done:
-  return;
-}
-
-static void _variance_pipe(NumsTrackerVariancePlugin *this)
-{
-  gdouble variance;
-  if(!this->var_pipe) return;
-  get_numstracker_variance_plugin_stats(this, &variance);
-  this->var_pipe(this->var_pipe_data, variance);
-}
-
-void
-_variance_add_activator(gpointer pdata, gint64 value)
-{
-  NumsTrackerVariancePlugin *this = pdata;
-  this->squere_sum += value * value;
-  this->sum += value;
-  ++this->counter;
-  _variance_pipe(this);
-
-}
-void
-_variance_rem_activator(gpointer pdata, gint64 value)
-{
-  NumsTrackerVariancePlugin *this = pdata;
-  this->squere_sum -= value * value;
-  this->sum -= value;
-  --this->counter;
-  _variance_pipe(this);
-}
-
-
-
-NumsTrackerSumPlugin *
-make_numstracker_sum_plugin(void (*sum_pipe)(gpointer,gint64), gpointer sum_data)
-{
-  NumsTrackerSumPlugin *this = g_malloc0(sizeof(NumsTrackerSumPlugin));;
-  this->base.add_activator = _sum_add_activator;
-  this->base.rem_activator = _sum_rem_activator;
-  this->sum_pipe = sum_pipe;
-  this->sum_pipe_data = sum_data;
-  this->base.destroyer = g_free;
+  this->dev = 1.;
   return this;
 }
 
 
-void get_numstracker_sum_plugin_stats(NumsTrackerSumPlugin *this, gint64 *sum)
+void get_numstracker_stat_plugin_stats(NumsTrackerStatPlugin *this, gint64 *sum)
 {
   if(sum) *sum = this->sum;
 }
 
-static void _sum_pipe(NumsTrackerSumPlugin *this)
+static void _stat_pipe(NumsTrackerStatPlugin *this)
 {
-  if(!this->sum_pipe) return;
-  this->sum_pipe(this->sum_pipe_data, this->sum);
+  NumsTrackerStatData stat;
+  if(!this->stat_pipe) return;
+  stat.sum = this->sum;
+  stat.avg = this->avg;
+  stat.dev = this->dev;
+  stat.var = this->var;
+  this->stat_pipe(this->stat_pipe_data, &stat);
 }
 
 void
-_sum_add_activator(gpointer pdata, gint64 value)
+_stat_add_activator(gpointer pdata, gint64 value)
 {
-  NumsTrackerSumPlugin *this = pdata;
+  NumsTrackerStatPlugin *this = pdata;
   this->sum += value;
-  _sum_pipe(this);
+  this->sq_sum += value * value;
+  ++this->counter;
+  this->avg = (gdouble)this->sum / (gdouble) this->counter;
+  if(1 < this->counter){
+    this->var = (gdouble)this->counter * this->sq_sum;
+    this->var -= (gdouble)(this->sum * this->sum);
+    this->var /= (gdouble) (this->counter * (this->counter - 1));
+    this->dev = sqrt(this->var);
+  }else{
+    this->var = this->dev = 0.;
+  }
+  _stat_pipe(this);
 
 }
 void
-_sum_rem_activator(gpointer pdata, gint64 value)
+_stat_rem_activator(gpointer pdata, gint64 value)
 {
-  NumsTrackerSumPlugin *this = pdata;
+  NumsTrackerStatPlugin *this = pdata;
   this->sum -= value;
-  _sum_pipe(this);
+  this->sq_sum -= value * value;
+  if(this->counter) {
+    --this->counter;
+    this->avg = (gdouble)this->sum / (gdouble) this->counter;
+  }
+  if(1 < this->counter){
+    this->var = (gdouble)this->counter * this->sq_sum;
+    this->var -= (gdouble)(this->sum * this->sum);
+    this->var /= (gdouble) (this->counter * (this->counter - 1));
+    this->dev = sqrt(this->var);
+  }else{
+    this->var = this->dev = 0;
+  }
+  _stat_pipe(this);
 }
 
 

@@ -348,7 +348,7 @@ libgstmprtp_la-gstmprtpscheduler.lo: gstmprtpscheduler.c \
  /usr/include/glib-2.0/gio/gmenuexporter.h \
  /usr/include/glib-2.0/gio/gdbusmenumodel.h \
  /usr/include/glib-2.0/gio/gnotification.h sndratedistor.h \
- subratectrler.h floatsbuffer.h streamsplitter.h \
+ subratectrler.h floatsbuffer.h subanalyser.h streamsplitter.h \
  /usr/include/x86_64-linux-gnu/sys/timex.h \
  /usr/include/x86_64-linux-gnu/sys/time.h \
  /usr/include/x86_64-linux-gnu/bits/timex.h
@@ -1154,6 +1154,8 @@ sndratedistor.h:
 subratectrler.h:
 
 floatsbuffer.h:
+
+subanalyser.h:
 
 streamsplitter.h:
 

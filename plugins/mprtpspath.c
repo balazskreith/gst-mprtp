@@ -103,10 +103,8 @@ void g_print_rrmeasurement(RRMeasurement *measurement)
   "|sent_payload_bytes_sum: %29u|\n"
   "|lost_rate: %29f|\n"
   "|goodput: %29f|\n"
-  "|sending_weight: %29f|\n"
   "|sender_rate: %29f|\n"
   "|receiver_rate: %29f|\n"
-  "|state: %29d|\n"
   "|checked: %29d|\n"
   "|bytes_in_flight: %29u|\n"
   "|bytes_in_queue: %29u|\n"
@@ -131,10 +129,8 @@ void g_print_rrmeasurement(RRMeasurement *measurement)
   measurement->sent_payload_bytes_sum,
   measurement->lost_rate,
   measurement->goodput,
-  measurement->sending_weight,
   measurement->sender_rate,
   measurement->receiver_rate,
-  measurement->state,
   measurement->checked,
   measurement->bytes_in_flight_acked,
   measurement->bytes_in_queue );
@@ -153,7 +149,7 @@ mprtps_path_reset (MPRTPSPath * this)
   this->is_new = TRUE;
   this->seq = 0;
   this->cycle_num = 0;
-  this->state = MPRTPS_PATH_FLAG_ACTIVE |
+  this->flags = MPRTPS_PATH_FLAG_ACTIVE |
       MPRTPS_PATH_FLAG_NON_CONGESTED | MPRTPS_PATH_FLAG_NON_LOSSY;
 
   this->total_sent_packet_num = 0;
@@ -177,10 +173,6 @@ mprtps_path_init (MPRTPSPath * this)
   this->packetsqueue = make_packetssndqueue();
   this->sent_bytes = make_numstracker(4096, GST_SECOND);
   this->incoming_bytes = make_numstracker(4096, GST_SECOND);
-  this->octets_in_flight_exped_history = make_numstracker(2048, 400 * GST_MSECOND);
-  this->octets_in_flight_exped_history_sum_plugin = make_numstracker_sum_plugin(NULL, NULL);
-  numstracker_add_plugin(this->octets_in_flight_exped_history,
-                         (NumsTrackerPlugin*)this->octets_in_flight_exped_history_sum_plugin);
   mprtps_path_reset (this);
 }
 
@@ -211,25 +203,12 @@ mprtps_path_set_not_new (MPRTPSPath * this)
   THIS_WRITEUNLOCK (this);
 }
 
-MPRTPSPathState
-mprtps_path_get_state (MPRTPSPath * this)
+guint8
+mprtps_path_get_flags (MPRTPSPath * this)
 {
-  MPRTPSPathState result;
+  guint8 result;
   THIS_READLOCK (this);
-  if ((this->state & (guint8) MPRTPS_PATH_FLAG_ACTIVE) == 0) {
-    result = MPRTPS_PATH_STATE_PASSIVE;
-    goto done;
-  }
-  if ((this->state & (guint8) MPRTPS_PATH_FLAG_NON_CONGESTED) == 0) {
-    result = MPRTPS_PATH_STATE_CONGESTED;
-    goto done;
-  }
-  if ((this->state & (guint8) MPRTPS_PATH_FLAG_NON_LOSSY) == 0) {
-    result = MPRTPS_PATH_STATE_LOSSY;
-    goto done;
-  }
-  result = MPRTPS_PATH_STATE_NON_CONGESTED;
-done:
+  result = this->flags;
   THIS_READUNLOCK (this);
   return result;
 }
@@ -240,7 +219,7 @@ mprtps_path_is_active (MPRTPSPath * this)
 {
   gboolean result;
   THIS_READLOCK (this);
-  result = (this->state & (guint8) MPRTPS_PATH_FLAG_ACTIVE) ? TRUE : FALSE;
+  result = (this->flags & (guint8) MPRTPS_PATH_FLAG_ACTIVE) ? TRUE : FALSE;
   THIS_READUNLOCK (this);
   return result;
 }
@@ -251,7 +230,7 @@ mprtps_path_set_active (MPRTPSPath * this)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->state |= (guint8) MPRTPS_PATH_FLAG_ACTIVE;
+  this->flags |= (guint8) MPRTPS_PATH_FLAG_ACTIVE;
   this->sent_active = gst_clock_get_time (this->sysclock);
   this->sent_passive = 0;
   THIS_WRITEUNLOCK (this);
@@ -263,50 +242,10 @@ mprtps_path_set_passive (MPRTPSPath * this)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->state &= (guint8) 255 ^ (guint8) MPRTPS_PATH_FLAG_ACTIVE;
+  this->flags &= (guint8) 255 ^ (guint8) MPRTPS_PATH_FLAG_ACTIVE;
   this->sent_passive = gst_clock_get_time (this->sysclock);
   this->sent_active = 0;
   THIS_WRITEUNLOCK (this);
-}
-
-GstClockTime
-mprtps_path_get_time_sent_to_passive (MPRTPSPath * this)
-{
-  GstClockTime result;
-  THIS_READLOCK (this);
-  result = this->sent_passive;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-GstClockTime
-mprtps_path_get_time_sent_to_non_congested (MPRTPSPath * this)
-{
-  GstClockTime result;
-  THIS_READLOCK (this);
-  result = this->sent_non_congested;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-GstClockTime
-mprtps_path_get_time_sent_to_lossy (MPRTPSPath * this)
-{
-  GstClockTime result;
-  THIS_READLOCK (this);
-  result = this->sent_middly_congested;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-GstClockTime
-mprtps_path_get_time_sent_to_congested (MPRTPSPath * this)
-{
-  GstClockTime result;
-  THIS_READLOCK (this);
-  result = this->sent_congested;
-  THIS_READUNLOCK (this);
-  return result;
 }
 
 guint16 mprtps_path_get_HSN(MPRTPSPath * this)
@@ -393,7 +332,7 @@ mprtps_path_is_non_lossy (MPRTPSPath * this)
 {
   gboolean result;
   THIS_READLOCK (this);
-  result = (this->state & (guint8) MPRTPS_PATH_FLAG_NON_LOSSY) ? TRUE : FALSE;
+  result = (this->flags & (guint8) MPRTPS_PATH_FLAG_NON_LOSSY) ? TRUE : FALSE;
   THIS_READUNLOCK (this);
   return result;
 
@@ -404,7 +343,7 @@ mprtps_path_set_lossy (MPRTPSPath * this)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->state &= (guint8) 255 ^ (guint8) MPRTPS_PATH_FLAG_NON_LOSSY;
+  this->flags &= (guint8) 255 ^ (guint8) MPRTPS_PATH_FLAG_NON_LOSSY;
   this->sent_middly_congested = gst_clock_get_time (this->sysclock);
   THIS_WRITEUNLOCK (this);
 }
@@ -415,7 +354,7 @@ mprtps_path_is_not_slow (MPRTPSPath * this)
 {
   gboolean result;
   THIS_READLOCK (this);
-  result = (this->state & (guint8) MPRTPS_PATH_FLAG_NOT_SLOW) ? TRUE : FALSE;
+  result = (this->flags & (guint8) MPRTPS_PATH_FLAG_NOT_SLOW) ? TRUE : FALSE;
   THIS_READUNLOCK (this);
   return result;
 
@@ -426,7 +365,7 @@ mprtps_path_set_slow (MPRTPSPath * this)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->state &= (guint8) 255 ^ (guint8) MPRTPS_PATH_FLAG_NOT_SLOW;
+  this->flags &= (guint8) 255 ^ (guint8) MPRTPS_PATH_FLAG_NOT_SLOW;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -436,7 +375,7 @@ mprtps_path_set_non_lossy (MPRTPSPath * this)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->state |= (guint8) MPRTPS_PATH_FLAG_NON_LOSSY;
+  this->flags |= (guint8) MPRTPS_PATH_FLAG_NON_LOSSY;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -447,7 +386,7 @@ mprtps_path_is_non_congested (MPRTPSPath * this)
   gboolean result;
   THIS_READLOCK (this);
   result =
-      (this->state & (guint8) MPRTPS_PATH_FLAG_NON_CONGESTED) ? TRUE : FALSE;
+      (this->flags & (guint8) MPRTPS_PATH_FLAG_NON_CONGESTED) ? TRUE : FALSE;
   THIS_READUNLOCK (this);
   return result;
 
@@ -459,7 +398,7 @@ mprtps_path_set_congested (MPRTPSPath * this)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->state &= (guint8) 255 ^ (guint8) MPRTPS_PATH_FLAG_NON_CONGESTED;
+  this->flags &= (guint8) 255 ^ (guint8) MPRTPS_PATH_FLAG_NON_CONGESTED;
   this->sent_congested = gst_clock_get_time (this->sysclock);
   THIS_WRITEUNLOCK (this);
 }
@@ -470,7 +409,7 @@ mprtps_path_set_non_congested (MPRTPSPath * this)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->state |= (guint8) MPRTPS_PATH_FLAG_NON_CONGESTED;
+  this->flags |= (guint8) MPRTPS_PATH_FLAG_NON_CONGESTED;
   this->sent_non_congested = gst_clock_get_time (this->sysclock);
   THIS_WRITEUNLOCK (this);
 }
@@ -572,12 +511,10 @@ done:
   return result;
 }
 
-void mprtps_path_get_bytes_in_flight(MPRTPSPath *this, guint32 *acked, gint64* ested)
+void mprtps_path_get_bytes_in_flight(MPRTPSPath *this, guint32 *acked)
 {
   THIS_READLOCK(this);
   if(acked) *acked = this->octets_in_flight_acked<<3;
-  get_numstracker_sum_plugin_stats(this->octets_in_flight_exped_history_sum_plugin, ested);
-  if(ested) *ested <<= 3;
   THIS_READUNLOCK(this);
 }
 
@@ -726,10 +663,6 @@ _refresh_stat(MPRTPSPath * this,
     this->total_sent_payload_bytes_sum += payload_bytes;
     this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
     this->octets_in_flight_acked += payload_bytes>>3;
-
-    numstracker_add_with_removal(this->octets_in_flight_exped_history,
-                                 payload_bytes>>3,
-                                 gst_clock_get_time(this->sysclock) + this->path_delay);
 
     numstracker_add(this->sent_bytes, payload_bytes);
     ++this->total_sent_normal_packet_num;

@@ -150,7 +150,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-percentiletracker.lo \
 	libgstmprtp_la-percentiletracker2.lo \
 	libgstmprtp_la-sndratedistor.lo libgstmprtp_la-numstracker.lo \
-	libgstmprtp_la-floatsbuffer.lo libgstmprtp_la-subratectrler.lo
+	libgstmprtp_la-floatsbuffer.lo libgstmprtp_la-subratectrler.lo \
+	libgstmprtp_la-subanalyser.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -416,7 +417,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          sndratedistor.c            \
                          numstracker.c              \
                          floatsbuffer.c             \
-                         subratectrler.c            
+                         subratectrler.c            \
+                         subanalyser.c
 
 noinst_HEADERS = mprtpspath.h           \
                  sndctrler.h            \
@@ -435,7 +437,8 @@ noinst_HEADERS = mprtpspath.h           \
                  sndratedistor.h        \
                  numstracker.h          \
                  floatsbuffer.h         \
-                 subratectrler.h        
+                 subratectrler.h        \
+                 subanalyser.h   
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -553,6 +556,7 @@ include ./$(DEPDIR)/libgstmprtp_la-sndctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndratedistor.Plo
 include ./$(DEPDIR)/libgstmprtp_la-streamjoiner.Plo
 include ./$(DEPDIR)/libgstmprtp_la-streamsplitter.Plo
+include ./$(DEPDIR)/libgstmprtp_la-subanalyser.Plo
 include ./$(DEPDIR)/libgstmprtp_la-subratectrler.Plo
 
 .c.o:
@@ -750,6 +754,13 @@ libgstmprtp_la-subratectrler.lo: subratectrler.c
 #	$(AM_V_CC)source='subratectrler.c' object='libgstmprtp_la-subratectrler.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-subratectrler.lo `test -f 'subratectrler.c' || echo '$(srcdir)/'`subratectrler.c
+
+libgstmprtp_la-subanalyser.lo: subanalyser.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-subanalyser.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-subanalyser.Tpo -c -o libgstmprtp_la-subanalyser.lo `test -f 'subanalyser.c' || echo '$(srcdir)/'`subanalyser.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-subanalyser.Tpo $(DEPDIR)/libgstmprtp_la-subanalyser.Plo
+#	$(AM_V_CC)source='subanalyser.c' object='libgstmprtp_la-subanalyser.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-subanalyser.lo `test -f 'subanalyser.c' || echo '$(srcdir)/'`subanalyser.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

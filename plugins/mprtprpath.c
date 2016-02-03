@@ -69,7 +69,7 @@ mprtpr_path_init (MpRTPRPath * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
   this->delays = make_percentiletracker(32, 50);
-  percentiletracker_set_treshold(this->delays, 3 * GST_SECOND);
+  percentiletracker_set_treshold(this->delays, 1 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->delays, _delays_stats_pipe, this);
 
   this->skews = make_percentiletracker2(100, 50);

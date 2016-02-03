@@ -146,7 +146,7 @@ make_video_testsrc_session (guint sessionNum)
       "video/x-raw",
       "width", G_TYPE_INT, 352,
       "height", G_TYPE_INT, 288,
-      "framerate", GST_TYPE_FRACTION, 25, 1, NULL);
+      "framerate", GST_TYPE_FRACTION, 50, 1, NULL);
 
   gst_element_link_filtered (videoSrc, encoder, videoCaps);
   gst_element_link (encoder, payloader);
@@ -310,7 +310,7 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
 //    ur->subflows[2].shareability = subflow2_shareability;
   }
 
-//  g_print("get_bitrate: %d new_bitrate: %d\n", get_bitrate, new_bitrate);
+  g_print("get_bitrate: %d new_bitrate: %d\n", get_bitrate, new_bitrate);
   g_object_set (encoder, "target-bitrate", new_bitrate, NULL);
 //done:
   return;

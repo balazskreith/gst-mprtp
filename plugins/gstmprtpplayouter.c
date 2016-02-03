@@ -962,7 +962,12 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
       this->pivot_address_subflow_id = mprtp->subflow_id;
       this->pivot_address = G_SOCKET_ADDRESS (g_object_ref (meta->addr));
     } else if (mprtp->subflow_seq != this->pivot_address_subflow_id) {
-      gst_buffer_add_net_address_meta (buf, this->pivot_address);
+      if(gst_buffer_is_writable(buf))
+        gst_buffer_add_net_address_meta (buf, this->pivot_address);
+      else{
+        buf = gst_buffer_make_writable(buf);
+        gst_buffer_add_net_address_meta (buf, this->pivot_address);
+      }
     }
   }
   if (_try_get_path (this, mprtp->subflow_id, &path) == FALSE) {

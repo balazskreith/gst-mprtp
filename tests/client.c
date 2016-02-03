@@ -94,6 +94,7 @@ setup_ghost_sink (GstElement * sink, GstBin * bin)
 static SessionData *
 make_video_session (guint sessionNum)
 {
+  gint framerate = 25;
   SessionData *ret = session_new (sessionNum);
   GstBin *bin = GST_BIN (gst_bin_new ("video"));
   GstElement *queue = gst_element_factory_make ("queue", NULL);
@@ -110,12 +111,15 @@ make_video_session (guint sessionNum)
 
   ret->output = GST_ELEMENT (bin);
 
+  if(test_parameters_.video_session == TEST_SOURCE)
+    framerate = 50;
+
   ret->caps = gst_caps_new_simple ("application/x-rtp",
       "media", G_TYPE_STRING, "video",
       "clock-rate", G_TYPE_INT, 90000,
       "width", G_TYPE_INT, 352,
       "height", G_TYPE_INT, 288,
-      "framerate", GST_TYPE_FRACTION, 25, 1,
+      "framerate", GST_TYPE_FRACTION, framerate, 1,
       //"encoding-name", G_TYPE_STRING, "THEORA", NULL
       "encoding-name", G_TYPE_STRING, "VP8", NULL
       );

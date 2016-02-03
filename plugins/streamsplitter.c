@@ -84,7 +84,7 @@ typedef struct{
 typedef struct{
   guint16 remained;
   SchNode *root;
-  MPRTPSPathState key_flag;
+  guint8   key_flag;
 }CreateData;
 
 #define _now(this) gst_clock_get_time (this->sysclock)
@@ -131,7 +131,7 @@ _create_nodes(
 static SchNode *
 _tree_ctor (
     StreamSplitter *this,
-    MPRTPSPathState key_pathes);
+    guint8 key_pathes);
 
 
 //Functions related to tree
@@ -406,7 +406,7 @@ stream_splitter_run (void *data)
   GstClockTime interval;
   gdouble rand;
   PriorData pdata;
-  MPRTPSPathState key_filter;
+  guint8 key_filter;
 
   this = STREAM_SPLITTER (data);
 
@@ -429,9 +429,9 @@ stream_splitter_run (void *data)
   _iterate_subflows(this, _check_pathes, &pdata);
   this->sending_target = pdata.c_sum + pdata.mc_sum + pdata.nc_sum;
 
-  if(pdata.nc_sum) key_filter = MPRTPS_PATH_STATE_NON_CONGESTED;
-  else if(pdata.mc_sum) key_filter = MPRTPS_PATH_STATE_LOSSY;
-  else key_filter = MPRTPS_PATH_STATE_CONGESTED;
+  if(pdata.nc_sum) key_filter = MPRTPS_PATH_FLAG_NON_CONGESTED | MPRTPS_PATH_FLAG_NON_LOSSY;
+  else if(pdata.mc_sum) key_filter = MPRTPS_PATH_FLAG_NON_CONGESTED;
+  else key_filter = MPRTPS_PATH_FLAG_ACTIVE;
 
   this->next_tree = _tree_ctor(this, key_filter);
 
@@ -488,23 +488,24 @@ static void _iterate_subflows(StreamSplitter *this, void(*iterator)(Subflow *, g
 
 void _check_pathes(Subflow *subflow, gpointer data)
 {
-  PriorData *pdata = data;
+  PriorData  *pdata = data;
   MPRTPSPath *path = subflow->path;
-  MPRTPSPathState path_state;
+  guint8      path_flags;
   if (mprtps_path_is_new (path)) {
     mprtps_path_set_not_new (path);
     mprtps_path_set_non_congested (path);
     mprtps_path_set_non_lossy (path);
   }
 
-  path_state = mprtps_path_get_state (path);
+  path_flags = mprtps_path_get_flags (path);
 
-  if (path_state == MPRTPS_PATH_STATE_NON_CONGESTED) {
-    pdata->nc_sum += subflow->sending_target;
-  } else if (path_state == MPRTPS_PATH_STATE_LOSSY) {
-    pdata->mc_sum += subflow->sending_target;
-  } else if (path_state == MPRTPS_PATH_STATE_CONGESTED) {
-    pdata->c_sum += subflow->sending_target;
+  if(path_flags & MPRTPS_PATH_FLAG_NON_CONGESTED){
+    if(path_flags & MPRTPS_PATH_FLAG_NON_LOSSY)
+      pdata->nc_sum += subflow->sending_target;
+    else
+      pdata->mc_sum += subflow->sending_target;
+  }else{
+      pdata->c_sum += subflow->sending_target;
   }
 
   subflow->valid = FALSE;
@@ -599,13 +600,13 @@ void _create_nodes(Subflow *subflow, gpointer data)
     subflow->weight += cdata->remained;
     cdata->remained = 0;
   }
-  subflow->key_path = mprtps_path_get_state(subflow->path) == cdata->key_flag;
+  subflow->key_path = (mprtps_path_get_flags(subflow->path) & cdata->key_flag) == cdata->key_flag;
   subflow->sent_bytes = mprtps_path_get_sent_bytes_in1s(subflow->path, NULL);
   _schtree_insert(&cdata->root, subflow, &subflow->weight, SCHTREE_MAX_VALUE);
 }
 
 SchNode *
-_tree_ctor (StreamSplitter *this, MPRTPSPathState key_pathes)
+_tree_ctor (StreamSplitter *this, guint8 key_pathes)
 {
   CreateData cdata;
   WeightData wdata;

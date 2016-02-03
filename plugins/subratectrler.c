@@ -151,8 +151,8 @@ struct _Moment{
 #define _rdiscard(this) (!_mt0(this)->path_is_slow && _mt0(this)->recent_discard)
 //FixME: apply trend calculation instead of recent discard
 #define _discard_rate(this) _mt0(this)->discard_rate
-#define _lost(this)  (!_mt0(this)->has_expected_lost && !_mt0(this)->path_is_lossy && _mt0(this)->lost > 10)
-#define _rlost(this) (!_mt0(this)->has_expected_lost && !_mt0(this)->path_is_lossy && _mt0(this)->recent_lost > 10)
+#define _lost(this)  (0 && !_mt0(this)->has_expected_lost && !_mt0(this)->path_is_lossy && _mt0(this)->lost > 10)
+#define _rlost(this) (0 && !_mt0(this)->has_expected_lost && !_mt0(this)->path_is_lossy && _mt0(this)->recent_lost > 10)
 #define _discard(this) (!_mt0(this)->path_is_slow && _discard_rate(this) > .1)
 #define _state_t1(this) _mt1(this)->state
 #define _state(this) _mt0(this)->state
@@ -1138,7 +1138,7 @@ void _log_measurement_update_state(SubflowRateController *this)
 void _log_abbrevations(SubflowRateController *this, FILE *file)
 {
   fprintf(file,
-  "############ Subflow %d abbrevations to measured values ###########################################\n"
+  "############ Subflow %d abbrevations ##############################################################\n"
   "#  State:      The actual state (Overused (-1), Stable (0), Monitored (1))                        #\n"
   "#  Ctrled:     Indicate weather the state is controlled or not                                    #\n"
   "#  rlost:      recent losts                                                                       #\n"

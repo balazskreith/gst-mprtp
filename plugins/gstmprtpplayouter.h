@@ -87,7 +87,7 @@ struct _GstMprtpplayouter
   RcvController*    controller;
   GstClock*       sysclock;
 //  GQueue*         mprtp_buffer_pool;
-  PointerPool*    mprtp_buffer_pool;
+//  PointerPool*    mprtp_buffer_pool;
 
   guint           subflows_num;
 

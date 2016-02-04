@@ -100,7 +100,8 @@ static void _change_auto_rate_and_cc (GstMprtpplayouter * this,
 static GstStructure *_collect_infos (GstMprtpplayouter * this);
 static GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer);
 //static void _trash_mprtp_buffer(GstMprtpplayouter * this, GstMpRTPBuffer *mprtp);
-#define _trash_mprtp_buffer(this, mprtp) pointerpool_add(this->mprtp_buffer_pool, mprtp);
+//#define _trash_mprtp_buffer(this, mprtp) pointerpool_add(this->mprtp_buffer_pool, mprtp);
+#define _trash_mprtp_buffer(this, mprtp) g_slice_free(GstMpRTPBuffer, mprtp)
 enum
 {
   PROP_0,
@@ -173,6 +174,8 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
   GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
   GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
 
+  DISABLE_LINE _mprtp_ctor();
+  DISABLE_LINE _mprtp_reset(NULL);
   /* Setting up pads and setting metadata should be moved to
      base_class_init if you intend to subclass this class. */
   gst_element_class_add_pad_template (element_class,
@@ -323,7 +326,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->pivot_address_subflow_id = 0;
   this->pivot_address = NULL;
   g_rw_lock_init (&this->rwmutex);
-  this->mprtp_buffer_pool = make_pointerpool(512, _mprtp_ctor, g_free, _mprtp_reset);
+//  this->mprtp_buffer_pool = make_pointerpool(512, _mprtp_ctor, g_free, _mprtp_reset);
   this->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
   stream_joiner_set_monitor_payload_type(this->joiner, this->monitor_payload_type);
 
@@ -395,7 +398,7 @@ gst_mprtpplayouter_finalize (GObject * object)
 //  while(!g_queue_is_empty(this->mprtp_buffer_pool)){
 //    g_free(g_queue_pop_head(this->mprtp_buffer_pool));
 //  }
-  g_object_unref(this->mprtp_buffer_pool);
+//  g_object_unref(this->mprtp_buffer_pool);
 }
 
 
@@ -602,7 +605,8 @@ gst_mprtpplayouter_src_query (GstPad * sinkpad, GstObject * parent,
       peer = gst_pad_get_peer (this->mprtp_sinkpad);
       if ((result = gst_pad_query (peer, query))) {
           gst_query_parse_latency (query, &live, &min, &max);
-          min= GST_MSECOND;
+//          min= GST_MSECOND;
+          min= 0;
           max = -1;
           gst_query_set_latency (query, live, min, max);
       }
@@ -1016,12 +1020,14 @@ _change_auto_rate_and_cc (GstMprtpplayouter * this,
 GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer)
 {
   GstMpRTPBuffer *result;
-  result = pointerpool_get(this->mprtp_buffer_pool);
+//  result = pointerpool_get(this->mprtp_buffer_pool);
+  result = g_slice_new0(GstMpRTPBuffer);
   gst_mprtp_buffer_init(result,
                     buffer,
                     this->mprtp_ext_header_id,
                     this->abs_time_ext_header_id,
-                    this->delay_offset);
+                    this->delay_offset,
+                    this->monitor_payload_type);
   return result;
 }
 

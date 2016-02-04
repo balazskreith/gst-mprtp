@@ -763,7 +763,7 @@ again:
   //flushing
   sent_payload_bytes+=payload_bytes;
 //  pace_interval = (gdouble)(sent_payload_bytes * 8000) / (gdouble)pacing_bitrate;
-//  g_print("Pace interval: %f\n", pace_interval);
+//  g_print("Pacing\n");
 
   //flushing
   if(!this->pacing){

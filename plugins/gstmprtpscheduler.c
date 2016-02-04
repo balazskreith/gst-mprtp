@@ -729,7 +729,7 @@ gst_mprtpscheduler_mprtp_proxy(gpointer ptr, GstBuffer * buffer)
     _setup_timestamp(this, &rtp);
   }
 
-//  g_print("Send: %u\n", gst_rtp_buffer_get_seq(&rtp));
+//  g_print("Send: %u payload: %u\n", gst_rtp_buffer_get_seq(&rtp), gst_rtp_buffer_get_payload_type(&rtp));
   gst_rtp_buffer_unmap (&rtp);
 
   gst_pad_push (this->mprtp_srcpad, outbuf);

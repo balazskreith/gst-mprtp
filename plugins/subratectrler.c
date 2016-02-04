@@ -469,7 +469,7 @@ void subratectrler_measurement_update(
   _mt0(this)->state               = _mt1(this)->state;
   _mt0(this)->stage               = _mt1(this)->stage;
   _mt0(this)->incoming_bitrate    = measurement->incoming_rate * 8;
-  _mt0(this)->discard_rate        = (gdouble)measurement->late_discarded_bytes / (gdouble)measurement->goodput;
+  _mt0(this)->discard_rate        = 1. - measurement->goodput / measurement->receiver_rate;
   _mt0(this)->sender_bitrate      = measurement->sender_rate * 8;
   if(measurement->expected_lost)
     _mt0(this)->has_expected_lost   = 2;
@@ -512,7 +512,6 @@ Moment* _m_step(SubflowRateController *this)
 void _undershoot(SubflowRateController *this, gboolean disable_controlling)
 {
   gint32 undershoot_target;
-
   if(_RateCorr(this) < .75)
     undershoot_target = _TR(this) * .6;
   else
@@ -547,19 +546,10 @@ void
 _restricted_stage(
     SubflowRateController *this)
 {
-  //check weather the incoming rate and the target bitrate are correlated
-  if(_TR(this) < _IR(this) * .9){
-    if(1.5 < _DiCoeffT(this)){
-      //pacing is ineffective
-      _undershoot(this, FALSE);
-    }
-    goto done;
-  }
-
   //check weather we reached the inflection point
   if(1.5 < _DiCoeffT(this)){
-    this->min_target_point *= .9;
-    this->desired_bitrate = this->min_target_point;
+    //pacing is ineffective
+    _undershoot(this, TRUE);
     goto done;
   }
 
@@ -598,15 +588,18 @@ _check_stage(
 {
 
   //Check weather the delay fluctuation is over the target
-  //  if(1.2 < _DeCorrT(this) || (_RRxBiF(this) < -.3 && 1. < _DiCoeffT(this))){
-  if(1.2 < _DeCorrT(this)){
+  if(1.1 < _DeCorrT(this)){
     _add_congestion_point(this, _TR(this));
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
     goto done;
   }
 
   this->desired_bitrate = this->max_target_point;
-  _set_bitrate_flags(this, BITRATE_CHANGE);
+  if(1. < _BiFCorr(this)){
+    _set_bitrate_flags(this, BITRATE_CHANGE | BITRATE_SLOW);
+  }else{
+    _set_bitrate_flags(this, BITRATE_CHANGE);
+  }
 
   //check weather 90% of the sent bytes are received
   if(_RateCorr(this) < .9){
@@ -615,7 +608,7 @@ _check_stage(
 
   //Check weather the sent bitrate reached the target bitrate
   //Check weather we reached the maximum bitrate point
-  if(_TRateCorr(this) < .9 || this->target_bitrate < this->max_target_point * .99){
+  if(_TRateCorr(this) < .9 || this->target_bitrate < this->max_target_point * .95){
     goto done;
   }
 
@@ -639,10 +632,7 @@ _mitigate_stage(
   }
 
   this->desired_bitrate = this->min_target_point;
-  if(1. < _BiFCorr(this))
-    _set_bitrate_flags(this, BITRATE_CHANGE);
-  else
-    _set_bitrate_flags(this, BITRATE_CHANGE | BITRATE_SLOW);
+  _set_bitrate_flags(this, BITRATE_CHANGE);
   _switch_stage_to(this, STAGE_CHECK, FALSE);
 }
 
@@ -652,8 +642,8 @@ _probe_stage(
 {
   //check weather we overrun or not
   if(1. < _DeCorrH(this)){
-    this->monitoring_interval<<=1;
-    this->stabilize = TRUE;
+    ++this->monitoring_interval;
+    _switch_stage_to(this, STAGE_MITIGATE, TRUE);
     goto stabilize;
   }
 
@@ -905,7 +895,8 @@ gdouble _adjust_bitrate(SubflowRateController *this)
   if(this->bitrate_flags & BITRATE_CHANGE){
     drate = this->desired_bitrate - this->target_bitrate;
     drate *= frac;
-    drate *= MAX(.3, _get_congestion_influence(this));
+    if(this->target_bitrate < this->desired_bitrate)
+      drate *= MAX(.1, _get_congestion_influence(this));
     drate /= this->bitrate_flags & BITRATE_SLOW ? 3. : 1.;
     drate = MIN(max_increasement, drate);
   }else{
@@ -1044,12 +1035,6 @@ gdouble _get_congestion_influence(SubflowRateController *this)
   result = (actual_rate - cc_point) / (.4 * actual_rate);
   result *= result;
 //  result  *= 0. < result ? 2. : -.5;
-  _append_to_log(this,
-                 "#######################################################################################\n"
-                 "# get_congestion_influence: ((%-10.3f - %-10.3f) / (.25 * %-10.3f))^2 = %-10.3f #"
-                 "#######################################################################################\n",
-                 actual_rate, cc_point, actual_rate, result
-                 );
   return CONSTRAIN(.01, 1., result);
 }
 
@@ -1098,7 +1083,7 @@ void _log_measurement_update_state(SubflowRateController *this)
           "target_br:  %-10d| min_tbr: %-10d| max_tbr: %-10d| dis_br:  %-10d|\n"
           "br_flags:   %-10d| stage:   %-10d| near2cc: %-10d| exp_lst: %-10d|\n"
           "mon_br:     %-10d| mon_int: %-10d| pacing_br:  %-10d| lc_rate: %-10d|\n"
-          "SR:         %-10d| IR:      %-10d|\n"
+          "SR:         %-10d| IR:      %-10d| disc_rate:  %-10.3f\n"
           "############################ Seconds since setup: %lu ##########################################\n",
           this->id, _state(this),
           this->disable_controlling > 0 ? GST_TIME_AS_MSECONDS(this->disable_controlling - _now(this)) : 0,
@@ -1127,6 +1112,7 @@ void _log_measurement_update_state(SubflowRateController *this)
           this->pacing_bitrate, this->last_congestion_point,
 
           _mt0(this)->sender_bitrate, _mt0(this)->incoming_bitrate,
+          _mt0(this)->discard_rate,
 
           GST_TIME_AS_SECONDS(_now(this) - this->setup_time)
 

@@ -418,7 +418,7 @@ gst_mprtpreceiver_src_query (GstPad * srcpad, GstObject * parent,
       peer = gst_pad_get_peer (((Subflow*)(this->subflows->data))->inpad);
       if ((result = gst_pad_query (peer, query))) {
           gst_query_parse_latency (query, &live, &min, &max);
-          min= GST_MSECOND;
+          min= 0;
           max = -1;
           gst_query_set_latency (query, live, min, max);
       }
@@ -659,6 +659,12 @@ gst_mprtpreceiver_sink_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
     gst_buffer_unmap (buf, &map);
     result = gst_pad_push (this->mprtcp_sr_srcpad, buf);
   }else{
+//    {
+//      GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+//      gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
+//      g_print("Rec-Seq: %hu\n", gst_rtp_buffer_get_seq(&rtp));
+//      gst_rtp_buffer_unmap(&rtp);
+//    }
     gst_buffer_unmap (buf, &map);
     result = gst_pad_push (this->mprtp_srcpad, buf);
   }

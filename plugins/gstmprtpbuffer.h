@@ -48,6 +48,7 @@ struct _GstMpRTPBuffer{
   guint64        abs_rcv_ntp_time;
   GstClockTime   delay;
   guint8         payload_type;
+  gboolean       monitor_packet;
   guint16        abs_seq;
   gboolean       marker;
 };
@@ -74,6 +75,7 @@ void gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
                                GstBuffer *buffer,
                                guint8 mprtp_ext_header_id,
                                guint8 abs_time_ext_header_id,
-                               GstClockTime delay_offset);
+                               GstClockTime delay_offset,
+                               guint8 monitor_payload_type);
 
 #endif //_GST_MPRTPBUFFER_H_

@@ -39,6 +39,7 @@ cleanup()
   pkill client
   pkill server
   ps -ef | grep 'run_veth0_const.sh' | grep -v grep | awk '{print $2}' | xargs kill
+  ps -ef | grep 'run_veth0_cc.sh' | grep -v grep | awk '{print $2}' | xargs kill
   ps -ef | grep 'run_veth2_const.sh' | grep -v grep | awk '{print $2}' | xargs kill
   ps -ef | grep 'run_veth4_const.sh' | grep -v grep | awk '{print $2}' | xargs kill
 }

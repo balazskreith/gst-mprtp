@@ -256,6 +256,7 @@ stream_joiner_init (StreamJoiner * this)
   this->max_delay_diff = 50 * GST_MSECOND;
   this->min_delay = this->max_delay = 100 * GST_MSECOND;
   this->forced_delay = 150 * GST_MSECOND;
+  this->forced_delay = 0;
   this->delays = make_numstracker(256, GST_SECOND);
   numstracker_add_plugin(this->delays,
                            (NumsTrackerPlugin*)make_numstracker_minmax_plugin(_delay_max_pipe, this, _delay_min_pipe, this));
@@ -393,7 +394,7 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
                               &subflow->jitter);
 
   numstracker_add(this->skews, subflow->skew);
-//  g_print("Subflow %d delay: %f\n", subflow->id, subflow->delay);
+  //g_print("Subflow %d delay: %f\n", subflow->id, subflow->delay);
   numstracker_add(this->delays, subflow->delay);
   this->playout_delay *= 124.;
   this->playout_delay += this->max_skew;

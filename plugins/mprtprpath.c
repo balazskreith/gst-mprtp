@@ -294,7 +294,7 @@ void
 mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
 {
 //  g_print("mprtpr_path_process_rtp_packet begin\n");
-  gint64 skew;
+  gint64 skew = 0;
 
   THIS_WRITELOCK (this);
   if (this->seq_initialized == FALSE) {
@@ -307,11 +307,14 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
     this->seq_initialized = TRUE;
     goto done;
   }
-  skew = (((gint64)this->last_mprtp_delay - (gint64)mprtp->delay));
-  this->last_mprtp_delay = mprtp->delay;
-  ++this->total_packets_received;
-  this->total_payload_bytes += mprtp->payload_bytes;
-  this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
+
+  if(!mprtp->monitor_packet){
+    skew = (((gint64)this->last_mprtp_delay - (gint64)mprtp->delay));
+    this->last_mprtp_delay = mprtp->delay;
+    ++this->total_packets_received;
+    this->total_payload_bytes += mprtp->payload_bytes;
+    this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
+  }
 //  g_print("J: %d\n", this->jitter);
   if(0 < mprtp->delay)
     _add_delay(this, mprtp->delay);
@@ -330,7 +333,9 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   if(this->last_rtp_timestamp == mprtp->timestamp)
     goto done;
 
-  _add_skew(this, skew);
+  if(!mprtp->monitor_packet){
+    _add_skew(this, skew);
+  }
 
   //For Kalman delay and skew estimation test (kalman_simple_test)
 //  if(this->id == 1){

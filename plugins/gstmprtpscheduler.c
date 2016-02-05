@@ -121,6 +121,7 @@ enum
   PROP_SET_SUBFLOW_CONGESTED,
   PROP_AUTO_RATE_AND_CC,
   PROP_SET_SENDING_TARGET,
+  PROP_INITIAL_DISABLING,
   PROP_SUBFLOWS_STATS,
 };
 
@@ -265,6 +266,11 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the target",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_INITIAL_DISABLING,
+      g_param_spec_uint64 ("initial-disabling",
+          "set an initial disabling time for rate controller in order to collect statistics at the beginning.",
+          "set an initial disabling time for rate controller in order to collect statistics at the beginning.",
+          0, 3600 * GST_SECOND, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SUBFLOWS_STATS,
       g_param_spec_string ("subflow-stats",
@@ -397,6 +403,7 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
   gboolean gboolean_value;
   guint8 subflow_id;
   guint subflow_target;
+  guint64 guint64_value;
 
   GST_DEBUG_OBJECT (this, "set_property");
 
@@ -456,7 +463,12 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       stream_splitter_commit_changes (this->splitter);
       THIS_WRITEUNLOCK (this);
       break;
-
+    case PROP_INITIAL_DISABLING:
+      THIS_WRITELOCK (this);
+      guint64_value = g_value_get_uint64 (value);
+      sndctrler_set_initial_disabling(this->controller, guint64_value);
+      THIS_WRITEUNLOCK (this);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;

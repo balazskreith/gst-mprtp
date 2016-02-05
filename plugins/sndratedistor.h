@@ -32,6 +32,7 @@ struct _SendingRateDistributor
 
   guint8               available_ids[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   guint8               available_ids_length;
+  GstClockTime         initial_disabling_time;
 
   gint32               extra_rate;
   gint32               target_bitrate;
@@ -60,5 +61,6 @@ void sndrate_distor_measurement_update(SendingRateDistributor *this,
 
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_time_update(SendingRateDistributor *this);
+void sndrate_set_initial_disabling_time(SendingRateDistributor *this, guint64 initial_disabling_time);
 guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id);
 #endif /* SNDRATEDISTOR_H_ */

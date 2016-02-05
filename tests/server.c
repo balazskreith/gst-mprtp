@@ -224,13 +224,12 @@ make_video_foreman_session (guint sessionNum)
   encoder = gst_element_factory_make ("vp8enc", NULL);
   //g_object_set (payloader, "config-interval", 2, NULL);
 
-  g_object_set (encoder, "target-bitrate", 1000000, NULL);
-  g_object_set (encoder, "end-usage", 0, NULL);
+  g_object_set (encoder, "target-bitrate", 500000, NULL);
+  g_object_set (encoder, "end-usage", 1, NULL);
   g_object_set (encoder, "deadline", 20000, NULL);
   g_object_set (encoder, "undershoot", 100, NULL);
   g_object_set (encoder, "cpu-used", 0, NULL);
 //  g_object_set (encoder, "keyframe-mode", 0, NULL);
-
   gst_bin_add_many (videoBin, videoConv, videoSrc, videoParse, encoder, payloader, NULL);
   g_object_set (videoParse,
       "width", 352,
@@ -414,10 +413,17 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
 
     g_object_set (rtcpSrc, "port", rtpbin_rx_rtcp_port, NULL);
 
-  if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING)
+  if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING){
     g_object_set (mprtpsch, "auto-rate-and-cc", TRUE, NULL);
-  else if(test_parameters_.test_directive == MANUAL_RATE_CONTROLLING)
+    if(test_parameters_.video_session == FOREMAN_SOURCE){
+      g_object_set (mprtpsch, "initial-disabling", 60 * GST_SECOND, NULL);
+    }else{
+      g_object_set (mprtpsch, "initial-disabling", 10 * GST_SECOND, NULL);
+    }
+  }else if(test_parameters_.test_directive == MANUAL_RATE_CONTROLLING)
     g_timeout_add (1000, _random_rate_controller, mprtpsch);
+
+
 
   padName = g_strdup_printf ("send_rtp_sink_%u", session->sessionNum);
   gst_element_link_pads (session->input, "src", rtpBin, padName);

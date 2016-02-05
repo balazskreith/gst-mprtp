@@ -110,8 +110,9 @@ SubflowRateController *make_subratectrler(void);
 void subratectrler_enable_logging(SubflowRateController *this, const gchar *filename);
 void subratectrler_disable_logging(SubflowRateController *this);
 void subratectrler_set(SubflowRateController *this,
-                              MPRTPSPath *path,
-                              guint32 sending_target);
+                         MPRTPSPath *path,
+                         guint32 sending_target,
+                         guint64 initial_disabling);
 void subratectrler_unset(SubflowRateController *this);
 
 void subratectrler_time_update(

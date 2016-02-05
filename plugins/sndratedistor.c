@@ -158,7 +158,7 @@ SubflowRateController* sndrate_distor_add_controllable_path(SendingRateDistribut
   Subflow *subflow;
   subflow =  _get_subflow(this, mprtps_path_get_id(path));
   if(!subflow->controller) subflow->controller = make_subratectrler();
-  subratectrler_set(subflow->controller, path, sending_target);
+  subratectrler_set(subflow->controller, path, sending_target, this->initial_disabling_time);
   subflow->controlled = TRUE;
   subflow->path = g_object_ref(path);
   ++this->controlled_num;
@@ -196,6 +196,11 @@ void sndrate_distor_time_update(SendingRateDistributor *this)
   _time_update_requestion(this);
 
   return;
+}
+
+void sndrate_set_initial_disabling_time(SendingRateDistributor *this, guint64 initial_disabling_time)
+{
+  this->initial_disabling_time = initial_disabling_time;
 }
 
 

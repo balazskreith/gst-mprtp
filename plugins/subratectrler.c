@@ -384,7 +384,8 @@ void subratectrler_disable_logging(SubflowRateController *this)
 
 void subratectrler_set(SubflowRateController *this,
                          MPRTPSPath *path,
-                         guint32 sending_target)
+                         guint32 sending_target,
+                         guint64 initial_disabling)
 {
   THIS_WRITELOCK(this);
   this->path = g_object_ref(path);
@@ -405,8 +406,13 @@ void subratectrler_set(SubflowRateController *this,
   _transit_state_to(this, STATE_STABLE);
   _set_bitrate_flags(this, BITRATE_CHANGE);
   subanalyser_reset(this->analyser);
-  this->last_reference_added = _now(this) - 5 * GST_SECOND;
-  this->disable_controlling = _now(this) + 10 * GST_SECOND;
+  if(initial_disabling < 10  *GST_SECOND){
+    this->last_reference_added = 0;
+    this->disable_controlling = _now(this) + initial_disabling;
+  }else{
+    this->last_reference_added = _now(this) + initial_disabling - 10 * GST_SECOND;
+    this->disable_controlling = _now(this) + initial_disabling;
+  }
   THIS_WRITEUNLOCK(this);
 }
 
@@ -588,7 +594,7 @@ _check_stage(
 {
 
   //Check weather the delay fluctuation is over the target
-  if(1.1 < _DeCorrT(this)){
+  if(1. < _DeCorrT(this)){
     _add_congestion_point(this, _TR(this));
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
     goto done;
@@ -1083,7 +1089,7 @@ void _log_measurement_update_state(SubflowRateController *this)
           "target_br:  %-10d| min_tbr: %-10d| max_tbr: %-10d| dis_br:  %-10d|\n"
           "br_flags:   %-10d| stage:   %-10d| near2cc: %-10d| exp_lst: %-10d|\n"
           "mon_br:     %-10d| mon_int: %-10d| pacing_br:  %-10d| lc_rate: %-10d|\n"
-          "SR:         %-10d| IR:      %-10d| disc_rate:  %-10.3f\n"
+          "SR:         %-10d| IR:      %-10d| disc_rate:  %-10.3f|\n"
           "############################ Seconds since setup: %lu ##########################################\n",
           this->id, _state(this),
           this->disable_controlling > 0 ? GST_TIME_AS_MSECONDS(this->disable_controlling - _now(this)) : 0,

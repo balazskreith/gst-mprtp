@@ -11,9 +11,34 @@
 
 LATENCY=100
 JITTER=1
+MAXBW=1000
+
+while [[ $# > 1 ]]
+do
+key="$1"
+
+case $key in
+    -x|--maxbw)
+    MAXBW="$2"
+    shift # past argument
+    ;;
+    --default)
+    DEFAULT=YES
+    ;;
+    *)
+            # unknown option
+    ;;
+esac
+shift # past argument or value
+done
+
+MINBW=500
+BWDIFF=500
+let "MINBW = $MAXBW / 2"
+let "BWDIFF = MAXBW - MINBW"
 
 #echo "Setup veth0 to 1000KBit"
-BW=2000
+BW=$MAXBW
 tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
 tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
 for j in `seq 1 60`;
@@ -23,17 +48,22 @@ do
 done
 #1 minute
 
-BW=1000
-tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
-tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
-for j in `seq 1 60`;
+#4 stair closing
+for i in `seq 1 4`;
 do
-  echo $BW"000,"
-  sleep 1
-done
+  let BW=MAXBW-BWDIFF/4*$i
+  tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+  tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
+  for j in `seq 1 15`;
+  do
+    echo $BW"000,"
+    sleep 1
+  done
+done 
 #2 minute
 
-BW=2000
+#constant bw
+BW=$MINBW
 tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
 tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
 for j in `seq 1 60`;
@@ -43,47 +73,38 @@ do
 done
 #3 minute
 
-BW=1000
-tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
-tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
-for j in `seq 1 30`;
+#echo "8 Stairs opening"
+for i in `seq 1 8`;
 do
-  echo $BW"000,"
-  sleep 1
-done
-#3.5 minute
-
-BW=2000
-tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
-tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
-for j in `seq 1 30`;
-do
-  echo $BW"000,"
-  sleep 1
-done
-#4 minute
-
-#echo "2 Stairs closing"
-for i in `seq 1 2`;
-do
-  let BW=2000-$i*300
+  let BW=MINBW+BWDIFF/8*$i
   tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
   tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
-  for j in `seq 1 30`;
+  for j in `seq 1 7`;
   do
     echo $BW"000,"
     sleep 1
   done
 done 
+#4 minute
+
+#constant bw
+BW=$MAXBW
+tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
+for j in `seq 1 60`;
+do
+  echo $BW"000,"
+  sleep 1
+done
 #5 minute
 
-#echo "4 Stairs opening"
-for i in `seq 1 4`;
+#echo "8 Stairs closing"
+for i in `seq 1 8`;
 do
-  let BW=1000+$i*150
+  let BW=MAXBW-BWDIFF/8*$i
   tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
   tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
-  for j in `seq 1 15`;
+  for j in `seq 1 7`;
   do
     echo $BW"000,"
     sleep 1
@@ -91,43 +112,21 @@ do
 done 
 #6 minute
 
-#echo "8 Stairs closing"
-for i in `seq 1 8`;
-do
-  let BW=2000-$i*75
-  tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
-  tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
-  for j in `seq 1 7`;
-  do
-    echo $BW"000,"
-    sleep 1
-  done
-done 
-for j in `seq 1 4`;
+#constant bw
+BW=$MINBW
+tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
+for j in `seq 1 60`;
 do
   echo $BW"000,"
   sleep 1
 done
 #7 minute
 
-#echo "2 Stairs opening"
-for i in `seq 1 2`;
-do
-  let BW=1000+$i*300
-  tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
-  tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
-  for j in `seq 1 30`;
-  do
-    echo $BW"000,"
-    sleep 1
-  done
-done 
-#8 minute
-
-#echo "4 Stairs closing"
+#4 stair opening
 for i in `seq 1 4`;
 do
-  let BW=2000-$i*150
+  let BW=MINBW+BWDIFF/4*$i
   tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
   tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
   for j in `seq 1 15`;
@@ -136,12 +135,67 @@ do
     sleep 1
   done
 done 
+#8 minute
+
+#constant bw
+BW=$MINBW
+tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
+for j in `seq 1 60`;
+do
+  echo $BW"000,"
+  sleep 1
+done
+#8 minute
+
+#constant bw
+BW=$MAXBW
+tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
+for j in `seq 1 60`;
+do
+  echo $BW"000,"
+  sleep 1
+done
 #9 minute
 
-#echo "8 Stairs opening"
+#constant bw
+BW=$MINBW
+tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
+for j in `seq 1 60`;
+do
+  echo $BW"000,"
+  sleep 1
+done
+#10 minute
+
+#constant bw
+BW=$MAXBW
+tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
+for j in `seq 1 60`;
+do
+  echo $BW"000,"
+  sleep 1
+done
+#11 minute
+
+#constant bw
+BW=$MAXBW
+tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
+for j in `seq 1 30`;
+do
+  echo $BW"000,"
+  sleep 1
+done
+#11.5 minute
+
+#echo "8 Stairs closing"
 for i in `seq 1 8`;
 do
-  let BW=1000+$i*75
+  let BW=MAXBW-BWDIFF/8*$i
   tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
   tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
   for j in `seq 1 7`;
@@ -150,11 +204,36 @@ do
     sleep 1
   done
 done 
+#12.5 minute
+
+BW=$MINBW
+tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
+for j in `seq 1 30`;
+do
+  echo $BW"000,"
+  sleep 1
+done
+#13 minute
+
+#echo "8 Stairs opening"
+for i in `seq 1 8`;
+do
+  let BW=MINBW+BWDIFF/8*$i
+  tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+  tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
+  for j in `seq 1 7`;
+  do
+    echo $BW"000,"
+    sleep 1
+  done
+done 
+#15 minute
+
 for j in `seq 1 4`;
 do
   echo $BW"000,"
   sleep 1
 done
-#10 minute
 
 

@@ -553,7 +553,7 @@ _restricted_stage(
     SubflowRateController *this)
 {
   //check weather we reached the inflection point
-  if(1.5 < _DiCoeffT(this)){
+  if(1. < _DiCoeffT(this)){
     //pacing is ineffective
     _undershoot(this, TRUE);
     goto done;
@@ -633,7 +633,7 @@ _mitigate_stage(
     SubflowRateController *this)
 {
   //determine target points
-  if(_TRateCorr(this) < .95 && this->target_bitrate * .95 < this->min_target_point){
+  if( .95 < _TRateCorr(this) && this->target_bitrate * .95 < this->min_target_point){
     this->min_target_point*=.95;
   }
 
@@ -894,8 +894,8 @@ void _set_path_pacing(SubflowRateController *this, gboolean enable_pacing)
 gdouble _adjust_bitrate(SubflowRateController *this)
 {
   gdouble drate = 0; //delta rate
-  gdouble actual_rate = _TR(this);
-  gdouble frac = (gdouble) RATE_ADJUST_INTERVAL / (gdouble) GST_SECOND;
+  gdouble actual_rate = _TR(this); //Todo: Hey, 1s here.
+  gdouble frac = (gdouble) RATE_ADJUST_INTERVAL / (gdouble) (1 * GST_SECOND);
   gdouble max_increasement = RAMP_UP_MAX_SPEED * frac;
 
   if(this->bitrate_flags & BITRATE_CHANGE){
@@ -1038,7 +1038,7 @@ gdouble _get_congestion_influence(SubflowRateController *this)
   gdouble actual_rate;
   if(!this->last_congestion_point) return 1.;
   actual_rate =_TR(this);
-  result = (actual_rate - cc_point) / (.4 * actual_rate);
+  result = (actual_rate - cc_point) / (.25 * actual_rate);
   result *= result;
 //  result  *= 0. < result ? 2. : -.5;
   return CONSTRAIN(.01, 1., result);
@@ -1089,7 +1089,7 @@ void _log_measurement_update_state(SubflowRateController *this)
           "target_br:  %-10d| min_tbr: %-10d| max_tbr: %-10d| dis_br:  %-10d|\n"
           "br_flags:   %-10d| stage:   %-10d| near2cc: %-10d| exp_lst: %-10d|\n"
           "mon_br:     %-10d| mon_int: %-10d| pacing_br:  %-10d| lc_rate: %-10d|\n"
-          "SR:         %-10d| IR:      %-10d| disc_rate:  %-10.3f|\n"
+          "SR:         %-10d| IR:      %-10d| disc_rate:  %-10.3f| ci:      %-10.3f\n"
           "############################ Seconds since setup: %lu ##########################################\n",
           this->id, _state(this),
           this->disable_controlling > 0 ? GST_TIME_AS_MSECONDS(this->disable_controlling - _now(this)) : 0,
@@ -1118,7 +1118,7 @@ void _log_measurement_update_state(SubflowRateController *this)
           this->pacing_bitrate, this->last_congestion_point,
 
           _mt0(this)->sender_bitrate, _mt0(this)->incoming_bitrate,
-          _mt0(this)->discard_rate,
+          _mt0(this)->discard_rate, _get_congestion_influence(this),
 
           GST_TIME_AS_SECONDS(_now(this) - this->setup_time)
 

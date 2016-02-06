@@ -13,6 +13,18 @@ let "ACTIVE_SUB1=$PROFILE&1"
 let "ACTIVE_SUB2=$PROFILE&2"
 let "ACTIVE_SUB3=$PROFILE&4"
 
+BWSUM=1500
+if [ "$ACTIVE_SUB1" -eq 1 ] && [ "$ACTIVE_SUB2" -eq 2 ]
+then
+BWPART=750
+else
+BWPART=1500
+fi
+
+VETH0_CMDS=$VETH0_CMDS" -x $BWPART"
+VETH2_CMDS=$VETH2_CMDS" -x $BWPART"
+VETH4_CMDS=$VETH4_CMDS" -x $BWPART"
+
 eval rm $TARGET_DIR"/*"
 
 if [ "$ACTIVE_SUB1" -eq 1 ]
@@ -56,7 +68,7 @@ trap control_c SIGINT
 
 #sudo ip netns exec ns0 ./run_veth0_const.sh > veth0_bw.txt &
 sleep 1
-for j in `seq 1 120`;
+for j in `seq 1 180`;
 do
   for i in `seq 1 5`;
   do

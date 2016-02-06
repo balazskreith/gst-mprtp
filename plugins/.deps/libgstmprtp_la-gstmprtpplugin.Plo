@@ -347,7 +347,7 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  subratectrler.h floatsbuffer.h subanalyser.h streamsplitter.h \
  gstmprtpsender.h gstmprtpplayouter.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
- packetsrcvqueue.h percentiletracker2.h streamjoiner.h \
+ percentiletracker2.h streamjoiner.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h rcvctrler.h \
  ricalcer.h /usr/include/glib-2.0/gio/gnetworking.h /usr/include/netdb.h \
  /usr/include/netinet/in.h \
@@ -1176,8 +1176,6 @@ gstmprtpplayouter.h:
 mprtprpath.h:
 
 /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h:
-
-packetsrcvqueue.h:
 
 percentiletracker2.h:
 

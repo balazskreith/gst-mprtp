@@ -101,14 +101,18 @@ void gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
     snd_time |=  (ntp_base & 0xFFFFFFC000000000UL);
     mprtp->abs_snd_ntp_time = snd_time;
     mprtp->delay = get_epoch_time_from_ntp_in_ns(NTP_NOW - snd_time);
-//    g_print("Delay: %lu, %lu\n",
+//    g_print("Delay: %lu, ts: %lu, dur: %lu, off: %lu, pts: %lu\n",
 //            mprtp->delay,
-//            GST_BUFFER_TIMESTAMP(mprtp->buffer));
+//            GST_BUFFER_TIMESTAMP(mprtp->buffer),
+//            GST_BUFFER_DURATION(mprtp->buffer),
+//            GST_BUFFER_OFFSET(mprtp->buffer),
+//            GST_BUFFER_PTS(mprtp->buffer));
 //    g_print("%lX:%lu (R)\n%lX:%lu (R) => %lu ->Delay: %lu\n",
 //            mprtp->abs_rcv_ntp_time, mprtp->abs_rcv_ntp_time,
 //            mprtp->abs_snd_ntp_time, mprtp->abs_snd_ntp_time,
 //            mprtp->abs_rcv_ntp_time - mprtp->abs_snd_ntp_time,
 //            mprtp->delay);
+
     if(mprtp->abs_rcv_ntp_time < mprtp->abs_snd_ntp_time){
       g_print("VALAMI PROBLÉMA VAN MÁR MEGINT\n");
     }

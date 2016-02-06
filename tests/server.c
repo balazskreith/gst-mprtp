@@ -129,6 +129,7 @@ make_video_testsrc_session (guint sessionNum)
   SessionData *session;
 
   encoder = gst_element_factory_make ("vp8enc", NULL);
+  g_object_set(videoSrc, "pattern", "GST_VIDEO_TEST_SRC_CHECKERS1", NULL);
   g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 1, NULL);
   //g_object_set (payloader, "config-interval", 2, NULL);
 

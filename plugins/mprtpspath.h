@@ -215,9 +215,10 @@ guint8 mprtps_path_get_id (MPRTPSPath * this);
 void mprtps_path_set_monitor_interval_and_duration(MPRTPSPath *this, guint interval, GstClockTime max_idle);
 gboolean mprtps_path_is_monitoring (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_packets_num (MPRTPSPath * this);
-void mprtps_path_tick(MPRTPSPath *this);
+void mprtps_path_tick(MPRTPSPath *this, GstBuffer **monitorbuf);
 void mprtps_path_process_rtp_packet(MPRTPSPath * this,
-                               GstBuffer * buffer);
+                               GstBuffer * buffer,
+                               GstBuffer **monitorbuf);
 gboolean mprtps_path_has_expected_lost(MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_frames_num (MPRTPSPath * this);

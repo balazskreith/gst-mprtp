@@ -48,7 +48,7 @@ static void _send_mprtp_packet(MPRTPSPath * this,
                                gboolean bypass);
 static guint32 _pacing(MPRTPSPath * this);
 //static gboolean _is_overused(MPRTPSPath * this);
-static GstBuffer* _create_monitor_packet(MPRTPSPath * this);
+static GstBuffer* _create_monitor_packet(MPRTPSPath * this, GstBuffer **buffer);
 
 #define MIN_PACE_INTERVAL 1
 #define MINIMUM_PACE_BANDWIDTH 50000
@@ -546,7 +546,7 @@ guint32 mprtps_path_get_bytes_in_queue(MPRTPSPath *this)
 
 
 void
-mprtps_path_tick(MPRTPSPath *this)
+mprtps_path_tick(MPRTPSPath *this, GstBuffer **monitorbuf)
 {
   gboolean expected_lost = FALSE;
 //  guint generate = 0, generated = 0;
@@ -570,7 +570,7 @@ mprtps_path_tick(MPRTPSPath *this)
   if(0 < this->monitoring_max_idle){
     if(this->monitoring_max_idle < _now(this) - this->last_monitoring_sent_time){
       GstBuffer *buffer;
-      buffer = _create_monitor_packet(this);
+      buffer = _create_monitor_packet(this, monitorbuf);
       _setup_rtp2mprtp (this, buffer);
       _refresh_stat(this, buffer);
       _send_mprtp_packet(this, buffer, TRUE);
@@ -589,7 +589,8 @@ done:
 
 void
 mprtps_path_process_rtp_packet(MPRTPSPath * this,
-                               GstBuffer * buffer)
+                               GstBuffer * buffer,
+                               GstBuffer **monitorbuf)
 {
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   THIS_WRITELOCK (this);
@@ -613,7 +614,7 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
   if(this->total_sent_normal_packet_num % this->monitoring_interval != 0) goto done;
   {
     GstBuffer *buffer;
-    buffer = _create_monitor_packet(this);
+    buffer = _create_monitor_packet(this, monitorbuf);
     _setup_rtp2mprtp(this, buffer);
     _send_mprtp_packet(this, buffer, FALSE);
     this->last_monitoring_sent_time = _now(this);
@@ -790,12 +791,16 @@ done:
 //  return FALSE;
 //}
 
-GstBuffer* _create_monitor_packet(MPRTPSPath * this)
+GstBuffer* _create_monitor_packet(MPRTPSPath * this, GstBuffer **buffer)
 {
   GstBuffer *result;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-
-  result = gst_rtp_buffer_new_allocate (1400, 0, 0);
+  if(buffer){
+    result = gst_buffer_make_writable(*buffer);
+    *buffer = NULL;
+  }else{
+    result = gst_rtp_buffer_new_allocate (1400, 0, 0);
+  }
   gst_rtp_buffer_map(result, GST_MAP_READWRITE, &rtp);
   gst_rtp_buffer_set_payload_type(&rtp, this->monitor_payload_type);
 

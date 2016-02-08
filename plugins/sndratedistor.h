@@ -38,6 +38,9 @@ struct _SendingRateDistributor
   gint32               target_bitrate;
   gint32               delta_rate;
 
+  gboolean             subflows_are_stable;
+  gboolean             subflows_are_measured;
+
   UtilizationReport    ur;
   SignalRequestFunc    signal_request;
   gpointer             signal_controller;
@@ -56,11 +59,11 @@ SubflowRateController*  sndrate_distor_add_controllable_path(SendingRateDistribu
                                  guint32 sending_rate);
 void sndrate_distor_measurement_update(SendingRateDistributor *this,
                                        guint8 id,
-                                       RRMeasurement *measurement,
-                                       guint32 media_rate);
+                                       RRMeasurement *measurement);
 
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
 void sndrate_distor_time_update(SendingRateDistributor *this);
+gboolean sndrate_distor_recalc_requestion(SendingRateDistributor *this);
 void sndrate_set_initial_disabling_time(SendingRateDistributor *this, guint64 initial_disabling_time);
 guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id);
 #endif /* SNDRATEDISTOR_H_ */

@@ -663,7 +663,8 @@ _irp_producer_main(SndController * this)
     _assemble_measurement(this, subflow);
     _determine_path_flags(this, subflow);
     if(0) g_print("%p", _irt(subflow, 0));
-    subratectrler_measurement_update(subflow->rate_controller, _irt0(subflow));
+    sndrate_distor_measurement_update(this->rate_distor, subflow->id, _irt0(subflow));
+//    subratectrler_measurement_update(subflow->rate_controller, _irt0(subflow));
 
     delay = mprtps_path_get_delay(subflow->path);
     if(slowest_delay < delay){
@@ -1340,13 +1341,15 @@ _split_controller_main(SndController * this)
   GstClockTime now;
   now = gst_clock_get_time(this->sysclock);
 
-  if(this->ticknum % 2 == 1)
-    sndrate_distor_time_update(this->rate_distor);
+  sndrate_distor_time_update(this->rate_distor);
 
   if(_subflows_are_ready(this) ||
      this->last_recalc_time < now - 15 * GST_SECOND)
   {
       this->bids_recalc_requested = TRUE;
+  }
+  else if(this->ticknum % 3 == 0){
+    this->bids_recalc_requested = TRUE;
   }
 //  goto recalc_done;
   if (!this->bids_recalc_requested) goto recalc_done;

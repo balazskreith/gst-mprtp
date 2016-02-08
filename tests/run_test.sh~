@@ -18,7 +18,7 @@ if [ "$ACTIVE_SUB1" -eq 1 ] && [ "$ACTIVE_SUB2" -eq 2 ]
 then
 BWPART=750
 else
-BWPART=1000
+BWPART=1500
 fi
 
 VETH0_CMDS=$VETH0_CMDS" -x $BWPART"

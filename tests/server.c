@@ -302,13 +302,13 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
   gint get_bitrate;
   g_object_get (encoder, "target-bitrate", &get_bitrate, NULL);
   {
-//    gint i;
+    gint i;
     new_bitrate = ur->target_rate;
-//    for(i=0; i<32; ++i){
-//      if(!ur->subflows[i].available) continue;
-//      ur->subflows[i].target_weight=0.;
-//    }
-//    ur->subflows[1].max_rate=subflow1_max_rate;
+    for(i=0; i<32; ++i){
+      if(!ur->subflows[i].controlled) continue;
+//      ur->subflows[i].min_rate = 300000;
+//      ur->subflows[i].max_rate = 1000000;
+    }
 //    ur->subflows[1].shareability = subflow1_shareability;
 //    ur->subflows[2].max_rate=subflow2_max_rate;
 //    ur->subflows[2].shareability = subflow2_shareability;

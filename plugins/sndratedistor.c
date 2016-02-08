@@ -49,6 +49,7 @@ struct _Subflow{
   MPRTPSPath*            path;
   gboolean               initialized;
   gboolean               controlled;
+  gboolean               ready;
   SubflowRateController* controller;
 
   gint32                 extra_rate;
@@ -85,6 +86,10 @@ _time_update_evaluation(
 
 static void
 _time_update_requestion(
+    SendingRateDistributor* this);
+
+static void
+_time_update_application(
     SendingRateDistributor* this);
 
 
@@ -166,6 +171,16 @@ SubflowRateController* sndrate_distor_add_controllable_path(SendingRateDistribut
   return subflow->controller;
 }
 
+void sndrate_distor_measurement_update(SendingRateDistributor *this,
+                                       guint8 id,
+                                       RRMeasurement *measurement)
+{
+  Subflow *subflow;
+  subflow =  _get_subflow(this, id);
+  subratectrler_measurement_update(subflow->controller, measurement);
+  subflow->ready = TRUE;
+}
+
 void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id)
 {
   Subflow *subflow;
@@ -181,8 +196,6 @@ done:
 }
 
 
-
-
 void sndrate_distor_time_update(SendingRateDistributor *this)
 {
   //1. Initialize and reset variable for updating
@@ -195,15 +208,32 @@ void sndrate_distor_time_update(SendingRateDistributor *this)
   //3. Requesting the media source for new media rate
   _time_update_requestion(this);
 
+  //4. Apply new min-max rates and disabling commanded by the application
+  _time_update_application(this);
+
   return;
+}
+
+gboolean sndrate_distor_recalc_requestion(SendingRateDistributor *this)
+{
+  gint i;
+  Subflow *subflow;
+  gboolean result = FALSE;
+  if(!this->subflows_are_measured) goto done;
+  if(!this->subflows_are_stable) goto done;
+  result = TRUE;
+  foreach_subflows(this, i, subflow)
+  {
+    subflow->ready = FALSE;
+  }
+done:
+  return result;
 }
 
 void sndrate_set_initial_disabling_time(SendingRateDistributor *this, guint64 initial_disabling_time)
 {
   this->initial_disabling_time = initial_disabling_time;
 }
-
-
 
 guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id)
 {
@@ -229,9 +259,12 @@ void _time_update_preparation(SendingRateDistributor* this)
   Subflow *subflow;
   gint32 prev_sending_target;
   UtilizationReport *ur = &this->ur;
+  gboolean overused = FALSE;
 
   this->delta_rate = 0;
   this->extra_rate = 0;
+  this->subflows_are_stable = TRUE;
+  this->subflows_are_measured = TRUE;
 
   foreach_subflows(this, i, subflow)
   {
@@ -240,8 +273,11 @@ void _time_update_preparation(SendingRateDistributor* this)
     subratectrler_time_update(subflow->controller,
                               &subflow->sending_target,
                               &subflow->extra_rate,
-                              &this->ur.subflows[subflow->id]);
+                              &this->ur.subflows[subflow->id],
+                              &overused);
 
+    this->subflows_are_stable &= !overused;
+    this->subflows_are_measured &= subflow->ready;
     subflow->delta_rate =subflow->sending_target - prev_sending_target;
     this->delta_rate += subflow->delta_rate;
     this->extra_rate += subflow->extra_rate;
@@ -293,6 +329,20 @@ void _time_update_requestion(SendingRateDistributor* this)
 
   this->target_bitrate = ur->target_rate;
 
+}
+
+
+void _time_update_application(SendingRateDistributor* this)
+{
+  gint i;
+  Subflow *subflow;
+  UtilizationReport *ur = &this->ur;
+  UtilizationSubflowReport *us;
+  foreach_subflows(this, i, subflow)
+  {
+     us = &ur->subflows[subflow->id];
+     subratectrler_change_targets(subflow->controller, us->min_rate, us->max_rate);
+  }
 }
 
 

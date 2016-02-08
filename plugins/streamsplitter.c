@@ -635,7 +635,8 @@ _schnode_rdtor (StreamSplitter *this,SchNode * node)
   _schnode_rdtor (this, node->left);
   _schnode_rdtor (this, node->right);
 //  pointerpool_add(this->pointerpool, node);
-  g_free(node);
+  g_slice_free(SchNode, node);
+//  g_free(node);
 }
 
 void
@@ -668,7 +669,8 @@ done:
 gpointer
 _schnode_ctor (void)
 {
-  SchNode *result = (SchNode *) g_malloc0 (sizeof (SchNode));
+
+  SchNode *result = g_slice_new0(SchNode);
   result->left = NULL;
   result->right = NULL;
 //  result->next = NULL;
@@ -723,7 +725,8 @@ schtree_get_next (SchNode * root, guint32 bytes_to_send, gboolean key_restrictio
 Subflow *
 make_subflow (MPRTPSPath * path)
 {
-  Subflow *result = g_malloc0 (sizeof (Subflow));
+
+  Subflow *result = g_slice_new0(Subflow);
   result->path = path;
   return result;
 }

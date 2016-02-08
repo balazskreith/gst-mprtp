@@ -743,7 +743,11 @@ gst_mprtpscheduler_mprtp_proxy(gpointer ptr, GstBuffer * buffer)
 
 //  g_print("Send: %u payload: %u\n", gst_rtp_buffer_get_seq(&rtp), gst_rtp_buffer_get_payload_type(&rtp));
   gst_rtp_buffer_unmap (&rtp);
-
+  if(this->auto_rate_and_cc){
+//    if(this->monitorpacket) gst_buffer_unref(this->monitorpacket);
+//    this->monitorpacket = gst_buffer_copy_deep(outbuf);
+//    this->monitorpacket = NULL;
+  }
   gst_pad_push (this->mprtp_srcpad, outbuf);
   if (!this->riport_flow_signal_sent) {
     this->riport_flow_signal_sent = TRUE;
@@ -806,7 +810,12 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     goto done;
   }
   outbuf = gst_buffer_make_writable (buffer);
-  mprtps_path_process_rtp_packet(path, outbuf);
+  if(this->auto_rate_and_cc){
+    //Todo: provide FEC packets here
+    mprtps_path_process_rtp_packet(path, outbuf, NULL);
+  }else{
+      mprtps_path_process_rtp_packet(path, outbuf, NULL);
+  }
   result = GST_FLOW_OK;
 done:
   THIS_READUNLOCK (this);
@@ -963,7 +972,12 @@ gst_mprtpscheduler_path_ticking_process_run (void *data)
   g_hash_table_iter_init (&iter, this->paths);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     path = (MPRTPSPath *) val;
-    mprtps_path_tick(path);
+    if(this->auto_rate_and_cc){
+      //Todo: provide FEC packets here
+      mprtps_path_tick(path, NULL);
+    }else{
+      mprtps_path_tick(path, NULL);
+    }
   }
   next_scheduler_time = now + 1 * GST_MSECOND;
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);

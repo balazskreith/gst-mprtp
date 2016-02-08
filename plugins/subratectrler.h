@@ -126,7 +126,13 @@ void subratectrler_time_update(
                          SubflowRateController *this,
                          gint32 *target_bitrate,
                          gint32 *extra_bitrate,
-                         UtilizationSubflowReport *rep);
+                         UtilizationSubflowReport *rep,
+                         gboolean *overused);
+
+void subratectrler_change_targets(
+                         SubflowRateController *this,
+                         gint32 min_rate,
+                         gint32 max_rate);
 
 void subratectrler_measurement_update(
                          SubflowRateController *this,

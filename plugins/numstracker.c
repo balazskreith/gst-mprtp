@@ -279,9 +279,9 @@ done:
 void
 numstracker_obsolate (NumsTracker * this)
 {
-  THIS_READLOCK (this);
+  THIS_WRITELOCK (this);
   _obsolate(this);
-  THIS_READUNLOCK (this);
+  THIS_WRITEUNLOCK (this);
 }
 
 

@@ -39,8 +39,8 @@ struct _SubAnalyser
   NumsTracker*             De_window;
   NumsTracker*             SR_window;
   NumsTracker*             TR_window;
-  PercentileTracker*       delaysH;
-  PercentileTracker*       delaysL;
+//  PercentileTracker*       delaysH;
+//  PercentileTracker*       delaysL;
   GstClockTime             window_time_limit;
   guint                    window_size;
   GstClockTime             append_log_abbr;
@@ -55,9 +55,9 @@ struct _SubAnalyserClass{
 };
 
 struct _SubAnalyserResult{
-  gdouble DeCorrH;
+//  gdouble DeCorrH;
   gdouble DeCorrT;
-  gdouble DeCorrL;
+//  gdouble DeCorrL;
   gdouble RateCorr;
   gdouble TRateCorr;
   gdouble BiFCorr;

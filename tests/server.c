@@ -47,6 +47,7 @@
 typedef struct _UtilizationSubflowReport{
   gboolean controlled;
   gint32   max_rate;
+  gint32   min_rate;
   gint32   lost_bytes;
   gint32   discarded_bytes;
   guint64  owd;
@@ -211,6 +212,7 @@ make_video_foreman_session (guint sessionNum)
   GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
 //  GstElement *videoSrc = gst_element_factory_make ("autovideosrc", NULL);
   GstElement *videoSrc = gst_element_factory_make ("multifilesrc", NULL);
+  GstElement *identity = gst_element_factory_make ("identity", NULL);
   GstElement *videoParse = gst_element_factory_make ("videoparse", NULL);
   GstElement *videoConv = gst_element_factory_make("autovideoconvert", NULL);
   GstElement *payloader = gst_element_factory_make ("rtpvp8pay", NULL);
@@ -225,22 +227,24 @@ make_video_foreman_session (guint sessionNum)
   encoder = gst_element_factory_make ("vp8enc", NULL);
   //g_object_set (payloader, "config-interval", 2, NULL);
 
-  g_object_set (encoder, "target-bitrate", 500000, NULL);
+  g_object_set (encoder, "target-bitrate", 750000, NULL);
   g_object_set (encoder, "end-usage", 1, NULL);
   g_object_set (encoder, "deadline", 20000, NULL);
   g_object_set (encoder, "undershoot", 100, NULL);
   g_object_set (encoder, "cpu-used", 0, NULL);
 //  g_object_set (encoder, "keyframe-mode", 0, NULL);
-  gst_bin_add_many (videoBin, videoConv, videoSrc, videoParse, encoder, payloader, NULL);
+  gst_bin_add_many (videoBin, videoConv, videoSrc, identity, videoParse, encoder, payloader, NULL);
   g_object_set (videoParse,
       "width", 352,
       "height", 288,
       "framerate", 25, 1,
       "format", 2,
       NULL);
+  g_object_set (identity, "sync", TRUE, NULL);
 
   gst_element_link (videoSrc, videoParse);
-  gst_element_link (videoParse, encoder);
+  gst_element_link (videoParse, identity);
+  gst_element_link (identity, encoder);
   gst_element_link (encoder, payloader);
 
 //  g_object_set(videoSrc, "filter-caps", videoCaps, NULL);
@@ -417,7 +421,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING){
     g_object_set (mprtpsch, "auto-rate-and-cc", TRUE, NULL);
     if(test_parameters_.video_session == FOREMAN_SOURCE){
-      g_object_set (mprtpsch, "initial-disabling", 60 * GST_SECOND, NULL);
+      g_object_set (mprtpsch, "initial-disabling", 10 * GST_SECOND, NULL);
     }else{
       g_object_set (mprtpsch, "initial-disabling", 10 * GST_SECOND, NULL);
     }

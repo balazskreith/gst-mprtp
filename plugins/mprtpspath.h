@@ -182,6 +182,7 @@ struct _RRMeasurement{
 typedef struct _UtilizationSubflowReport{
   gboolean controlled;
   gint32   max_rate;
+  gint32   min_rate;
   gint32   lost_bytes;
   gint32   discarded_bytes;
   guint64  owd;

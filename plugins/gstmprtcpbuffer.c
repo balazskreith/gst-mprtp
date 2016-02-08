@@ -253,7 +253,7 @@ gst_mprtcp_riport_block_add_rr (GstMPRTCPSubflowBlock * block)
 }
 
 GstRTCPXR_RFC7243 *
-gst_mprtcp_riport_block_add_xr_rfc2743 (GstMPRTCPSubflowBlock * block)
+gst_mprtcp_riport_block_add_xr_rfc7243 (GstMPRTCPSubflowBlock * block)
 {
   GstRTCPXR_RFC7243 *result = &block->xr_rfc7243_riport;
   gst_rtcp_xr_rfc7243_init (result);

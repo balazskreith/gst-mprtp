@@ -11,10 +11,11 @@
 LATENCY=100
 JITTER=1
 
-BW=2000
-tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+BW=1000
+tc qdisc change dev veth0 parent 1:12 netem loss 20% 25%
+tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit 
 tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
-for j in `seq 1 600`;
+for j in `seq 1 900`;
 do
   echo $BW"000,"
   sleep 1

@@ -366,7 +366,7 @@ GstRTCPSR *gst_mprtcp_riport_block_add_sr (GstMPRTCPSubflowBlock * block);
 
 GstRTCPRR *gst_mprtcp_riport_block_add_rr (GstMPRTCPSubflowBlock * block);
 
-GstRTCPXR_RFC7243 *gst_mprtcp_riport_block_add_xr_rfc2743 (GstMPRTCPSubflowBlock
+GstRTCPXR_RFC7243 *gst_mprtcp_riport_block_add_xr_rfc7243 (GstMPRTCPSubflowBlock
     * block);
 
 GstRTCPXR_OWD *

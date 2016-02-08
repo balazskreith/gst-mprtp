@@ -42,7 +42,7 @@
 #define REPORTTIMEOUT (3 * MAX_RIPORT_INTERVAL)
 #define PATH_RTT_MAX_TRESHOLD (800 * GST_MSECOND)
 #define PATH_RTT_MIN_TRESHOLD (600 * GST_MSECOND)
-#define MAX_SUBFLOW_MOMENT_NUM 5
+#define MAX_SUBFLOW_MOMENT_NUM 8
 #define SUBFLOW_DEFAULT_SENDING_RATE 128000
 
 GST_DEBUG_CATEGORY_STATIC (sndctrler_debug_category);
@@ -50,11 +50,12 @@ GST_DEBUG_CATEGORY_STATIC (sndctrler_debug_category);
 
 #define _now(this) (gst_clock_get_time (this->sysclock))
 
+#define _irt_prev(i) (i == 0 ? MAX_SUBFLOW_MOMENT_NUM - 1 : i - 1)
 #define _irt0(this) (this->ir_moments+this->ir_moments_index)
-#define _irt1(this) (this->ir_moments + (this->ir_moments_index == 0 ? MAX_SUBFLOW_MOMENT_NUM-1 : this->ir_moments_index-1))
-#define _irt2(this) _irt(this, 2)
-#define _irt3(this) _irt(this, 3)
-#define _irt4(this) _irt(this, 4)
+#define _irt1(this) (this->ir_moments + _irt_prev(this->ir_moments_index))
+#define _irt2(this) (this->ir_moments + _irt_prev(_irt_prev(this->ir_moments_index)))
+#define _irt3(this) (this->ir_moments + _irt_prev(_irt_prev(_irt_prev(this->ir_moments_index))))
+#define _irt4(this) (this->ir_moments + _irt_prev(_irt_prev(_irt_prev(_irt_prev(this->ir_moments_index)))))
 #define _ort0(this) (this->or_moments+this->or_moments_index)
 #define _ort1(this) (this->or_moments+!this->or_moments_index)
 #define _irt0_get_discarded_bytes(this) (_irt0(this)->early_discarded_bytes + _irt0(this)->late_discarded_bytes)
@@ -739,7 +740,7 @@ void _assemble_measurement(SndController * this, Subflow *subflow)
 //        g_print("Late discarded chunk: %lu\n", _irt0(subflow)->rle_discards.values[chunk_index]);
        _irt0(subflow)->late_discarded_bytes +=
            _irt0(subflow)->rle_discards.values[chunk_index];
-
+       g_print("DISCARD %d: %lu\n", chunk_index, _irt0(subflow)->rle_discards.values[chunk_index]);
     }
     _irt0(subflow)->late_discarded_bytes_sum +=
        _irt0(subflow)->late_discarded_bytes;
@@ -778,7 +779,6 @@ void _determine_path_flags(SndController *this, Subflow *subflow)
   losts += _irt2(subflow)->lost && !_irt2(subflow)->expected_lost ? 1 : 0;
   losts += _irt3(subflow)->lost && !_irt3(subflow)->expected_lost ? 1 : 0;
   losts += _irt4(subflow)->lost && !_irt4(subflow)->expected_lost ? 1 : 0;
-
   abs_losts += _irt0(subflow)->lost;
   abs_losts += _irt1(subflow)->lost;
   abs_losts += _irt2(subflow)->lost;

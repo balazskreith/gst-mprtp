@@ -18,7 +18,7 @@ if [ "$ACTIVE_SUB1" -eq 1 ] && [ "$ACTIVE_SUB2" -eq 2 ]
 then
 BWPART=750
 else
-BWPART=1500
+BWPART=1000
 fi
 
 VETH0_CMDS=$VETH0_CMDS" -x $BWPART"
@@ -68,7 +68,7 @@ trap control_c SIGINT
 
 #sudo ip netns exec ns0 ./run_veth0_const.sh > veth0_bw.txt &
 sleep 1
-for j in `seq 1 120`;
+for j in `seq 1 180`;
 do
   for i in `seq 1 5`;
   do

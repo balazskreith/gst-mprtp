@@ -256,7 +256,6 @@ stream_joiner_init (StreamJoiner * this)
   this->max_delay_diff = 50 * GST_MSECOND;
   this->min_delay = this->max_delay = 100 * GST_MSECOND;
   this->forced_delay = 150 * GST_MSECOND;
-  this->forced_delay = 0;
   this->delays = make_numstracker(256, GST_SECOND);
   numstracker_add_plugin(this->delays,
                            (NumsTrackerPlugin*)make_numstracker_minmax_plugin(_delay_max_pipe, this, _delay_min_pipe, this));
@@ -415,7 +414,13 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
 //            GST_BUFFER_DURATION(mprtp->buffer),
 //            GST_BUFFER_TIMESTAMP(mprtp->buffer),
 //            GST_BUFFER_OFFSET(mprtp->buffer));
-//            mprtpr_path_add_discard(subflow->path, mprtp);
+
+    //The packet should be forwarded and discarded
+//      g_print("mprtp timestamp: %u last played timestamp: %u\n", mprtp->timestamp, this->last_played_timestamp);
+    if(this->last_played_timestamp != 0 && _cmp_seq32(mprtp->timestamp, this->last_played_timestamp) < 0){
+      mprtpr_path_add_discard(subflow->path, mprtp);
+    }
+
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
   }
 done:

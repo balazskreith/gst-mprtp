@@ -520,6 +520,25 @@ rcvctrler_setup_callbacks(RcvController * this,
   THIS_WRITEUNLOCK (this);
 }
 
+void
+rcvctrler_setup_discarding_reports(RcvController * this,
+                          gboolean rfc7097_reports,
+                          gboolean rfc7243_reports)
+{
+  THIS_WRITELOCK (this);
+  this->rfc7097_enabled = rfc7097_reports;
+  this->rfc7243_enabled = rfc7243_reports;
+  THIS_WRITEUNLOCK (this);
+}
+
+void
+rcvctrler_setup_rle_lost_reports(RcvController * this,
+                          gboolean enabling)
+{
+  THIS_WRITELOCK (this);
+  this->rfc3611_losts_enabled = enabling;
+  THIS_WRITEUNLOCK (this);
+}
 
 void
 rcvctrler_report_can_flow (RcvController *this)
@@ -667,8 +686,7 @@ _orp_main(RcvController * this)
     block = _get_mprtcp_rr_block (this, subflow, &block_length);
     report_length += block_length;
 
-    //OWD simple report is obsolated,
-    //I use OWD RLE
+    //OWD simple report is useful because the min and max values
     {
       GstBuffer *xr;
       xr = _get_mprtcp_xr_owd_block (this, subflow, &block_length);
@@ -678,7 +696,7 @@ _orp_main(RcvController * this)
 
     //Note: We can calculate the total discarded packet num
     //by using RLE with RFC7097
-    if (_ort0(subflow)->discarded != _ort1(subflow)->discarded)
+    if (_ort0(subflow)->discarded != _ort1(subflow)->discarded && this->rfc7243_enabled)
     {
       GstBuffer *xr;
       xr = _get_mprtcp_xr_7243_block (this, subflow, &block_length);
@@ -687,12 +705,12 @@ _orp_main(RcvController * this)
     }
 
 
-    if (_ort0(subflow)->discarded != _ort1(subflow)->discarded)
+    if (_ort0(subflow)->discarded != _ort1(subflow)->discarded && this->rfc7097_enabled)
     {
       GstBuffer *xr;
-      DISABLE_LINE xr = _get_mprtcp_xr_rfc7097_block (this, subflow, &block_length);
-      DISABLE_LINE block = gst_buffer_append (block, xr);
-      DISABLE_LINE report_length += block_length;
+      xr = _get_mprtcp_xr_rfc7097_block (this, subflow, &block_length);
+      block = gst_buffer_append (block, xr);
+      report_length += block_length;
     }
 
     {
@@ -702,7 +720,7 @@ _orp_main(RcvController * this)
       report_length += block_length;
     }
 
-    if (_ort0(subflow)->missing > 0)
+    if (this->rfc3611_losts_enabled)
     {
       //RFC3611 RLE encoded for better quantification of losts
       GstBuffer *xr;
@@ -804,7 +822,7 @@ _get_mprtcp_xr_7243_block (RcvController * this, Subflow * subflow,
   GstBuffer *buf;
 
   gst_mprtcp_block_init (&block);
-  xr = gst_mprtcp_riport_block_add_xr_rfc2743 (&block);
+  xr = gst_mprtcp_riport_block_add_xr_rfc7243 (&block);
   _setup_xr_rfc7243_late_discarded_report (subflow, xr, this->ssrc);
   gst_rtcp_header_getdown (&xr->header, NULL, NULL, NULL, NULL, &length, NULL);
   block_length = (guint8) length + 1;

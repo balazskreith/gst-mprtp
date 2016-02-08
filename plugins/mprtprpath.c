@@ -68,8 +68,8 @@ mprtpr_path_init (MpRTPRPath * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
-  this->delays = make_percentiletracker(32, 50);
-  percentiletracker_set_treshold(this->delays, 1 * GST_SECOND);
+  this->delays = make_percentiletracker(256, 50);
+  percentiletracker_set_treshold(this->delays, 2 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->delays, _delays_stats_pipe, this);
 
   this->skews = make_percentiletracker2(100, 50);
@@ -129,11 +129,11 @@ mprtpr_path_get_id (MpRTPRPath * this)
 }
 
 void mprtpr_path_get_RR_stats(MpRTPRPath *this,
-                           guint16 *HSN,
-                           guint16 *cycle_num,
-                           guint32 *jitter,
-                           guint32 *received_num,
-                           guint32 *received_bytes)
+                              guint16 *HSN,
+                              guint16 *cycle_num,
+                              guint32 *jitter,
+                              guint32 *received_num,
+                              guint32 *received_bytes)
 {
   THIS_READLOCK (this);
   if(HSN) *HSN = this->highest_seq;
@@ -362,18 +362,12 @@ done:
 gint
 _cmp_seq (guint16 x, guint16 y)
 {
-
-  if (x == y) {
-    return 0;
-  }
-  /*
-     if(x < y || (0x8000 < x && y < 0x8000)){
-     return -1;
-     }
-     return 1;
-   */
-  return ((gint16) (x - y)) < 0 ? -1 : 1;
-
+  if(x == y) return 0;
+  if(x < y && y - x < 32768) return -1;
+  if(x > y && x - y > 32768) return -1;
+  if(x < y && y - x > 32768) return 1;
+  if(x > y && x - y < 32768) return 1;
+  return 0;
 }
 
 
@@ -433,9 +427,7 @@ void _delays_stats_pipe(gpointer data, PercentileTrackerPipeData *pdata)
 void _gaps_obsolation_pipe(gpointer data, gint64 seq)
 {
   MpRTPRPath *this = data;
-//  g_print("obsolate sequence nr. %hu from gaps\n", (guint16) seq);
   if(numstracker_find(this->lates, seq)) return;
-//  g_print("sequence number %hu not found in lates\n", (guint16) seq);
   ++_actual_RLEBlock(this)->losts;
 }
 

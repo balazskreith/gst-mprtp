@@ -45,6 +45,9 @@ struct _RcvController
   void            (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
   gpointer          send_mprtcp_packet_data;
   gboolean          report_is_flowable;
+  gboolean          rfc7097_enabled;
+  gboolean          rfc7243_enabled;
+  gboolean          rfc3611_losts_enabled;
 //  ReportIntervalCalculator *ricalcer;
 
   gboolean          enabled;
@@ -90,6 +93,15 @@ void
 rcvctrler_setup_callbacks(RcvController * this,
                           gpointer mprtcp_send_data,
                           GstBufferReceiverFunc mprtcp_send_func);
+
+void
+rcvctrler_setup_discarding_reports(RcvController * this,
+                          gboolean rle_reports,
+                          gboolean sum_reports);
+
+void
+rcvctrler_setup_rle_lost_reports(RcvController * this,
+                          gboolean enabling);
 
 GType rcvctrler_get_type (void);
 #endif /* REFCTRLER_H_ */

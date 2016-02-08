@@ -25,7 +25,8 @@ typedef struct _SubflowRateControllerClass SubflowRateControllerClass;
 #define SUBRATECTRLER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),SUBRATECTRLER_TYPE))
 #define SUBRATECTRLER_CAST(src)        ((SubflowRateController *)(src))
 
-typedef void (*SubRateProc)(SubflowRateController*);
+typedef void (*SubRateCtrler)(SubflowRateController*);
+typedef void (*SubRateAction)(SubflowRateController*);
 
 struct _SubflowRateController
 {
@@ -44,6 +45,7 @@ struct _SubflowRateController
 
   gboolean                 stabilize;
   gboolean                 steady;
+  gboolean                 distorted;
   gboolean                 settled;
 
   GstClockTime             disable_controlling;
@@ -64,12 +66,17 @@ struct _SubflowRateController
 
   GstClockTime             setup_time;
 
+  NumsTracker*             IR_window;
+  NumsTracker*             TR_window;
+  gdouble                  ir_sum;
+  gdouble                  tr_sum;
+  gdouble                  target_fraction;
   //Need for monitoring
   guint                    monitoring_interval;
   GstClockTime             monitoring_started;
 
-  SubRateProc              state_controller;
-  SubRateProc              state_action;
+  SubRateCtrler            state_controller;
+  SubRateAction            state_action;
 
   guint8*                  moments;
   gint                     moments_index;

@@ -39,7 +39,7 @@ let "BWDIFF = MAXBW - MINBW"
 
 #echo "Setup veth0 to 1000KBit"
 BW=$MAXBW
-tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit 
 tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
 for j in `seq 1 60`;
 do

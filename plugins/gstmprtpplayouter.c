@@ -321,6 +321,8 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   rcvctrler_setup(this->controller, this->joiner);
   rcvctrler_setup_callbacks(this->controller,
                             this, gst_mprtpplayouter_mprtcp_sender);
+  rcvctrler_setup_discarding_reports(this->controller, FALSE, FALSE);
+  rcvctrler_setup_rle_lost_reports(this->controller, TRUE);
   _change_auto_rate_and_cc (this, FALSE);
 
   this->pivot_address_subflow_id = 0;

@@ -58,8 +58,8 @@ typedef struct _SubAnalyserPrivate{
   guint64            delays40th;
   gdouble            delay_target;
   gdouble            delay_trend_dev;
-  gdouble            delay_t0,delay_t1,delay_t2,delay_t3;
-  gdouble            jitter;
+//  gdouble            delay_t0,delay_t1,delay_t2,delay_t3;
+  gdouble            off_t0,off_t1,off_t2,off_t3;
 }SubAnalyserPrivate;
 
 #define _priv(this) ((SubAnalyserPrivate*) this->priv)
@@ -74,8 +74,9 @@ static void _sr_stat_pipe(gpointer data, NumsTrackerStatData *stat);
 static void _tr_stat_pipe(gpointer data, NumsTrackerStatData *stat);
 static void _BiF_stat_pipe(gpointer data, NumsTrackerStatData *stat);
 static void _De_stat_pipe(gpointer data, NumsTrackerStatData *stat);
-static void _delaysH_stat_pipe(gpointer data, PercentileTrackerPipeData *stat);
-static void _delaysL_stat_pipe(gpointer data, PercentileTrackerPipeData *stat);
+static void _De_min_pipe(gpointer data, gint64 min);
+//static void _delaysH_stat_pipe(gpointer data, PercentileTrackerPipeData *stat);
+//static void _delaysL_stat_pipe(gpointer data, PercentileTrackerPipeData *stat);
 static void _DeT_stat_pipe(gpointer data, FloatsBufferStatData *stat);
 static void _log_abbrevations(SubAnalyser *this, FILE *file);
 
@@ -129,11 +130,11 @@ SubAnalyser *make_subanalyser(
   this->RR_window = make_numstracker(length, obsolation_treshold);
   this->SR_window = make_numstracker(length, obsolation_treshold);
   this->TR_window = make_numstracker(length, obsolation_treshold);
-  this->De_window = make_numstracker(length, obsolation_treshold);
-  this->delaysH = make_percentiletracker(100, 80);
-  percentiletracker_set_treshold(this->delaysH, GST_SECOND * 60);
-  this->delaysL = make_percentiletracker(100, 40);
-  percentiletracker_set_treshold(this->delaysL, GST_SECOND * 60);
+  this->De_window = make_numstracker(length, GST_SECOND * 30);
+//  this->delaysH = make_percentiletracker(100, 80);
+//  percentiletracker_set_treshold(this->delaysH, GST_SECOND * 60);
+//  this->delaysL = make_percentiletracker(100, 40);
+//  percentiletracker_set_treshold(this->delaysL, GST_SECOND * 60);
 
   numstracker_add_plugin(this->RR_window,
                          (NumsTrackerPlugin*) make_numstracker_stat_plugin(_rr_stat_pipe, this));
@@ -145,11 +146,13 @@ SubAnalyser *make_subanalyser(
                          (NumsTrackerPlugin*) make_numstracker_stat_plugin(_BiF_stat_pipe, this));
   numstracker_add_plugin(this->De_window,
                          (NumsTrackerPlugin*) make_numstracker_stat_plugin(_De_stat_pipe, this));
+  numstracker_add_plugin(this->De_window,
+                         (NumsTrackerPlugin*) make_numstracker_minmax_plugin(NULL, NULL, _De_min_pipe, this));
 
-  percentiletracker_set_stats_pipe(this->delaysH, _delaysH_stat_pipe, this);
-  percentiletracker_set_stats_pipe(this->delaysL, _delaysL_stat_pipe, this);
+//  percentiletracker_set_stats_pipe(this->delaysH, _delaysH_stat_pipe, this);
+//  percentiletracker_set_stats_pipe(this->delaysL, _delaysL_stat_pipe, this);
   floatsbuffer_set_stats_pipe(this->DeT_window, _DeT_stat_pipe, this);
-  this->target_aim = 3;
+  this->target_aim = 1;
   THIS_WRITEUNLOCK (this);
   return this;
 }
@@ -164,8 +167,8 @@ void subanalyser_reset(SubAnalyser *this)
   numstracker_reset(this->TR_window);
   numstracker_reset(this->SR_window);
   numstracker_reset(this->De_window);
-  percentiletracker_reset(this->delaysH);
-  percentiletracker_reset(this->delaysL);
+//  percentiletracker_reset(this->delaysH);
+//  percentiletracker_reset(this->delaysL);
   this->target_aim = 1;
   THIS_WRITEUNLOCK (this);
 }
@@ -185,21 +188,28 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
   //add delays
   for(i=0; i<measurement->rle_delays.length; ++i){
     GstClockTime delay;
+    gdouble off;
     delay = measurement->rle_delays.values[i];
     if(!delay) continue;
     numstracker_add(this->De_window, delay);
-    _priv(this)->delay_t3 = _priv(this)->delay_t2;
-    _priv(this)->delay_t2 = _priv(this)->delay_t1;
-    _priv(this)->delay_t1 = _priv(this)->delay_t0;
-    _priv(this)->delay_t0 = delay;
+//    _priv(this)->delay_t3 = _priv(this)->delay_t2;
+//    _priv(this)->delay_t2 = _priv(this)->delay_t1;
+//    _priv(this)->delay_t1 = _priv(this)->delay_t0;
+//    _priv(this)->delay_t0 = delay;
+
+    //Todo: decide weather we need this.
+    off = _priv(this)->delay_target - (gdouble)delay;
+    off/= (gdouble)delay;
+    _priv(this)->off_t3 = _priv(this)->off_t2;
+    _priv(this)->off_t2 = _priv(this)->off_t1;
+    _priv(this)->off_t1 = _priv(this)->off_t0;
+    _priv(this)->off_t0 = off;
   }
 
-  _priv(this)->jitter = MIN(measurement->jitter, _priv(this)->delay_t0 / 10.);
-
-  result->DeCorrT   = (_priv(this)->delay_t0 * .5 + _priv(this)->delay_t1 * .25 + _priv(this)->delay_t2 * .25) / (_priv(this)->delay_target);
-  result->DeCorrH   = (gdouble) measurement->recent_delay / (gdouble) _priv(this)->delays80th;
-  result->DeCorrL   = (gdouble) measurement->recent_delay / (gdouble) _priv(this)->delays40th;
+  result->DeCorrT  =  (_priv(this)->off_t0 * .5 + _priv(this)->off_t1 * .25 + _priv(this)->off_t2 * .25) / (-.2);
   result->RateCorr  = (gdouble) _priv(this)->rr_sum / (gdouble) _priv(this)->sr_sum;
+
+  //Todo: decide weather we need TRateCorr
   result->TRateCorr = (gdouble) _priv(this)->sr_sum / (gdouble) _priv(this)->tr_sum;
   result->BiFCorr   =  (gdouble)(measurement->bytes_in_flight_acked * 8)/(gdouble) (_priv(this)->BiF_avg + _priv(this)->BiF_dev);
 
@@ -209,15 +219,19 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
 
 void subanalyser_measurement_add_to_reference(SubAnalyser *this, RRMeasurement *measurement)
 {
-  gint i;
-  for(i=0; i<measurement->rle_delays.length; ++i){
-    GstClockTime delay;
-    delay = measurement->rle_delays.values[i];
-    if(!delay) continue;
-    delay+= g_random_int_range(0, 1000);
-    percentiletracker_add(this->delaysH, delay);
-    percentiletracker_add(this->delaysL, delay);
-  }
+//  gint i;
+//  for(i=0; i<measurement->rle_delays.length; ++i){
+//    GstClockTime delay;
+//    delay = measurement->rle_delays.values[i];
+//    if(!delay) continue;
+//    delay+= g_random_int_range(0, 1000);
+//    percentiletracker_add(this->delaysH, delay);
+//    percentiletracker_add(this->delaysL, delay);
+//  }
+//  percentiletracker_add(this->delaysH, measurement->min_delay);
+//  percentiletracker_add(this->delaysL, measurement->min_delay);
+//  percentiletracker_add(this->delaysH, measurement->max_delay);
+//  percentiletracker_add(this->delaysL, measurement->max_delay);
 }
 
 void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
@@ -226,18 +240,23 @@ void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
     _log_abbrevations(this, file);
     this->append_log_abbr = _now(this);
   }
+
+
   fprintf(file,
           "######################## Subflow Measurement Analyser log #######################\n"
-          "delay_t0: %-10.3f| delay_t1: %-10.3f| delay_t2: %-10.3f| delay_t3: %-10.3f|\n"
+//          "delay_t0: %-10.3f| delay_t1: %-10.3f| delay_t2: %-10.3f| delay_t3: %-10.3f|\n"
+          "off_t0:   %-10.3f| off_t1:   %-10.3f| off_t2:   %-10.3f| off_t3:   %-10.3f|\n"
           "sr_sum:   %-10ld| rr_sum: %-10ld| BiF_avg: %-10.3f| BiF_dev: %-10.3f|\n"
           "tdelay:   %-10.3f| delay80: %-10.3f| delay40: %-10.3f| DeT_dev: %-10.3f\n"
-          "jitter:   %-10.3f|\n"
           "#################################################################################\n",
+//
+//          _priv(this)->delay_t0 / (gdouble)GST_SECOND
+//          ,_priv(this)->delay_t1 / (gdouble)GST_SECOND,
+//          _priv(this)->delay_t2 / (gdouble)GST_SECOND
+//          ,_priv(this)->delay_t3 / (gdouble)GST_SECOND,
 
-          _priv(this)->delay_t0 / (gdouble)GST_SECOND
-          ,_priv(this)->delay_t1 / (gdouble)GST_SECOND,
-          _priv(this)->delay_t2 / (gdouble)GST_SECOND
-          ,_priv(this)->delay_t3 / (gdouble)GST_SECOND,
+          _priv(this)->off_t0, _priv(this)->off_t1,
+          _priv(this)->off_t2,_priv(this)->off_t3,
 
           _priv(this)->sr_sum, _priv(this)->rr_sum,
           _priv(this)->BiF_avg, _priv(this)->BiF_dev,
@@ -245,9 +264,7 @@ void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
           _priv(this)->delay_target / (gdouble)GST_SECOND,
           (gdouble)_priv(this)->delays80th / (gdouble)GST_SECOND,
           (gdouble)_priv(this)->delays40th / (gdouble)GST_SECOND,
-          _priv(this)->delay_trend_dev,
-
-          _priv(this)->jitter
+          _priv(this)->delay_trend_dev
 
           );
 
@@ -300,35 +317,40 @@ void _BiF_stat_pipe(gpointer data, NumsTrackerStatData *stat)
 void _De_stat_pipe(gpointer data, NumsTrackerStatData *stat)
 {
   SubAnalyser *this = data;
-  DISABLE_LINE g_print("%p\n", this);
   _priv(this)->delay_dev = stat->dev;
   _priv(this)->delay_avg = stat->avg;
 }
 
-
-void _delaysH_stat_pipe(gpointer data, PercentileTrackerPipeData *stat)
+void _De_min_pipe(gpointer data, gint64 min)
 {
   SubAnalyser *this = data;
-  _priv(this)->delays80th = stat->percentile;
-  if(this->target_aim == 3)
-     _priv(this)->delay_target = _priv(this)->delays40th * .125 + _priv(this)->delays80th * .875;
-  else if(this->target_aim == 2)
-     _priv(this)->delay_target = _priv(this)->delays40th * .375 + _priv(this)->delays80th * .625;
-  else
-    _priv(this)->delay_target = _priv(this)->delays40th * .625 + _priv(this)->delays80th * .375;
+  _priv(this)->delay_target = MIN(min, 400 * GST_MSECOND);
 }
 
-void _delaysL_stat_pipe(gpointer data, PercentileTrackerPipeData *stat)
-{
-  SubAnalyser *this = data;
-  _priv(this)->delays40th = stat->percentile;
-  if(this->target_aim == 3)
-     _priv(this)->delay_target = _priv(this)->delays40th * .125 + _priv(this)->delays80th * .875;
-  else if(this->target_aim == 2)
-     _priv(this)->delay_target = _priv(this)->delays40th * .375 + _priv(this)->delays80th * .625;
-  else
-    _priv(this)->delay_target = _priv(this)->delays40th * .625 + _priv(this)->delays80th * .375;
-}
+
+//void _delaysH_stat_pipe(gpointer data, PercentileTrackerPipeData *stat)
+//{
+//  SubAnalyser *this = data;
+//  _priv(this)->delays80th = stat->percentile;
+//  if(this->target_aim == 3)
+//     _priv(this)->delay_target = _priv(this)->delays40th * .125 + _priv(this)->delays80th * .875;
+//  else if(this->target_aim == 2)
+//     _priv(this)->delay_target = _priv(this)->delays40th * .375 + _priv(this)->delays80th * .625;
+//  else
+//    _priv(this)->delay_target = _priv(this)->delays40th * .625 + _priv(this)->delays80th * .375;
+//}
+//
+//void _delaysL_stat_pipe(gpointer data, PercentileTrackerPipeData *stat)
+//{
+//  SubAnalyser *this = data;
+//  _priv(this)->delays40th = stat->percentile;
+//  if(this->target_aim == 3)
+//     _priv(this)->delay_target = _priv(this)->delays40th * .125 + _priv(this)->delays80th * .875;
+//  else if(this->target_aim == 2)
+//     _priv(this)->delay_target = _priv(this)->delays40th * .375 + _priv(this)->delays80th * .625;
+//  else
+//    _priv(this)->delay_target = _priv(this)->delays40th * .625 + _priv(this)->delays80th * .375;
+//}
 
 void _DeT_stat_pipe(gpointer data, FloatsBufferStatData *stat)
 {

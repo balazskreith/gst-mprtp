@@ -704,11 +704,10 @@ _probe_stage(
     SubflowRateController *this)
 {
   //Check weather the delay fluctuation is over the target
-  if(.5 < _DeCorrT(this)){
-    if(1. < _DeCorrT(this) || (1. < _DiCoeffT(this) && .5 < _DeCorrT_t1(this))){
-      _add_congestion_point(this, _TR(this));
-      _switch_stage_to(this, STAGE_MITIGATE, TRUE);
-    }
+  if(.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)){
+    _add_congestion_point(this, _TR(this));
+    this->min_target_point *= .95;
+    _switch_stage_to(this, STAGE_MITIGATE, TRUE);
     goto stabilize;
   }
 
@@ -737,9 +736,21 @@ void
 _raise_stage(
     SubflowRateController *this)
 {
+  if(.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)){
+    _add_congestion_point(this, _TR(this));
+    this->min_target_point *= .95;
+    _switch_stage_to(this, STAGE_MITIGATE, TRUE);
+    goto stabilize;
+  }
   //check signs of congestion
+  if(_TRateCorr(this) < .9 || this->target_bitrate < this->max_target_point * .98){
+  //if(_TRateCorr(this) < .9){
+    goto done;
+  }
   this->max_target_point = this->desired_bitrate;
+stabilize:
   this->stabilize = TRUE;
+done:
   return;
 }
 
@@ -926,13 +937,15 @@ gdouble _adjust_bitrate(SubflowRateController *this)
   gdouble drate = 0; //delta rate
   gdouble actual_rate = _TR(this);
   gdouble frac = (gdouble) RATE_ADJUST_INTERVAL / (gdouble) (1 * GST_SECOND);
-  gdouble max_increasement = RAMP_UP_MAX_SPEED * frac;
+  gdouble max_increasement;;
+  frac *= this->desired_bitrate < this->target_bitrate ? 3. : 1.;
+  max_increasement = RAMP_UP_MAX_SPEED * frac;
   if((this->bitrate_flags & BITRATE_CHANGE) == 0){
    goto done;
   }
 
   drate = this->desired_bitrate - this->target_bitrate;
-  drate *= frac * this->desired_bitrate < this->target_bitrate ? 3. : 1.;
+  drate *= frac;
     if(this->target_bitrate < this->desired_bitrate && this->target_bitrate < this->last_congestion_point * .95)
       drate *= MAX(.1, _get_congestion_influence(this));
 //    if(this->target_bitrate < this->desired_bitrate)

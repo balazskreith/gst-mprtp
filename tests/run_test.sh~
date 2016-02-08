@@ -1,6 +1,6 @@
 #!/bin/bash
-VETH0_CMDS="./run_veth0_cc.sh"
-#VETH0_CMDS="./run_veth0_const.sh"
+#VETH0_CMDS="./run_veth0_cc.sh"
+VETH0_CMDS="./run_veth0_const.sh"
 VETH2_CMDS="./run_veth2_const.sh"
 VETH4_CMDS="./run_veth4_const.sh"
 SERVER="./server"

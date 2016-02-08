@@ -693,7 +693,7 @@ _mitigate_stage(
 //    this->distorted = TRUE;
   }
 
-//  this->target_bitrate =
+  this->target_bitrate =
       this->desired_bitrate = this->min_target_point;
   _set_bitrate_flags(this, BITRATE_CHANGE);
   _switch_stage_to(this, STAGE_CHECK, FALSE);

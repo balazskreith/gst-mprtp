@@ -51,6 +51,7 @@ typedef struct _UtilizationSubflowReport{
   gint32   lost_bytes;
   gint32   discarded_rate;
   guint64  owd;
+  gdouble  aggressivity;
 }UtilizationSubflowReport;
 
 typedef struct _UtilizationReport{
@@ -209,6 +210,7 @@ make_video_vl2src_session (guint sessionNum)
 static SessionData *
 make_video_foreman_session (guint sessionNum)
 {
+  guint subflow_num = 0;
   GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
 //  GstElement *videoSrc = gst_element_factory_make ("autovideosrc", NULL);
   GstElement *videoSrc = gst_element_factory_make ("multifilesrc", NULL);
@@ -226,8 +228,10 @@ make_video_foreman_session (guint sessionNum)
 
   encoder = gst_element_factory_make ("vp8enc", NULL);
   //g_object_set (payloader, "config-interval", 2, NULL);
-
-  g_object_set (encoder, "target-bitrate", 750000, NULL);
+  subflow_num+=test_parameters_.subflow1_active ? 1 : 0;
+  subflow_num+=test_parameters_.subflow2_active ? 1 : 0;
+  subflow_num+=test_parameters_.subflow3_active ? 1 : 0;
+  g_object_set (encoder, "target-bitrate", 128000 * subflow_num, NULL);
   g_object_set (encoder, "end-usage", 1, NULL);
   g_object_set (encoder, "deadline", 20000, NULL);
   g_object_set (encoder, "undershoot", 100, NULL);

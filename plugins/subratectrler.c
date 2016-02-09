@@ -48,7 +48,7 @@ G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 
 #define MOMENTS_LENGTH 8
 
-
+#define DEFAULT_AGGRESSIVITY .25
 // Min OWD target. Default value: 0.1 -> 100ms
 #define OWD_TARGET_LO 100 * GST_MSECOND
 //Max OWD target. Default value: 0.4s -> 400ms
@@ -190,9 +190,7 @@ struct _Moment{
 #define _mitigated(this) _mt0(this)->tr_is_mitigated
 #define _mitigated_t1(this) _mt1(this)->tr_is_mitigated
 #define _mitigated_t2(this) _mt2(this)->tr_is_mitigated
-
- static gdouble AGGRESSIVITY_TRESHOLD = .4;
-
+#define _aggressivity(this) this->discard_aggressivity
 
  static Moment*
 _m_step(
@@ -435,7 +433,7 @@ void subratectrler_set(SubflowRateController *this,
   this->max_rate = TARGET_BITRATE_MAX;
   this->min_target_point = MIN(TARGET_BITRATE_MIN, sending_target * 8);
   this->max_target_point = MAX(TARGET_BITRATE_MAX, sending_target * 8);
-
+  this->discard_aggressivity = DEFAULT_AGGRESSIVITY;
   _transit_state_to(this, STATE_STABLE);
   _set_bitrate_flags(this, BITRATE_CHANGE);
   subanalyser_reset(this->analyser);
@@ -633,16 +631,16 @@ void
 _release_stage(
     SubflowRateController *this)
 {
-  if(1. < _DiCoeffT(this)){
-    _switch_stage_to(this, STAGE_RESTRICT, TRUE);
+  if(1.2 < _DiCoeffT(this)){
+    _undershoot(this, TRUE);
     goto done;
   }
 
-  if(2. < _DeCorrT(this) || _discard(this)){
-    goto done;
-  }
   this->desired_bitrate = this->max_target_point;
   _set_bitrate_flags(this, BITRATE_CHANGE | BITRATE_SLOW);
+  if(1. < _DeCorrT(this)){
+    goto done;
+  }
   this->settled = TRUE;
 done:
   return;
@@ -655,7 +653,7 @@ _check_stage(
 
   //Check weather the delay fluctuation is over the target
   if(.5 < _DeCorrT(this) || .1 < _discrate(this)){
-    if(1. < _DeCorrT(this) || 1. < _DiCoeffT(this) || AGGRESSIVITY_TRESHOLD < _discrate(this)){
+    if(1. < _DeCorrT(this) || 1. < _DiCoeffT(this) || _aggressivity(this) < _discrate(this)){
       _add_congestion_point(this, _TR(this));
       this->max_target_point = _TR(this) * 1.05;
       _switch_stage_to(this, STAGE_MITIGATE, TRUE);
@@ -717,7 +715,7 @@ _probe_stage(
 {
   //Check weather the delay fluctuation is over the target
 //  if(.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)){
-  if((.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)) || AGGRESSIVITY_TRESHOLD < _discrate(this)){
+  if((.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)) || _aggressivity(this) < _discrate(this)){
     _add_congestion_point(this, _TR(this));
     this->min_target_point *= .95;
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
@@ -749,7 +747,7 @@ void
 _raise_stage(
     SubflowRateController *this)
 {
-  if((.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)) || AGGRESSIVITY_TRESHOLD < _discrate(this)){
+  if((.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)) || _aggressivity(this) < _discrate(this)){
     _add_congestion_point(this, _TR(this));
     this->min_target_point *= .95;
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
@@ -952,6 +950,12 @@ gdouble _adjust_bitrate(SubflowRateController *this)
   gdouble frac = (gdouble) RATE_ADJUST_INTERVAL / (gdouble) (1 * GST_SECOND);
   gdouble max_increasement;;
   frac *= this->desired_bitrate < this->target_bitrate ? 3. : 1.;
+  if(this->desired_bitrate < this->target_bitrate){
+    frac *= 3.;
+  }else if(this->target_bitrate < this->desired_bitrate){
+      //Todo: do this.
+    //frac *= this->ramp_up_aggressivity;
+  }
   max_increasement = RAMP_UP_MAX_SPEED * frac;
   if((this->bitrate_flags & BITRATE_CHANGE) == 0){
    goto done;
@@ -959,10 +963,12 @@ gdouble _adjust_bitrate(SubflowRateController *this)
 
   drate = this->desired_bitrate - this->target_bitrate;
   drate *= frac;
+  if(_now(this) - 10 * GST_SECOND < this->last_congestion_detected){
     if(this->target_bitrate < this->desired_bitrate && this->target_bitrate < this->last_congestion_point * .95)
       drate *= MAX(.1, _get_congestion_influence(this));
 //    if(this->target_bitrate < this->desired_bitrate)
 //      drate *= MAX(.3, _get_congestion_influence(this));
+  }
 
   drate /= this->bitrate_flags & BITRATE_SLOW ? 3. : 1.;
   drate = MIN(max_increasement, drate);

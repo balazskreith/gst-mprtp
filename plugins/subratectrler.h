@@ -82,6 +82,9 @@ struct _SubflowRateController
   gint                     moments_index;
   guint32                  moments_num;
 
+  gdouble                  discard_aggressivity;
+  gdouble                  ramp_up_aggressivity;
+
   gboolean                 cwnd_was_increased;
   gboolean                 bitrate_was_incrased;
   GstClockTime             last_target_bitrate_i_adjust;

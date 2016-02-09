@@ -43,17 +43,16 @@ struct _SubflowRateController
 
   SubAnalyser*              analyser;
 
-  gboolean                 stabilize;
-  gboolean                 steady;
-  gboolean                 distorted;
-  gboolean                 settled;
+//  gboolean                 stabilize;
+//  gboolean                 steady;
+//  gboolean                 distorted;
+//  gboolean                 settled;
 
   GstClockTime             disable_controlling;
 
   //Video target bitrate inflection point i.e. the last known highest
   //target_bitrate during fast start. Used to limit bitrate increase
   //close to the last know congestion point. Initial value: 1
-  gboolean                 min_rate_mitigated;
   gint32                   max_target_point;
   gint32                   min_target_point;
   gint32                   desired_bitrate;
@@ -75,8 +74,8 @@ struct _SubflowRateController
   guint                    monitoring_interval;
   GstClockTime             monitoring_started;
 
-  SubRateCtrler            state_controller;
-  SubRateAction            state_action;
+  SubRateCtrler            state;
+  SubRateAction            stage_fnc;
 
   guint8*                  moments;
   gint                     moments_index;
@@ -91,8 +90,6 @@ struct _SubflowRateController
   GstClockTime             last_target_bitrate_adjust;
   GstClockTime             last_queue_clear;
   GstClockTime             last_skip_time;
-  GstClockTime             last_reference_added;
-
   GstClockTime             packet_obsolation_treshold;
 
   //OWD target. Initial value: OWD_TARGET_LO
@@ -135,7 +132,9 @@ void subratectrler_time_update(
 void subratectrler_change_targets(
                          SubflowRateController *this,
                          gint32 min_rate,
-                         gint32 max_rate);
+                         gint32 max_rate,
+                         gdouble ramp_up_aggressivity,
+                         gdouble discard_aggressivity);
 
 void subratectrler_measurement_update(
                          SubflowRateController *this,

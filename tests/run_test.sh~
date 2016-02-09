@@ -1,7 +1,8 @@
 #!/bin/bash
 VETH0_CMDS="./run_veth0_cc.sh"
 #VETH0_CMDS="./run_veth0_const.sh"
-VETH2_CMDS="./run_veth2_const.sh"
+VETH2_CMDS="./run_veth2_cc.sh"
+#VETH2_CMDS="./run_veth2_const.sh"
 VETH4_CMDS="./run_veth4_const.sh"
 SERVER="./server"
 CLIENT="./client"
@@ -16,9 +17,9 @@ let "ACTIVE_SUB3=$PROFILE&4"
 BWSUM=2000
 if [ "$ACTIVE_SUB1" -eq 1 ] && [ "$ACTIVE_SUB2" -eq 2 ]
 then
-BWPART=500
+BWPART=1000
 else
-BWPART=1500
+BWPART=1000
 fi
 
 VETH0_CMDS=$VETH0_CMDS" -x $BWPART"
@@ -53,6 +54,7 @@ cleanup()
   ps -ef | grep 'run_veth0_const.sh' | grep -v grep | awk '{print $2}' | xargs kill
   ps -ef | grep 'run_veth0_cc.sh' | grep -v grep | awk '{print $2}' | xargs kill
   ps -ef | grep 'run_veth2_const.sh' | grep -v grep | awk '{print $2}' | xargs kill
+  ps -ef | grep 'run_veth2_cc.sh' | grep -v grep | awk '{print $2}' | xargs kill
   ps -ef | grep 'run_veth4_const.sh' | grep -v grep | awk '{print $2}' | xargs kill
 }
  
@@ -81,5 +83,35 @@ done
 sleep 1
 
 cleanup
+
+DATE="Tests_"$(date +%y_%m_%d)
+if [ ! -d "/home/balazs/Dropbox/MPRTP_Project/$DATE" ]; then
+  mkdir "/home/balazs/Dropbox/MPRTP_Project/$DATE"
+fi
+
+TESTDIR="Profile_"$PROFILE"_"$(date +%H_%M_%S)
+mkdir "/home/balazs/Dropbox/MPRTP_Project/$DATE/$TESTDIR"
+
+if [ "$ACTIVE_SUB1" -eq 1 ]
+then
+  cp ../../Research-Scripts/gnuplot/mprtp-subflow-1-report.pdf /home/balazs/Dropbox/MPRTP_Project/$DATE/$TESTDIR/mprtp-subflow-1-report.pdf
+fi
+
+if [ "$ACTIVE_SUB2" -eq 2 ]
+then
+  cp ../../Research-Scripts/gnuplot/mprtp-subflow-2-report.pdf /home/balazs/Dropbox/MPRTP_Project/$DATE/$TESTDIR/mprtp-subflow-2-report.pdf
+fi
+
+if [ "$ACTIVE_SUB3" -eq 4 ]
+then
+  cp ../../Research-Scripts/gnuplot/mprtp-subflow-3-report.pdf /home/balazs/Dropbox/MPRTP_Project/$DATE/$TESTDIR/mprtp-subflow-3-report.pdf
+fi
+
+cp ../../Research-Scripts/gnuplot/mprtp-sum-report.pdf /home/balazs/Dropbox/MPRTP_Project/$DATE/$TESTDIR/mprtp-sum-report.pdf
+
+mkdir "/home/balazs/Dropbox/MPRTP_Project/$DATE/$TESTDIR/mprtp_stat_files"
+cp ../../Research-Scripts/gnuplot/mprtp_stat_files/* /home/balazs/Dropbox/MPRTP_Project/$DATE/$TESTDIR/mprtp_stat_files/
+
+
 
 

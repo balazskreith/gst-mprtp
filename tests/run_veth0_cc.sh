@@ -22,6 +22,7 @@ case $key in
     MAXBW="$2"
     shift # past argument
     ;;
+
     --default)
     DEFAULT=YES
     ;;

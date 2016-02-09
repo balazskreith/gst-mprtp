@@ -341,7 +341,11 @@ void _time_update_application(SendingRateDistributor* this)
   foreach_subflows(this, i, subflow)
   {
      us = &ur->subflows[subflow->id];
-     subratectrler_change_targets(subflow->controller, us->min_rate, us->max_rate);
+     subratectrler_change_targets(subflow->controller,
+                                  us->min_rate,
+                                  us->max_rate,
+                                  us->ramp_up_aggressivity,
+                                  us->discard_aggressivity);
   }
 }
 

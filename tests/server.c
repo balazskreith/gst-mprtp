@@ -51,7 +51,8 @@ typedef struct _UtilizationSubflowReport{
   gint32   lost_bytes;
   gint32   discarded_rate;
   guint64  owd;
-  gdouble  aggressivity;
+  gdouble  ramp_up_aggressivity;
+  gdouble  discard_aggressivity;
 }UtilizationSubflowReport;
 
 typedef struct _UtilizationReport{
@@ -392,11 +393,6 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
 
   g_signal_connect (mprtpsch, "mprtp-subflows-utilization",
       (GCallback) changed_event, NULL);
-//  if(test_parameters_.other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time)
-//    g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2", NULL);
-//  else
-//    g_object_set (rtpSink_1, "port", basePort, "host", "10.0.0.2", "sync", FALSE, "async", FALSE, NULL);
-////      "sync",FALSE, "async", FALSE, NULL);
 
     g_object_set (mq, "max-size-buffers", 1, NULL);
     g_object_set (rtpSink_1, "port", path1_tx_rtp_port, "host", "10.0.0.2", NULL);
@@ -417,18 +413,6 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
          "sync",FALSE, "async", FALSE, NULL);
 
     g_object_set (rtcpSrc, "port", rtpbin_rx_rtcp_port, NULL);
-
-  if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING){
-    g_object_set (mprtpsch, "auto-rate-and-cc", TRUE, NULL);
-    if(test_parameters_.video_session == FOREMAN_SOURCE){
-      g_object_set (mprtpsch, "initial-disabling", 10 * GST_SECOND, NULL);
-    }else{
-      g_object_set (mprtpsch, "initial-disabling", 10 * GST_SECOND, NULL);
-    }
-  }else if(test_parameters_.test_directive == MANUAL_RATE_CONTROLLING)
-    g_timeout_add (1000, _random_rate_controller, mprtpsch);
-
-
 
   padName = g_strdup_printf ("send_rtp_sink_%u", session->sessionNum);
   gst_element_link_pads (session->input, "src", rtpBin, padName);
@@ -455,6 +439,12 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
     g_object_set (mprtpsch, "join-subflow", 2, NULL);
   if(test_parameters_.subflow3_active)
     g_object_set (mprtpsch, "join-subflow", 3, NULL);
+
+  if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING){
+    g_object_set (mprtpsch, "auto-rate-and-cc", TRUE, NULL);
+  }else if(test_parameters_.test_directive == MANUAL_RATE_CONTROLLING)
+    g_timeout_add (1000, _random_rate_controller, mprtpsch);
+
 
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");

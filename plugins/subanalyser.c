@@ -58,9 +58,10 @@ typedef struct _SubAnalyserPrivate{
   guint64            delays40th;
   gdouble            delay_target;
   gdouble            delay_trend_dev;
-//  gdouble            delay_t0,delay_t1,delay_t2,delay_t3;
+  gdouble            delay_t0,delay_t1,delay_t2,delay_t3;
   gdouble            off_t0,off_t1,off_t2,off_t3;
   gdouble            off_d0,off_d1,off_d2;
+
 }SubAnalyserPrivate;
 
 #define _priv(this) ((SubAnalyserPrivate*) this->priv)
@@ -132,6 +133,7 @@ SubAnalyser *make_subanalyser(
   this->SR_window = make_numstracker(length, obsolation_treshold);
   this->TR_window = make_numstracker(length, obsolation_treshold);
   this->De_window = make_numstracker(length, GST_SECOND * 30);
+
 //  this->delaysH = make_percentiletracker(100, 80);
 //  percentiletracker_set_treshold(this->delaysH, GST_SECOND * 60);
 //  this->delaysL = make_percentiletracker(100, 40);
@@ -193,10 +195,13 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
     delay = measurement->rle_delays.values[i];
     if(!delay) continue;
     numstracker_add(this->De_window, delay);
-//    _priv(this)->delay_t3 = _priv(this)->delay_t2;
-//    _priv(this)->delay_t2 = _priv(this)->delay_t1;
-//    _priv(this)->delay_t1 = _priv(this)->delay_t0;
-//    _priv(this)->delay_t0 = delay;
+    _priv(this)->delay_t3 = _priv(this)->delay_t2;
+    _priv(this)->delay_t2 = _priv(this)->delay_t1;
+    _priv(this)->delay_t1 = _priv(this)->delay_t0;
+    _priv(this)->delay_t0 = delay;
+
+    if(0. < (gdouble)delay) _priv(this)->delay_avg = (gdouble)delay * .2 + _priv(this)->delay_avg * .8;
+    else                    _priv(this)->delay_avg = (gdouble)delay;
 
     off = _priv(this)->delay_target - (gdouble)delay;
     off/= (gdouble)delay;
@@ -210,12 +215,10 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
   _priv(this)->off_d1 = _priv(this)->off_d0;
   _priv(this)->off_d0 = (gdouble) measurement->late_discarded_bytes / (gdouble) measurement->received_payload_bytes;
 
-  result->DeCorrT  =  (_priv(this)->off_t0 * .5 + _priv(this)->off_t1 * .25 + _priv(this)->off_t2 * .25) / (-.2);
+  result->DeCorrT   =  (_priv(this)->off_t0 * .5 + _priv(this)->off_t1 * .25 + _priv(this)->off_t2 * .25) / (-.2);
   result->RateCorr  = (gdouble) _priv(this)->rr_sum / (gdouble) _priv(this)->sr_sum;
-
-  //Todo: decide weather we need TRateCorr
+  result->DeAvgT    =  _priv(this)->delay_t0 / (2. *  _priv(this)->delay_avg);
   result->TRateCorr = (gdouble) _priv(this)->sr_sum / (gdouble) _priv(this)->tr_sum;
-  result->BiFCorr   =  (gdouble)(measurement->bytes_in_flight_acked * 8)/(gdouble) (_priv(this)->BiF_avg + _priv(this)->BiF_dev);
 
   result->DiscRate  =  (_priv(this)->off_d0 * .5 + _priv(this)->off_d1 * .25 + _priv(this)->off_d2 * .25) / (.2);
 
@@ -324,7 +327,6 @@ void _De_stat_pipe(gpointer data, NumsTrackerStatData *stat)
 {
   SubAnalyser *this = data;
   _priv(this)->delay_dev = stat->dev;
-  _priv(this)->delay_avg = stat->avg;
 }
 
 void _De_min_pipe(gpointer data, gint64 min)

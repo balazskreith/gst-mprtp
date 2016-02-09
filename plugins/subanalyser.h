@@ -56,9 +56,9 @@ struct _SubAnalyserClass{
 
 struct _SubAnalyserResult{
   gdouble DeCorrT;
+  gdouble DeAvgT;
   gdouble RateCorr;
   gdouble TRateCorr;
-  gdouble BiFCorr;
   gdouble DeCorrT_dev;
   gdouble DiscRate;
 };

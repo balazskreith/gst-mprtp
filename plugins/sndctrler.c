@@ -651,7 +651,6 @@ _irp_producer_main(SndController * this)
   GstClockTime   now;
   MPRTPSPath*    slowest_path = NULL;
   GstClockTime   delay, slowest_delay = 0;
-
   now = gst_clock_get_time(this->sysclock);
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
@@ -1338,17 +1337,9 @@ _system_notifier_utilization(gpointer controller, gpointer data)
 void
 _split_controller_main(SndController * this)
 {
-  GstClockTime now;
-  now = gst_clock_get_time(this->sysclock);
-
   sndrate_distor_time_update(this->rate_distor);
-
-  if(_subflows_are_ready(this) ||
-     this->last_recalc_time < now - 15 * GST_SECOND)
-  {
-      this->bids_recalc_requested = TRUE;
-  }
-  else if(this->ticknum % 3 == 0){
+  DISABLE_LINE _subflows_are_ready(this);
+  if(this->ticknum % 3 == 0){
     this->bids_recalc_requested = TRUE;
   }
 //  goto recalc_done;

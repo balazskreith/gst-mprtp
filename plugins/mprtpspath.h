@@ -189,7 +189,8 @@ typedef struct _UtilizationSubflowReport{
   gint32   lost_bytes;
   gint32   discarded_rate;
   guint64  owd;
-  gdouble  aggressivity;
+  gdouble  ramp_up_aggressivity;
+  gdouble  discard_aggressivity;
 }UtilizationSubflowReport;
 
 typedef struct _UtilizationReport{

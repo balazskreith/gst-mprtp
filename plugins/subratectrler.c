@@ -191,6 +191,7 @@ struct _Moment{
 #define _mitigated_t1(this) _mt1(this)->tr_is_mitigated
 #define _mitigated_t2(this) _mt2(this)->tr_is_mitigated
 
+ static gdouble AGGRESSIVITY_TRESHOLD = .4;
 
 
  static Moment*
@@ -654,7 +655,7 @@ _check_stage(
 
   //Check weather the delay fluctuation is over the target
   if(.5 < _DeCorrT(this) || .1 < _discrate(this)){
-    if(1. < _DeCorrT(this) || 1. < _DiCoeffT(this) || .1 < _discrate(this)){
+    if(1. < _DeCorrT(this) || 1. < _DiCoeffT(this) || AGGRESSIVITY_TRESHOLD < _discrate(this)){
       _add_congestion_point(this, _TR(this));
       this->max_target_point = _TR(this) * 1.05;
       _switch_stage_to(this, STAGE_MITIGATE, TRUE);
@@ -716,7 +717,7 @@ _probe_stage(
 {
   //Check weather the delay fluctuation is over the target
 //  if(.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)){
-  if((.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)) || .1 < _discrate(this)){
+  if((.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)) || AGGRESSIVITY_TRESHOLD < _discrate(this)){
     _add_congestion_point(this, _TR(this));
     this->min_target_point *= .95;
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
@@ -748,7 +749,7 @@ void
 _raise_stage(
     SubflowRateController *this)
 {
-  if((.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)) || .1 < _discrate(this)){
+  if((.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)) || AGGRESSIVITY_TRESHOLD < _discrate(this)){
     _add_congestion_point(this, _TR(this));
     this->min_target_point *= .95;
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);

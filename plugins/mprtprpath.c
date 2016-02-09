@@ -29,6 +29,7 @@ G_DEFINE_TYPE (MpRTPRPath, mprtpr_path, G_TYPE_OBJECT);
 static void mprtpr_path_finalize (GObject * object);
 static void mprtpr_path_reset (MpRTPRPath * this);
 static gint _cmp_seq (guint16 x, guint16 y);
+static void _add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp);
 static void _add_delay(MpRTPRPath *this, GstClockTime delay);
 static void _add_skew(MpRTPRPath *this, gint64 skew);
 static void _refresh_RLEBlock(MpRTPRPath *this);
@@ -208,9 +209,8 @@ mprtpr_path_get_chunks(MpRTPRPath *this,
     run_type = i != this->rle.write_index;
 
     if(chunks_get_type == 0){
-      read = &this->rle.blocks[i].discards;
-    }
-    else if(chunks_get_type == 1){
+          read = &this->rle.blocks[i].discard_nums;
+    }else if(chunks_get_type == 1){
       GstClockTime owd;
       owd = this->rle.blocks[i].median_delay;
       owd = GST_TIME_AS_MSECONDS(owd);
@@ -231,8 +231,10 @@ mprtpr_path_get_chunks(MpRTPRPath *this,
 //      read = &running_length;
     }else if(chunks_get_type == 2){
         read = &this->rle.blocks[i].losts;
+    }else if(chunks_get_type == 3){
+        read = &this->rle.blocks[i].discard_bytes;
     }else{
-        read = &this->rle.blocks[i].discards;
+        read = &this->rle.blocks[i].discard_nums;
     }
 
     gst_rtcp_xr_chunk_change(chunk,
@@ -274,10 +276,7 @@ void mprtpr_path_tick(MpRTPRPath *this)
 void mprtpr_path_add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp)
 {
   THIS_WRITELOCK (this);
-//  g_print("Discarded on subflow %d\n", this->id);
-  ++this->total_late_discarded;
-  this->total_late_discarded_bytes+=mprtp->payload_bytes;
-  ++_actual_RLEBlock(this)->discards;
+  _add_discard(this, mprtp);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -316,9 +315,12 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
     this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
   }
 //  g_print("J: %d\n", this->jitter);
-  if(0 < mprtp->delay)
+  if(0 < mprtp->delay){
     _add_delay(this, mprtp->delay);
-
+    if(this->delay_avg * 2 < mprtp->delay){
+      _add_discard(this, mprtp);
+    }
+  }
   if(_cmp_seq(mprtp->subflow_seq, this->highest_seq) <= 0){
     numstracker_add(this->lates, mprtp->subflow_seq);
     goto done;
@@ -370,6 +372,13 @@ _cmp_seq (guint16 x, guint16 y)
   return 0;
 }
 
+void _add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp)
+{
+  ++this->total_late_discarded;
+  this->total_late_discarded_bytes+=mprtp->payload_bytes;
+  ++_actual_RLEBlock(this)->discard_nums;
+  _actual_RLEBlock(this)->discard_bytes+=mprtp->payload_bytes;
+}
 
 void _add_delay(MpRTPRPath *this, GstClockTime delay)
 {
@@ -422,6 +431,14 @@ void _delays_stats_pipe(gpointer data, PercentileTrackerPipeData *pdata)
   MpRTPRPath *this = data;
   _actual_RLEBlock(this)->median_delay = pdata->percentile;
   ++_actual_RLEBlock(this)->median_delay_counter;
+  if(_now(this) - 200 * GST_MSECOND < this->delay_avg_refreshed) return;
+
+  this->delay_avg_refreshed = _now(this);
+  if(0. < this->delay_avg){
+    this->delay_avg = (gdouble) MIN(pdata->percentile, 400 * GST_MSECOND) * .05 + this->delay_avg * .95;
+  }else{
+    this->delay_avg = (gdouble) MIN(pdata->percentile, 400 * GST_MSECOND);
+  }
 }
 
 void _gaps_obsolation_pipe(gpointer data, gint64 seq)

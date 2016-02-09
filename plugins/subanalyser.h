@@ -55,15 +55,12 @@ struct _SubAnalyserClass{
 };
 
 struct _SubAnalyserResult{
-//  gdouble DeCorrH;
   gdouble DeCorrT;
-//  gdouble DeCorrL;
   gdouble RateCorr;
   gdouble TRateCorr;
   gdouble BiFCorr;
   gdouble DeCorrT_dev;
-
-  gboolean add2reference;
+  gdouble DiscRate;
 };
 
 GType subanalyser_get_type (void);

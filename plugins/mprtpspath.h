@@ -16,6 +16,7 @@
 #define ABS_TIME_DEFAULT_EXTENSION_HEADER_ID 8
 #define MONITOR_PAYLOAD_DEFAULT_ID 126
 #define DELAY_SKEW_MAX (100 * GST_MSECOND)
+#define SUBFLOW_DEFAULT_SENDING_RATE 128000
 
 G_BEGIN_DECLS typedef struct _MPRTPSPath MPRTPSPath;
 typedef struct _MPRTPSPathClass MPRTPSPathClass;
@@ -25,6 +26,7 @@ typedef struct _MPRTPSPathClass MPRTPSPathClass;
 #include "packetssndqueue.h"
 #include "percentiletracker.h"
 #include "numstracker.h"
+#include "monitorpackets.h"
 
 #define MPRTPS_PATH_TYPE             (mprtps_path_get_type())
 #define MPRTPS_PATH(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),MPRTPS_PATH_TYPE,MPRTPSPath))
@@ -90,6 +92,7 @@ struct _MPRTPSPath
   GstClockTime            last_monitoring_sent_time;
   guint16                 monitor_seq;
   guint8                  monitor_payload_type;
+  MonitorPackets*         monitorpackets;
   guint8                  pivot_payload_type;
 
   guint32                 extra_packets_per_100tick;
@@ -169,7 +172,7 @@ struct _RRMeasurement{
   RLERR               rle_discards;
   RLERR               rle_losts;
   RLERR               rle_delays;
-  guint32             recent_discard;
+  guint32             recent_discarded_bytes;
   GstClockTime        recent_delay;
   guint16             recent_lost;
   guint16             rfc3611_cum_lost;
@@ -184,7 +187,7 @@ typedef struct _UtilizationSubflowReport{
   gint32   max_rate;
   gint32   min_rate;
   gint32   lost_bytes;
-  gint32   discarded_bytes;
+  gint32   discarded_rate;
   guint64  owd;
 }UtilizationSubflowReport;
 
@@ -215,10 +218,8 @@ guint8 mprtps_path_get_id (MPRTPSPath * this);
 void mprtps_path_set_monitor_interval_and_duration(MPRTPSPath *this, guint interval, GstClockTime max_idle);
 gboolean mprtps_path_is_monitoring (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_packets_num (MPRTPSPath * this);
-void mprtps_path_tick(MPRTPSPath *this, GstBuffer **monitorbuf);
-void mprtps_path_process_rtp_packet(MPRTPSPath * this,
-                               GstBuffer * buffer,
-                               GstBuffer **monitorbuf);
+void mprtps_path_tick(MPRTPSPath *this);
+void mprtps_path_process_rtp_packet(MPRTPSPath * this, GstBuffer * buffer);
 gboolean mprtps_path_has_expected_lost(MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_frames_num (MPRTPSPath * this);
@@ -235,6 +236,7 @@ void mprtps_path_set_skip_duration(MPRTPSPath * this, GstClockTime duration);
 void mprtps_path_set_pacing_bitrate(MPRTPSPath * this, guint32 target_bitrate, GstClockTime obsolation_treshold);
 void mprtps_path_set_pacing (MPRTPSPath * this, gboolean pacing);
 void mprtps_path_set_monitor_payload_id(MPRTPSPath *this, guint8 payload_type);
+void mprtps_path_set_monitor_packet_provider(MPRTPSPath *this, MonitorPackets *monitorpackets);
 void mprtps_path_set_mprtp_ext_header_id(MPRTPSPath *this, guint ext_header_id);
 G_END_DECLS
 #endif /* MPRTPSPATH_H_ */

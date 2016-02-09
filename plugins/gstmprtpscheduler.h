@@ -55,6 +55,7 @@ struct _GstMprtpscheduler
   guint8                        mprtp_ext_header_id;
   guint8                        abs_time_ext_header_id;
   guint                         auto_rate_and_cc;
+  MonitorPackets*               monitorpackets;
 //  GstBuffer*                    monitorpacket;
   GHashTable*                   paths;
   GRWLock                       rwmutex;

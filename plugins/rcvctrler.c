@@ -705,7 +705,7 @@ _orp_main(RcvController * this)
     }
 
 
-    if (_ort0(subflow)->discarded != _ort1(subflow)->discarded && this->rfc7097_enabled)
+    if (_ort0(subflow)->discarded != _ort1(subflow)->discarded && (this->rfc7097_enabled))
     {
       GstBuffer *xr;
       xr = _get_mprtcp_xr_rfc7097_block (this, subflow, &block_length);
@@ -1056,7 +1056,8 @@ _setup_xr_rfc7097 (Subflow * this,
   gboolean early_bit = FALSE;
   guint8 thinning = 0;
 
-  chunks = mprtpr_path_get_XR7097_chunks(this->path, &chunks_num_, &begin_seq, &end_seq);
+//  chunks = mprtpr_path_get_XR7097_packet_nums_chunks(this->path, &chunks_num_, &begin_seq, &end_seq);
+  chunks = mprtpr_path_get_XR7097_sum_bytes_chunks(this->path, &chunks_num_, &begin_seq, &end_seq);
   result = g_malloc0(sizeof(*xr) + (chunks_num_ - 2) * 2);
 //  g_print("chunks num: %u, size of bytes xr: %lu, total: %lu\n",
 //          chunks_num, sizeof(*xr), sizeof(*xr) + (chunks_num - 2) * 2);

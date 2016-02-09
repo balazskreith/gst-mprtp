@@ -347,9 +347,10 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  /usr/include/x86_64-linux-gnu/bits/sys_errlist.h \
  /usr/include/x86_64-linux-gnu/bits/stdio.h \
  /usr/include/x86_64-linux-gnu/bits/stdio2.h mprtpspath.h \
- packetssndqueue.h sndratedistor.h subratectrler.h floatsbuffer.h \
- subanalyser.h streamsplitter.h /usr/include/glib-2.0/gio/gnetworking.h \
- /usr/include/netdb.h /usr/include/netinet/in.h \
+ packetssndqueue.h monitorpackets.h sndratedistor.h subratectrler.h \
+ floatsbuffer.h subanalyser.h streamsplitter.h \
+ /usr/include/glib-2.0/gio/gnetworking.h /usr/include/netdb.h \
+ /usr/include/netinet/in.h \
  /usr/lib/gcc/x86_64-linux-gnu/4.8/include/stdint.h /usr/include/stdint.h \
  /usr/include/x86_64-linux-gnu/bits/wchar.h \
  /usr/include/x86_64-linux-gnu/sys/socket.h \
@@ -1171,6 +1172,8 @@ sndctrler.h:
 mprtpspath.h:
 
 packetssndqueue.h:
+
+monitorpackets.h:
 
 sndratedistor.h:
 

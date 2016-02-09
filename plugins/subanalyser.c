@@ -60,6 +60,7 @@ typedef struct _SubAnalyserPrivate{
   gdouble            delay_trend_dev;
 //  gdouble            delay_t0,delay_t1,delay_t2,delay_t3;
   gdouble            off_t0,off_t1,off_t2,off_t3;
+  gdouble            off_d0,off_d1,off_d2;
 }SubAnalyserPrivate;
 
 #define _priv(this) ((SubAnalyserPrivate*) this->priv)
@@ -197,7 +198,6 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
 //    _priv(this)->delay_t1 = _priv(this)->delay_t0;
 //    _priv(this)->delay_t0 = delay;
 
-    //Todo: decide weather we need this.
     off = _priv(this)->delay_target - (gdouble)delay;
     off/= (gdouble)delay;
     _priv(this)->off_t3 = _priv(this)->off_t2;
@@ -206,12 +206,18 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
     _priv(this)->off_t0 = off;
   }
 
+  _priv(this)->off_d2 = _priv(this)->off_d1;
+  _priv(this)->off_d1 = _priv(this)->off_d0;
+  _priv(this)->off_d0 = (gdouble) measurement->late_discarded_bytes / (gdouble) measurement->received_payload_bytes;
+
   result->DeCorrT  =  (_priv(this)->off_t0 * .5 + _priv(this)->off_t1 * .25 + _priv(this)->off_t2 * .25) / (-.2);
   result->RateCorr  = (gdouble) _priv(this)->rr_sum / (gdouble) _priv(this)->sr_sum;
 
   //Todo: decide weather we need TRateCorr
   result->TRateCorr = (gdouble) _priv(this)->sr_sum / (gdouble) _priv(this)->tr_sum;
   result->BiFCorr   =  (gdouble)(measurement->bytes_in_flight_acked * 8)/(gdouble) (_priv(this)->BiF_avg + _priv(this)->BiF_dev);
+
+  result->DiscRate  =  (_priv(this)->off_d0 * .5 + _priv(this)->off_d1 * .25 + _priv(this)->off_d2 * .25) / (.2);
 
   floatsbuffer_add_full(this->DeT_window, result->DeCorrT, 0);
   result->DeCorrT_dev = _priv(this)->delay_trend_dev;

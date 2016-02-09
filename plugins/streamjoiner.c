@@ -255,7 +255,6 @@ stream_joiner_init (StreamJoiner * this)
   this->playout_halt_time = 100 * GST_MSECOND;
   this->max_delay_diff = 50 * GST_MSECOND;
   this->min_delay = this->max_delay = 100 * GST_MSECOND;
-  this->forced_delay = 150 * GST_MSECOND;
   this->forced_delay = 0;
   this->delays = make_numstracker(256, GST_SECOND);
   numstracker_add_plugin(this->delays,
@@ -417,10 +416,10 @@ void stream_joiner_receive_mprtp(StreamJoiner * this, GstMpRTPBuffer *mprtp)
 //            GST_BUFFER_OFFSET(mprtp->buffer));
 
     //The packet should be forwarded and discarded
-//      g_print("mprtp timestamp: %u last played timestamp: %u\n", mprtp->timestamp, this->last_played_timestamp);
-    if(this->last_played_timestamp != 0 && _cmp_seq32(mprtp->timestamp, this->last_played_timestamp) < 0){
-      mprtpr_path_add_discard(subflow->path, mprtp);
-    }
+//    g_print("mprtp timestamp: %u last played timestamp: %u\n", mprtp->timestamp, this->last_played_timestamp);
+//    if(this->last_played_timestamp != 0 && _cmp_seq32(mprtp->timestamp, this->last_played_timestamp) < 0){
+//      mprtpr_path_add_discard(subflow->path, mprtp);
+//    }
 
     this->send_mprtp_packet_func(this->send_mprtp_packet_data, mprtp);
   }
@@ -689,6 +688,9 @@ again:
   }
   goto again;
 done:
+
+  //refresh playout time
+  frame->playout_time+=this->playout_delay;
 
   //Check weather the frame is marked
   frame->marked |= node->marker;

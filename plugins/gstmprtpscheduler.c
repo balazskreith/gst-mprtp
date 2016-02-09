@@ -358,6 +358,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
                             this, gst_mprtpscheduler_mprtcp_sender,
                             this, gst_mprtpscheduler_emit_signal
                             );
+  this->monitorpackets = make_monitorpackets();
   stream_splitter_set_monitor_payload_type(this->splitter, this->monitor_payload_type);
   _change_auto_rate_and_cc (this, FALSE);
   _setup_paths(this);
@@ -568,6 +569,7 @@ _setup_paths (GstMprtpscheduler * this)
     path = (MPRTPSPath *) val;
     mprtps_path_set_monitor_payload_id(path, this->monitor_payload_type);
     mprtps_path_set_mprtp_ext_header_id(path, this->mprtp_ext_header_id);
+    mprtps_path_set_monitor_packet_provider(path, this->monitorpackets);
   }
   stream_splitter_set_monitor_payload_type(this->splitter, this->monitor_payload_type);
 }
@@ -744,9 +746,7 @@ gst_mprtpscheduler_mprtp_proxy(gpointer ptr, GstBuffer * buffer)
 //  g_print("Send: %u payload: %u\n", gst_rtp_buffer_get_seq(&rtp), gst_rtp_buffer_get_payload_type(&rtp));
   gst_rtp_buffer_unmap (&rtp);
   if(this->auto_rate_and_cc){
-//    if(this->monitorpacket) gst_buffer_unref(this->monitorpacket);
-//    this->monitorpacket = gst_buffer_copy_deep(outbuf);
-//    this->monitorpacket = NULL;
+    monitorpackets_push_rtp_packet(this->monitorpackets, outbuf);
   }
   gst_pad_push (this->mprtp_srcpad, outbuf);
   if (!this->riport_flow_signal_sent) {
@@ -810,12 +810,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     goto done;
   }
   outbuf = gst_buffer_make_writable (buffer);
-  if(this->auto_rate_and_cc){
-    //Todo: provide FEC packets here
-    mprtps_path_process_rtp_packet(path, outbuf, NULL);
-  }else{
-      mprtps_path_process_rtp_packet(path, outbuf, NULL);
-  }
+  mprtps_path_process_rtp_packet(path, outbuf);
   result = GST_FLOW_OK;
 done:
   THIS_READUNLOCK (this);
@@ -972,12 +967,7 @@ gst_mprtpscheduler_path_ticking_process_run (void *data)
   g_hash_table_iter_init (&iter, this->paths);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     path = (MPRTPSPath *) val;
-    if(this->auto_rate_and_cc){
-      //Todo: provide FEC packets here
-      mprtps_path_tick(path, NULL);
-    }else{
-      mprtps_path_tick(path, NULL);
-    }
+    mprtps_path_tick(path);
   }
   next_scheduler_time = now + 1 * GST_MSECOND;
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);

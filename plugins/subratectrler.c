@@ -63,7 +63,8 @@ G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 //Interval between video bitrate adjustments. Default value: 0.2s ->200ms
 #define RATE_ADJUST_INTERVAL 200 * GST_MSECOND /* ms */
 //Min target_bitrate [bps]
-#define TARGET_BITRATE_MIN 500000
+//#define TARGET_BITRATE_MIN 500000
+#define TARGET_BITRATE_MIN SUBFLOW_DEFAULT_SENDING_RATE
 //Max target_bitrate [bps]
 #define TARGET_BITRATE_MAX 0
 //Timespan [s] from lowest to highest bitrate. Default value: 10s->10000ms
@@ -173,12 +174,14 @@ struct _Moment{
 #define _DiCoeffT(this) (0. < _DeCorrT_t1(this) ? _DeCorrT(this) / _DeCorrT_t1(this) : 0.)
 #define _RRxBiF(this) _anres(this).RRxBiF
 
-#define _rdiscard(this) (!_mt0(this)->path_is_slow && _mt0(this)->recent_discard)
+#define _rdiscard(this) (0 < _mt0(this)->recent_discard)
 #define _discard_rate(this) _mt0(this)->discard_rate
+#define _discrate(this) _discard_rate(this)
 //#define _lost(this)  (!_mt0(this)->has_expected_lost && !_mt0(this)->path_is_lossy && _mt0(this)->lost > 0)
 #define _lost(this)  (_mt0(this)->has_expected_lost ? FALSE : _mt0(this)->path_is_lossy ? FALSE : _mt0(this)->lost > 0)
 #define _rlost(this) (!_mt0(this)->has_expected_lost && !_mt0(this)->path_is_lossy && _mt0(this)->recent_lost > 0)
-#define _discard(this) (!_mt0(this)->path_is_slow && _discard_rate(this) > .1)
+//#define _discard(this) (!_mt0(this)->path_is_slow && _discard_rate(this) > .2)
+#define _discard(this) (1. < _discard_rate(this))
 #define _state_t1(this) _mt1(this)->state
 #define _state(this) _mt0(this)->state
 #define _stage(this) _mt0(this)->stage
@@ -482,7 +485,7 @@ void subratectrler_time_update(
 done:
   if(rep){
     rep->lost_bytes = _mt0(this)->lost;
-    rep->discarded_bytes = _discard_rate(this) * 100.;
+    rep->discarded_rate = _discard_rate(this) * 100.;
     rep->owd = 0;//Todo: Fix it
     rep->max_rate = this->max_rate;
     rep->min_rate = this->min_rate;
@@ -519,14 +522,14 @@ void subratectrler_measurement_update(
 //  _mt0(this)->lost                = measurement->lost;
   _mt0(this)->lost                = measurement->rfc3611_cum_lost;
   _mt0(this)->recent_lost         = measurement->recent_lost;
-  _mt0(this)->recent_discard      = measurement->recent_discard;
+  _mt0(this)->recent_discard      = measurement->recent_discarded_bytes;
   _mt0(this)->path_is_lossy       = !mprtps_path_is_non_lossy(this->path);
   _mt0(this)->path_is_slow        = !mprtps_path_is_not_slow(this->path);
   _mt0(this)->has_expected_lost   = _mt1(this)->has_expected_lost;
   _mt0(this)->state               = _mt1(this)->state;
   _mt0(this)->stage               = _mt1(this)->stage;
   _mt0(this)->incoming_bitrate    = measurement->incoming_rate * 8;
-  _mt0(this)->discard_rate        = 1. - measurement->goodput / measurement->receiver_rate;
+//  _mt0(this)->discard_rate        = 1. - measurement->goodput / measurement->receiver_rate;
   _mt0(this)->sender_bitrate      = measurement->sender_rate * 8;
   if(measurement->expected_lost)
     _mt0(this)->has_expected_lost   = 3;
@@ -538,6 +541,8 @@ void subratectrler_measurement_update(
                                   _TR(this),
                                   &_mt0(this)->analysation);
 
+  _mt0(this)->discard_rate        = _anres(this).DiscRate;
+
   if(0 < this->disable_controlling && this->disable_controlling < _now(this)){
       this->disable_controlling = 0;
   }
@@ -548,7 +553,9 @@ void subratectrler_measurement_update(
 
   _log_measurement_update_state(this);
 
-  subanalyser_measurement_add_to_reference(this->analyser, measurement);
+  if(_state(this) != STATE_OVERUSED && _state_t1(this) == STATE_OVERUSED){
+    _mt0(this)->has_expected_lost   = 3;
+  }
 
 //  if(_mt0(this)->state != STATE_OVERUSED || this->last_reference_added < _now(this) - 10 * GST_SECOND){
 //    subanalyser_measurement_add_to_reference(this->analyser, measurement);
@@ -606,7 +613,7 @@ _restrict_stage(
     SubflowRateController *this)
 {
   //check weather we reached the inflection point
-  if(1. < _DiCoeffT(this)){
+  if((1.2 < _DiCoeffT(this) && 1. < _DeCorrT(this))){
     //pacing is ineffective
     _undershoot(this, TRUE);
     goto done;
@@ -630,6 +637,9 @@ _release_stage(
     goto done;
   }
 
+  if(2. < _DeCorrT(this) || _discard(this)){
+    goto done;
+  }
   this->desired_bitrate = this->max_target_point;
   _set_bitrate_flags(this, BITRATE_CHANGE | BITRATE_SLOW);
   this->settled = TRUE;
@@ -643,8 +653,8 @@ _check_stage(
 {
 
   //Check weather the delay fluctuation is over the target
-  if(.5 < _DeCorrT(this)){
-    if(1. < _DeCorrT(this) || 1. < _DiCoeffT(this)){
+  if(.5 < _DeCorrT(this) || .1 < _discrate(this)){
+    if(1. < _DeCorrT(this) || 1. < _DiCoeffT(this) || .1 < _discrate(this)){
       _add_congestion_point(this, _TR(this));
       this->max_target_point = _TR(this) * 1.05;
       _switch_stage_to(this, STAGE_MITIGATE, TRUE);
@@ -694,7 +704,8 @@ _mitigate_stage(
   }
 
   this->target_bitrate =
-      this->desired_bitrate = this->min_target_point;
+      this->desired_bitrate =
+          MAX(this->target_bitrate * .95, this->min_target_point);
   _set_bitrate_flags(this, BITRATE_CHANGE);
   _switch_stage_to(this, STAGE_CHECK, FALSE);
 }
@@ -704,7 +715,8 @@ _probe_stage(
     SubflowRateController *this)
 {
   //Check weather the delay fluctuation is over the target
-  if(.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)){
+//  if(.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)){
+  if((.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)) || .1 < _discrate(this)){
     _add_congestion_point(this, _TR(this));
     this->min_target_point *= .95;
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
@@ -736,7 +748,7 @@ void
 _raise_stage(
     SubflowRateController *this)
 {
-  if(.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)){
+  if((.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)) || .1 < _discrate(this)){
     _add_congestion_point(this, _TR(this));
     this->min_target_point *= .95;
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
@@ -785,7 +797,7 @@ _stable_state(
     SubflowRateController *this)
 {
   //supervise stage actions
-  if(_lost(this)){
+  if(_lost(this) || _discard(this) || (2. < _DeCorrT(this) && 2. < _DiCoeffT(this))){
     _undershoot(this, TRUE);
     _transit_state_to(this, STATE_OVERUSED);
     goto done;
@@ -814,7 +826,7 @@ void
 _monitored_state(
     SubflowRateController *this)
 {
-  if(_lost(this)){
+  if(_lost(this) || _discard(this)){
     _undershoot(this, TRUE);
     _transit_state_to(this, STATE_OVERUSED);
     goto done;
@@ -1154,6 +1166,7 @@ void _log_measurement_update_state(SubflowRateController *this)
           "mon_br:     %-10d| mon_int: %-10d| pacing_br:  %-10d| lc_rate: %-10d|\n"
           "SR:         %-10d| IR:      %-10d| disc_rate:  %-10.3f| ci:      %-10.3f\n"
           "l:          %-10d| rl:      %-10d| d:          %-10d| rd:      %-10d\n"
+          "abs_max:    %-10d| abs_min: %-10d|\n"
           "############################ Seconds since setup: %lu ##########################################\n",
           this->id, _state(this),
           this->disable_controlling > 0 ? GST_TIME_AS_MSECONDS(this->disable_controlling - _now(this)) : 0,
@@ -1186,6 +1199,8 @@ void _log_measurement_update_state(SubflowRateController *this)
 
           _mt0(this)->lost, _mt0(this)->recent_lost,
           _mt0(this)->discard,_mt0(this)->recent_discard,
+
+          this->max_rate, this->min_rate,
 
          GST_TIME_AS_SECONDS(_now(this) - this->setup_time)
 

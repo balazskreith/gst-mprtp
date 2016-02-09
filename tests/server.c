@@ -49,7 +49,7 @@ typedef struct _UtilizationSubflowReport{
   gint32   max_rate;
   gint32   min_rate;
   gint32   lost_bytes;
-  gint32   discarded_bytes;
+  gint32   discarded_rate;
   guint64  owd;
 }UtilizationSubflowReport;
 
@@ -306,8 +306,8 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
     new_bitrate = ur->target_rate;
     for(i=0; i<32; ++i){
       if(!ur->subflows[i].controlled) continue;
-      ur->subflows[i].min_rate = 100000;
-      ur->subflows[i].max_rate = 1000000;
+//      ur->subflows[i].min_rate = 100000;
+//      ur->subflows[i].max_rate = 1000000;
     }
 //    ur->subflows[1].shareability = subflow1_shareability;
 //    ur->subflows[2].max_rate=subflow2_max_rate;

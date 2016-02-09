@@ -43,7 +43,7 @@
 #define PATH_RTT_MAX_TRESHOLD (800 * GST_MSECOND)
 #define PATH_RTT_MIN_TRESHOLD (600 * GST_MSECOND)
 #define MAX_SUBFLOW_MOMENT_NUM 8
-#define SUBFLOW_DEFAULT_SENDING_RATE 128000
+
 
 GST_DEBUG_CATEGORY_STATIC (sndctrler_debug_category);
 #define GST_CAT_DEFAULT sndctrler_debug_category
@@ -748,7 +748,7 @@ void _assemble_measurement(SndController * this, Subflow *subflow)
   }
   if(_irt0(subflow)->rfc7097_arrived){
     chunk_index = _irt0(subflow)->rle_discards.length - 1;
-    _irt0(subflow)->recent_discard = _irt0(subflow)->rle_discards.values[chunk_index];
+    _irt0(subflow)->recent_discarded_bytes = _irt0(subflow)->rle_discards.values[chunk_index];
   }
 
   if(_irt0(subflow)->owd_rle_arrived){

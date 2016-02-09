@@ -41,7 +41,8 @@ typedef struct _RunningLengthEncodingBlock RLEBlock;
 struct _RunningLengthEncodingBlock{
   guint16      start_seq;
   guint16      end_seq;
-  guint16      discards;
+  guint16      discard_nums;
+  guint16      discard_bytes;
   guint16      losts;
   GstClockTime median_delay;
   guint16      median_delay_counter;
@@ -70,6 +71,8 @@ struct _MpRTPReceiverPath
   guint32             total_payload_bytes;
   gint32              jitter;
   guint16             highest_seq;
+  gdouble             delay_avg;
+  GstClockTime        delay_avg_refreshed;
 
   guint64             ext_rtptime;
   guint64             last_packet_skew;
@@ -133,11 +136,12 @@ void
 mprtpr_path_set_chunks_reported(MpRTPRPath *this);
 
 GstRTCPXR_Chunk *
-mprtpr_path_get_XR7097_chunks(MpRTPRPath *this,
+mprtpr_path_get_XR7097_packet_nums_chunks(MpRTPRPath *this,
                               guint *chunks_num,
                               guint16 *begin_seq,
                               guint16 *end_seq);
-#define mprtpr_path_get_XR7097_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 0, chunks_num, begin_seq, end_seq)
+#define mprtpr_path_get_XR7097_packet_nums_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 0, chunks_num, begin_seq, end_seq)
+#define mprtpr_path_get_XR7097_sum_bytes_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 3, chunks_num, begin_seq, end_seq)
 #define mprtpr_path_get_owd_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 1, chunks_num, begin_seq, end_seq)
 #define mprtpr_path_get_XR3611_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 2, chunks_num, begin_seq, end_seq)
 GstRTCPXR_Chunk *

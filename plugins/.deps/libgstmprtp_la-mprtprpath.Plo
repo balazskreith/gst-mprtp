@@ -212,7 +212,7 @@ libgstmprtp_la-mprtprpath.lo: mprtprpath.c /usr/include/stdc-predef.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
  gstmprtcpbuffer.h gstmprtpbuffer.h pointerpool.h bintree.h numstracker.h \
  bintree2.h percentiletracker2.h percentiletracker.h mprtpspath.h \
- packetssndqueue.h streamjoiner.h
+ packetssndqueue.h monitorpackets.h streamjoiner.h
 
 /usr/include/stdc-predef.h:
 
@@ -721,5 +721,7 @@ percentiletracker.h:
 mprtpspath.h:
 
 packetssndqueue.h:
+
+monitorpackets.h:
 
 streamjoiner.h:

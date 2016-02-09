@@ -48,7 +48,7 @@ static void _send_mprtp_packet(MPRTPSPath * this,
                                gboolean bypass);
 static guint32 _pacing(MPRTPSPath * this);
 //static gboolean _is_overused(MPRTPSPath * this);
-static GstBuffer* _create_monitor_packet(MPRTPSPath * this, GstBuffer **buffer);
+static GstBuffer* _create_monitor_packet(MPRTPSPath * this);
 
 #define MIN_PACE_INTERVAL 1
 #define MINIMUM_PACE_BANDWIDTH 50000
@@ -317,7 +317,13 @@ void mprtps_path_set_monitor_payload_id(MPRTPSPath *this, guint8 payload_type)
   THIS_WRITEUNLOCK (this);
 }
 
-
+void mprtps_path_set_monitor_packet_provider(MPRTPSPath *this, MonitorPackets *monitorpackets)
+{
+  g_return_if_fail (this);
+  THIS_WRITELOCK (this);
+  this->monitorpackets = monitorpackets;
+  THIS_WRITEUNLOCK (this);
+}
 
 void mprtps_path_set_mprtp_ext_header_id(MPRTPSPath *this, guint ext_header_id)
 {
@@ -546,7 +552,7 @@ guint32 mprtps_path_get_bytes_in_queue(MPRTPSPath *this)
 
 
 void
-mprtps_path_tick(MPRTPSPath *this, GstBuffer **monitorbuf)
+mprtps_path_tick(MPRTPSPath *this)
 {
   gboolean expected_lost = FALSE;
 //  guint generate = 0, generated = 0;
@@ -570,7 +576,7 @@ mprtps_path_tick(MPRTPSPath *this, GstBuffer **monitorbuf)
   if(0 < this->monitoring_max_idle){
     if(this->monitoring_max_idle < _now(this) - this->last_monitoring_sent_time){
       GstBuffer *buffer;
-      buffer = _create_monitor_packet(this, monitorbuf);
+      buffer = _create_monitor_packet(this);
       _setup_rtp2mprtp (this, buffer);
       _refresh_stat(this, buffer);
       _send_mprtp_packet(this, buffer, TRUE);
@@ -589,8 +595,7 @@ done:
 
 void
 mprtps_path_process_rtp_packet(MPRTPSPath * this,
-                               GstBuffer * buffer,
-                               GstBuffer **monitorbuf)
+                               GstBuffer * buffer)
 {
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   THIS_WRITELOCK (this);
@@ -614,7 +619,7 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
   if(this->total_sent_normal_packet_num % this->monitoring_interval != 0) goto done;
   {
     GstBuffer *buffer;
-    buffer = _create_monitor_packet(this, monitorbuf);
+    buffer = _create_monitor_packet(this);
     _setup_rtp2mprtp(this, buffer);
     _send_mprtp_packet(this, buffer, FALSE);
     this->last_monitoring_sent_time = _now(this);
@@ -791,13 +796,12 @@ done:
 //  return FALSE;
 //}
 
-GstBuffer* _create_monitor_packet(MPRTPSPath * this, GstBuffer **buffer)
+GstBuffer* _create_monitor_packet(MPRTPSPath * this)
 {
   GstBuffer *result;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-  if(buffer){
-    result = gst_buffer_make_writable(*buffer);
-    *buffer = NULL;
+  if(this->monitorpackets){
+    result = monitorpackets_provide_rtp_packet(this->monitorpackets);
   }else{
     result = gst_rtp_buffer_new_allocate (1400, 0, 0);
   }

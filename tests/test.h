@@ -95,7 +95,7 @@ typedef struct _TestParams{
   gboolean     subflow1_active;
   gboolean     subflow2_active;
   gboolean     subflow3_active;
-
+  guint        subflow_num;
   gboolean     other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time;
 }TestParams;
 
@@ -147,6 +147,10 @@ static void _setup_test_params(guint profile)
   g_print("%s subflow 2\n", test_parameters_.subflow2_active?"Active":"Deactive");
   test_parameters_.subflow3_active = (profile & 4) ? TRUE : FALSE;
   g_print("%s subflow 3\n", test_parameters_.subflow3_active?"Active":"Deactive");
+
+  test_parameters_.subflow_num+=test_parameters_.subflow1_active ? 1 : 0;
+  test_parameters_.subflow_num+=test_parameters_.subflow2_active ? 1 : 0;
+  test_parameters_.subflow_num+=test_parameters_.subflow3_active ? 1 : 0;
 
   test_parameters_.video_session =(VideoSession)((profile & 24)>>3);
   switch (test_parameters_.video_session) {

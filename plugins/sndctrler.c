@@ -649,8 +649,6 @@ _irp_producer_main(SndController * this)
   gpointer       key, val;
   Subflow*       subflow;
   GstClockTime   now;
-  MPRTPSPath*    slowest_path = NULL;
-  GstClockTime   delay, slowest_delay = 0;
   now = gst_clock_get_time(this->sysclock);
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
@@ -665,11 +663,6 @@ _irp_producer_main(SndController * this)
     sndrate_distor_measurement_update(this->rate_distor, subflow->id, _irt0(subflow));
 //    subratectrler_measurement_update(subflow->rate_controller, _irt0(subflow));
 
-    delay = mprtps_path_get_delay(subflow->path);
-    if(slowest_delay < delay){
-      slowest_path = subflow->path;
-    }
-
     _irt0(subflow)->checked = TRUE;
     subflow->ready = TRUE;
 
@@ -677,9 +670,6 @@ _irp_producer_main(SndController * this)
     continue;
   }
 
-  if(slowest_path) {
-    mprtps_path_set_slow(slowest_path);
-  }
   return;
 
 }

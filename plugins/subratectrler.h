@@ -27,6 +27,7 @@ typedef struct _SubflowRateControllerClass SubflowRateControllerClass;
 
 typedef void (*SubRateCtrler)(SubflowRateController*);
 typedef void (*SubRateAction)(SubflowRateController*);
+typedef void (*SubTargetRateCtrler)(SubflowRateController*, gint32);
 
 struct _SubflowRateController
 {
@@ -43,67 +44,55 @@ struct _SubflowRateController
 
   SubAnalyser*              analyser;
 
-//  gboolean                 stabilize;
-//  gboolean                 steady;
-//  gboolean                 distorted;
-//  gboolean                 settled;
+  SubTargetRateCtrler       change_target_bitrate_fnc;
 
-  GstClockTime             disable_controlling;
+  GstClockTime              disable_controlling;
 
-  //Video target bitrate inflection point i.e. the last known highest
-  //target_bitrate during fast start. Used to limit bitrate increase
-  //close to the last know congestion point. Initial value: 1
-  gint32                   max_target_point;
-  gint32                   min_target_point;
-  gint32                   desired_bitrate;
-  gint32                   target_bitrate;
+  gint32                    max_target_point;
+  gint32                    min_target_point;
+  gint32                    desired_bitrate;
+  gint32                    target_bitrate;
 
-  gint32                   max_rate;
-  gint32                   min_rate;
+  gint32                    max_rate;
+  gint32                    min_rate;
 
-  gint32                   last_congestion_point;
+  gint32                    last_congestion_point;
 
-  GstClockTime             setup_time;
+  GstClockTime              setup_time;
 
-  NumsTracker*             IR_window;
-  NumsTracker*             TR_window;
-  gdouble                  ir_sum;
-  gdouble                  tr_sum;
-  gdouble                  target_fraction;
+  NumsTracker*              IR_window;
+  NumsTracker*              TR_window;
+  gdouble                   ir_sum;
+  gdouble                   tr_sum;
+  gdouble                   target_fraction;
   //Need for monitoring
-  guint                    monitoring_interval;
-  GstClockTime             monitoring_started;
+  guint                     monitoring_interval;
+  GstClockTime              monitoring_started;
 
-  SubRateCtrler            state;
-  SubRateAction            stage_fnc;
+  SubRateCtrler             state;
+  SubRateAction             stage_fnc;
 
-  guint8*                  moments;
-  gint                     moments_index;
-  guint32                  moments_num;
+  guint8*                   moments;
+  gint                      moments_index;
+  guint32                   moments_num;
 
-  gdouble                  discard_aggressivity;
-  gdouble                  ramp_up_aggressivity;
+  gdouble                   discard_aggressivity;
+  gdouble                   ramp_up_aggressivity;
 
-  gboolean                 cwnd_was_increased;
-  gboolean                 bitrate_was_incrased;
-  GstClockTime             last_target_bitrate_i_adjust;
-  GstClockTime             last_target_bitrate_adjust;
-  GstClockTime             last_queue_clear;
-  GstClockTime             last_skip_time;
-  GstClockTime             packet_obsolation_treshold;
+  gboolean                  cwnd_was_increased;
+  gboolean                  bitrate_was_incrased;
+  GstClockTime              last_target_bitrate_i_adjust;
+  GstClockTime              last_target_bitrate_adjust;
+  GstClockTime              last_queue_clear;
+  GstClockTime              last_skip_time;
+  GstClockTime              packet_obsolation_treshold;
 
-  //OWD target. Initial value: OWD_TARGET_LO
-//  guint64                  owd_target;
-  //EWMA filtered owd fraction.Initial value:  0.0
-  //COngestion window
-  gint32                   pacing_bitrate;
-  GstClockTime             last_congestion_detected;
-  //Smoothed RTT [s], computed similar to method depicted in [RFC6298].
-  //Initial value: 0.0
+  gint32                    pacing_bitrate;
+  GstClockTime              last_congestion_detected;
 
-  gboolean                 log_enabled;
-  guint                    logtick;
-  gchar                    log_filename[255];
+  gboolean                  log_enabled;
+  guint                     logtick;
+  gchar                     log_filename[255];
 
 };
 

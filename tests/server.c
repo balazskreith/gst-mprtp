@@ -307,8 +307,15 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
     new_bitrate = ur->target_rate;
     for(i=0; i<32; ++i){
       if(!ur->subflows[i].controlled) continue;
-//      ur->subflows[i].min_rate = 100000;
-//      ur->subflows[i].max_rate = 1000000;
+      if(test_parameters_.video_session == TEST_SOURCE){
+               ur->subflows[i].min_rate = 400000 / test_parameters_.subflow_num;
+               ur->subflows[i].max_rate = 2000000;
+           }
+      else  if(test_parameters_.video_session == FOREMAN_SOURCE){
+          ur->subflows[i].min_rate = 50000 / test_parameters_.subflow_num;
+          ur->subflows[i].max_rate = 300000;
+      }
+
     }
 //    ur->subflows[1].shareability = subflow1_shareability;
 //    ur->subflows[2].max_rate=subflow2_max_rate;

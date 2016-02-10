@@ -49,7 +49,7 @@ G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 #define MOMENTS_LENGTH 8
 
 #define DEFAULT_RAMP_UP_AGGRESSIVITY 0.
-#define DEFAULT_DISCARD_AGGRESSIVITY .5
+#define DEFAULT_DISCARD_AGGRESSIVITY .2
 // Min OWD target. Default value: 0.1 -> 100ms
 #define OWD_TARGET_LO 100 * GST_MSECOND
 //Max OWD target. Default value: 0.4s -> 400ms
@@ -65,7 +65,7 @@ G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 #define RATE_ADJUST_INTERVAL 200 * GST_MSECOND /* ms */
 //Min target_bitrate [bps]
 //#define TARGET_BITRATE_MIN 500000
-#define TARGET_BITRATE_MIN SUBFLOW_DEFAULT_SENDING_RATE
+#define TARGET_BITRATE_MIN SUBFLOW_DEFAULT_SENDING_RATE / 2
 //Max target_bitrate [bps]
 #define TARGET_BITRATE_MAX 0
 //Timespan [s] from lowest to highest bitrate. Default value: 10s->10000ms
@@ -118,7 +118,6 @@ struct _Moment{
   gboolean          recent_lost;
   gboolean          path_is_congested;
   gboolean          path_is_lossy;
-  gboolean          path_is_slow;
   gboolean          tr_is_mitigated;
   gint32            has_expected_lost;
   gint32            incoming_bitrate;
@@ -438,6 +437,7 @@ void subratectrler_set(SubflowRateController *this,
   this->max_target_point = MAX(TARGET_BITRATE_MAX, sending_target * 2);
   this->discard_aggressivity = DEFAULT_DISCARD_AGGRESSIVITY;
   this->ramp_up_aggressivity = DEFAULT_RAMP_UP_AGGRESSIVITY;
+  this->change_target_bitrate_fnc = _change_target_bitrate;
   _switch_stage_to(this, STAGE_CHECK, FALSE);
   _transit_state_to(this, STATE_STABLE);
   subanalyser_reset(this->analyser);
@@ -476,7 +476,8 @@ void subratectrler_time_update(
   numstracker_add(this->TR_window, this->target_bitrate);
   this->target_fraction = this->ir_sum / this->tr_sum;
 
-  _change_target_bitrate(this, _adjust_bitrate(this));
+  this->change_target_bitrate_fnc(this, _adjust_bitrate(this));
+//  _change_target_bitrate(this, _adjust_bitrate(this));
   if(this->bitrate_flags & BITRATE_FORCED){
     _set_pacing_bitrate(this, this->target_bitrate * 1.5, TRUE);
   }
@@ -531,7 +532,6 @@ void subratectrler_measurement_update(
   _mt0(this)->recent_lost         = measurement->recent_lost;
   _mt0(this)->recent_discard      = measurement->recent_discarded_bytes;
   _mt0(this)->path_is_lossy       = !mprtps_path_is_non_lossy(this->path);
-  _mt0(this)->path_is_slow        = !mprtps_path_is_not_slow(this->path);
   _mt0(this)->has_expected_lost   = _mt1(this)->has_expected_lost;
   _mt0(this)->state               = _mt1(this)->state;
   _mt0(this)->stage               = _mt1(this)->stage;
@@ -588,13 +588,13 @@ void
 _reduce_stage(
     SubflowRateController *this)
 {
-
-  _add_congestion_point(this, _TR(this));
-  if(_RateCorr(this) < .75) this->target_bitrate = _TR(this) * .6;
-  else                      this->target_bitrate = _TR(this) * .8;
-
+  gint32 target;
+  target = MIN(_SR(this), _TR(this));
+  _add_congestion_point(this, target);
+  this->max_target_point = target;
+  if(_RateCorr(this) < .9) this->target_bitrate = target * .6;
+  else                     this->target_bitrate = target * .8;
   this->desired_bitrate = this->min_target_point = this->target_bitrate;
-  this->max_target_point = _TR(this);
   _set_bitrate_flags(this, BITRATE_FORCED);
   _switch_stage_to(this, STAGE_RELEASE, FALSE);
 }
@@ -729,6 +729,7 @@ _probe_stage(
   }else{
     _set_bitrate_flags(this, BITRATE_CHANGE);
   }
+  _disable_monitoring(this);
   _switch_stage_to(this, STAGE_RAISE, FALSE);
 
 done:
@@ -749,7 +750,7 @@ _raise_stage(
   }
 
   //check weather we reached the desired target or not
-  if(_TRateCorr(this) < .9 || this->target_bitrate < this->desired_bitrate * .98){
+  if(_TRateCorr(this) < .9 || this->target_bitrate < this->desired_bitrate * .97){
     goto done;
   }
   //refresh target points
@@ -1160,7 +1161,7 @@ void _log_measurement_update_state(SubflowRateController *this)
 
           "############ S%d | State: %-2d | Disable time %lu | Ctrled: %d #################\n"
           "rlost:      %-10d| rdiscard:%-10d| lost:    %-10d| discard: %-10d|\n"
-          "pth_cong:   %-10d| pth_lssy:%-10d| pth_slow:%-10d| pacing:  %-10d|\n"
+          "pth_cong:   %-10d| pth_lssy:%-10d| pacing:  %-10d|\n"
           "DeCorrH:    %-10.3f| DeCorrL: %-10.3f| DeCorrT: %-10.3f| DiCoeff: %-10.6f|\n"
           "RateCorr:   %-10.3f| TRateCorr:%-10.3f|\n"
           "target_br:  %-10d| min_tbr: %-10d| max_tbr: %-10d| dis_br:  %-10d|\n"
@@ -1178,7 +1179,6 @@ void _log_measurement_update_state(SubflowRateController *this)
 
           !mprtps_path_is_non_congested(this->path),
           !mprtps_path_is_non_lossy(this->path),
-          !mprtps_path_is_not_slow(this->path),
           this->path_is_paced,
 
           0., 0.,

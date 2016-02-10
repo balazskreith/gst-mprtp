@@ -12,7 +12,7 @@
 LATENCY=100
 JITTER=1
 MAXBW=1000
-
+MINBW=700
 while [[ $# > 1 ]]
 do
 key="$1"
@@ -22,7 +22,10 @@ case $key in
     MAXBW="$2"
     shift # past argument
     ;;
-
+    -n|--minbw)
+    MINBW="$2"
+    shift # past argument
+    ;;
     --default)
     DEFAULT=YES
     ;;
@@ -33,9 +36,9 @@ esac
 shift # past argument or value
 done
 
-MINBW=500
+
 BWDIFF=500
-let "MINBW = $MAXBW / 2"
+#let "MINBW = $MAXBW / 2"
 let "BWDIFF = MAXBW - MINBW"
 
 #echo "Setup veth2 to 1000KBit"

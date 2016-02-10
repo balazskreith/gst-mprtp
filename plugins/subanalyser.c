@@ -215,7 +215,11 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
   _priv(this)->off_d1 = _priv(this)->off_d0;
   _priv(this)->off_d0 = (gdouble) measurement->late_discarded_bytes / (gdouble) measurement->received_payload_bytes;
 
+  //The value of DeCorrT can be approximate with this:
   result->DeCorrT   =  (_priv(this)->off_t0 * .5 + _priv(this)->off_t1 * .25 + _priv(this)->off_t2 * .25) / (-.2);
+  //or with this:
+  //result->DeCorrT   =  (_priv(this)->delay_t0 * .5 + _priv(this)->delay_t1 * .25 + _priv(this)->delay_t2 * .25) / (_priv(this)->delay_avg * 0.8) - 1;
+
   result->RateCorr  = (gdouble) _priv(this)->rr_sum / (gdouble) _priv(this)->sr_sum;
   result->DeAvgT    =  _priv(this)->delay_t0 / (2. *  _priv(this)->delay_avg);
   result->TRateCorr = (gdouble) _priv(this)->sr_sum / (gdouble) _priv(this)->tr_sum;

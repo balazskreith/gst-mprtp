@@ -40,7 +40,7 @@ let "BWDIFF = MAXBW - MINBW"
 
 #echo "Setup veth2 to 1000KBit"
 BW=$MAXBW
-tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit 
+tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit 
 tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
 for j in `seq 1 120`;
 do
@@ -53,7 +53,7 @@ done
 for i in `seq 1 4`;
 do
   let BW=MAXBW-BWDIFF/4*$i
-  tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+  tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit
   tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
   for j in `seq 1 15`;
   do
@@ -65,7 +65,7 @@ done
 
 #constant bw
 BW=$MINBW
-tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit
 tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
 for j in `seq 1 60`;
 do
@@ -78,7 +78,7 @@ done
 for i in `seq 1 8`;
 do
   let BW=MINBW+BWDIFF/8*$i
-  tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+  tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit
   tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
   for j in `seq 1 7`;
   do
@@ -90,7 +90,7 @@ done
 
 #constant bw
 BW=$MAXBW
-tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit
 tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
 for j in `seq 1 60`;
 do
@@ -103,7 +103,7 @@ done
 for i in `seq 1 8`;
 do
   let BW=MAXBW-BWDIFF/8*$i
-  tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+  tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit
   tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
   for j in `seq 1 7`;
   do
@@ -115,7 +115,7 @@ done
 
 #constant bw
 BW=$MINBW
-tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit
 tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
 for j in `seq 1 60`;
 do
@@ -128,7 +128,7 @@ done
 for i in `seq 1 4`;
 do
   let BW=MINBW+BWDIFF/4*$i
-  tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+  tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit
   tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
   for j in `seq 1 15`;
   do
@@ -140,7 +140,7 @@ done
 
 #constant bw
 BW=$MINBW
-tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit
 tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
 for j in `seq 1 60`;
 do
@@ -151,7 +151,7 @@ done
 
 #constant bw
 BW=$MAXBW
-tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit
 tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
 for j in `seq 1 60`;
 do
@@ -162,7 +162,7 @@ done
 
 #constant bw
 BW=$MINBW
-tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit
 tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
 for j in `seq 1 60`;
 do
@@ -173,7 +173,7 @@ done
 
 #constant bw
 BW=$MAXBW
-tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit
 tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
 for j in `seq 1 60`;
 do
@@ -184,7 +184,7 @@ done
 
 #constant bw
 BW=$MAXBW
-tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit
 tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
 for j in `seq 1 30`;
 do
@@ -197,7 +197,7 @@ done
 for i in `seq 1 8`;
 do
   let BW=MAXBW-BWDIFF/8*$i
-  tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+  tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit
   tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
   for j in `seq 1 7`;
   do
@@ -208,7 +208,7 @@ done
 #14.5 minute
 
 BW=$MINBW
-tc class change dev veth2 parent 2:2 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit
+tc class change dev veth2 parent 2:2 classid 2:22 htb rate "$BW"Kbit ceil "$BW"Kbit
 tc qdisc change dev veth2 parent 2:22 netem delay "$LATENCY"ms "$JITTER"ms
 for j in `seq 1 30`;
 do

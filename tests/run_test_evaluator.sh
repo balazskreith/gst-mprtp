@@ -25,6 +25,7 @@ SOURCE_DIR="logs"
 
 PROFILE=$1
 let "ACTIVE_SUBFLOWS=$PROFILE&7"
+let "FOREMAN=$PROFILE&8"
 
 if [ "$ACTIVE_SUBFLOWS" -eq 7 ]
 then
@@ -157,17 +158,17 @@ cd ../../Research-Scripts/gnuplot
 
 if [ "$ACTIVE_SUBFLOWS" -eq 7 ]
 then
-  gnuplot -e "subflow_id='1'" -e "interface_id='0'" mprtp-subflow-report.plot
-  gnuplot -e "subflow_id='2'" -e "interface_id='2'" mprtp-subflow-report.plot
-  gnuplot -e "subflow_id='3'" -e "interface_id='4'" mprtp-subflow-report.plot
+  gnuplot -e "subflow_id='1'" -e "interface_id='0'" -e "foreman='"$FOREMAN"'" mprtp-subflow-report.plot
+  gnuplot -e "subflow_id='2'" -e "interface_id='2'" -e "foreman='"$FOREMAN"'"  mprtp-subflow-report.plot
+  gnuplot -e "subflow_id='3'" -e "interface_id='4'" -e "foreman='"$FOREMAN"'"  mprtp-subflow-report.plot
   gnuplot -e "subflow_num='3'" mprtp-sum-report.plot
 elif [ "$ACTIVE_SUBFLOWS" -eq 3 ]
 then
-  gnuplot -e "subflow_id='1'" -e "interface_id='0'" mprtp-subflow-report.plot
-  gnuplot -e "subflow_id='2'" -e "interface_id='2'" mprtp-subflow-report.plot
+  gnuplot -e "subflow_id='1'" -e "interface_id='0'" -e "foreman='"$FOREMAN"'" mprtp-subflow-report.plot
+  gnuplot -e "subflow_id='2'" -e "interface_id='2'" -e "foreman='"$FOREMAN"'" mprtp-subflow-report.plot
   gnuplot -e "subflow_num='2'" mprtp-sum-report.plot
 else
-  gnuplot -e "subflow_id='1'" -e "interface_id='0'" mprtp-subflow-report.plot
+  gnuplot -e "subflow_id='1'" -e "interface_id='0'" -e "foreman='"$FOREMAN"'" mprtp-subflow-report.plot
   gnuplot -e "subflow_num='1'" mprtp-sum-report.plot
 fi
 #gnuplot -e "subflow_id='1'" -e "interface_id='0'" mprtp-subflow-report.plot

@@ -189,9 +189,11 @@ struct _Moment{
 #define _TR(this) this->target_bitrate
 #define _IR(this) _mt0(this)->incoming_bitrate
 #define _SR(this) _mt0(this)->sender_bitrate
+
 #define _mitigated(this) _mt0(this)->tr_is_mitigated
 #define _mitigated_t1(this) _mt1(this)->tr_is_mitigated
 #define _mitigated_t2(this) _mt2(this)->tr_is_mitigated
+#define _mitigate(this) _mitigated(this) = TRUE
 #define _aggressivity(this) this->discard_aggressivity
 #define _set_event(this, e) _mt0(this)->event = e
 #define _event(this) _mt0(this)->event
@@ -437,6 +439,8 @@ void subratectrler_set(SubflowRateController *this,
   this->max_target_point = MAX(TARGET_BITRATE_MAX, sending_target * 2);
   this->discard_aggressivity = DEFAULT_DISCARD_AGGRESSIVITY;
   this->ramp_up_aggressivity = DEFAULT_RAMP_UP_AGGRESSIVITY;
+
+  //Todo: Using this fnc pointer in SndRateDistor for central rate distribution.
   this->change_target_bitrate_fnc = _change_target_bitrate;
   _switch_stage_to(this, STAGE_CHECK, FALSE);
   _transit_state_to(this, STATE_STABLE);
@@ -666,6 +670,10 @@ _check_stage(
   //In that case we found a target point and ready to ramp up
   this->min_target_point = _TR(this) *  .95;
   this->max_target_point = _TR(this) * 1.05;
+
+  if(.5 < _DeCorrT_t1(this)){
+    goto done;
+  }
   _set_event(this, EVENT_STEADY);
 
 done:

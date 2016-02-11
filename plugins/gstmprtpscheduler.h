@@ -61,6 +61,7 @@ struct _GstMprtpscheduler
   GRWLock                       rwmutex;
   StreamSplitter*               splitter;
   SndController*                controller;
+  gboolean                      logging;
   gboolean                      riport_flow_signal_sent;
   guint                         subflows_num;
 

@@ -114,6 +114,7 @@ enum
   PROP_PIVOT_CLOCK_RATE,
   PROP_AUTO_RATE_AND_CC,
   PROP_RTP_PASSTHROUGH,
+  PROP_LOG_ENABLED,
   PROP_SUBFLOWS_STATS,
   PROP_DELAY_OFFSET,
 };
@@ -254,6 +255,12 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           "Indicate the passthrough mode on no active subflow case",
           "Indicate weather the schdeuler let the packets travel "
           "through the element if it hasn't any active subflow.",
+          TRUE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_LOG_ENABLED,
+      g_param_spec_boolean ("logging",
+          "Indicate weather a log for subflow is enabled or not",
+          "Indicate weather a log for subflow is enabled or not",
           TRUE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SUBFLOWS_STATS,
@@ -458,6 +465,13 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       THIS_WRITELOCK (this);
       gboolean_value = g_value_get_boolean (value);
       this->rtp_passthrough = gboolean_value;
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_LOG_ENABLED:
+      THIS_WRITELOCK (this);
+      gboolean_value = g_value_get_boolean (value);
+      this->logging = gboolean_value;
+      rcvctrler_set_logging_flag(this->controller, this->logging);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_AUTO_RATE_AND_CC:

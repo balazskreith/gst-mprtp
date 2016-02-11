@@ -310,6 +310,8 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
   if(test_parameters_.subflow3_active)
     g_object_set (mprtpply, "join-subflow", 3, NULL);
 
+  g_object_set(mprtpply, "logging", TRUE, NULL);
+
   if(0 && test_parameters_.video_session == FOREMAN_SOURCE)
     g_object_set(mprtpply, "delay-offset", 2 * GST_SECOND, NULL);
 

@@ -452,6 +452,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   }else if(test_parameters_.test_directive == MANUAL_RATE_CONTROLLING)
     g_timeout_add (1000, _random_rate_controller, mprtpsch);
 
+  g_object_set(mprtpsch, "logging", TRUE, NULL);
 
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");

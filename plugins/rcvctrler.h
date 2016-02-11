@@ -34,6 +34,7 @@ struct _RcvController
   GstTask*          thread;
   GRecMutex         thread_mutex;
 
+  gboolean          stat_enabled;
   GstTask*          stat_thread;
   GRecMutex         stat_thread_mutex;
 
@@ -76,6 +77,8 @@ void
 rcvctrler_rem_path (
     RcvController *this,
     guint8 subflow_id);
+
+void rcvctrler_set_logging_flag(RcvController *this, gboolean enable);
 
 void
 rcvctrler_report_can_flow (RcvController *this);

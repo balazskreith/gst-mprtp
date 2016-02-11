@@ -84,6 +84,7 @@ struct _GstMprtpplayouter
 
   GHashTable*     paths;
   StreamJoiner*   joiner;
+  gboolean          logging;
   RcvController*    controller;
   GstClock*       sysclock;
 //  GQueue*         mprtp_buffer_pool;

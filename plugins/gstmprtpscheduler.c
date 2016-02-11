@@ -122,6 +122,7 @@ enum
   PROP_AUTO_RATE_AND_CC,
   PROP_SET_SENDING_TARGET,
   PROP_INITIAL_DISABLING,
+  PROP_LOG_ENABLED,
   PROP_SUBFLOWS_STATS,
 };
 
@@ -278,6 +279,12 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "Collect subflow statistics and return with "
           "a structure contains it",
           "NULL", G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_LOG_ENABLED,
+      g_param_spec_boolean ("logging",
+          "Indicate weather a log for subflow is enabled or not",
+          "Indicate weather a log for subflow is enabled or not",
+          TRUE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   _subflows_utilization =
       g_signal_new ("mprtp-subflows-utilization", G_TYPE_FROM_CLASS (klass),
@@ -468,6 +475,13 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       THIS_WRITELOCK (this);
       guint64_value = g_value_get_uint64 (value);
       sndctrler_set_initial_disabling(this->controller, guint64_value);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_LOG_ENABLED:
+      THIS_WRITELOCK (this);
+      gboolean_value = g_value_get_boolean (value);
+      this->logging = gboolean_value;
+      sndctrler_set_logging_flag(this->controller, this->logging);
       THIS_WRITEUNLOCK (this);
       break;
     default:

@@ -64,6 +64,7 @@ struct _SndController
   gboolean               enabled;
 //
 //  //for stat and plot
+  gboolean          stat_enabled;
   GstTask*          stat_thread;
   GRecMutex         stat_thread_mutex;
 };
@@ -92,6 +93,8 @@ void
 sndctrler_rem_path (SndController *controller_ptr, guint8 subflow_id);
 void
 sndctrler_add_path (SndController *controller_ptr, guint8 subflow_id, MPRTPSPath * path);
+void
+sndctrler_set_logging_flag(SndController *this, gboolean enable);
 void
 sndctrler_riport_can_flow (SndController *this);
 void sndctrler_receive_mprtcp (SndController *this,GstBuffer * buf);

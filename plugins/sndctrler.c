@@ -352,7 +352,6 @@ sndctrler_init (SndController * this)
   g_rec_mutex_init (&this->stat_thread_mutex);
   this->stat_thread = gst_task_new (sefctrler_stat_run, this, NULL);
   gst_task_set_lock (this->stat_thread, &this->stat_thread_mutex);
-  gst_task_start (this->stat_thread);
 
 }
 
@@ -545,6 +544,22 @@ sndctrler_setup_siganling(gpointer ptr,
   THIS_WRITELOCK (this);
   this->utilization_signal_func = scheduler_signaling;
   this->utilization_signal_data = scheduler;
+  THIS_WRITEUNLOCK (this);
+}
+
+void
+sndctrler_set_logging_flag(SndController *this, gboolean enable)
+{
+  THIS_WRITELOCK (this);
+  if(this->stat_enabled ^ enable){
+    if(enable) {
+        gst_task_start (this->stat_thread);
+    }
+    else {
+        gst_task_stop(this->stat_thread);
+    }
+    this->stat_enabled = enable;
+  }
   THIS_WRITEUNLOCK (this);
 }
 

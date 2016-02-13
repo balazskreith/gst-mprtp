@@ -284,7 +284,7 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
       g_param_spec_boolean ("logging",
           "Indicate weather a log for subflow is enabled or not",
           "Indicate weather a log for subflow is enabled or not",
-          TRUE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   _subflows_utilization =
       g_signal_new ("mprtp-subflows-utilization", G_TYPE_FROM_CLASS (klass),
@@ -518,6 +518,11 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
     case PROP_AUTO_RATE_AND_CC:
       THIS_READLOCK (this);
       g_value_set_boolean (value, this->auto_rate_and_cc);
+      THIS_READUNLOCK (this);
+      break;
+    case PROP_LOG_ENABLED:
+      THIS_READLOCK (this);
+      g_value_set_boolean (value, this->logging);
       THIS_READUNLOCK (this);
       break;
     case PROP_SUBFLOWS_STATS:
@@ -757,7 +762,7 @@ gst_mprtpscheduler_mprtp_proxy(gpointer ptr, GstBuffer * buffer)
     _setup_timestamp(this, &rtp);
   }
 
-//  g_print("Send: %u payload: %u\n", gst_rtp_buffer_get_seq(&rtp), gst_rtp_buffer_get_payload_type(&rtp));
+  //g_print("Send: %u payload: %u\n", gst_rtp_buffer_get_seq(&rtp), gst_rtp_buffer_get_payload_type(&rtp));
   gst_rtp_buffer_unmap (&rtp);
   if(this->auto_rate_and_cc){
     monitorpackets_push_rtp_packet(this->monitorpackets, outbuf);
@@ -805,11 +810,11 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   }
 
   if (!PACKET_IS_RTP_OR_RTCP (first_byte)) {
-    GST_WARNING_OBJECT (this, "Not RTP Packet arrived at rtp_sink");
+    GST_DEBUG_OBJECT (this, "Not RTP Packet arrived at rtp_sink");
     return gst_pad_push (this->mprtp_srcpad, buffer);
   }
   if(PACKET_IS_RTCP(second_byte)){
-    GST_WARNING_OBJECT (this, "RTCP Packet arrived on rtp sink");
+      GST_DEBUG_OBJECT (this, "RTCP Packet arrived on rtp sink");
     return gst_pad_push (this->mprtp_srcpad, buffer);
   }
   //the packet is rtp

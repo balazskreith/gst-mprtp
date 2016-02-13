@@ -582,6 +582,7 @@ gst_mprtpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
       GST_DEBUG_FUNCPTR (gst_mprtpsender_src_activate_mode));
 //  gst_pad_set_active (srcpad, TRUE);
 
+  gst_pad_set_active(srcpad,TRUE);
   gst_element_add_pad (GST_ELEMENT (this), srcpad);
 
   return srcpad;
@@ -616,8 +617,6 @@ gst_mprtpsender_change_state (GstElement * element, GstStateChange transition)
   ret =
       GST_ELEMENT_CLASS (gst_mprtpsender_parent_class)->change_state (element,
       transition);
-  g_print("Change state: %d\n", ret);
-
   switch (transition) {
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
       break;

@@ -261,7 +261,7 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
       g_param_spec_boolean ("logging",
           "Indicate weather a log for subflow is enabled or not",
           "Indicate weather a log for subflow is enabled or not",
-          TRUE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SUBFLOWS_STATS,
       g_param_spec_string ("subflow-stats",
@@ -535,6 +535,11 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
       THIS_READLOCK (this);
       g_value_set_string (value,
           gst_structure_to_string (_collect_infos (this)));
+      THIS_READUNLOCK (this);
+      break;
+    case PROP_LOG_ENABLED:
+      THIS_READLOCK (this);
+      g_value_set_boolean (value, this->logging);
       THIS_READUNLOCK (this);
       break;
     default:

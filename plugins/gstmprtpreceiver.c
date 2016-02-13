@@ -386,7 +386,6 @@ gst_mprtpreceiver_sink_query (GstPad * sinkpad, GstObject * parent,
 {
   GstMprtpreceiver *this = GST_MPRTPRECEIVER (parent);
   gboolean result;
-  g_print ("RCV SINK QUERY to the element: %s\n", GST_QUERY_TYPE_NAME (query));
   GST_DEBUG_OBJECT (this, "query");
 //  g_print ("QUERY to the sink: %s\n", GST_QUERY_TYPE_NAME (query));
   switch (GST_QUERY_TYPE (query)) {
@@ -405,7 +404,6 @@ gst_mprtpreceiver_src_query (GstPad * srcpad, GstObject * parent,
 {
   GstMprtpreceiver *this = GST_MPRTPRECEIVER (parent);
   gboolean result;
-  g_print ("RCV SRC QUERY to the element: %s\n", GST_QUERY_TYPE_NAME (query));
   GST_DEBUG_OBJECT (this, "query");
 //  g_print ("QUERY to the sink: %s\n", GST_QUERY_TYPE_NAME (query));
   switch (GST_QUERY_TYPE (query)) {
@@ -442,7 +440,6 @@ gst_mprtpreceiver_sink_event (GstPad * pad, GstObject * parent,
   GstMprtpreceiver *this = GST_MPRTPRECEIVER (parent);
   gboolean result = FALSE;
   GstPad *peer;
-  g_print ("RCV EVENT to the sink: %s", GST_EVENT_TYPE_NAME (event));
   GST_DEBUG_OBJECT (this, "sink event");
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_SEGMENT:

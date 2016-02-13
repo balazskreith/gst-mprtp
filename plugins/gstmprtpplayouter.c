@@ -649,7 +649,6 @@ gst_mprtpplayouter_sink_query (GstPad * sinkpad, GstObject * parent,
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (parent);
   gboolean result;
   GST_DEBUG_OBJECT (this, "query");
-  g_print ("PLY SINK QUERY to the element: %s\n", GST_QUERY_TYPE_NAME (query));
   switch (GST_QUERY_TYPE (query)) {
 
     default:
@@ -673,7 +672,6 @@ gst_mprtpplayouter_sink_event (GstPad * pad, GstObject * parent,
   guint guint_value;
 
   GST_DEBUG_OBJECT (this, "sink event");
-  g_print ("PLY EVENT to the sink: %s", GST_EVENT_TYPE_NAME (event));
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_LATENCY:
       {
@@ -815,7 +813,6 @@ gst_mprtpplayouter_query (GstElement * element, GstQuery * query)
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (element);
   gboolean ret = TRUE;
   GstStructure *s;
-  g_print ("PLY QUERY to the element: %s\n", GST_QUERY_TYPE_NAME (query));
   GST_DEBUG_OBJECT (this, "query");
   switch (GST_QUERY_TYPE (query)) {
     case GST_QUERY_CUSTOM:

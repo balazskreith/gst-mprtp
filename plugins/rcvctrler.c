@@ -440,7 +440,7 @@ refctrler_ticker (void *data)
   _system_notifier_main(this);
 
 done:
-  next_scheduler_time = _now(this) + 100 * GST_MSECOND;
+  next_scheduler_time = _now(this) + 50 * GST_MSECOND;
   THIS_WRITEUNLOCK (this);
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
 
@@ -1071,7 +1071,8 @@ _setup_xr_rfc7097 (Subflow * this,
   guint8 thinning = 0;
 
 //  chunks = mprtpr_path_get_XR7097_packet_nums_chunks(this->path, &chunks_num_, &begin_seq, &end_seq);
-  chunks = mprtpr_path_get_XR7097_sum_bytes_chunks(this->path, &chunks_num_, &begin_seq, &end_seq);
+//  chunks = mprtpr_path_get_XR7097_sum_bytes_chunks(this->path, &chunks_num_, &begin_seq, &end_seq);
+  chunks = mprtpr_path_get_discard_chunks(this->path, &chunks_num_, &begin_seq, &end_seq);
   result = g_malloc0(sizeof(*xr) + (chunks_num_ - 2) * 2);
 //  g_print("chunks num: %u, size of bytes xr: %lu, total: %lu\n",
 //          chunks_num, sizeof(*xr), sizeof(*xr) + (chunks_num - 2) * 2);
@@ -1104,7 +1105,8 @@ _setup_xr_rfc3611 (Subflow * this,
   gboolean early_bit = FALSE;
   guint8 thinning = 0;
 
-  chunks = mprtpr_path_get_XR3611_chunks(this->path, &chunks_num_, &begin_seq, &end_seq);
+//  chunks = mprtpr_path_get_XR3611_chunks(this->path, &chunks_num_, &begin_seq, &end_seq);
+  chunks = mprtpr_path_get_lost_chunks(this->path, &chunks_num_, &begin_seq, &end_seq);
   result = g_malloc0(sizeof(*xr) + (chunks_num_ - 2) * 2);
 //  g_print("chunks num: %u, size of bytes xr: %lu, total: %lu\n",
 //          chunks_num, sizeof(*xr), sizeof(*xr) + (chunks_num - 2) * 2);

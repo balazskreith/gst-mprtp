@@ -1,3 +1,4 @@
+#! /bin/bash
 #Test3 - Playout test
 #echo "Single congestion test on veth0"
 #echo "S1:100ms - 2ms"
@@ -10,9 +11,33 @@
 
 LATENCY=100
 JITTER=1
+MAXBW=1000
+MINBW=700
 
-BW=1000
-tc qdisc change dev veth0 parent 1:12 netem loss 20%
+while [[ $# > 1 ]]
+do
+key="$1"
+
+case $key in
+    -x|--maxbw)
+    MAXBW="$2"
+    shift # past argument
+    ;;
+    -n|--minbw)
+    MINBW="$2"
+    shift # past argument
+    ;;
+    --default)
+    DEFAULT=YES
+    ;;
+    *)
+            # unknown option
+    ;;
+esac
+shift # past argument or value
+done
+
+BW=$MAXBW
 tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit 
 tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
 for j in `seq 1 900`;

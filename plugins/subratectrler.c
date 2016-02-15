@@ -95,7 +95,7 @@ typedef enum{
 
 typedef enum{
   STAGE_REDUCE            = -3,
-  STAGE_RELEASE           = -2,
+  STAGE_BOUNCE           = -2,
   STAGE_MITIGATE          = -1,
   STAGE_CHECK             =  0,
   STAGE_PROBE             =  1,
@@ -122,6 +122,7 @@ struct _Moment{
   gint32            has_expected_lost;
   gint32            incoming_bitrate;
   gint32            sender_bitrate;
+  gint32            receiver_bitrate;
   gdouble           discard_rate;
   SubAnalyserResult analysation;
 
@@ -163,23 +164,13 @@ struct _Moment{
 #define _anres_t2(this) _mt2(this)->analysation
 //#define _reset_target_points(this) numstracker_reset(this->target_points)
 #define _skip_frames_for(this, duration) mprtps_path_set_skip_duration(this->path, duration);
-#define _DeCorrH(this) _anres(this).DeCorrH
-#define _DeCorrL(this) _anres(this).DeCorrL
-#define _DeCorrT(this) _anres(this).DeCorrT
-#define _RateCorr(this) _anres(this).RateCorr
-#define _TRateCorr(this) _anres(this).TRateCorr
-#define _DeCorrT_t1(this) _anres_t1(this).DeCorrT
-#define _DiCoeffT(this) (0. < _DeCorrT_t1(this) ? _DeCorrT(this) / _DeCorrT_t1(this) : 0.)
-#define _RRxBiF(this) _anres(this).RRxBiF
-
+#define _qtrend(this) _anres(this).qtrend
+#define _qtrend_th(this) 1.01
+#define _qtrend_th2(this) 1.2
 #define _rdiscard(this) (0 < _mt0(this)->recent_discard)
-#define _discard_rate(this) _mt0(this)->discard_rate
-#define _discrate(this) _discard_rate(this)
-//#define _lost(this)  (!_mt0(this)->has_expected_lost && !_mt0(this)->path_is_lossy && _mt0(this)->lost > 0)
+#define _discard(this) (this->discard_aggressivity < _anres(this).discards_rate)
 #define _lost(this)  (_mt0(this)->has_expected_lost ? FALSE : _mt0(this)->path_is_lossy ? FALSE : _mt0(this)->lost > 0)
 #define _rlost(this) (!_mt0(this)->has_expected_lost && !_mt0(this)->path_is_lossy && _mt0(this)->recent_lost > 0)
-//#define _discard(this) (!_mt0(this)->path_is_slow && _discard_rate(this) > .2)
-#define _discard(this) (1. < _discard_rate(this))
 #define _state_t1(this) _mt1(this)->state
 #define _state(this) _mt0(this)->state
 #define _stage(this) _mt0(this)->stage
@@ -189,16 +180,14 @@ struct _Moment{
 #define _TR(this) this->target_bitrate
 #define _IR(this) _mt0(this)->incoming_bitrate
 #define _SR(this) _mt0(this)->sender_bitrate
+#define _RR(this) _mt0(this)->receiver_bitrate
+#define _MSR(this) _anres(this).sending_rate_median
+#define _TRcorr(this) (gdouble)_MSR(this) / (gdouble)_TR(this)
+#define _RRcorr(this) (gdouble)_RR(this) / (gdouble)_SR(this)
 
-#define _mitigated(this) _mt0(this)->tr_is_mitigated
-#define _mitigated_t1(this) _mt1(this)->tr_is_mitigated
-#define _mitigated_t2(this) _mt2(this)->tr_is_mitigated
-#define _mitigate(this) _mitigated(this) = TRUE
-#define _aggressivity(this) this->discard_aggressivity
 #define _set_event(this, e) _mt0(this)->event = e
 #define _event(this) _mt0(this)->event
 #define _event_t1(this) _mt1(this)->event
-#define _late(this) 1. < _anres(this).DeAvgT
 
 
  static Moment*
@@ -210,7 +199,7 @@ _reduce_stage(
     SubflowRateController *this);
 
 static void
-_release_stage(
+_bounce_stage(
     SubflowRateController *this);
 
 static void
@@ -323,16 +312,6 @@ static gboolean
      SubflowRateController *this);
 
 static void
-_ir_stat_pipe(
-    gpointer data,
-    NumsTrackerStatData *stat);
-
-static void
-_tr_stat_pipe(
-    gpointer data,
-    NumsTrackerStatData *stat);
-
-static void
 _append_to_log(
     SubflowRateController *this,
     const gchar * format,
@@ -380,12 +359,7 @@ subratectrler_init (SubflowRateController * this)
   this->moments = g_malloc0(sizeof(Moment) * MOMENTS_LENGTH);
   this->sysclock = gst_system_clock_obtain();
   this->analyser = make_subanalyser(10, 10 * GST_SECOND);
-  this->IR_window = make_numstracker(32, 5 * GST_SECOND);
-  numstracker_add_plugin(this->IR_window, (NumsTrackerPlugin*)make_numstracker_stat_plugin(_ir_stat_pipe, this));
-  this->TR_window = make_numstracker(32, 5 * GST_SECOND);
-  numstracker_add_plugin(this->TR_window, (NumsTrackerPlugin*)make_numstracker_stat_plugin(_tr_stat_pipe, this));
   g_rw_lock_init (&this->rwmutex);
-
 }
 
 
@@ -469,17 +443,11 @@ void subratectrler_time_update(
                          UtilizationSubflowReport *rep,
                          gboolean *overused)
 {
-  gint64 ir;
-
   if (_now(this) - RATE_ADJUST_INTERVAL < this->last_target_bitrate_adjust) {
     goto done;
   }
 
-  mprtps_path_get_sent_bytes_in1s(this->path, &ir);
-  numstracker_add(this->IR_window, ir * 8);
-  numstracker_add(this->TR_window, this->target_bitrate);
-  this->target_fraction = this->ir_sum / this->tr_sum;
-
+  subanalyser_time_update(this->analyser, this->path);
   this->change_target_bitrate_fnc(this, _adjust_bitrate(this));
 //  _change_target_bitrate(this, _adjust_bitrate(this));
   if(this->bitrate_flags & BITRATE_FORCED){
@@ -491,7 +459,7 @@ void subratectrler_time_update(
 done:
   if(rep){
     rep->lost_bytes = _mt0(this)->lost;
-    rep->discarded_rate = _discard_rate(this) * 100.;
+    rep->discarded_rate = _discard(this);
     rep->owd = 0;//Todo: Fix it
     rep->max_rate = this->max_rate;
     rep->min_rate = this->min_rate;
@@ -540,8 +508,9 @@ void subratectrler_measurement_update(
   _mt0(this)->state               = _mt1(this)->state;
   _mt0(this)->stage               = _mt1(this)->stage;
   _mt0(this)->incoming_bitrate    = measurement->incoming_rate * 8;
-//  _mt0(this)->discard_rate        = 1. - measurement->goodput / measurement->receiver_rate;
+  _mt0(this)->discard_rate        = measurement->goodput / measurement->receiver_rate;
   _mt0(this)->sender_bitrate      = measurement->sender_rate * 8;
+  _mt0(this)->receiver_bitrate    = measurement->receiver_rate * 8;
   _mt0(this)->event               = EVENT_FI;
 
   if(measurement->expected_lost)
@@ -553,8 +522,6 @@ void subratectrler_measurement_update(
                                   measurement,
                                   _TR(this),
                                   &_mt0(this)->analysation);
-
-  _mt0(this)->discard_rate        = _anres(this).DiscRate;
 
   if(0 < this->disable_controlling && this->disable_controlling < _now(this)){
       this->disable_controlling = 0;
@@ -593,42 +560,33 @@ _reduce_stage(
     SubflowRateController *this)
 {
   gint32 target;
-  target = MIN(_SR(this), _TR(this));
+  target = MIN(_MSR(this), _TR(this));
   _add_congestion_point(this, target);
   this->max_target_point = target;
-  if(_RateCorr(this) < .9) this->target_bitrate = target * .6;
-  else                     this->target_bitrate = target * .8;
+  this->target_bitrate = target * _RRcorr(this) < .9 ? .6 : .8;
   this->desired_bitrate = this->min_target_point = this->target_bitrate;
   _set_bitrate_flags(this, BITRATE_FORCED);
-  _switch_stage_to(this, STAGE_RELEASE, FALSE);
+  _switch_stage_to(this, STAGE_BOUNCE, FALSE);
 }
 
 void
-_release_stage(
+_bounce_stage(
     SubflowRateController *this)
 {
-  if((4. < _DeCorrT(this) && 2. < _DiCoeffT(this))){
-    _switch_stage_to(this, STAGE_REDUCE, TRUE);
-    _set_event(this, EVENT_CONGESTION);
-    goto done;
+
+  if(_qtrend_th2(this) < _qtrend(this)){
+     _switch_stage_to(this, STAGE_REDUCE, TRUE);
+     goto done;
   }
+
   _open_cwnd(this);
 
-  this->desired_bitrate = this->max_target_point;
-  _set_bitrate_flags(this, BITRATE_CHANGE | BITRATE_SLOW);
-
-  if(_stage_t1(this) == STAGE_RELEASE &&
-     _stage_t2(this) == STAGE_RELEASE &&
-     _stage_t3(this) == STAGE_RELEASE){
-
-   _switch_stage_to(this, STAGE_REDUCE, TRUE);
-   _set_event(this, EVENT_CONGESTION);
-   goto done;
-  }
-
-  if(1. < _DeCorrT(this)){
+  if(_lost(this) || _discard(this)){
     goto done;
   }
+
+  this->desired_bitrate = this->max_target_point * .9;
+  _set_bitrate_flags(this, BITRATE_CHANGE);
   _switch_stage_to(this, STAGE_CHECK, FALSE);
   _set_event(this, EVENT_SETTLED);
 
@@ -640,40 +598,25 @@ void
 _check_stage(
     SubflowRateController *this)
 {
-
-  //Check weather the delay fluctuation is over the target
-  if(.5 < _DeCorrT(this) || 0. < _discrate(this)){
-    _switch_stage_to(this, STAGE_MITIGATE, TRUE);
-    _set_event(this, EVENT_DISTORTION);
-    goto done;
+  if(_qtrend_th(this) < _qtrend(this) || _discard(this)){
+     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
+     goto done;
   }
 
   this->desired_bitrate = this->max_target_point;
-  this->min_target_point = MAX(this->min_target_point, this->target_bitrate * .9);
   if(_is_near_to_congestion_point(this)){
     _set_bitrate_flags(this, BITRATE_CHANGE | BITRATE_SLOW);
   }else{
     _set_bitrate_flags(this, BITRATE_CHANGE);
   }
 
-  //check weather 90% of the sent bytes are received
-  if(_RateCorr(this) < .9){
-    goto done;
-  }
-
-  //Check weather the sent bitrate reached the target bitrate
-  //Check weather we reached the maximum bitrate point
-  if(_TRateCorr(this) < .9 || this->target_bitrate < this->max_target_point * .95){
+  if(_TRcorr(this) < .9 || _TR(this) < this->max_target_point * .95){
     goto done;
   }
 
   //In that case we found a target point and ready to ramp up
   this->min_target_point = _TR(this) *  .95;
   this->max_target_point = _TR(this) * 1.05;
-
-  if(.5 < _DeCorrT_t1(this)){
-    goto done;
-  }
   _set_event(this, EVENT_STEADY);
 
 done:
@@ -685,26 +628,19 @@ _mitigate_stage(
     SubflowRateController *this)
 {
   gint32 target;
-  if((4. < _DeCorrT(this) && 2. < _DiCoeffT(this))){
-    _switch_stage_to(this, STAGE_REDUCE, TRUE);
-    _set_event(this, EVENT_CONGESTION);
-    goto done;
+  if(_qtrend_th2(this) < _qtrend(this)){
+     _set_event(this, EVENT_CONGESTION);
+     goto done;
   }
 
-  target = MIN(_SR(this), _TR(this));
-  //determine target points
+  target = MIN(_MSR(this), _TR(this));
   _add_congestion_point(this, target);
   this->max_target_point = target * 1.05;
-
-  if( .95 < _TRateCorr(this) && target * .95 < this->min_target_point){
+  if( .95 < _TRcorr(this) && target * .95 < this->min_target_point){
     this->min_target_point*=.9;
   }
   this->target_bitrate = MAX(target * .95, this->min_target_point);
-  this->desired_bitrate = this->min_target_point;
-
-  if(1.5 < _DeCorrT(this) && 1.5 < _DeCorrT_t1(this)){
-//    this->distorted = TRUE;
-  }
+  this->desired_bitrate = MAX(target * .9, this->min_target_point);
 
   _set_bitrate_flags(this, BITRATE_CHANGE);
   _switch_stage_to(this, STAGE_CHECK, FALSE);
@@ -717,12 +653,9 @@ void
 _probe_stage(
     SubflowRateController *this)
 {
-  //Check weather the delay fluctuation is over the target
-//  if(.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)){
-  if((.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)) || _aggressivity(this) < _discrate(this)){
-    _switch_stage_to(this, STAGE_MITIGATE, TRUE);
-    _set_event(this, EVENT_DISTORTION);
-    goto done;
+  if(_qtrend_th(this) < _qtrend(this) || _discard(this)){
+     _set_event(this, EVENT_DISTORTION);
+     goto done;
   }
 
   //stay here for a while to check
@@ -730,15 +663,14 @@ _probe_stage(
     goto done;
   }
 
-
-  this->desired_bitrate = this->max_target_point + this->monitored_bitrate;
   if(_is_near_to_congestion_point(this)){
     _set_bitrate_flags(this, BITRATE_CHANGE | BITRATE_SLOW);
   }else{
     _set_bitrate_flags(this, BITRATE_CHANGE);
   }
+  this->desired_bitrate = this->max_target_point + this->monitored_bitrate;
   _disable_monitoring(this);
-  _switch_stage_to(this, STAGE_RAISE, FALSE);
+  _switch_stage_to(this, STAGE_RAISE, TRUE);
 
 done:
   return;
@@ -749,16 +681,12 @@ void
 _raise_stage(
     SubflowRateController *this)
 {
-
-  //check signs of distortion while rising the bitrate up
-  if((.75 < _DeCorrT(this) && 1. < _DiCoeffT(this)) || _aggressivity(this) < _discrate(this)){
-    _switch_stage_to(this, STAGE_MITIGATE, TRUE);
-    _set_event(this, EVENT_DISTORTION);
-    goto done;
+  if(_qtrend_th(this) < _qtrend(this) || _discard(this)){
+     _set_event(this, EVENT_DISTORTION);
+     goto done;
   }
 
-  //check weather we reached the desired target or not
-  if(_TRateCorr(this) < .9 || this->target_bitrate < this->desired_bitrate * .97){
+  if(_TRcorr(this) < .95 || _TR(this) < this->desired_bitrate * .95){
     goto done;
   }
   //refresh target points
@@ -781,8 +709,12 @@ _overused_state(
 
   //Evaluate events
   switch(_event(this)){
+    case EVENT_CONGESTION:
+     _disable_controlling(this);
+     break;
     case EVENT_SETTLED:
       _reset_monitoring(this);
+      _switch_stage_to(this, STAGE_CHECK, TRUE);
       _transit_state_to(this, STATE_STABLE);
       break;
     default:
@@ -796,7 +728,7 @@ _stable_state(
     SubflowRateController *this)
 {
   //supervise stage actions
-  if(_lost(this) || _discard(this) || _late(this)){
+  if(_lost(this)){
     _switch_stage_to(this, STAGE_REDUCE, TRUE);
     _transit_state_to(this, STATE_OVERUSED);
     _disable_controlling(this);
@@ -808,6 +740,7 @@ _stable_state(
   //Evaluate events
   switch(_event(this)){
     case EVENT_CONGESTION:
+      _switch_stage_to(this, STAGE_REDUCE, TRUE);
       _transit_state_to(this, STATE_OVERUSED);
       _disable_controlling(this);
       break;
@@ -827,7 +760,7 @@ void
 _monitored_state(
     SubflowRateController *this)
 {
-  if(_lost(this) || _discard(this) || _late(this)){
+  if(_lost(this)){
     _switch_stage_to(this, STAGE_REDUCE, TRUE);
     _transit_state_to(this, STATE_OVERUSED);
     _disable_controlling(this);
@@ -846,8 +779,8 @@ _monitored_state(
       break;
     case EVENT_STEADY:
       _setup_monitoring(this);
-      _switch_stage_to(this, STAGE_PROBE, FALSE);
-      _transit_state_to(this, STATE_MONITORED);
+      _switch_stage_to(this, STAGE_CHECK, FALSE);
+      _transit_state_to(this, STATE_STABLE);
       break;
     case EVENT_DISTORTION:
       _disable_monitoring(this);
@@ -905,8 +838,8 @@ void _switch_stage_to(
      case STAGE_REDUCE:
        this->stage_fnc = _reduce_stage;
      break;
-     case STAGE_RELEASE:
-       this->stage_fnc = _release_stage;
+     case STAGE_BOUNCE:
+       this->stage_fnc = _bounce_stage;
      break;
      case STAGE_MITIGATE:
        this->stage_fnc = _mitigate_stage;
@@ -956,32 +889,27 @@ gdouble _adjust_bitrate(SubflowRateController *this)
   gdouble actual_rate = _TR(this);
   gdouble frac = (gdouble) RATE_ADJUST_INTERVAL / (gdouble) (1 * GST_SECOND);
   gdouble max_increasement,min_increasement;
-  if(this->desired_bitrate < this->target_bitrate){
-    frac *= 3.;
-  }else if(this->target_bitrate < this->desired_bitrate){
+  if(this->target_bitrate < this->desired_bitrate){
     frac /= 1.-this->ramp_up_aggressivity;
   }
   max_increasement = RAMP_UP_MAX_SPEED * frac;
-  min_increasement = RAMP_UP_MAX_SPEED * .05;
+  min_increasement = RAMP_UP_MAX_SPEED * .01;
   if((this->bitrate_flags & BITRATE_CHANGE) == 0){
    goto done;
   }
 
   drate = this->desired_bitrate - this->target_bitrate;
   drate *= frac;
-  if(_is_near_to_congestion_point(this)){
-    drate *= MAX(.1, _get_congestion_influence(this));
-  }
   drate /= this->bitrate_flags & BITRATE_SLOW ? 3. : 1.;
-  if(0. < drate){
-    drate = CONSTRAIN(min_increasement, max_increasement, drate);
+  if(drate <= 0.){
+    if(1.1 < _TRcorr(this)) drate = 0.;
+    goto done;
   }
-
-  if(this->target_fraction < .9 && 0. < drate){
-    drate = 0.;
-  }else if(drate < 0. && 1.1 < this->target_fraction){
-    drate = 0.;
+  if(_is_near_to_congestion_point(this)){
+    drate *= _get_congestion_influence(this);
   }
+  drate = CONSTRAIN(min_increasement, max_increasement, drate);
+  if(_TRcorr(this) < .9) drate = 0.;
 done:
   return actual_rate + drate;
 }
@@ -1133,18 +1061,6 @@ gboolean _open_cwnd(SubflowRateController *this)
   return TRUE;
 }
 
-static void _ir_stat_pipe(gpointer data,    NumsTrackerStatData *stat)
-{
-  SubflowRateController *this = data;
-  this->ir_sum = stat->sum;
-}
-
-static void _tr_stat_pipe(gpointer data,    NumsTrackerStatData *stat)
-{
-  SubflowRateController *this = data;
-  this->tr_sum = stat->sum;
-}
-
 void _append_to_log(SubflowRateController *this, const gchar * format, ...)
 {
   FILE *file;
@@ -1169,15 +1085,13 @@ void _log_measurement_update_state(SubflowRateController *this)
 
           "############ S%d | State: %-2d | Disable time %lu | Ctrled: %d #################\n"
           "rlost:      %-10d| rdiscard:%-10d| lost:    %-10d| discard: %-10d|\n"
-          "pth_cong:   %-10d| pth_lssy:%-10d| pacing:  %-10d|\n"
-          "DeCorrH:    %-10.3f| DeCorrL: %-10.3f| DeCorrT: %-10.3f| DiCoeff: %-10.6f|\n"
-          "RateCorr:   %-10.3f| TRateCorr:%-10.3f|\n"
+          "pth_cong:   %-10d| pth_lssy:%-10d| pacing:  %-10d| trend_th:%-10d|\n"
           "target_br:  %-10d| min_tbr: %-10d| max_tbr: %-10d| dis_br:  %-10d|\n"
           "br_flags:   %-10d| stage:   %-10d| near2cc: %-10d| exp_lst: %-10d|\n"
           "mon_br:     %-10d| mon_int: %-10d| pacing_br:  %-10d| lc_rate: %-10d|\n"
           "SR:         %-10d| IR:      %-10d| disc_rate:  %-10.3f| ci:      %-10.3f\n"
           "l:          %-10d| rl:      %-10d| d:          %-10d| rd:      %-10d\n"
-          "abs_max:    %-10d| abs_min: %-10d| event:      %-10d| tr_frac: %-10.3f\n"
+          "abs_max:    %-10d| abs_min: %-10d| event:      %-10d| off_add: %-10.3f\n"
           "############################ Seconds since setup: %lu ##########################################\n",
           this->id, _state(this),
           this->disable_controlling > 0 ? GST_TIME_AS_MSECONDS(this->disable_controlling - _now(this)) : 0,
@@ -1188,11 +1102,7 @@ void _log_measurement_update_state(SubflowRateController *this)
           !mprtps_path_is_non_congested(this->path),
           !mprtps_path_is_non_lossy(this->path),
           this->path_is_paced,
-
-          0., 0.,
-          _DeCorrT(this), _DiCoeffT(this),
-
-          _RateCorr(this), _TRateCorr(this),
+          _qtrend_th(this) < _qtrend(this),
 
           this->target_bitrate, this->min_target_point,
           this->max_target_point, this->desired_bitrate,
@@ -1210,7 +1120,7 @@ void _log_measurement_update_state(SubflowRateController *this)
           _mt0(this)->lost, _mt0(this)->recent_lost,
           _mt0(this)->discard,_mt0(this)->recent_discard,
 
-          this->max_rate, this->min_rate, _event(this), this->target_fraction,
+          this->max_rate, this->min_rate, _event(this), _anres(this).last_off,
 
          GST_TIME_AS_SECONDS(_now(this) - this->setup_time)
 

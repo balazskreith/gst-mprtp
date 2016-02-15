@@ -28,7 +28,7 @@
 
 typedef struct _GstMpRTPBuffer GstMpRTPBuffer;
 
-#define MPRTP_PLUGIN_MAX_RLE_LENGTH 10
+#define MPRTP_PLUGIN_MAX_RLE_LENGTH 20
 
 #define MPRTP_PLUGIN_MAX_SUBFLOW_NUM 32
 

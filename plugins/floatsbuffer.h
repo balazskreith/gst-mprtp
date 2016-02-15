@@ -34,6 +34,8 @@ struct _FloatsBufferStatData{
   gdouble         sum;
   gdouble         dev;
   gdouble         var;
+  gdouble         G0,G1;
+
 };
 
 typedef enum{
@@ -47,7 +49,8 @@ struct _FloatsBuffer
   GRWLock                  rwmutex;
   FloatsBufferItem*        items;
   gdouble                  sum;
-  gdouble                  sq_sum;
+  gdouble                  sq_sum, G0, G1;
+  gdouble                  last_added;
   gdouble                  avg;
   gdouble                  dev;
   gdouble                  var;
@@ -68,6 +71,7 @@ struct _FloatsBuffer
 struct _FloatsBufferItem
 {
   gdouble       value;
+  gdouble       G0,G1;
   GstClockTime  added;
   GstClockTime  remove;
 };
@@ -90,6 +94,19 @@ struct _FloatsBufferEvaluator{
   gpointer                  iterator_data;
 };
 
+
+typedef struct _FloatsBufferTrendPlugin FloatsBufferTrendPlugin;
+struct _FloatsBufferTrendPlugin{
+  FloatsBufferPlugin base;
+  gint64             counter;
+  gdouble            sum;
+  gdouble            last_added;
+  gdouble            a0,a1,x1;
+  gdouble            last_obsolated;
+  gdouble            trend;
+  void             (*trend_pipe)(gpointer, gdouble);
+  gpointer           trend_pipe_data;
+};
 
 GType floatsbuffer_get_type (void);
 FloatsBuffer *make_floatsbuffer(guint32 length, GstClockTime obsolation_treshold);

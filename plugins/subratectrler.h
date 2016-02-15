@@ -60,11 +60,6 @@ struct _SubflowRateController
 
   GstClockTime              setup_time;
 
-  NumsTracker*              IR_window;
-  NumsTracker*              TR_window;
-  gdouble                   ir_sum;
-  gdouble                   tr_sum;
-  gdouble                   target_fraction;
   //Need for monitoring
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;

@@ -17,7 +17,7 @@ let "FOREMAN=$PROFILE&8"
 
 if [ "$FOREMAN" -eq 8 ]
 then
-BWMAX=250
+BWMAX=300
 BWMIN=150
 else
 BWMAX=1000

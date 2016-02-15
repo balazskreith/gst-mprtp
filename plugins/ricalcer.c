@@ -150,7 +150,7 @@ gboolean ricalcer_do_report_now (ReportIntervalCalculator * this)
   }
   this->last_interval = this->actual_interval;
   this->last_time = _now(this);
-  interval = .8 * g_random_double() + .7;
+  interval = .5 * g_random_double() + .5;
   this->actual_interval = interval * (gdouble)GST_SECOND;
   this->next_time = _now(this) + this->actual_interval;
   this->allow_early = TRUE;

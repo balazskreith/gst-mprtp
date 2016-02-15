@@ -60,6 +60,7 @@ static void
 _obsolate (FloatsBuffer * this);
 static void _fire_evaluator(FloatsBuffer *this, FloatsBufferEvaluator *evaluator);
 
+
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -269,6 +270,8 @@ void _pipe(FloatsBuffer * this)
   stat.dev = this->dev;
   stat.sum = this->sum;
   stat.var = this->var;
+  stat.G0  = this->G0;
+  stat.G1  = this->G1;
   this->stat_pipe(this->stat_pipe_data, &stat);
 }
 
@@ -288,14 +291,19 @@ _iterate (FloatsBuffer * this,
 void _add_value(FloatsBuffer *this, gdouble value, GstClockTime removal)
 {
   GstClockTime now;
-  now = gst_clock_get_time(this->sysclock);
+  now    = gst_clock_get_time(this->sysclock);
   //add new one
   ++this->counter;
-  this->items[this->write_index].value = value;
-  this->items[this->write_index].added = now;
+  this->items[this->write_index].value  = value;
+  this->items[this->write_index].added  = now;
   this->items[this->write_index].remove = removal;
+  this->items[this->write_index].G0     = INFINITY <= value ? 1 : value * value;
+  this->items[this->write_index].G1     = INFINITY <= value ? 1 : value *  this->last_added;
+  this->last_added = INFINITY <= value ? 1. : value;
   this->sum += INFINITY <= value? 1 : value;
-  this->sq_sum += INFINITY <= value ? 1 : value * value;
+  this->sq_sum += this->items[this->write_index].G0;
+  this->G0 += this->items[this->write_index].G0;
+  this->G1 += this->items[this->write_index].G1;
   this->avg = this->counter < 1 ? 0. : this->sum / (gdouble)this->counter;
   {
     GList *it;
@@ -329,9 +337,13 @@ void _rem_value(FloatsBuffer *this)
   value = this->items[this->read_index].value;
   this->sum-= INFINITY <= value? 1 : value;
   this->sq_sum -= INFINITY <= value ? 1 : value * value;
-  this->items[this->read_index].value = 0;
-  this->items[this->read_index].added = 0;
+  this->G0 -= this->items[this->read_index].G0;
+  this->G1 -= this->items[this->read_index].G1;
+  this->items[this->read_index].value  = 0.;
+  this->items[this->read_index].added  = 0;
   this->items[this->read_index].remove = 0;
+  this->items[this->read_index].G0     = 0.;
+  this->items[this->read_index].G1     = 0.;
   if(++this->read_index == this->length){
       this->read_index=0;
   }
@@ -390,6 +402,8 @@ void _fire_evaluator(FloatsBuffer *this, FloatsBufferEvaluator *evaluator)
     _iterate(this, evaluator->iterator, evaluator->iterator_data);
   }
 }
+
+
 
 //-----------------------------------------------------------------------------
 //-------------------------------- P L U G I N S ------------------------------

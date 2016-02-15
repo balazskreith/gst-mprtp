@@ -33,18 +33,12 @@ typedef struct _SubAnalyserResult SubAnalyserResult;
 struct _SubAnalyser
 {
   GObject                  object;
-  FloatsBuffer*            DeT_window;
-  NumsTracker*             RR_window;
-  NumsTracker*             BiF_window;
+  FloatsBuffer*            DeOff_window;
   NumsTracker*             De_window;
-  NumsTracker*             SR_window;
-  NumsTracker*             TR_window;
-//  PercentileTracker*       delaysH;
-//  PercentileTracker*       delaysL;
+  PercentileTracker*       SR_window;
   GstClockTime             window_time_limit;
   guint                    window_size;
   GstClockTime             append_log_abbr;
-  guint                    target_aim;
   GstClock*                sysclock;
   gpointer                 priv;
 };
@@ -55,23 +49,21 @@ struct _SubAnalyserClass{
 };
 
 struct _SubAnalyserResult{
-  gdouble DeCorrT;
-  gdouble DeAvgT;
-  gdouble RateCorr;
-  gdouble TRateCorr;
-  gdouble DeCorrT_dev;
-  gdouble DiscRate;
+  gdouble        qtrend;
+  gdouble        discards_rate;
+  GstClockTime   sending_rate_median;
+  gdouble        last_off;
 };
 
 GType subanalyser_get_type (void);
 void subanalyser_reset(SubAnalyser *this);
 SubAnalyser *make_subanalyser(guint size,
                               GstClockTime obsolation_treshold);
+void subanalyser_time_update(SubAnalyser *this, MPRTPSPath *path);
 void subanalyser_measurement_analyse(SubAnalyser *this,
                                      RRMeasurement *measurement,
                                      gint32         target_bitrate,
                                      SubAnalyserResult *result);
 
-void subanalyser_measurement_add_to_reference(SubAnalyser *this, RRMeasurement *measurement);
 void subanalyser_append_logfile(SubAnalyser *this, FILE *file);
 #endif /* SUBANALYSER_H_ */

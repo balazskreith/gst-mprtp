@@ -81,11 +81,6 @@ _stat_add_activator(gpointer pdata, gint64 value);
 static void
 _stat_rem_activator(gpointer pdata, gint64 value);
 
-static void
-_trend_add_activator(gpointer pdata, gint64 value);
-
-static void
-_trend_rem_activator(gpointer pdata, gint64 value);
 
 
 //----------------------------------------------------------------------
@@ -551,54 +546,6 @@ _stat_rem_activator(gpointer pdata, gint64 value)
 
 
 
-NumsTrackerTrendPlugin *
-make_numstracker_trend_plugin(void (*trend_pipe)(gpointer,gdouble), gpointer trend_data)
-{
-  NumsTrackerTrendPlugin *this = g_malloc0(sizeof(NumsTrackerTrendPlugin));;
-  this->base.add_activator = _trend_add_activator;
-  this->base.rem_activator = _trend_rem_activator;
-  this->trend_pipe = trend_pipe;
-  this->trend_pipe_data = trend_data;
-  this->base.destroyer = g_free;
-  return this;
-}
-
-
-void get_numstracker_trend_plugin_stats(NumsTrackerTrendPlugin *this, gint64 *trend)
-{
-  if(trend) *trend = this->trend;
-}
-
-static void _trend_pipe(NumsTrackerTrendPlugin *this)
-{
-  gdouble avg, I0, I1;
-  if(!this->trend_pipe) return;
-  avg = (gdouble) this->sum / (gdouble) this->counter;
-  I0 = this->last_added;
-  I0/=avg;
-  I1 = this->last_obsolated;
-  I1/=avg;
-  this->trend = ((I0 - avg) * (I1 - avg)) / ((I0 - avg) * (I0 - avg));
-  this->trend_pipe(this->trend_pipe_data, this->trend);
-}
-
-void
-_trend_add_activator(gpointer pdata, gint64 value)
-{
-  NumsTrackerTrendPlugin *this = pdata;
-  this->sum += value;
-  ++this->counter;
-  this->last_added = value;
-}
-void
-_trend_rem_activator(gpointer pdata, gint64 value)
-{
-  NumsTrackerTrendPlugin *this = pdata;
-  this->sum -= value;
-  --this->counter;
-  this->last_obsolated = value;
-  _trend_pipe(this);
-}
 
 #undef THIS_WRITELOCK
 #undef THIS_WRITEUNLOCK

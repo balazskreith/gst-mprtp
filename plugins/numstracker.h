@@ -116,16 +116,6 @@ struct _NumsTrackerStatData{
   gdouble           var;
 };
 
-struct _NumsTrackerTrendPlugin{
-  NumsTrackerPlugin base;
-  gint64            counter;
-  gint64            sum;
-  gint64            last_added;
-  gint64            last_obsolated;
-  gdouble           trend;
-  void            (*trend_pipe)(gpointer, gdouble);
-  gpointer          trend_pipe_data;
-};
 
 GType numstracker_get_type (void);
 NumsTracker *make_numstracker(guint32 length, GstClockTime obsolation_treshold);
@@ -175,9 +165,5 @@ make_numstracker_stat_plugin(void (*sum_pipe)(gpointer,NumsTrackerStatData*), gp
 void get_numstracker_stat_plugin_stats(NumsTrackerStatPlugin *this, gint64 *variance);
 
 
-NumsTrackerTrendPlugin *
-make_numstracker_trend_plugin(void (*trend_pipe)(gpointer,gdouble), gpointer trend_data);
-
-void get_numstracker_trend_plugin_stats(NumsTrackerTrendPlugin *this, gint64 *variance);
 
 #endif /* NUMSTRACKER_H_ */

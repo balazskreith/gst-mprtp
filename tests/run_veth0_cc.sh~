@@ -40,7 +40,7 @@ done
 BWDIFF=500
 #let "MINBW = $MAXBW / 2"
 let "BWDIFF = MAXBW - MINBW"
-echo "MAXBW: "$MAXBW" MINBW: "$MINBW
+#echo "MAXBW: "$MAXBW" MINBW: "$MINBW
 #echo "Setup veth0 to 1000KBit"
 BW=$MAXBW
 tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit 

@@ -26,6 +26,15 @@ G_DEFINE_TYPE (MpRTPRPath, mprtpr_path, G_TYPE_OBJECT);
 
 #define _actual_RLEBlock(this) ((RLEBlock*)(this->rle.blocks + this->rle.write_index))
 #define _now(this) (gst_clock_get_time(this->sysclock))
+
+#define _discrle(this) this->discard_rle
+#define _actual_discrle(this) ((DiscardRLEBlock*)(this->discard_rle.blocks + this->discard_rle.write_index))
+#define _lostrle(this) this->losts_rle
+#define _actual_lostrle(this) ((LostsRLEBlock*)(this->losts_rle.blocks + this->losts_rle.write_index))
+#define _owdrle(this) this->owd_rle
+#define _actual_owdrle(this) ((OWDRLEBlock*)(this->owd_rle.blocks + this->owd_rle.write_index))
+
+
 static void mprtpr_path_finalize (GObject * object);
 static void mprtpr_path_reset (MpRTPRPath * this);
 static gint _cmp_seq (guint16 x, guint16 y);
@@ -76,8 +85,18 @@ mprtpr_path_init (MpRTPRPath * this)
   this->skews = make_percentiletracker2(100, 50);
   percentiletracker2_set_treshold(this->skews, 2 * GST_SECOND);
 
-  this->rle.write_index = this->rle.read_index = 0;
-  this->rle.stepped = _now(this);
+  _owdrle(this).last_step = _now(this);
+  _owdrle(this).read_index = _owdrle(this).write_index = 0;
+  _owdrle(this).step_interval = 250 * GST_MSECOND;
+
+  _lostrle(this).last_step = _now(this);
+  _lostrle(this).read_index = _lostrle(this).write_index = 0;
+  _lostrle(this).step_interval = GST_SECOND;
+
+  _discrle(this).last_step = _now(this);
+  _discrle(this).read_index = _discrle(this).write_index = 0;
+  _discrle(this).step_interval = GST_SECOND;
+
   this->gaps = make_numstracker(128, GST_SECOND);
   numstracker_add_rem_pipe(this->gaps, _gaps_obsolation_pipe, this);
   this->lates = make_numstracker(128, 1500 * GST_MSECOND);
@@ -172,13 +191,15 @@ void
 mprtpr_path_set_chunks_reported(MpRTPRPath *this)
 {
   THIS_WRITELOCK (this);
-  this->rle.read_index = this->rle.write_index;
+  this->discard_rle.read_index = this->discard_rle.write_index;
+  this->losts_rle.read_index = this->losts_rle.write_index;
+  this->owd_rle.read_index = this->owd_rle.write_index;
   THIS_WRITEUNLOCK (this);
 }
 
+
 GstRTCPXR_Chunk *
-mprtpr_path_get_chunks(MpRTPRPath *this,
-                              guint chunks_get_type,
+mprtpr_path_get_discard_chunks(MpRTPRPath *this,
                               guint *chunks_num,
                               guint16 *begin_seq,
                               guint16 *end_seq)
@@ -186,62 +207,34 @@ mprtpr_path_get_chunks(MpRTPRPath *this,
   GstRTCPXR_Chunk *result = NULL, *chunk;
   gboolean chunk_type = TRUE;
   gboolean run_type;
-  RLEBlock *block;
+  DiscardRLEBlock *block;
   guint16 begin_seq_, end_seq_;
   gint i,chunks_num_;
   guint16 *read;
-  guint16 running_length;
 
   chunks_num_ = 0;
   THIS_READLOCK (this);
-  for(i=this->rle.read_index; ;){
+  for(i=this->discard_rle.read_index; ;){
     ++chunks_num_;
-    if(i == this->rle.write_index) break;
+    if(i == this->discard_rle.write_index) break;
     if(++i == MPRTP_PLUGIN_MAX_RLE_LENGTH) i=0;
   }
   if((chunks_num_ % 2) == 1) ++chunks_num_;
   chunk = result = g_malloc0(sizeof(GstRTCPXR_Chunk) * chunks_num_);
-  block = &this->rle.blocks[this->rle.read_index];
+  block = &this->discard_rle.blocks[this->discard_rle.read_index];
   begin_seq_ = block->start_seq;
-  for(i=this->rle.read_index; ; )
+  for(i=this->discard_rle.read_index; ; )
   {
     end_seq_ = block->end_seq;
-    run_type = i != this->rle.write_index;
+    run_type = i != this->discard_rle.write_index;
 
-    if(chunks_get_type == 0){
-          read = &this->rle.blocks[i].discard_nums;
-    }else if(chunks_get_type == 1){
-      GstClockTime owd;
-      owd = this->rle.blocks[i].median_delay;
-      owd = GST_TIME_AS_MSECONDS(owd);
-      if(owd > 0x3FFF)
-        running_length = 0x3FFF;
-      else
-        running_length = owd;
-//            g_print("MEDIAN: %lu VALUE: %hu\n", owd, running_length);
-      read = &running_length;
-//      g_print("READ: %hu-", *read);
-//
-//      if(owd > GST_SECOND)
-//        running_length = 0x3FFF;
-//      else
-//        running_length = (guint16)((get_ntp_from_epoch_ns(owd)>>18) & 0x3FFF);
-//      g_print("MEDIAN: %lu VALUE: %hu->%lu\n", owd, running_length,
-//              get_epoch_time_from_ntp_in_ns(running_length<<18));
-//      read = &running_length;
-    }else if(chunks_get_type == 2){
-        read = &this->rle.blocks[i].losts;
-    }else if(chunks_get_type == 3){
-        read = &this->rle.blocks[i].discard_bytes;
-    }else{
-        read = &this->rle.blocks[i].discard_nums;
-    }
+    read = &this->discard_rle.blocks[i].discarded_bytes;
 
     gst_rtcp_xr_chunk_change(chunk,
                              &chunk_type,
                              &run_type,
                              read);
-    if(i == this->rle.write_index) break;
+    if(i == this->discard_rle.write_index) break;
     ++chunk;
     ++block;
     if(++i == MPRTP_PLUGIN_MAX_RLE_LENGTH) i=0;
@@ -252,6 +245,112 @@ mprtpr_path_get_chunks(MpRTPRPath *this,
   if(end_seq) *end_seq = end_seq_;
   return result;
 }
+
+
+
+GstRTCPXR_Chunk *
+mprtpr_path_get_owd_chunks(MpRTPRPath *this,
+                              guint *chunks_num,
+                              guint16 *begin_seq,
+                              guint16 *end_seq)
+{
+  GstRTCPXR_Chunk *result = NULL, *chunk;
+  gboolean chunk_type = TRUE;
+  gboolean run_type;
+  OWDRLEBlock *block;
+  guint16 begin_seq_, end_seq_;
+  gint i,chunks_num_;
+  guint16 *read,running_length;
+
+  chunks_num_ = 0;
+  THIS_READLOCK (this);
+  for(i=this->owd_rle.read_index; ;){
+    ++chunks_num_;
+    if(i == this->owd_rle.write_index) break;
+    if(++i == MPRTP_PLUGIN_MAX_RLE_LENGTH) i=0;
+  }
+  if((chunks_num_ % 2) == 1) ++chunks_num_;
+  chunk = result = g_malloc0(sizeof(GstRTCPXR_Chunk) * chunks_num_);
+  block = &this->owd_rle.blocks[this->owd_rle.read_index];
+  begin_seq_ = block->start_seq;
+  for(i=this->owd_rle.read_index; ; )
+  {
+    end_seq_ = block->end_seq;
+    run_type = i != this->owd_rle.write_index;
+    {
+      GstClockTime owd;
+      owd = this->owd_rle.blocks[i].median_delay;
+      owd = GST_TIME_AS_MSECONDS(owd);
+      running_length = (owd > 0x3FFF) ? 0x3FFF : owd;
+      read = &running_length;
+    }
+
+    gst_rtcp_xr_chunk_change(chunk,
+                             &chunk_type,
+                             &run_type,
+                             read);
+    if(i == this->owd_rle.write_index) break;
+    ++chunk;
+    ++block;
+    if(++i == MPRTP_PLUGIN_MAX_RLE_LENGTH) i=0;
+  }
+  THIS_READUNLOCK (this);
+  if(chunks_num) *chunks_num = chunks_num_;
+  if(begin_seq) *begin_seq = begin_seq_;
+  if(end_seq) *end_seq = end_seq_;
+  return result;
+}
+
+
+GstRTCPXR_Chunk *
+mprtpr_path_get_lost_chunks(MpRTPRPath *this,
+                              guint *chunks_num,
+                              guint16 *begin_seq,
+                              guint16 *end_seq)
+{
+  GstRTCPXR_Chunk *result = NULL, *chunk;
+  gboolean chunk_type = TRUE;
+  gboolean run_type;
+  LostsRLEBlock *block;
+  guint16 begin_seq_, end_seq_;
+  gint i,chunks_num_;
+  guint16 *read;
+
+  chunks_num_ = 0;
+  THIS_READLOCK (this);
+  for(i=this->losts_rle.read_index; ;){
+    ++chunks_num_;
+    if(i == this->losts_rle.write_index) break;
+    if(++i == MPRTP_PLUGIN_MAX_RLE_LENGTH) i=0;
+  }
+  if((chunks_num_ % 2) == 1) ++chunks_num_;
+  chunk = result = g_malloc0(sizeof(GstRTCPXR_Chunk) * chunks_num_);
+  block = &this->losts_rle.blocks[this->losts_rle.read_index];
+  begin_seq_ = block->start_seq;
+  for(i=this->losts_rle.read_index; ; )
+  {
+    end_seq_ = block->end_seq;
+    run_type = i != this->losts_rle.write_index;
+
+    read = &this->losts_rle.blocks[i].lost_packets;
+
+    gst_rtcp_xr_chunk_change(chunk,
+                             &chunk_type,
+                             &run_type,
+                             read);
+    if(i == this->losts_rle.write_index) break;
+    ++chunk;
+    ++block;
+    if(++i == MPRTP_PLUGIN_MAX_RLE_LENGTH) i=0;
+  }
+  THIS_READUNLOCK (this);
+  if(chunks_num) *chunks_num = chunks_num_;
+  if(begin_seq) *begin_seq = begin_seq_;
+  if(end_seq) *end_seq = end_seq_;
+  return result;
+}
+
+
 
 void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
                            gdouble       *path_delay,
@@ -376,8 +475,8 @@ void _add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp)
 {
   ++this->total_late_discarded;
   this->total_late_discarded_bytes+=mprtp->payload_bytes;
-  ++_actual_RLEBlock(this)->discard_nums;
-  _actual_RLEBlock(this)->discard_bytes+=mprtp->payload_bytes;
+  _actual_discrle(this)->discarded_bytes+=mprtp->payload_bytes;
+  ++_actual_discrle(this)->discarded_packets;
 }
 
 void _add_delay(MpRTPRPath *this, GstClockTime delay)
@@ -388,22 +487,32 @@ void _add_delay(MpRTPRPath *this, GstClockTime delay)
 void _add_skew(MpRTPRPath *this, gint64 skew)
 {
   percentiletracker2_add(this->skews, skew);
-//  this->estimated_skew = skalmanfilter_measurement_update(this->skew_estimator, skew);
   this->path_skew = this->path_skew * .99 + (gdouble)percentiletracker2_get_stats(this->skews, NULL, NULL, NULL) * .01;
-//  g_print("%f,%f,%ld\n", this->path_skew,this->estimated_skew,
-//          percentiletracker2_get_stats(this->skews, NULL, NULL, NULL));
-//  percentiletracker_add(this->skews, skew);
 }
 
 void _refresh_RLEBlock(MpRTPRPath *this)
 {
-  RLEBlock *block = _actual_RLEBlock(this);
-  if(_cmp_seq(this->highest_seq, block->start_seq) < 0){
-    block->start_seq = this->highest_seq;
+  if(_cmp_seq(this->highest_seq, _actual_discrle(this)->start_seq) < 0){
+    _actual_discrle(this)->start_seq = this->highest_seq;
   }
-  if(_cmp_seq(block->end_seq, this->highest_seq) < 0){
-    block->end_seq = this->highest_seq;
+  if(_cmp_seq(_actual_discrle(this)->start_seq, this->highest_seq) < 0){
+    _actual_discrle(this)->end_seq = this->highest_seq;
   }
+
+  if(_cmp_seq(this->highest_seq, _actual_lostrle(this)->start_seq) < 0){
+    _actual_lostrle(this)->start_seq = this->highest_seq;
+  }
+  if(_cmp_seq(_actual_lostrle(this)->start_seq, this->highest_seq) < 0){
+    _actual_lostrle(this)->end_seq = this->highest_seq;
+  }
+
+  if(_cmp_seq(this->highest_seq, _actual_owdrle(this)->start_seq) < 0){
+    _actual_owdrle(this)->start_seq = this->highest_seq;
+  }
+  if(_cmp_seq(_actual_owdrle(this)->start_seq, this->highest_seq) < 0){
+    _actual_owdrle(this)->end_seq = this->highest_seq;
+  }
+
 //  g_print("RLEBlock| Begin: %hu, End: %hu| Discards: %hu| Delay: %lu\n",
 //          block->start_seq,
 //          block->end_seq,
@@ -411,26 +520,48 @@ void _refresh_RLEBlock(MpRTPRPath *this)
 //          block->median_delay);
 }
 
+
 void _refresh_RLE(MpRTPRPath *this)
 {
-  RLE *rle;
-  RLEBlock *block;
-  rle = &this->rle;
-again:
-  if(_now(this) - GST_SECOND < rle->stepped) return;
-  if(++rle->write_index == MPRTP_PLUGIN_MAX_RLE_LENGTH) rle->write_index = 0;
-  rle->stepped+=GST_SECOND;
-  block = _actual_RLEBlock(this);
-  memset(block, 0, sizeof(RLEBlock));
-  block->start_seq = block->end_seq = this->highest_seq;
-  goto again;
+  if(_discrle(this).last_step < _now(this) - _discrle(this).step_interval){
+    DiscardRLE *rle;
+    DiscardRLEBlock *block;
+    rle = &_discrle(this);
+    if(++rle->write_index == MPRTP_PLUGIN_MAX_RLE_LENGTH) rle->write_index = 0;
+    rle->last_step=_now(this);
+    block = _actual_discrle(this);
+    memset(block, 0, sizeof(DiscardRLEBlock));
+    block->start_seq = block->end_seq = this->highest_seq;
+  }
+
+  if(_lostrle(this).last_step < _now(this) - _lostrle(this).step_interval){
+    LostsRLE *rle;
+    LostsRLEBlock *block;
+    rle = &_lostrle(this);
+    if(++rle->write_index == MPRTP_PLUGIN_MAX_RLE_LENGTH) rle->write_index = 0;
+    rle->last_step=_now(this);
+    block = _actual_lostrle(this);
+    memset(block, 0, sizeof(LostsRLEBlock));
+    block->start_seq = block->end_seq = this->highest_seq;
+  }
+
+  if(_owdrle(this).last_step < _now(this) - _owdrle(this).step_interval){
+    OWDRLE *rle;
+    OWDRLEBlock *block;
+    rle = &_owdrle(this);
+    if(++rle->write_index == MPRTP_PLUGIN_MAX_RLE_LENGTH) rle->write_index = 0;
+    rle->last_step=_now(this);
+    block = _actual_owdrle(this);
+    memset(block, 0, sizeof(OWDRLEBlock));
+    block->start_seq = block->end_seq = this->highest_seq;
+  }
+
 }
 
 void _delays_stats_pipe(gpointer data, PercentileTrackerPipeData *pdata)
 {
   MpRTPRPath *this = data;
-  _actual_RLEBlock(this)->median_delay = pdata->percentile;
-  ++_actual_RLEBlock(this)->median_delay_counter;
+  _actual_owdrle(this)->median_delay = pdata->percentile;
   if(_now(this) - 200 * GST_MSECOND < this->delay_avg_refreshed) return;
 
   this->delay_avg_refreshed = _now(this);
@@ -445,7 +576,7 @@ void _gaps_obsolation_pipe(gpointer data, gint64 seq)
 {
   MpRTPRPath *this = data;
   if(numstracker_find(this->lates, seq)) return;
-  ++_actual_RLEBlock(this)->losts;
+  ++_actual_lostrle(this)->lost_packets;
 }
 
 #undef THIS_READLOCK

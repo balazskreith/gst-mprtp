@@ -37,25 +37,56 @@ typedef struct _MpRTPRReceivedItem  MpRTPRReceivedItem;
 
 #define SKEWS_ARRAY_LENGTH 256
 
-typedef struct _RunningLengthEncodingBlock RLEBlock;
-struct _RunningLengthEncodingBlock{
+typedef struct _DiscardRunningLengthEncodingBlock DiscardRLEBlock;
+struct _DiscardRunningLengthEncodingBlock{
   guint16      start_seq;
   guint16      end_seq;
-  guint16      discard_nums;
-  guint16      discard_bytes;
-  guint16      losts;
-  GstClockTime median_delay;
-  guint16      median_delay_counter;
-  guint32      bytes_in_flight;
+  guint16      discarded_packets;
+  guint16      discarded_bytes;
 };
 
-typedef struct _RunningLengthEncoding RLE;
-struct _RunningLengthEncoding{
-  RLEBlock     blocks[10];
-  guint        write_index;
-  guint        read_index;
-  GstClockTime stepped;
+typedef struct _DiscardRunningLengthEncoding DiscardRLE;
+struct _DiscardRunningLengthEncoding{
+  DiscardRLEBlock     blocks[MPRTP_PLUGIN_MAX_RLE_LENGTH];
+  guint               write_index;
+  guint               read_index;
+  GstClockTime        last_step;
+  GstClockTime        step_interval;
 };
+
+typedef struct _LostsRunningLengthEncodingBlock LostsRLEBlock;
+struct _LostsRunningLengthEncodingBlock{
+  guint16      start_seq;
+  guint16      end_seq;
+  guint16      lost_packets;
+  guint16      lost_bytes;
+};
+
+typedef struct _LostsRunningLengthEncoding LostsRLE;
+struct _LostsRunningLengthEncoding{
+  LostsRLEBlock       blocks[MPRTP_PLUGIN_MAX_RLE_LENGTH];
+  guint               write_index;
+  guint               read_index;
+  GstClockTime        last_step;
+  GstClockTime        step_interval;
+};
+
+typedef struct _OWDRunningLengthEncodingBlock OWDRLEBlock;
+struct _OWDRunningLengthEncodingBlock{
+  guint16      start_seq;
+  guint16      end_seq;
+  GstClockTime median_delay;
+};
+
+typedef struct _OWDRunningLengthEncoding OWDRLE;
+struct _OWDRunningLengthEncoding{
+  OWDRLEBlock         blocks[MPRTP_PLUGIN_MAX_RLE_LENGTH];
+  guint               write_index;
+  guint               read_index;
+  GstClockTime        last_step;
+  GstClockTime        step_interval;
+};
+
 
 struct _MpRTPReceiverPath
 {
@@ -78,7 +109,10 @@ struct _MpRTPReceiverPath
   guint64             last_packet_skew;
   GstClockTime        last_received_time;
 
-  RLE                 rle;
+  OWDRLE              owd_rle;
+  LostsRLE            losts_rle;
+  DiscardRLE          discard_rle;
+
 
   guint32             total_packet_losts;
   guint32             total_packets_received;
@@ -140,13 +174,26 @@ mprtpr_path_get_XR7097_packet_nums_chunks(MpRTPRPath *this,
                               guint *chunks_num,
                               guint16 *begin_seq,
                               guint16 *end_seq);
-#define mprtpr_path_get_XR7097_packet_nums_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 0, chunks_num, begin_seq, end_seq)
-#define mprtpr_path_get_XR7097_sum_bytes_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 3, chunks_num, begin_seq, end_seq)
-#define mprtpr_path_get_owd_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 1, chunks_num, begin_seq, end_seq)
-#define mprtpr_path_get_XR3611_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 2, chunks_num, begin_seq, end_seq)
+
+//#define mprtpr_path_get_XR7097_packet_nums_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 0, chunks_num, begin_seq, end_seq)
+//#define mprtpr_path_get_XR7097_sum_bytes_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 3, chunks_num, begin_seq, end_seq)
+//#define mprtpr_path_get_owd_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 1, chunks_num, begin_seq, end_seq)
+//#define mprtpr_path_get_XR3611_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 2, chunks_num, begin_seq, end_seq)
+
 GstRTCPXR_Chunk *
-mprtpr_path_get_chunks(MpRTPRPath *this,
-                              guint chunks_get_type,
+mprtpr_path_get_lost_chunks(MpRTPRPath *this,
+                              guint *chunks_num,
+                              guint16 *begin_seq,
+                              guint16 *end_seq);
+
+GstRTCPXR_Chunk *
+mprtpr_path_get_owd_chunks(MpRTPRPath *this,
+                              guint *chunks_num,
+                              guint16 *begin_seq,
+                              guint16 *end_seq);
+
+GstRTCPXR_Chunk *
+mprtpr_path_get_discard_chunks(MpRTPRPath *this,
                               guint *chunks_num,
                               guint16 *begin_seq,
                               guint16 *end_seq);

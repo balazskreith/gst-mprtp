@@ -78,7 +78,7 @@ mprtpr_path_init (MpRTPRPath * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
-  this->delays = make_percentiletracker(256, 50);
+  this->delays = make_percentiletracker(512, 50);
   percentiletracker_set_treshold(this->delays, 2 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->delays, _delays_stats_pipe, this);
 
@@ -280,8 +280,15 @@ mprtpr_path_get_owd_chunks(MpRTPRPath *this,
     {
       GstClockTime owd;
       owd = this->owd_rle.blocks[i].median_delay;
-      owd = GST_TIME_AS_MSECONDS(owd);
-      running_length = (owd > 0x3FFF) ? 0x3FFF : owd;
+      //owd = GST_TIME_AS_MSECONDS(owd);
+      //running_length = (owd > 0x3FFF) ? 0x3FFF : owd;
+      if(owd < GST_SECOND){
+        gdouble y = (gdouble) owd / (gdouble) GST_SECOND;
+        y *= 16384;
+        running_length = y;
+      }else{
+        running_length = 0x3FFF;
+      }
       read = &running_length;
     }
 

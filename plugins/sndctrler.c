@@ -1096,6 +1096,7 @@ _report_processing_xr_owd_rle_block_processor (SndController *this,
 {
   guint chunks_num, chunk_index;
   guint16 running_length;
+  guint64 owd;
   GstRTCPXR_Chunk *chunk;
 
   _irt0 (subflow)->owd_rle_arrived = TRUE;
@@ -1110,7 +1111,16 @@ _report_processing_xr_owd_rle_block_processor (SndController *this,
       //Terminate chunk
       if(*((guint16*)chunk) == 0) break;
       gst_rtcp_xr_chunk_getdown(chunk, NULL, NULL, &running_length);
-      _irt0(subflow)->rle_delays.values[chunk_index] = (GstClockTime)running_length * GST_MSECOND;
+      if(running_length < 0x3FFF){
+        gdouble x = (gdouble) running_length / 16384.;
+        x *= (gdouble) GST_SECOND;
+        owd = x;
+      }else{
+        owd = GST_SECOND;
+      }
+      //_irt0(subflow)->rle_delays.values[chunk_index] = (GstClockTime)running_length * GST_MSECOND;
+      _irt0(subflow)->rle_delays.values[chunk_index] = owd;
+      g_print("owd: %lu\n", owd);
       if(_irt0(subflow)->rle_delays.values[chunk_index] == 0){
         if(_irt0(subflow)->rle_delays.length == 0)
           g_warning("OWD delay at first index should not be 0");

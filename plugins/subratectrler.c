@@ -49,7 +49,7 @@ G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 #define MOMENTS_LENGTH 8
 
 #define DEFAULT_RAMP_UP_AGGRESSIVITY 0.
-#define DEFAULT_DISCARD_AGGRESSIVITY .2
+#define DEFAULT_DISCARD_AGGRESSIVITY .1
 // Min OWD target. Default value: 0.1 -> 100ms
 #define OWD_TARGET_LO 100 * GST_MSECOND
 //Max OWD target. Default value: 0.4s -> 400ms
@@ -165,8 +165,9 @@ struct _Moment{
 //#define _reset_target_points(this) numstracker_reset(this->target_points)
 #define _skip_frames_for(this, duration) mprtps_path_set_skip_duration(this->path, duration);
 #define _qtrend(this) _anres(this).qtrend
-#define _qtrend_th(this) 1.01
-#define _qtrend_th2(this) 1.2
+#define _qtrend_th(this) 1.05
+#define _qtrend_th2(this) 1.5
+#define _deoff(this) _anres(this).delay_off
 #define _rdiscard(this) (0 < _mt0(this)->recent_discard)
 #define _discard(this) (this->discard_aggressivity < _anres(this).discards_rate)
 #define _lost(this)  (_mt0(this)->has_expected_lost ? FALSE : _mt0(this)->path_is_lossy ? FALSE : _mt0(this)->lost > 0)
@@ -563,7 +564,7 @@ _reduce_stage(
   target = MIN(_MSR(this), _TR(this));
   _add_congestion_point(this, target);
   this->max_target_point = target;
-  this->target_bitrate = target * _RRcorr(this) < .9 ? .6 : .8;
+  this->target_bitrate = _RRcorr(this) < .9 ? target * .6 : target * .8;
   this->desired_bitrate = this->min_target_point = this->target_bitrate;
   _set_bitrate_flags(this, BITRATE_FORCED);
   _switch_stage_to(this, STAGE_BOUNCE, FALSE);
@@ -710,6 +711,7 @@ _overused_state(
   //Evaluate events
   switch(_event(this)){
     case EVENT_CONGESTION:
+     _switch_stage_to(this, STAGE_REDUCE, TRUE);
      _disable_controlling(this);
      break;
     case EVENT_SETTLED:
@@ -775,6 +777,7 @@ _monitored_state(
   switch(_event(this)){
     case EVENT_CONGESTION:
       _disable_monitoring(this);
+      _switch_stage_to(this, STAGE_REDUCE, TRUE);
       _transit_state_to(this, STATE_OVERUSED);
       break;
     case EVENT_STEADY:
@@ -784,6 +787,7 @@ _monitored_state(
       break;
     case EVENT_DISTORTION:
       _disable_monitoring(this);
+      _switch_stage_to(this, STAGE_MITIGATE, TRUE);
       _transit_state_to(this, STATE_STABLE);
       break;
     default:
@@ -852,6 +856,9 @@ void _switch_stage_to(
      break;
    }
   _mt0(this)->stage = target;
+  if(execute){
+      this->stage_fnc(this);
+  }
 }
 
 
@@ -903,6 +910,13 @@ gdouble _adjust_bitrate(SubflowRateController *this)
   drate /= this->bitrate_flags & BITRATE_SLOW ? 3. : 1.;
   if(drate <= 0.){
     if(1.1 < _TRcorr(this)) drate = 0.;
+    goto done;
+  }
+  if(_deoff(this) < -0.05){
+    _add_congestion_point(this, MIN(_MSR(this), _TR(this)));
+    this->max_target_point = this->last_congestion_point * 1.05;
+    this->min_target_point = this->last_congestion_point * .9;
+    drate = MAX(_MSR(this), _TR(this)) * MAX(-.2, _deoff(this));
     goto done;
   }
   if(_is_near_to_congestion_point(this)){
@@ -1120,7 +1134,7 @@ void _log_measurement_update_state(SubflowRateController *this)
           _mt0(this)->lost, _mt0(this)->recent_lost,
           _mt0(this)->discard,_mt0(this)->recent_discard,
 
-          this->max_rate, this->min_rate, _event(this), _anres(this).last_off,
+          this->max_rate, this->min_rate, _event(this), _anres(this).delay_off,
 
          GST_TIME_AS_SECONDS(_now(this) - this->setup_time)
 

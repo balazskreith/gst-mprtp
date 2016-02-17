@@ -52,7 +52,7 @@ struct _SubAnalyserResult{
   gdouble        qtrend;
   gdouble        discards_rate;
   GstClockTime   sending_rate_median;
-  gdouble        last_off;
+  gdouble        delay_off;
 };
 
 GType subanalyser_get_type (void);

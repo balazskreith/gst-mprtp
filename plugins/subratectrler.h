@@ -38,8 +38,6 @@ struct _SubflowRateController
   MPRTPSPath*               path;
   gboolean                  path_is_paced;
 
-  guint                     bitrate_flags;
-
   gint32                    monitored_bitrate;
 
   SubAnalyser*              analyser;
@@ -50,7 +48,7 @@ struct _SubflowRateController
 
   gint32                    max_target_point;
   gint32                    min_target_point;
-  gint32                    desired_bitrate;
+//  gint32                    desired_bitrate;
   gint32                    target_bitrate;
 
   gint32                    max_rate;
@@ -65,7 +63,6 @@ struct _SubflowRateController
   GstClockTime              monitoring_started;
 
   guint                     pending_event;
-  SubRateCtrler             state;
   SubRateAction             stage_fnc;
 
   guint8*                   moments;

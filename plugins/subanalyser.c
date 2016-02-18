@@ -252,7 +252,7 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
   tr_ratio = (gdouble) target_bitrate / (gdouble) _priv(this)->sending_rate_median;
   result->rate_indicators.congested     = br_ratio < .1;
   result->rate_indicators.rr_correlated = br_ratio > .9;
-  result->rate_indicators.tr_correlated = tr_ratio > .95;
+  result->rate_indicators.tr_correlated = tr_ratio > .95 && tr_ratio < 1.05;
   result->rate_indicators.distorted     = disc_ratio > .1;
 
 }
@@ -265,6 +265,7 @@ void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
     this->append_log_abbr = _now(this);
   }
 
+  goto done;
 
   fprintf(file,
           "######################## Subflow Measurement Analyser log #######################\n"
@@ -285,7 +286,8 @@ void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
           _priv(this)->logstr
           );
   memset(_priv(this)->logstr, 0, 4096);
-
+done:
+  return;
 }
 
 void _log_abbrevations(SubAnalyser *this, FILE *file)

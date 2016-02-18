@@ -36,6 +36,7 @@ struct _SubAnalyser
   FloatsBuffer*            DeOff_window;
   NumsTracker*             De_window;
   PercentileTracker*       SR_window;
+  gdouble                  RR_avg;
   GstClockTime             window_time_limit;
   guint                    window_size;
   GstClockTime             append_log_abbr;
@@ -51,8 +52,16 @@ struct _SubAnalyserClass{
 struct _SubAnalyserResult{
   gdouble        qtrend;
   gdouble        discards_rate;
-  GstClockTime   sending_rate_median;
+  gint32         sending_rate_median;
   gdouble        delay_off;
+
+  struct{
+    gboolean     congestion, bottleneck, blockage;
+  }delay_indicators;
+
+  struct{
+    gboolean     rr_correlated, tr_correlated, distorted, congested;
+  }rate_indicators;
 };
 
 GType subanalyser_get_type (void);

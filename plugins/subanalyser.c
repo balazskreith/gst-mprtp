@@ -47,9 +47,9 @@ G_DEFINE_TYPE (SubAnalyser, subanalyser, G_TYPE_OBJECT);
 typedef struct _StatCollector StatCollector;
 typedef struct _TrendDetector TrendDetector;
 typedef struct _CongestionDetector CongestionDetector;
-
+typedef struct _QueueDelayAnalyzer QueueDelayAnalyzer;
 typedef struct{
-  gdouble  avg,var,dev,davg;
+  gdouble  avg,var,dev,off;
   gint64   max,min,median;
   gboolean trend;
   gboolean congestion;
@@ -59,9 +59,10 @@ typedef struct{
 struct _StatCollector{
   gint64          items[STATCOLLECTOR_ITEMS_LENGTH];
   gint64          sorted[STATCOLLECTOR_ITEMS_LENGTH];
-  gint            index;
+  gint            index,last_forwarded_index;
   gint64          sum,sq_sum;
   ItemsStat       forward;
+  gint64          treshold;
   TrendDetector  *tdetector;
 };
 
@@ -69,21 +70,26 @@ struct _TrendDetector{
   ItemsStat           last;
   ItemsStat           forward;
   gboolean            filled;
+  gint64              treshold;
   CongestionDetector *cdetector;
 };
 
 struct _CongestionDetector{
   ItemsStat           last;
+  ItemsStat           forward;
   gboolean            filled;
+  gint64              treshold;
+  QueueDelayAnalyzer* qdelays;
 };
 
 
-typedef struct _QueueDelayAnalyzer{
+struct _QueueDelayAnalyzer{
   StatCollector       collector;
   TrendDetector       tdetector;
   CongestionDetector  cdetector;
-  gboolean            congestion,mitigation,alleviation;
-}QueueDelayAnalyzer;
+  gboolean            congestion,bottleneck,blockage;
+  ItemsStat           reference;
+};
 
 typedef struct _SubAnalyserPrivate{
   SubAnalyserResult  *result;
@@ -91,8 +97,9 @@ typedef struct _SubAnalyserPrivate{
   gdouble             off_avg;
   gdouble             delay_avg;
   gdouble             qtrend;
-  GstClockTime        sending_rate_median;
+  guint32             sending_rate_median;
   QueueDelayAnalyzer *qanalyzer;
+  gchar               logstr[4096];
 }SubAnalyserPrivate;
 
 #define _priv(this) ((SubAnalyserPrivate*) this->priv)
@@ -109,6 +116,7 @@ static void _De_min_pipe(gpointer data, gint64 min);
 //static void _delaysH_stat_pipe(gpointer data, PercentileTrackerPipeData *stat);
 //static void _delaysL_stat_pipe(gpointer data, PercentileTrackerPipeData *stat);
 static void _log_abbrevations(SubAnalyser *this, FILE *file);
+static void _append_log (SubAnalyser *this, const gchar * format, ... );
 
 static void subanalyser_finalize (GObject * object);
 
@@ -117,7 +125,7 @@ static void _statcollector_add_queue_delay(StatCollector *this, gint64 queue_del
 static void _statcollector_forward(StatCollector *this);
 static void _tdetector_add_stat(TrendDetector *this, ItemsStat *actual);
 static void _cdetector_add_stat(CongestionDetector *this, ItemsStat *actual);
-static void _qdeanalyzer_evaluation(QueueDelayAnalyzer *this);
+static void _qdeanalyzer_evaluation(QueueDelayAnalyzer *this, ItemsStat *actual);
 
 
 void
@@ -203,19 +211,22 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
 {
   gint i;
   gdouble off_add = 0.;
+  gdouble br_ratio,disc_ratio, tr_ratio;
   //add delays
+  _qdelays(this)->blockage      = FALSE;
+  _qdelays(this)->bottleneck    = FALSE;
+  _qdelays(this)->congestion    = FALSE;
   for(i=0; i<measurement->rle_delays.length; ++i){
     GstClockTime delay;
     gdouble off;
     delay = measurement->rle_delays.values[i];
     if(!delay) continue;
     off = (gdouble) delay / _priv(this)->delay_target;
-    //off = ((gdouble) delay - _priv(this)->delay_target) / _priv(this)->delay_target;
     off_add+=(_priv(this)->delay_target - (gdouble) delay) / _priv(this)->delay_target;
     numstracker_add(this->De_window, delay);
     floatsbuffer_add(this->DeOff_window, off);
 
-    _statcollector_add_queue_delay(&_qdelays(this)->collector, delay - _priv(this)->delay_target);
+    _statcollector_add_queue_delay(&_qdelays(this)->collector, delay);
 
     if(0. < (gdouble)delay) _priv(this)->delay_avg = (gdouble)delay * .2 + _priv(this)->delay_avg * .8;
     else                    _priv(this)->delay_avg = (gdouble)delay;
@@ -223,11 +234,27 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
     if(0. < off) _priv(this)->off_avg = off * .1 + _priv(this)->off_avg * .9;
     else         _priv(this)->off_avg = off;
   }
-  _qdeanalyzer_evaluation(_qdelays(this));
+
+  this->RR_avg = this->RR_avg * .5 + measurement->received_payload_bytes * 4.;
+
+  _statcollector_forward(&_qdelays(this)->collector);
+
   result->delay_off = off_add;
   result->discards_rate  =  ((gdouble) measurement->late_discarded_bytes / (gdouble) measurement->received_payload_bytes);
   result->qtrend    = _priv(this)->qtrend;
   result->sending_rate_median = _priv(this)->sending_rate_median;
+
+  result->delay_indicators.blockage   = _qdelays(this)->blockage;
+  result->delay_indicators.bottleneck = _qdelays(this)->bottleneck;
+  result->delay_indicators.congestion = _qdelays(this)->congestion;
+  br_ratio = this->RR_avg / (gdouble) _priv(this)->sending_rate_median;
+  disc_ratio = ((gdouble) measurement->late_discarded_bytes / (gdouble) measurement->received_payload_bytes);
+  tr_ratio = (gdouble) target_bitrate / (gdouble) _priv(this)->sending_rate_median;
+  result->rate_indicators.congested     = br_ratio < .1;
+  result->rate_indicators.rr_correlated = br_ratio > .9;
+  result->rate_indicators.tr_correlated = tr_ratio > .95;
+  result->rate_indicators.distorted     = disc_ratio > .1;
+
 }
 
 void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
@@ -242,19 +269,22 @@ void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
   fprintf(file,
           "######################## Subflow Measurement Analyser log #######################\n"
           "delay_target:  %-10.3f| off_avg:      %-10.3f| qtrend:       %-10.5f|\n"
-          "sr_median:     %-10lu|\n"
-          "alleviation:   %-10d| mitigation:    %-10d| congestion:   %-10d|\n"
-          "#################################################################################\n",
+          "sr_median:     %-10u|\n"
+          "blockage:      %-10d| bottleneck:    %-10d| congestion:   %-10d|\n"
+          "#################################################################################\n"
+          "%s",
 
           _priv(this)->delay_target / (gdouble)GST_SECOND,
           _priv(this)->off_avg,
           _priv(this)->qtrend,
           _priv(this)->sending_rate_median,
 
-          _qdelays(this)->alleviation, _qdelays(this)->mitigation,
-          _qdelays(this)->congestion
+          _qdelays(this)->blockage, _qdelays(this)->bottleneck,
+          _qdelays(this)->congestion,
 
+          _priv(this)->logstr
           );
+  memset(_priv(this)->logstr, 0, 4096);
 
 }
 
@@ -265,6 +295,16 @@ void _log_abbrevations(SubAnalyser *this, FILE *file)
   "NOT COMPLETED YET\n"
   "###################################################################################################\n"
   );
+
+  DISABLE_LINE _append_log(this, "Muhaha");
+}
+
+void _append_log (SubAnalyser *this, const gchar * format, ... )
+{
+  va_list args;
+  va_start (args, format);
+  vsprintf (_priv(this)->logstr,format, args);
+  va_end (args);
 }
 
 void _SR_stat_pipe(gpointer data, PercentileTrackerPipeData *stat)
@@ -303,10 +343,25 @@ void _De_min_pipe(gpointer data, gint64 min)
 //                  Queue Delay Analyzation
 //----------------------------------------------------------------------------------------
 
+static void _print_itemsstat(const gchar *title, ItemsStat *stat)
+{
+g_print("############ %s ########################################################\n"
+    "avg: %f| var: %f| dev: %f| davg: %f\n"
+    "median: %ld| max: %ld| min: %ld|\n"
+    "trend: %d| congestion: %d|\n"
+        "###################################################################################################\n",
+          title,
+          stat->avg, stat->var, stat->dev, stat->off,
+          stat->median, stat->max, stat->min,
+          stat->trend, stat->congestion
+          );
+}
+
 void _queuedelay_analyzator_init(QueueDelayAnalyzer *this)
 {
   this->collector.tdetector = &this->tdetector;
   this->tdetector.cdetector = &this->cdetector;
+  this->cdetector.qdelays   = this;
 
 }
 
@@ -321,7 +376,8 @@ void _statcollector_add_queue_delay(StatCollector *this, gint64 queue_delay)
   this->sq_sum += queue_delay * queue_delay;
   if(++this->index == STATCOLLECTOR_ITEMS_LENGTH){
     this->index = 0;
-    //pass it towards
+  }
+  if(this->index == this->last_forwarded_index){
     _statcollector_forward(this);
   }
   return;
@@ -340,8 +396,9 @@ void _statcollector_forward(StatCollector *this)
   this->forward.var -= (gdouble)(this->sum * this->sum);
   this->forward.var /= (gdouble) (STATCOLLECTOR_ITEMS_LENGTH * (STATCOLLECTOR_ITEMS_LENGTH - 1));
   this->forward.dev = sqrt(this->forward.var);
-  //select max
 
+
+  //select max
   //sorting network for 4 items
   //https://mitpress.mit.edu/sites/default/files/Chapter%2027.pdf
   //if two nodes are connected the upper contains the greater
@@ -376,6 +433,11 @@ void _statcollector_forward(StatCollector *this)
   this->forward.median       = (this->sorted[1] + this->sorted[2])>>1;
   this->forward.trend        = FALSE;
   this->forward.congestion   = FALSE;
+  this->forward.off          = (gdouble)(this->treshold - this->forward.median) / (gdouble)this->treshold;
+
+  DISABLE_LINE _print_itemsstat("StatCollector forwarded stat", &this->forward);
+
+  this->last_forwarded_index = this->index;
   _tdetector_add_stat(this->tdetector , &this->forward);
   return;
 }
@@ -384,15 +446,13 @@ void _statcollector_forward(StatCollector *this)
 void _tdetector_add_stat(TrendDetector *this, ItemsStat *actual)
 {
   ItemsStat  *last;
-  guint64    treshold;
   last = &this->last;
   if(!this->filled) {
     this->filled = TRUE;
     goto done;
   }
   //trend detection
-  treshold = MAX(1.1 * last->median, 2 * last->dev);
-  actual->trend = (last->median + treshold < actual->median);
+  actual->trend = (this->treshold < actual->dev);
   if(last->trend || actual->trend){
     this->forward.avg = MIN(last->avg, actual->avg);
     this->forward.var = MIN(last->var, actual->var);
@@ -408,7 +468,7 @@ void _tdetector_add_stat(TrendDetector *this, ItemsStat *actual)
   this->forward.max    = MAX(last->max, actual->max);
   this->forward.min    = MIN(last->min, actual->min);
 
-  actual->davg   = last->avg - actual->avg;
+  actual->off   = last->avg - actual->avg;
   _cdetector_add_stat(this->cdetector, &this->forward);
 done:
   memcpy(last, actual, sizeof(ItemsStat));
@@ -416,33 +476,64 @@ done:
 
 void _cdetector_add_stat(CongestionDetector *this, ItemsStat *actual)
 {
-  ItemsStat *last;
-  guint64    treshold;
+  ItemsStat *last, *forward = NULL;
+
   last = &this->last;
   if(!this->filled) {
     this->filled = TRUE;
+    forward = actual;
     goto done;
   }
 
-  //trend detection
-  treshold = MAX(1.5 * last->median, 4 * last->dev);
-  actual->congestion = (last->median + treshold < actual->median);
+  //congestion detection
+  actual->congestion = (this->treshold < actual->median);
+  if(actual->congestion) g_print("congestion treshold: %ld median: %ld\n", this->treshold, actual->median);
+  if(actual->congestion || actual->trend || last->congestion || last->trend) goto done;
 
+  //reference point
+  this->forward.avg = (last->avg + actual->avg) / 2.;
+  this->forward.dev = (last->dev + actual->dev) / 2.;
+  this->forward.median = MIN(last->median, actual->median);
+  this->forward.var = MIN(last->var, actual->var);
+  this->forward.max    = MAX(last->max, actual->max);
+  this->forward.min    = MIN(last->min, actual->min);
+  forward = &this->forward;
 done:
+  _qdeanalyzer_evaluation(this->qdelays, forward);
   memcpy(last, actual, sizeof(ItemsStat));
 }
 
-void _qdeanalyzer_evaluation(QueueDelayAnalyzer *this)
+void _qdeanalyzer_evaluation(QueueDelayAnalyzer *this, ItemsStat *actual)
 {
+  StatCollector *collector;
   CongestionDetector *cdetector;
   TrendDetector *tdetector;
+  ItemsStat *last;
 
   tdetector = &this->tdetector;
   cdetector = &this->cdetector;
+  collector = &this->collector;
 
-  this->alleviation   = tdetector->last.davg < 0.;
-  this->mitigation    = tdetector->last.trend;
-  this->congestion    = cdetector->last.congestion;
+  this->blockage      |= tdetector->last.off < 0.;
+  this->bottleneck    |= tdetector->last.trend;
+  this->congestion    |= cdetector->last.congestion;
+
+  if(!actual) goto done;
+  last = &this->reference;
+  //new reference point forwarded
+  this->reference.avg = (last->avg + actual->avg) / 2.;
+  this->reference.dev = (last->dev + actual->dev) / 2.;
+  this->reference.median = (last->median + actual->median)>>1;
+  this->reference.var = (last->var + actual->var) / 2.;
+  this->reference.max    = MIN(last->max, actual->max);
+  this->reference.min    = MAX(last->min, actual->min);
+
+  //refresh t and cdetector treshold values
+  collector->treshold = .25 * this->reference.min + this->reference.median * .75;
+  tdetector->treshold = this->reference.dev * 4.;
+  cdetector->treshold = this->reference.median * 2;
+done:
+  return;
 }
 
 #undef _swap_sitems

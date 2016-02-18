@@ -738,7 +738,7 @@ void _assemble_measurement(SndController * this, Subflow *subflow)
 {
   guint chunks_num, chunk_index;
 
-  if(!_irt0(subflow)->rfc7243_arrived && _irt0(subflow)->rfc7097_arrived){
+  if(!_irt0(subflow)->rfc7243_arrived && _irt0(subflow)->rfc7097_arrived && _irt0(subflow)->rle_discards.length){
     chunks_num = _irt0(subflow)->rle_discards.length;
     for(chunk_index = 0; chunk_index < chunks_num; ++chunk_index)
     {
@@ -760,8 +760,7 @@ void _assemble_measurement(SndController * this, Subflow *subflow)
     _irt0(subflow)->recent_delay = _irt0(subflow)->rle_delays.values[chunk_index];
   }
 
-  if(_irt0(subflow)->rfc3611_arrived){
-
+  if(_irt0(subflow)->rfc3611_arrived && _irt0(subflow)->rle_losts.length){
     chunk_index = _irt0(subflow)->rle_losts.length - 1;
     _irt0(subflow)->recent_lost = _irt0(subflow)->rle_losts.values[chunk_index];
     chunks_num = _irt0(subflow)->rle_losts.length;
@@ -1100,7 +1099,7 @@ _report_processing_xr_owd_rle_block_processor (SndController *this,
   GstRTCPXR_Chunk *chunk;
 
   _irt0 (subflow)->owd_rle_arrived = TRUE;
-//gst_print_rtcp_xr_owd_rle(xrb);
+//  gst_print_rtcp_xr_owd_rle(xrb);
   chunks_num = gst_rtcp_xr_owd_rle_get_chunks_num(xrb);
   for(chunk_index = 0;
       chunk_index < chunks_num;

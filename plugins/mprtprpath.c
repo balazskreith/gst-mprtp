@@ -83,7 +83,7 @@ mprtpr_path_init (MpRTPRPath * this)
   percentiletracker_set_stats_pipe(this->delays, _delays_stats_pipe, this);
 
   this->skews = make_percentiletracker2(100, 50);
-  percentiletracker2_set_treshold(this->skews, 2 * GST_SECOND);
+  percentiletracker2_set_treshold(this->skews, 1 * GST_SECOND);
 
   _owdrle(this).last_step = _now(this);
   _owdrle(this).read_index = _owdrle(this).write_index = 0;
@@ -205,7 +205,7 @@ mprtpr_path_get_discard_chunks(MpRTPRPath *this,
                               guint16 *end_seq)
 {
   GstRTCPXR_Chunk *result = NULL, *chunk;
-  gboolean chunk_type = TRUE;
+  gboolean chunk_type = FALSE;
   gboolean run_type;
   DiscardRLEBlock *block;
   guint16 begin_seq_, end_seq_;
@@ -255,7 +255,7 @@ mprtpr_path_get_owd_chunks(MpRTPRPath *this,
                               guint16 *end_seq)
 {
   GstRTCPXR_Chunk *result = NULL, *chunk;
-  gboolean chunk_type = TRUE;
+  gboolean chunk_type = FALSE;
   gboolean run_type;
   OWDRLEBlock *block;
   guint16 begin_seq_, end_seq_;
@@ -316,7 +316,7 @@ mprtpr_path_get_lost_chunks(MpRTPRPath *this,
                               guint16 *end_seq)
 {
   GstRTCPXR_Chunk *result = NULL, *chunk;
-  gboolean chunk_type = TRUE;
+  gboolean chunk_type = FALSE;
   gboolean run_type;
   LostsRLEBlock *block;
   guint16 begin_seq_, end_seq_;

@@ -64,6 +64,7 @@ struct _SubflowRateController
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;
 
+  guint                     pending_event;
   SubRateCtrler             state;
   SubRateAction             stage_fnc;
 

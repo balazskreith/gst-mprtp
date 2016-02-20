@@ -43,7 +43,7 @@ GST_DEBUG_CATEGORY_STATIC (subanalyser_debug_category);
 
 G_DEFINE_TYPE (SubAnalyser, subanalyser, G_TYPE_OBJECT);
 
-
+typedef struct _CorrBlock CorrBlock;
 typedef struct _StatCollector StatCollector;
 typedef struct _TrendDetector TrendDetector;
 typedef struct _CongestionDetector CongestionDetector;
@@ -91,6 +91,20 @@ struct _QueueDelayAnalyzer{
   ItemsStat           reference;
 };
 
+struct _CorrBlock{
+  guint           id,N;
+  gint64          Iu0,Iu1,Id1,Id2,Id3,G01,M0,M1,G_[4],M_[4];
+  gint            index;
+  gdouble         g,g_avg;
+  guint           overused;
+  gboolean        distortion;
+  CorrBlock*     next;
+};
+
+
+static void _execute_corrblocks(guint32 *counter, CorrBlock *blocks, guint blocks_length);
+static void _execute_corrblock6(CorrBlock* this);
+
 typedef struct _SubAnalyserPrivate{
   SubAnalyserResult  *result;
   gdouble             delay_target;
@@ -100,7 +114,10 @@ typedef struct _SubAnalyserPrivate{
   guint32             sending_rate_median;
   QueueDelayAnalyzer *qanalyzer;
   gchar               logstr[4096];
+  CorrBlock           cblocks[4];
+  guint32             cblocks_counter;
 }SubAnalyserPrivate;
+
 
 #define _priv(this) ((SubAnalyserPrivate*) this->priv)
 #define _result(this) ((SubAnalyserResult*) _priv(this)->result)
@@ -185,6 +202,19 @@ SubAnalyser *make_subanalyser(
 
   _queuedelay_analyzator_init(_qdelays(this));
 
+  _priv(this)->cblocks[0].next = &_priv(this)->cblocks[1];
+  _priv(this)->cblocks[1].next = &_priv(this)->cblocks[2];
+  _priv(this)->cblocks[2].next = &_priv(this)->cblocks[3];
+  _priv(this)->cblocks[0].id   = 0;
+  _priv(this)->cblocks[1].id   = 1;
+  _priv(this)->cblocks[2].id   = 2;
+  _priv(this)->cblocks[3].id   = 3;
+  _priv(this)->cblocks[0].N   = 4;
+  _priv(this)->cblocks[1].N   = 4;
+  _priv(this)->cblocks[2].N   = 4;
+  _priv(this)->cblocks[3].N   = 4;
+  _priv(this)->cblocks_counter = 1;
+
   THIS_WRITEUNLOCK (this);
   return this;
 }
@@ -226,6 +256,11 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
     numstracker_add(this->De_window, delay);
     floatsbuffer_add(this->DeOff_window, off);
 
+    _priv(this)->cblocks[0].Iu0 = GST_TIME_AS_USECONDS(delay);
+    _execute_corrblocks(&_priv(this)->cblocks_counter, _priv(this)->cblocks, 4);
+    _execute_corrblocks(&_priv(this)->cblocks_counter, _priv(this)->cblocks, 4);
+    _priv(this)->cblocks[0].Id1 = GST_TIME_AS_USECONDS(delay);
+
     _statcollector_add_queue_delay(&_qdelays(this)->collector, delay);
 
     if(0. < (gdouble)delay) _priv(this)->delay_avg = (gdouble)delay * .2 + _priv(this)->delay_avg * .8;
@@ -247,13 +282,13 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
   result->delay_indicators.blockage   = _qdelays(this)->blockage;
   result->delay_indicators.bottleneck = _qdelays(this)->bottleneck;
   result->delay_indicators.congestion = _qdelays(this)->congestion;
-  br_ratio = this->RR_avg / (gdouble) _priv(this)->sending_rate_median;
+  br_ratio = this->RR_avg / (gdouble) target_bitrate;
   disc_ratio = ((gdouble) measurement->late_discarded_bytes / (gdouble) measurement->received_payload_bytes);
   tr_ratio = (gdouble) target_bitrate / (gdouble) _priv(this)->sending_rate_median;
   result->rate_indicators.congested     = br_ratio < .1;
   result->rate_indicators.rr_correlated = br_ratio > .9;
   result->rate_indicators.tr_correlated = tr_ratio > .95 && tr_ratio < 1.05;
-  result->rate_indicators.distorted     = disc_ratio > .1;
+  result->rate_indicators.distorted     = disc_ratio > .2;
 
 }
 
@@ -264,6 +299,41 @@ void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
     _log_abbrevations(this, file);
     this->append_log_abbr = _now(this);
   }
+
+//  fprintf(file,
+//          "g[0]:   %-10.6f| g[1]:  %-10.6f| g[2]:  %-10.6f| g[3]:  %-10.6f|\n",
+//          _priv(this)->cblocks[0].g, _priv(this)->cblocks[1].g,
+//          _priv(this)->cblocks[2].g, _priv(this)->cblocks[3].g
+//          );
+
+//  fprintf(file,
+//          "g[0]:   %-10.6f| g[1]:  %-10.6f| g[2]:  %-10.6f| g[3]:  %-10.6f|\n",
+//          _priv(this)->cblocks2[0].gxy, _priv(this)->cblocks2[1].gxy,
+//          _priv(this)->cblocks2[2].gxy, _priv(this)->cblocks2[3].gxy
+//          );
+
+//  fprintf(file,
+//          "g[0]:   %-10.6f| g[1]:  %-10.6f| g[2]:  %-10.6f| g[3]:  %-10.6f|\n",
+//          _priv(this)->cblocks3[0].g, _priv(this)->cblocks3[1].g,
+//          _priv(this)->cblocks3[2].g, _priv(this)->cblocks3[3].g
+//          );
+
+//  fprintf(file,
+//          "g[0]:   %-10.6f%-10.6f (%d)| g[1]:  %-10.6f%-10.6f (%d)| g[2]:  %-10.6f%-10.6f (%d)| g[3]:  %-10.6f%-10.6f (%d)|\n",
+//          _priv(this)->cblocks4[0].g,_priv(this)->cblocks4[0].g_avg,_priv(this)->cblocks4[0].distortion,
+//          _priv(this)->cblocks4[1].g,_priv(this)->cblocks4[1].g_avg,_priv(this)->cblocks4[1].distortion,
+//          _priv(this)->cblocks4[2].g,_priv(this)->cblocks4[2].g_avg,_priv(this)->cblocks4[2].distortion,
+//          _priv(this)->cblocks4[3].g,_priv(this)->cblocks4[3].g_avg,_priv(this)->cblocks4[3].distortion
+//          );
+
+  fprintf(file,
+          "g[0]:   %-10.6f%-10.6f (%d)| g[1]:  %-10.6f%-10.6f (%d)| g[2]:  %-10.6f%-10.6f (%d)| g[3]:  %-10.6f%-10.6f (%d)|\n",
+          _priv(this)->cblocks[0].g,_priv(this)->cblocks[0].g_avg,_priv(this)->cblocks[0].distortion,
+          _priv(this)->cblocks[1].g,_priv(this)->cblocks[1].g_avg,_priv(this)->cblocks[1].distortion,
+          _priv(this)->cblocks[2].g,_priv(this)->cblocks[2].g_avg,_priv(this)->cblocks[2].distortion,
+          _priv(this)->cblocks[3].g,_priv(this)->cblocks[3].g_avg,_priv(this)->cblocks[3].distortion
+          );
+
 
   goto done;
 
@@ -525,18 +595,85 @@ void _qdeanalyzer_evaluation(QueueDelayAnalyzer *this, ItemsStat *actual)
   //new reference point forwarded
   this->reference.avg = (last->avg + actual->avg) / 2.;
   this->reference.dev = (last->dev + actual->dev) / 2.;
-  this->reference.median = (last->median + actual->median)>>1;
+  if(last->median && actual->median)
+    this->reference.median = (last->median + actual->median)>>1;
+  else
+    this->reference.median = actual->median;
   this->reference.var = (last->var + actual->var) / 2.;
   this->reference.max    = MIN(last->max, actual->max);
   this->reference.min    = MAX(last->min, actual->min);
 
   //refresh t and cdetector treshold values
   collector->treshold = .25 * this->reference.min + this->reference.median * .75;
-  tdetector->treshold = this->reference.dev * 4.;
+  tdetector->treshold = MAX(this->reference.min * .01, this->reference.dev * 4.);
   cdetector->treshold = this->reference.median * 2;
 done:
   return;
 }
+
+
+void _execute_corrblocks(guint32 *counter, CorrBlock *blocks, guint blocks_length)
+{
+  guint32 X = (*counter ^ (*counter-1))+1;
+  switch(X){
+    case 2:
+      _execute_corrblock6(blocks);
+    break;
+    case 4:
+          _execute_corrblock6(blocks + 1);
+        break;
+    case 8:
+          _execute_corrblock6(blocks + 2);
+        break;
+    case 16:
+          _execute_corrblock6(blocks + 3);
+        break;
+    default:
+//      g_print("not execute: %u\n", X);
+      break;
+  }
+
+  ++*counter;
+}
+
+void _execute_corrblock6(CorrBlock* this)
+{
+  this->M1   = this->M0;
+  this->M0  -= this->M_[this->index];
+  this->G01 -= this->G_[this->index];
+  this->M0  += this->M_[this->index] = this->Iu0;
+  this->G01 += this->G_[this->index] = this->Iu0 * this->Id1;
+  if(this->M0 && this->M1){
+    this->g  = this->G01 * this->N;
+    this->g /= this->M0 * this->M1;
+    this->g -= 1.;
+  }
+  if(++this->index == this->N) {
+    this->index = 0;
+  }
+
+  if(this->next){
+    CorrBlock *next = this->next;
+    next->Iu0 = this->Iu0 + this->Iu1;
+    next->Id1 = this->Id2 + this->Id3;
+  }
+
+  this->Iu1  = this->Iu0;
+  this->Id3  = this->Id2;
+  this->Id2  = this->Id1;
+
+  if(0 < this->overused) {
+    --this->overused;
+  }else if(this->M0 && this->M1){
+    this->g_avg = this->g * .2 + this->g_avg * .8;
+  }
+
+  if(this->g_avg * 4. < this->g){
+    this->overused = 4;
+  }
+  this->distortion = 0 < this->overused;
+}
+
 
 #undef _swap_sitems
 #undef THIS_WRITELOCK

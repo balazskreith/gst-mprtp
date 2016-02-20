@@ -184,7 +184,7 @@ struct _Moment{
 #define _SR(this) _anres(this).sending_rate_median
 #define _RR(this) _mt0(this)->receiver_bitrate
 #define _RR_t1(this) _mt1(this)->receiver_bitrate
-#define _actual_br(this) MIN(_MSR(this), _TR(this))
+#define _actual_br(this) MIN(_SR(this), _TR(this))
 #define _set_pending_event(this, e) this->pending_event = e
 #define _set_event(this, e) _mt0(this)->event = e
 #define _event(this) _mt0(this)->event
@@ -425,9 +425,9 @@ void subratectrler_time_update(
   }
 
   subanalyser_time_update(this->analyser, this->path);
-  this->change_target_bitrate_fnc(this, _adjust_bitrate(this));
+//  this->change_target_bitrate_fnc(this, this->target_bitrate);
 //  _change_target_bitrate(this, _adjust_bitrate(this));
-  DISABLE_LINE _set_pacing_bitrate(this, this->target_bitrate * 1.5, TRUE);
+//  DISABLE_LINE _set_pacing_bitrate(this, this->target_bitrate * 1.5, TRUE);
 
 //done:
   this->last_target_bitrate_adjust = _now(this);
@@ -463,6 +463,13 @@ void subratectrler_change_targets(
   this->max_rate = max_rate;
   this->ramp_up_aggressivity = ramp_up_aggressivity;
   this->discard_aggressivity = discard_aggressivity;
+  if(this->target_bitrate < this->min_rate){
+    this->target_bitrate = this->min_rate;
+    if(this->max_rate && this->max_target_point < this->target_bitrate){
+      this->max_target_point = this->max_rate;
+    }
+  }
+
   THIS_WRITEUNLOCK(this);
 }
 
@@ -542,8 +549,8 @@ _reduce_stage(
 {
   this->max_target_point = MAX(_RR(this), _RR_t1(this)) * .9;
   _add_congestion_point(this, this->max_target_point);
-  this->target_bitrate = _actual_br(this) * _bitrate(this).rr_correlated ?  .8 : .6;
-  _set_bitrate_flags(this, BITRATE_FORCED);
+  this->target_bitrate  = _actual_br(this);
+  this->target_bitrate *= _bitrate(this).tr_correlated ?  .8 : .6;
   _switch_stage_to(this, STAGE_BOUNCE, FALSE);
 }
 
@@ -586,17 +593,17 @@ _keep_stage(
     goto done;
   }
 
-  if(!_bitrate(this).rr_correlated || !_bitrate(this).tr_correlated){
+  if(!_bitrate(this).tr_correlated){
     goto done;
   }
 
+  this->min_target_point = _TR(this) *  .95;
   if(this->target_bitrate < this->max_target_point){
-    this->target_bitrate = MIN(this->max_target_point, this->target_bitrate * 1.1);
+    this->target_bitrate = MIN(this->max_target_point, this->target_bitrate * 1.5);
     goto done;
   }
+  this->max_target_point = MAX(this->max_target_point, this->target_bitrate * 1.05);
   //In that case we found a target point and ready to ramp up
-  this->min_target_point = _TR(this) *  .95;
-  this->max_target_point = _TR(this) * 1.05;
   _setup_monitoring(this);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
 
@@ -614,15 +621,15 @@ _mitigate_stage(
     goto done;
   }
 
-  _add_congestion_point(this, _actual_br(this));
-  if(_bitrate(this).tr_correlated){
-    if(this->target_bitrate * .95 < this->min_target_point)
-      this->min_target_point *= .9;
-    this->target_bitrate = this->min_target_point;
-  }else{
-    this->target_bitrate = _actual_br(this) * .9;
-    this->min_target_point = MIN(this->min_target_point, this->target_bitrate);
-  }
+//  _add_congestion_point(this, _actual_br(this));
+//  if(_bitrate(this).tr_correlated){
+//    if(this->target_bitrate * .95 < this->min_target_point)
+//      this->min_target_point *= .9;
+//    this->target_bitrate = this->min_target_point;
+//  }else{
+//    this->target_bitrate = _actual_br(this) * .9;
+//    this->min_target_point = MIN(this->min_target_point, this->target_bitrate);
+//  }
 
   this->max_target_point = _actual_br(this);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
@@ -701,6 +708,7 @@ _fire(
         break;
         case EVENT_SETTLED:
           mprtps_path_set_non_congested(this->path);
+          _reset_monitoring(this);
           _transit_state_to(this, STATE_STABLE);
         break;
         case EVENT_FI:
@@ -712,7 +720,6 @@ _fire(
       switch(event){
         case EVENT_CONGESTION:
           mprtps_path_set_congested(this->path);
-          _switch_stage_to(this, STAGE_REDUCE, TRUE);
           _transit_state_to(this, STATE_OVERUSED);
           _disable_controlling(this);
         break;
@@ -732,17 +739,17 @@ _fire(
       switch(event){
         case EVENT_CONGESTION:
           mprtps_path_set_congested(this->path);
-          _switch_stage_to(this, STAGE_REDUCE, TRUE);
           _transit_state_to(this, STATE_OVERUSED);
           _disable_controlling(this);
           _disable_monitoring(this);
         break;
         case EVENT_DISTORTION:
           _transit_state_to(this, STATE_OVERUSED);
-          _disable_controlling(this);
+          _disable_monitoring(this);
         break;
         case EVENT_STEADY:
           _transit_state_to(this, STATE_STABLE);
+          _disable_monitoring(this);
         break;
         case EVENT_FI:
         default:
@@ -903,9 +910,9 @@ exit:
 
 void _change_target_bitrate(SubflowRateController *this, gint32 new_target)
 {
-  gint32 max_rate, min_rate, max_target;
-  max_rate = !this->max_rate ? max_target : MIN(max_target, this->max_rate);
-  min_rate = !this->min_rate ? this->min_target_point : MAX(this->min_target_point, this->min_rate);
+  gint32 max_rate, min_rate;
+  max_rate = !this->max_rate ?  this->max_target_point : MIN(this->max_target_point, this->max_rate);
+  min_rate = !this->min_rate ? this->min_target_point  : MAX(this->min_target_point, this->min_rate);
   this->target_bitrate = CONSTRAIN(min_rate, max_rate, new_target);
 }
 
@@ -973,9 +980,9 @@ void _log_measurement_update_state(SubflowRateController *this)
           "rlost:      %-10d| rdiscard:%-10d| lost:    %-10d| discard: %-10d|\n"
           "pth_cong:   %-10d| pth_lssy:%-10d| pacing:  %-10d| trend_th:%-10d|\n"
           "target_br:  %-10d| min_tbr: %-10d| max_tbr: %-10d|\n"
-          "stage:      %-10d| near2cc: %-10d| exp_lst: %-10d|\n"
+          "stage:      %-10d| near2cc: %-10d| exp_lst: %-10d| pevent:  %-10d|\n"
           "mon_br:     %-10d| mon_int: %-10d| pace_br: %-10d| lc_rate: %-10d|\n"
-          "SR:         %-10d| disc_rat:%-10.3f| ci:      %-10.3f|\n"
+          "RR:         %-10d| SR:      %-10d| disc_rat:%-10.3f| ci:      %-10.3f|\n"
           "l:          %-10d| rl:      %-10d| d:       %-10d| rd:      %-10d\n"
           "abs_max:    %-10d| abs_min: %-10d| event:      %-7d| off_add: %-10.3f\n"
           "Delay--------------> congestion: %-10d| bottleneck: %-7d| blockage:%-7d|\n"
@@ -998,12 +1005,12 @@ void _log_measurement_update_state(SubflowRateController *this)
 
           _stage(this),
           _is_near_to_congestion_point(this),
-          _mt0(this)->has_expected_lost,
+          _mt0(this)->has_expected_lost, this->pending_event,
 
           this->monitored_bitrate, this->monitoring_interval,
           this->pacing_bitrate, this->last_congestion_point,
 
-          _mt0(this)->sender_bitrate,
+          _RR(this), _mt0(this)->sender_bitrate,
           _mt0(this)->discard_rate, _get_congestion_influence(this),
 
           _mt0(this)->lost, _mt0(this)->recent_lost,

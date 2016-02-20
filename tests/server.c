@@ -308,7 +308,7 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
     for(i=0; i<32; ++i){
       if(!ur->subflows[i].controlled) continue;
       if(test_parameters_.video_session == TEST_SOURCE){
-               ur->subflows[i].min_rate = 400000 / test_parameters_.subflow_num;
+               ur->subflows[i].min_rate = 500000 / test_parameters_.subflow_num;
                ur->subflows[i].max_rate = 2000000;
            }
       else  if(test_parameters_.video_session == FOREMAN_SOURCE){

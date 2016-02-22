@@ -29,6 +29,7 @@
 #include <string.h>
 #include "bintree.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 
 //#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
@@ -604,7 +605,6 @@ void
 _mitigate_stage(
     SubflowRateController *this)
 {
-  gdouble alpha;
   //Fixme: do this
 //  if(_delays(this).congestion || _lost(this)){
 //    _switch_stage_to(this, STAGE_REDUCE, TRUE);
@@ -626,33 +626,10 @@ _mitigate_stage(
   }
   _change_target_bitrate(this, MAX(_min_br(this) * (1.-_qtrend(this)) , this->bottleneck_point * .9));
 
-
-
-  alpha = (0. < _qtrend(this)) ? (1.- _qtrend(this)) : .9;
-  if(!_bitrate(this).tr_correlated){
-    if(_SR(this) < _TR(this)){
-      _add_bottleneck_point(this, _SR(this));
-      this->max_target_point = _SR(this);
-      this->min_target_point = this->target_bitrate = MIN(_SR(this), (_SR(this) + this->monitored_bitrate) * alpha);
-      _set_path_pacing(this, TRUE);
-    }
-    goto settle;
-  }
-  _add_bottleneck_point(this, _TR(this));
-  if(this->max_target_point < _TR(this) * 1.05){
-    this->max_target_point = _TR(this) * .975;
-  }
-  this->target_bitrate =MIN((_TR(this) + this->monitored_bitrate) * alpha, _TR(this));
-
-  if(this->target_bitrate < this->min_target_point){
-    this->min_target_point = this->target_bitrate;
-  }
+done:
   _set_path_pacing(this, TRUE);
-settle:
   _set_pending_event(this, EVENT_SETTLED);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
-//done:
-
   return;
 }
 
@@ -917,10 +894,11 @@ exit:
 
 void _change_target_bitrate(SubflowRateController *this, gint32 new_target)
 {
-  gint32 max_rate, min_rate;
-  max_rate = !this->max_rate ?  this->max_target_point : MIN(this->max_target_point, this->max_rate);
-  min_rate = !this->min_rate ? this->min_target_point  : MAX(this->min_target_point, this->min_rate);
-  this->target_bitrate = CONSTRAIN(min_rate, max_rate, new_target);
+//  gint32 max_rate, min_rate;
+//  max_rate = !this->max_rate ?  this->max_target_point : MIN(this->max_target_point, this->max_rate);
+//  min_rate = !this->min_rate ? this->min_target_point  : MAX(this->min_target_point, this->min_rate);
+  //  this->target_bitrate = CONSTRAIN(min_rate, max_rate, new_target);
+  this->target_bitrate = CONSTRAIN(this->min_rate, this->max_rate, new_target);
 }
 
 gboolean _is_near_to_congestion_point(SubflowRateController *this)

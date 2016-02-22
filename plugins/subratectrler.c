@@ -644,7 +644,7 @@ _probe_stage(
   }
 
   //stay here for a while to check
-  if(_now(this) - 2 * GST_SECOND < this->monitoring_started){
+  if(_now(this) - 10 * GST_SECOND < this->monitoring_started){
     goto done;
   }
 

@@ -44,7 +44,7 @@ For profile options run gst-mprtp/tests/server --info
 
 **Contacts**
 
-Balázs Krieth, Varun Singh, Jörg Ott
+Balázs Kreith, Varun Singh, Jörg Ott
      
 **Acknowledgements** 
   

@@ -423,7 +423,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
 //  g_print("J: %d\n", this->jitter);
   if(0 < mprtp->delay){
     _add_delay(this, mprtp->delay);
-    if(this->delay_avg * 2 < mprtp->delay){
+    if(0 < this->delay_avg && this->delay_avg * 2 < mprtp->delay){
       _add_discard(this, mprtp);
     }
   }
@@ -484,6 +484,7 @@ void _add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp)
   this->total_late_discarded_bytes+=mprtp->payload_bytes;
   _actual_discrle(this)->discarded_bytes+=mprtp->payload_bytes;
   ++_actual_discrle(this)->discarded_packets;
+  this->discard_happened = _now(this);
 }
 
 void _add_delay(MpRTPRPath *this, GstClockTime delay)
@@ -570,7 +571,7 @@ void _delays_stats_pipe(gpointer data, PercentileTrackerPipeData *pdata)
   MpRTPRPath *this = data;
   _actual_owdrle(this)->median_delay = pdata->percentile;
   if(_now(this) - 200 * GST_MSECOND < this->delay_avg_refreshed) return;
-
+  if(_now(this) - GST_SECOND < this->discard_happened) return;
   this->delay_avg_refreshed = _now(this);
   if(0. < this->delay_avg){
     this->delay_avg = (gdouble) MIN(pdata->percentile, 400 * GST_MSECOND) * .05 + this->delay_avg * .95;

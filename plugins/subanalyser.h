@@ -33,7 +33,6 @@ typedef struct _SubAnalyserResult SubAnalyserResult;
 struct _SubAnalyser
 {
   GObject                  object;
-  FloatsBuffer*            DeOff_window;
   NumsTracker*             De_window;
   PercentileTracker*       SR_window;
   gdouble                  RR_avg;
@@ -56,11 +55,11 @@ struct _SubAnalyserResult{
   gdouble        delay_off;
 
   struct{
-    gboolean     congestion, bottleneck, blockage;
+    gboolean     distortion, congestion;
   }delay_indicators;
 
   struct{
-    gboolean     rr_correlated, tr_correlated, distorted, congested;
+    gboolean     rr_correlated, tr_correlated, distortion;
   }rate_indicators;
 };
 

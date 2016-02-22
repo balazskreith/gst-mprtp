@@ -47,11 +47,12 @@ typedef struct _CorrBlock CorrBlock;
 
 struct _CorrBlock{
   guint           id,N;
-  gint64          Iu0,Iu1,Id1,Id2,Id3,G01,M0,M1,G_[4],M_[4];
+  gint64          Iu0,Iu1,Id1,Id2,Id3,G01,M0,M1,G_[16],M_[16];
   gint            index;
   gdouble         g,g_avg;
   guint           overused;
-  gboolean        distortion;
+  gdouble         treshold, min_treshold;
+  gboolean        distorted;
   CorrBlock*     next;
 };
 
@@ -66,9 +67,10 @@ typedef struct _SubAnalyserPrivate{
   gdouble             delay_avg;
   gdouble             qtrend;
   guint32             sending_rate_median;
-  gboolean            congestion,bottleneck,blockage;
+  gboolean            distortion,congestion;
   gchar               logstr[4096];
   CorrBlock           cblocks[4];
+  gdouble             qdelays_th;
   guint32             cblocks_counter;
 }SubAnalyserPrivate;
 
@@ -81,7 +83,6 @@ typedef struct _SubAnalyserPrivate{
 //----------------------------------------------------------------------
 static void _SR_stat_pipe(gpointer data, PercentileTrackerPipeData *stat);
 static void _De_stat_pipe(gpointer data, NumsTrackerStatData *stat);
-void _DeOff_state_pipe(gpointer data, FloatsBufferStatData *stat);
 static void _De_min_pipe(gpointer data, gint64 min);
 //static void _delaysH_stat_pipe(gpointer data, PercentileTrackerPipeData *stat);
 //static void _delaysL_stat_pipe(gpointer data, PercentileTrackerPipeData *stat);
@@ -112,7 +113,6 @@ subanalyser_finalize (GObject * object)
 {
   SubAnalyser *this;
   this = SUBANALYSER(object);
-  g_free(_qdelays(this));
   g_free(_result(this));
   g_free(_priv(this));
   g_object_unref(this->sysclock);
@@ -137,31 +137,27 @@ SubAnalyser *make_subanalyser(
   this->SR_window = make_percentiletracker(128, 50);
   percentiletracker_set_treshold(this->SR_window, 2 * GST_SECOND);
   this->De_window = make_numstracker(length, GST_SECOND * 30);
-  this->DeOff_window = make_floatsbuffer(20, 3 * GST_SECOND);
 
   percentiletracker_set_stats_pipe(this->SR_window, _SR_stat_pipe, this);
   numstracker_add_plugin(this->De_window,
                          (NumsTrackerPlugin*) make_numstracker_stat_plugin(_De_stat_pipe, this));
   numstracker_add_plugin(this->De_window,
                          (NumsTrackerPlugin*) make_numstracker_minmax_plugin(NULL, NULL, _De_min_pipe, this));
-  floatsbuffer_set_stats_pipe(this->DeOff_window, _DeOff_state_pipe, this);
   _priv(this)->delay_target = 100 * GST_MSECOND;
-
-  _queuedelay_analyzator_init(_qdelays(this));
 
   _priv(this)->cblocks[0].next = &_priv(this)->cblocks[1];
   _priv(this)->cblocks[1].next = &_priv(this)->cblocks[2];
-  _priv(this)->cblocks[2].next = &_priv(this)->cblocks[3];
   _priv(this)->cblocks[0].id   = 0;
   _priv(this)->cblocks[1].id   = 1;
   _priv(this)->cblocks[2].id   = 2;
-  _priv(this)->cblocks[3].id   = 3;
-  _priv(this)->cblocks[0].N   = 4;
+  _priv(this)->cblocks[0].N   = 2;
   _priv(this)->cblocks[1].N   = 4;
-  _priv(this)->cblocks[2].N   = 4;
-  _priv(this)->cblocks[3].N   = 4;
+  _priv(this)->cblocks[2].N   = 8;
+  _priv(this)->cblocks[0].min_treshold   = .001;
+  _priv(this)->cblocks[1].min_treshold   = .01;
+  _priv(this)->cblocks[2].min_treshold   = .1;
   _priv(this)->cblocks_counter = 1;
-
+  _priv(this)->qdelays_th = .001;
   THIS_WRITEUNLOCK (this);
   return this;
 }
@@ -172,7 +168,6 @@ void subanalyser_reset(SubAnalyser *this)
   THIS_WRITELOCK (this);
   percentiletracker_reset(this->SR_window);
   numstracker_reset(this->De_window);
-  floatsbuffer_reset(this->DeOff_window);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -210,33 +205,34 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
   result->qtrend    = _priv(this)->qtrend;
   result->sending_rate_median = _priv(this)->sending_rate_median;
 
-  result->delay_indicators.blockage   = _priv(this)->blockage;
-  result->delay_indicators.bottleneck = _priv(this)->bottleneck;
-  result->delay_indicators.congestion = _priv(this)->congestion;
+  result->qtrend                         = _priv(this)->qtrend;
+  result->delay_indicators.congestion    = _priv(this)->congestion;
+  result->delay_indicators.distortion    = 0. < _priv(this)->qtrend;
   br_ratio = this->RR_avg / (gdouble) target_bitrate;
   disc_ratio = ((gdouble) measurement->late_discarded_bytes / (gdouble) measurement->received_payload_bytes);
   tr_ratio = (gdouble) target_bitrate / (gdouble) _priv(this)->sending_rate_median;
-  result->rate_indicators.congested     = br_ratio < .1;
-  result->rate_indicators.rr_correlated = br_ratio > .9;
-  result->rate_indicators.tr_correlated = tr_ratio > .95 && tr_ratio < 1.05;
-  result->rate_indicators.distorted     = disc_ratio > .2;
+  result->rate_indicators.rr_correlated  = br_ratio > .9;
+  result->rate_indicators.tr_correlated  = tr_ratio > .95 && tr_ratio < 1.05;
+  result->rate_indicators.distortion     = disc_ratio > .2;
 
 }
 
 void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
 {
-
+  gdouble trend;
   if(this->append_log_abbr < _now(this) - 60 * GST_SECOND){
     _log_abbrevations(this, file);
     this->append_log_abbr = _now(this);
   }
 
+  trend = _priv(this)->cblocks[1].g > .002 ? (2*_priv(this)->cblocks[0].g) / _priv(this)->cblocks[1].g : 0.;
+//  trend = _priv(this)->cblocks[0].g > .002 ? (_priv(this)->cblocks[1].g) / (2. * _priv(this)->cblocks[0].g) : 0.;
   fprintf(file,
-          "g[0]:   %-10.6f%-10.6f (%d)| g[1]:  %-10.6f%-10.6f (%d)| g[2]:  %-10.6f%-10.6f (%d)| g[3]:  %-10.6f%-10.6f (%d)|\n",
-          _priv(this)->cblocks[0].g,_priv(this)->cblocks[0].g_avg,_priv(this)->cblocks[0].distortion,
-          _priv(this)->cblocks[1].g,_priv(this)->cblocks[1].g_avg,_priv(this)->cblocks[1].distortion,
-          _priv(this)->cblocks[2].g,_priv(this)->cblocks[2].g_avg,_priv(this)->cblocks[2].distortion,
-          _priv(this)->cblocks[3].g,_priv(this)->cblocks[3].g_avg,_priv(this)->cblocks[3].distortion
+          "g[0]:   %-10.6f%-10.6f (d:%d)| g[1]:  %-10.6f%-10.6f (d:%d) -trend:%f| g[2]:  %-10.6f%-10.6f (d:%d)|\n",
+          _priv(this)->cblocks[0].g,_priv(this)->cblocks[0].g_avg,_priv(this)->cblocks[0].distorted,
+          _priv(this)->cblocks[1].g,_priv(this)->cblocks[1].g_avg,_priv(this)->cblocks[1].distorted,
+          trend,
+          _priv(this)->cblocks[2].g,_priv(this)->cblocks[2].g_avg,_priv(this)->cblocks[2].distorted
           );
 
 
@@ -246,7 +242,7 @@ void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
           "######################## Subflow Measurement Analyser log #######################\n"
           "delay_target:  %-10.3f| off_avg:      %-10.3f| qtrend:       %-10.5f|\n"
           "sr_median:     %-10u|\n"
-          "blockage:      %-10d| bottleneck:    %-10d| congestion:   %-10d|\n"
+          "trouble:       %-10d| congestion:   %-10d|\n"
           "#################################################################################\n"
           "%s",
 
@@ -255,8 +251,8 @@ void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
           _priv(this)->qtrend,
           _priv(this)->sending_rate_median,
 
-          _priv(this)->blockage, _priv(this)->bottleneck,
           _priv(this)->congestion,
+          _priv(this)->distortion,
 
           _priv(this)->logstr
           );
@@ -297,18 +293,6 @@ void _De_stat_pipe(gpointer data, NumsTrackerStatData *stat)
   _priv(this)->delay_avg = stat->avg;
 }
 
-void _DeOff_state_pipe(gpointer data, FloatsBufferStatData *stat)
-{
-  SubAnalyser *this = data;
-  if(0. == stat->G0){
-    _priv(this)->qtrend = 0.;
-    return;
-  }
-//  _priv(this)->qtrend = MIN(1.0,MAX(0.0,stat->G1 / stat->G0 * _priv(this)->off_avg));
-  _priv(this)->qtrend = MIN(2.0,MAX(0.0,stat->G1 / stat->G0 * _priv(this)->off_avg));
-//  _priv(this)->qtrend = MIN(1.0,MAX(0.0,stat->G0 / stat->G1));
-}
-
 void _De_min_pipe(gpointer data, gint64 min)
 {
   SubAnalyser *this = data;
@@ -323,10 +307,15 @@ void _De_min_pipe(gpointer data, gint64 min)
 void _qdeanalyzer_evaluation(SubAnalyser *this)
 {
 
-  _priv(this)->blockage      = _priv(this)->cblocks[0].distortion;
-  _priv(this)->bottleneck    = _priv(this)->cblocks[1].distortion;
-  _priv(this)->congestion    = FALSE;
+//  _priv(this)->qtrend = CONSTRAIN(-.1, .1, _priv(this)->cblocks[0].g_avg * 1000.);
+//  _priv(this)->qtrend = _priv(this)->cblocks[0].g * 1000.;
+//  _priv(this)->qtrend = CONSTRAIN(-2., .2, _priv(this)->cblocks[0].g / .0005 - 1.);
+//  _priv(this)->qtrend     = _priv(this)->cblocks[0].g > 0.002 ? (_priv(this)->cblocks[1].g) / (2. * _priv(this)->cblocks[0].g) : 0.;
 
+  _priv(this)->qtrend     = _priv(this)->cblocks[1].g > 0.001 ? (2*_priv(this)->cblocks[0].g) / _priv(this)->cblocks[1].g : 0.;
+  _priv(this)->qtrend     = CONSTRAIN(-2., .2, _priv(this)->qtrend);
+  _priv(this)->distortion = _priv(this)->cblocks[0].distorted;
+  _priv(this)->congestion = 0 && _priv(this)->cblocks[1].distorted;
 }
 
 
@@ -380,16 +369,19 @@ void _execute_corrblock6(CorrBlock* this)
   this->Id3  = this->Id2;
   this->Id2  = this->Id1;
 
-  if(0 < this->overused) {
-    --this->overused;
-  }else if(this->M0 && this->M1){
-    this->g_avg = this->g * .2 + this->g_avg * .8;
+  if(this->M0 && this->M1){
+    this->g_avg = this->g * .25 + this->g_avg * .75;
   }
 
-  if(this->g_avg * 4. < this->g){
-    this->overused = 4;
+  if(!this->distorted){
+    if(this->treshold < this->g){
+      this->distorted = TRUE;
+    }else{
+      this->treshold = CONSTRAIN(this->min_treshold / 10., this->min_treshold, this->g_avg * 4.);
+    }
+  }else if(this->g_avg < this->min_treshold){
+    this->distorted = FALSE;
   }
-  this->distortion = 0 < this->overused;
 }
 
 

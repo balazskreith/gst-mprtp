@@ -50,11 +50,12 @@ struct _SubflowRateController
   gint32                    min_target_point;
 //  gint32                    desired_bitrate;
   gint32                    target_bitrate;
+  gboolean                  skip_mitigate;
 
   gint32                    max_rate;
   gint32                    min_rate;
 
-  gint32                    last_congestion_point;
+  gint32                    bottleneck_point;
 
   GstClockTime              setup_time;
 
@@ -81,7 +82,7 @@ struct _SubflowRateController
   GstClockTime              packet_obsolation_treshold;
 
   gint32                    pacing_bitrate;
-  GstClockTime              last_congestion_detected;
+  GstClockTime              congestion_detected;
 
   gboolean                  log_enabled;
   guint                     logtick;

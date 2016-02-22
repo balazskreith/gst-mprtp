@@ -104,6 +104,7 @@ struct _MpRTPReceiverPath
   guint16             highest_seq;
   gdouble             delay_avg;
   GstClockTime        delay_avg_refreshed;
+  GstClockTime        discard_happened;
 
   guint64             ext_rtptime;
   guint64             last_packet_skew;

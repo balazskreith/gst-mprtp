@@ -291,6 +291,10 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
       g_object_set (async_tx_rtcpSrc_1, "port",  path1_tx_rtcp_port, NULL);
       g_object_set (async_tx_rtcpSrc_2, "port",  path2_tx_rtcp_port, NULL);
       g_object_set (async_tx_rtcpSrc_3, "port",  path3_tx_rtcp_port, NULL);
+
+      if(test_parameters_.video_session == FOREMAN_SOURCE){
+        g_object_set (mprtpply, "forced-delay", 200, NULL);
+      }
   }
 
   g_object_set (rtcpSrc, "port", rtpbin_tx_rtcp_port, NULL);

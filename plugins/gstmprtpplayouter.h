@@ -76,6 +76,7 @@ struct _GstMprtpplayouter
   gboolean        auto_rate_and_cc;
   gboolean        rtp_passthrough;
 
+
   GstPad*         mprtp_srcpad;
   GstPad*         mprtp_sinkpad;
   GstPad*         mprtcp_sr_sinkpad;

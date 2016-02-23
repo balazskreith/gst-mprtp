@@ -584,11 +584,14 @@ _keep_stage(
 
   this->max_target_point = MAX(_TR(this), this->max_target_point);
   this->min_target_point = _TR(this) *  .95;
-
-  if(_now(this) - 2 * GST_SECOND < this->congestion_detected){
+  if(this->target_bitrate < this->bottleneck_point){
+    this->target_bitrate = this->bottleneck_point;
     goto done;
   }
 
+  if(_now(this) - 10 * GST_SECOND < this->congestion_detected){
+    goto done;
+  }
   _switch_stage_to(this, STAGE_RAISE, FALSE);
   _set_event(this, EVENT_PROBE);
 
@@ -643,7 +646,7 @@ _raise_stage(
     this->desired_increasing_rate = 1. / (gdouble) this->monitoring_interval;
   }
 
-  _disable_monitoring(this);
+//  _disable_monitoring(this);
   this->max_target_point = _min_br(this);
   this->min_target_point = _min_br(this) *.9;
   if(this->target_bitrate < this->desired_bitrate){
@@ -667,6 +670,7 @@ _fire(
     case STATE_OVERUSED:
       switch(event){
         case EVENT_CONGESTION:
+          this->bottleneck_point = 0;
           mprtps_path_set_congested(this->path);
           _switch_stage_to(this, STAGE_REDUCE, TRUE);
           _transit_state_to(this, STATE_OVERUSED);
@@ -685,6 +689,7 @@ _fire(
     case STATE_STABLE:
       switch(event){
         case EVENT_CONGESTION:
+          this->bottleneck_point = 0;
           mprtps_path_set_congested(this->path);
           _transit_state_to(this, STATE_OVERUSED);
           _disable_controlling(this);
@@ -705,6 +710,7 @@ _fire(
     case STATE_MONITORED:
       switch(event){
         case EVENT_CONGESTION:
+          this->bottleneck_point = 0;
           mprtps_path_set_congested(this->path);
           _transit_state_to(this, STATE_OVERUSED);
           _disable_controlling(this);
@@ -802,14 +808,14 @@ void _setup_monitoring(SubflowRateController *this)
   min_interval = MIN_MONITORING_INTERVAL;
 
   //try to brake the bottleneck
-  if(_max_br(this) < this->bottleneck_point && _is_near_to_bottleneck_point(this)){
-      plus_rate = this->bottleneck_point - _min_br(this);
+  if(_TR(this) < this->bottleneck_point){
+      plus_rate = this->bottleneck_point * 1.02 - _TR(this);
   }else{
     scl =  (gdouble) this->min_rate;
     scl /= (gdouble)(_TR(this) - this->min_rate * .5);
     scl *= scl;
     scl = MIN(1., MAX(1./14., scl));
-  //  plus_rate = _TR(this) * scl * (1.-_get_bottleneck_influence(this));
+    plus_rate = _TR(this) * scl * (1.-_get_bottleneck_influence(this));
     plus_rate = _TR(this) * scl;
     plus_rate = CONSTRAIN(RAMP_UP_MIN_SPEED, RAMP_UP_MAX_SPEED, plus_rate);
   }

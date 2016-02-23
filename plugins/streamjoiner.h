@@ -72,6 +72,7 @@ struct _StreamJoiner
   guint64              last_snd_ntp_reference;
   void               (*send_mprtp_packet_func)(gpointer,GstMpRTPBuffer*);
   gpointer             send_mprtp_packet_data;
+
 };
 struct _StreamJoinerClass{
   GObjectClass parent_class;

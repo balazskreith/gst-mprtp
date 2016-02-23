@@ -56,7 +56,8 @@ static PacketsSndQueueNode* _make_node(PacketsSndQueue *this,
                                        GstBuffer *buffer,
                                        guint32 payload_bytes);
 
-#define _trash_node(this, node) g_slice_free(PacketsSndQueueNode, node)
+//#define _trash_node(this, node) g_slice_free(PacketsSndQueueNode, node)
+#define _trash_node(this, node) g_free(node)
 
 static void _packetssndqueue_add(PacketsSndQueue *this,
                                  GstBuffer* buffer,
@@ -218,7 +219,8 @@ void _remove_head(PacketsSndQueue *this)
 PacketsSndQueueNode* _make_node(PacketsSndQueue *this, GstBuffer *buffer, guint32 payload_bytes)
 {
   PacketsSndQueueNode *result;
-  result = g_slice_new0(PacketsSndQueueNode);
+//  result = g_slice_new0(PacketsSndQueueNode);
+  result = g_malloc0(sizeof(PacketsSndQueueNode));
   result->next = NULL;
   result->added = gst_clock_get_time(this->sysclock);
   result->buffer = gst_buffer_ref(buffer);

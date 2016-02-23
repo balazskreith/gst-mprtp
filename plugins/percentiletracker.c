@@ -300,6 +300,8 @@ void percentiletracker_add(PercentileTracker *this, guint64 value)
   _add_value(this, value);
   _obsolate(this);
 
+  if(this->debug) _print_items(this);
+
   if(this->median)
     _median_balancer(this);
   else

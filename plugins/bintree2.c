@@ -559,7 +559,8 @@ BinTree2Node *_search_value(BinTree2 *this, gint64 value, BinTree2Node **parent)
 BinTree2Node *_make_bintree2node(BinTree2 *this, gint64 value)
 {
   BinTree2Node *result;
-  result = g_slice_new0(BinTree2Node);
+//  result = g_slice_new0(BinTree2Node);
+  result = g_malloc0(sizeof(BinTree2Node));
   result->value = value;
   return result;
 }
@@ -569,8 +570,9 @@ void _trash_bintree2node(BinTree2 *this, BinTree2Node *node)
   if(node){
     if(node == this->top) _refresh_top(this);
     else if(node == this->bottom) _refresh_bottom(this);
+//    g_slice_free(BinTree2Node, node);
+    g_free(node);
   }
-  g_slice_free(BinTree2Node, node);
 }
 
 void _refresh_top(BinTree2 *this)

@@ -113,6 +113,7 @@ numstracker_finalize (GObject * object)
     plugin = it->data;
     plugin->destroyer(plugin);
   }
+  g_print("numstracker_finalize\n");
   g_free(this->items);
 }
 

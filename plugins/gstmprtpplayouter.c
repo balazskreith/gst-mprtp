@@ -101,7 +101,8 @@ static GstStructure *_collect_infos (GstMprtpplayouter * this);
 static GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer);
 //static void _trash_mprtp_buffer(GstMprtpplayouter * this, GstMpRTPBuffer *mprtp);
 //#define _trash_mprtp_buffer(this, mprtp) pointerpool_add(this->mprtp_buffer_pool, mprtp);
-#define _trash_mprtp_buffer(this, mprtp) g_slice_free(GstMpRTPBuffer, mprtp)
+//#define _trash_mprtp_buffer(this, mprtp) g_slice_free(GstMpRTPBuffer, mprtp)
+#define _trash_mprtp_buffer(this, mprtp) g_free(mprtp)
 enum
 {
   PROP_0,
@@ -116,7 +117,7 @@ enum
   PROP_RTP_PASSTHROUGH,
   PROP_LOG_ENABLED,
   PROP_SUBFLOWS_STATS,
-  PROP_DELAY_OFFSET,
+  PROP_FORCED_DELAY,
 };
 
 /* pad templates */
@@ -238,11 +239,6 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
            "Detach a subflow with a given id.", 0,
            MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_DELAY_OFFSET,
-       g_param_spec_uint64 ("delay-offset",
-                          "In non living sources a delay offset can be configured",
-                          "In non living sources a delay offset can be configured", 0,
-           100 * GST_SECOND, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_AUTO_RATE_AND_CC,
       g_param_spec_boolean ("auto-rate-and-cc",
@@ -269,6 +265,13 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           "Collect subflow statistics and return with "
           "a structure contains it",
           "NULL", G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_FORCED_DELAY,
+                                   g_param_spec_uint64 ("forced-delay",
+                                                        "forced delay before playout",
+                                                        "forced delay before playout",
+                                                        0, G_MAXUINT, 0,
+                                                        G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   element_class->change_state =
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_change_state);
@@ -338,7 +341,6 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
 //  this->mprtp_buffer_pool = make_pointerpool(512, _mprtp_ctor, g_free, _mprtp_reset);
   this->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
   stream_joiner_set_monitor_payload_type(this->joiner, this->monitor_payload_type);
-
 //  percentiletracker_test();
 //  {
 //    StreamJoiner *s = NULL;
@@ -456,11 +458,6 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       _detach_path (this, g_value_get_uint (value));
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_DELAY_OFFSET:
-      THIS_WRITELOCK (this);
-      this->delay_offset = g_value_get_uint64 (value);
-      THIS_WRITEUNLOCK (this);
-      break;
     case PROP_RTP_PASSTHROUGH:
       THIS_WRITELOCK (this);
       gboolean_value = g_value_get_boolean (value);
@@ -472,6 +469,11 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       gboolean_value = g_value_get_boolean (value);
       this->logging = gboolean_value;
       rcvctrler_set_logging_flag(this->controller, this->logging);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_FORCED_DELAY:
+      THIS_WRITELOCK (this);
+      stream_joiner_set_forced_delay(this->joiner, g_value_get_uint64 (value) * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_AUTO_RATE_AND_CC:
@@ -627,7 +629,7 @@ gst_mprtpplayouter_src_query (GstPad * sinkpad, GstObject * parent,
       if ((result = gst_pad_query (peer, query))) {
           gst_query_parse_latency (query, &live, &min, &max);
 //          min= GST_MSECOND;
-          min= 0;
+          min = 0;
           max = -1;
           gst_query_set_latency (query, live, min, max);
       }
@@ -1039,7 +1041,8 @@ GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer)
 {
   GstMpRTPBuffer *result;
 //  result = pointerpool_get(this->mprtp_buffer_pool);
-  result = g_slice_new0(GstMpRTPBuffer);
+//  result = g_slice_new0(GstMpRTPBuffer);
+  result = g_malloc0(sizeof(GstMpRTPBuffer));
   gst_mprtp_buffer_init(result,
                     buffer,
                     this->mprtp_ext_header_id,

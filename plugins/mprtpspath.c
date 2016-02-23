@@ -171,8 +171,8 @@ mprtps_path_init (MPRTPSPath * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
   this->packetsqueue = make_packetssndqueue();
-  this->sent_bytes = make_numstracker(4096, GST_SECOND);
-  this->incoming_bytes = make_numstracker(4096, GST_SECOND);
+  this->sent_bytes = make_numstracker(512, GST_SECOND);
+  this->incoming_bytes = make_numstracker(512, GST_SECOND);
   mprtps_path_reset (this);
 }
 
@@ -181,6 +181,7 @@ void
 mprtps_path_finalize (GObject * object)
 {
   MPRTPSPath *this = MPRTPS_PATH_CAST (object);
+  g_print("||||||| FINALIZING MPRTPS PATH ||||||||\n");
   g_object_unref (this->sysclock);
 }
 

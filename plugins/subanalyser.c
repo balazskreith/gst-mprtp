@@ -26,6 +26,7 @@
 #include "subanalyser.h"
 #include <math.h>
 #include <string.h>
+#include <stdlib.h>
 
 //#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
 //#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
@@ -67,7 +68,6 @@ typedef struct _SubAnalyserPrivate{
   gdouble             off_avg;
   gdouble             delay_avg,delay_t2,delay_t1,delay_t0;
   gdouble             qtrend;
-  guint32             sending_rate_median;
   gboolean            distortion,congestion;
   CorrBlock           cblocks[4];
   gdouble             qdelays_th;
@@ -81,7 +81,6 @@ typedef struct _SubAnalyserPrivate{
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
-static void _SR_stat_pipe(gpointer data, PercentileTrackerPipeData *stat);
 static void _log_abbrevations(SubAnalyser *this, FILE *file);
 
 static void subanalyser_finalize (GObject * object);
@@ -127,9 +126,8 @@ SubAnalyser *make_subanalyser(void)
   this->sysclock = gst_system_clock_obtain();
   this->priv = g_malloc0(sizeof(SubAnalyserPrivate));
   _priv(this)->result = g_malloc0(sizeof(SubAnalyserPrivate));
-  this->SR_window = make_percentiletracker(128, 50);
-  percentiletracker_set_treshold(this->SR_window, 2 * GST_SECOND);
-  percentiletracker_set_stats_pipe(this->SR_window, _SR_stat_pipe, this);
+  this->SR_window = g_malloc0(sizeof(gint32) * 8);
+  this->SR_window_index = 0;
   _priv(this)->delay_target = 100 * GST_MSECOND;
 
   _priv(this)->cblocks[0].next = &_priv(this)->cblocks[1];
@@ -153,28 +151,26 @@ SubAnalyser *make_subanalyser(void)
 void subanalyser_reset(SubAnalyser *this)
 {
   THIS_WRITELOCK (this);
-  percentiletracker_reset(this->SR_window);
   THIS_WRITEUNLOCK (this);
 }
 
 void subanalyser_time_update(SubAnalyser *this, gint32 sending_bitrate)
 {
-  //Todo: Figure out why min/maxtree inside of percentiletracker get NULL!!!!
-  //I have no idea why, and I don't have time to figure it out, so here comes
-  //my ugliest fix I have ever done.
-  if(!this->SR_window){
-    this->SR_window = make_percentiletracker(128, 50);
-    percentiletracker_set_treshold(this->SR_window, 2 * GST_SECOND);
-    percentiletracker_set_stats_pipe(this->SR_window, _SR_stat_pipe, this);
-  }else if(!this->SR_window->mintree || !this->SR_window->maxtree){
-    g_object_unref(this->SR_window);
-    this->SR_window = make_percentiletracker(128, 50);
-    percentiletracker_set_treshold(this->SR_window, 2 * GST_SECOND);
-    percentiletracker_set_stats_pipe(this->SR_window, _SR_stat_pipe, this);
-  }
+  this->SR_window[this->SR_window_index] = sending_bitrate;
+  this->SR_window_index = this->SR_window_index + 1;
+  this->SR_window_index &= 7;
+}
+static gint _compare (const void* a, const void* b)
+{
+  return ( *(gint32*)a - *(gint32*)b );
+}
 
-  percentiletracker_add(this->SR_window, sending_bitrate);
-
+static gint32 _get_sending_rate_median(SubAnalyser *this)
+{
+  gint32 result;
+  qsort (this->SR_window, 8, sizeof(gint32), _compare);
+  result = this->SR_window[3] + this->SR_window[4];
+  return result>>1;
 }
 
 void subanalyser_measurement_analyse(SubAnalyser *this,
@@ -210,7 +206,7 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
 
   result->delay_off = off_add;
   result->discards_rate  =  ((gdouble) measurement->late_discarded_bytes / (gdouble) measurement->received_payload_bytes);
-  result->sending_rate_median = _priv(this)->sending_rate_median;
+  result->sending_rate_median = _get_sending_rate_median(this);
 
   result->off                            = (_priv(this)->delay_t0 * .5 + _priv(this)->delay_t1 * .25 + _priv(this)->delay_t2 * .25) / _priv(this)->delay_avg;
   result->qtrend                         = _priv(this)->qtrend;
@@ -218,7 +214,7 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
   result->delay_indicators.distortion    = 0. < _priv(this)->qtrend;
   br_ratio = this->RR_avg / (gdouble) target_bitrate;
   disc_ratio = ((gdouble) measurement->late_discarded_bytes / (gdouble) measurement->received_payload_bytes);
-  tr_ratio = (gdouble) target_bitrate / (gdouble) _priv(this)->sending_rate_median;
+  tr_ratio = (gdouble) target_bitrate / (gdouble) result->sending_rate_median;
   result->rate_indicators.rr_correlated  = br_ratio > .9;
   result->rate_indicators.tr_correlated  = tr_ratio > .95 && tr_ratio < 1.05;
   result->rate_indicators.distortion     = disc_ratio > .5;
@@ -248,14 +244,12 @@ void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
   fprintf(file,
           "######################## Subflow Measurement Analyser log #######################\n"
           "delay_target:  %-10.3f| off_avg:      %-10.3f| qtrend:       %-10.5f|\n"
-          "sr_median:     %-10u|\n"
           "trouble:       %-10d| congestion:   %-10d|\n"
           "#################################################################################\n",
 
           _priv(this)->delay_target / (gdouble)GST_SECOND,
           _priv(this)->off_avg,
           _priv(this)->qtrend,
-          _priv(this)->sending_rate_median,
 
           _priv(this)->congestion,
           _priv(this)->distortion
@@ -274,14 +268,6 @@ void _log_abbrevations(SubAnalyser *this, FILE *file)
   );
 
 }
-
-
-void _SR_stat_pipe(gpointer data, PercentileTrackerPipeData *stat)
-{
-  SubAnalyser *this = data;
-  _priv(this)->sending_rate_median = stat->percentile;
-}
-
 
 
 //----------------------------------------------------------------------------------------

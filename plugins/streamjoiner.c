@@ -142,12 +142,18 @@ _push_into_frame(
     Frame *frame,
     GstMpRTPBuffer *rtp);
 
+//#define _trash_frame(this, frame)
+//  g_slice_free(Frame, frame);
+//  --this->framecounter;
+
+
 #define _trash_frame(this, frame)  \
-  g_slice_free(Frame, frame);      \
+  g_free(frame);      \
   --this->framecounter;
 
 
-#define _trash_framenode(this, node) g_slice_free(FrameNode, node);
+//#define _trash_framenode(this, node) g_slice_free(FrameNode, node);
+#define _trash_framenode(this, node) g_free(node);
 
 
 //#define DEBUG_PRINT_TOOLS
@@ -258,6 +264,7 @@ make_stream_joiner(gpointer data, void (*func)(gpointer,GstMpRTPBuffer*))
   return result;
 }
 
+
 void
 stream_joiner_run (void *data)
 {
@@ -279,6 +286,7 @@ stream_joiner_run (void *data)
     this->playout_halt = FALSE;
     goto done;
   }
+
 pop_frame:
   frame = this->head;
   if(!frame || now < frame->playout_time) goto next_tick;
@@ -683,7 +691,8 @@ Frame* _make_frame(StreamJoiner *this, FrameNode *node)
   Frame *result;
   GstClockTime delay_diff;
 
-  result = g_slice_new0(Frame);
+//  result = g_slice_new0(Frame);
+  result = g_malloc0(sizeof(Frame));
   result->head = result->tail = node;
   result->timestamp = node->mprtp->timestamp;
   result->created = gst_clock_get_time(this->sysclock);
@@ -706,7 +715,8 @@ Frame* _make_frame(StreamJoiner *this, FrameNode *node)
 FrameNode * _make_framenode(StreamJoiner *this, GstMpRTPBuffer *mprtp)
 {
   FrameNode *result;
-  result = g_slice_new0(FrameNode);
+//  result = g_slice_new0(FrameNode);
+  result = g_malloc0(sizeof(FrameNode));
   result->mprtp = mprtp;
   result->next = NULL;
   result->seq = mprtp->abs_seq;

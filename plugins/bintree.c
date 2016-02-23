@@ -564,7 +564,9 @@ BinTreeNode *_search_value(BinTree *this, gint64 value, BinTreeNode **parent)
 BinTreeNode *_make_bintreenode(BinTree *this, gint64 value)
 {
   BinTreeNode *result;
-  result = g_slice_new0(BinTreeNode);
+
+//  result = g_slice_new0(BinTreeNode);
+  result = g_malloc0(sizeof(BinTreeNode));
   result->value = value;
   return result;
 }
@@ -574,7 +576,8 @@ void _trash_bintreenode(BinTree *this, BinTreeNode *node)
   if(node){
     if(node == this->top) _refresh_top(this);
     else if(node == this->bottom) _refresh_bottom(this);
-    g_slice_free(BinTreeNode, node);
+//    g_slice_free(BinTreeNode, node);
+    g_free(node);
   }
 }
 

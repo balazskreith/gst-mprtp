@@ -210,7 +210,7 @@ void sndrate_distor_time_update(SendingRateDistributor *this)
 
   //4. Apply new min-max rates and disabling commanded by the application
   _time_update_application(this);
-
+done:
   return;
 }
 

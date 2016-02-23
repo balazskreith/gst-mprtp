@@ -26,6 +26,7 @@
 #include "percentiletracker.h"
 #include <math.h>
 #include <string.h>
+#include <stdlib.h>     /* qsort */
 
 //#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
 //#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
@@ -76,24 +77,29 @@ _get_stats (PercentileTracker * this,
 
 static void
 _obsolate (PercentileTracker * this);
+static void
+_rem_value(PercentileTracker * this);
 static gint
 _cmp_for_max (guint64 x, guint64 y);
 static gint
 _cmp_for_min (guint64 x, guint64 y);
 
-static void _balance_value(PercentileTracker *this, guint64 value);
-static void _collect_value(PercentileTracker* this, guint64 value);
-static void _transit_to_collecting(PercentileTracker *this, guint requested);
-static void _transit_to_balancing(PercentileTracker *this);
 static void _median_balancer(PercentileTracker *this);
-static void _nmedian_balancer(PercentileTracker *this);
+static void _percentile_balancer(PercentileTracker *this);
 static guint64 _get_median(PercentileTracker * this);
-static guint64 _get_nmedian(PercentileTracker * this);
-#define _counter(this) (bintree_get_num(this->maxtree) + bintree_get_num(this->mintree))
-
+static guint64 _get_percentile(PercentileTracker * this);
+//#define _counter(this) (bintree_get_num(this->maxtree) + bintree_get_num(this->mintree))
+#define _counter(this) (this->Mxc + this->Mnc)
+#define _now(this) gst_clock_get_time(this->sysclock)
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
+
+
+static gint _compare (const void* a, const void* b)
+{
+  return ( *(guint64*)a - *(guint64*)b );
+}
 
 void
 percentiletracker_class_init (PercentileTrackerClass * klass)
@@ -128,7 +134,6 @@ percentiletracker_init (PercentileTracker * this)
   this->sum = 0;
   this->sysclock = gst_system_clock_obtain();
   this->treshold = GST_SECOND;
-  this->state = g_malloc0(sizeof(PercentileState));
 }
 
 PercentileTracker *make_percentiletracker(
@@ -152,8 +157,6 @@ PercentileTracker *make_percentiletracker_full(BinTreeCmpFunc cmp_min,
                                   guint32 length,
                                   guint percentile)
 {
-  CollectingState *collecting;
-  BalancingState *balancing;
   PercentileTracker *this;
   this = g_object_new (PERCENTILETRACKER_TYPE, NULL);
   THIS_WRITELOCK (this);
@@ -164,39 +167,44 @@ PercentileTracker *make_percentiletracker_full(BinTreeCmpFunc cmp_min,
   this->maxtree = make_bintree(cmp_max);
   this->mintree = make_bintree(cmp_min);
 
-  collecting = &this->state->collecting;
-  balancing = &this->state->balancing;
   if(this->ratio < 1.){
-
     this->required = (1./this->ratio) + 1;
-    this->state->producer = _get_nmedian;
-    collecting->collector = this->mintree;
-    collecting->dispensor = this->maxtree;
-    balancing->balancer = _nmedian_balancer;
+    this->median = FALSE;
   }else if(1. < this->ratio){
     this->required = this->ratio + 1;
-    this->state->producer = _get_nmedian;
-    collecting->collector = this->maxtree;
-    collecting->dispensor = this->mintree;
-    balancing->balancer = _nmedian_balancer;
+    this->median = FALSE;
   }else{
     this->required = 2;
-    this->state->producer = _get_median;
-    collecting->collector = this->maxtree;
-    collecting->dispensor = this->mintree;
-    balancing->balancer = _median_balancer;
+    this->median = TRUE;
   }
-//  g_print("required num: %d\n", this->required);
-  _transit_to_collecting(this, this->required);
+  this->ready = FALSE;
+  this->collection = (guint64*) g_malloc0(sizeof(guint64) * this->required);
   THIS_WRITEUNLOCK (this);
 
   return this;
 }
 
+static void _print_items(PercentileTracker *this)
+{
+  gint i,c;
+  guint64 *items, perc, min, max, sum;
+  items = g_malloc0(sizeof(guint64) * this->length);
+  g_print("Ready: %d Items (%d = Mx: %d + Mn: %d (%d)): ", this->ready, _counter(this),  this->Mxc,  this->Mnc, this->counter);
+  for(c = 0,i=this->read_index; c < _counter(this); ++c,i = (i + 1) % this->length){
+    items[c] = this->items[i].value;
+  }
+  qsort (items, c, sizeof(guint64), _compare);
+  for(i=0; i<c; ++i) g_print("%-5lu ", items[i]);
+  perc = percentiletracker_get_stats(this, &min, &max, &sum);
+  g_print("Min: %lu, %dth percentile: %lu Max: %lu, Sum: %lu\n", min, this->percentile, perc, max, sum);
+  g_free(items);
+}
+
 void percentiletracker_test(void)
 {
+  gint i;
   PercentileTracker *tracker;
-  tracker = make_percentiletracker(20, 50);
+  tracker = make_percentiletracker(10, 50);
   percentiletracker_add(tracker, 7);
   percentiletracker_add(tracker, 1);
   percentiletracker_add(tracker, 3);
@@ -207,28 +215,44 @@ void percentiletracker_test(void)
   percentiletracker_add(tracker, 5);
   percentiletracker_add(tracker, 9);
   percentiletracker_add(tracker, 10);
-  percentiletracker_add(tracker, 11);
 
-  {
-    guint64 min,max,perc;
-    perc = percentiletracker_get_stats(tracker, &min, &max, NULL);
-    g_print("PercentileTracker test for 50th percentile\n"
-              "Min: %lu, 50th percentile: %lu Max: %lu\n", min, perc, max);
+  _print_items(tracker);
+  _rem_value(tracker);_rem_value(tracker);_rem_value(tracker);_rem_value(tracker);_rem_value(tracker);
+  _rem_value(tracker);_rem_value(tracker);_rem_value(tracker);_rem_value(tracker);_rem_value(tracker);
+  _print_items(tracker);
+
+  for(i=0; i<10; ++i){
+    percentiletracker_add(tracker, (g_random_int() % 100) + 50);
+    _print_items(tracker);
   }
-  {
-    guint64 min,max,perc,i;
-    for(i=0; i<100; ++i){
-      percentiletracker_add(tracker, (g_random_int() % 100) + 50);
-      perc = percentiletracker_get_stats(tracker, &min, &max, NULL);
-      g_print("PercentileTracker test for 50th percentile\n"
-              "Min: %lu, 50th percentile: %lu Max: %lu\n", min, perc, max);
-    }
 
+  g_object_unref(tracker);
+//
+  tracker = make_percentiletracker(10, 20);
+  percentiletracker_add(tracker, 7);
+  percentiletracker_add(tracker, 1);
+  percentiletracker_add(tracker, 3);
+  percentiletracker_add(tracker, 8);
+  percentiletracker_add(tracker, 2);
+  percentiletracker_add(tracker, 6);
+  percentiletracker_add(tracker, 4);
+  percentiletracker_add(tracker, 5);
+  percentiletracker_add(tracker, 9);
+  percentiletracker_add(tracker, 10);
+
+  _print_items(tracker);
+  _rem_value(tracker);_rem_value(tracker);_rem_value(tracker);_rem_value(tracker);_rem_value(tracker);
+  _rem_value(tracker);_rem_value(tracker);_rem_value(tracker);_rem_value(tracker);_rem_value(tracker);
+  _print_items(tracker);
+
+  for(i=0; i<(1<<30); ++i){
+    percentiletracker_add(tracker, (g_random_int() % 100) + 50);
+    //_print_items(tracker);
   }
 
   g_object_unref(tracker);
 
-  tracker = make_percentiletracker(20, 10);
+  tracker = make_percentiletracker(10, 80);
   percentiletracker_add(tracker, 7);
   percentiletracker_add(tracker, 1);
   percentiletracker_add(tracker, 3);
@@ -240,12 +264,16 @@ void percentiletracker_test(void)
   percentiletracker_add(tracker, 9);
   percentiletracker_add(tracker, 10);
 
-  {
-    guint64 min,max,perc;
-    perc = percentiletracker_get_stats(tracker, &min, &max, NULL);
-    g_print("PercentileTracker test for 10th percentile\n"
-            "Min: %lu, 10th percentile: %lu Max: %lu\n", min, perc, max);
+  _print_items(tracker);
+  _rem_value(tracker);_rem_value(tracker);_rem_value(tracker);_rem_value(tracker);_rem_value(tracker);
+  _rem_value(tracker);_rem_value(tracker);_rem_value(tracker);_rem_value(tracker);_rem_value(tracker);
+  _print_items(tracker);
+
+  for(i=0; i<10; ++i){
+    percentiletracker_add(tracker, (g_random_int() % 100) + 50);
+    _print_items(tracker);
   }
+
   g_object_unref(tracker);
 
 }
@@ -255,20 +283,27 @@ void percentiletracker_reset(PercentileTracker *this)
   THIS_WRITELOCK (this);
   bintree_reset(this->maxtree);
   bintree_reset(this->mintree);
+  this->ready = FALSE;
   memset(this->items, 0, sizeof(PercentileTrackerItem) * this->length);
   this->write_index = this->read_index = 0;
+  this->Mxc = this->Mnc = 0;
   this->sum = 0;
-  _transit_to_collecting(this, this->required);
   THIS_WRITEUNLOCK (this);
 }
 
 void percentiletracker_add(PercentileTracker *this, guint64 value)
 {
   THIS_WRITELOCK (this);
-  if(!this->state->processor){
-    _transit_to_balancing(this);
-  }
-  this->state->processor(this, value);
+  //add new one
+  _add_value(this, value);
+  _obsolate(this);
+
+  if(this->median)
+    _median_balancer(this);
+  else
+    _percentile_balancer(this);
+
+  _pipe_stats(this);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -331,20 +366,69 @@ percentiletracker_obsolate (PercentileTracker * this)
 {
   THIS_READLOCK (this);
   _obsolate(this);
+  _pipe_stats(this);
   THIS_READUNLOCK (this);
 }
-
 
 void _add_value(PercentileTracker *this, guint64 value)
 {
   this->sum += value;
+
+  if(0 < this->items[this->write_index].added)
+    _rem_value(this);
+
   this->items[this->write_index].value = value;
-  this->items[this->write_index].added = gst_clock_get_time(this->sysclock);
+  this->items[this->write_index].added = _now(this);
   if(++this->write_index == this->length){
     this->write_index=0;
   }
+
+  if(this->ready){
+    goto add2tree;
+  }
+
+  this->collection[this->counter] = value;
   this->counter = MIN(this->counter + 1, this->length);
-  _pipe_stats(this);
+  if(this->counter < this->required){
+    goto done;
+  }
+  this->ready = TRUE;
+  //sort the array
+  qsort (this->collection, this->required, sizeof(guint64), _compare);
+  //distribute
+  if(this->ratio == 1.){
+    bintree_insert_value(this->maxtree, this->collection[0]);
+    bintree_insert_value(this->mintree, this->collection[1]);
+    this->Mxc = this->Mnc = 1;
+  }else if(this->ratio < 1.){
+    gint i,c = this->required - 1;
+    for(i = 0; i < c; ++i){
+      bintree_insert_value(this->maxtree, this->collection[i]);
+      ++this->Mxc;
+    }
+    bintree_insert_value(this->mintree, this->collection[c]);
+    ++this->Mnc;
+  }else if(1. < this->ratio){
+    gint i;
+    for(i = this->required - 1; 0 < i; --i) {
+      bintree_insert_value(this->mintree, this->collection[i]);
+      ++this->Mnc;
+    }
+    bintree_insert_value(this->maxtree, this->collection[0]);
+    ++this->Mxc;
+  }
+  goto done;
+
+add2tree:
+  if(value <= bintree_get_top_value(this->maxtree)){
+    bintree_insert_value(this->maxtree, value);
+    ++this->Mxc;
+  }else{
+    bintree_insert_value(this->mintree, value);
+    ++this->Mnc;
+  }
+done:
+  return;
 }
 
 void _pipe_stats(PercentileTracker * this)
@@ -362,20 +446,17 @@ _get_stats (PercentileTracker * this,
             guint64 *sum)
 {
   guint64 result = 0;
-  gint32 max_count, min_count;
+  result = (this->median) ? _get_median(this) : _get_percentile(this);
   if(sum) *sum = this->sum;
-  result = this->state->producer(this);
   if(!min && !max) goto done;
   if(min) *min = 0;
   if(max) *max = 0;
 
-  min_count = bintree_get_num(this->mintree);
-  max_count = bintree_get_num(this->maxtree);
-  if(!min_count && !max_count) goto done;
-  if(!max_count){
+  if(!this->Mnc && !this->Mxc) goto done;
+  if(!this->Mxc){
     if(min) *min = bintree_get_top_value(this->mintree);
     if(max) *max = bintree_get_bottom_value(this->mintree);
-  }else if(!min_count){
+  }else if(!this->Mnc){
     if(min) *min = bintree_get_bottom_value(this->maxtree);
     if(max) *max = bintree_get_top_value(this->maxtree);
   }else{
@@ -388,45 +469,27 @@ _get_stats (PercentileTracker * this,
 
 guint64 _get_median(PercentileTracker * this)
 {
-  gint32 max_count,min_count;
   guint64 result;
-  max_count = bintree_get_num(this->maxtree);
-  min_count = bintree_get_num(this->mintree);
 
-  if(min_count == max_count){
+  if(this->Mnc == this->Mxc){
     result = (bintree_get_top_value(this->maxtree) + bintree_get_top_value(this->mintree))>>1;
-  } else if(min_count < max_count)
+  } else if(this->Mnc < this->Mxc)
     result = bintree_get_top_value(this->maxtree);
   else
     result = bintree_get_top_value(this->mintree);
 
-  if(this->debug){
-      g_print("_get_median debug, item num: %u <-> R:%d-W:%d\n",
-              percentiletracker_get_num(this),
-              this->read_index,
-              this->write_index);
-      g_print("maxtree top: %lu (%u), mintree top: %lu (%u) result is: %lu\n",
-              bintree_get_top_value(this->maxtree),
-              bintree_get_num(this->maxtree),
-              bintree_get_top_value(this->mintree),
-              bintree_get_num(this->mintree),
-              result);
-    }
   return result;
 }
 
-guint64 _get_nmedian(PercentileTracker * this)
+guint64 _get_percentile(PercentileTracker * this)
 {
-  gint32 max_count,min_count;
   gdouble ratio;
-  max_count = bintree_get_num(this->maxtree);
-  min_count = bintree_get_num(this->mintree);
-  if(!min_count)
+  if(!this->Mnc)
     return bintree_get_top_value(this->maxtree);
-  if(!max_count)
+  if(!this->Mxc)
     return bintree_get_top_value(this->mintree);
 
-  ratio = (gdouble) max_count / (gdouble) min_count;
+  ratio = (gdouble) this->Mxc / (gdouble) this->Mnc;
   if(ratio == this->ratio)
     return (bintree_get_top_value(this->maxtree) + bintree_get_top_value(this->mintree))>>1;
   if(this->ratio < ratio)
@@ -435,147 +498,67 @@ guint64 _get_nmedian(PercentileTracker * this)
     return bintree_get_top_value(this->mintree);
 }
 
-
-void _balance_value(PercentileTracker *this, guint64 value)
-{
-  BalancingState *state;
-  state = &this->state->balancing;
-  //add new one
-  _add_value(this, value);
-
-  if(value <= bintree_get_top_value(this->maxtree))
-    bintree_insert_value(this->maxtree, value);
-  else
-    bintree_insert_value(this->mintree, value);
-
-  _obsolate(this);
-  if(_counter(this) < this->required) goto collecting;
-  else goto balancing;
-balancing:
-  state->balancer(this);
-  return;
-collecting:
-  _transit_to_collecting(this, this->required - _counter(this));
-  return;
-}
-
-
-void _collect_value(PercentileTracker* this, guint64 value)
-{
-  CollectingState *state;
-  BinTreeNode *node;
-  gint32 c_was, c_is;
-  state = &this->state->collecting;
-  c_was = _counter(this);
-  _add_value(this, value);
-  bintree_insert_value(state->collector, value);
-  c_is = _counter(this);
-  if(c_was == c_is) goto done;
-  if(--state->requested > 0) goto done;
-
-  node = bintree_pop_top_node(state->collector);
-  bintree_insert_node(state->dispensor, node);
-
-  c_was = c_is;
-  _obsolate(this);
-  c_is = _counter(this);
-//  g_print("after insert c is %d (c was: %d) \n", c_is, c_was);
-  if(c_is == c_was) goto transit;
-  state->requested += c_was - c_is;
-done:
-//  g_print("requested num: %d\n", state->requested);
-  return;
-transit:
-  _transit_to_balancing(this);
-  return;
-}
-
-void _transit_to_collecting(PercentileTracker *this, guint requested)
-{
-  CollectingState *state;
-  state = &this->state->collecting;
-  this->state->processor = _collect_value;
-  state->requested = requested;
-
-//  while(bintree_get_num(state->dispensor)){
-//    BinTreeNode* node;
-//    node = bintree_pop_top_node(state->dispensor);
-//    bintree_insert_node(state->dispensor, node);
-//  }
-  return;
-}
-
-
-void _transit_to_balancing(PercentileTracker *this)
-{
-  this->state->processor = _balance_value;
-}
-
-
 void _median_balancer(PercentileTracker *this)
 {
   gint32 diff;
-  gint32 max_count, min_count;
-  BinTreeNode *top;
-  max_count = bintree_get_num(this->maxtree);
-  min_count = bintree_get_num(this->mintree);
+  guint64 value;
+  if(!this->ready) goto done;
 again:
-  if(!max_count || !min_count) goto collecting;
-  diff = max_count - min_count;
+  diff = this->Mxc - this->Mnc;
   if(-2 < diff && diff < 2) goto done;
   if (diff < -1) {
-    top = bintree_pop_top_node(this->mintree);
-    bintree_insert_node(this->maxtree, top);
-    --min_count;++max_count;
+    value = bintree_get_top_value(this->mintree);
+    bintree_delete_value(this->mintree, value);
+    bintree_insert_value(this->maxtree, value);
+    --this->Mnc; ++this->Mxc;
   } else if (1 < diff) {
-    top = bintree_pop_top_node(this->maxtree);
-    bintree_insert_node(this->mintree, top);
-    --max_count;++min_count;
+    value = bintree_get_top_value(this->maxtree);
+    bintree_delete_value(this->maxtree, value);
+    bintree_insert_value(this->mintree, value);
+    --this->Mxc; ++this->Mnc;
   }
   goto again;
 done:
   return;
-collecting:
-  _transit_to_collecting(this, 1);
 }
 
 
-void _nmedian_balancer(PercentileTracker *this)
+void _percentile_balancer(PercentileTracker *this)
 {
-  gint32 max_count, min_count;
   gdouble ratio;
-  BinTreeNode *top;
-  max_count = bintree_get_num(this->maxtree);
-  min_count = bintree_get_num(this->mintree);
-  if(!min_count) ratio = .001;
-  else ratio = (gdouble) max_count / (gdouble) min_count;
+  guint64 value;
+  if(!this->ready)
+    goto done;
+  if(!this->Mnc)
+    ratio = .001;
+  else
+    ratio = (gdouble) this->Mxc / (gdouble) this->Mnc;
+
   if(ratio < this->ratio)
     goto balancing_mintree;
   else
     goto balancing_maxtree;
 
 balancing_mintree:
-  if(min_count == 0) goto collecting;
-  ratio = (gdouble) (max_count + 1) / (gdouble) (min_count - 1);
+  ratio = (gdouble) (this->Mxc + 1) / (gdouble) (this->Mnc - 1);
   if(this->ratio < ratio) goto done;
-  top = bintree_pop_top_node(this->mintree);
-  bintree_insert_node(this->maxtree, top);
-  --min_count;++max_count;
+  value = bintree_get_top_value(this->mintree);
+  bintree_delete_value(this->mintree, value);
+  bintree_insert_value(this->maxtree, value);
+  --this->Mnc; ++this->Mxc;
   goto balancing_mintree;
 
 balancing_maxtree:
-  if(max_count == 0) goto collecting;
-  ratio = (gdouble) (max_count - 1) / (gdouble) (min_count + 1);
+  ratio = (gdouble) (this->Mxc - 1) / (gdouble) (this->Mnc + 1);
   if(ratio < this->ratio) goto done;
-  top = bintree_pop_top_node(this->maxtree);
-  bintree_insert_node(this->mintree, top);
-  ++min_count;--max_count;
+  value = bintree_get_top_value(this->maxtree);
+  bintree_delete_value(this->maxtree, value);
+  bintree_insert_value(this->mintree, value);
+  --this->Mxc; ++this->Mnc;
   goto balancing_maxtree;
 
 done:
   return;
-collecting:
-  _transit_to_collecting(this, 1);
 }
 
 void
@@ -586,24 +569,52 @@ _obsolate (PercentileTracker * this)
   treshold = now - this->treshold;
 again:
   if(this->counter < 1) goto done;
-  if(this->write_index == this->read_index) goto elliminate;
-  else if(this->items[this->read_index].added < treshold) goto elliminate;
+  if(this->items[this->read_index].added < treshold) goto elliminate;
   else goto done;
 elliminate:
-  if(this->items[this->read_index].value <= bintree_get_top_value(this->maxtree))
-    bintree_delete_value(this->maxtree, this->items[this->read_index].value);
-  else
-    bintree_delete_value(this->mintree, this->items[this->read_index].value);
-  this->sum -= this->items[this->read_index].value;
+  _rem_value(this);
+  goto again;
+done:
+  return;
+}
+
+void _rem_value(PercentileTracker * this)
+{
+  guint64 value;
+  this->sum -= value = this->items[this->read_index].value;
   this->items[this->read_index].value = 0;
   this->items[this->read_index].added = 0;
   if(++this->read_index == this->length){
-      this->read_index=0;
+    this->read_index=0;
   }
-  this->counter = MAX(0, this->counter - 1);
-  goto again;
+  if(!this->ready){
+    goto collect;
+  }
+  if(value <= bintree_get_top_value(this->maxtree)){
+    bintree_delete_value(this->maxtree, value);
+    --this->Mxc;
+  }else{
+    bintree_delete_value(this->mintree, value);
+    --this->Mnc;
+  }
+
+  if(this->required <= _counter(this)){
+    goto done;
+  }
+collect:
+  {
+    gint i,j,c = _counter(this);
+    this->ready = FALSE;
+    this->counter = c;
+    this->Mxc = this->Mnc = 0;
+    bintree_reset(this->maxtree);
+    bintree_reset(this->mintree);
+    if(c < 1) goto done;
+    for(j = 0, i = this->read_index; j < c; i = (i + 1) % this->length, ++j){
+      this->collection[j] = this->items[i].value;
+    }
+  }
 done:
-  _pipe_stats(this);
   return;
 }
 

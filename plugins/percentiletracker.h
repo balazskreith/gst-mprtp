@@ -12,7 +12,6 @@
 
 typedef struct _PercentileTracker PercentileTracker;
 typedef struct _PercentileTrackerClass PercentileTrackerClass;
-typedef struct _PercentileState PercentileState;
 #include "bintree.h"
 
 #define PERCENTILETRACKER_TYPE             (percentiletracker_get_type())
@@ -43,10 +42,12 @@ struct _PercentileTracker
   gint32                   write_index;
   gint32                   read_index;
   gint32                   counter;
+  gint32                   Mxc, Mnc;
   gdouble                  ratio;
-
+  guint64*                 collection;
+  gboolean                 median;
+  gboolean                 ready;
   guint                    required;
-  PercentileState*         state;
 
   void                   (*stats_pipe)(gpointer, PercentileTrackerPipeData*);
   gpointer                 stats_pipe_data;

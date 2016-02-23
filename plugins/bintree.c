@@ -287,6 +287,9 @@ gint64 bintree_get_bottom_value(BinTree *this)
   THIS_READLOCK (this);
   if(!this->bottom) result = 0;
   else result = this->bottom->value;
+//  if(this->bottom){
+//    g_print("\nbottom: %p->%lu\n", this, this->bottom->value);
+//  }
   THIS_READUNLOCK (this);
   return result;
 }
@@ -321,6 +324,7 @@ void bintree_insert_value(BinTree* this, gint64 value)
 void bintree_delete_value(BinTree* this, gint64 value)
 {
   THIS_WRITELOCK (this);
+//  g_print("\ndelete: %p->%lu\n", this, value);
   _deref_from_tree(this, value);
   THIS_WRITEUNLOCK (this);
 }
@@ -377,7 +381,7 @@ BinTreeNode * _insert(BinTree *this, BinTreeNode *actual, BinTreeNode *insert)
     top = this->top;
     bottom = this->bottom;
     if(this->cmp(top->value, insert->value) < 0) this->top = insert;
-    else if(this->cmp(bottom->value, insert->value) > 0) this->bottom = insert;
+    else if(this->cmp(insert->value, bottom->value) < 0) this->bottom = insert;
   }
   return result;
 }
@@ -561,10 +565,6 @@ BinTreeNode *_make_bintreenode(BinTree *this, gint64 value)
 {
   BinTreeNode *result;
   result = g_slice_new0(BinTreeNode);
-//  if(!g_queue_is_empty(this->node_pool))
-//    result = g_queue_pop_head(this->node_pool);
-//  else
-//    result = g_malloc0(sizeof(BinTreeNode));
   result->value = value;
   return result;
 }
@@ -574,14 +574,8 @@ void _trash_bintreenode(BinTree *this, BinTreeNode *node)
   if(node){
     if(node == this->top) _refresh_top(this);
     else if(node == this->bottom) _refresh_bottom(this);
+    g_slice_free(BinTreeNode, node);
   }
-  g_slice_free(BinTreeNode, node);
-//
-//  if(g_queue_get_length(this->node_pool) > 1024){
-//    g_free(node);
-//  }else{
-//    g_queue_push_tail(this->node_pool, node);
-//  }
 }
 
 void _refresh_top(BinTree *this)
@@ -594,9 +588,9 @@ void _refresh_top(BinTree *this)
 
 void _refresh_bottom(BinTree *this)
 {
-  BinTreeNode *top, *parent = NULL;
-  top = this->bottom;
-  if(top->right) this->bottom = _get_leftest_value(top->right, &parent);
+  BinTreeNode *bottom, *parent = NULL;
+  bottom = this->bottom;
+  if(bottom->right) this->bottom = _get_leftest_value(bottom->right, &parent);
   else this->bottom = _get_leftest_value(this->root, &parent);
 }
 

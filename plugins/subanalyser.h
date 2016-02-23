@@ -65,9 +65,8 @@ struct _SubAnalyserResult{
 
 GType subanalyser_get_type (void);
 void subanalyser_reset(SubAnalyser *this);
-SubAnalyser *make_subanalyser(guint size,
-                              GstClockTime obsolation_treshold);
-void subanalyser_time_update(SubAnalyser *this, MPRTPSPath *path);
+SubAnalyser *make_subanalyser(void);
+void subanalyser_time_update(SubAnalyser *this, gint32 sending_bitrate);
 void subanalyser_measurement_analyse(SubAnalyser *this,
                                      RRMeasurement *measurement,
                                      gint32         target_bitrate,

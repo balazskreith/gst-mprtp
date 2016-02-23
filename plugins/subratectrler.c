@@ -336,7 +336,7 @@ subratectrler_init (SubflowRateController * this)
 {
   this->moments = g_malloc0(sizeof(Moment) * MOMENTS_LENGTH);
   this->sysclock = gst_system_clock_obtain();
-  this->analyser = make_subanalyser(10, 10 * GST_SECOND);
+  this->analyser = make_subanalyser();
   g_rw_lock_init (&this->rwmutex);
 }
 
@@ -419,11 +419,12 @@ void subratectrler_time_update(
                          UtilizationSubflowReport *rep,
                          gboolean *overused)
 {
+  gint32 sending_bitrate;
   if (_now(this) - RATE_ADJUST_INTERVAL < this->last_target_bitrate_adjust) {
     goto done;
   }
-
-  subanalyser_time_update(this->analyser, this->path);
+  sending_bitrate = mprtps_path_get_sent_bytes_in1s(this->path, NULL) * 8;
+  subanalyser_time_update(this->analyser, sending_bitrate);
 //  this->change_target_bitrate_fnc(this, this->target_bitrate);
 //  _change_target_bitrate(this, _adjust_bitrate(this));
 //  DISABLE_LINE _set_pacing_bitrate(this, this->target_bitrate * 1.5, TRUE);

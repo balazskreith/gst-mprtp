@@ -119,9 +119,7 @@ subanalyser_init (SubAnalyser * this)
 
 }
 
-SubAnalyser *make_subanalyser(
-    guint32 length,
-    GstClockTime obsolation_treshold)
+SubAnalyser *make_subanalyser(void)
 {
   SubAnalyser *this;
   this = g_object_new (SUBANALYSER_TYPE, NULL);
@@ -159,9 +157,24 @@ void subanalyser_reset(SubAnalyser *this)
   THIS_WRITEUNLOCK (this);
 }
 
-void subanalyser_time_update(SubAnalyser *this, MPRTPSPath *path)
+void subanalyser_time_update(SubAnalyser *this, gint32 sending_bitrate)
 {
-  percentiletracker_add(this->SR_window, mprtps_path_get_sent_bytes_in1s(path, NULL) * 8);
+  //Todo: Figure out why min/maxtree inside of percentiletracker get NULL!!!!
+  //I have no idea why, and I don't have time to figure it out, so here comes
+  //my ugliest fix I have ever done.
+  if(!this->SR_window){
+    this->SR_window = make_percentiletracker(128, 50);
+    percentiletracker_set_treshold(this->SR_window, 2 * GST_SECOND);
+    percentiletracker_set_stats_pipe(this->SR_window, _SR_stat_pipe, this);
+  }else if(!this->SR_window->mintree || !this->SR_window->maxtree){
+    g_object_unref(this->SR_window);
+    this->SR_window = make_percentiletracker(128, 50);
+    percentiletracker_set_treshold(this->SR_window, 2 * GST_SECOND);
+    percentiletracker_set_stats_pipe(this->SR_window, _SR_stat_pipe, this);
+  }
+
+  percentiletracker_add(this->SR_window, sending_bitrate);
+
 }
 
 void subanalyser_measurement_analyse(SubAnalyser *this,

@@ -30,7 +30,9 @@ struct _PercentileTracker
 {
   GObject                  object;
   BinTree*                 mintree;
+  BinTreeCmpFunc           mintree_cmp;
   BinTree*                 maxtree;
+  BinTreeCmpFunc           maxtree_cmp;
   GRWLock                  rwmutex;
   PercentileTrackerItem*   items;
   gboolean                 debug;

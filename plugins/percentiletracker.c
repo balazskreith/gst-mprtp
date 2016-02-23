@@ -43,22 +43,22 @@ GST_DEBUG_CATEGORY_STATIC (percentiletracker_debug_category);
 
 G_DEFINE_TYPE (PercentileTracker, percentiletracker, G_TYPE_OBJECT);
 
-typedef struct _CollectingState{
-  BinTree *collector;
-  BinTree *dispensor;
-  guint    requested;
-}CollectingState;
-
-typedef struct _BalancingState{
-  void (*balancer)(PercentileTracker*);
-}BalancingState;
-
-struct _PercentileState{
-  void    (*processor)(PercentileTracker*, guint64);
-  guint64 (*producer)(PercentileTracker*);
-  CollectingState   collecting;
-  BalancingState    balancing;
-};
+//typedef struct _CollectingState{
+//  BinTree *collector;
+//  BinTree *dispensor;
+//  guint    requested;
+//}CollectingState;
+//
+//typedef struct _BalancingState{
+//  void (*balancer)(PercentileTracker*);
+//}BalancingState;
+//
+//struct _PercentileState{
+//  void    (*processor)(PercentileTracker*, guint64);
+//  guint64 (*producer)(PercentileTracker*);
+//  CollectingState   collecting;
+//  BalancingState    balancing;
+//};
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
@@ -265,6 +265,9 @@ void percentiletracker_reset(PercentileTracker *this)
 void percentiletracker_add(PercentileTracker *this, guint64 value)
 {
   THIS_WRITELOCK (this);
+  if(!this->state->processor){
+    _transit_to_balancing(this);
+  }
   this->state->processor(this, value);
   THIS_WRITEUNLOCK (this);
 }

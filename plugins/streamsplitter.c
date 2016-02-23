@@ -229,12 +229,6 @@ stream_splitter_finalize (GObject * object)
   g_object_unref (this->sysclock);
 }
 
-static void _schnode_reset(gpointer inc_data)
-{
-  SchNode *casted_data = inc_data;
-  memset(casted_data, 0, sizeof(SchNode));
-}
-
 
 void
 stream_splitter_init (StreamSplitter * this)
@@ -249,7 +243,6 @@ stream_splitter_init (StreamSplitter * this)
   this->first_delta_flag = TRUE;
   this->thread = gst_task_new (stream_splitter_run, this, NULL);
   this->incoming_bytes = make_numstracker(1<<15, GST_SECOND);
-  this->pointerpool = make_pointerpool(128, _schnode_ctor, g_free, _schnode_reset);
 //    this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
   numstracker_reset(this->incoming_bytes);
   g_rw_lock_init (&this->rwmutex);

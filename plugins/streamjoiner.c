@@ -90,16 +90,6 @@ struct _Frame
   GstClockTime    created;
 };
 
-static gpointer _frame_ctor(void)
-{
-  return g_malloc0(sizeof(Frame));
-}
-
-static gpointer _framenode_ctor(void)
-{
-  return g_malloc0(sizeof(FrameNode));
-}
-
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
@@ -153,11 +143,11 @@ _push_into_frame(
     GstMpRTPBuffer *rtp);
 
 #define _trash_frame(this, frame)  \
-  pointerpool_add(this->frames_pool, frame); \
+  g_slice_free(Frame, frame);      \
   --this->framecounter;
 
 
-#define _trash_framenode(this, frame) pointerpool_add(this->framenodes_pool, node)
+#define _trash_framenode(this, node) g_slice_free(FrameNode, node);
 
 
 //#define DEBUG_PRINT_TOOLS
@@ -203,21 +193,7 @@ stream_joiner_finalize (GObject * object)
   gst_task_join (this->thread);
 
   g_object_unref (this->sysclock);
-  g_object_unref (this->frames_pool);
-  g_object_unref (this->framenodes_pool);
 //  g_object_unref(this->playoutgate);
-}
-
-static void _frame_reset(gpointer inc_data)
-{
-  Frame *casted_data = inc_data;
-  memset(casted_data, 0, sizeof(Frame));
-}
-
-static void _framenode_reset(gpointer inc_data)
-{
-  FrameNode *casted_data = inc_data;
-  memset(casted_data, 0, sizeof(FrameNode));
 }
 
 static void _skew_max_pipe(gpointer data, gint64 value)
@@ -246,8 +222,6 @@ stream_joiner_init (StreamJoiner * this)
   this->sysclock = gst_system_clock_obtain ();
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, _ruin_subflow);
 //  this->max_path_skew = 10 * GST_MSECOND;
-  this->frames_pool = make_pointerpool(1024, _frame_ctor, g_free, _frame_reset);
-  this->framenodes_pool = make_pointerpool(1024, _framenode_ctor, g_free, _framenode_reset);
   this->PHSN = 0;
   this->flushing = FALSE;
   this->playout_allowed = TRUE;
@@ -709,8 +683,7 @@ Frame* _make_frame(StreamJoiner *this, FrameNode *node)
   Frame *result;
   GstClockTime delay_diff;
 
-  result = pointerpool_get(this->frames_pool);
-  memset((gpointer)result, 0, sizeof(Frame));
+  result = g_slice_new0(Frame);
   result->head = result->tail = node;
   result->timestamp = node->mprtp->timestamp;
   result->created = gst_clock_get_time(this->sysclock);
@@ -733,8 +706,7 @@ Frame* _make_frame(StreamJoiner *this, FrameNode *node)
 FrameNode * _make_framenode(StreamJoiner *this, GstMpRTPBuffer *mprtp)
 {
   FrameNode *result;
-  result = pointerpool_get(this->framenodes_pool);
-  memset((gpointer)result, 0, sizeof(FrameNode));
+  result = g_slice_new0(FrameNode);
   result->mprtp = mprtp;
   result->next = NULL;
   result->seq = mprtp->abs_seq;

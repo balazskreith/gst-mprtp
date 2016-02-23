@@ -194,13 +194,10 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  gstmprtcpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
  gstmprtpbuffer.h /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h pointerpool.h \
- /usr/include/string.h /usr/include/x86_64-linux-gnu/bits/string.h \
- /usr/include/x86_64-linux-gnu/bits/string2.h /usr/include/stdlib.h \
- /usr/include/x86_64-linux-gnu/bits/string3.h bintree.h monitorpackets.h \
- mprtpspath.h packetssndqueue.h percentiletracker.h numstracker.h \
- bintree2.h sndctrler.h /usr/include/glib-2.0/gio/gio.h \
- /usr/include/glib-2.0/gio/giotypes.h \
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
+ monitorpackets.h bintree.h mprtpspath.h packetssndqueue.h \
+ percentiletracker.h numstracker.h bintree2.h sndctrler.h \
+ /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
  /usr/include/glib-2.0/gio/gactiongroup.h \
  /usr/include/glib-2.0/gio/gactiongroupexporter.h \
@@ -372,7 +369,10 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/include/asm-generic/param.h /usr/include/arpa/nameser.h \
  /usr/include/x86_64-linux-gnu/sys/bitypes.h \
  /usr/include/arpa/nameser_compat.h \
- /usr/include/x86_64-linux-gnu/sys/un.h /usr/include/net/if.h \
+ /usr/include/x86_64-linux-gnu/sys/un.h /usr/include/string.h \
+ /usr/include/x86_64-linux-gnu/bits/string.h \
+ /usr/include/x86_64-linux-gnu/bits/string2.h /usr/include/stdlib.h \
+ /usr/include/x86_64-linux-gnu/bits/string3.h /usr/include/net/if.h \
  /usr/include/arpa/inet.h gstmprtpreceiver.h
 
 /usr/include/stdc-predef.h:
@@ -821,21 +821,9 @@ gstmprtpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
 
-pointerpool.h:
-
-/usr/include/string.h:
-
-/usr/include/x86_64-linux-gnu/bits/string.h:
-
-/usr/include/x86_64-linux-gnu/bits/string2.h:
-
-/usr/include/stdlib.h:
-
-/usr/include/x86_64-linux-gnu/bits/string3.h:
+monitorpackets.h:
 
 bintree.h:
-
-monitorpackets.h:
 
 mprtpspath.h:
 
@@ -1250,6 +1238,16 @@ ricalcer.h:
 /usr/include/arpa/nameser_compat.h:
 
 /usr/include/x86_64-linux-gnu/sys/un.h:
+
+/usr/include/string.h:
+
+/usr/include/x86_64-linux-gnu/bits/string.h:
+
+/usr/include/x86_64-linux-gnu/bits/string2.h:
+
+/usr/include/stdlib.h:
+
+/usr/include/x86_64-linux-gnu/bits/string3.h:
 
 /usr/include/net/if.h:
 

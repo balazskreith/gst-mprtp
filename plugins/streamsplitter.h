@@ -55,8 +55,6 @@ struct _StreamSplitter
   NumsTracker*         incoming_bytes;
   guint8               monitor_payload_type;
 
-  PointerPool*         pointerpool;
-
 };
 
 struct _StreamSplitterClass{

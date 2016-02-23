@@ -9,7 +9,6 @@
 #define BINTREE2_H_
 
 #include <gst/gst.h>
-#include "pointerpool.h"
 
 typedef struct _BinTree2 BinTree2;
 typedef struct _BinTree2Class BinTree2Class;
@@ -32,7 +31,6 @@ struct _BinTree2
   BinTree2CmpFunc           cmp;
   GRWLock                   rwmutex;
 //  GQueue*                  node_pool;
-  PointerPool*              node_pool;
   guint32                   counter;
 
 };

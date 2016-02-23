@@ -56,8 +56,8 @@ struct _StreamJoiner
   GstClockTime         forced_delay;
 //  PercentileTracker*   latency_window;
   guint32              ssrc;
-  PointerPool*         frames_pool;
-  PointerPool*         framenodes_pool;
+//  PointerPool*         frames_pool;
+//  PointerPool*         framenodes_pool;
   Frame*               head;
   Frame*               tail;
   guint16              PHSN;

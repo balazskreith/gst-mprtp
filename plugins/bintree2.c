@@ -83,11 +83,6 @@ _print_tree (BinTree2 * tree, BinTree2Node* node, gint level)
   _print_tree (tree, node->right, level + 1);
 }
 
-static gpointer _node_ctor(void)
-{
-  return g_malloc0(sizeof(BinTree2Node));
-}
-
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -115,14 +110,7 @@ bintree2_finalize (GObject * object)
 //  while(!g_queue_is_empty(this->node_pool)){
 //    g_free(g_queue_pop_head(this->node_pool));
 //  }
-  g_object_unref(this->node_pool);
   _ruin_full(this, this->root);
-}
-
-static void _node_reset(gpointer data)
-{
-  BinTree2Node *node = data;
-  memset(node, 0, sizeof(BinTree2Node));
 }
 
 void
@@ -130,7 +118,6 @@ bintree2_init (BinTree2 * this)
 {
   g_rw_lock_init (&this->rwmutex);
 //  this->node_pool = g_queue_new();
-  this->node_pool = make_pointerpool(1024, _node_ctor,g_free,_node_reset);
 }
 
 BinTree2 *make_bintree2(BinTree2CmpFunc cmp)
@@ -572,12 +559,7 @@ BinTree2Node *_search_value(BinTree2 *this, gint64 value, BinTree2Node **parent)
 BinTree2Node *_make_bintree2node(BinTree2 *this, gint64 value)
 {
   BinTree2Node *result;
-  result = pointerpool_get(this->node_pool);
-//  if(!g_queue_is_empty(this->node_pool))
-//    result = g_queue_pop_head(this->node_pool);
-//  else
-//    result = g_malloc0(sizeof(BinTree2Node));
-  memset((gpointer)result, 0, sizeof(BinTree2Node));
+  result = g_slice_new0(BinTree2Node);
   result->value = value;
   return result;
 }
@@ -588,13 +570,7 @@ void _trash_bintree2node(BinTree2 *this, BinTree2Node *node)
     if(node == this->top) _refresh_top(this);
     else if(node == this->bottom) _refresh_bottom(this);
   }
-  pointerpool_add(this->node_pool, node);
-//
-//  if(g_queue_get_length(this->node_pool) > 1024){
-//    g_free(node);
-//  }else{
-//    g_queue_push_tail(this->node_pool, node);
-//  }
+  g_slice_free(BinTree2Node, node);
 }
 
 void _refresh_top(BinTree2 *this)

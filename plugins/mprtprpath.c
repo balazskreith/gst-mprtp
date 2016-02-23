@@ -79,7 +79,7 @@ mprtpr_path_init (MpRTPRPath * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
   this->delays = make_percentiletracker(512, 50);
-  percentiletracker_set_treshold(this->delays, 2 * GST_SECOND);
+  percentiletracker_set_treshold(this->delays, 500 * GST_MSECOND);
   percentiletracker_set_stats_pipe(this->delays, _delays_stats_pipe, this);
 
   this->skews = make_percentiletracker2(100, 50);
@@ -97,9 +97,9 @@ mprtpr_path_init (MpRTPRPath * this)
   _discrle(this).read_index = _discrle(this).write_index = 0;
   _discrle(this).step_interval = GST_SECOND;
 
-  this->gaps = make_numstracker(128, GST_SECOND);
+  this->gaps = make_numstracker(1024, 2000 * GST_MSECOND);
   numstracker_add_rem_pipe(this->gaps, _gaps_obsolation_pipe, this);
-  this->lates = make_numstracker(128, 1500 * GST_MSECOND);
+  this->lates = make_numstracker(1024, 2500 * GST_MSECOND);
   mprtpr_path_reset (this);
 }
 

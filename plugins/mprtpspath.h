@@ -21,6 +21,7 @@
 G_BEGIN_DECLS typedef struct _MPRTPSPath MPRTPSPath;
 typedef struct _MPRTPSPathClass MPRTPSPathClass;
 
+#define DISABLE_LINE if(0)
 
 #include "gstmprtcpbuffer.h"
 #include "packetssndqueue.h"

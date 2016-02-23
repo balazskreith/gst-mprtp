@@ -31,7 +31,6 @@ struct _PacketsSndQueue
   guint32                  counter;
   guint32                  bytes_in_queue;
   GRWLock                  rwmutex;
-  PointerPool*             node_pool;
   GstClock*                sysclock;
   GstClockTime             obsolation_treshold;
 };

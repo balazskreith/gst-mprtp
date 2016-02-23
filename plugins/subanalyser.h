@@ -33,7 +33,6 @@ typedef struct _SubAnalyserResult SubAnalyserResult;
 struct _SubAnalyser
 {
   GObject                  object;
-  NumsTracker*             De_window;
   PercentileTracker*       SR_window;
   gdouble                  RR_avg;
   GstClockTime             window_time_limit;
@@ -50,6 +49,7 @@ struct _SubAnalyserClass{
 
 struct _SubAnalyserResult{
   gdouble        qtrend;
+  gdouble        off;
   gdouble        discards_rate;
   gint32         sending_rate_median;
   gdouble        delay_off;

@@ -138,8 +138,6 @@ void numstracker_iterate (NumsTracker * this,
                           void(*process)(gpointer,gint64),
                           gpointer data);
 
-gint64* numstracker_evaluate(NumsTracker * this, guint *length);
-
 void numstracker_add_plugin(NumsTracker *this, NumsTrackerPlugin *plugin);
 void numstracker_rem_plugin(NumsTracker *this, NumsTrackerPlugin *plugin);
 

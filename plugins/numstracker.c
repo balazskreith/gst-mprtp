@@ -196,21 +196,6 @@ numstracker_iterate (NumsTracker * this,
   return;
 }
 
-gint64* numstracker_evaluate(NumsTracker * this, guint *length)
-{
-  gint64 *result;
-  gint32 c,i;
-  THIS_READLOCK (this);
-  result = g_malloc0(sizeof(gint64) * this->counter);
-  for(c = 0, i = this->read_index; c < this->counter; ++c){
-    result[c] = this->items[i].value;
-    if(++i == this->length) i = 0;
-  }
-  *length = c;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
 void numstracker_add(NumsTracker *this, gint64 value)
 {
   THIS_WRITELOCK (this);
@@ -298,6 +283,9 @@ void _add_value(NumsTracker *this, gint64 value, GstClockTime removal)
   GstClockTime now;
   now = gst_clock_get_time(this->sysclock);
   //add new one
+  if(0 < this->items[this->write_index].added){
+    _rem_value(this);
+  }
   ++this->counter;
   this->items[this->write_index].value = value;
   this->items[this->write_index].added = now;
@@ -357,10 +345,8 @@ _obsolate (NumsTracker * this)
 
 again:
   if(this->counter < 1) goto done;
-
   removal = this->items[this->read_index].remove;
-  if(this->write_index == this->read_index) goto elliminate;
-  else if(this->items[this->read_index].added < treshold) goto elliminate;
+  if(this->items[this->read_index].added < treshold) goto elliminate;
   else if(0 < removal && removal < now) goto elliminate;
   else goto done;
 elliminate:

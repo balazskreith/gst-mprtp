@@ -652,7 +652,8 @@ void _enable_controlling(Subflow *subflow, gpointer data)
 void _disable_controlling(Subflow *subflow, gpointer data)
 {
   SndController *this = data;
-  sndrate_distor_remove_id(this->rate_distor, subflow->id);
+  //Fixme: fix me
+  DISABLE_LINE sndrate_distor_remove_id(this->rate_distor, subflow->id);
 }
 
 //------------------------- Incoming Report Processor -------------------
@@ -796,7 +797,8 @@ void _determine_path_flags(SndController *this, Subflow *subflow)
   }
 
   if(flags & MPRTPS_PATH_FLAG_ACTIVE){
-    if (_check_report_timeout (subflow)){
+    //Todo: Fix it
+    if (0 && _check_report_timeout (subflow)){
       _subflow_fall_action(this, subflow);
     }
   }else{

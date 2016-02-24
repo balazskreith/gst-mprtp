@@ -181,7 +181,6 @@ void
 mprtps_path_finalize (GObject * object)
 {
   MPRTPSPath *this = MPRTPS_PATH_CAST (object);
-  g_print("||||||| FINALIZING MPRTPS PATH ||||||||\n");
   g_object_unref (this->sysclock);
 }
 
@@ -412,16 +411,6 @@ mprtps_path_get_id (MPRTPSPath * this)
   return result;
 }
 
-void mprtps_path_set_monitor_interval_and_duration(
-    MPRTPSPath *this, guint interval, GstClockTime max_idle)
-{
-  g_return_if_fail (this);
-  THIS_WRITELOCK (this);
-  this->monitoring_interval = interval;
-  this->monitoring_max_idle = max_idle;
-  THIS_WRITEUNLOCK (this);
-}
-
 
 gboolean
 mprtps_path_is_monitoring (MPRTPSPath * this)
@@ -539,31 +528,6 @@ mprtps_path_tick(MPRTPSPath *this)
 //  guint generate = 0, generated = 0;
   THIS_WRITELOCK (this);
   ++this->ticknum;
-//  if(this->extra_packets_per_tick > 0){
-//    generate = this->extra_packets_per_tick;
-//  }
-//  else if(this->extra_packets_per_10tick > 0 && this->ticknum % 10 == 0){
-//    generate = this->extra_packets_per_10tick;
-//  }
-//  else if(this->extra_packets_per_100tick > 0 && this->ticknum % 100 == 0){
-//    generate = this->extra_packets_per_100tick;
-//  }
-//  for(generated = 0; generated < generate; ++generated){
-//    GstBuffer *buffer;
-//    buffer = _create_monitor_packet(this);
-//    _setup_rtp2mprtp(this, buffer);
-//    _send_mprtp_packet(this, buffer);
-//  }
-  if(0 < this->monitoring_max_idle){
-    if(this->monitoring_max_idle < _now(this) - this->last_monitoring_sent_time){
-      GstBuffer *buffer;
-      buffer = _create_monitor_packet(this);
-      _setup_rtp2mprtp (this, buffer);
-      _refresh_stat(this, buffer);
-      _send_mprtp_packet(this, buffer, TRUE);
-      this->last_monitoring_sent_time = _now(this);
-    }
-  }
   numstracker_obsolate(this->sent_bytes);
   numstracker_obsolate(this->incoming_bytes);
   if(this->ticknum < this->pacing_tick) goto done;
@@ -603,7 +567,6 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
     buffer = _create_monitor_packet(this);
     _setup_rtp2mprtp(this, buffer);
     _send_mprtp_packet(this, buffer, FALSE);
-    this->last_monitoring_sent_time = _now(this);
   }
 done:
   THIS_WRITEUNLOCK (this);
@@ -767,15 +730,6 @@ done:
   return pacing_tick;
 }
 
-//
-//gboolean _is_overused(MPRTPSPath * this)
-//{
-//  gint64 sum = 0;
-//  if(!this->cwnd_enabled){
-//    return FALSE;
-//  }
-//  return FALSE;
-//}
 
 GstBuffer* _create_monitor_packet(MPRTPSPath * this)
 {

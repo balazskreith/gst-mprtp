@@ -88,8 +88,6 @@ struct _MPRTPSPath
   guint32                 last_sent_payload_bytes;
   guint64                 ticknum;
   guint32                 monitoring_interval;
-  GstClockTime            monitoring_max_idle;
-  GstClockTime            last_monitoring_sent_time;
   guint16                 monitor_seq;
   guint8                  monitor_payload_type;
   MonitorPackets*         monitorpackets;
@@ -107,13 +105,8 @@ struct _MPRTPSPath
   gboolean                pacing;
 
   guint32                 octets_in_flight_acked;
-//  guint32                 cwnd_size;
-//  guint32                 cwnd_slack;
-//  gboolean                cwnd_slack_allowed;
-//  guint32                 srtt_ms;
   guint32                 pacing_tick;
   //cwnd implementation
-//  gboolean                cwnd_enabled;
   gboolean                expected_lost;
   PacketsSndQueue*        packetsqueue;
   NumsTracker*            sent_bytes;
@@ -214,7 +207,6 @@ gboolean mprtps_path_is_non_congested (MPRTPSPath * this);
 void mprtps_path_set_congested (MPRTPSPath * this);
 void mprtps_path_set_non_congested (MPRTPSPath * this);
 guint8 mprtps_path_get_id (MPRTPSPath * this);
-void mprtps_path_set_monitor_interval_and_duration(MPRTPSPath *this, guint interval, GstClockTime max_idle);
 gboolean mprtps_path_is_monitoring (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_packets_num (MPRTPSPath * this);
 void mprtps_path_tick(MPRTPSPath *this);

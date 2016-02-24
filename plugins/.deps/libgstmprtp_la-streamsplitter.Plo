@@ -186,7 +186,9 @@ libgstmprtp_la-streamsplitter.lo: streamsplitter.c \
  /usr/local/include/gstreamer-1.0/gst/gstsystemclock.h \
  /usr/local/include/gstreamer-1.0/gst/gsttagsetter.h \
  /usr/local/include/gstreamer-1.0/gst/gsttocsetter.h \
+ /usr/local/include/gstreamer-1.0/gst/gsttracer.h \
  /usr/local/include/gstreamer-1.0/gst/gsttracerfactory.h \
+ /usr/local/include/gstreamer-1.0/gst/gsttracerrecord.h \
  /usr/local/include/gstreamer-1.0/gst/gsttypefind.h \
  /usr/local/include/gstreamer-1.0/gst/gsttypefindfactory.h \
  /usr/local/include/gstreamer-1.0/gst/gstutils.h \
@@ -630,7 +632,11 @@ libgstmprtp_la-streamsplitter.lo: streamsplitter.c \
 
 /usr/local/include/gstreamer-1.0/gst/gsttocsetter.h:
 
+/usr/local/include/gstreamer-1.0/gst/gsttracer.h:
+
 /usr/local/include/gstreamer-1.0/gst/gsttracerfactory.h:
+
+/usr/local/include/gstreamer-1.0/gst/gsttracerrecord.h:
 
 /usr/local/include/gstreamer-1.0/gst/gsttypefind.h:
 

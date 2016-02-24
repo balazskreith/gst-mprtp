@@ -986,9 +986,9 @@ gst_mprtpscheduler_path_ticking_process_run (void *data)
   g_hash_table_iter_init (&iter, this->paths);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     path = (MPRTPSPath *) val;
-    mprtps_path_tick(path);
+    //mprtps_path_tick(path);
   }
-  next_scheduler_time = now + 1 * GST_MSECOND;
+  next_scheduler_time = now + 100 * GST_MSECOND;
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
   THIS_WRITEUNLOCK (this);
 

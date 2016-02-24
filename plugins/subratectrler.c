@@ -406,7 +406,6 @@ void subratectrler_set(SubflowRateController *this,
 void subratectrler_unset(SubflowRateController *this)
 {
   THIS_WRITELOCK(this);
-  mprtps_path_set_monitor_interval_and_duration(this->path, 0, 0);
   g_object_unref(this->path);
   this->path = NULL;
   THIS_WRITEUNLOCK(this);

@@ -137,7 +137,7 @@ SubAnalyser *make_subanalyser(void)
   _priv(this)->cblocks[2].id   = 2;
   _priv(this)->cblocks[0].N   = 4;
   _priv(this)->cblocks[1].N   = 4;
-  _priv(this)->cblocks[2].N   = 8;
+  _priv(this)->cblocks[2].N   = 2;
   _priv(this)->cblocks[0].min_treshold   = .001;
   _priv(this)->cblocks[1].min_treshold   = .01;
   _priv(this)->cblocks[2].min_treshold   = .1;

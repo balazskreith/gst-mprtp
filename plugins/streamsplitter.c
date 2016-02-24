@@ -43,15 +43,6 @@ G_DEFINE_TYPE (StreamSplitter, stream_splitter, G_TYPE_OBJECT);
 typedef struct _Subflow Subflow;
 
 
-struct _SchNode
-{
-  SchNode *left;
-  SchNode *right;
-  Subflow *subflow;
-  gint32   sent_bytes;
-  gboolean has_keynode;
-};
-
 struct _Subflow
 {
   guint8      id;
@@ -64,6 +55,14 @@ struct _Subflow
   gboolean    valid;
 };
 
+struct _SchNode
+{
+  SchNode *left;
+  SchNode *right;
+  Subflow *subflow;
+  gint32   sent_bytes;
+  gboolean has_keynode;
+};
 
 typedef struct{
   gint32 nc_sum;

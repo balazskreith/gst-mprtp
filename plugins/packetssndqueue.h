@@ -22,6 +22,7 @@ typedef struct _PacketsSndQueueClass PacketsSndQueueClass;
 #define PACKETSSNDQUEUE_CAST(src)        ((PacketsSndQueue *)(src))
 
 typedef struct _PacketsSndQueueNode PacketsSndQueueNode;
+typedef void (*BufferProxy)(gpointer,GstBuffer*);
 
 struct _PacketsSndQueue
 {
@@ -29,10 +30,11 @@ struct _PacketsSndQueue
   PacketsSndQueueNode*     head;
   PacketsSndQueueNode*     tail;
   guint32                  counter;
-  guint32                  bytes_in_queue;
   GRWLock                  rwmutex;
   GstClock*                sysclock;
   GstClockTime             obsolation_treshold;
+  BufferProxy              proxy;
+  gpointer                 proxydata;
 };
 
 struct _PacketsSndQueueNode
@@ -40,24 +42,19 @@ struct _PacketsSndQueueNode
   PacketsSndQueueNode* next;
   GstClockTime         added;
   GstBuffer*           buffer;
-  guint32              payload_bytes;
 };
 
 struct _PacketsSndQueueClass{
   GObjectClass parent_class;
 
 };
+
+
+
 GType packetssndqueue_get_type (void);
-PacketsSndQueue *make_packetssndqueue(void);
+PacketsSndQueue *make_packetssndqueue(BufferProxy proxy, gpointer proxydata);
 void packetssndqueue_reset(PacketsSndQueue *this);
-guint32 packetssndqueue_get_num(PacketsSndQueue *this, guint32 *bytes_in_queue);
 void packetssndqueue_push(PacketsSndQueue *this,
-                          GstBuffer* buffer,
-                          guint32 payload_bytes);
+                          GstBuffer* buffer);
 GstBuffer* packetssndqueue_pop(PacketsSndQueue *this);
-void packetssndqueue_set_obsolation_treshold(PacketsSndQueue *this,
-                                    GstClockTime obsolation_treshold);
-gboolean packetssndqueue_has_buffer(PacketsSndQueue *this,
-                                    guint32 *payload_bytes,
-                                    gboolean *expected_lost);
 #endif /* PACKETSSNDQUEUE_H_ */

@@ -36,7 +36,6 @@ struct _SubflowRateController
   GstClock*                 sysclock;
   guint8                    id;
   MPRTPSPath*               path;
-  gboolean                  path_is_paced;
 
   gint32                    monitored_bitrate;
 
@@ -82,7 +81,6 @@ struct _SubflowRateController
   GstClockTime              last_skip_time;
   GstClockTime              packet_obsolation_treshold;
 
-  gint32                    pacing_bitrate;
   GstClockTime              congestion_detected;
 
   gboolean                  log_enabled;

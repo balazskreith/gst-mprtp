@@ -42,6 +42,7 @@ struct _SndController
   GHashTable*            subflows;
   GRWLock                rwmutex;
   StreamSplitter*        splitter;
+  PacketsSndQueue*       pacer;
 
   GstClock*              sysclock;
   guint64                ticknum;
@@ -78,7 +79,8 @@ struct _SndControllerClass{
 
 //Class functions
 void sndctrler_setup(SndController* this,
-                     StreamSplitter* splitter);
+                     StreamSplitter* splitter,
+                     PacketsSndQueue *pacer);
 
 void
 sndctrler_setup_callbacks(SndController *this,

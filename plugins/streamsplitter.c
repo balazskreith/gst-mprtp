@@ -593,7 +593,7 @@ void _create_nodes(Subflow *subflow, gpointer data)
     cdata->remained = 0;
   }
   subflow->key_path = (mprtps_path_get_flags(subflow->path) & cdata->key_flag) == cdata->key_flag;
-  subflow->sent_bytes = mprtps_path_get_sent_bytes_in1s(subflow->path, NULL);
+  subflow->sent_bytes = mprtps_path_get_sent_bytes_in1s(subflow->path);
   _schtree_insert(&cdata->root, subflow, &subflow->weight, SCHTREE_MAX_VALUE);
 }
 

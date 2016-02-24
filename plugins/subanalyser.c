@@ -60,7 +60,7 @@ struct _CorrBlock{
 
 
 static void _execute_corrblocks(guint32 *counter, CorrBlock *blocks, guint blocks_length);
-static void _execute_corrblock6(CorrBlock* this);
+static void _execute_corrblock(CorrBlock* this);
 
 typedef struct _SubAnalyserPrivate{
   SubAnalyserResult  *result;
@@ -68,7 +68,7 @@ typedef struct _SubAnalyserPrivate{
   gdouble             off_avg;
   gdouble             delay_avg,delay_t2,delay_t1,delay_t0;
   gdouble             qtrend;
-  gboolean            distortion,congestion;
+  gboolean            fluctuation, distortion,congestion;
   CorrBlock           cblocks[4];
   gdouble             qdelays_th;
   guint32             cblocks_counter;
@@ -137,7 +137,7 @@ SubAnalyser *make_subanalyser(void)
   _priv(this)->cblocks[2].id   = 2;
   _priv(this)->cblocks[0].N   = 4;
   _priv(this)->cblocks[1].N   = 4;
-  _priv(this)->cblocks[2].N   = 2;
+  _priv(this)->cblocks[2].N   = 8;
   _priv(this)->cblocks[0].min_treshold   = .001;
   _priv(this)->cblocks[1].min_treshold   = .01;
   _priv(this)->cblocks[2].min_treshold   = .1;
@@ -210,6 +210,7 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
 
   result->off                            = (_priv(this)->delay_t0 * .5 + _priv(this)->delay_t1 * .25 + _priv(this)->delay_t2 * .25) / _priv(this)->delay_avg;
   result->qtrend                         = _priv(this)->qtrend;
+  result->delay_indicators.fluctuation   = _priv(this)->fluctuation;
   result->delay_indicators.congestion    = _priv(this)->congestion;
   result->delay_indicators.distortion    = 0. < _priv(this)->qtrend;
   br_ratio = this->RR_avg / (gdouble) target_bitrate;
@@ -244,7 +245,7 @@ void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
   fprintf(file,
           "######################## Subflow Measurement Analyser log #######################\n"
           "delay_target:  %-10.3f| off_avg:      %-10.3f| qtrend:       %-10.5f|\n"
-          "trouble:       %-10d| congestion:   %-10d|\n"
+          "trouble:       %-10d| congestion:   %-10d| fluctuation       %-10.6d\n"
           "#################################################################################\n",
 
           _priv(this)->delay_target / (gdouble)GST_SECOND,
@@ -252,7 +253,8 @@ void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
           _priv(this)->qtrend,
 
           _priv(this)->congestion,
-          _priv(this)->distortion
+          _priv(this)->distortion,
+          _priv(this)->fluctuation
 
           );
 done:
@@ -282,11 +284,11 @@ void _qdeanalyzer_evaluation(SubAnalyser *this)
 //  _priv(this)->qtrend = CONSTRAIN(-2., .2, _priv(this)->cblocks[0].g / .0005 - 1.);
 //  _priv(this)->qtrend     = _priv(this)->cblocks[0].g > 0.002 ? (_priv(this)->cblocks[1].g) / (2. * _priv(this)->cblocks[0].g) : 0.;
 
-  _priv(this)->qtrend     = _priv(this)->cblocks[1].g > AGGRESSIVITY ? (2*_priv(this)->cblocks[0].g) / _priv(this)->cblocks[1].g : 0.;
-  _priv(this)->qtrend     = CONSTRAIN(-2., .2, _priv(this)->qtrend);
-//  _priv(this)->distortion = _priv(this)->cblocks[0].distorted;
-  _priv(this)->distortion =  0. < _priv(this)->qtrend;
-  _priv(this)->congestion = 0 && _priv(this)->cblocks[1].distorted;
+  _priv(this)->qtrend      = _priv(this)->cblocks[1].g > AGGRESSIVITY ? (2*_priv(this)->cblocks[0].g) / _priv(this)->cblocks[1].g : 0.;
+  _priv(this)->qtrend      = CONSTRAIN(-2., .2, _priv(this)->qtrend);
+  _priv(this)->fluctuation = _priv(this)->cblocks[2].g < -.001 || .001 < _priv(this)->cblocks[2].g;
+  _priv(this)->distortion  =    0. < _priv(this)->qtrend;
+  _priv(this)->congestion  =    0 && _priv(this)->cblocks[1].distorted;
 }
 
 
@@ -295,16 +297,16 @@ void _execute_corrblocks(guint32 *counter, CorrBlock *blocks, guint blocks_lengt
   guint32 X = (*counter ^ (*counter-1))+1;
   switch(X){
     case 2:
-      _execute_corrblock6(blocks);
+      _execute_corrblock(blocks);
     break;
     case 4:
-          _execute_corrblock6(blocks + 1);
+          _execute_corrblock(blocks + 1);
         break;
     case 8:
-          _execute_corrblock6(blocks + 2);
+          _execute_corrblock(blocks + 2);
         break;
     case 16:
-          _execute_corrblock6(blocks + 3);
+          _execute_corrblock(blocks + 3);
         break;
     default:
 //      g_print("not execute: %u\n", X);
@@ -314,7 +316,7 @@ void _execute_corrblocks(guint32 *counter, CorrBlock *blocks, guint blocks_lengt
   ++*counter;
 }
 
-void _execute_corrblock6(CorrBlock* this)
+void _execute_corrblock(CorrBlock* this)
 {
   this->M1   = this->M0;
   this->M0  -= this->M_[this->index];

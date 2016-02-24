@@ -75,6 +75,8 @@ static gboolean gst_mprtpscheduler_query (GstElement * element,
 static void
 gst_mprtpscheduler_mprtp_proxy(gpointer ptr, GstBuffer * buffer);
 static void
+gst_mprtpscheduler_mprtp_setup(gpointer ptr, GstBuffer * buffer);
+static void
 gst_mprtpscheduler_emit_signal(gpointer ptr, gpointer data);
 static GstFlowReturn gst_mprtpscheduler_rtp_sink_chain (GstPad * pad,
     GstObject * parent, GstBuffer * buffer);
@@ -360,12 +362,14 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->paths = g_hash_table_new_full (NULL, NULL, NULL, g_free);
   this->splitter = (StreamSplitter *) g_object_new (STREAM_SPLITTER_TYPE, NULL);
   this->controller = (SndController*) g_object_new(SNDCTRLER_TYPE, NULL);
-  sndctrler_setup(this->controller, this->splitter);
+  this->sndqueue = make_packetssndqueue(gst_mprtpscheduler_mprtp_setup, this);
+  sndctrler_setup(this->controller, this->splitter, this->sndqueue);
   sndctrler_setup_callbacks(this->controller,
                             this, gst_mprtpscheduler_mprtcp_sender,
                             this, gst_mprtpscheduler_emit_signal
                             );
   this->monitorpackets = make_monitorpackets();
+
   stream_splitter_set_monitor_payload_type(this->splitter, this->monitor_payload_type);
   _change_auto_rate_and_cc (this, FALSE);
   _setup_paths(this);
@@ -777,6 +781,31 @@ done:
   return;
 }
 
+void gst_mprtpscheduler_mprtp_setup(gpointer ptr, GstBuffer * buffer)
+{
+  GstMprtpscheduler *this;
+  GstBuffer *outbuf;
+  MPRTPSPath *path;
+  gboolean suggest_to_skip = FALSE;
+
+  this = GST_MPRTPSCHEDULER(ptr);
+  THIS_READLOCK (this);
+  path = stream_splitter_get_next_path(this->splitter, buffer);
+  if(!path){
+    GST_WARNING_OBJECT(this, "No active subflow");
+    goto done;
+  }
+  if(suggest_to_skip){
+    gst_buffer_unref(buffer);
+    goto done;
+  }
+  outbuf = gst_buffer_make_writable (buffer);
+  mprtps_path_process_rtp_packet(path, outbuf);
+done:
+  THIS_READUNLOCK (this);
+  return;
+}
+
 void
 gst_mprtpscheduler_emit_signal(gpointer ptr, gpointer data)
 {
@@ -790,12 +819,12 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buffer)
 {
   GstMprtpscheduler *this;
-  MPRTPSPath *path;
+//  MPRTPSPath *path;
   GstFlowReturn result;
   guint8 first_byte;
   guint8 second_byte;
-  gboolean suggest_to_skip = FALSE;
-  GstBuffer *outbuf;
+//  gboolean suggest_to_skip = FALSE;
+//  GstBuffer *outbuf;
   result = GST_FLOW_OK;
 
   this = GST_MPRTPSCHEDULER (parent);
@@ -817,22 +846,25 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
       GST_DEBUG_OBJECT (this, "RTCP Packet arrived on rtp sink");
     return gst_pad_push (this->mprtp_srcpad, buffer);
   }
-  //the packet is rtp
-  THIS_READLOCK (this);
-  path = stream_splitter_get_next_path(this->splitter, buffer);
-  if(!path){
-    GST_WARNING_OBJECT(this, "No active subflow");
-    goto done;
-  }
-  if(suggest_to_skip){
-    gst_buffer_unref(buffer);
-    goto done;
-  }
-  outbuf = gst_buffer_make_writable (buffer);
-  mprtps_path_process_rtp_packet(path, outbuf);
+//  gst_mprtpscheduler_mprtp_setup(this, buffer);
+  packetssndqueue_push(this->sndqueue, buffer);
+//
+//  //the packet is rtp
+//  THIS_READLOCK (this);
+//  path = stream_splitter_get_next_path(this->splitter, buffer);
+//  if(!path){
+//    GST_WARNING_OBJECT(this, "No active subflow");
+//    goto done;
+//  }
+//  if(suggest_to_skip){
+//    gst_buffer_unref(buffer);
+//    goto done;
+//  }
+//  outbuf = gst_buffer_make_writable (buffer);
+//  mprtps_path_process_rtp_packet(path, outbuf);
   result = GST_FLOW_OK;
-done:
-  THIS_READUNLOCK (this);
+//done:
+//  THIS_READUNLOCK (this);
   return result;
 }
 
@@ -975,19 +1007,18 @@ gst_mprtpscheduler_path_ticking_process_run (void *data)
   GstMprtpscheduler *this;
   GstClockID clock_id;
   GstClockTime next_scheduler_time;
-  GHashTableIter iter;
-  gpointer key, val;
-  MPRTPSPath *path;
+//  GHashTableIter iter;
+//  gpointer key, val;
+//  MPRTPSPath *path;
   GstClockTime now;
   this = (GstMprtpscheduler *) data;
 
   THIS_WRITELOCK (this);
   now = gst_clock_get_time (this->sysclock);
-  g_hash_table_iter_init (&iter, this->paths);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-    path = (MPRTPSPath *) val;
-    //mprtps_path_tick(path);
-  }
+//  g_hash_table_iter_init (&iter, this->paths);
+//  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+//    path = (MPRTPSPath *) val;
+//  }
   next_scheduler_time = now + 100 * GST_MSECOND;
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
   THIS_WRITEUNLOCK (this);

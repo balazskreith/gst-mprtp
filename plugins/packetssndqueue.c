@@ -53,15 +53,13 @@ G_DEFINE_TYPE (PacketsSndQueue, packetssndqueue, G_TYPE_OBJECT);
 
 static void packetssndqueue_finalize (GObject * object);
 static PacketsSndQueueNode* _make_node(PacketsSndQueue *this,
-                                       GstBuffer *buffer,
-                                       guint32 payload_bytes);
+                                       GstBuffer *buffer);
 
 //#define _trash_node(this, node) g_slice_free(PacketsSndQueueNode, node)
 #define _trash_node(this, node) g_free(node)
 
 static void _packetssndqueue_add(PacketsSndQueue *this,
-                                 GstBuffer* buffer,
-                                 guint32 payload_bytes);
+                                 GstBuffer* buffer);
 static void _remove_head(PacketsSndQueue *this);
 
 //----------------------------------------------------------------------
@@ -114,91 +112,40 @@ void packetssndqueue_reset(PacketsSndQueue *this)
   THIS_WRITEUNLOCK(this);
 }
 
-guint32 packetssndqueue_get_num(PacketsSndQueue *this, guint32 *bytes_in_queue)
-{
-  guint32 result;
-  THIS_READLOCK(this);
-  result = this->counter;
-  if(bytes_in_queue) *bytes_in_queue = this->bytes_in_queue;
-  THIS_READUNLOCK(this);
-  return result;
-}
-
-PacketsSndQueue *make_packetssndqueue(void)
+PacketsSndQueue *make_packetssndqueue(BufferProxy proxy, gpointer proxydata)
 {
   PacketsSndQueue *result;
   result = g_object_new (PACKETSSNDQUEUE_TYPE, NULL);
+  result->proxy     = proxy;
+  result->proxydata = proxydata;
   return result;
 }
 
 void packetssndqueue_push(PacketsSndQueue *this,
-                          GstBuffer *buffer,
-                          guint32 payload_bytes)
+                          GstBuffer *buffer)
 {
   THIS_WRITELOCK(this);
-  _packetssndqueue_add(this, buffer, payload_bytes);
+  //Todo implement pacing
+  this->proxy(this->proxydata, buffer);
+  if(0) _packetssndqueue_add(this, buffer);
   THIS_WRITEUNLOCK(this);
-}
-
-GstBuffer* packetssndqueue_pop(PacketsSndQueue *this)
-{
-  GstBuffer *result = NULL;
-  THIS_WRITELOCK(this);
-  if(!this->head) goto done;
-  result = this->head->buffer;
-  _remove_head(this);
-done:
-  THIS_WRITEUNLOCK(this);
-  return result;
-}
-
-void packetssndqueue_set_obsolation_treshold(PacketsSndQueue *this,
-                                    GstClockTime obsolation_treshold)
-{
-  THIS_WRITELOCK(this);
-  this->obsolation_treshold = obsolation_treshold;
-  THIS_WRITEUNLOCK(this);
-}
-
-gboolean packetssndqueue_has_buffer(PacketsSndQueue *this,
-                                    guint32 *payload_bytes,
-                                    gboolean *expected_lost)
-{
-  gboolean result = FALSE;
-  THIS_READLOCK(this);
-again:
-  if(!this->head) goto done;
-  if(payload_bytes) *payload_bytes = this->head->payload_bytes;
-  if(0 < this->obsolation_treshold){
-    if(this->head->added < gst_clock_get_time(this->sysclock) - this->obsolation_treshold){
-      _remove_head(this);
-      if(expected_lost) *expected_lost = TRUE;
-      goto again;
-    }
-  }
-  result = TRUE;
-done:
-  THIS_READUNLOCK(this);
-  return result;
 }
 
 void _packetssndqueue_add(PacketsSndQueue *this,
-                             GstBuffer *buffer,
-                             guint32 payload_bytes)
+                             GstBuffer *buffer)
 {
 //  guint64 skew = 0;
   PacketsSndQueueNode* node;
-  node = _make_node(this, buffer, payload_bytes);
+  node = _make_node(this, buffer);
   if(!this->head) {
       this->head = this->tail = node;
       this->counter = 1;
-      this->bytes_in_queue = payload_bytes;
       goto done;
   }
   this->tail->next = node;
   this->tail = node;
   ++this->counter;
-  this->bytes_in_queue += payload_bytes;
+  if(0) _remove_head(this);
 done:
   return;
 }
@@ -206,25 +153,20 @@ done:
 void _remove_head(PacketsSndQueue *this)
 {
   PacketsSndQueueNode *node;
-  guint32 payload_bytes;
   node = this->head;
-  payload_bytes = node->payload_bytes;
   this->head = node->next;
   _trash_node(this, node);
-  this->bytes_in_queue-=payload_bytes;
   --this->counter;
 }
 
 
-PacketsSndQueueNode* _make_node(PacketsSndQueue *this, GstBuffer *buffer, guint32 payload_bytes)
+PacketsSndQueueNode* _make_node(PacketsSndQueue *this, GstBuffer *buffer)
 {
   PacketsSndQueueNode *result;
-//  result = g_slice_new0(PacketsSndQueueNode);
   result = g_malloc0(sizeof(PacketsSndQueueNode));
   result->next = NULL;
   result->added = gst_clock_get_time(this->sysclock);
   result->buffer = gst_buffer_ref(buffer);
-  result->payload_bytes = payload_bytes;
   return result;
 }
 

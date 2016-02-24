@@ -120,8 +120,6 @@ struct _NumsTrackerStatData{
 GType numstracker_get_type (void);
 NumsTracker *make_numstracker(guint32 length, GstClockTime obsolation_treshold);
 guint32 numstracker_get_num(NumsTracker *this);
-guint64 numstracker_get_last(NumsTracker *this);
-
 
 void
 numstracker_get_stats (NumsTracker * this,

@@ -403,11 +403,11 @@ sefctrler_stat_run (void *data)
 
     file = files[subflow->id];
     if(this->enabled){
-      sender_bitrate= mprtps_path_get_sent_bytes_in1s(subflow->path, NULL) * 8;
+      sender_bitrate= mprtps_path_get_sent_bytes_in1s(subflow->path) * 8;
       goodput        = 0;
       monitored_bits = subratectrler_get_monitoring_bitrate(subflow->rate_controller);
       target_bitrate = stream_splitter_get_sending_target(this->splitter, subflow->id);
-      queued_bits    = mprtps_path_get_bytes_in_queue(subflow->path) * 8;
+      queued_bits    = 0 * 8;
       target_delay   = 0;
       ltt80th_delay  = 0;
       recent_delay   = 0;
@@ -512,10 +512,11 @@ exit:
 
 
 void
-sndctrler_setup (SndController * this, StreamSplitter * splitter)
+sndctrler_setup (SndController * this, StreamSplitter * splitter, PacketsSndQueue *pacer)
 {
   THIS_WRITELOCK (this);
   this->splitter = splitter;
+  this->pacer = pacer;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -554,8 +555,7 @@ sndctrler_set_logging_flag(SndController *this, gboolean enable)
   if(this->stat_enabled ^ enable){
     if(enable) {
         gst_task_start (this->stat_thread);
-    }
-    else {
+    }else {
         gst_task_stop(this->stat_thread);
     }
     this->stat_enabled = enable;
@@ -726,7 +726,7 @@ _step_ir (Subflow * this)
   _irt0(this)->checked                   = FALSE;
   _irt0(this)->sent_payload_bytes_sum    = mprtps_path_get_total_sent_payload_bytes(this->path);
   _irt0(this)->expected_lost             = mprtps_path_has_expected_lost(this->path);
-  _irt0(this)->sender_rate               = mprtps_path_get_sent_bytes_in1s(this->path, &_irt0(this)->incoming_rate);
+  _irt0(this)->sender_rate               = mprtps_path_get_sent_bytes_in1s(this->path);
   _irt0(this)->sent_payload_bytes        = _irt0(this)->sent_payload_bytes_sum - _irt1(this)->sent_payload_bytes_sum;
 
 
@@ -944,7 +944,7 @@ _report_processing_rrblock_processor (SndController *this,
       mprtps_path_get_sent_octet_sum_for (subflow->path, _irt0 (subflow)->expected_packets)<<3;
 
   mprtps_path_get_bytes_in_flight(subflow->path, &_irt0(subflow)->bytes_in_flight_acked);
-  _irt0(subflow)->bytes_in_queue = mprtps_path_get_bytes_in_queue(subflow->path);
+  _irt0(subflow)->bytes_in_queue = 0;
   if (subflow->ir_moments_num > 1 && (LSR == 0 || DLSR == 0)) {
     return;
   }

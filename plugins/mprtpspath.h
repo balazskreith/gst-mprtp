@@ -86,31 +86,20 @@ struct _MPRTPSPath
 
   GstClockTime            last_packet_sent_time;
   guint32                 last_sent_payload_bytes;
-  guint64                 ticknum;
   guint32                 monitoring_interval;
   guint16                 monitor_seq;
   guint8                  monitor_payload_type;
   MonitorPackets*         monitorpackets;
   guint8                  pivot_payload_type;
 
-  guint32                 extra_packets_per_100tick;
-  guint32                 extra_packets_per_10tick;
-  guint32                 extra_packets_per_tick;
-
   void                    (*send_mprtp_packet_func)(gpointer, GstBuffer*);
   gpointer                  send_mprtp_func_data;
 
   GstClockTime            path_delay;
-  guint32                 pacing_bitrate;
-  gboolean                pacing;
 
   guint32                 octets_in_flight_acked;
-  guint32                 pacing_tick;
-  //cwnd implementation
   gboolean                expected_lost;
-  PacketsSndQueue*        packetsqueue;
   NumsTracker*            sent_bytes;
-  NumsTracker*            incoming_bytes;
 };
 
 struct _MPRTPSPathClass
@@ -209,23 +198,19 @@ void mprtps_path_set_non_congested (MPRTPSPath * this);
 guint8 mprtps_path_get_id (MPRTPSPath * this);
 gboolean mprtps_path_is_monitoring (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_packets_num (MPRTPSPath * this);
-void mprtps_path_tick(MPRTPSPath *this);
 void mprtps_path_process_rtp_packet(MPRTPSPath * this, GstBuffer * buffer);
 gboolean mprtps_path_has_expected_lost(MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_frames_num (MPRTPSPath * this);
 guint32 mprtps_path_get_sent_octet_sum_for(MPRTPSPath *this, guint32 amount);
 void mprtps_path_get_bytes_in_flight(MPRTPSPath *this, guint32 *acked);
-void mprtps_path_clear_queue(MPRTPSPath *this);
-guint32 mprtps_path_get_sent_bytes_in1s(MPRTPSPath *this, gint64 *incoming_bytes);
+guint32 mprtps_path_get_sent_bytes_in1s(MPRTPSPath *this);
 guint32 mprtps_path_get_bytes_in_queue(MPRTPSPath *this);
 guint8 mprtps_path_get_flags (MPRTPSPath * this);
 guint16 mprtps_path_get_HSN(MPRTPSPath * this);
 void mprtps_path_set_delay(MPRTPSPath * this, GstClockTime delay);
 GstClockTime mprtps_path_get_delay(MPRTPSPath * this);
 void mprtps_path_set_skip_duration(MPRTPSPath * this, GstClockTime duration);
-void mprtps_path_set_pacing_bitrate(MPRTPSPath * this, guint32 target_bitrate, GstClockTime obsolation_treshold);
-void mprtps_path_set_pacing (MPRTPSPath * this, gboolean pacing);
 void mprtps_path_set_monitor_payload_id(MPRTPSPath *this, guint8 payload_type);
 void mprtps_path_set_monitor_packet_provider(MPRTPSPath *this, MonitorPackets *monitorpackets);
 void mprtps_path_set_mprtp_ext_header_id(MPRTPSPath *this, guint ext_header_id);

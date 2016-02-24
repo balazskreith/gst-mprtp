@@ -229,18 +229,6 @@ guint32 numstracker_get_num(NumsTracker *this)
   return result;
 }
 
-guint64 numstracker_get_last(NumsTracker *this)
-{
-  guint64 result;
-  THIS_READLOCK(this);
-  if(this->read_index == this->write_index) result = 0;
-  else if(this->write_index == 0) result = this->items[this->length-1].value;
-  else result = this->items[this->write_index-1].value;
-  THIS_READUNLOCK(this);
-  return result;
-}
-
-
 void
 numstracker_get_stats (NumsTracker * this,
                          gint64 *sum)
@@ -283,12 +271,15 @@ void _add_value(NumsTracker *this, gint64 value, GstClockTime removal)
   GstClockTime now;
   now = gst_clock_get_time(this->sysclock);
   //add new one
+  if(this->write_index < 0 || this->length <= this->write_index){
+      g_print("write index value: %d\n", this->write_index);
+  }
   if(0 < this->items[this->write_index].added){
     _rem_value(this);
   }
   ++this->counter;
-  this->items[this->write_index].value = value;
-  this->items[this->write_index].added = now;
+  this->items[this->write_index].value  = value;
+  this->items[this->write_index].added  = now;
   this->items[this->write_index].remove = removal;
   this->value_sum += value;
   if(++this->write_index == this->length){

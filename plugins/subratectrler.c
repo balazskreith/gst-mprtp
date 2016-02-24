@@ -55,7 +55,6 @@ G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 #define OWD_TARGET_LO 100 * GST_MSECOND
 //Max OWD target. Default value: 0.4s -> 400ms
 #define OWD_TARGET_HI 400 * GST_MSECOND
-#define INIT_CWND 100000
 // Max video rampup speed in bps/s (bits per second increase per second)
 #define RAMP_UP_MAX_SPEED 200000.0f // bps/s
 #define RAMP_UP_MIN_SPEED 2000.0f // bps/s
@@ -238,11 +237,6 @@ _fire(
 #define _pacing_enabled(this) this->path_is_paced
 
 static void
-_set_path_pacing(
-    SubflowRateController *this,
-    gboolean enable_pacing);
-
-static void
 _disable_controlling(
     SubflowRateController *this);
 
@@ -284,10 +278,6 @@ static void
 _add_bottleneck_point(
     SubflowRateController *this,
     gint32 rate);
-
-static gboolean
- _open_cwnd(
-     SubflowRateController *this);
 
 static void
 _append_to_log(
@@ -381,7 +371,6 @@ void subratectrler_set(SubflowRateController *this,
   this->id = mprtps_path_get_id(this->path);
   this->setup_time = _now(this);
   this->monitoring_interval = 3;
-  this->pacing_bitrate = INIT_CWND;
   this->target_bitrate = sending_target;
   this->min_rate = TARGET_BITRATE_MIN;
   this->max_rate = TARGET_BITRATE_MAX;
@@ -422,7 +411,7 @@ void subratectrler_time_update(
   if (_now(this) - RATE_ADJUST_INTERVAL < this->last_target_bitrate_adjust) {
     goto done;
   }
-  sending_bitrate = mprtps_path_get_sent_bytes_in1s(this->path, NULL) * 8;
+  sending_bitrate = mprtps_path_get_sent_bytes_in1s(this->path) * 8;
   subanalyser_time_update(this->analyser, sending_bitrate);
 //  this->change_target_bitrate_fnc(this, this->target_bitrate);
 //  _change_target_bitrate(this, _adjust_bitrate(this));
@@ -558,7 +547,6 @@ void
 _bounce_stage(
     SubflowRateController *this)
 {
-  _open_cwnd(this);
   //Todo: put in order
   this->target_bitrate = this->max_target_point;
   _switch_stage_to(this, STAGE_KEEP, FALSE);
@@ -570,7 +558,6 @@ void
 _keep_stage(
     SubflowRateController *this)
 {
-  _open_cwnd(this);
   if(_delays(this).distortion || _bitrate(this).distortion){
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
     _set_event(this, EVENT_DISTORTION);
@@ -582,13 +569,17 @@ _keep_stage(
   }
 
   this->max_target_point = MAX(_TR(this), this->max_target_point);
+  if(0 < this->bottleneck_point){
+    this->max_target_point = MAX(this->bottleneck_point * .95, this->max_target_point);
+  }
+
   this->min_target_point = _TR(this) *  .95;
-  if(this->target_bitrate < this->bottleneck_point){
-    this->target_bitrate = this->bottleneck_point;
+  if(this->target_bitrate < this->max_target_point){
+    this->target_bitrate = this->max_target_point;
     goto done;
   }
 
-  if(_now(this) - 10 * GST_SECOND < this->congestion_detected){
+  if(_now(this) - 10 * GST_SECOND < this->congestion_detected || _delays(this).fluctuation){
     goto done;
   }
   _switch_stage_to(this, STAGE_RAISE, FALSE);
@@ -776,13 +767,6 @@ gint32 subratectrler_get_monitoring_bitrate(SubflowRateController *this)
   return this->monitored_bitrate;
 }
 
-void _set_path_pacing(SubflowRateController *this, gboolean enable_pacing)
-{
-  mprtps_path_set_pacing_bitrate(this->path, this->pacing_bitrate = _TR(this), 400 * GST_MSECOND);
-  mprtps_path_set_pacing(this->path, this->path_is_paced = enable_pacing);
-
-}
-
 void _disable_controlling(SubflowRateController *this)
 {
   GstClockTime interval;
@@ -854,7 +838,6 @@ void _set_monitoring_interval(SubflowRateController *this, guint interval)
     this->monitored_bitrate = (gdouble)_TR(this) / (gdouble)interval;
   else
     this->monitored_bitrate = 0;
-  mprtps_path_set_monitor_interval_and_duration(this->path, interval, 0 * GST_MSECOND);
   return;
 }
 
@@ -931,13 +914,6 @@ _add_bottleneck_point(
   this->bottleneck_point = rate;
 }
 
-gboolean _open_cwnd(SubflowRateController *this)
-{
-  mprtps_path_clear_queue(this->path);
-  _disable_pacing(this);
-  return TRUE;
-}
-
 void _append_to_log(SubflowRateController *this, const gchar * format, ...)
 {
   FILE *file;
@@ -962,10 +938,10 @@ void _log_measurement_update_state(SubflowRateController *this)
 
           "############ S%d | State: %-2d | Disable time %lu | Ctrled: %d #################\n"
           "rlost:      %-10d| rdiscard:%-10d| lost:    %-10d| discard: %-10d|\n"
-          "pth_cong:   %-10d| pth_lssy:%-10d| pacing:  %-10d| trend_th:%-10d|\n"
+          "pth_cong:   %-10d| pth_lssy:%-10d| dis_br:  %-10d| trend_th:%-10d|\n"
           "target_br:  %-10d| min_tbr: %-10d| max_tbr: %-10d| trend:   %-10.6f\n"
           "stage:      %-10d| near2cc: %-10d| exp_lst: %-10d| pevent:  %-10d|\n"
-          "mon_br:     %-10d| mon_int: %-10d| pace_br: %-10d| lc_rate: %-10d|\n"
+          "mon_br:     %-10d| mon_int: %-10d| btlnck:  %-10d| fluct:   %-10d|\n"
           "RR:         %-10d| SR:      %-10d| disc_rat:%-10.3f| ci:      %-10.3f|\n"
           "l:          %-10d| rl:      %-10d| d:       %-10d| rd:      %-10d\n"
           "abs_max:    %-10d| abs_min: %-10d| event:      %-7d| off_add: %-10.3f\n"
@@ -981,7 +957,7 @@ void _log_measurement_update_state(SubflowRateController *this)
 
           !mprtps_path_is_non_congested(this->path),
           !mprtps_path_is_non_lossy(this->path),
-          this->path_is_paced,
+          this->desired_bitrate,
           _qtrend_th(this) < _qtrend(this),
 
           this->target_bitrate, this->min_target_point,
@@ -992,7 +968,7 @@ void _log_measurement_update_state(SubflowRateController *this)
           _mt0(this)->has_expected_lost, this->pending_event,
 
           this->monitored_bitrate, this->monitoring_interval,
-          this->pacing_bitrate, this->bottleneck_point,
+          this->bottleneck_point, _delays(this).fluctuation,
 
           _RR(this), _mt0(this)->sender_bitrate,
           _mt0(this)->discard_rate, _get_bottleneck_influence(this),

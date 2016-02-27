@@ -43,23 +43,31 @@
  *                                           '------------'       '-------'
  */
 
+typedef struct _SubflowUtilization{
+  gboolean   controlled;
+  struct{
+    gint32   lost_bytes;
+    gint32   discarded_bytes;
+    gint32   target_rate;
+    gint32   sending_rate;
+    guint64  owd;
+    gint     state;
+  }report;
+  struct{
+    gint32   max_rate;
+    gint32   min_rate;
+  }control;
+}SubflowUtilization;
 
-typedef struct _UtilizationSubflowReport{
-  gboolean controlled;
-  gint32   max_rate;
-  gint32   min_rate;
-  gint32   lost_bytes;
-  gint32   discarded_rate;
-  guint64  owd;
-  gdouble  ramp_up_aggressivity;
-  gdouble  discard_aggressivity;
-}UtilizationSubflowReport;
-
-typedef struct _UtilizationReport{
-  guint32                  target_rate;
-  UtilizationSubflowReport subflows[32];
-}UtilizationReport;
-
+typedef struct _MPRTPPluginUtilization{
+  struct{
+    gint32 target_rate;
+  }report;
+  struct{
+    gint32 max_rate,min_rate;
+  }control;
+  SubflowUtilization subflows[32];
+}MPRTPPluginUtilization;
 typedef struct _SessionData
 {
   int ref;
@@ -297,23 +305,23 @@ request_aux_sender (GstElement * rtpbin, guint sessid, SessionData * session)
 static void
 changed_event (GstElement * mprtp_sch, gpointer ptr)
 {
-  UtilizationReport *ur = ptr;
+  MPRTPPluginUtilization *ur = ptr;
 //  gint delta;
   gint new_bitrate;
   gint get_bitrate;
   g_object_get (encoder, "target-bitrate", &get_bitrate, NULL);
   {
     gint i;
-    new_bitrate = ur->target_rate;
+    new_bitrate = ur->report.target_rate;
     for(i=0; i<32; ++i){
       if(!ur->subflows[i].controlled) continue;
       if(test_parameters_.video_session == TEST_SOURCE){
-               ur->subflows[i].min_rate = 500000 / test_parameters_.subflow_num;
-               ur->subflows[i].max_rate = 2000000;
+               ur->subflows[i].control.min_rate = 500000 / test_parameters_.subflow_num;
+               ur->subflows[i].control.max_rate = 2000000;
            }
       else  if(test_parameters_.video_session == FOREMAN_SOURCE){
-          ur->subflows[i].min_rate = 50000 / test_parameters_.subflow_num;
-          ur->subflows[i].max_rate = 300000;
+          ur->subflows[i].control.min_rate = 50000 / test_parameters_.subflow_num;
+          ur->subflows[i].control.max_rate = 300000;
       }
 
     }

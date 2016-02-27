@@ -16,7 +16,7 @@
 #define ABS_TIME_DEFAULT_EXTENSION_HEADER_ID 8
 #define MONITOR_PAYLOAD_DEFAULT_ID 126
 #define DELAY_SKEW_MAX (100 * GST_MSECOND)
-#define SUBFLOW_DEFAULT_SENDING_RATE 128000
+#define SUBFLOW_DEFAULT_SENDING_RATE 12800
 
 G_BEGIN_DECLS typedef struct _MPRTPSPath MPRTPSPath;
 typedef struct _MPRTPSPathClass MPRTPSPathClass;
@@ -43,13 +43,6 @@ typedef enum
   MPRTPS_PATH_FLAG_NON_CONGESTED = 2,
   MPRTPS_PATH_FLAG_ACTIVE        = 4,
 } MPRTPSPathFlags;
-
-//typedef enum{
-//  MPRTPS_PATH_STATE_NON_CONGESTED    = 4,
-//  MPRTPS_PATH_STATE_LOSSY            = 3,
-//  MPRTPS_PATH_STATE_CONGESTED        = 2,
-//  MPRTPS_PATH_STATE_PASSIVE          = 1,
-//}MPRTPSPathState;
 
 #define MAX_INT32_POSPART 32767
 
@@ -164,21 +157,36 @@ struct _RRMeasurement{
 };
 
 
-typedef struct _UtilizationSubflowReport{
-  gboolean controlled;
-  gint32   max_rate;
-  gint32   min_rate;
-  gint32   lost_bytes;
-  gint32   discarded_rate;
-  guint64  owd;
-  gdouble  ramp_up_aggressivity;
-  gdouble  discard_aggressivity;
-}UtilizationSubflowReport;
+typedef struct _SubflowUtilization{
+  gboolean   controlled;
+  struct _SubflowUtilizationReport{
+    gint32   lost_bytes;
+    gint32   discarded_bytes;
+    gint32   target_rate;
+    gint32   sending_rate;
+    guint64  owd;
+    gint     state;
+  }report;
+  struct _SubflowUtilizationControl{
+    gint32   max_rate;
+    gint32   min_rate;
+    //Todo: add this
+    //gdouble  aggressivity;
 
-typedef struct _UtilizationReport{
-  guint32                  target_rate;
-  UtilizationSubflowReport subflows[32];
-}UtilizationReport;
+  }control;
+}SubflowUtilization;
+
+typedef struct _MPRTPPluginUtilization{
+  struct{
+    gint32 target_rate;
+  }report;
+  struct{
+    gint32 max_rate,min_rate;
+    //Todo: add this
+    //gdouble  max_takover_rate; <- the maximum amount of rate [0,1] taken over by a subflow from another subflow.
+  }control;
+  SubflowUtilization subflows[32];
+}MPRTPPluginUtilization;
 
 
 GType mprtps_path_get_type (void);

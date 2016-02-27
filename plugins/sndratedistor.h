@@ -10,7 +10,8 @@
 
 #include <gst/gst.h>
 #include "mprtpspath.h"
-#include "subratectrler.h"
+#include "streamsplitter.h"
+#include "packetssndqueue.h"
 
 typedef struct _SendingRateDistributor SendingRateDistributor;
 typedef struct _SendingRateDistributorClass SendingRateDistributorClass;
@@ -38,12 +39,15 @@ struct _SendingRateDistributor
   gint32               target_bitrate;
   gint32               delta_rate;
 
-  gboolean             subflows_are_stable;
-  gboolean             subflows_are_measured;
+  PacketsSndQueue*     pacer;
+  StreamSplitter*      splitter;
 
-  UtilizationReport    ur;
-  SignalRequestFunc    signal_request;
-  gpointer             signal_controller;
+  gint32               supplied_bitrate;
+  gint32               requested_bitrate;
+
+  MPRTPPluginUtilization    ur;
+//  SignalRequestFunc    signal_request;
+//  gpointer             signal_controller;
 };
 
 
@@ -53,17 +57,15 @@ struct _SendingRateDistributorClass{
 
 
 GType sndrate_distor_get_type (void);
-SendingRateDistributor *make_sndrate_distor(SignalRequestFunc signal_request, gpointer controller);
-SubflowRateController*  sndrate_distor_add_controllable_path(SendingRateDistributor *this,
-                                 MPRTPSPath *path,
-                                 guint32 sending_rate);
-void sndrate_distor_measurement_update(SendingRateDistributor *this,
-                                       guint8 id,
-                                       RRMeasurement *measurement);
-
-void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id);
-void sndrate_distor_time_update(SendingRateDistributor *this);
-gboolean sndrate_distor_recalc_requestion(SendingRateDistributor *this);
+SendingRateDistributor *make_sndrate_distor(void);
+void sndrate_distor_setup(SendingRateDistributor *this, StreamSplitter *splitter, PacketsSndQueue *pacer);
+void sndrate_setup_report(
+    SendingRateDistributor *this,
+    guint8 id,
+    struct _SubflowUtilizationReport *report);
+void sndrate_distor_add_controlled_subflow(SendingRateDistributor *this, guint8 id);
+void sndrate_distor_rem_controlled_subflow(SendingRateDistributor *this, guint8 id);
+MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this);
 void sndrate_set_initial_disabling_time(SendingRateDistributor *this, guint64 initial_disabling_time);
 guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id);
 #endif /* SNDRATEDISTOR_H_ */

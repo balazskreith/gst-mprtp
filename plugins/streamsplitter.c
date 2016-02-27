@@ -318,7 +318,7 @@ stream_splitter_setup_sending_target (StreamSplitter * this, guint8 subflow_id,
         "due to not existed subflow id (%d)", subflow_id);
     goto exit;
   }
-//  g_print("setup %d sending rate for subflow %d\n", sending_rate, subflow_id);
+//  g_print("setup %d sending rate for subflow %d\n", sending_target, subflow_id);
   subflow->sending_target = sending_target;
 exit:
   THIS_WRITEUNLOCK (this);

@@ -33,8 +33,6 @@ typedef struct _SubAnalyserResult SubAnalyserResult;
 struct _SubAnalyser
 {
   GObject                  object;
-  gint32*                  SR_window;
-  gint                     SR_window_index;
   gdouble                  RR_avg;
   GstClockTime             window_time_limit;
   guint                    window_size;
@@ -71,6 +69,7 @@ void subanalyser_time_update(SubAnalyser *this, gint32 sending_bitrate);
 void subanalyser_measurement_analyse(SubAnalyser *this,
                                      RRMeasurement *measurement,
                                      gint32         target_bitrate,
+                                     gint32 sending_rate,
                                      SubAnalyserResult *result);
 
 void subanalyser_append_logfile(SubAnalyser *this, FILE *file);

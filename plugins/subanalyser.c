@@ -126,8 +126,6 @@ SubAnalyser *make_subanalyser(void)
   this->sysclock = gst_system_clock_obtain();
   this->priv = g_malloc0(sizeof(SubAnalyserPrivate));
   _priv(this)->result = g_malloc0(sizeof(SubAnalyserPrivate));
-  this->SR_window = g_malloc0(sizeof(gint32) * 8);
-  this->SR_window_index = 0;
   _priv(this)->delay_target = 100 * GST_MSECOND;
 
   _priv(this)->cblocks[0].next = &_priv(this)->cblocks[1];
@@ -154,28 +152,12 @@ void subanalyser_reset(SubAnalyser *this)
   THIS_WRITEUNLOCK (this);
 }
 
-void subanalyser_time_update(SubAnalyser *this, gint32 sending_bitrate)
-{
-  this->SR_window[this->SR_window_index] = sending_bitrate;
-  this->SR_window_index = this->SR_window_index + 1;
-  this->SR_window_index &= 7;
-}
-static gint _compare (const void* a, const void* b)
-{
-  return ( *(gint32*)a - *(gint32*)b );
-}
 
-static gint32 _get_sending_rate_median(SubAnalyser *this)
-{
-  gint32 result;
-  qsort (this->SR_window, 8, sizeof(gint32), _compare);
-  result = this->SR_window[3] + this->SR_window[4];
-  return result>>1;
-}
 
 void subanalyser_measurement_analyse(SubAnalyser *this,
                                      RRMeasurement *measurement,
                                      gint32 target_bitrate,
+                                     gint32 sending_rate,
                                      SubAnalyserResult *result)
 {
   gint i;
@@ -206,7 +188,7 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
 
   result->delay_off = off_add;
   result->discards_rate  =  ((gdouble) measurement->late_discarded_bytes / (gdouble) measurement->received_payload_bytes);
-  result->sending_rate_median = _get_sending_rate_median(this);
+  result->sending_rate_median = sending_rate;
 
   result->off                            = (_priv(this)->delay_t0 * .5 + _priv(this)->delay_t1 * .25 + _priv(this)->delay_t2 * .25) / _priv(this)->delay_avg;
   result->qtrend                         = _priv(this)->qtrend;
@@ -283,12 +265,15 @@ void _qdeanalyzer_evaluation(SubAnalyser *this)
 //  _priv(this)->qtrend = _priv(this)->cblocks[0].g * 1000.;
 //  _priv(this)->qtrend = CONSTRAIN(-2., .2, _priv(this)->cblocks[0].g / .0005 - 1.);
 //  _priv(this)->qtrend     = _priv(this)->cblocks[0].g > 0.002 ? (_priv(this)->cblocks[1].g) / (2. * _priv(this)->cblocks[0].g) : 0.;
-
-  _priv(this)->qtrend      = _priv(this)->cblocks[1].g > AGGRESSIVITY ? (2*_priv(this)->cblocks[0].g) / _priv(this)->cblocks[1].g : 0.;
-  _priv(this)->qtrend      = CONSTRAIN(-2., .2, _priv(this)->qtrend);
+  if(_priv(this)->qtrend < -AGGRESSIVITY / 2. || AGGRESSIVITY * 2. < _priv(this)->cblocks[1].g){
+    _priv(this)->qtrend = 2*_priv(this)->cblocks[0].g / _priv(this)->cblocks[1].g;
+  }else{
+    _priv(this)->qtrend = 0.;
+  }
+  _priv(this)->qtrend      = CONSTRAIN(-.2, .2, _priv(this)->qtrend);
   _priv(this)->fluctuation = _priv(this)->cblocks[2].g < -.001 || .001 < _priv(this)->cblocks[2].g;
-  _priv(this)->distortion  =    0. < _priv(this)->qtrend;
-  _priv(this)->congestion  =    0 && _priv(this)->cblocks[1].distorted;
+  _priv(this)->distortion  = _priv(this)->qtrend < -AGGRESSIVITY      ||      AGGRESSIVITY < _priv(this)->cblocks[1].g;
+  _priv(this)->congestion  = _priv(this)->qtrend < -4. * AGGRESSIVITY || 4. * AGGRESSIVITY < _priv(this)->cblocks[1].g;
 }
 
 
@@ -324,7 +309,7 @@ void _execute_corrblock(CorrBlock* this)
   this->M0  += this->M_[this->index] = this->Iu0;
   this->G01 += this->G_[this->index] = this->Iu0 * this->Id1;
   if(this->M0 && this->M1){
-    this->g  = this->G01 * this->N;
+    this->g  = this->G01 * (this->N-1);
     this->g /= this->M0 * this->M1;
     this->g -= 1.;
   }

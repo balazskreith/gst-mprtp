@@ -103,13 +103,6 @@ typedef enum{
   STAGE_RAISE             =  1,
 }Stage;
 
-typedef enum{
-  BITRATE_CHANGE          = 1,
-  BITRATE_SLOW            = 2,
-  BITRATE_FORCED          = 4,
-}AimFlag;
-
-
 struct _Moment{
   GstClockTime      time;
   //Explicit Congestion Notifier Influence Values (ECN)
@@ -331,10 +324,11 @@ subratectrler_init (SubflowRateController * this)
 }
 
 
-SubflowRateController *make_subratectrler(void)
+SubflowRateController *make_subratectrler(SendingRateDistributor* rate_controlller)
 {
   SubflowRateController *result;
   result = g_object_new (SUBRATECTRLER_TYPE, NULL);
+  result->rate_controller = rate_controlller;
   return result;
 }
 
@@ -400,44 +394,6 @@ void subratectrler_unset(SubflowRateController *this)
   THIS_WRITEUNLOCK(this);
 }
 
-void subratectrler_time_update(
-                         SubflowRateController *this,
-                         gint32 *target_bitrate,
-                         gint32 *extra_bitrate,
-                         UtilizationSubflowReport *rep,
-                         gboolean *overused)
-{
-  gint32 sending_bitrate;
-  if (_now(this) - RATE_ADJUST_INTERVAL < this->last_target_bitrate_adjust) {
-    goto done;
-  }
-  sending_bitrate = mprtps_path_get_sent_bytes_in1s(this->path) * 8;
-  subanalyser_time_update(this->analyser, sending_bitrate);
-//  this->change_target_bitrate_fnc(this, this->target_bitrate);
-//  _change_target_bitrate(this, _adjust_bitrate(this));
-//  DISABLE_LINE _set_pacing_bitrate(this, this->target_bitrate * 1.5, TRUE);
-
-//done:
-  this->last_target_bitrate_adjust = _now(this);
-done:
-  if(rep){
-    rep->lost_bytes = _mt0(this)->lost;
-    rep->discarded_rate = _discard(this);
-    rep->owd = 0;//Todo: Fix it
-    rep->max_rate = this->max_rate;
-    rep->min_rate = this->min_rate;
-    rep->ramp_up_aggressivity = this->ramp_up_aggressivity;
-    rep->discard_aggressivity = this->discard_aggressivity;
-  }
-  if(target_bitrate)
-    *target_bitrate = this->target_bitrate;
-  if(extra_bitrate)
-    *extra_bitrate = this->monitored_bitrate;
-  if(overused)
-    *overused = _state(this) == STATE_OVERUSED;
-  return;
-
-}
 
 void subratectrler_change_targets(
                          SubflowRateController *this,
@@ -456,8 +412,10 @@ void subratectrler_change_targets(
 //    if(this->max_rate && this->max_target_point < this->target_bitrate){
 //      this->max_target_point = this->max_rate;
 //    }
-  }
 
+  }
+  this->max_target_point = MAX(this->max_target_point, this->target_bitrate);
+  this->min_target_point = MIN(this->min_target_point, this->target_bitrate);
   THIS_WRITEUNLOCK(this);
 }
 
@@ -465,6 +423,7 @@ void subratectrler_measurement_update(
                          SubflowRateController *this,
                          RRMeasurement * measurement)
 {
+  struct _SubflowUtilizationReport *report = &this->utilization.report;
   if(measurement->goodput <= 0.) goto done;
   _m_step(this);
 
@@ -489,9 +448,8 @@ void subratectrler_measurement_update(
   subanalyser_measurement_analyse(this->analyser,
                                   measurement,
                                   _TR(this),
+                                  _mt0(this)->sender_bitrate,
                                   &_mt0(this)->analysation);
-
-  _mt0(this)->sender_bitrate      = _anres(this).sending_rate_median;
 
   if(0 < this->disable_controlling && this->disable_controlling < _now(this)){
       this->disable_controlling = 0;
@@ -517,7 +475,21 @@ void subratectrler_measurement_update(
 //    this->last_reference_added = _now(this);
 //  }
 done:
+  report->discarded_bytes = 0; //Fixme
+  report->lost_bytes = 0;//Fixme
+  report->sending_rate = _SR(this);
+  report->target_rate = _TR(this);
+  report->state = _state(this);
+  sndrate_setup_report(this->rate_controller, this->id, report);
   return;
+}
+
+void subratectrler_setup_controls(
+                         SubflowRateController *this, struct _SubflowUtilizationControl* src)
+{
+  struct _SubflowUtilizationControl *ctrl = &this->utilization.control;
+  memcpy(ctrl, src, sizeof(struct _SubflowUtilizationControl));
+
 }
 
 Moment* _m_step(SubflowRateController *this)
@@ -570,10 +542,16 @@ _keep_stage(
 
   this->max_target_point = MAX(_TR(this), this->max_target_point);
   if(0 < this->bottleneck_point){
-    this->max_target_point = MAX(this->bottleneck_point * .95, this->max_target_point);
+    this->max_target_point = MIN(this->bottleneck_point * .95, this->max_target_point);
+  }
+
+  this->target_bitrate *= 1. - _qtrend(this);
+  if(0. < _qtrend(this)){
+    goto done;
   }
 
   this->min_target_point = _TR(this) *  .95;
+  this->target_bitrate = MIN(this->max_target_point, this->target_bitrate);
   if(this->target_bitrate < this->max_target_point){
     this->target_bitrate = this->max_target_point;
     goto done;
@@ -607,10 +585,13 @@ _mitigate_stage(
     goto done;
   }
 
-  if(this->bottleneck_point * 1.1 < _min_br(this)){
+  this->bottleneck_point = _min_br(this);
+  if(this->bottleneck_point * 1.05 < _min_br(this)){
     this->bottleneck_point = _min_br(this);
   }else if(_SR(this) * 1.05 < this->bottleneck_point){
     this->bottleneck_point = _SR(this);
+  }else{
+    this->bottleneck_point = MIN(_min_br(this), this->bottleneck_point);
   }
   _change_target_bitrate(this, MAX(_min_br(this) * (1.-_qtrend(this)) , this->bottleneck_point * .9));
 
@@ -626,7 +607,7 @@ void
 _raise_stage(
     SubflowRateController *this)
 {
-  if(0. < _qtrend(this) || _bitrate(this).distortion){
+  if(_delays(this).distortion || _bitrate(this).distortion){
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
     _set_event(this, EVENT_DISTORTION);
     goto done;

@@ -42,19 +42,19 @@ G_DEFINE_TYPE (SendingRateDistributor, sndrate_distor, G_TYPE_OBJECT);
 
 
 typedef struct _Subflow Subflow;
-typedef struct _Moment Moment;
 
 struct _Subflow{
   guint8                 id;
   MPRTPSPath*            path;
   gboolean               initialized;
-  gboolean               controlled;
   gboolean               ready;
-  SubflowRateController* controller;
+  gboolean               controlled;
 
   gint32                 extra_rate;
   gint32                 delta_rate;
   gint32                 sending_target;
+  gint32                 supplied_bitrate;
+  gint32                 requested_bitrate;
 };
 
 //----------------------------------------------------------------------
@@ -74,22 +74,6 @@ sndrate_distor_finalize (
 
 static void
 _refresh_available_ids(
-    SendingRateDistributor* this);
-
-static void
-_time_update_preparation(
-    SendingRateDistributor* this);
-
-static void
-_time_update_evaluation(
-    SendingRateDistributor* this);
-
-static void
-_time_update_requestion(
-    SendingRateDistributor* this);
-
-static void
-_time_update_application(
     SendingRateDistributor* this);
 
 
@@ -143,88 +127,136 @@ sndrate_distor_init (SendingRateDistributor * this)
 }
 
 
-SendingRateDistributor *make_sndrate_distor(SignalRequestFunc signal_request,
-                                            gpointer controller)
+SendingRateDistributor *make_sndrate_distor(void)
 {
   SendingRateDistributor *result;
   result = g_object_new (SNDRATEDISTOR_TYPE, NULL);
-  result->signal_request = signal_request;
-  result->signal_controller = controller;
-//  result->max_rate = 128000;
-//  result->target_media_rate = 64000;
-//  result->target_rate = result->max_rate;
+  result->splitter = NULL;
+  result->pacer    = NULL;
   return result;
 }
 
-SubflowRateController* sndrate_distor_add_controllable_path(SendingRateDistributor *this,
-                                 MPRTPSPath *path,
-                                 guint32 sending_target)
+void sndrate_distor_setup(SendingRateDistributor *this, StreamSplitter *splitter, PacketsSndQueue *pacer)
 {
-  Subflow *subflow;
-  subflow =  _get_subflow(this, mprtps_path_get_id(path));
-  if(!subflow->controller) subflow->controller = make_subratectrler();
-  subratectrler_set(subflow->controller, path, sending_target, this->initial_disabling_time);
-  subflow->controlled = TRUE;
-  subflow->path = g_object_ref(path);
-  ++this->controlled_num;
-  _refresh_available_ids(this);
-  return subflow->controller;
+  this->splitter = splitter;
+  this->pacer    = pacer;
 }
 
-void sndrate_distor_measurement_update(SendingRateDistributor *this,
-                                       guint8 id,
-                                       RRMeasurement *measurement)
+
+void sndrate_setup_report(
+    SendingRateDistributor *this,
+    guint8 id,
+    struct _SubflowUtilizationReport *report)
 {
   Subflow *subflow;
   subflow =  _get_subflow(this, id);
-  subratectrler_measurement_update(subflow->controller, measurement);
   subflow->ready = TRUE;
+  memcpy(&this->ur.subflows[id].report, report, sizeof(struct _SubflowUtilizationReport));
+  if(report->target_rate < subflow->sending_target){
+    subflow->supplied_bitrate = subflow->sending_target - report->target_rate;
+  }else{
+    subflow->requested_bitrate = report->target_rate - subflow->sending_target;
+  }
 }
 
-void sndrate_distor_remove_id(SendingRateDistributor *this, guint8 id)
+void sndrate_distor_add_controlled_subflow(SendingRateDistributor *this, guint8 id)
 {
   Subflow *subflow;
-  subflow = _get_subflow(this, id);
-  if(!subflow->controlled) goto done;
-  subratectrler_unset(subflow->controller);
-  subflow->controlled = FALSE;
-  g_object_unref(subflow->path);
-  --this->controlled_num;
+  subflow =  _get_subflow(this, id);
+  subflow->controlled = TRUE;
   _refresh_available_ids(this);
-done:
-  return;
 }
 
-
-void sndrate_distor_time_update(SendingRateDistributor *this)
+void sndrate_distor_rem_controlled_subflow(SendingRateDistributor *this, guint8 id)
 {
-  //1. Initialize and reset variable for updating
-  _time_update_preparation(this);
-
-  //2. mitigate the effect of byte requesting and supplying by
-  //moving the bytes between the subflows
-  _time_update_evaluation(this);
-
-  //3. Requesting the media source for new media rate
-  _time_update_requestion(this);
-
-  //4. Apply new min-max rates and disabling commanded by the application
-  _time_update_application(this);
-  return;
+  Subflow *subflow;
+  subflow =  _get_subflow(this, id);
+  subflow->controlled = FALSE;
+  _refresh_available_ids(this);
 }
 
-gboolean sndrate_distor_recalc_requestion(SendingRateDistributor *this)
+
+MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this)
 {
   gint i;
   Subflow *subflow;
-  gboolean result = FALSE;
-  if(!this->subflows_are_measured) goto done;
-  if(!this->subflows_are_stable) goto done;
-  result = TRUE;
+  gboolean ready = TRUE;
+  MPRTPPluginUtilization* result = NULL;
+  SubflowUtilization *report;
+  gint32 remaining_bitrate;
+  gdouble monitored_sr = 0., stable_sr = 0.;
+
+  this->supplied_bitrate = this->requested_bitrate = this->target_bitrate = 0;
+  if(!this->splitter || !this->pacer) goto done;
+
   foreach_subflows(this, i, subflow)
   {
-    subflow->ready = FALSE;
+    report = &this->ur.subflows[subflow->id];
+    ready &= subflow->ready && subflow->controlled;
+    this->supplied_bitrate  += subflow->supplied_bitrate;
+    this->requested_bitrate += subflow->requested_bitrate;
+    subflow->delta_rate     =  subflow->requested_bitrate - subflow->supplied_bitrate;
+    this->target_bitrate    += subflow->sending_target;
+
+    if(report->report.state == 0)       stable_sr    += report->report.sending_rate;
+    else if(report->report.state == 1)  monitored_sr += report->report.sending_rate;
+
   }
+  if(!ready) goto done;
+  result = &this->ur;
+  result->report.target_rate = this->target_bitrate;
+
+  //first we calculate the new sending targets for subflows
+  foreach_subflows(this, i, subflow)
+  {
+    subflow->sending_target += subflow->delta_rate;
+  }
+  //then exemine weather we have remaining bitrate
+  remaining_bitrate = this->supplied_bitrate - this->requested_bitrate;
+  if(remaining_bitrate <= 0) goto distribute;
+
+  //we try to distribute the reminaing bitrate first amongst the subflows, which are monitored
+  if(0. < monitored_sr)
+  foreach_subflows(this, i, subflow)
+  {
+    gint32 extra_bitrate;
+    report = &this->ur.subflows[subflow->id];
+    if(report->report.state != 1) continue;
+    //limit egy bizonyos mennyiségre. nem lehet több mint a sending rate 10%-a
+    extra_bitrate = MIN(subflow->sending_target * .1, remaining_bitrate * ((gdouble) subflow->sending_target / monitored_sr));
+    subflow->delta_rate     += extra_bitrate;
+    subflow->sending_target += extra_bitrate;
+    remaining_bitrate       -= extra_bitrate;
+  }
+  if(remaining_bitrate <= 0) goto distribute;
+
+  //we try to distribute the reminaing bitrate the stable subflows
+  if(0. < stable_sr)
+  foreach_subflows(this, i, subflow)
+  {
+    gint32 extra_bitrate;
+    report = &this->ur.subflows[subflow->id];
+    if(report->report.state != 0 || 0 < subflow->supplied_bitrate) continue;
+    //limit egy bizonyos mennyiségre. nem lehet több mint a sending rate 10%-a
+    extra_bitrate = MIN(subflow->sending_target * .05, remaining_bitrate * ((gdouble) subflow->sending_target / stable_sr));
+    subflow->delta_rate     += extra_bitrate;
+    subflow->sending_target += extra_bitrate;
+    remaining_bitrate       -= extra_bitrate;
+  }
+
+  if(remaining_bitrate <= 0) goto distribute;
+  //if remaining bitrate still available we apply pacing if it exceeds the 10% of the sending target;
+  if(this->target_bitrate * .1 < remaining_bitrate){
+    //Todo: apply pacing here.
+  }
+distribute:
+  //setup sending rate in splitter
+  foreach_subflows(this, i, subflow)
+  {
+    stream_splitter_setup_sending_target(this->splitter, subflow->id, subflow->sending_target);
+  }
+  stream_splitter_setup_sending_target(this->splitter, subflow->id, subflow->sending_target);
+  stream_splitter_commit_changes (this->splitter);
 done:
   return result;
 }
@@ -251,102 +283,5 @@ void _refresh_available_ids(SendingRateDistributor* this)
     this->available_ids[this->available_ids_length++] = subflow->id;
   }
 }
-
-void _time_update_preparation(SendingRateDistributor* this)
-{
-  gint i;
-  Subflow *subflow;
-  gint32 prev_sending_target;
-  UtilizationReport *ur = &this->ur;
-  gboolean overused = FALSE;
-
-  this->delta_rate = 0;
-  this->extra_rate = 0;
-  this->subflows_are_stable = TRUE;
-  this->subflows_are_measured = TRUE;
-
-  foreach_subflows(this, i, subflow)
-  {
-    ur->subflows[subflow->id].controlled = TRUE;
-    prev_sending_target = subflow->sending_target;
-    subratectrler_time_update(subflow->controller,
-                              &subflow->sending_target,
-                              &subflow->extra_rate,
-                              &this->ur.subflows[subflow->id],
-                              &overused);
-
-    this->subflows_are_stable &= !overused;
-    this->subflows_are_measured &= subflow->ready;
-    subflow->delta_rate =subflow->sending_target - prev_sending_target;
-    this->delta_rate += subflow->delta_rate;
-    this->extra_rate += subflow->extra_rate;
-
-  }
-}
-
-void _time_update_evaluation(SendingRateDistributor* this)
-{
-  Subflow *target, *source;
-  gint i,j;
-goto done;
-  if(0 < this->delta_rate || this->extra_rate < 1) goto done;
-
-  //moving bytes
-  foreach_subflows(this, i, target){
-    if(0 < target->delta_rate) continue;
-    foreach_subflows(this, j, source){
-      if(source->extra_rate < 1) continue;
-      if(target->delta_rate * -1 <= source->extra_rate){
-        subratectrler_add_extra_rate(source->controller, target->delta_rate * -1);
-        this->delta_rate+=target->delta_rate * -1;
-        break;
-      }
-      subratectrler_add_extra_rate(source->controller, target->extra_rate);
-      this->delta_rate+=source->extra_rate;
-    }
-  }
-  this->extra_rate = 0;
-done:
-  return;
-}
-
-void _time_update_requestion(SendingRateDistributor* this)
-{
-  UtilizationReport *ur = &this->ur;
-  gint32 target_rate = 0;
-
-  this->target_bitrate+=this->delta_rate;
-  ur->target_rate = this->target_bitrate;
-
-  if(this->signal_request && this->signal_controller)
-    this->signal_request(this->signal_controller, ur);
-
-  if(ur->target_rate == 0) {
-    g_warning("The actual media rate must be greater than 0");
-    ur->target_rate = target_rate;
-  }
-
-  this->target_bitrate = ur->target_rate;
-
-}
-
-
-void _time_update_application(SendingRateDistributor* this)
-{
-  gint i;
-  Subflow *subflow;
-  UtilizationReport *ur = &this->ur;
-  UtilizationSubflowReport *us;
-  foreach_subflows(this, i, subflow)
-  {
-     us = &ur->subflows[subflow->id];
-     subratectrler_change_targets(subflow->controller,
-                                  us->min_rate,
-                                  us->max_rate,
-                                  us->ramp_up_aggressivity,
-                                  us->discard_aggressivity);
-  }
-}
-
 
 

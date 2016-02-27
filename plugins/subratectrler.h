@@ -13,6 +13,7 @@
 #include "bintree.h"
 #include "floatsbuffer.h"
 #include "subanalyser.h"
+#include "sndratedistor.h"
 
 
 typedef struct _SubflowRateController SubflowRateController;
@@ -40,8 +41,9 @@ struct _SubflowRateController
   gint32                    monitored_bitrate;
 
   SubAnalyser*              analyser;
-
+  SendingRateDistributor*   rate_controller;
   SubTargetRateCtrler       change_target_bitrate_fnc;
+  SubflowUtilization        utilization;
 
   GstClockTime              disable_controlling;
 
@@ -95,7 +97,7 @@ struct _SubflowRateControllerClass{
 
 };
 GType subratectrler_get_type (void);
-SubflowRateController *make_subratectrler(void);
+SubflowRateController *make_subratectrler(SendingRateDistributor* rate_controlller);
 void subratectrler_enable_logging(SubflowRateController *this, const gchar *filename);
 void subratectrler_disable_logging(SubflowRateController *this);
 void subratectrler_set(SubflowRateController *this,
@@ -103,13 +105,6 @@ void subratectrler_set(SubflowRateController *this,
                          guint32 sending_target,
                          guint64 initial_disabling);
 void subratectrler_unset(SubflowRateController *this);
-
-void subratectrler_time_update(
-                         SubflowRateController *this,
-                         gint32 *target_bitrate,
-                         gint32 *extra_bitrate,
-                         UtilizationSubflowReport *rep,
-                         gboolean *overused);
 
 void subratectrler_change_targets(
                          SubflowRateController *this,
@@ -121,6 +116,8 @@ void subratectrler_change_targets(
 void subratectrler_measurement_update(
                          SubflowRateController *this,
                          RRMeasurement * measurement);
+void subratectrler_setup_controls(
+                         SubflowRateController *this, struct _SubflowUtilizationControl* src);
 gint32 subratectrler_get_target_bitrate(SubflowRateController *this);
 gint32 subratectrler_get_monitoring_bitrate(SubflowRateController *this);
 void subratectrler_add_extra_rate(SubflowRateController *this,

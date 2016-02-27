@@ -47,12 +47,10 @@ struct _SndController
   GstClock*              sysclock;
   guint64                ticknum;
   guint                  subflow_num;
-  gboolean               pacing;
-  GstClockTime           last_recalc_time;
   GstClockTime           RTT_max;
-  gboolean               bids_recalc_requested;
-  gboolean               bids_commit_requested;
-  guint32                target_rate;
+//  gboolean               bids_recalc_requested;
+//  gboolean               bids_commit_requested;
+//  guint32                target_rate;
   SendingRateDistributor*rate_distor;
   guint32                ssrc;
   gboolean               report_is_flowable;

@@ -48,7 +48,7 @@ G_DEFINE_TYPE (NumsTracker, numstracker, G_TYPE_OBJECT);
 //----------------------------------------------------------------------
 
 static void numstracker_finalize (GObject * object);
-void _iterate (NumsTracker * this,
+static void _iterate (NumsTracker * this,
                void (*process)(gpointer,gint64),
                gpointer data);
 

@@ -32,6 +32,7 @@
 #include "ricalcer.h"
 #include "percentiletracker.h"
 #include "subratectrler.h"
+#include <stdlib.h>
 
 #define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
 #define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
@@ -121,11 +122,13 @@ struct _Subflow
   ORMoment                   or_moments[2];
   gint                       or_moments_index;
   guint32                    or_moments_num;
-  gboolean                   ready;
   guint8                     lost_history;
   guint8                     late_discarded_history;
   gdouble                    avg_rtcp_size;
   gdouble                    actual_rate;
+
+  gint32                     SR_window[8];
+  guint8                     SR_window_index;
 
   SubflowRateController*     rate_controller;
   gint32                     sending_target;
@@ -262,21 +265,9 @@ static gboolean
 _check_report_timeout (Subflow * this);
 //----------------------------------------------------------------------------
 
-//----------------------------- System Notifier ------------------------------
-//static void
-//_system_notifier_main(SndEventBasedController * this);
-
-static void
-_system_notifier_utilization(gpointer sndrate_distor, gpointer data);
-//----------------------------------------------------------------------------
-
 //----------------------------- Split Controller -----------------------------
 static void
 _split_controller_main(SndController * this);
-static guint32
-_recalc_bids(SndController * this);
-static gboolean
-_subflows_are_ready(SndController * this);
 //----------------------------------------------------------------------------
 
 //------------------------- Utility functions --------------------------------
@@ -284,7 +275,7 @@ static Subflow *_subflow_ctor (void);
 static void _subflow_dtor (Subflow * this);
 static void _ruin_subflow (gpointer * subflow);
 static Subflow *_make_subflow (guint8 id, MPRTPSPath * path);
-static void reset_subflow (Subflow * this);
+static void _reset_subflow (Subflow * this);
 static guint16 _uint16_diff (guint16 a, guint16 b);
 static guint32 _uint32_diff (guint32 a, guint32 b);
 //----------------------------------------------------------------------------
@@ -332,16 +323,10 @@ sndctrler_init (SndController * this)
   this->subflows = g_hash_table_new_full (NULL, NULL,
       NULL, (GDestroyNotify) _ruin_subflow);
   this->subflow_num = 0;
-  this->bids_recalc_requested = FALSE;
-  this->bids_commit_requested = FALSE;
-  this->target_rate = 128000;
   this->ssrc = g_random_int ();
   this->report_is_flowable = FALSE;
-  this->pacing = FALSE;
   this->RTT_max = 5 * GST_SECOND;
-  this->last_recalc_time = gst_clock_get_time(this->sysclock);
-//  this->event = SPLITCTRLER_EVENT_FI;
-  this->rate_distor = make_sndrate_distor(_system_notifier_utilization, this);
+  this->rate_distor = make_sndrate_distor();
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   this->thread = gst_task_new (sndctrler_ticker_run, this, NULL);
@@ -474,6 +459,7 @@ sndctrler_add_path (SndController *this, guint8 subflow_id, MPRTPSPath * path)
                        new_subflow);
   ++this->subflow_num;
   stream_splitter_add_path (this->splitter, subflow_id, path, SUBFLOW_DEFAULT_SENDING_RATE);
+  sndrate_distor_add_controlled_subflow(this->rate_distor, new_subflow->id);
   if(this->enabled){
     _enable_controlling(new_subflow, this);
   }
@@ -501,6 +487,7 @@ sndctrler_rem_path (SndController *this, guint8 subflow_id)
   }
 
   stream_splitter_rem_path (this->splitter, subflow_id);
+  sndrate_distor_rem_controlled_subflow(this->rate_distor, subflow_id);
   g_hash_table_remove (this->subflows, GINT_TO_POINTER (subflow_id));
   if (--this->subflow_num < 0) {
     this->subflow_num = 0;
@@ -517,6 +504,7 @@ sndctrler_setup (SndController * this, StreamSplitter * splitter, PacketsSndQueu
   THIS_WRITELOCK (this);
   this->splitter = splitter;
   this->pacer = pacer;
+  sndrate_distor_setup(this->rate_distor, this->splitter, this->pacer);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -644,16 +632,16 @@ void _enable_controlling(Subflow *subflow, gpointer data)
 {
   gchar filename[255];
   SndController *this = data;
-  subflow->rate_controller = sndrate_distor_add_controllable_path(this->rate_distor, subflow->path, SUBFLOW_DEFAULT_SENDING_RATE);
+//  subflow->rate_controller = sndrate_distor_add_controllable_path(this->rate_distor, subflow->path, SUBFLOW_DEFAULT_SENDING_RATE);
+  subflow->rate_controller = make_subratectrler(this->rate_distor);
+  subratectrler_set(subflow->rate_controller, subflow->path, SUBFLOW_DEFAULT_SENDING_RATE, 10 * GST_SECOND);
   sprintf(filename, "logs/subratectrler_%d.log", subflow->id);
   subratectrler_enable_logging(subflow->rate_controller, filename);
 }
 
 void _disable_controlling(Subflow *subflow, gpointer data)
 {
-  SndController *this = data;
-  //Fixme: fix me
-  DISABLE_LINE sndrate_distor_remove_id(this->rate_distor, subflow->id);
+//  SndController *this = data;
 }
 
 //------------------------- Incoming Report Processor -------------------
@@ -665,23 +653,26 @@ _irp_producer_main(SndController * this)
   gpointer       key, val;
   Subflow*       subflow;
   GstClockTime   now;
+
   now = gst_clock_get_time(this->sysclock);
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
     subflow = (Subflow *) val;
+    //sending rate updater
+    subflow->SR_window[subflow->SR_window_index] = mprtps_path_get_sent_bytes_in1s(subflow->path);;
+    subflow->SR_window_index = subflow->SR_window_index + 1;
+    subflow->SR_window_index &= 7;
+
     if(_irt0(subflow)->checked) goto wait;
     if(now - 10 * GST_MSECOND < _irt0(subflow)->time) goto wait;
 
     _assemble_measurement(this, subflow);
     _determine_path_flags(this, subflow);
     if(0) g_print("%p", _irt(subflow, 0));
-    sndrate_distor_measurement_update(this->rate_distor, subflow->id, _irt0(subflow));
-//    subratectrler_measurement_update(subflow->rate_controller, _irt0(subflow));
-
+    subratectrler_measurement_update(subflow->rate_controller, _irt0(subflow));
+//    sndrate_distor_measurement_update(this->rate_distor, subflow->id, _irt0(subflow));
     _irt0(subflow)->checked = TRUE;
-    subflow->ready = TRUE;
-
   wait:
     continue;
   }
@@ -735,6 +726,19 @@ _step_ir (Subflow * this)
   ++this->ir_moments_num;
 }
 
+static gint _compare (const void* a, const void* b)
+{
+  return ( *(gint32*)a - *(gint32*)b );
+}
+
+static gint32 _get_sending_rate_median(Subflow *this)
+{
+  gint32 result;
+  qsort (this->SR_window, 8, sizeof(gint32), _compare);
+  result = this->SR_window[3] + this->SR_window[4];
+  return result>>1;
+}
+
 void _assemble_measurement(SndController * this, Subflow *subflow)
 {
   guint chunks_num, chunk_index;
@@ -746,7 +750,7 @@ void _assemble_measurement(SndController * this, Subflow *subflow)
 //        g_print("Late discarded chunk: %lu\n", _irt0(subflow)->rle_discards.values[chunk_index]);
        _irt0(subflow)->late_discarded_bytes +=
            _irt0(subflow)->rle_discards.values[chunk_index];
-       g_print("DISCARD %d: %lu\n", chunk_index, _irt0(subflow)->rle_discards.values[chunk_index]);
+//       g_print("DISCARD %d: %lu\n", chunk_index, _irt0(subflow)->rle_discards.values[chunk_index]);
     }
     _irt0(subflow)->late_discarded_bytes_sum +=
        _irt0(subflow)->late_discarded_bytes;
@@ -773,13 +777,14 @@ void _assemble_measurement(SndController * this, Subflow *subflow)
   }
 
   _irt0(subflow)->goodput = _get_subflow_goodput(subflow, &_irt0(subflow)->receiver_rate);
+  _irt0(subflow)->sender_rate = _get_sending_rate_median(subflow);
 }
 
 void _determine_path_flags(SndController *this, Subflow *subflow)
 {
   guint8 flags = mprtps_path_get_flags(subflow->path);
   guint losts = 0, abs_losts = 0;
-  losts += _irt0(subflow)->lost && !_irt0(subflow)->expected_lost? 1 : 0;
+  losts += _irt0(subflow)->lost && !_irt0(subflow)->expected_lost ? 1 : 0;
   losts += _irt1(subflow)->lost && !_irt1(subflow)->expected_lost ? 1 : 0;
   losts += _irt2(subflow)->lost && !_irt2(subflow)->expected_lost ? 1 : 0;
   losts += _irt3(subflow)->lost && !_irt3(subflow)->expected_lost ? 1 : 0;
@@ -797,7 +802,6 @@ void _determine_path_flags(SndController *this, Subflow *subflow)
   }
 
   if(flags & MPRTPS_PATH_FLAG_ACTIVE){
-    //Todo: Fix it
     if (0 && _check_report_timeout (subflow)){
       _subflow_fall_action(this, subflow);
     }
@@ -1180,7 +1184,6 @@ void _subflow_fall_action(SndController *this, Subflow *subflow)
 {
   mprtps_path_set_passive(subflow->path);
   stream_splitter_rem_path(this->splitter, subflow->id);
-  sndrate_distor_remove_id(this->rate_distor, subflow->id);
 }
 
 gboolean
@@ -1333,112 +1336,31 @@ _setup_sr_riport (Subflow * this, GstRTCPSR * sr, guint32 ssrc)
 //  g_print("Created NTP time for subflow %d is %lu\n", this->id, ntptime);
 }
 
-
-//---------------------------------------------------------------------------
-
-//----------------------------- System Notifier ------------------------------
-
-static void
-_system_notifier_utilization(gpointer controller, gpointer data)
-{
-  SndController *this = controller;
-  this->utilization_signal_func(this->utilization_signal_data, data);
-}
-
 //---------------------------------------------------------------------------
 
 
 //----------------------------- Split Controller -----------------------------
 
+static void _subratectrler_notify(Subflow *this, gpointer data)
+{
+  MPRTPPluginUtilization* ur = data;
+  SubflowUtilization *sur = &ur->subflows[this->id];
+  struct _SubflowUtilizationControl *ctrl = &sur->control;
+  subratectrler_setup_controls(this->rate_controller, ctrl);
+}
+
 void
 _split_controller_main(SndController * this)
 {
-  sndrate_distor_time_update(this->rate_distor);
-  DISABLE_LINE _subflows_are_ready(this);
-  if(this->ticknum % 3 == 0){
-    this->bids_recalc_requested = TRUE;
-  }
-//  goto recalc_done;
-  if (!this->bids_recalc_requested) goto recalc_done;
-  this->bids_recalc_requested = FALSE;
-  this->bids_commit_requested = TRUE;
-  this->target_rate = _recalc_bids(this);
-recalc_done:
-  if (!this->bids_commit_requested) goto process_done;
-  this->bids_commit_requested = FALSE;
+  MPRTPPluginUtilization* ur;
+  ur = sndrate_distor_time_update(this->rate_distor);
+  if(!ur) goto done;
 
-  //  stream_splitter_commit_changes (this->splitter, 0 * this->target_rate, 0 * GST_MSECOND);
-    stream_splitter_commit_changes (this->splitter);
-
-process_done:
+  this->utilization_signal_func(this->utilization_signal_data, ur);
+  _subflow_iterator(this, _subratectrler_notify, ur);
+done:
   return;
 }
-
-
-typedef struct _Utilization{
-  gint     delta_sr;
-  gboolean accepted;
-  gdouble  changing_rate;
-}Utilization;
-
-guint32 _recalc_bids(SndController * this)
-{
-  GHashTableIter iter;
-  gpointer key, val;
-  Subflow *subflow;
-  guint32 sending_bitrate;
-  guint32 target_byterate = 0;
-  GstClockTime now;
-
-  now = gst_clock_get_time(this->sysclock);
-  g_hash_table_iter_init (&iter, this->subflows);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
-  {
-    subflow = (Subflow *) val;
-    if(!mprtps_path_is_active(subflow->path)){
-      continue;
-    }
-
-    sending_bitrate = subratectrler_get_target_bitrate(subflow->rate_controller);
-    target_byterate += sending_bitrate>>3;
-//    g_print("Subflow %d sending rate %u\n",
-//            subflow->id,
-//            sending_rate);
-    stream_splitter_setup_sending_target(this->splitter,
-                                      subflow->id,
-                                      sending_bitrate);
-
-    subflow->ready = FALSE;
-  }
-
-  this->last_recalc_time = now;
-  return target_byterate;
-}
-
-
-gboolean _subflows_are_ready(SndController * this)
-{
-  GHashTableIter iter;
-  gpointer key, val;
-  Subflow *subflow;
-  gboolean result = TRUE;
-
-  g_hash_table_iter_init (&iter, this->subflows);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
-  {
-    subflow = (Subflow *) val;
-    if(!mprtps_path_is_active(subflow->path)){
-      continue;
-    }
-    result&=subflow->ready;
-  }
-
-  return result;
-}
-
-
-//----------------------------------------------------------------------------
-
 
 //---------------------- Utility functions ----------------------------------
 Subflow *
@@ -1480,13 +1402,13 @@ _make_subflow (guint8 id, MPRTPSPath * path)
       (RRMeasurement *) g_malloc0 (sizeof (RRMeasurement) * MAX_SUBFLOW_MOMENT_NUM);
   result->ir_moments_index = 0;
   result->ricalcer = make_ricalcer(TRUE);
-  reset_subflow (result);
+  _reset_subflow (result);
   _irt0(result)->time = result->joined_time;
   return result;
 }
 
 void
-reset_subflow (Subflow * this)
+_reset_subflow (Subflow * this)
 {
   gint i;
   for (i = 0; i < MAX_SUBFLOW_MOMENT_NUM; ++i) {

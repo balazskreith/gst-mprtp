@@ -79,7 +79,6 @@ struct _ORMoment{
   GstClockTime                  median_delay;
   GstClockTime                  min_delay;
   GstClockTime                  max_delay;
-
   guint16                       discarded;
   guint32                       discarded_bytes;
   guint16                       cycle_num;

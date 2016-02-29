@@ -27,7 +27,7 @@ sudo make install command in bash.
 For testing the plugin with server and client you need tc
 and you need to run the following scripts:
   
-1. Run gst-mprtp/setup_enviroment.sh shell script
+1. Run gst-mprtp/setup_test_enviroment.sh shell script
 This will create a simulation enviroment with two 
 namespaces and setup 3 virtual interfaces on each 
 of it along with 3 routes.

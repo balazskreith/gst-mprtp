@@ -273,7 +273,7 @@ _split_controller_main(SndController * this);
 //------------------------- Utility functions --------------------------------
 static Subflow *_subflow_ctor (void);
 static void _subflow_dtor (Subflow * this);
-static void _ruin_subflow (gpointer * subflow);
+static void _ruin_subflow (gpointer subflow);
 static Subflow *_make_subflow (guint8 id, MPRTPSPath * path);
 static void _reset_subflow (Subflow * this);
 static guint16 _uint16_diff (guint16 a, guint16 b);
@@ -743,6 +743,21 @@ void _assemble_measurement(SndController * this, Subflow *subflow)
 {
   guint chunks_num, chunk_index;
 
+  _irt0(subflow)->goodput = _get_subflow_goodput(subflow, &_irt0(subflow)->receiver_rate);
+  _irt0(subflow)->sender_rate = _get_sending_rate_median(subflow);
+
+  if(_irt0(subflow)->rfc3611_arrived && _irt0(subflow)->rle_losts.length){
+    chunk_index = _irt0(subflow)->rle_losts.length - 1;
+    _irt0(subflow)->recent_lost = _irt0(subflow)->rle_losts.values[chunk_index];
+    chunks_num = _irt0(subflow)->rle_losts.length;
+    for(chunk_index = 0; chunk_index < chunks_num; ++chunk_index)
+    {
+      _irt0(subflow)->rfc3611_cum_lost +=
+      _irt0(subflow)->rle_losts.values[chunk_index];
+    }
+    _irt0(subflow)->receiver_rate = _irt0(subflow)->sender_rate - _irt0(subflow)->recent_lost;
+  }
+
   if(!_irt0(subflow)->rfc7243_arrived && _irt0(subflow)->rfc7097_arrived && _irt0(subflow)->rle_discards.length){
     chunks_num = _irt0(subflow)->rle_discards.length;
     for(chunk_index = 0; chunk_index < chunks_num; ++chunk_index)
@@ -758,6 +773,7 @@ void _assemble_measurement(SndController * this, Subflow *subflow)
   if(_irt0(subflow)->rfc7097_arrived){
     chunk_index = _irt0(subflow)->rle_discards.length - 1;
     _irt0(subflow)->recent_discarded_bytes = _irt0(subflow)->rle_discards.values[chunk_index];
+    _irt0(subflow)->goodput = _irt0(subflow)->sender_rate - _irt0(subflow)->recent_discarded_bytes;
   }
 
   if(_irt0(subflow)->owd_rle_arrived){
@@ -765,19 +781,6 @@ void _assemble_measurement(SndController * this, Subflow *subflow)
     _irt0(subflow)->recent_delay = _irt0(subflow)->rle_delays.values[chunk_index];
   }
 
-  if(_irt0(subflow)->rfc3611_arrived && _irt0(subflow)->rle_losts.length){
-    chunk_index = _irt0(subflow)->rle_losts.length - 1;
-    _irt0(subflow)->recent_lost = _irt0(subflow)->rle_losts.values[chunk_index];
-    chunks_num = _irt0(subflow)->rle_losts.length;
-    for(chunk_index = 0; chunk_index < chunks_num; ++chunk_index)
-    {
-      _irt0(subflow)->rfc3611_cum_lost +=
-      _irt0(subflow)->rle_losts.values[chunk_index];
-    }
-  }
-
-  _irt0(subflow)->goodput = _get_subflow_goodput(subflow, &_irt0(subflow)->receiver_rate);
-  _irt0(subflow)->sender_rate = _get_sending_rate_median(subflow);
 }
 
 void _determine_path_flags(SndController *this, Subflow *subflow)
@@ -1379,7 +1382,7 @@ _subflow_dtor (Subflow * this)
 }
 
 void
-_ruin_subflow (gpointer * subflow)
+_ruin_subflow (gpointer subflow)
 {
   Subflow *this;
   g_return_if_fail (subflow);

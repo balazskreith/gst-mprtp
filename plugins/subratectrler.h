@@ -50,7 +50,6 @@ struct _SubflowRateController
   gint32                    max_target_point;
   gint32                    min_target_point;
   gint32                    desired_bitrate;
-  gdouble                   desired_increasing_rate;
   gint32                    target_bitrate;
   gboolean                  skip_mitigate;
 
@@ -105,13 +104,6 @@ void subratectrler_set(SubflowRateController *this,
                          guint32 sending_target,
                          guint64 initial_disabling);
 void subratectrler_unset(SubflowRateController *this);
-
-void subratectrler_change_targets(
-                         SubflowRateController *this,
-                         gint32 min_rate,
-                         gint32 max_rate,
-                         gdouble ramp_up_aggressivity,
-                         gdouble discard_aggressivity);
 
 void subratectrler_measurement_update(
                          SubflowRateController *this,

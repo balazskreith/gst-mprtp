@@ -54,7 +54,7 @@ struct _SubAnalyserResult{
   gdouble        delay_off;
 
   struct{
-    gboolean     fluctuation, distortion, congestion;
+    gboolean     stability, distortion, congestion;
   }delay_indicators;
 
   struct{

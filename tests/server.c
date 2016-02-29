@@ -45,7 +45,7 @@
 
 typedef struct _SubflowUtilization{
   gboolean   controlled;
-  struct{
+  struct _SubflowUtilizationReport{
     gint32   lost_bytes;
     gint32   discarded_bytes;
     gint32   target_rate;
@@ -53,9 +53,12 @@ typedef struct _SubflowUtilization{
     guint64  owd;
     gint     state;
   }report;
-  struct{
+  struct _SubflowUtilizationControl{
     gint32   max_rate;
     gint32   min_rate;
+    //Todo: add this
+    //gdouble  aggressivity;
+
   }control;
 }SubflowUtilization;
 
@@ -64,10 +67,12 @@ typedef struct _MPRTPPluginUtilization{
     gint32 target_rate;
   }report;
   struct{
-    gint32 max_rate,min_rate;
+    gint32  max_rate,min_rate;
+    gdouble max_mtakover,max_stakover;
   }control;
   SubflowUtilization subflows[32];
 }MPRTPPluginUtilization;
+
 typedef struct _SessionData
 {
   int ref;

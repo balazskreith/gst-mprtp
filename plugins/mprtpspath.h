@@ -16,7 +16,7 @@
 #define ABS_TIME_DEFAULT_EXTENSION_HEADER_ID 8
 #define MONITOR_PAYLOAD_DEFAULT_ID 126
 #define DELAY_SKEW_MAX (100 * GST_MSECOND)
-#define SUBFLOW_DEFAULT_SENDING_RATE 12800
+#define SUBFLOW_DEFAULT_SENDING_RATE 128000
 
 G_BEGIN_DECLS typedef struct _MPRTPSPath MPRTPSPath;
 typedef struct _MPRTPSPathClass MPRTPSPathClass;
@@ -181,9 +181,8 @@ typedef struct _MPRTPPluginUtilization{
     gint32 target_rate;
   }report;
   struct{
-    gint32 max_rate,min_rate;
-    //Todo: add this
-    //gdouble  max_takover_rate; <- the maximum amount of rate [0,1] taken over by a subflow from another subflow.
+    gint32  max_rate,min_rate;
+    gdouble max_mtakover,max_stakover;
   }control;
   SubflowUtilization subflows[32];
 }MPRTPPluginUtilization;

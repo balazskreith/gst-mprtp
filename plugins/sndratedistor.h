@@ -46,6 +46,7 @@ struct _SendingRateDistributor
   gint32               requested_bitrate;
 
   MPRTPPluginUtilization    ur;
+  gboolean                  ready;
 //  SignalRequestFunc    signal_request;
 //  gpointer             signal_controller;
 };

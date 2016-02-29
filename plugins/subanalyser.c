@@ -51,7 +51,7 @@ struct _CorrBlock{
   guint           id,N;
   gint64          Iu0,Iu1,Id1,Id2,Id3,G01,M0,M1,G_[16],M_[16];
   gint            index;
-  gdouble         g,g_avg;
+  gdouble         g,g1,g_next,g_dev;
   guint           overused;
   gdouble         treshold, min_treshold;
   gboolean        distorted;
@@ -68,7 +68,7 @@ typedef struct _SubAnalyserPrivate{
   gdouble             off_avg;
   gdouble             delay_avg,delay_t2,delay_t1,delay_t0;
   gdouble             qtrend;
-  gboolean            fluctuation, distortion,congestion;
+  gboolean            stability, distortion,congestion;
   CorrBlock           cblocks[4];
   gdouble             qdelays_th;
   guint32             cblocks_counter;
@@ -133,9 +133,9 @@ SubAnalyser *make_subanalyser(void)
   _priv(this)->cblocks[0].id   = 0;
   _priv(this)->cblocks[1].id   = 1;
   _priv(this)->cblocks[2].id   = 2;
-  _priv(this)->cblocks[0].N   = 4;
-  _priv(this)->cblocks[1].N   = 4;
-  _priv(this)->cblocks[2].N   = 8;
+  _priv(this)->cblocks[0].N    = 4;
+  _priv(this)->cblocks[1].N    = 4;
+  _priv(this)->cblocks[2].N    = 4;
   _priv(this)->cblocks[0].min_treshold   = .001;
   _priv(this)->cblocks[1].min_treshold   = .01;
   _priv(this)->cblocks[2].min_treshold   = .1;
@@ -183,7 +183,6 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
   }
 
   _qdeanalyzer_evaluation(this);
-
   this->RR_avg = this->RR_avg * .5 + measurement->received_payload_bytes * 4.;
 
   result->delay_off = off_add;
@@ -192,15 +191,16 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
 
   result->off                            = (_priv(this)->delay_t0 * .5 + _priv(this)->delay_t1 * .25 + _priv(this)->delay_t2 * .25) / _priv(this)->delay_avg;
   result->qtrend                         = _priv(this)->qtrend;
-  result->delay_indicators.fluctuation   = _priv(this)->fluctuation;
   result->delay_indicators.congestion    = _priv(this)->congestion;
-  result->delay_indicators.distortion    = 0. < _priv(this)->qtrend;
+  result->delay_indicators.distortion    = _priv(this)->distortion;
+  result->delay_indicators.stability     = _priv(this)->stability;
+
   br_ratio = this->RR_avg / (gdouble) target_bitrate;
   disc_ratio = ((gdouble) measurement->late_discarded_bytes / (gdouble) measurement->received_payload_bytes);
   tr_ratio = (gdouble) target_bitrate / (gdouble) result->sending_rate_median;
   result->rate_indicators.rr_correlated  = br_ratio > .9;
   result->rate_indicators.tr_correlated  = tr_ratio > .95 && tr_ratio < 1.05;
-  result->rate_indicators.distortion     = disc_ratio > .5;
+  result->rate_indicators.distortion     = disc_ratio > .1;
 
 }
 
@@ -215,19 +215,21 @@ void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
   trend = _priv(this)->cblocks[1].g > .002 ? (2*_priv(this)->cblocks[0].g) / _priv(this)->cblocks[1].g : 0.;
   fprintf(file,
           "g[0]:   %-10.6f%-10.6f (d:%d)| g[1]:  %-10.6f%-10.6f (d:%d) -trend:%f| g[2]:  %-10.6f%-10.6f (d:%d)|\n",
-          _priv(this)->cblocks[0].g,_priv(this)->cblocks[0].g_avg,_priv(this)->cblocks[0].distorted,
-          _priv(this)->cblocks[1].g,_priv(this)->cblocks[1].g_avg,_priv(this)->cblocks[1].distorted,
+          _priv(this)->cblocks[0].g,_priv(this)->cblocks[0].g_next,_priv(this)->cblocks[0].distorted,
+          _priv(this)->cblocks[1].g,_priv(this)->cblocks[1].g_next,_priv(this)->cblocks[1].distorted,
           trend,
-          _priv(this)->cblocks[2].g,_priv(this)->cblocks[2].g_avg,_priv(this)->cblocks[2].distorted
+          _priv(this)->cblocks[2].g,_priv(this)->cblocks[2].g_next,_priv(this)->cblocks[2].distorted
           );
 
 
-  goto done;
+DISABLE_LINE  goto done;
 
   fprintf(file,
           "######################## Subflow Measurement Analyser log #######################\n"
           "delay_target:  %-10.3f| off_avg:      %-10.3f| qtrend:       %-10.5f|\n"
-          "trouble:       %-10d| congestion:   %-10d| fluctuation       %-10.6d\n"
+          "trouble:       %-10d| congestion:   %-10d| fluctuation       |\n"
+          "g^(0):         %-10.6f|g^(1):         %-10.6f|g^(2):         %-10.6f|\n"
+          "g_dev^(0):     %-10.6f|g_dev^(1):     %-10.6f|g_dev^(2):     %-10.6f|\n"
           "#################################################################################\n",
 
           _priv(this)->delay_target / (gdouble)GST_SECOND,
@@ -236,7 +238,14 @@ void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
 
           _priv(this)->congestion,
           _priv(this)->distortion,
-          _priv(this)->fluctuation
+
+          _priv(this)->cblocks[0].g,
+          _priv(this)->cblocks[1].g,
+          _priv(this)->cblocks[2].g,
+
+          _priv(this)->cblocks[0].g_dev,
+          _priv(this)->cblocks[1].g_dev,
+          _priv(this)->cblocks[2].g_dev
 
           );
 done:
@@ -260,20 +269,31 @@ void _log_abbrevations(SubAnalyser *this, FILE *file)
 
 void _qdeanalyzer_evaluation(SubAnalyser *this)
 {
-
-//  _priv(this)->qtrend = CONSTRAIN(-.1, .1, _priv(this)->cblocks[0].g_avg * 1000.);
-//  _priv(this)->qtrend = _priv(this)->cblocks[0].g * 1000.;
-//  _priv(this)->qtrend = CONSTRAIN(-2., .2, _priv(this)->cblocks[0].g / .0005 - 1.);
-//  _priv(this)->qtrend     = _priv(this)->cblocks[0].g > 0.002 ? (_priv(this)->cblocks[1].g) / (2. * _priv(this)->cblocks[0].g) : 0.;
-  if(_priv(this)->qtrend < -AGGRESSIVITY / 2. || AGGRESSIVITY * 2. < _priv(this)->cblocks[1].g){
-    _priv(this)->qtrend = 2*_priv(this)->cblocks[0].g / _priv(this)->cblocks[1].g;
-  }else{
-    _priv(this)->qtrend = 0.;
+  gdouble g_dev, g_dev1, g_dev2, g_dev3;
+  g_dev = MAX(AGGRESSIVITY * .01, _priv(this)->cblocks[0].g_dev );
+  _priv(this)->qtrend = 0.;
+  if(_priv(this)->cblocks[0].g < - g_dev || g_dev < _priv(this)->cblocks[0].g){
+    _priv(this)->qtrend = _priv(this)->cblocks[0].g;
   }
+
   _priv(this)->qtrend      = CONSTRAIN(-.2, .2, _priv(this)->qtrend);
-  _priv(this)->fluctuation = _priv(this)->cblocks[2].g < -.001 || .001 < _priv(this)->cblocks[2].g;
-  _priv(this)->distortion  = _priv(this)->qtrend < -AGGRESSIVITY      ||      AGGRESSIVITY < _priv(this)->cblocks[1].g;
-  _priv(this)->congestion  = _priv(this)->qtrend < -4. * AGGRESSIVITY || 4. * AGGRESSIVITY < _priv(this)->cblocks[1].g;
+
+  g_dev1 = MIN(AGGRESSIVITY * .01, 4. * _priv(this)->cblocks[0].g_dev);
+//  g_dev1 = AGGRESSIVITY * .01;
+  g_dev2 = MIN(AGGRESSIVITY * .02, 4. * _priv(this)->cblocks[1].g_dev);
+//  g_dev2 = AGGRESSIVITY * .02;
+  g_dev3 = MIN(AGGRESSIVITY * .04, 4. * _priv(this)->cblocks[2].g_dev);
+//  g_dev3 = AGGRESSIVITY * .04;
+
+  _priv(this)->stability  =   _priv(this)->cblocks[0].g_dev != 0. ? -g_dev1 < _priv(this)->cblocks[0].g    &&   _priv(this)->cblocks[0].g < g_dev1 : TRUE;
+  _priv(this)->stability  &=  _priv(this)->cblocks[1].g_dev != 0. ? -g_dev2 < _priv(this)->cblocks[1].g    &&   _priv(this)->cblocks[1].g < g_dev2 : TRUE;
+  _priv(this)->stability  &=  _priv(this)->cblocks[1].g_dev != 0. ? -g_dev3 < _priv(this)->cblocks[2].g    &&   _priv(this)->cblocks[2].g < g_dev3 : TRUE;
+
+  _priv(this)->distortion  = 0. < _priv(this)->qtrend;
+  _priv(this)->congestion  = AGGRESSIVITY < _priv(this)->qtrend;
+
+//  _priv(this)->distortion  = _priv(this)->qtrend < -AGGRESSIVITY      ||      AGGRESSIVITY < _priv(this)->qtrend;
+//  _priv(this)->congestion  = _priv(this)->qtrend < -50. * AGGRESSIVITY || 50. * AGGRESSIVITY < _priv(this)->qtrend;
 }
 
 
@@ -309,7 +329,8 @@ void _execute_corrblock(CorrBlock* this)
   this->M0  += this->M_[this->index] = this->Iu0;
   this->G01 += this->G_[this->index] = this->Iu0 * this->Id1;
   if(this->M0 && this->M1){
-    this->g  = this->G01 * (this->N-1);
+    this->g1 = this->g;
+    this->g  = this->G01 * (this->N);
     this->g /= this->M0 * this->M1;
     this->g -= 1.;
   }
@@ -328,18 +349,22 @@ void _execute_corrblock(CorrBlock* this)
   this->Id2  = this->Id1;
 
   if(this->M0 && this->M1){
-    this->g_avg = this->g * .25 + this->g_avg * .75;
+    this->g_next = this->g + this->g1;
+    this->g_dev += ((this->g - this->g1) - this->g_dev) / (gdouble)(2 * this->N);
+    if(this->g_dev < 0.) this->g_dev *=-1.;
   }
 
   if(!this->distorted){
     if(this->treshold < this->g){
       this->distorted = TRUE;
     }else{
-      this->treshold = CONSTRAIN(this->min_treshold / 10., this->min_treshold, this->g_avg * 4.);
+      this->treshold = CONSTRAIN(this->min_treshold / 10., this->min_treshold, this->g_next * 4.);
     }
-  }else if(this->g_avg < this->min_treshold){
+  }else if(this->g_next * .5 < this->min_treshold){
     this->distorted = FALSE;
   }
+
+
 }
 
 

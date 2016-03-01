@@ -176,6 +176,7 @@ mprtps_path_finalize (GObject * object)
 {
   MPRTPSPath *this = MPRTPS_PATH_CAST (object);
   g_object_unref (this->sysclock);
+  g_object_unref(this->sent_bytes);
 }
 
 gboolean
@@ -547,7 +548,6 @@ _refresh_stat(MPRTPSPath * this,
     this->total_sent_payload_bytes_sum += payload_bytes;
     this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
     this->octets_in_flight_acked += payload_bytes>>3;
-
     numstracker_add(this->sent_bytes, payload_bytes);
     ++this->total_sent_normal_packet_num;
   } else {

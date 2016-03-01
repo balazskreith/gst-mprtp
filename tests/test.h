@@ -92,11 +92,12 @@ typedef enum{
 typedef struct _TestParams{
   TestSuite    test_directive;
   VideoSession video_session;
+  gboolean     random_detach;
   gboolean     subflow1_active;
   gboolean     subflow2_active;
   gboolean     subflow3_active;
   guint        subflow_num;
-  gboolean     other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time;
+//  gboolean     other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time;
 }TestParams;
 
 static TestParams test_parameters_;
@@ -116,14 +117,15 @@ static void _print_info(void)
 {
   println("####################### Test profiles #############################");
   println("#                                                                 #");
-  println("# profile = 0b00|00|0|0|0                                         #");
-  println("#              ^  ^ ^ ^ ^                                         #");
-  println("#              |  | | | |0/1 - Deactivate/Activate subflow 1      #");
-  println("#              |  | | |0/1 - Deactivate/Activate subflow 2        #");
-  println("#              |  | |0/1 - Deactivate/Activate subflow 3          #");
-  println("#              |  |0 - Test source, 1 - v4l2src, 2 - foreman seq  #");
-  println("#              |0 - No rate control, 1 - random rate ctrl,        #");
-  println("#              |2 - auto rate and cc control                      #");
+  println("# profile = 0b0|00|00|0|0|0                                       #");
+  println("#             ^  ^  ^ ^ ^ ^                                       #");
+  println("#             |  |  | | | |0/1 - Deactivate/Activate subflow 1    #");
+  println("#             |  |  | | |0/1 - Deactivate/Activate subflow 2      #");
+  println("#             |  |  | |0/1 - Deactivate/Activate subflow 3        #");
+  println("#             |  |  |0 - Test source, 1 - foreman seq, 2 - v4l2src#");
+  println("#             |  |0 - No rate control, 1 - random rate ctrl,      #");
+  println("#             |  |2 - auto rate and cc control                    #");
+  println("#             |0/1 - join detach subflow continously              #");
   println("# Examples:                                                       #");
   println("# --profile=1 <- subflow 1, test source, no rate controller       #");
   println("# --profile=3 <- subflow 1 and 2, test source, no rate controller #");
@@ -180,7 +182,10 @@ static void _setup_test_params(guint profile)
         break;
     }
 
-  test_parameters_.other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time = (profile & 128) > 0 ? TRUE : FALSE;
+  test_parameters_.random_detach = (profile & 128) > 0 ? TRUE : FALSE;
+  if(test_parameters_.random_detach){
+    g_print("Random join/detach is activated\n");
+  }
 }
 
 

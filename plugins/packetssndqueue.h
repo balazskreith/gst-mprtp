@@ -32,9 +32,15 @@ struct _PacketsSndQueue
   guint32                  counter;
   GRWLock                  rwmutex;
   GstClock*                sysclock;
+  gboolean                 pacing;
+  gboolean                 pacing_started;
+  gdouble                  bandwidth;
   GstClockTime             obsolation_treshold;
   BufferProxy              proxy;
   gpointer                 proxydata;
+
+  GstTask*                 ticking_thread;
+  GRecMutex                ticking_mutex;
 };
 
 struct _PacketsSndQueueNode
@@ -42,6 +48,7 @@ struct _PacketsSndQueueNode
   PacketsSndQueueNode* next;
   GstClockTime         added;
   GstBuffer*           buffer;
+  guint                size;
 };
 
 struct _PacketsSndQueueClass{
@@ -53,8 +60,8 @@ struct _PacketsSndQueueClass{
 
 GType packetssndqueue_get_type (void);
 PacketsSndQueue *make_packetssndqueue(BufferProxy proxy, gpointer proxydata);
+void packetssndqueue_set_bandwidth(PacketsSndQueue *this, gdouble bandwidth);
 void packetssndqueue_reset(PacketsSndQueue *this);
 void packetssndqueue_push(PacketsSndQueue *this,
                           GstBuffer* buffer);
-GstBuffer* packetssndqueue_pop(PacketsSndQueue *this);
 #endif /* PACKETSSNDQUEUE_H_ */

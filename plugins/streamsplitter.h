@@ -54,6 +54,7 @@ struct _StreamSplitter
   gboolean             first_delta_flag;
   NumsTracker*         incoming_bytes;
   guint8               monitor_payload_type;
+  GQueue*              trash;
 
 };
 

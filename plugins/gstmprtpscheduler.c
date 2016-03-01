@@ -105,7 +105,6 @@ static gboolean gst_mprtpscheduler_sink_eventfunc (GstPad * srckpad, GstObject *
                                                    GstEvent * event);
 static GstStructure *_collect_infos (GstMprtpscheduler * this);
 static void _setup_paths (GstMprtpscheduler * this);
-static void gst_mprtpscheduler_path_ticking_process_run (void *data);
 
 
 static guint _subflows_utilization;
@@ -351,8 +350,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   gst_element_add_pad (GST_ELEMENT (this), this->mprtp_srcpad);
 
-  this->path_ticking_thread =
-      gst_task_new (gst_mprtpscheduler_path_ticking_process_run, this, NULL);
+
   this->sysclock = gst_system_clock_obtain ();
   g_rw_lock_init (&this->rwmutex);
   this->paths = g_hash_table_new_full (NULL, NULL, NULL, g_free);
@@ -396,8 +394,6 @@ gst_mprtpscheduler_finalize (GObject * object)
   GST_DEBUG_OBJECT (this, "finalize");
 
   /* clean up object here */
-  gst_task_join (this->path_ticking_thread);
-  gst_object_unref (this->path_ticking_thread);
 
   g_object_unref (this->sysclock);
   G_OBJECT_CLASS (gst_mprtpscheduler_parent_class)->finalize (object);
@@ -552,7 +548,7 @@ _collect_infos (GstMprtpscheduler * this)
   GValue g_value = { 0 };
   gchar *field_name;
   result = gst_structure_new ("SchedulerSubflowReports",
-      "length", G_TYPE_UINT, this->subflows_num, NULL);
+      "length", G_TYPE_UINT, this->active_subflows_num, NULL);
   g_value_init (&g_value, G_TYPE_UINT);
   g_hash_table_iter_init (&iter, this->paths);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
@@ -623,17 +619,14 @@ _join_subflow (GstMprtpscheduler * this, guint subflow_id)
   path =
       (MPRTPSPath *) g_hash_table_lookup (this->paths,
       GINT_TO_POINTER (subflow_id));
-  if (path != NULL) {
-    GST_WARNING_OBJECT (this, "Join operation can not be done "
-        "due to duplicated subflow id (%d)", subflow_id);
-    return;
+  if (path == NULL) {
+    path = make_mprtps_path ((guint8) subflow_id, gst_mprtpscheduler_mprtp_proxy, this);
+    g_hash_table_insert (this->paths, GINT_TO_POINTER (subflow_id), path);
+    mprtps_path_set_monitor_payload_id(path, this->monitor_payload_type);
+    mprtps_path_set_mprtp_ext_header_id(path, this->mprtp_ext_header_id);
   }
-  path = make_mprtps_path ((guint8) subflow_id, gst_mprtpscheduler_mprtp_proxy, this);
-  g_hash_table_insert (this->paths, GINT_TO_POINTER (subflow_id), path);
-  mprtps_path_set_monitor_payload_id(path, this->monitor_payload_type);
-  mprtps_path_set_mprtp_ext_header_id(path, this->mprtp_ext_header_id);
   sndctrler_add_path(this->controller, subflow_id, path);
-  ++this->subflows_num;
+  ++this->active_subflows_num;
 }
 
 void
@@ -649,9 +642,9 @@ _detach_subflow (GstMprtpscheduler * this, guint subflow_id)
         "due to not existed subflow id (%d)", subflow_id);
     return;
   }
-  g_hash_table_remove (this->paths, GINT_TO_POINTER (subflow_id));
   sndctrler_rem_path(this->controller, subflow_id);
-  --this->subflows_num;
+  //g_hash_table_remove (this->paths, GINT_TO_POINTER (subflow_id));
+  --this->active_subflows_num;
 }
 
 
@@ -661,11 +654,9 @@ gst_mprtpscheduler_change_state (GstElement * element,
     GstStateChange transition)
 {
   GstStateChangeReturn ret;
-  GstMprtpscheduler *this;
 
   g_return_val_if_fail (GST_IS_MPRTPSCHEDULER (element),
       GST_STATE_CHANGE_FAILURE);
-  this = GST_MPRTPSCHEDULER (element);
 
   switch (transition) {
     case GST_STATE_CHANGE_NULL_TO_READY:
@@ -673,8 +664,7 @@ gst_mprtpscheduler_change_state (GstElement * element,
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       break;
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
-      gst_task_set_lock (this->path_ticking_thread, &this->path_ticking_mutex);
-      gst_task_start (this->path_ticking_thread);
+
       break;
     default:
       break;
@@ -686,7 +676,7 @@ gst_mprtpscheduler_change_state (GstElement * element,
 
   switch (transition) {
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
-      gst_task_stop (this->path_ticking_thread);
+
       break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       break;
@@ -819,7 +809,6 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buffer)
 {
   GstMprtpscheduler *this;
-//  MPRTPSPath *path;
   GstFlowReturn result;
   guint8 first_byte;
   guint8 second_byte;
@@ -1000,34 +989,6 @@ gst_mprtpscheduler_src_query (GstPad * srckpad, GstObject * parent,
   return result;
 }
 
-
-void
-gst_mprtpscheduler_path_ticking_process_run (void *data)
-{
-  GstMprtpscheduler *this;
-  GstClockID clock_id;
-  GstClockTime next_scheduler_time;
-//  GHashTableIter iter;
-//  gpointer key, val;
-//  MPRTPSPath *path;
-  GstClockTime now;
-  this = (GstMprtpscheduler *) data;
-
-  THIS_WRITELOCK (this);
-  now = gst_clock_get_time (this->sysclock);
-//  g_hash_table_iter_init (&iter, this->paths);
-//  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-//    path = (MPRTPSPath *) val;
-//  }
-  next_scheduler_time = now + 100 * GST_MSECOND;
-  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
-  THIS_WRITEUNLOCK (this);
-
-  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
-    GST_WARNING_OBJECT (this, "The scheduler clock wait is interrupted");
-  }
-  gst_clock_id_unref (clock_id);
-}
 
 
 gboolean

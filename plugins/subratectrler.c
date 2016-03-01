@@ -120,6 +120,8 @@ struct _Moment{
   gint32            receiver_bitrate;
   gdouble           discard_rate;
   SubAnalyserResult analysation;
+  gboolean          mitigated;
+  gdouble           rtt;
 
   //application
   Event             event;
@@ -160,7 +162,9 @@ struct _Moment{
 #define _delays(this) _anres(this).delay_indicators
 #define _bitrate(this) _anres(this).rate_indicators
 #define _delays_t1(this) _anres_t1(this).delay_indicators
+#define _delays_t2(this) _anres_t2(this).delay_indicators
 #define _bitrate_t1(this) _anres_t1(this).rate_indicators
+#define _bitrate_t2(this) _anres_t2(this).rate_indicators
 //#define _reset_target_points(this) numstracker_reset(this->target_points)
 #define _skip_frames_for(this, duration) mprtps_path_set_skip_duration(this->path, duration);
 #define _qtrend(this) _anres(this).qtrend
@@ -172,6 +176,7 @@ struct _Moment{
 #define _lost(this)  ((_mt0(this)->has_expected_lost ? FALSE : _mt0(this)->path_is_lossy ? FALSE : _mt0(this)->lost > 0))
 #define _rlost(this) (!_mt0(this)->has_expected_lost && !_mt0(this)->path_is_lossy && _mt0(this)->recent_lost > 0)
 #define _state_t1(this) _mt1(this)->state
+#define _state_t2(this) _mt2(this)->state
 #define _state(this) _mt0(this)->state
 #define _stage(this) _mt0(this)->stage
 #define _stage_t1(this) _mt1(this)->stage
@@ -426,6 +431,8 @@ void subratectrler_measurement_update(
   _mt0(this)->sender_bitrate      = measurement->sender_rate * 8;
   _mt0(this)->goodput_bitrate     = measurement->goodput * 8.;
   _mt0(this)->event               = EVENT_FI;
+  _mt0(this)->state               = _mt1(this)->state;
+  _mt0(this)->rtt                 = (gdouble)measurement->RTT / (gdouble) GST_SECOND;
 
   if(measurement->expected_lost)
     _mt0(this)->has_expected_lost   = 3;
@@ -467,6 +474,7 @@ done:
   report->sending_rate = _SR(this);
   report->target_rate = _TR(this);
   report->state = _state(this);
+  report->rtt  = _mt0(this)->rtt;
   sndrate_setup_report(this->rate_controller, this->id, report);
   return;
 }
@@ -476,7 +484,9 @@ void subratectrler_setup_controls(
 {
   struct _SubflowUtilizationControl *ctrl = &this->utilization.control;
   memcpy(ctrl, src, sizeof(struct _SubflowUtilizationControl));
-
+  this->min_rate = ctrl->min_rate;
+  this->max_rate = ctrl->max_rate;
+  if(this->target_bitrate < this->min_rate) this->target_bitrate = this->min_rate;
 }
 
 Moment* _m_step(SubflowRateController *this)
@@ -513,17 +523,10 @@ void
 _reduce_stage(
     SubflowRateController *this)
 {
-  gint32 dSR, NSR , max_gp/*New SR*/;
+  gint32 NSR , max_gp/*New SR*/;
   max_gp = MAX(_GP(this), _GP_t1(this));
   this->bottleneck_point = MIN(_TR(this), max_gp);
-  if(_SR(this) <= max_gp){
-    NSR = .9 * _SR(this);
-    goto done;
-  }
-  dSR = _SR(this) - max_gp;
-  g_print("DELTA SR: %d\n", dSR);
-  NSR = MAX(.6 * _SR(this), _SR(this) - 2 * dSR);
-done:
+  NSR = (_mt0(this)->discard_rate < .5 || _mt1(this)->state == STATE_OVERUSED) ? _SR(this) * .6 : _SR(this) * .9;
   _change_target_bitrate(this, NSR);
   _switch_stage_to(this, STAGE_BOUNCE, FALSE);
 }
@@ -549,14 +552,17 @@ _keep_stage(
     SubflowRateController *this)
 {
   gint32 target_rate = _TR(this);
+  gboolean unstable = !_delays(this).stability && !_delays_t1(this).stability && !_delays_t2(this).stability;
+  unstable &= _bitrate(this).tr_correlated && _bitrate_t1(this).tr_correlated && _bitrate_t2(this).tr_correlated;
+  unstable &= _state_t1(this) != STATE_OVERUSED && _state_t2(this) != STATE_OVERUSED;
 
-  if(_delays(this).distortion || _bitrate(this).distortion){
+  if(_delays(this).distortion || _bitrate(this).distortion || unstable){
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
     _set_event(this, EVENT_DISTORTION);
     goto exit;
   }
 
-  if(!_bitrate(this).tr_correlated){
+  if(!_bitrate(this).tr_correlated || _state_t1(this) != STATE_STABLE){
     goto exit;
   }
 
@@ -570,7 +576,10 @@ _keep_stage(
     goto done;
   }
 
-  if(_now(this) - 5 * GST_SECOND < this->congestion_detected || !_delays(this).stability){
+  if(_now(this) - 5 * GST_SECOND < this->congestion_detected ||
+     !_delays(this).stability ||
+     _mt1(this)->mitigated)
+  {
     goto done;
   }
 
@@ -587,19 +596,22 @@ _mitigate_stage(
     SubflowRateController *this)
 {
   gint32 target_rate = _TR(this);
-  if(_delays(this).congestion || _lost(this)){
+  if(_mt1(this)->mitigated && (_delays(this).congestion || _lost(this))){
     _switch_stage_to(this, STAGE_REDUCE, TRUE);
     _set_event(this, EVENT_CONGESTION);
     goto exit;
   }
 
+  _mt0(this)->mitigated = TRUE;
   this->congestion_detected = _now(this);
   if(!_bitrate(this).tr_correlated){
+    if(_SR(this) < _TR(this))
+      target_rate = _SR(this) * .9;
     goto done;
   }
 
   this->bottleneck_point = _TR(this);
-  target_rate *= 1.-MIN(.2,_qtrend(this));
+  target_rate *= 1.- MAX(.1,_qtrend(this));
 
 done:
   _change_target_bitrate(this, target_rate);
@@ -614,8 +626,13 @@ void
 _raise_stage(
     SubflowRateController *this)
 {
+
   gint32 target_rate = _TR(this);
-  if(_delays(this).distortion || _bitrate(this).distortion){
+  gboolean unstable = !_delays(this).stability && !_delays_t1(this).stability && !_delays_t2(this).stability;
+   unstable &= _bitrate(this).tr_correlated && _bitrate_t1(this).tr_correlated && _bitrate_t2(this).tr_correlated;
+   unstable |= _mt0(this)->discard_rate < .9;
+
+  if(_delays(this).distortion || _bitrate(this).distortion || unstable){
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
     _set_event(this, EVENT_DISTORTION);
     goto exit;
@@ -628,7 +645,7 @@ _raise_stage(
     goto exit;
   }
 
-  if(!_bitrate(this).tr_correlated || _bitrate_t1(this).tr_correlated){
+  if(!_bitrate(this).tr_correlated || !_bitrate_t1(this).tr_correlated){
     goto done;
   }
 

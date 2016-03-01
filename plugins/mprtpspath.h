@@ -165,6 +165,7 @@ typedef struct _SubflowUtilization{
     gint32   target_rate;
     gint32   sending_rate;
     guint64  owd;
+    gdouble  rtt;
     gint     state;
   }report;
   struct _SubflowUtilizationControl{

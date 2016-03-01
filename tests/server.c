@@ -51,6 +51,7 @@ typedef struct _SubflowUtilization{
     gint32   target_rate;
     gint32   sending_rate;
     guint64  owd;
+    gdouble  rtt;
     gint     state;
   }report;
   struct _SubflowUtilizationControl{
@@ -61,6 +62,7 @@ typedef struct _SubflowUtilization{
 
   }control;
 }SubflowUtilization;
+
 
 typedef struct _MPRTPPluginUtilization{
   struct{
@@ -73,6 +75,7 @@ typedef struct _MPRTPPluginUtilization{
   SubflowUtilization subflows[32];
 }MPRTPPluginUtilization;
 
+
 typedef struct _SessionData
 {
   int ref;
@@ -80,6 +83,14 @@ typedef struct _SessionData
   GstElement *input;
 } SessionData;
 
+
+typedef struct _JoinDetachData{
+  gboolean active;
+  gboolean stop;
+  GstElement *mprtpsch;
+}JoinDetachData;
+
+static JoinDetachData join_detach_data;
 
 static SessionData *
 session_ref (SessionData * data)
@@ -145,7 +156,6 @@ make_video_testsrc_session (guint sessionNum)
   SessionData *session;
 
   encoder = gst_element_factory_make ("vp8enc", NULL);
-  g_object_set(videoSrc, "pattern", "GST_VIDEO_TEST_SRC_CHECKERS1", NULL);
   g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 1, NULL);
   //g_object_set (payloader, "config-interval", 2, NULL);
 
@@ -369,6 +379,27 @@ go_on:
   return G_SOURCE_CONTINUE;
 }
 
+static gboolean _join_detach_test(gpointer ptr)
+{
+  JoinDetachData *data = ptr;
+  GstElement *mprtpsch;
+  mprtpsch = data->mprtpsch;
+
+  if(data->active)
+  {
+      g_print("Disabling Subflow 1 ...\n\n");
+      g_object_set (mprtpsch, "detach-subflow", 1, NULL);
+      data->active=FALSE;
+  }
+  else
+  {
+    g_object_set (mprtpsch, "join-subflow", 1, NULL);
+    g_print("Activate Subflow 1\n\n");
+    data->active=TRUE;
+  }
+
+  return data->stop ? G_SOURCE_REMOVE : G_SOURCE_CONTINUE;
+}
 
 static void
 add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
@@ -392,6 +423,10 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   GstElement *mq = gst_element_factory_make ("multiqueue", "rtpq");
   int basePort;
   gchar *padName;
+
+  join_detach_data.stop = FALSE;
+  join_detach_data.active = FALSE;
+  join_detach_data.mprtpsch = mprtpsch;
 
   basePort = 5000;
 
@@ -462,8 +497,13 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
 
   if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING){
     g_object_set (mprtpsch, "auto-rate-and-cc", TRUE, NULL);
-  }else if(test_parameters_.test_directive == MANUAL_RATE_CONTROLLING)
+  }else if(test_parameters_.test_directive == MANUAL_RATE_CONTROLLING){
     g_timeout_add (1000, _random_rate_controller, mprtpsch);
+  }
+
+  if(test_parameters_.random_detach){
+    g_timeout_add (1000, _join_detach_test, &join_detach_data);
+  }
 
   g_object_set(mprtpsch, "logging", TRUE, NULL);
 
@@ -525,7 +565,7 @@ main (int argc, char **argv)
 
   rtpBin = gst_element_factory_make ("rtpbin", NULL);
   g_object_set (rtpBin, "rtp-profile", GST_RTP_PROFILE_AVPF, NULL);
-  g_object_set (rtpBin, "buffer-mode", "none", NULL);
+//  g_object_set (rtpBin, "buffer-mode", "none", NULL);
 
   gst_bin_add (GST_BIN (pipe), rtpBin);
 

@@ -743,7 +743,7 @@ void _assemble_measurement(SndController * this, Subflow *subflow)
 {
   guint chunks_num, chunk_index;
 
-  _irt0(subflow)->goodput = _get_subflow_goodput(subflow, &_irt0(subflow)->receiver_rate);
+  DISABLE_LINE _irt0(subflow)->goodput = _get_subflow_goodput(subflow, &_irt0(subflow)->receiver_rate);
   _irt0(subflow)->sender_rate = _get_sending_rate_median(subflow);
 
   if(_irt0(subflow)->rfc3611_arrived && _irt0(subflow)->rle_losts.length){
@@ -756,6 +756,8 @@ void _assemble_measurement(SndController * this, Subflow *subflow)
       _irt0(subflow)->rle_losts.values[chunk_index];
     }
     _irt0(subflow)->receiver_rate = _irt0(subflow)->sender_rate - _irt0(subflow)->recent_lost;
+  }else{
+    _irt0(subflow)->receiver_rate =  _irt0(subflow)->sender_rate;
   }
 
   if(!_irt0(subflow)->rfc7243_arrived && _irt0(subflow)->rfc7097_arrived && _irt0(subflow)->rle_discards.length){
@@ -773,7 +775,11 @@ void _assemble_measurement(SndController * this, Subflow *subflow)
   if(_irt0(subflow)->rfc7097_arrived){
     chunk_index = _irt0(subflow)->rle_discards.length - 1;
     _irt0(subflow)->recent_discarded_bytes = _irt0(subflow)->rle_discards.values[chunk_index];
-    _irt0(subflow)->goodput = _irt0(subflow)->sender_rate - _irt0(subflow)->recent_discarded_bytes;
+    _irt0(subflow)->goodput = _irt0(subflow)->sender_rate - _irt0(subflow)->late_discarded_bytes;
+  }else if(_irt0(subflow)->rfc7243_arrived){
+    _irt0(subflow)->goodput = _irt0(subflow)->sender_rate - _irt0(subflow)->late_discarded_bytes;
+  }else{
+    _irt0(subflow)->goodput = _irt0(subflow)->sender_rate;
   }
 
   if(_irt0(subflow)->owd_rle_arrived){
@@ -1128,7 +1134,7 @@ _report_processing_xr_owd_rle_block_processor (SndController *this,
       }
       //_irt0(subflow)->rle_delays.values[chunk_index] = (GstClockTime)running_length * GST_MSECOND;
       _irt0(subflow)->rle_delays.values[chunk_index] = owd;
-      g_print("owd: %lu\n", owd);
+//      g_print("owd: %lu\n", owd);
       if(_irt0(subflow)->rle_delays.values[chunk_index] == 0){
         if(_irt0(subflow)->rle_delays.length == 0)
           g_warning("OWD delay at first index should not be 0");
@@ -1396,9 +1402,8 @@ Subflow *
 _make_subflow (guint8 id, MPRTPSPath * path)
 {
   Subflow *result = _subflow_ctor ();
-  g_object_ref (path);
   result->sysclock = gst_system_clock_obtain ();
-  result->path = path;
+  result->path = g_object_ref (path);
   result->id = id;
   result->joined_time = gst_clock_get_time (result->sysclock);
   result->ir_moments =

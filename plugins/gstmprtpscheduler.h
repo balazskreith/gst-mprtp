@@ -64,7 +64,7 @@ struct _GstMprtpscheduler
   SndController*                controller;
   gboolean                      logging;
   gboolean                      riport_flow_signal_sent;
-  guint                         subflows_num;
+  guint                         active_subflows_num;
 
   GstSegment                    segment;
   GstClockTime                  position_out;
@@ -72,8 +72,7 @@ struct _GstMprtpscheduler
   guint8                        monitor_payload_type;
 
   GstClock*                     sysclock;
-  GstTask*                      path_ticking_thread;
-  GRecMutex                     path_ticking_mutex;
+
 
 //  void (*controller_pacing) (gpointer,gboolean);
 //  gboolean (*controller_is_pacing) (gpointer);

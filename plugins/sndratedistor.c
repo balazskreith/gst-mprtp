@@ -119,8 +119,8 @@ sndrate_distor_init (SendingRateDistributor * this)
   this->sysclock = gst_system_clock_obtain();
   this->controlled_num = 0;
   this->subflows = g_malloc0(sizeof(Subflow)*MPRTP_PLUGIN_MAX_SUBFLOW_NUM);
-  this->ur.control.max_mtakover = .1;
-  this->ur.control.max_stakover = .05;
+  this->ur.control.max_mtakover = .25;
+  this->ur.control.max_stakover = .125;
   for(i=0; i<MPRTP_PLUGIN_MAX_SUBFLOW_NUM; ++i){
     _get_subflow(this, i)->id = i;
     _get_subflow(this, i)->controlled = FALSE;
@@ -170,7 +170,7 @@ void sndrate_distor_add_controlled_subflow(SendingRateDistributor *this, guint8 
 {
   Subflow *subflow;
   subflow =  _get_subflow(this, id);
-  subflow->controlled = TRUE;
+  this->ur.subflows[id].controlled = subflow->controlled = TRUE;
   _refresh_available_ids(this);
 }
 
@@ -178,7 +178,7 @@ void sndrate_distor_rem_controlled_subflow(SendingRateDistributor *this, guint8 
 {
   Subflow *subflow;
   subflow =  _get_subflow(this, id);
-  subflow->controlled = FALSE;
+  this->ur.subflows[id].controlled = subflow->controlled = FALSE;
   _refresh_available_ids(this);
 }
 
@@ -219,6 +219,7 @@ MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this)
   MPRTPPluginUtilization* result = NULL;
   SubflowUtilization *su;
   gdouble monitored_sr = 0., stable_sr = 0.;
+  gboolean pacing = FALSE;
 
   DISABLE_LINE _print_utilization(&this->ur);
 
@@ -229,7 +230,7 @@ MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this)
   foreach_subflows(this, i, subflow)
   {
     su = &this->ur.subflows[subflow->id];
-    if(su->controlled)
+    if(!su->controlled)
       continue;
 
     subflow->delta_rate      = su->report.target_rate - subflow->sending_target;
@@ -246,7 +247,7 @@ MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this)
   result->report.target_rate = this->target_bitrate;
 
   if(0 <= this->delta_rate) goto distribute;
-
+//  g_print("negative delta rate is %d, stable sr is %f monitored sr is %f\n", this->delta_rate, stable_sr, monitored_sr);
   //we try to distribute the reminaing bitrate amongst the stable subflows
   foreach_subflows(this, i, subflow)
   {
@@ -257,16 +258,21 @@ MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this)
     takover = su->report.state == 0 ? this->ur.control.max_stakover : this->ur.control.max_mtakover;
     divider = su->report.state == 0 ? stable_sr : monitored_sr;
     extra_bitrate = MIN(subflow->sending_target * takover,
-                        -this->delta_rate * ((gdouble) subflow->sending_target / divider));
+                         -1. * this->delta_rate * ((gdouble) su->report.sending_rate / divider));
+
     subflow->delta_rate     += this->delta_rate += extra_bitrate;
     subflow->sending_target += extra_bitrate;
+    g_print("subflow %d take over %d bits, remining: %d\n", subflow->id, extra_bitrate,subflow->delta_rate);
   }
 
   //if remaining bitrate still available we apply pacing if it exceeds the 10% of the sending target;
-  if(this->delta_rate < this->target_bitrate * -.1){
-    //Todo: apply pacing here.
-  }
+  pacing =(this->delta_rate < this->target_bitrate * -.1);
 distribute:
+  if(pacing){
+    packetssndqueue_set_bandwidth(this->pacer, this->target_bitrate);
+  }else{
+    packetssndqueue_set_bandwidth(this->pacer, 0.);
+  }
   foreach_subflows(this, i, subflow)
   {
     stream_splitter_setup_sending_target(this->splitter, subflow->id, subflow->sending_target);

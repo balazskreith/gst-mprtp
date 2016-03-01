@@ -53,6 +53,7 @@ struct _Subflow
   gboolean    key_path;
   guint32     target_rate;
   gboolean    valid;
+  gboolean    mark2remove;
 };
 
 struct _SchNode
@@ -242,6 +243,7 @@ stream_splitter_init (StreamSplitter * this)
   this->first_delta_flag = TRUE;
   this->thread = gst_task_new (stream_splitter_run, this, NULL);
   this->incoming_bytes = make_numstracker(1<<15, GST_SECOND);
+  this->trash = g_queue_new();
 //    this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
   numstracker_reset(this->incoming_bytes);
   g_rw_lock_init (&this->rwmutex);
@@ -293,10 +295,14 @@ stream_splitter_rem_path (StreamSplitter * this, guint8 subflow_id)
         "due to not existed subflow id (%d)", subflow_id);
     goto exit;
   }
-  g_hash_table_remove (this->subflows, GINT_TO_POINTER (subflow_id));
+  if(g_queue_find(this->trash, lookup_result)){
+    goto exit;
+  }
+  g_queue_push_head(this->trash, lookup_result);
+  //g_hash_table_remove (this->subflows, GINT_TO_POINTER (subflow_id));
   this->path_is_removed = TRUE;
   --this->active_subflow_num;
-  GST_DEBUG ("Subflow is removed, the actual number of subflow is: %d",
+  GST_DEBUG ("Subflow is marked to be removed, the actual number of subflow is: %d",
       this->active_subflow_num);
 exit:
   THIS_WRITEUNLOCK (this);
@@ -318,7 +324,7 @@ stream_splitter_setup_sending_target (StreamSplitter * this, guint8 subflow_id,
         "due to not existed subflow id (%d)", subflow_id);
     goto exit;
   }
-//  g_print("setup %d sending rate for subflow %d\n", sending_target, subflow_id);
+  g_print("setup %d sending rate for subflow %d\n", sending_target, subflow_id);
   subflow->sending_target = sending_target;
 exit:
   THIS_WRITEUNLOCK (this);
@@ -416,6 +422,12 @@ stream_splitter_run (void *data)
     goto done;
   }
 
+  while(this->path_is_removed && !g_queue_is_empty(this->trash)){
+    Subflow *candidate;
+    candidate = g_queue_pop_head(this->trash);
+    g_hash_table_remove (this->subflows, GINT_TO_POINTER (candidate->id));
+  }
+
 //  g_print("new path: %d removed: %d changed: %d\n", this->new_path_added, this->path_is_removed, this->changes_are_committed);
   pdata.c_sum = pdata.mc_sum = pdata.nc_sum = 0;
   _iterate_subflows(this, _check_pathes, &pdata);
@@ -476,6 +488,7 @@ static void _iterate_subflows(StreamSplitter *this, void(*iterator)(Subflow *, g
     iterator(subflow, data);
   }
 }
+
 
 
 void _check_pathes(Subflow *subflow, gpointer data)

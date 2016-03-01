@@ -38,7 +38,7 @@
 #define THIS_WRITELOCK(this)
 #define THIS_WRITEUNLOCK(this)
 
-#define AGGRESSIVITY 0.001f
+#define AGGRESSIVITY 0.1f
 
 GST_DEBUG_CATEGORY_STATIC (subanalyser_debug_category);
 #define GST_CAT_DEFAULT cosubanalyser_debug_category
@@ -52,9 +52,6 @@ struct _CorrBlock{
   gint64          Iu0,Iu1,Id1,Id2,Id3,G01,M0,M1,G_[16],M_[16];
   gint            index;
   gdouble         g,g1,g_next,g_dev;
-  guint           overused;
-  gdouble         treshold, min_treshold;
-  gboolean        distorted;
   CorrBlock*     next;
 };
 
@@ -136,9 +133,6 @@ SubAnalyser *make_subanalyser(void)
   _priv(this)->cblocks[0].N    = 4;
   _priv(this)->cblocks[1].N    = 4;
   _priv(this)->cblocks[2].N    = 4;
-  _priv(this)->cblocks[0].min_treshold   = .001;
-  _priv(this)->cblocks[1].min_treshold   = .01;
-  _priv(this)->cblocks[2].min_treshold   = .1;
   _priv(this)->cblocks_counter = 1;
   _priv(this)->qdelays_th = .001;
   THIS_WRITEUNLOCK (this);
@@ -206,21 +200,10 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
 
 void subanalyser_append_logfile(SubAnalyser *this, FILE *file)
 {
-  gdouble trend;
   if(this->append_log_abbr < _now(this) - 60 * GST_SECOND){
     _log_abbrevations(this, file);
     this->append_log_abbr = _now(this);
   }
-
-  trend = _priv(this)->cblocks[1].g > .002 ? (2*_priv(this)->cblocks[0].g) / _priv(this)->cblocks[1].g : 0.;
-  fprintf(file,
-          "g[0]:   %-10.6f%-10.6f (d:%d)| g[1]:  %-10.6f%-10.6f (d:%d) -trend:%f| g[2]:  %-10.6f%-10.6f (d:%d)|\n",
-          _priv(this)->cblocks[0].g,_priv(this)->cblocks[0].g_next,_priv(this)->cblocks[0].distorted,
-          _priv(this)->cblocks[1].g,_priv(this)->cblocks[1].g_next,_priv(this)->cblocks[1].distorted,
-          trend,
-          _priv(this)->cblocks[2].g,_priv(this)->cblocks[2].g_next,_priv(this)->cblocks[2].distorted
-          );
-
 
 DISABLE_LINE  goto done;
 
@@ -278,16 +261,16 @@ void _qdeanalyzer_evaluation(SubAnalyser *this)
 
   _priv(this)->qtrend      = CONSTRAIN(-.2, .2, _priv(this)->qtrend);
 
-  g_dev1 = MIN(AGGRESSIVITY * .01, 4. * _priv(this)->cblocks[0].g_dev);
-//  g_dev1 = AGGRESSIVITY * .01;
-  g_dev2 = MIN(AGGRESSIVITY * .02, 4. * _priv(this)->cblocks[1].g_dev);
-//  g_dev2 = AGGRESSIVITY * .02;
-  g_dev3 = MIN(AGGRESSIVITY * .04, 4. * _priv(this)->cblocks[2].g_dev);
-//  g_dev3 = AGGRESSIVITY * .04;
+//  g_dev1 = MIN(AGGRESSIVITY * .01, 4. * _priv(this)->cblocks[0].g_dev);
+  g_dev1 = AGGRESSIVITY * .01;
+//  g_dev2 = MIN(AGGRESSIVITY * .02, 4. * _priv(this)->cblocks[1].g_dev);
+  g_dev2 = AGGRESSIVITY * .02;
+//  g_dev3 = MIN(AGGRESSIVITY * .04, 4. * _priv(this)->cblocks[2].g_dev);
+  g_dev3 = AGGRESSIVITY * .04;
 
-  _priv(this)->stability  =   _priv(this)->cblocks[0].g_dev != 0. ? -g_dev1 < _priv(this)->cblocks[0].g    &&   _priv(this)->cblocks[0].g < g_dev1 : TRUE;
-  _priv(this)->stability  &=  _priv(this)->cblocks[1].g_dev != 0. ? -g_dev2 < _priv(this)->cblocks[1].g    &&   _priv(this)->cblocks[1].g < g_dev2 : TRUE;
-  _priv(this)->stability  &=  _priv(this)->cblocks[1].g_dev != 0. ? -g_dev3 < _priv(this)->cblocks[2].g    &&   _priv(this)->cblocks[2].g < g_dev3 : TRUE;
+  _priv(this)->stability  =   _priv(this)->cblocks[0].g_dev != 0. ? -g_dev1 <= _priv(this)->cblocks[0].g    &&   _priv(this)->cblocks[0].g <= g_dev1 : TRUE;
+  _priv(this)->stability  &=  _priv(this)->cblocks[1].g_dev != 0. ? -g_dev2 <= _priv(this)->cblocks[1].g    &&   _priv(this)->cblocks[1].g <= g_dev2 : TRUE;
+  _priv(this)->stability  &=  _priv(this)->cblocks[1].g_dev != 0. ? -g_dev3 <= _priv(this)->cblocks[2].g    &&   _priv(this)->cblocks[2].g <= g_dev3 : TRUE;
 
   _priv(this)->distortion  = 0. < _priv(this)->qtrend;
   _priv(this)->congestion  = AGGRESSIVITY < _priv(this)->qtrend;
@@ -353,17 +336,6 @@ void _execute_corrblock(CorrBlock* this)
     this->g_dev += ((this->g - this->g1) - this->g_dev) / (gdouble)(2 * this->N);
     if(this->g_dev < 0.) this->g_dev *=-1.;
   }
-
-  if(!this->distorted){
-    if(this->treshold < this->g){
-      this->distorted = TRUE;
-    }else{
-      this->treshold = CONSTRAIN(this->min_treshold / 10., this->min_treshold, this->g_next * 4.);
-    }
-  }else if(this->g_next * .5 < this->min_treshold){
-    this->distorted = FALSE;
-  }
-
 
 }
 

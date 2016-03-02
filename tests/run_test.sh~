@@ -9,15 +9,18 @@ CLIENT="./client"
 TARGET_DIR="logs"
 BW_SUM_LOG='bw_sum.csv'
 PROFILE=$1
+TCP_FLOW_NUM=$2
+
 
 let "ACTIVE_SUB1=$PROFILE&1"
 let "ACTIVE_SUB2=$PROFILE&2"
 let "ACTIVE_SUB3=$PROFILE&4"
-let "FOREMAN=$PROFILE&8"
+let "YUVFILE=$PROFILE&8"
+let "PROFILE=$PROFILE"
 
-if [ "$FOREMAN" -eq 8 ]
+if [ "$YUVFILE" -eq 8 ]
 then
-BWMAX=300
+BWMAX=500
 BWMIN=150
 else
 BWMAX=1000
@@ -47,6 +50,16 @@ fi
 
 sudo ip netns exec ns0 $SERVER "--profile="$PROFILE 2> $TARGET_DIR"/"server.log &
 sudo ip netns exec ns1 $CLIENT "--profile="$PROFILE 2> $TARGET_DIR"/"client.log &
+
+if [ "$TCP_FLOW_NUM" -gt 0 ]
+then
+  echo "iperf -s -p 45678" > iperf_s.sh
+  chmod 777 iperf_s.sh
+  echo "iperf -c 10.0.0.2 -p 45678 -t 60 -P $TCP_FLOW_NUM" > iperf_c.sh
+  chmod 777 iperf_c.sh
+  sudo ip netns exec ns1 ./iperf_s.sh &
+  sudo ip netns exec ns0 ./iperf_c.sh &
+fi
 
 cleanup()
 # example cleanup function

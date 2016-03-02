@@ -292,7 +292,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
       g_object_set (async_tx_rtcpSrc_2, "port",  path2_tx_rtcp_port, NULL);
       g_object_set (async_tx_rtcpSrc_3, "port",  path3_tx_rtcp_port, NULL);
 
-      if(test_parameters_.video_session == FOREMAN_SOURCE){
+      if(test_parameters_.video_session == YUVFILE_SOURCE){
         g_object_set (mprtpply, "forced-delay", 200, NULL);
       }
   }
@@ -316,7 +316,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
 
   g_object_set(mprtpply, "logging", TRUE, NULL);
 
-  if(0 && test_parameters_.video_session == FOREMAN_SOURCE)
+  if(0 && test_parameters_.video_session == YUVFILE_SOURCE)
     g_object_set(mprtpply, "delay-offset", 2 * GST_SECOND, NULL);
 
   g_print ("Connecting to %i/%i/%i/%i/%i/%i\n",

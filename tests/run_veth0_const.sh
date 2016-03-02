@@ -38,13 +38,14 @@ shift # past argument or value
 done
 
 BW=$MAXBW
+tc qdisc change dev veth0 parent 1:12 handle 2: pfifo limit 5
 tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit 
-tc qdisc change dev veth0 parent 1:12 netem delay "$LATENCY"ms "$JITTER"ms
+tc qdisc change dev veth0 parent 1:12 handle 2: pfifo limit 5
+
 for j in `seq 1 900`;
 do
   echo $BW"000,"
   sleep 1
 done
-#10 minute
 
 #tc qdisc change dev veth0 parent 1:12 netem delay 100ms 0ms

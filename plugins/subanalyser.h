@@ -37,7 +37,9 @@ struct _SubAnalyser
   GstClockTime             window_time_limit;
   guint                    window_size;
   GstClockTime             append_log_abbr;
+  GstClockTime             last_stable;
   GstClock*                sysclock;
+  gboolean                 discarded;
   gpointer                 priv;
 };
 
@@ -50,16 +52,11 @@ struct _SubAnalyserResult{
   gdouble        qtrend;
   gdouble        off;
   gdouble        discards_rate;
+  gboolean       tr_correlated;
+  gboolean       pierced, distorted, congested;
+  GstClockTime   stable;
   gint32         sending_rate_median;
-  gdouble        delay_off;
 
-  struct{
-    gboolean     stability, distortion, congestion;
-  }delay_indicators;
-
-  struct{
-    gboolean     rr_correlated, tr_correlated, distortion;
-  }rate_indicators;
 };
 
 GType subanalyser_get_type (void);

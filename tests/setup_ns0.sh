@@ -1,5 +1,6 @@
 tc qdisc add dev veth0 root netem delay 100ms
 tc qdisc add dev veth2 root netem delay 100ms
+tc qdisc change dev veth0 root pfifo limit 15
 tc qdisc change dev veth0 root netem delay 100ms 10ms
 tc qdisc change dev veth2 root netem delay 80ms 5ms
 

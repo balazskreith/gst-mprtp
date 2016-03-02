@@ -85,9 +85,16 @@ typedef enum{
 
 typedef enum{
   TEST_SOURCE    = 0,
-  FOREMAN_SOURCE = 1,
+  YUVFILE_SOURCE = 1,
   VL2SRC         = 2,
 }VideoSession;
+
+typedef enum{
+  FOREMAN          = 0,
+  KRISTEN_AND_SARA = 1,
+  EMPTY_1          = 2,
+  EMPTY_2          = 3,
+}YUVSequence;
 
 typedef struct _TestParams{
   TestSuite    test_directive;
@@ -97,6 +104,8 @@ typedef struct _TestParams{
   gboolean     subflow2_active;
   gboolean     subflow3_active;
   guint        subflow_num;
+  YUVSequence  yuvsequence;
+  gchar        yuvfile_str[255];
 //  gboolean     other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time;
 }TestParams;
 
@@ -115,22 +124,23 @@ static GOptionEntry entries[] =
 #define println(str) g_print(str"\n")
 static void _print_info(void)
 {
-  println("####################### Test profiles #############################");
-  println("#                                                                 #");
-  println("# profile = 0b0|00|00|0|0|0                                       #");
-  println("#             ^  ^  ^ ^ ^ ^                                       #");
-  println("#             |  |  | | | |0/1 - Deactivate/Activate subflow 1    #");
-  println("#             |  |  | | |0/1 - Deactivate/Activate subflow 2      #");
-  println("#             |  |  | |0/1 - Deactivate/Activate subflow 3        #");
-  println("#             |  |  |0 - Test source, 1 - foreman seq, 2 - v4l2src#");
-  println("#             |  |0 - No rate control, 1 - random rate ctrl,      #");
-  println("#             |  |2 - auto rate and cc control                    #");
-  println("#             |0/1 - join detach subflow continously              #");
-  println("# Examples:                                                       #");
-  println("# --profile=1 <- subflow 1, test source, no rate controller       #");
-  println("# --profile=3 <- subflow 1 and 2, test source, no rate controller #");
-  println("# --profile=67 <- sub 1 and 2, test source, rate and cc           #");
-  println("###################################################################");
+  println("####################### Test profiles ################################");
+  println("#                                                                    #");
+  println("# profile = 0b00|0|00|00|0|0|0                                       #");
+  println("#              ^ ^  ^  ^ ^ ^ ^                                       #");
+  println("#              | |  |  | | | |0/1 - Deactivate/Activate subflow 1    #");
+  println("#              | |  |  | | |0/1 - Deactivate/Activate subflow 2      #");
+  println("#              | |  |  | |0/1 - Deactivate/Activate subflow 3        #");
+  println("#              | |  |  |0 - Test source,1 - yuv sequence, 2 - v4l2src#");
+  println("#              | |  |0 - No rate control, 1 - random rate ctrl,      #");
+  println("#              | |  |2 - auto rate and cc control                    #");
+  println("#              | |0/1 - join detach subflow continously              #");
+  println("#              |0 - foreman,                                 #");
+  println("# Examples:                                                          #");
+  println("# --profile=1 <- subflow 1, test source, no rate controller          #");
+  println("# --profile=3 <- subflow 1 and 2, test source, no rate controller    #");
+  println("# --profile=67 <- sub 1 and 2, test source, rate and cc              #");
+  println("######################################################################");
 }
 
 
@@ -159,8 +169,8 @@ static void _setup_test_params(guint profile)
     case VL2SRC:
       g_print("Vl2 source is selected\n");
       break;
-    case FOREMAN_SOURCE:
-      g_print("Foreman sequence is selected\n");
+    case YUVFILE_SOURCE:
+      g_print("Yuvfile sequence is selected\n");
       break;
     case TEST_SOURCE:
     default:
@@ -186,6 +196,25 @@ static void _setup_test_params(guint profile)
   if(test_parameters_.random_detach){
     g_print("Random join/detach is activated\n");
   }
+
+  test_parameters_.yuvsequence =(VideoSession)((profile & 768)>>8);
+  switch(test_parameters_.yuvsequence){
+    case KRISTEN_AND_SARA:
+      strcpy(test_parameters_.yuvfile_str, "KristenAndSara_1280x720_60.yuv");
+      break;
+    case EMPTY_1:
+      strcpy(test_parameters_.yuvfile_str, "foreman_cif.yuv");
+      break;
+    case EMPTY_2:
+      strcpy(test_parameters_.yuvfile_str, "foreman_cif.yuv");
+      break;
+    default:
+    case FOREMAN:
+      strcpy(test_parameters_.yuvfile_str, "foreman_cif.yuv");
+      break;
+  }
+
+  if(test_parameters_.video_session == YUVFILE_SOURCE) g_print("Yuv sequence: %s\n", test_parameters_.yuvfile_str);
 }
 
 

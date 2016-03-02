@@ -232,7 +232,7 @@ make_video_vl2src_session (guint sessionNum)
 }
 
 static SessionData *
-make_video_foreman_session (guint sessionNum)
+make_video_yuvfile_session (guint sessionNum)
 {
   GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
 //  GstElement *videoSrc = gst_element_factory_make ("autovideosrc", NULL);
@@ -243,9 +243,8 @@ make_video_foreman_session (guint sessionNum)
   GstElement *payloader = gst_element_factory_make ("rtpvp8pay", NULL);
   GstCaps *videoCaps;
   SessionData *session;
-
   g_object_set (videoSrc,
-                "location", "foreman_cif.yuv",
+                "location", test_parameters_.yuvfile_str,
                 "loop", TRUE,
                 NULL);
 
@@ -258,12 +257,21 @@ make_video_foreman_session (guint sessionNum)
   g_object_set (encoder, "cpu-used", 0, NULL);
 //  g_object_set (encoder, "keyframe-mode", 0, NULL);
   gst_bin_add_many (videoBin, videoConv, videoSrc, identity, videoParse, encoder, payloader, NULL);
-  g_object_set (videoParse,
-      "width", 352,
-      "height", 288,
-      "framerate", 25, 1,
-      "format", 2,
-      NULL);
+  if(test_parameters_.yuvsequence == FOREMAN){
+    g_object_set (videoParse,
+        "width", 352,
+        "height", 288,
+        "framerate", 25, 1,
+        "format", 2,
+        NULL);
+  }else if(test_parameters_.yuvsequence == KRISTEN_AND_SARA){
+      g_object_set (videoParse,
+            "width", 1280,
+            "height", 720,
+            "framerate", 25, 1,
+            "format", 2,
+            NULL);
+  }
   g_object_set (identity, "sync", TRUE, NULL);
 
   gst_element_link (videoSrc, videoParse);
@@ -332,11 +340,16 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
       if(!ur->subflows[i].controlled) continue;
       if(test_parameters_.video_session == TEST_SOURCE){
                ur->subflows[i].control.min_rate = 500000 / test_parameters_.subflow_num;
-               ur->subflows[i].control.max_rate = 2000000;
+               ur->subflows[i].control.max_rate = 1000000;
            }
-      else  if(test_parameters_.video_session == FOREMAN_SOURCE){
-          ur->subflows[i].control.min_rate = 50000 / test_parameters_.subflow_num;
-          ur->subflows[i].control.max_rate = 300000;
+      else  if(test_parameters_.video_session == YUVFILE_SOURCE){
+          if(test_parameters_.yuvsequence == FOREMAN){
+            ur->subflows[i].control.min_rate = 150000 / test_parameters_.subflow_num;
+            ur->subflows[i].control.max_rate = 300000;
+          }else if(test_parameters_.yuvsequence == KRISTEN_AND_SARA){
+            ur->subflows[i].control.min_rate = 333000 / test_parameters_.subflow_num;
+            ur->subflows[i].control.max_rate = 500000;
+          }
       }
 
     }
@@ -572,8 +585,8 @@ main (int argc, char **argv)
   if(argc > 1) testfile = argv[1];
 
   switch(test_parameters_.video_session){
-    case FOREMAN_SOURCE:
-      videoSession = make_video_foreman_session(0);
+    case YUVFILE_SOURCE:
+      videoSession = make_video_yuvfile_session(0);
       break;
     case VL2SRC:
       videoSession = make_video_vl2src_session(0);

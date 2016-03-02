@@ -1134,7 +1134,7 @@ _report_processing_xr_owd_rle_block_processor (SndController *this,
       }
       //_irt0(subflow)->rle_delays.values[chunk_index] = (GstClockTime)running_length * GST_MSECOND;
       _irt0(subflow)->rle_delays.values[chunk_index] = owd;
-//      g_print("owd: %lu\n", owd);
+      g_print("owd: %lu\n", owd);
       if(_irt0(subflow)->rle_delays.values[chunk_index] == 0){
         if(_irt0(subflow)->rle_delays.length == 0)
           g_warning("OWD delay at first index should not be 0");

@@ -42,7 +42,6 @@ struct _SubflowRateController
 
   SubAnalyser*              analyser;
   SendingRateDistributor*   rate_controller;
-  SubTargetRateCtrler       change_target_bitrate_fnc;
   SubflowUtilization        utilization;
 
   GstClockTime              disable_controlling;
@@ -51,7 +50,6 @@ struct _SubflowRateController
   gint32                    min_target_point;
   gint32                    desired_bitrate;
   gint32                    target_bitrate;
-  gboolean                  skip_mitigate;
 
   gint32                    max_rate;
   gint32                    min_rate;

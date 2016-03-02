@@ -386,8 +386,6 @@ void subratectrler_set(SubflowRateController *this,
   this->discard_aggressivity = DEFAULT_DISCARD_AGGRESSIVITY;
   this->ramp_up_aggressivity = DEFAULT_RAMP_UP_AGGRESSIVITY;
 
-  //Todo: Using this fnc pointer in SndRateDistor for central rate distribution.
-  this->change_target_bitrate_fnc = _change_target_bitrate;
   _switch_stage_to(this, STAGE_KEEP, FALSE);
   _transit_state_to(this, STATE_STABLE);
   subanalyser_reset(this->analyser);
@@ -535,7 +533,7 @@ void
 _bounce_stage(
     SubflowRateController *this)
 {
-  if(_delays(this).distortion || _bitrate(this).distortion){
+  if(_anres(this).distorted){
     _switch_stage_to(this, STAGE_REDUCE, TRUE);
     _set_event(this, EVENT_CONGESTION);
     goto exit;
@@ -552,17 +550,14 @@ _keep_stage(
     SubflowRateController *this)
 {
   gint32 target_rate = _TR(this);
-  gboolean unstable = !_delays(this).stability && !_delays_t1(this).stability && !_delays_t2(this).stability;
-  unstable &= _bitrate(this).tr_correlated && _bitrate_t1(this).tr_correlated && _bitrate_t2(this).tr_correlated;
-  unstable &= _state_t1(this) != STATE_OVERUSED && _state_t2(this) != STATE_OVERUSED;
 
-  if(_delays(this).distortion || _bitrate(this).distortion || unstable){
-    _switch_stage_to(this, STAGE_MITIGATE, TRUE);
-    _set_event(this, EVENT_DISTORTION);
-    goto exit;
-  }
+//  if(_anres(this).distorted){
+//    _switch_stage_to(this, STAGE_MITIGATE, TRUE);
+//    _set_event(this, EVENT_DISTORTION);
+//    goto exit;
+//  }
 
-  if(!_bitrate(this).tr_correlated || _state_t1(this) != STATE_STABLE){
+  if(!_anres(this).tr_correlated || _state_t1(this) != STATE_STABLE){
     goto exit;
   }
 
@@ -576,15 +571,12 @@ _keep_stage(
     goto done;
   }
 
-  if(_now(this) - 5 * GST_SECOND < this->congestion_detected ||
-     !_delays(this).stability ||
-     _mt1(this)->mitigated)
-  {
+  if(_anres(this).stable < 10 * GST_SECOND){
     goto done;
   }
 
-  _switch_stage_to(this, STAGE_RAISE, FALSE);
-  _set_event(this, EVENT_PROBE);
+//  _switch_stage_to(this, STAGE_RAISE, FALSE);
+//  _set_event(this, EVENT_PROBE);
 done:
   _change_target_bitrate(this, target_rate);
 exit:
@@ -596,15 +588,14 @@ _mitigate_stage(
     SubflowRateController *this)
 {
   gint32 target_rate = _TR(this);
-  if(_mt1(this)->mitigated && (_delays(this).congestion || _lost(this))){
+  if(_anres(this).congested || _lost(this)){
     _switch_stage_to(this, STAGE_REDUCE, TRUE);
     _set_event(this, EVENT_CONGESTION);
     goto exit;
   }
 
-  _mt0(this)->mitigated = TRUE;
   this->congestion_detected = _now(this);
-  if(!_bitrate(this).tr_correlated){
+  if(!_anres(this).tr_correlated){
     if(_SR(this) < _TR(this))
       target_rate = _SR(this) * .9;
     goto done;
@@ -628,24 +619,21 @@ _raise_stage(
 {
 
   gint32 target_rate = _TR(this);
-  gboolean unstable = !_delays(this).stability && !_delays_t1(this).stability && !_delays_t2(this).stability;
-   unstable &= _bitrate(this).tr_correlated && _bitrate_t1(this).tr_correlated && _bitrate_t2(this).tr_correlated;
-   unstable |= _mt0(this)->discard_rate < .9;
 
-  if(_delays(this).distortion || _bitrate(this).distortion || unstable){
+  if(_anres(this).distorted){
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
     _set_event(this, EVENT_DISTORTION);
     goto exit;
   }
 
-  if(!_delays(this).stability){
+  if(!_anres(this).pierced){
     _switch_stage_to(this, STAGE_KEEP, FALSE);
     _set_pending_event(this, EVENT_STEADY);
     _disable_monitoring(this);
     goto exit;
   }
 
-  if(!_bitrate(this).tr_correlated || !_bitrate_t1(this).tr_correlated){
+  if(!_anres(this).tr_correlated || !_anres_t1(this).tr_correlated){
     goto done;
   }
 
@@ -967,9 +955,8 @@ void _log_measurement_update_state(SubflowRateController *this)
           "RR:         %-10d| SR:      %-10d| disc_rat:%-10.3f| ci:      %-10.3f|\n"
           "l:          %-10d| rl:      %-10d| d:       %-10d| rd:      %-10d\n"
           "abs_max:    %-10d| abs_min: %-10d| event:      %-7d| off_add: %-10.3f\n"
-          "Delay--------------> distortion: %-10d| congestion: %-7d| stability: %-7d|\n"
-          "Rates--------------> distorted:  %-7d| rr_corr: %-7d|\n"
-          "Rates--------------> tr_corr:    %-10d|\n"
+          "Analysis--------------> pierced: %-7d| distorted: %-7d| congested: %-7d|\n"
+          "----------------------> tr_corr: %-7d| stable:  %-7lu|\n"
           "############################ Seconds since setup: %lu ##########################################\n",
           this->id, _state(this),
           this->disable_controlling > 0 ? GST_TIME_AS_MSECONDS(this->disable_controlling - _now(this)) : 0,
@@ -1000,12 +987,12 @@ void _log_measurement_update_state(SubflowRateController *this)
 
           this->max_rate, this->min_rate, _event(this), _anres(this).off,
 
-          _delays(this).distortion,
-          _delays(this).congestion,
-          _delays(this).stability,
+          _anres(this).pierced,
+          _anres(this).distorted,
+          _anres(this).congested,
 
-          _bitrate(this).distortion,
-          _bitrate(this).rr_correlated,_bitrate(this).tr_correlated,
+          _anres(this).tr_correlated,
+          GST_TIME_AS_SECONDS(_anres(this).stable),
 
          GST_TIME_AS_SECONDS(_now(this) - this->setup_time)
 

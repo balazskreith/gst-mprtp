@@ -574,7 +574,7 @@ void _delays_stats_pipe(gpointer data, PercentileTrackerPipeData *pdata)
   if(_now(this) - GST_SECOND < this->discard_happened) return;
   this->delay_avg_refreshed = _now(this);
   if(0. < this->delay_avg){
-    this->delay_avg = (gdouble) MIN(pdata->percentile, 400 * GST_MSECOND) * .05 + this->delay_avg * .95;
+    this->delay_avg = (gdouble) MIN(pdata->percentile, 400 * GST_MSECOND) * .5 + this->delay_avg * .5;
   }else{
     this->delay_avg = (gdouble) MIN(pdata->percentile, 400 * GST_MSECOND);
   }

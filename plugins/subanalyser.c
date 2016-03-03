@@ -202,6 +202,7 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
     _priv(this)->delay_t1 = _priv(this)->delay_t0;
     _priv(this)->delay_t0 = delay;
   }
+  result->sending_rate_median     = sending_rate;
   tr_ratio                        = (gdouble) target_bitrate / (gdouble) result->sending_rate_median;
   result->tr_correlated           = tr_ratio > .95 && tr_ratio < 1.05;
   result->discards_rate           =  ((gdouble) measurement->late_discarded_bytes / (gdouble) measurement->received_payload_bytes);

@@ -15,6 +15,7 @@ SUB_SND_SUM_LOG="sub_snd_sum.csv"
 SUB1_CTRLER_LOG="subratectrler_1.log"
 SUB2_CTRLER_LOG="subratectrler_2.log"
 SUB3_CTRLER_LOG="subratectrler_3.log"
+SUBANALYSER_LOG="subanalyser.csv"
 BW_SUM='bw_sum.csv'
 BW_SUM_LOG='bw_sum_res.csv'
 BW_SUM_LOG_T='bw_sum_res_t.csv'
@@ -71,6 +72,7 @@ then
   cp $SOURCE_DIR"/"$SUB2_CTRLER_LOG $TARGET_DIR"/"$SUB2_CTRLER_LOG
 fi
 
+cp $SOURCE_DIR"/"$SUBANALYSER_LOG $TARGET_DIR"/"$SUBANALYSER_LOG
 
 cp $SOURCE_DIR"/"$SUB1_SND_LOG $TARGET_DIR"/"$SUB1_SND_LOG
 cp $SOURCE_DIR"/"$SUB1_RCV_LOG $TARGET_DIR"/"$SUB1_RCV_LOG
@@ -172,6 +174,8 @@ else
   gnuplot -e "subflow_num='1'" mprtp-sum-report.plot
 fi
 #gnuplot -e "subflow_id='1'" -e "interface_id='0'" mprtp-subflow-report.plot
+
+gnuplot autocorr.plot
 
 cd ../../gst-mprtp/tests
 

@@ -242,7 +242,7 @@ _disable_controlling(
     SubflowRateController *this);
 
 #define MAX_MONITORING_INTERVAL 14
-#define MIN_PROBE_MONITORING_INTERVAL 10
+#define MIN_PROBE_MONITORING_INTERVAL 5
 #define MIN_BOUNCE_MONITORING_INTERVAL 2
 #define MAX_MONITORING_RATE 200000
 #define _disable_monitoring(this) _set_monitoring_interval(this, 0)
@@ -385,6 +385,7 @@ void subratectrler_set(SubflowRateController *this,
   this->max_target_point = MAX(TARGET_BITRATE_MAX, sending_target * 2);
   this->discard_aggressivity = DEFAULT_DISCARD_AGGRESSIVITY;
   this->ramp_up_aggressivity = DEFAULT_RAMP_UP_AGGRESSIVITY;
+  this->keep = 5;
 
   _switch_stage_to(this, STAGE_KEEP, FALSE);
   _transit_state_to(this, STATE_STABLE);
@@ -541,6 +542,7 @@ _bounce_stage(
   _change_target_bitrate(this, this->bottleneck_point);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
   _set_pending_event(this, EVENT_SETTLED);
+  this->keep = 5;
 exit:
   return;
 }
@@ -551,14 +553,29 @@ _keep_stage(
 {
   gint32 target_rate = _TR(this);
 
-//  if(_anres(this).distorted){
-//    _switch_stage_to(this, STAGE_MITIGATE, TRUE);
-//    _set_event(this, EVENT_DISTORTION);
-//    goto exit;
-//  }
+  if(_anres(this).distorted){
+    _switch_stage_to(this, STAGE_MITIGATE, TRUE);
+    _set_event(this, EVENT_DISTORTION);
+    goto exit;
+  }
+
+  if(_anres(this).pierced){
+      this->bottleneck_point = _TR(this);
+  }
 
   if(!_anres(this).tr_correlated || _state_t1(this) != STATE_STABLE){
     goto exit;
+  }
+
+  if(_anres(this).pierced){
+    if(this->keep == 20){
+      this->keep = 10;
+      this->bottleneck_point *= .95;
+      target_rate = this->bottleneck_point;
+      goto done;
+    }else{
+      this->keep = MIN(20, this->keep * 2);
+    }
   }
 
   if(target_rate < this->bottleneck_point){
@@ -571,12 +588,12 @@ _keep_stage(
     goto done;
   }
 
-  if(_anres(this).stable < 10 * GST_SECOND){
+  if(_anres(this).stable < this->keep * GST_SECOND || _state_t1(this) != STATE_STABLE){
     goto done;
   }
 
-//  _switch_stage_to(this, STAGE_RAISE, FALSE);
-//  _set_event(this, EVENT_PROBE);
+  _switch_stage_to(this, STAGE_RAISE, FALSE);
+  _set_event(this, EVENT_PROBE);
 done:
   _change_target_bitrate(this, target_rate);
 exit:
@@ -595,6 +612,7 @@ _mitigate_stage(
   }
 
   this->congestion_detected = _now(this);
+  this->bottleneck_point = _min_br(this);
   if(!_anres(this).tr_correlated){
     if(_SR(this) < _TR(this))
       target_rate = _SR(this) * .9;
@@ -608,6 +626,7 @@ done:
   _change_target_bitrate(this, target_rate);
   _set_pending_event(this, EVENT_SETTLED);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
+  this->keep = 10;
 exit:
   return;
 }
@@ -626,7 +645,7 @@ _raise_stage(
     goto exit;
   }
 
-  if(!_anres(this).pierced){
+  if(_anres(this).pierced){
     _switch_stage_to(this, STAGE_KEEP, FALSE);
     _set_pending_event(this, EVENT_STEADY);
     _disable_monitoring(this);
@@ -656,6 +675,7 @@ _raise_stage(
   _switch_stage_to(this, STAGE_KEEP, FALSE);
   _set_pending_event(this, EVENT_STEADY);
   _disable_monitoring(this);
+  this->keep = MAX(5, this->keep / 2);
 done:
   _change_target_bitrate(this, target_rate);
 exit:
@@ -826,7 +846,7 @@ void _setup_raise_monitoring(SubflowRateController *this)
   }
 
   scl = (gdouble)(_TR(this) - this->bottleneck_point);
-  scl /=  (gdouble) (this->bottleneck_point * .25);
+  scl /=  (gdouble) (this->bottleneck_point * .2);
   scl *= scl;
   scl = MIN(1., MAX(1./14., scl));
   plus_rate = _TR(this) * scl;
@@ -885,6 +905,7 @@ void _change_target_bitrate(SubflowRateController *this, gint32 new_target)
   if(0 < this->max_rate){
     this->target_bitrate = MIN(this->max_rate, new_target);
   }
+  g_print("TARGET RATE: %d\n", new_target);
 }
 
 gboolean _is_near_to_bottleneck_point(SubflowRateController *this)
@@ -955,6 +976,7 @@ void _log_measurement_update_state(SubflowRateController *this)
           "RR:         %-10d| SR:      %-10d| disc_rat:%-10.3f| ci:      %-10.3f|\n"
           "l:          %-10d| rl:      %-10d| d:       %-10d| rd:      %-10d\n"
           "abs_max:    %-10d| abs_min: %-10d| event:      %-7d| off_add: %-10.3f\n"
+          "keep:       %-10d|\n"
           "Analysis--------------> pierced: %-7d| distorted: %-7d| congested: %-7d|\n"
           "----------------------> tr_corr: %-7d| stable:  %-7lu|\n"
           "############################ Seconds since setup: %lu ##########################################\n",
@@ -986,6 +1008,8 @@ void _log_measurement_update_state(SubflowRateController *this)
           _mt0(this)->discard,_mt0(this)->recent_discard,
 
           this->max_rate, this->min_rate, _event(this), _anres(this).off,
+
+          this->keep,
 
           _anres(this).pierced,
           _anres(this).distorted,

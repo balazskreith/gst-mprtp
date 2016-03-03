@@ -20,7 +20,7 @@ let "PROFILE=$PROFILE"
 
 if [ "$YUVFILE" -eq 8 ]
 then
-BWMAX=500
+BWMAX=2000
 BWMIN=150
 else
 BWMAX=1000
@@ -55,7 +55,7 @@ if [ "$TCP_FLOW_NUM" -gt 0 ]
 then
   echo "iperf -s -p 45678" > iperf_s.sh
   chmod 777 iperf_s.sh
-  echo "iperf -c 10.0.0.2 -p 45678 -t 60 -P $TCP_FLOW_NUM" > iperf_c.sh
+  echo "iperf -c 10.0.0.2 -p 45678 -t 900 -P $TCP_FLOW_NUM" > iperf_c.sh
   chmod 777 iperf_c.sh
   sudo ip netns exec ns1 ./iperf_s.sh &
   sudo ip netns exec ns0 ./iperf_c.sh &

@@ -234,7 +234,10 @@ again:
 
   this->proxy(this->proxydata, node->buffer);
   next_scheduler_time = now + MAX(0.001,(node->size*8)/MAX(50000,this->bandwidth)) * GST_SECOND;
-  g_print("Pacing here, next time:%f, remaining packets: %d\n", MAX(0.001,node->size*8/MAX(50000,this->bandwidth)), this->counter);
+  g_print("Pacing here, next time:%f, remaining packets: %d, rtt: %f\n",
+          MAX(0.001,node->size*8/MAX(50000,this->bandwidth)),
+          this->counter,
+          this->bandwidth);
   _remove_head(this);
   if(!this->pacing_started) goto again;
 

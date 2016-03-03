@@ -344,7 +344,7 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
            }
       else  if(test_parameters_.video_session == YUVFILE_SOURCE){
           if(test_parameters_.yuvsequence == FOREMAN){
-            ur->subflows[i].control.min_rate = 150000 / test_parameters_.subflow_num;
+            ur->subflows[i].control.min_rate = 100000 / test_parameters_.subflow_num;
             ur->subflows[i].control.max_rate = 300000;
           }else if(test_parameters_.yuvsequence == KRISTEN_AND_SARA){
             ur->subflows[i].control.min_rate = 333000 / test_parameters_.subflow_num;

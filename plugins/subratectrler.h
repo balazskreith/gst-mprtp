@@ -55,6 +55,7 @@ struct _SubflowRateController
   gint32                    min_rate;
 
   gint32                    bottleneck_point;
+  gint32                    keep;
 
   GstClockTime              setup_time;
 

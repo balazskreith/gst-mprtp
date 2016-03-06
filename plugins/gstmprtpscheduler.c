@@ -113,6 +113,7 @@ static guint _subflows_utilization;
 enum
 {
   PROP_0,
+  PROP_MPRTP_SSRC_FILTER,
   PROP_MPRTP_EXT_HEADER_ID,
   PROP_ABS_TIME_EXT_HEADER_ID,
   PROP_MONITORING_PAYLOAD_TYPE,
@@ -223,6 +224,12 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "Sets or gets the id for the extension header the MpRTP based on. The default is 3",
           0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_MPRTP_SSRC_FILTER,
+      g_param_spec_uint ("mprtp-ssrc-filter",
+          "Sets or gets the ssrc of the RTP packets splitted into several subflows. 0 - means all RTP packets are assigned",
+          "Sets or gets the ssrc of the RTP packets splitted into several subflows. 0 - means all RTP packets are assigned",
+          0, 1<<31, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_ABS_TIME_EXT_HEADER_ID,
       g_param_spec_uint ("abs-time-ext-header-id",
           "Set or get the id for the absolute time RTP extension",
@@ -302,6 +309,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 //  GstMprtpschedulerPrivate *priv;
 //  priv = this->priv = GST_MPRTPSCHEDULER_GET_PRIVATE (this);
 
+  init_mprtp_logger();
+
   this->rtp_sinkpad =
       gst_pad_new_from_static_template (&gst_mprtpscheduler_rtp_sink_template,
       "rtp_sink");
@@ -353,11 +362,11 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   this->sysclock = gst_system_clock_obtain ();
   g_rw_lock_init (&this->rwmutex);
+  this->ssrc_filter = 0;
   this->paths = g_hash_table_new_full (NULL, NULL, NULL, g_free);
   this->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
   this->abs_time_ext_header_id = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
   this->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
-  this->paths = g_hash_table_new_full (NULL, NULL, NULL, g_free);
   this->splitter = (StreamSplitter *) g_object_new (STREAM_SPLITTER_TYPE, NULL);
   this->controller = (SndController*) g_object_new(SNDCTRLER_TYPE, NULL);
   this->sndqueue = make_packetssndqueue(gst_mprtpscheduler_mprtp_setup, this);
@@ -371,6 +380,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   stream_splitter_set_monitor_payload_type(this->splitter, this->monitor_payload_type);
   _change_auto_rate_and_cc (this, FALSE);
   _setup_paths(this);
+
 }
 
 
@@ -394,7 +404,7 @@ gst_mprtpscheduler_finalize (GObject * object)
   GST_DEBUG_OBJECT (this, "finalize");
 
   /* clean up object here */
-
+  g_hash_table_destroy(this->paths);
   g_object_unref (this->sysclock);
   G_OBJECT_CLASS (gst_mprtpscheduler_parent_class)->finalize (object);
 }
@@ -416,6 +426,12 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
   GST_DEBUG_OBJECT (this, "set_property");
 
   switch (property_id) {
+    case PROP_MPRTP_SSRC_FILTER:
+      THIS_WRITELOCK (this);
+      this->ssrc_filter = (guint8) g_value_get_uint (value);
+      _setup_paths(this);
+      THIS_WRITEUNLOCK (this);
+      break;
     case PROP_MPRTP_EXT_HEADER_ID:
       THIS_WRITELOCK (this);
       this->mprtp_ext_header_id = (guint8) g_value_get_uint (value);
@@ -500,6 +516,11 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
   GST_DEBUG_OBJECT (this, "get_property");
 
   switch (property_id) {
+    case PROP_MPRTP_SSRC_FILTER:
+      THIS_READLOCK (this);
+      g_value_set_uint (value, (guint) this->ssrc_filter);
+      THIS_READUNLOCK (this);
+      break;
     case PROP_MPRTP_EXT_HEADER_ID:
       THIS_READLOCK (this);
       g_value_set_uint (value, (guint) this->mprtp_ext_header_id);
@@ -834,6 +855,25 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   if(PACKET_IS_RTCP(second_byte)){
       GST_DEBUG_OBJECT (this, "RTCP Packet arrived on rtp sink");
     return gst_pad_push (this->mprtp_srcpad, buffer);
+  }
+  if(this->ssrc_filter != 0){
+    GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+    GstFlowReturn result;
+
+    THIS_READLOCK (this);
+    if (G_UNLIKELY (!gst_rtp_buffer_map (buffer, GST_MAP_READ, &rtp))) {
+      GST_WARNING_OBJECT (this, "The RTP packet is not writeable");
+      result = gst_pad_push (this->mprtp_srcpad, buffer);
+      THIS_READUNLOCK (this);
+      return result;
+    }
+
+    if(gst_rtp_buffer_get_ssrc(&rtp) != this->ssrc_filter){
+      result = gst_pad_push (this->mprtp_srcpad, buffer);
+      THIS_READUNLOCK (this);
+      return result;
+    }
+    THIS_READUNLOCK (this);
   }
 //  gst_mprtpscheduler_mprtp_setup(this, buffer);
   packetssndqueue_push(this->sndqueue, buffer);

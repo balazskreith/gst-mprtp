@@ -26,29 +26,27 @@ typedef void  (*SignalRequestFunc)(gpointer,gpointer);
 
 struct _SendingRateDistributor
 {
-  GObject              object;
-  GstClock*            sysclock;
-  guint8*              subflows;
-  guint8               controlled_num;
+  GObject                   object;
+  GstClock*                 sysclock;
+  gpointer                  subflows;
+  guint8                    controlled_num;
 
-  guint8               available_ids[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  guint8               available_ids_length;
-  GstClockTime         initial_disabling_time;
+  guint8                    available_ids[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  guint8                    available_ids_length;
+  GstClockTime              initial_disabling_time;
 
-  gint32               extra_rate;
-  gint32               target_bitrate;
-  gint32               delta_rate;
+  gint32                    extra_rate;
+  gint32                    target_bitrate;
+  gint32                    delta_rate;
 
-  PacketsSndQueue*     pacer;
-  StreamSplitter*      splitter;
+  PacketsSndQueue*          pacer;
+  StreamSplitter*           splitter;
 
-  gint32               supplied_bitrate;
-  gint32               requested_bitrate;
+  gint32                    supplied_bitrate;
+  gint32                    requested_bitrate;
 
   MPRTPPluginUtilization    ur;
   gboolean                  ready;
-//  SignalRequestFunc    signal_request;
-//  gpointer             signal_controller;
 };
 
 

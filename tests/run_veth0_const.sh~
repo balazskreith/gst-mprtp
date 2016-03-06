@@ -36,11 +36,24 @@ case $key in
 esac
 shift # past argument or value
 done
-
 BW=$MAXBW
+BW=500
+tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit buffer 1600 limit 30
 tc qdisc change dev veth0 parent 1:12 handle 2: pfifo limit 5
-tc class change dev veth0 parent 1:1 classid 1:12 htb rate "$BW"Kbit ceil "$BW"Kbit 
-tc qdisc change dev veth0 parent 1:12 handle2: pfifo limit 5
+
+tc qdisc del dev veth0 root
+tc qdisc add dev veth0 root handle 1:0 netem delay 100ms
+tc qdisc add dev veth0 parent 1:0 handle 10: tbf rate 256kbit 
+tc qdisc add dev veth0 parent 1:0 handle 10: tbf rate 256kbit buffer 1600 limit 30
+
+tc qdisc del dev veth0 root
+tc qdisc add dev veth0 root handle 1: netem delay 10ms reorder 25% 50% loss 0.2%
+tc qdisc add dev veth0 parent 1: handle 2: tbf rate 1mbit burst 32kbit latency 400ms
+
+tc qdisc del dev veth0 root
+tc qdisc add dev veth0 root handle 1: netem delay 10ms 
+tc qdisc add dev veth0 parent 1: handle 2: tbf rate 1mbit burst 32kbit latency 400ms
+tc qdisc add dev veth0 parent 1: handle 2: tbf rate 1mbit burst 32kbit limit 30
 
 for j in `seq 1 900`;
 do

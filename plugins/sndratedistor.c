@@ -77,8 +77,12 @@ _refresh_available_ids(
     SendingRateDistributor* this);
 
 
-#define _get_subflow(this, n) ((Subflow*)(this->subflows + n * sizeof(Subflow)))
-
+//#define _get_subflow(this, n) ((Subflow*)(this->subflows + n * sizeof(Subflow)))
+static Subflow* _get_subflow(SendingRateDistributor* this, gint n)
+{
+  Subflow* subflows = this->subflows;
+  return subflows+n;
+}
 
 #define foreach_subflows(this, i, subflow) \
   for(i=0, subflow = _get_subflow(this, this->available_ids[0]); i < this->available_ids_length; subflow = _get_subflow(this,  this->available_ids[++i]))
@@ -159,11 +163,6 @@ void sndrate_setup_report(
   {
     this->ready &= subflow->ready;
   }
-//  if(report->target_rate < subflow->sending_target){
-//    subflow->supplied_bitrate = subflow->sending_target - report->target_rate;
-//  }else{
-//    subflow->requested_bitrate = report->target_rate - subflow->sending_target;
-//  }
 }
 
 void sndrate_distor_add_controlled_subflow(SendingRateDistributor *this, guint8 id)
@@ -262,7 +261,7 @@ MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this)
 
     subflow->delta_rate     += this->delta_rate += extra_bitrate;
     subflow->sending_target += extra_bitrate;
-    g_print("subflow %d take over %d bits, remining: %d\n", subflow->id, extra_bitrate,subflow->delta_rate);
+//    g_print("subflow %d take over %d bits, remining: %d\n", subflow->id, extra_bitrate,subflow->delta_rate);
   }
 
   //if remaining bitrate still available we apply pacing if it exceeds the 10% of the sending target;
@@ -282,93 +281,6 @@ done:
   return result;
 }
 
-//
-//MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this)
-//{
-//  gint i;
-//  Subflow *subflow;
-//  gboolean ready = TRUE;
-//  MPRTPPluginUtilization* result = NULL;
-//  SubflowUtilization *report;
-//  gint32 remaining_bitrate;
-//  gdouble monitored_sr = 0., stable_sr = 0.;
-//
-//  DISABLE_LINE _print_utilization(&this->ur);
-//
-//  this->supplied_bitrate = this->requested_bitrate = this->target_bitrate = 0;
-//  if(!this->splitter || !this->pacer) goto done;
-//
-//  foreach_subflows(this, i, subflow)
-//  {
-//    report = &this->ur.subflows[subflow->id];
-//    ready &= subflow->ready && subflow->controlled;
-//    this->supplied_bitrate  += subflow->supplied_bitrate;
-//    this->requested_bitrate += subflow->requested_bitrate;
-//    subflow->delta_rate     =  subflow->requested_bitrate - subflow->supplied_bitrate;
-//    this->target_bitrate    += subflow->sending_target;
-//
-//    if(report->report.state == 0)       stable_sr    += report->report.sending_rate;
-//    else if(report->report.state == 1)  monitored_sr += report->report.sending_rate;
-//  }
-//
-//  if(!ready) goto done;
-//  result = &this->ur;
-//  result->report.target_rate = this->target_bitrate;
-//
-//  //first we calculate the new sending targets for subflows
-//  foreach_subflows(this, i, subflow)
-//  {
-//    subflow->sending_target += subflow->delta_rate;
-//  }
-//  //then exemine weather we have remaining bitrate
-//  remaining_bitrate = this->supplied_bitrate - this->requested_bitrate;
-//  if(remaining_bitrate <= 0) goto distribute;
-//
-//  //we try to distribute the reminaing bitrate first amongst the subflows, which are monitored
-//  if(0. < monitored_sr)
-//  foreach_subflows(this, i, subflow)
-//  {
-//    gint32 extra_bitrate;
-//    report = &this->ur.subflows[subflow->id];
-//    if(report->report.state != 1) continue;
-//    //limit egy bizonyos mennyiségre. nem lehet több mint a sending rate 10%-a
-//    extra_bitrate = MIN(subflow->sending_target * .1, remaining_bitrate * ((gdouble) subflow->sending_target / monitored_sr));
-//    subflow->delta_rate     += extra_bitrate;
-//    subflow->sending_target += extra_bitrate;
-//    remaining_bitrate       -= extra_bitrate;
-//  }
-//  if(remaining_bitrate <= 0) goto distribute;
-//
-//  //we try to distribute the reminaing bitrate the stable subflows
-//  if(0. < stable_sr)
-//  foreach_subflows(this, i, subflow)
-//  {
-//    gint32 extra_bitrate;
-//    report = &this->ur.subflows[subflow->id];
-//    if(report->report.state != 0 || 0 < subflow->supplied_bitrate) continue;
-//    //limit egy bizonyos mennyiségre. nem lehet több mint a sending rate 10%-a
-//    extra_bitrate = MIN(subflow->sending_target * .05, remaining_bitrate * ((gdouble) subflow->sending_target / stable_sr));
-//    subflow->delta_rate     += extra_bitrate;
-//    subflow->sending_target += extra_bitrate;
-//    remaining_bitrate       -= extra_bitrate;
-//  }
-//
-//  if(remaining_bitrate <= 0) goto distribute;
-//  //if remaining bitrate still available we apply pacing if it exceeds the 10% of the sending target;
-//  if(this->target_bitrate * .1 < remaining_bitrate){
-//    //Todo: apply pacing here.
-//  }
-//distribute:
-//  //setup sending rate in splitter
-//  foreach_subflows(this, i, subflow)
-//  {
-//    stream_splitter_setup_sending_target(this->splitter, subflow->id, subflow->sending_target);
-//  }
-//  stream_splitter_setup_sending_target(this->splitter, subflow->id, subflow->sending_target);
-//  stream_splitter_commit_changes (this->splitter);
-//done:
-//  return result;
-//}
 
 void sndrate_set_initial_disabling_time(SendingRateDistributor *this, guint64 initial_disabling_time)
 {

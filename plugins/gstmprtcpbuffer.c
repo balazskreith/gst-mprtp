@@ -579,7 +579,7 @@ gst_rtcp_xr_rfc7243_setup (GstRTCPXR_RFC7243 * riport, guint8 interval_metric,
     gboolean early_bit, guint32 ssrc, guint32 discarded_bytes)
 {
   riport->block_length = g_htons (2);
-  riport->block_type = GST_RTCP_XR_OWD_RLE_BLOCK_TYPE_IDENTIFIER;
+  riport->block_type = GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER;
   riport->discarded_bytes = g_htonl (discarded_bytes);
   riport->early_bit = early_bit;
   riport->interval_metric = interval_metric;

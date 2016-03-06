@@ -272,17 +272,6 @@ typedef struct PACKED _GstRTCPXR_OWD
 } GstRTCPXR_OWD;
 
 
-typedef struct PACKED _GstRTCPFB_MPCC
-{
-  GstRTCPHeader   header;
-  guint32         media_ssrc;
-  guint32         identifier;
-  guint32         lt80_delay;
-  guint32         lt40_delay;
-  guint32         md_delay;
-  guint32         sh_delay;
-} GstRTCPFB_MPCC;
-
 
 /*MPRTCP struct polymorphism*/
 
@@ -319,7 +308,6 @@ typedef struct PACKED _GstMPRTCPSubflowBlock
     GstRTCPXR_RFC3611 xr_rfc3611_report;
     GstRTCPXR_OWD_RLE xr_owd_rle_report;
     GstRTCPXR_OWD     xr_owd;
-    GstRTCPFB_MPCC    fb_mpcc;
   };
 } GstMPRTCPSubflowBlock;
 

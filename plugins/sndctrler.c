@@ -39,8 +39,7 @@
 #define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
 #define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
 
-//Must be power of 2
-#define SR_WINDOW_SIZE 16
+#define SR_WINDOW_SIZE 10
 #define MAX_RIPORT_INTERVAL (5 * GST_SECOND)
 #define REPORTTIMEOUT (3 * MAX_RIPORT_INTERVAL)
 #define PATH_RTT_MAX_TRESHOLD (800 * GST_MSECOND)
@@ -662,9 +661,10 @@ _irp_producer_main(SndController * this)
   {
     subflow = (Subflow *) val;
     //sending rate updater
-    subflow->SR_window[subflow->SR_window_index] = mprtps_path_get_sent_bytes_in1s(subflow->path);;
-    subflow->SR_window_index = subflow->SR_window_index + 1;
-    subflow->SR_window_index &= (SR_WINDOW_SIZE-1);
+    subflow->SR_window[subflow->SR_window_index] = mprtps_path_get_sent_bytes_in1s(subflow->path);
+    if(++subflow->SR_window_index == SR_WINDOW_SIZE){
+      subflow->SR_window_index = 0;
+    }
 
     if(_irt0(subflow)->checked) goto wait;
     if(now - 10 * GST_MSECOND < _irt0(subflow)->time) goto wait;
@@ -682,6 +682,7 @@ _irp_producer_main(SndController * this)
   return;
 
 }
+
 
 RRMeasurement *
 _irt (Subflow * this, gint moment)
@@ -737,7 +738,7 @@ static gint32 _get_sending_rate_median(Subflow *this)
 {
   gint32 result;
   qsort (this->SR_window, SR_WINDOW_SIZE, sizeof(gint32), _compare);
-  result = this->SR_window[3] + this->SR_window[4];
+  result = this->SR_window[4] + this->SR_window[5];
   return result>>1;
 }
 

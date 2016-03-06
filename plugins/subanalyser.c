@@ -51,7 +51,7 @@ struct _CorrBlock{
   guint           id,N;
   gint64          Iu0,Iu1,Id1,Id2,Id3,G01,M0,M1,G_[16],M_[16];
   gint            index;
-  gdouble         g,g1,g_next,g_dev;
+  gdouble         g,g1,g_next,g_dev,distortion_th;
   gboolean        distorted;
   CorrBlock*     next;
 };
@@ -59,6 +59,8 @@ struct _CorrBlock{
 
 static void _execute_corrblocks(guint32 *counter, CorrBlock *blocks, guint blocks_length);
 static void _execute_corrblock(CorrBlock* this);
+
+typedef void (*Evaluator)(SubAnalyser *this, SubAnalyserResult *result);
 
 typedef struct _SubAnalyserPrivate{
   SubAnalyserResult  *result;
@@ -70,6 +72,7 @@ typedef struct _SubAnalyserPrivate{
   gdouble             delay_avg,delay_t2,delay_t1,delay_t0;
   CorrBlock           cblocks[6];
   guint32             cblocks_counter;
+//Todo: memory check here. WHo is responsible for the memory leak? you? you? you?...
 
 }SubAnalyserPrivate;
 
@@ -84,7 +87,7 @@ static void _log_abbrevations(SubAnalyser *this, FILE *file);
 
 static void subanalyser_finalize (GObject * object);
 
-static void _qdeanalyzer_evaluation(SubAnalyser *this, SubAnalyserResult *result);
+static void _qdeanalyzer_stable_evaluation(SubAnalyser *this, SubAnalyserResult *result);
 
 static void _append_to_corrlog(SubAnalyser *this, const gchar * format, ...);
 
@@ -153,7 +156,13 @@ SubAnalyser *make_subanalyser(void)
   _priv(this)->cblocks[2].N    = 4;
   _priv(this)->cblocks[3].N    = 4;
   _priv(this)->cblocks[4].N    = 4;
+  _priv(this)->cblocks[0].distortion_th   = 0.025;
+  _priv(this)->cblocks[1].distortion_th   = 0.05;
+  _priv(this)->cblocks[2].distortion_th   = 0.1;
+  _priv(this)->cblocks[3].distortion_th   = 1.;
+  _priv(this)->cblocks[4].distortion_th   = 1.;
   _priv(this)->cblocks_counter = 1;
+
   THIS_WRITEUNLOCK (this);
   return this;
 }
@@ -165,7 +174,10 @@ void subanalyser_reset(SubAnalyser *this)
   THIS_WRITEUNLOCK (this);
 }
 
-
+void subanalyser_reset_stability(SubAnalyser *this)
+{
+  this->last_stable = 0;
+}
 
 void subanalyser_measurement_analyse(SubAnalyser *this,
                                      RRMeasurement *measurement,
@@ -175,11 +187,18 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
 {
   gint i;
   gdouble tr_ratio;
+  gboolean congestion;
+
+  congestion = 0 < measurement->rle_delays.length;
   //add delays
   for(i=0; i<measurement->rle_delays.length; ++i){
     GstClockTime delay;
     delay = measurement->rle_delays.values[i];
-    if(!delay) continue;
+    if(!delay){
+        congestion &= FALSE;
+        continue;
+    }
+    congestion &= delay == GST_SECOND;
 
     _priv(this)->cblocks[0].Iu0 = GST_TIME_AS_USECONDS(delay) / 50.;
     _execute_corrblocks(&_priv(this)->cblocks_counter, _priv(this)->cblocks, 4);
@@ -204,12 +223,14 @@ void subanalyser_measurement_analyse(SubAnalyser *this,
   }
   result->sending_rate_median     = sending_rate;
   tr_ratio                        = (gdouble) target_bitrate / (gdouble) result->sending_rate_median;
-  result->tr_correlated           = tr_ratio > .95 && tr_ratio < 1.05;
+  result->tr_correlated           = tr_ratio > .9 && tr_ratio < 1.1;
   result->discards_rate           =  ((gdouble) measurement->late_discarded_bytes / (gdouble) measurement->received_payload_bytes);
   result->sending_rate_median     = sending_rate;
   result->off                     = (_priv(this)->delay_t0 * .5 + _priv(this)->delay_t1 * .25 + _priv(this)->delay_t2 * .25) / _priv(this)->delay_avg;
 
-  _qdeanalyzer_evaluation(this, result);
+  result->pierced = result->distorted = result->congested = congestion;
+  _qdeanalyzer_stable_evaluation(this, result);
+//  _priv(this)->evaluator(this, result);
 
 }
 
@@ -274,21 +295,13 @@ void _log_abbrevations(SubAnalyser *this, FILE *file)
 //                  Queue Delay Analyzation
 //----------------------------------------------------------------------------------------
 
-void _qdeanalyzer_evaluation(SubAnalyser *this, SubAnalyserResult *result)
+void _qdeanalyzer_stable_evaluation(SubAnalyser *this, SubAnalyserResult *result)
 {
 
-  result->pierced = result->distorted = result->congested = FALSE;
-
-  if(result->discards_rate > .1){
-    result->distorted = this->discarded;
-    this->discarded = TRUE;
-  }else{
-    this->discarded = FALSE;
-  }
-
-  result->pierced   |= _priv(this)->cblocks[0].distorted || this->discarded;
+  result->pierced   |= result->discards_rate > 0.1 || _priv(this)->cblocks[0].distorted || _priv(this)->cblocks[2].g < -.01;
   result->distorted |= result->pierced   && _priv(this)->cblocks[1].distorted;
-  result->congested = result->distorted && _priv(this)->cblocks[2].distorted;
+  result->congested |= result->distorted && _priv(this)->cblocks[2].distorted;
+
 
   _priv(this)->cblocks[0].distorted = FALSE;
   _priv(this)->cblocks[1].distorted = FALSE;
@@ -301,8 +314,9 @@ void _qdeanalyzer_evaluation(SubAnalyser *this, SubAnalyserResult *result)
     this->last_stable = _now(this);
     result->stable = 0;
   }else{
-    result->stable = _now(this) - this->last_stable;
+    result->stable = GST_TIME_AS_SECONDS(_now(this) - this->last_stable);
   }
+
 }
 
 
@@ -368,8 +382,7 @@ void _execute_corrblock(CorrBlock* this)
     this->g_dev += ((this->g - this->g1) - this->g_dev) / (gdouble)(2 * this->N);
     if(this->g_dev < 0.) this->g_dev *=-1.;
   }
-
-  if(.05 < this->g){
+  if(this->distortion_th < this->g){
     this->distorted = TRUE;
   }
 }

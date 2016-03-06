@@ -15,6 +15,7 @@
 #include "ricalcer.h"
 #include "sndctrler.h"
 #include "streamsplitter.h"
+#include "reportprod.h"
 
 typedef struct _RcvController RcvController;
 typedef struct _RcvControllerClass RcvControllerClass;
@@ -50,7 +51,7 @@ struct _RcvController
   gboolean          rfc7243_enabled;
   gboolean          rfc3611_losts_enabled;
 //  ReportIntervalCalculator *ricalcer;
-
+  ReportProducer*   report_producer;
   gboolean          enabled;
 
 

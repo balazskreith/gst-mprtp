@@ -145,7 +145,9 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-streamsplitter.lo libgstmprtp_la-sndctrler.lo \
 	libgstmprtp_la-rcvctrler.lo libgstmprtp_la-bintree.lo \
 	libgstmprtp_la-bintree2.lo libgstmprtp_la-monitorpackets.lo \
+	libgstmprtp_la-mprtplogger.lo \
 	libgstmprtp_la-packetssndqueue.lo libgstmprtp_la-ricalcer.lo \
+	libgstmprtp_la-reportprod.lo \
 	libgstmprtp_la-percentiletracker.lo \
 	libgstmprtp_la-percentiletracker2.lo \
 	libgstmprtp_la-sndratedistor.lo libgstmprtp_la-numstracker.lo \
@@ -408,8 +410,10 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          bintree.c                  \
                          bintree2.c                 \
                          monitorpackets.c           \
+                         mprtplogger.c              \
                          packetssndqueue.c          \
                          ricalcer.c                 \
+                         reportprod.c               \
                          percentiletracker.c        \
                          percentiletracker2.c       \
                          sndratedistor.c            \
@@ -427,8 +431,10 @@ noinst_HEADERS = mprtpspath.h           \
                  bintree.h              \
                  bintree2.h             \
                  monitorpackets.h       \
+                 mprtplogger.h          \
                  packetssndqueue.h      \
                  ricalcer.h             \
+                 reportprod.h           \
                  percentiletracker.h    \
                  percentiletracker2.h   \
                  sndratedistor.h        \
@@ -540,6 +546,7 @@ include ./$(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
 include ./$(DEPDIR)/libgstmprtp_la-monitorpackets.Plo
+include ./$(DEPDIR)/libgstmprtp_la-mprtplogger.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-numstracker.Plo
@@ -547,6 +554,7 @@ include ./$(DEPDIR)/libgstmprtp_la-packetssndqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-percentiletracker.Plo
 include ./$(DEPDIR)/libgstmprtp_la-percentiletracker2.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rcvctrler.Plo
+include ./$(DEPDIR)/libgstmprtp_la-reportprod.Plo
 include ./$(DEPDIR)/libgstmprtp_la-ricalcer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndratedistor.Plo
@@ -688,6 +696,13 @@ libgstmprtp_la-monitorpackets.lo: monitorpackets.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-monitorpackets.lo `test -f 'monitorpackets.c' || echo '$(srcdir)/'`monitorpackets.c
 
+libgstmprtp_la-mprtplogger.lo: mprtplogger.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-mprtplogger.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-mprtplogger.Tpo -c -o libgstmprtp_la-mprtplogger.lo `test -f 'mprtplogger.c' || echo '$(srcdir)/'`mprtplogger.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-mprtplogger.Tpo $(DEPDIR)/libgstmprtp_la-mprtplogger.Plo
+#	$(AM_V_CC)source='mprtplogger.c' object='libgstmprtp_la-mprtplogger.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-mprtplogger.lo `test -f 'mprtplogger.c' || echo '$(srcdir)/'`mprtplogger.c
+
 libgstmprtp_la-packetssndqueue.lo: packetssndqueue.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-packetssndqueue.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-packetssndqueue.Tpo -c -o libgstmprtp_la-packetssndqueue.lo `test -f 'packetssndqueue.c' || echo '$(srcdir)/'`packetssndqueue.c
 	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-packetssndqueue.Tpo $(DEPDIR)/libgstmprtp_la-packetssndqueue.Plo
@@ -701,6 +716,13 @@ libgstmprtp_la-ricalcer.lo: ricalcer.c
 #	$(AM_V_CC)source='ricalcer.c' object='libgstmprtp_la-ricalcer.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-ricalcer.lo `test -f 'ricalcer.c' || echo '$(srcdir)/'`ricalcer.c
+
+libgstmprtp_la-reportprod.lo: reportprod.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-reportprod.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-reportprod.Tpo -c -o libgstmprtp_la-reportprod.lo `test -f 'reportprod.c' || echo '$(srcdir)/'`reportprod.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-reportprod.Tpo $(DEPDIR)/libgstmprtp_la-reportprod.Plo
+#	$(AM_V_CC)source='reportprod.c' object='libgstmprtp_la-reportprod.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-reportprod.lo `test -f 'reportprod.c' || echo '$(srcdir)/'`reportprod.c
 
 libgstmprtp_la-percentiletracker.lo: percentiletracker.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-percentiletracker.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-percentiletracker.Tpo -c -o libgstmprtp_la-percentiletracker.lo `test -f 'percentiletracker.c' || echo '$(srcdir)/'`percentiletracker.c

@@ -20,7 +20,7 @@ let "PROFILE=$PROFILE"
 
 if [ "$YUVFILE" -eq 8 ]
 then
-BWMAX=2000
+BWMAX=300
 BWMIN=150
 else
 BWMAX=1000

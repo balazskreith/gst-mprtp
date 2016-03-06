@@ -34,6 +34,8 @@
 #define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
 #define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
 
+#define _now(this) gst_clock_get_time (this->sysclock)
+
 //#define THIS_READLOCK(this)
 //#define THIS_READUNLOCK(this)
 //#define THIS_WRITELOCK(this)
@@ -45,7 +47,12 @@ GST_DEBUG_CATEGORY_STATIC (packetssndqueue_debug_category);
 
 G_DEFINE_TYPE (PacketsSndQueue, packetssndqueue, G_TYPE_OBJECT);
 
-
+typedef enum{
+  PACING_DEACTIVE    = 0,
+  PACING_ACTIVATED   = 1,
+  PACING_ACTIVE      = 2,
+  PACING_DEACTIVATED = 3
+}PacingTypes;
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
@@ -63,6 +70,11 @@ static void _packetssndqueue_add(PacketsSndQueue *this,
 static void _remove_head(PacketsSndQueue *this);
 
 static void _ticking_process_run (void *data);
+
+static guint64 _pacing_deactive_state(PacketsSndQueue *this);
+static guint64 _pacing_activated_state(PacketsSndQueue *this);
+static guint64 _pacing_active_state(PacketsSndQueue *this);
+static guint64 _pacing_deactivated_state(PacketsSndQueue *this);
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -134,9 +146,12 @@ void packetssndqueue_set_bandwidth(PacketsSndQueue *this, gdouble bandwidth)
 {
   THIS_WRITELOCK(this);
   this->bandwidth = bandwidth;
-  this->pacing = bandwidth != 0.;
-  if(!this->pacing)
-    this->pacing_started = FALSE;
+  if(this->pacing == PACING_DEACTIVE && 0. < bandwidth){
+    this->pacing = PACING_ACTIVATED;
+  }else if(this->pacing == PACING_ACTIVE && 0. == bandwidth){
+    this->pacing = PACING_DEACTIVATED;
+  }
+  this->allowed_rate_per_ms = bandwidth / 1000.;
   THIS_WRITEUNLOCK(this);
 }
 
@@ -144,10 +159,10 @@ void packetssndqueue_push(PacketsSndQueue *this,
                           GstBuffer *buffer)
 {
   THIS_WRITELOCK(this);
-  if(!this->pacing_started){
-    this->proxy(this->proxydata, buffer);
-  }else{
+  if(0 < (this->pacing & 2)){
     _packetssndqueue_add(this, buffer);
+  }else{
+    this->proxy(this->proxydata, buffer);
   }
   THIS_WRITEUNLOCK(this);
 }
@@ -200,48 +215,26 @@ done:
   return result;
 }
 
-
-
 void
 _ticking_process_run (void *data)
 {
   PacketsSndQueue *this;
   GstClockID clock_id;
   GstClockTime next_scheduler_time;
-  GstClockTime now;
-  PacketsSndQueueNode* node;
 
   this = (PacketsSndQueue *) data;
+  next_scheduler_time = _now(this) + 100 * GST_MSECOND;
 
   THIS_WRITELOCK (this);
-  now = gst_clock_get_time (this->sysclock);
-  if(!this->pacing){
-    next_scheduler_time = now + 100 * GST_MSECOND;
-    goto done;
+  if(this->pacing == PACING_ACTIVATED){
+    next_scheduler_time = _pacing_activated_state(this);
+  }else if(this->pacing == PACING_ACTIVE){
+    next_scheduler_time = _pacing_active_state(this);
+  }else if(this->pacing == PACING_DEACTIVATED){
+    next_scheduler_time = _pacing_deactivated_state(this);
+  }else if(this->pacing == PACING_DEACTIVE){
+    next_scheduler_time = _pacing_deactive_state(this);
   }
-  this->pacing_started = this->pacing;
-again:
-  if(!this->head){
-    next_scheduler_time = now + 2 * GST_MSECOND;
-    goto done;
-  }
-  node = this->head;
-  if(node->added < now - 400 * GST_MSECOND){
-     //Todo: Set expected losts flag here
-    _remove_head(this);
-    goto again;
-  }
-
-  this->proxy(this->proxydata, node->buffer);
-  next_scheduler_time = now + MAX(0.001,(node->size*8)/MAX(50000,this->bandwidth)) * GST_SECOND;
-  g_print("Pacing here, next time:%f, remaining packets: %d, rtt: %f\n",
-          MAX(0.001,node->size*8/MAX(50000,this->bandwidth)),
-          this->counter,
-          this->bandwidth);
-  _remove_head(this);
-  if(!this->pacing_started) goto again;
-
-done:
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
   THIS_WRITEUNLOCK (this);
 
@@ -249,6 +242,63 @@ done:
     GST_WARNING_OBJECT (this, "The scheduler clock wait is interrupted");
   }
   gst_clock_id_unref (clock_id);
+}
+
+guint64 _pacing_deactive_state(PacketsSndQueue *this)
+{
+  return _now(this) + 100 * GST_MSECOND;
+}
+
+guint64 _pacing_activated_state(PacketsSndQueue *this)
+{
+  this->pacing = PACING_ACTIVE;
+  return _now(this) + 1 * GST_MSECOND;
+}
+
+guint64 _pacing_active_state(PacketsSndQueue *this)
+{
+  guint64              next_scheduler_time = _now(this) + 1 * GST_MSECOND;
+  PacketsSndQueueNode* node;
+again:
+  if(!this->head){
+    goto done;
+  }
+  node = this->head;
+  if(node->added < _now(this) - 400 * GST_MSECOND){
+     //Todo: Set expected losts flag here
+    _remove_head(this);
+    goto again;
+  }
+  node->allowed_size += this->allowed_rate_per_ms;
+  if(node->allowed_size < node->size){
+    goto done;
+  }
+  this->proxy(this->proxydata, node->buffer);
+  _remove_head(this);
+//  next_scheduler_time = now + MAX(0.001,(node->size*8)/MAX(50000,this->bandwidth)) * GST_SECOND;
+done:
+  return next_scheduler_time;
+}
+
+guint64 _pacing_deactivated_state(PacketsSndQueue *this)
+{
+  guint64              next_scheduler_time = _now(this) + 100 * GST_MSECOND;
+  PacketsSndQueueNode* node;
+again:
+  if(!this->head){
+    goto done;
+  }
+  node = this->head;
+  if(node->added < _now(this) - 400 * GST_MSECOND){
+     //Todo: Set expected losts flag here
+    _remove_head(this);
+  }else{
+    this->proxy(this->proxydata, node->buffer);
+  }
+  goto again;
+done:
+  this->pacing = PACING_DEACTIVE;
+  return next_scheduler_time;
 }
 
 

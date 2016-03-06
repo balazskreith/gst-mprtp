@@ -197,7 +197,7 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
  gstmprtpbuffer.h /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
- monitorpackets.h bintree.h mprtpspath.h packetssndqueue.h \
+ monitorpackets.h bintree.h mprtpspath.h mprtplogger.h packetssndqueue.h \
  percentiletracker.h numstracker.h bintree2.h sndctrler.h \
  /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
@@ -347,8 +347,8 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
  percentiletracker2.h streamjoiner.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h rcvctrler.h \
- ricalcer.h /usr/include/glib-2.0/gio/gnetworking.h /usr/include/netdb.h \
- /usr/include/netinet/in.h \
+ ricalcer.h reportprod.h /usr/include/glib-2.0/gio/gnetworking.h \
+ /usr/include/netdb.h /usr/include/netinet/in.h \
  /usr/lib/gcc/x86_64-linux-gnu/4.8/include/stdint.h /usr/include/stdint.h \
  /usr/include/x86_64-linux-gnu/bits/wchar.h \
  /usr/include/x86_64-linux-gnu/sys/socket.h \
@@ -832,6 +832,8 @@ bintree.h:
 
 mprtpspath.h:
 
+mprtplogger.h:
+
 packetssndqueue.h:
 
 percentiletracker.h:
@@ -1175,6 +1177,8 @@ streamjoiner.h:
 rcvctrler.h:
 
 ricalcer.h:
+
+reportprod.h:
 
 /usr/include/glib-2.0/gio/gnetworking.h:
 

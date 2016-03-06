@@ -199,7 +199,7 @@ libgstmprtp_la-gstmprtpsender.lo: gstmprtpsender.c \
  /usr/local/include/gstreamer-1.0/gst/gstcompat.h gstmprtpsender.h \
  mprtpspath.h /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h mprtplogger.h \
  gstmprtcpbuffer.h gstmprtpbuffer.h packetssndqueue.h bintree.h \
  percentiletracker.h numstracker.h bintree2.h monitorpackets.h \
  /usr/include/string.h /usr/include/x86_64-linux-gnu/bits/string.h \
@@ -669,6 +669,8 @@ mprtpspath.h:
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h:
+
+mprtplogger.h:
 
 gstmprtcpbuffer.h:
 

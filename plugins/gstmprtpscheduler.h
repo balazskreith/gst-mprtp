@@ -41,6 +41,7 @@ typedef struct _GstMprtpscheduler GstMprtpscheduler;
 typedef struct _GstMprtpschedulerClass GstMprtpschedulerClass;
 typedef struct _GstMprtpschedulerPrivate GstMprtpschedulerPrivate;
 
+
 struct _GstMprtpscheduler
 {
   GstElement                    base_object;
@@ -54,10 +55,10 @@ struct _GstMprtpscheduler
 
   guint8                        mprtp_ext_header_id;
   guint8                        abs_time_ext_header_id;
+  guint32                       ssrc_filter;
   guint                         auto_rate_and_cc;
   MonitorPackets*               monitorpackets;
   PacketsSndQueue*              sndqueue;
-//  GstBuffer*                    monitorpacket;
   GHashTable*                   paths;
   GRWLock                       rwmutex;
   StreamSplitter*               splitter;
@@ -73,14 +74,9 @@ struct _GstMprtpscheduler
 
   GstClock*                     sysclock;
 
+  guint32                       rtcp_sent_octet_sum;
 
-//  void (*controller_pacing) (gpointer,gboolean);
-//  gboolean (*controller_is_pacing) (gpointer);
-//  GstStructure* (*controller_state)(gpointer);
-
-  guint32 rtcp_sent_octet_sum;
-
-  GstMprtpschedulerPrivate* priv;
+  GstMprtpschedulerPrivate*     priv;
 };
 
 struct _GstMprtpschedulerClass

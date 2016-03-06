@@ -571,10 +571,11 @@ void _delays_stats_pipe(gpointer data, PercentileTrackerPipeData *pdata)
   MpRTPRPath *this = data;
   _actual_owdrle(this)->median_delay = pdata->percentile;
   if(_now(this) - 200 * GST_MSECOND < this->delay_avg_refreshed) return;
-  if(_now(this) - GST_SECOND < this->discard_happened) return;
+  if(pdata->percentile == 0) return;
+//  if(_now(this) - GST_SECOND < this->discard_happened) return;
   this->delay_avg_refreshed = _now(this);
   if(0. < this->delay_avg){
-    this->delay_avg = (gdouble) MIN(pdata->percentile, 400 * GST_MSECOND) * .5 + this->delay_avg * .5;
+    this->delay_avg = (gdouble) MIN(pdata->percentile, 400 * GST_MSECOND) * .2 + this->delay_avg * .8;
   }else{
     this->delay_avg = (gdouble) MIN(pdata->percentile, 400 * GST_MSECOND);
   }

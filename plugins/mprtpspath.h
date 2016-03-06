@@ -11,6 +11,7 @@
 #include <gst/gst.h>
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
+#include "mprtplogger.h"
 
 #define MPRTP_DEFAULT_EXTENSION_HEADER_ID 3
 #define ABS_TIME_DEFAULT_EXTENSION_HEADER_ID 8

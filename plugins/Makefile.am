@@ -17,8 +17,10 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          bintree.c                  \
                          bintree2.c                 \
                          monitorpackets.c           \
+                         mprtplogger.c              \
                          packetssndqueue.c          \
                          ricalcer.c                 \
+                         reportprod.c               \
                          percentiletracker.c        \
                          percentiletracker2.c       \
                          sndratedistor.c            \
@@ -37,8 +39,10 @@ noinst_HEADERS = mprtpspath.h           \
                  bintree.h              \
                  bintree2.h             \
                  monitorpackets.h       \
+                 mprtplogger.h          \
                  packetssndqueue.h      \
                  ricalcer.h             \
+                 reportprod.h           \
                  percentiletracker.h    \
                  percentiletracker2.h   \
                  sndratedistor.h        \

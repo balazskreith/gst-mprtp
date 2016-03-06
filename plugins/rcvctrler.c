@@ -304,6 +304,7 @@ rcvctrler_finalize (GObject * object)
   gst_task_join (this->thread);
 //  g_object_unref (this->ricalcer);
   g_object_unref (this->sysclock);
+  g_object_unref(this->report_producer);
 }
 
 static void
@@ -326,7 +327,7 @@ rcvctrler_init (RcvController * this)
   g_rec_mutex_init (&this->stat_thread_mutex);
   this->stat_thread = gst_task_new (rcvctrler_stat_run, this, NULL);
   gst_task_set_lock (this->stat_thread, &this->stat_thread_mutex);
-
+  this->report_producer = g_object_new(REPORTPRODUCER_TYPE, NULL);
 }
 
 static gboolean file_init = FALSE;
@@ -679,7 +680,7 @@ _orp_main(RcvController * this)
 
 
   if (!this->report_is_flowable) {
-      goto done;
+      //goto done;
   }
 
   g_hash_table_iter_init (&iter, this->subflows);
@@ -690,6 +691,26 @@ _orp_main(RcvController * this)
     if(!ricalcer_do_report_now(ricalcer)){
         goto done;
     }
+
+    report_producer_begin(this->report_producer, subflow->id);
+    report_producer_add_rr(this->report_producer, 1, 2, 3, 4, 5, 6);
+    report_producer_add_xr_rfc7243(this->report_producer, 8);
+
+    {
+      GstMapInfo map;
+      GstBuffer *buffer;
+      GstRTCPXR_Chunk chunks[4];
+      chunks[0].run_length = 1;
+      chunks[1].run_length = 2;
+      chunks[2].run_length = 3;
+      report_producer_add_xr_rfc7097(this->report_producer, 9, 10, 11, chunks, 2);
+      buffer = report_producer_end(this->report_producer);
+      gst_buffer_map(buffer, &map, GST_MAP_READ);
+      gst_print_rtcp((GstRTCPHeader*)map.data);
+      gst_buffer_unmap(buffer, &map);
+    }
+
+
 //    g_print("Report time: %lu\n", GST_TIME_AS_MSECONDS(_ort0(subflow)->time - _ort1(subflow)->time));
     if(!_irt0(subflow)->SR_sent_ntp_time){
       continue;

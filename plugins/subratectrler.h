@@ -32,16 +32,16 @@ typedef void (*SubTargetRateCtrler)(SubflowRateController*, gint32);
 
 struct _SubflowRateController
 {
+  guint8                    id;
   GObject                   object;
   GRWLock                   rwmutex;
   GstClock*                 sysclock;
-  guint8                    id;
   MPRTPSPath*               path;
+  SubAnalyser*              analyser;
+  SendingRateDistributor*   rate_controller;
 
   gint32                    monitored_bitrate;
 
-  SubAnalyser*              analyser;
-  SendingRateDistributor*   rate_controller;
   SubflowUtilization        utilization;
 
   GstClockTime              disable_controlling;
@@ -56,6 +56,8 @@ struct _SubflowRateController
 
   gint32                    bottleneck_point;
   gint32                    keep;
+  gboolean                  reduced;
+  gint32                    in_congestion;
 
   GstClockTime              setup_time;
 
@@ -66,7 +68,7 @@ struct _SubflowRateController
   guint                     pending_event;
   SubRateAction             stage_fnc;
 
-  guint8*                   moments;
+  gpointer                  moments;
   gint                      moments_index;
   guint32                   moments_num;
 
@@ -75,9 +77,6 @@ struct _SubflowRateController
 
   gboolean                  cwnd_was_increased;
   gboolean                  bitrate_was_incrased;
-  GstClockTime              last_target_bitrate_i_adjust;
-  GstClockTime              last_target_bitrate_adjust;
-  GstClockTime              last_queue_clear;
   GstClockTime              last_skip_time;
   GstClockTime              packet_obsolation_treshold;
 

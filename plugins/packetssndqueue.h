@@ -32,9 +32,9 @@ struct _PacketsSndQueue
   guint32                  counter;
   GRWLock                  rwmutex;
   GstClock*                sysclock;
-  gboolean                 pacing;
-  gboolean                 pacing_started;
+  guint                    pacing;
   gdouble                  bandwidth;
+  guint                    allowed_rate_per_ms;
   GstClockTime             obsolation_treshold;
   BufferProxy              proxy;
   gpointer                 proxydata;
@@ -49,6 +49,7 @@ struct _PacketsSndQueueNode
   GstClockTime         added;
   GstBuffer*           buffer;
   guint                size;
+  guint                allowed_size;
 };
 
 struct _PacketsSndQueueClass{

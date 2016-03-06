@@ -703,7 +703,7 @@ _orp_main(RcvController * this)
       chunks[0].run_length = 1;
       chunks[1].run_length = 2;
       chunks[2].run_length = 3;
-      report_producer_add_xr_rfc7097(this->report_producer, 9, 10, 11, chunks, 2);
+      report_producer_add_xr_rfc7097(this->report_producer, 9, 10, 11, chunks, 4);
       buffer = report_producer_end(this->report_producer);
       gst_buffer_map(buffer, &map, GST_MAP_READ);
       gst_print_rtcp((GstRTCPHeader*)map.data);

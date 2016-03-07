@@ -27,6 +27,7 @@
 #include "mprtpspath.h"
 #include "sndctrler.h"
 #include "streamsplitter.h"
+#include "mprtplogger.h"
 
 G_BEGIN_DECLS
 #define GST_TYPE_MPRTPSCHEDULER   (gst_mprtpscheduler_get_type())

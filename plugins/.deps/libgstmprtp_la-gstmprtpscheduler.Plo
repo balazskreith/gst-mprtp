@@ -350,7 +350,10 @@ libgstmprtp_la-gstmprtpscheduler.lo: gstmprtpscheduler.c \
  /usr/include/glib-2.0/gio/gmenuexporter.h \
  /usr/include/glib-2.0/gio/gdbusmenumodel.h \
  /usr/include/glib-2.0/gio/gnotification.h sndratedistor.h \
- streamsplitter.h /usr/include/x86_64-linux-gnu/sys/timex.h \
+ streamsplitter.h reportprod.h mprtprpath.h \
+ /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
+ percentiletracker2.h streamjoiner.h ricalcer.h reportproc.h \
+ /usr/include/x86_64-linux-gnu/sys/timex.h \
  /usr/include/x86_64-linux-gnu/sys/time.h \
  /usr/include/x86_64-linux-gnu/bits/timex.h
 
@@ -1159,6 +1162,20 @@ sndctrler.h:
 sndratedistor.h:
 
 streamsplitter.h:
+
+reportprod.h:
+
+mprtprpath.h:
+
+/usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h:
+
+percentiletracker2.h:
+
+streamjoiner.h:
+
+ricalcer.h:
+
+reportproc.h:
 
 /usr/include/x86_64-linux-gnu/sys/timex.h:
 

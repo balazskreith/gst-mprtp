@@ -486,7 +486,10 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       THIS_WRITELOCK (this);
       gboolean_value = g_value_get_boolean (value);
       this->logging = gboolean_value;
-      rcvctrler_set_logging_flag(this->controller, this->logging);
+      if(this->logging)
+        enable_mprtp_logger();
+      else
+        disable_mprtp_logger();
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_FORCED_DELAY:

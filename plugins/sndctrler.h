@@ -33,8 +33,6 @@ typedef void(*GstSchedulerSignaling)(gpointer, gpointer);
 #define SNDCTRLER_CAST(src)        ((SndController *)(src))
 
 
-
-
 struct _SndController
 {
   GObject                    object;
@@ -86,8 +84,6 @@ void
 sndctrler_rem_path (SndController *controller_ptr, guint8 subflow_id);
 void
 sndctrler_add_path (SndController *controller_ptr, guint8 subflow_id, MPRTPSPath * path);
-void
-sndctrler_set_logging_flag(SndController *this, gboolean logging);
 void
 sndctrler_report_can_flow (SndController *this);
 void sndctrler_receive_mprtcp (SndController *this,GstBuffer * buf);

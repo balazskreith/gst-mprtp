@@ -38,7 +38,10 @@
 #define THIS_WRITELOCK(this)
 #define THIS_WRITEUNLOCK(this)
 
-#define AGGRESSIVITY 0.1f
+// Min OWD target. Default value: 0.1 -> 100ms
+#define OWD_TARGET_LO 100 * GST_MSECOND
+//Max OWD target. Default value: 0.4s -> 400ms
+#define OWD_TARGET_HI 400 * GST_MSECOND
 
 GST_DEBUG_CATEGORY_STATIC (netqueue_analyser_debug_category);
 #define GST_CAT_DEFAULT conetqueue_analyser_debug_category
@@ -55,10 +58,6 @@ struct _CorrBlock{
   gboolean        distorted;
   CorrBlock*     next;
 };
-#define CORR_LOG_ON
-
-static void _execute_corrblocks(NetQueueAnalyserPrivate *this, CorrBlock *blocks, guint blocks_length);
-static void _execute_corrblock(CorrBlock* this);
 
 typedef struct _NetQueueAnalyserPrivate{
   CorrBlock           cblocks[6];
@@ -71,11 +70,12 @@ typedef struct _NetQueueAnalyserPrivate{
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
-static void _log_abbrevations(NetQueueAnalyser *this, FILE *file);
-
 static void netqueue_analyser_finalize (GObject * object);
 
 static void _qdeanalyzer_evaluation(NetQueueAnalyser *this, NetQueueAnalyserResult *result);
+
+static void _execute_corrblocks(NetQueueAnalyserPrivate *this, CorrBlock *blocks, guint blocks_length);
+static void _execute_corrblock(CorrBlock* this);
 
 void
 netqueue_analyser_class_init (NetQueueAnalyserClass * klass)
@@ -157,7 +157,6 @@ void netqueue_analyser_do(NetQueueAnalyser *this,
                           NetQueueAnalyserResult *result)
 {
   gint i;
-  gdouble tr_ratio;
   gboolean congestion;
 
   if(!summary->XR_OWD_RLE.processed){

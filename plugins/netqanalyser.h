@@ -20,6 +20,7 @@ typedef struct _NetQueueAnalyserClass NetQueueAnalyserClass;
 #include "percentiletracker.h"
 #include "mprtpspath.h"
 #include "floatsbuffer.h"
+#include "reportproc.h"
 
 #define NETQANALYSER_TYPE             (netqueue_analyser_get_type())
 #define NETQANALYSER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),NETQANALYSER_TYPE,NetQueueAnalyser))
@@ -55,11 +56,8 @@ void netqueue_analyser_reset(NetQueueAnalyser *this);
 NetQueueAnalyser *make_netqueue_analyser(void);
 void netqueue_analyser_time_update(NetQueueAnalyser *this, gint32 sending_bitrate);
 void netqueue_analyser_reset_stability(NetQueueAnalyser *this);
-void netqueue_analyser_measurement_analyse(NetQueueAnalyser *this,
-                                     RRMeasurement *measurement,
-                                     gint32         target_bitrate,
-                                     gint32 sending_rate,
-                                     NetQueueAnalyserResult *result);
-
+void netqueue_analyser_do(NetQueueAnalyser *this,
+                          GstMPRTCPReportSummary *summary,
+                          NetQueueAnalyserResult *result);
 void netqueue_analyser_append_logfile(NetQueueAnalyser *this, FILE *file);
 #endif /* NETQANALYSER_H_ */

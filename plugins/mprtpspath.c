@@ -76,63 +76,63 @@ make_mprtps_path (guint8 id, void (*send_func)(gpointer, GstBuffer*), gpointer f
   THIS_WRITEUNLOCK (result);
   return result;
 }
-
-void g_print_rrmeasurement(RRMeasurement *measurement)
-{
-  g_print("+=+=+=+=+=+=+=+=+=+=+ RRMeasurement dump =+=+=+=+=+=+=+=+=+=+=+=+=+\n"
-  "|Time: %29lu|\n"
-  "|RTT: %29lu|\n"
-  "|jitter: %29u|\n"
-  "|cum_packet_lost: %29u|\n"
-  "|lost: %29u|\n"
-  "|median_delay: %29lu|\n"
-  "|min_delay: %29lu|\n"
-  "|max_delay: %29lu|\n"
-  "|early_discarded_bytes: %29u|\n"
-  "|late_discarded_bytes: %29u|\n"
-  "|early_discarded_bytes_sum: %29u|\n"
-  "|late_discarded_bytes_sum: %29u|\n"
-  "|HSSN: %29hu|\n"
-  "|cycle_num: %29hu|\n"
-  "|expected_packets: %29hu|\n"
-  "|PiT: %29hu|\n"
-  "|expected_payload_bytes: %29u|\n"
-  "|sent_payload_bytes_sum: %29u|\n"
-  "|lost_rate: %29f|\n"
-  "|goodput: %29f|\n"
-  "|sender_rate: %29f|\n"
-  "|receiver_rate: %29f|\n"
-  "|checked: %29d|\n"
-  "|bytes_in_flight: %29u|\n"
-  "|bytes_in_queue: %29u|\n"
-  "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n",
-  measurement->time,
-  measurement->RTT,
-  measurement->jitter,
-  measurement->cum_packet_lost,
-  measurement->lost,
-  measurement->recent_delay,
-  measurement->min_delay,
-  measurement->max_delay,
-  measurement->early_discarded_bytes,
-  measurement->late_discarded_bytes,
-  measurement->early_discarded_bytes_sum,
-  measurement->late_discarded_bytes_sum,
-  measurement->HSSN,
-  measurement->cycle_num,
-  measurement->expected_packets,
-  measurement->PiT,
-  measurement->expected_payload_bytes,
-  measurement->sent_payload_bytes_sum,
-  measurement->lost_rate,
-  measurement->goodput,
-  measurement->sender_rate,
-  measurement->receiver_rate,
-  measurement->checked,
-  measurement->bytes_in_flight_acked,
-  measurement->bytes_in_queue );
-
-}
+//
+//void g_print_rrmeasurement(RRMeasurement *measurement)
+//{
+//  g_print("+=+=+=+=+=+=+=+=+=+=+ RRMeasurement dump =+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+//  "|Time: %29lu|\n"
+//  "|RTT: %29lu|\n"
+//  "|jitter: %29u|\n"
+//  "|cum_packet_lost: %29u|\n"
+//  "|lost: %29u|\n"
+//  "|median_delay: %29lu|\n"
+//  "|min_delay: %29lu|\n"
+//  "|max_delay: %29lu|\n"
+//  "|early_discarded_bytes: %29u|\n"
+//  "|late_discarded_bytes: %29u|\n"
+//  "|early_discarded_bytes_sum: %29u|\n"
+//  "|late_discarded_bytes_sum: %29u|\n"
+//  "|HSSN: %29hu|\n"
+//  "|cycle_num: %29hu|\n"
+//  "|expected_packets: %29hu|\n"
+//  "|PiT: %29hu|\n"
+//  "|expected_payload_bytes: %29u|\n"
+//  "|sent_payload_bytes_sum: %29u|\n"
+//  "|lost_rate: %29f|\n"
+//  "|goodput: %29f|\n"
+//  "|sender_rate: %29f|\n"
+//  "|receiver_rate: %29f|\n"
+//  "|checked: %29d|\n"
+//  "|bytes_in_flight: %29u|\n"
+//  "|bytes_in_queue: %29u|\n"
+//  "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n",
+//  measurement->time,
+//  measurement->RTT,
+//  measurement->jitter,
+//  measurement->cum_packet_lost,
+//  measurement->lost,
+//  measurement->recent_delay,
+//  measurement->min_delay,
+//  measurement->max_delay,
+//  measurement->early_discarded_bytes,
+//  measurement->late_discarded_bytes,
+//  measurement->early_discarded_bytes_sum,
+//  measurement->late_discarded_bytes_sum,
+//  measurement->HSSN,
+//  measurement->cycle_num,
+//  measurement->expected_packets,
+//  measurement->PiT,
+//  measurement->expected_payload_bytes,
+//  measurement->sent_payload_bytes_sum,
+//  measurement->lost_rate,
+//  measurement->goodput,
+//  measurement->sender_rate,
+//  measurement->receiver_rate,
+//  measurement->checked,
+//  measurement->bytes_in_flight_acked,
+//  measurement->bytes_in_queue );
+//
+//}
 
 /**
  * mprtps_path_reset:

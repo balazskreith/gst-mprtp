@@ -243,7 +243,7 @@ _logging (RcvController *this)
   GstClockTime median_delay;
   gchar main_file[255];
 
-  if(!this->joiner || !this->log_flag) goto done;
+  if(!this->joiner) goto done;
   sprintf(main_file, "logs/sub_rcv_sum.csv");
 
   g_hash_table_iter_init (&iter, this->subflows);
@@ -411,13 +411,6 @@ rcvctrler_set_additional_reports(RcvController * this,
   THIS_WRITEUNLOCK (this);
 }
 
-
-void rcvctrler_set_logging_flag(RcvController *this, gboolean log_flag)
-{
-  THIS_WRITELOCK (this);
-  this->log_flag = log_flag;
-  THIS_WRITEUNLOCK (this);
-}
 
 //------------------------- Incoming Report Processor -------------------
 

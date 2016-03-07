@@ -59,7 +59,6 @@ typedef struct _SubflowUtilization{
     gint32   min_rate;
     //Todo: add this
     //gdouble  aggressivity;
-
   }control;
 }SubflowUtilization;
 

@@ -105,58 +105,58 @@ struct _MPRTPSPathClass
 };
 
 
-typedef struct _RunningLengthEncodingRR RLERR;
-struct _RunningLengthEncodingRR{
-  guint64      values[MPRTP_PLUGIN_MAX_RLE_LENGTH];
-  guint        length;
-};
-
-typedef struct _RRMeasurement RRMeasurement;
-void g_print_rrmeasurement(RRMeasurement *measurement);
-struct _RRMeasurement{
-  GstClockTime        time;
-  GstClockTime        RTT;
-  guint32             jitter;
-  guint32             cum_packet_lost;
-  guint32             lost;
-  gboolean            expected_lost;
-  guint64             min_delay;
-  guint64             max_delay;
-  guint32             early_discarded_bytes;
-  guint32             late_discarded_bytes;
-  guint32             early_discarded_bytes_sum;
-  guint32             late_discarded_bytes_sum;
-  guint16             HSSN;
-  guint16             cycle_num;
-  guint16             expected_packets;
-  guint16             PiT;
-  guint32             expected_payload_bytes;
-  guint32             sent_payload_bytes_sum;
-  guint32             sent_payload_bytes;
-  guint32             received_payload_bytes;
-  gdouble             lost_rate;
-  gdouble             goodput;
-  gdouble             sender_rate;
-  gint64              incoming_rate;
-  gdouble             receiver_rate;
-  gboolean            checked;
-
-  gboolean            rfc7097_arrived;
-  gboolean            rfc3611_arrived;
-  gboolean            rfc7243_arrived;
-  gboolean            owd_rle_arrived;
-
-  RLERR               rle_discards;
-  RLERR               rle_losts;
-  RLERR               rle_delays;
-  guint32             recent_discarded_bytes;
-  GstClockTime        recent_delay;
-  guint16             recent_lost;
-  guint16             rfc3611_cum_lost;
-
-  guint32             bytes_in_flight_acked;
-  guint32             bytes_in_queue;
-};
+//typedef struct _RunningLengthEncodingRR RLERR;
+//struct _RunningLengthEncodingRR{
+//  guint64      values[MPRTP_PLUGIN_MAX_RLE_LENGTH];
+//  guint        length;
+//};
+//
+//typedef struct _RRMeasurement RRMeasurement;
+//void g_print_rrmeasurement(RRMeasurement *measurement);
+//struct _RRMeasurement{
+//  GstClockTime        time;
+//  GstClockTime        RTT;
+//  guint32             jitter;
+//  guint32             cum_packet_lost;
+//  guint32             lost;
+//  gboolean            expected_lost;
+//  guint64             min_delay;
+//  guint64             max_delay;
+//  guint32             early_discarded_bytes;
+//  guint32             late_discarded_bytes;
+//  guint32             early_discarded_bytes_sum;
+//  guint32             late_discarded_bytes_sum;
+//  guint16             HSSN;
+//  guint16             cycle_num;
+//  guint16             expected_packets;
+//  guint16             PiT;
+//  guint32             expected_payload_bytes;
+//  guint32             sent_payload_bytes_sum;
+//  guint32             sent_payload_bytes;
+//  guint32             received_payload_bytes;
+//  gdouble             lost_rate;
+//  gdouble             goodput;
+//  gdouble             sender_rate;
+//  gint64              incoming_rate;
+//  gdouble             receiver_rate;
+//  gboolean            checked;
+//
+//  gboolean            rfc7097_arrived;
+//  gboolean            rfc3611_arrived;
+//  gboolean            rfc7243_arrived;
+//  gboolean            owd_rle_arrived;
+//
+//  RLERR               rle_discards;
+//  RLERR               rle_losts;
+//  RLERR               rle_delays;
+//  guint32             recent_discarded_bytes;
+//  GstClockTime        recent_delay;
+//  guint16             recent_lost;
+//  guint16             rfc3611_cum_lost;
+//
+//  guint32             bytes_in_flight_acked;
+//  guint32             bytes_in_queue;
+//};
 
 
 typedef struct _SubflowUtilization{

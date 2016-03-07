@@ -12,8 +12,9 @@
 #include "mprtpspath.h"
 #include "bintree.h"
 #include "floatsbuffer.h"
-#include "subanalyser.h"
+#include "netqanalyser.h"
 #include "sndratedistor.h"
+#include "reportproc.h"
 
 
 typedef struct _SubflowRateController SubflowRateController;
@@ -31,14 +32,27 @@ typedef void (*SubRateCtrler)(SubflowRateController*);
 typedef void (*SubRateAction)(SubflowRateController*);
 typedef void (*SubTargetRateCtrler)(SubflowRateController*, gint32);
 
+typedef enum{
+  SUBFLOW_STATE_OVERUSED       = -1,
+  SUBFLOW_STATE_STABLE         =  0,
+  SUBFLOW_STATE_MONITORED      =  1,
+}SubflowState;
+
+struct _SubflowMeasurement{
+  GstMPRTCPReportSummary *reports;
+  NetQueueAnalyserResult  netq_analysation;
+  guint32                 sending_bitrate;
+};
+
+
 struct _SubflowRateController
 {
-  guint8                    id;
   GObject                   object;
+  guint8                    id;
   GRWLock                   rwmutex;
   GstClock*                 sysclock;
   MPRTPSPath*               path;
-  SubAnalyser*              analyser;
+  NetQueueAnalyser*         analyser;
   SendingRateDistributor*   rate_controller;
 
   gint32                    monitored_bitrate;
@@ -46,7 +60,9 @@ struct _SubflowRateController
   SubflowUtilization        utilization;
 
   GstClockTime              disable_controlling;
+  guint                     measurements_num;
 
+  gint32                    bottleneck_point;
   gint32                    max_target_point;
   gint32                    min_target_point;
   gint32                    desired_bitrate;
@@ -55,7 +71,7 @@ struct _SubflowRateController
   gint32                    max_rate;
   gint32                    min_rate;
 
-  gint32                    bottleneck_point;
+  SubflowState              state;
   gint32                    keep;
   gboolean                  reduced;
   gint32                    in_congestion;
@@ -69,23 +85,9 @@ struct _SubflowRateController
   guint                     pending_event;
   SubRateAction             stage_fnc;
 
-  gpointer                  moments;
-  gint                      moments_index;
-  guint32                   moments_num;
-
-  gdouble                   discard_aggressivity;
-  gdouble                   ramp_up_aggressivity;
-
-  gboolean                  cwnd_was_increased;
-  gboolean                  bitrate_was_incrased;
-  GstClockTime              last_skip_time;
-  GstClockTime              packet_obsolation_treshold;
-
   GstClockTime              congestion_detected;
 
-  gboolean                  log_enabled;
-  guint                     logtick;
-  gchar                     log_filename[255];
+  gpointer                  priv;
 
 };
 
@@ -96,8 +98,6 @@ struct _SubflowRateControllerClass{
 };
 GType subratectrler_get_type (void);
 SubflowRateController *make_subratectrler(SendingRateDistributor* rate_controlller);
-void subratectrler_enable_logging(SubflowRateController *this, const gchar *filename);
-void subratectrler_disable_logging(SubflowRateController *this);
 void subratectrler_set(SubflowRateController *this,
                          MPRTPSPath *path,
                          guint32 sending_target,
@@ -106,7 +106,7 @@ void subratectrler_unset(SubflowRateController *this);
 
 void subratectrler_measurement_update(
                          SubflowRateController *this,
-                         RRMeasurement * measurement);
+                         SubflowMeasurement * measurement);
 void subratectrler_setup_controls(
                          SubflowRateController *this, struct _SubflowUtilizationControl* src);
 gint32 subratectrler_get_target_bitrate(SubflowRateController *this);

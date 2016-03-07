@@ -45,6 +45,7 @@
 #include "sndctrler.h"
 #include <sys/timex.h>
 
+
 GST_DEBUG_CATEGORY_STATIC (gst_mprtpscheduler_debug_category);
 #define GST_CAT_DEFAULT gst_mprtpscheduler_debug_category
 
@@ -497,7 +498,10 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       THIS_WRITELOCK (this);
       gboolean_value = g_value_get_boolean (value);
       this->logging = gboolean_value;
-      sndctrler_set_logging_flag(this->controller, this->logging);
+      if(this->logging)
+        enable_mprtp_logger();
+      else
+        disable_mprtp_logger();
       THIS_WRITEUNLOCK (this);
       break;
     default:

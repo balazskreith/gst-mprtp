@@ -343,11 +343,11 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/include/x86_64-linux-gnu/bits/sys_errlist.h \
  /usr/include/x86_64-linux-gnu/bits/stdio.h \
  /usr/include/x86_64-linux-gnu/bits/stdio2.h sndratedistor.h \
- streamsplitter.h gstmprtpsender.h gstmprtpplayouter.h mprtprpath.h \
+ streamsplitter.h reportprod.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
- percentiletracker2.h streamjoiner.h \
+ percentiletracker2.h streamjoiner.h ricalcer.h reportproc.h \
+ gstmprtpsender.h gstmprtpplayouter.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h rcvctrler.h \
- ricalcer.h reportprod.h reportproc.h \
  /usr/include/glib-2.0/gio/gnetworking.h /usr/include/netdb.h \
  /usr/include/netinet/in.h \
  /usr/lib/gcc/x86_64-linux-gnu/4.8/include/stdint.h /usr/include/stdint.h \
@@ -1161,9 +1161,7 @@ sndratedistor.h:
 
 streamsplitter.h:
 
-gstmprtpsender.h:
-
-gstmprtpplayouter.h:
+reportprod.h:
 
 mprtprpath.h:
 
@@ -1173,15 +1171,17 @@ percentiletracker2.h:
 
 streamjoiner.h:
 
+ricalcer.h:
+
+reportproc.h:
+
+gstmprtpsender.h:
+
+gstmprtpplayouter.h:
+
 /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h:
 
 rcvctrler.h:
-
-ricalcer.h:
-
-reportprod.h:
-
-reportproc.h:
 
 /usr/include/glib-2.0/gio/gnetworking.h:
 

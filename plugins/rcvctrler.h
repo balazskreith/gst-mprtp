@@ -36,8 +36,6 @@ struct _RcvController
   GstTask*          thread;
   GRecMutex         thread_mutex;
 
-  gboolean          log_flag;
-
   GHashTable*       subflows;
   GRWLock           rwmutex;
   GstClock*         sysclock;
@@ -77,9 +75,6 @@ void
 rcvctrler_rem_path (
     RcvController *this,
     guint8 subflow_id);
-
-void rcvctrler_set_logging_flag(RcvController *this, gboolean enable);
-
 
 void
 rcvctrler_receive_mprtcp (

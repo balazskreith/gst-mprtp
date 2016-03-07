@@ -18,6 +18,7 @@
 
 typedef struct _SubflowRateController SubflowRateController;
 typedef struct _SubflowRateControllerClass SubflowRateControllerClass;
+typedef struct _SubflowMeasurement SubflowMeasurement;
 
 #define SUBRATECTRLER_TYPE             (subratectrler_get_type())
 #define SUBRATECTRLER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),SUBRATECTRLER_TYPE,SubflowRateController))

@@ -45,6 +45,7 @@
 #include "mprtpspath.h"
 #include "streamjoiner.h"
 #include "gstmprtpbuffer.h"
+#include "mprtplogger.h"
 
 
 #include "rcvctrler.h"
@@ -98,6 +99,7 @@ static gboolean _try_get_path (GstMprtpplayouter * this, guint16 subflow_id,
 static void _change_auto_rate_and_cc (GstMprtpplayouter * this,
                                  gboolean auto_rate_and_cc);
 static GstStructure *_collect_infos (GstMprtpplayouter * this);
+static void _setup_paths (GstMprtpplayouter * this);
 static GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer);
 //static void _trash_mprtp_buffer(GstMprtpplayouter * this, GstMpRTPBuffer *mprtp);
 //#define _trash_mprtp_buffer(this, mprtp) pointerpool_add(this->mprtp_buffer_pool, mprtp);
@@ -118,6 +120,9 @@ enum
   PROP_LOG_ENABLED,
   PROP_SUBFLOWS_STATS,
   PROP_FORCED_DELAY,
+  PROP_LATENCY_DISCARD,
+  PROP_LATENCY_LOST,
+
 };
 
 /* pad templates */
@@ -273,6 +278,20 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                                                         0, G_MAXUINT, 0,
                                                         G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_LATENCY_DISCARD,
+       g_param_spec_uint ("latency-discard",
+                          "A latency in ms after a packet considered to be discarded.",
+                          "A latency in ms after a packet considered to be discarded.",
+                          0,
+                          5000, 400, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_LATENCY_LOST,
+       g_param_spec_uint ("latency-lost",
+                          "A latency in ms after a packet considered to be lost.",
+                          "A latency in ms after a packet considered to be lost.",
+                          0,
+                          10000, 1000, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   element_class->change_state =
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_change_state);
   element_class->query = GST_DEBUG_FUNCPTR (gst_mprtpplayouter_query);
@@ -318,7 +337,6 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_sink_event));
 
   this->rtp_passthrough = TRUE;
-  this->riport_flow_signal_sent = FALSE;
   this->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
   this->abs_time_ext_header_id = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
   this->sysclock = gst_system_clock_obtain ();
@@ -329,10 +347,8 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->joiner = make_stream_joiner(this,gst_mprtpplayouter_send_mprtp_proxy);
   this->controller = g_object_new(RCVCTRLER_TYPE, NULL);
   rcvctrler_setup(this->controller, this->joiner);
-  rcvctrler_setup_callbacks(this->controller,
-                            this, gst_mprtpplayouter_mprtcp_sender);
-  rcvctrler_setup_discarding_reports(this->controller, TRUE, FALSE);
-  rcvctrler_setup_rle_lost_reports(this->controller, TRUE);
+  rcvctrler_setup_callbacks(this->controller, this, gst_mprtpplayouter_mprtcp_sender);
+  rcvctrler_set_additional_reports(this->controller, FALSE, FALSE, FALSE);
   _change_auto_rate_and_cc (this, FALSE);
 
   this->pivot_address_subflow_id = 0;
@@ -341,6 +357,8 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
 //  this->mprtp_buffer_pool = make_pointerpool(512, _mprtp_ctor, g_free, _mprtp_reset);
   this->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
   stream_joiner_set_monitor_payload_type(this->joiner, this->monitor_payload_type);
+
+  init_mprtp_logger();
 //  percentiletracker_test();
 //  {
 //    StreamJoiner *s = NULL;
@@ -482,6 +500,18 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       _change_auto_rate_and_cc (this, gboolean_value);
       THIS_WRITEUNLOCK (this);
       break;
+    case PROP_LATENCY_DISCARD:
+      THIS_WRITELOCK (this);
+      this->discard_latency = g_value_get_uint (value);
+      _setup_paths(this);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_LATENCY_LOST:
+      THIS_WRITELOCK (this);
+      this->lost_latency = g_value_get_uint (value);
+      _setup_paths(this);
+      THIS_WRITEUNLOCK (this);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -542,6 +572,18 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
     case PROP_LOG_ENABLED:
       THIS_READLOCK (this);
       g_value_set_boolean (value, this->logging);
+      THIS_READUNLOCK (this);
+      break;
+    case PROP_LATENCY_DISCARD:
+      THIS_READLOCK (this);
+      g_value_set_uint (value, this->discard_latency);
+      _setup_paths(this);
+      THIS_READUNLOCK (this);
+      break;
+    case PROP_LATENCY_LOST:
+      THIS_READLOCK (this);
+      g_value_set_uint (value, this->lost_latency);
+      _setup_paths(this);
       THIS_READUNLOCK (this);
       break;
     default:
@@ -608,6 +650,23 @@ _collect_infos (GstMprtpplayouter * this)
     ++index;
   }
   return result;
+}
+
+void
+_setup_paths (GstMprtpplayouter * this)
+{
+  GHashTableIter iter;
+  gpointer key, val;
+  MpRTPRPath *path;
+  GstClockTime latency;
+
+  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+    path = (MpRTPRPath *) val;
+    latency = this->discard_latency;
+    mprtpr_path_set_discard_latency(path, latency * GST_MSECOND);
+    latency = this->lost_latency;
+    mprtpr_path_set_lost_latency(path, latency * GST_MSECOND);
+  }
 }
 
 
@@ -889,10 +948,6 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 
   _processing_mprtp_packet (this, buf);
   result = GST_FLOW_OK;
-  if (!this->riport_flow_signal_sent) {
-    this->riport_flow_signal_sent = TRUE;
-    rcvctrler_report_can_flow(this->controller);
-  }
 done:
   THIS_READUNLOCK (this);
 //  g_print("END PROCESSING RTP\n");
@@ -929,10 +984,6 @@ gst_mprtpplayouter_mprtcp_sr_sink_chain (GstPad * pad, GstObject * parent,
     result = GST_FLOW_OK;
   }
 
-  if (!this->riport_flow_signal_sent) {
-    this->riport_flow_signal_sent = TRUE;
-    rcvctrler_report_can_flow(this->controller);
-  }
 done:
   THIS_READUNLOCK (this);
   return result;

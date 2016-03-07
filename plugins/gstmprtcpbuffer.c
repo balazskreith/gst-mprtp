@@ -922,7 +922,7 @@ void gst_rtcp_xr_owd_rle_getdown (GstRTCPXR_OWD_RLE *report,
      *early_bit = report->early_bit;
    }
    if (thinning) {
-     *thinning = report->thinning;
+     *thinning = report->resolution;
    }
    if (begin_seq) {
      *begin_seq = g_ntohs (report->begin_seq);
@@ -935,7 +935,7 @@ void gst_rtcp_xr_owd_rle_getdown (GstRTCPXR_OWD_RLE *report,
 
 void gst_rtcp_xr_owd_rle_change (GstRTCPXR_OWD_RLE *report,
                              gboolean *early_bit,
-                             guint8 *thinning,
+                             guint8 *resolution,
                              guint32 *ssrc,
                              guint16 *begin_seq,
                              guint16 *end_seq)
@@ -946,8 +946,8 @@ void gst_rtcp_xr_owd_rle_change (GstRTCPXR_OWD_RLE *report,
    if(early_bit){
        report->early_bit = *early_bit;
    }
-   if (thinning) {
-       report->thinning = *thinning;
+   if (resolution) {
+       report->resolution = *resolution;
    }
    if (begin_seq) {
        report->begin_seq = g_htons(*begin_seq);
@@ -1071,7 +1071,7 @@ gst_mprtcp_riport_setup (GstMPRTCPSubflowReport * riport, guint32 ssrc)
 }
 
 void
-gst_mprtcp_riport_getdown (GstMPRTCPSubflowReport * riport, guint32 * ssrc)
+gst_mprtcp_report_getdown (GstMPRTCPSubflowReport * riport, guint32 * ssrc)
 {
   if (ssrc) {
     *ssrc = g_ntohl (riport->ssrc);
@@ -1285,6 +1285,8 @@ gst_print_rtcp (GstRTCPHeader * header)
             gst_print_rtcp_xr_owd ((GstRTCPXR_OWD *) step);
           else if(block_type == GST_RTCP_XR_RFC7097_BLOCK_TYPE_IDENTIFIER)
             gst_print_rtcp_xr_7097((GstRTCPXR_RFC7097*) step);
+          else if(block_type == GST_RTCP_XR_RFC3611_BLOCK_TYPE_IDENTIFIER)
+            gst_print_rtcp_xr_3611((GstRTCPXR_RFC3611*) step);
           else if(block_type == GST_RTCP_XR_OWD_RLE_BLOCK_TYPE_IDENTIFIER)
             gst_print_rtcp_xr_owd_rle((GstRTCPXR_OWD_RLE*) step);
         }
@@ -1308,7 +1310,7 @@ gst_print_mprtcp (GstMPRTCPSubflowReport * riport)
   GstRTCPHeader *riport_header = &riport->header;
   guint32 ssrc;
   guint8 src;
-  gst_mprtcp_riport_getdown (riport, &ssrc);
+  gst_mprtcp_report_getdown (riport, &ssrc);
 
   gst_print_rtcp_header (riport_header);
   gst_rtcp_header_getdown (riport_header, NULL, NULL, &src, NULL, NULL, NULL);
@@ -1547,7 +1549,7 @@ gst_print_rtcp_xr_7097(GstRTCPXR_RFC7097 * report)
 
 
 void
-gst_print_rtcp_xr_owd_rle(GstRTCPXR_OWD_RLE * report)
+gst_print_rtcp_xr_3611(GstRTCPXR_RFC3611 * report)
 {
   gboolean early_bit;
   guint chunk_index;
@@ -1558,7 +1560,7 @@ gst_print_rtcp_xr_owd_rle(GstRTCPXR_OWD_RLE * report)
   guint16 begin_seq, end_seq;
 
   gst_print_rtcp_header (&report->header);
-  gst_rtcp_xr_owd_rle_getdown (report, &early_bit, &thinning, &ssrc, &begin_seq, &end_seq);
+  gst_rtcp_xr_rfc3611_getdown (report, &early_bit, &thinning, &ssrc, &begin_seq, &end_seq);
 
   g_print (
       "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
@@ -1570,6 +1572,44 @@ gst_print_rtcp_xr_owd_rle(GstRTCPXR_OWD_RLE * report)
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       ,
       report->block_type, report->reserved, early_bit, thinning,
+      g_ntohs (report->block_length), ssrc, begin_seq, end_seq);
+
+  chunks_num = gst_rtcp_xr_rfc3611_get_chunks_num(report);
+
+   for(chunk_index = 0;
+       chunk_index < chunks_num;
+       chunk_index+=2)
+   {
+       chunk1 = gst_rtcp_xr_rfc3611_get_chunk(report, chunk_index);
+       chunk2 = gst_rtcp_xr_rfc3611_get_chunk(report, chunk_index+1);
+       gst_print_rtcp_xrchunks(chunk1, chunk2);
+   }
+}
+
+void
+gst_print_rtcp_xr_owd_rle(GstRTCPXR_OWD_RLE * report)
+{
+  gboolean early_bit;
+  guint chunk_index;
+  guint8 resolution;
+  guint32 ssrc;
+  guint chunks_num;
+  GstRTCPXR_Chunk *chunk1, *chunk2;
+  guint16 begin_seq, end_seq;
+
+  gst_print_rtcp_header (&report->header);
+  gst_rtcp_xr_owd_rle_getdown (report, &early_bit, &resolution, &ssrc, &begin_seq, &end_seq);
+
+  g_print (
+      "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+      "|%15d|%5d|%1d|%7d|%31d|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63X|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%31d|%31d|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      ,
+      report->block_type, report->reserved, early_bit, resolution,
       g_ntohs (report->block_length), ssrc, begin_seq, end_seq);
 
    chunks_num = gst_rtcp_xr_owd_rle_get_chunks_num(report);

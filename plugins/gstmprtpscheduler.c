@@ -785,7 +785,7 @@ gst_mprtpscheduler_mprtp_proxy(gpointer ptr, GstBuffer * buffer)
   gst_pad_push (this->mprtp_srcpad, outbuf);
   if (!this->riport_flow_signal_sent) {
     this->riport_flow_signal_sent = TRUE;
-    sndctrler_riport_can_flow(this->controller);
+    sndctrler_report_can_flow(this->controller);
   }
 
 done:
@@ -1055,7 +1055,7 @@ _change_auto_rate_and_cc (GstMprtpscheduler * this,
 {
   if(this->auto_rate_and_cc ^ auto_rate_and_cc){
     if(auto_rate_and_cc) sndctrler_enable_auto_rate_and_cc(this->controller);
-    else sndctrler_disable_auto_rate_and_congestion_control(this->controller);
+    else sndctrler_disable_auto_rate_and_cc(this->controller);
   }
   this->auto_rate_and_cc = auto_rate_and_cc;
 }

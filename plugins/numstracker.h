@@ -127,6 +127,7 @@ numstracker_get_stats (NumsTracker * this,
 
 void numstracker_obsolate (NumsTracker * this);
 void numstracker_reset(NumsTracker *this);
+void numstracker_set_treshold(NumsTracker *this, GstClockTime treshold);
 gboolean numstracker_find(NumsTracker *this, gint64 value);
 void numstracker_add(NumsTracker *this, gint64 value);
 void numstracker_add_rem_pipe(NumsTracker *this, void (*rem_pipe)(gpointer, gint64), gpointer rem_pipe_data);

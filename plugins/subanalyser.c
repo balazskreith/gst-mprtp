@@ -302,7 +302,6 @@ void _qdeanalyzer_stable_evaluation(SubAnalyser *this, SubAnalyserResult *result
   result->distorted |= result->pierced   && _priv(this)->cblocks[1].distorted;
   result->congested |= result->distorted && _priv(this)->cblocks[2].distorted;
 
-
   _priv(this)->cblocks[0].distorted = FALSE;
   _priv(this)->cblocks[1].distorted = FALSE;
   _priv(this)->cblocks[2].distorted = FALSE;

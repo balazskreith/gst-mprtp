@@ -672,23 +672,22 @@ exit:
 }
 
 
+
+
 GstFlowReturn
 _send_mprtcp_buffer (GstMprtpreceiver * this, GstBuffer * buf)
 {
   GstFlowReturn result = GST_FLOW_OK;
   GstPad *outpad;
   GstRTCPBuffer rtcp = { NULL, };
-  GstRTCPHeader *block_header;
+  GstRTCPHeader *header;
   GstMPRTCPSubflowReport *report;
   GstMPRTCPSubflowBlock *block;
-  GstMPRTCPSubflowInfo *info;
-  guint8 info_type;
   guint8 block_length;
-  guint8 block_riport_type;
-  GstBuffer *buffer;
-  gpointer data;
-  gsize buf_length;
-  guint8 src = 0;
+  gpointer databed, actual;
+  guint16 processed_length;
+  guint16 actual_length;
+  guint8 pt;
 
   if (G_UNLIKELY (!gst_rtcp_buffer_map (buf, GST_MAP_READ, &rtcp))) {
     GST_WARNING_OBJECT (this, "The RTCP packet is not readable");
@@ -696,48 +695,92 @@ _send_mprtcp_buffer (GstMprtpreceiver * this, GstBuffer * buf)
   }
 
   report = (GstMPRTCPSubflowReport *) gst_rtcp_get_first_header (&rtcp);
-//  gst_print_rtcp(&report->header);
-  for (block = gst_mprtcp_get_first_block (report);
-      block != NULL; block = gst_mprtcp_get_next_block (report, block, &src)) {
-    info = &block->info;
-    gst_mprtcp_block_getdown (info, &info_type, &block_length, NULL);
-    if (info_type != 0) {
-      continue;
-    }
-    block_header = &block->block_header;
-    gst_rtcp_header_getdown (block_header, NULL, NULL, NULL,
-        &block_riport_type, NULL, NULL);
+  block = gst_mprtcp_get_first_block (report);
+  outpad = this->mprtcp_sr_srcpad;
 
-    buf_length = (block_length + 1) << 2;
-    data = g_malloc0 (buf_length);
-    memcpy (data, (gpointer) block, buf_length);
-    buffer = gst_buffer_new_wrapped (data, buf_length);
-    outpad = (block_riport_type == GST_RTCP_TYPE_SR) ? this->mprtcp_sr_srcpad
-        : this->mprtcp_rr_srcpad;
-//    {
-//      guint16 subflow_id;
-//      gst_mprtcp_block_getdown (info, NULL, NULL, &subflow_id);
-//      if(block_riport_type == GST_RTCP_TYPE_SR){
-//          guint64 ntptime;
-//          GstRTCPSR *sr;
-//          sr = &block->sender_riport;
-//          gst_rtcp_srb_getdown(&sr->sender_block, &ntptime, NULL, NULL, NULL);
-//          g_print("Created NTP time for subflow %d is %lu, but it "
-//              "received at: %lu (%lu)\n",
-//              subflow_id, ntptime, NTP_NOW>>32,
-//              get_epoch_time_from_ntp_in_ns(NTP_NOW - ntptime));
-//      }
-//    }
-//    g_print("ARRIVED REPORT: %d\n", block_riport_type);
-    if ((result = gst_pad_push (outpad, buffer)) != GST_FLOW_OK) {
-      goto done;
-    }
+  gst_mprtcp_block_getdown(&block->info, NULL, &block_length, NULL);
+  actual = databed = header = &block->block_header;
 
+  for(processed_length = 0; processed_length < block_length; )
+  {
+      gst_rtcp_header_getdown (header, NULL, NULL, NULL, &pt, &actual_length, NULL);
+      if(pt == GST_RTCP_TYPE_RR){
+        outpad = this->mprtcp_rr_srcpad;
+      }
+      processed_length +=actual_length + 1;
+      header = actual = processed_length * 4 + (gchar*)databed;
   }
-//  g_print("-------------------------\n");
-done:
-  return result;
+  return gst_pad_push (outpad, buf);
 }
+
+
+//
+//GstFlowReturn
+//_send_mprtcp_buffer (GstMprtpreceiver * this, GstBuffer * buf)
+//{
+//  GstFlowReturn result = GST_FLOW_OK;
+//  GstPad *outpad;
+//  GstRTCPBuffer rtcp = { NULL, };
+//  GstRTCPHeader *block_header;
+//  GstMPRTCPSubflowReport *report;
+//  GstMPRTCPSubflowBlock *block;
+//  GstMPRTCPSubflowInfo *info;
+//  guint8 info_type;
+//  guint8 block_length;
+//  guint8 block_riport_type;
+//  GstBuffer *buffer;
+//  gpointer data;
+//  gsize buf_length;
+//  guint8 src = 0;
+//
+//  if (G_UNLIKELY (!gst_rtcp_buffer_map (buf, GST_MAP_READ, &rtcp))) {
+//    GST_WARNING_OBJECT (this, "The RTCP packet is not readable");
+//    return result;
+//  }
+//
+//  report = (GstMPRTCPSubflowReport *) gst_rtcp_get_first_header (&rtcp);
+////  gst_print_rtcp(&report->header);
+//  for (block = gst_mprtcp_get_first_block (report);
+//      block != NULL; block = gst_mprtcp_get_next_block (report, block, &src)) {
+//    info = &block->info;
+//    gst_mprtcp_block_getdown (info, &info_type, &block_length, NULL);
+//    if (info_type != 0) {
+//      continue;
+//    }
+//    block_header = &block->block_header;
+//    gst_rtcp_header_getdown (block_header, NULL, NULL, NULL,
+//        &block_riport_type, NULL, NULL);
+//
+//    buf_length = (block_length + 1) << 2;
+//    data = g_malloc0 (buf_length);
+//    memcpy (data, (gpointer) block, buf_length);
+//    buffer = gst_buffer_new_wrapped (data, buf_length);
+//    outpad = (block_riport_type == GST_RTCP_TYPE_SR) ? this->mprtcp_sr_srcpad
+//        : this->mprtcp_rr_srcpad;
+////    {
+////      guint16 subflow_id;
+////      gst_mprtcp_block_getdown (info, NULL, NULL, &subflow_id);
+////      if(block_riport_type == GST_RTCP_TYPE_SR){
+////          guint64 ntptime;
+////          GstRTCPSR *sr;
+////          sr = &block->sender_riport;
+////          gst_rtcp_srb_getdown(&sr->sender_block, &ntptime, NULL, NULL, NULL);
+////          g_print("Created NTP time for subflow %d is %lu, but it "
+////              "received at: %lu (%lu)\n",
+////              subflow_id, ntptime, NTP_NOW>>32,
+////              get_epoch_time_from_ntp_in_ns(NTP_NOW - ntptime));
+////      }
+////    }
+////    g_print("ARRIVED REPORT: %d\n", block_riport_type);
+//    if ((result = gst_pad_push (outpad, buffer)) != GST_FLOW_OK) {
+//      goto done;
+//    }
+//
+//  }
+////  g_print("-------------------------\n");
+//done:
+//  return result;
+//}
 
 
 #undef THIS_WRITELOCK

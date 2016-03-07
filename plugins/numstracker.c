@@ -113,7 +113,6 @@ numstracker_finalize (GObject * object)
     plugin = it->data;
     plugin->destroyer(plugin);
   }
-  g_print("numstracker_finalize\n");
   g_free(this->items);
 }
 
@@ -146,6 +145,13 @@ void numstracker_reset(NumsTracker *this)
 {
   THIS_WRITELOCK (this);
   while(0 < this->counter) _rem_value(this);
+  THIS_WRITEUNLOCK (this);
+}
+
+void numstracker_set_treshold(NumsTracker *this, GstClockTime treshold)
+{
+  THIS_WRITELOCK (this);
+  this->treshold = treshold;
   THIS_WRITEUNLOCK (this);
 }
 

@@ -864,7 +864,7 @@ static void _init_all_subflows(GstMprtpsender *this, GstBuffer *buf)
     //when it finally changed the state to PLAYING.
     //Anyway, if you are not a gstreamer developer you have probably no idea
     //how much it hurts me that one possible solution for that problem
-    //is so simple that this anecdote is longer in lines.
+    //is so simple that this anecdote is in fact longer.
     {
       GstBuffer *result;
       GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
@@ -971,10 +971,13 @@ gst_mprtpsender_mprtcp_sink_chain (GstPad * pad, GstObject * parent,
     goto done;
   }
 //  g_print("############################ SENT (%lu)################################\n", GST_TIME_AS_MSECONDS(gst_clock_get_time(subflow->sysclock)));
-  if(subflow->async_outpad)
-    result = gst_pad_push (subflow->async_outpad, _assemble_report (subflow, buf));
-  else
-    result = gst_pad_push (subflow->outpad, _assemble_report (subflow, buf));
+  if(subflow->async_outpad){
+    DISABLE_LINE result = gst_pad_push (subflow->async_outpad, _assemble_report (subflow, buf));
+    result = gst_pad_push (subflow->async_outpad, buf);
+  }else{
+    DISABLE_LINE result = gst_pad_push (subflow->outpad, _assemble_report (subflow, buf));
+    result = gst_pad_push (subflow->outpad, buf);
+  }
 
 done:
   THIS_READUNLOCK (this);
@@ -997,6 +1000,7 @@ _get_subflow_from_blocks (GstMprtpsender * this, GstBuffer * blocks)
   if (!_select_subflow (this, subflow_id, &result)) {
     result = NULL;
   }
+  gst_buffer_unmap(blocks, &map);
 done:
   return result;
 }

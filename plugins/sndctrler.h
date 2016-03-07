@@ -16,6 +16,8 @@
 #include "bintree.h"
 #include "sndratedistor.h"
 #include "streamsplitter.h"
+#include "reportprod.h"
+#include "reportproc.h"
 
 
 typedef struct _SndController SndController;
@@ -35,37 +37,28 @@ typedef void(*GstSchedulerSignaling)(gpointer, gpointer);
 
 struct _SndController
 {
-  GObject                object;
+  GObject                    object;
 
-  GstTask*               thread;
-  GRecMutex              thread_mutex;
-  GHashTable*            subflows;
-  GRWLock                rwmutex;
-  StreamSplitter*        splitter;
-  PacketsSndQueue*       pacer;
+  GstTask*                   thread;
+  GRecMutex                  thread_mutex;
+  GHashTable*                subflows;
+  GRWLock                    rwmutex;
+  StreamSplitter*            splitter;
+  PacketsSndQueue*           pacer;
+  ReportProcessor*           report_processor;
+  ReportProducer*            report_producer;
+  GstClock*                  sysclock;
+  SendingRateDistributor*    rate_distor;
+  GstClockTime               expected_lost_detected;
+  guint64                    ticknum;
+  guint                      subflow_num;
 
-  GstClock*              sysclock;
-  guint64                ticknum;
-  guint                  subflow_num;
-  GstClockTime           RTT_max;
-//  gboolean               bids_recalc_requested;
-//  gboolean               bids_commit_requested;
-//  guint32                target_rate;
-  SendingRateDistributor*rate_distor;
-  guint32                ssrc;
-  gboolean               report_is_flowable;
-  GstBufferReceiverFunc  send_mprtcp_packet_func;
-  gpointer               send_mprtcp_packet_data;
-  GstSchedulerSignaling  utilization_signal_func;
-  gpointer               utilization_signal_data;
-  gboolean               stability_started;
-  gdouble                rate_diff;
-  gboolean               enabled;
-//
-//  //for stat and plot
-  gboolean          stat_enabled;
-  GstTask*          stat_thread;
-  GRecMutex         stat_thread_mutex;
+  gboolean                   report_is_flowable;
+  GstBufferReceiverFunc      send_mprtcp_packet_func;
+  gpointer                   send_mprtcp_packet_data;
+  GstSchedulerSignaling      utilization_signal_func;
+  gpointer                   utilization_signal_data;
+  gboolean                   enabled;
 };
 
 struct _SndControllerClass{
@@ -94,13 +87,13 @@ sndctrler_rem_path (SndController *controller_ptr, guint8 subflow_id);
 void
 sndctrler_add_path (SndController *controller_ptr, guint8 subflow_id, MPRTPSPath * path);
 void
-sndctrler_set_logging_flag(SndController *this, gboolean enable);
+sndctrler_set_logging_flag(SndController *this, gboolean logging);
 void
-sndctrler_riport_can_flow (SndController *this);
+sndctrler_report_can_flow (SndController *this);
 void sndctrler_receive_mprtcp (SndController *this,GstBuffer * buf);
 
 void sndctrler_enable_auto_rate_and_cc(SndController *this);
-void sndctrler_disable_auto_rate_and_congestion_control(SndController *this);
+void sndctrler_disable_auto_rate_and_cc(SndController *this);
 
 void
 sndctrler_setup_siganling(gpointer ptr,

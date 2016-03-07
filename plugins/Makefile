@@ -147,7 +147,7 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-bintree2.lo libgstmprtp_la-monitorpackets.lo \
 	libgstmprtp_la-mprtplogger.lo \
 	libgstmprtp_la-packetssndqueue.lo libgstmprtp_la-ricalcer.lo \
-	libgstmprtp_la-reportprod.lo \
+	libgstmprtp_la-reportproc.lo libgstmprtp_la-reportprod.lo \
 	libgstmprtp_la-percentiletracker.lo \
 	libgstmprtp_la-percentiletracker2.lo \
 	libgstmprtp_la-sndratedistor.lo libgstmprtp_la-numstracker.lo \
@@ -413,6 +413,7 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          mprtplogger.c              \
                          packetssndqueue.c          \
                          ricalcer.c                 \
+                         reportproc.c               \
                          reportprod.c               \
                          percentiletracker.c        \
                          percentiletracker2.c       \
@@ -434,6 +435,7 @@ noinst_HEADERS = mprtpspath.h           \
                  mprtplogger.h          \
                  packetssndqueue.h      \
                  ricalcer.h             \
+                 reportproc.h           \
                  reportprod.h           \
                  percentiletracker.h    \
                  percentiletracker2.h   \
@@ -554,6 +556,7 @@ include ./$(DEPDIR)/libgstmprtp_la-packetssndqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-percentiletracker.Plo
 include ./$(DEPDIR)/libgstmprtp_la-percentiletracker2.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rcvctrler.Plo
+include ./$(DEPDIR)/libgstmprtp_la-reportproc.Plo
 include ./$(DEPDIR)/libgstmprtp_la-reportprod.Plo
 include ./$(DEPDIR)/libgstmprtp_la-ricalcer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndctrler.Plo
@@ -716,6 +719,13 @@ libgstmprtp_la-ricalcer.lo: ricalcer.c
 #	$(AM_V_CC)source='ricalcer.c' object='libgstmprtp_la-ricalcer.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-ricalcer.lo `test -f 'ricalcer.c' || echo '$(srcdir)/'`ricalcer.c
+
+libgstmprtp_la-reportproc.lo: reportproc.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-reportproc.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-reportproc.Tpo -c -o libgstmprtp_la-reportproc.lo `test -f 'reportproc.c' || echo '$(srcdir)/'`reportproc.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-reportproc.Tpo $(DEPDIR)/libgstmprtp_la-reportproc.Plo
+#	$(AM_V_CC)source='reportproc.c' object='libgstmprtp_la-reportproc.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-reportproc.lo `test -f 'reportproc.c' || echo '$(srcdir)/'`reportproc.c
 
 libgstmprtp_la-reportprod.lo: reportprod.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-reportprod.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-reportprod.Tpo -c -o libgstmprtp_la-reportprod.lo `test -f 'reportprod.c' || echo '$(srcdir)/'`reportprod.c

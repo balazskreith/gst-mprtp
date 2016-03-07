@@ -8,6 +8,7 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          gstmprtpplayouter.c        \
                          gstmprtpreceiver.c         \
                          gstmprtpsender.c           \
+                         netqanalyser.c             \
                          mprtprpath.c               \
                          mprtpspath.c               \
                          streamjoiner.c             \
@@ -20,6 +21,7 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          mprtplogger.c              \
                          packetssndqueue.c          \
                          ricalcer.c                 \
+                         reportproc.c               \
                          reportprod.c               \
                          percentiletracker.c        \
                          percentiletracker2.c       \
@@ -34,6 +36,7 @@ noinst_HEADERS = mprtpspath.h           \
                  sndctrler.h            \
                  rcvctrler.c            \
                  mprtprpath.h           \
+                 netqanalyser.h         \
                  streamsplitter.h       \
                  streamjoiner.h         \
                  bintree.h              \
@@ -42,6 +45,7 @@ noinst_HEADERS = mprtpspath.h           \
                  mprtplogger.h          \
                  packetssndqueue.h      \
                  ricalcer.h             \
+                 reportproc.h           \
                  reportprod.h           \
                  percentiletracker.h    \
                  percentiletracker2.h   \

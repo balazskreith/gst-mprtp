@@ -120,6 +120,7 @@ packetssndqueue_init (PacketsSndQueue * this)
   this->sysclock = gst_system_clock_obtain();
   this->obsolation_treshold = 0;
   this->ticking_thread = gst_task_new (_ticking_process_run, this, NULL);
+  this->pacing = PACING_DEACTIVE;
   gst_task_set_lock (this->ticking_thread, &this->ticking_mutex);
   gst_task_start (this->ticking_thread);
 
@@ -131,6 +132,17 @@ void packetssndqueue_reset(PacketsSndQueue *this)
   THIS_WRITELOCK(this);
   while(this->head) _remove_head(this);
   THIS_WRITEUNLOCK(this);
+}
+
+
+gboolean packetssndqueue_expected_lost(PacketsSndQueue *this)
+{
+  gboolean result;
+  THIS_READLOCK(this);
+  result = this->expected_lost;
+  this->expected_lost = FALSE;
+  THIS_READUNLOCK(this);
+  return result;
 }
 
 PacketsSndQueue *make_packetssndqueue(BufferProxy proxy, gpointer proxydata)
@@ -265,7 +277,7 @@ again:
   }
   node = this->head;
   if(node->added < _now(this) - 400 * GST_MSECOND){
-     //Todo: Set expected losts flag here
+     this->expected_lost = TRUE;
     _remove_head(this);
     goto again;
   }

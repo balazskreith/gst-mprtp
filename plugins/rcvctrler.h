@@ -16,6 +16,7 @@
 #include "sndctrler.h"
 #include "streamsplitter.h"
 #include "reportprod.h"
+#include "reportproc.h"
 
 typedef struct _RcvController RcvController;
 typedef struct _RcvControllerClass RcvControllerClass;
@@ -35,9 +36,7 @@ struct _RcvController
   GstTask*          thread;
   GRecMutex         thread_mutex;
 
-  gboolean          stat_enabled;
-  GstTask*          stat_thread;
-  GRecMutex         stat_thread_mutex;
+  gboolean          log_flag;
 
   GHashTable*       subflows;
   GRWLock           rwmutex;
@@ -49,9 +48,9 @@ struct _RcvController
   gboolean          report_is_flowable;
   gboolean          rfc7097_enabled;
   gboolean          rfc7243_enabled;
-  gboolean          rfc3611_losts_enabled;
-//  ReportIntervalCalculator *ricalcer;
+  gboolean          rfc3611_enabled;
   ReportProducer*   report_producer;
+  ReportProcessor*  report_processor;
   gboolean          enabled;
 
 
@@ -81,8 +80,6 @@ rcvctrler_rem_path (
 
 void rcvctrler_set_logging_flag(RcvController *this, gboolean enable);
 
-void
-rcvctrler_report_can_flow (RcvController *this);
 
 void
 rcvctrler_receive_mprtcp (
@@ -98,14 +95,14 @@ rcvctrler_setup_callbacks(RcvController * this,
                           gpointer mprtcp_send_data,
                           GstBufferReceiverFunc mprtcp_send_func);
 
-void
-rcvctrler_setup_discarding_reports(RcvController * this,
-                          gboolean rle_reports,
-                          gboolean sum_reports);
 
 void
-rcvctrler_setup_rle_lost_reports(RcvController * this,
-                          gboolean enabling);
+rcvctrler_set_additional_reports(RcvController * this,
+                          gboolean rfc3611_reports,
+                          gboolean rfc7097_reports,
+                          gboolean rfc7243_reports
+                          );
+
 
 GType rcvctrler_get_type (void);
 #endif /* REFCTRLER_H_ */

@@ -81,7 +81,9 @@ struct _GstMprtpplayouter
   GstPad*         mprtp_sinkpad;
   GstPad*         mprtcp_sr_sinkpad;
   GstPad*         mprtcp_rr_srcpad;
-  gboolean        riport_flow_signal_sent;
+
+  guint           lost_latency;
+  guint           discard_latency;
 
   GHashTable*     paths;
   StreamJoiner*   joiner;

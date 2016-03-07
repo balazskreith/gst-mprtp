@@ -38,7 +38,7 @@ struct _PacketsSndQueue
   GstClockTime             obsolation_treshold;
   BufferProxy              proxy;
   gpointer                 proxydata;
-
+  gboolean                 expected_lost;
   GstTask*                 ticking_thread;
   GRecMutex                ticking_mutex;
 };
@@ -63,6 +63,7 @@ GType packetssndqueue_get_type (void);
 PacketsSndQueue *make_packetssndqueue(BufferProxy proxy, gpointer proxydata);
 void packetssndqueue_set_bandwidth(PacketsSndQueue *this, gdouble bandwidth);
 void packetssndqueue_reset(PacketsSndQueue *this);
+gboolean packetssndqueue_expected_lost(PacketsSndQueue *this);
 void packetssndqueue_push(PacketsSndQueue *this,
                           GstBuffer* buffer);
 #endif /* PACKETSSNDQUEUE_H_ */

@@ -191,7 +191,7 @@ typedef struct PACKED _GstRTCPXR_RFC7097
   guint8 early_bit:1;
   guint8 thinning:4;
 #elif G_BYTE_ORDER == G_BIG_ENDIAN
-  guint8 thinning:4;
+  guint8 resolution:4;
   guint8 early_bit:1;
   guint8 reserved:3;
 #else
@@ -215,7 +215,7 @@ typedef struct PACKED _GstRTCPXR_RFC3611
   guint8 early_bit:1;
   guint8 thinning:4;
 #elif G_BYTE_ORDER == G_BIG_ENDIAN
-  guint8 thinning:4;
+  guint8 resolution:4;
   guint8 early_bit:1;
   guint8 reserved:3;
 #else
@@ -236,9 +236,9 @@ typedef struct PACKED _GstRTCPXR_OWDRLE
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
   guint8 reserved:3;
   guint8 early_bit:1;
-  guint8 thinning:4;
+  guint8 resolution:4;
 #elif G_BYTE_ORDER == G_BIG_ENDIAN
-  guint8 thinning:4;
+  guint8 resolution:4;
   guint8 early_bit:1;
   guint8 reserved:3;
 #else
@@ -546,7 +546,7 @@ void gst_rtcp_xr_owd_getdown(GstRTCPXR_OWD *report,
 
 void gst_mprtcp_report_init (GstMPRTCPSubflowReport * report);
 void gst_mprtcp_riport_setup (GstMPRTCPSubflowReport * report, guint32 ssrc);
-void gst_mprtcp_riport_getdown (GstMPRTCPSubflowReport * report,
+void gst_mprtcp_report_getdown (GstMPRTCPSubflowReport * report,
     guint32 * ssrc);
 
 
@@ -575,6 +575,7 @@ void gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * report);
 void gst_print_rtcp_xr_owd (GstRTCPXR_OWD * report);
 void gst_print_rtcp_xrchunks(GstRTCPXR_Chunk * chunk1, GstRTCPXR_Chunk * chunk2);
 void gst_print_rtcp_xr_7097(GstRTCPXR_RFC7097 * report);
+void gst_print_rtcp_xr_3611(GstRTCPXR_RFC3611 * report);
 void gst_print_rtcp_xr_owd_rle(GstRTCPXR_OWD_RLE * report);
 void gst_print_rtcp_srb (GstRTCPSRBlock * block_ptr);
 void gst_print_rtcp_rrb (GstRTCPRRBlock * block_ptr);

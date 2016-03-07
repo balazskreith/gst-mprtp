@@ -102,9 +102,7 @@ struct _MpRTPReceiverPath
   guint32             total_payload_bytes;
   gint32              jitter;
   guint16             highest_seq;
-  gdouble             delay_avg;
-  GstClockTime        delay_avg_refreshed;
-  GstClockTime        discard_happened;
+  GstClockTime        discard_latency;
 
   guint64             ext_rtptime;
   guint64             last_packet_skew;
@@ -153,11 +151,12 @@ MpRTPRPath *make_mprtpr_path (guint8 id);
 
 guint8 mprtpr_path_get_id (MpRTPRPath * this);
 void mprtpr_path_get_RR_stats(MpRTPRPath *this,
-                           guint16 *HSN,
-                           guint16 *cycle_num,
-                           guint32 *jitter,
-                           guint32 *received_num,
-                           guint32 *received_bytes);
+                              guint16 *HSN,
+                              guint16 *cycle_num,
+                              guint32 *jitter,
+                              guint32 *received_num,
+                              guint32 *total_lost,
+                              guint32 *received_bytes);
 
 void mprtpr_path_get_XR7243_stats(MpRTPRPath *this,
                            guint16 *discarded,
@@ -169,6 +168,12 @@ void mprtpr_path_get_XROWD_stats(MpRTPRPath *this,
                                  GstClockTime* max);
 void
 mprtpr_path_set_chunks_reported(MpRTPRPath *this);
+
+void
+mprtpr_path_set_discard_latency(MpRTPRPath *this, GstClockTime latency);
+
+void
+mprtpr_path_set_lost_latency(MpRTPRPath *this, GstClockTime latency);
 
 GstRTCPXR_Chunk *
 mprtpr_path_get_XR7097_packet_nums_chunks(MpRTPRPath *this,

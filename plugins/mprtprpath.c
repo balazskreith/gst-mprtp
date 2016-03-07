@@ -97,9 +97,9 @@ mprtpr_path_init (MpRTPRPath * this)
   _discrle(this).read_index = _discrle(this).write_index = 0;
   _discrle(this).step_interval = GST_SECOND;
 
-  this->gaps = make_numstracker(1024, 2000 * GST_MSECOND);
+  this->gaps = make_numstracker(1024, 1000 * GST_MSECOND);
   numstracker_add_rem_pipe(this->gaps, _gaps_obsolation_pipe, this);
-  this->lates = make_numstracker(1024, 2500 * GST_MSECOND);
+  this->lates = make_numstracker(1024, 1500 * GST_MSECOND);
   mprtpr_path_reset (this);
 }
 
@@ -132,7 +132,7 @@ mprtpr_path_reset (MpRTPRPath * this)
   this->jitter = 0;
   this->total_packets_received = 0;
   this->total_payload_bytes = 0;
-
+  this->total_packet_losts = 0;
   this->last_packet_skew = 0;
   this->last_received_time = 0;
 
@@ -153,12 +153,14 @@ void mprtpr_path_get_RR_stats(MpRTPRPath *this,
                               guint16 *cycle_num,
                               guint32 *jitter,
                               guint32 *received_num,
+                              guint32 *total_lost,
                               guint32 *received_bytes)
 {
   THIS_READLOCK (this);
   if(HSN) *HSN = this->highest_seq;
   if(cycle_num) *cycle_num = this->cycle_num;
   if(jitter) *jitter = this->jitter;
+  if(total_lost) *total_lost = this->total_packet_losts;
   if(received_num) *received_num = this->total_packets_received;
   if(received_bytes) *received_bytes = this->total_payload_bytes;
   THIS_READUNLOCK (this);
@@ -194,6 +196,23 @@ mprtpr_path_set_chunks_reported(MpRTPRPath *this)
   this->discard_rle.read_index = this->discard_rle.write_index;
   this->losts_rle.read_index = this->losts_rle.write_index;
   this->owd_rle.read_index = this->owd_rle.write_index;
+  THIS_WRITEUNLOCK (this);
+}
+
+void
+mprtpr_path_set_discard_latency(MpRTPRPath *this, GstClockTime latency)
+{
+  THIS_WRITELOCK (this);
+  this->discard_latency = latency;
+  THIS_WRITEUNLOCK (this);
+}
+
+void
+mprtpr_path_set_lost_latency(MpRTPRPath *this, GstClockTime latency)
+{
+  THIS_WRITELOCK (this);
+  numstracker_set_treshold(this->gaps,  latency);
+  numstracker_set_treshold(this->lates, latency * 1.5);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -423,7 +442,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
 //  g_print("J: %d\n", this->jitter);
   if(0 < mprtp->delay){
     _add_delay(this, mprtp->delay);
-    if(0 < this->delay_avg && this->delay_avg * 2 < mprtp->delay){
+    if(0 < this->discard_latency && this->discard_latency < mprtp->delay){
       _add_discard(this, mprtp);
     }
   }
@@ -437,6 +456,11 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
       numstracker_add(this->gaps, seq);
     }
   }
+
+  if(65472 < this->highest_seq && mprtp->subflow_seq < 128){
+    ++this->cycle_num;
+  }
+
   this->highest_seq = mprtp->subflow_seq;
   if(this->last_rtp_timestamp == mprtp->timestamp)
     goto done;
@@ -484,7 +508,6 @@ void _add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp)
   this->total_late_discarded_bytes+=mprtp->payload_bytes;
   _actual_discrle(this)->discarded_bytes+=mprtp->payload_bytes;
   ++_actual_discrle(this)->discarded_packets;
-  this->discard_happened = _now(this);
 }
 
 void _add_delay(MpRTPRPath *this, GstClockTime delay)
@@ -570,15 +593,6 @@ void _delays_stats_pipe(gpointer data, PercentileTrackerPipeData *pdata)
 {
   MpRTPRPath *this = data;
   _actual_owdrle(this)->median_delay = pdata->percentile;
-  if(_now(this) - 200 * GST_MSECOND < this->delay_avg_refreshed) return;
-  if(pdata->percentile == 0) return;
-//  if(_now(this) - GST_SECOND < this->discard_happened) return;
-  this->delay_avg_refreshed = _now(this);
-  if(0. < this->delay_avg){
-    this->delay_avg = (gdouble) MIN(pdata->percentile, 400 * GST_MSECOND) * .2 + this->delay_avg * .8;
-  }else{
-    this->delay_avg = (gdouble) MIN(pdata->percentile, 400 * GST_MSECOND);
-  }
 }
 
 void _gaps_obsolation_pipe(gpointer data, gint64 seq)
@@ -586,6 +600,7 @@ void _gaps_obsolation_pipe(gpointer data, gint64 seq)
   MpRTPRPath *this = data;
   if(numstracker_find(this->lates, seq)) return;
   ++_actual_lostrle(this)->lost_packets;
+  ++this->total_packet_losts;
 }
 
 #undef THIS_READLOCK

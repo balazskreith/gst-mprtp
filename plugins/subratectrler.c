@@ -121,6 +121,7 @@ struct _Private{
 
 #define _priv(this) ((Private*)this->priv)
 #define _state(this) this->state
+#define _stage(this) _priv(this)->stage
 #define _measurement(this) _priv(this)->measurement
 #define _anres(this) _measurement(this)->netq_analysation
 
@@ -223,19 +224,8 @@ _add_bottleneck_point(
     gint32 rate);
 
 static void
-_append_to_log(
-    SubflowRateController *this,
-    const gchar * format,
-    ...);
-
-static void
-_log_measurement_update_state(
+_logging(
     SubflowRateController *this);
-
-static void
-_log_abbrevations(
-    SubflowRateController *this,
-    FILE *file);
 
 
 //----------------------------------------------------------------------
@@ -778,155 +768,43 @@ _add_bottleneck_point(
   DISABLE_LINE _append_to_log(this, "sg");
 }
 
-void _append_to_log(SubflowRateController *this, const gchar * format, ...)
-{
-  FILE *file;
-  va_list args;
-  if(!this->log_enabled) return;
-  file = fopen(this->log_filename, "a");
-  va_start (args, format);
-  vfprintf (file, format, args);
-  va_end (args);
-  fclose(file);
-
-  DISABLE_LINE _add_bottleneck_point(NULL, 0);
-}
-
 void _logging(SubflowRateController *this)
 {
   gchar filename[255];
   sprintf(filename, "subflow_%d.log", this->id);
   mprtp_logger(filename,
                "############ S%d | State: %-2d | Disable time %lu | Ctrled: %d #################\n"
-               "rlost:      %-10d| rdiscard:%-10d| lost:    %-10d| discard: %-10d|\n"
-               "pth_cong:   %-10d| pth_lssy:%-10d| dis_br:  %-10d| GP_t1:   %-10d|\n"
-               "target_br:  %-10d| min_tbr: %-10d| max_tbr: %-10d| trend:   %-10.6f\n"
-               "stage:      %-10d| near2cc: %-10d| pevent:  %-10d|\n"
-               "mon_br:     %-10d| mon_int: %-10d| btlnck:  %-10d| GP:      %-10d|\n"
-               "RR:         %-10d| SR:      %-10d| disc_rat:%-10.3f| ci:      %-10.3f|\n"
-               "l:          %-10d| rl:      %-10d| d:       %-10d| rd:      %-10d\n"
-               "abs_max:    %-10d| abs_min: %-10d| event:      %-7d|\n"
+               "SR:         %-10d| TR:      %-10d| botlnck: %-10d|\n"
+               "abs_max:    %-10d| abs_min: %-10d| max_tbr: %-10d| min_tbr: %-10d|\n"
+               "stage:      %-10d| event:   %-10d| pevent:  %-10d| keep:    %-10.6f\n"
+               "mon_br:     %-10d| mon_int: %-10d| tr_corr: %-10d|\n"
                "############################ Seconds since setup: %lu ##########################################\n",
 
                this->id, _state(this),
                this->disable_controlling > 0 ? GST_TIME_AS_MSECONDS(this->disable_controlling - _now(this)) : 0,
                _priv(this)->controlled,
 
-               _rlost(this),_rdiscard(this),_lost(this),_discard(this),
+               _priv(this)->sending_bitrate_sum / 3,
+               _priv(this)->target_bitrate_sum / 3,
+               this->bottleneck_point,
 
-               !mprtps_path_is_non_congested(this->path),
-               !mprtps_path_is_non_lossy(this->path),
-               this->desired_bitrate,
-               _GP_t1(this),
+               this->max_rate,
+               this->min_rate,
+               this->max_target_point,
+               this->min_target_point,
 
-               this->target_bitrate, this->min_target_point,
-               this->max_target_point, _qtrend(this),
-
-               _stage(this),
-               _is_near_to_bottleneck_point(this),
+               _priv(this)->stage,
+               _priv(this)->event,
                this->pending_event,
+               this->keep,
 
-               this->monitored_bitrate, this->monitoring_interval,
-               this->bottleneck_point, _GP(this),
-
-               _RR(this), _priv(this)->sender_bitrate,
-               _mt0(this)->discard_rate, _get_bottleneck_influence(this),
-
-               _mt0(this)->lost, _mt0(this)->recent_lost,
-               _mt0(this)->discard,_mt0(this)->recent_discard,
-
-               this->max_rate, this->min_rate, _event(this),
+               this->monitored_bitrate,
+               this->monitoring_interval,
+               _priv(this)->tr_correlated,
 
               GST_TIME_AS_SECONDS(_now(this) - this->setup_time)
 
   );
 }
 
-
-void _log_measurement_update_state(SubflowRateController *this)
-{
-  FILE *file;
-  if(!this->log_enabled) return;
-  file = fopen(this->log_filename, "a");
-  if(++this->logtick % 60 == 0)
-    _log_abbrevations(this, file);
-  fprintf(file,
-//  g_print (
-
-          "############ S%d | State: %-2d | Disable time %lu | Ctrled: %d #################\n"
-          "rlost:      %-10d| rdiscard:%-10d| lost:    %-10d| discard: %-10d|\n"
-          "pth_cong:   %-10d| pth_lssy:%-10d| dis_br:  %-10d| GP_t1:   %-10d|\n"
-          "target_br:  %-10d| min_tbr: %-10d| max_tbr: %-10d| trend:   %-10.6f\n"
-          "stage:      %-10d| near2cc: %-10d| exp_lst: %-10d| pevent:  %-10d|\n"
-          "mon_br:     %-10d| mon_int: %-10d| btlnck:  %-10d| GP:      %-10d|\n"
-          "RR:         %-10d| SR:      %-10d| disc_rat:%-10.3f| ci:      %-10.3f|\n"
-          "l:          %-10d| rl:      %-10d| d:       %-10d| rd:      %-10d\n"
-          "abs_max:    %-10d| abs_min: %-10d| event:      %-7d| off_add: %-10.3f\n"
-          "keep:       %-10d| now:    %-10lu| cong:    %-10d|\n"
-          "Analysis--------------> pierced: %-7d| distorted: %-7d| congested: %-7d|\n"
-          "----------------------> tr_corr: %-7d| stable:  %-7d|\n"
-          "############################ Seconds since setup: %lu ##########################################\n",
-          this->id, _state(this),
-          this->disable_controlling > 0 ? GST_TIME_AS_MSECONDS(this->disable_controlling - _now(this)) : 0,
-          _mt0(this)->controlled,
-
-          _rlost(this),_rdiscard(this),_lost(this),_discard(this),
-
-          !mprtps_path_is_non_congested(this->path),
-          !mprtps_path_is_non_lossy(this->path),
-          this->desired_bitrate,
-          _GP_t1(this),
-
-          this->target_bitrate, this->min_target_point,
-          this->max_target_point, _qtrend(this),
-
-          _stage(this),
-          _is_near_to_bottleneck_point(this),
-          _mt0(this)->has_expected_lost, this->pending_event,
-
-          this->monitored_bitrate, this->monitoring_interval,
-          this->bottleneck_point, _GP(this),
-
-          _RR(this), _mt0(this)->sender_bitrate,
-          _mt0(this)->discard_rate, _get_bottleneck_influence(this),
-
-          _mt0(this)->lost, _mt0(this)->recent_lost,
-          _mt0(this)->discard,_mt0(this)->recent_discard,
-
-          this->max_rate, this->min_rate, _event(this), _anres(this).off,
-
-          this->keep,
-          GST_TIME_AS_SECONDS(_now(this)),
-          _anres(this).congested,
-
-          _anres(this).pierced,
-          _anres(this).distorted,
-          _anres(this).congested,
-
-          _anres(this).tr_correlated,
-          _anres(this).stable,
-
-         GST_TIME_AS_SECONDS(_now(this) - this->setup_time)
-
-         );
-  subanalyser_append_logfile(this->analyser, file);
-  fclose(file);
-}
-
-void _log_abbrevations(SubflowRateController *this, FILE *file)
-{
-  fprintf(file,
-    "############ Subflow %d abbrevations ##############################################################\n"
-    "#  State:      The actual state (Overused (-1), Stable (0), Monitored (1))                        #\n"
-    "#  Ctrled:     Indicate weather the state is controlled or not                                    #\n"
-    "#  rlost:      recent losts                                                                       #\n"
-    "#  rdiscard:   recent discards                                                                    #\n"
-    "#  lost:       any losts                                                                          #\n"
-    "#  pth_lssy:   Indicate weather the path is lossy                                                 #\n"
-    "#  pth_cong:   Indicate weather the path is congested                                             #\n"
-    "#  pth_slow:   Indicate weather the path is slow                                                  #\n"
-    "###################################################################################################\n",
-    this->id
-  );
-}
 

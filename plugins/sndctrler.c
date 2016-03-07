@@ -110,6 +110,9 @@ struct _Subflow
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
 
+static void
+_logging (
+    SndController *this);
 
 static void
 sefctrler_finalize (GObject * object);
@@ -187,6 +190,7 @@ static void _reset_subflow (Subflow * this);
 static guint16 _uint16_diff (guint16 a, guint16 b);
 static guint32 _uint32_diff (guint32 a, guint32 b);
 static void _sending_rate_pipe(gpointer data, PercentileTrackerPipeData* stats);
+
 //----------------------------------------------------------------------------
 
 
@@ -253,57 +257,35 @@ void _logging (SndController *this)
   gint32 sender_bitrate = 0;
   gint32 media_target = 0;
   gint32 media_rate = 0;
-  gint32 goodput = 0;
   gint32 monitored_bits = 0;
   gint32 target_bitrate = 0;
   guint32 queued_bits = 0;
-  guint64 target_delay = 0;
-  guint64 ltt80th_delay = 0;
-  guint64 recent_delay = 0;
+  gchar filenames[MPRTP_PLUGIN_MAX_SUBFLOW_NUM][255], main_file[255];
+  gint i;
 
-    for(i=0; i<10; ++i) {
-        files[i] = NULL;
-        sprintf(file_names[i], "logs/sub_%d_snd.csv", i);
-    }
-
-  if( !main_file) main_file=fopen("logs/sub_snd_sum.csv", "w");
-  else main_file=fopen("logs/sub_snd_sum.csv", "a");
+  for(i=0; i<10; ++i) {
+      sprintf(filenames[i], "logs/sub_%d_snd.csv", i);
+  }
+  sprintf(main_file, "logs/sub_snd_sum.csv");
 
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) &key, (gpointer) & val)) {
     subflow = (Subflow *) val;
     if(!subflow) goto next;
-    if( !files[subflow->id]) files[subflow->id]=fopen(file_names[subflow->id], "w");
-    else files[subflow->id]=fopen(file_names[subflow->id], "a");
-
-    file = files[subflow->id];
     if(this->enabled){
       sender_bitrate= mprtps_path_get_sent_bytes_in1s(subflow->path) * 8;
-      goodput        = 0;
       monitored_bits = subratectrler_get_monitoring_bitrate(subflow->rate_controller);
       target_bitrate = stream_splitter_get_sending_target(this->splitter, subflow->id);
       queued_bits    = 0 * 8;
-      target_delay   = 0;
-      ltt80th_delay  = 0;
-      recent_delay   = 0;
     }
-    fprintf(file, "%d,%d,%d,%d,%d,%lu,%lu,%lu\n",
-            sender_bitrate,
-            goodput,
-            sender_bitrate + monitored_bits,
-            target_bitrate,
-            queued_bits,
-            target_delay,
-            ltt80th_delay,
-            recent_delay);
+    mprtp_logger(filenames[subflow->id],
+                 "%d,%d,%d,%d,%d,%lu,%lu,%lu\n",
+                sender_bitrate,
+                sender_bitrate + monitored_bits,
+                target_bitrate,
+                queued_bits);
     media_rate += sender_bitrate;
     media_target += target_bitrate;
-//    fprintf(file, "%f,%f,",
-//            media_target / 125.,
-//            stream_splitter_get_media_rate(this->splitter) / 125.);
-//    fprintf(file, "|\n");
-    fclose(file);
-//
   next:
     continue;
   }
@@ -311,9 +293,8 @@ void _logging (SndController *this)
   {
     gint32 encoder_rate = 0;
     encoder_rate = stream_splitter_get_encoder_rate(this->splitter);
-    fprintf(main_file,"%d,%d,%d\n", media_rate,media_target,encoder_rate);
+    mprtp_logger(main_file,"%d,%d,%d\n", media_rate,media_target,encoder_rate);
   }
-  fclose(main_file);
 
 }
 

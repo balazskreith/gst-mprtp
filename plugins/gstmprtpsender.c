@@ -101,6 +101,8 @@ typedef struct
 static GstBuffer *_assemble_report (Subflow * this, GstBuffer * blocks);
 static Subflow *_get_subflow_from_blocks (GstMprtpsender * this,
     GstBuffer * blocks);
+static Subflow *
+_get_subflow_from_report (GstMprtpsender * this, GstBuffer * blocks);
 static gboolean _select_subflow (GstMprtpsender * this, guint8 id,
     Subflow ** result);
 
@@ -914,8 +916,7 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     goto done;
   }
   packet_type = _get_packet_mptype (this, buf, &map, &subflow_id);
-  if (packet_type != PACKET_IS_NOT_MP &&
-      _select_subflow (this, subflow_id, &subflow) != FALSE) {
+  if (packet_type != PACKET_IS_NOT_MP && _select_subflow (this, subflow_id, &subflow) != FALSE) {
     if(packet_type == PACKET_IS_MPRTP_ASYNC || packet_type == PACKET_IS_MPRTCP){
       outpad = subflow->async_outpad ? subflow->async_outpad : subflow->outpad;
     }else
@@ -966,10 +967,17 @@ gst_mprtpsender_mprtcp_sink_chain (GstPad * pad, GstObject * parent,
   Subflow *subflow = NULL;
   this = GST_MPRTPSENDER (parent);
   THIS_READLOCK (this);
-  subflow = _get_subflow_from_blocks (this, buf);
+  DISABLE_LINE subflow = _get_subflow_from_blocks (this, buf);
+  subflow = _get_subflow_from_report(this, buf);
   if (!subflow) {
     goto done;
   }
+//  {
+//    GstMapInfo map;
+//    gst_buffer_map(buf, &map, GST_MAP_READ);
+//    gst_print_rtcp((GstRTCPHeader*)map.data);
+//    gst_buffer_unmap(buf, &map);
+//  }
 //  g_print("############################ SENT (%lu)################################\n", GST_TIME_AS_MSECONDS(gst_clock_get_time(subflow->sysclock)));
   if(subflow->async_outpad){
     DISABLE_LINE result = gst_pad_push (subflow->async_outpad, _assemble_report (subflow, buf));
@@ -992,12 +1000,37 @@ _get_subflow_from_blocks (GstMprtpsender * this, GstBuffer * blocks)
   guint16 subflow_id;
   GstMPRTCPSubflowBlock *block;
   if (!gst_buffer_map (blocks, &map, GST_MAP_READ)) {
-    GST_ERROR_OBJECT (this, "Buffer is not readable");
+    GST_WARNING_OBJECT (this, "Buffer is not readable");
     goto done;
   }
   block = (GstMPRTCPSubflowBlock *) map.data;
   gst_mprtcp_block_getdown (&block->info, NULL, NULL, &subflow_id);
   if (!_select_subflow (this, subflow_id, &result)) {
+    GST_WARNING_OBJECT (this, "No Subflow with the given id. (%d)", subflow_id);
+    result = NULL;
+  }
+  gst_buffer_unmap(blocks, &map);
+done:
+  return result;
+}
+
+Subflow *
+_get_subflow_from_report (GstMprtpsender * this, GstBuffer * blocks)
+{
+  GstMapInfo map = GST_MAP_INFO_INIT;
+  Subflow *result = NULL;
+  guint16 subflow_id;
+  GstMPRTCPSubflowReport *report;
+  GstMPRTCPSubflowBlock *block;
+  if (!gst_buffer_map (blocks, &map, GST_MAP_READ)) {
+    GST_WARNING_OBJECT (this, "Buffer is not readable");
+    goto done;
+  }
+  report = (GstMPRTCPSubflowReport *) map.data;
+  block = &report->blocks;
+  gst_mprtcp_block_getdown (&block->info, NULL, NULL, &subflow_id);
+  if (!_select_subflow (this, subflow_id, &result)) {
+    GST_WARNING_OBJECT (this, "No Subflow with the given id. (%d)", subflow_id);
     result = NULL;
   }
   gst_buffer_unmap(blocks, &map);

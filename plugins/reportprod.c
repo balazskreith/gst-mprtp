@@ -187,12 +187,9 @@ void report_producer_add_sr(ReportProducer *this,
   guint16 length;
 //  guint8 block_length;
   GstRTCPSR *sr;
-  GstRTCPSRBlock *srb;
   THIS_WRITELOCK(this);
-  sr = this->actual;
-  gst_rtcp_sr_init(sr);
-  srb = gst_rtcp_sr_add_srb(sr);
-  gst_rtcp_srb_setup(srb, ntp_timestamp, rtp_timestamp, packet_count, octet_count);
+  sr = gst_mprtcp_riport_block_add_sr(this->block);
+  gst_rtcp_srb_setup(&sr->sender_block, ntp_timestamp, rtp_timestamp, packet_count, octet_count);
   gst_rtcp_header_getdown (&sr->header, NULL, NULL, NULL, NULL, &length, NULL);
   _add_length(this, length);
   THIS_WRITEUNLOCK(this);
@@ -282,7 +279,8 @@ GstBuffer *report_producer_end(ReportProducer *this, guint *length)
   GstBuffer* result = NULL;
   THIS_WRITELOCK(this);
 //  gst_mprtcp_riport_add_block_end(this->report, this->block);
-  g_print("length: %lu\n", this->length);
+//  g_print("length: %lu\n", this->length);
+//  gst_print_rtcp(this->databed);
   data = g_malloc(this->length);
   memcpy(data, this->databed, this->length);
   result = gst_buffer_new_wrapped(data, this->length);

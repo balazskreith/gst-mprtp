@@ -87,8 +87,6 @@ struct _MPRTPSPath
   MonitorPackets*         monitorpackets;
   guint8                  pivot_payload_type;
 
-  void                    (*send_mprtp_packet_func)(gpointer, GstBuffer*);
-  gpointer                  send_mprtp_func_data;
 
   GstClockTime            path_delay;
 
@@ -192,7 +190,8 @@ typedef struct _MPRTPPluginUtilization{
 
 
 GType mprtps_path_get_type (void);
-MPRTPSPath *make_mprtps_path (guint8 id, void (*send_func)(gpointer, GstBuffer*), gpointer func_this);
+//MPRTPSPath *make_mprtps_path (guint8 id, void (*send_func)(gpointer, GstBuffer*), gpointer func_this);
+MPRTPSPath *make_mprtps_path (guint8 id);
 
 gboolean mprtps_path_is_new (MPRTPSPath * this);
 void mprtps_path_set_not_new(MPRTPSPath * this);
@@ -208,7 +207,7 @@ void mprtps_path_set_non_congested (MPRTPSPath * this);
 guint8 mprtps_path_get_id (MPRTPSPath * this);
 gboolean mprtps_path_is_monitoring (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_packets_num (MPRTPSPath * this);
-void mprtps_path_process_rtp_packet(MPRTPSPath * this, GstBuffer * buffer);
+void mprtps_path_process_rtp_packet(MPRTPSPath * this, GstBuffer * buffer, gboolean *monitoring_request);
 gboolean mprtps_path_has_expected_lost(MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_frames_num (MPRTPSPath * this);

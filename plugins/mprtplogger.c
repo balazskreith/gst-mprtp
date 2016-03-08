@@ -123,7 +123,7 @@ void mprtp_logger(const gchar *filename, const gchar * format, ...)
     goto done;
   }
 
-  memcpy(writable, filename, strlen(filename));
+  strcpy(writable, filename);
   if(!g_hash_table_lookup(this->touches, filename)){
     THIS_READUNLOCK(this);
     THIS_WRITELOCK(this);

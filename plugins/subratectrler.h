@@ -97,12 +97,7 @@ struct _SubflowRateControllerClass{
 
 };
 GType subratectrler_get_type (void);
-SubflowRateController *make_subratectrler(SendingRateDistributor* rate_controlller);
-void subratectrler_set(SubflowRateController *this,
-                         MPRTPSPath *path,
-                         guint32 sending_target,
-                         guint64 initial_disabling);
-void subratectrler_unset(SubflowRateController *this);
+SubflowRateController *make_subratectrler(SendingRateDistributor* rate_controlller, MPRTPSPath *path);
 
 void subratectrler_measurement_update(
                          SubflowRateController *this,

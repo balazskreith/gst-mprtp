@@ -337,10 +337,6 @@ void gst_rtcp_add_end (GstRTCPBuffer * rtcp, GstRTCPHeader * header);
 
 GstRTCPSR *gst_rtcp_add_sr (GstRTCPHeader * header);
 
-GstRTCPSRBlock *gst_rtcp_sr_add_srb (GstRTCPSR * sr);
-
-GstRTCPRRBlock *gst_rtcp_sr_add_rrb (GstRTCPSR * sr);
-
 GstMPRTCPSubflowReport *gst_mprtcp_add_riport (GstRTCPHeader * header);
 
 GstMPRTCPSubflowBlock *gst_mprtcp_riport_add_block_begin (GstMPRTCPSubflowReport

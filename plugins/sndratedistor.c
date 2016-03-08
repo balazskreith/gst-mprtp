@@ -165,6 +165,7 @@ void sndrate_setup_report(
   }
 }
 
+
 void sndrate_distor_add_controlled_subflow(SendingRateDistributor *this, guint8 id)
 {
   Subflow *subflow;
@@ -181,36 +182,6 @@ void sndrate_distor_rem_controlled_subflow(SendingRateDistributor *this, guint8 
   _refresh_available_ids(this);
 }
 
-
-static void _print_utilization(MPRTPPluginUtilization *u)
-{
-  gint i;
-  SubflowUtilization *su;
-  g_print(
-    "# min_rate:     %-10d| target_rate:  %-10d| max_rate:     %-10d #\n",
-    u->control.min_rate, u->report.target_rate, u->control.max_rate
-    );
-
-  for(i = 0; i < MPRTP_PLUGIN_MAX_SUBFLOW_NUM; ++i){
-    su = &u->subflows[i];
-    if(!su->controlled) continue;
-    g_print(
-      "# +++++++++++++++++++++++       Subflow %d        +++++++++++++++++++++++++#\n"
-      "# disc_rate:    %-10d| lost_bytes:   %-10d| owd:          %-10lu #\n"
-      "# snd_rate:     %-10d| state:        %-10d| target_rate:  %-10d #\n"
-      "# min_rate:     %-10d| max_rate:     %-10d #\n",
-
-      i,
-
-      su->report.discarded_bytes, su->report.lost_bytes, su->report.owd,
-      su->report.sending_rate, su->report.state, su->report.target_rate,
-
-      su->control.max_rate, su->control.min_rate
-      );
-  }
-
-}
-
 MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this)
 {
   gint i;
@@ -219,8 +190,6 @@ MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this)
   SubflowUtilization *su;
   gdouble monitored_sr = 0., stable_sr = 0.;
   gboolean pacing = FALSE;
-
-  DISABLE_LINE _print_utilization(&this->ur);
 
   this->delta_rate = this->target_bitrate = 0;
   if(!this->splitter || !this->pacer || !this->ready) goto done;
@@ -267,11 +236,7 @@ MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this)
   //if remaining bitrate still available we apply pacing if it exceeds the 10% of the sending target;
   pacing =(this->delta_rate < this->target_bitrate * -.1);
 distribute:
-  if(pacing){
-    packetssndqueue_set_bandwidth(this->pacer, this->target_bitrate);
-  }else{
-    packetssndqueue_set_bandwidth(this->pacer, 0.);
-  }
+  packetssndqueue_setup(this->pacer, this->target_bitrate, pacing);
   foreach_subflows(this, i, subflow)
   {
     stream_splitter_setup_sending_target(this->splitter, subflow->id, subflow->sending_target);

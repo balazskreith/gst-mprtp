@@ -375,9 +375,8 @@ stream_splitter_get_next_path (StreamSplitter * this, GstBuffer * buf)
 {
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   MPRTPSPath *path = NULL;
-
   if (G_UNLIKELY (!gst_rtp_buffer_map (buf, GST_MAP_READ, &rtp))) {
-    GST_WARNING_OBJECT (this, "The RTP packet is not writeable");
+    GST_WARNING_OBJECT (this, "The RTP packet is not readable");
     goto exit;
   }
   THIS_WRITELOCK (this);

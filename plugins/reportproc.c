@@ -190,33 +190,40 @@ again:
 
   switch(pt){
     case GST_RTCP_TYPE_SR:
-      _processing_srblock (this, &block->sender_riport.sender_block, summary);
+      {
+        GstRTCPSR* sr = (GstRTCPSR*)header;
+        _processing_srblock (this, &sr->sender_block, summary);
+      }
     break;
     case GST_RTCP_TYPE_RR:
-      _processing_rrblock (this, &block->receiver_riport.blocks, summary);
+      {
+        GstRTCPRR* rr = (GstRTCPRR*)header;
+        _processing_rrblock (this, &rr->blocks, summary);
+      }
     break;
     case GST_RTCP_TYPE_XR:
     {
       guint8 xr_block_type;
-      gst_rtcp_xr_block_getdown((GstRTCPXR*) &block->xr_header, &xr_block_type, NULL,  NULL);
+      GstRTCPXR* xr = (GstRTCPXR*) header;
+      gst_rtcp_xr_block_getdown(xr, &xr_block_type, NULL,  NULL);
       switch(xr_block_type){
         case GST_RTCP_XR_RFC3611_BLOCK_TYPE_IDENTIFIER:
-          _processing_xr_rfc3611(this, &block->xr_rfc3611_report, summary);
+          _processing_xr_rfc3611(this, (GstRTCPXR_RFC3611*)xr, summary);
         break;
         case GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER:
-          _processing_xr_7243(this, &block->xr_rfc7243_riport, summary);
+          _processing_xr_7243(this, (GstRTCPXR_RFC7243*)xr, summary);
         break;
         case GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER:
-          _processing_xr_owd(this, &block->xr_owd, summary);
+          _processing_xr_owd(this, (GstRTCPXR_OWD*)xr, summary);
         break;
         case GST_RTCP_XR_RFC7097_BLOCK_TYPE_IDENTIFIER:
-          _processing_xr_rfc7097(this, &block->xr_rfc7097_report, summary);
+          _processing_xr_rfc7097(this, (GstRTCPXR_RFC7097*)xr, summary);
           break;
         case GST_RTCP_XR_OWD_RLE_BLOCK_TYPE_IDENTIFIER:
-          _processing_xr_owd_rle(this, &block->xr_owd_rle_report, summary);
+          _processing_xr_owd_rle(this, (GstRTCPXR_OWD_RLE*)xr, summary);
           break;
         default:
-          GST_WARNING_OBJECT(this, "Unrecognized RTCP XR REPORT");
+          GST_WARNING_OBJECT(this, "Unrecognized RTCP XR REPORT (%d)", xr_block_type);
         break;
       }
     }

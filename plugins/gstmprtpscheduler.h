@@ -77,6 +77,9 @@ struct _GstMprtpscheduler
 
   guint32                       rtcp_sent_octet_sum;
 
+  GstTask*                      path_ticking_thread;
+  GRecMutex                     path_ticking_mutex;
+
   GstMprtpschedulerPrivate*     priv;
 };
 

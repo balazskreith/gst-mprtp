@@ -76,6 +76,8 @@ static void _qdeanalyzer_evaluation(NetQueueAnalyser *this, NetQueueAnalyserResu
 
 static void _execute_corrblocks(NetQueueAnalyserPrivate *this, CorrBlock *blocks, guint blocks_length);
 static void _execute_corrblock(CorrBlock* this);
+void _csv_logging(NetQueueAnalyser *this, GstClockTime delay);
+void _readable_logging(NetQueueAnalyser *this);
 
 void
 netqueue_analyser_class_init (NetQueueAnalyserClass * klass)
@@ -109,12 +111,14 @@ netqueue_analyser_init (NetQueueAnalyser * this)
   this->priv = g_malloc0(sizeof(NetQueueAnalyserPrivate));
 }
 
-NetQueueAnalyser *make_netqueue_analyser(void)
+NetQueueAnalyser *make_netqueue_analyser(guint8 id)
 {
   NetQueueAnalyser *this;
   this = g_object_new (NETQANALYSER_TYPE, NULL);
   THIS_WRITELOCK (this);
 
+  this->id                     = id;
+  this->made                   = _now(this);
   _priv(this)->cblocks[0].next = &_priv(this)->cblocks[1];
   _priv(this)->cblocks[1].next = &_priv(this)->cblocks[2];
   _priv(this)->cblocks[2].next = &_priv(this)->cblocks[3];
@@ -197,10 +201,13 @@ void netqueue_analyser_do(NetQueueAnalyser *this,
     _execute_corrblocks(_priv(this), _priv(this)->cblocks, 4);
     _execute_corrblocks(_priv(this), _priv(this)->cblocks, 4);
     _priv(this)->cblocks[0].Id1 = GST_TIME_AS_USECONDS(delay) / 50.;
+
+    _csv_logging(this, delay);
   }
 
   result->congested |= congestion;
   _qdeanalyzer_evaluation(this, result);
+  _readable_logging(this);
 
 }
 
@@ -298,8 +305,51 @@ void _execute_corrblock(CorrBlock* this)
   }
 }
 
-#undef CORR_LOG_ON
-#undef _swap_sitems
+
+void _csv_logging(NetQueueAnalyser *this, GstClockTime delay)
+{
+  gchar filename[255];
+  sprintf(filename, "logs/netqanalyser_%d.csv", this->id);
+  mprtp_logger(filename,
+               "%lu,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f\n",
+
+               delay,
+
+              _priv(this)->cblocks[0].g,
+              _priv(this)->cblocks[1].g,
+              _priv(this)->cblocks[2].g,
+              _priv(this)->cblocks[3].g,
+              _priv(this)->cblocks[4].g
+
+  );
+}
+
+void _readable_logging(NetQueueAnalyser *this)
+{
+  gchar filename[255];
+  sprintf(filename, "logs/netqanalyser_%d.log", this->id);
+  mprtp_logger(filename,
+               "############ Network Queue Analyser log after %lu seconds #################\n"
+               "g(0): %-10.8f| g(0): %-10.8f| g(0): %-10.8f| g(0): %-10.8f| g(0): %-10.8f|\n"
+               "dist: %-10d| dist: %-10d| dist: %-10d| dist: %-10d| dist: %-10d|\n"
+               "###########################################################################\n",
+
+               GST_TIME_AS_SECONDS(_now(this) - this->made),
+
+               _priv(this)->cblocks[0].g,
+              _priv(this)->cblocks[1].g,
+              _priv(this)->cblocks[2].g,
+              _priv(this)->cblocks[3].g,
+
+              _priv(this)->cblocks[0].distorted,
+              _priv(this)->cblocks[1].distorted,
+              _priv(this)->cblocks[2].distorted,
+              _priv(this)->cblocks[3].distorted
+
+  );
+}
+
+
 #undef THIS_WRITELOCK
 #undef THIS_WRITEUNLOCK
 #undef THIS_READLOCK

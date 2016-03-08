@@ -43,9 +43,9 @@ static void mprtps_path_finalize (GObject * object);
 static void mprtps_path_reset (MPRTPSPath * this);
 static void _setup_rtp2mprtp (MPRTPSPath * this, GstBuffer * buffer);
 static void _refresh_stat(MPRTPSPath * this, GstBuffer *buffer);
-static void _send_mprtp_packet(MPRTPSPath * this,
-                               GstBuffer *buffer);
-static GstBuffer* _create_monitor_packet(MPRTPSPath * this);
+//static void _send_mprtp_packet(MPRTPSPath * this,
+//                               GstBuffer *buffer);
+//static GstBuffer* _create_monitor_packet(MPRTPSPath * this);
 
 #define MIN_PACE_INTERVAL 1
 #define MINIMUM_PACE_BANDWIDTH 50000
@@ -64,15 +64,15 @@ mprtps_path_class_init (MPRTPSPathClass * klass)
 }
 
 MPRTPSPath *
-make_mprtps_path (guint8 id, void (*send_func)(gpointer, GstBuffer*), gpointer func_this)
+make_mprtps_path (guint8 id)
 {
   MPRTPSPath *result;
 
   result = g_object_new (MPRTPS_PATH_TYPE, NULL);
   THIS_WRITELOCK (result);
   result->id = id;
-  result->send_mprtp_func_data = func_this;
-  result->send_mprtp_packet_func = send_func;
+//  result->send_mprtp_func_data = func_this;
+//  result->send_mprtp_packet_func = send_func;
   THIS_WRITEUNLOCK (result);
   return result;
 }
@@ -476,33 +476,26 @@ guint32 mprtps_path_get_sent_bytes_in1s(MPRTPSPath *this)
 
 void
 mprtps_path_process_rtp_packet(MPRTPSPath * this,
-                               GstBuffer * buffer)
+                               GstBuffer * rtppacket,
+                               gboolean *monitoring_request)
 {
-  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   THIS_WRITELOCK (this);
-  gst_rtp_buffer_map(buffer, GST_MAP_READWRITE, &rtp);
-  gst_rtp_buffer_unmap(&rtp);
 
   if(0 < this->skip_until){
     if(_now(this) < this->skip_until){
       this->expected_lost|=TRUE;
-      gst_buffer_unref(buffer);
+      gst_buffer_unref(rtppacket);
       goto done;
     }
     this->skip_until = 0;
   }
 
-  _setup_rtp2mprtp (this, buffer);
-  _send_mprtp_packet(this, buffer);
+  _setup_rtp2mprtp (this, rtppacket);
+  _refresh_stat(this, rtppacket);
+
 //  goto done;
-  if(!this->monitoring_interval) goto done;
-  if(this->total_sent_normal_packet_num % this->monitoring_interval != 0) goto done;
-  {
-    GstBuffer *buffer;
-    buffer = _create_monitor_packet(this);
-    _setup_rtp2mprtp(this, buffer);
-    _send_mprtp_packet(this, buffer);
-  }
+  if(!monitoring_request || !this->monitoring_interval) goto done;
+  *monitoring_request = this->total_sent_normal_packet_num % this->monitoring_interval == 0;
 done:
   THIS_WRITEUNLOCK (this);
 
@@ -514,7 +507,6 @@ _setup_rtp2mprtp (MPRTPSPath * this,
 {
   MPRTPSubflowHeaderExtension data;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-
   gst_rtp_buffer_map(buffer, GST_MAP_READWRITE, &rtp);
   data.id = this->id;
   if (++(this->seq) == 0) {
@@ -559,30 +551,23 @@ _refresh_stat(MPRTPSPath * this,
   gst_rtp_buffer_unmap(&rtp);
 }
 
-void
-_send_mprtp_packet(MPRTPSPath * this,
-                      GstBuffer *buffer)
-{
-  _refresh_stat(this, buffer);
-  this->send_mprtp_packet_func(this->send_mprtp_func_data, buffer);
-}
 
-
-GstBuffer* _create_monitor_packet(MPRTPSPath * this)
-{
-  GstBuffer *result;
-  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-  if(this->monitorpackets){
-    result = monitorpackets_provide_rtp_packet(this->monitorpackets);
-  }else{
-    result = gst_rtp_buffer_new_allocate (1400, 0, 0);
-  }
-  gst_rtp_buffer_map(result, GST_MAP_READWRITE, &rtp);
-  gst_rtp_buffer_set_payload_type(&rtp, this->monitor_payload_type);
-
-  gst_rtp_buffer_unmap(&rtp);
-  return result;
-}
+//
+//GstBuffer* _create_monitor_packet(MPRTPSPath * this)
+//{
+//  GstBuffer *result;
+//  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+//  if(this->monitorpackets){
+//    result = monitorpackets_provide_rtp_packet(this->monitorpackets);
+//  }else{
+//    result = gst_rtp_buffer_new_allocate (1400, 0, 0);
+//  }
+//  gst_rtp_buffer_map(result, GST_MAP_READWRITE, &rtp);
+//  gst_rtp_buffer_set_payload_type(&rtp, this->monitor_payload_type);
+//
+//  gst_rtp_buffer_unmap(&rtp);
+//  return result;
+//}
 
 #undef THIS_READLOCK
 #undef THIS_READUNLOCK

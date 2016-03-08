@@ -34,6 +34,8 @@ typedef struct _NetQueueAnalyserResult NetQueueAnalyserResult;
 struct _NetQueueAnalyser
 {
   GObject                  object;
+  guint8                   id;
+  GstClockTime             made;
   GstClockTime             last_stable;
   GstClock*                sysclock;
   GRWLock                  rwmutex;
@@ -53,7 +55,7 @@ struct _NetQueueAnalyserResult{
 
 GType netqueue_analyser_get_type (void);
 void netqueue_analyser_reset(NetQueueAnalyser *this);
-NetQueueAnalyser *make_netqueue_analyser(void);
+NetQueueAnalyser *make_netqueue_analyser(guint8 id);
 void netqueue_analyser_time_update(NetQueueAnalyser *this, gint32 sending_bitrate);
 void netqueue_analyser_reset_stability(NetQueueAnalyser *this);
 void netqueue_analyser_do(NetQueueAnalyser *this,

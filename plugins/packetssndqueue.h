@@ -21,36 +21,37 @@ typedef struct _PacketsSndQueueClass PacketsSndQueueClass;
 #define PACKETSSNDQUEUE_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),PACKETSSNDQUEUE_TYPE))
 #define PACKETSSNDQUEUE_CAST(src)        ((PacketsSndQueue *)(src))
 
-typedef struct _PacketsSndQueueNode PacketsSndQueueNode;
-typedef void (*BufferProxy)(gpointer,GstBuffer*);
+typedef struct _PacketsSndQueueItem PacketsSndQueueItem;
+
+struct _PacketsSndQueueItem
+{
+  GstClockTime         added;
+  GstBuffer*           buffer;
+  guint32              timestamp;
+  gint32               size;
+};
+
+#define PACKETSSNDQUEUE_MAX_ITEMS_NUM 2000
 
 struct _PacketsSndQueue
 {
   GObject                  object;
-  PacketsSndQueueNode*     head;
-  PacketsSndQueueNode*     tail;
-  guint32                  counter;
-  GRWLock                  rwmutex;
   GstClock*                sysclock;
-  guint                    pacing;
-  gdouble                  bandwidth;
-  guint                    allowed_rate_per_ms;
+  GRWLock                  rwmutex;
+  PacketsSndQueueItem      items[PACKETSSNDQUEUE_MAX_ITEMS_NUM];
+  gint32                   items_read_index;
+  gint32                   items_write_index;
+  guint32                  counter;
+  gboolean                 pacing;
+  guint32                  last_timestamp;
+  gint32                   approved_bytes;
+  gint32                   allowed_rate_per_ms;
+  gint32                   target_rate;
   GstClockTime             obsolation_treshold;
-  BufferProxy              proxy;
-  gpointer                 proxydata;
   gboolean                 expected_lost;
-  GstTask*                 ticking_thread;
-  GRecMutex                ticking_mutex;
 };
 
-struct _PacketsSndQueueNode
-{
-  PacketsSndQueueNode* next;
-  GstClockTime         added;
-  GstBuffer*           buffer;
-  guint                size;
-  guint                allowed_size;
-};
+
 
 struct _PacketsSndQueueClass{
   GObjectClass parent_class;
@@ -60,10 +61,11 @@ struct _PacketsSndQueueClass{
 
 
 GType packetssndqueue_get_type (void);
-PacketsSndQueue *make_packetssndqueue(BufferProxy proxy, gpointer proxydata);
-void packetssndqueue_set_bandwidth(PacketsSndQueue *this, gdouble bandwidth);
+PacketsSndQueue *make_packetssndqueue(void);
+void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_rate, gboolean pacing);
 void packetssndqueue_reset(PacketsSndQueue *this);
 gboolean packetssndqueue_expected_lost(PacketsSndQueue *this);
-void packetssndqueue_push(PacketsSndQueue *this,
-                          GstBuffer* buffer);
+void packetssndqueue_push(PacketsSndQueue *this, GstBuffer* buffer);
+GstBuffer * packetssndqueue_pop(PacketsSndQueue *this);
+void packetssndqueue_approve(PacketsSndQueue *this);
 #endif /* PACKETSSNDQUEUE_H_ */

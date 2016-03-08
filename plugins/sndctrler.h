@@ -38,6 +38,7 @@ struct _SndController
   GObject                    object;
 
   GstTask*                   thread;
+  GstClockTime               made;
   GRecMutex                  thread_mutex;
   GHashTable*                subflows;
   GRWLock                    rwmutex;

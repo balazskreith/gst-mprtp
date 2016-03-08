@@ -122,9 +122,15 @@ struct _Private{
 #define _priv(this) ((Private*)this->priv)
 #define _state(this) this->state
 #define _stage(this) _priv(this)->stage
+#define _event(this) _priv(this)->event
+#define _set_event(this, e) _event(this) = e
+#define _set_pending_event(this, e) this->pending_event = e
 #define _measurement(this) _priv(this)->measurement
 #define _anres(this) _measurement(this)->netq_analysation
-
+#define _TR(this) this->target_bitrate
+#define _SR(this) (_priv(this)->sending_bitrate_sum / 3)
+#define _min_br(this) MIN(_SR(this), _TR(this))
+#define _max_br(this) MAX(_SR(this), _TR(this))
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
@@ -210,10 +216,6 @@ _calculate_monitoring_interval(
 static void
 _change_target_bitrate(SubflowRateController *this, gint32 new_target);
 
- static gboolean
- _is_near_to_bottleneck_point(
-     SubflowRateController *this);
-
  static gdouble
  _get_bottleneck_influence(
      SubflowRateController *this);
@@ -262,7 +264,6 @@ subratectrler_init (SubflowRateController * this)
 {
   this->priv = g_malloc0(sizeof(Private));
   this->sysclock = gst_system_clock_obtain();
-  this->analyser = make_netqueue_analyser();
   g_rw_lock_init (&this->rwmutex);
 
   //Initial values
@@ -283,7 +284,7 @@ SubflowRateController *make_subratectrler(SendingRateDistributor* rate_controlll
   result->id                  = mprtps_path_get_id(result->path);
   result->setup_time          = _now(result);
   result->monitoring_interval = 3;
-
+  result->analyser            = make_netqueue_analyser(result->id);
   _switch_stage_to(result, STAGE_KEEP, FALSE);
   _transit_state_to(result, SUBFLOW_STATE_STABLE);
 
@@ -310,6 +311,7 @@ static void _update_tr_corr(SubflowRateController *this,
   tr_corr =  _priv(this)->sending_bitrate_sum / _priv(this)->target_bitrate_sum;
 
   _priv(this)->tr_correlated = .95 < tr_corr && tr_corr < 1.05;
+
 
 }
 
@@ -342,13 +344,9 @@ void subratectrler_measurement_update(
     _priv(this)->controlled = FALSE;
   }
 
-  _log_measurement_update_state(this);
+  _logging(this);
   ++this->measurements_num;
-//  if(_mt0(this)->state != STATE_OVERUSED || this->last_reference_added < _now(this) - 10 * GST_SECOND){
-//    subanalyser_measurement_add_to_reference(this->analyser, measurement);
-//    this->last_reference_added = _now(this);
-//  }
-done:
+
   report->discarded_bytes = 0; //Fixme
   report->lost_bytes = 0;//Fixme
   report->sending_rate = _SR(this);
@@ -416,33 +414,33 @@ _keep_stage(
 {
   gint32 target_rate = _TR(this);
 
-  if(_anres(this).distorted){
-    _switch_stage_to(this, STAGE_MITIGATE, TRUE);
-    _set_event(this, EVENT_DISTORTION);
-    goto exit;
-  }
+//  if(_anres(this).distorted){
+//    _switch_stage_to(this, STAGE_MITIGATE, TRUE);
+//    _set_event(this, EVENT_DISTORTION);
+//    goto exit;
+//  }
 
   if(_anres(this).pierced){
     this->keep = MIN(this->keep * 2, KEEP_MAX);
     goto done;
   }
 
-  if(_anres(this).stability < this->keep || !_priv(this).tr_correlated){
+  if(_anres(this).stability < this->keep || !_priv(this)->tr_correlated){
     goto done;
   }
 
   if(0 < this->bottleneck_point && target_rate < this->bottleneck_point){
     target_rate = this->bottleneck_point;
-    subanalyser_reset(this->analyser);
+    netqueue_analyser_reset_stability(this->analyser);
     goto done;
   }
 
 
-  _switch_stage_to(this, STAGE_RAISE, FALSE);
-  _set_event(this, EVENT_PROBE);
+//  _switch_stage_to(this, STAGE_RAISE, FALSE);
+//  _set_event(this, EVENT_PROBE);
 done:
   _change_target_bitrate(this, target_rate);
-exit:
+//exit:
   return;
 }
 
@@ -452,7 +450,8 @@ _mitigate_stage(
 {
   gint32 target_rate = _TR(this);
   this->congestion_detected = _now(this);
-  if(_anres(this).congested || _lost(this)){
+  //  if(_anres(this).congested || _lost(this)){
+  if(_anres(this).congested){
     _switch_stage_to(this, STAGE_REDUCE, TRUE);
     _set_event(this, EVENT_CONGESTION);
     goto exit;
@@ -480,7 +479,7 @@ _raise_stage(
 {
   gint32 target_rate = _TR(this);
 
-  if(_anres(this).distorted || _lost(this)){
+  if(_anres(this).distorted){
     _switch_stage_to(this, STAGE_MITIGATE, TRUE);
     _set_event(this, EVENT_DISTORTION);
     goto exit;
@@ -495,7 +494,7 @@ _raise_stage(
     goto exit;
   }
 
-  if(_anres(this).stability < this->keep || !_priv(this).tr_correlated){
+  if(_anres(this).stability < this->keep || !_priv(this)->tr_correlated){
     goto done;
   }
 
@@ -504,7 +503,7 @@ _raise_stage(
     target_rate  = target_rate + CONSTRAIN(RAMP_UP_MIN_SPEED,
                                            RAMP_UP_MAX_SPEED,
                                            this->desired_bitrate - this->target_bitrate);
-    subanalyser_reset_stability(this->analyser);
+    netqueue_analyser_reset_stability(this->analyser);
     goto done;
   }
 
@@ -580,7 +579,7 @@ _fire(
           _disable_monitoring(this);
         break;
         case EVENT_STEADY:
-          subanalyser_reset_stability(this->analyser);
+          netqueue_analyser_reset_stability(this->analyser);
           _transit_state_to(this, SUBFLOW_STATE_STABLE);
           _disable_monitoring(this);
         break;
@@ -639,7 +638,6 @@ gint32 subratectrler_get_monitoring_bitrate(SubflowRateController *this)
 
 void _disable_controlling(SubflowRateController *this)
 {
-  GstClockTime interval;
   this->disable_controlling = _now(this) +  2 * GST_SECOND;
 }
 
@@ -731,15 +729,8 @@ void _change_target_bitrate(SubflowRateController *this, gint32 new_target)
     this->target_bitrate = MIN(this->max_rate, new_target);
   }
   g_print("TARGET RATE: %d\n", new_target);
-}
-
-gboolean _is_near_to_bottleneck_point(SubflowRateController *this)
-{
-  gint32 cc_point;
-  cc_point = this->bottleneck_point;
-  if(!cc_point) return FALSE;
-  if( _min_br(this) * .9 < cc_point && cc_point < _max_br(this) * 1.1) return TRUE;
-  return FALSE;
+  DISABLE_LINE _get_bottleneck_influence(this);
+  DISABLE_LINE _add_bottleneck_point(this, 0);
 }
 
 gdouble _get_bottleneck_influence(SubflowRateController *this)
@@ -765,18 +756,17 @@ _add_bottleneck_point(
 {
   this->congestion_detected = _now(this);
   this->bottleneck_point = rate;
-  DISABLE_LINE _append_to_log(this, "sg");
 }
 
 void _logging(SubflowRateController *this)
 {
   gchar filename[255];
-  sprintf(filename, "subflow_%d.log", this->id);
+  sprintf(filename, "logs/subratectrler_%d.log", this->id);
   mprtp_logger(filename,
                "############ S%d | State: %-2d | Disable time %lu | Ctrled: %d #################\n"
                "SR:         %-10d| TR:      %-10d| botlnck: %-10d|\n"
                "abs_max:    %-10d| abs_min: %-10d| max_tbr: %-10d| min_tbr: %-10d|\n"
-               "stage:      %-10d| event:   %-10d| pevent:  %-10d| keep:    %-10.6f\n"
+               "stage:      %-10d| event:   %-10d| pevent:  %-10d| keep:    %-10d\n"
                "mon_br:     %-10d| mon_int: %-10d| tr_corr: %-10d|\n"
                "############################ Seconds since setup: %lu ##########################################\n",
 

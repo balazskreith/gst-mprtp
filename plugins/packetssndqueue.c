@@ -28,6 +28,7 @@
 #include <math.h>
 #include <string.h>
 #include "bintree.h"
+#include "mprtpspath.h"
 
 #define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
 #define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
@@ -59,23 +60,12 @@ typedef enum{
 //----------------------------------------------------------------------
 
 static void packetssndqueue_finalize (GObject * object);
-static PacketsSndQueueNode* _make_node(PacketsSndQueue *this,
-                                       GstBuffer *buffer);
 
 //#define _trash_node(this, node) g_slice_free(PacketsSndQueueNode, node)
 #define _trash_node(this, node) g_free(node)
 
-static void _packetssndqueue_add(PacketsSndQueue *this,
-                                 GstBuffer* buffer);
-static void _remove_head(PacketsSndQueue *this);
-
-static void _ticking_process_run (void *data);
-
-static guint64 _pacing_deactive_state(PacketsSndQueue *this);
-static guint64 _pacing_activated_state(PacketsSndQueue *this);
-static guint64 _pacing_active_state(PacketsSndQueue *this);
-static guint64 _pacing_deactivated_state(PacketsSndQueue *this);
-
+static void _packetssndqueue_add(PacketsSndQueue *this, GstBuffer* buffer);
+static GstBuffer * _packetssndqueue_rem(PacketsSndQueue *this);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -98,19 +88,8 @@ void
 packetssndqueue_finalize (GObject * object)
 {
   PacketsSndQueue *this;
-  PacketsSndQueueNode *next;
-
   this = PACKETSSNDQUEUE(object);
-  while(this->head){
-    next = this->head->next;
-    _trash_node(this, this->head);
-    this->head = next;
-  }
   g_object_unref(this->sysclock);
-  gst_task_stop (this->ticking_thread);
-  gst_task_join (this->ticking_thread);
-  gst_object_unref (this->ticking_thread);
-
 }
 
 void
@@ -118,19 +97,14 @@ packetssndqueue_init (PacketsSndQueue * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain();
-  this->obsolation_treshold = 0;
-  this->ticking_thread = gst_task_new (_ticking_process_run, this, NULL);
-  this->pacing = PACING_DEACTIVE;
-  gst_task_set_lock (this->ticking_thread, &this->ticking_mutex);
-  gst_task_start (this->ticking_thread);
-
+  this->obsolation_treshold = 400 * GST_MSECOND;
 }
 
 
 void packetssndqueue_reset(PacketsSndQueue *this)
 {
   THIS_WRITELOCK(this);
-  while(this->head) _remove_head(this);
+  this->approved_bytes = 0;
   THIS_WRITEUNLOCK(this);
 }
 
@@ -145,172 +119,118 @@ gboolean packetssndqueue_expected_lost(PacketsSndQueue *this)
   return result;
 }
 
-PacketsSndQueue *make_packetssndqueue(BufferProxy proxy, gpointer proxydata)
+PacketsSndQueue *make_packetssndqueue(void)
 {
   PacketsSndQueue *result;
   result = g_object_new (PACKETSSNDQUEUE_TYPE, NULL);
-  result->proxy     = proxy;
-  result->proxydata = proxydata;
   return result;
 }
 
-void packetssndqueue_set_bandwidth(PacketsSndQueue *this, gdouble bandwidth)
+void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_rate, gboolean pacing)
 {
   THIS_WRITELOCK(this);
-  this->bandwidth = bandwidth;
-  if(this->pacing == PACING_DEACTIVE && 0. < bandwidth){
-    this->pacing = PACING_ACTIVATED;
-  }else if(this->pacing == PACING_ACTIVE && 0. == bandwidth){
-    this->pacing = PACING_DEACTIVATED;
+  this->target_rate = target_rate * .75;
+  if(!this->pacing && pacing){
+    this->approved_bytes = target_rate / 100;
   }
-  this->allowed_rate_per_ms = bandwidth / 1000.;
+  this->pacing = pacing;
+  this->allowed_rate_per_ms = target_rate / 1000;
   THIS_WRITEUNLOCK(this);
 }
 
-void packetssndqueue_push(PacketsSndQueue *this,
-                          GstBuffer *buffer)
+void packetssndqueue_approve(PacketsSndQueue *this)
 {
   THIS_WRITELOCK(this);
-  if(0 < (this->pacing & 2)){
-    _packetssndqueue_add(this, buffer);
-  }else{
-    this->proxy(this->proxydata, buffer);
-  }
+  this->approved_bytes += this->allowed_rate_per_ms;
   THIS_WRITEUNLOCK(this);
 }
 
-void _packetssndqueue_add(PacketsSndQueue *this,
-                             GstBuffer *buffer)
+void packetssndqueue_push(PacketsSndQueue *this, GstBuffer *buffer)
 {
-//  guint64 skew = 0;
-  PacketsSndQueueNode* node;
-  node = _make_node(this, buffer);
-  if(!this->head) {
-      this->head = this->tail = node;
-      this->counter = 1;
-      goto done;
+  THIS_WRITELOCK(this);
+  _packetssndqueue_add(this, buffer);
+  THIS_WRITEUNLOCK(this);
+}
+
+GstBuffer * packetssndqueue_pop(PacketsSndQueue *this)
+{
+  GstBuffer *result = NULL;
+  THIS_WRITELOCK(this);
+again:
+  if(!this->counter){
+    goto done;
   }
-  this->tail->next = node;
-  this->tail = node;
-  ++this->counter;
-  if(0) _remove_head(this);
+  if(!this->pacing){
+    result = _packetssndqueue_rem(this);
+    goto done;
+  }
+  if(this->items[this->items_read_index].timestamp == this->last_timestamp){
+    this->approved_bytes -= this->items[this->items_read_index].size;
+    result = _packetssndqueue_rem(this);
+    goto done;
+  }
+  if(this->items[this->items_read_index].added < _now(this) - this->obsolation_treshold){
+      GstBuffer *buf;
+      buf = _packetssndqueue_rem(this);
+      GST_WARNING_OBJECT(this, "A buffer might be dropped due to obsolation");
+      gst_buffer_unref(buf);
+      this->expected_lost = TRUE;
+      goto again;
+  }
+  if(this->approved_bytes < this->items[this->items_read_index].size){
+    goto done;
+  }
+  this->last_timestamp  = this->items[this->items_read_index].timestamp;
+  this->approved_bytes -= this->items[this->items_read_index].size;
+  result = _packetssndqueue_rem(this);
+
 done:
+//g_print("approved bytes: %d - counter: %d\n", this->approved_bytes, this->counter);
+  THIS_WRITEUNLOCK(this);
+  return result;
+}
+
+void _packetssndqueue_add(PacketsSndQueue *this, GstBuffer *buffer)
+{
+  this->items[this->items_write_index].added  = _now(this);
+  {
+    GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+    gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
+    this->items[this->items_write_index].size = gst_rtp_buffer_get_payload_len(&rtp);
+    this->items[this->items_write_index].timestamp = gst_rtp_buffer_get_timestamp(&rtp);
+    gst_rtp_buffer_unmap(&rtp);
+  }
+  this->items[this->items_write_index].buffer = gst_buffer_ref(buffer);
+  ++this->counter;
+
+  if(++this->items_write_index == PACKETSSNDQUEUE_MAX_ITEMS_NUM){
+    this->items_write_index = 0;
+  }
+
+  if(this->items_write_index == this->items_read_index){
+    GstBuffer *buf;
+    buf = _packetssndqueue_rem(this);
+    if(buf){
+      GST_WARNING_OBJECT(this, "A buffer might be dropped due to queue fullness");
+      gst_buffer_unref(buf);
+      this->expected_lost = TRUE;
+    }
+  }
   return;
 }
 
-void _remove_head(PacketsSndQueue *this)
+GstBuffer * _packetssndqueue_rem(PacketsSndQueue *this)
 {
-  PacketsSndQueueNode *node;
-  node = this->head;
-  this->head = node->next;
-  _trash_node(this, node);
+  GstBuffer *result = NULL;
+  result = this->items[this->items_read_index].buffer;
+  this->items[this->items_read_index].buffer = 0;
+  this->items[this->items_read_index].size = 0;
+  this->items[this->items_read_index].added = 0;
+  if(++this->items_read_index == PACKETSSNDQUEUE_MAX_ITEMS_NUM){
+    this->items_read_index = 0;
+  }
   --this->counter;
-}
-
-
-PacketsSndQueueNode* _make_node(PacketsSndQueue *this, GstBuffer *buffer)
-{
-  PacketsSndQueueNode *result;
-  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-  result = g_malloc0(sizeof(PacketsSndQueueNode));
-  result->next = NULL;
-  result->added = gst_clock_get_time(this->sysclock);
-  result->buffer = gst_buffer_ref(buffer);
-
-  if (G_UNLIKELY (!gst_rtp_buffer_map (buffer, GST_MAP_READWRITE, &rtp))) {
-    GST_WARNING_OBJECT (this, "The RTP packet is not writeable");
-    goto done;
-  }
-  result->size = gst_rtp_buffer_get_payload_len(&rtp);
-  gst_rtp_buffer_unmap(&rtp);
-done:
   return result;
-}
-
-void
-_ticking_process_run (void *data)
-{
-  PacketsSndQueue *this;
-  GstClockID clock_id;
-  GstClockTime next_scheduler_time;
-
-  this = (PacketsSndQueue *) data;
-  next_scheduler_time = _now(this) + 100 * GST_MSECOND;
-
-  THIS_WRITELOCK (this);
-  if(this->pacing == PACING_ACTIVATED){
-    next_scheduler_time = _pacing_activated_state(this);
-  }else if(this->pacing == PACING_ACTIVE){
-    next_scheduler_time = _pacing_active_state(this);
-  }else if(this->pacing == PACING_DEACTIVATED){
-    next_scheduler_time = _pacing_deactivated_state(this);
-  }else if(this->pacing == PACING_DEACTIVE){
-    next_scheduler_time = _pacing_deactive_state(this);
-  }
-  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
-  THIS_WRITEUNLOCK (this);
-
-  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
-    GST_WARNING_OBJECT (this, "The scheduler clock wait is interrupted");
-  }
-  gst_clock_id_unref (clock_id);
-}
-
-guint64 _pacing_deactive_state(PacketsSndQueue *this)
-{
-  return _now(this) + 100 * GST_MSECOND;
-}
-
-guint64 _pacing_activated_state(PacketsSndQueue *this)
-{
-  this->pacing = PACING_ACTIVE;
-  return _now(this) + 1 * GST_MSECOND;
-}
-
-guint64 _pacing_active_state(PacketsSndQueue *this)
-{
-  guint64              next_scheduler_time = _now(this) + 1 * GST_MSECOND;
-  PacketsSndQueueNode* node;
-again:
-  if(!this->head){
-    goto done;
-  }
-  node = this->head;
-  if(node->added < _now(this) - 400 * GST_MSECOND){
-     this->expected_lost = TRUE;
-    _remove_head(this);
-    goto again;
-  }
-  node->allowed_size += this->allowed_rate_per_ms;
-  if(node->allowed_size < node->size){
-    goto done;
-  }
-  this->proxy(this->proxydata, node->buffer);
-  _remove_head(this);
-//  next_scheduler_time = now + MAX(0.001,(node->size*8)/MAX(50000,this->bandwidth)) * GST_SECOND;
-done:
-  return next_scheduler_time;
-}
-
-guint64 _pacing_deactivated_state(PacketsSndQueue *this)
-{
-  guint64              next_scheduler_time = _now(this) + 100 * GST_MSECOND;
-  PacketsSndQueueNode* node;
-again:
-  if(!this->head){
-    goto done;
-  }
-  node = this->head;
-  if(node->added < _now(this) - 400 * GST_MSECOND){
-     //Todo: Set expected losts flag here
-    _remove_head(this);
-  }else{
-    this->proxy(this->proxydata, node->buffer);
-  }
-  goto again;
-done:
-  this->pacing = PACING_DEACTIVE;
-  return next_scheduler_time;
 }
 
 

@@ -98,7 +98,6 @@ typedef struct
 } Subflow;
 
 
-static GstBuffer *_assemble_report (Subflow * this, GstBuffer * blocks);
 static Subflow *_get_subflow_from_blocks (GstMprtpsender * this,
     GstBuffer * blocks);
 static Subflow *
@@ -980,10 +979,8 @@ gst_mprtpsender_mprtcp_sink_chain (GstPad * pad, GstObject * parent,
 //  }
 //  g_print("############################ SENT (%lu)################################\n", GST_TIME_AS_MSECONDS(gst_clock_get_time(subflow->sysclock)));
   if(subflow->async_outpad){
-    DISABLE_LINE result = gst_pad_push (subflow->async_outpad, _assemble_report (subflow, buf));
     result = gst_pad_push (subflow->async_outpad, buf);
   }else{
-    DISABLE_LINE result = gst_pad_push (subflow->outpad, _assemble_report (subflow, buf));
     result = gst_pad_push (subflow->outpad, buf);
   }
 
@@ -1035,63 +1032,6 @@ _get_subflow_from_report (GstMprtpsender * this, GstBuffer * blocks)
   }
   gst_buffer_unmap(blocks, &map);
 done:
-  return result;
-}
-
-GstBuffer *
-_assemble_report (Subflow * this, GstBuffer * blocks)
-{
-  GstBuffer *result = NULL;
-  gsize report_header_size = 0;
-  gsize blocks_length = 0;
-  GstMPRTCPSubflowReport *report;
-  GstMPRTCPSubflowBlock *block;
-  guint16 length;
-  guint16 offset = 0;
-  guint8 block_length = 0;
-  guint16 subflow_id, prev_subflow_id = 0;
-  GstMapInfo map = GST_MAP_INFO_INIT;
-  guint8 src = 0;
-
-  if (!gst_buffer_map (blocks, &map, GST_MAP_READ)) {
-    GST_ERROR_OBJECT (this, "Buffer is not readable");
-    goto exit;
-  }
-  report_header_size = sizeof(GstRTCPHeader) + sizeof(guint32);
-  block = (GstMPRTCPSubflowBlock *) (map.data + offset);
-  for (; offset < map.size; offset += (block_length + 1) << 2, ++src) {
-//      {
-//            guint8 pt;
-//            gst_rtcp_header_getdown(&block->block_header, NULL, NULL, NULL, &pt, NULL, NULL);
-//            if(pt == GST_RTCP_TYPE_SR){
-//                guint64 ntptime;
-//                GstRTCPSR *sr;
-//                sr = &block->sender_riport;
-//                gst_rtcp_srb_getdown(&sr->sender_block, &ntptime, NULL, NULL, NULL);
-//                g_print("Created NTP time for subflow %d is %lu, but it sent at: "
-//                    "%lu (%lu)\n", this->id, ntptime, NTP_NOW>>32,
-//                    get_epoch_time_from_ntp_in_ns(NTP_NOW - ntptime));
-//            }
-//          }
-    gst_mprtcp_block_getdown (&block->info, NULL, &block_length, &subflow_id);
-    if (prev_subflow_id > 0 && subflow_id != prev_subflow_id) {
-      GST_WARNING ("MPRTCP block comes from multiple subflow");
-    }
-    blocks_length += (block_length + 1) << 2;
-    block = (GstMPRTCPSubflowBlock *) (map.data + blocks_length);
-  }
-  report = (GstMPRTCPSubflowReport*) g_malloc0(report_header_size + blocks_length);
-  gst_mprtcp_report_init (report);
-  memcpy((gpointer) &report->blocks, (gpointer) map.data, blocks_length);
-  length = (report_header_size + blocks_length - 4)>>2;
-
-  gst_rtcp_header_change(&report->header, NULL, NULL,
-                         &src, NULL, &length, NULL);
-  gst_buffer_unmap(blocks, &map);
-//  gst_print_rtcp(&report->header);
-  result = gst_buffer_new_wrapped ((gpointer)report, (length + 1)<<2);
-
-exit:
   return result;
 }
 

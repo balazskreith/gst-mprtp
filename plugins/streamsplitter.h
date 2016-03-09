@@ -30,11 +30,7 @@ typedef struct _SchNode SchNode;
 struct _StreamSplitter
 {
   GObject              object;
-
-  gboolean             new_path_added;
-  gboolean             path_is_removed;
-  gboolean             changes_are_committed;
-
+  GstClockTime         made;
   SchNode*             tree;
   SchNode*             next_tree;
 
@@ -44,17 +40,12 @@ struct _StreamSplitter
   GRWLock              rwmutex;
 
   GstClock*            sysclock;
-  GstTask*             thread;
-  GRecMutex            thread_mutex;
 
   guint8               active_subflow_num;
 
   gboolean             separation_is_possible;
   gboolean             last_delta_flag;
   gboolean             first_delta_flag;
-  NumsTracker*         incoming_bytes;
-  guint8               monitor_payload_type;
-  GQueue*              trash;
 
 };
 
@@ -81,13 +72,6 @@ void stream_splitter_setup_sending_target(
     StreamSplitter* this,
     guint8 subflow_id,
     gint32 sending_target);
-
-gint32 stream_splitter_get_encoder_rate(
-    StreamSplitter* this);
-
-void stream_splitter_set_monitor_payload_type(
-    StreamSplitter *this,
-    guint8 playload_type);
 
 gdouble stream_splitter_get_sending_target(
     StreamSplitter* this,

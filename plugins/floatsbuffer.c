@@ -88,7 +88,7 @@ floatsbuffer_finalize (GObject * object)
   FloatsBufferEvaluator *evaluator;
   this = FLOATSBUFFER(object);
   g_object_unref(this->sysclock);
-  g_free(this->items);
+  mprtp_free(this->items);
 
   for(it = this->plugins; it != NULL; it = it->next){
     plugin = it->data;
@@ -114,7 +114,7 @@ FloatsBuffer *make_floatsbuffer(
   FloatsBuffer *result;
   result = g_object_new (FLOATSBUFFER_TYPE, NULL);
   THIS_WRITELOCK (result);
-  result->items = g_malloc0(sizeof(FloatsBufferItem)*length);
+  result->items = mprtp_malloc(sizeof(FloatsBufferItem)*length);
   result->sum = 0;
   result->length = length;
   result->sysclock = gst_system_clock_obtain();
@@ -165,11 +165,11 @@ floatsbuffer_add_evaluator(FloatsBuffer *this,
 {
   FloatsBufferEvaluator *evaluator;
   THIS_WRITELOCK (this);
-  evaluator = g_malloc0(sizeof(FloatsBufferEvaluator));
+  evaluator = mprtp_malloc(sizeof(FloatsBufferEvaluator));
   evaluator->activator_filter = activator_filter;
   evaluator->iterator = iterator;
   evaluator->iterator_data = iterator_data;
-  evaluator->destroyer = g_free;
+  evaluator->destroyer = mprtp_free;
   this->evaluators = g_list_prepend(this->evaluators, evaluator);
   THIS_WRITEUNLOCK (this);
   return evaluator;
@@ -180,7 +180,7 @@ void floatsbuffer_rem_evaluator(FloatsBuffer *this, FloatsBufferEvaluator *evalu
 {
   THIS_WRITELOCK (this);
   if(evaluator->destroyer) evaluator->destroyer(evaluator);
-  else g_free(evaluator);
+  else mprtp_free(evaluator);
   this->evaluators = g_list_remove(this->evaluators, evaluator);
   THIS_WRITEUNLOCK (this);
 }

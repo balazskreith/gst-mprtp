@@ -239,7 +239,7 @@ mprtpr_path_get_discard_chunks(MpRTPRPath *this,
     if(++i == MPRTP_PLUGIN_MAX_RLE_LENGTH) i=0;
   }
   if((chunks_num_ % 2) == 1) ++chunks_num_;
-  chunk = result = g_malloc0(sizeof(GstRTCPXR_Chunk) * chunks_num_);
+  chunk = result = mprtp_malloc(sizeof(GstRTCPXR_Chunk) * chunks_num_);
   block = &this->discard_rle.blocks[this->discard_rle.read_index];
   begin_seq_ = block->start_seq;
   for(i=this->discard_rle.read_index; ; )
@@ -289,7 +289,7 @@ mprtpr_path_get_owd_chunks(MpRTPRPath *this,
     if(++i == MPRTP_PLUGIN_MAX_RLE_LENGTH) i=0;
   }
   if((chunks_num_ % 2) == 1) ++chunks_num_;
-  chunk = result = g_malloc0(sizeof(GstRTCPXR_Chunk) * chunks_num_);
+  chunk = result = mprtp_malloc(sizeof(GstRTCPXR_Chunk) * chunks_num_);
   block = &this->owd_rle.blocks[this->owd_rle.read_index];
   begin_seq_ = block->start_seq;
   for(i=this->owd_rle.read_index; ; )
@@ -350,7 +350,7 @@ mprtpr_path_get_lost_chunks(MpRTPRPath *this,
     if(++i == MPRTP_PLUGIN_MAX_RLE_LENGTH) i=0;
   }
   if((chunks_num_ % 2) == 1) ++chunks_num_;
-  chunk = result = g_malloc0(sizeof(GstRTCPXR_Chunk) * chunks_num_);
+  chunk = result = mprtp_malloc(sizeof(GstRTCPXR_Chunk) * chunks_num_);
   block = &this->losts_rle.blocks[this->losts_rle.read_index];
   begin_seq_ = block->start_seq;
   for(i=this->losts_rle.read_index; ; )
@@ -439,7 +439,6 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
     this->total_payload_bytes += mprtp->payload_bytes;
     this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
   }
-//  g_print("J: %d\n", this->jitter);
   if(0 < mprtp->delay){
     _add_delay(this, mprtp->delay);
     if(0 < this->discard_latency && this->discard_latency < mprtp->delay){

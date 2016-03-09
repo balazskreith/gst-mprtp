@@ -104,7 +104,13 @@ static GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *b
 //static void _trash_mprtp_buffer(GstMprtpplayouter * this, GstMpRTPBuffer *mprtp);
 //#define _trash_mprtp_buffer(this, mprtp) pointerpool_add(this->mprtp_buffer_pool, mprtp);
 //#define _trash_mprtp_buffer(this, mprtp) g_slice_free(GstMpRTPBuffer, mprtp)
-#define _trash_mprtp_buffer(this, mprtp) g_free(mprtp)
+#define _trash_mprtp_buffer(this, mprtp) mprtp_free(mprtp)
+
+#define _now(this) gst_clock_get_time (this->sysclock)
+
+static void
+_mprtpplayouter_process_run (void *data);
+
 enum
 {
   PROP_0,
@@ -157,17 +163,6 @@ GST_STATIC_PAD_TEMPLATE ("mprtcp_rr_src",
     GST_STATIC_CAPS ("application/x-rtcp")
     );
 
-static gpointer _mprtp_ctor(void)
-{
-  return g_malloc0(sizeof(GstMpRTPBuffer));
-}
-
-static void _mprtp_reset(gpointer inc_data)
-{
-  GstMpRTPBuffer *casted_data = inc_data;
-  memset(casted_data, 0, sizeof(GstMpRTPBuffer));
-}
-
 /* class initialization */
 
 G_DEFINE_TYPE_WITH_CODE (GstMprtpplayouter, gst_mprtpplayouter,
@@ -181,8 +176,6 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
   GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
   GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
 
-  DISABLE_LINE _mprtp_ctor();
-  DISABLE_LINE _mprtp_reset(NULL);
   /* Setting up pads and setting metadata should be moved to
      base_class_init if you intend to subclass this class. */
   gst_element_class_add_pad_template (element_class,
@@ -301,6 +294,8 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
 static void
 gst_mprtpplayouter_init (GstMprtpplayouter * this)
 {
+  init_mprtp_logger();
+
   this->mprtp_sinkpad =
       gst_pad_new_from_static_template (&gst_mprtpplayouter_mprtp_sink_template,
       "mprtp_sink");
@@ -336,34 +331,31 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   gst_pad_set_event_function (this->mprtp_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_sink_event));
 
-  this->rtp_passthrough = TRUE;
-  this->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
-  this->abs_time_ext_header_id = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
-  this->sysclock = gst_system_clock_obtain ();
-  this->pivot_clock_rate = MPRTP_PLAYOUTER_DEFAULT_CLOCKRATE;
-  this->pivot_ssrc = MPRTP_PLAYOUTER_DEFAULT_SSRC;
-  //this->paths = g_hash_table_new_full (NULL, NULL, NULL, g_free);
-  this->paths = g_hash_table_new_full (NULL, NULL, NULL, mprtpr_path_destroy);
-  this->joiner = make_stream_joiner(this,gst_mprtpplayouter_send_mprtp_proxy);
-  this->controller = g_object_new(RCVCTRLER_TYPE, NULL);
+  g_rw_lock_init (&this->rwmutex);
+
+  this->thread                   = gst_task_new (_mprtpplayouter_process_run, this, NULL);
+  this->rtp_passthrough          = TRUE;
+  this->mprtp_ext_header_id      = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
+  this->abs_time_ext_header_id   = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
+  this->sysclock                 = gst_system_clock_obtain ();
+  this->pivot_clock_rate         = MPRTP_PLAYOUTER_DEFAULT_CLOCKRATE;
+  this->pivot_ssrc               = MPRTP_PLAYOUTER_DEFAULT_SSRC;
+  this->paths                    = g_hash_table_new_full (NULL, NULL, NULL, mprtpr_path_destroy);
+  this->joiner                   = make_stream_joiner(this,gst_mprtpplayouter_send_mprtp_proxy);
+  this->controller               = g_object_new(RCVCTRLER_TYPE, NULL);
+  this->discard_latency          = 400 * GST_MSECOND;
+  this->lost_latency             = GST_SECOND;
+  this->monitor_payload_type     = MONITOR_PAYLOAD_DEFAULT_ID;
+  this->pivot_address_subflow_id = 0;
+  this->pivot_address            = NULL;
+
   rcvctrler_setup(this->controller, this->joiner);
   rcvctrler_setup_callbacks(this->controller, this, gst_mprtpplayouter_mprtcp_sender);
   rcvctrler_set_additional_reports(this->controller, FALSE, FALSE, FALSE);
   _change_auto_rate_and_cc (this, FALSE);
 
-  this->pivot_address_subflow_id = 0;
-  this->pivot_address = NULL;
-  g_rw_lock_init (&this->rwmutex);
-//  this->mprtp_buffer_pool = make_pointerpool(512, _mprtp_ctor, g_free, _mprtp_reset);
-  this->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
   stream_joiner_set_monitor_payload_type(this->joiner, this->monitor_payload_type);
 
-  init_mprtp_logger();
-//  percentiletracker_test();
-//  {
-//    StreamJoiner *s = NULL;
-//    g_print("%hu",s->PHSN);
-//  }
 }
 
 //static GstClockTime out_prev;
@@ -377,35 +369,6 @@ gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstMpRTPBuffer * mprtp)
   if(mprtp->payload_type == this->monitor_payload_type){
     goto done;
   }
-  //For Playout test
-//  {
-//    GstClockTime now;
-//    now = gst_clock_get_time(this->sysclock);
-//    if(!out_prev){
-//      out_prev = now;
-//      goto skip;
-//    }
-//
-//    if(mprtp->subflow_id == 1)
-//      g_print("%lu,%lu,%lu\n",
-//            GST_TIME_AS_USECONDS(mprtp->delay),
-//            0UL,
-//            GST_TIME_AS_USECONDS(get_epoch_time_from_ntp_in_ns(NTP_NOW - mprtp->abs_snd_ntp_time)));
-//    else
-//      g_print("%lu,%lu,%lu\n",
-//            0UL,
-//            GST_TIME_AS_USECONDS(mprtp->delay),
-//            GST_TIME_AS_USECONDS(get_epoch_time_from_ntp_in_ns(NTP_NOW - mprtp->abs_snd_ntp_time))
-//            );
-//  }
-//  skip:
-//  g_print("%lu: %hu-%u<-%d\n",
-//          GST_TIME_AS_MSECONDS(gst_clock_get_time(this->sysclock)-out_prev),
-//          gst_mprtp_ptr_buffer_get_abs_seq(mprtp),
-//          gst_mprtp_ptr_buffer_get_timestamp(mprtp),
-//          mprtp->subflow_id);
-//  g_print("%lu\n", GST_TIME_AS_MSECONDS(get_epoch_time_from_ntp_in_ns(NTP_NOW - mprtp->abs_snd_ntp_time)));
-//  out_prev = gst_clock_get_time(this->sysclock);
   gst_pad_push (this->mprtp_srcpad, mprtp->buffer);
 done:
 //  gst_mprtp_buffer_read_unmap(mprtp);
@@ -421,11 +384,14 @@ gst_mprtpplayouter_finalize (GObject * object)
   g_object_unref (this->joiner);
   g_object_unref (this->controller);
   g_object_unref (this->sysclock);
+
   /* clean up object here */
+  gst_task_join (this->thread);
+  gst_object_unref (this->thread);
   g_hash_table_destroy (this->paths);
   G_OBJECT_CLASS (gst_mprtpplayouter_parent_class)->finalize (object);
 //  while(!g_queue_is_empty(this->mprtp_buffer_pool)){
-//    g_free(g_queue_pop_head(this->mprtp_buffer_pool));
+//    mprtp_free(g_queue_pop_head(this->mprtp_buffer_pool));
 //  }
 //  g_object_unref(this->mprtp_buffer_pool);
 }
@@ -621,35 +587,35 @@ _collect_infos (GstMprtpplayouter * this)
     field_name = g_strdup_printf ("subflow-%d-id", index);
     g_value_set_uint (&g_value, mprtpr_path_get_id (path));
     gst_structure_set_value (result, field_name, &g_value);
-    g_free (field_name);
+    mprtp_free (field_name);
 
     field_name = g_strdup_printf ("subflow-%d-received_packet_num", index);
     g_value_set_uint (&g_value,
         received_num);
     gst_structure_set_value (result, field_name, &g_value);
-    g_free (field_name);
+    mprtp_free (field_name);
 
     field_name = g_strdup_printf ("subflow-%d-jitter", index);
     g_value_set_uint (&g_value, jitter);
     gst_structure_set_value (result, field_name, &g_value);
-    g_free (field_name);
+    mprtp_free (field_name);
 
     field_name = g_strdup_printf ("subflow-%d-HSN", index);
     g_value_set_uint (&g_value, HSN);
     gst_structure_set_value (result, field_name, &g_value);
-    g_free (field_name);
+    mprtp_free (field_name);
 
     field_name = g_strdup_printf ("subflow-%d-cycle_num", index);
     g_value_set_uint (&g_value, cycle_num);
     gst_structure_set_value (result, field_name, &g_value);
-    g_free (field_name);
+    mprtp_free (field_name);
 
     field_name =
         g_strdup_printf ("subflow-%d-late_discarded_packet_num", index);
     g_value_set_uint (&g_value,
         late_discarded);
     gst_structure_set_value (result, field_name, &g_value);
-    g_free (field_name);
+    mprtp_free (field_name);
     ++index;
   }
   return result;
@@ -839,8 +805,11 @@ gst_mprtpplayouter_change_state (GstElement * element,
     GstStateChange transition)
 {
   GstStateChangeReturn ret;
+  GstMprtpplayouter *this;
   g_return_val_if_fail (GST_IS_MPRTPPLAYOUTER (element),
       GST_STATE_CHANGE_FAILURE);
+
+  this = GST_MPRTPPLAYOUTER (element);
 
   switch (transition) {
     case GST_STATE_CHANGE_NULL_TO_READY:
@@ -848,18 +817,21 @@ gst_mprtpplayouter_change_state (GstElement * element,
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       break;
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
-      break;
-    default:
-      break;
-  }
+        gst_task_set_lock (this->thread, &this->thread_mutex);
+        gst_task_start (this->thread);
+        break;
+      default:
+        break;
+    }
 
-  ret =
-      GST_ELEMENT_CLASS (gst_mprtpplayouter_parent_class)->change_state
-      (element, transition);
+    ret =
+        GST_ELEMENT_CLASS (gst_mprtpplayouter_parent_class)->change_state
+        (element, transition);
 
-  switch (transition) {
-    case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
-      break;
+    switch (transition) {
+      case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
+        gst_task_stop (this->thread);
+        break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       break;
     case GST_STATE_CHANGE_READY_TO_NULL:
@@ -947,7 +919,6 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
       result = gst_pad_push (this->mprtp_srcpad, buf);
     goto done;
   }
-  //init mprtp buffer
 
   _processing_mprtp_packet (this, buf);
   result = GST_FLOW_OK;
@@ -1056,9 +1027,7 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
       return;
     }
   }
-  mprtp->buffer = gst_buffer_ref(mprtp->buffer);
-  mprtpr_path_process_rtp_packet (path, mprtp);
-  stream_joiner_receive_mprtp(this->joiner, mprtp);
+  stream_joiner_push(this->joiner, mprtp);
   return;
 }
 
@@ -1104,6 +1073,45 @@ GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer)
                     this->delay_offset,
                     this->monitor_payload_type);
   return result;
+}
+
+void
+_mprtpplayouter_process_run (void *data)
+{
+  GstMprtpplayouter *this;
+  GstClockID clock_id;
+  GstClockTime next_scheduler_time;
+  GstMpRTPBuffer *mprtp;
+  GstBuffer *buffer = NULL;
+
+  this = (GstMprtpplayouter *) data;
+
+  THIS_READLOCK (this);
+  next_scheduler_time = _now(this) + 1 * GST_MSECOND;
+
+again:
+  mprtp = stream_joiner_pop(this->joiner);
+  if(!mprtp){
+    goto done;
+  }
+  buffer = mprtp->buffer;
+  _trash_mprtp_buffer(this, mprtp);
+  if(!buffer) {
+    goto done;
+  }
+//  if(1 < buffer->mini_object.refcount){
+//    gst_buffer_unref(buffer);
+//  }
+  gst_pad_push (this->mprtp_srcpad, buffer);
+  goto again;
+done:
+  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
+  THIS_READUNLOCK (this);
+
+  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
+    GST_WARNING_OBJECT (this, "The scheduler clock wait is interrupted");
+  }
+  gst_clock_id_unref (clock_id);
 }
 
 #undef THIS_READLOCK

@@ -72,7 +72,7 @@ echo "'-------------------------------------------------------------'"
 
 BWCTRLER="run_bwctrler.sh"
 NSSND="ns_snd"
-NSRCV="ns_snd"
+NSRCV="ns_rcv"
 SERVER="./server"
 CLIENT="./client"
 TARGET_DIR="logs"
@@ -82,9 +82,10 @@ TARGET_DIR="logs"
 if [ "$S1PROFILE" -gt 0 ]
 then
   echo "executing bandwidth test case for subflow 1"
-  echo "./scripts/run_bwctrler.sh --bwprofile $RPROFILE --bwref 1000 --shift 1 --veth 0 --jitter 10 --latency 100 --output veth0.csv --ip 10.0.0.1" > scripts/test_bw_snd.sh
+  echo "./scripts/run_bwctrler.sh --bwprofile $RPROFILE --bwref 1000 --shift 2 --veth 0 --jitter 1 --latency 100 --output veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
   chmod 777 scripts/test_bw_veth0_snd.sh
   sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
+  sleep 1
 fi
 
 if [ "$S2PROFILE" -gt 0 ]
@@ -99,8 +100,8 @@ fi
 
 
 
-sudo ip netns exec ns0 $SERVER "--profile="$RPROFILE 2> $TARGET_DIR"/"server.log &
-sudo ip netns exec ns1 $CLIENT "--profile="$RPROFILE 2> $TARGET_DIR"/"client.log &
+sudo ip netns exec $NSSND $SERVER "--profile="$RPROFILE 2> $TARGET_DIR"/"server.log &
+sudo ip netns exec $NSRCV $CLIENT "--profile="$RPROFILE 2> $TARGET_DIR"/"client.log &
 
 cleanup()
 # example cleanup function
@@ -120,23 +121,18 @@ control_c()
 
 trap control_c SIGINT
 
-echo "#!/bin/bash" > scripts/veth0.sh
-echo "./scripts/$BWCTRLER --bwprofile 10 --bwmax 100 --tcpnum 200 --tcpprofile 300" >> scripts/veth0.sh
-chmod 777 scripts/veth0.sh
-sudo ip netns exec $NSSND "./scripts/veth0.sh"
-
-echo "After the exit"
-
 sleep 1
-for j in `seq 1 180`;
+
+DURATION=600
+let "WAIT=$DURATION/100"
+for j in `seq 1 100`;
 do
-  for i in `seq 1 5`;
+  for i in `seq 1 $WAIT`;
   do
-    echo "0," >> $TARGET_DIR"/"$BW_SUM_LOG
     sleep 1
   done
-  echo $j"*5 seconds"
-  ./run_test_evaluator.sh $PROFILE
+  echo $j"*$WAIT seconds"
+  #./run_test_evaluator.sh $PROFILE
 done
 sleep 1
 

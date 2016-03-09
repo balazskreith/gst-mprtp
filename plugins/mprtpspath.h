@@ -39,6 +39,7 @@ typedef struct _MPRTPSPathClass MPRTPSPathClass;
 #define MPRTPS_PATH_CAST(src)        ((MPRTPSPath *)(src))
 
 
+
 typedef enum
 {
   MPRTPS_PATH_FLAG_NON_LOSSY     = 1,

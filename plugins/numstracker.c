@@ -113,7 +113,7 @@ numstracker_finalize (GObject * object)
     plugin = it->data;
     plugin->destroyer(plugin);
   }
-  g_free(this->items);
+  mprtp_free(this->items);
 }
 
 void
@@ -129,7 +129,7 @@ NumsTracker *make_numstracker(
   NumsTracker *result;
   result = g_object_new (NUMSTRACKER_TYPE, NULL);
   THIS_WRITELOCK (result);
-  result->items = g_malloc0(sizeof(NumsTrackerItem)*length);
+  result->items = mprtp_malloc(sizeof(NumsTrackerItem)*length);
   result->value_sum = 0;
   result->length = length;
   result->sysclock = gst_system_clock_obtain();
@@ -367,7 +367,7 @@ NumsTrackerMinMaxPlugin *
 make_numstracker_minmax_plugin(void (*max_pipe)(gpointer,gint64), gpointer max_data,
                                void (*min_pipe)(gpointer,gint64), gpointer min_data)
 {
-  NumsTrackerMinMaxPlugin *this = g_malloc0(sizeof(NumsTrackerMinMaxPlugin));
+  NumsTrackerMinMaxPlugin *this = mprtp_malloc(sizeof(NumsTrackerMinMaxPlugin));
   this->base.add_activator = _minmax_add_activator;
   this->base.rem_activator = _minmax_rem_activator;
   this->max_pipe = max_pipe;
@@ -430,13 +430,13 @@ NumsTrackerEWMAPlugin *
 make_numstracker_ewma_plugin(void (*avg_pipe)(gpointer,gdouble), gpointer avg_data,
                                gdouble factor)
 {
-  NumsTrackerEWMAPlugin *this = g_malloc0(sizeof(NumsTrackerEWMAPlugin));;
+  NumsTrackerEWMAPlugin *this = mprtp_malloc(sizeof(NumsTrackerEWMAPlugin));;
   this->base.add_activator = _ewma_add_activator;
   this->base.rem_activator = NULL;
   this->avg_pipe = avg_pipe;
   this->avg_pipe_data = avg_data;
   this->factor = factor;
-  this->base.destroyer = g_free;
+  this->base.destroyer = mprtp_free;
   return this;
 }
 
@@ -460,12 +460,12 @@ _ewma_add_activator(gpointer pdata, gint64 value)
 NumsTrackerStatPlugin *
 make_numstracker_stat_plugin(void (*stat_pipe)(gpointer,NumsTrackerStatData*), gpointer stat_data)
 {
-  NumsTrackerStatPlugin *this = g_malloc0(sizeof(NumsTrackerStatPlugin));;
+  NumsTrackerStatPlugin *this = mprtp_malloc(sizeof(NumsTrackerStatPlugin));;
   this->base.add_activator = _stat_add_activator;
   this->base.rem_activator = _stat_rem_activator;
   this->stat_pipe = stat_pipe;
   this->stat_pipe_data = stat_data;
-  this->base.destroyer = g_free;
+  this->base.destroyer = mprtp_free;
   this->dev = 1.;
   return this;
 }

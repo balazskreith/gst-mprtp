@@ -101,6 +101,9 @@ struct _GstMprtpplayouter
 //  void          (*riport_can_flow) (gpointer);
   guint32         rtcp_sent_octet_sum;
 
+  GstTask*                      thread;
+  GRecMutex                     thread_mutex;
+
 };
 
 struct _GstMprtpplayouterClass

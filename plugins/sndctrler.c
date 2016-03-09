@@ -234,6 +234,7 @@ sndctrler_init (SndController * this)
   this->report_processor   = g_object_new(REPORTPROCESSOR_TYPE, NULL);
   this->thread             = gst_task_new (sndctrler_ticker_run, this, NULL);
   this->made               = _now(this);
+  this->enabled            = FALSE;
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   gst_task_set_lock (this->thread, &this->thread_mutex);
@@ -282,9 +283,9 @@ void _logging (SndController *this)
   }
 
   {
-    gint32 encoder_rate = 0;
-    encoder_rate = stream_splitter_get_encoder_rate(this->splitter);
-    mprtp_logger(main_file,"%d,%d,%d\n", media_rate,media_target,encoder_rate);
+    gint32 encoder_bitrate = 0;
+    encoder_bitrate = packetssndqueue_get_encoder_bitrate(this->pacer);
+    mprtp_logger(main_file,"%d,%d,%d\n", media_rate,media_target,encoder_bitrate);
   }
 
 }
@@ -471,6 +472,7 @@ void _subflow_iterator(
 void _enable_controlling(Subflow *subflow, gpointer data)
 {
   SndController *this = data;
+  g_print("EZT EN HIVOGATOM AKARMIKOR IS?\n");
   subflow->rate_controller = make_subratectrler(this->rate_distor, subflow->path);
 }
 
@@ -488,11 +490,11 @@ _irp_processor_main(SndController * this)
   gpointer           key, val;
   Subflow*           subflow;
   guint32            sending_rate;
+  SubflowMeasurement measurement;
 
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
-    SubflowMeasurement measurement;
     subflow = (Subflow *) val;
 
     if(subflow->process_state == NO_CONTROLLING){
@@ -504,6 +506,7 @@ _irp_processor_main(SndController * this)
     if(subflow->process_state != REPORT_ARRIVED){
       continue;
     }
+    memset(&measurement, 0, sizeof(SubflowMeasurement));
     measurement.reports = subflow->reports;
     measurement.sending_bitrate = subflow->sending_bitrate;
 
@@ -579,12 +582,12 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
     GST_WARNING_OBJECT (this,
         "MPRTCP riport can not be binded any "
         "subflow with the given id: %d", summary->subflow_id);
-    g_free(summary);
+    mprtp_free(summary);
     goto done;
   }
 
   if(subflow->reports){
-    g_free(subflow->reports);
+    mprtp_free(subflow->reports);
   }
   subflow->reports = summary;
   subflow->last_report = _now(this);
@@ -743,7 +746,7 @@ Subflow *
 _subflow_ctor (void)
 {
   Subflow *result;
-  result = g_malloc0 (sizeof (Subflow));
+  result = mprtp_malloc (sizeof (Subflow));
   return result;
 }
 
@@ -751,7 +754,7 @@ void
 _subflow_dtor (Subflow * this)
 {
   g_return_if_fail (this);
-  g_free (this);
+  mprtp_free (this);
 }
 
 void

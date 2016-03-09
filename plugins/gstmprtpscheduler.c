@@ -355,10 +355,10 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
 
   this->sysclock = gst_system_clock_obtain ();
-  this->path_ticking_thread = gst_task_new (_mprtpscheduler_process_run, this, NULL);
+  this->thread = gst_task_new (_mprtpscheduler_process_run, this, NULL);
   g_rw_lock_init (&this->rwmutex);
   this->ssrc_filter = 0;
-  this->paths = g_hash_table_new_full (NULL, NULL, NULL, g_free);
+  this->paths = g_hash_table_new_full (NULL, NULL, NULL, mprtp_free);
   this->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
   this->abs_time_ext_header_id = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
   this->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
@@ -373,7 +373,6 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
                             );
   this->monitorpackets = make_monitorpackets();
 
-  stream_splitter_set_monitor_payload_type(this->splitter, this->monitor_payload_type);
   _change_auto_rate_and_cc (this, FALSE);
   _setup_paths(this);
 
@@ -400,8 +399,8 @@ gst_mprtpscheduler_finalize (GObject * object)
   GST_DEBUG_OBJECT (this, "finalize");
 
   /* clean up object here */
-  gst_task_join (this->path_ticking_thread);
-  gst_object_unref (this->path_ticking_thread);
+  gst_task_join (this->thread);
+  gst_object_unref (this->thread);
 
   g_hash_table_destroy(this->paths);
   g_object_unref (this->sysclock);
@@ -580,18 +579,18 @@ _collect_infos (GstMprtpscheduler * this)
     field_name = g_strdup_printf ("subflow-%d-id", index);
     g_value_set_uint (&g_value, mprtps_path_get_id (path));
     gst_structure_set_value (result, field_name, &g_value);
-    g_free (field_name);
+    mprtp_free (field_name);
 
     field_name = g_strdup_printf ("subflow-%d-sent_packet_num", index);
     g_value_set_uint (&g_value, mprtps_path_get_total_sent_packets_num (path));
     gst_structure_set_value (result, field_name, &g_value);
-    g_free (field_name);
+    mprtp_free (field_name);
 
     field_name = g_strdup_printf ("subflow-%d-sent_payload_bytes", index);
     g_value_set_uint (&g_value,
         mprtps_path_get_total_sent_payload_bytes (path));
     gst_structure_set_value (result, field_name, &g_value);
-    g_free (field_name);
+    mprtp_free (field_name);
 
     ++index;
   }
@@ -613,7 +612,6 @@ _setup_paths (GstMprtpscheduler * this)
     mprtps_path_set_mprtp_ext_header_id(path, this->mprtp_ext_header_id);
     mprtps_path_set_monitor_packet_provider(path, this->monitorpackets);
   }
-  stream_splitter_set_monitor_payload_type(this->splitter, this->monitor_payload_type);
 }
 
 
@@ -689,8 +687,8 @@ gst_mprtpscheduler_change_state (GstElement * element,
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       break;
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
-       gst_task_set_lock (this->path_ticking_thread, &this->path_ticking_mutex);
-       gst_task_start (this->path_ticking_thread);
+       gst_task_set_lock (this->thread, &this->thread_mutex);
+       gst_task_start (this->thread);
        break;
      default:
        break;
@@ -702,7 +700,7 @@ gst_mprtpscheduler_change_state (GstElement * element,
 
    switch (transition) {
      case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
-       gst_task_stop (this->path_ticking_thread);
+       gst_task_stop (this->thread);
        break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       break;
@@ -1068,9 +1066,9 @@ again:
   if(!buffer) {
     goto done;
   }
-  if(1 < buffer->mini_object.refcount){
-    gst_buffer_unref(buffer);
-  }
+//  if(1 < buffer->mini_object.refcount){
+//    gst_buffer_unref(buffer);
+//  }
   buffer = gst_buffer_make_writable (buffer);
   path = stream_splitter_get_next_path(this->splitter, buffer);
   if(!path){
@@ -1079,14 +1077,18 @@ again:
     goto done;
   }
   mprtps_path_process_rtp_packet(path, buffer, &monitoring_request);
+  _setup_timestamp(this, buffer);
   if(this->auto_rate_and_cc){
-    _setup_timestamp(this, buffer);
-    monitorpackets_push_rtp_packet(this->monitorpackets, buffer);
+    monitorpackets_add_outgoing_rtp_packet(this->monitorpackets, buffer);
+    gst_pad_push (this->mprtp_srcpad, buffer);
     if(monitoring_request){
-      //Todo implement FEC packets here
+      GstBuffer *monitorp;
+      monitorp = monitorpackets_provide_FEC_packet(this->monitorpackets);
+      gst_pad_push (this->mprtp_srcpad, monitorp);
     }
+  }else{
+    gst_pad_push (this->mprtp_srcpad, buffer);
   }
-  gst_pad_push (this->mprtp_srcpad, buffer);
   if (!this->riport_flow_signal_sent) {
     this->riport_flow_signal_sent = TRUE;
     sndctrler_report_can_flow(this->controller);

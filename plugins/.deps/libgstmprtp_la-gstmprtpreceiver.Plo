@@ -205,7 +205,7 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h mprtplogger.h \
  gstmprtcpbuffer.h gstmprtpbuffer.h packetssndqueue.h bintree.h \
- percentiletracker.h numstracker.h bintree2.h monitorpackets.h \
+ numstracker.h bintree2.h percentiletracker.h monitorpackets.h \
  mprtprpath.h /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
  percentiletracker2.h
 
@@ -693,11 +693,11 @@ packetssndqueue.h:
 
 bintree.h:
 
-percentiletracker.h:
-
 numstracker.h:
 
 bintree2.h:
+
+percentiletracker.h:
 
 monitorpackets.h:
 

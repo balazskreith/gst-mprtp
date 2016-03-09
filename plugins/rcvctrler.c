@@ -443,7 +443,7 @@ rcvctrler_receive_mprtcp (RcvController *this, GstBuffer * buf)
     subflow->LSR = summary->SR.ntptime;
   }
 
-  g_free(summary);
+  mprtp_free(summary);
 
 done:
   THIS_WRITEUNLOCK (this);
@@ -607,7 +607,7 @@ void _orp_add_xr_owd_rle(RcvController * this, Subflow *subflow)
                                  chunks,
                                  chunks_num);
 
-  g_free(chunks);
+  mprtp_free(chunks);
 }
 
 void _orp_add_xr_rfc3611(RcvController * this, Subflow *subflow)
@@ -625,7 +625,7 @@ void _orp_add_xr_rfc3611(RcvController * this, Subflow *subflow)
                                  chunks,
                                  chunks_num);
 
-  g_free(chunks);
+  mprtp_free(chunks);
 }
 
 void _orp_add_xr_rfc7097(RcvController * this, Subflow *subflow)
@@ -643,7 +643,7 @@ void _orp_add_xr_rfc7097(RcvController * this, Subflow *subflow)
                                  chunks,
                                  chunks_num);
 
-  g_free(chunks);
+  mprtp_free(chunks);
 }
 
 
@@ -700,7 +700,7 @@ _ruin_subflow (gpointer * subflow)
   g_object_unref (this->path);
   g_object_unref (this->ricalcer);
   if(this->logfile){
-    g_free(this->logfile);
+    mprtp_free(this->logfile);
   }
   _subflow_dtor (this);
 }
@@ -716,7 +716,7 @@ Subflow *
 _subflow_ctor (void)
 {
   Subflow *result;
-  result = g_malloc0 (sizeof (Subflow));
+  result = mprtp_malloc (sizeof (Subflow));
   return result;
 }
 
@@ -724,7 +724,7 @@ void
 _subflow_dtor (Subflow * this)
 {
   g_return_if_fail (this);
-  g_free (this);
+  mprtp_free (this);
 }
 
 

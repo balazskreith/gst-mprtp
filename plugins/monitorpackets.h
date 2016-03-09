@@ -41,6 +41,8 @@ struct _MonitorPacketsClass{
 GType monitorpackets_get_type (void);
 MonitorPackets *make_monitorpackets(void);
 void monitorpackets_reset(MonitorPackets *this);
-void monitorpackets_push_rtp_packet(MonitorPackets* this, GstBuffer* buf);
-GstBuffer *monitorpackets_provide_rtp_packet(MonitorPackets *this);
+void monitorpackets_add_outgoing_rtp_packet(MonitorPackets* this, GstBuffer* buf);
+void monitorpackets_add_incoming_rtp_packet(MonitorPackets *this, GstBuffer *buf);
+GstBuffer *monitorpackets_process_FEC_packet(MonitorPackets *this, GstBuffer *rtpbuf);
+GstBuffer *monitorpackets_provide_FEC_packet(MonitorPackets *this);
 #endif /* MONITORPACKETS_H_ */

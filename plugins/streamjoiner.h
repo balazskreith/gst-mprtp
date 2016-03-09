@@ -14,6 +14,7 @@ typedef struct _StreamJoiner StreamJoiner;
 typedef struct _StreamJoinerClass StreamJoinerClass;
 
 #include "mprtprpath.h"
+#include "monitorpackets.h"
 
 #define STREAM_JOINER_TYPE             (stream_joiner_get_type())
 #define STREAM_JOINER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),STREAM_JOINER_TYPE,StreamJoiner))
@@ -31,43 +32,37 @@ typedef struct _Frame Frame;
 
 struct _StreamJoiner
 {
-  GObject               object;
-
-  GstTask*             thread;
-  GRecMutex            thread_mutex;
+  GObject              object;
+  GstClockTime         made;
   GHashTable*          subflows;
   GRWLock              rwmutex;
   guint8               monitor_payload_type;
   gboolean             playout_allowed;
   gboolean             playout_halt;
   GstClockTime         playout_halt_time;
+  gint32               monitored_bytes;
   GstClockTime         stream_delay;
   gint                 subflow_num;
   GstClock*            sysclock;
-  GstClockTime         last_obsolate_checked;
-//  gdouble              latency;
   gdouble              playout_delay;
   NumsTracker*         skews;
   NumsTracker*         delays;
   gint64               max_skew;
-  GstClockTime         max_delay_diff;
   GstClockTime         max_delay;
   GstClockTime         min_delay;
   GstClockTime         forced_delay;
-//  PercentileTracker*   latency_window;
-  guint32              ssrc;
-//  PointerPool*         frames_pool;
-//  PointerPool*         framenodes_pool;
   Frame*               head;
   Frame*               tail;
   guint16              PHSN;
   gint32               bytes_in_queue;
   guint32              last_played_timestamp;
   gboolean             flushing;
-//  SKalmanFilter*       tick_estimator;
   PercentileTracker*   ticks;
-  gdouble              estimated_tick;
   gint32               framecounter;
+  MonitorPackets*      monitorpackets;
+
+  GstClockTime         last_logging;
+  GQueue*              urgent;
 
   guint64              last_snd_ntp_reference;
   void               (*send_mprtp_packet_func)(gpointer,GstMpRTPBuffer*);
@@ -95,9 +90,13 @@ stream_joiner_rem_path(
     guint8 subflow_id);
 
 void
-stream_joiner_receive_mprtp(
+stream_joiner_push(
     StreamJoiner * this,
-    GstMpRTPBuffer *rtp);
+    GstMpRTPBuffer *mprtp);
+
+GstMpRTPBuffer*
+stream_joiner_pop(
+    StreamJoiner *this);
 
 void
 stream_joiner_set_monitor_payload_type(
@@ -129,11 +128,6 @@ void
 stream_joiner_set_stream_delay(
     StreamJoiner *this,
     GstClockTime stream_delay);
-
-guint32
-stream_joiner_get_monitored_bytes(
-    StreamJoiner *this,
-    guint8 subflow_id);
 
 GType
 stream_joiner_get_type (void);

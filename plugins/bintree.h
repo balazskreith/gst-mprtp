@@ -9,6 +9,7 @@
 #define BINTREE_H_
 
 #include <gst/gst.h>
+#include "mprtplogger.h"
 
 typedef struct _BinTree BinTree;
 typedef struct _BinTreeClass BinTreeClass;

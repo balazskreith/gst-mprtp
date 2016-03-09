@@ -87,7 +87,7 @@ report_producer_finalize (GObject * object)
 {
   ReportProducer *this = REPORTPRODUCER (object);
   g_object_unref (this->sysclock);
-  g_free(this->databed);
+  mprtp_free(this->databed);
 }
 
 void

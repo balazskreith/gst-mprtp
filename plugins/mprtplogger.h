@@ -27,12 +27,19 @@ struct _MPRTPLogger
   GRWLock           rwmutex;
   GstClock*         sysclock;
   GHashTable*       touches;
+  GHashTable*       reserves;
   gboolean          enabled;
 };
 
 struct _MPRTPLoggerClass{
   GObjectClass parent_class;
 };
+
+//#define mprtp_malloc(bytenum) g_malloc0(bytenum)
+gpointer mprtp_malloc(gsize bytenum);
+
+//#define mprtp_free(bytenum) g_free(bytenum)
+void mprtp_free(gpointer ptr);
 
 void init_mprtp_logger(void);
 void enable_mprtp_logger(void);

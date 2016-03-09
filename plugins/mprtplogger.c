@@ -59,6 +59,30 @@ mprtp_logger_finalize (GObject * object);
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
 
+gpointer mprtp_malloc(gsize bytenum){
+  gpointer result;
+  result = g_malloc0(bytenum);
+//  if(!g_hash_table_lookup(this->reserves, result)){
+//    g_hash_table_insert(this->reserves, result, NULL);
+//    mprtp_logger("logs/memory.log", "malloc: %p\n", result);
+//  }else{
+//    mprtp_logger("logs/memory.log", "malloc: %p <- doubly reserved\n", result);
+//  }
+  return result;
+}
+
+void mprtp_free(gpointer ptr){
+
+//  if(g_hash_table_lookup(this->reserves, ptr)){
+//    g_hash_table_remove(this->reserves, ptr);
+//    mprtp_logger("logs/memory.log", "free: %p\n", ptr);
+//  }else{
+//    mprtp_logger("logs/memory.log", "free: %p <- doubly freed\n", ptr);
+//    g_warning("doubly free detected");
+//  }
+  g_free(ptr);
+}
+
 
 void
 mprtp_logger_class_init (MPRTPLoggerClass * klass)
@@ -85,9 +109,10 @@ void
 mprtp_logger_init (MPRTPLogger * this)
 {
   g_rw_lock_init (&this->rwmutex);
-
+  this->enabled    = FALSE;
   this->sysclock   = gst_system_clock_obtain ();
   this->touches    = g_hash_table_new(g_str_hash, g_str_equal);
+  this->reserves   = g_hash_table_new(g_direct_hash, g_direct_equal);
 }
 
 void init_mprtp_logger(void)
@@ -118,18 +143,14 @@ void mprtp_logger(const gchar *filename, const gchar * format, ...)
   FILE *file;
   va_list args;
   gchar writable[255];
-  THIS_READLOCK(this);
+  THIS_WRITELOCK(this);
   if(!this->enabled){
     goto done;
   }
 
   strcpy(writable, filename);
   if(!g_hash_table_lookup(this->touches, filename)){
-    THIS_READUNLOCK(this);
-    THIS_WRITELOCK(this);
     g_hash_table_insert(this->touches, writable, writable);
-    THIS_WRITEUNLOCK(this);
-    THIS_READLOCK(this);
     file = fopen(filename, "w");
   }else{
     file = fopen(filename, "a");
@@ -139,7 +160,7 @@ void mprtp_logger(const gchar *filename, const gchar * format, ...)
   va_end (args);
   fclose(file);
 done:
-  THIS_READUNLOCK(this);
+  THIS_WRITEUNLOCK(this);
 }
 
 #undef MAX_RIPORT_INTERVAL

@@ -99,7 +99,7 @@ netqueue_analyser_finalize (GObject * object)
   NetQueueAnalyser *this;
   this = NETQANALYSER(object);
 
-  g_free(this->priv);
+  mprtp_free(this->priv);
   g_object_unref(this->sysclock);
 }
 
@@ -156,7 +156,7 @@ void netqueue_analyser_reset_stability(NetQueueAnalyser *this)
   this->last_stable = 0;
 }
 
-void netqueue_analyser_do(NetQueueAnalyser *this,
+void netqueue_analyser_do(NetQueueAnalyser       *this,
                           GstMPRTCPReportSummary *summary,
                           NetQueueAnalyserResult *result)
 {
@@ -167,8 +167,6 @@ void netqueue_analyser_do(NetQueueAnalyser *this,
     g_warning("NetQueue Analyser can not work without OWD RLE");
     return;
   }
-
-  memset(result, 0, sizeof(NetQueueAnalyserResult));
 
   if(summary->XR_RFC7097.processed){
     result->pierced |= 0 < summary->XR_RFC7097.length;

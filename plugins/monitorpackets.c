@@ -107,7 +107,7 @@ MonitorPackets *make_monitorpackets(void)
   return result;
 }
 
-void monitorpackets_push_rtp_packet(MonitorPackets *this,
+void monitorpackets_add_outgoing_rtp_packet(MonitorPackets *this,
                          GstBuffer *buf)
 {
   THIS_WRITELOCK(this);
@@ -123,7 +123,23 @@ void monitorpackets_push_rtp_packet(MonitorPackets *this,
   THIS_WRITEUNLOCK(this);
 }
 
-GstBuffer * monitorpackets_provide_rtp_packet(MonitorPackets *this)
+void monitorpackets_add_incoming_rtp_packet(MonitorPackets *this, GstBuffer *buf)
+{
+  THIS_WRITELOCK(this);
+  //implement counter here.
+  THIS_WRITEUNLOCK(this);
+}
+
+GstBuffer *monitorpackets_process_FEC_packet(MonitorPackets *this, GstBuffer *buf)
+{
+  GstBuffer *result = NULL;
+  THIS_WRITELOCK(this);
+  //Todo implement recovery here.
+  THIS_WRITEUNLOCK(this);
+  return result;
+}
+
+GstBuffer * monitorpackets_provide_FEC_packet(MonitorPackets *this)
 {
   GstBuffer * result = NULL;
   THIS_WRITELOCK(this);

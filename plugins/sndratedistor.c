@@ -112,7 +112,7 @@ sndrate_distor_finalize (GObject * object)
   SendingRateDistributor * this;
   this = SNDRATEDISTOR(object);
   g_object_unref(this->sysclock);
-  g_free(this->subflows);
+  mprtp_free(this->subflows);
 }
 
 
@@ -122,7 +122,7 @@ sndrate_distor_init (SendingRateDistributor * this)
   gint i;
   this->sysclock = gst_system_clock_obtain();
   this->controlled_num = 0;
-  this->subflows = g_malloc0(sizeof(Subflow)*MPRTP_PLUGIN_MAX_SUBFLOW_NUM);
+  this->subflows = mprtp_malloc(sizeof(Subflow)*MPRTP_PLUGIN_MAX_SUBFLOW_NUM);
   this->ur.control.max_mtakover = .25;
   this->ur.control.max_stakover = .125;
   for(i=0; i<MPRTP_PLUGIN_MAX_SUBFLOW_NUM; ++i){

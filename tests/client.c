@@ -293,7 +293,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
       g_object_set (async_tx_rtcpSrc_3, "port",  path3_tx_rtcp_port, NULL);
 
       if(test_parameters_.video_session == YUVFILE_SOURCE){
-        g_object_set (mprtpply, "forced-delay", 200, NULL);
+        //g_object_set (mprtpply, "forced-delay", 200, NULL);
       }
   }
 

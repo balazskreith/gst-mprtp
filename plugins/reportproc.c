@@ -389,15 +389,21 @@ _processing_xr_owd_rle(ReportProcessor *this,
   guint16 running_length;
   guint64 owd;
   GstRTCPXR_Chunk *chunk;
-
+gboolean debug = FALSE;
   summary->XR_OWD_RLE.processed = TRUE;
 
   chunks_num = gst_rtcp_xr_owd_rle_get_chunks_num(xrb);
+
+  if(chunks_num > 100) debug = TRUE;
+
   for(chunk_index = 0;
       chunk_index < chunks_num;
       ++chunk_index)
   {
       chunk = gst_rtcp_xr_owd_rle_get_chunk(xrb, chunk_index);
+
+      if(debug)
+        mprtp_logger("logs/debug_reportproc", "chunks_num: %d, chunk: %hu\n", chunks_num, *((guint16*)chunk));
 
       //Terminate chunk
       if(*((guint16*)chunk) == 0) break;

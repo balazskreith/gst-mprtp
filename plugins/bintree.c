@@ -108,7 +108,7 @@ bintree_finalize (GObject * object)
   BinTree *this;
   this = BINTREE(object);
 //  while(!g_queue_is_empty(this->node_pool)){
-//    g_free(g_queue_pop_head(this->node_pool));
+//    mprtp_free(g_queue_pop_head(this->node_pool));
 //  }
   _ruin_full(this, this->root);
 }
@@ -566,7 +566,7 @@ BinTreeNode *_make_bintreenode(BinTree *this, gint64 value)
   BinTreeNode *result;
 
 //  result = g_slice_new0(BinTreeNode);
-  result = g_malloc0(sizeof(BinTreeNode));
+  result = mprtp_malloc(sizeof(BinTreeNode));
   result->value = value;
   return result;
 }
@@ -577,7 +577,7 @@ void _trash_bintreenode(BinTree *this, BinTreeNode *node)
     if(node == this->top) _refresh_top(this);
     else if(node == this->bottom) _refresh_bottom(this);
 //    g_slice_free(BinTreeNode, node);
-    g_free(node);
+    mprtp_free(node);
   }
 }
 

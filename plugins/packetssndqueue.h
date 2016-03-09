@@ -10,6 +10,7 @@
 
 #include <gst/gst.h>
 #include "bintree.h"
+#include "numstracker.h"
 
 typedef struct _PacketsSndQueue PacketsSndQueue;
 typedef struct _PacketsSndQueueClass PacketsSndQueueClass;
@@ -37,11 +38,13 @@ struct _PacketsSndQueue
 {
   GObject                  object;
   GstClock*                sysclock;
+  GstClockTime             made;
   GRWLock                  rwmutex;
   PacketsSndQueueItem      items[PACKETSSNDQUEUE_MAX_ITEMS_NUM];
   gint32                   items_read_index;
   gint32                   items_write_index;
-  guint32                  counter;
+  gint32                   counter;
+  gint32                   bytes;
   gboolean                 pacing;
   guint32                  last_timestamp;
   gint32                   approved_bytes;
@@ -49,6 +52,9 @@ struct _PacketsSndQueue
   gint32                   target_rate;
   GstClockTime             obsolation_treshold;
   gboolean                 expected_lost;
+  GstClockTime             logging_interval;
+  NumsTracker*             incoming_bytes;
+  GstClockTime             last_logging;
 };
 
 
@@ -65,6 +71,7 @@ PacketsSndQueue *make_packetssndqueue(void);
 void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_rate, gboolean pacing);
 void packetssndqueue_reset(PacketsSndQueue *this);
 gboolean packetssndqueue_expected_lost(PacketsSndQueue *this);
+gint32 packetssndqueue_get_encoder_bitrate(PacketsSndQueue *this);
 void packetssndqueue_push(PacketsSndQueue *this, GstBuffer* buffer);
 GstBuffer * packetssndqueue_pop(PacketsSndQueue *this);
 void packetssndqueue_approve(PacketsSndQueue *this);

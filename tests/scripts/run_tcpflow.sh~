@@ -14,7 +14,7 @@ function usage {
     exit 1
 }
 
-if [[ 2 -gt "$#"]]
+if [ 2 -gt "$#"]
 then
   usage
 fi

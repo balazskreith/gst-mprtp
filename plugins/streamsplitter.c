@@ -51,9 +51,7 @@ struct _Subflow
   gint32      sending_target;
   gint        weight;
   gboolean    key_path;
-  guint32     target_rate;
   gboolean    valid;
-  gboolean    mark2remove;
 };
 
 struct _SchNode
@@ -160,8 +158,8 @@ schtree_get_next (
 
 
 static void
-stream_splitter_run (
-    void *data);
+_refresh_splitter (
+    StreamSplitter *this);
 
 
 static Subflow *
@@ -174,30 +172,11 @@ _get_next_path (
     StreamSplitter * this,
     GstRTPBuffer * rtp);
 
+static void
+_logging(
+    StreamSplitter *this);
 
 
-static void _print_tree (SchNode * node, gint top, gint level)
-{
-  gint i;
-  if (node == NULL) {
-    return;
-  }
-  for (i = 0; i < level; ++i)
-    g_print ("--");
-  if (node->subflow != NULL) {
-    g_print ("%d->%d:%d (K:%d) (L:%p,R:%p)\n",
-             top >> level,
-             node->subflow->id,
-             node->sent_bytes,
-             node->has_keynode,
-             node->left,
-             node->right);
-  } else {
-    g_print ("%d->C:%d\n", top >> level, node->sent_bytes);
-  }
-  _print_tree (node->left, top, level + 1);
-  _print_tree (node->right, top, level + 1);
-}
 
 //----------------------------------------------------------------------
 //---- Private function implementations to Stream Dealer object --------
@@ -222,10 +201,6 @@ stream_splitter_finalize (GObject * object)
 {
   StreamSplitter *this = STREAM_SPLITTER (object);
   g_hash_table_destroy (this->subflows);
-  gst_task_stop (this->thread);
-  gst_task_join (this->thread);
-  gst_object_unref (this->thread);
-  g_object_unref(this->incoming_bytes);
   g_object_unref (this->sysclock);
 }
 
@@ -233,25 +208,13 @@ stream_splitter_finalize (GObject * object)
 void
 stream_splitter_init (StreamSplitter * this)
 {
-  this->new_path_added = FALSE;
-  this->changes_are_committed = FALSE;
-  this->path_is_removed = FALSE;
   this->sysclock = gst_system_clock_obtain ();
-  this->active_subflow_num = 0;
-  this->subflows = g_hash_table_new_full (NULL, NULL, NULL, g_free);
+  this->active_subflow_num     = 0;
+  this->subflows               = g_hash_table_new_full (NULL, NULL, NULL, mprtp_free);
   this->separation_is_possible = FALSE;
-  this->first_delta_flag = TRUE;
-  this->thread = gst_task_new (stream_splitter_run, this, NULL);
-  this->incoming_bytes = make_numstracker(1<<15, GST_SECOND);
-  this->trash = g_queue_new();
-//    this->splitting_mode = MPRTP_STREAM_FRAME_BASED_SPLITTING;
-  numstracker_reset(this->incoming_bytes);
+  this->first_delta_flag       = TRUE;
+  this->made                   = _now(this);
   g_rw_lock_init (&this->rwmutex);
-  g_rec_mutex_init (&this->thread_mutex);
-
-  gst_task_set_lock (this->thread, &this->thread_mutex);
-  gst_task_start (this->thread);
-
 
 }
 
@@ -272,12 +235,14 @@ stream_splitter_add_path (StreamSplitter * this, guint8 subflow_id,
   lookup_result = make_subflow (path);
   g_hash_table_insert (this->subflows, GINT_TO_POINTER (subflow_id),
       lookup_result);
-  this->new_path_added = TRUE;
   lookup_result->sending_target = sending_rate;
   lookup_result->id = subflow_id;
   ++this->active_subflow_num;
   GST_DEBUG ("Subflow is added, the actual number of subflow is: %d",
       this->active_subflow_num);
+
+  _refresh_splitter(this);
+
 exit:
   THIS_WRITEUNLOCK (this);
 }
@@ -295,15 +260,13 @@ stream_splitter_rem_path (StreamSplitter * this, guint8 subflow_id)
         "due to not existed subflow id (%d)", subflow_id);
     goto exit;
   }
-  if(g_queue_find(this->trash, lookup_result)){
-    goto exit;
-  }
-  g_queue_push_head(this->trash, lookup_result);
-  //g_hash_table_remove (this->subflows, GINT_TO_POINTER (subflow_id));
-  this->path_is_removed = TRUE;
+  g_hash_table_remove (this->subflows, GINT_TO_POINTER (subflow_id));
   --this->active_subflow_num;
   GST_DEBUG ("Subflow is marked to be removed, the actual number of subflow is: %d",
       this->active_subflow_num);
+
+  _refresh_splitter(this);
+
 exit:
   THIS_WRITEUNLOCK (this);
 }
@@ -324,26 +287,9 @@ stream_splitter_setup_sending_target (StreamSplitter * this, guint8 subflow_id,
         "due to not existed subflow id (%d)", subflow_id);
     goto exit;
   }
-  g_print("setup %d sending rate for subflow %d\n", sending_target, subflow_id);
   subflow->sending_target = sending_target;
 exit:
   THIS_WRITEUNLOCK (this);
-}
-
-gint32 stream_splitter_get_encoder_rate(StreamSplitter* this)
-{
-  gint64 result = 0;
-  THIS_READLOCK(this);
-  numstracker_get_stats(this->incoming_bytes, &result);
-  THIS_READUNLOCK(this);
-  return result * 8;
-}
-
-void stream_splitter_set_monitor_payload_type(StreamSplitter *this, guint8 payload_type)
-{
-  THIS_WRITELOCK(this);
-  this->monitor_payload_type = payload_type;
-  THIS_WRITEUNLOCK(this);
 }
 
 gdouble stream_splitter_get_sending_target(StreamSplitter* this, guint8 subflow_id)
@@ -365,7 +311,7 @@ void
 stream_splitter_commit_changes (StreamSplitter * this)
 {
   THIS_WRITELOCK (this);
-  this->changes_are_committed = TRUE;
+  _refresh_splitter(this);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -394,26 +340,12 @@ exit:
 }
 
 
+
 void
-stream_splitter_run (void *data)
+_refresh_splitter (StreamSplitter *this)
 {
-  StreamSplitter *this;
-  GstClockID clock_id;
-  GstClockTime next_scheduler_time;
-  GstClockTime interval;
-  gdouble rand;
   PriorData pdata;
   guint8 key_filter;
-
-  this = STREAM_SPLITTER (data);
-
-  THIS_WRITELOCK (this);
-
-  numstracker_obsolate(this->incoming_bytes);
-  if (!this->new_path_added &&
-      !this->path_is_removed && !this->changes_are_committed) {
-    goto done;
-  }
 
   if(!this->active_subflow_num){
     _schnode_rdtor(this, this->tree);
@@ -421,13 +353,6 @@ stream_splitter_run (void *data)
     goto done;
   }
 
-  while(this->path_is_removed && !g_queue_is_empty(this->trash)){
-    Subflow *candidate;
-    candidate = g_queue_pop_head(this->trash);
-    g_hash_table_remove (this->subflows, GINT_TO_POINTER (candidate->id));
-  }
-
-//  g_print("new path: %d removed: %d changed: %d\n", this->new_path_added, this->path_is_removed, this->changes_are_committed);
   pdata.c_sum = pdata.mc_sum = pdata.nc_sum = 0;
   _iterate_subflows(this, _check_pathes, &pdata);
   this->sending_target = pdata.c_sum + pdata.mc_sum + pdata.nc_sum;
@@ -438,41 +363,14 @@ stream_splitter_run (void *data)
 
   this->next_tree = _tree_ctor(this, key_filter);
 
-  DISABLE_LINE _print_tree(this->next_tree, SCHTREE_MAX_VALUE, 0);
+  _schnode_rdtor(this, this->tree);
+  this->tree = this->next_tree;
+  this->next_tree = NULL;
 
-  if(1 || this->tree == NULL){
-    _schnode_rdtor(this, this->tree);
-    this->tree = this->next_tree;
-    this->next_tree = NULL;
-  }
-
-  this->new_path_added = FALSE;
-  this->path_is_removed = FALSE;
-  this->changes_are_committed = FALSE;
-
-
+  _logging(this);
 done:
-  if (this->active_subflow_num > 0) {
-    rand = g_random_double () * 100.;
-    interval = GST_MSECOND * (100 + rand);
-    next_scheduler_time = _now(this) + interval;
-
-    GST_DEBUG_OBJECT (this, "Next scheduling interval time is %lu",
-        GST_TIME_AS_MSECONDS (interval));
-  } else {
-    next_scheduler_time = _now(this) + GST_MSECOND * 10;
-  }
-  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
-
-  THIS_WRITEUNLOCK (this);
-
-  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
-    GST_WARNING_OBJECT (this, "The scheduler clock wait is interrupted");
-  }
-  gst_clock_id_unref (clock_id);
+  return;
 }
-
-
 
 
 static void _iterate_subflows(StreamSplitter *this, void(*iterator)(Subflow *, gpointer), gpointer data)
@@ -536,10 +434,6 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
     subflow = schtree_get_next(this->tree, bytes_to_send, !dflag);
   }else{
     subflow = schtree_get_next(this->tree, bytes_to_send, FALSE);
-  }
-
-  if(gst_rtp_buffer_get_payload_type(rtp) != this->monitor_payload_type){
-    numstracker_add(this->incoming_bytes, bytes_to_send);
   }
 
   return subflow ? subflow->path : NULL;
@@ -640,7 +534,7 @@ _schnode_rdtor (StreamSplitter *this,SchNode * node)
   _schnode_rdtor (this, node->right);
 //  pointerpool_add(this->pointerpool, node);
 //  g_slice_free(SchNode, node);
-  g_free(node);
+  mprtp_free(node);
 }
 
 void
@@ -675,7 +569,7 @@ _schnode_ctor (void)
 {
 
 //  SchNode *result = g_slice_new0(SchNode);
-  SchNode *result = g_malloc0(sizeof(SchNode));
+  SchNode *result = mprtp_malloc(sizeof(SchNode));
   result->left = NULL;
   result->right = NULL;
 //  result->next = NULL;
@@ -732,11 +626,69 @@ make_subflow (MPRTPSPath * path)
 {
 
   Subflow *result; // = g_slice_new0(Subflow);
-  result = g_malloc0(sizeof(Subflow));
+  result = mprtp_malloc(sizeof(Subflow));
   result->path = path;
   return result;
 }
 
+
+
+static void _log_tree (SchNode * node, gint top, gint level)
+{
+  gint i;
+  if (node == NULL) {
+    return;
+  }
+  for (i = 0; i < level; ++i)
+    mprtp_logger ("logs/streamsplitter.log","--");
+  if (node->subflow != NULL) {
+      mprtp_logger ("logs/streamsplitter.log",
+             "%d->%d:%d (K:%d) (L:%p,R:%p)\n",
+             top >> level,
+             node->subflow->id,
+             node->sent_bytes,
+             node->has_keynode,
+             node->left,
+             node->right);
+  } else {
+      mprtp_logger ("logs/streamsplitter.log","%d->C:%d\n", top >> level, node->sent_bytes);
+  }
+  _log_tree (node->left, top, level + 1);
+  _log_tree (node->right, top, level + 1);
+}
+
+
+static void _log_subflow(Subflow *subflow, gpointer data)
+{
+  mprtp_logger("logs/streamsplitter.log",
+               "----------------------------------------------------------------\n"
+               "Subflow id: %d\n"
+               "Sending target: %d | Sent bytes: %d | weight: %d\n",
+
+               subflow->id,
+               subflow->sending_target,
+               subflow->sent_bytes,
+               subflow->weight
+               );
+
+}
+
+void _logging(StreamSplitter *this)
+{
+  mprtp_logger("logs/streamsplitter.log",
+               "###############################################################\n"
+               "Seconds: %lu\n"
+               "Active subflow num: %d\n"
+               "separation is possible: %d\n"
+               ,
+               GST_TIME_AS_SECONDS(_now(this) - this->made),
+               this->active_subflow_num,
+               this->separation_is_possible
+               );
+
+  _iterate_subflows(this, _log_subflow, this);
+  _log_tree(this->tree, SCHTREE_MAX_VALUE, 0);
+}
 
 
 #undef THIS_READLOCK

@@ -123,7 +123,7 @@ percentiletracker_finalize (GObject * object)
   g_object_unref(this->maxtree);
   g_object_unref(this->mintree);
   g_object_unref(this->sysclock);
-  g_free(this->items);
+  mprtp_free(this->items);
 }
 
 void
@@ -161,7 +161,7 @@ PercentileTracker *make_percentiletracker_full(BinTreeCmpFunc cmp_min,
   this = g_object_new (PERCENTILETRACKER_TYPE, NULL);
   THIS_WRITELOCK (this);
   this->ratio = (gdouble)percentile / (gdouble)(100 - percentile);
-  this->items = g_malloc0(sizeof(PercentileTrackerItem)*length);
+  this->items = mprtp_malloc(sizeof(PercentileTrackerItem)*length);
   this->percentile = percentile;
   this->length = length;
   this->maxtree = make_bintree(this->maxtree_cmp = cmp_max);
@@ -178,7 +178,7 @@ PercentileTracker *make_percentiletracker_full(BinTreeCmpFunc cmp_min,
     this->median = TRUE;
   }
   this->ready = FALSE;
-  this->collection = (guint64*) g_malloc0(sizeof(guint64) * this->required);
+  this->collection = (guint64*) mprtp_malloc(sizeof(guint64) * this->required);
   THIS_WRITEUNLOCK (this);
 
   return this;
@@ -188,7 +188,7 @@ static void _print_items(PercentileTracker *this)
 {
   gint i,c;
   guint64 *items, perc, min, max, sum;
-  items = g_malloc0(sizeof(guint64) * this->length);
+  items = mprtp_malloc(sizeof(guint64) * this->length);
   g_print("Ready: %d Items (%d = Mx: %d + Mn: %d (%d)): ", this->ready, _counter(this),  this->Mxc,  this->Mnc, this->counter);
   for(c = 0,i=this->read_index; c < _counter(this); ++c,i = (i + 1) % this->length){
     items[c] = this->items[i].value;
@@ -197,7 +197,7 @@ static void _print_items(PercentileTracker *this)
   for(i=0; i<c; ++i) g_print("%-5lu ", items[i]);
   perc = percentiletracker_get_stats(this, &min, &max, &sum);
   g_print("Min: %lu, %dth percentile: %lu Max: %lu, Sum: %lu\n", min, this->percentile, perc, max, sum);
-  g_free(items);
+  mprtp_free(items);
 }
 
 void percentiletracker_test(void)

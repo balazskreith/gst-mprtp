@@ -253,16 +253,17 @@ subratectrler_finalize (GObject * object)
 {
   SubflowRateController *this;
   this = SUBRATECTRLER(object);
-  g_free(this->priv);
+  mprtp_free(this->priv);
   g_object_unref(this->analyser);
   g_object_unref(this->sysclock);
   g_object_unref(this->path);
+  g_object_unref(this->rate_controller);
 }
 
 void
 subratectrler_init (SubflowRateController * this)
 {
-  this->priv = g_malloc0(sizeof(Private));
+  this->priv = mprtp_malloc(sizeof(Private));
   this->sysclock = gst_system_clock_obtain();
   g_rw_lock_init (&this->rwmutex);
 
@@ -280,7 +281,7 @@ SubflowRateController *make_subratectrler(SendingRateDistributor* rate_controlll
   SubflowRateController *result;
   result                      = g_object_new (SUBRATECTRLER_TYPE, NULL);
   result->path                = g_object_ref(path);
-  result->rate_controller     = rate_controlller;
+  result->rate_controller     = g_object_ref(rate_controlller);
   result->id                  = mprtps_path_get_id(result->path);
   result->setup_time          = _now(result);
   result->monitoring_interval = 3;

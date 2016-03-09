@@ -1,8 +1,0 @@
-
-(client:15269): GStreamer-WARNING **: gstpad.c:4379:gst_pad_push_data:<mprtpplayouter0:mprtcp_rr_src> Got data flow before segment event
-
-(client:15269): GStreamer-WARNING **: gstpad.c:4126:gst_pad_chain_data_unchecked:<mprtpsender0:mprtcp_rr_sink> Got data flow before segment event
-
-(client:15269): GStreamer-WARNING **: gstpad.c:4379:gst_pad_push_data:<mprtpsender0:async_src_1> Got data flow before segment event
-
-(client:15269): GStreamer-WARNING **: gstpad.c:4126:gst_pad_chain_data_unchecked:<udpsink1:sink> Got data flow before segment event

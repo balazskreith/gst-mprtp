@@ -200,7 +200,7 @@ void netqueue_analyser_do(NetQueueAnalyser       *this,
     _execute_corrblocks(_priv(this), _priv(this)->cblocks, 4);
     _priv(this)->cblocks[0].Id1 = GST_TIME_AS_USECONDS(delay) / 50.;
 
-//    _csv_logging(this, delay);
+    _csv_logging(this, delay);
   }
 
   result->congested |= congestion;

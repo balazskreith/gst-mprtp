@@ -363,7 +363,7 @@ _processing_xr_rfc3611 (ReportProcessor *this,
   GstRTCPXR_Chunk *chunk;
 
   summary->XR_RFC3611.processed = TRUE;
-  summary->XR_RFC3611.length = 0;
+//  summary->XR_RFC3611.length = 0;
 
   chunks_num = gst_rtcp_xr_rfc3611_get_chunks_num(xrb);
   for(chunk_index = 0;

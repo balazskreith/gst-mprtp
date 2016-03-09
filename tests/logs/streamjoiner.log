@@ -1,0 +1,3294 @@
+###############################################################
+Seconds: 0
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100000000 | min_delay: 100000000 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 0 | jitter: 2 | skew: 0.000000
+###############################################################
+Seconds: 1
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 102719774 | min_delay: 0 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 463541 | jitter: 2 | skew: 100251485.000000
+###############################################################
+Seconds: 2
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 102719774 | min_delay: 0 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 201225 | jitter: 2 | skew: 100274393.000000
+###############################################################
+Seconds: 3
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100290780 | min_delay: 100249528 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 110216 | jitter: 2 | skew: 100274120.000000
+###############################################################
+Seconds: 4
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100278289 | min_delay: 100256445 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 114364 | jitter: 2 | skew: 100260277.000000
+###############################################################
+Seconds: 5
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100277466 | min_delay: 100240044 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 58443 | jitter: 2 | skew: 100262685.000000
+###############################################################
+Seconds: 6
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100284666 | min_delay: 100240044 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 168745 | jitter: 2 | skew: 100265903.000000
+###############################################################
+Seconds: 7
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100284666 | min_delay: 100237814 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 78680 | jitter: 2 | skew: 100237814.000000
+###############################################################
+Seconds: 8
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100282793 | min_delay: 100229536 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 86912 | jitter: 2 | skew: 100254822.000000
+###############################################################
+Seconds: 9
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100282793 | min_delay: 100229536 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 38114 | jitter: 2 | skew: 100244989.000000
+###############################################################
+Seconds: 10
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100278978 | min_delay: 100235630 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 27733 | jitter: 2 | skew: 100235630.000000
+###############################################################
+Seconds: 11
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100286118 | min_delay: 100235630 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 76146 | jitter: 2 | skew: 100244898.000000
+###############################################################
+Seconds: 12
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100286118 | min_delay: 100235630 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 231383 | jitter: 2 | skew: 100285198.000000
+###############################################################
+Seconds: 13
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100332693 | min_delay: 100247070 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 428416 | jitter: 2 | skew: 100257588.000000
+###############################################################
+Seconds: 14
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100332693 | min_delay: 100240142 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 108570 | jitter: 2 | skew: 100253099.000000
+###############################################################
+Seconds: 15
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100282154 | min_delay: 100240142 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 78969 | jitter: 2 | skew: 100266196.000000
+###############################################################
+Seconds: 16
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100288565 | min_delay: 100253099 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 116605 | jitter: 2 | skew: 100257364.000000
+###############################################################
+Seconds: 17
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100288565 | min_delay: 100238751 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 46513 | jitter: 2 | skew: 100259354.000000
+###############################################################
+Seconds: 18
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100277091 | min_delay: 100238751 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 437336 | jitter: 2 | skew: 100277091.000000
+###############################################################
+Seconds: 19
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100279921 | min_delay: 100247239 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 168708 | jitter: 2 | skew: 100247239.000000
+###############################################################
+Seconds: 20
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100279921 | min_delay: 100242938 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 97521 | jitter: 2 | skew: 100261727.000000
+###############################################################
+Seconds: 21
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100270243 | min_delay: 100242938 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 72422 | jitter: 2 | skew: 100270243.000000
+###############################################################
+Seconds: 22
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100270243 | min_delay: 100237363 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 626036 | jitter: 2 | skew: 100258251.000000
+###############################################################
+Seconds: 23
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100393948 | min_delay: 100237363 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 178904 | jitter: 2 | skew: 100264720.000000
+###############################################################
+Seconds: 24
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100393948 | min_delay: 100248390 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 94435 | jitter: 2 | skew: 100268294.000000
+###############################################################
+Seconds: 25
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100288659 | min_delay: 100248390 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 107835 | jitter: 2 | skew: 100263411.000000
+###############################################################
+Seconds: 26
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100288659 | min_delay: 100244758 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 124988 | jitter: 2 | skew: 100279763.000000
+###############################################################
+Seconds: 27
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100305032 | min_delay: 100244758 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 140521 | jitter: 2 | skew: 100272059.000000
+###############################################################
+Seconds: 28
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100305032 | min_delay: 100226411 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 265496 | jitter: 2 | skew: 100226411.000000
+###############################################################
+Seconds: 29
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100276149 | min_delay: 100226411 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 111027 | jitter: 2 | skew: 100241945.000000
+###############################################################
+Seconds: 30
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100276149 | min_delay: 100233103 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 244321 | jitter: 2 | skew: 100236215.000000
+###############################################################
+Seconds: 31
+PHSN: 0 | framecounter: 1 | bytes_in_queue: 1080
+max_delay: 100269614 | min_delay: 100236215 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 131870 | jitter: 2 | skew: 100241443.000000
+###############################################################
+Seconds: 32
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100266599 | min_delay: 100236215 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 235206 | jitter: 2 | skew: 100256312.000000
+###############################################################
+Seconds: 33
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100264968 | min_delay: 100238757 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 68156 | jitter: 2 | skew: 100254812.000000
+###############################################################
+Seconds: 34
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100278387 | min_delay: 100231496 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 559286 | jitter: 2 | skew: 100231496.000000
+###############################################################
+Seconds: 35
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100310384 | min_delay: 100231496 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 267700 | jitter: 2 | skew: 100259102.000000
+###############################################################
+Seconds: 36
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100349428 | min_delay: 100231496 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 137509 | jitter: 2 | skew: 100349428.000000
+###############################################################
+Seconds: 37
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100355999 | min_delay: 100244500 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 95799 | jitter: 2 | skew: 100244500.000000
+###############################################################
+Seconds: 38
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100355999 | min_delay: 100244500 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 64979 | jitter: 2 | skew: 100304135.000000
+###############################################################
+Seconds: 39
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100305969 | min_delay: 100244500 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 62127 | jitter: 2 | skew: 100270606.000000
+###############################################################
+Seconds: 40
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100315962 | min_delay: 100262781 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 101950 | jitter: 2 | skew: 100277656.000000
+###############################################################
+Seconds: 41
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100315962 | min_delay: 100259749 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 361104 | jitter: 2 | skew: 100259749.000000
+###############################################################
+Seconds: 42
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100276380 | min_delay: 100257993 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 108073 | jitter: 2 | skew: 100259428.000000
+###############################################################
+Seconds: 43
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100276380 | min_delay: 100237024 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 531186 | jitter: 2 | skew: 100237024.000000
+###############################################################
+Seconds: 44
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100269248 | min_delay: 100233110 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 124730 | jitter: 2 | skew: 100269248.000000
+###############################################################
+Seconds: 45
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100283107 | min_delay: 100233110 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 78607 | jitter: 2 | skew: 100247144.000000
+###############################################################
+Seconds: 46
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100283107 | min_delay: 100226464 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 65690 | jitter: 2 | skew: 100226464.000000
+###############################################################
+Seconds: 47
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100267114 | min_delay: 100224765 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 50155 | jitter: 2 | skew: 100258508.000000
+###############################################################
+Seconds: 48
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100291133 | min_delay: 100224765 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 73798 | jitter: 2 | skew: 100290117.000000
+###############################################################
+Seconds: 49
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100346733 | min_delay: 100239359 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 70235 | jitter: 2 | skew: 100239359.000000
+###############################################################
+Seconds: 50
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100346733 | min_delay: 100239359 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 61801 | jitter: 2 | skew: 100265554.000000
+###############################################################
+Seconds: 51
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100276140 | min_delay: 100239359 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 79701 | jitter: 2 | skew: 100276140.000000
+###############################################################
+Seconds: 52
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100277158 | min_delay: 100247438 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 289647 | jitter: 2 | skew: 100247438.000000
+###############################################################
+Seconds: 53
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100280795 | min_delay: 100247364 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 267754 | jitter: 2 | skew: 100273635.000000
+###############################################################
+Seconds: 54
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100280795 | min_delay: 100247364 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 80694 | jitter: 2 | skew: 100248884.000000
+###############################################################
+Seconds: 55
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100273635 | min_delay: 100243594 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 78008 | jitter: 2 | skew: 100263205.000000
+###############################################################
+Seconds: 56
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100277748 | min_delay: 100243594 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 79659 | jitter: 2 | skew: 100277748.000000
+###############################################################
+Seconds: 57
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100285265 | min_delay: 100245035 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 255426 | jitter: 2 | skew: 100273012.000000
+###############################################################
+Seconds: 58
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100285265 | min_delay: 100234146 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 77308 | jitter: 2 | skew: 100234146.000000
+###############################################################
+Seconds: 59
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100273012 | min_delay: 100223362 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 167206 | jitter: 2 | skew: 100244294.000000
+###############################################################
+Seconds: 60
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100267270 | min_delay: 100223362 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 259571 | jitter: 2 | skew: 100262411.000000
+###############################################################
+Seconds: 61
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100278975 | min_delay: 100244294 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 156137 | jitter: 2 | skew: 100273715.000000
+###############################################################
+Seconds: 62
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100278975 | min_delay: 100245609 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 82448 | jitter: 2 | skew: 100260977.000000
+###############################################################
+Seconds: 63
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100273715 | min_delay: 100245609 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 65305 | jitter: 2 | skew: 100271825.000000
+###############################################################
+Seconds: 64
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100271825 | min_delay: 100249130 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 237954 | jitter: 2 | skew: 100263151.000000
+###############################################################
+Seconds: 65
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100270536 | min_delay: 100259922 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 72486 | jitter: 2 | skew: 100260864.000000
+###############################################################
+Seconds: 66
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100268898 | min_delay: 100254449 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 102327 | jitter: 2 | skew: 100258704.000000
+###############################################################
+Seconds: 67
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100264556 | min_delay: 100223933 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 119555 | jitter: 2 | skew: 100223933.000000
+###############################################################
+Seconds: 68
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100271372 | min_delay: 100216221 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 64332 | jitter: 2 | skew: 100264141.000000
+###############################################################
+Seconds: 69
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100271390 | min_delay: 100222629 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 63088 | jitter: 2 | skew: 100240419.000000
+###############################################################
+Seconds: 70
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100271390 | min_delay: 100228362 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 37118 | jitter: 2 | skew: 100228362.000000
+###############################################################
+Seconds: 71
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100270314 | min_delay: 100228362 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 213083 | jitter: 2 | skew: 100243396.000000
+###############################################################
+Seconds: 72
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100270314 | min_delay: 100228474 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 95574 | jitter: 2 | skew: 100262872.000000
+###############################################################
+Seconds: 73
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100459112 | min_delay: 100243396 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 298859 | jitter: 2 | skew: 100295326.000000
+###############################################################
+Seconds: 74
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100459112 | min_delay: 100252670 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 246926 | jitter: 2 | skew: 100260133.000000
+###############################################################
+Seconds: 75
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100286369 | min_delay: 100252670 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 77737 | jitter: 2 | skew: 100261093.000000
+###############################################################
+Seconds: 76
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100270390 | min_delay: 100246148 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 80262 | jitter: 2 | skew: 100246148.000000
+###############################################################
+Seconds: 77
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100282895 | min_delay: 100243322 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 85958 | jitter: 2 | skew: 100280725.000000
+###############################################################
+Seconds: 78
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100282895 | min_delay: 100243322 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 72003 | jitter: 2 | skew: 100258440.000000
+###############################################################
+Seconds: 79
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100280725 | min_delay: 100248565 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 392186 | jitter: 2 | skew: 100266278.000000
+###############################################################
+Seconds: 80
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100269060 | min_delay: 100235929 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 105353 | jitter: 2 | skew: 100251173.000000
+###############################################################
+Seconds: 81
+PHSN: 0 | framecounter: 1 | bytes_in_queue: 581
+max_delay: 100266278 | min_delay: 100235929 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 73109 | jitter: 2 | skew: 100247191.000000
+###############################################################
+Seconds: 82
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100263146 | min_delay: 100230819 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 64328 | jitter: 2 | skew: 100251181.000000
+###############################################################
+Seconds: 83
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100279069 | min_delay: 100230819 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 77605 | jitter: 2 | skew: 100247952.000000
+###############################################################
+Seconds: 84
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100279069 | min_delay: 100242163 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 183352 | jitter: 2 | skew: 100267797.000000
+###############################################################
+Seconds: 85
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100275354 | min_delay: 100245456 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 91003 | jitter: 2 | skew: 100256686.000000
+###############################################################
+Seconds: 86
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100268505 | min_delay: 100254643 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 31625 | jitter: 2 | skew: 100260704.000000
+###############################################################
+Seconds: 87
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100288305 | min_delay: 100254643 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 64770 | jitter: 2 | skew: 100288305.000000
+###############################################################
+Seconds: 88
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100291901 | min_delay: 100250117 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 295719 | jitter: 2 | skew: 100250117.000000
+###############################################################
+Seconds: 89
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100291901 | min_delay: 100240758 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 85449 | jitter: 2 | skew: 100255225.000000
+###############################################################
+Seconds: 90
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100288363 | min_delay: 100240758 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 128753 | jitter: 2 | skew: 100267208.000000
+###############################################################
+Seconds: 91
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100276330 | min_delay: 100247244 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 72328 | jitter: 2 | skew: 100247244.000000
+###############################################################
+Seconds: 92
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100303349 | min_delay: 100247244 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 98410 | jitter: 2 | skew: 100272598.000000
+###############################################################
+Seconds: 93
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100303349 | min_delay: 100247244 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 101531 | jitter: 2 | skew: 100248706.000000
+###############################################################
+Seconds: 94
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100275317 | min_delay: 100231365 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 75731 | jitter: 2 | skew: 100231365.000000
+###############################################################
+Seconds: 95
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100267027 | min_delay: 100231365 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 61194 | jitter: 2 | skew: 100262665.000000
+###############################################################
+Seconds: 96
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100288204 | min_delay: 100231365 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 108958 | jitter: 2 | skew: 100288204.000000
+###############################################################
+Seconds: 97
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100307994 | min_delay: 100229864 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 61456 | jitter: 2 | skew: 100229864.000000
+###############################################################
+Seconds: 98
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100307994 | min_delay: 100227261 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 960715 | jitter: 2 | skew: 100271853.000000
+###############################################################
+Seconds: 99
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100277282 | min_delay: 100227261 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 242783 | jitter: 2 | skew: 100259849.000000
+###############################################################
+Seconds: 100
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100277282 | min_delay: 100248619 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 116126 | jitter: 2 | skew: 100261521.000000
+###############################################################
+Seconds: 101
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100273753 | min_delay: 100248619 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 69293 | jitter: 2 | skew: 100271370.000000
+###############################################################
+Seconds: 102
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100273753 | min_delay: 100254318 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 70439 | jitter: 2 | skew: 100256951.000000
+###############################################################
+Seconds: 103
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100278538 | min_delay: 100256448 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 167854 | jitter: 2 | skew: 100260242.000000
+###############################################################
+Seconds: 104
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100278538 | min_delay: 100256448 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 64981 | jitter: 2 | skew: 100267749.000000
+###############################################################
+Seconds: 105
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100271123 | min_delay: 100257289 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 63202 | jitter: 2 | skew: 100257289.000000
+###############################################################
+Seconds: 106
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100271123 | min_delay: 100239922 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 219538 | jitter: 2 | skew: 100239922.000000
+###############################################################
+Seconds: 107
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100268353 | min_delay: 100232570 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 75471 | jitter: 2 | skew: 100247472.000000
+###############################################################
+Seconds: 108
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100282344 | min_delay: 100232570 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 102251 | jitter: 2 | skew: 100264339.000000
+###############################################################
+Seconds: 109
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100440385 | min_delay: 100236579 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 71647 | jitter: 2 | skew: 100236579.000000
+###############################################################
+Seconds: 110
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100440385 | min_delay: 100234764 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 148574 | jitter: 2 | skew: 100259672.000000
+###############################################################
+Seconds: 111
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100279679 | min_delay: 100234764 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 216704 | jitter: 2 | skew: 100279679.000000
+###############################################################
+Seconds: 112
+PHSN: 0 | framecounter: 1 | bytes_in_queue: 372
+max_delay: 100282074 | min_delay: 100255357 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 93348 | jitter: 2 | skew: 100255357.000000
+###############################################################
+Seconds: 113
+PHSN: 0 | framecounter: 1 | bytes_in_queue: 1017
+max_delay: 100316366 | min_delay: 100255357 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 649821 | jitter: 2 | skew: 100288133.000000
+###############################################################
+Seconds: 114
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100321867 | min_delay: 100255357 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 171904 | jitter: 2 | skew: 100274787.000000
+###############################################################
+Seconds: 115
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100321867 | min_delay: 100256672 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 87197 | jitter: 2 | skew: 100261825.000000
+###############################################################
+Seconds: 116
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100280818 | min_delay: 100246140 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 156930 | jitter: 2 | skew: 100271710.000000
+###############################################################
+Seconds: 117
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100275848 | min_delay: 100242320 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 200151 | jitter: 2 | skew: 100242320.000000
+###############################################################
+Seconds: 118
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100275848 | min_delay: 100236798 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 342321 | jitter: 2 | skew: 100237919.000000
+###############################################################
+Seconds: 119
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100273148 | min_delay: 100236798 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 131149 | jitter: 2 | skew: 100272562.000000
+###############################################################
+Seconds: 120
+PHSN: 0 | framecounter: 1 | bytes_in_queue: 632
+max_delay: 100273148 | min_delay: 100244342 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 88093 | jitter: 2 | skew: 100254335.000000
+###############################################################
+Seconds: 121
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100272150 | min_delay: 100244144 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 248030 | jitter: 2 | skew: 100247991.000000
+###############################################################
+Seconds: 122
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100272150 | min_delay: 100244144 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 130675 | jitter: 2 | skew: 100264703.000000
+###############################################################
+Seconds: 123
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100321205 | min_delay: 100246679 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 216794 | jitter: 2 | skew: 100272138.000000
+###############################################################
+Seconds: 124
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100321205 | min_delay: 100238889 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 228421 | jitter: 2 | skew: 100238889.000000
+###############################################################
+Seconds: 125
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100272402 | min_delay: 100238170 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 174178 | jitter: 2 | skew: 100272335.000000
+###############################################################
+Seconds: 126
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100275048 | min_delay: 100238170 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 199721 | jitter: 2 | skew: 100254000.000000
+###############################################################
+Seconds: 127
+PHSN: 0 | framecounter: 1 | bytes_in_queue: 988
+max_delay: 100275048 | min_delay: 100230362 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 123008 | jitter: 2 | skew: 100238015.000000
+###############################################################
+Seconds: 128
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100266176 | min_delay: 100230362 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 71999 | jitter: 2 | skew: 100248382.000000
+###############################################################
+Seconds: 129
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100271748 | min_delay: 100235170 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 53119 | jitter: 2 | skew: 100267077.000000
+###############################################################
+Seconds: 130
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100271748 | min_delay: 100241296 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 80698 | jitter: 2 | skew: 100248898.000000
+###############################################################
+Seconds: 131
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100278275 | min_delay: 100241296 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 82095 | jitter: 2 | skew: 100256060.000000
+###############################################################
+Seconds: 132
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100320291 | min_delay: 100242179 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 600022 | jitter: 2 | skew: 100303160.000000
+###############################################################
+Seconds: 133
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100351851 | min_delay: 100253261 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 920574 | jitter: 2 | skew: 100351851.000000
+###############################################################
+Seconds: 134
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100351851 | min_delay: 100241621 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 218858 | jitter: 2 | skew: 100263275.000000
+###############################################################
+Seconds: 135
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100351851 | min_delay: 100241621 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 90102 | jitter: 2 | skew: 100276289.000000
+###############################################################
+Seconds: 136
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100280595 | min_delay: 100252007 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 192994 | jitter: 2 | skew: 100256131.000000
+###############################################################
+Seconds: 137
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100304136 | min_delay: 100252007 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 179353 | jitter: 2 | skew: 100282778.000000
+###############################################################
+Seconds: 138
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100304136 | min_delay: 100252826 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 232767 | jitter: 2 | skew: 100268928.000000
+###############################################################
+Seconds: 139
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100290176 | min_delay: 100252855 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 125141 | jitter: 2 | skew: 100252855.000000
+###############################################################
+Seconds: 140
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100276155 | min_delay: 100244206 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 222667 | jitter: 2 | skew: 100256313.000000
+###############################################################
+Seconds: 141
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100274144 | min_delay: 100244206 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 78306 | jitter: 2 | skew: 100247378.000000
+###############################################################
+Seconds: 142
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100274144 | min_delay: 100236583 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 79628 | jitter: 2 | skew: 100252025.000000
+###############################################################
+Seconds: 143
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100302698 | min_delay: 100236583 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 86710 | jitter: 2 | skew: 100263626.000000
+###############################################################
+Seconds: 144
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100302698 | min_delay: 100252025 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 111781 | jitter: 2 | skew: 100260814.000000
+###############################################################
+Seconds: 145
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100284031 | min_delay: 100226372 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 130366 | jitter: 2 | skew: 100226372.000000
+###############################################################
+Seconds: 146
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100274465 | min_delay: 100223665 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 87652 | jitter: 2 | skew: 100263963.000000
+###############################################################
+Seconds: 147
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100266992 | min_delay: 100223665 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 323688 | jitter: 2 | skew: 100256975.000000
+###############################################################
+Seconds: 148
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100275313 | min_delay: 100252101 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 567634 | jitter: 2 | skew: 100255739.000000
+###############################################################
+Seconds: 149
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100275313 | min_delay: 100238691 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 137354 | jitter: 2 | skew: 100269454.000000
+###############################################################
+Seconds: 150
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100278979 | min_delay: 100238691 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 311911 | jitter: 2 | skew: 100268046.000000
+###############################################################
+Seconds: 151
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100280140 | min_delay: 100247526 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 141506 | jitter: 2 | skew: 100250846.000000
+###############################################################
+Seconds: 152
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100280140 | min_delay: 100244951 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 159120 | jitter: 2 | skew: 100267604.000000
+###############################################################
+Seconds: 153
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100272311 | min_delay: 100246377 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 80434 | jitter: 2 | skew: 100267338.000000
+###############################################################
+Seconds: 154
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100272311 | min_delay: 100237400 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 526436 | jitter: 2 | skew: 100237400.000000
+###############################################################
+Seconds: 155
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100269763 | min_delay: 100214266 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 128103 | jitter: 2 | skew: 100253932.000000
+###############################################################
+Seconds: 156
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100294419 | min_delay: 100214266 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 255369 | jitter: 2 | skew: 100256525.000000
+###############################################################
+Seconds: 157
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100294419 | min_delay: 100240028 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 70345 | jitter: 2 | skew: 100241382.000000
+###############################################################
+Seconds: 158
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100262071 | min_delay: 100236956 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 398979 | jitter: 2 | skew: 100256314.000000
+###############################################################
+Seconds: 159
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100289084 | min_delay: 100236956 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 143980 | jitter: 2 | skew: 100283723.000000
+###############################################################
+Seconds: 160
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100289084 | min_delay: 100249039 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 893758 | jitter: 2 | skew: 100255619.000000
+###############################################################
+Seconds: 161
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100285019 | min_delay: 100235546 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 292680 | jitter: 2 | skew: 100259244.000000
+###############################################################
+Seconds: 162
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100285019 | min_delay: 100235546 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 97528 | jitter: 2 | skew: 100257191.000000
+###############################################################
+Seconds: 163
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100281212 | min_delay: 100255356 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 1094329 | jitter: 2 | skew: 100260989.000000
+###############################################################
+Seconds: 164
+PHSN: 0 | framecounter: 1 | bytes_in_queue: 593
+max_delay: 100287969 | min_delay: 100255356 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 485321 | jitter: 2 | skew: 100287969.000000
+###############################################################
+Seconds: 165
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100313527 | min_delay: 100256691 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 712545 | jitter: 2 | skew: 100289121.000000
+###############################################################
+Seconds: 166
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100313527 | min_delay: 100261922 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 248578 | jitter: 2 | skew: 100262644.000000
+###############################################################
+Seconds: 167
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100328100 | min_delay: 100259526 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 458521 | jitter: 2 | skew: 100271311.000000
+###############################################################
+Seconds: 168
+PHSN: 0 | framecounter: 1 | bytes_in_queue: 532
+max_delay: 100328100 | min_delay: 100252234 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 216458 | jitter: 2 | skew: 100270951.000000
+###############################################################
+Seconds: 169
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100284675 | min_delay: 100252234 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 334904 | jitter: 2 | skew: 100272783.000000
+###############################################################
+Seconds: 170
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100286512 | min_delay: 100256057 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 142800 | jitter: 2 | skew: 100286390.000000
+###############################################################
+Seconds: 171
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100286572 | min_delay: 100252964 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 76807 | jitter: 2 | skew: 100259775.000000
+###############################################################
+Seconds: 172
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100350537 | min_delay: 100252964 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 375387 | jitter: 2 | skew: 100324776.000000
+###############################################################
+Seconds: 173
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100350537 | min_delay: 100266267 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 406664 | jitter: 2 | skew: 100273876.000000
+###############################################################
+Seconds: 174
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100350537 | min_delay: 100271344 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 392690 | jitter: 2 | skew: 100284906.000000
+###############################################################
+Seconds: 175
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100318585 | min_delay: 100273876 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 330409 | jitter: 2 | skew: 100304267.000000
+###############################################################
+Seconds: 176
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100318243 | min_delay: 100247326 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 389126 | jitter: 2 | skew: 100247326.000000
+###############################################################
+Seconds: 177
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100305072 | min_delay: 100245157 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 152381 | jitter: 2 | skew: 100283079.000000
+###############################################################
+Seconds: 178
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100287412 | min_delay: 100245157 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 73647 | jitter: 2 | skew: 100274028.000000
+###############################################################
+Seconds: 179
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100292297 | min_delay: 100272564 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 242619 | jitter: 2 | skew: 100285452.000000
+###############################################################
+Seconds: 180
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100312901 | min_delay: 100254015 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 489900 | jitter: 2 | skew: 100272398.000000
+###############################################################
+Seconds: 181
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100312901 | min_delay: 100254015 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 1629389 | jitter: 2 | skew: 100265957.000000
+###############################################################
+Seconds: 182
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100287586 | min_delay: 100218855 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 699186 | jitter: 2 | skew: 100275114.000000
+###############################################################
+Seconds: 183
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100295826 | min_delay: 100218855 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 357078 | jitter: 2 | skew: 100273644.000000
+###############################################################
+Seconds: 184
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100295826 | min_delay: 100259517 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 522429 | jitter: 2 | skew: 100271781.000000
+###############################################################
+Seconds: 185
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100364772 | min_delay: 100255253 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 1040303 | jitter: 2 | skew: 100271170.000000
+###############################################################
+Seconds: 186
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100364772 | min_delay: 100255253 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 329685 | jitter: 2 | skew: 100275538.000000
+###############################################################
+Seconds: 187
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100286044 | min_delay: 100265967 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 1097601 | jitter: 2 | skew: 100268319.000000
+###############################################################
+Seconds: 188
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100275538 | min_delay: 100241919 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 324295 | jitter: 2 | skew: 100246372.000000
+###############################################################
+Seconds: 189
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100278321 | min_delay: 100241651 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 197645 | jitter: 2 | skew: 100278321.000000
+###############################################################
+Seconds: 190
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100328461 | min_delay: 100241651 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 1085030 | jitter: 2 | skew: 100259592.000000
+###############################################################
+Seconds: 191
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100328461 | min_delay: 100225957 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 205477 | jitter: 2 | skew: 100231769.000000
+###############################################################
+Seconds: 192
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100280210 | min_delay: 100218788 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 79531 | jitter: 2 | skew: 100272597.000000
+###############################################################
+Seconds: 193
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100305699 | min_delay: 100218788 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 729633 | jitter: 2 | skew: 100304427.000000
+###############################################################
+Seconds: 194
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100417081 | min_delay: 100245598 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 381030 | jitter: 2 | skew: 100274180.000000
+###############################################################
+Seconds: 195
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100417081 | min_delay: 100245598 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 563678 | jitter: 2 | skew: 100302126.000000
+###############################################################
+Seconds: 196
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100315567 | min_delay: 100261393 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 321643 | jitter: 2 | skew: 100271136.000000
+###############################################################
+Seconds: 197
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100315567 | min_delay: 100235061 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 487824 | jitter: 2 | skew: 100276000.000000
+###############################################################
+Seconds: 198
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100312666 | min_delay: 100235061 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 362347 | jitter: 2 | skew: 100267663.000000
+###############################################################
+Seconds: 199
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100312666 | min_delay: 100265141 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 1150087 | jitter: 2 | skew: 100274432.000000
+###############################################################
+Seconds: 200
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100284713 | min_delay: 100226360 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 308850 | jitter: 2 | skew: 100254084.000000
+###############################################################
+Seconds: 201
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100290459 | min_delay: 100226360 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 745330 | jitter: 2 | skew: 100290459.000000
+###############################################################
+Seconds: 202
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100390382 | min_delay: 100257648 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 482816 | jitter: 2 | skew: 100390382.000000
+###############################################################
+Seconds: 203
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100390382 | min_delay: 100259554 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 515684 | jitter: 2 | skew: 100259554.000000
+###############################################################
+Seconds: 204
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100390382 | min_delay: 100262041 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 581943 | jitter: 2 | skew: 100303574.000000
+###############################################################
+Seconds: 205
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100348207 | min_delay: 100262041 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 1864414 | jitter: 2 | skew: 100303089.000000
+###############################################################
+Seconds: 206
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100332143 | min_delay: 100270224 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 895211 | jitter: 2 | skew: 100332143.000000
+###############################################################
+Seconds: 207
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100334117 | min_delay: 100242781 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 560270 | jitter: 2 | skew: 100244965.000000
+###############################################################
+Seconds: 208
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100334117 | min_delay: 100241829 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 230457 | jitter: 2 | skew: 100252971.000000
+###############################################################
+Seconds: 209
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100309879 | min_delay: 100241829 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 379950 | jitter: 2 | skew: 100270452.000000
+###############################################################
+Seconds: 210
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100313002 | min_delay: 100252971 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 262835 | jitter: 2 | skew: 100313002.000000
+###############################################################
+Seconds: 211
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100313002 | min_delay: 100251846 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 557803 | jitter: 2 | skew: 100262122.000000
+###############################################################
+Seconds: 212
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100281639 | min_delay: 100242992 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 395118 | jitter: 2 | skew: 100266610.000000
+###############################################################
+Seconds: 213
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100278067 | min_delay: 100242992 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 169022 | jitter: 2 | skew: 100278067.000000
+###############################################################
+Seconds: 214
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100293463 | min_delay: 100247275 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 883781 | jitter: 2 | skew: 100279514.000000
+###############################################################
+Seconds: 215
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100339125 | min_delay: 100260862 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 150608 | jitter: 2 | skew: 100283894.000000
+###############################################################
+Seconds: 216
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100339125 | min_delay: 100260862 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 513900 | jitter: 2 | skew: 100288000.000000
+###############################################################
+Seconds: 217
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100420174 | min_delay: 100268059 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 500219 | jitter: 2 | skew: 100412837.000000
+###############################################################
+Seconds: 218
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100570624 | min_delay: 100250965 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 461922 | jitter: 2 | skew: 100269782.000000
+###############################################################
+Seconds: 219
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100570624 | min_delay: 100250965 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 146694 | jitter: 2 | skew: 100281946.000000
+###############################################################
+Seconds: 220
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100304381 | min_delay: 100269397 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 587033 | jitter: 2 | skew: 100282486.000000
+###############################################################
+Seconds: 221
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100304381 | min_delay: 100256504 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 312294 | jitter: 2 | skew: 100270146.000000
+###############################################################
+Seconds: 222
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100315686 | min_delay: 100256504 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 278115 | jitter: 2 | skew: 100296007.000000
+###############################################################
+Seconds: 223
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100315686 | min_delay: 100268742 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 403809 | jitter: 2 | skew: 100270548.000000
+###############################################################
+Seconds: 224
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100309663 | min_delay: 100247091 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 314366 | jitter: 2 | skew: 100271879.000000
+###############################################################
+Seconds: 225
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100309663 | min_delay: 100247091 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 103719 | jitter: 2 | skew: 100277802.000000
+###############################################################
+Seconds: 226
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100335684 | min_delay: 100257687 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 878531 | jitter: 2 | skew: 100316507.000000
+###############################################################
+Seconds: 227
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100335684 | min_delay: 100275970 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 421315 | jitter: 2 | skew: 100297185.000000
+###############################################################
+Seconds: 228
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100335684 | min_delay: 100278213 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 176868 | jitter: 2 | skew: 100296205.000000
+###############################################################
+Seconds: 229
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100333270 | min_delay: 100269035 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 1262107 | jitter: 2 | skew: 100285181.000000
+###############################################################
+Seconds: 230
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100371584 | min_delay: 100269035 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 434342 | jitter: 2 | skew: 100371584.000000
+###############################################################
+Seconds: 231
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100371584 | min_delay: 100273904 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 171727 | jitter: 2 | skew: 100329112.000000
+###############################################################
+Seconds: 232
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100371584 | min_delay: 100272517 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 288450 | jitter: 2 | skew: 100272517.000000
+###############################################################
+Seconds: 233
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100329112 | min_delay: 100271450 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 152813 | jitter: 2 | skew: 100313371.000000
+###############################################################
+Seconds: 234
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100385452 | min_delay: 100271450 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 561581 | jitter: 2 | skew: 100304155.000000
+###############################################################
+Seconds: 235
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100385452 | min_delay: 100274830 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 482080 | jitter: 2 | skew: 100274830.000000
+###############################################################
+Seconds: 236
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100358840 | min_delay: 100257413 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 341370 | jitter: 2 | skew: 100358840.000000
+###############################################################
+Seconds: 237
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100358840 | min_delay: 100257413 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 177568 | jitter: 2 | skew: 100292064.000000
+###############################################################
+Seconds: 238
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100358840 | min_delay: 100262641 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 734935 | jitter: 2 | skew: 100313319.000000
+###############################################################
+Seconds: 239
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100470218 | min_delay: 100279773 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 228989 | jitter: 2 | skew: 100302608.000000
+###############################################################
+Seconds: 240
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100470218 | min_delay: 100274861 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 816116 | jitter: 2 | skew: 100390192.000000
+###############################################################
+Seconds: 241
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100390192 | min_delay: 100274861 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 385672 | jitter: 2 | skew: 100312365.000000
+###############################################################
+Seconds: 242
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100373797 | min_delay: 100230595 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 938560 | jitter: 2 | skew: 100231126.000000
+###############################################################
+Seconds: 243
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100335207 | min_delay: 100230595 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 336268 | jitter: 2 | skew: 100262282.000000
+###############################################################
+Seconds: 244
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100277211 | min_delay: 100231126 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 891587 | jitter: 2 | skew: 100277211.000000
+###############################################################
+Seconds: 245
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100304707 | min_delay: 100256511 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 473451 | jitter: 2 | skew: 100268093.000000
+###############################################################
+Seconds: 246
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100304707 | min_delay: 100248440 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 157820 | jitter: 2 | skew: 100286112.000000
+###############################################################
+Seconds: 247
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100297685 | min_delay: 100248440 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 87778 | jitter: 2 | skew: 100297685.000000
+###############################################################
+Seconds: 248
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100321122 | min_delay: 100271338 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 360578 | jitter: 2 | skew: 100307927.000000
+###############################################################
+Seconds: 249
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100321122 | min_delay: 100272016 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 162772 | jitter: 2 | skew: 100296121.000000
+###############################################################
+Seconds: 250
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100473395 | min_delay: 100272016 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 501358 | jitter: 2 | skew: 100473395.000000
+###############################################################
+Seconds: 251
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100845225 | min_delay: 100226412 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 170365 | jitter: 2 | skew: 100234531.000000
+###############################################################
+Seconds: 252
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100845225 | min_delay: 100226412 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 82399 | jitter: 2 | skew: 100281083.000000
+###############################################################
+Seconds: 253
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100296503 | min_delay: 100228415 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 1003900 | jitter: 2 | skew: 100294542.000000
+###############################################################
+Seconds: 254
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100318377 | min_delay: 100248615 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 489520 | jitter: 2 | skew: 100281797.000000
+###############################################################
+Seconds: 255
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100318377 | min_delay: 100272061 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 265960 | jitter: 2 | skew: 100282754.000000
+###############################################################
+Seconds: 256
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100288186 | min_delay: 100246405 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 269188 | jitter: 2 | skew: 100248025.000000
+###############################################################
+Seconds: 257
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100284829 | min_delay: 100246405 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 212819 | jitter: 2 | skew: 100260486.000000
+###############################################################
+Seconds: 258
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100275792 | min_delay: 100246474 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 273374 | jitter: 2 | skew: 100272994.000000
+###############################################################
+Seconds: 259
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100306685 | min_delay: 100259116 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 189858 | jitter: 2 | skew: 100267204.000000
+###############################################################
+Seconds: 260
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100306685 | min_delay: 100262364 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 575605 | jitter: 2 | skew: 100276406.000000
+###############################################################
+Seconds: 261
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100294924 | min_delay: 100262364 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 145729 | jitter: 2 | skew: 100271822.000000
+###############################################################
+Seconds: 262
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100294924 | min_delay: 100264518 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 251821 | jitter: 2 | skew: 100267338.000000
+###############################################################
+Seconds: 263
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100327754 | min_delay: 100264186 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 109900 | jitter: 2 | skew: 100309958.000000
+###############################################################
+Seconds: 264
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100391394 | min_delay: 100264186 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 339681 | jitter: 2 | skew: 100285018.000000
+###############################################################
+Seconds: 265
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100391394 | min_delay: 100270608 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 462725 | jitter: 2 | skew: 100274787.000000
+###############################################################
+Seconds: 266
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100321586 | min_delay: 100233478 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 362575 | jitter: 2 | skew: 100261593.000000
+###############################################################
+Seconds: 267
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100301227 | min_delay: 100233478 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 134395 | jitter: 2 | skew: 100260097.000000
+###############################################################
+Seconds: 268
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100320223 | min_delay: 100259915 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 1010319 | jitter: 2 | skew: 100320223.000000
+###############################################################
+Seconds: 269
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100320223 | min_delay: 100259915 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 316659 | jitter: 2 | skew: 100271894.000000
+###############################################################
+Seconds: 270
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100320223 | min_delay: 100261438 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 174937 | jitter: 2 | skew: 100263305.000000
+###############################################################
+Seconds: 271
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100292626 | min_delay: 100261438 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 86929 | jitter: 2 | skew: 100276864.000000
+###############################################################
+Seconds: 272
+PHSN: 0 | framecounter: 1 | bytes_in_queue: 663
+max_delay: 100375543 | min_delay: 100261635 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 140287 | jitter: 2 | skew: 100278032.000000
+###############################################################
+Seconds: 273
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100375543 | min_delay: 100265247 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 117714 | jitter: 2 | skew: 100293192.000000
+###############################################################
+Seconds: 274
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100323139 | min_delay: 100265044 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 376232 | jitter: 2 | skew: 100322245.000000
+###############################################################
+Seconds: 275
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100323139 | min_delay: 100265044 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 136669 | jitter: 2 | skew: 100294949.000000
+###############################################################
+Seconds: 276
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100322245 | min_delay: 100273602 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 81148 | jitter: 2 | skew: 100292462.000000
+###############################################################
+Seconds: 277
+PHSN: 0 | framecounter: 1 | bytes_in_queue: 366
+max_delay: 100393304 | min_delay: 100269575 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 179566 | jitter: 2 | skew: 100273751.000000
+###############################################################
+Seconds: 278
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100393304 | min_delay: 100249044 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 110261 | jitter: 2 | skew: 100286248.000000
+###############################################################
+Seconds: 279
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100304878 | min_delay: 100249044 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 737811 | jitter: 2 | skew: 100304878.000000
+###############################################################
+Seconds: 280
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100321820 | min_delay: 100265510 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 381559 | jitter: 2 | skew: 100280012.000000
+###############################################################
+Seconds: 281
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100321820 | min_delay: 100266172 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 328214 | jitter: 2 | skew: 100270931.000000
+###############################################################
+Seconds: 282
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100301609 | min_delay: 100230826 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 105643 | jitter: 2 | skew: 100230826.000000
+###############################################################
+Seconds: 283
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100301609 | min_delay: 100225043 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 302966 | jitter: 2 | skew: 100282815.000000
+###############################################################
+Seconds: 284
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100306040 | min_delay: 100225043 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 429476 | jitter: 2 | skew: 100260847.000000
+###############################################################
+Seconds: 285
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100306040 | min_delay: 100251609 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 122502 | jitter: 2 | skew: 100282460.000000
+###############################################################
+Seconds: 286
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100289837 | min_delay: 100260847 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 91714 | jitter: 2 | skew: 100282150.000000
+###############################################################
+Seconds: 287
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100313573 | min_delay: 100269170 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 163671 | jitter: 2 | skew: 100294640.000000
+###############################################################
+Seconds: 288
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100486373 | min_delay: 100268138 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 328923 | jitter: 2 | skew: 100412428.000000
+###############################################################
+Seconds: 289
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100486373 | min_delay: 100268138 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 324335 | jitter: 2 | skew: 100270306.000000
+###############################################################
+Seconds: 290
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100443962 | min_delay: 100264985 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 389969 | jitter: 2 | skew: 100274424.000000
+###############################################################
+Seconds: 291
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100325339 | min_delay: 100264985 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 576656 | jitter: 2 | skew: 100278590.000000
+###############################################################
+Seconds: 292
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100325339 | min_delay: 100269448 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 534828 | jitter: 2 | skew: 100277660.000000
+###############################################################
+Seconds: 293
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100338054 | min_delay: 100261324 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 620529 | jitter: 2 | skew: 100295948.000000
+###############################################################
+Seconds: 294
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100338054 | min_delay: 100261324 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 277226 | jitter: 2 | skew: 100286122.000000
+###############################################################
+Seconds: 295
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100371315 | min_delay: 100269779 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 525793 | jitter: 2 | skew: 100281123.000000
+###############################################################
+Seconds: 296
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100371315 | min_delay: 100235590 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 556648 | jitter: 2 | skew: 100288172.000000
+###############################################################
+Seconds: 297
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100339844 | min_delay: 100235590 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 541354 | jitter: 2 | skew: 100312829.000000
+###############################################################
+Seconds: 298
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100339844 | min_delay: 100277634 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 678439 | jitter: 2 | skew: 100303019.000000
+###############################################################
+Seconds: 299
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100524082 | min_delay: 100265651 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 284046 | jitter: 2 | skew: 100320295.000000
+###############################################################
+Seconds: 300
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100524082 | min_delay: 100265651 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 101503 | jitter: 2 | skew: 100310882.000000
+###############################################################
+Seconds: 301
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100335474 | min_delay: 100270173 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 551347 | jitter: 2 | skew: 100270173.000000
+###############################################################
+Seconds: 302
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100335474 | min_delay: 100263283 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 657572 | jitter: 2 | skew: 100289200.000000
+###############################################################
+Seconds: 303
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100430000 | min_delay: 100242728 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 273096 | jitter: 2 | skew: 100263529.000000
+###############################################################
+Seconds: 304
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100430000 | min_delay: 100242728 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 326367 | jitter: 2 | skew: 100267387.000000
+###############################################################
+Seconds: 305
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100300319 | min_delay: 100253329 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 391457 | jitter: 2 | skew: 100287602.000000
+###############################################################
+Seconds: 306
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100297979 | min_delay: 100253329 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 393345 | jitter: 2 | skew: 100268302.000000
+###############################################################
+Seconds: 307
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100343099 | min_delay: 100268302 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 539228 | jitter: 2 | skew: 100306802.000000
+###############################################################
+Seconds: 308
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100343099 | min_delay: 100251551 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 631512 | jitter: 2 | skew: 100267337.000000
+###############################################################
+Seconds: 309
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100364955 | min_delay: 100251551 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 443326 | jitter: 2 | skew: 100297312.000000
+###############################################################
+Seconds: 310
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100464598 | min_delay: 100264117 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 603006 | jitter: 2 | skew: 100292460.000000
+###############################################################
+Seconds: 311
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100464598 | min_delay: 100263277 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 406266 | jitter: 2 | skew: 100293719.000000
+###############################################################
+Seconds: 312
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100392100 | min_delay: 100263277 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 424864 | jitter: 2 | skew: 100287786.000000
+###############################################################
+Seconds: 313
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100460597 | min_delay: 100276064 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 669399 | jitter: 2 | skew: 100277805.000000
+###############################################################
+Seconds: 314
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100460597 | min_delay: 100272458 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 275094 | jitter: 2 | skew: 100278996.000000
+###############################################################
+Seconds: 315
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100322084 | min_delay: 100272458 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 577442 | jitter: 2 | skew: 100288382.000000
+###############################################################
+Seconds: 316
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100333154 | min_delay: 100278202 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 375869 | jitter: 2 | skew: 100294216.000000
+###############################################################
+Seconds: 317
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100333154 | min_delay: 100253877 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 501041 | jitter: 2 | skew: 100261491.000000
+###############################################################
+Seconds: 318
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100303771 | min_delay: 100253877 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 272293 | jitter: 2 | skew: 100292574.000000
+###############################################################
+Seconds: 319
+PHSN: 0 | framecounter: 1 | bytes_in_queue: 616
+max_delay: 100303771 | min_delay: 100241862 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 1548655 | jitter: 2 | skew: 100257678.000000
+###############################################################
+Seconds: 320
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100292574 | min_delay: 100241862 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 402901 | jitter: 2 | skew: 100260339.000000
+###############################################################
+Seconds: 321
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100307947 | min_delay: 100242905 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 388205 | jitter: 2 | skew: 100278437.000000
+###############################################################
+Seconds: 322
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100406656 | min_delay: 100260339 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 547008 | jitter: 2 | skew: 100339435.000000
+###############################################################
+Seconds: 323
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 101606065 | min_delay: 100271314 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 744745 | jitter: 2 | skew: 100271314.000000
+###############################################################
+Seconds: 324
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 101606065 | min_delay: 100258616 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 200698 | jitter: 2 | skew: 100305017.000000
+###############################################################
+Seconds: 325
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100351100 | min_delay: 100247760 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 173050 | jitter: 2 | skew: 100273018.000000
+###############################################################
+Seconds: 326
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100351100 | min_delay: 100247760 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 172578 | jitter: 2 | skew: 100263115.000000
+###############################################################
+Seconds: 327
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100288455 | min_delay: 100258649 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 228927 | jitter: 2 | skew: 100283159.000000
+###############################################################
+Seconds: 328
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100327169 | min_delay: 100265652 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 577989 | jitter: 2 | skew: 100274704.000000
+###############################################################
+Seconds: 329
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100327169 | min_delay: 100259741 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 484870 | jitter: 2 | skew: 100309561.000000
+###############################################################
+Seconds: 330
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100340566 | min_delay: 100259741 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 775785 | jitter: 2 | skew: 100340566.000000
+###############################################################
+Seconds: 331
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100534039 | min_delay: 100232814 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 435191 | jitter: 2 | skew: 100289621.000000
+###############################################################
+Seconds: 332
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100534039 | min_delay: 100232814 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 416715 | jitter: 2 | skew: 100253221.000000
+###############################################################
+Seconds: 333
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100305558 | min_delay: 100247941 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 217329 | jitter: 2 | skew: 100298104.000000
+###############################################################
+Seconds: 334
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100298104 | min_delay: 100233380 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 180144 | jitter: 2 | skew: 100264344.000000
+###############################################################
+Seconds: 335
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100298104 | min_delay: 100233380 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 384007 | jitter: 2 | skew: 100252898.000000
+###############################################################
+Seconds: 336
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100324675 | min_delay: 100224761 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 278473 | jitter: 2 | skew: 100324675.000000
+###############################################################
+Seconds: 337
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100482749 | min_delay: 100224761 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 385436 | jitter: 2 | skew: 100277216.000000
+###############################################################
+Seconds: 338
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100482749 | min_delay: 100260117 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 230574 | jitter: 2 | skew: 100265082.000000
+###############################################################
+Seconds: 339
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100333147 | min_delay: 100258447 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 460896 | jitter: 2 | skew: 100322302.000000
+###############################################################
+Seconds: 340
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100359848 | min_delay: 100258447 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 574089 | jitter: 2 | skew: 100283504.000000
+###############################################################
+Seconds: 341
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100373810 | min_delay: 100251272 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 305714 | jitter: 2 | skew: 100373810.000000
+###############################################################
+Seconds: 342
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100373810 | min_delay: 100251272 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 377399 | jitter: 2 | skew: 100296078.000000
+###############################################################
+Seconds: 343
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100434487 | min_delay: 100267922 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 861467 | jitter: 2 | skew: 100331756.000000
+###############################################################
+Seconds: 344
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100559203 | min_delay: 100267922 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 621249 | jitter: 2 | skew: 100300148.000000
+###############################################################
+Seconds: 345
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100559203 | min_delay: 100243475 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 544792 | jitter: 2 | skew: 100243475.000000
+###############################################################
+Seconds: 346
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100300148 | min_delay: 100237101 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 208911 | jitter: 2 | skew: 100257912.000000
+###############################################################
+Seconds: 347
+PHSN: 0 | framecounter: 1 | bytes_in_queue: 786
+max_delay: 100319508 | min_delay: 100237101 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 574326 | jitter: 2 | skew: 100319508.000000
+###############################################################
+Seconds: 348
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100474317 | min_delay: 100244206 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 1154014 | jitter: 2 | skew: 100474317.000000
+###############################################################
+Seconds: 349
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100481758 | min_delay: 100259549 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 871689 | jitter: 2 | skew: 100259549.000000
+###############################################################
+Seconds: 350
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100481758 | min_delay: 100241315 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 511508 | jitter: 2 | skew: 100241315.000000
+###############################################################
+Seconds: 351
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100318831 | min_delay: 100230128 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 455494 | jitter: 2 | skew: 100290111.000000
+###############################################################
+Seconds: 352
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100316604 | min_delay: 100230128 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 321766 | jitter: 2 | skew: 100271520.000000
+###############################################################
+Seconds: 353
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100313530 | min_delay: 100267587 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 780393 | jitter: 2 | skew: 100271640.000000
+###############################################################
+Seconds: 354
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100615763 | min_delay: 100267587 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 515478 | jitter: 2 | skew: 100279157.000000
+###############################################################
+Seconds: 355
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100615763 | min_delay: 100257653 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 330234 | jitter: 2 | skew: 100273200.000000
+###############################################################
+Seconds: 356
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100295079 | min_delay: 100257653 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 321422 | jitter: 2 | skew: 100274094.000000
+###############################################################
+Seconds: 357
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100306681 | min_delay: 100259717 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 349037 | jitter: 2 | skew: 100284574.000000
+###############################################################
+Seconds: 358
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100306681 | min_delay: 100258919 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 143240 | jitter: 2 | skew: 100262532.000000
+###############################################################
+Seconds: 359
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100300518 | min_delay: 100244550 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 202552 | jitter: 2 | skew: 100283365.000000
+###############################################################
+Seconds: 360
+PHSN: 0 | framecounter: 1 | bytes_in_queue: 427
+max_delay: 100543304 | min_delay: 100244550 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 345632 | jitter: 2 | skew: 100338255.000000
+###############################################################
+Seconds: 361
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100543304 | min_delay: 100273868 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 721888 | jitter: 2 | skew: 100294708.000000
+###############################################################
+Seconds: 362
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100343941 | min_delay: 100273582 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 201714 | jitter: 2 | skew: 100292742.000000
+###############################################################
+Seconds: 363
+PHSN: 0 | framecounter: 1 | bytes_in_queue: 711
+max_delay: 100323672 | min_delay: 100273582 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 286731 | jitter: 2 | skew: 100288997.000000
+###############################################################
+Seconds: 364
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100350779 | min_delay: 100266364 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 141423 | jitter: 2 | skew: 100266364.000000
+###############################################################
+Seconds: 365
+PHSN: 0 | framecounter: 0 | bytes_in_queue: 0
+max_delay: 100350779 | min_delay: 100254957 | forced_delay: 0
+flushing: 0 | playout_allowed: 1 | playout_halt: 0
+halt_time: 100000000 | monitored bytes: 0
+----------------------------------------------------------------
+Subflow id: 1
+delay: 345804 | jitter: 2 | skew: 100259853.000000

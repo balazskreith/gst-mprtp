@@ -79,6 +79,7 @@ struct _Subflow
   guint32                       total_received;
   guint16                       HSN;
   guint64                       LSR;
+  GstClockTime                  LRR;
 
   gchar                        *logfile;
 
@@ -216,19 +217,19 @@ rcvctrler_finalize (GObject * object)
 void
 rcvctrler_init (RcvController * this)
 {
-  this->sysclock = gst_system_clock_obtain ();
-  this->subflows = g_hash_table_new_full (NULL, NULL,
-      NULL, (GDestroyNotify) _ruin_subflow);
-  this->ssrc = g_random_int ();
+  this->sysclock           = gst_system_clock_obtain ();
+  this->subflows           = g_hash_table_new_full (NULL, NULL,NULL, (GDestroyNotify) _ruin_subflow);
+  this->ssrc               = g_random_int ();
   this->report_is_flowable = FALSE;
+  this->report_producer    = g_object_new(REPORTPRODUCER_TYPE, NULL);
+  this->report_processor   = g_object_new(REPORTPROCESSOR_TYPE, NULL);
+
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   this->thread = gst_task_new (refctrler_ticker, this, NULL);
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
 
-  this->report_producer = g_object_new(REPORTPRODUCER_TYPE, NULL);
-  this->report_processor = g_object_new(REPORTPROCESSOR_TYPE, NULL);
 }
 
 void
@@ -244,6 +245,7 @@ _logging (RcvController *this)
   gchar main_file[255];
 
   if(!this->joiner) goto done;
+  memset(main_file, 0, 255);
   sprintf(main_file, "logs/sub_rcv_sum.csv");
 
   g_hash_table_iter_init (&iter, this->subflows);
@@ -255,6 +257,8 @@ _logging (RcvController *this)
       subflow->logfile = g_malloc(255);
       sprintf(subflow->logfile, "logs/sub_%d_rcv.csv", subflow->id);
     }
+
+    //Todo: refactor and consider rtcp reports
 
     discarded_bytes = subflow->discarded_bytes;
 
@@ -461,6 +465,7 @@ _orp_main(RcvController * this)
   Subflow *subflow;
   guint report_length = 0;
   GstBuffer *buffer;
+  gchar logfile[255];
 
 
   if (!this->report_is_flowable) {
@@ -475,6 +480,8 @@ _orp_main(RcvController * this)
     if(!ricalcer_do_report_now(ricalcer)){
       continue;
     }
+    memset(logfile, 0, 255);
+    sprintf(logfile, "logs/rtcp_rr_%d.csv", subflow->id);
 
     report_producer_begin(this->report_producer, subflow->id);
     _orp_add_rr(this, subflow);
@@ -493,6 +500,9 @@ _orp_main(RcvController * this)
     buffer = report_producer_end(this->report_producer, &report_length);
 
     mprtpr_path_set_chunks_reported(subflow->path);
+
+    mprtp_logger(logfile, "%lu,%d\n", GST_TIME_AS_MSECONDS(_now(this) - subflow->LRR), report_length);
+    subflow->LRR = _now(this);
 
     subflow->avg_rtcp_size += (report_length - subflow->avg_rtcp_size) / 4.;
     this->send_mprtcp_packet_func (this->send_mprtcp_packet_data, buffer);
@@ -678,13 +688,13 @@ _path_ticker_main(RcvController * this)
 Subflow *
 _make_subflow (guint8 id, MpRTPRPath * path)
 {
-  Subflow *result = _subflow_ctor ();
-  g_object_ref (path);
-  result->sysclock = gst_system_clock_obtain ();
-  result->path = path;
-  result->id = id;
+  Subflow *result     = _subflow_ctor ();
+  result->sysclock    = gst_system_clock_obtain ();
+  result->path        = g_object_ref (path);;
+  result->id          = id;
   result->joined_time = gst_clock_get_time (result->sysclock);
-  result->ricalcer = make_ricalcer(FALSE);
+  result->ricalcer    = make_ricalcer(FALSE);
+  result->LRR         = _now(result);
   _reset_subflow (result);
   return result;
 }

@@ -200,7 +200,7 @@ void netqueue_analyser_do(NetQueueAnalyser       *this,
     _execute_corrblocks(_priv(this), _priv(this)->cblocks, 4);
     _priv(this)->cblocks[0].Id1 = GST_TIME_AS_USECONDS(delay) / 50.;
 
-    _csv_logging(this, delay);
+//    _csv_logging(this, delay);
   }
 
   result->congested |= congestion;
@@ -307,6 +307,7 @@ void _execute_corrblock(CorrBlock* this)
 void _csv_logging(NetQueueAnalyser *this, GstClockTime delay)
 {
   gchar filename[255];
+  memset(filename, 0, 255);
   sprintf(filename, "logs/netqanalyser_%d.csv", this->id);
   mprtp_logger(filename,
                "%lu,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f\n",
@@ -325,6 +326,7 @@ void _csv_logging(NetQueueAnalyser *this, GstClockTime delay)
 void _readable_logging(NetQueueAnalyser *this)
 {
   gchar filename[255];
+  memset(filename, 0, 255);
   sprintf(filename, "logs/netqanalyser_%d.log", this->id);
   mprtp_logger(filename,
                "############ Network Queue Analyser log after %lu seconds #################\n"

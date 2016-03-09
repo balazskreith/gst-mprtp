@@ -152,7 +152,7 @@ GstMPRTCPReportSummary* report_processor_process_mprtcp(ReportProcessor * this, 
   GstMapInfo map = GST_MAP_INFO_INIT;
   GstMPRTCPSubflowReport *report;
   GstMPRTCPSubflowBlock *block;
-  result = g_malloc(sizeof(GstMPRTCPReportSummary));
+  result = mprtp_malloc(sizeof(GstMPRTCPReportSummary));
   gst_buffer_map(buffer, &map, GST_MAP_READ);
   report = (GstMPRTCPSubflowReport *)map.data;
   gst_mprtcp_report_getdown(report, &ssrc);
@@ -336,6 +336,7 @@ _processing_xr_rfc7097 (ReportProcessor *this,
   GstRTCPXR_Chunk *chunk;
 
   summary->XR_RFC7097.processed = TRUE;
+  summary->XR_RFC7097.length = 0;
 
   chunks_num = gst_rtcp_xr_rfc7097_get_chunks_num(xrb);
   for(chunk_index = 0;
@@ -345,7 +346,7 @@ _processing_xr_rfc7097 (ReportProcessor *this,
       chunk = gst_rtcp_xr_rfc7097_get_chunk(xrb, chunk_index);
 
       //Terminate chunk
-      if(*((guint16*)chunk) == 0) break;
+      if(chunk->chunk_type == 0 && chunk->run_length == 0 && chunk->run_type == 0) break;
       gst_rtcp_xr_chunk_getdown(chunk, NULL, NULL, &running_length);
       summary->XR_RFC7097.values[chunk_index] = running_length;
       ++summary->XR_RFC7097.length;
@@ -362,6 +363,7 @@ _processing_xr_rfc3611 (ReportProcessor *this,
   GstRTCPXR_Chunk *chunk;
 
   summary->XR_RFC3611.processed = TRUE;
+  summary->XR_RFC3611.length = 0;
 
   chunks_num = gst_rtcp_xr_rfc3611_get_chunks_num(xrb);
   for(chunk_index = 0;
@@ -371,7 +373,7 @@ _processing_xr_rfc3611 (ReportProcessor *this,
       chunk = gst_rtcp_xr_rfc3611_get_chunk(xrb, chunk_index);
 
       //Terminate chunk
-      if(*((guint16*)chunk) == 0) break;
+      if(chunk->chunk_type == 0 && chunk->run_length == 0 && chunk->run_type == 0) break;
       gst_rtcp_xr_chunk_getdown(chunk, NULL, NULL, &running_length);
       summary->XR_RFC3611.values[chunk_index] = running_length;
       ++summary->XR_RFC3611.length;
@@ -389,24 +391,18 @@ _processing_xr_owd_rle(ReportProcessor *this,
   guint16 running_length;
   guint64 owd;
   GstRTCPXR_Chunk *chunk;
-gboolean debug = FALSE;
   summary->XR_OWD_RLE.processed = TRUE;
+  summary->XR_OWD_RLE.length = 0;
 
   chunks_num = gst_rtcp_xr_owd_rle_get_chunks_num(xrb);
-
-  if(chunks_num > 100) debug = TRUE;
-
   for(chunk_index = 0;
       chunk_index < chunks_num;
       ++chunk_index)
   {
       chunk = gst_rtcp_xr_owd_rle_get_chunk(xrb, chunk_index);
 
-      if(debug)
-        mprtp_logger("logs/debug_reportproc", "chunks_num: %d, chunk: %hu\n", chunks_num, *((guint16*)chunk));
-
       //Terminate chunk
-      if(*((guint16*)chunk) == 0) break;
+      if(chunk->chunk_type == 0 && chunk->run_length == 0 && chunk->run_type == 0) break;
       gst_rtcp_xr_chunk_getdown(chunk, NULL, NULL, &running_length);
       if(running_length < 0x3FFF){
         gdouble x = (gdouble) running_length / 16384.;
@@ -435,7 +431,6 @@ _processing_srblock(ReportProcessor *this,
                        &summary->SR.packet_count,
                        &summary->SR.octet_count);
 }
-
 
 #undef THIS_READLOCK
 #undef THIS_READUNLOCK

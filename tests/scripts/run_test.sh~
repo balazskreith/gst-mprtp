@@ -123,7 +123,7 @@ trap control_c SIGINT
 
 sleep 1
 
-DURATION=610
+DURATION=660
 let "WAIT=$DURATION/100"
 for j in `seq 1 100`;
 do
@@ -132,6 +132,7 @@ do
     sleep 1
   done
   echo $j"*$WAIT seconds"
+  ./scripts/report_generator.sh -o reports/report.pdf
   #./run_test_evaluator.sh $PROFILE
 done
 sleep 1

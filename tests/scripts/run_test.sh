@@ -132,6 +132,7 @@ do
     sleep 1
   done
   echo $j"*$WAIT seconds"
+  ./scripts/report_generator.sh -o reports/report.pdf &
   #./run_test_evaluator.sh $PROFILE
 done
 sleep 1

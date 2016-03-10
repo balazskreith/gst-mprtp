@@ -24,6 +24,8 @@ set rmargin 7
 set yrange [0:3000]
 set ytics 500
 set xrange [0:csv_length]
+set xlabel "Rates (Kbits/s)"
+set ylabel "time (ms)"
 set xtics 500
 
 # set title plot_title font ",18"
@@ -44,8 +46,8 @@ set style line 1 linecolor rgb '#008c48' linetype 1 linewidth 1
 set style line 2 linecolor rgb '#b43894' linetype 2 linewidth 1
 set style line 3 linecolor rgb '#185aa9' linetype 3 linewidth 1
 set style line 4 linecolor rgb '#a21d21' linetype 4 linewidth 1	
-plot rates_file using 0:1 with lines ls 1 title "Sender rate", \
-     rates_file using 0:2 with lines ls 2 title "Monitored rate", \
-     rates_file using 0:3 with lines ls 3 title "Target rate", \
+plot rates_file using 0:1 with lines ls 1 title "Sender", \
+     rates_file using 0:2 with lines ls 2 title "Monitor", \
+     rates_file using 0:3 with lines ls 3 title "Target", \
      bw_file    using 0:1 with lines ls 4 title "Capacity"
 

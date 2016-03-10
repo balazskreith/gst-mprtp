@@ -25,6 +25,8 @@ set yrange [0:375]
 set ytics 100
 set xrange [0:csv_length]
 set xtics 500
+set ylabel "Size (KBytes)"
+set xlabel "time (ms)"
 
 # set title plot_title font ",18"
 
@@ -44,6 +46,6 @@ set style line 1 linecolor rgb '#008c48' linetype 1 linewidth 1
 set style line 2 linecolor rgb '#b43894' linetype 2 linewidth 1
 set style line 3 linecolor rgb '#185aa9' linetype 3 linewidth 1
 set style line 4 linecolor rgb '#a21d21' linetype 4 linewidth 1	
-plot rates_file using 0:1 with lines ls 1 title "Received bytes", \
-     rates_file using 0:2 with lines ls 2 title "Discarded bytes"
+plot rates_file using 0:1 with lines ls 1 title "Received", \
+     rates_file using 0:2 with lines ls 2 title "Discarded"
 

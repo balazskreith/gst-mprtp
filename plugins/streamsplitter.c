@@ -49,8 +49,9 @@ struct _Subflow
   MPRTPSPath *path;
   gint32      sent_bytes;
   gint32      sending_target;
-  gint        weight;
+  gint        weight_for_tree;
   gboolean    key_path;
+  gdouble     weight;
   gboolean    valid;
 };
 
@@ -307,6 +308,21 @@ done:
   return result;
 }
 
+gdouble stream_splitter_get_sending_weight(StreamSplitter* this, guint8 subflow_id)
+{
+  Subflow *subflow;
+  gdouble result = 0.;
+  THIS_READLOCK(this);
+  subflow =
+        (Subflow *) g_hash_table_lookup (this->subflows,
+        GINT_TO_POINTER (subflow_id));
+  if(!subflow) goto done;
+  result = subflow->weight;
+done:
+  THIS_READUNLOCK(this);
+  return result;
+}
+
 void
 stream_splitter_commit_changes (StreamSplitter * this)
 {
@@ -486,7 +502,7 @@ void _setup_sending_weights(Subflow *subflow, gpointer data)
   if(!subflow->valid) return;
   weight = (gdouble) subflow->sending_target / (gdouble) wdata->valid_sum;
   weight *= (gdouble) SCHTREE_MAX_VALUE;
-  wdata->total_weight+=subflow->weight = weight;
+  wdata->total_weight+=subflow->weight_for_tree = weight;
 }
 
 
@@ -495,12 +511,13 @@ void _create_nodes(Subflow *subflow, gpointer data)
   CreateData *cdata = data;
   if(!subflow->valid) return;
   if(cdata->remained){
-    subflow->weight += cdata->remained;
+    subflow->weight_for_tree += cdata->remained;
     cdata->remained = 0;
   }
+  subflow->weight = (gdouble)subflow->weight_for_tree / (gdouble)SCHTREE_MAX_VALUE;
   subflow->key_path = (mprtps_path_get_flags(subflow->path) & cdata->key_flag) == cdata->key_flag;
   subflow->sent_bytes = mprtps_path_get_sent_bytes_in1s(subflow->path);
-  _schtree_insert(&cdata->root, subflow, &subflow->weight, SCHTREE_MAX_VALUE);
+  _schtree_insert(&cdata->root, subflow, &subflow->weight_for_tree, SCHTREE_MAX_VALUE);
 }
 
 SchNode *
@@ -663,7 +680,7 @@ static void _log_subflow(Subflow *subflow, gpointer data)
   mprtp_logger("logs/streamsplitter.log",
                "----------------------------------------------------------------\n"
                "Subflow id: %d\n"
-               "Sending target: %d | Sent bytes: %d | weight: %d\n",
+               "Sending target: %d | Sent bytes: %d | weight: %f\n",
 
                subflow->id,
                subflow->sending_target,

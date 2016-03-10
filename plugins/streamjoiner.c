@@ -143,7 +143,12 @@ _rem_mprtp(
     StreamJoiner *this);
 
 static void
-_logging(StreamJoiner *this);
+_playout_logging(
+    StreamJoiner *this);
+
+static void
+_readable_logging(
+    StreamJoiner *this);
 
 //#define _trash_frame(this, frame)
 //  g_slice_free(Frame, frame);
@@ -285,9 +290,11 @@ GstMpRTPBuffer *stream_joiner_pop(StreamJoiner *this)
   GstMpRTPBuffer *result = NULL;
   THIS_WRITELOCK (this);
   if(this->last_logging < _now(this) - GST_SECOND){
-    _logging(this);
+    _readable_logging(this);
     this->last_logging = _now(this);
   }
+
+  _playout_logging(this);
 
   if (this->subflow_num == 0 || !this->playout_allowed) {
     goto done;
@@ -630,7 +637,7 @@ again:
 done:
 
   //refresh playout time
-  frame->playout_time+=this->playout_delay;
+  frame->playout_time+=MAX(0, this->max_skew);
 
   //Check weather the frame is marked
   frame->marked |= node->marker;
@@ -659,12 +666,12 @@ Frame* _make_frame(StreamJoiner *this, FrameNode *node)
   playout_delay  = MAX(this->forced_delay, this->max_delay);
   playout_delay += MIN(this->max_skew,     100 * GST_MSECOND);
   playout_delay -= MIN(node->mprtp->delay, 300 * GST_MSECOND);
+  if(100 * GST_MSECOND < playout_delay){
+      g_print("PLAYOUT DELAY < 0. forced delay: %lu, max delay: %lu, max skew: %lu, mprtp_delay: %lu\n",
+              this->forced_delay, this->max_delay, this->max_skew, node->mprtp->delay);
+  }
   result->playout_time = _now(this) + MAX(0, playout_delay);
   ++this->framecounter;
-
-  mprtp_logger("logs/playouts.csv", "%lu,%lu\n",
-               node->mprtp->delay,
-               node->mprtp->delay + playout_delay);
 
   return result;
 }
@@ -679,6 +686,24 @@ FrameNode * _make_framenode(StreamJoiner *this, GstMpRTPBuffer *mprtp)
   result->seq = mprtp->abs_seq;
   result->marker = mprtp->marker;
   return result;
+}
+
+void _playout_logging(StreamJoiner *this)
+{
+  gint32 playout_remaining = 0;
+  GstClockTime now = _now(this);
+  if(this->head && now < this->head->playout_time - GST_USECOND){
+    playout_remaining = GST_TIME_AS_USECONDS(this->head->playout_time - now);
+  }
+  if(playout_remaining > 20000 * GST_USECOND){
+    g_print("PLAYOUT PROBLEM: remaining time: %d skew: %ld max delay: %lu this->head->playout_time %lu now: %lu\n",
+            playout_remaining, this->max_skew, this->max_delay, this->head->playout_time, now);
+  }
+  mprtp_logger("logs/playouts.csv", "%d,%d,%d\n",
+                this->bytes_in_queue / 1000,
+                playout_remaining,
+                GST_TIME_AS_USECONDS(this->max_skew));
+
 }
 
 static void _log_subflow(Subflow *subflow, gpointer data)
@@ -696,7 +721,7 @@ static void _log_subflow(Subflow *subflow, gpointer data)
 
 }
 
-void _logging(StreamJoiner *this)
+void _readable_logging(StreamJoiner *this)
 {
   mprtp_logger("logs/streamjoiner.log",
                  "###############################################################\n"

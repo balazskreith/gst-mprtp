@@ -91,6 +91,7 @@ struct _ReportProcessor
   GstClock*                sysclock;
   guint32                  ssrc;
   gsize                    length;
+  gchar                    logfile[255];
 };
 
 struct _ReportProcessorClass{
@@ -99,6 +100,6 @@ struct _ReportProcessorClass{
 
 void report_processor_set_ssrc(ReportProcessor *this, guint32 ssrc);
 GstMPRTCPReportSummary* report_processor_process_mprtcp(ReportProcessor * this, GstBuffer* buffer);
-
+void report_processor_set_logfile(ReportProcessor *this, const gchar *logfile);
 GType report_processor_get_type (void);
 #endif /* REPPROCER_H_ */

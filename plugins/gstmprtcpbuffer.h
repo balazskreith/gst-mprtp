@@ -554,7 +554,11 @@ void gst_mprtcp_block_change (GstMPRTCPSubflowInfo * info,
 void gst_mprtcp_block_getdown (GstMPRTCPSubflowInfo * info,
     guint8 * type, guint8 * block_length, guint16 * subflow_id);
 
-void gst_print_mprtcp (GstMPRTCPSubflowReport * report);
+
+typedef void (*printfnc)(const gchar* format, ...);
+
+#define gst_print_mprtcp(report) gst_printfnc_mprtcp(report, g_print)
+void gst_printfnc_mprtcp (GstMPRTCPSubflowReport * riport, printfnc print);
 void gst_print_mprtcp_block (GstMPRTCPSubflowBlock * block, guint8 *block_length);
 void gst_print_rtcp_check_sr (GstRTCPBuffer * rtcp, gint offset);
 void gst_print_rtcp_check_srb (GstRTCPSRBlock * block_ptr,

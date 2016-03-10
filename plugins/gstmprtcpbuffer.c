@@ -1300,9 +1300,8 @@ gst_print_rtcp (GstRTCPHeader * header)
   }
 }
 
-
 void
-gst_print_mprtcp (GstMPRTCPSubflowReport * riport)
+gst_printfnc_mprtcp (GstMPRTCPSubflowReport * riport, printfnc print)
 {
   gint index;
   GstMPRTCPSubflowBlock *block = &riport->blocks;
@@ -1315,7 +1314,7 @@ gst_print_mprtcp (GstMPRTCPSubflowReport * riport)
   gst_print_rtcp_header (riport_header);
   gst_rtcp_header_getdown (riport_header, NULL, NULL, &src, NULL, NULL, NULL);
 
-  g_print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+  print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
       "|%63u|\n", ssrc);
 
   for (index = 0; index < src; ++index) {
@@ -1326,6 +1325,7 @@ gst_print_mprtcp (GstMPRTCPSubflowReport * riport)
         ((guint8 *) block + ((block_length + 1) << 2));
   }
 }
+
 
 void
 gst_print_mprtcp_block (GstMPRTCPSubflowBlock * block, guint8 * block_length)

@@ -97,7 +97,7 @@ report_producer_init (ReportProducer * this)
 
   this->sysclock   = gst_system_clock_obtain ();
   this->ssrc       = g_random_int();
-  this->report       = this->databed = g_malloc(DATABED_LENGTH);
+  this->report       = this->databed = g_malloc0(DATABED_LENGTH);
 }
 
 void report_producer_set_ssrc(ReportProducer *this, guint32 ssrc)
@@ -281,7 +281,7 @@ GstBuffer *report_producer_end(ReportProducer *this, guint *length)
 //  gst_mprtcp_riport_add_block_end(this->report, this->block);
 //  g_print("length: %lu\n", this->length);
 //  gst_print_rtcp(this->databed);
-  data = g_malloc(this->length);
+  data = g_malloc0(this->length);
   memcpy(data, this->databed, this->length);
   result = gst_buffer_new_wrapped(data, this->length);
   if(length) {
@@ -306,6 +306,8 @@ void _add_length(ReportProducer *this, guint16 length)
   this->length = (main_length + 1)<<2;
   this->actual = this->length + (gchar*)this->databed;
 }
+
+
 
 
 

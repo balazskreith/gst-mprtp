@@ -83,10 +83,12 @@ struct _Subflow
 
   gchar                        *logfile;
 
-  guint32                       discarded_bytes;
+  guint32                       discarded_bytes[10];
+  guint                         discarded_bytes_index;
+  guint32                       discarded_bytes_window;
   guint32                       rcvd_bytes[10];
   guint                         rcvd_bytes_index;
-  guint32                       rcvd_bytes_sum;
+  guint32                       rcvd_bytes_window;
 
 };
 
@@ -224,6 +226,7 @@ rcvctrler_init (RcvController * this)
   this->report_producer    = g_object_new(REPORTPRODUCER_TYPE, NULL);
   this->report_processor   = g_object_new(REPORTPROCESSOR_TYPE, NULL);
 
+  report_processor_set_logfile(this->report_processor, "logs/rcv_reports.log");
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   this->thread = gst_task_new (refctrler_ticker, this, NULL);
@@ -254,13 +257,9 @@ _logging (RcvController *this)
     guint32 discarded_bytes;
     subflow = (Subflow *) val;
     if(!subflow->logfile){
-      subflow->logfile = g_malloc(255);
+      subflow->logfile = g_malloc0(255);
       sprintf(subflow->logfile, "logs/sub_%d_rcv.csv", subflow->id);
     }
-
-    //Todo: refactor and consider rtcp reports
-
-    discarded_bytes = subflow->discarded_bytes;
 
     mprtpr_path_get_RR_stats(subflow->path,
                              NULL,
@@ -270,28 +269,29 @@ _logging (RcvController *this)
                              NULL,
                              &rcvd_bytes);
 
-    subflow->rcvd_bytes_sum -= subflow->rcvd_bytes[subflow->rcvd_bytes_index];
-    if(++subflow->rcvd_bytes_index){ subflow->rcvd_bytes_index = 0; }
-    subflow->rcvd_bytes[subflow->rcvd_bytes_index] = rcvd_bytes - subflow->rcvd_bytes[subflow->rcvd_bytes_index];
-    subflow->rcvd_bytes_sum += subflow->rcvd_bytes[subflow->rcvd_bytes_index];
-
+    subflow->rcvd_bytes_window = subflow->rcvd_bytes[subflow->rcvd_bytes_index] = rcvd_bytes;
+    if(++subflow->rcvd_bytes_index == 10){ subflow->rcvd_bytes_index = 0; }
+    subflow->rcvd_bytes_window -= subflow->rcvd_bytes[subflow->rcvd_bytes_index];
 
     mprtpr_path_get_XR7243_stats(subflow->path,
                                  NULL,
-                                 &subflow->discarded_bytes);
+                                 &discarded_bytes);
+
+    subflow->discarded_bytes_window = subflow->discarded_bytes[subflow->discarded_bytes_index] = discarded_bytes;
+    if(++subflow->discarded_bytes_index == 10){ subflow->discarded_bytes_index = 0; }
+    subflow->discarded_bytes_window -= subflow->discarded_bytes[subflow->discarded_bytes_index];
+
 
     mprtpr_path_get_XROWD_stats(subflow->path,
                                 &median_delay,
                                 NULL,
                                 NULL);
 
-    discarded_bytes = subflow->discarded_bytes - discarded_bytes;
-
     mprtp_logger(subflow->logfile, "%u,%u,%lu,%u\n",
-            subflow->rcvd_bytes_sum * 8,
-            discarded_bytes * 8,
-            median_delay,
-            jitter);
+            subflow->rcvd_bytes_window/1000,
+            subflow->discarded_bytes_window/1000, //KByte
+            GST_TIME_AS_USECONDS(median_delay),
+            GST_TIME_AS_USECONDS(jitter));
 
   }
 

@@ -104,6 +104,11 @@ _processing_srblock (
     GstRTCPSRBlock * rrb,
     GstMPRTCPReportSummary* summary);
 
+static void
+_logging(
+    ReportProcessor *this,
+    GstMPRTCPReportSummary* summary);
+
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -136,6 +141,9 @@ report_processor_init (ReportProcessor * this)
 
   this->sysclock   = gst_system_clock_obtain ();
   this->ssrc       = g_random_int();
+
+  memset(this->logfile, 0, 255);
+  sprintf(this->logfile, "report_processor.log");
 }
 
 void report_processor_set_ssrc(ReportProcessor *this, guint32 ssrc)
@@ -164,8 +172,16 @@ GstMPRTCPReportSummary* report_processor_process_mprtcp(ReportProcessor * this, 
   result->created = _now(this);
   block = gst_mprtcp_get_first_block(report);
   _processing_mprtcp_subflow_block(this, block, result);
+  _logging(this, result);
   gst_buffer_unmap(buffer, &map);
   return result;
+}
+
+void report_processor_set_logfile(ReportProcessor *this, const gchar *logfile)
+{
+  THIS_WRITELOCK(this);
+  strcpy(this->logfile, logfile);
+  THIS_WRITEUNLOCK(this);
 }
 
 void _processing_mprtcp_subflow_block (
@@ -430,6 +446,137 @@ _processing_srblock(ReportProcessor *this,
                        &summary->SR.rtptime,
                        &summary->SR.packet_count,
                        &summary->SR.octet_count);
+}
+
+void _logging(ReportProcessor *this, GstMPRTCPReportSummary* summary)
+{
+  mprtp_logger(this->logfile,
+               "###################################################################\n"
+               "Summary created at %lu\n"
+               "Subflow id: %hu\n"
+               "SSRC: %u\n"
+               ,
+               summary->created,
+               summary->subflow_id,
+               summary->ssrc
+   );
+
+  if(summary->RR.processed){
+
+    mprtp_logger(this->logfile,
+                 "-------------------------- Receiver Report ---------------------------\n"
+                 "HSSN:            %hu\n"
+                 "RTT:             %lu\n"
+                 "cum_packet_lost: %u\n"
+                 "cycle_num:       %hu\n"
+                 "jitter:          %u\n"
+                 "lost_rate:       %f\n"
+                 ,
+                 summary->RR.HSSN,
+                 summary->RR.RTT,
+                 summary->RR.cum_packet_lost,
+                 summary->RR.cycle_num,
+                 summary->RR.jitter,
+                 summary->RR.lost_rate
+    );
+  }
+
+  if(summary->SR.processed){
+
+    mprtp_logger(this->logfile,
+                 "-------------------------- Sender Report ---------------------------\n"
+                 "ntptime:            %lu\n"
+                 "octet_count:        %u\n"
+                 "packet_count:       %u\n"
+                 "rtptime:            %u\n"
+                 ,
+                 summary->SR.ntptime,
+                 summary->SR.octet_count,
+                 summary->SR.packet_count,
+                 summary->SR.rtptime
+    );
+  }
+
+  if(summary->XR_OWD.processed){
+
+    mprtp_logger(this->logfile,
+                 "-------------------------- XR OWD ---------------------------\n"
+                 "interval_metric:    %d\n"
+                 "max_delay:          %lu\n"
+                 "min_delay:          %lu\n"
+                 "median_delay:       %lu\n"
+                 ,
+                 summary->XR_OWD.interval_metric,
+                 summary->XR_OWD.max_delay,
+                 summary->XR_OWD.min_delay,
+                 summary->XR_OWD.median_delay
+    );
+  }
+
+  if(summary->XR_RFC7243.processed){
+
+    mprtp_logger(this->logfile,
+                 "-------------------------- XR_RFC7243 ---------------------------\n"
+                 "interval_metric:    %d\n"
+                 "early_bit:          %d\n"
+                 "discarded_bytes:    %u\n"
+                 ,
+                 summary->XR_RFC7243.interval_metric,
+                 summary->XR_RFC7243.early_bit,
+                 summary->XR_RFC7243.discarded_bytes
+    );
+  }
+
+  if(summary->XR_OWD_RLE.processed){
+      gint i;
+      mprtp_logger(this->logfile,
+                   "-------------------------- XR OWD RLE ---------------------------\n"
+                   "length:    %d\n"
+                   ,
+                   summary->XR_OWD_RLE.length
+      );
+      for(i=0; i<summary->XR_OWD_RLE.length; ++i){
+          mprtp_logger(this->logfile,
+                           "value %d:    %lu\n"
+                           ,
+                           i, summary->XR_OWD_RLE.values[i]
+              );
+      }
+    }
+
+  if(summary->XR_RFC3611.processed){
+      gint i;
+      mprtp_logger(this->logfile,
+                   "-------------------------- XR_RFC3611 ---------------------------\n"
+                   "length:    %d\n"
+                   ,
+                   summary->XR_RFC3611.length
+      );
+      for(i=0; i<summary->XR_RFC3611.length; ++i){
+          mprtp_logger(this->logfile,
+                           "value %d:    %hu\n"
+                           ,
+                           i, summary->XR_RFC3611.values[i]
+              );
+      }
+    }
+
+  if(summary->XR_RFC7097.processed){
+      gint i;
+      mprtp_logger(this->logfile,
+                   "-------------------------- XR_RFC7097 ---------------------------\n"
+                   "length:    %d\n"
+                   ,
+                   summary->XR_RFC7097.length
+      );
+      for(i=0; i<summary->XR_RFC7097.length; ++i){
+          mprtp_logger(this->logfile,
+                           "value %d:    %hu\n"
+                           ,
+                           i, summary->XR_RFC7097.values[i]
+              );
+      }
+    }
 }
 
 #undef THIS_READLOCK

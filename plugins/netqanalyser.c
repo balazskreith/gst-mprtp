@@ -312,7 +312,7 @@ void _csv_logging(NetQueueAnalyser *this, GstClockTime delay)
   mprtp_logger(filename,
                "%lu,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f\n",
 
-               delay,
+               GST_TIME_AS_USECONDS(delay),
 
               _priv(this)->cblocks[0].g,
               _priv(this)->cblocks[1].g,
@@ -336,7 +336,7 @@ void _readable_logging(NetQueueAnalyser *this)
 
                GST_TIME_AS_SECONDS(_now(this) - this->made),
 
-               _priv(this)->cblocks[0].g,
+              _priv(this)->cblocks[0].g,
               _priv(this)->cblocks[1].g,
               _priv(this)->cblocks[2].g,
               _priv(this)->cblocks[3].g,

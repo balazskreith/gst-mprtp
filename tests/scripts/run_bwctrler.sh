@@ -27,6 +27,7 @@ LIMIT=0
 SNUM=0
 BPROFILE=0
 JITTER=0
+OUTPUT="output.csv"
 
 # Process arguments
 # copyright: http://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash
@@ -91,7 +92,7 @@ done
     
 
 VETH="veth"$VNUM
-OUTPUT=$VETH".csv"
+
 echo "" > $OUTPUT
 
 echo "   +--------------------------------------+-------------------------------+"

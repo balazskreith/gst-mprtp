@@ -161,6 +161,15 @@ gint32 packetssndqueue_get_encoder_bitrate(PacketsSndQueue *this)
   return result * 8;
 }
 
+gint32 packetssndqueue_get_bytes_in_queue(PacketsSndQueue *this)
+{
+  gint32 result;
+  THIS_READLOCK(this);
+  result = this->bytes;
+  THIS_READUNLOCK(this);
+  return result;
+}
+
 void packetssndqueue_push(PacketsSndQueue *this, GstBuffer *buffer)
 {
   THIS_WRITELOCK(this);

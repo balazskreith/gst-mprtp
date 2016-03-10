@@ -72,6 +72,7 @@ void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_rate, gboolean p
 void packetssndqueue_reset(PacketsSndQueue *this);
 gboolean packetssndqueue_expected_lost(PacketsSndQueue *this);
 gint32 packetssndqueue_get_encoder_bitrate(PacketsSndQueue *this);
+gint32 packetssndqueue_get_bytes_in_queue(PacketsSndQueue *this);
 void packetssndqueue_push(PacketsSndQueue *this, GstBuffer* buffer);
 GstBuffer * packetssndqueue_pop(PacketsSndQueue *this);
 void packetssndqueue_approve(PacketsSndQueue *this);

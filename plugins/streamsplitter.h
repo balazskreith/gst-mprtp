@@ -77,6 +77,10 @@ gdouble stream_splitter_get_sending_target(
     StreamSplitter* this,
     guint8 subflow_id);
 
+gdouble stream_splitter_get_sending_weight(
+    StreamSplitter* this,
+    guint8 subflow_id);
+
 void stream_splitter_commit_changes (
     StreamSplitter * this);
 

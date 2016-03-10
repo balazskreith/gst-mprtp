@@ -235,6 +235,8 @@ sndctrler_init (SndController * this)
   this->thread             = gst_task_new (sndctrler_ticker_run, this, NULL);
   this->made               = _now(this);
   this->enabled            = FALSE;
+
+  report_processor_set_logfile(this->report_processor, "logs/snd_reports.log");
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   gst_task_set_lock (this->thread, &this->thread_mutex);
@@ -252,9 +254,10 @@ void _logging (SndController *this)
   gint32 sender_bitrate = 0;
   gint32 media_target = 0;
   gint32 media_rate = 0;
-  gint32 monitored_bits = 0;
+  gint32 monitored_bitrate = 0;
   gint32 target_bitrate = 0;
-  guint32 queued_bits = 0;
+  gint32 queue_bytes = 0;
+  gdouble weight = 0.;
   gchar filename[255], main_file[255];
 
   sprintf(main_file, "logs/sub_snd_sum.csv");
@@ -265,27 +268,36 @@ void _logging (SndController *this)
     if(!subflow) goto next;
     sprintf(filename, "logs/sub_%d_snd.csv", subflow->id);
     if(this->enabled){
-      sender_bitrate= mprtps_path_get_sent_bytes_in1s(subflow->path) * 8;
-      monitored_bits = subratectrler_get_monitoring_bitrate(subflow->rate_controller);
-      target_bitrate = stream_splitter_get_sending_target(this->splitter, subflow->id);
-      queued_bits    = 0 * 8;
+      sender_bitrate    = mprtps_path_get_sent_bytes_in1s(subflow->path) * 8;
+      monitored_bitrate = subratectrler_get_monitoring_bitrate(subflow->rate_controller);
+      target_bitrate    = stream_splitter_get_sending_target(this->splitter, subflow->id);
+      weight            = stream_splitter_get_sending_weight(this->splitter, subflow->id);
     }
     mprtp_logger(filename,
-                 "%d,%d,%d,%d,%d,%lu,%lu,%lu\n",
-                sender_bitrate,
-                sender_bitrate + monitored_bits,
-                target_bitrate,
-                queued_bits);
+                 "%d,%d,%d,%f\n",
+                sender_bitrate / 1000,
+                monitored_bitrate / 1000,
+                target_bitrate / 1000,
+                weight
+                );
+
+    mprtp_logger("logs/path_rates.csv", "%f,", weight);
     media_rate += sender_bitrate;
     media_target += target_bitrate;
   next:
     continue;
   }
-
+  mprtp_logger("logs/path_rates.csv", "\n");
   {
     gint32 encoder_bitrate = 0;
     encoder_bitrate = packetssndqueue_get_encoder_bitrate(this->pacer);
-    mprtp_logger(main_file,"%d,%d,%d\n", media_rate,media_target,encoder_bitrate);
+    queue_bytes     = packetssndqueue_get_bytes_in_queue(this->pacer);
+    mprtp_logger(main_file,"%d,%d,%d,%d\n",
+                 media_rate / 1000,
+                 media_target / 1000,
+                 encoder_bitrate / 1000,
+                 queue_bytes / 125
+                 );
   }
 
 }

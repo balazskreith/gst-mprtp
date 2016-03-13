@@ -46,6 +46,7 @@ struct _PacketsSndQueue
   gint32                   counter;
   gint32                   bytes;
   gboolean                 pacing;
+  GstClockTime             pacing_started;
   guint32                  last_timestamp;
   gint32                   approved_bytes;
   gint32                   allowed_rate_per_ms;

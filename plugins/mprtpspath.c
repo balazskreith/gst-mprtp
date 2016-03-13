@@ -156,7 +156,6 @@ mprtps_path_reset (MPRTPSPath * this)
   this->last_sent_frame_timestamp = 0;
   this->sent_octets_read = 0;
   this->sent_octets_write = 0;
-  this->monitor_payload_type = FALSE;
   this->monitoring_interval = 0;
 }
 
@@ -280,19 +279,11 @@ void mprtps_path_set_skip_duration(MPRTPSPath * this, GstClockTime duration)
 }
 
 
-void mprtps_path_set_monitor_payload_id(MPRTPSPath *this, guint8 payload_type)
+void mprtps_path_set_monitor_packet_interval(MPRTPSPath *this, guint monitoring_interval)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
-  this->monitor_payload_type = payload_type;
-  THIS_WRITEUNLOCK (this);
-}
-
-void mprtps_path_set_monitor_packet_provider(MPRTPSPath *this, MonitorPackets *monitorpackets)
-{
-  g_return_if_fail (this);
-  THIS_WRITELOCK (this);
-  this->monitorpackets = monitorpackets;
+  this->monitoring_interval = monitoring_interval;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -474,6 +465,7 @@ guint32 mprtps_path_get_sent_bytes_in1s(MPRTPSPath *this)
   return result;
 }
 
+
 void
 mprtps_path_process_rtp_packet(MPRTPSPath * this,
                                GstBuffer * rtppacket,
@@ -516,8 +508,6 @@ _setup_rtp2mprtp (MPRTPSPath * this,
 
   gst_rtp_buffer_add_extension_onebyte_header (&rtp, this->mprtp_ext_header_id,
       (gpointer) & data, sizeof (data));
-  if(this->ssrc_allowed == 0)
-    this->ssrc_allowed = gst_rtp_buffer_get_ssrc(&rtp);
   gst_rtp_buffer_unmap(&rtp);
 }
 
@@ -536,15 +526,11 @@ _refresh_stat(MPRTPSPath * this,
       ++this->total_sent_frames_num;
       this->last_sent_frame_timestamp = gst_rtp_buffer_get_timestamp(&rtp);
   }
-  if(gst_rtp_buffer_get_payload_type(&rtp) != this->monitor_payload_type){
-    this->total_sent_payload_bytes_sum += payload_bytes;
-    this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
-    this->octets_in_flight_acked += payload_bytes>>3;
-    numstracker_add(this->sent_bytes, payload_bytes);
-    ++this->total_sent_normal_packet_num;
-  } else {
-    this->sent_octets[this->sent_octets_write] = 0;
-  }
+  this->total_sent_payload_bytes_sum += payload_bytes;
+  this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
+  this->octets_in_flight_acked += payload_bytes>>3;
+  numstracker_add(this->sent_bytes, payload_bytes);
+  ++this->total_sent_normal_packet_num;
 
   this->sent_octets_write += 1;
   this->sent_octets_write &= MAX_INT32_POSPART;

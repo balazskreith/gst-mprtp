@@ -5,7 +5,8 @@ function usage {
     echo "usage: $programname [-r|-rtpprofile num] [-s1|-sub1profile num] [-s2|-sub2profile num] [-s3|-sub3profile num]"
     echo "	-r --rtprofile		determines the rtp testing profile"
     echo "				equal to the ./server --profile=profile_num"
-    echo "				for more information type ./server --info"
+    echo "      -tc --testcase          determines the overall test profile"
+    echo "                              0 - constant bw for subflow 1"
     echo "	-s[X] --sub[X]profile	determines the subflow test profile"
     echo "				0 - constant, 1 - "
     exit 1
@@ -30,6 +31,7 @@ S1PROFILE=0
 S2PROFILE=0
 S3PROFILE=0
 RPROFILE=73
+TESTCASE=0
 
 while [[ $# > 1 ]]
 do
@@ -51,6 +53,10 @@ case $key in
     S3PROFILE="$2"
     shift # past argument
     ;;
+    -tc|--testcase)
+    TESTCASE="$2"
+    shift # past argument
+    ;;
     --default)
     ;;
     *)
@@ -64,9 +70,7 @@ done
 echo ".-------------------------------------------------------------."
 echo "| Test starts with the following parameters                   |"
 echo "| RTP profile: "$RPROFILE
-echo "| Subflow 1 profile: "$S1PROFILE
-echo "| Subflow 2 profile: "$S2PROFILE
-echo "| Subflow 3 profile: "$S3PROFILE
+echo "| Testcase:    "$TESTCASE
 echo "'-------------------------------------------------------------'"
 
 
@@ -79,25 +83,20 @@ TARGET_DIR="logs"
 
 #"[-b|--bwprofile num] [-x|--bwref num] [s|--shift seconds] [-v|--veth if_num] [-j|--jitter milliseconds] [-l|--latency milliseconds] [-o|--output filename] [-i|--ip ip address] [-h|--help]"
 
-if [ "$S1PROFILE" -gt 0 ]
+if [ "$TESTCASE" -eq 0 ]
 then
-  echo "executing bandwidth test case for subflow 1"
-  echo "./scripts/run_bwctrler.sh --bwprofile $RPROFILE --bwref 1000 --shift 2 --veth 0 --jitter 1 --latency 100 --output logs/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
+  echo "executing test case 0"
+  echo "./scripts/run_bwctrler.sh --bwprofile 0 --bwref 1000 --shift 2 --veth 0 --jitter 1 --latency 100 --output logs/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
+  chmod 777 scripts/test_bw_veth0_snd.sh
+  sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
+  sleep 1
+elif [ "$TESTCASE" -eq 1 ]; then
+  echo "executing test case 1"
+  echo "./scripts/run_bwctrler.sh --bwprofile 1 --bwref 1000 --shift 2 --veth 0 --jitter 1 --latency 100 --output logs/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
   chmod 777 scripts/test_bw_veth0_snd.sh
   sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
   sleep 1
 fi
-
-if [ "$S2PROFILE" -gt 0 ]
-then
-  echo "generating test cases for subflow 2"
-fi
-
-if [ "$S3PROFILE" -gt 0 ]
-then
-  echo "generating test cases for subflow 3"
-fi
-
 
 
 sudo ip netns exec $NSSND $SERVER "--profile="$RPROFILE 2> $TARGET_DIR"/"server.log &
@@ -132,7 +131,7 @@ do
     sleep 1
   done
   echo $j"*$WAIT seconds"
-  ./scripts/report_generator.sh -o reports/report.pdf &
+  ./scripts/report_generator.sh -o reports/report.pdf -tc $TESTCASE > reportlog.txt &
   #./run_test_evaluator.sh $PROFILE
 done
 sleep 1

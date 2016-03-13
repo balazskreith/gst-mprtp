@@ -49,8 +49,12 @@ struct _NetQueueAnalyserClass{
 
 struct _NetQueueAnalyserResult{
   gdouble        trend;
-  gboolean       pierced, distorted, congested;
-  gint32         stability;
+  gboolean       congestion_indicator;
+  gint32         congestion_level;
+  gint32         distortion_level;
+  gint32         consecutive_congestion;
+  gint32         consecutive_distortion;
+  GstClockTime   stability_time;
 };
 
 GType netqueue_analyser_get_type (void);

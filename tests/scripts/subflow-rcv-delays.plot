@@ -20,12 +20,12 @@ set tmargin 5
 set bmargin 5
 set lmargin 10
 set rmargin 7
-set yrange [0:300000]
+set yrange [0:500000]
 set ytics 100000
 set xrange [0:csv_length]
 set xtics 500
-set xlabel "Latency (us)"
-set ylabel "time (100ms)"
+set ylabel "Latency (us)"
+set xlabel "time (100ms)"
 
 # set title plot_title font ",18"
 

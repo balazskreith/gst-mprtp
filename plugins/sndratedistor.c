@@ -234,8 +234,9 @@ MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this)
   }
 
   //if remaining bitrate still available we apply pacing if it exceeds the 10% of the sending target;
-  pacing =(this->delta_rate < this->target_bitrate * -.1);
+  pacing =this->last_target * .1 < -1* this->delta_rate;
 distribute:
+  this->last_target = this->target_bitrate;
   packetssndqueue_setup(this->pacer, this->target_bitrate, pacing);
   foreach_subflows(this, i, subflow)
   {

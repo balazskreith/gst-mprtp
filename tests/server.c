@@ -201,7 +201,7 @@ make_video_vl2src_session (guint sessionNum)
   encoder = gst_element_factory_make ("vp8enc", NULL);
   //g_object_set (payloader, "config-interval", 2, NULL);
 
-  g_object_set (encoder, "target-bitrate", 128000 * test_parameters_.subflow_num, NULL);
+  g_object_set (encoder, "target-bitrate", 500000 * test_parameters_.subflow_num, NULL);
   g_object_set (encoder, "keyframe-max-dist", 20, NULL);
   g_object_set (encoder, "end-usage", 1, NULL);
   g_object_set (encoder, "deadline", 20000, NULL);
@@ -249,7 +249,7 @@ make_video_yuvfile_session (guint sessionNum)
 
   encoder = gst_element_factory_make ("vp8enc", NULL);
   //g_object_set (payloader, "config-interval", 2, NULL);
-  g_object_set (encoder, "target-bitrate", 128000 * test_parameters_.subflow_num, NULL);
+  g_object_set (encoder, "target-bitrate", 500000 * test_parameters_.subflow_num, NULL);
   g_object_set (encoder, "end-usage", 1, NULL);
   g_object_set (encoder, "deadline", 20000, NULL);
   g_object_set (encoder, "undershoot", 100, NULL);
@@ -343,11 +343,11 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
            }
       else  if(test_parameters_.video_session == YUVFILE_SOURCE){
           if(test_parameters_.yuvsequence == FOREMAN){
-            ur->subflows[i].control.min_rate = 100000 / test_parameters_.subflow_num;
-            ur->subflows[i].control.max_rate = 300000;
+            ur->subflows[i].control.min_rate = 500000 / test_parameters_.subflow_num;
+            ur->subflows[i].control.max_rate = 3000000;
           }else if(test_parameters_.yuvsequence == KRISTEN_AND_SARA){
-            ur->subflows[i].control.min_rate = 333000 / test_parameters_.subflow_num;
-            ur->subflows[i].control.max_rate = 500000;
+            ur->subflows[i].control.min_rate = 500000 / test_parameters_.subflow_num;
+            ur->subflows[i].control.max_rate = 3000000;
           }
       }
 

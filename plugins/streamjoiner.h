@@ -46,10 +46,7 @@ struct _StreamJoiner
   GstClock*            sysclock;
   gdouble              playout_delay;
   NumsTracker*         skews;
-  NumsTracker*         delays;
   gint64               max_skew;
-  GstClockTime         max_delay;
-  GstClockTime         min_delay;
   GstClockTime         forced_delay;
   Frame*               head;
   Frame*               tail;
@@ -88,6 +85,11 @@ void
 stream_joiner_rem_path(
     StreamJoiner * this,
     guint8 subflow_id);
+
+void
+stream_joiner_push_monitoring_packet(
+    StreamJoiner * this,
+    GstMpRTPBuffer *mprtp);
 
 void
 stream_joiner_push(

@@ -5,6 +5,7 @@ function usage {
     echo "	-s2 --subflow2	generates report for subflow 2"
     echo "	-s3 --subflow3	generates report for subflow 3"
     echo "	-o --output	determines output file"
+    echo "	-tc --testcase	determines the test case the report generator report"
     exit 1
 }
 
@@ -18,6 +19,7 @@ fi
 OUTPUT="reports/report.pdf"
 SUBFLOW2=0
 SUBFLOW3=0
+TESTCASE=0
 
 while [[ $# > 1 ]]
 do
@@ -33,6 +35,10 @@ case $key in
     ;;
     -o|--output)
     OUTPUT="$2"
+    shift # past argument
+    ;;
+    -tc|--testcase)
+    TESTCASE="$2"
     shift # past argument
     ;;
     --default)
@@ -277,7 +283,7 @@ TMPDIR="logs/tmp"
 mkdir logs/tmp
 
 #generate the texts for the test
-./scripts/generate_tex_texts.sh -o logs/tmp -c 0
+./scripts/generate_tex_texts.sh -o logs/tmp -tc $TESTCASE
 
 
 sed -e '/TESTCASEANDTOPOLOGY/ {' -e 'r '$TMPDIR'/TESTCASEANDTOPOLOGY.txt' -e 'd' -e '}' -i logs/report.tex
@@ -288,29 +294,29 @@ sed -i -e 's/AUTHORREPLACESTRING/Balázs Kreith/g' logs/report.tex
 sed -i -e 's/SUMMARYREPORTREPLACESTRING/Summary./g' logs/report.tex
 
 #echo "\includepdf[hb]{"$SUMSNDRATES"}" > $TMPDIR"/tmp.txt"
-echo "\includegraphics[width=1.3\textwidth]{"$SUMSNDRATES"}" > $TMPDIR"/tmp.txt"
+echo "\includegraphics[scale=0.6]{"$SUMSNDRATES"}" > $TMPDIR"/tmp.txt"
 sed -e '/SUMMARYSENDINGRATEREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-echo "\includegraphics[width=1.3\textwidth]{"$SUMPLAYOUT"}" > $TMPDIR"/tmp.txt"
+echo "\includegraphics[scale=0.5]{"$SUMPLAYOUT"}" > $TMPDIR"/tmp.txt"
 sed -e '/SUMMARYPLAYOUTDELAYREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-echo "\includegraphics[width=1.3\textwidth]{"$SUMPATHRATES"}" > $TMPDIR"/tmp.txt"
+echo "\includegraphics[scale=0.6]{"$SUMPATHRATES"}" > $TMPDIR"/tmp.txt"
 sed -e '/SUMMARYPATHRATIOSREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
 sed -i -e 's/SUBFLOW1SUMMARYREPLACESTRING/Summary./g' logs/report.tex
-echo "\includegraphics[width=1.3\textwidth]{"$SUB1SNDRATES"}" > $TMPDIR"/tmp.txt"
+echo "\includegraphics[scale=0.6]{"$SUB1SNDRATES"}" > $TMPDIR"/tmp.txt"
 sed -e '/SUBFLOW1SENDERRATEREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-echo "\includegraphics[width=1.2\textwidth]{"$SUB1RCVRATES"}" > $TMPDIR"/tmp.txt"
+echo "\includegraphics[scale=0.6]{"$SUB1RCVRATES"}" > $TMPDIR"/tmp.txt"
 sed -e '/SUBFLOW1RECEIVERRATEREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-echo "\includegraphics[width=1.2\textwidth]{"$SUB1RTCPINTVALS"}" > $TMPDIR"/tmp.txt"
+echo "\includegraphics[scale=0.6]{"$SUB1RTCPINTVALS"}" > $TMPDIR"/tmp.txt"
 sed -e '/SUBFLOW1RTCPINTERVALSREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-echo "\includegraphics[width=1.2\textwidth]{"$SUB1RCVDELAYS"}" > $TMPDIR"/tmp.txt"
+echo "\includegraphics[scale=0.6]{"$SUB1RCVDELAYS"}" > $TMPDIR"/tmp.txt"
 sed -e '/SUBFLOW1LATENCIESREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-echo "\includegraphics[width=1.2\textwidth,height=0.6\textheight]{"$SUB1AUTOCORRS"}" > $TMPDIR"/tmp.txt"
+echo "\includegraphics[scale=0.4]{"$SUB1AUTOCORRS"}" > $TMPDIR"/tmp.txt"
 sed -e '/SUBFLOW1MULTIPLETAUCORRELATIONREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
 #if now subflow 2 or 3 elliminate that parts
@@ -320,53 +326,53 @@ sed -e '/SUBFLOW1MULTIPLETAUCORRELATIONREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt
 if [ $SUBFLOW2 = "1" ] && [ $SUBFLOW3 = "1" ]; then
 
 	sed -i -e 's/SUBFLOW2SUMMARYREPLACESTRING/Summary./g' logs/report.tex
-	echo "\includegraphics[width=1.3\textwidth]{"$SUB1SNDRATES"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6]{"$SUB1SNDRATES"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW2SENDERRATEREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-	echo "\includegraphics[width=1.2\textwidth]{"$SUB1RCVRATES"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6]{"$SUB1RCVRATES"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW2RECEIVERRATEREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-	echo "\includegraphics[width=1.2\textwidth]{"$SUB1RTCPINTVALS"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6]{"$SUB1RTCPINTVALS"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW2RTCPINTERVALSREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-	echo "\includegraphics[width=1.2\textwidth]{"$SUB1RCVDELAYS"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6]{"$SUB1RCVDELAYS"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW2LATENCIESREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-	echo "\includegraphics[width=1.2\textwidth,height=0.6\textheight]{"$SUB1AUTOCORRS"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6\textheight]{"$SUB1AUTOCORRS"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW2MULTIPLETAUCORRELATIONREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
 	sed -i -e 's/SUBFLOW3SUMMARYREPLACESTRING/Summary./g' logs/report.tex
-	echo "\includegraphics[width=1.3\textwidth]{"$SUB1SNDRATES"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6]{"$SUB1SNDRATES"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW3SENDERRATEREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-	echo "\includegraphics[width=1.2\textwidth]{"$SUB1RCVRATES"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6]{"$SUB1RCVRATES"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW3RECEIVERRATEREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-	echo "\includegraphics[width=1.2\textwidth]{"$SUB1RTCPINTVALS"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6]{"$SUB1RTCPINTVALS"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW3RTCPINTERVALSREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-	echo "\includegraphics[width=1.2\textwidth]{"$SUB1RCVDELAYS"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6]{"$SUB1RCVDELAYS"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW3LATENCIESREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-	echo "\includegraphics[width=1.2\textwidth,height=0.6\textheight]{"$SUB1AUTOCORRS"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6\textheight]{"$SUB1AUTOCORRS"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW3MULTIPLETAUCORRELATIONREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
 elif [ $SUBFLOW2 = "1" ]; then
 
 	sed -i -e 's/SUBFLOW2SUMMARYREPLACESTRING/Summary./g' logs/report.tex
-	echo "\includegraphics[width=1.3\textwidth]{"$SUB1SNDRATES"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6]{"$SUB1SNDRATES"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW2SENDERRATEREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-	echo "\includegraphics[width=1.2\textwidth]{"$SUB1RCVRATES"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6]{"$SUB1RCVRATES"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW2RECEIVERRATEREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-	echo "\includegraphics[width=1.2\textwidth]{"$SUB1RTCPINTVALS"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6]{"$SUB1RTCPINTVALS"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW2RTCPINTERVALSREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-	echo "\includegraphics[width=1.2\textwidth]{"$SUB1RCVDELAYS"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6]{"$SUB1RCVDELAYS"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW2LATENCIESREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
-	echo "\includegraphics[width=1.2\textwidth,height=0.6\textheight]{"$SUB1AUTOCORRS"}" > $TMPDIR"/tmp.txt"
+	echo "\includegraphics[scale=0.6]{"$SUB1AUTOCORRS"}" > $TMPDIR"/tmp.txt"
 	sed -e '/SUBFLOW2MULTIPLETAUCORRELATIONREPLACESTRING/ {' -e 'r '$TMPDIR'/tmp.txt' -e 'd' -e '}' -i logs/report.tex
 
 

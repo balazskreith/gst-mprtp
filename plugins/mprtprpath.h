@@ -102,6 +102,7 @@ struct _MpRTPReceiverPath
   guint32             total_payload_bytes;
   gint32              jitter;
   guint16             highest_seq;
+  guint16             reported_sequence_number;
   GstClockTime        discard_latency;
 
   guint64             ext_rtptime;
@@ -157,6 +158,10 @@ void mprtpr_path_get_RR_stats(MpRTPRPath *this,
                               guint32 *received_num,
                               guint32 *total_lost,
                               guint32 *received_bytes);
+
+void mprtpr_path_set_reported_sequence(
+    MpRTPRPath *this,
+    guint16 sequence_number);
 
 void mprtpr_path_get_XR7243_stats(MpRTPRPath *this,
                            guint16 *discarded,

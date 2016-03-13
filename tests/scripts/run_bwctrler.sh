@@ -110,11 +110,11 @@ echo "   +----------------------------------------------------------------------
 #usage: path interface bandwidth
 function path() {
 	let "BW=$2"
-	let "LIMIT=$2*75"
-	let "LIMIT=$LIMIT/2"
+	let "LIMIT=$2*125"
+	let "LIMIT=$LIMIT/5"
 	echo "Setup $1 for "$LATENCY"ms and "$BW"Kbit rate with "$LIMIT" queue limit"
 	tc qdisc change dev "$1" root handle 1: netem delay "$LATENCY"ms 
-	tc qdisc change dev "$1" parent 1: handle 2: tbf rate 1mbit burst "$BW"kbit limit $LIMIT
+	tc qdisc change dev "$1" parent 1: handle 2: tbf rate "$BW"kbit burst 100kbit limit $LIMIT
 }
 
 function wait_and_log() {
@@ -191,7 +191,7 @@ function test1() {
 	echo "   | Four               | Forward      | 80s       | 1.0               |"
 	echo "   +--------------------+--------------+-----------+-------------------+"
 	
-        ./scripts/run_tcpflow.sh -t 0 -n 3 -i $IP -d &
+        #./scripts/run_tcpflow.sh -t 0 -n 3 -i $IP -d &
 
 	let "BW=$BWREF"
         path $VETH $BW

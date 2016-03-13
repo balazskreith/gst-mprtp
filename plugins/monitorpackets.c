@@ -100,6 +100,13 @@ void monitorpackets_reset(MonitorPackets *this)
   THIS_WRITEUNLOCK(this);
 }
 
+void monitorpackets_set_payload_type(MonitorPackets *this, guint8 payload_type)
+{
+  THIS_WRITELOCK(this);
+  this->payload_type = payload_type;
+  THIS_WRITEUNLOCK(this);
+}
+
 MonitorPackets *make_monitorpackets(void)
 {
   MonitorPackets *result;
@@ -134,19 +141,35 @@ GstBuffer *monitorpackets_process_FEC_packet(MonitorPackets *this, GstBuffer *bu
 {
   GstBuffer *result = NULL;
   THIS_WRITELOCK(this);
+
   //Todo implement recovery here.
+  gst_buffer_unref(buf);
+
   THIS_WRITEUNLOCK(this);
   return result;
 }
 
-GstBuffer * monitorpackets_provide_FEC_packet(MonitorPackets *this)
+GstBuffer * monitorpackets_provide_FEC_packet(MonitorPackets *this,
+                                              guint8 mprtp_ext_header_id,
+                                              guint8 subflow_id)
 {
   GstBuffer * result = NULL;
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  MPRTPSubflowHeaderExtension data;
   THIS_WRITELOCK(this);
   result = gst_rtp_buffer_new_allocate (1400, 0, 0);
-//  if(this->counter == 0) goto done;
-//  result = g_queue_pop_tail(this->queue);
-//  --this->counter;
+//
+  gst_rtp_buffer_map(result, GST_MAP_READWRITE, &rtp);
+  gst_rtp_buffer_set_payload_type(&rtp, this->payload_type);
+  data.id = subflow_id;
+  if (++(this->monitor_seq) == 0) {
+    ++(this->monitor_cycle);
+  }
+  data.seq = this->monitor_seq;
+
+  gst_rtp_buffer_add_extension_onebyte_header (&rtp, mprtp_ext_header_id,
+     (gpointer) & data, sizeof (data));
+  gst_rtp_buffer_unmap(&rtp);
   THIS_WRITEUNLOCK(this);
   return result;
 }

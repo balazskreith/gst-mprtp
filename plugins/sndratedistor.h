@@ -37,6 +37,7 @@ struct _SendingRateDistributor
 
   gint32                    extra_rate;
   gint32                    target_bitrate;
+  gint32                    last_target;
   gint32                    delta_rate;
 
   PacketsSndQueue*          pacer;

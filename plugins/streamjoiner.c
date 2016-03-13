@@ -214,19 +214,6 @@ static void _skew_max_pipe(gpointer data, gint64 value)
   this->max_skew = value;
 }
 
-static void _delay_max_pipe(gpointer data, gint64 value)
-{
-  StreamJoiner* this = data;
-  this->max_delay = MIN(value, 300 * GST_MSECOND);
-//  g_print("Max delay: %ld, %lu\n", value, this->max_delay);
-}
-
-static void _delay_min_pipe(gpointer data, gint64 value)
-{
-  StreamJoiner* this = data;
-  this->min_delay = MIN(value, 300 * GST_MSECOND);
-//  g_print("Max delay: %ld, %lu\n", value, this->max_delay);
-}
 
 static void _iterate_subflows(StreamJoiner *this, void(*iterator)(Subflow *, gpointer), gpointer data)
 {
@@ -253,16 +240,12 @@ stream_joiner_init (StreamJoiner * this)
   this->playout_allowed   = TRUE;
   this->playout_halt      = FALSE;
   this->playout_halt_time = 100 * GST_MSECOND;
-  this->min_delay         = this->max_delay = 100 * GST_MSECOND;
   this->forced_delay      = 0;
   this->monitorpackets    = make_monitorpackets();
   this->urgent            = g_queue_new();
-  this->delays            = make_numstracker(256, 2 * GST_SECOND);
   this->skews             = make_numstracker(256, 2 * GST_SECOND);
   this->made              = _now(this);
 
-  numstracker_add_plugin(this->delays,
-                           (NumsTrackerPlugin*)make_numstracker_minmax_plugin(_delay_max_pipe, this, _delay_min_pipe, this));
 
   numstracker_add_plugin(this->skews,
                          (NumsTrackerPlugin*)make_numstracker_minmax_plugin(_skew_max_pipe, this, NULL, NULL));
@@ -313,6 +296,23 @@ done:
   return result;
 }
 
+void stream_joiner_push_monitoring_packet(StreamJoiner * this, GstMpRTPBuffer *mprtp)
+{
+  GstBuffer *recovered;
+  THIS_WRITELOCK(this);
+
+  //Todo: FEC packet processing here,
+  this->monitored_bytes += mprtp->payload_bytes;
+//  g_print("monitor buffer size: %d\n",  mprtp->payload_bytes);
+  recovered = monitorpackets_process_FEC_packet(this->monitorpackets, mprtp->buffer);
+  if(recovered){
+    // push it into the frame... so continue the process with that. <- no just push!
+      //aftre mptp_process_done we doesn't need GstMpRTPBuffer literally.
+      //No lets assign the subflow of the path we received the FEC packet
+      //but it doesn't counted in the path statistics and we have the GstMPRTPBuffer then.
+  }
+  THIS_WRITEUNLOCK(this);
+}
 
 
 void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
@@ -320,19 +320,6 @@ void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
   Subflow *subflow;
   THIS_WRITELOCK(this);
   subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (mprtp->subflow_id));
-  if(mprtp->payload_type == this->monitor_payload_type){
-    GstBuffer *recovered;
-    //Todo: FEC packet processing here,
-    this->monitored_bytes += mprtp->payload_bytes;
-    recovered = monitorpackets_process_FEC_packet(this->monitorpackets, mprtp->buffer);
-    if(recovered){
-      // push it into the frame... so continue the process with that. <- no just push!
-        //aftre mptp_process_done we doesn't need GstMpRTPBuffer literally.
-        //No lets assign the subflow of the path we received the FEC packet
-        //but it doesn't counted in the path statistics and we have the GstMPRTPBuffer then.
-    }
-    goto done;
-  }
 
   monitorpackets_add_incoming_rtp_packet(this->monitorpackets, mprtp->buffer);
 
@@ -344,7 +331,6 @@ void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
                               &subflow->jitter);
 
   numstracker_add(this->skews, subflow->skew);
-  numstracker_add(this->delays, subflow->delay);
 
   this->playout_delay *= 124.;
   this->playout_delay += this->max_skew;
@@ -355,7 +341,6 @@ void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
   if(!_add_mprtp_packet(this, mprtp)){
     g_queue_push_tail(this->urgent, mprtp);
   }
-done:
   THIS_WRITEUNLOCK(this);
 }
 
@@ -663,14 +648,11 @@ Frame* _make_frame(StreamJoiner *this, FrameNode *node)
   result->ready = node->marker;
   result->last_seq = result->ready ? node->seq : 0;
 
-  playout_delay  = MAX(this->forced_delay, this->max_delay);
-  playout_delay += MIN(this->max_skew,     100 * GST_MSECOND);
-  playout_delay -= MIN(node->mprtp->delay, 300 * GST_MSECOND);
-  if(100 * GST_MSECOND < playout_delay){
-      g_print("PLAYOUT DELAY < 0. forced delay: %lu, max delay: %lu, max skew: %lu, mprtp_delay: %lu\n",
-              this->forced_delay, this->max_delay, this->max_skew, node->mprtp->delay);
+  playout_delay = MIN(MAX(0, this->max_skew), 20 * GST_MSECOND);
+  if(node->mprtp->delay < this->forced_delay && 0 < node->mprtp->delay){
+    playout_delay += this->forced_delay - node->mprtp->delay;
   }
-  result->playout_time = _now(this) + MAX(0, playout_delay);
+  result->playout_time = _now(this) + playout_delay;
   ++this->framecounter;
 
   return result;
@@ -695,10 +677,7 @@ void _playout_logging(StreamJoiner *this)
   if(this->head && now < this->head->playout_time - GST_USECOND){
     playout_remaining = GST_TIME_AS_USECONDS(this->head->playout_time - now);
   }
-  if(playout_remaining > 20000 * GST_USECOND){
-    g_print("PLAYOUT PROBLEM: remaining time: %d skew: %ld max delay: %lu this->head->playout_time %lu now: %lu\n",
-            playout_remaining, this->max_skew, this->max_delay, this->head->playout_time, now);
-  }
+
   mprtp_logger("logs/playouts.csv", "%d,%d,%d\n",
                 this->bytes_in_queue / 1000,
                 playout_remaining,
@@ -727,7 +706,7 @@ void _readable_logging(StreamJoiner *this)
                  "###############################################################\n"
                  "Seconds: %lu\n"
                  "PHSN: %d | framecounter: %d | bytes_in_queue: %d\n"
-                 "max_delay: %lu | min_delay: %lu | forced_delay: %lu\n"
+                 "forced_delay: %lu\n"
                  "flushing: %d | playout_allowed: %d | playout_halt: %d\n"
                  "halt_time: %lu | monitored bytes: %d\n"
                  ,
@@ -735,8 +714,6 @@ void _readable_logging(StreamJoiner *this)
                  this->PHSN,
                  this->framecounter,
                  this->bytes_in_queue,
-                 this->max_delay,
-                 this->min_delay,
                  this->forced_delay,
                  this->flushing,
                  this->playout_allowed,

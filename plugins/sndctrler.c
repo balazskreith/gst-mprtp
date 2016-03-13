@@ -100,6 +100,7 @@ struct _Subflow
   GstClockTime               joined_time;
   GstClockTime               last_report;
   guint8                     lost_history;
+  gboolean                   lost;
   gdouble                    avg_rtcp_size;
   ProcessState               process_state;
   guint32                    packet_count;
@@ -519,9 +520,9 @@ _irp_processor_main(SndController * this)
       continue;
     }
     memset(&measurement, 0, sizeof(SubflowMeasurement));
-    measurement.reports = subflow->reports;
+    measurement.reports         = subflow->reports;
     measurement.sending_bitrate = subflow->sending_bitrate;
-
+    measurement.lost            = subflow->lost;
     subratectrler_measurement_update(subflow->rate_controller, &measurement);
     subflow->process_state = REPORT_WAITING;
   }
@@ -529,7 +530,8 @@ _irp_processor_main(SndController * this)
 
 void _check_subflow_losts(SndController *this, Subflow *subflow)
 {
-  guint8                  path_is_non_lossy;
+  gboolean                path_is_non_lossy;
+  gboolean                path_is_non_congested;
   guint                   losts = 0;
   gboolean                expected_lost;
   GstMPRTCPReportSummary *summary;
@@ -540,8 +542,10 @@ void _check_subflow_losts(SndController *this, Subflow *subflow)
   }
 
   expected_lost          = 0 < this->expected_lost_detected && _now(this) - this->expected_lost_detected < GST_SECOND * 10;
-  subflow->lost_history +=  (0. < summary->RR.lost_rate && !expected_lost)?1:0;
+  subflow->lost          = 0. < summary->RR.lost_rate && !expected_lost;
+  subflow->lost_history += subflow->lost ? 1 : 0;
   path_is_non_lossy      = mprtps_path_is_non_lossy(subflow->path);
+  path_is_non_congested  = mprtps_path_is_non_congested(subflow->path);
 
   losts += subflow->lost_history & 1  ? 1 : 0;
   losts += subflow->lost_history & 2  ? 1 : 0;
@@ -551,12 +555,14 @@ void _check_subflow_losts(SndController *this, Subflow *subflow)
 
   subflow->lost_history<<=1;
 
-  if(path_is_non_lossy){
-    if(3 < losts){
-      mprtps_path_set_lossy(subflow->path);
+  if(path_is_non_congested){
+    if(path_is_non_lossy){
+      if(3 < losts){
+        mprtps_path_set_lossy(subflow->path);
+      }
+    }else if(!losts){
+      mprtps_path_set_non_lossy(subflow->path);
     }
-  }else if(!losts){
-    mprtps_path_set_non_lossy(subflow->path);
   }
 }
 

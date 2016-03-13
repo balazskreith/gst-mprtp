@@ -54,6 +54,17 @@ gboolean gst_buffer_is_mprtp(GstBuffer *buffer, guint8 mprtp_ext_header_id)
   return result;
 }
 
+gboolean gst_buffer_is_monitoring_rtp(GstBuffer *buffer, guint8 monitoring_payload_type)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  gboolean result;
+  g_return_val_if_fail(GST_IS_BUFFER(buffer), FALSE);
+  g_return_val_if_fail(gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp), FALSE);
+  result = gst_rtp_buffer_get_payload_type(&rtp) == monitoring_payload_type;
+  gst_rtp_buffer_unmap(&rtp);
+  return result;
+}
+
 void gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
                                GstBuffer *buffer,
                                guint8 mprtp_ext_header_id,

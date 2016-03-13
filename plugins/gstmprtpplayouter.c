@@ -128,6 +128,8 @@ enum
   PROP_FORCED_DELAY,
   PROP_LATENCY_DISCARD,
   PROP_LATENCY_LOST,
+  PROP_LIVE_STREAM,
+  PROP_PLAYOUT_HALT_TIME,
 
 };
 
@@ -257,6 +259,12 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           "Indicate weather a log for subflow is enabled or not",
           FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_LIVE_STREAM,
+      g_param_spec_boolean ("live-stream",
+          "Indicate weather the stream is live",
+          "Indicate weather the stream is live",
+          FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_SUBFLOWS_STATS,
       g_param_spec_string ("subflow-stats",
           "Extract subflow stats",
@@ -265,11 +273,18 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           "NULL", G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_FORCED_DELAY,
-                                   g_param_spec_uint64 ("forced-delay",
-                                                        "forced delay before playout",
-                                                        "forced delay before playout",
-                                                        0, G_MAXUINT, 0,
-                                                        G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+                                    g_param_spec_uint64 ("forced-delay",
+                                                         "forced delay for playout",
+                                                         "forced delay for playout",
+                                                         0, G_MAXUINT, 0,
+                                                         G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_PLAYOUT_HALT_TIME,
+                                    g_param_spec_uint64 ("halt-time",
+                                                         "set halt time for playout",
+                                                         "set halt time for playout",
+                                                         0, G_MAXUINT, 0,
+                                                         G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LATENCY_DISCARD,
        g_param_spec_uint ("latency-discard",
@@ -351,7 +366,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
 
   rcvctrler_setup(this->controller, this->joiner);
   rcvctrler_setup_callbacks(this->controller, this, gst_mprtpplayouter_mprtcp_sender);
-  rcvctrler_set_additional_reports(this->controller, FALSE, FALSE, FALSE);
+  rcvctrler_set_additional_reports(this->controller, FALSE, FALSE, TRUE);
   _change_auto_rate_and_cc (this, FALSE);
 
   stream_joiner_set_monitor_payload_type(this->joiner, this->monitor_payload_type);
@@ -458,9 +473,20 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
         disable_mprtp_logger();
       THIS_WRITEUNLOCK (this);
       break;
+    case PROP_LIVE_STREAM:
+      THIS_WRITELOCK (this);
+      gboolean_value = g_value_get_boolean (value);
+      //Todo consider live stream here
+      THIS_WRITEUNLOCK (this);
+      break;
     case PROP_FORCED_DELAY:
       THIS_WRITELOCK (this);
       stream_joiner_set_forced_delay(this->joiner, g_value_get_uint64 (value) * GST_MSECOND);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_PLAYOUT_HALT_TIME:
+      THIS_WRITELOCK (this);
+      stream_joiner_set_playout_halt_time(this->joiner, g_value_get_uint64 (value) * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_AUTO_RATE_AND_CC:
@@ -541,6 +567,12 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
     case PROP_LOG_ENABLED:
       THIS_READLOCK (this);
       g_value_set_boolean (value, this->logging);
+      THIS_READUNLOCK (this);
+      break;
+    case PROP_LIVE_STREAM:
+      THIS_READLOCK (this);
+      g_value_set_boolean (value, this->logging);
+      //Todo consider live stream here
       THIS_READUNLOCK (this);
       break;
     case PROP_LATENCY_DISCARD:
@@ -763,6 +795,8 @@ _join_path (GstMprtpplayouter * this, guint8 subflow_id)
     goto exit;
   }
   path = make_mprtpr_path (subflow_id);
+  mprtpr_path_set_discard_latency(path, this->discard_latency);
+  mprtpr_path_set_lost_latency(path, this->lost_latency);
   g_hash_table_insert (this->paths, GINT_TO_POINTER (subflow_id), path);
   stream_joiner_add_path (this->joiner, subflow_id, path);
   rcvctrler_add_path(this->controller, subflow_id, path);
@@ -912,7 +946,6 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
       result = gst_pad_push (this->mprtp_srcpad, buf);
     goto done;
   }
-
   //check weather the packet is mprtp
   if(!gst_buffer_is_mprtp(buf, this->mprtp_ext_header_id)){
     if(GST_IS_BUFFER(buf))
@@ -1027,7 +1060,12 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
       return;
     }
   }
-  stream_joiner_push(this->joiner, mprtp);
+
+  if(mprtp->monitor_packet){
+    stream_joiner_push_monitoring_packet(this->joiner, mprtp);
+  }else{
+    stream_joiner_push(this->joiner, mprtp);
+  }
   return;
 }
 

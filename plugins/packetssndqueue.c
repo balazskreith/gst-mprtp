@@ -131,15 +131,20 @@ PacketsSndQueue *make_packetssndqueue(void)
   return result;
 }
 
-void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_rate, gboolean pacing)
+void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_bitrate, gboolean pacing)
 {
   THIS_WRITELOCK(this);
-  this->target_rate = target_rate * .75;
+  target_bitrate>>=3;
+  this->target_rate = target_bitrate * .75;
   if(!this->pacing && pacing){
-    this->approved_bytes = target_rate / 100;
+    this->approved_bytes = target_bitrate / 100;
+    this->pacing_started = _now(this);
+    this->pacing = TRUE;
+  }else if(!pacing && this->pacing){
+    this->pacing = _now(this) - this->pacing_started < 2 * GST_SECOND;
   }
-  this->pacing = pacing;
-  this->allowed_rate_per_ms = target_rate / 1000;
+
+  this->allowed_rate_per_ms = target_bitrate / 1000;
   THIS_WRITEUNLOCK(this);
 }
 
@@ -213,7 +218,7 @@ again:
   result = _packetssndqueue_rem(this);
 
 done:
-//g_print("approved bytes: %d - counter: %d\n", this->approved_bytes, this->counter);
+  //g_print("approved bytes: %d - counter: %d\n", this->approved_bytes, this->counter);
   THIS_WRITEUNLOCK(this);
   return result;
 }

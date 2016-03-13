@@ -42,6 +42,7 @@ struct _SubflowMeasurement{
   GstMPRTCPReportSummary *reports;
   NetQueueAnalyserResult  netq_analysation;
   guint32                 sending_bitrate;
+  gboolean                lost;
 };
 
 
@@ -62,11 +63,13 @@ struct _SubflowRateController
   GstClockTime              disable_controlling;
   guint                     measurements_num;
 
+  GstClockTime              mitigated;
   gint32                    bottleneck_point;
   gint32                    max_target_point;
   gint32                    min_target_point;
   gint32                    desired_bitrate;
   gint32                    target_bitrate;
+  gint32                    consecutive_distortion;
 
   gint32                    max_rate;
   gint32                    min_rate;
@@ -74,7 +77,7 @@ struct _SubflowRateController
   SubflowState              state;
   gint32                    keep;
   gboolean                  reduced;
-  gint32                    in_congestion;
+  gint32                    consecutive_congestion;
 
   GstClockTime              setup_time;
 

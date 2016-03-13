@@ -69,7 +69,7 @@ struct _RTPAbsTimeExtension
 };
 
 gboolean gst_buffer_is_mprtp(GstBuffer *buffer, guint8 mprtp_ext_header_id);
-
+gboolean gst_buffer_is_monitoring_rtp(GstBuffer *buffer, guint8 monitoring_payload_type);
 void gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
                                GstBuffer *buffer,
                                guint8 mprtp_ext_header_id,

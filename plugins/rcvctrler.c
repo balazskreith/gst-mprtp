@@ -568,6 +568,8 @@ void _orp_add_rr(RcvController * this, Subflow *subflow)
                          LSR,
                          DLSR
                          );
+
+  mprtpr_path_set_reported_sequence(subflow->path, HSN);
 }
 
 

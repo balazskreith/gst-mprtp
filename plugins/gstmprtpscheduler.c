@@ -372,6 +372,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
                             this, gst_mprtpscheduler_emit_signal
                             );
   this->monitorpackets = make_monitorpackets();
+  monitorpackets_set_payload_type(this->monitorpackets, this->monitor_payload_type);
 
   _change_auto_rate_and_cc (this, FALSE);
   _setup_paths(this);
@@ -608,10 +609,9 @@ _setup_paths (GstMprtpscheduler * this)
   g_hash_table_iter_init (&iter, this->paths);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     path = (MPRTPSPath *) val;
-    mprtps_path_set_monitor_payload_id(path, this->monitor_payload_type);
     mprtps_path_set_mprtp_ext_header_id(path, this->mprtp_ext_header_id);
-    mprtps_path_set_monitor_packet_provider(path, this->monitorpackets);
   }
+  monitorpackets_set_payload_type(this->monitorpackets, this->monitor_payload_type);
 }
 
 
@@ -643,7 +643,6 @@ _join_subflow (GstMprtpscheduler * this, guint subflow_id)
   if (path == NULL) {
     path = make_mprtps_path ((guint8) subflow_id);
     g_hash_table_insert (this->paths, GINT_TO_POINTER (subflow_id), path);
-    mprtps_path_set_monitor_payload_id(path, this->monitor_payload_type);
     mprtps_path_set_mprtp_ext_header_id(path, this->mprtp_ext_header_id);
   }
   sndctrler_add_path(this->controller, subflow_id, path);
@@ -1052,7 +1051,7 @@ _mprtpscheduler_process_run (void *data)
   GstClockTime next_scheduler_time;
   MPRTPSPath *path;
   GstBuffer *buffer = NULL;
-  gboolean monitoring_request;
+  gboolean monitoring_request = FALSE;
 
   this = (GstMprtpscheduler *) data;
 
@@ -1080,15 +1079,15 @@ again:
   _setup_timestamp(this, buffer);
   if(this->auto_rate_and_cc){
     monitorpackets_add_outgoing_rtp_packet(this->monitorpackets, buffer);
-    gst_pad_push (this->mprtp_srcpad, buffer);
     if(monitoring_request){
       GstBuffer *monitorp;
-      monitorp = monitorpackets_provide_FEC_packet(this->monitorpackets);
+      monitorp = monitorpackets_provide_FEC_packet(this->monitorpackets,
+                                                   this->mprtp_ext_header_id,
+                                                   mprtps_path_get_id(path));
       gst_pad_push (this->mprtp_srcpad, monitorp);
     }
-  }else{
-    gst_pad_push (this->mprtp_srcpad, buffer);
   }
+  gst_pad_push (this->mprtp_srcpad, buffer);
   if (!this->riport_flow_signal_sent) {
     this->riport_flow_signal_sent = TRUE;
     sndctrler_report_can_flow(this->controller);

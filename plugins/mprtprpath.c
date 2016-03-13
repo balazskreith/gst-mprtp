@@ -79,7 +79,7 @@ mprtpr_path_init (MpRTPRPath * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
   this->delays = make_percentiletracker(512, 50);
-  percentiletracker_set_treshold(this->delays, 500 * GST_MSECOND);
+  percentiletracker_set_treshold(this->delays, 1000 * GST_MSECOND);
   percentiletracker_set_stats_pipe(this->delays, _delays_stats_pipe, this);
 
   this->skews = make_percentiletracker2(100, 50);
@@ -164,6 +164,13 @@ void mprtpr_path_get_RR_stats(MpRTPRPath *this,
   if(received_num) *received_num = this->total_packets_received;
   if(received_bytes) *received_bytes = this->total_payload_bytes;
   THIS_READUNLOCK (this);
+}
+
+void mprtpr_path_set_reported_sequence(MpRTPRPath *this, guint16 sequence_number)
+{
+  THIS_WRITELOCK (this);
+  this->reported_sequence_number = sequence_number;
+  THIS_WRITEUNLOCK (this);
 }
 
 void mprtpr_path_get_XR7243_stats(MpRTPRPath *this,
@@ -441,7 +448,10 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   }
   if(0 < mprtp->delay){
     _add_delay(this, mprtp->delay);
-    if(0 < this->discard_latency && this->discard_latency < mprtp->delay){
+    if(//_cmp_seq(this->reported_sequence_number, mprtp->subflow_seq) < 0 &&
+       0 < this->discard_latency &&
+       this->discard_latency < mprtp->delay)
+    {
       _add_discard(this, mprtp);
     }
   }

@@ -30,6 +30,9 @@ struct _MonitorPackets
   GObject                  object;
   GRWLock                  rwmutex;
   GQueue*                  queue;
+  guint8                   payload_type;
+  guint16                  monitor_seq;
+  guint16                  monitor_cycle;
   gint                     counter;
   GstClock*                sysclock;
 };
@@ -41,8 +44,9 @@ struct _MonitorPacketsClass{
 GType monitorpackets_get_type (void);
 MonitorPackets *make_monitorpackets(void);
 void monitorpackets_reset(MonitorPackets *this);
+void monitorpackets_set_payload_type(MonitorPackets *this, guint8 payload_type);
 void monitorpackets_add_outgoing_rtp_packet(MonitorPackets* this, GstBuffer* buf);
 void monitorpackets_add_incoming_rtp_packet(MonitorPackets *this, GstBuffer *buf);
 GstBuffer *monitorpackets_process_FEC_packet(MonitorPackets *this, GstBuffer *rtpbuf);
-GstBuffer *monitorpackets_provide_FEC_packet(MonitorPackets *this);
+GstBuffer * monitorpackets_provide_FEC_packet(MonitorPackets *this, guint8 mprtp_ext_header_id, guint8 subflow_id);
 #endif /* MONITORPACKETS_H_ */

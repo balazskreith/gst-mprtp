@@ -83,9 +83,6 @@ struct _MPRTPSPath
   GstClockTime            last_packet_sent_time;
   guint32                 last_sent_payload_bytes;
   guint32                 monitoring_interval;
-  guint16                 monitor_seq;
-  guint8                  monitor_payload_type;
-  MonitorPackets*         monitorpackets;
   guint8                  pivot_payload_type;
 
 
@@ -221,8 +218,7 @@ guint16 mprtps_path_get_HSN(MPRTPSPath * this);
 void mprtps_path_set_delay(MPRTPSPath * this, GstClockTime delay);
 GstClockTime mprtps_path_get_delay(MPRTPSPath * this);
 void mprtps_path_set_skip_duration(MPRTPSPath * this, GstClockTime duration);
-void mprtps_path_set_monitor_payload_id(MPRTPSPath *this, guint8 payload_type);
-void mprtps_path_set_monitor_packet_provider(MPRTPSPath *this, MonitorPackets *monitorpackets);
 void mprtps_path_set_mprtp_ext_header_id(MPRTPSPath *this, guint ext_header_id);
+void mprtps_path_set_monitor_packet_interval(MPRTPSPath *this, guint monitoring_interval);
 G_END_DECLS
 #endif /* MPRTPSPATH_H_ */

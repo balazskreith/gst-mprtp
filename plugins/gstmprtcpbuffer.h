@@ -55,6 +55,7 @@
 #include <gst/gst.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include "gstmprtpbuffer.h"
+#include "mprtpdefs.h"
 
 #define MPRTCP_PACKET_DEFAULT_MTU 1400
 #define MPRTCP_PACKET_TYPE_IDENTIFIER 212

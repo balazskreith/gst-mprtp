@@ -196,9 +196,11 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  gstmprtcpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
  gstmprtpbuffer.h /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtpdefs.h \
  monitorpackets.h bintree.h mprtplogger.h mprtpspath.h packetssndqueue.h \
- numstracker.h bintree2.h percentiletracker.h sndctrler.h \
+ numstracker.h bintree2.h percentiletracker.h reportproc.h mprtprpath.h \
+ /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
+ percentiletracker2.h streamjoiner.h ricalcer.h sndctrler.h \
  /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
  /usr/include/glib-2.0/gio/gactiongroup.h \
@@ -343,10 +345,7 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/include/x86_64-linux-gnu/bits/sys_errlist.h \
  /usr/include/x86_64-linux-gnu/bits/stdio.h \
  /usr/include/x86_64-linux-gnu/bits/stdio2.h sndratedistor.h \
- streamsplitter.h reportprod.h mprtprpath.h \
- /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
- percentiletracker2.h streamjoiner.h ricalcer.h reportproc.h \
- gstmprtpsender.h gstmprtpplayouter.h \
+ streamsplitter.h reportprod.h gstmprtpsender.h gstmprtpplayouter.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h rcvctrler.h \
  /usr/include/glib-2.0/gio/gnetworking.h /usr/include/netdb.h \
  /usr/include/netinet/in.h \
@@ -827,6 +826,8 @@ gstmprtpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
 
+mprtpdefs.h:
+
 monitorpackets.h:
 
 bintree.h:
@@ -842,6 +843,18 @@ numstracker.h:
 bintree2.h:
 
 percentiletracker.h:
+
+reportproc.h:
+
+mprtprpath.h:
+
+/usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h:
+
+percentiletracker2.h:
+
+streamjoiner.h:
+
+ricalcer.h:
 
 sndctrler.h:
 
@@ -1162,18 +1175,6 @@ sndratedistor.h:
 streamsplitter.h:
 
 reportprod.h:
-
-mprtprpath.h:
-
-/usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h:
-
-percentiletracker2.h:
-
-streamjoiner.h:
-
-ricalcer.h:
-
-reportproc.h:
 
 gstmprtpsender.h:
 

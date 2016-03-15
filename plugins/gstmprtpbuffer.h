@@ -23,6 +23,7 @@
 #include <gst/gst.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include <gst/rtp/gstrtpbuffer.h>
+#include "mprtpdefs.h"
 
 
 typedef struct _GstMpRTPBuffer GstMpRTPBuffer;

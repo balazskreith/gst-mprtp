@@ -66,6 +66,7 @@ struct _CorrBlock{
 typedef struct _NetQueueAnalyserPrivate{
   CorrBlock           cblocks[6];
   guint32             cblocks_counter;
+  GstClockTime        delay80th;
 }NetQueueAnalyserPrivate;
 
 
@@ -116,6 +117,12 @@ netqueue_analyser_init (NetQueueAnalyser * this)
   this->priv = g_malloc0(sizeof(NetQueueAnalyserPrivate));
 }
 
+static void _delay80th_pipe(gpointer data, PercentileTrackerPipeData *stats)
+{
+  NetQueueAnalyser *this = data;
+  _priv(this)->delay80th = stats->percentile;
+}
+
 NetQueueAnalyser *make_netqueue_analyser(guint8 id)
 {
   NetQueueAnalyser *this;
@@ -124,6 +131,10 @@ NetQueueAnalyser *make_netqueue_analyser(guint8 id)
 
   this->id                     = id;
   this->made                   = _now(this);
+  this->delays                 = make_percentiletracker(256, 80);
+  percentiletracker_set_treshold(this->delays, 30 * GST_SECOND);
+  percentiletracker_set_stats_pipe(this->delays, _delay80th_pipe, this);
+
   _priv(this)->cblocks[0].next = &_priv(this)->cblocks[1];
   _priv(this)->cblocks[1].next = &_priv(this)->cblocks[2];
   _priv(this)->cblocks[2].next = &_priv(this)->cblocks[3];
@@ -178,14 +189,14 @@ void netqueue_analyser_do(NetQueueAnalyser       *this,
     return;
   }
 
-  result->distortion_level = 0;
-  result->congestion_level = 0;
+  result->distortion_level        = 0;
+  result->congestion_level        = 0;
   result->congestion_indicator    = FALSE;
 
   if(summary->XR_RFC7097.processed){
-    result->congestion_indicator |= 0 < summary->XR_RFC7097.length ? 1 : 0;
+    result->congestion_level = 0 < summary->XR_RFC7097.length ? 1 : 0;
   }else if(summary->XR_RFC7243.processed){
-    result->congestion_indicator |= 0 < summary->XR_RFC7243.discarded_bytes ? 1 : 0;
+    result->congestion_level = 0 < summary->XR_RFC7243.discarded_bytes ? 1 : 0;
   }
 
 
@@ -195,6 +206,10 @@ void netqueue_analyser_do(NetQueueAnalyser       *this,
     if(!delay){
         continue;
     }
+
+    percentiletracker_add(this->delays, delay);
+    //Todo: do it more softly
+    result->congestion_level = _priv(this)->delay80th * 1.2 < delay ? 2 : 0;
 
     _priv(this)->cblocks[0].Iu0 = GST_TIME_AS_USECONDS(delay) / 50.;
     _execute_corrblocks(_priv(this), _priv(this)->cblocks, 4);
@@ -218,24 +233,18 @@ void netqueue_analyser_do(NetQueueAnalyser       *this,
 void _qdeanalyzer_evaluation(NetQueueAnalyser *this, NetQueueAnalyserResult *result)
 {
 
-  result->trend = MAX(_priv(this)->cblocks[0].g_max, _priv(this)->cblocks[1].g_max);
+  result->trend = _priv(this)->cblocks[0].g_max + _priv(this)->cblocks[1].g_max + _priv(this)->cblocks[2].g_max;
+  result->trend = CONSTRAIN(-.1, .1, result->trend);
 
-  result->congestion_level = 0;
-  if(result->congestion_indicator){
+  if(result->congestion_level == 0){
+    result->congestion_level = _priv(this)->cblocks[0].distorted || _priv(this)->cblocks[1].distorted ? 1 : 0;
+  }else if(result->congestion_level == 1){
     if(_priv(this)->cblocks[0].congested){
       result->congestion_level = _priv(this)->cblocks[1].congested ? 2 : 1;
     }
-    result->distortion_level = 1;
-  }else{
-    result->distortion_level = 0;
   }
 
-  result->distortion_level += _priv(this)->cblocks[0].distorted ? 1 : 0;
-  result->distortion_level += _priv(this)->cblocks[1].distorted ? 1 : 0;
-  //  result->distortion_level += _priv(this)->cblocks[2].distorted ? 1 : 0;
-
-
-  if(!result->congestion_level && !result->distortion_level){
+  if(!result->congestion_level){
     if(this->last_stable == 0){
       this->last_stable = _now(this);
     }else{

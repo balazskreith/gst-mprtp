@@ -42,6 +42,9 @@ struct _SubflowMeasurement{
   GstMPRTCPReportSummary *reports;
   NetQueueAnalyserResult  netq_analysation;
   guint32                 sending_bitrate;
+  guint32                 receiver_bitrate;
+  guint32                 goodput_bitrate;
+  gint32                  bytes_in_flight;
   gboolean                lost;
 };
 

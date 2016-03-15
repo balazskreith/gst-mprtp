@@ -26,7 +26,6 @@
 #include "reportproc.h"
 #include "gstmprtcpbuffer.h"
 #include "mprtprpath.h"
-#include "streamjoiner.h"
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
@@ -353,6 +352,7 @@ _processing_xr_rfc7097 (ReportProcessor *this,
 
   summary->XR_RFC7097.processed = TRUE;
   summary->XR_RFC7097.length = 0;
+  summary->XR_RFC7097.total  = 0;
 
   chunks_num = gst_rtcp_xr_rfc7097_get_chunks_num(xrb);
   for(chunk_index = 0;
@@ -365,6 +365,7 @@ _processing_xr_rfc7097 (ReportProcessor *this,
       if(chunk->chunk_type == 0 && chunk->run_length == 0 && chunk->run_type == 0) break;
       gst_rtcp_xr_chunk_getdown(chunk, NULL, NULL, &running_length);
       summary->XR_RFC7097.values[chunk_index] = running_length;
+      summary->XR_RFC7097.total += running_length;
       ++summary->XR_RFC7097.length;
   }
 }

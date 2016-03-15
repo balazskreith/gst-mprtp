@@ -47,6 +47,9 @@
 #define MAX_SUBFLOW_MOMENT_NUM 8
 #define MIN_MEDIA_RATE 50000
 
+//It determines how many packets can be followed in the path
+//over the last 2 seconds.
+#define DEFAULT_PATH_STAT_PACKETS_LENGTH 5000
 
 GST_DEBUG_CATEGORY_STATIC (sndctrler_debug_category);
 #define GST_CAT_DEFAULT sndctrler_debug_category
@@ -485,13 +488,14 @@ void _subflow_iterator(
 void _enable_controlling(Subflow *subflow, gpointer data)
 {
   SndController *this = data;
-  g_print("EZT EN HIVOGATOM AKARMIKOR IS?\n");
   subflow->rate_controller = make_subratectrler(this->rate_distor, subflow->path);
+  mprtps_path_activate_packets_monitoring(subflow->path, DEFAULT_PATH_STAT_PACKETS_LENGTH);
 }
 
 void _disable_controlling(Subflow *subflow, gpointer data)
 {
 //  SndController *this = data;
+  mprtps_path_deactivate_packets_monitoring(subflow->path);
 }
 
 //------------------------- Incoming Report Processor -------------------
@@ -513,6 +517,7 @@ _irp_processor_main(SndController * this)
     if(subflow->process_state == NO_CONTROLLING){
       continue;
     }
+    mprtps_path_packets_refresh(subflow->path);
     sending_rate = mprtps_path_get_sent_bytes_in1s(subflow->path);
     percentiletracker_add(subflow->sr_window, sending_rate);
 
@@ -520,10 +525,19 @@ _irp_processor_main(SndController * this)
       continue;
     }
     memset(&measurement, 0, sizeof(SubflowMeasurement));
-    measurement.reports         = subflow->reports;
-    measurement.sending_bitrate = subflow->sending_bitrate;
-    measurement.lost            = subflow->lost;
+    measurement.reports          = subflow->reports;
+    measurement.sending_bitrate  = subflow->sending_bitrate;
+    measurement.receiver_bitrate = mprtps_path_get_received_bytes_in1s(subflow->path) * 8;
+    measurement.goodput_bitrate  = mprtps_path_get_goodput_bytes_in1s(subflow->path) * 8;
+    measurement.bytes_in_flight  = mprtps_path_get_bytes_in_flight(subflow->path);
+    measurement.lost             = subflow->lost;
+
+    mprtps_path_packets_feedback_update(subflow->path, measurement.reports);
     subratectrler_measurement_update(subflow->rate_controller, &measurement);
+
+    g_print("Sender bitrate: %d Receiver bitrate: %d Goodput bitrate: %d bytes_in_flight: %d\n",
+            measurement.sending_bitrate, measurement.receiver_bitrate,
+            measurement.goodput_bitrate, measurement.bytes_in_flight);
     subflow->process_state = REPORT_WAITING;
   }
 }

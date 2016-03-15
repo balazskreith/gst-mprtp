@@ -23,6 +23,7 @@
 
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
+#include <string.h>
 #include "mprtpspath.h"
 #include "gstmprtcpbuffer.h"
 
@@ -41,14 +42,25 @@ G_DEFINE_TYPE (MPRTPSPath, mprtps_path, G_TYPE_OBJECT);
 
 static void mprtps_path_finalize (GObject * object);
 static void mprtps_path_reset (MPRTPSPath * this);
-static void _setup_rtp2mprtp (MPRTPSPath * this, GstBuffer * buffer);
-static void _refresh_stat(MPRTPSPath * this, GstBuffer *buffer);
+static void _setup_rtp2mprtp (MPRTPSPath * this, GstRTPBuffer *rtp);
+static void _refresh_stat(MPRTPSPath * this, GstRTPBuffer *rtp);
 //static void _send_mprtp_packet(MPRTPSPath * this,
 //                               GstBuffer *buffer);
 //static GstBuffer* _create_monitor_packet(MPRTPSPath * this);
 
 #define MIN_PACE_INTERVAL 1
 #define MINIMUM_PACE_BANDWIDTH 50000
+
+static gint
+_cmp_uint16 (guint16 x, guint16 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 32768) return -1;
+  if(x > y && x - y > 32768) return -1;
+  if(x < y && y - x > 32768) return 1;
+  if(x > y && x - y < 32768) return 1;
+  return 0;
+}
 
 void
 mprtps_path_class_init (MPRTPSPathClass * klass)
@@ -71,68 +83,11 @@ make_mprtps_path (guint8 id)
   result = g_object_new (MPRTPS_PATH_TYPE, NULL);
   THIS_WRITELOCK (result);
   result->id = id;
-//  result->send_mprtp_func_data = func_this;
+  //  result->send_mprtp_func_data = func_this;
 //  result->send_mprtp_packet_func = send_func;
   THIS_WRITEUNLOCK (result);
   return result;
 }
-//
-//void g_print_rrmeasurement(RRMeasurement *measurement)
-//{
-//  g_print("+=+=+=+=+=+=+=+=+=+=+ RRMeasurement dump =+=+=+=+=+=+=+=+=+=+=+=+=+\n"
-//  "|Time: %29lu|\n"
-//  "|RTT: %29lu|\n"
-//  "|jitter: %29u|\n"
-//  "|cum_packet_lost: %29u|\n"
-//  "|lost: %29u|\n"
-//  "|median_delay: %29lu|\n"
-//  "|min_delay: %29lu|\n"
-//  "|max_delay: %29lu|\n"
-//  "|early_discarded_bytes: %29u|\n"
-//  "|late_discarded_bytes: %29u|\n"
-//  "|early_discarded_bytes_sum: %29u|\n"
-//  "|late_discarded_bytes_sum: %29u|\n"
-//  "|HSSN: %29hu|\n"
-//  "|cycle_num: %29hu|\n"
-//  "|expected_packets: %29hu|\n"
-//  "|PiT: %29hu|\n"
-//  "|expected_payload_bytes: %29u|\n"
-//  "|sent_payload_bytes_sum: %29u|\n"
-//  "|lost_rate: %29f|\n"
-//  "|goodput: %29f|\n"
-//  "|sender_rate: %29f|\n"
-//  "|receiver_rate: %29f|\n"
-//  "|checked: %29d|\n"
-//  "|bytes_in_flight: %29u|\n"
-//  "|bytes_in_queue: %29u|\n"
-//  "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n",
-//  measurement->time,
-//  measurement->RTT,
-//  measurement->jitter,
-//  measurement->cum_packet_lost,
-//  measurement->lost,
-//  measurement->recent_delay,
-//  measurement->min_delay,
-//  measurement->max_delay,
-//  measurement->early_discarded_bytes,
-//  measurement->late_discarded_bytes,
-//  measurement->early_discarded_bytes_sum,
-//  measurement->late_discarded_bytes_sum,
-//  measurement->HSSN,
-//  measurement->cycle_num,
-//  measurement->expected_packets,
-//  measurement->PiT,
-//  measurement->expected_payload_bytes,
-//  measurement->sent_payload_bytes_sum,
-//  measurement->lost_rate,
-//  measurement->goodput,
-//  measurement->sender_rate,
-//  measurement->receiver_rate,
-//  measurement->checked,
-//  measurement->bytes_in_flight_acked,
-//  measurement->bytes_in_queue );
-//
-//}
 
 /**
  * mprtps_path_reset:
@@ -149,14 +104,10 @@ mprtps_path_reset (MPRTPSPath * this)
   this->flags = MPRTPS_PATH_FLAG_ACTIVE |
       MPRTPS_PATH_FLAG_NON_CONGESTED | MPRTPS_PATH_FLAG_NON_LOSSY;
 
-  this->total_sent_packet_num = 0;
-  this->total_sent_normal_packet_num = 0;
-  this->total_sent_payload_bytes_sum = 0;
-  this->total_sent_frames_num = 0;
-  this->last_sent_frame_timestamp = 0;
-  this->sent_octets_read = 0;
-  this->sent_octets_write = 0;
+  memset(&this->packets, 0, sizeof(MPRTPSPathPackets));
+
   this->monitoring_interval = 0;
+
 }
 
 
@@ -165,7 +116,6 @@ mprtps_path_init (MPRTPSPath * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
-  this->sent_bytes = make_numstracker(512, GST_SECOND);
   mprtps_path_reset (this);
 }
 
@@ -175,7 +125,17 @@ mprtps_path_finalize (GObject * object)
 {
   MPRTPSPath *this = MPRTPS_PATH_CAST (object);
   g_object_unref (this->sysclock);
-  g_object_unref(this->sent_bytes);
+}
+
+
+guint8
+mprtps_path_get_id (MPRTPSPath * this)
+{
+  guint16 result;
+  THIS_READLOCK (this);
+  result = this->id;
+  THIS_READUNLOCK (this);
+  return result;
 }
 
 gboolean
@@ -242,30 +202,11 @@ mprtps_path_set_passive (MPRTPSPath * this)
   THIS_WRITEUNLOCK (this);
 }
 
-guint16 mprtps_path_get_HSN(MPRTPSPath * this)
+guint16 mprtps_path_get_actual_seq(MPRTPSPath * this)
 {
   guint16 result;
   THIS_READLOCK (this);
   result = this->seq;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-void
-mprtps_path_set_delay(MPRTPSPath * this, GstClockTime delay)
-{
-  g_return_if_fail (this);
-  THIS_WRITELOCK (this);
-  this->path_delay = delay;
-  THIS_WRITEUNLOCK (this);
-}
-
-GstClockTime
-mprtps_path_get_delay(MPRTPSPath * this)
-{
-  GstClockTime result;
-  THIS_READLOCK (this);
-  result = this->path_delay;
   THIS_READUNLOCK (this);
   return result;
 }
@@ -312,7 +253,7 @@ mprtps_path_set_lossy (MPRTPSPath * this)
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
   this->flags &= (guint8) 255 ^ (guint8) MPRTPS_PATH_FLAG_NON_LOSSY;
-  this->sent_middly_congested = gst_clock_get_time (this->sysclock);
+  this->sent_lossy = gst_clock_get_time (this->sysclock);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -363,33 +304,12 @@ mprtps_path_set_non_congested (MPRTPSPath * this)
 }
 
 
-guint8
-mprtps_path_get_id (MPRTPSPath * this)
-{
-  guint16 result;
-  THIS_READLOCK (this);
-  result = this->id;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-
 gboolean
 mprtps_path_is_monitoring (MPRTPSPath * this)
 {
   gboolean result;
   THIS_READLOCK (this);
   result = this->monitoring_interval > 0;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-guint32
-mprtps_path_get_total_sent_packets_num (MPRTPSPath * this)
-{
-  guint32 result;
-  THIS_READLOCK (this);
-  result = this->total_sent_packet_num;
   THIS_READUNLOCK (this);
   return result;
 }
@@ -404,65 +324,259 @@ gboolean mprtps_path_has_expected_lost(MPRTPSPath * this)
   return result;
 }
 
+guint32
+mprtps_path_get_total_sent_packets_num (MPRTPSPath * this)
+{
+  guint32 result;
+  THIS_READLOCK (this);
+  result = this->packets.total_sent_packets_num;
+  THIS_READUNLOCK (this);
+  return result;
+}
+
+
+
 
 guint32
 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this)
 {
   guint32 result;
   THIS_READLOCK (this);
-  result = this->total_sent_payload_bytes_sum;
+  result = this->packets.total_sent_payload_bytes;
   THIS_READUNLOCK (this);
   return result;
 }
 
-guint32
-mprtps_path_get_total_sent_frames_num (MPRTPSPath * this)
-{
-  guint32 result;
-  THIS_READLOCK (this);
-  result = this->total_sent_frames_num;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-guint32
-mprtps_path_get_sent_octet_sum_for (MPRTPSPath * this, guint32 amount)
-{
-  guint32 result = 0, read;
-  guint16 i;
-
-  THIS_WRITELOCK (this);
-  if (amount < 1 || this->sent_octets_read == this->sent_octets_write) {
-    goto done;
-  }
-  for ( i = 0;
-      this->sent_octets_read != this->sent_octets_write &&  i < amount;
-      ++ i) {
-    read =  this->sent_octets[this->sent_octets_read];
-    result += read;
-    this->sent_octets_read += 1;
-    this->sent_octets_read &= MAX_INT32_POSPART;
-  }
-  this->octets_in_flight_acked-= result;
-done:
-  THIS_WRITEUNLOCK (this);
-  return result;
-}
-
-void mprtps_path_get_bytes_in_flight(MPRTPSPath *this, guint32 *acked)
-{
-  THIS_READLOCK(this);
-  if(acked) *acked = this->octets_in_flight_acked<<3;
-  THIS_READUNLOCK(this);
-}
 
 guint32 mprtps_path_get_sent_bytes_in1s(MPRTPSPath *this)
 {
-  gint64 result;
+  gint64 result = 0;
   THIS_READLOCK(this);
-  numstracker_get_stats(this->sent_bytes, &result);
+  if(!this->packets.activated){
+    goto done;
+  }
+  result = this->packets.sent_bytes_in_1s;
+done:
   THIS_READUNLOCK(this);
   return result;
+}
+
+guint32 mprtps_path_get_received_bytes_in1s(MPRTPSPath *this)
+{
+  gint64 result = 0;
+  THIS_READLOCK(this);
+  if(!this->packets.activated){
+    goto done;
+  }
+  result = this->packets.received_bytes_in_1s;
+done:
+  THIS_READUNLOCK(this);
+  return result;
+}
+
+guint32 mprtps_path_get_goodput_bytes_in1s(MPRTPSPath *this)
+{
+  gint64 result = 0;
+  THIS_READLOCK(this);
+  if(!this->packets.activated){
+    goto done;
+  }
+  result = this->packets.goodput_bytes_in_1s;
+done:
+  THIS_READUNLOCK(this);
+  return result;
+}
+
+guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this)
+{
+  gint64 result = 0;
+  THIS_READLOCK(this);
+  if(!this->packets.activated){
+    goto done;
+  }
+  result = this->packets.bytes_in_flight;
+done:
+  THIS_READUNLOCK(this);
+  return result;
+}
+
+
+
+void mprtps_path_activate_packets_monitoring(MPRTPSPath * this, gint32 items_length)
+{
+  MPRTPSPathPackets *packets;
+  THIS_WRITELOCK (this);
+  packets = &this->packets;
+  if(packets->activated){
+    GST_WARNING_OBJECT(this, "Packets monitoring on subflow %d has already been activated.", this->id);
+    goto done;
+  }
+
+  //reset
+  packets->read_index            = 0;
+  packets->write_index           = 0;
+  packets->counter               = 0;
+  packets->sent_obsolation_index = 0;
+  packets->received_bytes_in_1s  = 0;
+  packets->sent_bytes_in_1s      = 0;
+  packets->length                = items_length;
+  packets->unkown_last_hssn      = TRUE;
+
+  packets->activated = TRUE;
+  packets->items = mprtp_malloc(sizeof(MPRTPSPathPacketsItem) * items_length);
+
+done:
+  THIS_WRITEUNLOCK (this);
+}
+
+void mprtps_path_deactivate_packets_monitoring (MPRTPSPath * this)
+{
+  MPRTPSPathPackets *packets;
+  THIS_WRITELOCK (this);
+  packets = &this->packets;
+  if(!packets->activated){
+    goto done;
+  }
+
+  if(packets->items != NULL){
+    mprtp_free(packets->items);
+    packets->items = NULL;
+    packets->length  = 0;
+    packets->counter = 0;
+  }
+
+  packets->activated = FALSE;
+done:
+  THIS_WRITEUNLOCK (this);
+}
+
+void mprtps_path_packets_refresh(MPRTPSPath *this)
+{
+//obsolate packets sent older than 2 seconds
+  //consider the fact if we reach the last_hssn
+  //Todo: if we reach the last_hssn then set it to the next one,
+  //but get a notification.
+  //If we reach the write index set the last_hssn to 0
+
+  MPRTPSPathPackets*     packets;
+  MPRTPSPathPacketsItem* item = NULL;
+  GstClockTime           treshold = 0;
+  gint32                 next_read_index;
+
+  THIS_WRITELOCK (this);
+  packets   = &this->packets;
+  treshold  = _now(this);
+
+  if(2 * GST_SECOND < treshold){
+    treshold -= 2 * GST_SECOND;
+  }
+
+again:
+  item = packets->items + packets->read_index;
+  if(packets->counter == 0) goto done;
+  if(treshold < item->sent) goto done;
+
+  //remove
+  if(item->seq_num == packets->last_hssn){
+    packets->unkown_last_hssn = TRUE;
+  }
+  next_read_index = (packets->read_index + 1) % packets->length;
+
+  if(packets->read_index == packets->sent_obsolation_index){
+    g_print("Sent bytes subtracted by %d at refresh process\n", item->payload_bytes);
+    packets->sent_bytes_in_1s -= item->payload_bytes;
+    packets->sent_obsolation_index = next_read_index;
+  }
+
+  item->payload_bytes = 0;
+  item->sent          = 0;
+  item->seq_num       = 0;
+  packets->read_index = next_read_index;
+  --packets->counter;
+  goto again;
+done:
+  THIS_WRITEUNLOCK(this);
+}
+
+void mprtps_path_packets_feedback_update(MPRTPSPath *this, GstMPRTCPReportSummary *summary)
+{
+  gint32                 i;
+  GstClockTime           treshold = 0;
+  guint16                actual_hssn;
+  gint32                 actual_hssn_index = -1;
+  gint32                 newly_received_bytes_sum = 0;
+  MPRTPSPathPackets*     packets;
+  MPRTPSPathPacketsItem* item = NULL;
+
+  THIS_WRITELOCK (this);
+
+  packets                       = &this->packets;
+  actual_hssn                   = summary->RR.HSSN;
+  packets->bytes_in_flight      = 0;
+  packets->received_bytes_in_1s = 0;
+
+  if(packets->counter == 0){
+    goto done;
+  }
+
+  for(i=packets->write_index; i != packets->read_index;){
+    item = packets->items + i;
+    if(item->seq_num == actual_hssn){
+      actual_hssn_index = i;
+      if(GST_SECOND < item->sent){
+        treshold = item->sent - GST_SECOND;
+      }
+      break;
+    }
+    if(i == 0) i = packets->length - 1;
+    else       --i;
+  }
+
+  if(actual_hssn_index == -1){
+      //didn'T found the hssn reported!
+      g_warning("Reported HSSN can not be found amongst sent packets.\n"
+          "(counter: %d HSSN: %hu, last_seq: %hu)",
+          packets->counter, actual_hssn, item->seq_num);
+      goto done;
+  }
+
+  for(i = packets->read_index; i != packets->write_index; i = (i+1) % packets->length){
+    item = packets->items + i;
+
+    if(item->sent < treshold){
+      continue;
+    }
+
+    if(!packets->unkown_last_hssn && _cmp_uint16(item->seq_num, packets->last_hssn) <= 0){
+      packets->received_bytes_in_1s  += item->payload_bytes;
+      continue;
+    }
+
+    if( _cmp_uint16(item->seq_num, actual_hssn) <= 0){
+      newly_received_bytes_sum += item->payload_bytes;
+    }else{
+      packets->bytes_in_flight += item->payload_bytes;
+    }
+  }
+
+  if(summary->RR.processed && 0. < summary->RR.lost_rate){
+    newly_received_bytes_sum *= 1.-summary->RR.lost_rate;
+  }
+  packets->received_bytes_in_1s += newly_received_bytes_sum;
+  packets->goodput_bytes_in_1s  = packets->received_bytes_in_1s;
+
+  if(summary->XR_RFC7097.processed){
+    packets->goodput_bytes_in_1s -= summary->XR_RFC7097.total;
+  }else if(summary->XR_RFC7243.processed){
+    packets->goodput_bytes_in_1s -= summary->XR_RFC7243.discarded_bytes;
+  }
+
+  packets->unkown_last_hssn = FALSE;
+  packets->last_hssn        = actual_hssn;
+
+
+done:
+  THIS_WRITEUNLOCK(this);
 }
 
 
@@ -471,6 +585,7 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
                                GstBuffer * rtppacket,
                                gboolean *monitoring_request)
 {
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   THIS_WRITELOCK (this);
 
   if(0 < this->skip_until){
@@ -481,79 +596,94 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
     }
     this->skip_until = 0;
   }
+  gst_rtp_buffer_map(rtppacket, GST_MAP_READWRITE, &rtp);
+  _setup_rtp2mprtp (this, &rtp);
+  _refresh_stat(this, &rtp);
+  gst_rtp_buffer_unmap(&rtp);
 
-  _setup_rtp2mprtp (this, rtppacket);
-  _refresh_stat(this, rtppacket);
 
-//  goto done;
+
   if(!monitoring_request || !this->monitoring_interval) goto done;
-  *monitoring_request = this->total_sent_normal_packet_num % this->monitoring_interval == 0;
+  *monitoring_request = this->packets.total_sent_packets_num % this->monitoring_interval == 0;
 done:
   THIS_WRITEUNLOCK (this);
-
 }
+
 
 void
 _setup_rtp2mprtp (MPRTPSPath * this,
-                  GstBuffer * buffer)
+                  GstRTPBuffer *rtp)
 {
   MPRTPSubflowHeaderExtension data;
-  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-  gst_rtp_buffer_map(buffer, GST_MAP_READWRITE, &rtp);
   data.id = this->id;
   if (++(this->seq) == 0) {
     ++(this->cycle_num);
   }
   data.seq = this->seq;
 
-  gst_rtp_buffer_add_extension_onebyte_header (&rtp, this->mprtp_ext_header_id,
+  gst_rtp_buffer_add_extension_onebyte_header (rtp, this->mprtp_ext_header_id,
       (gpointer) & data, sizeof (data));
-  gst_rtp_buffer_unmap(&rtp);
 }
 
 void
 _refresh_stat(MPRTPSPath * this,
-              GstBuffer *buffer)
+              GstRTPBuffer *rtp)
 {
-  guint payload_bytes;
-  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-  gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
-  payload_bytes = gst_rtp_buffer_get_payload_len (&rtp);
-  ++this->total_sent_packet_num;
-  this->last_sent_payload_bytes = payload_bytes;
-  this->last_packet_sent_time = gst_clock_get_time (this->sysclock);
-  if(gst_rtp_buffer_get_timestamp(&rtp) != this->last_sent_frame_timestamp){
-      ++this->total_sent_frames_num;
-      this->last_sent_frame_timestamp = gst_rtp_buffer_get_timestamp(&rtp);
-  }
-  this->total_sent_payload_bytes_sum += payload_bytes;
-  this->sent_octets[this->sent_octets_write] = payload_bytes >> 3;
-  this->octets_in_flight_acked += payload_bytes>>3;
-  numstracker_add(this->sent_bytes, payload_bytes);
-  ++this->total_sent_normal_packet_num;
+  guint                  payload_bytes;
+  MPRTPSPathPackets*     packets;
+  MPRTPSPathPacketsItem* item;
+  gint                   i;
+  GstClockTime           treshold;
 
-  this->sent_octets_write += 1;
-  this->sent_octets_write &= MAX_INT32_POSPART;
-  gst_rtp_buffer_unmap(&rtp);
+  packets = &this->packets;
+
+  payload_bytes = gst_rtp_buffer_get_payload_len (rtp);
+
+  ++packets->total_sent_packets_num;
+  packets->total_sent_payload_bytes += payload_bytes;
+
+  if(!packets->activated){
+    goto done;
+  }
+
+  packets->items[packets->write_index].payload_bytes = payload_bytes;
+  packets->items[packets->write_index].sent          = treshold = _now(this);
+  packets->items[packets->write_index].seq_num       = this->seq;
+
+  packets->sent_bytes_in_1s += payload_bytes;
+  treshold                  -= GST_SECOND < _now(this) ? GST_SECOND : 0;
+
+//g_print("Indexes: read - %d, write - %d, obsolation - %d sent_bytes: %d\n",
+//        packets->read_index,
+//        packets->write_index,
+//        packets->sent_obsolation_index,
+//        packets->sent_bytes_in_1s);
+
+  for(i = packets->sent_obsolation_index; i != packets->write_index; i = (i+1) % packets->length){
+    item = packets->items + i;
+    if(treshold < item->sent){
+      break;
+    }
+//    g_print("Sent bytes subtracted by %d at sent process\n", item->payload_bytes);
+    packets->sent_bytes_in_1s      -= item->payload_bytes;
+    packets->sent_obsolation_index  = (i+1) % packets->length;
+  }
+
+  if(++packets->write_index == packets->length){
+    packets->write_index = 0;
+  }
+  if(packets->write_index == packets->read_index){
+    //BAD!
+    GST_WARNING_OBJECT(this, "Too many packet sent on path or packets monitoring hasn't been refreshed");
+  }else{
+    ++packets->counter;
+  }
+
+done:
+  return;
 }
 
 
-//
-//GstBuffer* _create_monitor_packet(MPRTPSPath * this)
-//{
-//  GstBuffer *result;
-//  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-//  if(this->monitorpackets){
-//    result = monitorpackets_provide_rtp_packet(this->monitorpackets);
-//  }else{
-//    result = gst_rtp_buffer_new_allocate (1400, 0, 0);
-//  }
-//  gst_rtp_buffer_map(result, GST_MAP_READWRITE, &rtp);
-//  gst_rtp_buffer_set_payload_type(&rtp, this->monitor_payload_type);
-//
-//  gst_rtp_buffer_unmap(&rtp);
-//  return result;
-//}
 
 #undef THIS_READLOCK
 #undef THIS_READUNLOCK

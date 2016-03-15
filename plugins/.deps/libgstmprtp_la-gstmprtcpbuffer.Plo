@@ -203,7 +203,7 @@ libgstmprtp_la-gstmprtcpbuffer.lo: gstmprtcpbuffer.c \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
  gstmprtcpbuffer.h gstmprtpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtpdefs.h \
  /usr/include/x86_64-linux-gnu/sys/time.h \
  /usr/lib/gcc/x86_64-linux-gnu/4.8/include/stdint.h /usr/include/stdint.h \
  /usr/include/x86_64-linux-gnu/bits/wchar.h
@@ -677,6 +677,8 @@ gstmprtpbuffer.h:
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
+
+mprtpdefs.h:
 
 /usr/include/x86_64-linux-gnu/sys/time.h:
 

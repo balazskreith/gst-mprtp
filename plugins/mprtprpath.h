@@ -16,6 +16,8 @@
 #include "bintree.h"
 #include "numstracker.h"
 #include "percentiletracker2.h"
+#include "gstmprtpbuffer.h"
+#include "percentiletracker.h"
 
 G_BEGIN_DECLS
 
@@ -23,8 +25,7 @@ typedef struct _MpRTPReceiverPath MpRTPRPath;
 typedef struct _MpRTPReceiverPathClass MpRTPRPathClass;
 typedef struct _MpRTPRReceivedItem  MpRTPRReceivedItem;
 
-#include "gstmprtpbuffer.h"
-#include "percentiletracker.h"
+
 
 #define MPRTPR_PACKET_INIT           {NULL, 0, 0, 0}
 

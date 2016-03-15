@@ -40,6 +40,8 @@ struct _NetQueueAnalyser
   GstClock*                sysclock;
   GRWLock                  rwmutex;
   gpointer                 priv;
+  GstClockTime             last_congestion;
+  PercentileTracker*       delays;
 };
 
 struct _NetQueueAnalyserClass{

@@ -81,12 +81,12 @@ typedef enum{
   EVENT_DISTORTION           = -1,
   EVENT_FI                   =  0,
   EVENT_SETTLED              =  1,
-  EVENT_STEADY               =  2,
+  EVENT_READY               =  2,
 }Event;
 
 typedef enum{
   STAGE_REDUCE             = -1,
-  STAGE_KEEP               =  0,
+  STAGE_STEADY               =  0,
   STAGE_PROBE              =  1,
   STAGE_INCREASE           =  2,
 }Stage;
@@ -102,9 +102,13 @@ struct _Private{
   gboolean            path_is_congested;
   gboolean            path_is_lossy;
   gint32              sender_bitrate;
+  gint32              receiver_bitrate;
+  gint32              goodput_bitrate;
+
   gboolean            mitigated;
   Event               event;
   Stage               stage;
+  Stage               stage_t1;
   gboolean            controlled;
   SubflowMeasurement* measurement;
   gboolean            tr_correlated;
@@ -120,6 +124,7 @@ struct _Private{
 #define _priv(this) ((Private*)this->priv)
 #define _state(this) this->state
 #define _stage(this) _priv(this)->stage
+#define _stage_t1(this) _priv(this)->stage_t1
 #define _event(this) _priv(this)->event
 #define _set_event(this, e) _event(this) = e
 #define _set_pending_event(this, e) this->pending_event = e
@@ -127,6 +132,8 @@ struct _Private{
 #define _anres(this) _measurement(this)->netq_analysation
 #define _TR(this) this->target_bitrate
 #define _SR(this) (_priv(this)->sender_bitrate)
+#define _RR(this) (_priv(this)->receiver_bitrate)
+#define _GP(this) (_priv(this)->goodput_bitrate)
 #define _min_br(this) MIN(_SR(this), _TR(this))
 #define _max_br(this) MAX(_SR(this), _TR(this))
 
@@ -267,7 +274,7 @@ SubflowRateController *make_subratectrler(SendingRateDistributor* rate_controlll
   result->setup_time          = _now(result);
   result->monitoring_interval = 3;
   result->analyser            = make_netqueue_analyser(result->id);
-  _switch_stage_to(result, STAGE_KEEP, FALSE);
+  _switch_stage_to(result, STAGE_STEADY, FALSE);
   _transit_state_to(result, SUBFLOW_STATE_STABLE);
 
   return result;
@@ -277,22 +284,10 @@ static void _update_tr_corr(SubflowRateController *this,
                             SubflowMeasurement *measurement)
 {
   gdouble tr_corr;
-//  _priv(this)->sending_bitrates[_priv(this)->sr_tr_index] = measurement->sending_bitrate;
-//  _priv(this)->target_bitrates[_priv(this)->sr_tr_index]  = this->target_bitrate;
-//
-//  _priv(this)->sending_bitrate_sum += _priv(this)->sending_bitrates[_priv(this)->sr_tr_index];
-//  _priv(this)->target_bitrate_sum  += _priv(this)->target_bitrates[_priv(this)->sr_tr_index];
-//
-//  if(++_priv(this)->sr_tr_index == SR_TR_ARRAY_LENGTH){
-//    _priv(this)->sr_tr_index = 0;
-//  }
-//
-//  _priv(this)->sending_bitrate_sum -= _priv(this)->sending_bitrates[_priv(this)->sr_tr_index];
-//  _priv(this)->target_bitrate_sum  -= _priv(this)->target_bitrates[_priv(this)->sr_tr_index];
-//
-//  tr_corr =  _priv(this)->sending_bitrate_sum / _priv(this)->target_bitrate_sum;
 
-  _priv(this)->sender_bitrate = measurement->sending_bitrate;
+  _priv(this)->sender_bitrate   = measurement->sending_bitrate;
+  _priv(this)->receiver_bitrate = measurement->receiver_bitrate;
+  _priv(this)->goodput_bitrate  = measurement->goodput_bitrate;
   tr_corr =  (gdouble)measurement->sending_bitrate / (gdouble)this->target_bitrate;
 
   _priv(this)->tr_correlated = .9 < tr_corr && tr_corr < 1.1;
@@ -388,26 +383,25 @@ _reduce_stage(
   gint32 target_rate;
   target_rate = this->target_bitrate;
 
-  if(!this->reduced || KEEP_MIN < this->consecutive_congestion){
-    this->reduced = TRUE;
-    this->congestion_detected = _now(this);
-    this->consecutive_congestion = 0;
-    this->bottleneck_point = _min_br(this);
-    target_rate *= _anres(this).congestion_level == 1 ? .8 : .6;
-    _change_target_bitrate(this, target_rate);
-    _disable_controlling(this);
+  if(!_anres(this).congestion_level){
+    if(this->mitigated < _now(this) - 5 * GST_SECOND){
+      this->mitigated = _now(this);
+      target_rate *= 1.-CONSTRAIN(.1,.2,_anres(this).trend * 2.);
+      this->bottleneck_point = target_rate;
+    }
     goto done;
   }
 
-  if(_anres(this).stability_time == 0){
-    this->consecutive_congestion = GST_TIME_AS_SECONDS(_now(this) - this->congestion_detected);
-    goto done;
-  }
+  this->bottleneck_point    = _min_br(this);
+  this->congestion_detected = _now(this);
+  target_rate *= _anres(this).congestion_level == 1 ? .8 : .6;
 
+done:
+  _change_target_bitrate(this, target_rate);
   _reset_monitoring(this);
   _set_pending_event(this, EVENT_SETTLED);
-  _switch_stage_to(this, STAGE_KEEP, FALSE);
-done:
+  _switch_stage_to(this, STAGE_STEADY, FALSE);
+  _disable_controlling(this);
   return;
 }
 
@@ -417,29 +411,19 @@ _steady_stage(
 {
   gint32 target_rate = _TR(this);
 
-  if(_anres(this).congestion_level){
+  if(0 < _anres(this).congestion_level){
+    if(_anres(this).congestion_level == 1 && _stage_t1(this) != STAGE_STEADY){
+      target_rate *= 1. - _anres(this).trend;
+      goto done;
+    }
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, TRUE);
     goto exit;
   }
 
-  if(_anres(this).distortion_level && this->mitigated < _now(this) - 5 * GST_SECOND){
-    this->mitigated = _now(this);
-    target_rate *= 1.-CONSTRAIN(.1,.2,_anres(this).trend * 2.);
-    this->bottleneck_point = target_rate;
-    _set_event(this, EVENT_DISTORTION);
-    _set_pending_event(this, EVENT_SETTLED);
-    _disable_controlling(this);
-    goto done;
-  }
-
-  if(_anres(this).stability_time < this->keep || !_priv(this)->tr_correlated){
-    goto done;
-  }
-
   _setup_monitoring(this);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
-  _set_event(this, EVENT_STEADY);
+  _set_event(this, EVENT_READY);
 done:
   _change_target_bitrate(this, target_rate);
 exit:
@@ -453,26 +437,22 @@ _probe_stage(
 {
   gint32 target_rate = this->target_bitrate;
 
-  if(_anres(this).congestion_level){
+  if(0 < _anres(this).congestion_level){
     _disable_monitoring(this);
+    if(_anres(this).congestion_level == 1){
+      _change_target_bitrate(this, target_rate * (1. - _anres(this).trend));
+      _switch_stage_to(this, STAGE_STEADY, FALSE);
+      _set_event(this, EVENT_DISTORTION);
+      goto exit;
+    }
     _switch_stage_to(this, STAGE_REDUCE, TRUE);
     _set_event(this, EVENT_CONGESTION);
     goto exit;
   }
 
-  if(_anres(this).distortion_level){
-    _disable_monitoring(this);
-    _switch_stage_to(this, STAGE_KEEP, TRUE);
-    _set_event(this, EVENT_DISTORTION);
-    goto exit;
+  if(_priv(this)->tr_correlated){
+    _change_target_bitrate(this, target_rate + this->monitored_bitrate);
   }
-
-  if(_anres(this).stability_time < this->keep){
-    goto exit;
-  }
-
-  netqueue_analyser_reset_stability(this->analyser);
-  _change_target_bitrate(this, target_rate + this->monitored_bitrate);
   _disable_monitoring(this);
   _switch_stage_to(this, STAGE_INCREASE, FALSE);
 exit:
@@ -490,19 +470,10 @@ _increase_stage(
     goto exit;
   }
 
-  if(0 < _anres(this).distortion_level){
-    _switch_stage_to(this, STAGE_KEEP, TRUE);
-    _set_event(this, EVENT_DISTORTION);
-    goto exit;
-  }
-
-  if(_anres(this).stability_time < this->keep || !_priv(this)->tr_correlated){
-    goto exit;
-  }
-
+  _change_target_bitrate(this, this->target_bitrate * (1. - _anres(this).trend));
   _setup_monitoring(this);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
-  _set_event(this, EVENT_STEADY);
+  _set_event(this, EVENT_READY);
 exit:
   return;
 }
@@ -533,7 +504,7 @@ _fire(
           mprtps_path_set_congested(this->path);
           _transit_state_to(this, SUBFLOW_STATE_OVERUSED);
         break;
-        case EVENT_STEADY:
+        case EVENT_READY:
           netqueue_analyser_reset_stability(this->analyser);
           _transit_state_to(this, SUBFLOW_STATE_MONITORED);
           break;
@@ -555,7 +526,7 @@ _fire(
           netqueue_analyser_reset_stability(this->analyser);
           _transit_state_to(this, SUBFLOW_STATE_STABLE);
         break;
-        case EVENT_STEADY:
+        case EVENT_READY:
           netqueue_analyser_reset_stability(this->analyser);
         break;
         case EVENT_FI:
@@ -576,7 +547,7 @@ void _switch_stage_to(
     gboolean execute)
 {
   switch(target){
-     case STAGE_KEEP:
+     case STAGE_STEADY:
        this->stage_fnc = _steady_stage;
      break;
      case STAGE_REDUCE:
@@ -589,6 +560,7 @@ void _switch_stage_to(
        this->stage_fnc = _probe_stage;
      break;
    }
+  _priv(this)->stage_t1 = _priv(this)->stage;
   _priv(this)->stage = target;
   if(execute){
       this->stage_fnc(this);

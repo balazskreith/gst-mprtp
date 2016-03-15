@@ -9,15 +9,15 @@
 #define REPPROCER_H_
 
 #include <gst/gst.h>
-
 #include "mprtprpath.h"
 #include "streamjoiner.h"
 #include "ricalcer.h"
-#include "streamsplitter.h"
+
 
 typedef struct _ReportProcessor ReportProcessor;
 typedef struct _ReportProcessorClass ReportProcessorClass;
 typedef struct _GstMPRTCPReportSummary GstMPRTCPReportSummary;
+
 
 #define REPORTPROCESSOR_TYPE             (report_processor_get_type())
 #define REPORTPROCESSOR(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),REPORTPROCESSOR_TYPE,ReportProcessor))
@@ -79,6 +79,7 @@ struct _GstMPRTCPReportSummary{
     gboolean          processed;
     guint16           values[100];
     guint16           length;
+    gint32            total;
   }XR_RFC7097;
 };
 

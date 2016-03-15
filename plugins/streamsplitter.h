@@ -9,7 +9,6 @@
 #define STREAM_SPLITTERN_H_
 
 #include <gst/gst.h>
-
 #include "mprtpspath.h"
 #include "numstracker.h"
 

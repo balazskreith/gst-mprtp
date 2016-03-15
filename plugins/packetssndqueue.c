@@ -41,7 +41,19 @@
 //#define THIS_READUNLOCK(this)
 //#define THIS_WRITELOCK(this)
 //#define THIS_WRITEUNLOCK(this)
-#define _cmp_uint16(x,y) ((x==y)?0:((gint16) (x - y)) < 0 ? -1 : 1)
+//#define _cmp_uint16(x,y) ((x==y)?0:((gint16) (x - y)) < 0 ? -1 : 1)
+
+//static gint
+//_cmp_uint16 (guint16 x, guint16 y)
+//{
+//  if(x == y) return 0;
+//  if(x < y && y - x < 32768) return -1;
+//  if(x > y && x - y > 32768) return -1;
+//  if(x < y && y - x > 32768) return 1;
+//  if(x > y && x - y < 32768) return 1;
+//  return 0;
+//}
+
 
 GST_DEBUG_CATEGORY_STATIC (packetssndqueue_debug_category);
 #define GST_CAT_DEFAULT packetssndqueue_debug_category

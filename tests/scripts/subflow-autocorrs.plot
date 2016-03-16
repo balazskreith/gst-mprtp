@@ -33,7 +33,7 @@ unset xlabel
 unset xrange
 
 #set multiplot layout 6,1 title plot_title
-set multiplot layout 6,1 font ",18"
+set multiplot layout 9,1 font ",18"
 
 # Line width of the axes
 set border linewidth 0.1
@@ -73,5 +73,13 @@ plot autocorr_file using 0:4 with lines ls 4 title "g(500ms)"
 set xlabel "running length"
 
 plot autocorr_file using 0:5 with lines ls 5 title "g(1000ms)"
+
+#plot autocorr_file using 0:6 with lines ls 6 title "g(2000ms)"
+
+#plot autocorr_file using 0:7 with lines ls 7 title "g(4000ms)"
+
+#plot autocorr_file using 0:8 with lines ls 8 title "g(8000ms)"
+
+
 
 unset multiplot

@@ -22,6 +22,7 @@ typedef struct _MonitorPacketsClass MonitorPacketsClass;
 #define MONITORPACKETS_CAST(src)        ((MonitorPackets *)(src))
 
 typedef struct _MonitorPacketsNode MonitorPacketsNode;
+typedef struct _RTPFECHeader RTPFECHeader;
 
 #define MONITORPACKETS_CONTENTS_LENGTH 3
 
@@ -35,6 +36,11 @@ struct _MonitorPackets
   guint16                  monitor_cycle;
   gint                     counter;
   GstClock*                sysclock;
+};
+
+//Todo: implement it
+struct _RTPFECHeader{
+
 };
 
 struct _MonitorPacketsClass{

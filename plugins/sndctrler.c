@@ -325,6 +325,7 @@ sndctrler_add_path (SndController *this, guint8 subflow_id, MPRTPSPath * path)
     goto exit;
   }
   new_subflow = _make_subflow (subflow_id, path);
+  new_subflow->rate_controller = make_subratectrler(this->rate_distor, new_subflow->path);
   g_hash_table_insert (this->subflows, GINT_TO_POINTER (subflow_id),
                        new_subflow);
   ++this->subflow_num;
@@ -487,14 +488,15 @@ void _subflow_iterator(
 
 void _enable_controlling(Subflow *subflow, gpointer data)
 {
-  SndController *this = data;
-  subflow->rate_controller = make_subratectrler(this->rate_distor, subflow->path);
+//  SndController *this = data;
+  subratectrler_enable(subflow->rate_controller);
   mprtps_path_activate_packets_monitoring(subflow->path, DEFAULT_PATH_STAT_PACKETS_LENGTH);
 }
 
 void _disable_controlling(Subflow *subflow, gpointer data)
 {
 //  SndController *this = data;
+  subratectrler_disable(subflow->rate_controller);
   mprtps_path_deactivate_packets_monitoring(subflow->path);
 }
 

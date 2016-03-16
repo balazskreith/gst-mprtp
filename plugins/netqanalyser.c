@@ -64,9 +64,10 @@ struct _CorrBlock{
 };
 
 typedef struct _NetQueueAnalyserPrivate{
-  CorrBlock           cblocks[6];
+  CorrBlock           cblocks[8];
   guint32             cblocks_counter;
   GstClockTime        delay80th;
+  GstClockTime        min_delay;
 }NetQueueAnalyserPrivate;
 
 
@@ -121,6 +122,7 @@ static void _delay80th_pipe(gpointer data, PercentileTrackerPipeData *stats)
 {
   NetQueueAnalyser *this = data;
   _priv(this)->delay80th = stats->percentile;
+  _priv(this)->min_delay = stats->min;
 }
 
 NetQueueAnalyser *make_netqueue_analyser(guint8 id)
@@ -139,27 +141,43 @@ NetQueueAnalyser *make_netqueue_analyser(guint8 id)
   _priv(this)->cblocks[1].next = &_priv(this)->cblocks[2];
   _priv(this)->cblocks[2].next = &_priv(this)->cblocks[3];
   _priv(this)->cblocks[3].next = &_priv(this)->cblocks[4];
+  _priv(this)->cblocks[4].next = &_priv(this)->cblocks[5];
+  _priv(this)->cblocks[5].next = &_priv(this)->cblocks[6];
+  _priv(this)->cblocks[6].next = &_priv(this)->cblocks[7];
   _priv(this)->cblocks[0].id   = 0;
   _priv(this)->cblocks[1].id   = 1;
   _priv(this)->cblocks[2].id   = 2;
   _priv(this)->cblocks[3].id   = 3;
   _priv(this)->cblocks[4].id   = 4;
-  _priv(this)->cblocks[0].N    = 4;
-  _priv(this)->cblocks[1].N    = 4;
+  _priv(this)->cblocks[5].id   = 5;
+  _priv(this)->cblocks[6].id   = 6;
+  _priv(this)->cblocks[7].id   = 7;
+
+  _priv(this)->cblocks[0].N    = 16;
+  _priv(this)->cblocks[1].N    = 8;
   _priv(this)->cblocks[2].N    = 4;
-  _priv(this)->cblocks[3].N    = 4;
+  _priv(this)->cblocks[3].N    = 2;
   _priv(this)->cblocks[4].N    = 4;
-  _priv(this)->cblocks[0].distortion_th   = 0.025;
-  _priv(this)->cblocks[1].distortion_th   = 0.05;
-  _priv(this)->cblocks[2].distortion_th   = 0.1;
-  _priv(this)->cblocks[3].distortion_th   = 1.;
+  _priv(this)->cblocks[5].N    = 4;
+  _priv(this)->cblocks[6].N    = 4;
+  _priv(this)->cblocks[7].N    = 4;
+  _priv(this)->cblocks[0].distortion_th   = 0.0125;
+  _priv(this)->cblocks[1].distortion_th   = 0.0125;
+  _priv(this)->cblocks[2].distortion_th   = 0.0125;
+  _priv(this)->cblocks[3].distortion_th   = 0.00625;
   _priv(this)->cblocks[4].distortion_th   = 1.;
+  _priv(this)->cblocks[5].distortion_th   = 1.;
+  _priv(this)->cblocks[6].distortion_th   = 1.;
+  _priv(this)->cblocks[7].distortion_th   = 1.;
 
   _priv(this)->cblocks[0].congestion_th   = 0.1;
   _priv(this)->cblocks[1].congestion_th   = 0.1;
   _priv(this)->cblocks[2].congestion_th   = 0.1;
   _priv(this)->cblocks[3].congestion_th   = 1.;
   _priv(this)->cblocks[4].congestion_th   = 1.;
+  _priv(this)->cblocks[5].congestion_th   = 1.;
+  _priv(this)->cblocks[6].congestion_th   = 1.;
+  _priv(this)->cblocks[7].congestion_th   = 1.;
   _priv(this)->cblocks_counter = 1;
 
   THIS_WRITEUNLOCK (this);
@@ -183,22 +201,21 @@ void netqueue_analyser_do(NetQueueAnalyser       *this,
                           NetQueueAnalyserResult *result)
 {
   gint i;
-
+  gdouble corrH = 0.;
   if(!summary->XR_OWD_RLE.processed){
     g_warning("NetQueue Analyser can not work without OWD RLE");
     return;
   }
 
-  result->distortion_level        = 0;
-  result->congestion_level        = 0;
-  result->congestion_indicator    = FALSE;
+  result->discards   = FALSE;
+  result->congestion = FALSE;
 
   if(summary->XR_RFC7097.processed){
-    result->congestion_level = 0 < summary->XR_RFC7097.length ? 1 : 0;
+    result->discards = 0 < summary->XR_RFC7097.length ? 1 : 0;
+    result->rdiscards = 0 < summary->XR_RFC7097.values[summary->XR_RFC7097.length-1];
   }else if(summary->XR_RFC7243.processed){
-    result->congestion_level = 0 < summary->XR_RFC7243.discarded_bytes ? 1 : 0;
+    result->discards = 0 < summary->XR_RFC7243.discarded_bytes ? 1 : 0;
   }
-
 
   for(i=0; i<summary->XR_OWD_RLE.length; ++i){
     GstClockTime delay;
@@ -208,9 +225,7 @@ void netqueue_analyser_do(NetQueueAnalyser       *this,
     }
 
     percentiletracker_add(this->delays, delay);
-    //Todo: do it more softly
-    result->congestion_level = _priv(this)->delay80th * 1.2 < delay ? 2 : 0;
-
+    corrH = MAX(corrH, (gdouble)delay / (gdouble)_priv(this)->delay80th);
     _priv(this)->cblocks[0].Iu0 = GST_TIME_AS_USECONDS(delay) / 50.;
     _execute_corrblocks(_priv(this), _priv(this)->cblocks, 4);
     _execute_corrblocks(_priv(this), _priv(this)->cblocks, 4);
@@ -220,7 +235,8 @@ void netqueue_analyser_do(NetQueueAnalyser       *this,
     _readable_logging(this);
 
   }
-
+  result->corrH      = corrH;
+  result->congestion = FALSE;
   _qdeanalyzer_evaluation(this, result);
   _readable_result(this, result);
 
@@ -233,18 +249,15 @@ void netqueue_analyser_do(NetQueueAnalyser       *this,
 void _qdeanalyzer_evaluation(NetQueueAnalyser *this, NetQueueAnalyserResult *result)
 {
 
-  result->trend = _priv(this)->cblocks[0].g_max + _priv(this)->cblocks[1].g_max + _priv(this)->cblocks[2].g_max;
+  result->distortion |= _priv(this)->cblocks[0].distorted;
+  result->distortion |= _priv(this)->cblocks[1].distorted;
+  result->distortion |= _priv(this)->cblocks[2].distorted;
+  result->distortion |= _priv(this)->cblocks[3].distorted;
+
+  result->trend = _priv(this)->cblocks[0].g_max + _priv(this)->cblocks[1].g_max + _priv(this)->cblocks[2].g_max + _priv(this)->cblocks[3].g_max;
   result->trend = CONSTRAIN(-.1, .1, result->trend);
 
-  if(result->congestion_level == 0){
-    result->congestion_level = _priv(this)->cblocks[0].distorted || _priv(this)->cblocks[1].distorted ? 1 : 0;
-  }else if(result->congestion_level == 1){
-    if(_priv(this)->cblocks[0].congested){
-      result->congestion_level = _priv(this)->cblocks[1].congested ? 2 : 1;
-    }
-  }
-
-  if(!result->congestion_level){
+  if(!result->distortion){
     if(this->last_stable == 0){
       this->last_stable = _now(this);
     }else{
@@ -257,16 +270,54 @@ void _qdeanalyzer_evaluation(NetQueueAnalyser *this, NetQueueAnalyserResult *res
   _priv(this)->cblocks[0].distorted = FALSE;
   _priv(this)->cblocks[1].distorted = FALSE;
   _priv(this)->cblocks[2].distorted = FALSE;
-
-  _priv(this)->cblocks[0].congested = FALSE;
-  _priv(this)->cblocks[1].congested = FALSE;
-  _priv(this)->cblocks[2].congested = FALSE;
+  _priv(this)->cblocks[3].distorted = FALSE;
 
   _priv(this)->cblocks[0].g_max = 0.;
   _priv(this)->cblocks[1].g_max = 0.;
   _priv(this)->cblocks[2].g_max = 0.;
+  _priv(this)->cblocks[3].g_max = 0.;
 
 }
+
+
+//void _qdeanalyzer_evaluation(NetQueueAnalyser *this, NetQueueAnalyserResult *result)
+//{
+//
+//  result->trend = _priv(this)->cblocks[0].g_max + _priv(this)->cblocks[1].g_max + _priv(this)->cblocks[2].g_max;
+//  result->trend = CONSTRAIN(-.1, .1, result->trend);
+//
+//  if(result->congestion_level == 0){
+//    result->congestion_level = _priv(this)->cblocks[0].distorted || _priv(this)->cblocks[1].distorted ? 1 : 0;
+//  }else if(result->congestion_level == 1){
+//    if(_priv(this)->cblocks[0].congested){
+//      result->congestion_level = _priv(this)->cblocks[1].congested ? 2 : 1;
+//    }
+//  }
+//
+//  if(!result->congestion_level){
+//    if(this->last_stable == 0){
+//      this->last_stable = _now(this);
+//    }else{
+//      result->stability_time = GST_TIME_AS_SECONDS(_now(this) - this->last_stable);
+//    }
+//  }else{
+//    result->stability_time = this->last_stable = 0;
+//  }
+//
+//  _priv(this)->cblocks[0].distorted = FALSE;
+//  _priv(this)->cblocks[1].distorted = FALSE;
+//  _priv(this)->cblocks[2].distorted = FALSE;
+//  _priv(this)->cblocks[3].distorted = FALSE;
+//
+//  _priv(this)->cblocks[0].congested = FALSE;
+//  _priv(this)->cblocks[1].congested = FALSE;
+//  _priv(this)->cblocks[2].congested = FALSE;
+//
+//  _priv(this)->cblocks[0].g_max = 0.;
+//  _priv(this)->cblocks[1].g_max = 0.;
+//  _priv(this)->cblocks[2].g_max = 0.;
+//
+//}
 
 
 void _execute_corrblocks(NetQueueAnalyserPrivate *this, CorrBlock *blocks, guint blocks_length)
@@ -290,6 +341,12 @@ void _execute_corrblocks(NetQueueAnalyserPrivate *this, CorrBlock *blocks, guint
         break;
     case 64:
           _execute_corrblock(blocks + 5);
+        break;
+    case 128:
+          _execute_corrblock(blocks + 6);
+        break;
+    case 256:
+          _execute_corrblock(blocks + 7);
         break;
     default:
 //      g_print("not execute: %u\n", X);
@@ -329,10 +386,10 @@ void _execute_corrblock(CorrBlock* this)
   if(this->g < -1.*this->distortion_th || this->distortion_th < this->g){
     this->distorted = TRUE;
   }
-
-  if(this->congestion_th < this->g){
-    this->congested = TRUE;
-  }
+//
+//  if(this->congestion_th < this->g){
+//    this->congested = TRUE;
+//  }
 }
 
 
@@ -342,7 +399,7 @@ void _csv_logging(NetQueueAnalyser *this, GstClockTime delay)
   memset(filename, 0, 255);
   sprintf(filename, "logs/netqanalyser_%d.csv", this->id);
   mprtp_logger(filename,
-               "%lu,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f\n",
+               "%lu,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f\n",
 
                GST_TIME_AS_USECONDS(delay),
 
@@ -350,7 +407,10 @@ void _csv_logging(NetQueueAnalyser *this, GstClockTime delay)
               _priv(this)->cblocks[1].g,
               _priv(this)->cblocks[2].g,
               _priv(this)->cblocks[3].g,
-              _priv(this)->cblocks[4].g
+              _priv(this)->cblocks[4].g,
+              _priv(this)->cblocks[5].g,
+              _priv(this)->cblocks[6].g,
+              _priv(this)->cblocks[7].g
 
   );
 }
@@ -388,16 +448,15 @@ void _readable_result(NetQueueAnalyser *this, NetQueueAnalyserResult *result)
   sprintf(filename, "logs/netqanalyser_%d.log", this->id);
   mprtp_logger(filename,
                "############ Network Queue Analyser Results #################\n"
-               "congestion_level: %d, distortion_level: %d, stability_time: %lu\n"
-               "consecutive_congestion: %d, consecutive_distortion: %d, congestion_indicator: %d\n"
+               "distortion: %d, discards: %d, rdiscards: %d\n"
+               "corrH: %f\n"
                ,
 
-               result->congestion_level,
-               result->distortion_level,
+               result->distortion,
+               result->discards,
                result->stability_time,
-               result->consecutive_congestion,
-               result->consecutive_distortion,
-               result->congestion_indicator
+               result->rdiscards,
+               result->corrH
   );
 }
 

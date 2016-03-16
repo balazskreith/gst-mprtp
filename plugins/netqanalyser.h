@@ -50,12 +50,12 @@ struct _NetQueueAnalyserClass{
 };
 
 struct _NetQueueAnalyserResult{
+  gdouble        corrH;
+  gboolean       discards;
+  gboolean       rdiscards;
   gdouble        trend;
-  gboolean       congestion_indicator;
-  gint32         congestion_level;
-  gint32         distortion_level;
-  gint32         consecutive_congestion;
-  gint32         consecutive_distortion;
+  gboolean       distortion;
+  gboolean       congestion;
   GstClockTime   stability_time;
 };
 

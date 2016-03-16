@@ -35,7 +35,7 @@ typedef void (*SubTargetRateCtrler)(SubflowRateController*, gint32);
 typedef enum{
   SUBFLOW_STATE_OVERUSED       = -1,
   SUBFLOW_STATE_STABLE         =  0,
-  SUBFLOW_STATE_MONITORED      =  1,
+  SUBFLOW_STATE_UNDERUSED      =  1,
 }SubflowState;
 
 struct _SubflowMeasurement{
@@ -78,8 +78,10 @@ struct _SubflowRateController
   gint32                    min_rate;
 
   SubflowState              state;
+  SubflowState              state_t1;
+  gboolean                  enabled;
   gint32                    keep;
-  gboolean                  reduced;
+  GstClockTime              reduced;
   gint32                    consecutive_congestion;
 
   GstClockTime              setup_time;
@@ -104,6 +106,9 @@ struct _SubflowRateControllerClass{
 };
 GType subratectrler_get_type (void);
 SubflowRateController *make_subratectrler(SendingRateDistributor* rate_controlller, MPRTPSPath *path);
+
+void subratectrler_enable(SubflowRateController *this);
+void subratectrler_disable(SubflowRateController *this);
 
 void subratectrler_measurement_update(
                          SubflowRateController *this,

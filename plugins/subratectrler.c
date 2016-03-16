@@ -48,8 +48,8 @@ GST_DEBUG_CATEGORY_STATIC (subratectrler_debug_category);
 G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 
 #define MOMENTS_LENGTH 8
-#define KEEP_MAX 10
-#define KEEP_MIN 5
+#define KEEP_MAX 6
+#define KEEP_MIN 2
 
 #define DEFAULT_RAMP_UP_AGGRESSIVITY 0.
 #define DEFAULT_DISCARD_AGGRESSIVITY .1
@@ -313,16 +313,19 @@ static void _update_congestion_indicator(SubflowRateController *this,
 
   switch(_state(this)){
     case SUBFLOW_STATE_OVERUSED:
-      anres->congestion |= 1.5 < anres->corrH;
-      anres->congestion |= anres->rdiscards;
+      anres->congestion |= anres->discards && 1.5 < anres->corrH;
       break;
     case SUBFLOW_STATE_STABLE:
-      anres->congestion |= 1.2 < anres->corrH;
-      anres->congestion |= anres->discards;
+      if(_stage(this) == STAGE_KEEP){
+        anres->congestion |= anres->discards && 1.5 < anres->corrH;
+        anres->distortion |= 1.2 < anres->corrH;
+      }else if(_stage(this) == STAGE_PROBE){
+        anres->congestion |= anres->discards && 1.5 < anres->corrH;
+        anres->distortion |= 1.2 < anres->corrH;
+      }
       break;
     case SUBFLOW_STATE_UNDERUSED:
-      anres->congestion |= 1.5 < anres->corrH;
-      anres->congestion |= anres->rdiscards;
+      anres->congestion |= anres->discards && 1.5 < anres->corrH;
       anres->distortion |= 1.2 < anres->corrH;
       break;
   }
@@ -433,41 +436,39 @@ _reduce_stage(
     SubflowRateController *this)
 {
   gint32   target_rate;
-  gint32   pgp;
-  gint32   delta;
-  gint32   possibleRate;
+//  gint32   pgp;
+//  gint32   delta;
+//  gint32   possibleRate;
 
   target_rate = this->target_bitrate;
-  if(!_anres(this).congestion){
+  if(!_anres(this).congestion || !_anres(this).distortion){
+    target_rate *= .9;
     goto done;
   }
 
 //  if(_now(this) - 2 * GST_SECOND < this->reduced){
 //    goto exit;
 //  }
-//
-//  this->reduced         = _now(this);
-
-  if(_GP_t1(this) < _SR(this)){
-    delta = _SR(this) - _GP_t1(this);
-    pgp   = _GP_t1(this);
-  }else if(_GP(this) < _SR(this)){
-    delta = _SR(this) - _GP(this);
-    pgp   = _GP(this);
-  }else{
-    target_rate = _min_br(this) * .9;
-    goto done;
-  }
-  possibleRate           = _SR(this) - 2 * delta;
-  this->bottleneck_point = _RR(this);
-  if(_SR(this) < 2 * delta || possibleRate < .6 * _SR(this)){
-    if(_stage_t1(this) == STAGE_REDUCE || pgp < .6  * _SR(this)){
-      target_rate *= .6;
-    }
-  }else{
-    target_rate = possibleRate;
-    this->desired_bitrate = pgp;
-  }
+  this->reduced = _now(this);
+  target_rate  = MIN(_RR(this) * .9, target_rate * .6);
+//  if(_GP_t1(this) < _TR(this)){
+//    delta = _TR(this) - _GP_t1(this);
+//    pgp   = _GP_t1(this);
+//  }else if(_GP(this) < _TR(this)){
+//    delta = _TR(this) - _GP(this);
+//    pgp   = _GP(this);
+//  }else{
+//    target_rate *= .95;
+//    goto done;
+//  }
+//  possibleRate           = target_rate - 2 * delta;
+//  this->bottleneck_point = _RR(this);
+//  if(possibleRate < target_rate * .6){
+//    target_rate *= .707;
+//  }else{
+//    target_rate = possibleRate;
+//    this->desired_bitrate = pgp;
+//  }
 
   _change_target_bitrate(this, target_rate);
   _reset_monitoring(this);
@@ -475,10 +476,7 @@ _reduce_stage(
   goto exit;
 
 done:
-  if(0 < this->desired_bitrate){
-    _change_target_bitrate(this, MAX(this->desired_bitrate, target_rate));
-    this->desired_bitrate = 0;
-  }
+  _change_target_bitrate(this, target_rate);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
 exit:
   return;
@@ -497,16 +495,13 @@ _keep_stage(
   }
 
   if(_anres(this).distortion){
-    this->bottleneck_point = (_TR(this) + _SR(this))>>1;
-    target_rate *= 1.-_anres(this).trend;
     _set_event(this, EVENT_DISTORTION);
-    goto done;
+    goto exit;
   }
-  _set_event(this, EVENT_SETTLED);
 
+  _set_event(this, EVENT_SETTLED);
   _setup_monitoring(this);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
-done:
   _change_target_bitrate(this, target_rate);
 exit:
   return;
@@ -531,7 +526,7 @@ _probe_stage(
     goto exit;
   }
 
-  if(_now(this) - 2 * GST_SECOND < _priv(this)->stage_changed || !_priv(this)->tr_correlated){
+  if(_now(this) - KEEP_MIN * GST_SECOND < _priv(this)->stage_changed || !_priv(this)->tr_correlated){
     goto exit;
   }
 
@@ -556,11 +551,11 @@ _increase_stage(
 
   if(_anres(this).distortion){
     _set_event(this, EVENT_DISTORTION);
-    _switch_stage_to(this, STAGE_REDUCE, FALSE);
+    _switch_stage_to(this, STAGE_REDUCE, TRUE);
     goto exit;
   }
 
-  if(_now(this) - 2 * GST_SECOND < _priv(this)->stage_changed && !_priv(this)->tr_correlated){
+  if(_now(this) - KEEP_MIN * GST_SECOND < _priv(this)->stage_changed || !_priv(this)->tr_correlated){
     goto exit;
   }
 

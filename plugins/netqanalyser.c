@@ -161,10 +161,10 @@ NetQueueAnalyser *make_netqueue_analyser(guint8 id)
   _priv(this)->cblocks[5].N    = 4;
   _priv(this)->cblocks[6].N    = 4;
   _priv(this)->cblocks[7].N    = 4;
-  _priv(this)->cblocks[0].distortion_th   = 0.0125;
-  _priv(this)->cblocks[1].distortion_th   = 0.0125;
-  _priv(this)->cblocks[2].distortion_th   = 0.0125;
-  _priv(this)->cblocks[3].distortion_th   = 0.00625;
+  _priv(this)->cblocks[0].distortion_th   = 0.025;
+  _priv(this)->cblocks[1].distortion_th   = 0.025;
+  _priv(this)->cblocks[2].distortion_th   = 0.025;
+  _priv(this)->cblocks[3].distortion_th   = 0.025;
   _priv(this)->cblocks[4].distortion_th   = 1.;
   _priv(this)->cblocks[5].distortion_th   = 1.;
   _priv(this)->cblocks[6].distortion_th   = 1.;

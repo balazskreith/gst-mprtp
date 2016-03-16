@@ -498,7 +498,7 @@ _keep_stage(
 
   if(_anres(this).distortion){
     this->bottleneck_point = (_TR(this) + _SR(this))>>1;
-    target_rate *= _anres(this).trend;
+    target_rate *= 1.-_anres(this).trend;
     _set_event(this, EVENT_DISTORTION);
     goto done;
   }

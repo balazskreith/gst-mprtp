@@ -477,6 +477,10 @@ _orp_main(RcvController * this)
   {
     subflow = (Subflow *) val;
     ricalcer = subflow->ricalcer;
+    if(mprtpr_path_request_urgent_report(subflow->path)){
+      ricalcer_urgent_report_request(ricalcer);
+    }
+
     if(!ricalcer_do_report_now(ricalcer)){
       continue;
     }

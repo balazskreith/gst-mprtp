@@ -196,6 +196,18 @@ void mprtpr_path_get_XROWD_stats(MpRTPRPath *this,
   THIS_READUNLOCK (this);
 }
 
+
+
+gboolean mprtpr_path_request_urgent_report(MpRTPRPath *this)
+{
+  gboolean result;
+  THIS_WRITELOCK (this);
+  result = this->request_urgent_report;
+  this->request_urgent_report = FALSE;
+  THIS_WRITEUNLOCK (this);
+  return result;
+}
+
 void
 mprtpr_path_set_chunks_reported(MpRTPRPath *this)
 {
@@ -522,6 +534,13 @@ void _add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp)
 void _add_delay(MpRTPRPath *this, GstClockTime delay)
 {
   percentiletracker_add(this->delays, delay);
+
+  if(this->delay_avg == 0.) this->delay_avg = delay;
+  else                      this->delay_avg = delay * .001 + this->delay_avg * .999;
+
+  if(this->delay_avg < (delay>>1)){
+    this->request_urgent_report = TRUE;
+  }
 }
 
 void _add_skew(MpRTPRPath *this, gint64 skew)

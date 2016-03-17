@@ -124,6 +124,9 @@ struct _MpRTPReceiverPath
   PercentileTracker*  delays;
   PercentileTracker2* skews;
 
+  gdouble             delay_avg;
+  gboolean            request_urgent_report;
+
   NumsTracker*        gaps;
   NumsTracker*        lates;
 
@@ -172,6 +175,9 @@ void mprtpr_path_get_XROWD_stats(MpRTPRPath *this,
                                  GstClockTime *median,
                                  GstClockTime *min,
                                  GstClockTime* max);
+gboolean
+mprtpr_path_request_urgent_report(MpRTPRPath *this);
+
 void
 mprtpr_path_set_chunks_reported(MpRTPRPath *this);
 

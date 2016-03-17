@@ -316,24 +316,6 @@ static void _update_congestion_indicator(SubflowRateController *this,
 
   _priv(this)->fraction_lost = measurement->reports->RR.lost_rate;
   _anres(this).distortion |= .001 < _anres(this).trend;
-  switch(_state(this)){
-    case SUBFLOW_STATE_OVERUSED:
-      anres->congestion |= anres->discards && 1.5 < anres->corrH;
-      break;
-    case SUBFLOW_STATE_STABLE:
-      if(_stage(this) == STAGE_KEEP){
-        anres->congestion |= anres->discards && 1.5 < anres->corrH;
-        anres->distortion |= 1.2 < anres->corrH;
-      }else if(_stage(this) == STAGE_PROBE){
-        anres->congestion |= anres->discards && 1.5 < anres->corrH;
-        anres->distortion |= 1.2 < anres->corrH;
-      }
-      break;
-    case SUBFLOW_STATE_UNDERUSED:
-      anres->congestion |= anres->discards && 1.5 < anres->corrH;
-      anres->distortion |= 1.2 < anres->corrH;
-      break;
-  }
 
 }
 
@@ -518,7 +500,7 @@ _keep_stage(
       target_rate *= 1.-MIN(.05, _anres(this).trend);
     }
     _set_event(this, EVENT_DISTORTION);
-    goto exit;
+    goto done;
   }
 
   _set_event(this, EVENT_SETTLED);
@@ -526,7 +508,7 @@ _keep_stage(
   _switch_stage_to(this, STAGE_PROBE, FALSE);
 done:
   _change_target_bitrate(this, target_rate);
-exit:
+//exit:
   return;
 }
 
@@ -823,7 +805,7 @@ void _logging(SubflowRateController *this)
                "mon_br:     %-10d| mon_int: %-10d| tr_corr: %-10d| stability: %-9d\n"
                "dist_level: %-10d| cong_lvl:%-10d| trend:   %-10f| cons_cng:  %-10d|\n"
                "reduced:    %-10d| RR:      %-10d| GP:      %-10d| corrH:   %-10.3f\n"
-               "frac_lost:  %-10.3f\n"
+               "frac_lost:  %-10.3f| last_i:%-10lu| last_d: %-10lu|\n"
                "############################ Seconds since setup: %lu ##########################################\n",
 
                this->id, _state(this),
@@ -860,6 +842,8 @@ void _logging(SubflowRateController *this)
                _anres(this).corrH,
 
                _FL(this),
+               GST_TIME_AS_SECONDS(_now(this) - this->last_increase),
+               GST_TIME_AS_SECONDS(_now(this) - this->last_decrease),
 
               GST_TIME_AS_SECONDS(_now(this) - this->setup_time)
 

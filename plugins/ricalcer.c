@@ -86,6 +86,9 @@ ricalcer_init (ReportIntervalCalculator * this)
   this->avg_rtcp_size = 128.;
   this->allow_early = TRUE;
   this->urgent = FALSE;
+  this->max_interval = 1.5;
+  this->base_interval = 1.5;
+  this->min_interval = .5;
   this->sysclock = gst_system_clock_obtain();
 }
 
@@ -144,13 +147,15 @@ gboolean ricalcer_do_report_now (ReportIntervalCalculator * this)
     this->urgent = FALSE;
     result = TRUE;
     goto done;
+  }else if(!this->urgent){
+    this->base_interval = MIN(this->max_interval, this->base_interval * 1.5);
   }
   if(_now(this) < this->next_time){
     goto done;
   }
   this->last_interval = this->actual_interval;
   this->last_time = _now(this);
-  interval = .5 * g_random_double() + .5;
+  interval = this->base_interval * g_random_double() + .5;
   this->actual_interval = interval * (gdouble)GST_SECOND;
   this->next_time = _now(this) + this->actual_interval;
   this->allow_early = TRUE;
@@ -170,6 +175,7 @@ void ricalcer_refresh_parameters(ReportIntervalCalculator * this, gdouble media_
 void ricalcer_urgent_report_request(ReportIntervalCalculator * this)
 {
   this->urgent = TRUE;
+  this->base_interval = MAX(this->min_interval, this->base_interval/2.);
 }
 
 gdouble _calc_report_interval(ReportIntervalCalculator * this)

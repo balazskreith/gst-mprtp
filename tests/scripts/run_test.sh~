@@ -86,7 +86,7 @@ TARGET_DIR="logs"
 if [ "$TESTCASE" -eq 0 ]
 then
   echo "executing test case 0"
-  echo "./scripts/run_bwctrler.sh --bwprofile 0 --bwref 1000 --shift 2 --veth 0 --jitter 1 --latency 100 --output logs/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
+  echo "./scripts/run_bwctrler.sh --bwprofile 0 --bwref 2000 --shift 2 --veth 0 --jitter 1 --latency 100 --output logs/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
   chmod 777 scripts/test_bw_veth0_snd.sh
   sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
   sleep 1

@@ -31,6 +31,9 @@ struct _ReportIntervalCalculator
   gboolean         initialized;
   gboolean         allow_early;
   gboolean         urgent;
+  gdouble          max_interval;
+  gdouble          min_interval;
+  gdouble          base_interval;
   GstClock*        sysclock;
   GstClockTime     last_time;
   GstClockTime     next_time;

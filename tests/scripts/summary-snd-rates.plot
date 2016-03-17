@@ -5,7 +5,7 @@ if (!exists("plot_title")) plot_title='Subflow Receiver Rate Report'
 if (!exists("rate_file")) rate_file='logs/sub_snd_sum.csv'
 if (!exists("bw_file")) bw_file='logs/veth0.csv'
 if (!exists("output_file")) output_file='reports/summary-snd-rates.pdf'
-if (!exists("csv_length")) csv_length=6000
+if (!exists("duration")) duration=6000
 
 #-------------------------------------------------------------------------
 
@@ -23,7 +23,7 @@ set lmargin 10
 set rmargin 7
 set yrange [0:3000]
 set ytics 1000
-set xrange [0:csv_length]
+set xrange [0:duration]
 set xtics 500
 set ylabel "Size (KBits)"
 set xlabel "time (ms)"

@@ -5,7 +5,7 @@ if (!exists("plot_title")) plot_title='Subflow Sending report'
 if (!exists("rates_file")) rates_file='logs/sub_1_snd.csv'
 if (!exists("bw_file")) bw_file='logs/veth0.csv'
 if (!exists("output_file")) output_file='reports/sub_1_snd.pdf'
-if (!exists("csv_length")) csv_length=6000
+if (!exists("duration")) duration=6000
 
 #-------------------------------------------------------------------------
 
@@ -23,9 +23,9 @@ set lmargin 7
 set rmargin 7
 set yrange [0:3000]
 set ytics 500
-set xrange [0:csv_length]
-set xlabel "Rates (Kbits/s)"
-set ylabel "time (ms)"
+set xrange [0:duration]
+set ylabel "Rates (Kbits/s)"
+set xlabel "time (100ms)"
 set xtics 500
 
 # set title plot_title font ",18"

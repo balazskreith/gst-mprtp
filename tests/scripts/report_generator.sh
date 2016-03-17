@@ -51,6 +51,43 @@ esac
 shift # past argument or value
 done
 
+#1 tick is 125ms
+AUTOCORRDURATION=4800
+#1 tick is 100ms
+SUBRCVDELAYSDURATION=6000
+SUBRCVRATESDURATION=6000
+SUBSNDRATESDURATION=6000
+
+#1 tick is one arrive
+RTCPINTERVALDURATION=600
+
+SUMMARYDELAYSDURATION=6000
+SUMMARYSNDRATESDURATION=6000
+SUMPATHRATESDURATION=6000
+PLAYOUTSDURATION=600000
+
+case $TESTCASE in
+    0) 
+
+    ;;
+    1) 
+    AUTOCORRDURATION=800
+    SUBRCVDELAYSDURATION=1000
+    SUBRCVRATESDURATION=1000
+    RTCPINTERVALDURATION=100
+    SUBSNDRATESDURATION=1000
+    SUMMARYDELAYSDURATION=1000
+    SUMMARYSNDRATESDURATION=1000
+    SUMPATHRATESDURATION=1000
+    PLAYOUTSDURATION=100000
+    ;;
+    --default)
+
+    ;;
+    *)
+    echo "No Bandwidth profile was given the default is used"
+    ;;
+esac
 
 SUMPLAYOUT="reports/summary-playouts.pdf"
 SUMDELAYS="reports/summary-path-delays.pdf"
@@ -72,91 +109,92 @@ SUB1SNDRATES="reports/sub_1_snd_rates.pdf"
 SUB2SNDRATES="reports/sub_2_snd_rates.pdf"
 SUB3SNDRATES="reports/sub_3_snd_rates.pdf"
 #generate the plots
-gnuplot -e "csv_length='600000'" \
+gnuplot -e "duration='$PLAYOUTSDURATION'" \
         -e "xtick_value='100000'" \
         -e "output='$SUMPLAYOUT'" \
         scripts/summary-playouts.plot
 
 if [ $SUBFLOW2 = "1" ] && [ $SUBFLOW3 = "1" ]; then
   echo "Generate reports for subflow[1|2|3]"
-  gnuplot -e "csv_length='6000'" \
+
+  gnuplot -e "duration='$SUMMARYDELAYSDURATION'" \
           -e "latency_file_1='logs/sub_1_rcv.csv'" \
           -e "latency_file_2='logs/sub_2_rcv.csv'" \
           -e "latency_file_3='logs/sub_3_rcv.csv'" \
           -e "output_file='$SUMDELAYS'" \
           scripts/summary-delays.plot
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$AUTOCORRDURATION'" \
           -e "autocorr_file='logs/netqanalyser_1.csv'" \
           -e "output_file='$SUB1AUTOCORRS'" \
           scripts/subflow-autocorrs.plot
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$AUTOCORRDURATION'" \
           -e "autocorr_file='logs/netqanalyser_2.csv'" \
           -e "output_file='$SUB2AUTOCORRS'" \
           scripts/subflow-autocorrs.plot
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$AUTOCORRDURATION'" \
           -e "autocorr_file='logs/netqanalyser_3.csv'" \
           -e "output_file='$SUB3AUTOCORRS'" \
           scripts/subflow-autocorrs.plot
 
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$SUBRCVDELAYSDURATION'" \
           -e "delays_file='logs/sub_1_rcv.csv'" \
           -e "output_file='$SUB1RCVDELAYS'" \
           scripts/subflow-rcv-delays.plot
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$SUBRCVDELAYSDURATION'" \
           -e "delays_file='logs/sub_2_rcv.csv'" \
           -e "output_file='$SUB2RCVDELAYS'" \
           scripts/subflow-rcv-delays.plot
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$SUBRCVDELAYSDURATION'" \
           -e "delays_file='logs/sub_3_rcv.csv'" \
           -e "output_file='$SUB3RCVDELAYS'" \
           scripts/subflow-rcv-delays.plot
 
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUBRCVRATESDURATION'" \
           -e "rates_file='logs/sub_1_rcv.csv'" \
           -e "output_file='$SUB1RCVRATES'" \
           scripts/subflow-rcv-rates.plot
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUBRCVRATESDURATION'" \
           -e "rates_file='logs/sub_2_rcv.csv'" \
           -e "output_file='$SUB2RCVRATES'" \
           scripts/subflow-rcv-rates.plot
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUBRCVRATESDURATION'" \
           -e "rates_file='logs/sub_3_rcv.csv'" \
           -e "output_file='$SUB3RCVRATES'" \
           scripts/subflow-rcv-rates.plot
 
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$RTCPINTERVALDURATION'" \
           -e "rtcp_file='logs/rtcp_rr_1.csv'" \
           -e "output_file='$SUB1RTCPINTVALS'" \
           scripts/subflow-rtcp-intervals.plot
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$RTCPINTERVALDURATION'" \
           -e "rtcp_file='logs/rtcp_rr_2.csv'" \
           -e "output_file='$SUB2RTCPINTVALS'" \
           scripts/subflow-rtcp-intervals.plot
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$RTCPINTERVALDURATION'" \
           -e "rtcp_file='logs/rtcp_rr_3.csv'" \
           -e "output_file='$SUB3RTCPINTVALS'" \
           scripts/subflow-rtcp-intervals.plot
 
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUBSNDRATESDURATION'" \
           -e "rates_file='logs/sub_1_snd.csv'" \
           -e "output_file='$SUB1SNDRATES'" \
           scripts/subflow-snd-rates.plot
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUBSNDRATESDURATION'" \
           -e "rates_file='logs/sub_2_snd.csv'" \
           -e "output_file='$SUB2SNDRATES'" \
           scripts/subflow-snd-rates.plot
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUBSNDRATESDURATION'" \
           -e "rates_file='logs/sub_3_snd.csv'" \
           -e "output_file='$SUB3SNDRATES'" \
           scripts/subflow-snd-rates.plot
 
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUMPATHRATESDURATION'" \
           -e "path_rates='logs/path_rates.csv'" \
           -e "output_file='$SUMPATHRATES'" \
           -e "subflow_num='1'" \
           scripts/summary-path-rates.plot
 
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUMMARYSNDRATESDURATION'" \
           -e "rate_file='logs/sub_snd_sum.csv'" \
           -e "bw_file='logs/veth_aggr.csv'" \
           -e "output_file='$SUMSNDRATES'" \
@@ -165,106 +203,106 @@ if [ $SUBFLOW2 = "1" ] && [ $SUBFLOW3 = "1" ]; then
 
 elif [ $SUBFLOW2 = "1" ]; then
   echo "Generate reports for subflow[1|2]"
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUMMARYDELAYSDURATION'" \
           -e "latency_file_1='logs/sub_1_rcv.csv'" \
           -e "latency_file_2='logs/sub_2_rcv.csv'" \
           -e "output_file='$SUMDELAYS'" \
           scripts/summary-delays.plot
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$AUTOCORRDURATION'" \
           -e "autocorr_file='logs/netqanalyser_1.csv'" \
           -e "output_file='$SUB1AUTOCORRS'"
           scripts/subflow-autocorrs.plot
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$AUTOCORRDURATION'" \
           -e "autocorr_file='logs/netqanalyser_2.csv'" \
           -e "output_file='$SUB2AUTOCORRS'" \
           scripts/subflow-autocorrs.plot
 
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$SUBRCVDELAYSDURATION'" \
           -e "delays_file='logs/sub_1_rcv.csv'" \
           -e "output='$SUB1RCVDELAYS'" \
           scripts/subflow-rcv-delays.plot
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$SUBRCVDELAYSDURATION'" \
           -e "delays_file='logs/sub_2_rcv.csv'" \
           -e "output_file='$SUB2RCVDELAYS'" \
           scripts/subflow-rcv-delays.plot
 
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUBRCVRATESDURATION'" \
           -e "rates_file='logs/sub_1_rcv.csv'" \
           -e "output_file='$SUB1RCVRATES'" \
           scripts/subflow-rcv-rates.plot
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUBRCVRATESDURATION'" \
           -e "rates_file='logs/sub_2_rcv.csv'" \
           -e "output='$SUB2RCVRATES'" \
           scripts/subflow-rcv-rates.plot
 
-  gnuplot -e "csv_length='1000'" \
+   gnuplot -e "duration='$RTCPINTERVALDURATION'" \
           -e "rtcp_file='logs/rtcp_rr_1.csv'" \
           -e "output_file='$SUB1RTCPINTVALS'" \
           scripts/subflow-rtcp-intervals.plot
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$RTCPINTERVALDURATION'" \
           -e "rtcp_file='logs/rtcp_rr_2.csv'" \
           -e "output_file='$SUB2RTCPINTVALS'" \
           scripts/subflow-rtcp-intervals.plot
 
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUBSNDRATESDURATION'" \
           -e "rates_file='logs/sub_1_snd.csv'" \
           -e "output_file='$SUB1SNDRATES'" \
           scripts/subflow-snd-rates.plot
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUBSNDRATESDURATION'" \
           -e "rates_file='logs/sub_2_snd.csv'" \
           -e "output_file='$SUB2SNDRATES'" \
           scripts/subflow-snd-rates.plot
 
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUMPATHRATESDURATION'" \
           -e "path_rates='logs/path_rates.csv'" \
           -e "output_file='$SUMPATHRATES'" \
           -e "subflow_num='1'" \
           scripts/summary-path-rates.plot
 
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUMMARYSNDRATESDURATION'" \
           -e "rate_file='logs/sub_snd_sum.csv'" \
           -e "bw_file='logs/veth_aggr.csv'" \
           -e "output_file='$SUMSNDRATES'" \
           scripts/summary-snd-rates.plot
 else
   echo "Generate reports for subflow[1]"
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUMMARYDELAYSDURATION'" \
           -e "latency_file_1='logs/sub_1_rcv.csv'" \
           -e "output_file='$SUMDELAYS'" \
           scripts/summary-delays.plot
 
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$AUTOCORRDURATION'" \
           -e "autocorr_file='logs/netqanalyser_1.csv'" \
           -e "output_file='$SUB1AUTOCORRS'" \
           scripts/subflow-autocorrs.plot
 
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$SUBRCVDELAYSDURATION'" \
           -e "delays_file='logs/sub_1_rcv.csv'" \
           -e "output_file='$SUB1RCVDELAYS'" \
           scripts/subflow-rcv-delays.plot
 
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUBRCVRATESDURATION'" \
           -e "rates_file='logs/sub_1_rcv.csv'" \
           -e "output_file='$SUB1RCVRATES'" \
           scripts/subflow-rcv-rates.plot
 
-  gnuplot -e "csv_length='1000'" \
+  gnuplot -e "duration='$RTCPINTERVALDURATION'" \
           -e "rtcp_file='logs/rtcp_rr_1.csv'" \
           -e "output_file='$SUB1RTCPINTVALS'" \
           scripts/subflow-rtcp-intervals.plot
 
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUBSNDRATESDURATION'" \
           -e "rates_file='logs/sub_1_snd.csv'" \
           -e "output_file='$SUB1SNDRATES'" \
           scripts/subflow-snd-rates.plot
 
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUMPATHRATESDURATION'" \
           -e "path_rates='logs/path_rates.csv'" \
           -e "output_file='$SUMPATHRATES'" \
           -e "subflow_num='1'" \
           scripts/summary-path-rates.plot
 
-  gnuplot -e "csv_length='6000'" \
+  gnuplot -e "duration='$SUMMARYSNDRATESDURATION'" \
           -e "rate_file='logs/sub_snd_sum.csv'" \
           -e "bw_file='logs/veth0.csv'" \
           -e "output_file='$SUMSNDRATES'" \

@@ -26,7 +26,7 @@ LATENCY=50
 LIMIT=0
 SNUM=0
 BPROFILE=0
-JITTER=10
+JITTER=1
 OUTPUT="output.csv"
 
 # Process arguments
@@ -113,7 +113,7 @@ function path() {
 	let "LIMIT=$2*125"
 	let "LIMIT=$LIMIT/5"
 	echo "Setup $1 for "$LATENCY"ms and "$BW"Kbit rate with "$LIMIT" queue limit"
-	tc qdisc change dev "$1" root handle 1: netem delay "$LATENCY"ms 
+	tc qdisc change dev "$1" root handle 1: netem delay "$LATENCY"ms "$JITTER"ms
 	tc qdisc change dev "$1" parent 1: handle 2: tbf rate "$BW"kbit burst 100kbit limit $LIMIT
 }
 

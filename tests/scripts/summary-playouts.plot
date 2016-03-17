@@ -4,7 +4,7 @@ time=system("date +%Y_%m_%d_%H_%M_%S")
 if (!exists("plot_title"))    plot_title='Playouts summary'
 if (!exists("playouts_file")) playouts_file='logs/playouts.csv'
 if (!exists("output_file"))   output_file='reports/summary-playouts.pdf'
-if (!exists("csv_length"))    csv_length=600000
+if (!exists("duration"))    duration=600000
 if (!exists("xtick_value"))   xtick_value=100000
 
 #-------------------------------------------------------------------------
@@ -13,7 +13,7 @@ set terminal pdf enhanced rounded size 12,6
 set output output_file
 
 set origin 0,0
-set size ratio 0.25
+set size ratio 0.15
 set datafile separator "," 
 
 set key inside horizontal top right 
@@ -23,15 +23,15 @@ set tmargin 2
 set bmargin 0
 set lmargin 15
 set rmargin 5
-set xrange [0:csv_length]
-set yrange [0:200000]
-set ytics 50000
-set xrange [0:csv_length]
-set ylabel "Remaining time (us)"
+set xrange [0:duration]
+set yrange [0:200]
+set ytics 50
+set xrange [0:duration]
+set ylabel "Remaining time (ms)"
 unset xlabel
 
 #set multiplot layout 2,1 title plot_title
-set multiplot layout 2,1 font ",18"
+set multiplot layout 3,1 font ",18"
 
 # Line width of the axes
 set border linewidth 0.1
@@ -51,16 +51,19 @@ set style line 3 linecolor rgb '#185aa9' linetype 3 linewidth 1
 set style line 4 linecolor rgb '#a21d21' linetype 4 linewidth 1	
 set style line 5 linecolor rgb '#f47d23' linetype 4 linewidth 1	
 
-plot playouts_file using 0:2 with lines ls 1 title "Playout buffer" 
+set xrange [0:duration]
+set xlabel "Elapsed time (ms)"
+set xtics xtick_value
+
+plot playouts_file using 0:($2/1000) with lines ls 1 title "Playout buffer" 
 
 set key inside horizontal top right 
 set tics scale 0
 set ylabel "Size (KBytes)"
 set yrange [0:100]
 set ytics  20
-set xrange [0:csv_length]
-set xlabel "Elapsed time (ms)"
-set xtics xtick_value
+set xrange [0:duration]
+set ylabel "Remaining time (ms)"
 
 plot playouts_file using 0:1 with lines ls 2 title "Playout buffer"
 

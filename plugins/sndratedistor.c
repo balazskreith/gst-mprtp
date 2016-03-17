@@ -237,7 +237,7 @@ MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this)
   pacing =this->last_target * .1 < -1* this->delta_rate;
 distribute:
   this->last_target = this->target_bitrate;
-  packetssndqueue_setup(this->pacer, this->target_bitrate, pacing);
+  packetssndqueue_setup(this->pacer, this->target_bitrate * 1.2, 0 && pacing);
   foreach_subflows(this, i, subflow)
   {
     stream_splitter_setup_sending_target(this->splitter, subflow->id, subflow->sending_target);

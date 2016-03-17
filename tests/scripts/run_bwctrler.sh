@@ -26,7 +26,7 @@ LATENCY=50
 LIMIT=0
 SNUM=0
 BPROFILE=0
-JITTER=10
+JITTER=1
 OUTPUT="output.csv"
 
 # Process arguments

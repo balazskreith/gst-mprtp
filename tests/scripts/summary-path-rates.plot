@@ -5,7 +5,7 @@ if (!exists("plot_title")) plot_title='Subflow Path ratios'
 if (!exists("path_rates")) path_rates='logs/path_rates.csv'
 if (!exists("subflow_num")) subflow_num=1
 if (!exists("output_file")) output_file='reports/summary-path-rates.pdf'
-if (!exists("csv_length")) csv_length=6000
+if (!exists("duration")) duration=6000
 
 #-------------------------------------------------------------------------
 
@@ -23,10 +23,10 @@ set lmargin 10
 set rmargin 7
 set yrange [0:1.1]
 set ytics 0.1
-set xrange [0:csv_length]
+set xrange [0:duration]
 set xtics 500
 set ylabel "Ratio"
-set xlabel "time (ms)"
+set xlabel "time (100ms)"
 
 set style fill solid
 set style data boxes

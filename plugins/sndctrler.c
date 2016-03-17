@@ -537,9 +537,9 @@ _irp_processor_main(SndController * this)
     mprtps_path_packets_feedback_update(subflow->path, measurement.reports);
     subratectrler_measurement_update(subflow->rate_controller, &measurement);
 
-    g_print("Sender bitrate: %d Receiver bitrate: %d Goodput bitrate: %d bytes_in_flight: %d\n",
+    g_print("Sender bitrate: %d Receiver bitrate: %d Goodput bitrate: %d bits_in_flight: %d\n",
             measurement.sending_bitrate, measurement.receiver_bitrate,
-            measurement.goodput_bitrate, measurement.bytes_in_flight);
+            measurement.goodput_bitrate, measurement.bytes_in_flight * 8);
     subflow->process_state = REPORT_WAITING;
   }
 }

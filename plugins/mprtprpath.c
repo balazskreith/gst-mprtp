@@ -87,7 +87,7 @@ mprtpr_path_init (MpRTPRPath * this)
 
   _owdrle(this).last_step = _now(this);
   _owdrle(this).read_index = _owdrle(this).write_index = 0;
-  _owdrle(this).step_interval = 125 * GST_MSECOND;
+  _owdrle(this).step_interval = 100 * GST_MSECOND;
 
   _lostrle(this).last_step = _now(this);
   _lostrle(this).read_index = _lostrle(this).write_index = 0;
@@ -448,7 +448,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   }
   if(0 < mprtp->delay){
     _add_delay(this, mprtp->delay);
-    if(//_cmp_seq(this->reported_sequence_number, mprtp->subflow_seq) < 0 &&
+    if(_cmp_seq(this->reported_sequence_number, mprtp->subflow_seq) < 0 &&
        0 < this->discard_latency &&
        this->discard_latency < mprtp->delay)
     {
@@ -527,7 +527,7 @@ void _add_delay(MpRTPRPath *this, GstClockTime delay)
 void _add_skew(MpRTPRPath *this, gint64 skew)
 {
   percentiletracker2_add(this->skews, skew);
-  this->path_skew = this->path_skew * .99 + (gdouble)percentiletracker2_get_stats(this->skews, NULL, NULL, NULL) * .01;
+  this->path_skew = this->path_skew * .999 + (gdouble)percentiletracker2_get_stats(this->skews, NULL, NULL, NULL) * .001;
 }
 
 void _refresh_RLEBlock(MpRTPRPath *this)

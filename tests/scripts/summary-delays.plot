@@ -4,7 +4,7 @@ time=system("date +%Y_%m_%d_%H_%M_%S")
 if (!exists("plot_title")) plot_title='Subflow Receiver Delays Report'
 if (!exists("latency_file_1")) latency_file_1='logs/sub_1_rcv.csv'
 if (!exists("output_file")) output_file='reports/summary_delays.pdf'
-if (!exists("csv_length")) csv_length=6000
+if (!exists("duration")) duration=6000
 
 #-------------------------------------------------------------------------
 
@@ -22,7 +22,7 @@ set lmargin 7
 set rmargin 7
 set yrange [0:300000]
 set ytics 100000
-set xrange [0:csv_length]
+set xrange [0:duration]
 set xtics 500
 
 # set title plot_title font ",18"

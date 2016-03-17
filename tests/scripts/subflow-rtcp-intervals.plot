@@ -4,7 +4,7 @@ time=system("date +%Y_%m_%d_%H_%M_%S")
 if (!exists("plot_title"))  plot_title='Subflow RTCP Intervals'
 if (!exists("rtcp_file")) rtcp_file='logs/rtcp_rr_1.csv'
 if (!exists("output_file")) output_file='reports/sub_1_rtcp_intervals.pdf'
-if (!exists("csv_length"))  csv_length=100
+if (!exists("duration"))  duration=100
 
 #-------------------------------------------------------------------------
 
@@ -22,10 +22,10 @@ set lmargin 10
 set rmargin 7
 set yrange [0:1500]
 set ytics 500
-set xrange [0:csv_length]
+set xrange [0:duration]
 set xtics 50
 set xlabel "Intervals counter"
-set ylabel "Intervals length (ms)"
+set ylabel "Intervals length (100ms)"
 
 # set title plot_title font ",18"
 

@@ -52,7 +52,7 @@ typedef struct _CorrBlock CorrBlock;
 
 struct _CorrBlock{
   guint           id,N;
-  gint64          Iu0,Iu1,Id1,Id2,Id3,G01,M0,M1,G_[16],M_[16];
+  gint64          Iu0,Iu1,Id1,Id2,Id3,G01,M0,M1,G_[32],M_[32];
   gint            index;
   gdouble         g;
   gdouble         distortion_th;
@@ -128,6 +128,8 @@ static void _delay80th_pipe(gpointer data, PercentileTrackerPipeData *stats)
 NetQueueAnalyser *make_netqueue_analyser(guint8 id)
 {
   NetQueueAnalyser *this;
+  gint multiplier;
+
   this = g_object_new (NETQANALYSER_TYPE, NULL);
   THIS_WRITELOCK (this);
 
@@ -153,10 +155,11 @@ NetQueueAnalyser *make_netqueue_analyser(guint8 id)
   _priv(this)->cblocks[6].id   = 6;
   _priv(this)->cblocks[7].id   = 7;
 
-  _priv(this)->cblocks[0].N    = 16;
-  _priv(this)->cblocks[1].N    = 8;
-  _priv(this)->cblocks[2].N    = 4;
-  _priv(this)->cblocks[3].N    = 2;
+  multiplier = 2;
+  _priv(this)->cblocks[0].N    = 16 * multiplier;
+  _priv(this)->cblocks[1].N    = 8  * multiplier;
+  _priv(this)->cblocks[2].N    = 4  * multiplier;
+  _priv(this)->cblocks[3].N    = 2  * multiplier;
   _priv(this)->cblocks[4].N    = 4;
   _priv(this)->cblocks[5].N    = 4;
   _priv(this)->cblocks[6].N    = 4;

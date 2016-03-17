@@ -350,11 +350,7 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
             ur->subflows[i].control.max_rate = 3000000;
           }
       }
-
     }
-//    ur->subflows[1].shareability = subflow1_shareability;
-//    ur->subflows[2].max_rate=subflow2_max_rate;
-//    ur->subflows[2].shareability = subflow2_shareability;
   }
 
   g_print("get_bitrate: %d new_bitrate: %d\n", get_bitrate, new_bitrate);

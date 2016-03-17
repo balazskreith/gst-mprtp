@@ -145,42 +145,50 @@ static void _print_transfer_info(void)
   g_print(" ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
   g_print(" +     +                          10.0.0.0/24                               +     +\n");
   g_print(" +     +--------------------------------------------------------------------+     +\n");
-  g_print(" +     +                     .1      sync         .2                        +     +\n");
-  g_print(" +     +                .----o------------------>¤ :%18d       +     +\n",path1_tx_rtp_port);
-  g_print(" +  P  +                | TX |       async                                  +  P  +\n");
-  g_print(" +  E  +                '----o------------------>¤ :%18d      +  E  +\n",path1_tx_rtcp_port);
-  g_print(" +  E  +                                                                    +  E  +\n");
-  g_print(" +  R  +                              sync                                  +  R  +\n");
-  g_print(" +     +    :%18d  ¤<------------------o----.                  +     +\n",path1_rx_rtp_port);
-  g_print(" +  1  +                              async         | RX |                  +  2  +\n");
-  g_print(" +     +    :%18d ¤<------------------o----'                  +     +\n",path1_rx_rtcp_port);
+  g_print(" +     +                                                                    +     +\n");
+  g_print(" +     +                               RTCP                                 +     +\n");
+  g_print(" +     +                 TX o----------------------------->   %-13d +     +\n",rtpbin_tx_rtcp_port);
+  g_print(" +     +                               RTCP                                 +     +\n");
+  g_print(" +     +%19d  <-----------------------------o RX             +     +\n",rtpbin_rx_rtcp_port);
+  g_print(" +     +                                                                    +     +\n");
+  g_print(" +     +--------------------------------------------------------------------+     +\n");
   g_print(" +     +                                                                    +     +\n");
   g_print(" +     +                     .1      sync         .2                        +     +\n");
-  g_print(" +     +                .----o------------------>¤ :%18d       +     +\n",path2_tx_rtp_port);
+  g_print(" +     +                .----o------------------>  :%-18d      +     +\n",path1_tx_rtp_port);
   g_print(" +  P  +                | TX |       async                                  +  P  +\n");
-  g_print(" +  E  +                '----o------------------>¤ :%18d      +  E  +\n",path2_tx_rtcp_port);
+  g_print(" +  E  +                '----o------------------>  :%-18d      +  E  +\n",path1_tx_rtcp_port);
   g_print(" +  E  +                                                                    +  E  +\n");
   g_print(" +  R  +                              sync                                  +  R  +\n");
-  g_print(" +     +    :%18d  ¤<------------------o----.                  +     +\n",path2_rx_rtp_port);
+  g_print(" +     +     %18d  <------------------o----.                  +     +\n",path1_rx_rtp_port);
   g_print(" +  1  +                              async         | RX |                  +  2  +\n");
-  g_print(" +     +    :%18d ¤<------------------o----'                  +     +\n",path2_rx_rtcp_port);
+  g_print(" +     +     %18d  <------------------o----'                  +     +\n",path1_rx_rtcp_port);
   g_print(" +     +                                                                    +     +\n");
+  g_print(" +     ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++     +\n");
+  g_print(" +     +                          10.0.1.0/24                               +     +\n");
+  g_print(" +     +--------------------------------------------------------------------+     +\n");
   g_print(" +     +                     .1      sync         .2                        +     +\n");
-  g_print(" +     +                .----o------------------>¤ :%18d       +     +\n",path2_tx_rtp_port);
+  g_print(" +     +                .----o------------------>  :%-18d      +     +\n",path2_tx_rtp_port);
   g_print(" +  P  +                | TX |       async                                  +  P  +\n");
-  g_print(" +  E  +                '----o------------------>¤ :%18d      +  E  +\n",path2_tx_rtcp_port);
+  g_print(" +  E  +                '----o------------------>  :%-18d      +  E  +\n",path2_tx_rtcp_port);
   g_print(" +  E  +                                                                    +  E  +\n");
   g_print(" +  R  +                              sync                                  +  R  +\n");
-  g_print(" +     +    :%18d  ¤<------------------o----.                  +     +\n",path2_rx_rtp_port);
+  g_print(" +     +     %18d  <------------------o----.                  +     +\n",path2_rx_rtp_port);
   g_print(" +  1  +                              async         | RX |                  +  2  +\n");
-  g_print(" +     +    :%18d ¤<------------------o----'                  +     +\n",path2_rx_rtcp_port);
+  g_print(" +     +     %18d  <------------------o----'                  +     +\n",path2_rx_rtcp_port);
   g_print(" +     +                                                                    +     +\n");
-  g_print(" +                                                                                +\n");
-  g_print(" +                                     RTCP                                       +\n");
-  g_print(" +                       TX o----------------------------->¤ :%19d +\n",rtpbin_tx_rtcp_port);
-  g_print(" +                                     RTCP                                       +\n");
-  g_print(" +     :%19d ¤<-----------------------------o RX                   +\n",rtpbin_rx_rtcp_port);
-  g_print(" +                                                                                +\n");
+  g_print(" +     ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++     +\n");
+  g_print(" +     +                          10.0.2.0/24                               +     +\n");
+  g_print(" +     +--------------------------------------------------------------------+     +\n");
+  g_print(" +     +                     .1      sync         .2                        +     +\n");
+  g_print(" +     +                .----o------------------>   %-18d      +     +\n",path2_tx_rtp_port);
+  g_print(" +  P  +                | TX |       async                                  +  P  +\n");
+  g_print(" +  E  +                '----o------------------>   %-18d      +  E  +\n",path2_tx_rtcp_port);
+  g_print(" +  E  +                                                                    +  E  +\n");
+  g_print(" +  R  +                              sync                                  +  R  +\n");
+  g_print(" +     +     %18d  <------------------o----.                  +     +\n",path2_rx_rtp_port);
+  g_print(" +  1  +                              async         | RX |                  +  2  +\n");
+  g_print(" +     +     %18d  <------------------o----'                  +     +\n",path2_rx_rtcp_port);
+  g_print(" +     +                                                                    +     +\n");
   g_print(" ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
   g_print("#                                                                                 #\n");
   g_print("# Example to setup a port: --path3_rx_rtcp_port=1234                              #\n");
@@ -289,50 +297,50 @@ static void _setup_test_params(guint profile)
 
 
 
-  if(path1_tx_rtp_port){
+  if(path1_tx_rtp_port == 0){
     path1_tx_rtp_port  = 5000;
   }
-  if(path1_tx_rtcp_port){
+  if(path1_tx_rtcp_port == 0){
       path1_tx_rtcp_port = 5001;
   }
-  if(path1_rx_rtp_port){
+  if(path1_rx_rtp_port == 0){
       path1_rx_rtp_port  = 5002;
   }
-  if(path1_rx_rtcp_port){
+  if(path1_rx_rtcp_port == 0){
       path1_rx_rtcp_port = 5003;
   }
 
 
-  if(path2_tx_rtp_port){
+  if(path2_tx_rtp_port == 0){
     path2_tx_rtp_port  = 5004;
   }
-  if(path2_tx_rtcp_port){
+  if(path2_tx_rtcp_port == 0){
     path2_tx_rtcp_port = 5005;
   }
-  if(path2_rx_rtp_port){
+  if(path2_rx_rtp_port == 0){
     path2_rx_rtp_port  = 5006;
   }
-  if(path2_rx_rtcp_port){
+  if(path2_rx_rtcp_port == 0){
     path2_rx_rtcp_port = 5007;
   }
 
-  if(path3_tx_rtp_port){
+  if(path3_tx_rtp_port == 0){
     path3_tx_rtp_port  = 5008;
   }
-  if(path3_tx_rtcp_port){
+  if(path3_tx_rtcp_port == 0){
     path3_tx_rtcp_port = 5009;
   }
-  if(path3_rx_rtp_port){
+  if(path3_rx_rtp_port == 0){
     path3_rx_rtp_port  = 5010;
   }
-  if(path3_rx_rtcp_port){
+  if(path3_rx_rtcp_port == 0){
     path3_rx_rtcp_port = 5011;
   }
 
-  if(rtpbin_tx_rtcp_port){
+  if(rtpbin_tx_rtcp_port == 0){
       rtpbin_tx_rtcp_port  = 5013;
   }
-  if(rtpbin_rx_rtcp_port){
+  if(rtpbin_rx_rtcp_port == 0){
       rtpbin_rx_rtcp_port = 5015;
   }
   _print_transfer_info();

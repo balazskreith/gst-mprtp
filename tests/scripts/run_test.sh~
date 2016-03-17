@@ -85,7 +85,7 @@ TARGET_DIR="logs"
 
 #Report author
 REPORTAUTHORFILE=$TARGET_DIR"/author.txt"
-echo "Requested by: Balázs Kreith" > $REPORTAUTHORFILE
+echo "Test is requested by: Balázs Kreith" > $REPORTAUTHORFILE
 
 #report title
 REPORTTITLEFILE=$TARGET_DIR"/title.txt"
@@ -94,7 +94,7 @@ echo "RMCAT test report" > $REPORTTITLEFILE
 if [ "$TESTCASE" -eq 0 ]
 
 then
-  echo "RMCAT Test 0 report" > $REPORTTITLEFILE
+  echo "AUTOMATIC TEST REPORT\\ Constant Available Capacity with Single RMCAT flow" > $REPORTTITLEFILE
   echo "executing test case 0"
   echo "./scripts/run_bwctrler.sh --bwprofile 0 --bwref 2000 --shift 2 --veth 0 --jitter 1 --latency 100 --output logs/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
   chmod 777 scripts/test_bw_veth0_snd.sh
@@ -104,7 +104,7 @@ then
 
 elif [ "$TESTCASE" -eq 1 ]; then
 
-  echo "RMCAT Test 0 report" > $REPORTTITLEFILE
+  echo "AUTOMATIC TEST REPORT for Variable Available Capacity with Single RMCAT flow" > $REPORTTITLEFILE
   echo "executing test case 1"
   echo "./scripts/run_bwctrler.sh --bwprofile 1 --bwref 1000 --shift 2 --veth 0 --jitter 1 --latency 100 --output logs/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
   chmod 777 scripts/test_bw_veth0_snd.sh

@@ -59,24 +59,6 @@
 
 #include <string.h>
 
-static const int path1_tx_rtp_port  = 5000;
-static const int path1_tx_rtcp_port = 5001;
-static const int path1_rx_rtp_port  = 5002;
-static const int path1_rx_rtcp_port = 5003;
-
-static const int path2_tx_rtp_port  = 5004;
-static const int path2_tx_rtcp_port = 5005;
-static const int path2_rx_rtp_port  = 5006;
-static const int path2_rx_rtcp_port = 5007;
-
-static const int path3_tx_rtp_port  = 5008;
-static const int path3_tx_rtcp_port = 5009;
-static const int path3_rx_rtp_port  = 5010;
-static const int path3_rx_rtcp_port = 5011;
-
-static const int rtpbin_tx_rtcp_port = 5013;
-static const int rtpbin_rx_rtcp_port = 5015;
-
 typedef enum{
   NO_CONTROLLING               = 0,
   MANUAL_RATE_CONTROLLING      = 1,
@@ -113,12 +95,97 @@ static TestParams test_parameters_;
 static gint32 profile;
 static gint32 info;
 
+static int path1_tx_rtp_port  = 5000;
+static int path1_tx_rtcp_port = 5001;
+static int path1_rx_rtp_port  = 5002;
+static int path1_rx_rtcp_port = 5003;
+
+static int path2_tx_rtp_port  = 5004;
+static int path2_tx_rtcp_port = 5005;
+static int path2_rx_rtp_port  = 5006;
+static int path2_rx_rtcp_port = 5007;
+
+static int path3_tx_rtp_port  = 5008;
+static int path3_tx_rtcp_port = 5009;
+static int path3_rx_rtp_port  = 5010;
+static int path3_rx_rtcp_port = 5011;
+
+static int rtpbin_tx_rtcp_port = 5013;
+static int rtpbin_rx_rtcp_port = 5015;
+
 static GOptionEntry entries[] =
 {
     { "profile", 0, 0, G_OPTION_ARG_INT, &profile, "Profile", NULL },
+    { "path1_tx_rtp_port", 0, 0, G_OPTION_ARG_INT, &path1_tx_rtp_port, "path1_tx_rtp_port", NULL },
+    { "path1_tx_rtcp_port", 0, 0, G_OPTION_ARG_INT, &path1_tx_rtcp_port, "path1_tx_rtcp_port", NULL },
+    { "path1_rx_rtp_port", 0, 0, G_OPTION_ARG_INT, &path1_rx_rtp_port, "path1_rx_rtp_port", NULL },
+    { "path1_rx_rtcp_port", 0, 0, G_OPTION_ARG_INT, &path1_rx_rtcp_port, "path1_rx_rtcp_port", NULL },
+
+    { "path2_tx_rtp_port", 0, 0, G_OPTION_ARG_INT, &path2_tx_rtp_port, "path2_tx_rtp_port", NULL },
+    { "path2_tx_rtcp_port", 0, 0, G_OPTION_ARG_INT, &path2_tx_rtcp_port, "path2_tx_rtcp_port", NULL },
+    { "path2_rx_rtp_port", 0, 0, G_OPTION_ARG_INT, &path2_rx_rtp_port, "path2_rx_rtp_port", NULL },
+    { "path2_rx_rtcp_port", 0, 0, G_OPTION_ARG_INT, &path2_rx_rtcp_port, "path2_rx_rtcp_port", NULL },
+
+    { "path3_tx_rtp_port", 0, 0, G_OPTION_ARG_INT, &path3_tx_rtp_port, "path3_tx_rtp_port", NULL },
+    { "path3_tx_rtcp_port", 0, 0, G_OPTION_ARG_INT, &path3_tx_rtcp_port, "path3_tx_rtcp_port", NULL },
+    { "path3_rx_rtp_port", 0, 0, G_OPTION_ARG_INT, &path3_rx_rtp_port, "path3_rx_rtp_port", NULL },
+    { "path3_rx_rtcp_port", 0, 0, G_OPTION_ARG_INT, &path3_rx_rtcp_port, "path3_rx_rtcp_port", NULL },
+
+    { "rtpbin_tx_rtcp_port", 0, 0, G_OPTION_ARG_INT, &rtpbin_tx_rtcp_port, "rtpbin_tx_rtcp_port", NULL },
+    { "rtpbin_rx_rtcp_port", 0, 0, G_OPTION_ARG_INT, &rtpbin_rx_rtcp_port, "rtpbin_rx_rtcp_port", NULL },
+
     { "info", 0, 0, G_OPTION_ARG_NONE, &info, "Info", NULL },
   { NULL }
 };
+
+static void _print_transfer_info(void)
+{
+  g_print("################### Network transfer port parameters ##############################\n");
+  g_print("#                                                                                 #\n");
+  g_print(" ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+  g_print(" +     +                          10.0.0.0/24                               +     +\n");
+  g_print(" +     +--------------------------------------------------------------------+     +\n");
+  g_print(" +     +                     .1      sync         .2                        +     +\n");
+  g_print(" +     +                .----o------------------>¤ :%18d       +     +\n",path1_tx_rtp_port);
+  g_print(" +  P  +                | TX |       async                                  +  P  +\n");
+  g_print(" +  E  +                '----o------------------>¤ :%18d      +  E  +\n",path1_tx_rtcp_port);
+  g_print(" +  E  +                                                                    +  E  +\n");
+  g_print(" +  R  +                              sync                                  +  R  +\n");
+  g_print(" +     +    :%18d  ¤<------------------o----.                  +     +\n",path1_rx_rtp_port);
+  g_print(" +  1  +                              async         | RX |                  +  2  +\n");
+  g_print(" +     +    :%18d ¤<------------------o----'                  +     +\n",path1_rx_rtcp_port);
+  g_print(" +     +                                                                    +     +\n");
+  g_print(" +     +                     .1      sync         .2                        +     +\n");
+  g_print(" +     +                .----o------------------>¤ :%18d       +     +\n",path2_tx_rtp_port);
+  g_print(" +  P  +                | TX |       async                                  +  P  +\n");
+  g_print(" +  E  +                '----o------------------>¤ :%18d      +  E  +\n",path2_tx_rtcp_port);
+  g_print(" +  E  +                                                                    +  E  +\n");
+  g_print(" +  R  +                              sync                                  +  R  +\n");
+  g_print(" +     +    :%18d  ¤<------------------o----.                  +     +\n",path2_rx_rtp_port);
+  g_print(" +  1  +                              async         | RX |                  +  2  +\n");
+  g_print(" +     +    :%18d ¤<------------------o----'                  +     +\n",path2_rx_rtcp_port);
+  g_print(" +     +                                                                    +     +\n");
+  g_print(" +     +                     .1      sync         .2                        +     +\n");
+  g_print(" +     +                .----o------------------>¤ :%18d       +     +\n",path2_tx_rtp_port);
+  g_print(" +  P  +                | TX |       async                                  +  P  +\n");
+  g_print(" +  E  +                '----o------------------>¤ :%18d      +  E  +\n",path2_tx_rtcp_port);
+  g_print(" +  E  +                                                                    +  E  +\n");
+  g_print(" +  R  +                              sync                                  +  R  +\n");
+  g_print(" +     +    :%18d  ¤<------------------o----.                  +     +\n",path2_rx_rtp_port);
+  g_print(" +  1  +                              async         | RX |                  +  2  +\n");
+  g_print(" +     +    :%18d ¤<------------------o----'                  +     +\n",path2_rx_rtcp_port);
+  g_print(" +     +                                                                    +     +\n");
+  g_print(" +                                                                                +\n");
+  g_print(" +                                     RTCP                                       +\n");
+  g_print(" +                       TX o----------------------------->¤ :%19d +\n",rtpbin_tx_rtcp_port);
+  g_print(" +                                     RTCP                                       +\n");
+  g_print(" +     :%19d ¤<-----------------------------o RX                   +\n",rtpbin_rx_rtcp_port);
+  g_print(" +                                                                                +\n");
+  g_print(" ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+  g_print("#                                                                                 #\n");
+  g_print("# Example to setup a port: --path3_rx_rtcp_port=1234                              #\n");
+  g_print("###################################################################################\n");
+}
 
 
 #define println(str) g_print(str"\n")
@@ -135,13 +202,17 @@ static void _print_info(void)
   println("#              | |  |0 - No rate control, 1 - random rate ctrl,      #");
   println("#              | |  |2 - auto rate and cc control                    #");
   println("#              | |0/1 - join detach subflow continously              #");
-  println("#              |0 - foreman,                                 #");
+  println("#              |0 - foreman,                                         #");
   println("# Examples:                                                          #");
   println("# --profile=1 <- subflow 1, test source, no rate controller          #");
   println("# --profile=3 <- subflow 1 and 2, test source, no rate controller    #");
   println("# --profile=67 <- sub 1 and 2, test source, rate and cc              #");
   println("######################################################################");
+
+  println("\n\n");
+  _print_transfer_info();
 }
+
 
 
 static void _setup_test_params(guint profile)
@@ -215,6 +286,57 @@ static void _setup_test_params(guint profile)
   }
 
   if(test_parameters_.video_session == YUVFILE_SOURCE) g_print("Yuv sequence: %s\n", test_parameters_.yuvfile_str);
+
+
+
+  if(path1_tx_rtp_port){
+    path1_tx_rtp_port  = 5000;
+  }
+  if(path1_tx_rtcp_port){
+      path1_tx_rtcp_port = 5001;
+  }
+  if(path1_rx_rtp_port){
+      path1_rx_rtp_port  = 5002;
+  }
+  if(path1_rx_rtcp_port){
+      path1_rx_rtcp_port = 5003;
+  }
+
+
+  if(path2_tx_rtp_port){
+    path2_tx_rtp_port  = 5004;
+  }
+  if(path2_tx_rtcp_port){
+    path2_tx_rtcp_port = 5005;
+  }
+  if(path2_rx_rtp_port){
+    path2_rx_rtp_port  = 5006;
+  }
+  if(path2_rx_rtcp_port){
+    path2_rx_rtcp_port = 5007;
+  }
+
+  if(path3_tx_rtp_port){
+    path3_tx_rtp_port  = 5008;
+  }
+  if(path3_tx_rtcp_port){
+    path3_tx_rtcp_port = 5009;
+  }
+  if(path3_rx_rtp_port){
+    path3_rx_rtp_port  = 5010;
+  }
+  if(path3_rx_rtcp_port){
+    path3_rx_rtcp_port = 5011;
+  }
+
+  if(rtpbin_tx_rtcp_port){
+      rtpbin_tx_rtcp_port  = 5013;
+  }
+  if(rtpbin_rx_rtcp_port){
+      rtpbin_rx_rtcp_port = 5015;
+  }
+  _print_transfer_info();
+
 }
 
 

@@ -51,10 +51,12 @@ G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 //if target close to the bottleneck, the increasement will be multiplied by this factor
 #define BOTTLENECK_INCREASEMENT_FACTOR 1.
 
-//determine the epsilon factor indicate weather we close to the bottleneck or not.
-#define BOTTLENECK_MONITORING_EPSILON .25
+//determine the epsilon factor around the target rate indicate weather we close to the bottleneck or not.
+#define BOTTLENECK_EPSILON .25
 
-//if target bitrate is close to the bottleneck, monitoring interval will be this value
+//if target bitrate is close to the bottleneck, monitoring interval is requested for this interval
+//note if the target/interval is higher than the maximum ramp up speed, then monitoring is
+//restricted to the max_ramp_up
 #define BOTTLENECK_MONITORING_INTERVAL 5
 
 //determine the minimum interval in seconds must be stay in probe stage
@@ -318,7 +320,7 @@ subratectrler_init (SubflowRateController * this)
   this->target_bitrate   = SUBFLOW_DEFAULT_SENDING_RATE;
 
   _priv(this)->bottleneck_increasement_factor   = BOTTLENECK_INCREASEMENT_FACTOR;
-  _priv(this)->bottleneck_epsilon               = BOTTLENECK_MONITORING_EPSILON;
+  _priv(this)->bottleneck_epsilon               = BOTTLENECK_EPSILON;
   _priv(this)->bottleneck_monitoring_interval   = BOTTLENECK_MONITORING_INTERVAL;
   _priv(this)->normal_probe_interval            = NORMAL_PROBE_INTERVAL;
   _priv(this)->bottleneck_probe_interval        = BOTTLENECK_PROBE_INTERVAL;

@@ -65,14 +65,51 @@ G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 #define TARGET_BITRATE_MIN (SUBFLOW_DEFAULT_SENDING_RATE>>1)
 //Max target_bitrate [bps]
 #define TARGET_BITRATE_MAX 0
-//Timespan [s] from lowest to highest bitrate. Default value: 10s->10000ms
-#define RAMP_UP_TIME 10000
-//Guard factor against early congestion onset.
-//A higher value gives less jitter possibly at the
-//expense of a lower video bitrate. Default value: 0.0..0.95
-#define PRE_CONGESTION_GUARD .0
 //Guard factor against RTP queue buildup. Default value: 0.0..2.0
 #define TX_QUEUE_SIZE_FACTOR 1.0
+
+
+//if target close to the bottleneck, the increasement will be multiplied by this factor
+#define BOTTLENECK_INCREASEMENT_FACTOR 1.
+
+//determine the epsilon factor indicate weather we close to the bottleneck or not.
+#define BOTTLENECK_MONITORING_EPSILON .25
+
+//if target bitrate is close to the bottleneck, monitoring interval will be this value
+#define BOTTLENECK_MONITORING_INTERVAL 5
+
+//determine the minimum interval in seconds must be stay in probe stage
+//before the target considered to be accepted
+#define NORMAL_PROBE_INTERVAL 2
+
+//determine the maximum interval in seconds must be stay in probe stage
+//before the target considered to be accepted
+#define BOTTLENECK_PROBE_INTERVAL 5
+
+//determines the maximum time in seconds the target can be mitigated after it is increased in probe stage
+#define INCREASEMENT_MITIGATION_TRESHOLD 5
+
+//determines the qdelay trend treshold considered to be distortion
+#define QDELAY_DISTORTION_TRESHOLD 0.001
+
+//determines the minimum monitoring interval
+#define MIN_MONITORING_INTERVAL 2
+
+//determines the maximum monitoring interval
+#define MAX_MONITORING_INTERVAL 10
+
+//determines the maximum keep time in second before mitigation applied
+//if qdelay is distorted in keep stage
+#define MAX_DISTORTION_KEEP_TIME 10
+
+//determines the maximum ramp up bitrate
+#define RAMP_UP_MIN_SPEED 10000
+
+//determines the maximum ramp up bitrate
+#define RAMP_UP_MAX_SPEED 200000
+
+//determines the reduction factor applies on the target bitrate if it is in reduced stage
+#define REDUCE_TARGET_FACTOR 0.6
 
 typedef struct _Private Private;
 
@@ -119,6 +156,23 @@ struct _Private{
   gint32              sending_bitrates[SR_TR_ARRAY_LENGTH];
   gint32              target_bitrates[SR_TR_ARRAY_LENGTH];
   gint                sr_tr_index;
+
+  //Possible parameters
+  gint32              min_monitoring_interval;
+  gint32              max_monitoring_interval;
+  gdouble             bottleneck_epsilon;
+  gint32              bottleneck_monitoring_interval;
+  gint32              normal_probe_interval;
+  gint32              bottleneck_probe_interval;
+  gdouble             qdelay_distortion_treshold;
+  gint32              max_distortion_keep_time;
+  gint32              increasement_mitigation_treshold;
+  gdouble             bottleneck_increasement_factor;
+  gint32              min_ramp_up_bitrate;
+  gint32              max_ramp_up_bitrate;
+  gint32              min_target_bitrate;
+  gint32              max_target_bitrate;
+  gdouble             reduce_target_factor;
 };
 
 
@@ -141,6 +195,21 @@ struct _Private{
 #define _GP_t1(this) (_priv(this)->goodput_bitrate_t1)
 #define _min_br(this) MIN(_SR(this), _TR(this))
 #define _max_br(this) MAX(_SR(this), _TR(this))
+
+
+#define _btl_inc_fac(this)    _priv(this)->bottleneck_increasement_factor
+#define _btl_eps(this)        _priv(this)->bottleneck_epsilon
+#define _btl_mon_int(this)    _priv(this)->bottleneck_monitoring_interval
+#define _btl_probe_int(this)  _priv(this)->bottleneck_probe_interval
+#define _norm_pbobe_int(this) _priv(this)->normal_probe_interval
+#define _inc_mit_th(this)     _priv(this)->increasement_mitigation_treshold
+#define _qtrend_th(this)      _priv(this)->qdelay_distortion_treshold
+#define _mon_min_int(this)    _priv(this)->min_monitoring_interval
+#define _mon_max_int(this)    _priv(this)->max_monitoring_interval
+#define _max_dist_keep(this)  _priv(this)->max_distortion_keep_time
+#define _min_ramp_up(this)    _priv(this)->min_ramp_up_bitrate
+#define _max_ramp_up(this)    _priv(this)->max_ramp_up_bitrate
+#define _rdc_target_fac(this) _priv(this)->reduce_target_factor
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
@@ -194,10 +263,6 @@ static void
 _disable_controlling(
     SubflowRateController *this);
 
-#define MAX_MONITORING_INTERVAL 14
-#define MIN_PROBE_MONITORING_INTERVAL 5
-#define MIN_BOUNCE_MONITORING_INTERVAL 2
-#define MAX_MONITORING_RATE 200000
 #define _disable_monitoring(this) _set_monitoring_interval(this, 0)
 
 static void
@@ -264,10 +329,23 @@ subratectrler_init (SubflowRateController * this)
   g_rw_lock_init (&this->rwmutex);
 
   //Initial values
-  this->min_rate         = this->min_target_point = TARGET_BITRATE_MIN;
-  this->max_rate         = this->max_target_point = TARGET_BITRATE_MAX;
-  this->keep             = KEEP_MIN;
   this->target_bitrate   = SUBFLOW_DEFAULT_SENDING_RATE;
+
+  _priv(this)->bottleneck_increasement_factor   = BOTTLENECK_INCREASEMENT_FACTOR;
+  _priv(this)->bottleneck_epsilon               = BOTTLENECK_MONITORING_EPSILON;
+  _priv(this)->bottleneck_monitoring_interval   = BOTTLENECK_MONITORING_INTERVAL;
+  _priv(this)->normal_probe_interval            = NORMAL_PROBE_INTERVAL;
+  _priv(this)->bottleneck_probe_interval        = BOTTLENECK_PROBE_INTERVAL;
+  _priv(this)->increasement_mitigation_treshold = INCREASEMENT_MITIGATION_TRESHOLD;
+  _priv(this)->qdelay_distortion_treshold       = QDELAY_DISTORTION_TRESHOLD;
+  _priv(this)->min_monitoring_interval          = MIN_MONITORING_INTERVAL;
+  _priv(this)->max_monitoring_interval          = MAX_MONITORING_INTERVAL;
+  _priv(this)->max_distortion_keep_time         = MAX_DISTORTION_KEEP_TIME;
+  _priv(this)->min_ramp_up_bitrate              = RAMP_UP_MIN_SPEED;
+  _priv(this)->max_ramp_up_bitrate              = RAMP_UP_MAX_SPEED;
+  _priv(this)->min_target_bitrate               = TARGET_BITRATE_MIN;
+  _priv(this)->max_target_bitrate               = TARGET_BITRATE_MAX;
+  _priv(this)->reduce_target_factor             = REDUCE_TARGET_FACTOR;
 
 }
 
@@ -315,7 +393,7 @@ static void _update_congestion_indicator(SubflowRateController *this,
   }
 
   _priv(this)->fraction_lost = measurement->reports->RR.lost_rate;
-  _anres(this).distortion |= .001 < _anres(this).trend;
+  _anres(this).distortion |= _qtrend_th(this) < _anres(this).trend;
 
 }
 
@@ -334,45 +412,19 @@ static void _update_tr_corr(SubflowRateController *this,
 
 }
 
-static void _update_keep(SubflowRateController *this,
-                            SubflowMeasurement *measurement)
-{
-  if(!this->bottleneck_point){
-    this->keep = KEEP_MIN;
-    goto done;
-  }
-  if(measurement->sending_bitrate * 1.2 < this->bottleneck_point ||
-       this->bottleneck_point < measurement->sending_bitrate * .8){
-      this->keep = KEEP_MIN;
-    }
-
-  if(measurement->sending_bitrate * 1.1 < this->bottleneck_point ||
-       this->bottleneck_point < measurement->sending_bitrate * .1){
-      this->keep = (KEEP_MIN + KEEP_MAX)>>1;
-    }
-  this->keep = KEEP_MAX;
-done:
-  return;
-}
 
 static gint32 _get_probe_interval(SubflowRateController *this)
 {
   if(!this->bottleneck_point){
-    return KEEP_MIN;
+    return _norm_pbobe_int(this);
   }
-  if(this->target_bitrate < this->bottleneck_point * .8){
-    return KEEP_MIN;
+  if(this->target_bitrate < this->bottleneck_point * (1.-_btl_eps(this))){
+    return _norm_pbobe_int(this);
   }
-  if(this->bottleneck_point * 1.2 < this->target_bitrate){
-    return KEEP_MIN;
+  if(this->bottleneck_point * (1.+_btl_eps(this)) < this->target_bitrate){
+    return _norm_pbobe_int(this);
   }
-  if(this->target_bitrate < this->bottleneck_point * .9){
-    return (KEEP_MIN + KEEP_MAX)>>1;
-  }
-  if(this->bottleneck_point * 1.1 < this->target_bitrate){
-    return (KEEP_MIN + KEEP_MAX)>>1;
-  }
-  return KEEP_MAX;
+  return _btl_probe_int(this);
 }
 
 static gint32 _get_increasement(SubflowRateController *this)
@@ -380,13 +432,14 @@ static gint32 _get_increasement(SubflowRateController *this)
   if(!this->bottleneck_point){
     return this->monitored_bitrate;
   }
-  if(this->target_bitrate < this->bottleneck_point * .8){
+  if(this->target_bitrate < this->bottleneck_point * (1.-_btl_eps(this))){
     return this->monitored_bitrate;
   }
-  if(this->bottleneck_point * 1.2 < this->target_bitrate){
+  if(this->bottleneck_point * (1.+_btl_eps(this)) < this->target_bitrate){
     return this->monitored_bitrate;
   }
-  return this->monitored_bitrate>>1;
+  return this->monitored_bitrate * _btl_inc_fac(this);
+
 }
 
 void subratectrler_measurement_update(
@@ -405,7 +458,6 @@ void subratectrler_measurement_update(
   _update_congestion_indicator(this, measurement);
 
   _update_tr_corr(this, measurement);
-  _update_keep(this, measurement);
 
 
   if(0 < this->disable_controlling && this->disable_controlling < _now(this)){
@@ -447,9 +499,11 @@ void subratectrler_setup_controls(
 {
   struct _SubflowUtilizationControl *ctrl = &this->utilization.control;
   memcpy(ctrl, src, sizeof(struct _SubflowUtilizationControl));
-  this->min_rate = ctrl->min_rate;
-  this->max_rate = ctrl->max_rate;
-  if(this->target_bitrate < this->min_rate) this->target_bitrate = this->min_rate;
+  _priv(this)->min_target_bitrate = ctrl->min_rate;
+  _priv(this)->max_target_bitrate = ctrl->max_rate;
+  if(this->target_bitrate < _priv(this)->min_target_bitrate){
+    this->target_bitrate = _priv(this)->min_target_bitrate;
+  }
 }
 
 void
@@ -466,7 +520,7 @@ _reduce_stage(
     goto done;
   }
 
-  target_rate = MIN(_RR(this) * .85, _TR(this) * .6);
+  target_rate = MIN(_RR(this) * .85, _max_br(this) * _rdc_target_fac(this));
   _change_target_bitrate(this, target_rate);
   _reset_monitoring(this);
   _disable_controlling(this);
@@ -482,7 +536,7 @@ _keep_stage(
   gint32   target_rate;
 
   _anres(this).congestion  = .1 < _FL(this) && 1.5 < _anres(this).corrH;
-  _anres(this).distortion  |= 0.001 < _anres(this).trend;
+  _anres(this).distortion  |= _qtrend_th(this) < _anres(this).trend;
   target_rate = this->target_bitrate;
 
   if(_anres(this).congestion){
@@ -496,7 +550,7 @@ _keep_stage(
 
   if(_anres(this).distortion){
     this->bottleneck_point = _TR(this);
-    if(this->last_decrease < _now(this) - 5 * GST_SECOND){
+    if(_priv(this)->stage_changed < _now(this) - _max_dist_keep(this) * GST_SECOND){
       target_rate *= 1.-MIN(.05, _anres(this).trend);
     }
     _set_event(this, EVENT_DISTORTION);
@@ -521,7 +575,7 @@ _probe_stage(
   gint32   probe_interval;
 
   _anres(this).congestion  = .1 < _FL(this) && 1.5 < _anres(this).corrH;
-  _anres(this).distortion  |= 0.001 < _anres(this).trend;
+  _anres(this).distortion  |= _qtrend_th(this) < _anres(this).trend;
   target_rate = this->target_bitrate;
   probe_interval = _get_probe_interval(this);
 
@@ -542,7 +596,7 @@ _probe_stage(
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_KEEP, FALSE);
-    if(_now(this) - 5 * GST_SECOND < this->last_increase){
+    if(_now(this) - _inc_mit_th(this) * GST_SECOND < this->last_increase){
       target_rate *= 1.-MIN(.05, _anres(this).trend);
     }
     goto done;
@@ -570,7 +624,7 @@ _increase_stage(
   gint32   target_rate;
 
   _anres(this).congestion  = .1 < _FL(this) && 1.5 < _anres(this).corrH;
-  _anres(this).distortion |= 1.2 < _anres(this).corrH || 0.001 < _anres(this).trend;
+  _anres(this).distortion |= 1.2 < _anres(this).corrH || _qtrend_th(this) < _anres(this).trend;
   target_rate = this->target_bitrate;
 
   if(_anres(this).congestion){
@@ -590,7 +644,7 @@ _increase_stage(
     goto done;
   }
 
-  if(_now(this) - KEEP_MIN * GST_SECOND < _priv(this)->stage_changed || !_priv(this)->tr_correlated){
+  if(!_priv(this)->tr_correlated){
     goto exit;
   }
 
@@ -614,7 +668,6 @@ _fire(
         case EVENT_CONGESTION:
         break;
         case EVENT_SETTLED:
-          this->reduced = FALSE;
           mprtps_path_set_non_congested(this->path);
           _transit_state_to(this, SUBFLOW_STATE_STABLE);
         break;
@@ -719,18 +772,18 @@ void _setup_monitoring(SubflowRateController *this)
 {
   guint interval;
   gdouble plus_rate = 0, scl = 0;
-  if(this->bottleneck_point * .8 < _TR(this) && _TR(this) < this->bottleneck_point * 1.2){
-    interval = (this->bottleneck_point * .9 < _TR(this) && _TR(this) < this->bottleneck_point * 1.1) ? 5 : 10;
+  if(this->bottleneck_point * (1.-_btl_eps(this)) < _TR(this) && _TR(this) < this->bottleneck_point * (1.+_btl_eps(this))){
+    plus_rate = this->target_bitrate / (gdouble)_btl_mon_int(this);
     goto done;
   }
-  scl =  (gdouble) this->min_rate;
-  scl /= (gdouble)(_TR(this) - this->min_rate * .5);
+  scl =  (gdouble) _priv(this)->min_target_bitrate;
+  scl /= (gdouble)(_TR(this) - _priv(this)->min_target_bitrate * .5);
   scl *= scl;
-  scl = MIN(.5, MAX(1./5., scl));
+  scl = CONSTRAIN(1./(gdouble)_mon_max_int(this), 1./(gdouble)_mon_min_int(this), scl);
   plus_rate = _TR(this) * scl;
-  plus_rate = CONSTRAIN(RAMP_UP_MIN_SPEED, RAMP_UP_MAX_SPEED, plus_rate);
-  interval = _calculate_monitoring_interval(this, plus_rate);
 done:
+  plus_rate = CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), plus_rate);
+  interval = _calculate_monitoring_interval(this, plus_rate);
   _set_monitoring_interval(this, interval);
 }
 
@@ -780,11 +833,11 @@ void _change_target_bitrate(SubflowRateController *this, gint32 new_target)
 {
   this->target_bitrate_t1 = this->target_bitrate;
   this->target_bitrate = new_target;
-  if(0 < this->min_rate){
-    this->target_bitrate = MAX(this->min_rate, this->target_bitrate);
+  if(0 < _priv(this)->min_target_bitrate){
+    this->target_bitrate = MAX(_priv(this)->min_target_bitrate, this->target_bitrate);
   }
-  if(0 < this->max_rate){
-    this->target_bitrate = MIN(this->max_rate, this->target_bitrate);
+  if(0 < _priv(this)->max_target_bitrate){
+    this->target_bitrate = MIN(_priv(this)->max_target_bitrate, this->target_bitrate);
   }
   if(this->target_bitrate < this->target_bitrate_t1){
     this->last_decrease = _now(this);
@@ -801,10 +854,10 @@ void _logging(SubflowRateController *this)
                "############ S%d | State: %-2d | Disable time %lu | Ctrled: %d #################\n"
                "SR:         %-10d| TR:      %-10d| botlnck: %-10d|\n"
                "abs_max:    %-10d| abs_min: %-10d| max_tbr: %-10d| min_tbr: %-10d|\n"
-               "stage:      %-10d| event:   %-10d| pevent:  %-10d| keep:    %-10d\n"
+               "stage:      %-10d| event:   %-10d| pevent:  %-10d|\n"
                "mon_br:     %-10d| mon_int: %-10d| tr_corr: %-10d| stability: %-9d\n"
-               "dist_level: %-10d| cong_lvl:%-10d| trend:   %-10f| cons_cng:  %-10d|\n"
-               "reduced:    %-10d| RR:      %-10d| GP:      %-10d| corrH:   %-10.3f\n"
+               "dist_level: %-10d| cong_lvl:%-10d| trend:   %-10f|\n"
+               "RR:      %-10d| GP:      %-10d| corrH:   %-10.3f\n"
                "frac_lost:  %-10.3f| last_i:%-10lu| last_d: %-10lu|\n"
                "############################ Seconds since setup: %lu ##########################################\n",
 
@@ -816,15 +869,14 @@ void _logging(SubflowRateController *this)
                this->target_bitrate,
                this->bottleneck_point,
 
-               this->max_rate,
-               this->min_rate,
+               _priv(this)->max_target_bitrate,
+               _priv(this)->min_target_bitrate,
                this->max_target_point,
                this->min_target_point,
 
                _priv(this)->stage,
                _priv(this)->event,
                this->pending_event,
-               this->keep,
 
                this->monitored_bitrate,
                this->monitoring_interval,
@@ -834,9 +886,7 @@ void _logging(SubflowRateController *this)
                _anres(this).distortion,
                _anres(this).congestion,
                _anres(this).trend,
-               this->consecutive_congestion,
 
-               this->reduced,
                _RR(this),
                _GP(this),
                _anres(this).corrH,

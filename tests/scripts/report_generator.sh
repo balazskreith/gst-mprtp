@@ -5,6 +5,8 @@ function usage {
     echo "	-s2 --subflow2	generates report for subflow 2"
     echo "	-s3 --subflow3	generates report for subflow 3"
     echo "	-o --output	determines output file"
+    echo "	--author	determines the author of the report"
+    echo "	--title 	determines the title of the report"
     echo "	-tc --testcase	determines the test case the report generator report"
     exit 1
 }
@@ -16,10 +18,14 @@ then
   exit 1
 fi 
 
+echo "missed parameter" > reports/missing.txt
+
 OUTPUT="reports/report.pdf"
 SUBFLOW2=0
 SUBFLOW3=0
 TESTCASE=0
+REPORTTITLE="reports/missing.txt"
+REPORTAUTHOR="reports/missing.txt"
 
 while [[ $# > 1 ]]
 do
@@ -39,6 +45,14 @@ case $key in
     ;;
     -tc|--testcase)
     TESTCASE="$2"
+    shift # past argument
+    ;;
+    --author)
+    REPORTAUTHOR="$2"
+    shift # past argument
+    ;;
+    --title)
+    REPORTTITLE="$2"
     shift # past argument
     ;;
     --default)
@@ -326,8 +340,10 @@ mkdir logs/tmp
 
 sed -e '/TESTCASEANDTOPOLOGY/ {' -e 'r '$TMPDIR'/TESTCASEANDTOPOLOGY.txt' -e 'd' -e '}' -i logs/report.tex
 TESTCASEANDTOPOLOGY=$(cat "$TMPDIR/TESTCASEANDTOPOLOGY.txt")
-sed -i -e 's/TITLEREPLACESTRING/Automatic MPRTP test report/g' logs/report.tex
-sed -i -e 's/AUTHORREPLACESTRING/Balázs Kreith/g' logs/report.tex
+#sed -i -e 's/TITLEREPLACESTRING/'$REPORTTITLE'/g' logs/report.tex
+#sed -i -e 's/AUTHORREPLACESTRING/'$REPORTAUTHOR'/g' logs/report.tex
+sed -e '/TITLEREPLACESTRING/ {' -e 'r '$REPORTTITLE -e 'd' -e '}' -i logs/report.tex
+sed -e '/AUTHORREPLACESTRING/ {' -e 'r '$REPORTAUTHOR -e 'd' -e '}' -i logs/report.tex
 
 sed -i -e 's/SUMMARYREPORTREPLACESTRING/Summary./g' logs/report.tex
 

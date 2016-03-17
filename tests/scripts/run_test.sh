@@ -83,19 +83,34 @@ TARGET_DIR="logs"
 
 #"[-b|--bwprofile num] [-x|--bwref num] [s|--shift seconds] [-v|--veth if_num] [-j|--jitter milliseconds] [-l|--latency milliseconds] [-o|--output filename] [-i|--ip ip address] [-h|--help]"
 
+#Report author
+REPORTAUTHORFILE=$TARGET_DIR"/author.txt"
+echo "Requested by: Balázs Kreith" > $REPORTAUTHORFILE
+
+#report title
+REPORTTITLEFILE=$TARGET_DIR"/title.txt"
+echo "RMCAT test report" > $REPORTTITLEFILE
+
 if [ "$TESTCASE" -eq 0 ]
+
 then
+  echo "RMCAT Test 0 report" > $REPORTTITLEFILE
   echo "executing test case 0"
-  echo "./scripts/run_bwctrler.sh --bwprofile 0 --bwref 1000 --shift 2 --veth 0 --jitter 1 --latency 100 --output logs/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
+  echo "./scripts/run_bwctrler.sh --bwprofile 0 --bwref 2000 --shift 2 --veth 0 --jitter 1 --latency 100 --output logs/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
   chmod 777 scripts/test_bw_veth0_snd.sh
   sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
   sleep 1
+
+
 elif [ "$TESTCASE" -eq 1 ]; then
+
+  echo "RMCAT Test 1 report" > $REPORTTITLEFILE
   echo "executing test case 1"
   echo "./scripts/run_bwctrler.sh --bwprofile 1 --bwref 1000 --shift 2 --veth 0 --jitter 1 --latency 100 --output logs/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
   chmod 777 scripts/test_bw_veth0_snd.sh
   sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
   sleep 1
+
 fi
 
 
@@ -131,7 +146,7 @@ do
     sleep 1
   done
   echo $j"*$WAIT seconds"
-  ./scripts/report_generator.sh -o reports/report.pdf -tc $TESTCASE > reportlog.txt &
+  ./scripts/report_generator.sh -o reports/report.pdf -tc $TESTCASE --author $REPORTAUTHORFILE --title $REPORTTITLEFILE > reportlog.txt &
   #./run_test_evaluator.sh $PROFILE
 done
 sleep 1

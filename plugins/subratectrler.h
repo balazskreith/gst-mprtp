@@ -77,15 +77,9 @@ struct _SubflowRateController
   GstClockTime              last_increase;
   gint32                    consecutive_distortion;
 
-  gint32                    max_rate;
-  gint32                    min_rate;
-
   SubflowState              state;
   SubflowState              state_t1;
   gboolean                  enabled;
-  gint32                    keep;
-  GstClockTime              reduced;
-  gint32                    consecutive_congestion;
 
   GstClockTime              setup_time;
 

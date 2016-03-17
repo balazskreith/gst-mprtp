@@ -47,27 +47,6 @@ GST_DEBUG_CATEGORY_STATIC (subratectrler_debug_category);
 
 G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 
-#define MOMENTS_LENGTH 8
-#define KEEP_MAX 5
-#define KEEP_MIN 2
-
-#define DEFAULT_RAMP_UP_AGGRESSIVITY 0.
-#define DEFAULT_DISCARD_AGGRESSIVITY .1
-// Max video rampup speed in bps/s (bits per second increase per second)
-#define RAMP_UP_MAX_SPEED 200000 // bps/s
-#define RAMP_UP_MIN_SPEED 10000 // bps/s
-//CWND scale factor due to loss event. Default value: 0.6
-#define BETA 0.6
-// Target rate scale factor due to loss event. Default value: 0.8
-#define BETA_R 0.8
-//Min target_bitrate [bps]
-//#define TARGET_BITRATE_MIN 500000
-#define TARGET_BITRATE_MIN (SUBFLOW_DEFAULT_SENDING_RATE>>1)
-//Max target_bitrate [bps]
-#define TARGET_BITRATE_MAX 0
-//Guard factor against RTP queue buildup. Default value: 0.0..2.0
-#define TX_QUEUE_SIZE_FACTOR 1.0
-
 
 //if target close to the bottleneck, the increasement will be multiplied by this factor
 #define BOTTLENECK_INCREASEMENT_FACTOR 1.
@@ -107,6 +86,13 @@ G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 
 //determines the maximum ramp up bitrate
 #define RAMP_UP_MAX_SPEED 200000
+
+//Min target_bitrate [bps]
+//#define TARGET_BITRATE_MIN 500000
+#define TARGET_BITRATE_MIN (SUBFLOW_DEFAULT_SENDING_RATE>>1)
+
+//Max target_bitrate [bps]
+#define TARGET_BITRATE_MAX 0
 
 //determines the reduction factor applies on the target bitrate if it is in reduced stage
 #define REDUCE_TARGET_FACTOR 0.6

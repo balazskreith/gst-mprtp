@@ -36,7 +36,7 @@ and you need to run the following scripts:
 
 3. Run ./server --info 
 
-4. Run ./scripts/run_stest --profile=X --duration=Y, where X is the profile num for server and client and Y is the duration time for running in seconds. You can abort the test by pressing Ctrl+C
+4. Run ./scripts/run_stest --profile X --duration Y, where X is the profile num for server and client and Y is the duration time for running in seconds. You can abort the test by pressing Ctrl+C
 
 **Contacts**
 

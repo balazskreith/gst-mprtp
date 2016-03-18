@@ -1,0 +1,162 @@
+############ S1 | State: 0  | Disable time 9600 | Ctrled: 0 #################
+SR:         0         | TR:      150000    | botlnck: 0         |
+abs_max:    0         | abs_min: 75000     | max_tbr: 0         | min_tbr: 0         |
+stage:      0         | event:   0         | pevent:  0         |
+mon_br:     0         | mon_int: 3         | tr_corr: 0         | stability: 0        
+dist_level: 0         | cong_lvl:0         | trend:   0.000000  |
+RR:      0         | GP:      0         | corrH:   inf       
+frac_lost:  0.000     | last_i:87892     | last_d: 87892     |
+############################ Seconds since setup: 0 ##########################################
+############ S1 | State: 0  | Disable time 9397 | Ctrled: 0 #################
+SR:         319128    | TR:      500000    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      0         | event:   0         | pevent:  0         |
+mon_br:     0         | mon_int: 3         | tr_corr: 0         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.100000  |
+RR:      259040    | GP:      259040    | corrH:   inf       
+frac_lost:  0.000     | last_i:87892     | last_d: 87892     |
+############################ Seconds since setup: 0 ##########################################
+############ S1 | State: 0  | Disable time 7990 | Ctrled: 0 #################
+SR:         302576    | TR:      500000    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      0         | event:   0         | pevent:  0         |
+mon_br:     0         | mon_int: 3         | tr_corr: 0         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.100000  |
+RR:      301944    | GP:      301944    | corrH:   inf       
+frac_lost:  0.000     | last_i:87893     | last_d: 87893     |
+############################ Seconds since setup: 2 ##########################################
+############ S1 | State: 0  | Disable time 6141 | Ctrled: 0 #################
+SR:         418264    | TR:      500000    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      0         | event:   0         | pevent:  0         |
+mon_br:     0         | mon_int: 3         | tr_corr: 0         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.100000  |
+RR:      284096    | GP:      284096    | corrH:   0.920     
+frac_lost:  0.000     | last_i:87895     | last_d: 87895     |
+############################ Seconds since setup: 3 ##########################################
+############ S1 | State: 0  | Disable time 4627 | Ctrled: 0 #################
+SR:         399528    | TR:      500000    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      0         | event:   0         | pevent:  0         |
+mon_br:     0         | mon_int: 3         | tr_corr: 0         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.005446  |
+RR:      439920    | GP:      439920    | corrH:   0.996     
+frac_lost:  0.000     | last_i:87897     | last_d: 87897     |
+############################ Seconds since setup: 5 ##########################################
+############ S1 | State: 0  | Disable time 2691 | Ctrled: 0 #################
+SR:         447648    | TR:      500000    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      0         | event:   0         | pevent:  0         |
+mon_br:     0         | mon_int: 3         | tr_corr: 0         | stability: 1        
+dist_level: 0         | cong_lvl:0         | trend:   0.000001  |
+RR:      535664    | GP:      535664    | corrH:   1.002     
+frac_lost:  0.000     | last_i:87899     | last_d: 87899     |
+############################ Seconds since setup: 7 ##########################################
+############ S1 | State: 0  | Disable time 1183 | Ctrled: 0 #################
+SR:         340720    | TR:      500000    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      0         | event:   0         | pevent:  0         |
+mon_br:     0         | mon_int: 3         | tr_corr: 0         | stability: 3        
+dist_level: 0         | cong_lvl:0         | trend:   0.000003  |
+RR:      439904    | GP:      439904    | corrH:   1.001     
+frac_lost:  0.000     | last_i:87900     | last_d: 87900     |
+############################ Seconds since setup: 8 ##########################################
+############ S1 | State: 0  | Disable time 90 | Ctrled: 0 #################
+SR:         278152    | TR:      500000    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      0         | event:   0         | pevent:  0         |
+mon_br:     0         | mon_int: 3         | tr_corr: 0         | stability: 4        
+dist_level: 0         | cong_lvl:0         | trend:   0.000003  |
+RR:      265264    | GP:      265264    | corrH:   1.000     
+frac_lost:  0.000     | last_i:87901     | last_d: 87901     |
+############################ Seconds since setup: 9 ##########################################
+############ S1 | State: 0  | Disable time 0 | Ctrled: 1 #################
+SR:         445568    | TR:      500000    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      1         | event:   0         | pevent:  0         |
+mon_br:     166666    | mon_int: 3         | tr_corr: 0         | stability: 6        
+dist_level: 0         | cong_lvl:0         | trend:   0.000002  |
+RR:      466864    | GP:      466864    | corrH:   1.004     
+frac_lost:  0.000     | last_i:87903     | last_d: 87903     |
+############################ Seconds since setup: 11 ##########################################
+############ S1 | State: 0  | Disable time 0 | Ctrled: 1 #################
+SR:         384352    | TR:      500000    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      1         | event:   0         | pevent:  0         |
+mon_br:     166666    | mon_int: 3         | tr_corr: 0         | stability: 7        
+dist_level: 0         | cong_lvl:0         | trend:   0.000003  |
+RR:      404600    | GP:      404600    | corrH:   1.001     
+frac_lost:  0.000     | last_i:87904     | last_d: 87904     |
+############################ Seconds since setup: 12 ##########################################
+############ S1 | State: 0  | Disable time 0 | Ctrled: 1 #################
+SR:         405776    | TR:      500000    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      1         | event:   0         | pevent:  0         |
+mon_br:     166666    | mon_int: 3         | tr_corr: 0         | stability: 8        
+dist_level: 0         | cong_lvl:0         | trend:   0.000004  |
+RR:      415520    | GP:      415520    | corrH:   1.000     
+frac_lost:  0.000     | last_i:87905     | last_d: 87905     |
+############################ Seconds since setup: 13 ##########################################
+############ S1 | State: 0  | Disable time 0 | Ctrled: 1 #################
+SR:         419456    | TR:      500000    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      1         | event:   0         | pevent:  0         |
+mon_br:     166666    | mon_int: 3         | tr_corr: 0         | stability: 8        
+dist_level: 0         | cong_lvl:0         | trend:   0.000004  |
+RR:      418088    | GP:      418088    | corrH:   1.000     
+frac_lost:  0.000     | last_i:87906     | last_d: 87906     |
+############################ Seconds since setup: 14 ##########################################
+############ S1 | State: 1  | Disable time 0 | Ctrled: 1 #################
+SR:         453832    | TR:      666666    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      2         | event:   0         | pevent:  0         |
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 9        
+dist_level: 0         | cong_lvl:0         | trend:   0.000003  |
+RR:      467976    | GP:      467976    | corrH:   0.999     
+frac_lost:  0.000     | last_i:0         | last_d: 87906     |
+############################ Seconds since setup: 15 ##########################################
+############ S1 | State: 1  | Disable time 0 | Ctrled: 1 #################
+SR:         491696    | TR:      666666    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      2         | event:   0         | pevent:  0         |
+mon_br:     0         | mon_int: 0         | tr_corr: 0         | stability: 0        
+dist_level: 0         | cong_lvl:0         | trend:   0.000001  |
+RR:      487696    | GP:      487696    | corrH:   1.000     
+frac_lost:  0.000     | last_i:1         | last_d: 87908     |
+############################ Seconds since setup: 16 ##########################################
+############ S1 | State: 1  | Disable time 0 | Ctrled: 1 #################
+SR:         394072    | TR:      666666    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      2         | event:   0         | pevent:  0         |
+mon_br:     0         | mon_int: 0         | tr_corr: 0         | stability: 1        
+dist_level: 0         | cong_lvl:0         | trend:   0.000001  |
+RR:      455600    | GP:      455600    | corrH:   1.000     
+frac_lost:  0.000     | last_i:2         | last_d: 87909     |
+############################ Seconds since setup: 18 ##########################################
+############ S1 | State: 1  | Disable time 0 | Ctrled: 1 #################
+SR:         537344    | TR:      666666    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      2         | event:   0         | pevent:  0         |
+mon_br:     0         | mon_int: 0         | tr_corr: 0         | stability: 2        
+dist_level: 0         | cong_lvl:0         | trend:   0.000004  |
+RR:      551728    | GP:      551728    | corrH:   1.000     
+frac_lost:  0.000     | last_i:4         | last_d: 87911     |
+############################ Seconds since setup: 19 ##########################################
+############ S1 | State: 0  | Disable time 0 | Ctrled: 1 #################
+SR:         612880    | TR:      666666    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      1         | event:   0         | pevent:  0         |
+mon_br:     166666    | mon_int: 4         | tr_corr: 1         | stability: 3        
+dist_level: 0         | cong_lvl:0         | trend:   0.000006  |
+RR:      606200    | GP:      606200    | corrH:   0.999     
+frac_lost:  0.000     | last_i:5         | last_d: 87912     |
+############################ Seconds since setup: 20 ##########################################
+############ S1 | State: 0  | Disable time 0 | Ctrled: 1 #################
+SR:         619048    | TR:      666666    | botlnck: 0         |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 0         |
+stage:      1         | event:   0         | pevent:  0         |
+mon_br:     166666    | mon_int: 4         | tr_corr: 1         | stability: 0        
+dist_level: 0         | cong_lvl:0         | trend:   0.000005  |
+RR:      605528    | GP:      605528    | corrH:   0.999     
+frac_lost:  0.000     | last_i:6         | last_d: 87913     |
+############################ Seconds since setup: 21 ##########################################

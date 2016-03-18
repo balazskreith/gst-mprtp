@@ -1,0 +1,224 @@
+############ S0 | State: -1 | Disable time 1999 | Ctrled: 1 #################
+SR:         519560    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  0         |
+reduced:    1         |
+############################ Seconds since setup: 516 ##########################################
+############ S0 | State: -1 | Disable time 1269 | Ctrled: 0 #################
+SR:         530488    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  0         |
+reduced:    1         |
+############################ Seconds since setup: 517 ##########################################
+############ S0 | State: -1 | Disable time 262 | Ctrled: 0 #################
+SR:         534912    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  0         |
+reduced:    1         |
+############################ Seconds since setup: 518 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         529984    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  2         |
+reduced:    1         |
+############################ Seconds since setup: 519 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         498384    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  3         |
+reduced:    1         |
+############################ Seconds since setup: 520 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         482656    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  4         |
+reduced:    1         |
+############################ Seconds since setup: 521 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         490208    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  5         |
+reduced:    1         |
+############################ Seconds since setup: 521 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         505984    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  5         |
+reduced:    1         |
+############################ Seconds since setup: 522 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         520952    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  6         |
+reduced:    1         |
+############################ Seconds since setup: 523 ##########################################
+############ S0 | State: -1 | Disable time 1999 | Ctrled: 1 #################
+SR:         521384    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  0         |
+reduced:    1         |
+############################ Seconds since setup: 523 ##########################################
+############ S0 | State: -1 | Disable time 1394 | Ctrled: 0 #################
+SR:         510368    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  0         |
+reduced:    1         |
+############################ Seconds since setup: 524 ##########################################
+############ S0 | State: -1 | Disable time 587 | Ctrled: 0 #################
+SR:         486608    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  0         |
+reduced:    1         |
+############################ Seconds since setup: 525 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         492328    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  2         |
+reduced:    1         |
+############################ Seconds since setup: 525 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         534296    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  3         |
+reduced:    1         |
+############################ Seconds since setup: 526 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         536456    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  3         |
+reduced:    1         |
+############################ Seconds since setup: 527 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         567696    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 0         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  4         |
+reduced:    1         |
+############################ Seconds since setup: 528 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         559872    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 0         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  5         |
+reduced:    1         |
+############################ Seconds since setup: 528 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         468992    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  5         |
+reduced:    1         |
+############################ Seconds since setup: 529 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         462992    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  6         |
+reduced:    1         |
+############################ Seconds since setup: 530 ##########################################
+############ S0 | State: -1 | Disable time 1999 | Ctrled: 1 #################
+SR:         483536    | TR:      500000    | botlnck: 483536    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  0         |
+reduced:    1         |
+############################ Seconds since setup: 530 ##########################################
+############ S0 | State: -1 | Disable time 996 | Ctrled: 0 #################
+SR:         494984    | TR:      500000    | botlnck: 483536    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  0         |
+reduced:    1         |
+############################ Seconds since setup: 531 ##########################################
+############ S0 | State: -1 | Disable time 293 | Ctrled: 0 #################
+SR:         488160    | TR:      500000    | botlnck: 483536    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  0         |
+reduced:    1         |
+############################ Seconds since setup: 532 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         496232    | TR:      500000    | botlnck: 483536    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  1266398095|
+reduced:    1         |
+############################ Seconds since setup: 18446267809 ##########################################
+############ S0 | State: -1 | Disable time 2000 | Ctrled: 1 #################
+SR:         521280    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  0         |
+reduced:    1         |
+############################ Seconds since setup: 18446267809 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         523552    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  0         |
+reduced:    1         |
+############################ Seconds since setup: 18446267809 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         503392    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  0         |
+reduced:    1         |
+############################ Seconds since setup: 18446267809 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         497928    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  0         |
+reduced:    1         |
+############################ Seconds since setup: 18446267809 ##########################################
+############ S0 | State: -1 | Disable time 0 | Ctrled: 1 #################
+SR:         490360    | TR:      500000    | botlnck: 500000    |
+abs_max:    3000000   | abs_min: 500000    | max_tbr: 0         | min_tbr: 75000     |
+stage:      -1        | event:   0         | pevent:  0         | keep:    5         
+mon_br:     0         | mon_int: 0         | tr_corr: 1         | stability: 0        
+dist_level: 1         | cong_lvl:0         | trend:   0.000000  | cons_cng:  0         |
+reduced:    1         |
+############################ Seconds since setup: 18446267809 ##########################################

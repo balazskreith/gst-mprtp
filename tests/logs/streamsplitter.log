@@ -1,0 +1,144 @@
+###############################################################
+Seconds: 0
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 150000 | Sent bytes: 39097 | weight: 1.000000
+128->1:39097 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 0
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 500000 | Sent bytes: 41540 | weight: 1.000000
+128->1:41540 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 2
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 500000 | Sent bytes: 37822 | weight: 1.000000
+128->1:37822 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 3
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 500000 | Sent bytes: 54929 | weight: 1.000000
+128->1:54929 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 5
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 500000 | Sent bytes: 62985 | weight: 1.000000
+128->1:62985 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 7
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 500000 | Sent bytes: 52476 | weight: 1.000000
+128->1:52476 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 8
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 500000 | Sent bytes: 33077 | weight: 1.000000
+128->1:33077 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 9
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 500000 | Sent bytes: 57407 | weight: 1.000000
+128->1:57407 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 11
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 500000 | Sent bytes: 39427 | weight: 1.000000
+128->1:39427 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 12
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 500000 | Sent bytes: 52980 | weight: 1.000000
+128->1:52980 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 13
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 500000 | Sent bytes: 53558 | weight: 1.000000
+128->1:53558 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 14
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 500000 | Sent bytes: 60446 | weight: 1.000000
+128->1:60446 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 15
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 666666 | Sent bytes: 55750 | weight: 1.000000
+128->1:55750 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 16
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 666666 | Sent bytes: 47825 | weight: 1.000000
+128->1:47825 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 18
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 666666 | Sent bytes: 68293 | weight: 1.000000
+128->1:68293 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 19
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 666666 | Sent bytes: 79038 | weight: 1.000000
+128->1:79038 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 20
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 666666 | Sent bytes: 79543 | weight: 1.000000
+128->1:79543 (K:1) (L:(nil),R:(nil))
+###############################################################
+Seconds: 21
+Active subflow num: 1
+separation is possible: 0
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 666666 | Sent bytes: 89732 | weight: 1.000000
+128->1:89732 (K:1) (L:(nil),R:(nil))

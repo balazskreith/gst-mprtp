@@ -1,0 +1,684 @@
+############ Network Queue Analyser log after 0 seconds #################
+g(0): 0.00000000| g(0): 0.00000000| g(0): 0.00000000| g(0): 0.00000000| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 18812160  |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 0
+corrH: inf
+############ Network Queue Analyser log after 0 seconds #################
+g(0): 17.17276142| g(0): 0.00000000| g(0): 0.00000000| g(0): 0.00000000| g(0): -nan      |
+dist: 1         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 0 seconds #################
+g(0): 10.58137857| g(0): 10.58439591| g(0): 0.00000000| g(0): 0.00000000| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 1, discards: 0, rdiscards: 0
+corrH: inf
+############ Network Queue Analyser log after 2 seconds #################
+g(0): 7.38143747| g(0): 10.58439591| g(0): 0.00000000| g(0): 0.00000000| g(0): -nan      |
+dist: 1         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 2 seconds #################
+g(0): 5.60883052| g(0): 5.32751107| g(0): 0.00000000| g(0): 0.00000000| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 2 seconds #################
+g(0): 4.47020332| g(0): 5.32751107| g(0): 5.61623675| g(0): 0.00000000| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 2 seconds #################
+g(0): 3.67063847| g(0): 3.48098801| g(0): 5.61623675| g(0): 0.00000000| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 2 seconds #################
+g(0): 3.07530419| g(0): 3.48098801| g(0): 5.61623675| g(0): 0.00000000| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 2 seconds #################
+g(0): 2.61466919| g(0): 2.48914441| g(0): 5.61623675| g(0): 0.00000000| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 2 seconds #################
+g(0): 2.24762912| g(0): 2.48914441| g(0): 2.37949879| g(0): 0.00000000| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 2 seconds #################
+g(0): 1.94822245| g(0): 1.85707958| g(0): 2.37949879| g(0): 0.00000000| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 2 seconds #################
+g(0): 1.70185026| g(0): 1.85707958| g(0): 2.37949879| g(0): 2.59073251| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 2 seconds #################
+g(0): 1.49329722| g(0): 1.42047498| g(0): 2.37949879| g(0): 2.59073251| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 2 seconds #################
+g(0): 1.31444279| g(0): 1.42047498| g(0): 1.35073352| g(0): 2.59073251| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 2 seconds #################
+g(0): 1.15939271| g(0): 1.10150709| g(0): 1.35073352| g(0): 2.59073251| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 2 seconds #################
+g(0): 1.02371749| g(0): 1.10150709| g(0): 1.35073352| g(0): 2.59073251| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 2 seconds #################
+g(0): 0.90400625| g(0): 0.85696946| g(0): 1.35073352| g(0): 2.59073251| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 1, discards: 0, rdiscards: 0
+corrH: inf
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.79761050| g(0): 0.85696946| g(0): 0.80970489| g(0): 2.59073251| g(0): -nan      |
+dist: 1         | dist: 0         | dist: 1         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.70242447| g(0): 0.66350229| g(0): 0.80970489| g(0): 2.59073251| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.61678007| g(0): 0.66350229| g(0): 0.80970489| g(0): 0.75780749| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.53931481| g(0): 0.50658893| g(0): 0.80970489| g(0): 0.75780749| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.46891050| g(0): 0.50658893| g(0): 0.47342008| g(0): 0.75780749| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.40464863| g(0): 0.37676252| g(0): 0.47342008| g(0): 0.75780749| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.34575953| g(0): 0.37676252| g(0): 0.47342008| g(0): 0.75780749| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.29160068| g(0): 0.26755714| g(0): 0.47342008| g(0): 0.75780749| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.24162087| g(0): 0.26755714| g(0): 0.24309907| g(0): 0.75780749| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.19535619| g(0): 0.17442118| g(0): 0.24309907| g(0): 0.75780749| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.15240803| g(0): 0.17442118| g(0): 0.24309907| g(0): 0.21668604| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.11243397| g(0): 0.09404338| g(0): 0.24309907| g(0): 0.21668604| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.07513422| g(0): 0.09404338| g(0): 0.07530638| g(0): 0.21668604| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.04025058| g(0): 0.02397071| g(0): 0.07530638| g(0): 0.21668604| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.00755598| g(0): 0.02397071| g(0): 0.07530638| g(0): 0.21668604| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.00850564| g(0): -0.00647684| g(0): 0.07530638| g(0): 0.21668604| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.00828998| g(0): -0.00647684| g(0): -0.02174985| g(0): 0.21668604| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.00402731| g(0): 0.00481127| g(0): -0.02174985| g(0): 0.21668604| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser log after 3 seconds #################
+g(0): 0.00172997| g(0): 0.00481127| g(0): -0.02174985| g(0): -0.03789616| g(0): -nan      |
+dist: 1         | dist: 1         | dist: 1         | dist: 1         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 1, discards: 0, rdiscards: 0
+corrH: 0.919978
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00106063| g(0): 0.00132195| g(0): -0.02174985| g(0): -0.03789616| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00080151| g(0): 0.00132195| g(0): 0.00270411| g(0): -0.03789616| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00062134| g(0): 0.00060303| g(0): 0.00270411| g(0): -0.03789616| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00043129| g(0): 0.00060303| g(0): 0.00270411| g(0): -0.03789616| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00022576| g(0): 0.00021577| g(0): 0.00270411| g(0): -0.03789616| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00000585| g(0): 0.00021577| g(0): 0.00019837| g(0): -0.03789616| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00000001| g(0): -0.00000204| g(0): 0.00019837| g(0): -0.03789616| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00000007| g(0): -0.00000204| g(0): 0.00019837| g(0): 0.00035931| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00000005| g(0): 0.00000007| g(0): 0.00019837| g(0): 0.00035931| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00000004| g(0): 0.00000007| g(0): -0.00000154| g(0): 0.00035931| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00000004| g(0): 0.00000004| g(0): -0.00000154| g(0): 0.00035931| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00000003| g(0): 0.00000004| g(0): -0.00000154| g(0): 0.00035931| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00000002| g(0): 0.00000002| g(0): -0.00000154| g(0): 0.00035931| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00000005| g(0): 0.00000002| g(0): 0.00000001| g(0): 0.00035931| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 5 seconds #################
+g(0): 0.00000015| g(0): 0.00000007| g(0): 0.00000001| g(0): 0.00035931| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 0
+corrH: 0.996355
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000019| g(0): 0.00000007| g(0): 0.00000001| g(0): -0.00000046| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000023| g(0): 0.00000020| g(0): 0.00000001| g(0): -0.00000046| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000032| g(0): 0.00000020| g(0): 0.00000009| g(0): -0.00000046| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000040| g(0): 0.00000032| g(0): 0.00000009| g(0): -0.00000046| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000043| g(0): 0.00000032| g(0): 0.00000009| g(0): -0.00000046| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000043| g(0): 0.00000033| g(0): 0.00000009| g(0): -0.00000046| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000040| g(0): 0.00000033| g(0): 0.00000025| g(0): -0.00000046| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000043| g(0): 0.00000034| g(0): 0.00000025| g(0): -0.00000046| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000041| g(0): 0.00000034| g(0): 0.00000025| g(0): 0.00000003| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000050| g(0): 0.00000021| g(0): 0.00000025| g(0): 0.00000003| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000067| g(0): 0.00000021| g(0): 0.00000021| g(0): 0.00000003| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000069| g(0): 0.00000034| g(0): 0.00000021| g(0): 0.00000003| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000069| g(0): 0.00000034| g(0): 0.00000021| g(0): 0.00000003| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000069| g(0): 0.00000036| g(0): 0.00000021| g(0): 0.00000003| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000068| g(0): 0.00000036| g(0): 0.00000024| g(0): 0.00000003| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000068| g(0): 0.00000033| g(0): 0.00000024| g(0): 0.00000003| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000068| g(0): 0.00000033| g(0): 0.00000024| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000068| g(0): 0.00000033| g(0): 0.00000024| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 7 seconds #################
+g(0): 0.00000068| g(0): 0.00000033| g(0): 0.00000016| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 1
+corrH: 1.001825
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000068| g(0): 0.00000033| g(0): 0.00000016| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000066| g(0): 0.00000033| g(0): 0.00000016| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000064| g(0): 0.00000030| g(0): 0.00000016| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000063| g(0): 0.00000030| g(0): 0.00000012| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000062| g(0): 0.00000028| g(0): 0.00000012| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000069| g(0): 0.00000028| g(0): 0.00000012| g(0): -0.00000024| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000081| g(0): 0.00000033| g(0): 0.00000012| g(0): -0.00000024| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000093| g(0): 0.00000033| g(0): 0.00000004| g(0): -0.00000024| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000105| g(0): 0.00000059| g(0): 0.00000004| g(0): -0.00000024| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000116| g(0): 0.00000059| g(0): 0.00000004| g(0): -0.00000024| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000127| g(0): 0.00000081| g(0): 0.00000004| g(0): -0.00000024| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000130| g(0): 0.00000081| g(0): 0.00000036| g(0): -0.00000024| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000123| g(0): 0.00000092| g(0): 0.00000036| g(0): -0.00000024| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000125| g(0): 0.00000092| g(0): 0.00000036| g(0): -0.00000042| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 8 seconds #################
+g(0): 0.00000126| g(0): 0.00000086| g(0): 0.00000036| g(0): -0.00000042| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 3
+corrH: 1.000608
+############ Network Queue Analyser log after 9 seconds #################
+g(0): 0.00000114| g(0): 0.00000086| g(0): 0.00000065| g(0): -0.00000042| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 9 seconds #################
+g(0): 0.00000099| g(0): 0.00000068| g(0): 0.00000065| g(0): -0.00000042| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 9 seconds #################
+g(0): 0.00000091| g(0): 0.00000068| g(0): 0.00000065| g(0): -0.00000042| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 9 seconds #################
+g(0): 0.00000094| g(0): 0.00000059| g(0): 0.00000065| g(0): -0.00000042| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 9 seconds #################
+g(0): 0.00000095| g(0): 0.00000059| g(0): 0.00000046| g(0): -0.00000042| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 9 seconds #################
+g(0): 0.00000083| g(0): 0.00000053| g(0): 0.00000046| g(0): -0.00000042| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 9 seconds #################
+g(0): 0.00000083| g(0): 0.00000053| g(0): 0.00000046| g(0): 0.00000006| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 9 seconds #################
+g(0): 0.00000083| g(0): 0.00000066| g(0): 0.00000046| g(0): 0.00000006| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 9 seconds #################
+g(0): 0.00000077| g(0): 0.00000066| g(0): 0.00000043| g(0): 0.00000006| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 9 seconds #################
+g(0): 0.00000078| g(0): 0.00000064| g(0): 0.00000043| g(0): 0.00000006| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 9 seconds #################
+g(0): 0.00000078| g(0): 0.00000064| g(0): 0.00000043| g(0): 0.00000006| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 4
+corrH: 1.000000
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000081| g(0): 0.00000065| g(0): 0.00000043| g(0): 0.00000006| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000076| g(0): 0.00000065| g(0): 0.00000045| g(0): 0.00000006| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000067| g(0): 0.00000059| g(0): 0.00000045| g(0): 0.00000006| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000059| g(0): 0.00000059| g(0): 0.00000045| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000049| g(0): 0.00000041| g(0): 0.00000045| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000038| g(0): 0.00000041| g(0): 0.00000040| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000031| g(0): 0.00000019| g(0): 0.00000040| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000027| g(0): 0.00000019| g(0): 0.00000040| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000031| g(0): 0.00000015| g(0): 0.00000040| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000038| g(0): 0.00000015| g(0): 0.00000000| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000045| g(0): 0.00000025| g(0): 0.00000000| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000056| g(0): 0.00000025| g(0): 0.00000000| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000069| g(0): 0.00000051| g(0): 0.00000000| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000081| g(0): 0.00000051| g(0): 0.00000025| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 11 seconds #################
+g(0): 0.00000102| g(0): 0.00000084| g(0): 0.00000025| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 6
+corrH: 1.003647
+############ Network Queue Analyser log after 12 seconds #################
+g(0): 0.00000110| g(0): 0.00000084| g(0): 0.00000025| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 12 seconds #################
+g(0): 0.00000113| g(0): 0.00000101| g(0): 0.00000025| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 12 seconds #################
+g(0): 0.00000115| g(0): 0.00000101| g(0): 0.00000071| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 12 seconds #################
+g(0): 0.00000115| g(0): 0.00000104| g(0): 0.00000071| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 12 seconds #################
+g(0): 0.00000115| g(0): 0.00000104| g(0): 0.00000071| g(0): 0.00000016| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 12 seconds #################
+g(0): 0.00000116| g(0): 0.00000105| g(0): 0.00000071| g(0): 0.00000016| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 12 seconds #################
+g(0): 0.00000114| g(0): 0.00000105| g(0): 0.00000085| g(0): 0.00000016| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 12 seconds #################
+g(0): 0.00000108| g(0): 0.00000098| g(0): 0.00000085| g(0): 0.00000016| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 12 seconds #################
+g(0): 0.00000117| g(0): 0.00000098| g(0): 0.00000085| g(0): 0.00000016| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 12 seconds #################
+g(0): 0.00000112| g(0): 0.00000099| g(0): 0.00000085| g(0): 0.00000016| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 12 seconds #################
+g(0): 0.00000109| g(0): 0.00000099| g(0): 0.00000072| g(0): 0.00000016| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 12 seconds #################
+g(0): 0.00000109| g(0): 0.00000101| g(0): 0.00000072| g(0): 0.00000016| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 12 seconds #################
+g(0): 0.00000106| g(0): 0.00000101| g(0): 0.00000072| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 12 seconds #################
+g(0): 0.00000100| g(0): 0.00000101| g(0): 0.00000072| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 7
+corrH: 1.001215
+############ Network Queue Analyser log after 13 seconds #################
+g(0): 0.00000115| g(0): 0.00000101| g(0): 0.00000070| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 13 seconds #################
+g(0): 0.00000131| g(0): 0.00000109| g(0): 0.00000070| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 13 seconds #################
+g(0): 0.00000147| g(0): 0.00000109| g(0): 0.00000070| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 13 seconds #################
+g(0): 0.00000163| g(0): 0.00000144| g(0): 0.00000070| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 13 seconds #################
+g(0): 0.00000157| g(0): 0.00000144| g(0): 0.00000089| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 13 seconds #################
+g(0): 0.00000147| g(0): 0.00000149| g(0): 0.00000089| g(0): 0.00000008| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 13 seconds #################
+g(0): 0.00000144| g(0): 0.00000149| g(0): 0.00000089| g(0): -0.00000005| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 13 seconds #################
+g(0): 0.00000140| g(0): 0.00000141| g(0): 0.00000089| g(0): -0.00000005| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 13 seconds #################
+g(0): 0.00000142| g(0): 0.00000141| g(0): 0.00000096| g(0): -0.00000005| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 8
+corrH: 1.000000
+############ Network Queue Analyser log after 14 seconds #################
+g(0): 0.00000143| g(0): 0.00000147| g(0): 0.00000096| g(0): -0.00000005| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 14 seconds #################
+g(0): 0.00000139| g(0): 0.00000147| g(0): 0.00000096| g(0): -0.00000005| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 14 seconds #################
+g(0): 0.00000137| g(0): 0.00000141| g(0): 0.00000096| g(0): -0.00000005| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 14 seconds #################
+g(0): 0.00000127| g(0): 0.00000141| g(0): 0.00000107| g(0): -0.00000005| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 14 seconds #################
+g(0): 0.00000120| g(0): 0.00000126| g(0): 0.00000107| g(0): -0.00000005| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 14 seconds #################
+g(0): 0.00000116| g(0): 0.00000126| g(0): 0.00000107| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 8
+corrH: 1.000000
+############ Network Queue Analyser log after 15 seconds #################
+g(0): 0.00000110| g(0): 0.00000112| g(0): 0.00000107| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 15 seconds #################
+g(0): 0.00000102| g(0): 0.00000112| g(0): 0.00000091| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 15 seconds #################
+g(0): 0.00000081| g(0): 0.00000085| g(0): 0.00000091| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 15 seconds #################
+g(0): 0.00000067| g(0): 0.00000085| g(0): 0.00000091| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 15 seconds #################
+g(0): 0.00000057| g(0): 0.00000055| g(0): 0.00000091| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 15 seconds #################
+g(0): 0.00000046| g(0): 0.00000055| g(0): 0.00000048| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 15 seconds #################
+g(0): 0.00000038| g(0): 0.00000038| g(0): 0.00000048| g(0): 0.00000002| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 9
+corrH: 0.998786
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000031| g(0): 0.00000038| g(0): 0.00000048| g(0): 0.00000020| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000024| g(0): 0.00000022| g(0): 0.00000048| g(0): 0.00000020| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000021| g(0): 0.00000022| g(0): -0.00000003| g(0): 0.00000020| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000023| g(0): 0.00000021| g(0): -0.00000003| g(0): 0.00000020| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000023| g(0): 0.00000021| g(0): -0.00000003| g(0): 0.00000020| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000033| g(0): 0.00000026| g(0): -0.00000003| g(0): 0.00000020| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000043| g(0): 0.00000026| g(0): -0.00000003| g(0): 0.00000020| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000039| g(0): 0.00000028| g(0): -0.00000003| g(0): 0.00000020| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000038| g(0): 0.00000028| g(0): -0.00000003| g(0): -0.00000039| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000046| g(0): 0.00000027| g(0): -0.00000003| g(0): -0.00000039| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000040| g(0): 0.00000027| g(0): -0.00000005| g(0): -0.00000039| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000034| g(0): 0.00000031| g(0): -0.00000005| g(0): -0.00000039| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000031| g(0): 0.00000031| g(0): -0.00000005| g(0): -0.00000039| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000025| g(0): 0.00000020| g(0): -0.00000005| g(0): -0.00000039| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 16 seconds #################
+g(0): 0.00000032| g(0): 0.00000020| g(0): -0.00000002| g(0): -0.00000039| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 0
+corrH: 1.000000
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000035| g(0): 0.00000023| g(0): -0.00000002| g(0): -0.00000039| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000036| g(0): 0.00000023| g(0): -0.00000002| g(0): -0.00000031| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000038| g(0): 0.00000023| g(0): -0.00000002| g(0): -0.00000031| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000040| g(0): 0.00000023| g(0): -0.00000001| g(0): -0.00000031| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000044| g(0): 0.00000026| g(0): -0.00000001| g(0): -0.00000031| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000050| g(0): 0.00000026| g(0): -0.00000001| g(0): -0.00000031| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000044| g(0): 0.00000031| g(0): -0.00000001| g(0): -0.00000031| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000043| g(0): 0.00000031| g(0): 0.00000000| g(0): -0.00000031| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000045| g(0): 0.00000034| g(0): 0.00000000| g(0): -0.00000031| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000042| g(0): 0.00000034| g(0): 0.00000000| g(0): -0.00000030| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000039| g(0): 0.00000031| g(0): 0.00000000| g(0): -0.00000030| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000035| g(0): 0.00000031| g(0): 0.00000006| g(0): -0.00000030| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000030| g(0): 0.00000025| g(0): 0.00000006| g(0): -0.00000030| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000027| g(0): 0.00000025| g(0): 0.00000006| g(0): -0.00000030| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 18 seconds #################
+g(0): 0.00000028| g(0): 0.00000022| g(0): 0.00000006| g(0): -0.00000030| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 1
+corrH: 1.000000
+############ Network Queue Analyser log after 19 seconds #################
+g(0): 0.00000029| g(0): 0.00000022| g(0): 0.00000001| g(0): -0.00000030| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 19 seconds #################
+g(0): 0.00000031| g(0): 0.00000021| g(0): 0.00000001| g(0): -0.00000030| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 19 seconds #################
+g(0): 0.00000031| g(0): 0.00000021| g(0): 0.00000001| g(0): -0.00000023| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 19 seconds #################
+g(0): 0.00000032| g(0): 0.00000024| g(0): 0.00000001| g(0): -0.00000023| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 19 seconds #################
+g(0): 0.00000032| g(0): 0.00000024| g(0): 0.00000002| g(0): -0.00000023| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 19 seconds #################
+g(0): 0.00000031| g(0): 0.00000020| g(0): 0.00000002| g(0): -0.00000023| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 19 seconds #################
+g(0): 0.00000047| g(0): 0.00000020| g(0): 0.00000002| g(0): -0.00000023| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 19 seconds #################
+g(0): 0.00000073| g(0): 0.00000031| g(0): 0.00000002| g(0): -0.00000023| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 19 seconds #################
+g(0): 0.00000092| g(0): 0.00000031| g(0): -0.00000015| g(0): -0.00000023| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 19 seconds #################
+g(0): 0.00000120| g(0): 0.00000081| g(0): -0.00000015| g(0): -0.00000023| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 19 seconds #################
+g(0): 0.00000150| g(0): 0.00000081| g(0): -0.00000015| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 19 seconds #################
+g(0): 0.00000179| g(0): 0.00000136| g(0): -0.00000015| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 19 seconds #################
+g(0): 0.00000198| g(0): 0.00000136| g(0): 0.00000051| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 2
+corrH: 1.000000
+############ Network Queue Analyser log after 20 seconds #################
+g(0): 0.00000216| g(0): 0.00000183| g(0): 0.00000051| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 20 seconds #################
+g(0): 0.00000234| g(0): 0.00000183| g(0): 0.00000051| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 20 seconds #################
+g(0): 0.00000244| g(0): 0.00000211| g(0): 0.00000051| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 20 seconds #################
+g(0): 0.00000248| g(0): 0.00000211| g(0): 0.00000131| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 20 seconds #################
+g(0): 0.00000250| g(0): 0.00000223| g(0): 0.00000131| g(0): -0.00000014| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 20 seconds #################
+g(0): 0.00000248| g(0): 0.00000223| g(0): 0.00000131| g(0): 0.00000018| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 20 seconds #################
+g(0): 0.00000243| g(0): 0.00000215| g(0): 0.00000131| g(0): 0.00000018| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 20 seconds #################
+g(0): 0.00000236| g(0): 0.00000215| g(0): 0.00000144| g(0): 0.00000018| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 20 seconds #################
+g(0): 0.00000231| g(0): 0.00000202| g(0): 0.00000144| g(0): 0.00000018| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 20 seconds #################
+g(0): 0.00000222| g(0): 0.00000202| g(0): 0.00000144| g(0): 0.00000018| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 20 seconds #################
+g(0): 0.00000212| g(0): 0.00000182| g(0): 0.00000144| g(0): 0.00000018| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 3
+corrH: 0.999392
+############ Network Queue Analyser log after 21 seconds #################
+g(0): 0.00000204| g(0): 0.00000182| g(0): 0.00000118| g(0): 0.00000018| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 21 seconds #################
+g(0): 0.00000195| g(0): 0.00000162| g(0): 0.00000118| g(0): 0.00000018| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 21 seconds #################
+g(0): 0.00000192| g(0): 0.00000162| g(0): 0.00000118| g(0): 0.00000013| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 21 seconds #################
+g(0): 0.00000191| g(0): 0.00000155| g(0): 0.00000118| g(0): 0.00000013| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 21 seconds #################
+g(0): 0.00000188| g(0): 0.00000155| g(0): 0.00000092| g(0): 0.00000013| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 21 seconds #################
+g(0): 0.00000186| g(0): 0.00000151| g(0): 0.00000092| g(0): 0.00000013| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 21 seconds #################
+g(0): 0.00000190| g(0): 0.00000151| g(0): 0.00000092| g(0): 0.00000013| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 21 seconds #################
+g(0): 0.00000202| g(0): 0.00000152| g(0): 0.00000092| g(0): 0.00000013| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser log after 21 seconds #################
+g(0): 0.00000206| g(0): 0.00000152| g(0): 0.00000069| g(0): 0.00000013| g(0): -nan      |
+dist: 0         | dist: 0         | dist: 0         | dist: 0         | dist: 4096      |
+############ Network Queue Analyser Results #################
+distortion: 0, discards: 0, rdiscards: 0
+corrH: 0.998785

@@ -1,0 +1,42 @@
+ 
+In this test case the bottleneck-link capacity between the two
+endpoints varies over time.  This test is designed to measure the
+responsiveness of the candidate algorithm.  This test tries to
+address the requirements in [I-D.ietf-rmcat-cc-requirements], which
+requires the algorithm to adapt the flow(s) and provide lower end-to-
+end latency when there exists:\
+
+\begin{itemize}
+\item an intermediate bottleneck
+\item change in available capacity (e.g., due to interface change, routing change, abrupt arrival/departure of background non-adaptive traffic).
+\item maximum Media Bit Rate is Greater than Link Capacity.  In this case, the application will attempt to ramp up to its maximum bit rate, since the link capacity is limited to a value lower, the congestion control scheme is expected to stabilize the sending bit rate close to the available bottleneck capacity.  This situation can occur when the endpoints are connected via thin long networks even though the advertised capacity of the access network may be higher.
+\end{itemize}
+
+It should be noted that the exact variation in available capacity due
+to any of the above depends on the under-lying technologies.  Hence,
+we describe a set of known factors, which may be extended to devise a
+more specific test case targeting certain behaviour in a certain
+network environment.\
+
+Expected behavior: the candidate algorithm is expected to detect the
+path capacity constraint, converges to bottleneck link's capacity and
+adapt the flow to avoid unwanted oscillation when the sending bit
+rate is approaching the bottleneck link's capacity.  The oscillations
+occur when the media flow(s) attempts to reach its maximum bit rate,
+overshoots the usage of the available bottleneck capacity, to rectify
+it reduces the bit rate and starts to ramp up again.\
+
+\begin{figure}
+\begin{verbatim}
+                            Forward -->
++---+       +-----+                               +-----+       +---+
+|S1 |=======|  A  |------------------------------>|  B  |=======|R1 |
++---+       |     |<------------------------------|     |       +---+
+            +-----+                               +-----+
+                         <-- Backward
+\end{verbatim}
+\caption{Box in an old RFC}
+\label{fig:ascii-box}
+\end{figure}
+
+

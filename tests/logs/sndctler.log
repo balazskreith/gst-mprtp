@@ -1,0 +1,180 @@
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      0                                           #
+# target_rate:  150000    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 283336015 | max_stakover: 20644208                               #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     0         | state:        0         | target_rate:  150000       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      0                                           #
+# target_rate:  500000    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     319128    | state:        0         | target_rate:  500000       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      2                                           #
+# target_rate:  500000    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     302576    | state:        0         | target_rate:  500000       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      3                                           #
+# target_rate:  500000    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     418264    | state:        0         | target_rate:  500000       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      5                                           #
+# target_rate:  500000    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     399528    | state:        0         | target_rate:  500000       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      7                                           #
+# target_rate:  500000    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     447648    | state:        0         | target_rate:  500000       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      8                                           #
+# target_rate:  500000    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     340720    | state:        0         | target_rate:  500000       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      9                                           #
+# target_rate:  500000    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     278152    | state:        0         | target_rate:  500000       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      11                                          #
+# target_rate:  500000    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     445568    | state:        0         | target_rate:  500000       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      12                                          #
+# target_rate:  500000    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     384352    | state:        0         | target_rate:  500000       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      13                                          #
+# target_rate:  500000    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     405776    | state:        0         | target_rate:  500000       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      14                                          #
+# target_rate:  500000    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     419456    | state:        0         | target_rate:  500000       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      15                                          #
+# target_rate:  666666    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     453832    | state:        1         | target_rate:  666666       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      16                                          #
+# target_rate:  666666    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     491696    | state:        1         | target_rate:  666666       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      18                                          #
+# target_rate:  666666    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     394072    | state:        1         | target_rate:  666666       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      19                                          #
+# target_rate:  666666    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     537344    | state:        1         | target_rate:  666666       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      20                                          #
+# target_rate:  666666    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     612880    | state:        0         | target_rate:  666666       #
+############################# MPRTPPluginUtilization #############################
+# seconds since sndctrler made:      21                                          #
+# target_rate:  666666    | encoder rate: 0                                      #
+# max_rate:     0         | min_rate:     0                                      #
+# max_mtakover: 0         | max_stakover: 0                                      #
+#+++++++++++++++++++++++  Subflow: 1 Controll part ++++++++++++++++++++++++++++++#
+# min_rate:     500000    | max_rate:     3000000                                #
+#+++++++++++++++++++++++  Subflow: 1 Report part ++++++++++++++++++++++++++++++++#
+# disc_rate:    0         | lost_bytes:   0         | owd:          0            #
+# snd_rate:     619048    | state:        0         | target_rate:  666666       #

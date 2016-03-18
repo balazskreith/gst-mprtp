@@ -1,0 +1,6 @@
+
+(server:27940): GStreamer-WARNING **: gstpad.c:4379:gst_pad_push_data:<mprtpscheduler0:mprtcp_sr_src> Got data flow before segment event
+
+(server:27940): GStreamer-WARNING **: gstpad.c:4126:gst_pad_chain_data_unchecked:<mprtpsender0:mprtcp_sr_sink> Got data flow before segment event
+
+** (server:27940): WARNING **: The Last Sent Report and the Delay Since Last Sent Report can not be 0

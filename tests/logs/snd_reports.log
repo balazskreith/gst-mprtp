@@ -1,0 +1,516 @@
+###################################################################
+Summary created at 87892112925950
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            24
+RTT:             0
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          1749581
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    1
+value 0:    109313964
+###################################################################
+Summary created at 87892313496716
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            33
+RTT:             50323486
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          7284026
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    2
+value 0:    143676757
+value 1:    143127441
+###################################################################
+Summary created at 87893716933145
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            80
+RTT:             50216674
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          1026963
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    14
+value 0:    122619628
+value 1:    113281250
+value 2:    109313964
+value 3:    109069824
+value 4:    109008789
+value 5:    109008789
+value 6:    108947753
+value 7:    100463867
+value 8:    100158691
+value 9:    100158691
+value 10:    100219726
+value 11:    100158691
+value 12:    100219726
+value 13:    100158691
+###################################################################
+Summary created at 87895622561749
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            184
+RTT:             50338745
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          572855
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    19
+value 0:    100280761
+value 1:    100280761
+value 2:    100219726
+value 3:    100280761
+value 4:    100219726
+value 5:    100280761
+value 6:    100158691
+value 7:    100219726
+value 8:    100219726
+value 9:    100280761
+value 10:    100219726
+value 11:    100280761
+value 12:    100280761
+value 13:    100280761
+value 14:    100280761
+value 15:    100280761
+value 16:    100341796
+value 17:    100280761
+value 18:    100280761
+###################################################################
+Summary created at 87897125965337
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            261
+RTT:             50247192
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          374961
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    15
+value 0:    100280761
+value 1:    100280761
+value 2:    100280761
+value 3:    100341796
+value 4:    100280761
+value 5:    100280761
+value 6:    100280761
+value 7:    100280761
+value 8:    100280761
+value 9:    100219726
+value 10:    100219726
+value 11:    100219726
+value 12:    100219726
+value 13:    100097656
+value 14:    100097656
+###################################################################
+Summary created at 87899029823515
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            358
+RTT:             50247192
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          811549
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    19
+value 0:    100158691
+value 1:    100097656
+value 2:    100097656
+value 3:    100097656
+value 4:    100158691
+value 5:    100280761
+value 6:    100097656
+value 7:    100158691
+value 8:    100341796
+value 9:    100524902
+value 10:    100402832
+value 11:    100280761
+value 12:    100341796
+value 13:    100219726
+value 14:    100158691
+value 15:    100158691
+value 16:    100158691
+value 17:    100158691
+value 18:    100158691
+###################################################################
+Summary created at 87900533114383
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            404
+RTT:             50216674
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          931014
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    15
+value 0:    100158691
+value 1:    100219726
+value 2:    100219726
+value 3:    100219726
+value 4:    100341796
+value 5:    100402832
+value 6:    100402832
+value 7:    100402832
+value 8:    100402832
+value 9:    100402832
+value 10:    100402832
+value 11:    100341796
+value 12:    100402832
+value 13:    100402832
+value 14:    100402832
+###################################################################
+Summary created at 87901636923665
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            462
+RTT:             50262451
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          576242
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    11
+value 0:    100341796
+value 1:    100341796
+value 2:    100402832
+value 3:    100402832
+value 4:    100402832
+value 5:    100341796
+value 6:    100402832
+value 7:    100341796
+value 8:    100341796
+value 9:    100341796
+value 10:    100402832
+###################################################################
+Summary created at 87903144932386
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            525
+RTT:             50201416
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          1632354
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    15
+value 0:    100402832
+value 1:    100341796
+value 2:    100341796
+value 3:    100341796
+value 4:    100341796
+value 5:    100463867
+value 6:    100463867
+value 7:    100524902
+value 8:    100646972
+value 9:    100646972
+value 10:    100585937
+value 11:    100646972
+value 12:    100646972
+value 13:    100646972
+value 14:    100769042
+###################################################################
+Summary created at 87904548400731
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            589
+RTT:             50231933
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          639913
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    14
+value 0:    100524902
+value 1:    100585937
+value 2:    100524902
+value 3:    100524902
+value 4:    100524902
+value 5:    100524902
+value 6:    100463867
+value 7:    100341796
+value 8:    100219726
+value 9:    100524902
+value 10:    100341796
+value 11:    100402832
+value 12:    100524902
+value 13:    100219726
+###################################################################
+Summary created at 87905466815467
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            635
+RTT:             50216674
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          1228929
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    9
+value 0:    100158691
+value 1:    100219726
+value 2:    100219726
+value 3:    100219726
+value 4:    100524902
+value 5:    100280761
+value 6:    100402832
+value 7:    100341796
+value 8:    100402832
+###################################################################
+Summary created at 87906069784868
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            672
+RTT:             50262451
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          709898
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    6
+value 0:    100341796
+value 1:    100524902
+value 2:    100524902
+value 3:    100402832
+value 4:    100341796
+value 5:    100280761
+###################################################################
+Summary created at 87906771421513
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            710
+RTT:             50277709
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          886584
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    7
+value 0:    100280761
+value 1:    100280761
+value 2:    100280761
+value 3:    100280761
+value 4:    100402832
+value 5:    100341796
+value 6:    100402832
+###################################################################
+Summary created at 87908275339677
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            789
+RTT:             50247192
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          563416
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    15
+value 0:    100402832
+value 1:    100463867
+value 2:    100402832
+value 3:    100402832
+value 4:    100402832
+value 5:    100524902
+value 6:    100524902
+value 7:    100280761
+value 8:    100341796
+value 9:    100280761
+value 10:    100280761
+value 11:    100280761
+value 12:    100280761
+value 13:    100341796
+value 14:    100402832
+###################################################################
+Summary created at 87909778837059
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            867
+RTT:             50292968
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          599263
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    15
+value 0:    100341796
+value 1:    100402832
+value 2:    100402832
+value 3:    100463867
+value 4:    100463867
+value 5:    100463867
+value 6:    100402832
+value 7:    100402832
+value 8:    100463867
+value 9:    100341796
+value 10:    100341796
+value 11:    100402832
+value 12:    100341796
+value 13:    100341796
+value 14:    100402832
+###################################################################
+Summary created at 87911088096285
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            950
+RTT:             54992675
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          734338
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    13
+value 0:    100463867
+value 1:    100402832
+value 2:    100463867
+value 3:    100463867
+value 4:    100402832
+value 5:    100219726
+value 6:    100097656
+value 7:    100097656
+value 8:    100097656
+value 9:    100097656
+value 10:    99975585
+value 11:    100097656
+value 12:    100097656
+###################################################################
+Summary created at 87912195556624
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            1027
+RTT:             50384521
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          634999
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    11
+value 0:    100097656
+value 1:    100097656
+value 2:    100158691
+value 3:    100158691
+value 4:    100219726
+value 5:    100341796
+value 6:    100341796
+value 7:    100402832
+value 8:    100402832
+value 9:    100341796
+value 10:    100219726
+###################################################################
+Summary created at 87913097806775
+Subflow id: 1
+SSRC: 0
+-------------------------- Receiver Report ---------------------------
+HSSN:            1083
+RTT:             50384521
+cum_packet_lost: 0
+cycle_num:       0
+jitter:          493500
+lost_rate:       0.000000
+-------------------------- XR_RFC7243 ---------------------------
+interval_metric:    2
+early_bit:          0
+discarded_bytes:    0
+-------------------------- XR OWD RLE ---------------------------
+length:    9
+value 0:    100341796
+value 1:    100341796
+value 2:    100280761
+value 3:    100219726
+value 4:    100158691
+value 5:    100158691
+value 6:    100036621
+value 7:    99975585
+value 8:    99975585

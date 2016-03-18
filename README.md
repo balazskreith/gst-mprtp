@@ -2,10 +2,11 @@
 
 **What is it?**
   
-Multipath RTP (MPRTP) extends RTP header in order to 
-be used for splitting a consequent media stream amongst 
-several subflow. Thus it is used for transmitting 
-a coherent media stream on different path parallely. 
+Multipath RTP (MPRTP) is a header extension for RTP. 
+It extends RTP header in order to be used for splitting 
+a consequent media stream amongst several subflow. 
+Thus it is used for transmitting a coherent media 
+stream on different path parallely. 
 
 **The Latest Version**
 
@@ -27,20 +28,15 @@ sudo make install command in bash.
 For testing the plugin with server and client you need tc
 and you need to run the following scripts:
   
-1. Run gst-mprtp/setup_test_enviroment.sh shell script
-This will create a simulation enviroment with two 
-namespaces and setup 3 virtual interfaces on each 
-of it along with 3 routes.
-  
-  
-2. Enters into ns0 and ns1 bash by using 
-"sudo ip netns exec [ns0|ns1] bash" command
+0. Run make install at gst-mprtp/ directory. 
  
-3.1. Run gst-mprtp/tests/setup_ns0.sh in ns0 
-3.2. Run gst-mprtp/tests/setup_ns1.sh in ns1
-  
-4. Run gst-mprtp/tests/run_test.sh --profile=X
-For profile options run gst-mprtp/tests/server --info
+1. Enter to gst-mprtp/tests directory in sudo su mode.
+
+2. Run ./scripts/setup_testbed.sh from tests directory.
+
+3. Run ./server --info 
+
+4. Run ./scripts/run_stest --profile=X --duration=Y, where X is the profile num for server and client and Y is the duration time for running in seconds. You can abort the test by pressing Ctrl+C
 
 **Contacts**
 

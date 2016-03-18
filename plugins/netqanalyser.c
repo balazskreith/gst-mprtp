@@ -52,7 +52,7 @@ typedef struct _CorrBlock CorrBlock;
 
 struct _CorrBlock{
   guint           id,N;
-  gint64          Iu0,Iu1,Id1,Id2,Id3,G01,M0,M1,G_[32],M_[32];
+  gint64          Iu0,Iu1,Id1,Id2,Id3,G01,M0,M1,G_[64],M_[64];
   gint            index;
   gdouble         g;
   gdouble         distortion_th;
@@ -155,7 +155,7 @@ NetQueueAnalyser *make_netqueue_analyser(guint8 id)
   _priv(this)->cblocks[6].id   = 6;
   _priv(this)->cblocks[7].id   = 7;
 
-  multiplier = 2;
+  multiplier = 4;
   _priv(this)->cblocks[0].N    = 16 * multiplier;
   _priv(this)->cblocks[1].N    = 8  * multiplier;
   _priv(this)->cblocks[2].N    = 4  * multiplier;
@@ -257,8 +257,11 @@ void _qdeanalyzer_evaluation(NetQueueAnalyser *this, NetQueueAnalyserResult *res
   result->distortion |= _priv(this)->cblocks[2].distorted;
   result->distortion |= _priv(this)->cblocks[3].distorted;
 
-  result->trend = _priv(this)->cblocks[0].g_max + _priv(this)->cblocks[1].g_max + _priv(this)->cblocks[2].g_max + _priv(this)->cblocks[3].g_max;
-  result->trend = CONSTRAIN(-.1, .1, result->trend);
+//  result->trend = _priv(this)->cblocks[0].g_max + _priv(this)->cblocks[1].g_max + _priv(this)->cblocks[2].g_max + _priv(this)->cblocks[3].g_max;
+  result->trend = MAX(_priv(this)->cblocks[0].g_max,
+                      MAX(_priv(this)->cblocks[1].g_max ,
+                          MAX(_priv(this)->cblocks[2].g_max, _priv(this)->cblocks[3].g_max)));
+//  result->trend = CONSTRAIN(-.1, .1, result->trend);
 
   if(!result->distortion){
     if(this->last_stable == 0){

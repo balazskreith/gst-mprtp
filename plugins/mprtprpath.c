@@ -87,7 +87,7 @@ mprtpr_path_init (MpRTPRPath * this)
 
   _owdrle(this).last_step = _now(this);
   _owdrle(this).read_index = _owdrle(this).write_index = 0;
-  _owdrle(this).step_interval = 100 * GST_MSECOND;
+  _owdrle(this).step_interval = 125 * GST_MSECOND;
 
   _lostrle(this).last_step = _now(this);
   _lostrle(this).read_index = _lostrle(this).write_index = 0;

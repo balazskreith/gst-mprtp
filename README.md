@@ -25,8 +25,7 @@ sudo make install command in bash.
   
 **Tests**
 
-For testing the plugin with server and client you need tc
-and you need to run the following scripts:
+For tests you need tc and you need to run the following scripts:
   
 0. Run make install at gst-mprtp/ directory. 
  

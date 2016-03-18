@@ -657,9 +657,9 @@ static void _log_tree (SchNode * node, gint top, gint level)
     return;
   }
   for (i = 0; i < level; ++i)
-    mprtp_logger ("logs/streamsplitter.log","--");
+    mprtp_logger ("streamsplitter.log","--");
   if (node->subflow != NULL) {
-      mprtp_logger ("logs/streamsplitter.log",
+      mprtp_logger ("streamsplitter.log",
              "%d->%d:%d (K:%d) (L:%p,R:%p)\n",
              top >> level,
              node->subflow->id,
@@ -668,7 +668,7 @@ static void _log_tree (SchNode * node, gint top, gint level)
              node->left,
              node->right);
   } else {
-      mprtp_logger ("logs/streamsplitter.log","%d->C:%d\n", top >> level, node->sent_bytes);
+      mprtp_logger ("streamsplitter.log","%d->C:%d\n", top >> level, node->sent_bytes);
   }
   _log_tree (node->left, top, level + 1);
   _log_tree (node->right, top, level + 1);
@@ -677,7 +677,7 @@ static void _log_tree (SchNode * node, gint top, gint level)
 
 static void _log_subflow(Subflow *subflow, gpointer data)
 {
-  mprtp_logger("logs/streamsplitter.log",
+  mprtp_logger("streamsplitter.log",
                "----------------------------------------------------------------\n"
                "Subflow id: %d\n"
                "Sending target: %d | Sent bytes: %d | weight: %f\n",
@@ -692,7 +692,7 @@ static void _log_subflow(Subflow *subflow, gpointer data)
 
 void _logging(StreamSplitter *this)
 {
-  mprtp_logger("logs/streamsplitter.log",
+  mprtp_logger("streamsplitter.log",
                "###############################################################\n"
                "Seconds: %lu\n"
                "Active subflow num: %d\n"

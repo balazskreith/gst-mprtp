@@ -286,7 +286,7 @@ GstBuffer * _packetssndqueue_rem(PacketsSndQueue *this)
 
 void _logging(PacketsSndQueue *this)
 {
-  mprtp_logger("logs/packetssnqueue.log",
+  mprtp_logger("packetssnqueue.log",
                "----------------------------------------------------\n"
                "Seconds: %lu, pacing: %d, approved bytes: %d\n"
                "packets in queue: %d bytes in queue: %d\n",

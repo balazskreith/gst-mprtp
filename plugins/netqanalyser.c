@@ -400,7 +400,7 @@ void _csv_logging(NetQueueAnalyser *this, GstClockTime delay)
 {
   gchar filename[255];
   memset(filename, 0, 255);
-  sprintf(filename, "logs/netqanalyser_%d.csv", this->id);
+  sprintf(filename, "netqanalyser_%d.csv", this->id);
   mprtp_logger(filename,
                "%lu,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f\n",
 
@@ -422,7 +422,7 @@ void _readable_logging(NetQueueAnalyser *this)
 {
   gchar filename[255];
   memset(filename, 0, 255);
-  sprintf(filename, "logs/netqanalyser_%d.log", this->id);
+  sprintf(filename, "netqanalyser_%d.log", this->id);
   mprtp_logger(filename,
                "############ Network Queue Analyser log after %lu seconds #################\n"
                "g(0): %-10.8f| g(0): %-10.8f| g(0): %-10.8f| g(0): %-10.8f| g(0): %-10.8f|\n"
@@ -448,7 +448,7 @@ void _readable_result(NetQueueAnalyser *this, NetQueueAnalyserResult *result)
 {
   gchar filename[255];
   memset(filename, 0, 255);
-  sprintf(filename, "logs/netqanalyser_%d.log", this->id);
+  sprintf(filename, "netqanalyser_%d.log", this->id);
   mprtp_logger(filename,
                "############ Network Queue Analyser Results #################\n"
                "distortion: %d, discards: %d, rdiscards: %d\n"

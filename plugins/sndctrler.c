@@ -240,7 +240,7 @@ sndctrler_init (SndController * this)
   this->made               = _now(this);
   this->enabled            = FALSE;
 
-  report_processor_set_logfile(this->report_processor, "logs/snd_reports.log");
+  report_processor_set_logfile(this->report_processor, "snd_reports.log");
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   gst_task_set_lock (this->thread, &this->thread_mutex);
@@ -264,13 +264,13 @@ void _logging (SndController *this)
   gdouble weight = 0.;
   gchar filename[255], main_file[255];
 
-  sprintf(main_file, "logs/sub_snd_sum.csv");
+  sprintf(main_file, "sub_snd_sum.csv");
 
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) &key, (gpointer) & val)) {
     subflow = (Subflow *) val;
     if(!subflow) goto next;
-    sprintf(filename, "logs/sub_%d_snd.csv", subflow->id);
+    sprintf(filename, "sub_%d_snd.csv", subflow->id);
     if(this->enabled){
       sender_bitrate    = mprtps_path_get_sent_bytes_in1s(subflow->path) * 8;
       monitored_bitrate = subratectrler_get_monitoring_bitrate(subflow->rate_controller);
@@ -285,13 +285,13 @@ void _logging (SndController *this)
                 weight
                 );
 
-    mprtp_logger("logs/path_rates.csv", "%f,", weight);
+    mprtp_logger("path_rates.csv", "%f,", weight);
     media_rate += sender_bitrate;
     media_target += target_bitrate;
   next:
     continue;
   }
-  mprtp_logger("logs/path_rates.csv", "\n");
+  mprtp_logger("path_rates.csv", "\n");
   {
     gint32 encoder_bitrate = 0;
     encoder_bitrate = packetssndqueue_get_encoder_bitrate(this->pacer);
@@ -714,7 +714,7 @@ static void _log_utilization(MPRTPPluginUtilization *u, GstClockTime seconds)
 {
   gint i;
   SubflowUtilization *su;
-  mprtp_logger("logs/sndctler.log",
+  mprtp_logger("sndctler.log",
     "############################# MPRTPPluginUtilization #############################\n"
     "# seconds since sndctrler made:      %-10lu                                  #\n"
     "# target_rate:  %-10d| encoder rate: %-10d                             #\n"
@@ -731,7 +731,7 @@ static void _log_utilization(MPRTPPluginUtilization *u, GstClockTime seconds)
   for(i = 0; i < MPRTP_PLUGIN_MAX_SUBFLOW_NUM; ++i){
     su = &u->subflows[i];
     if(!su->controlled) continue;
-    mprtp_logger("logs/sndctler.log",
+    mprtp_logger("sndctler.log",
       "#+++++++++++++++++++++++  Subflow: %d Controll part ++++++++++++++++++++++++++++++#\n"
       "# min_rate:     %-10d| max_rate:     %-10d                             #\n"
       "#+++++++++++++++++++++++  Subflow: %d Report part ++++++++++++++++++++++++++++++++#\n"

@@ -678,7 +678,7 @@ void _playout_logging(StreamJoiner *this)
     playout_remaining = GST_TIME_AS_USECONDS(this->head->playout_time - now);
   }
 
-  mprtp_logger("logs/playouts.csv", "%d,%d,%d\n",
+  mprtp_logger("playouts.csv", "%d,%d,%d\n",
                 this->bytes_in_queue / 1000,
                 playout_remaining,
                 GST_TIME_AS_USECONDS(this->max_skew));
@@ -687,7 +687,7 @@ void _playout_logging(StreamJoiner *this)
 
 static void _log_subflow(Subflow *subflow, gpointer data)
 {
-  mprtp_logger("logs/streamjoiner.log",
+  mprtp_logger("streamjoiner.log",
                "----------------------------------------------------------------\n"
                "Subflow id: %d\n"
                "delay: %lu | jitter: %u | skew: %f\n",
@@ -702,7 +702,7 @@ static void _log_subflow(Subflow *subflow, gpointer data)
 
 void _readable_logging(StreamJoiner *this)
 {
-  mprtp_logger("logs/streamjoiner.log",
+  mprtp_logger("streamjoiner.log",
                  "###############################################################\n"
                  "Seconds: %lu\n"
                  "PHSN: %d | framecounter: %d | bytes_in_queue: %d\n"
@@ -722,7 +722,7 @@ void _readable_logging(StreamJoiner *this)
                  this->monitored_bytes
                  );
 
-  mprtp_logger("logs/streamjoiner.csv",
+  mprtp_logger("streamjoiner.csv",
                "%d,%d,%d\n",
                this->bytes_in_queue * 8,
                this->monitored_bytes * 8,

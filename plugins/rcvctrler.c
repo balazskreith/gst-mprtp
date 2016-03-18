@@ -226,7 +226,7 @@ rcvctrler_init (RcvController * this)
   this->report_producer    = g_object_new(REPORTPRODUCER_TYPE, NULL);
   this->report_processor   = g_object_new(REPORTPROCESSOR_TYPE, NULL);
 
-  report_processor_set_logfile(this->report_processor, "logs/rcv_reports.log");
+  report_processor_set_logfile(this->report_processor, "rcv_reports.log");
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   this->thread = gst_task_new (refctrler_ticker, this, NULL);
@@ -249,7 +249,7 @@ _logging (RcvController *this)
 
   if(!this->joiner) goto done;
   memset(main_file, 0, 255);
-  sprintf(main_file, "logs/sub_rcv_sum.csv");
+  sprintf(main_file, "sub_rcv_sum.csv");
 
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
@@ -258,7 +258,7 @@ _logging (RcvController *this)
     subflow = (Subflow *) val;
     if(!subflow->logfile){
       subflow->logfile = g_malloc0(255);
-      sprintf(subflow->logfile, "logs/sub_%d_rcv.csv", subflow->id);
+      sprintf(subflow->logfile, "sub_%d_rcv.csv", subflow->id);
     }
 
     mprtpr_path_get_RR_stats(subflow->path,
@@ -485,7 +485,7 @@ _orp_main(RcvController * this)
       continue;
     }
     memset(logfile, 0, 255);
-    sprintf(logfile, "logs/rtcp_rr_%d.csv", subflow->id);
+    sprintf(logfile, "rtcp_rr_%d.csv", subflow->id);
 
     report_producer_begin(this->report_producer, subflow->id);
     _orp_add_rr(this, subflow);

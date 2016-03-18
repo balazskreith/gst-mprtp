@@ -124,6 +124,7 @@ enum
   PROP_AUTO_RATE_AND_CC,
   PROP_RTP_PASSTHROUGH,
   PROP_LOG_ENABLED,
+  PROP_LOG_PATH,
   PROP_SUBFLOWS_STATS,
   PROP_FORCED_DELAY,
   PROP_LATENCY_DISCARD,
@@ -258,6 +259,12 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           "Indicate weather a log for subflow is enabled or not",
           "Indicate weather a log for subflow is enabled or not",
           FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_LOG_PATH,
+        g_param_spec_string ("logs-path",
+            "Determines the path for logfiles",
+            "Determines the path for logfiles",
+            "NULL", G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LIVE_STREAM,
       g_param_spec_boolean ("live-stream",
@@ -473,6 +480,11 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
         disable_mprtp_logger();
       THIS_WRITEUNLOCK (this);
       break;
+    case PROP_LOG_PATH:
+      THIS_WRITELOCK (this);
+      mprtp_logger_set_target_directory(g_value_get_string(value));
+      THIS_WRITEUNLOCK (this);
+      break;
     case PROP_LIVE_STREAM:
       THIS_WRITELOCK (this);
       gboolean_value = g_value_get_boolean (value);
@@ -567,6 +579,15 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
     case PROP_LOG_ENABLED:
       THIS_READLOCK (this);
       g_value_set_boolean (value, this->logging);
+      THIS_READUNLOCK (this);
+      break;
+    case PROP_LOG_PATH:
+      THIS_READLOCK (this);
+      {
+        gchar string[255];
+        mprtp_logger_get_target_directory(string);
+        g_value_set_string (value, string);
+      }
       THIS_READUNLOCK (this);
       break;
     case PROP_LIVE_STREAM:

@@ -111,8 +111,9 @@ mprtp_logger_init (MPRTPLogger * this)
   g_rw_lock_init (&this->rwmutex);
   this->enabled    = FALSE;
   this->sysclock   = gst_system_clock_obtain ();
+  strcpy(this->path, "logs/");
   this->touches    = g_hash_table_new(g_str_hash, g_str_equal);
-  this->reserves   = g_hash_table_new(g_direct_hash, g_direct_equal);
+//  this->reserves   = g_hash_table_new(g_direct_hash, g_direct_equal);
 }
 
 void init_mprtp_logger(void)
@@ -138,6 +139,20 @@ void disable_mprtp_logger(void)
   THIS_WRITEUNLOCK(this);
 }
 
+void mprtp_logger_set_target_directory(const gchar *path)
+{
+  THIS_WRITELOCK(this);
+  strcpy(this->path, path);
+  THIS_WRITEUNLOCK(this);
+}
+
+void mprtp_logger_get_target_directory(gchar* result)
+{
+  THIS_READLOCK(this);
+  strcpy(result, this->path);
+  THIS_READUNLOCK(this);
+}
+
 void mprtp_logger(const gchar *filename, const gchar * format, ...)
 {
   FILE *file;
@@ -147,13 +162,14 @@ void mprtp_logger(const gchar *filename, const gchar * format, ...)
   if(!this->enabled){
     goto done;
   }
-
-  strcpy(writable, filename);
-  if(!g_hash_table_lookup(this->touches, filename)){
+  strcpy(writable, this->path);
+  strcat(writable, filename);
+//  strcpy(writable, filename);
+  if(!g_hash_table_lookup(this->touches, writable)){
     g_hash_table_insert(this->touches, writable, writable);
-    file = fopen(filename, "w");
+    file = fopen(writable, "w");
   }else{
-    file = fopen(filename, "a");
+    file = fopen(writable, "a");
   }
   va_start (args, format);
   vfprintf (file, format, args);

@@ -837,7 +837,7 @@ void _change_target_bitrate(SubflowRateController *this, gint32 new_target)
 void _logging(SubflowRateController *this)
 {
   gchar filename[255];
-  sprintf(filename, "logs/subratectrler_%d.log", this->id);
+  sprintf(filename, "subratectrler_%d.log", this->id);
   mprtp_logger(filename,
                "############ S%d | State: %-2d | Disable time %lu | Ctrled: %d #################\n"
                "SR:         %-10d| TR:      %-10d| botlnck: %-10d|\n"

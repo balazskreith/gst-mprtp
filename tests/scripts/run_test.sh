@@ -96,26 +96,30 @@ if [ "$TESTCASE" -eq 0 ]
 then
   echo "Constant Available Capacity with Single RMCAT flow" > $REPORTTITLEFILE
   echo "executing test case 0"
-  echo "./scripts/run_bwctrler.sh --bwprofile 0 --bwref 2000 --shift 2 --veth 0 --jitter 1 --latency 100 --output logs/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
+  echo "./scripts/run_bwctrler.sh --bwprofile 0 --bwref 2000 --shift 2 --veth 0 --jitter 1 --latency 100 --output $TARGET_DIR/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
   chmod 777 scripts/test_bw_veth0_snd.sh
   sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
   sleep 1
+  
+  sudo ip netns exec $NSSND $SERVER "--profile="$RPROFILE 2> $TARGET_DIR"/"server.log &
+  sudo ip netns exec $NSRCV $CLIENT "--profile="$RPROFILE 2> $TARGET_DIR"/"client.log &
 
 
 elif [ "$TESTCASE" -eq 1 ]; then
 
-  echo "AUTOMATIC TEST REPORT for Variable Available Capacity with Single RMCAT flow" > $REPORTTITLEFILE
+  echo "Variable Available Capacity with Single RMCAT flow" > $REPORTTITLEFILE
   echo "executing test case 1"
-  echo "./scripts/run_bwctrler.sh --bwprofile 1 --bwref 1000 --shift 2 --veth 0 --jitter 1 --latency 100 --output logs/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
+  echo "./scripts/run_bwctrler.sh --bwprofile 1 --bwref 1000 --shift 2 --veth 0 --jitter 1 --latency 100 --output $TARGET_DIR/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
   chmod 777 scripts/test_bw_veth0_snd.sh
   sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
   sleep 1
 
+  sudo ip netns exec $NSSND $SERVER "--profile="$RPROFILE 2> $TARGET_DIR"/"server.log &
+  sudo ip netns exec $NSRCV $CLIENT "--profile="$RPROFILE 2> $TARGET_DIR"/"client.log &
 fi
 
 
-sudo ip netns exec $NSSND $SERVER "--profile="$RPROFILE 2> $TARGET_DIR"/"server.log &
-sudo ip netns exec $NSRCV $CLIENT "--profile="$RPROFILE 2> $TARGET_DIR"/"client.log &
+
 
 cleanup()
 # example cleanup function
@@ -146,7 +150,7 @@ do
     sleep 1
   done
   echo $j"*$WAIT seconds"
-  ./scripts/report_generator.sh -o reports/report.pdf -tc $TESTCASE --author $REPORTAUTHORFILE --title $REPORTTITLEFILE > reportlog.txt &
+  ./scripts/report_generator.sh -o reports/report.pdf -tc $TESTCASE --author $REPORTAUTHORFILE --title $REPORTTITLEFILE > $TARGET_DIR"/"reportlog.txt &
   #./run_test_evaluator.sh $PROFILE
 done
 sleep 1

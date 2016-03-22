@@ -54,6 +54,7 @@ struct _NetQueueAnalyserResult{
   gboolean       discards;
   gboolean       rdiscards;
   gdouble        trend;
+  gdouble        g_125,g_250,g_500,g_1000;
   gboolean       distortion;
   gboolean       congestion;
   GstClockTime   stability_time;
@@ -64,6 +65,16 @@ void netqueue_analyser_reset(NetQueueAnalyser *this);
 NetQueueAnalyser *make_netqueue_analyser(guint8 id);
 void netqueue_analyser_time_update(NetQueueAnalyser *this, gint32 sending_bitrate);
 void netqueue_analyser_reset_stability(NetQueueAnalyser *this);
+void netqueue_analyser_set_acfs_history(NetQueueAnalyser *this,
+                                        gint32 g125_length,
+                                        gint32 g250_length,
+                                        gint32 g500_length,
+                                        gint32 g1000_length);
+void netqueue_analyser_get_acfs_history(NetQueueAnalyser *this,
+                                        gint32 *g125_length,
+                                        gint32 *g250_length,
+                                        gint32 *g500_length,
+                                        gint32 *g1000_length);
 void netqueue_analyser_do(NetQueueAnalyser *this,
                           GstMPRTCPReportSummary *summary,
                           NetQueueAnalyserResult *result);

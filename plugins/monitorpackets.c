@@ -85,8 +85,10 @@ void
 monitorpackets_init (MonitorPackets * this)
 {
   g_rw_lock_init (&this->rwmutex);
-  this->sysclock = gst_system_clock_obtain();
-  this->queue  = g_queue_new();
+  this->sysclock          = gst_system_clock_obtain();
+  this->queue             = g_queue_new();
+  this->protected_packets_num = 0;
+  this->max_protected_packets_num = 128;
   monitorpackets_reset(this);
 }
 
@@ -100,10 +102,10 @@ void monitorpackets_reset(MonitorPackets *this)
   THIS_WRITEUNLOCK(this);
 }
 
-void monitorpackets_set_payload_type(MonitorPackets *this, guint8 payload_type)
+void monitorpackets_set_fec_payload_type(MonitorPackets *this, guint8 payload_type)
 {
   THIS_WRITELOCK(this);
-  this->payload_type = payload_type;
+  this->fec_payload_type = payload_type;
   THIS_WRITEUNLOCK(this);
 }
 
@@ -117,23 +119,49 @@ MonitorPackets *make_monitorpackets(void)
 void monitorpackets_add_outgoing_rtp_packet(MonitorPackets *this,
                          GstBuffer *buf)
 {
+  GstMapInfo info = GST_MAP_INFO_INIT;
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  guint16 packet_length;
+  guint8 tmp[10];
+  guint8 *src;
+  gint i,c;
   THIS_WRITELOCK(this);
-  //Fixme: Something is wrong.
-  //Something is really wrong. If I push a deep copy buffer into a queue
-  //and later wants to use it, it failes with the GST_IS_BUFFER.
-  //perhaps I need to push it with gst_buffer_ref
-//  g_queue_push_head(this->queue, gst_buffer_copy_deep(buf));
-//  if(MONITORPACKETS_CONTENTS_LENGTH < ++this->counter){
-//    gst_buffer_unref(g_queue_pop_tail(this->queue));
-//    --this->counter;
-//  }
+  if(++this->protected_packets_num == this->max_protected_packets_num){
+    memset(this->produced_fec_packet, 0, MONITORPACKETS_MAX_LENGTH);
+    this->produced_fec_packet_length = 0;
+    this->protected_packets_num = 1;
+    this->produced_sn_base = -1;
+  }
+
+  gst_buffer_map(buf, &info, GST_MAP_READ);
+  memcpy(&tmp[0], info.data, 8);
+  packet_length = g_htons(g_ntohs(info.size-12));
+  memcpy(&tmp[8], &packet_length, 2);
+  gst_buffer_unmap(buf, &info);
+
+  for(i=0; i<10; ++i){
+      this->produced_fec_packet[i] ^= tmp[i];
+  }
+  gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
+  c = gst_rtp_buffer_get_packet_len(&rtp);
+  src = gst_rtp_buffer_get_payload(&rtp);
+  for(i=0; i<c; ++i){
+    this->produced_fec_packet[i+10] ^= src[i];
+  }
+  if(this->produced_sn_base == -1){
+      this->produced_sn_base = gst_rtp_buffer_get_seq(&rtp);
+  }
+  gst_rtp_buffer_unmap(&rtp);
+  this->produced_fec_packet_length = MAX(this->produced_fec_packet_length, c + 10);
   THIS_WRITEUNLOCK(this);
 }
 
 void monitorpackets_add_incoming_rtp_packet(MonitorPackets *this, GstBuffer *buf)
 {
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   THIS_WRITELOCK(this);
   //implement counter here.
+
   THIS_WRITEUNLOCK(this);
 }
 
@@ -142,7 +170,7 @@ GstBuffer *monitorpackets_process_FEC_packet(MonitorPackets *this, GstBuffer *bu
   GstBuffer *result = NULL;
   THIS_WRITELOCK(this);
 
-  //Todo implement recovery here.
+  //add fec packet to a list;
   gst_buffer_unref(buf);
 
   THIS_WRITEUNLOCK(this);
@@ -153,26 +181,60 @@ GstBuffer * monitorpackets_provide_FEC_packet(MonitorPackets *this,
                                               guint8 mprtp_ext_header_id,
                                               guint8 subflow_id)
 {
-  GstBuffer * result = NULL;
-  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-  MPRTPSubflowHeaderExtension data;
+  GstBuffer*                   result = NULL;
+  GstRTPBuffer                 rtp = GST_RTP_BUFFER_INIT;
+  GstRTPFECHeader             *fecheader;
+  guint8                      *fecpayload;
+  MPRTPSubflowHeaderExtension *data;
+  guint16                      length;
+  guint8*                      databed;
+  gint i;
+
   THIS_WRITELOCK(this);
-  result = gst_rtp_buffer_new_allocate (1400, 0, 0);
+  length = this->produced_fec_packet_length - 10 + sizeof(GstRTPFECHeader);
+  result = gst_rtp_buffer_new_allocate (this->produced_fec_packet_length, 0, 0);
 //
   gst_rtp_buffer_map(result, GST_MAP_READWRITE, &rtp);
-  gst_rtp_buffer_set_payload_type(&rtp, this->payload_type);
+  gst_rtp_buffer_set_payload_type(&rtp, this->fec_payload_type);
   data.id = subflow_id;
   if (++(this->monitor_seq) == 0) {
     ++(this->monitor_cycle);
   }
   data.seq = this->monitor_seq;
-
+  gst_rtp_buffer_set_seq(&rtp, this->monitor_seq);
   gst_rtp_buffer_add_extension_onebyte_header (&rtp, mprtp_ext_header_id,
      (gpointer) & data, sizeof (data));
+
+  databed = fecheader = gst_rtp_buffer_get_payload(&rtp);
+  fecheader->F          = 1;
+  fecheader->R          = 0;
+  fecheader->P          = this->produced_fec_packet[0]>>2;
+  fecheader->X          = this->produced_fec_packet[0]>>3;
+  fecheader->CC         = this->produced_fec_packet[0]>>4;
+  fecheader->M          = this->produced_fec_packet[1];
+  fecheader->PT         = this->produced_fec_packet[1]>>1;
+  fecheader->reserved   = 0;
+  fecheader->N_MASK     = this->protected_packets_num;
+  fecheader->M_MASK     = 0;
+  fecheader->SSRC_Count = 1;
+  fecheader->sn_base    = g_htons(this->produced_sn_base);
+  memcpy(&fecheader->TS, &this->produced_fec_packet[4], 4);
+  memcpy(&fecheader->length_recovery, &this->produced_fec_packet[8], 2);
+  memcpy(databed + sizeof(GstRTPFECHeader), &this->produced_fec_packet[10], this->produced_fec_packet_length - 10);
+
   gst_rtp_buffer_unmap(&rtp);
+
+  memset(this->produced_fec_packet, 0, MONITORPACKETS_MAX_LENGTH);
+  this->produced_fec_packet_length = 0;
+  this->protected_packets_num = 0;
+  this->produced_sn_base = -1;
+
   THIS_WRITEUNLOCK(this);
   return result;
 }
+
+
+
 
 
 #undef THIS_WRITELOCK

@@ -22,6 +22,7 @@ fi
 echo "missed parameter" > reports/missing.txt
 
 OUTPUT="reports/report.pdf"
+SUBFLOW1=1
 SUBFLOW2=0
 SUBFLOW3=0
 TESTCASE=0
@@ -72,19 +73,20 @@ shift # past argument or value
 done
 
 #1 tick is 125ms
-AUTOCORRDURATION=4800
+AUTOCORRDURATION=2400
 #1 tick is 100ms
-SUBRCVDELAYSDURATION=6000
-SUBRCVRATESDURATION=6000
-SUBSNDRATESDURATION=6000
+SUBRCVDELAYSDURATION=3000
+SUBRCVRATESDURATION=3000
+SUBSNDRATESDURATION=3000
 
 #1 tick is one arrive
 RTCPINTERVALDURATION=600
 
-SUMMARYDELAYSDURATION=6000
-SUMMARYSNDRATESDURATION=6000
-SUMPATHRATESDURATION=6000
-PLAYOUTSDURATION=600000
+SUMMARYDELAYSDURATION=3000
+SUMMARYSNDRATESDURATION=3000
+SUMPATHRATESDURATION=3000
+PLAYOUTSDURATION=300000
+SUBFLOW1="1"
 
 case $TESTCASE in
     0) 
@@ -100,6 +102,9 @@ case $TESTCASE in
     SUMMARYSNDRATESDURATION=1000
     SUMPATHRATESDURATION=1000
     PLAYOUTSDURATION=100000
+    SUBFLOW1="1"
+    SUBFLOW2=0
+    SUBFLOW3=0
     ;;
     --default)
 
@@ -128,13 +133,9 @@ SUB3RTCPINTVALS="reports/rtcp_rr_2.pdf"
 SUB1SNDRATES="reports/sub_1_snd_rates.pdf"
 SUB2SNDRATES="reports/sub_2_snd_rates.pdf"
 SUB3SNDRATES="reports/sub_3_snd_rates.pdf"
-#generate the plots
-gnuplot -e "duration='$PLAYOUTSDURATION'" \
-        -e "xtick_value='100000'" \
-        -e "output='$SUMPLAYOUT'" \
-        scripts/summary-playouts.plot
 
-if [ $SUBFLOW2 = "1" ] && [ $SUBFLOW3 = "1" ]; then
+
+if [ $SUBFLOW1 = "1" ] && [ $SUBFLOW2 = "1" ] && [ $SUBFLOW3 = "1" ]; then
   echo "Generate reports for subflow[1|2|3]"
 
   gnuplot -e "duration='$SUMMARYDELAYSDURATION'" \
@@ -220,8 +221,14 @@ if [ $SUBFLOW2 = "1" ] && [ $SUBFLOW3 = "1" ]; then
           -e "output_file='$SUMSNDRATES'" \
           scripts/summary-snd-rates.plot
 
+  gnuplot -e "duration='$PLAYOUTSDURATION'" \
+        -e "xtick_value='100000'" \
+        -e "output='$SUMPLAYOUT'" \
+        scripts/summary-playouts.plot
 
-elif [ $SUBFLOW2 = "1" ]; then
+
+
+elif [ $SUBFLOW1 = "1" ] && [ $SUBFLOW2 = "1" ]; then
   echo "Generate reports for subflow[1|2]"
   gnuplot -e "duration='$SUMMARYDELAYSDURATION'" \
           -e "latency_file_1='$LOGDIR/sub_1_rcv.csv'" \
@@ -284,7 +291,15 @@ elif [ $SUBFLOW2 = "1" ]; then
           -e "bw_file='$LOGDIR/veth_aggr.csv'" \
           -e "output_file='$SUMSNDRATES'" \
           scripts/summary-snd-rates.plot
-else
+
+
+  gnuplot -e "duration='$PLAYOUTSDURATION'" \
+          -e "xtick_value='100000'" \
+          -e "output='$SUMPLAYOUT'" \
+          scripts/summary-playouts.plot
+
+elif [ $SUBFLOW1 = "1" ]; then
+
   echo "Generate reports for subflow[1]"
   gnuplot -e "duration='$SUMMARYDELAYSDURATION'" \
           -e "latency_file_1='$LOGDIR/sub_1_rcv.csv'" \
@@ -328,8 +343,12 @@ else
           -e "output_file='$SUMSNDRATES'" \
           scripts/summary-snd-rates.plot
 
-fi
+  gnuplot -e "duration='$PLAYOUTSDURATION'" \
+          -e "xtick_value='100000'" \
+          -e "output='$SUMPLAYOUT'" \
+          scripts/summary-playouts.plot
 
+fi
 
 #Do the report.pdf
 

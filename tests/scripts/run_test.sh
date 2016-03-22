@@ -2,13 +2,11 @@
 programname=$0
 
 function usage {
-    echo "usage: $programname [-r|-rtpprofile num] [-s1|-sub1profile num] [-s2|-sub2profile num] [-s3|-sub3profile num]"
+    echo "usage: $programname [-r|-rtpprofile num]"
     echo "	-r --rtprofile		determines the rtp testing profile"
     echo "				equal to the ./server --profile=profile_num"
-    echo "      -tc --testcase          determines the overall test profile"
-    echo "                              0 - constant bw for subflow 1"
-    echo "	-s[X] --sub[X]profile	determines the subflow test profile"
-    echo "				0 - constant, 1 - "
+    echo "      -tc --testcase          determines the test case for bandwidth controlling"
+    echo "      -p --period             determines the period of the report generation"
     exit 1
 }
  
@@ -32,6 +30,7 @@ S2PROFILE=0
 S3PROFILE=0
 RPROFILE=73
 TESTCASE=0
+REPPERIOD=5
 
 while [[ $# > 1 ]]
 do
@@ -41,20 +40,12 @@ case $key in
     RPROFILE="$2"
     shift # past argument
     ;;
-    -s1|--sub1profile)
-    S1PROFILE="$2"
-    shift # past argument
-    ;;
-    -s2|--sub2profile)
-    S2PROFILE="$2"
-    shift # past argument
-    ;;
-    -s3|--sub3profile)
-    S3PROFILE="$2"
-    shift # past argument
-    ;;
     -tc|--testcase)
     TESTCASE="$2"
+    shift # past argument
+    ;;
+    -p|--period)
+    REPPERIOD="$2"
     shift # past argument
     ;;
     --default)
@@ -69,91 +60,102 @@ done
 
 echo ".-------------------------------------------------------------."
 echo "| Test starts with the following parameters                   |"
-echo "| RTP profile: "$RPROFILE
-echo "| Testcase:    "$TESTCASE
+echo "| RTP profile:   "$RPROFILE
+echo "| Testcase:      "$TESTCASE
+echo "| Report period: "$REPPERIOD
 echo "'-------------------------------------------------------------'"
 
 
-BWCTRLER="run_bwctrler.sh"
 NSSND="ns_snd"
 NSRCV="ns_rcv"
 SERVER="./server"
 CLIENT="./client"
-TARGET_DIR="logs"
-
-#"[-b|--bwprofile num] [-x|--bwref num] [s|--shift seconds] [-v|--veth if_num] [-j|--jitter milliseconds] [-l|--latency milliseconds] [-o|--output filename] [-i|--ip ip address] [-h|--help]"
+LOGSDIR="logs"
+REPORTSDIR="reports"
+REPORTEXFILE="report.tex"
+REPORTPDF="report.pdf"
 
 #Report author
-REPORTAUTHORFILE=$TARGET_DIR"/author.txt"
+REPORTAUTHORFILE=$LOGSDIR"/author.txt"
 echo "Balázs Kreith" > $REPORTAUTHORFILE
-
-#report title
-REPORTTITLEFILE=$TARGET_DIR"/title.txt"
-echo "RMCAT test report" > $REPORTTITLEFILE
 
 if [ "$TESTCASE" -eq 0 ]
 
 then
-  echo "Constant Available Capacity with Single RMCAT flow" > $REPORTTITLEFILE
-  echo "executing test case 0"
-  echo "./scripts/run_bwctrler.sh --bwprofile 0 --bwref 1000 --shift 2 --veth 0 --jitter 1 --latency 100 --output $TARGET_DIR/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
-  chmod 777 scripts/test_bw_veth0_snd.sh
-  sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
-  sleep 1
+  #setup duration
+  DURATION=350
   
-  sudo ip netns exec $NSSND $SERVER "--profile="$RPROFILE 2> $TARGET_DIR"/"server.log &
-  sudo ip netns exec $NSRCV $CLIENT "--profile="$RPROFILE 2> $TARGET_DIR"/"client.log &
+  #setup virtual ethernet interface controller script
+  echo "./scripts/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input scripts/test0_veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
+  chmod 777 scripts/test_bw_veth0_snd.sh
 
+  #start client and server
+  sudo ip netns exec $NSRCV $CLIENT "--profile="$RPROFILE 2> $LOGSDIR"/"client.log &
+  sleep 1
+  sudo ip netns exec $NSSND $SERVER "--profile="$RPROFILE 2> $LOGSDIR"/"server.log &
+
+  sleep 1
+  #run a virtual ethernet interface controller script
+  sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
+
+  echo "
+  while true; do 
+    ./scripts/plots_generator.sh --testcase $TESTCASE --srcdir $LOGSDIR --dstdir $REPORTSDIR
+    mv $LOGSDIR/ccparams_1.log $REPORTSDIR/ccparams_1.log
+    ./scripts/test0_report.sh --srcdir $REPORTSDIR --author $REPORTAUTHORFILE --dst $REPORTEXFILE
+    ./scripts/pdflatex.sh $REPORTEXFILE
+    mv $REPORTPDF $REPORTSDIR/$REPORTPDF
+    sleep $REPPERIOD
+  done
+
+  " > scripts/auto_rep_generator.sh
+
+  chmod 777 scripts/auto_rep_generator.sh
 
 elif [ "$TESTCASE" -eq 1 ]; then
+  DURATION=120
+  echo "./scripts/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input scripts/test1_veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
 
-  echo "Variable Available Capacity with Single RMCAT flow" > $REPORTTITLEFILE
-  echo "executing test case 1"
-  echo "./scripts/run_bwctrler.sh --bwprofile 1 --bwref 1000 --shift 2 --veth 0 --jitter 1 --latency 100 --output $TARGET_DIR/veth0.csv --ip 10.0.0.1" > scripts/test_bw_veth0_snd.sh
-  chmod 777 scripts/test_bw_veth0_snd.sh
-  sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
+  chmod 777 scripts/test_bw_veth0_snd.sh  
+
+  #start client and server
+  sudo ip netns exec $NSRCV $CLIENT "--profile="$RPROFILE 2> $LOGSDIR"/"client.log &
   sleep 1
+  sudo ip netns exec $NSSND $SERVER "--profile="$RPROFILE 2> $LOGSDIR"/"server.log &
 
-  sudo ip netns exec $NSSND $SERVER "--profile="$RPROFILE 2> $TARGET_DIR"/"server.log &
-  sudo ip netns exec $NSRCV $CLIENT "--profile="$RPROFILE 2> $TARGET_DIR"/"client.log &
+  sleep 1
+  #run a virtual ethernet interface controller script
+  sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
+
 fi
 
 
-
+mv 
 
 cleanup()
 # example cleanup function
 {
   pkill client
   pkill server
-  ps -ef | grep 'run_bwctrler.sh' | grep -v grep | awk '{print $2}' | xargs kill
+  ps -ef | grep 'veth_ctrler.sh' | grep -v grep | awk '{print $2}' | xargs kill
+  ps -ef | grep 'report_generato' | grep -v grep | awk '{print $2}' | xargs kill
+  ps -ef | grep 'run_test' | grep -v grep | awk '{print $2}' | xargs kill
+
 }
  
 control_c()
 # run if user hits control-c
 {
-  echo -en "\n*** Ouch! Exiting ***\n"
+  echo -en "\n*** Exiting run_test.sh ***\n"
   cleanup
   exit $?
 }
 
 trap control_c SIGINT
 
-sleep 1
+./scripts/auto_rep_generator.sh  > report.log &
 
-DURATION=660
-let "WAIT=$DURATION/100"
-for j in `seq 1 100`;
-do
-  for i in `seq 1 $WAIT`;
-  do
-    sleep 1
-  done
-  echo $j"*$WAIT seconds"
-  ./scripts/report_generator.sh -o reports/report.pdf -tc $TESTCASE --author $REPORTAUTHORFILE --title $REPORTTITLEFILE > $TARGET_DIR"/"reportlog.txt &
-  #./run_test_evaluator.sh $PROFILE
-done
-sleep 1
+sleep $DURATION
 
 cleanup
 

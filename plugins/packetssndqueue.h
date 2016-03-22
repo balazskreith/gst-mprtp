@@ -24,6 +24,12 @@ typedef struct _PacketsSndQueueClass PacketsSndQueueClass;
 
 typedef struct _PacketsSndQueueItem PacketsSndQueueItem;
 
+typedef enum{
+  PACKETSSNDQUEUE_PACING_DEACTIVE    = 0,
+  PACKETSSNDQUEUE_PACING_ACTIVE      = 1,
+  PACKETSSNDQUEUE_PACING_DEACTIVATED = 2
+}PacketsSndQueuePacingState;
+
 struct _PacketsSndQueueItem
 {
   GstClockTime         added;
@@ -36,26 +42,28 @@ struct _PacketsSndQueueItem
 
 struct _PacketsSndQueue
 {
-  GObject                  object;
-  GstClock*                sysclock;
-  GstClockTime             made;
-  GRWLock                  rwmutex;
-  PacketsSndQueueItem      items[PACKETSSNDQUEUE_MAX_ITEMS_NUM];
-  gint32                   items_read_index;
-  gint32                   items_write_index;
-  gint32                   counter;
-  gint32                   bytes;
-  gboolean                 pacing;
-  GstClockTime             pacing_started;
-  guint32                  last_timestamp;
-  gint32                   approved_bytes;
-  gint32                   allowed_rate_per_ms;
-  gint32                   target_rate;
-  GstClockTime             obsolation_treshold;
-  gboolean                 expected_lost;
-  GstClockTime             logging_interval;
-  NumsTracker*             incoming_bytes;
-  GstClockTime             last_logging;
+  GObject                    object;
+  GstClock*                  sysclock;
+  GstClockTime               made;
+  GRWLock                    rwmutex;
+  PacketsSndQueueItem        items[PACKETSSNDQUEUE_MAX_ITEMS_NUM];
+  gint32                     items_read_index;
+  gint32                     items_write_index;
+  gint32                     counter;
+  gint32                     bytes;
+  PacketsSndQueuePacingState state;
+  gboolean                   pacing;
+  GstClockTime               pacing_started;
+  GstClockTime               pacing_ended;
+  guint32                    last_timestamp;
+  gint32                     approved_bytes;
+  gint32                     allowed_bytes_per_ms;
+  gint32                     target_rate;
+  GstClockTime               obsolation_treshold;
+  gboolean                   expected_lost;
+  GstClockTime               logging_interval;
+  NumsTracker*               incoming_bytes;
+  GstClockTime               last_logging;
 };
 
 

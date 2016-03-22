@@ -135,8 +135,8 @@ NetQueueAnalyser *make_netqueue_analyser(guint8 id)
 
   this->id                     = id;
   this->made                   = _now(this);
-  this->delays                 = make_percentiletracker(256, 80);
-  percentiletracker_set_treshold(this->delays, 30 * GST_SECOND);
+  this->delays                 = make_percentiletracker(600, 80);
+  percentiletracker_set_treshold(this->delays, 60 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->delays, _delay80th_pipe, this);
 
   _priv(this)->cblocks[0].next = &_priv(this)->cblocks[1];
@@ -155,11 +155,11 @@ NetQueueAnalyser *make_netqueue_analyser(guint8 id)
   _priv(this)->cblocks[6].id   = 6;
   _priv(this)->cblocks[7].id   = 7;
 
-  multiplier = 4;
-  _priv(this)->cblocks[0].N    = 16 * multiplier;
-  _priv(this)->cblocks[1].N    = 8  * multiplier;
+  multiplier = 1;
+  _priv(this)->cblocks[0].N    = 8  * multiplier;
+  _priv(this)->cblocks[1].N    = 4  * multiplier;
   _priv(this)->cblocks[2].N    = 4  * multiplier;
-  _priv(this)->cblocks[3].N    = 2  * multiplier;
+  _priv(this)->cblocks[3].N    = 8  * multiplier;
   _priv(this)->cblocks[4].N    = 4;
   _priv(this)->cblocks[5].N    = 4;
   _priv(this)->cblocks[6].N    = 4;
@@ -197,6 +197,39 @@ void netqueue_analyser_reset(NetQueueAnalyser *this)
 void netqueue_analyser_reset_stability(NetQueueAnalyser *this)
 {
   this->last_stable = 0;
+}
+
+
+void netqueue_analyser_set_acfs_history(NetQueueAnalyser *this,
+                                        gint32 g125_length,
+                                        gint32 g250_length,
+                                        gint32 g500_length,
+                                        gint32 g1000_length)
+{
+  _priv(this)->cblocks[0].N    = g125_length;
+  _priv(this)->cblocks[1].N    = g250_length;
+  _priv(this)->cblocks[2].N    = g500_length;
+  _priv(this)->cblocks[3].N    = g1000_length;
+}
+
+void netqueue_analyser_get_acfs_history(NetQueueAnalyser *this,
+                                        gint32 *g125_length,
+                                        gint32 *g250_length,
+                                        gint32 *g500_length,
+                                        gint32 *g1000_length)
+{
+  if(g125_length){
+      *g125_length =  _priv(this)->cblocks[0].N;
+  }
+  if(g250_length){
+      *g250_length =  _priv(this)->cblocks[1].N;
+  }
+  if(g500_length){
+      *g500_length =  _priv(this)->cblocks[2].N;
+  }
+  if(g1000_length){
+      *g1000_length = _priv(this)->cblocks[3].N;
+  }
 }
 
 void netqueue_analyser_do(NetQueueAnalyser       *this,
@@ -257,10 +290,18 @@ void _qdeanalyzer_evaluation(NetQueueAnalyser *this, NetQueueAnalyserResult *res
   result->distortion |= _priv(this)->cblocks[2].distorted;
   result->distortion |= _priv(this)->cblocks[3].distorted;
 
+  result->g_125  = _priv(this)->cblocks[0].g_max;
+  result->g_250  = _priv(this)->cblocks[1].g_max;
+  result->g_500  = _priv(this)->cblocks[2].g_max;
+  result->g_1000 = _priv(this)->cblocks[3].g_max;
+
 //  result->trend = _priv(this)->cblocks[0].g_max + _priv(this)->cblocks[1].g_max + _priv(this)->cblocks[2].g_max + _priv(this)->cblocks[3].g_max;
   result->trend = MAX(_priv(this)->cblocks[0].g_max,
                       MAX(_priv(this)->cblocks[1].g_max ,
                           MAX(_priv(this)->cblocks[2].g_max, _priv(this)->cblocks[3].g_max)));
+//  result->trend = MIN(_priv(this)->cblocks[0].g_max,
+//                      MIN(_priv(this)->cblocks[1].g_max ,
+//                          MIN(_priv(this)->cblocks[2].g_max, _priv(this)->cblocks[3].g_max)));
 //  result->trend = CONSTRAIN(-.1, .1, result->trend);
 
   if(!result->distortion){
@@ -278,10 +319,10 @@ void _qdeanalyzer_evaluation(NetQueueAnalyser *this, NetQueueAnalyserResult *res
   _priv(this)->cblocks[2].distorted = FALSE;
   _priv(this)->cblocks[3].distorted = FALSE;
 
-  _priv(this)->cblocks[0].g_max = 0.;
-  _priv(this)->cblocks[1].g_max = 0.;
-  _priv(this)->cblocks[2].g_max = 0.;
-  _priv(this)->cblocks[3].g_max = 0.;
+  _priv(this)->cblocks[0].g_max = -1.;
+  _priv(this)->cblocks[1].g_max = -1.;
+  _priv(this)->cblocks[2].g_max = -1.;
+  _priv(this)->cblocks[3].g_max = -1.;
 
 }
 

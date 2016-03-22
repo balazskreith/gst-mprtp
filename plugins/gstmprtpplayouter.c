@@ -1083,6 +1083,7 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
   }
 
   if(mprtp->monitor_packet){
+    //Todo: Memory leak here if we doesn't free the mprtp somewhere.
     stream_joiner_push_monitoring_packet(this->joiner, mprtp);
   }else{
     stream_joiner_push(this->joiner, mprtp);

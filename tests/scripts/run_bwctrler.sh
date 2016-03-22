@@ -6,19 +6,27 @@ programname=$0
 
 function usage {
     echo "usage: $programname [-b|--bwprofile num] [-x|--bwref num] [s|--shift seconds] [-v|--veth if_num] [-j|--jitter milliseconds] [-l|--latency milliseconds] [-o|--output filename] [-i|--ip ip address] [-h|--help]"
-    echo "	-b --bwprofile	determines the testing profile"
-    echo "			https://tools.ietf.org/html/draft-ietf-rmcat-eval-test-02"
-    echo "			0 - Constant, 1 - "
-    echo "	-x --bwref	determines the reference bandwidth (in Kbit) used in the test"
-    echo "	-s --shift	determines the timeshift before the bw profile is started"
-    echo "	-v --veth	determines the veth interface num the bandwidth changes applied for"
-    echo "	-j --jitter	determines the jitter"
-    echo "	-l --latency	determines the latency"
-    echo "	-i --ip   	determines the IP the TCP connections are used for connecting"
-    echo "	-o --output	determines the csv file"
-    echo "	-h --help	print this"
+    echo "	-b --bwprofile	 determines the testing profile"
+    echo "			 https://tools.ietf.org/html/draft-ietf-rmcat-eval-test-02"
+    echo "		 	 0 - Constant, 1 - "
+    echo "	-x --bwref	 determines the reference bandwidth (in Kbit) used in the test"
+    echo "	-s --shift	 determines the timeshift before the bw profile is started"
+    echo "	-v --veth	 determines the veth interface num the bandwidth changes applied for"
+    echo "	-j --jitter	 determines the jitter"
+    echo "	-l --latency	 determines the latency"
+    echo "	-i --ip   	 determines the IP the TCP connections are used for connecting"
+    echo "	-o --output	 determines the csv file"
+    echo "	-h --help	 print this"
+    echo "      -rh --roothandle root handler num"
+    echo "      -lh --leafhandle leaf handler num"
     exit 1
 }
+
+while read LATENCY JITTER BW BURST LIMIT WAIT
+do 
+  tc qdisc change dev "$VETH" root handle $ROOTHANDLER: netem delay "$LATENCY"ms "$JITTER"ms
+  tc qdisc change dev "$VETH" parent $ROOTHANDLER: handle $LEAFHANDLER: tbf rate "$BW"kbit burst "$BURST"kbit limit $LIMIT
+done < $FILENAME
 
 
 BWREF=1000
@@ -149,7 +157,7 @@ function test0() {
 	echo "   | Variation pattern  | Path         | Start     | Path capacity     |"
 	echo "   | index              | direction    | time      | ratio             |"
 	echo "   +--------------------+--------------+-----------+-------------------+"
-	echo "   | One                | Forward      | 600s      | 1.0               |"
+	echo "   | One                | Forward      | 300s      | 1.0               |"
 	echo "   +--------------------+--------------+-----------+-------------------+"
 	
 

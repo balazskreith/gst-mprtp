@@ -372,7 +372,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
                             this, gst_mprtpscheduler_emit_signal
                             );
   this->monitorpackets = make_monitorpackets();
-  monitorpackets_set_payload_type(this->monitorpackets, this->monitor_payload_type);
+  monitorpackets_set_fec_payload_type(this->monitorpackets, this->monitor_payload_type);
 
   _change_auto_rate_and_cc (this, FALSE);
   _setup_paths(this);
@@ -611,7 +611,7 @@ _setup_paths (GstMprtpscheduler * this)
     path = (MPRTPSPath *) val;
     mprtps_path_set_mprtp_ext_header_id(path, this->mprtp_ext_header_id);
   }
-  monitorpackets_set_payload_type(this->monitorpackets, this->monitor_payload_type);
+  monitorpackets_set_fec_payload_type(this->monitorpackets, this->monitor_payload_type);
 }
 
 

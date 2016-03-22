@@ -134,11 +134,13 @@ typedef struct _SubflowUtilization{
     gint     state;
   }report;
   struct _SubflowUtilizationControl{
+    //values for congestion controlling
     gint32   max_rate;
     gint32   min_rate;
+
+
     //Todo: add this
     //gdouble  aggressivity;
-
   }control;
 }SubflowUtilization;
 

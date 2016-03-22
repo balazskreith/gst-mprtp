@@ -79,8 +79,10 @@ control_c()
 
 trap control_c SIGINT
 
-sudo ip netns exec $NSSND $SERVER "--profile="$PROFILE &
 sudo ip netns exec $NSRCV $CLIENT "--profile="$PROFILE &
+sleep 1
+sudo ip netns exec $NSSND $SERVER "--profile="$PROFILE &
+
 sleep $DURATION
 
 cleanup

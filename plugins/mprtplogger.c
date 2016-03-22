@@ -179,6 +179,30 @@ done:
   THIS_WRITEUNLOCK(this);
 }
 
+void mprtp_logger_rewrite(const gchar *filename, const gchar * format, ...)
+{
+  FILE *file;
+  va_list args;
+  gchar writable[255];
+  THIS_WRITELOCK(this);
+  if(!this->enabled){
+    goto done;
+  }
+  strcpy(writable, this->path);
+  strcat(writable, filename);
+//  strcpy(writable, filename);
+  if(!g_hash_table_lookup(this->touches, writable)){
+    g_hash_table_insert(this->touches, writable, writable);
+  }
+  file = fopen(writable, "w");
+  va_start (args, format);
+  vfprintf (file, format, args);
+  va_end (args);
+  fclose(file);
+done:
+  THIS_WRITEUNLOCK(this);
+}
+
 #undef MAX_RIPORT_INTERVAL
 #undef THIS_READLOCK
 #undef THIS_READUNLOCK

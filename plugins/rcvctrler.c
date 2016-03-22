@@ -273,9 +273,9 @@ _logging (RcvController *this)
     if(++subflow->rcvd_bytes_index == 10){ subflow->rcvd_bytes_index = 0; }
     subflow->rcvd_bytes_window -= subflow->rcvd_bytes[subflow->rcvd_bytes_index];
 
-    mprtpr_path_get_XR7243_stats(subflow->path,
-                                 NULL,
-                                 &discarded_bytes);
+    mprtpr_path_get_total_discards(subflow->path,
+                             NULL,
+                             &discarded_bytes);
 
     subflow->discarded_bytes_window = subflow->discarded_bytes[subflow->discarded_bytes_index] = discarded_bytes;
     if(++subflow->discarded_bytes_index == 10){ subflow->discarded_bytes_index = 0; }

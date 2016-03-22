@@ -50,7 +50,7 @@ struct _StreamJoiner
   GstClockTime         forced_delay;
   Frame*               head;
   Frame*               tail;
-  guint16              PHSN;
+  guint16              HPSN;
   gint32               bytes_in_queue;
   guint32              last_played_timestamp;
   gboolean             flushing;

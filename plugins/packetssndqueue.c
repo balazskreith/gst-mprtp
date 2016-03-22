@@ -60,13 +60,6 @@ GST_DEBUG_CATEGORY_STATIC (packetssndqueue_debug_category);
 
 G_DEFINE_TYPE (PacketsSndQueue, packetssndqueue, G_TYPE_OBJECT);
 
-typedef enum{
-  PACING_DEACTIVE    = 0,
-  PACING_ACTIVATED   = 1,
-  PACING_ACTIVE      = 2,
-  PACING_DEACTIVATED = 3
-}PacingTypes;
-
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
@@ -143,29 +136,86 @@ PacketsSndQueue *make_packetssndqueue(void)
   return result;
 }
 
+//void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_bitrate, gboolean pacing)
+//{
+//  THIS_WRITELOCK(this);
+//  target_bitrate>>=3;
+//  this->target_rate = target_bitrate * .75;
+//  if(!this->pacing && pacing){
+//    this->approved_bytes = target_bitrate / 100;
+//    this->pacing_started = _now(this);
+//    this->pacing = TRUE;
+//  }else if(!pacing && this->pacing){
+//    this->pacing = _now(this) - this->pacing_started < 2 * GST_SECOND;
+//  }
+//
+//  this->allowed_rate_per_ms = target_bitrate / 1000;
+//  THIS_WRITEUNLOCK(this);
+//}
+
 void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_bitrate, gboolean pacing)
 {
   THIS_WRITELOCK(this);
-  target_bitrate>>=3;
-  this->target_rate = target_bitrate * .75;
-  if(!this->pacing && pacing){
-    this->approved_bytes = target_bitrate / 100;
-    this->pacing_started = _now(this);
-    this->pacing = TRUE;
-  }else if(!pacing && this->pacing){
-    this->pacing = _now(this) - this->pacing_started < 2 * GST_SECOND;
+  this->target_rate         = target_bitrate>>3;
+  switch(this->state){
+    case PACKETSSNDQUEUE_PACING_DEACTIVE:
+      if(!pacing){
+        goto done;
+      }
+      this->pacing_started      = _now(this);
+      this->pacing              = TRUE;
+      this->state               = PACKETSSNDQUEUE_PACING_ACTIVE;
+      this->allowed_bytes_per_ms = this->target_rate / 1000;
+      break;
+    case PACKETSSNDQUEUE_PACING_ACTIVE:
+      if(pacing){
+        goto done;
+      }
+      this->pacing_ended        = _now(this);
+      this->pacing              = TRUE;
+      this->state               = PACKETSSNDQUEUE_PACING_DEACTIVATED;
+      this->allowed_bytes_per_ms = this->target_rate / 1000;
+      break;
+    case PACKETSSNDQUEUE_PACING_DEACTIVATED:
+      if(!pacing){
+        goto done;
+      }
+      this->pacing_started      = _now(this);
+      this->pacing              = TRUE;
+      this->state               = PACKETSSNDQUEUE_PACING_ACTIVE;
+      this->allowed_bytes_per_ms = this->target_rate / 1000;
+      break;
+    default:
+    break;
   }
-
-  this->allowed_rate_per_ms = target_bitrate / 1000;
+done:
   THIS_WRITEUNLOCK(this);
 }
 
 void packetssndqueue_approve(PacketsSndQueue *this)
 {
   THIS_WRITELOCK(this);
-  if(this->pacing){
-    this->approved_bytes += this->allowed_rate_per_ms;
+  if(!this->pacing){
+    goto done;
   }
+  this->approved_bytes += this->allowed_bytes_per_ms;
+  if(this->state != PACKETSSNDQUEUE_PACING_DEACTIVATED){
+    goto done;
+  }
+  if(this->bytes < this->target_rate * .1){
+    this->pacing = FALSE;
+    this->state  = PACKETSSNDQUEUE_PACING_DEACTIVE;
+    goto done;
+  }
+
+  {
+    gdouble x;
+    x  = _now(this) - this->pacing_ended;
+    x /= (gdouble) GST_SECOND;
+//    g_print("allowed per ms %d %f\n", this->allowed_bytes_per_ms, this->allowed_bytes_per_ms * log(8 * x + 1.));
+    this->approved_bytes += this->allowed_bytes_per_ms * MAX(0.,log(x));
+  }
+done:
   THIS_WRITEUNLOCK(this);
 }
 

@@ -48,6 +48,7 @@ void disable_mprtp_logger(void);
 void mprtp_logger_set_target_directory(const gchar *path);
 void mprtp_logger_get_target_directory(gchar* result);
 void mprtp_logger(const gchar *filename, const gchar * format, ...);
+void mprtp_logger_rewrite(const gchar *filename, const gchar * format, ...);
 
 GType mprtp_logger_get_type (void);
 #endif /* MPRTP_LOGGER_H_ */

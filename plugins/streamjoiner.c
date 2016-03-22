@@ -84,7 +84,7 @@ struct _Frame
   guint32         timestamp;
   gboolean        ready;
   gboolean        marked;
-  gboolean        sorted;
+  gboolean        intact;
   guint32         last_seq;
   GstClockTime    playout_time;
   GstClockTime    created;
@@ -170,7 +170,7 @@ static void _print_frame(Frame *frame)
 {
   FrameNode *node;
   g_print("Frame %p created: %lu, srt: %d, rd: %d, m: %d src: %d, h: %p, t: %p\n",
-          frame, frame->created, frame->sorted, frame->ready, frame->marked,
+          frame, frame->created, frame->intact, frame->ready, frame->marked,
           frame->source, frame->head, frame->tail);
   g_print("Items: ");
   for(node = frame->head; node; node = node->next)
@@ -235,7 +235,7 @@ stream_joiner_init (StreamJoiner * this)
   this->sysclock = gst_system_clock_obtain ();
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, _ruin_subflow);
 //  this->max_path_skew = 10 * GST_MSECOND;
-  this->PHSN              = 0;
+  this->HPSN              = 0;
   this->flushing          = FALSE;
   this->playout_allowed   = TRUE;
   this->playout_halt      = FALSE;
@@ -574,7 +574,7 @@ again:
 done:
   result = TRUE;
   this->bytes_in_queue += mprtp->payload_bytes;
-  frame->ready = frame->sorted && frame->marked;
+  frame->ready = frame->intact && frame->marked;
   if(prev) frame->ready&=prev->marked;
 exit:
   return result;
@@ -622,16 +622,19 @@ again:
 done:
 
   //refresh playout time
-  frame->playout_time+=MAX(0, this->max_skew);
+  frame->playout_time+=MAX(0, this->playout_delay);
 
   //Check weather the frame is marked
-  frame->marked |= node->marker;
+  if(node->marker){
+    frame->last_seq = node->seq;
+    frame->marked   = TRUE;
+  }
 
   //Check weather the frame is sorted
   for(prev = frame->head, act = frame->head->next;
             !act && (guint16)(prev->seq + 1) == act->seq;
             prev = act, act = act->next);
-  frame->sorted = !act;
+  frame->intact = !act;
 exit:
   return;
 }
@@ -648,7 +651,8 @@ Frame* _make_frame(StreamJoiner *this, FrameNode *node)
   result->ready = node->marker;
   result->last_seq = result->ready ? node->seq : 0;
 
-  playout_delay = MIN(MAX(0, this->max_skew), 20 * GST_MSECOND);
+//  playout_delay = MIN(MAX(0, this->max_skew), 20 * GST_MSECOND);
+  playout_delay = CONSTRAIN(0, 20 * GST_MSECOND, this->playout_delay);
   if(node->mprtp->delay < this->forced_delay && 0 < node->mprtp->delay){
     playout_delay += this->forced_delay - node->mprtp->delay;
   }
@@ -711,7 +715,7 @@ void _readable_logging(StreamJoiner *this)
                  "halt_time: %lu | monitored bytes: %d\n"
                  ,
                  GST_TIME_AS_SECONDS(_now(this) - this->made),
-                 this->PHSN,
+                 this->HPSN,
                  this->framecounter,
                  this->bytes_in_queue,
                  this->forced_delay,

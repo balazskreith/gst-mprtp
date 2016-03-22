@@ -99,7 +99,9 @@ struct _MpRTPReceiverPath
   gboolean            seq_initialized;
   guint16             cycle_num;
   guint32             total_late_discarded;
+  guint32             interval_late_discarded;
   guint32             total_late_discarded_bytes;
+  guint32             interval_late_discarded_bytes;
   guint32             total_payload_bytes;
   gint32              jitter;
   guint16             highest_seq;
@@ -166,6 +168,10 @@ void mprtpr_path_get_RR_stats(MpRTPRPath *this,
 void mprtpr_path_set_reported_sequence(
     MpRTPRPath *this,
     guint16 sequence_number);
+
+void mprtpr_path_get_total_discards (MpRTPRPath * this,
+                               guint16 *discarded,
+                               guint32 *discarded_bytes);
 
 void mprtpr_path_get_XR7243_stats(MpRTPRPath *this,
                            guint16 *discarded,

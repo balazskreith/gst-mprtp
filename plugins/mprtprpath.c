@@ -173,13 +173,25 @@ void mprtpr_path_set_reported_sequence(MpRTPRPath *this, guint16 sequence_number
   THIS_WRITEUNLOCK (this);
 }
 
+void mprtpr_path_get_total_discards (MpRTPRPath * this,
+                               guint16 *discarded,
+                               guint32 *discarded_bytes)
+{
+  THIS_READLOCK (this);
+  if(discarded) *discarded = this->total_late_discarded;
+  if(discarded_bytes) *discarded_bytes = this->total_late_discarded_bytes;
+  THIS_READUNLOCK (this);
+}
+
 void mprtpr_path_get_XR7243_stats(MpRTPRPath *this,
                            guint16 *discarded,
                            guint32 *discarded_bytes)
 {
   THIS_READLOCK (this);
-  if(discarded) *discarded = this->total_late_discarded;
-  if(discarded_bytes) *discarded_bytes = this->total_late_discarded_bytes;
+  if(discarded) *discarded = this->total_late_discarded - this->interval_late_discarded;
+  if(discarded_bytes) *discarded_bytes = this->total_late_discarded_bytes - this->interval_late_discarded_bytes;
+  this->interval_late_discarded = this->total_late_discarded;
+  this->interval_late_discarded_bytes = this->total_late_discarded_bytes;
   THIS_READUNLOCK (this);
 }
 
@@ -490,7 +502,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
     _add_skew(this, skew);
   }
 
-  //For Kalman delay and skew estimation test (kalman_simple_test)
+  //For delay and skew estimation test (kalman_simple_test)
 //  if(this->id == 1){
 //    g_print("%lu,%lu,%lu,%lu,%ld,%f,%f,%lu,%lu\n",
 //            GST_TIME_AS_USECONDS((guint64)mprtp->delay),
@@ -536,7 +548,7 @@ void _add_delay(MpRTPRPath *this, GstClockTime delay)
   percentiletracker_add(this->delays, delay);
 
   if(this->delay_avg == 0.) this->delay_avg = delay;
-  else                      this->delay_avg = delay * .001 + this->delay_avg * .999;
+  else                      this->delay_avg = delay * .01 + this->delay_avg * .99;
 
   if(this->delay_avg < (delay>>1)){
     this->request_urgent_report = TRUE;
@@ -546,7 +558,7 @@ void _add_delay(MpRTPRPath *this, GstClockTime delay)
 void _add_skew(MpRTPRPath *this, gint64 skew)
 {
   percentiletracker2_add(this->skews, skew);
-  this->path_skew = this->path_skew * .999 + (gdouble)percentiletracker2_get_stats(this->skews, NULL, NULL, NULL) * .001;
+  this->path_skew = this->path_skew * .99 + (gdouble)percentiletracker2_get_stats(this->skews, NULL, NULL, NULL) * .01;
 }
 
 void _refresh_RLEBlock(MpRTPRPath *this)

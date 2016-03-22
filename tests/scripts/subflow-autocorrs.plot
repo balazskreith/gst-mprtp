@@ -58,7 +58,7 @@ plot autocorr_file using 0:($1/1000) with lines ls 1 title "Reported OWD"
 set key inside horizontal top right 
 set tics scale 0
 set ylabel "Autocorr"
-set yrange [-0.2:0.2]
+set yrange [-0.1:0.3]
 set ytics  0.05
 set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"

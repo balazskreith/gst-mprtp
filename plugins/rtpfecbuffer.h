@@ -86,6 +86,57 @@ typedef struct PACKED _GstRTPFECHeader
 
 STATIC_ASSERT (sizeof (GstRTPFECHeader) == 20, "GstRTPFECHeader size is not ok");
 
-void rtpfecbuffer_get_inistring(GstBuffer *buf, guint8* result);
-guint16 rtpfecbuffer_get_sn_base(GstBuffer *buf);
+
+
+//Note RTP FEC is based on: https://tools.ietf.org/html/draft-ietf-payload-flexible-fec-scheme-01
+typedef struct PACKED _GstBasicRTPHeader
+{
+  //first byte
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
+  unsigned int         CC:4;        /* CC field */
+  unsigned int         X:1;         /* X field */
+  unsigned int         P:1;         /* padding flag */
+  unsigned int         version:2;
+#elif G_BYTE_ORDER == G_BIG_ENDIAN
+  unsigned int         version:2;
+  unsigned int         P:1;         /* padding flag */
+  unsigned int         X:1;         /* X field */
+  unsigned int         CC:4;        /* CC field*/
+#else
+#error "G_BYTE_ORDER should be big or little endian."
+#endif
+  //second byte
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
+  //second byte
+  unsigned int         PT:7;     /* PT field */
+  unsigned int         M:1;       /* M field */
+#elif G_BYTE_ORDER == G_BIG_ENDIAN
+  //second byte
+  unsigned int         M:1;         /* M field */
+  unsigned int         PT:7;       /* PT field */
+#else
+#error "G_BYTE_ORDER should be big or little endian."
+#endif
+  guint16              seq_num;      /* length of the recovery */
+  guint32              TS;                   /* TS to recover */
+  guint32              ssrc;
+} GstBasicRTPHeader; //20 bytes
+
+STATIC_ASSERT (sizeof (GstBasicRTPHeader) == 12, "GstBasicRTPHeader size is not ok");
+
+
+#define GST_RTPFEC_PARITY_BYTES_MAX_LENGTH 1400
+
+typedef struct _GstRTPFECSegment{
+  guint8     parity_bytes[GST_RTPFEC_PARITY_BYTES_MAX_LENGTH];
+  gint32     parity_bytes_length;
+  gint32     base_sn;
+  guint32    ssrc;
+  guint8     processed_packets_num;
+}GstRTPFECSegment;
+
+void rtpfecbuffer_cpy_header_data(GstBuffer *buf, GstRTPFECHeader *result);
+void rtpfecbuffer_get_rtpfec_payload(GstRTPFECSegment *segment, guint8 *rtpfecpayload, guint16 *length);
+void rtpfecbuffer_add_rtpbuffer_to_fec_segment(GstRTPFECSegment *segment, GstBuffer *buf);
+GstBuffer* rtpfecbuffer_get_rtpbuffer_by_fec(GstRTPFECSegment *segment, GstBuffer *fec, guint16 seq);
 #endif /* RTPFECBUFFER_H_ */

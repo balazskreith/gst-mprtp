@@ -28,6 +28,7 @@
 #include "sndctrler.h"
 #include "streamsplitter.h"
 #include "mprtplogger.h"
+#include "fecenc.h"
 
 G_BEGIN_DECLS
 #define GST_TYPE_MPRTPSCHEDULER   (gst_mprtpscheduler_get_type())
@@ -58,7 +59,7 @@ struct _GstMprtpscheduler
   guint8                        abs_time_ext_header_id;
   guint32                       ssrc_filter;
   guint                         auto_rate_and_cc;
-  MonitorPackets*               monitorpackets;
+//  MonitorPackets*               monitorpackets;
   PacketsSndQueue*              sndqueue;
   GHashTable*                   paths;
   GRWLock                       rwmutex;
@@ -71,7 +72,7 @@ struct _GstMprtpscheduler
   GstSegment                    segment;
   GstClockTime                  position_out;
 
-  guint8                        monitor_payload_type;
+  guint8                        fec_payload_type;
 
   GstClock*                     sysclock;
 
@@ -79,7 +80,7 @@ struct _GstMprtpscheduler
 
   GstTask*                      thread;
   GRecMutex                     thread_mutex;
-
+  FECEncoder*                   fec_encoder;
   GstMprtpschedulerPrivate*     priv;
 };
 

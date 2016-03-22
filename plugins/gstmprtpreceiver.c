@@ -95,7 +95,7 @@ enum
   PROP_0,
   PROP_MPRTP_EXT_HEADER_ID,
   PROP_REPORT_ONLY,
-  PROP_MONITORING_PAYLOAD_TYPE,
+  PROP_FEC_PAYLOAD_TYPE,
 };
 
 
@@ -185,10 +185,10 @@ gst_mprtpreceiver_class_init (GstMprtpreceiverClass * klass)
           "Indicate weather the receiver only receive reports on its subflows",
           FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_MONITORING_PAYLOAD_TYPE,
-      g_param_spec_uint ("monitoring-payload-type",
-          "Set or get the payload type of monitoring packets",
-          "Set or get the payload type of monitoring packets. The default is 8",
+  g_object_class_install_property (gobject_class, PROP_FEC_PAYLOAD_TYPE,
+      g_param_spec_uint ("fec-payload-type",
+          "Set or get the payload type of fec packets",
+          "Set or get the payload type of fec packets. The default is 126",
           0, 127, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   element_class->request_new_pad =
@@ -230,7 +230,7 @@ gst_mprtpreceiver_init (GstMprtpreceiver * mprtpreceiver)
 
   mprtpreceiver->only_report_receiving = FALSE;
   mprtpreceiver->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
-  mprtpreceiver->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
+  mprtpreceiver->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
 }
 
 void
@@ -246,9 +246,9 @@ gst_mprtpreceiver_set_property (GObject * object, guint property_id,
       this->mprtp_ext_header_id = (guint8) g_value_get_uint (value);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_MONITORING_PAYLOAD_TYPE:
+    case PROP_FEC_PAYLOAD_TYPE:
       THIS_WRITELOCK (this);
-      this->monitor_payload_type = (guint8) g_value_get_uint (value);
+      this->fec_payload_type = (guint8) g_value_get_uint (value);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_REPORT_ONLY:
@@ -276,9 +276,9 @@ gst_mprtpreceiver_get_property (GObject * object, guint property_id,
       g_value_set_uint (value, (guint) this->mprtp_ext_header_id);
       THIS_READUNLOCK (this);
       break;
-    case PROP_MONITORING_PAYLOAD_TYPE:
+    case PROP_FEC_PAYLOAD_TYPE:
        THIS_READLOCK (this);
-       g_value_set_uint (value, (guint) this->monitor_payload_type);
+       g_value_set_uint (value, (guint) this->fec_payload_type);
        THIS_READUNLOCK (this);
        break;
     case PROP_REPORT_ONLY:
@@ -615,7 +615,7 @@ _get_packet_mptype (GstMprtpreceiver * this,
       subflow_infos = (MPRTPSubflowHeaderExtension *) pointer;
       *subflow_id = subflow_infos->id;
     }
-    if(gst_rtp_buffer_get_payload_type(&rtp) == this->monitor_payload_type){
+    if(gst_rtp_buffer_get_payload_type(&rtp) == this->fec_payload_type){
       result = PACKET_IS_MPRTP_MONITORING;
     }else{
       result = PACKET_IS_MPRTP;

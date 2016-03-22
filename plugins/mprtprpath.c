@@ -463,7 +463,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
     goto done;
   }
 
-  if(!mprtp->monitor_packet){
+  if(!mprtp->fec_packet){
     skew = (((gint64)this->last_mprtp_delay - (gint64)mprtp->delay));
     this->last_mprtp_delay = mprtp->delay;
     ++this->total_packets_received;
@@ -498,7 +498,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   if(this->last_rtp_timestamp == mprtp->timestamp)
     goto done;
 
-  if(!mprtp->monitor_packet){
+  if(!mprtp->fec_packet){
     _add_skew(this, skew);
   }
 

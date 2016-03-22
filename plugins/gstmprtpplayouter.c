@@ -116,7 +116,7 @@ enum
   PROP_0,
   PROP_MPRTP_EXT_HEADER_ID,
   PROP_ABS_TIME_EXT_HEADER_ID,
-  PROP_MONITORING_PAYLOAD_TYPE,
+  PROP_FEC_PAYLOAD_TYPE,
   PROP_PIVOT_SSRC,
   PROP_JOIN_SUBFLOW,
   PROP_DETACH_SUBFLOW,
@@ -224,11 +224,11 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           "Sets or gets the id for the extension header the absolute time based on. The default is 8",
           0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_MONITORING_PAYLOAD_TYPE,
-      g_param_spec_uint ("monitoring-payload-type",
-          "Set or get the payload type of monitoring packets",
-          "Set or get the payload type of monitoring packets. The default is 8",
-          0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (gobject_class, PROP_FEC_PAYLOAD_TYPE,
+      g_param_spec_uint ("fec-payload-type",
+          "Set or get the payload type of fec packets",
+          "Set or get the payload type of fec packets. The default is 126",
+          0, 127, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_JOIN_SUBFLOW,
       g_param_spec_uint ("join-subflow", "the subflow id requested to join",
@@ -367,16 +367,20 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->controller               = g_object_new(RCVCTRLER_TYPE, NULL);
   this->discard_latency          = 400 * GST_MSECOND;
   this->lost_latency             = GST_SECOND;
-  this->monitor_payload_type     = MONITOR_PAYLOAD_DEFAULT_ID;
+  this->fec_payload_type         = FEC_PAYLOAD_DEFAULT_ID;
   this->pivot_address_subflow_id = 0;
   this->pivot_address            = NULL;
+  this->fec_decoder              = make_fecdecoder();
 
   rcvctrler_setup(this->controller, this->joiner);
   rcvctrler_setup_callbacks(this->controller, this, gst_mprtpplayouter_mprtcp_sender);
   rcvctrler_set_additional_reports(this->controller, FALSE, FALSE, TRUE);
   _change_auto_rate_and_cc (this, FALSE);
 
-  stream_joiner_set_monitor_payload_type(this->joiner, this->monitor_payload_type);
+  //Todo: consider stream joiner here
+//  stream_joiner_set_monitor_payload_type(this->joiner, this->fec_payload_type);
+  fecdecoder_set_payload_type(this->fec_decoder, this->fec_payload_type);
+  stream_joiner_set_playout_allowed(this->joiner, FALSE);
 
 }
 
@@ -388,7 +392,7 @@ gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstMpRTPBuffer * mprtp)
   if(!GST_IS_BUFFER(mprtp->buffer)){
     goto done;
   }
-  if(mprtp->payload_type == this->monitor_payload_type){
+  if(mprtp->payload_type == this->fec_payload_type){
     goto done;
   }
   gst_pad_push (this->mprtp_srcpad, mprtp->buffer);
@@ -438,10 +442,12 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       this->abs_time_ext_header_id = (guint8) g_value_get_uint (value);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_MONITORING_PAYLOAD_TYPE:
+    case PROP_FEC_PAYLOAD_TYPE:
       THIS_WRITELOCK (this);
-      this->monitor_payload_type = (guint8) g_value_get_uint (value);
-      stream_joiner_set_monitor_payload_type(this->joiner, this->monitor_payload_type);
+      this->fec_payload_type = (guint8) g_value_get_uint (value);
+//      stream_joiner_set_monitor_payload_type(this->joiner, this->fec_payload_type);
+      //Todo: stream joiner refresh here.
+      fecdecoder_set_payload_type(this->fec_decoder, this->fec_payload_type);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_PIVOT_SSRC:
@@ -545,9 +551,9 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
       g_value_set_uint (value, (guint) this->abs_time_ext_header_id);
       THIS_READUNLOCK (this);
       break;
-    case PROP_MONITORING_PAYLOAD_TYPE:
+    case PROP_FEC_PAYLOAD_TYPE:
       THIS_READLOCK (this);
-      g_value_set_uint (value, (guint) this->monitor_payload_type);
+      g_value_set_uint (value, (guint) this->fec_payload_type);
       THIS_READUNLOCK (this);
       break;
     case PROP_PIVOT_CLOCK_RATE:
@@ -592,7 +598,6 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
       break;
     case PROP_LIVE_STREAM:
       THIS_READLOCK (this);
-      g_value_set_boolean (value, this->logging);
       //Todo consider live stream here
       THIS_READUNLOCK (this);
       break;
@@ -874,6 +879,7 @@ gst_mprtpplayouter_change_state (GstElement * element,
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
         gst_task_set_lock (this->thread, &this->thread_mutex);
         gst_task_start (this->thread);
+        stream_joiner_set_playout_allowed(this->joiner, TRUE);
         break;
       default:
         break;
@@ -885,6 +891,7 @@ gst_mprtpplayouter_change_state (GstElement * element,
 
     switch (transition) {
       case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
+        stream_joiner_set_playout_allowed(this->joiner, FALSE);
         gst_task_stop (this->thread);
         break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
@@ -1005,7 +1012,7 @@ gst_mprtpplayouter_mprtcp_sr_sink_chain (GstPad * pad, GstObject * parent,
   data = info.data + 1;
   gst_buffer_unmap (buf, &info);
   //demultiplexing based on RFC5761
-  if (*data != this->monitor_payload_type) {
+  if (*data != this->fec_payload_type) {
     result = _processing_mprtcp_packet (this, buf);
   }else{
     _processing_mprtp_packet(this, buf);
@@ -1082,9 +1089,10 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
     }
   }
 
-  if(mprtp->monitor_packet){
-    //Todo: Memory leak here if we doesn't free the mprtp somewhere.
-    stream_joiner_push_monitoring_packet(this->joiner, mprtp);
+  if(mprtp->fec_packet){
+    fecdecoder_add_fec_packet(this->fec_decoder, mprtp);
+    _trash_mprtp_buffer(this, mprtp);
+//    stream_joiner_push_monitoring_packet(this->joiner, mprtp);
   }else{
     stream_joiner_push(this->joiner, mprtp);
   }
@@ -1131,7 +1139,7 @@ GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer)
                     this->mprtp_ext_header_id,
                     this->abs_time_ext_header_id,
                     this->delay_offset,
-                    this->monitor_payload_type);
+                    this->fec_payload_type);
   return result;
 }
 
@@ -1155,6 +1163,8 @@ again:
     goto done;
   }
   buffer = mprtp->buffer;
+  //FEC recovery here?
+  fecdecoder_add_rtp_packet(this->fec_decoder, mprtp);
   _trash_mprtp_buffer(this, mprtp);
   if(!buffer) {
     goto done;

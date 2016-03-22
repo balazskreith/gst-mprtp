@@ -27,6 +27,7 @@
 #include <gst/net/gstnetaddressmeta.h>
 #include "gstmprtpbuffer.h"
 #include "rcvctrler.h"
+#include "fecdec.h"
 
 #if GLIB_CHECK_VERSION (2, 35, 7)
 #include <gio/gnetworking.h>
@@ -71,7 +72,7 @@ struct _GstMprtpplayouter
   GstClockTime    delay_offset;
   GSocketAddress *pivot_address;
   guint8          pivot_address_subflow_id;
-  guint8          monitor_payload_type;
+  guint8          fec_payload_type;
   guint64         clock_base;
   gboolean        auto_rate_and_cc;
   gboolean        rtp_passthrough;
@@ -90,15 +91,9 @@ struct _GstMprtpplayouter
   gboolean          logging;
   RcvController*    controller;
   GstClock*       sysclock;
-//  GQueue*         mprtp_buffer_pool;
-//  PointerPool*    mprtp_buffer_pool;
 
   guint           subflows_num;
-
-//  void          (*controller_add_path) (gpointer, guint8, MpRTPRPath *);
-//  void          (*controller_rem_path) (gpointer, guint8);
-//  void          (*mprtcp_receiver) (gpointer, GstBuffer *);
-//  void          (*riport_can_flow) (gpointer);
+  FECDecoder*     fec_decoder;
   guint32         rtcp_sent_octet_sum;
 
   GstTask*                      thread;

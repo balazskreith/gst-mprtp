@@ -70,7 +70,7 @@ void gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
                                guint8 mprtp_ext_header_id,
                                guint8 abs_time_ext_header_id,
                                GstClockTime delay_offset,
-                               guint8 monitor_payload_type)
+                               guint8 fec_payload_type)
 {
   gpointer pointer = NULL;
   guint size;
@@ -92,7 +92,7 @@ void gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
   mprtp->abs_seq          = gst_rtp_buffer_get_seq(&rtp);
   mprtp->payload_type     = gst_rtp_buffer_get_payload_type(&rtp);
   mprtp->abs_rcv_ntp_time = NTP_NOW;
-  mprtp->monitor_packet   = mprtp->payload_type == monitor_payload_type;
+  mprtp->fec_packet   = mprtp->payload_type == fec_payload_type;
   size=0;
   pointer = NULL;
   if(gst_rtp_buffer_get_extension_onebyte_header(

@@ -38,7 +38,7 @@ struct _PacketsSndQueueItem
   gint32               size;
 };
 
-#define PACKETSSNDQUEUE_MAX_ITEMS_NUM 2000
+#define PACKETSSNDQUEUE_MAX_ITEMS_NUM 100
 
 struct _PacketsSndQueue
 {
@@ -51,6 +51,7 @@ struct _PacketsSndQueue
   gint32                     items_write_index;
   gint32                     counter;
   gint32                     bytes;
+  gint32                     logged_drops;
   PacketsSndQueuePacingState state;
   gboolean                   pacing;
   GstClockTime               pacing_started;
@@ -64,6 +65,7 @@ struct _PacketsSndQueue
   GstClockTime               logging_interval;
   NumsTracker*               incoming_bytes;
   GstClockTime               last_logging;
+
 };
 
 
@@ -85,4 +87,6 @@ gint32 packetssndqueue_get_bytes_in_queue(PacketsSndQueue *this);
 void packetssndqueue_push(PacketsSndQueue *this, GstBuffer* buffer);
 GstBuffer * packetssndqueue_pop(PacketsSndQueue *this);
 void packetssndqueue_approve(PacketsSndQueue *this);
+
+
 #endif /* PACKETSSNDQUEUE_H_ */

@@ -152,7 +152,9 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-percentiletracker.lo \
 	libgstmprtp_la-percentiletracker2.lo \
 	libgstmprtp_la-sndratedistor.lo libgstmprtp_la-numstracker.lo \
-	libgstmprtp_la-floatsbuffer.lo libgstmprtp_la-subratectrler.lo
+	libgstmprtp_la-floatsbuffer.lo libgstmprtp_la-subratectrler.lo \
+	libgstmprtp_la-fecdec.lo libgstmprtp_la-fecenc.lo \
+	libgstmprtp_la-rtpfecbuffer.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -224,15 +226,15 @@ am__define_uniq_tagged_files = \
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /home/balazs/gst/master/mprtp2/missing aclocal-1.14
+ACLOCAL = ${SHELL} /home/balazs/gst/master/gst-mprtp/missing aclocal-1.14
 ACLOCAL_AMFLAGS = -I m4 -I common/m4
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 1
 AR = ar
 AS = as
-AUTOCONF = ${SHELL} /home/balazs/gst/master/mprtp2/missing autoconf
-AUTOHEADER = ${SHELL} /home/balazs/gst/master/mprtp2/missing autoheader
-AUTOMAKE = ${SHELL} /home/balazs/gst/master/mprtp2/missing automake-1.14
+AUTOCONF = ${SHELL} /home/balazs/gst/master/gst-mprtp/missing autoconf
+AUTOHEADER = ${SHELL} /home/balazs/gst/master/gst-mprtp/missing autoheader
+AUTOMAKE = ${SHELL} /home/balazs/gst/master/gst-mprtp/missing automake-1.14
 AWK = gawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
@@ -301,7 +303,7 @@ LIPO =
 LN_S = ln -s
 LTLIBOBJS = 
 MAINT = 
-MAKEINFO = ${SHELL} /home/balazs/gst/master/mprtp2/missing makeinfo
+MAKEINFO = ${SHELL} /home/balazs/gst/master/gst-mprtp/missing makeinfo
 MANIFEST_TOOL = :
 MKDIR_P = /bin/mkdir -p
 NM = /usr/bin/nm -B
@@ -332,10 +334,10 @@ VERSION = 1.0.0
 WARNING_CFLAGS =  -Wall -Wdeclaration-after-statement -Wvla -Wpointer-arith -Wmissing-declarations -Wmissing-prototypes -Wredundant-decls -Wwrite-strings -Wold-style-definition -Waggregate-return -Winit-self -Wmissing-include-dirs -Waddress -Wno-multichar -Wnested-externs
 WARNING_CXXFLAGS =  -Wall -Wmissing-declarations -Wredundant-decls -Wwrite-strings -Winit-self -Wmissing-include-dirs -Waddress -Wno-multichar
 WARNING_OBJCFLAGS = 
-abs_builddir = /home/balazs/gst/master/mprtp2/plugins
-abs_srcdir = /home/balazs/gst/master/mprtp2/plugins
-abs_top_builddir = /home/balazs/gst/master/mprtp2
-abs_top_srcdir = /home/balazs/gst/master/mprtp2
+abs_builddir = /home/balazs/gst/master/gst-mprtp/plugins
+abs_srcdir = /home/balazs/gst/master/gst-mprtp/plugins
+abs_top_builddir = /home/balazs/gst/master/gst-mprtp
+abs_top_srcdir = /home/balazs/gst/master/gst-mprtp
 ac_ct_AR = ar
 ac_ct_CC = gcc
 ac_ct_CXX = g++
@@ -366,7 +368,7 @@ host_vendor = unknown
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /home/balazs/gst/master/mprtp2/install-sh
+install_sh = ${SHELL} /home/balazs/gst/master/gst-mprtp/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -421,7 +423,10 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          sndratedistor.c            \
                          numstracker.c              \
                          floatsbuffer.c             \
-                         subratectrler.c            
+                         subratectrler.c            \
+                         fecdec.c                   \
+                         fecenc.c                   \
+                         rtpfecbuffer.c    
 
 noinst_HEADERS = mprtpspath.h           \
                  sndctrler.h            \
@@ -443,7 +448,10 @@ noinst_HEADERS = mprtpspath.h           \
                  sndratedistor.h        \
                  numstracker.h          \
                  floatsbuffer.h         \
-                 subratectrler.h        
+                 subratectrler.h        \
+                 fecdec.h               \
+                 fecenc.h               \
+                 rtpfecbuffer.h  
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -539,6 +547,8 @@ distclean-compile:
 
 include ./$(DEPDIR)/libgstmprtp_la-bintree.Plo
 include ./$(DEPDIR)/libgstmprtp_la-bintree2.Plo
+include ./$(DEPDIR)/libgstmprtp_la-fecdec.Plo
+include ./$(DEPDIR)/libgstmprtp_la-fecenc.Plo
 include ./$(DEPDIR)/libgstmprtp_la-floatsbuffer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtcpbuffer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpbuffer.Plo
@@ -560,6 +570,7 @@ include ./$(DEPDIR)/libgstmprtp_la-rcvctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-reportproc.Plo
 include ./$(DEPDIR)/libgstmprtp_la-reportprod.Plo
 include ./$(DEPDIR)/libgstmprtp_la-ricalcer.Plo
+include ./$(DEPDIR)/libgstmprtp_la-rtpfecbuffer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndratedistor.Plo
 include ./$(DEPDIR)/libgstmprtp_la-streamjoiner.Plo
@@ -782,6 +793,27 @@ libgstmprtp_la-subratectrler.lo: subratectrler.c
 #	$(AM_V_CC)source='subratectrler.c' object='libgstmprtp_la-subratectrler.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-subratectrler.lo `test -f 'subratectrler.c' || echo '$(srcdir)/'`subratectrler.c
+
+libgstmprtp_la-fecdec.lo: fecdec.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-fecdec.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-fecdec.Tpo -c -o libgstmprtp_la-fecdec.lo `test -f 'fecdec.c' || echo '$(srcdir)/'`fecdec.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-fecdec.Tpo $(DEPDIR)/libgstmprtp_la-fecdec.Plo
+#	$(AM_V_CC)source='fecdec.c' object='libgstmprtp_la-fecdec.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-fecdec.lo `test -f 'fecdec.c' || echo '$(srcdir)/'`fecdec.c
+
+libgstmprtp_la-fecenc.lo: fecenc.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-fecenc.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-fecenc.Tpo -c -o libgstmprtp_la-fecenc.lo `test -f 'fecenc.c' || echo '$(srcdir)/'`fecenc.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-fecenc.Tpo $(DEPDIR)/libgstmprtp_la-fecenc.Plo
+#	$(AM_V_CC)source='fecenc.c' object='libgstmprtp_la-fecenc.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-fecenc.lo `test -f 'fecenc.c' || echo '$(srcdir)/'`fecenc.c
+
+libgstmprtp_la-rtpfecbuffer.lo: rtpfecbuffer.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-rtpfecbuffer.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-rtpfecbuffer.Tpo -c -o libgstmprtp_la-rtpfecbuffer.lo `test -f 'rtpfecbuffer.c' || echo '$(srcdir)/'`rtpfecbuffer.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-rtpfecbuffer.Tpo $(DEPDIR)/libgstmprtp_la-rtpfecbuffer.Plo
+#	$(AM_V_CC)source='rtpfecbuffer.c' object='libgstmprtp_la-rtpfecbuffer.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-rtpfecbuffer.lo `test -f 'rtpfecbuffer.c' || echo '$(srcdir)/'`rtpfecbuffer.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

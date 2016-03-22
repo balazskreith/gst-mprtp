@@ -48,7 +48,7 @@ struct _GstMpRTPBuffer{
   guint64        abs_rcv_ntp_time;
   GstClockTime   delay;
   guint8         payload_type;
-  gboolean       monitor_packet;
+  gboolean       fec_packet;
   guint16        abs_seq;
   gboolean       marker;
 };

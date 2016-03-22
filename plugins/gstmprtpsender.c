@@ -109,7 +109,7 @@ enum
 {
   PROP_0,
   PROP_MPRTP_EXT_HEADER_ID,
-  PROP_MONITORING_PAYLOAD_TYPE,
+  PROP_FEC_PAYLOAD_TYPE,
   PROP_PIVOT_OUTPAD,
 };
 
@@ -328,10 +328,10 @@ gst_mprtpsender_class_init (GstMprtpsenderClass * klass)
           "The id of the subflow sets to pivot for non-mp packets. (DTLS, RTCP, Others)",
           0, 255, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_MONITORING_PAYLOAD_TYPE,
-      g_param_spec_uint ("monitoring-payload-type",
-          "Set or get the payload type of monitoring packets",
-          "Set or get the payload type of monitoring packets. The default is 8",
+  g_object_class_install_property (gobject_class, PROP_FEC_PAYLOAD_TYPE,
+      g_param_spec_uint ("fec-payload-type",
+          "Set or get the payload type of fec packets",
+          "Set or get the payload type of fec packets. The default is 126",
           0, 127, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
 
@@ -383,7 +383,7 @@ gst_mprtpsender_init (GstMprtpsender * mprtpsender)
   mprtpsender->event_segment = NULL;
   mprtpsender->event_caps = NULL;
   mprtpsender->event_stream_start = NULL;
-  mprtpsender->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
+  mprtpsender->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
   //mprtpsender->events = g_queue_new();
   g_rw_lock_init (&mprtpsender->rwmutex);
 }
@@ -413,9 +413,9 @@ gst_mprtpsender_set_property (GObject * object, guint property_id,
       }
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_MONITORING_PAYLOAD_TYPE:
+    case PROP_FEC_PAYLOAD_TYPE:
       THIS_WRITELOCK (this);
-      this->monitor_payload_type = (guint8) g_value_get_uint (value);
+      this->fec_payload_type = (guint8) g_value_get_uint (value);
       THIS_WRITEUNLOCK (this);
       break;
     default:
@@ -438,9 +438,9 @@ gst_mprtpsender_get_property (GObject * object, guint property_id,
       g_value_set_uint (value, (guint) this->mprtp_ext_header_id);
       THIS_READUNLOCK (this);
       break;
-    case PROP_MONITORING_PAYLOAD_TYPE:
+    case PROP_FEC_PAYLOAD_TYPE:
      THIS_READLOCK (this);
-     g_value_set_uint (value, (guint) this->monitor_payload_type);
+     g_value_set_uint (value, (guint) this->fec_payload_type);
      THIS_READUNLOCK (this);
      break;
     default:
@@ -816,7 +816,7 @@ _get_packet_mptype (GstMprtpsender * this,
 //      gst_rtp_buffer_add_extension_onebyte_header (&rtp, 2,
 //            (gpointer) subflow_infos, sizeof (*subflow_infos));
     }
-    if(gst_rtp_buffer_get_payload_type(&rtp) == this->monitor_payload_type){
+    if(gst_rtp_buffer_get_payload_type(&rtp) == this->fec_payload_type){
       result = PACKET_IS_MPRTP_ASYNC;
     }else{
       result = PACKET_IS_MPRTP_SYNC;
@@ -872,7 +872,7 @@ static void _init_all_subflows(GstMprtpsender *this, GstBuffer *buf)
 
       result = gst_rtp_buffer_new_allocate (1400, 0, 0);
       gst_rtp_buffer_map(result, GST_MAP_READWRITE, &rtp);
-      gst_rtp_buffer_set_payload_type(&rtp, MONITOR_PAYLOAD_DEFAULT_ID);
+      gst_rtp_buffer_set_payload_type(&rtp, FEC_PAYLOAD_DEFAULT_ID);
       gst_rtp_buffer_unmap(&rtp);
       gst_pad_push(subflow->outpad, result);
     }

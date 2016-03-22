@@ -208,10 +208,16 @@ stream_joiner_finalize (GObject * object)
 //  g_object_unref(this->playoutgate);
 }
 
-static void _skew_max_pipe(gpointer data, gint64 value)
+static void _delay_max_pipe(gpointer data, gint64 value)
 {
   StreamJoiner* this = data;
-  this->max_skew = value;
+  this->max_delay = MAX(0, value);
+}
+
+static void _delay_min_pipe(gpointer data, gint64 value)
+{
+  StreamJoiner* this = data;
+  this->min_delay = MAX(0, value);
 }
 
 
@@ -243,12 +249,13 @@ stream_joiner_init (StreamJoiner * this)
   this->forced_delay      = 0;
   this->monitorpackets    = make_monitorpackets();
   this->urgent            = g_queue_new();
-  this->skews             = make_numstracker(256, 2 * GST_SECOND);
+  this->delays             = make_numstracker(256, 2 * GST_SECOND);
   this->made              = _now(this);
 
 
-  numstracker_add_plugin(this->skews,
-                         (NumsTrackerPlugin*)make_numstracker_minmax_plugin(_skew_max_pipe, this, NULL, NULL));
+  numstracker_add_plugin(this->delays,
+                         (NumsTrackerPlugin*)make_numstracker_minmax_plugin(_delay_max_pipe, this,
+                                                                            _delay_min_pipe, this));
 
   g_rw_lock_init (&this->rwmutex);
   this->ticks = make_percentiletracker(1024, 50);
@@ -260,6 +267,7 @@ make_stream_joiner(gpointer data, void (*func)(gpointer,GstMpRTPBuffer*))
 {
   StreamJoiner *result;
   result = (StreamJoiner *) g_object_new (STREAM_JOINER_TYPE, NULL);
+  //Todo: elliminate fnc pointer from here.
   result->send_mprtp_packet_data = data;
   result->send_mprtp_packet_func = func;
 //  result->playoutgate = make_playoutgate(data, func);
@@ -271,20 +279,32 @@ GstMpRTPBuffer *stream_joiner_pop(StreamJoiner *this)
 {
 
   GstMpRTPBuffer *result = NULL;
+  GstClockTime now;
   THIS_WRITELOCK (this);
-  if(this->last_logging < _now(this) - GST_SECOND){
+  now  = _now(this);
+  if(this->last_logging < now - GST_SECOND){
     _readable_logging(this);
-    this->last_logging = _now(this);
+    this->last_logging = now;
+  }
+  if(this->last_playout_refresh < now - 20 * GST_MSECOND){
+    gdouble playout_delay;
+    playout_delay = this->max_delay - this->min_delay;
+    this->playout_delay = CONSTRAIN(0, 250 * GST_MSECOND, (124. * this->playout_delay + playout_delay ) / 125.);
+    this->last_playout_refresh = now;
   }
 
   _playout_logging(this);
+
+  if(!this->playout_allowed){
+    goto done;
+  }
 
   if (this->subflow_num == 0 || !this->playout_allowed) {
     goto done;
   }
 
   if(this->playout_halt){
-    this->playout_halt = _now(this) < this->playout_halt_time;
+    this->playout_halt = now < this->playout_halt_time;
     goto done;
   }
 
@@ -318,6 +338,7 @@ void stream_joiner_push_monitoring_packet(StreamJoiner * this, GstMpRTPBuffer *m
 void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
 {
   Subflow *subflow;
+  gdouble delay;
   THIS_WRITELOCK(this);
   subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (mprtp->subflow_id));
 
@@ -326,15 +347,17 @@ void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
   mprtpr_path_process_rtp_packet(subflow->path, mprtp);
 
   mprtpr_path_get_joiner_stats(subflow->path,
-                              &subflow->delay,
+                              &delay,
                               &subflow->skew,
                               &subflow->jitter);
 
-  numstracker_add(this->skews, subflow->skew);
+  //Because I don't know yet...
+  subflow->delay = delay * 1. + subflow->delay * 0.;
+  numstracker_add(this->delays, subflow->delay);
 
-  this->playout_delay *= 124.;
-  this->playout_delay += this->max_skew;
-  this->playout_delay /= 125.;
+//  this->playout_delay *= 124.;
+//  this->playout_delay += this->max_delay;
+//  this->playout_delay /= 125.;
 
   mprtp->buffer = gst_buffer_ref(mprtp->buffer);
 //  g_print("push %p->%d\n", mprtp->buffer, mprtp->buffer->mini_object.refcount);
@@ -652,8 +675,9 @@ Frame* _make_frame(StreamJoiner *this, FrameNode *node)
   result->last_seq = result->ready ? node->seq : 0;
 
 //  playout_delay = MIN(MAX(0, this->max_skew), 20 * GST_MSECOND);
-  playout_delay = CONSTRAIN(0, 20 * GST_MSECOND, this->playout_delay);
-  if(node->mprtp->delay < this->forced_delay && 0 < node->mprtp->delay){
+//  playout_delay = CONSTRAIN(0, 20 * GST_MSECOND, this->playout_delay);
+  playout_delay = this->playout_delay;
+  if(node->mprtp->delay + playout_delay < this->forced_delay && 0 < node->mprtp->delay){
     playout_delay += this->forced_delay - node->mprtp->delay;
   }
   result->playout_time = _now(this) + playout_delay;
@@ -685,7 +709,7 @@ void _playout_logging(StreamJoiner *this)
   mprtp_logger("playouts.csv", "%d,%d,%d\n",
                 this->bytes_in_queue / 1000,
                 playout_remaining,
-                GST_TIME_AS_USECONDS(this->max_skew));
+                GST_TIME_AS_USECONDS(this->max_delay));
 
 }
 
@@ -730,7 +754,7 @@ void _readable_logging(StreamJoiner *this)
                "%d,%d,%d\n",
                this->bytes_in_queue * 8,
                this->monitored_bytes * 8,
-               this->max_skew
+               this->max_delay
                );
 
   _iterate_subflows(this, _log_subflow, this);

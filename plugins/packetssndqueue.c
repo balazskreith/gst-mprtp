@@ -29,6 +29,7 @@
 #include <string.h>
 #include "bintree.h"
 #include "mprtpspath.h"
+#include "rtpfecbuffer.h"
 
 #define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
 #define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
@@ -219,6 +220,8 @@ done:
   THIS_WRITEUNLOCK(this);
 }
 
+
+
 gint32 packetssndqueue_get_encoder_bitrate(PacketsSndQueue *this)
 {
   gint64 result;
@@ -308,11 +311,18 @@ void _packetssndqueue_add(PacketsSndQueue *this, GstBuffer *buffer)
 
   if(this->items_write_index == this->items_read_index){
     GstBuffer *buf;
-    buf = _packetssndqueue_rem(this);
-    if(buf){
-      GST_WARNING_OBJECT(this, "A buffer might be dropped due to queue fullness");
-      gst_buffer_unref(buf);
+    guint32 first_timestamp, actual_timestamp;
+    actual_timestamp = first_timestamp = this->items[this->items_write_index].timestamp;
+    GST_WARNING_OBJECT(this, "A buffer is dropped due to sending queue fullness");
+    while(actual_timestamp == first_timestamp && 0 < this->counter){
+      buf = _packetssndqueue_rem(this);
+      if(!buf){
+        continue;
+      }
       this->expected_lost = TRUE;
+      gst_buffer_unref(buf);
+      ++this->logged_drops;
+      actual_timestamp = this->items[this->items_read_index].timestamp;
     }
   }
   return;
@@ -339,11 +349,12 @@ void _logging(PacketsSndQueue *this)
   mprtp_logger("packetssnqueue.log",
                "----------------------------------------------------\n"
                "Seconds: %lu, pacing: %d, approved bytes: %d\n"
-               "packets in queue: %d bytes in queue: %d\n",
+               "packets in queue: %d bytes in queue: %d packets_dropped: %d\n",
                GST_TIME_AS_SECONDS(_now(this) - this->made), this->pacing, this->approved_bytes,
 
-               this->counter, this->bytes
+               this->counter, this->bytes, this->logged_drops
                );
+  this->logged_drops = 0;
   this->last_logging = _now(this);
 }
 

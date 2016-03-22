@@ -43,7 +43,7 @@ struct _GstMprtpreceiver
 
   guint   only_report_receiving;
   guint8  mprtp_ext_header_id;
-  guint8  monitor_payload_type;
+  guint8  fec_payload_type;
 
 };
 

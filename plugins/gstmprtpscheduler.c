@@ -110,7 +110,7 @@ enum
   PROP_MPRTP_SSRC_FILTER,
   PROP_MPRTP_EXT_HEADER_ID,
   PROP_ABS_TIME_EXT_HEADER_ID,
-  PROP_MONITORING_PAYLOAD_TYPE,
+  PROP_FEC_PAYLOAD_TYPE,
   PROP_JOIN_SUBFLOW,
   PROP_DETACH_SUBFLOW,
   PROP_SET_SUBFLOW_NON_CONGESTED,
@@ -230,10 +230,10 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "Sets or gets the id for the extension header the absolute time based on. The default is 8",
           0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_MONITORING_PAYLOAD_TYPE,
-      g_param_spec_uint ("monitoring-payload-type",
-          "Set or get the payload type of monitoring packets",
-          "Set or get the payload type of monitoring packets. The default is 8",
+  g_object_class_install_property (gobject_class, PROP_FEC_PAYLOAD_TYPE,
+      g_param_spec_uint ("fec-payload-type",
+          "Set or get the payload type of FEC packets",
+          "Set or get the payload type of FEC packets. The default is 126",
           0, 127, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_JOIN_SUBFLOW,
@@ -361,19 +361,17 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->paths = g_hash_table_new_full (NULL, NULL, NULL, mprtp_free);
   this->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
   this->abs_time_ext_header_id = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
-  this->monitor_payload_type = MONITOR_PAYLOAD_DEFAULT_ID;
+  this->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
   this->splitter = (StreamSplitter *) g_object_new (STREAM_SPLITTER_TYPE, NULL);
   this->controller = (SndController*) g_object_new(SNDCTRLER_TYPE, NULL);
-  //  this->sndqueue = make_packetssndqueue(gst_mprtpscheduler_mprtp_setup, this);
+  this->fec_encoder = make_fecencoder();
   this->sndqueue = make_packetssndqueue();
   sndctrler_setup(this->controller, this->splitter, this->sndqueue);
   sndctrler_setup_callbacks(this->controller,
                             this, gst_mprtpscheduler_mprtcp_sender,
                             this, gst_mprtpscheduler_emit_signal
                             );
-  this->monitorpackets = make_monitorpackets();
-  monitorpackets_set_fec_payload_type(this->monitorpackets, this->monitor_payload_type);
-
+  fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
   _change_auto_rate_and_cc (this, FALSE);
   _setup_paths(this);
 
@@ -442,9 +440,9 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       this->abs_time_ext_header_id = (guint8) g_value_get_uint (value);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_MONITORING_PAYLOAD_TYPE:
+    case PROP_FEC_PAYLOAD_TYPE:
       THIS_WRITELOCK (this);
-      this->monitor_payload_type = (guint8) g_value_get_uint (value);
+      this->fec_payload_type = (guint8) g_value_get_uint (value);
       _setup_paths(this);
       THIS_WRITEUNLOCK (this);
       break;
@@ -533,9 +531,9 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
       g_value_set_uint (value, (guint) this->abs_time_ext_header_id);
       THIS_READUNLOCK (this);
       break;
-    case PROP_MONITORING_PAYLOAD_TYPE:
+    case PROP_FEC_PAYLOAD_TYPE:
       THIS_READLOCK (this);
-      g_value_set_uint (value, (guint) this->monitor_payload_type);
+      g_value_set_uint (value, (guint) this->fec_payload_type);
       THIS_READUNLOCK (this);
       break;
     case PROP_AUTO_RATE_AND_CC:
@@ -611,7 +609,7 @@ _setup_paths (GstMprtpscheduler * this)
     path = (MPRTPSPath *) val;
     mprtps_path_set_mprtp_ext_header_id(path, this->mprtp_ext_header_id);
   }
-  monitorpackets_set_fec_payload_type(this->monitorpackets, this->monitor_payload_type);
+  fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
 }
 
 
@@ -1078,12 +1076,15 @@ again:
   mprtps_path_process_rtp_packet(path, buffer, &monitoring_request);
   _setup_timestamp(this, buffer);
   if(this->auto_rate_and_cc){
-    monitorpackets_add_outgoing_rtp_packet(this->monitorpackets, buffer);
+    fecencoder_add_rtpbuffer(this->fec_encoder, buffer);
     if(monitoring_request){
       GstBuffer *monitorp;
-      monitorp = monitorpackets_provide_FEC_packet(this->monitorpackets,
-                                                   this->mprtp_ext_header_id,
-                                                   mprtps_path_get_id(path));
+      monitorp = fecencoder_get_fec_packet(this->fec_encoder);
+      fecencoder_assign_to_subflow(this->fec_encoder,
+                                   monitorp,
+                                   this->mprtp_ext_header_id,
+                                   mprtps_path_get_id(path));
+
       gst_pad_push (this->mprtp_srcpad, monitorp);
     }
   }

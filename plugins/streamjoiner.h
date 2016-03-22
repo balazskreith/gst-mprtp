@@ -45,8 +45,10 @@ struct _StreamJoiner
   gint                 subflow_num;
   GstClock*            sysclock;
   gdouble              playout_delay;
-  NumsTracker*         skews;
-  gint64               max_skew;
+  GstClockTime         last_playout_refresh;
+  NumsTracker*         delays;
+  GstClockTime         max_delay;
+  GstClockTime         min_delay;
   GstClockTime         forced_delay;
   Frame*               head;
   Frame*               tail;

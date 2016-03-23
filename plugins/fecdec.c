@@ -78,11 +78,45 @@ static FECDecoderRequest * _find_request_by_seq(FECDecoder *this, guint16 seq);
 static void _remove_from_request(FECDecoder *this, FECDecoderRequest *request);
 static void _segment_dtor(FECDecoderSegment *segment);
 static FECDecoderSegment* _segment_ctor(void);
-//#define _trash_node(this, node) g_slice_free(FECDecoderNode, node)
-#define _trash_node(this, node) g_free(node)
-//----------------------------------------------------------------------
-//--------- Private functions implementations to SchTree object --------
-//----------------------------------------------------------------------
+
+
+static void
+_print_segment(FECDecoderSegment *segment)
+{
+  gint i;
+  if(!segment){
+    return;
+  }
+  g_print(
+      "##### Segment #####\n"
+      "arrived_length: %d\n"
+      "complete:       %d\n"
+      "base_sn:        %d\n"
+      "high_sn:        %d\n"
+      "missing_length: %d\n"
+      "missing_num:    %d\n"
+      "protected:      %d\n"
+      ,
+      segment->arrived_length,
+      segment->complete,
+      segment->base_sn,
+      segment->high_sn,
+      segment->missing_length,
+      segment->missing_num,
+      segment->protected
+  );
+  g_print("----- Arrives -----\n");
+  for(i=0; i<segment->arrived_length; ++i){
+    g_print("%d| ", segment->arrived[i]);
+  }
+  g_print("\n----- Missing -----\n");
+  for(i=0; i<segment->missing_length; ++i){
+    g_print("%d| ", segment->missing[i]);
+  }
+  g_print("\n###############\n");
+
+}
+
 
 void
 fecdecoder_class_init (FECDecoderClass * klass)
@@ -157,13 +191,16 @@ gboolean fecdecoder_has_repaired_rtpbuffer(FECDecoder *this, GstBuffer** repaire
     if(_now(this) - this->repair_window_min < request->added){
       continue;
     }
-    g_print("Active request for repair: %hu\n", request->seq_num);
+//    g_print("Active request for repair: %hu\n", request->seq_num);
     segment = _find_segment_by_seq(this, request->seq_num);
+    _print_segment(segment);
     if(!segment || segment->missing_num != 1){
       continue;
     }
     result = TRUE;
     *repairedbuf = _repair_rtpbuf_by_segment(this, segment, request->seq_num);
+    gst_print_rtp_buffer(*repairedbuf);
+    _remove_from_request(this, request);
     goto done;
   }
 done:
@@ -210,16 +247,17 @@ void fecdecoder_add_fec_packet(FECDecoder *this, GstMpRTPBuffer *mprtp)
   if(header.F != 1){//If it not start with 1 it is an empty packet in my view now.
     goto done;
   }
+
   segment               = _segment_ctor();
   segment->added        = _now(this);
   segment->fec          = gst_buffer_ref(mprtp->buffer);
   segment->base_sn      = g_ntohs(header.sn_base);
-  segment->high_sn      = (guint16)(segment->base_sn + (guint16)header.N_MASK);
+  segment->high_sn      = (guint16)(segment->base_sn + (guint16)(header.N_MASK-1));
   segment->protected    = header.N_MASK;
   segment->items        = NULL;
 
   //collects the segment already arrived
-  for(c = 0, seq = segment->base_sn; seq != segment->high_sn && c < GST_RTPFEC_MAX_PROTECTION_NUM; ++seq, ++c){
+  for(c = 0, seq = segment->base_sn; seq != (segment->high_sn+1) && c < GST_RTPFEC_MAX_PROTECTION_NUM; ++seq, ++c){
     FECDecoderItem* item;
     item = _take_item_by_seq(this, seq);
     if(!item){
@@ -231,6 +269,8 @@ void fecdecoder_add_fec_packet(FECDecoder *this, GstMpRTPBuffer *mprtp)
   }
   segment->missing_num = segment->missing_length;
   segment->complete = segment->arrived_length == segment->protected;
+  this->segments = g_list_prepend(this->segments, segment);
+  DISABLE_LINE _print_segment(segment);
 done:
   THIS_WRITEUNLOCK(this);
 }

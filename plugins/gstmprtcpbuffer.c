@@ -1672,6 +1672,16 @@ gst_print_rtcp_srb (GstRTCPSRBlock * block)
 
 
 void
+gst_print_rtp_buffer (GstBuffer * buf)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
+  gst_print_rtp_packet_info(&rtp);
+  gst_rtp_buffer_unmap(&rtp);
+}
+
+
+void
 gst_print_rtp_packet_info (GstRTPBuffer * rtp)
 {
   gboolean extended;

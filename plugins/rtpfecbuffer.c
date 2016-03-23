@@ -29,10 +29,10 @@
 
 void rtpfecbuffer_cpy_header_data(GstBuffer *buf, GstRTPFECHeader *result)
 {
-  GstMapInfo info = GST_MAP_INFO_INIT;
-  gst_buffer_map(buf, &info, GST_MAP_READ);
-  memcpy(result, info.data, sizeof(GstRTPFECHeader));
-  gst_buffer_unmap(buf, &info);
+  GstRTPBuffer       rtp = GST_RTP_BUFFER_INIT;
+  gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
+  memcpy(result, gst_rtp_buffer_get_payload(&rtp), sizeof(GstRTPFECHeader));
+  gst_rtp_buffer_unmap(&rtp);
 }
 
 void rtpfecbuffer_init_segment(GstRTPFECSegment *segment)
@@ -71,12 +71,13 @@ rtpfecbuffer_get_rtpfec_payload(GstRTPFECSegment *segment, guint8 *rtpfecpayload
 void rtpfecbuffer_setup_bitstring(GstBuffer *buf, guint8 *bitstring, gint16 *bitstring_length)
 {
   GstMapInfo info = GST_MAP_INFO_INIT;
-  guint16 length;
+  guint16 length, written_length;
   gint i;
   gst_buffer_map(buf, &info, GST_MAP_READ);
   memcpy(bitstring, info.data, 8);
   length = info.size-12;
-  memcpy(bitstring + 8, &length, 2);
+  written_length = g_htons(length);
+  memcpy(bitstring + 8, &written_length, 2);
   for(i=0; i<10; ++i){
       bitstring[i] ^= bitstring[i];
   }
@@ -91,12 +92,13 @@ void rtpfecbuffer_add_rtpbuffer_to_fec_segment(GstRTPFECSegment *segment, GstBuf
 {
   GstMapInfo info = GST_MAP_INFO_INIT;
   guint8 bitstring[10];
-  guint16 length;
+  guint16 length, written_length;
   gint i;
   gst_buffer_map(buf, &info, GST_MAP_READ);
   memcpy(bitstring, info.data, 8);
   length = info.size-12;
-  memcpy(bitstring + 8, &length, 2);
+  written_length = g_htons(length);
+  memcpy(bitstring + 8, &written_length, 2);
   for(i=0; i<10; ++i){
       segment->parity_bytes[i] ^= bitstring[i];
   }

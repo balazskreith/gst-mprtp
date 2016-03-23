@@ -584,6 +584,7 @@ void gst_print_rtcp_rrb (GstRTCPRRBlock * block_ptr);
 
 
 #include <gst/rtp/gstrtpbuffer.h>
+void gst_print_rtp_buffer (GstBuffer * buf);
 void gst_print_rtp_packet_info (GstRTPBuffer * rtp);
 
 gboolean gst_mprtp_get_subflow_extension(GstRTPBuffer *rtp,

@@ -1174,7 +1174,10 @@ _mprtpplayouter_process_run (void *data)
 
   THIS_READLOCK (this);
   next_scheduler_time = _now(this) + 1 * GST_MSECOND;
-
+  if(this->last_fec_clean < _now(this) - 500 * GST_MSECOND){
+    fecdecoder_clean(this->fec_decoder);
+    this->last_fec_clean = _now(this);
+  }
 again:
   mprtp = stream_joiner_pop(this->joiner);
   if(!mprtp){

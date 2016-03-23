@@ -37,6 +37,8 @@
 
 #define _now(this) gst_clock_get_time (this->sysclock)
 
+
+
 //#define THIS_READLOCK(this)
 //#define THIS_READUNLOCK(this)
 //#define THIS_WRITELOCK(this)
@@ -64,8 +66,18 @@ G_DEFINE_TYPE (FECDecoder, fecdecoder, G_TYPE_OBJECT);
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
 
+
 static void fecdecoder_finalize (GObject * object);
-static FECDecoderItem *_find_item(FECDecoder *this, guint16 sn);
+static void _add_rtp_packet_to_segment(FECDecoder *this, GstMpRTPBuffer *mprtp, FECDecoderSegment *segment);
+static FECDecoderSegment *_find_segment_by_seq(FECDecoder *this, guint16 seq_num);
+static void _add_rtp_packet_to_items(FECDecoder *this, GstMpRTPBuffer *mprtp);
+static GstBuffer *_repair_rtpbuf_by_segment(FECDecoder *this, FECDecoderSegment *segment, guint16 seq);
+static FECDecoderItem * _find_item_by_seq(FECDecoder *this, guint16 seq);
+static FECDecoderItem * _take_item_by_seq(FECDecoder *this, guint16 seq);
+static FECDecoderRequest * _find_request_by_seq(FECDecoder *this, guint16 seq);
+static void _remove_from_request(FECDecoder *this, FECDecoderRequest *request);
+static void _segment_dtor(FECDecoderSegment *segment);
+static FECDecoderSegment* _segment_ctor(void);
 //#define _trash_node(this, node) g_slice_free(FECDecoderNode, node)
 #define _trash_node(this, node) g_free(node)
 //----------------------------------------------------------------------
@@ -92,7 +104,7 @@ fecdecoder_finalize (GObject * object)
   FECDecoder *this;
   this = FECDECODER(object);
   g_object_unref(this->sysclock);
-  g_free(this->items);
+  g_free(this->segments);
 }
 
 void
@@ -100,8 +112,8 @@ fecdecoder_init (FECDecoder * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain();
-  this->items_length = 100;
-  this->items = g_malloc0(sizeof(FECDecoderItem) * this->items_length);
+  this->repair_window_max = 400 * GST_MSECOND;
+  this->repair_window_min = 20 * GST_MSECOND;
 }
 
 
@@ -122,22 +134,38 @@ FECDecoder *make_fecdecoder(void)
   return this;
 }
 
-GstBuffer* fecdecoder_repair_rtp(FECDecoder *this, guint16 sn)
+void fecdecoder_request_repair(FECDecoder *this, guint16 seq)
 {
-  FECDecoderItem *item;
-  GstBuffer* result = NULL;
+  FECDecoderRequest *request;
   THIS_WRITELOCK(this);
-  item = _find_item(this, sn);
-  if(!item){
+  request = mprtp_malloc(sizeof(FECDecoderRequest));
+  request->added = _now(this);
+  request->seq_num = seq;
+  this->requests = g_list_prepend(this->requests, request);
+  THIS_WRITEUNLOCK(this);
+}
+
+gboolean fecdecoder_has_repaired_rtpbuffer(FECDecoder *this, GstBuffer** repairedbuf)
+{
+  FECDecoderSegment *segment;
+  FECDecoderRequest *request;
+  GList *it;
+  gboolean result = FALSE;
+  THIS_WRITELOCK(this);
+  for(it = this->requests; it; it = it->next){
+    request = it->data;
+    segment = _find_segment_by_seq(this, request->seq_num);
+    if(!segment || segment->missing_num != 1){
+      continue;
+    }
+    result = TRUE;
+    *repairedbuf = _repair_rtpbuf_by_segment(this, segment, request->seq_num);
     goto done;
   }
-  if(item->processed != item->protected - 1){
-    goto done;
-  }
-  result = rtpfecbuffer_get_rtpbuffer_by_fec(&item->segment, item->fec, sn);
 done:
   THIS_WRITEUNLOCK(this);
   return result;
+
 }
 
 void fecdecoder_set_payload_type(FECDecoder *this, guint8 payload_type)
@@ -149,106 +177,281 @@ void fecdecoder_set_payload_type(FECDecoder *this, guint8 payload_type)
 
 void fecdecoder_add_rtp_packet(FECDecoder *this, GstMpRTPBuffer *mprtp)
 {
-  FECDecoderItem *item;
-  gint i;
+  FECDecoderSegment *segment;
+  FECDecoderRequest *request;
   THIS_WRITELOCK(this);
-  item =_find_item(this, mprtp->abs_seq);
-  if(!item){
-    goto done;
-  }
-  if(item->protected <= item->processed){
-    goto done;
+  request = _find_request_by_seq(this, mprtp->abs_seq);
+  if(request){
+    _remove_from_request(this, request);
   }
 
-  for(i = 0; item->sequences[i] != -1; ++i){
-    if((guint16)item->sequences[i] == mprtp->abs_seq){
-      goto done;
-    }
+  segment =_find_segment_by_seq(this, mprtp->abs_seq);
+  if(!segment){
+    _add_rtp_packet_to_items(this, mprtp);
+    goto done;
   }
-  item->sequences[i] = mprtp->abs_seq;
-  ++item->processed;
-  rtpfecbuffer_add_rtpbuffer_to_fec_segment(&item->segment, mprtp->buffer);
+  _add_rtp_packet_to_segment(this, mprtp, segment);
 done:
   THIS_WRITEUNLOCK(this);
 }
 
 void fecdecoder_add_fec_packet(FECDecoder *this, GstMpRTPBuffer *mprtp)
 {
-  FECDecoderItem *item;
+  FECDecoderSegment *segment;
   GstRTPFECHeader      header;
+  guint16 seq,c;
 
   THIS_WRITELOCK(this);
-  item = this->items + this->items_write_index;
   rtpfecbuffer_cpy_header_data(mprtp->buffer, &header);
   if(header.F != 1){//If it not start with 1 it is an empty packet in my view now.
     goto done;
   }
-  item->added        = _now(this);
-  item->processed      = 0;
-  item->fec          = gst_buffer_ref(mprtp->buffer);
-  item->base_sn      = g_ntohs(header.sn_base);
-  item->expected_hsn = (guint16)(item->base_sn + (guint16)header.N_MASK);
-  item->protected      = header.N_MASK;
-  memset(item->sequences, (gint32)-1, sizeof(gint32) * 16);
+  segment               = _segment_ctor();
+  segment->added        = _now(this);
+  segment->fec          = gst_buffer_ref(mprtp->buffer);
+  segment->base_sn      = g_ntohs(header.sn_base);
+  segment->high_sn      = (guint16)(segment->base_sn + (guint16)header.N_MASK);
+  segment->protected    = header.N_MASK;
+  segment->items        = NULL;
 
-  if(++this->items_write_index == this->items_length){
-    this->items_write_index = 0;
+  //collects the segment already arrived
+  for(c = 0, seq = segment->base_sn; seq != segment->high_sn && c < GST_RTPFEC_MAX_PROTECTION_NUM; ++seq, ++c){
+    FECDecoderItem* item;
+    item = _take_item_by_seq(this, seq);
+    if(!item){
+      segment->missing[segment->missing_length++] = seq;
+      continue;
+    }
+    segment->arrived[segment->arrived_length++] = seq;
+    segment->items = g_list_prepend(segment->items, item);
   }
-  ++this->counter;
+  segment->missing_num = segment->missing_length;
+  segment->complete = segment->arrived_length == segment->protected;
 done:
   THIS_WRITEUNLOCK(this);
 }
 
-void fecdecoder_obsolate(FECDecoder *this)
+void fecdecoder_clean(FECDecoder *this)
 {
-  FECDecoderItem *item = NULL;
+  GList *new_list, *it;
+  GstClockTime now;
   THIS_WRITELOCK(this);
-again:
-  if(this->counter < 1){
-    goto done;
+  now = _now(this);
+
+  //filter request elements
+  new_list = NULL;
+  for(it = this->requests; it; it = it->next){
+    FECDecoderRequest *request;
+    request = it->data;
+    if(request->added < now - this->repair_window_max){
+      mprtp_free(request);
+      continue;
+    }
+    new_list = g_list_prepend(new_list, request);
   }
-  item = this->items + this->items_read_index;
-  if(_now(this) - 400 * GST_MSECOND < item->added){
-    goto done;
+  g_list_free(this->requests);
+  this->requests = new_list;
+
+  //filter out items
+  new_list = NULL;
+  for(it = this->items; it; it = it->next){
+    FECDecoderItem *item;
+    item = it->data;
+    if(item->added < now - this->repair_window_max){
+      mprtp_free(item);
+      continue;
+    }
+    new_list = g_list_prepend(new_list, item);
   }
-  gst_buffer_unref(item->fec);
-  memset(item, 0, sizeof(FECDecoderItem));
-  --this->counter;
-  if(++this->items_read_index == this->items_length){
-    this->items_read_index = 0;
+  g_list_free(this->items);
+  this->items = new_list;
+
+
+  //filter out segments
+  new_list = NULL;
+  for(it = this->segments; it; it = it->next){
+    FECDecoderSegment *segment;
+    segment = it->data;
+    if(segment->added < now - this->repair_window_max || segment->complete){
+      _segment_dtor(segment);
+      continue;
+    }
+    new_list = g_list_prepend(new_list, segment);
   }
-  goto again;
-done:
+  g_list_free(this->segments);
+  this->segments = new_list;
+
   THIS_WRITEUNLOCK(this);
 }
 
-FECDecoderItem *_find_item(FECDecoder *this, guint16 sn)
+static gint _find_segment_by_seq_helper(gconstpointer segment_ptr, gconstpointer seq_ptr)
 {
-  FECDecoderItem *result = NULL;
-  gint32 read_index;
-  if(this->counter < 1){
+  const guint16 *seq = seq_ptr;
+  const FECDecoderSegment *segment = segment_ptr;
+  if(_cmp_uint16(*seq, segment->base_sn) < 0){
+    return -1;
+  }
+  if(_cmp_uint16(segment->high_sn, *seq) < 0){
+    return -1;
+  }
+  return 0;
+}
+
+FECDecoderSegment *_find_segment_by_seq(FECDecoder *this, guint16 seq_num)
+{
+  GList *it;
+  FECDecoderSegment *result = NULL;
+  it = g_list_find_custom(this->segments, &seq_num, _find_segment_by_seq_helper);
+  if(!it){
     goto done;
   }
-  read_index = this->items_read_index;
-again:
-  result = this->items + read_index;
-  if(_cmp_uint16(result->base_sn, sn) <= 0 &&
-     _cmp_uint16(sn, result->expected_hsn) <= 0){
-    goto done;
-  }
-  result = NULL;
-  if(read_index == this->items_write_index){
-    goto done;
-  }
-  if(++read_index == this->items_length){
-    read_index = 0;
-  }
-  goto again;
+  result = it->data;
 done:
   return result;
 }
 
-#undef DEBUG_PRINT_TOOLS
+
+void _add_rtp_packet_to_items(FECDecoder *this, GstMpRTPBuffer *mprtp)
+{
+  FECDecoderItem *item;
+  item = _find_item_by_seq(this, mprtp->abs_seq);
+  if(item){
+      GST_WARNING_OBJECT(this, "Duplicated RTP sequence number found");
+      goto done;
+  }
+  item = g_malloc0(sizeof(FECDecoderItem));
+  rtpfecbuffer_setup_bitstring(mprtp->buffer, item->bitstring, &item->bitstring_length);
+  item->seq_num = mprtp->abs_seq;
+  item->ssrc    = mprtp->ssrc;
+  item->added   = _now(this);
+  this->items = g_list_prepend(this->items, item);
+done:
+  return;
+}
+
+void _add_rtp_packet_to_segment(FECDecoder *this, GstMpRTPBuffer *mprtp, FECDecoderSegment *segment)
+{
+  gint i;
+  for(i=0; i<segment->arrived_length; ++i){
+    if(segment->arrived[i] == mprtp->abs_seq){
+      GST_WARNING_OBJECT(this, "Duplicated sequece number %hu for RTP packet", mprtp->abs_seq);
+      goto done;
+    }
+  }
+  segment->arrived[segment->arrived_length++] = mprtp->abs_seq;
+  rtpfecbuffer_add_rtpbuffer_to_fec_segment(&segment->base, mprtp->buffer);
+
+  //elliminate if missed once, mark obsolate if its full
+  for(i=0; i<segment->missing_length; ++i){
+    if(segment->missing[i] != mprtp->abs_seq){
+      continue;
+    }
+    break;
+  }
+  if(i == segment->missing_length){
+    GST_WARNING_OBJECT(this, "RTP packet bitstring is added, but sequence num not found in missing lists");
+    goto done;
+  }
+  segment->missing[i] = -1;
+  if(0 < segment->missing_num){
+    if(--segment->missing_num == 0){
+      segment->complete = TRUE;
+    }
+  }
+done:
+  return;
+}
+
+
+GstBuffer *_repair_rtpbuf_by_segment(FECDecoder *this, FECDecoderSegment *segment, guint16 seq)
+{
+  GList *it;
+  gint i;
+  //only called when repair is possible
+
+  //check weather we have unprocessed items
+  for(it = segment->items; it; it = it->next){
+    FECDecoderItem *item;
+    item = it->data;
+    for(i=0; i < item->bitstring_length; ++i){
+      segment->base.parity_bytes[i] ^= item->bitstring[i];
+    }
+  }
+  return rtpfecbuffer_get_rtpbuffer_by_fec(&segment->base, segment->fec, seq);
+}
+
+static gint _find_item_by_seq_helper(gconstpointer item_ptr, gconstpointer desired_seq)
+{
+  const guint16 *seq = desired_seq;
+  const FECDecoderItem *item = item_ptr;
+  return item->seq_num == *seq ? 0 : -1;
+}
+
+FECDecoderItem * _find_item_by_seq(FECDecoder *this, guint16 seq)
+{
+  FECDecoderItem *result = NULL;
+  GList *item;
+  item = g_list_find_custom(this->items, &seq, _find_item_by_seq_helper);
+  if(!item){
+    goto done;
+  }
+  result = item->data;
+done:
+  return result;
+}
+
+FECDecoderItem * _take_item_by_seq(FECDecoder *this, guint16 seq)
+{
+  FECDecoderItem *result = NULL;
+  result = _find_item_by_seq(this, seq);
+  if(result){
+    this->items = g_list_remove(this->items, result);
+  }
+  return result;
+}
+
+static gint _find_request_by_seq_helper(gconstpointer item_ptr, gconstpointer seq_ptr)
+{
+  const guint16 *seq = seq_ptr;
+  const FECDecoderRequest *request = item_ptr;
+  return request->seq_num == *seq ? 0 : -1;
+}
+
+FECDecoderRequest * _find_request_by_seq(FECDecoder *this, guint16 seq)
+{
+  FECDecoderRequest *result = NULL;
+  GList *item;
+  item = g_list_find_custom(this->requests, &seq, _find_request_by_seq_helper);
+  if(!item){
+    goto done;
+  }
+  result = item->data;
+done:
+  return result;
+}
+
+void _remove_from_request(FECDecoder *this, FECDecoderRequest *request)
+{
+  this->requests = g_list_remove(this->requests, request);
+}
+
+void _segment_dtor(FECDecoderSegment *segment)
+{
+  gst_buffer_unref(segment->fec);
+  if(segment->items){
+    g_list_free_full(segment->items, mprtp_free);
+  }
+  mprtp_free(segment);
+}
+
+FECDecoderSegment* _segment_ctor(void)
+{
+  FECDecoderSegment* result;
+  result = mprtp_malloc(sizeof(FECDecoderSegment));
+  rtpfecbuffer_init_segment(&result->base);
+  return result;
+}
+
 #undef THIS_WRITELOCK
 #undef THIS_WRITEUNLOCK
 #undef THIS_READLOCK

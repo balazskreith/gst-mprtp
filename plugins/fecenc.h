@@ -23,7 +23,6 @@ typedef struct _FECEncoderClass FECEncoderClass;
 #define FECENCODER_CAST(src)        ((FECEncoder *)(src))
 
 
-
 struct _FECEncoder
 {
   GObject                    object;

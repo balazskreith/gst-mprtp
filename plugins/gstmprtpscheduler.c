@@ -1049,7 +1049,7 @@ _mprtpscheduler_process_run (void *data)
   GstClockTime next_scheduler_time;
   MPRTPSPath *path;
   GstBuffer *buffer = NULL;
-  gboolean monitoring_request = FALSE;
+  gboolean fec_request = FALSE;
 
   this = (GstMprtpscheduler *) data;
 
@@ -1073,19 +1073,19 @@ again:
     next_scheduler_time = _now(this) + 100 * GST_MSECOND;
     goto done;
   }
-  mprtps_path_process_rtp_packet(path, buffer, &monitoring_request);
+  mprtps_path_process_rtp_packet(path, buffer, &fec_request);
   _setup_timestamp(this, buffer);
   if(this->auto_rate_and_cc){
     fecencoder_add_rtpbuffer(this->fec_encoder, buffer);
-    if(monitoring_request){
-      GstBuffer *monitorp;
-      monitorp = fecencoder_get_fec_packet(this->fec_encoder);
+    if(fec_request){
+      GstBuffer *rtpfecbuf;
+      rtpfecbuf = fecencoder_get_fec_packet(this->fec_encoder);
       fecencoder_assign_to_subflow(this->fec_encoder,
-                                   monitorp,
+                                   rtpfecbuf,
                                    this->mprtp_ext_header_id,
                                    mprtps_path_get_id(path));
-
-      gst_pad_push (this->mprtp_srcpad, monitorp);
+      gst_print_rtpfec_buffer(rtpfecbuf);
+      gst_pad_push (this->mprtp_srcpad, rtpfecbuf);
     }
   }
   gst_pad_push (this->mprtp_srcpad, buffer);

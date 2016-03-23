@@ -24,6 +24,7 @@
 #include "rtpfecbuffer.h"
 #include <gst/rtp/gstrtpbuffer.h>
 #include <string.h>
+#include "gstmprtcpbuffer.h"
 
 
 void rtpfecbuffer_cpy_header_data(GstBuffer *buf, GstRTPFECHeader *result)
@@ -32,6 +33,12 @@ void rtpfecbuffer_cpy_header_data(GstBuffer *buf, GstRTPFECHeader *result)
   gst_buffer_map(buf, &info, GST_MAP_READ);
   memcpy(result, info.data, sizeof(GstRTPFECHeader));
   gst_buffer_unmap(buf, &info);
+}
+
+void rtpfecbuffer_init_segment(GstRTPFECSegment *segment)
+{
+  memset(segment, 0, sizeof(GstRTPFECSegment));
+  segment->base_sn = -1;
 }
 
 void
@@ -60,14 +67,32 @@ rtpfecbuffer_get_rtpfec_payload(GstRTPFECSegment *segment, guint8 *rtpfecpayload
   *length = segment->parity_bytes_length + 10;
 }
 
+void rtpfecbuffer_setup_bitstring(GstBuffer *buf, guint8 *bitstring, gint16 *bitstring_length)
+{
+  GstMapInfo info = GST_MAP_INFO_INIT;
+  guint16 length;
+  gint i;
+  gst_buffer_map(buf, &info, GST_MAP_READ);
+  memcpy(bitstring, info.data, 8);
+  length = info.size-12;
+  memcpy(bitstring + 8, &length, 2);
+  for(i=0; i<10; ++i){
+      bitstring[i] ^= bitstring[i];
+  }
+  for(i=0; i < length; ++i){
+      bitstring[i+10] ^= info.data[i+12];
+  }
+  *bitstring_length = length + 12;
+  gst_buffer_unmap(buf, &info);
+}
+
 void rtpfecbuffer_add_rtpbuffer_to_fec_segment(GstRTPFECSegment *segment, GstBuffer *buf)
 {
-  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   GstMapInfo info = GST_MAP_INFO_INIT;
   guint8 bitstring[10];
   guint16 length;
   gint i;
-  gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
+  gst_buffer_map(buf, &info, GST_MAP_READ);
   memcpy(bitstring, info.data, 8);
   length = info.size-12;
   memcpy(bitstring + 8, &length, 2);
@@ -134,5 +159,50 @@ GstBuffer* rtpfecbuffer_get_rtpbuffer_by_fec(GstRTPFECSegment *segment, GstBuffe
   gst_rtp_buffer_unmap(&rtp);
 
   return gst_buffer_new_wrapped(databed, length);
+
+}
+
+
+void gst_print_rtpfec_buffer(GstBuffer *rtpfec)
+{
+  GstRTPBuffer       rtp = GST_RTP_BUFFER_INIT;
+  gst_rtp_buffer_map(rtpfec, GST_MAP_READ, &rtp);
+  gst_print_rtp_packet_info(&rtp);
+  gst_print_rtpfec_payload(gst_rtp_buffer_get_payload(&rtp));
+  gst_rtp_buffer_unmap(&rtp);
+}
+
+
+void gst_print_rtpfec_payload(GstRTPFECHeader *header)
+{
+
+  g_print (
+           "|%1d|%1d|%1d|%1d|%7d|%1d|%13d|%31d|\n"
+           "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+           "|%63u|\n"
+           "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+           "|%15d|%47d|\n"
+           "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+           "|%63u|\n"
+           "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+           "|%31d|%15d|%15d|\n"
+           "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+           ,
+           header->F,
+           header->R,
+           header->P,
+           header->X,
+           header->CC,
+           header->M,
+           header->PT,
+           g_ntohs(header->length_recovery),
+           g_ntohl(header->TS),
+           header->SSRC_Count,
+           header->reserved,
+           header->ssrc,
+           header->sn_base,
+           header->N_MASK,
+           header->M_MASK
+        );
 
 }

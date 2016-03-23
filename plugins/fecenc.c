@@ -86,7 +86,7 @@ fecencoder_init (FECEncoder * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain();
-  this->max_protection_num = 16;
+  this->max_protection_num = GST_RTPFEC_MAX_PROTECTION_NUM;
 }
 
 

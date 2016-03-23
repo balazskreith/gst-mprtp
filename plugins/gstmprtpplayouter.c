@@ -371,6 +371,8 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->pivot_address_subflow_id = 0;
   this->pivot_address            = NULL;
   this->fec_decoder              = make_fecdecoder();
+  this->expected_seq             = 0;
+  this->expected_seq_init        = FALSE;
 
   rcvctrler_setup(this->controller, this->joiner);
   rcvctrler_setup_callbacks(this->controller, this, gst_mprtpplayouter_mprtcp_sender);
@@ -1090,10 +1092,14 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
   }
 
   if(mprtp->fec_packet){
-    fecdecoder_add_fec_packet(this->fec_decoder, mprtp);
+    if(this->auto_rate_and_cc){
+      fecdecoder_add_fec_packet(this->fec_decoder, mprtp);
+    }
     _trash_mprtp_buffer(this, mprtp);
-//    stream_joiner_push_monitoring_packet(this->joiner, mprtp);
   }else{
+    if(this->auto_rate_and_cc){
+      fecdecoder_add_rtp_packet(this->fec_decoder, mprtp);
+    }
     stream_joiner_push(this->joiner, mprtp);
   }
   return;
@@ -1143,6 +1149,17 @@ GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer)
   return result;
 }
 
+static gint
+_cmp_seq (guint16 x, guint16 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 32768) return -1;
+  if(x > y && x - y > 32768) return -1;
+  if(x < y && y - x > 32768) return 1;
+  if(x > y && x - y < 32768) return 1;
+  return 0;
+}
+
 void
 _mprtpplayouter_process_run (void *data)
 {
@@ -1151,6 +1168,7 @@ _mprtpplayouter_process_run (void *data)
   GstClockTime next_scheduler_time;
   GstMpRTPBuffer *mprtp;
   GstBuffer *buffer = NULL;
+  GstBuffer *repairedbuf = NULL;
 
   this = (GstMprtpplayouter *) data;
 
@@ -1163,8 +1181,24 @@ again:
     goto done;
   }
   buffer = mprtp->buffer;
-  //FEC recovery here?
-  fecdecoder_add_rtp_packet(this->fec_decoder, mprtp);
+
+  if(!this->expected_seq_init){
+    this->expected_seq_init = TRUE;
+    this->expected_seq = mprtp->abs_seq;
+  }
+  if(mprtp->abs_seq != this->expected_seq){
+    if(_cmp_seq(this->expected_seq, mprtp->abs_seq) < 0){
+      for(; this->expected_seq != mprtp->abs_seq; ++this->expected_seq){
+        fecdecoder_request_repair(this->fec_decoder, this->expected_seq);
+      }
+    }
+  }else{
+      ++this->expected_seq;
+  }
+  if(fecdecoder_has_repaired_rtpbuffer(this->fec_decoder, &repairedbuf)){
+    gst_pad_push(this->mprtp_srcpad, repairedbuf);
+  }
+
   _trash_mprtp_buffer(this, mprtp);
   if(!buffer) {
     goto done;

@@ -94,6 +94,8 @@ struct _GstMprtpplayouter
 
   guint           subflows_num;
   FECDecoder*     fec_decoder;
+  guint16         expected_seq;
+  gboolean        expected_seq_init;
   guint32         rtcp_sent_octet_sum;
 
   GstTask*                      thread;

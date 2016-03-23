@@ -145,8 +145,7 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-mprtpspath.lo libgstmprtp_la-streamjoiner.lo \
 	libgstmprtp_la-streamsplitter.lo libgstmprtp_la-sndctrler.lo \
 	libgstmprtp_la-rcvctrler.lo libgstmprtp_la-bintree.lo \
-	libgstmprtp_la-bintree2.lo libgstmprtp_la-monitorpackets.lo \
-	libgstmprtp_la-mprtplogger.lo \
+	libgstmprtp_la-bintree2.lo libgstmprtp_la-mprtplogger.lo \
 	libgstmprtp_la-packetssndqueue.lo libgstmprtp_la-ricalcer.lo \
 	libgstmprtp_la-reportproc.lo libgstmprtp_la-reportprod.lo \
 	libgstmprtp_la-percentiletracker.lo \
@@ -412,7 +411,6 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          rcvctrler.c                \
                          bintree.c                  \
                          bintree2.c                 \
-                         monitorpackets.c           \
                          mprtplogger.c              \
                          packetssndqueue.c          \
                          ricalcer.c                 \
@@ -437,7 +435,6 @@ noinst_HEADERS = mprtpspath.h           \
                  streamjoiner.h         \
                  bintree.h              \
                  bintree2.h             \
-                 monitorpackets.h       \
                  mprtplogger.h          \
                  packetssndqueue.h      \
                  ricalcer.h             \
@@ -557,7 +554,6 @@ include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplugin.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
-include ./$(DEPDIR)/libgstmprtp_la-monitorpackets.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtplogger.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
@@ -709,13 +705,6 @@ libgstmprtp_la-bintree2.lo: bintree2.c
 #	$(AM_V_CC)source='bintree2.c' object='libgstmprtp_la-bintree2.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-bintree2.lo `test -f 'bintree2.c' || echo '$(srcdir)/'`bintree2.c
-
-libgstmprtp_la-monitorpackets.lo: monitorpackets.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-monitorpackets.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-monitorpackets.Tpo -c -o libgstmprtp_la-monitorpackets.lo `test -f 'monitorpackets.c' || echo '$(srcdir)/'`monitorpackets.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-monitorpackets.Tpo $(DEPDIR)/libgstmprtp_la-monitorpackets.Plo
-#	$(AM_V_CC)source='monitorpackets.c' object='libgstmprtp_la-monitorpackets.lo' libtool=yes \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-monitorpackets.lo `test -f 'monitorpackets.c' || echo '$(srcdir)/'`monitorpackets.c
 
 libgstmprtp_la-mprtplogger.lo: mprtplogger.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-mprtplogger.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-mprtplogger.Tpo -c -o libgstmprtp_la-mprtplogger.lo `test -f 'mprtplogger.c' || echo '$(srcdir)/'`mprtplogger.c

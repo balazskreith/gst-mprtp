@@ -23,7 +23,6 @@
 #include <gst/gst.h>
 
 #include "gstmprtcpbuffer.h"
-#include "monitorpackets.h"
 #include "mprtpspath.h"
 #include "sndctrler.h"
 #include "streamsplitter.h"
@@ -59,7 +58,6 @@ struct _GstMprtpscheduler
   guint8                        abs_time_ext_header_id;
   guint32                       ssrc_filter;
   guint                         auto_rate_and_cc;
-//  MonitorPackets*               monitorpackets;
   PacketsSndQueue*              sndqueue;
   GHashTable*                   paths;
   GRWLock                       rwmutex;

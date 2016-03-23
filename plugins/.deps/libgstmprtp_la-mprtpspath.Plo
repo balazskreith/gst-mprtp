@@ -199,9 +199,8 @@ libgstmprtp_la-mprtpspath.lo: mprtpspath.c /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/bits/string2.h /usr/include/stdlib.h \
  /usr/include/x86_64-linux-gnu/bits/string3.h mprtpspath.h mprtpdefs.h \
  mprtplogger.h gstmprtcpbuffer.h gstmprtpbuffer.h packetssndqueue.h \
- bintree.h numstracker.h bintree2.h percentiletracker.h monitorpackets.h \
- reportproc.h mprtprpath.h \
- /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
+ bintree.h numstracker.h bintree2.h percentiletracker.h reportproc.h \
+ mprtprpath.h /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
  percentiletracker2.h streamjoiner.h ricalcer.h
 
 /usr/include/stdc-predef.h:
@@ -677,8 +676,6 @@ numstracker.h:
 bintree2.h:
 
 percentiletracker.h:
-
-monitorpackets.h:
 
 reportproc.h:
 

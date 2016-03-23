@@ -247,7 +247,6 @@ stream_joiner_init (StreamJoiner * this)
   this->playout_halt      = FALSE;
   this->playout_halt_time = 100 * GST_MSECOND;
   this->forced_delay      = 0;
-  this->monitorpackets    = make_monitorpackets();
   this->urgent            = g_queue_new();
   this->delays             = make_numstracker(256, 2 * GST_SECOND);
   this->made              = _now(this);
@@ -324,7 +323,6 @@ void stream_joiner_push_monitoring_packet(StreamJoiner * this, GstMpRTPBuffer *m
   //Todo: FEC packet processing here,
   this->monitored_bytes += mprtp->payload_bytes;
 //  g_print("monitor buffer size: %d\n",  mprtp->payload_bytes);
-  recovered = monitorpackets_process_FEC_packet(this->monitorpackets, mprtp->buffer);
   if(recovered){
     // push it into the frame... so continue the process with that. <- no just push!
       //aftre mptp_process_done we doesn't need GstMpRTPBuffer literally.
@@ -341,8 +339,6 @@ void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
   gdouble delay;
   THIS_WRITELOCK(this);
   subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (mprtp->subflow_id));
-
-  monitorpackets_add_incoming_rtp_packet(this->monitorpackets, mprtp->buffer);
 
   mprtpr_path_process_rtp_packet(subflow->path, mprtp);
 

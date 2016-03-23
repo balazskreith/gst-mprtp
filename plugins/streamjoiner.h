@@ -14,7 +14,6 @@ typedef struct _StreamJoiner StreamJoiner;
 typedef struct _StreamJoinerClass StreamJoinerClass;
 
 #include "mprtprpath.h"
-#include "monitorpackets.h"
 
 #define STREAM_JOINER_TYPE             (stream_joiner_get_type())
 #define STREAM_JOINER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),STREAM_JOINER_TYPE,StreamJoiner))
@@ -58,7 +57,6 @@ struct _StreamJoiner
   gboolean             flushing;
   PercentileTracker*   ticks;
   gint32               framecounter;
-  MonitorPackets*      monitorpackets;
 
   GstClockTime         last_logging;
   GQueue*              urgent;

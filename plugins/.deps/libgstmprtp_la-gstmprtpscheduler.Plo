@@ -209,8 +209,8 @@ libgstmprtp_la-gstmprtpscheduler.lo: gstmprtpscheduler.c \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
  gstmprtpbuffer.h /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtpdefs.h \
- monitorpackets.h bintree.h mprtplogger.h mprtpspath.h packetssndqueue.h \
- numstracker.h bintree2.h percentiletracker.h reportproc.h mprtprpath.h \
+ mprtpspath.h mprtplogger.h packetssndqueue.h bintree.h numstracker.h \
+ bintree2.h percentiletracker.h reportproc.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
  percentiletracker2.h streamjoiner.h ricalcer.h sndctrler.h \
  /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
@@ -847,15 +847,13 @@ gstmprtpbuffer.h:
 
 mprtpdefs.h:
 
-monitorpackets.h:
-
-bintree.h:
+mprtpspath.h:
 
 mprtplogger.h:
 
-mprtpspath.h:
-
 packetssndqueue.h:
+
+bintree.h:
 
 numstracker.h:
 

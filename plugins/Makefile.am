@@ -17,7 +17,6 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          rcvctrler.c                \
                          bintree.c                  \
                          bintree2.c                 \
-                         monitorpackets.c           \
                          mprtplogger.c              \
                          packetssndqueue.c          \
                          ricalcer.c                 \
@@ -43,7 +42,6 @@ noinst_HEADERS = mprtpspath.h           \
                  streamjoiner.h         \
                  bintree.h              \
                  bintree2.h             \
-                 monitorpackets.h       \
                  mprtplogger.h          \
                  packetssndqueue.h      \
                  ricalcer.h             \

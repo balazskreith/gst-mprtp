@@ -1186,6 +1186,7 @@ again:
     this->expected_seq_init = TRUE;
     this->expected_seq = mprtp->abs_seq;
   }
+
   if(mprtp->abs_seq != this->expected_seq){
     if(_cmp_seq(this->expected_seq, mprtp->abs_seq) < 0){
       for(; this->expected_seq != mprtp->abs_seq; ++this->expected_seq){

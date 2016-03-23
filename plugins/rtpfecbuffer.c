@@ -200,7 +200,7 @@ void gst_print_rtpfec_payload(GstRTPFECHeader *header)
            header->SSRC_Count,
            header->reserved,
            header->ssrc,
-           header->sn_base,
+           g_ntohs(header->sn_base),
            header->N_MASK,
            header->M_MASK
         );

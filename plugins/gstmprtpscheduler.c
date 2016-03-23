@@ -1084,7 +1084,6 @@ again:
                                    rtpfecbuf,
                                    this->mprtp_ext_header_id,
                                    mprtps_path_get_id(path));
-      gst_print_rtpfec_buffer(rtpfecbuf);
       gst_pad_push (this->mprtp_srcpad, rtpfecbuf);
     }
   }

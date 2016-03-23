@@ -60,6 +60,7 @@ rtpfecbuffer_get_rtpfec_payload(GstRTPFECSegment *segment, guint8 *rtpfecpayload
   fecheader->M_MASK     = 0;
   fecheader->SSRC_Count = 1;
   fecheader->sn_base    = g_htons(segment->base_sn);
+  fecheader->ssrc       = g_htonl(segment->ssrc);
   memcpy(&fecheader->TS, &segment->parity_bytes[4], 4);
   memcpy(&length_recovery, &segment->parity_bytes[8], 2);
   fecheader->length_recovery = g_htons(length_recovery);
@@ -199,7 +200,7 @@ void gst_print_rtpfec_payload(GstRTPFECHeader *header)
            g_ntohl(header->TS),
            header->SSRC_Count,
            header->reserved,
-           header->ssrc,
+           g_ntohl(header->ssrc),
            g_ntohs(header->sn_base),
            header->N_MASK,
            header->M_MASK

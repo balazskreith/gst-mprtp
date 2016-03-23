@@ -154,6 +154,10 @@ gboolean fecdecoder_has_repaired_rtpbuffer(FECDecoder *this, GstBuffer** repaire
   THIS_WRITELOCK(this);
   for(it = this->requests; it; it = it->next){
     request = it->data;
+    if(_now(this) - this->repair_window_min < request->added){
+      continue;
+    }
+    g_print("Active request for repair: %hu\n", request->seq_num);
     segment = _find_segment_by_seq(this, request->seq_num);
     if(!segment || segment->missing_num != 1){
       continue;

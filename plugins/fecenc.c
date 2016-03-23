@@ -150,6 +150,7 @@ fecencoder_get_fec_packet(FECEncoder *this)
   gst_rtp_buffer_map(result, GST_MAP_READWRITE, &rtp);
   gst_rtp_buffer_set_payload_type(&rtp, this->payload_type);
   gst_rtp_buffer_set_seq(&rtp, ++this->seq_num);
+  gst_rtp_buffer_set_ssrc(&rtp, actual->ssrc);
   payload = gst_rtp_buffer_get_payload(&rtp);
   memcpy(payload, this->tmp, length);
   gst_rtp_buffer_unmap(&rtp);

@@ -1192,6 +1192,7 @@ again:
       for(; this->expected_seq != mprtp->abs_seq; ++this->expected_seq){
         fecdecoder_request_repair(this->fec_decoder, this->expected_seq);
       }
+      ++this->expected_seq;
     }
   }else{
       ++this->expected_seq;

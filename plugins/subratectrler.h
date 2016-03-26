@@ -114,6 +114,7 @@ void subratectrler_setup_controls(
                          SubflowRateController *this, struct _SubflowUtilizationControl* src);
 gint32 subratectrler_get_target_bitrate(SubflowRateController *this);
 gint32 subratectrler_get_monitoring_bitrate(SubflowRateController *this);
+void subratectrler_set_monitored_bitrate(SubflowRateController *this, gint32 monitored_bitrate);
 void subratectrler_add_extra_rate(SubflowRateController *this,
                                   gint32 extra_rate);
 

@@ -17,6 +17,7 @@
 #include "streamsplitter.h"
 #include "reportprod.h"
 #include "reportproc.h"
+#include "fecdec.h"
 
 typedef struct _RcvController RcvController;
 typedef struct _RcvControllerClass RcvControllerClass;
@@ -49,6 +50,9 @@ struct _RcvController
   gboolean          rfc3611_enabled;
   ReportProducer*   report_producer;
   ReportProcessor*  report_processor;
+  FECDecoder*       fecdecoder;
+  guint32           fecdecoder_early_repaired_bytes;
+  guint32           fecdecoder_total_repaired_bytes;
   gboolean          enabled;
 
 
@@ -62,7 +66,8 @@ struct _RcvControllerClass{
 
 //Class functions
 void rcvctrler_setup(RcvController *this,
-                     StreamJoiner* splitter);
+                     StreamJoiner* splitter,
+                     FECDecoder*   fecdecoder);
 
 void
 rcvctrler_add_path (

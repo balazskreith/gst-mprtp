@@ -67,7 +67,8 @@ void report_producer_add_xr_owd_rle(ReportProducer *this,
                                     guint16 begin_seq,
                                     guint16 end_seq,
                                     GstRTCPXR_Chunk *chunks,
-                                    guint chunks_num);
+                                    guint chunks_num,
+                                    guint32 offset);
 
 void report_producer_add_xr_rfc3611(ReportProducer *this,
                                     guint8 thinning,

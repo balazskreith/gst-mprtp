@@ -62,8 +62,6 @@ struct _StreamJoiner
   GQueue*              urgent;
 
   guint64              last_snd_ntp_reference;
-  void               (*send_mprtp_packet_func)(gpointer,GstMpRTPBuffer*);
-  gpointer             send_mprtp_packet_data;
 
 };
 struct _StreamJoinerClass{
@@ -71,9 +69,7 @@ struct _StreamJoinerClass{
 };
 
 StreamJoiner*
-make_stream_joiner(
-    gpointer data,
-    void (*func)(gpointer,GstMpRTPBuffer*));
+make_stream_joiner(void);
 
 void
 stream_joiner_add_path(

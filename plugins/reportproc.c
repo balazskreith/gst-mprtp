@@ -408,9 +408,15 @@ _processing_xr_owd_rle(ReportProcessor *this,
   guint16 running_length;
   guint64 owd;
   GstRTCPXR_Chunk *chunk;
+  guint32 offset;
+  GstClockTime abs_offset;
   summary->XR_OWD_RLE.processed = TRUE;
   summary->XR_OWD_RLE.length = 0;
 
+  gst_rtcp_xr_owd_rle_getdown(xrb, NULL, NULL, NULL, &offset, NULL, NULL);
+  abs_offset = offset;
+  abs_offset *= GST_SECOND;
+  summary->XR_OWD_RLE.offset = abs_offset;
   chunks_num = gst_rtcp_xr_owd_rle_get_chunks_num(xrb);
   for(chunk_index = 0;
       chunk_index < chunks_num;
@@ -533,8 +539,10 @@ void _logging(ReportProcessor *this, GstMPRTCPReportSummary* summary)
       mprtp_logger(this->logfile,
                    "-------------------------- XR OWD RLE ---------------------------\n"
                    "length:    %d\n"
+                   "offset:    %lu\n"
                    ,
-                   summary->XR_OWD_RLE.length
+                   summary->XR_OWD_RLE.length,
+                   summary->XR_OWD_RLE.offset
       );
       for(i=0; i<summary->XR_OWD_RLE.length; ++i){
           mprtp_logger(this->logfile,

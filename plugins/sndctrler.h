@@ -18,7 +18,7 @@
 #include "streamsplitter.h"
 #include "reportprod.h"
 #include "reportproc.h"
-
+#include "fecenc.h"
 
 typedef struct _SndController SndController;
 typedef struct _SndControllerClass SndControllerClass;
@@ -58,6 +58,8 @@ struct _SndController
   GstSchedulerSignaling      utilization_signal_func;
   gpointer                   utilization_signal_data;
   gboolean                   enabled;
+
+  FECEncoder*                fecencoder;
 };
 
 struct _SndControllerClass{
@@ -70,7 +72,8 @@ struct _SndControllerClass{
 //Class functions
 void sndctrler_setup(SndController* this,
                      StreamSplitter* splitter,
-                     PacketsSndQueue *pacer);
+                     PacketsSndQueue *pacer,
+                     FECEncoder* fecencoder);
 
 void
 sndctrler_setup_callbacks(SndController *this,

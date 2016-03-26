@@ -104,6 +104,8 @@ struct _MPRTPSPath
   GstClockTime            sent_lossy;
   GstClockTime            sent_congested;
 
+  GstClockTime            last_sent;
+
   GstClockTime            skip_until;
 
   guint32                 monitoring_interval;
@@ -111,6 +113,8 @@ struct _MPRTPSPath
   MPRTPSPathPackets       packets;
 
   gboolean                expected_lost;
+
+  GstClockTime            keep_alive_period;
 };
 
 struct _MPRTPSPathClass
@@ -181,6 +185,8 @@ gboolean mprtps_path_has_expected_lost(MPRTPSPath * this);
 
 void mprtps_path_process_rtp_packet(MPRTPSPath * this, GstBuffer * buffer, gboolean *monitoring_request);
 
+void mprtps_path_set_keep_alive_period(MPRTPSPath *this, GstClockTime period);
+gboolean mprtps_path_request_keep_alive(MPRTPSPath *this);
 
 guint32 mprtps_path_get_total_sent_packets_num (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);

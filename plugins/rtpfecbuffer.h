@@ -110,11 +110,9 @@ typedef struct PACKED _GstBasicRTPHeader
 #endif
   //second byte
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
-  //second byte
   unsigned int         PT:7;     /* PT field */
   unsigned int         M:1;       /* M field */
 #elif G_BYTE_ORDER == G_BIG_ENDIAN
-  //second byte
   unsigned int         M:1;         /* M field */
   unsigned int         PT:7;       /* PT field */
 #else
@@ -142,7 +140,6 @@ void rtpfecbuffer_cpy_header_data(GstBuffer *buf, GstRTPFECHeader *result);
 void rtpfecbuffer_init_segment(GstRTPFECSegment *segment);
 void rtpfecbuffer_get_rtpfec_payload(GstRTPFECSegment *segment, guint8 *rtpfecpayload, guint16 *length);
 void rtpfecbuffer_setup_bitstring(GstBuffer *buf, guint8 *bitstring, gint16 *bitstring_length);
-void rtpfecbuffer_add_rtpbuffer_to_fec_segment(GstRTPFECSegment *segment, GstBuffer *buf);
 GstBuffer* rtpfecbuffer_get_rtpbuffer_by_fec(GstRTPFECSegment *segment, GstBuffer *fec, guint16 seq);
 void gst_print_rtpfec_buffer(GstBuffer *rtpfec);
 void gst_print_rtpfec_payload(GstRTPFECHeader *header);

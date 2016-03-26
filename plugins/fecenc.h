@@ -30,13 +30,14 @@ struct _FECEncoder
   GstClockTime               made;
   GRWLock                    rwmutex;
 
-  gint32                     protected_num;
   gint32                     max_protection_num;
-  GstRTPFECSegment           segment;
   guint16                    seq_num;
   guint8                     payload_type;
+
+  GQueue*                    bitstrings;
+
   guint16                    subflows_seg[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  guint8                     tmp[GST_RTPFEC_PARITY_BYTES_MAX_LENGTH];
+  guint32                    subflows_pay[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
 };
 
 
@@ -51,6 +52,7 @@ GType fecencoder_get_type (void);
 FECEncoder *make_fecencoder(void);
 void fecencoder_reset(FECEncoder *this);
 void fecencoder_set_payload_type(FECEncoder *this, guint8 fec_payload_type);
+void fecencoder_get_stats(FECEncoder *this, guint8 subflow_id, guint32 *sum_fec_payloads);
 void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf);
 GstBuffer* fecencoder_get_fec_packet(FECEncoder *this);
 void fecencoder_assign_to_subflow (

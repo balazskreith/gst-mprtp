@@ -41,80 +41,19 @@ void rtpfecbuffer_init_segment(GstRTPFECSegment *segment)
   segment->base_sn = -1;
 }
 
-void
-rtpfecbuffer_get_rtpfec_payload(GstRTPFECSegment *segment, guint8 *rtpfecpayload, guint16 *length)
-{
-  GstRTPFECHeader             *fecheader;
-  guint16                      length_recovery = 0;
-
-  fecheader = (GstRTPFECHeader*)rtpfecpayload;
-  fecheader->F          = 1;
-  fecheader->R          = 0;
-  fecheader->P          = segment->parity_bytes[0]>>2;
-  fecheader->X          = segment->parity_bytes[0]>>3;
-  fecheader->CC         = segment->parity_bytes[0]>>4;
-  fecheader->M          = segment->parity_bytes[1];
-  fecheader->PT         = segment->parity_bytes[1]>>1;
-  fecheader->reserved   = 0;
-  fecheader->N_MASK     = segment->processed_packets_num;
-  fecheader->M_MASK     = 0;
-  fecheader->SSRC_Count = 1;
-  fecheader->sn_base    = g_htons(segment->base_sn);
-  fecheader->ssrc       = g_htonl(segment->ssrc);
-  memcpy(&fecheader->TS, &segment->parity_bytes[4], 4);
-  memcpy(&length_recovery, &segment->parity_bytes[8], 2);
-  fecheader->length_recovery = g_htons(length_recovery);
-  memcpy(rtpfecpayload + sizeof(GstRTPFECHeader), &segment->parity_bytes[10], segment->parity_bytes_length - 10);
-  *length = segment->parity_bytes_length + 10;
-}
 
 void rtpfecbuffer_setup_bitstring(GstBuffer *buf, guint8 *bitstring, gint16 *bitstring_length)
 {
   GstMapInfo info = GST_MAP_INFO_INIT;
   guint16 length, written_length;
-  gint i;
   gst_buffer_map(buf, &info, GST_MAP_READ);
   memcpy(bitstring, info.data, 8);
   length = info.size-12;
   written_length = g_htons(length);
   memcpy(bitstring + 8, &written_length, 2);
-  for(i=0; i<10; ++i){
-      bitstring[i] ^= bitstring[i];
-  }
-  for(i=0; i < length; ++i){
-      bitstring[i+10] ^= info.data[i+12];
-  }
-  *bitstring_length = length + 12;
+  memcpy(bitstring + 10, info.data + 12, length);
+  *bitstring_length = length + 10;
   gst_buffer_unmap(buf, &info);
-}
-
-void rtpfecbuffer_add_rtpbuffer_to_fec_segment(GstRTPFECSegment *segment, GstBuffer *buf)
-{
-  GstMapInfo info = GST_MAP_INFO_INIT;
-  guint8 bitstring[10];
-  guint16 length, written_length;
-  gint i;
-  gst_buffer_map(buf, &info, GST_MAP_READ);
-  memcpy(bitstring, info.data, 8);
-  length = info.size-12;
-  written_length = g_htons(length);
-  memcpy(bitstring + 8, &written_length, 2);
-  for(i=0; i<10; ++i){
-      segment->parity_bytes[i] ^= bitstring[i];
-  }
-  for(i=0; i < length; ++i){
-    segment->parity_bytes[i+10] ^= info.data[i+12];
-  }
-  if(segment->base_sn == -1){
-    guint16 *sn;
-    guint32 *ssrc;
-    sn = (guint16*)(info.data + 2);
-    segment->base_sn = g_ntohs(*sn);
-    ssrc = (guint32*)(info.data + 8);
-    segment->ssrc = g_ntohl(*ssrc);
-  }
-  gst_buffer_unmap(buf, &info);
-  segment->parity_bytes_length = MAX(segment->parity_bytes_length, length + 10);
 }
 
 
@@ -147,6 +86,7 @@ GstBuffer* rtpfecbuffer_get_rtpbuffer_by_fec(GstRTPFECSegment *segment, GstBuffe
   rtpheader = (GstBasicRTPHeader*) rtpdata;
 
   rtpheader->version = 2;
+
   rtpheader->P       = segment->parity_bytes[0]>>2;
   rtpheader->X       = segment->parity_bytes[0]>>3;
   rtpheader->CC      = segment->parity_bytes[0]>>4;

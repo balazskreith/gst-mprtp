@@ -118,6 +118,7 @@ enum
   PROP_AUTO_RATE_AND_CC,
   PROP_SET_SENDING_TARGET,
   PROP_INITIAL_DISABLING,
+  PROP_KEEP_ALIVE_PERIOD,
   PROP_LOG_ENABLED,
   PROP_SUBFLOWS_STATS,
 };
@@ -269,6 +270,12 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the target",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_KEEP_ALIVE_PERIOD,
+      g_param_spec_uint ("setup-keep-alive-period",
+          "set a keep-alive period for subflow",
+          "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the period in ms",
+          0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_INITIAL_DISABLING,
       g_param_spec_uint64 ("initial-disabling",
           "set an initial disabling time for rate controller in order to collect statistics at the beginning.",
@@ -366,7 +373,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->controller = (SndController*) g_object_new(SNDCTRLER_TYPE, NULL);
   this->fec_encoder = make_fecencoder();
   this->sndqueue = make_packetssndqueue();
-  sndctrler_setup(this->controller, this->splitter, this->sndqueue);
+  sndctrler_setup(this->controller, this->splitter, this->sndqueue, this->fec_encoder);
   sndctrler_setup_callbacks(this->controller,
                             this, gst_mprtpscheduler_mprtcp_sender,
                             this, gst_mprtpscheduler_emit_signal
@@ -419,6 +426,7 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
   guint8 subflow_id;
   guint subflow_target;
   guint64 guint64_value;
+  MPRTPSPath *path;
 
   GST_DEBUG_OBJECT (this, "set_property");
 
@@ -488,6 +496,20 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       THIS_WRITELOCK (this);
       guint64_value = g_value_get_uint64 (value);
       sndctrler_set_initial_disabling(this->controller, guint64_value);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_KEEP_ALIVE_PERIOD:
+      THIS_WRITELOCK (this);
+      guint_value = g_value_get_uint (value);
+      subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
+      guint64_value = guint_value & 0x00FFFFFFUL;
+      guint64_value *= GST_MSECOND;
+      path = (MPRTPSPath *) g_hash_table_lookup (this->paths, GINT_TO_POINTER (subflow_id));
+      if(!path){
+        GST_WARNING_OBJECT(this, "subflow with id %d doesn't exist.", subflow_id);
+      }else{
+        mprtps_path_set_keep_alive_period(path, guint64_value);
+      }
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_LOG_ENABLED:
@@ -642,9 +664,9 @@ _join_subflow (GstMprtpscheduler * this, guint subflow_id)
     path = make_mprtps_path ((guint8) subflow_id);
     g_hash_table_insert (this->paths, GINT_TO_POINTER (subflow_id), path);
     mprtps_path_set_mprtp_ext_header_id(path, this->mprtp_ext_header_id);
+    ++this->active_subflows_num;
   }
   sndctrler_add_path(this->controller, subflow_id, path);
-  ++this->active_subflows_num;
 }
 
 void
@@ -1049,6 +1071,7 @@ _mprtpscheduler_process_run (void *data)
   GstClockTime next_scheduler_time;
   MPRTPSPath *path;
   GstBuffer *buffer = NULL;
+  GstBuffer *rtpfecbuf = NULL;
   gboolean fec_request = FALSE;
 
   this = (GstMprtpscheduler *) data;
@@ -1074,20 +1097,25 @@ again:
     goto done;
   }
   mprtps_path_process_rtp_packet(path, buffer, &fec_request);
+  fec_request |= mprtps_path_request_keep_alive(path);
+
   _setup_timestamp(this, buffer);
   if(this->auto_rate_and_cc){
     fecencoder_add_rtpbuffer(this->fec_encoder, buffer);
     if(fec_request){
-      GstBuffer *rtpfecbuf;
       rtpfecbuf = fecencoder_get_fec_packet(this->fec_encoder);
       fecencoder_assign_to_subflow(this->fec_encoder,
                                    rtpfecbuf,
                                    this->mprtp_ext_header_id,
                                    mprtps_path_get_id(path));
-      gst_pad_push (this->mprtp_srcpad, rtpfecbuf);
     }
   }
+
   gst_pad_push (this->mprtp_srcpad, buffer);
+  if(rtpfecbuf){
+    gst_pad_push (this->mprtp_srcpad, rtpfecbuf);
+    rtpfecbuf = NULL;
+  }
   if (!this->riport_flow_signal_sent) {
     this->riport_flow_signal_sent = TRUE;
     sndctrler_report_can_flow(this->controller);

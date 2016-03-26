@@ -33,6 +33,8 @@ G_DEFINE_TYPE (MpRTPRPath, mprtpr_path, G_TYPE_OBJECT);
 #define _actual_lostrle(this) ((LostsRLEBlock*)(this->losts_rle.blocks + this->losts_rle.write_index))
 #define _owdrle(this) this->owd_rle
 #define _actual_owdrle(this) ((OWDRLEBlock*)(this->owd_rle.blocks + this->owd_rle.write_index))
+#define _skewrle(this) this->skew_rle
+#define _actual_skewrle(this) ((SkewRLEBlock*)(this->skew_rle.blocks + this->skew_rle.write_index))
 
 
 static void mprtpr_path_finalize (GObject * object);
@@ -302,7 +304,8 @@ GstRTCPXR_Chunk *
 mprtpr_path_get_owd_chunks(MpRTPRPath *this,
                               guint *chunks_num,
                               guint16 *begin_seq,
-                              guint16 *end_seq)
+                              guint16 *end_seq,
+                              guint32 *offset)
 {
   GstRTCPXR_Chunk *result = NULL, *chunk;
   gboolean chunk_type = FALSE;
@@ -311,6 +314,7 @@ mprtpr_path_get_owd_chunks(MpRTPRPath *this,
   guint16 begin_seq_, end_seq_;
   gint i,chunks_num_;
   guint16 *read,running_length;
+  GstClockTime abs_offset = -1;
 
   chunks_num_ = 0;
   THIS_READLOCK (this);
@@ -323,6 +327,23 @@ mprtpr_path_get_owd_chunks(MpRTPRPath *this,
   chunk = result = mprtp_malloc(sizeof(GstRTCPXR_Chunk) * chunks_num_);
   block = &this->owd_rle.blocks[this->owd_rle.read_index];
   begin_seq_ = block->start_seq;
+  //get the offset
+  for(i=this->owd_rle.read_index; ; )
+  {
+    {
+      GstClockTime owd;
+      owd = this->owd_rle.blocks[i].median_delay;
+      if(owd < abs_offset){
+        abs_offset = owd;
+      }
+    }
+    if(i == this->owd_rle.write_index) break;
+    if(++i == MPRTP_PLUGIN_MAX_RLE_LENGTH) i=0;
+  }
+
+  abs_offset -= abs_offset % GST_SECOND;
+  *offset = abs_offset / GST_SECOND;
+
   for(i=this->owd_rle.read_index; ; )
   {
     end_seq_ = block->end_seq;
@@ -330,6 +351,7 @@ mprtpr_path_get_owd_chunks(MpRTPRPath *this,
     {
       GstClockTime owd;
       owd = this->owd_rle.blocks[i].median_delay;
+      owd -= abs_offset;
       //owd = GST_TIME_AS_MSECONDS(owd);
       //running_length = (owd > 0x3FFF) ? 0x3FFF : owd;
       if(owd < GST_SECOND){
@@ -416,10 +438,20 @@ void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
 {
   THIS_READLOCK (this);
 //  if(path_delay) *path_delay = this->estimated_delay;
-  if(path_delay) *path_delay = percentiletracker_get_stats(this->delays, NULL, NULL, NULL);
+  if(path_delay) *path_delay = this->delay_avg;
   if(path_skew)  *path_skew = this->path_skew; //this->estimated_skew;
   if(jitter) *jitter = this->jitter;
   THIS_READUNLOCK (this);
+}
+
+gboolean mprtpr_path_is_distorted(MpRTPRPath *this)
+{
+  gboolean result;
+  THIS_WRITELOCK (this);
+  result = this->distorted;
+  this->distorted = FALSE;
+  THIS_WRITEUNLOCK (this);
+  return result;
 }
 
 void mprtpr_path_tick(MpRTPRPath *this)
@@ -443,7 +475,11 @@ void mprtpr_path_add_delay(MpRTPRPath *this, GstClockTime delay)
   THIS_WRITEUNLOCK (this);
 }
 
-
+typedef struct{
+  guint64 rcv;
+  guint64 snd;
+  guint32 bytes;
+}ActualData;
 
 void
 mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
@@ -452,6 +488,9 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   gint64 skew = 0;
 
   THIS_WRITELOCK (this);
+  if(mprtp->fec_packet){
+    goto done;
+  }
   if (this->seq_initialized == FALSE) {
     this->highest_seq = mprtp->subflow_seq;
     this->total_packets_received = 1;
@@ -463,13 +502,12 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
     goto done;
   }
 
-  if(!mprtp->fec_packet){
-    skew = (((gint64)this->last_mprtp_delay - (gint64)mprtp->delay));
-    this->last_mprtp_delay = mprtp->delay;
-    ++this->total_packets_received;
-    this->total_payload_bytes += mprtp->payload_bytes;
-    this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
-  }
+  skew = (((gint64)this->last_mprtp_delay - (gint64)mprtp->delay));
+  this->last_mprtp_delay = mprtp->delay;
+  ++this->total_packets_received;
+  this->total_payload_bytes += mprtp->payload_bytes;
+  this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
+
   if(0 < mprtp->delay){
     _add_delay(this, mprtp->delay);
     if(_cmp_seq(this->reported_sequence_number, mprtp->subflow_seq) < 0 &&
@@ -488,6 +526,48 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
     for(; _cmp_seq(seq, mprtp->subflow_seq) < 0; ++seq){
       numstracker_add(this->gaps, seq);
     }
+  }else{
+    if(!this->actual_group){
+      this->actual_group = g_queue_new();
+    }
+    //packet is in order
+    if(this->last_rtp_timestamp != mprtp->timestamp){
+      ActualData *data;
+      gdouble skew2;
+
+      this->group_t2.rcv_avg = this->group_t1.rcv_avg;
+      this->group_t2.snd_avg = this->group_t1.snd_avg;
+      this->group_t1.rcv_avg = 0;
+      this->group_t1.snd_avg = 0;
+
+      while(!g_queue_is_empty(this->actual_group)){
+        gdouble weight;
+        data = g_queue_pop_head(this->actual_group);
+        weight = (gdouble) data->bytes / (gdouble) this->actual_bytes_sum;
+        this->group_t1.rcv_avg += (gdouble)data->rcv * weight;
+        this->group_t1.snd_avg += (gdouble)data->snd * weight;
+        g_print("this->group_t1.rcv_avg (%f) += data->rcv (%f) * weight (%f)\n", this->group_t1.rcv_avg, (gdouble)data->rcv, weight);
+        g_print("this->group_t1.snd_avg (%f) += data->snd (%f) * weight (%f)\n", this->group_t1.snd_avg, (gdouble)data->snd, weight);
+        mprtp_free(data);
+      }
+      this->actual_bytes_sum   = 0;
+      this->last_rtp_timestamp = mprtp->timestamp;
+      skew2  = this->group_t1.rcv_avg - this->group_t2.rcv_avg;
+      g_print("A1: %f\n",this->group_t1.rcv_avg - this->group_t2.rcv_avg);
+      skew2 -= this->group_t1.snd_avg - this->group_t2.snd_avg;
+      g_print("A2: %f\n",this->group_t1.snd_avg - this->group_t2.snd_avg);
+      skew2  = get_epoch_time_from_ntp_in_ns(skew);
+      g_print("new kind of skew: %f\n", skew2);
+      _add_skew(this, skew);
+    }else{
+      ActualData *data;
+      data = mprtp_malloc(sizeof(ActualData));
+      this->actual_bytes_sum += mprtp->payload_bytes;
+      data->bytes = mprtp->payload_bytes;
+      data->rcv   = mprtp->abs_rcv_ntp_time;
+      data->snd   = mprtp->abs_snd_ntp_time;
+      g_queue_push_tail(this->actual_group, data);
+    }
   }
 
   if(65472 < this->highest_seq && mprtp->subflow_seq < 128){
@@ -495,29 +575,6 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   }
 
   this->highest_seq = mprtp->subflow_seq;
-  if(this->last_rtp_timestamp == mprtp->timestamp)
-    goto done;
-
-  if(!mprtp->fec_packet){
-    _add_skew(this, skew);
-  }
-
-  //For delay and skew estimation test (kalman_simple_test)
-//  if(this->id == 1){
-//    g_print("%lu,%lu,%lu,%lu,%ld,%f,%f,%lu,%lu\n",
-//            GST_TIME_AS_USECONDS((guint64)mprtp->delay),
-//            GST_TIME_AS_USECONDS((guint64)this->sh_delay),
-//            GST_TIME_AS_USECONDS((guint64)this->md_delay),
-//            GST_TIME_AS_USECONDS((guint64)this->estimated_delay),
-//            skew / 1000,
-//            this->path_skew / 1000.,
-//            this->estimated_skew / 1000.,
-//            GST_TIME_AS_USECONDS(percentiletracker_get_stats(this->lt_low_delays, NULL, NULL, NULL)),
-//            GST_TIME_AS_USECONDS(percentiletracker_get_stats(this->lt_high_delays, NULL, NULL, NULL))
-//            );
-//  }
-  //new frame
-  this->last_rtp_timestamp = mprtp->timestamp;
 
 done:
   _refresh_RLEBlock(this);
@@ -541,24 +598,29 @@ void _add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp)
   this->total_late_discarded_bytes+=mprtp->payload_bytes;
   _actual_discrle(this)->discarded_bytes+=mprtp->payload_bytes;
   ++_actual_discrle(this)->discarded_packets;
+  this->distorted = TRUE;
 }
 
 void _add_delay(MpRTPRPath *this, GstClockTime delay)
 {
   percentiletracker_add(this->delays, delay);
 
-  if(this->delay_avg == 0.) this->delay_avg = delay;
-  else                      this->delay_avg = delay * .01 + this->delay_avg * .99;
+  this->delay_avg = delay * .01 + this->delay_avg * .99;
 
   if(this->delay_avg < (delay>>1)){
+    this->distorted = TRUE;
     this->request_urgent_report = TRUE;
   }
+
 }
 
 void _add_skew(MpRTPRPath *this, gint64 skew)
 {
+  GstClockTime median_skew;
   percentiletracker2_add(this->skews, skew);
-  this->path_skew = this->path_skew * .99 + (gdouble)percentiletracker2_get_stats(this->skews, NULL, NULL, NULL) * .01;
+  median_skew = percentiletracker2_get_stats(this->skews, NULL, NULL, NULL);
+  _actual_skewrle(this)->median_delay = median_skew;
+  this->path_skew = this->path_skew * .99 + (gdouble) median_skew * .01;
 }
 
 void _refresh_RLEBlock(MpRTPRPath *this)
@@ -627,6 +689,17 @@ void _refresh_RLE(MpRTPRPath *this)
     block->start_seq = block->end_seq = this->highest_seq;
   }
 
+  if(_skewrle(this).last_step < _now(this) - _skewrle(this).step_interval){
+    SkewRLE *rle;
+    SkewRLEBlock *block;
+    rle = &_skewrle(this);
+    if(++rle->write_index == MPRTP_PLUGIN_MAX_RLE_LENGTH) rle->write_index = 0;
+    rle->last_step=_now(this);
+    block = _actual_skewrle(this);
+    memset(block, 0, sizeof(SkewRLEBlock));
+    block->start_seq = block->end_seq = this->highest_seq;
+  }
+
 }
 
 void _delays_stats_pipe(gpointer data, PercentileTrackerPipeData *pdata)
@@ -641,6 +714,7 @@ void _gaps_obsolation_pipe(gpointer data, gint64 seq)
   if(numstracker_find(this->lates, seq)) return;
   ++_actual_lostrle(this)->lost_packets;
   ++this->total_packet_losts;
+  this->distorted = TRUE;
 }
 
 #undef THIS_READLOCK

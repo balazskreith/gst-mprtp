@@ -255,7 +255,7 @@ void netqueue_analyser_do(NetQueueAnalyser       *this,
 
   for(i=0; i<summary->XR_OWD_RLE.length; ++i){
     GstClockTime delay;
-    delay = summary->XR_OWD_RLE.values[i];
+    delay = summary->XR_OWD_RLE.values[i] + summary->XR_OWD_RLE.offset;
     if(!delay){
         continue;
     }

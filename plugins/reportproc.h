@@ -52,6 +52,7 @@ struct _GstMPRTCPReportSummary{
     gboolean          processed;
     GstClockTime      values[100];
     guint16           length;
+    GstClockTime      offset;
   }XR_OWD_RLE;
 
   struct{

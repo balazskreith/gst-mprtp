@@ -197,10 +197,11 @@ rcvctrler_class_init (RcvControllerClass * klass)
 
 
 void
-rcvctrler_setup (RcvController *this, StreamJoiner * joiner)
+rcvctrler_setup (RcvController *this, StreamJoiner * joiner, FECDecoder* fecdecoder)
 {
   THIS_WRITELOCK (this);
-  this->joiner = joiner;
+  this->joiner     = joiner;
+  this->fecdecoder = fecdecoder;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -298,6 +299,22 @@ _logging (RcvController *this)
   stream_joiner_get_stats(this->joiner, &playout_delay, &playout_buffer_len);
   mprtp_logger(main_file,"%f,%d\n", playout_delay,playout_buffer_len);
 
+  {
+    guint32 fecdecoder_early_repaired_bytes, fecdecoder_total_repaired_bytes;
+    gdouble fecdecoder_ratio;
+
+    fecdecoder_get_stat(this->fecdecoder, &fecdecoder_early_repaired_bytes, &fecdecoder_total_repaired_bytes);
+
+    fecdecoder_ratio = !fecdecoder_total_repaired_bytes ? 0. : (gdouble) fecdecoder_early_repaired_bytes / (gdouble) fecdecoder_total_repaired_bytes;
+
+    mprtp_logger("fecdec_stat.csv",
+                 "%u,%u,%f\n",
+                 fecdecoder_early_repaired_bytes - this->fecdecoder_early_repaired_bytes,
+                 fecdecoder_total_repaired_bytes - this->fecdecoder_total_repaired_bytes,
+                 fecdecoder_ratio);
+    this->fecdecoder_early_repaired_bytes = fecdecoder_early_repaired_bytes;
+    this->fecdecoder_total_repaired_bytes = fecdecoder_total_repaired_bytes;
+  }
 done:
   return;
 }
@@ -613,15 +630,17 @@ void _orp_add_xr_owd_rle(RcvController * this, Subflow *subflow)
   GstRTCPXR_Chunk *chunks;
   guint chunks_num;
   guint16 begin_seq, end_seq;
+  guint32 offset;
 
-  chunks = mprtpr_path_get_owd_chunks(subflow->path, &chunks_num, &begin_seq, &end_seq);
+  chunks = mprtpr_path_get_owd_chunks(subflow->path, &chunks_num, &begin_seq, &end_seq, &offset);
 
   report_producer_add_xr_owd_rle(this->report_producer,
                                  3,
                                  begin_seq,
                                  end_seq,
                                  chunks,
-                                 chunks_num);
+                                 chunks_num,
+                                 offset);
 
   mprtp_free(chunks);
 }

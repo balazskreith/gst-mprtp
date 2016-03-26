@@ -108,11 +108,19 @@ struct _Subflow
   ProcessState               process_state;
   guint32                    packet_count;
   guint32                    octet_count;
+
+  guint32                    fec_bitrate;
+  gint                       read_fec_bytes_index;
+  guint32                    read_fec_bytes[10];
 };
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
+
+static void
+_fec_rate_refresher(
+    SndController *this);
 
 static void
 _logging (
@@ -250,6 +258,29 @@ sndctrler_init (SndController * this)
 
 }
 
+static void _fec_rate_refresh_per_subflow(Subflow *subflow, gpointer data)
+{
+  FECEncoder *fecencoder = data;
+  guint32 sum_fec_bytes;
+
+  fecencoder_get_stats(fecencoder, subflow->id, &sum_fec_bytes);
+
+  subflow->read_fec_bytes[subflow->read_fec_bytes_index] = sum_fec_bytes;
+  subflow->read_fec_bytes_index = (subflow->read_fec_bytes_index + 1) % 10;
+  subflow->fec_bitrate = sum_fec_bytes - subflow->read_fec_bytes[subflow->read_fec_bytes_index];
+  subflow->fec_bitrate *= 8;
+
+  if(subflow->rate_controller){
+    subratectrler_set_monitored_bitrate(subflow->rate_controller, subflow->fec_bitrate);
+  }
+
+}
+
+void _fec_rate_refresher(SndController *this)
+{
+  _subflow_iterator(this, _fec_rate_refresh_per_subflow, this->fecencoder);
+}
+
 void _logging (SndController *this)
 {
   GHashTableIter iter;
@@ -258,7 +289,6 @@ void _logging (SndController *this)
   gint32 sender_bitrate = 0;
   gint32 media_target = 0;
   gint32 media_rate = 0;
-  gint32 monitored_bitrate = 0;
   gint32 target_bitrate = 0;
   gint32 queue_bytes = 0;
   gdouble weight = 0.;
@@ -273,14 +303,14 @@ void _logging (SndController *this)
     sprintf(filename, "sub_%d_snd.csv", subflow->id);
     if(this->enabled){
       sender_bitrate    = mprtps_path_get_sent_bytes_in1s(subflow->path) * 8;
-      monitored_bitrate = subratectrler_get_monitoring_bitrate(subflow->rate_controller);
       target_bitrate    = stream_splitter_get_sending_target(this->splitter, subflow->id);
       weight            = stream_splitter_get_sending_weight(this->splitter, subflow->id);
     }
+
     mprtp_logger(filename,
                  "%d,%d,%d,%f\n",
                 sender_bitrate / 1000,
-                monitored_bitrate / 1000,
+                subflow->fec_bitrate / 1000,
                 target_bitrate / 1000,
                 weight
                 );
@@ -370,11 +400,15 @@ exit:
 
 
 void
-sndctrler_setup (SndController * this, StreamSplitter * splitter, PacketsSndQueue *pacer)
+sndctrler_setup (SndController   *this,
+                 StreamSplitter  *splitter,
+                 PacketsSndQueue *pacer,
+                 FECEncoder      *fecencoder)
 {
   THIS_WRITELOCK (this);
-  this->splitter = splitter;
-  this->pacer = pacer;
+  this->splitter   = splitter;
+  this->pacer      = pacer;
+  this->fecencoder = fecencoder;
   sndrate_distor_setup(this->rate_distor, this->splitter, this->pacer);
   THIS_WRITEUNLOCK (this);
 }
@@ -451,6 +485,7 @@ sndctrler_ticker_run (void *data)
   _irp_processor_main(this);
   _ratedistor_main(this);
   _orp_producer_main(this);
+  _fec_rate_refresher(this);
   _logging(this);
 //  _system_notifier_main(this);
 

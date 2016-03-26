@@ -813,9 +813,13 @@ gint32 subratectrler_get_monitoring_bitrate(SubflowRateController *this)
   return this->monitored_bitrate;
 }
 
+void subratectrler_set_monitored_bitrate(SubflowRateController *this, gint32 monitored_bitrate)
+{
+  this->monitored_bitrate = monitored_bitrate;
+}
+
 void _disable_controlling(SubflowRateController *this)
 {
-
   this->disable_controlling = _now(this) +  CONSTRAIN(500 * GST_MSECOND, 1.5 * GST_SECOND, _priv(this)->rtt * 2.);
 }
 
@@ -849,10 +853,11 @@ void _set_monitoring_interval(SubflowRateController *this, guint interval)
 {
   this->monitoring_interval = interval;
   this->monitoring_started = _now(this);
-  if(interval > 0)
-    this->monitored_bitrate = (gdouble)_TR(this) / (gdouble)interval;
-  else
-    this->monitored_bitrate = 0;
+//  if(interval > 0)
+//    this->monitored_bitrate = (gdouble)_TR(this) / (gdouble)interval;
+//  else
+//    this->monitored_bitrate = 0;
+  this->monitored_bitrate = 0;
   mprtps_path_set_monitor_packet_interval(this->path, this->monitoring_interval);
   return;
 }

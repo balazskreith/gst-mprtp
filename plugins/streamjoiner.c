@@ -63,7 +63,7 @@ struct _Subflow
 {
   guint8 id;
   MpRTPRPath  *path;
-  gdouble      delay;
+  gdouble      delay_avg;
   gdouble      skew;
   guint32      jitter;
 };
@@ -262,13 +262,11 @@ stream_joiner_init (StreamJoiner * this)
 }
 
 StreamJoiner*
-make_stream_joiner(gpointer data, void (*func)(gpointer,GstMpRTPBuffer*))
+make_stream_joiner(void)
 {
   StreamJoiner *result;
   result = (StreamJoiner *) g_object_new (STREAM_JOINER_TYPE, NULL);
   //Todo: elliminate fnc pointer from here.
-  result->send_mprtp_packet_data = data;
-  result->send_mprtp_packet_func = func;
 //  result->playoutgate = make_playoutgate(data, func);
   return result;
 }
@@ -347,9 +345,10 @@ void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
                               &subflow->skew,
                               &subflow->jitter);
 
-  //Because I don't know yet...
-  subflow->delay = delay * 1. + subflow->delay * 0.;
-  numstracker_add(this->delays, subflow->delay);
+  if(!mprtpr_path_is_distorted(subflow->path)){
+    subflow->delay_avg = subflow->delay_avg * .99802 + delay * .00192;
+    numstracker_add(this->delays, subflow->delay_avg);
+  }
 
 //  this->playout_delay *= 124.;
 //  this->playout_delay += this->max_delay;
@@ -717,7 +716,7 @@ static void _log_subflow(Subflow *subflow, gpointer data)
                "delay: %lu | jitter: %u | skew: %f\n",
 
                subflow->id,
-               subflow->delay,
+               subflow->delay_avg,
                subflow->jitter,
                subflow->skew
                );

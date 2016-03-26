@@ -92,8 +92,6 @@ static GstFlowReturn _processing_mprtcp_packet (GstMprtpplayouter * this,
     GstBuffer * buf);
 static void _join_path (GstMprtpplayouter * this, guint8 subflow_id);
 static void _detach_path (GstMprtpplayouter * this, guint8 subflow_id);
-static void gst_mprtpplayouter_send_mprtp_proxy (gpointer data,
-                                                 GstMpRTPBuffer * buf);
 static gboolean _try_get_path (GstMprtpplayouter * this, guint16 subflow_id,
     MpRTPRPath ** result);
 static void _change_auto_rate_and_cc (GstMprtpplayouter * this,
@@ -363,7 +361,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->pivot_clock_rate         = MPRTP_PLAYOUTER_DEFAULT_CLOCKRATE;
   this->pivot_ssrc               = MPRTP_PLAYOUTER_DEFAULT_SSRC;
   this->paths                    = g_hash_table_new_full (NULL, NULL, NULL, mprtpr_path_destroy);
-  this->joiner                   = make_stream_joiner(this,gst_mprtpplayouter_send_mprtp_proxy);
+  this->joiner                   = make_stream_joiner();
   this->controller               = g_object_new(RCVCTRLER_TYPE, NULL);
   this->discard_latency          = 400 * GST_MSECOND;
   this->lost_latency             = GST_SECOND;
@@ -374,7 +372,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->expected_seq             = 0;
   this->expected_seq_init        = FALSE;
 
-  rcvctrler_setup(this->controller, this->joiner);
+  rcvctrler_setup(this->controller, this->joiner, this->fec_decoder);
   rcvctrler_setup_callbacks(this->controller, this, gst_mprtpplayouter_mprtcp_sender);
   rcvctrler_set_additional_reports(this->controller, FALSE, FALSE, TRUE);
   _change_auto_rate_and_cc (this, FALSE);
@@ -386,22 +384,6 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
 
 }
 
-//static GstClockTime out_prev;
-void
-gst_mprtpplayouter_send_mprtp_proxy (gpointer data, GstMpRTPBuffer * mprtp)
-{
-  GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (data);
-  if(!GST_IS_BUFFER(mprtp->buffer)){
-    goto done;
-  }
-  if(mprtp->payload_type == this->fec_payload_type){
-    goto done;
-  }
-  gst_pad_push (this->mprtp_srcpad, mprtp->buffer);
-done:
-//  gst_mprtp_buffer_read_unmap(mprtp);
-  _trash_mprtp_buffer(this, mprtp);
-}
 
 void
 gst_mprtpplayouter_finalize (GObject * object)
@@ -1149,6 +1131,7 @@ GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer)
   return result;
 }
 
+
 static gint
 _cmp_seq (guint16 x, guint16 y)
 {
@@ -1174,10 +1157,11 @@ _mprtpplayouter_process_run (void *data)
 
   THIS_READLOCK (this);
   next_scheduler_time = _now(this) + 1 * GST_MSECOND;
-  if(this->last_fec_clean < _now(this) - 500 * GST_MSECOND){
+  if(this->last_fec_clean < _now(this) - 200 * GST_MSECOND){
     fecdecoder_clean(this->fec_decoder);
     this->last_fec_clean = _now(this);
   }
+
 again:
   mprtp = stream_joiner_pop(this->joiner);
   if(!mprtp){

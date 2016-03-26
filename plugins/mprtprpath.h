@@ -88,6 +88,22 @@ struct _OWDRunningLengthEncoding{
   GstClockTime        step_interval;
 };
 
+typedef struct _SkewRunningLengthEncodingBlock SkewRLEBlock;
+struct _SkewRunningLengthEncodingBlock{
+  guint16      start_seq;
+  guint16      end_seq;
+  GstClockTime median_delay;
+};
+
+typedef struct _SkewRunningLengthEncoding SkewRLE;
+struct _SkewRunningLengthEncoding{
+  SkewRLEBlock        blocks[MPRTP_PLUGIN_MAX_RLE_LENGTH];
+  guint               write_index;
+  guint               read_index;
+  GstClockTime        last_step;
+  GstClockTime        step_interval;
+};
+
 
 struct _MpRTPReceiverPath
 {
@@ -115,11 +131,19 @@ struct _MpRTPReceiverPath
   OWDRLE              owd_rle;
   LostsRLE            losts_rle;
   DiscardRLE          discard_rle;
-
+  SkewRLE             skew_rle;
 
   guint32             total_packet_losts;
   guint32             total_packets_received;
   guint32             last_rtp_timestamp;
+
+
+  GQueue* actual_group;
+  guint32 actual_bytes_sum;
+  struct{
+    gdouble rcv_avg;
+    gdouble snd_avg;
+  }group_t1,group_t2;
 
   gdouble             path_skew;
   GstClockTime        last_mprtp_delay;
@@ -131,9 +155,7 @@ struct _MpRTPReceiverPath
 
   NumsTracker*        gaps;
   NumsTracker*        lates;
-
-  gdouble             md_delay;
-  gdouble             sh_delay;
+  gboolean            distorted;
 
 
 };
@@ -214,7 +236,8 @@ GstRTCPXR_Chunk *
 mprtpr_path_get_owd_chunks(MpRTPRPath *this,
                               guint *chunks_num,
                               guint16 *begin_seq,
-                              guint16 *end_seq);
+                              guint16 *end_seq,
+                              guint32 *offset);
 
 GstRTCPXR_Chunk *
 mprtpr_path_get_discard_chunks(MpRTPRPath *this,
@@ -227,6 +250,7 @@ void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
                            gdouble       *path_skew,
                            guint32       *jitter);
 
+gboolean mprtpr_path_is_distorted(MpRTPRPath *this);
 void mprtpr_path_tick(MpRTPRPath *this);
 void mprtpr_path_add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp);
 void mprtpr_path_add_delay(MpRTPRPath *this, GstClockTime delay);

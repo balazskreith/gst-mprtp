@@ -247,6 +247,7 @@ typedef struct PACKED _GstRTCPXR_OWDRLE
 #endif
   guint16 block_length;
   guint32 ssrc;
+  guint32 offset;
   guint16 begin_seq;
   guint16 end_seq;
   GstRTCPXR_Chunk chunks[2];
@@ -496,18 +497,21 @@ gst_rtcp_xr_owd_rle_setup(GstRTCPXR_OWD_RLE *report,
                       gboolean early_bit,
                       guint8 thinning,
                       guint32 ssrc,
+                      guint32 offset,
                       guint16 begin_seq,
                       guint16 end_seq);
 void gst_rtcp_xr_owd_rle_getdown (GstRTCPXR_OWD_RLE *report,
                                        gboolean *early_bit,
                                        guint8 *thinning,
                                        guint32 *ssrc,
+                                       guint32 *offset,
                                        guint16 *begin_seq,
                                        guint16 *end_seq);
 void gst_rtcp_xr_owd_rle_change (GstRTCPXR_OWD_RLE *report,
                              gboolean *early_bit,
                              guint8 *thinning,
                              guint32 *ssrc,
+                             guint32 *offset,
                              guint16 *begin_seq,
                              guint16 *end_seq);
 

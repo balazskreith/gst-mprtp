@@ -59,7 +59,7 @@
 #define RTCPXRRFC7097BLOCK_BYTES 16
 #define RTCPXRRFC7097BLOCK_WORDS (RTCPXRRFC7097BLOCK_BYTES>>2)
 
-#define RTCPXROWDRLEBLOCK_BYTES 16
+#define RTCPXROWDRLEBLOCK_BYTES 20
 #define RTCPXROWDRLEBLOCK_WORDS (RTCPXROWDRLEBLOCK_BYTES>>2)
 
 #define RTCPXRRFC3611BLOCK_BYTES 16
@@ -886,7 +886,7 @@ void gst_rtcp_xr_owd_rle_init (GstRTCPXR_OWD_RLE * report)
   gst_rtcp_header_init (&report->header);
   gst_rtcp_header_setup (&report->header, FALSE, 0,
       GST_RTCP_TYPE_XR, RTCPHEADER_WORDS - 1 + RTCPXROWDRLEBLOCK_WORDS, 0);
-  gst_rtcp_xr_owd_rle_setup (report, 0, 0, 0, 0, 0);
+  gst_rtcp_xr_owd_rle_setup (report, 0, 0, 0, 0, 0, 0);
 }
 
 
@@ -895,6 +895,7 @@ gst_rtcp_xr_owd_rle_setup(GstRTCPXR_OWD_RLE *report,
                       gboolean early_bit,
                       guint8 thinning,
                       guint32 ssrc,
+                      guint32 offset,
                       guint16 begin_seq,
                       guint16 end_seq)
 {
@@ -904,6 +905,7 @@ gst_rtcp_xr_owd_rle_setup(GstRTCPXR_OWD_RLE *report,
                              &early_bit,
                              &thinning,
                              &ssrc,
+                             &offset,
                              &begin_seq,
                              &end_seq);
 }
@@ -912,11 +914,15 @@ void gst_rtcp_xr_owd_rle_getdown (GstRTCPXR_OWD_RLE *report,
                              gboolean *early_bit,
                              guint8 *thinning,
                              guint32 *ssrc,
+                             guint32 *offset,
                              guint16 *begin_seq,
                              guint16 *end_seq)
 {
   if (ssrc) {
      *ssrc = g_ntohl (report->ssrc);
+   }
+  if (offset) {
+     *offset = g_ntohl (report->offset);
    }
    if(early_bit){
      *early_bit = report->early_bit;
@@ -937,11 +943,15 @@ void gst_rtcp_xr_owd_rle_change (GstRTCPXR_OWD_RLE *report,
                              gboolean *early_bit,
                              guint8 *resolution,
                              guint32 *ssrc,
+                             guint32 *offset,
                              guint16 *begin_seq,
                              guint16 *end_seq)
 {
   if (ssrc) {
      report->ssrc = g_htonl(*ssrc);
+   }
+  if (offset) {
+     report->offset = g_htonl(*offset);
    }
    if(early_bit){
        report->early_bit = *early_bit;
@@ -1596,9 +1606,10 @@ gst_print_rtcp_xr_owd_rle(GstRTCPXR_OWD_RLE * report)
   guint chunks_num;
   GstRTCPXR_Chunk *chunk1, *chunk2;
   guint16 begin_seq, end_seq;
+  guint32 offset;
 
   gst_print_rtcp_header (&report->header);
-  gst_rtcp_xr_owd_rle_getdown (report, &early_bit, &resolution, &ssrc, &begin_seq, &end_seq);
+  gst_rtcp_xr_owd_rle_getdown (report, &early_bit, &resolution, &ssrc, &offset, &begin_seq, &end_seq);
 
   g_print (
       "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
@@ -1606,11 +1617,13 @@ gst_print_rtcp_xr_owd_rle(GstRTCPXR_OWD_RLE * report)
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%63X|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63X|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%31d|%31d|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       ,
       report->block_type, report->reserved, early_bit, resolution,
-      g_ntohs (report->block_length), ssrc, begin_seq, end_seq);
+      g_ntohs (report->block_length), ssrc, offset, begin_seq, end_seq);
 
    chunks_num = gst_rtcp_xr_owd_rle_get_chunks_num(report);
 

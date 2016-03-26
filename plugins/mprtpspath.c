@@ -324,6 +324,32 @@ gboolean mprtps_path_has_expected_lost(MPRTPSPath * this)
   return result;
 }
 
+void
+mprtps_path_set_keep_alive_period(MPRTPSPath *this, GstClockTime period)
+{
+  THIS_WRITELOCK (this);
+  this->keep_alive_period = period;
+  THIS_WRITEUNLOCK (this);
+}
+
+
+gboolean
+mprtps_path_request_keep_alive(MPRTPSPath *this)
+{
+  gboolean result = FALSE;
+  THIS_WRITELOCK (this);
+  if(!this->keep_alive_period){
+    goto done;
+  }
+  if(this->last_sent < _now(this) - this->keep_alive_period){
+    this->last_sent = _now(this);
+    result = TRUE;
+  }
+done:
+  THIS_WRITEUNLOCK (this);
+  return result;
+}
+
 guint32
 mprtps_path_get_total_sent_packets_num (MPRTPSPath * this)
 {
@@ -601,7 +627,7 @@ mprtps_path_process_rtp_packet(MPRTPSPath * this,
   _refresh_stat(this, &rtp);
   gst_rtp_buffer_unmap(&rtp);
 
-
+  this->last_sent = _now(this);
 
   if(!monitoring_request || !this->monitoring_interval) goto done;
   *monitoring_request = this->packets.total_sent_packets_num % this->monitoring_interval == 0;

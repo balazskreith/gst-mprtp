@@ -276,6 +276,7 @@ make_video_yuvfile_session (guint sessionNum)
   gst_element_link (videoSrc, videoParse);
   gst_element_link (videoParse, identity);
   gst_element_link (identity, encoder);
+//  gst_element_link (videoParse, encoder);
   gst_element_link (encoder, payloader);
 
 //  g_object_set(videoSrc, "filter-caps", videoCaps, NULL);
@@ -495,6 +496,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   gst_element_link_pads (mprtpsnd, "src_3", mq, "sink_3");
   gst_element_link_pads (mq, "src_3", rtpSink_3, "sink");
 
+  g_object_set (mprtpsch, "setup-keep-alive-period", (1 << 24) | 100, NULL);
 
   if(test_parameters_.subflow1_active)
     g_object_set (mprtpsch, "join-subflow", 1, NULL);
@@ -505,6 +507,14 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
 
   if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING){
     g_object_set (mprtpsch, "auto-rate-and-cc", TRUE, NULL);
+
+    if(test_parameters_.subflow1_active)
+      g_object_set (mprtpsch, "setup-keep-alive-period", (1 << 24) | 100, NULL);
+    if(test_parameters_.subflow2_active)
+      g_object_set (mprtpsch, "setup-keep-alive-period", (2 << 24) | 100, NULL);
+    if(test_parameters_.subflow3_active)
+      g_object_set (mprtpsch, "setup-keep-alive-period", (3 << 24) | 100, NULL);
+
   }else if(test_parameters_.test_directive == MANUAL_RATE_CONTROLLING){
     g_timeout_add (1000, _random_rate_controller, mprtpsch);
   }

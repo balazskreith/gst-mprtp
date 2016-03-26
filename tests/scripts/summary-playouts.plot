@@ -13,7 +13,7 @@ set terminal pdf enhanced rounded size 12,6
 set output output_file
 
 set origin 0,0
-set size ratio 0.15
+set size ratio 0.2
 set datafile separator "," 
 
 set key inside horizontal top right 
@@ -63,7 +63,6 @@ set ylabel "Size (KBytes)"
 set yrange [0:100]
 set ytics  20
 set xrange [0:duration]
-set ylabel "Remaining time (ms)"
 
 plot playouts_file using 0:1 with lines ls 2 title "Playout buffer"
 

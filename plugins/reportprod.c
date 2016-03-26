@@ -252,7 +252,8 @@ void report_producer_add_xr_owd_rle(ReportProducer *this,
                                     guint16 begin_seq,
                                     guint16 end_seq,
                                     GstRTCPXR_Chunk *chunks,
-                                    guint chunks_num)
+                                    guint chunks_num,
+                                    guint32 offset)
 {
   guint16 length;
   guint16 xr_block_length;
@@ -267,7 +268,7 @@ void report_producer_add_xr_owd_rle(ReportProducer *this,
   length+=(chunks_num-2)>>1;
   xr_block_length += (chunks_num-2)>>1;
   gst_rtcp_xr_block_change((GstRTCPXR*) xr, NULL, &xr_block_length, NULL);
-  gst_rtcp_xr_owd_rle_change(xr, &early_bit, &resolution, &this->ssrc, &begin_seq, &end_seq);
+  gst_rtcp_xr_owd_rle_change(xr, &early_bit, &resolution, &this->ssrc, &offset, &begin_seq, &end_seq);
   gst_rtcp_header_change(&xr->header, NULL, NULL, NULL, NULL, &length, NULL);
   _add_length(this, length);
   THIS_WRITEUNLOCK(this);

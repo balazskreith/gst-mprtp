@@ -536,12 +536,10 @@ _reduce_stage(
   gint32   target_rate;
   gboolean congestion;
   gboolean distortion;
-  gdouble  trend;
 
-  trend       = MAX(_q1000(this), _q500(this));
-  distortion  = 1.5 < _anres(this).corrH || _qtrend_keep_th(this) < trend;
-  congestion  = _qtrend_cng_th(this) < trend || _UF(this) < .9;
-  congestion |= 1.5 < _anres(this).corrH && _priv(this)->stage_changed < _now(this) - 3 * GST_SECOND;
+  distortion  = 1.5 < _anres(this).corrH || _qtrend_keep_th(this) < _q500(this);
+  congestion  = _qtrend_cng_th(this) < _q1000(this) || _UF(this) < .9;
+  congestion |= 1.5 < _anres(this).corrH && _priv(this)->stage_changed < _now(this) - 5 * GST_SECOND;
   target_rate = this->target_bitrate;
 
   if(!congestion){
@@ -557,7 +555,7 @@ _reduce_stage(
   }else if(.2 < _q1000(this)){
     target_rate = MIN(_RR(this) * .85, _TR(this) * _rdc_target_fac(this));
   }else{
-    target_rate = MIN(_RR(this) * .85, _TR(this) * _UF(this)/2.);
+    target_rate = MIN(_RR(this) * .85, _TR(this) * _UF(this));
   }
   _change_target_bitrate(this, target_rate);
   _reset_monitoring(this);
@@ -566,7 +564,7 @@ _reduce_stage(
 done:
   _anres(this).congestion = congestion;
   _anres(this).distortion = distortion;
-  _anres(this).trend      = trend;
+  _anres(this).trend      = _q1000(this);
   return;
 }
 
@@ -580,7 +578,7 @@ _keep_stage(
   gdouble  trend;
 
   congestion  = _anres(this).congestion;
-  distortion  = _anres(this).distortion || _qtrend_keep_th(this) < MAX(_q250(this), _q500(this)) || 1.5 < _anres(this).corrH;
+  distortion  = _anres(this).distortion || _qtrend_keep_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _anres(this).corrH;
   target_rate = this->target_bitrate;
   trend       = CONSTRAIN(0.05, 0.1, MAX(_q250(this), _q500(this)));
 
@@ -593,14 +591,21 @@ _keep_stage(
   }
 
   if(distortion){
-    if(this->last_decrease < _now(this) - _max_dist_keep(this) * GST_SECOND){
+    if(this->last_settled < _now(this) - _max_dist_keep(this) * GST_SECOND){
       target_rate *= 1.-trend;
     }
     _set_event(this, EVENT_DISTORTION);
     goto done;
   }
 
-  _set_event(this, EVENT_SETTLED);
+  if(_state(this) != SUBFLOW_STATE_STABLE){
+    _set_event(this, EVENT_SETTLED);
+    goto done;
+  }
+  if(_qtrend_probe_th(this) < MAX(_q125(this), _q250(this))){
+    goto done;
+  }
+
   _setup_monitoring(this);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
 done:
@@ -728,6 +733,7 @@ _fire(
         case EVENT_CONGESTION:
         break;
         case EVENT_SETTLED:
+          this->last_settled = _now(this);
           mprtps_path_set_non_congested(this->path);
           _transit_state_to(this, SUBFLOW_STATE_STABLE);
         break;
@@ -763,6 +769,7 @@ _fire(
           _transit_state_to(this, SUBFLOW_STATE_OVERUSED);
         break;
         case EVENT_READY:
+
           _transit_state_to(this, SUBFLOW_STATE_STABLE);
         break;
         case EVENT_FI:
@@ -784,6 +791,7 @@ void _switch_stage_to(
 {
   switch(target){
      case STAGE_KEEP:
+       this->last_settled = _now(this);
        this->stage_fnc = _keep_stage;
      break;
      case STAGE_REDUCE:

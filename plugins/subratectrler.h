@@ -74,6 +74,7 @@ struct _SubflowRateController
   gint32                    target_bitrate;
   gint32                    target_bitrate_t1;
   GstClockTime              last_decrease;
+  GstClockTime              last_settled;
   GstClockTime              last_increase;
   gint32                    consecutive_distortion;
 

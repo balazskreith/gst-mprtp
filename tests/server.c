@@ -583,7 +583,7 @@ main (int argc, char **argv)
 
   rtpBin = gst_element_factory_make ("rtpbin", NULL);
   g_object_set (rtpBin, "rtp-profile", GST_RTP_PROFILE_AVPF, NULL);
-//  g_object_set (rtpBin, "buffer-mode", "none", NULL);
+  g_object_set (rtpBin, "buffer-mode", "buffer", NULL);
 
   gst_bin_add (GST_BIN (pipe), rtpBin);
 

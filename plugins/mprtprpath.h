@@ -88,22 +88,6 @@ struct _OWDRunningLengthEncoding{
   GstClockTime        step_interval;
 };
 
-typedef struct _SkewRunningLengthEncodingBlock SkewRLEBlock;
-struct _SkewRunningLengthEncodingBlock{
-  guint16      start_seq;
-  guint16      end_seq;
-  GstClockTime median_delay;
-};
-
-typedef struct _SkewRunningLengthEncoding SkewRLE;
-struct _SkewRunningLengthEncoding{
-  SkewRLEBlock        blocks[MPRTP_PLUGIN_MAX_RLE_LENGTH];
-  guint               write_index;
-  guint               read_index;
-  GstClockTime        last_step;
-  GstClockTime        step_interval;
-};
-
 
 struct _MpRTPReceiverPath
 {
@@ -131,19 +115,11 @@ struct _MpRTPReceiverPath
   OWDRLE              owd_rle;
   LostsRLE            losts_rle;
   DiscardRLE          discard_rle;
-  SkewRLE             skew_rle;
 
   guint32             total_packet_losts;
   guint32             total_packets_received;
   guint32             last_rtp_timestamp;
 
-
-  GQueue* actual_group;
-  guint32 actual_bytes_sum;
-  struct{
-    gdouble rcv_avg;
-    gdouble snd_avg;
-  }group_t1,group_t2;
 
   gdouble             path_skew;
   GstClockTime        last_mprtp_delay;

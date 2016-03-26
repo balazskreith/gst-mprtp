@@ -33,8 +33,6 @@ G_DEFINE_TYPE (MpRTPRPath, mprtpr_path, G_TYPE_OBJECT);
 #define _actual_lostrle(this) ((LostsRLEBlock*)(this->losts_rle.blocks + this->losts_rle.write_index))
 #define _owdrle(this) this->owd_rle
 #define _actual_owdrle(this) ((OWDRLEBlock*)(this->owd_rle.blocks + this->owd_rle.write_index))
-#define _skewrle(this) this->skew_rle
-#define _actual_skewrle(this) ((SkewRLEBlock*)(this->skew_rle.blocks + this->skew_rle.write_index))
 
 
 static void mprtpr_path_finalize (GObject * object);
@@ -475,12 +473,6 @@ void mprtpr_path_add_delay(MpRTPRPath *this, GstClockTime delay)
   THIS_WRITEUNLOCK (this);
 }
 
-typedef struct{
-  guint64 rcv;
-  guint64 snd;
-  guint32 bytes;
-}ActualData;
-
 void
 mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
 {
@@ -527,46 +519,10 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
       numstracker_add(this->gaps, seq);
     }
   }else{
-    if(!this->actual_group){
-      this->actual_group = g_queue_new();
-    }
     //packet is in order
     if(this->last_rtp_timestamp != mprtp->timestamp){
-      ActualData *data;
-      gdouble skew2;
-
-      this->group_t2.rcv_avg = this->group_t1.rcv_avg;
-      this->group_t2.snd_avg = this->group_t1.snd_avg;
-      this->group_t1.rcv_avg = 0;
-      this->group_t1.snd_avg = 0;
-
-      while(!g_queue_is_empty(this->actual_group)){
-        gdouble weight;
-        data = g_queue_pop_head(this->actual_group);
-        weight = (gdouble) data->bytes / (gdouble) this->actual_bytes_sum;
-        this->group_t1.rcv_avg += (gdouble)data->rcv * weight;
-        this->group_t1.snd_avg += (gdouble)data->snd * weight;
-        g_print("this->group_t1.rcv_avg (%f) += data->rcv (%f) * weight (%f)\n", this->group_t1.rcv_avg, (gdouble)data->rcv, weight);
-        g_print("this->group_t1.snd_avg (%f) += data->snd (%f) * weight (%f)\n", this->group_t1.snd_avg, (gdouble)data->snd, weight);
-        mprtp_free(data);
-      }
-      this->actual_bytes_sum   = 0;
       this->last_rtp_timestamp = mprtp->timestamp;
-      skew2  = this->group_t1.rcv_avg - this->group_t2.rcv_avg;
-      g_print("A1: %f\n",this->group_t1.rcv_avg - this->group_t2.rcv_avg);
-      skew2 -= this->group_t1.snd_avg - this->group_t2.snd_avg;
-      g_print("A2: %f\n",this->group_t1.snd_avg - this->group_t2.snd_avg);
-      skew2  = get_epoch_time_from_ntp_in_ns(skew);
-      g_print("new kind of skew: %f\n", skew2);
       _add_skew(this, skew);
-    }else{
-      ActualData *data;
-      data = mprtp_malloc(sizeof(ActualData));
-      this->actual_bytes_sum += mprtp->payload_bytes;
-      data->bytes = mprtp->payload_bytes;
-      data->rcv   = mprtp->abs_rcv_ntp_time;
-      data->snd   = mprtp->abs_snd_ntp_time;
-      g_queue_push_tail(this->actual_group, data);
     }
   }
 
@@ -575,6 +531,10 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   }
 
   this->highest_seq = mprtp->subflow_seq;
+  if(this->last_rtp_timestamp == mprtp->timestamp)
+    goto done;
+
+  this->last_rtp_timestamp = mprtp->timestamp;
 
 done:
   _refresh_RLEBlock(this);
@@ -616,11 +576,11 @@ void _add_delay(MpRTPRPath *this, GstClockTime delay)
 
 void _add_skew(MpRTPRPath *this, gint64 skew)
 {
-  GstClockTime median_skew;
+  gint64 median_skew;
   percentiletracker2_add(this->skews, skew);
   median_skew = percentiletracker2_get_stats(this->skews, NULL, NULL, NULL);
-  _actual_skewrle(this)->median_delay = median_skew;
   this->path_skew = this->path_skew * .99 + (gdouble) median_skew * .01;
+  mprtp_logger("skews.csv", "%ld,%ld,%f\n", skew, median_skew,this->path_skew);
 }
 
 void _refresh_RLEBlock(MpRTPRPath *this)
@@ -686,17 +646,6 @@ void _refresh_RLE(MpRTPRPath *this)
     rle->last_step=_now(this);
     block = _actual_owdrle(this);
     memset(block, 0, sizeof(OWDRLEBlock));
-    block->start_seq = block->end_seq = this->highest_seq;
-  }
-
-  if(_skewrle(this).last_step < _now(this) - _skewrle(this).step_interval){
-    SkewRLE *rle;
-    SkewRLEBlock *block;
-    rle = &_skewrle(this);
-    if(++rle->write_index == MPRTP_PLUGIN_MAX_RLE_LENGTH) rle->write_index = 0;
-    rle->last_step=_now(this);
-    block = _actual_skewrle(this);
-    memset(block, 0, sizeof(SkewRLEBlock));
     block->start_seq = block->end_seq = this->highest_seq;
   }
 

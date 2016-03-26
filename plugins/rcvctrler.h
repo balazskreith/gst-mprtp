@@ -50,9 +50,12 @@ struct _RcvController
   gboolean          rfc3611_enabled;
   ReportProducer*   report_producer;
   ReportProcessor*  report_processor;
+
   FECDecoder*       fecdecoder;
-  guint32           fecdecoder_early_repaired_bytes;
-  guint32           fecdecoder_total_repaired_bytes;
+  guint32           fecdecoder_early_repaired_bytes[10];
+  guint32           fecdecoder_total_repaired_bytes[10];
+  guint32           fecdecoder_total_lost_bytes[10];
+  gint32            fecdecoder_index;
   gboolean          enabled;
 
 

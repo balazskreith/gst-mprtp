@@ -135,7 +135,7 @@ fecdecoder_init (FECDecoder * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain();
-  this->repair_window_max = 200 * GST_MSECOND;
+  this->repair_window_max = 300 * GST_MSECOND;
   this->repair_window_min = 10 * GST_MSECOND;
 }
 
@@ -147,7 +147,10 @@ void fecdecoder_reset(FECDecoder *this)
   THIS_WRITEUNLOCK(this);
 }
 
-void fecdecoder_get_stat(FECDecoder *this, guint32 *early_repaired_bytes, guint32 *total_repaired_bytes)
+void fecdecoder_get_stat(FECDecoder *this,
+                         guint32 *early_repaired_bytes,
+                         guint32 *total_repaired_bytes,
+                         guint32 *total_lost_bytes)
 {
   THIS_READLOCK(this);
   if(early_repaired_bytes){
@@ -156,6 +159,10 @@ void fecdecoder_get_stat(FECDecoder *this, guint32 *early_repaired_bytes, guint3
 
   if(total_repaired_bytes){
     *total_repaired_bytes = this->total_repaired_bytes;
+  }
+
+  if(total_lost_bytes){
+    *total_lost_bytes = this->total_lost_bytes;
   }
   THIS_READUNLOCK(this);
 }
@@ -168,13 +175,14 @@ FECDecoder *make_fecdecoder(void)
   return this;
 }
 
-void fecdecoder_request_repair(FECDecoder *this, guint16 seq)
+void fecdecoder_request_repair(FECDecoder *this, guint16 seq, guint payload_bytes)
 {
   FECDecoderRequest *request;
   THIS_WRITELOCK(this);
   request = mprtp_malloc(sizeof(FECDecoderRequest));
-  request->added   = _now(this);
-  request->seq_num = seq;
+  request->added         = _now(this);
+  request->seq_num       = seq;
+  request->payload_bytes = payload_bytes;
   this->requests   = g_list_prepend(this->requests, request);
   THIS_WRITEUNLOCK(this);
 }
@@ -295,6 +303,7 @@ void fecdecoder_clean(FECDecoder *this)
     FECDecoderRequest *request;
     request = it->data;
     if(request->added < now - this->repair_window_max){
+      this->total_lost_bytes+=request->payload_bytes;
       mprtp_free(request);
       continue;
     }

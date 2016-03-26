@@ -1177,7 +1177,7 @@ again:
   if(mprtp->abs_seq != this->expected_seq){
     if(_cmp_seq(this->expected_seq, mprtp->abs_seq) < 0){
       for(; this->expected_seq != mprtp->abs_seq; ++this->expected_seq){
-        fecdecoder_request_repair(this->fec_decoder, this->expected_seq);
+        fecdecoder_request_repair(this->fec_decoder, this->expected_seq, mprtp->payload_bytes);
       }
       ++this->expected_seq;
     }

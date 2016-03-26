@@ -113,10 +113,13 @@ then
   chmod 777 scripts/auto_rep_generator.sh
 
 elif [ "$TESTCASE" -eq 1 ]; then
-  DURATION=120
-  echo "./scripts/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input scripts/test1_veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
 
-  chmod 777 scripts/test_bw_veth0_snd.sh  
+ #setup duration
+  DURATION=120
+  
+  #setup virtual ethernet interface controller script
+  echo "./scripts/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input scripts/test1_veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
+  chmod 777 scripts/test_bw_veth0_snd.sh
 
   #start client and server
   sudo ip netns exec $NSRCV $CLIENT "--profile="$RPROFILE 2> $LOGSDIR"/"client.log &
@@ -127,6 +130,51 @@ elif [ "$TESTCASE" -eq 1 ]; then
   #run a virtual ethernet interface controller script
   sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
 
+  echo "
+  while true; do 
+    ./scripts/plots_generator.sh --testcase $TESTCASE --srcdir $LOGSDIR --dstdir $REPORTSDIR
+    mv $LOGSDIR/ccparams_1.log $REPORTSDIR/ccparams_1.log
+    ./scripts/test1_report.sh --srcdir $REPORTSDIR --author $REPORTAUTHORFILE --dst $REPORTEXFILE
+    ./scripts/pdflatex.sh $REPORTEXFILE
+    mv $REPORTPDF $REPORTSDIR/$REPORTPDF
+    sleep $REPPERIOD
+  done
+
+  " > scripts/auto_rep_generator.sh
+
+  chmod 777 scripts/auto_rep_generator.sh
+
+elif [ "$TESTCASE" -eq 2 ]; then
+
+ #setup duration
+  DURATION=120
+  
+  #setup virtual ethernet interface controller script
+  echo "./scripts/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input scripts/test2_veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
+  chmod 777 scripts/test_bw_veth0_snd.sh
+
+  #start client and server
+  sudo ip netns exec $NSRCV $CLIENT "--profile="$RPROFILE 2> $LOGSDIR"/"client.log &
+  sleep 1
+  sudo ip netns exec $NSSND $SERVER "--profile="$RPROFILE 2> $LOGSDIR"/"server.log &
+
+  sleep 1
+  #run a virtual ethernet interface controller script
+  sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
+
+  echo "
+  while true; do 
+    ./scripts/plots_generator.sh --testcase $TESTCASE --srcdir $LOGSDIR --dstdir $REPORTSDIR
+    mv $LOGSDIR/ccparams_1.log $REPORTSDIR/ccparams_1.log
+    ./scripts/test1_report.sh --srcdir $REPORTSDIR --author $REPORTAUTHORFILE --dst $REPORTEXFILE
+    ./scripts/pdflatex.sh $REPORTEXFILE
+    mv $REPORTPDF $REPORTSDIR/$REPORTPDF
+    sleep $REPPERIOD
+  done
+
+  " > scripts/auto_rep_generator.sh
+
+  chmod 777 scripts/auto_rep_generator.sh
 fi
 
 

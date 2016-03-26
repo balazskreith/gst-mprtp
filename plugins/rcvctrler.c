@@ -300,20 +300,30 @@ _logging (RcvController *this)
   mprtp_logger(main_file,"%f,%d\n", playout_delay,playout_buffer_len);
 
   {
-    guint32 fecdecoder_early_repaired_bytes, fecdecoder_total_repaired_bytes;
-    gdouble fecdecoder_ratio;
+    guint32 fecdecoder_early_repaired_bytes, fecdecoder_total_repaired_bytes, fecdecoder_total_lost_bytes;
+    gdouble fecdecoder_early_ratio, fecdecoder_recovered_ratio;
 
-    fecdecoder_get_stat(this->fecdecoder, &fecdecoder_early_repaired_bytes, &fecdecoder_total_repaired_bytes);
+    fecdecoder_get_stat(this->fecdecoder,
+                        &fecdecoder_early_repaired_bytes,
+                        &fecdecoder_total_repaired_bytes,
+                        &fecdecoder_total_lost_bytes);
 
-    fecdecoder_ratio = !fecdecoder_total_repaired_bytes ? 0. : (gdouble) fecdecoder_early_repaired_bytes / (gdouble) fecdecoder_total_repaired_bytes;
+    this->fecdecoder_early_repaired_bytes[this->fecdecoder_index] = fecdecoder_early_repaired_bytes;
+    this->fecdecoder_total_repaired_bytes[this->fecdecoder_index] = fecdecoder_total_repaired_bytes;
+    this->fecdecoder_total_lost_bytes[this->fecdecoder_index]     = fecdecoder_total_lost_bytes;
+    this->fecdecoder_index = (this->fecdecoder_index + 1) % 10;
 
+    fecdecoder_early_ratio     = !fecdecoder_total_repaired_bytes ? 0. : (gdouble) fecdecoder_early_repaired_bytes / (gdouble) fecdecoder_total_repaired_bytes;
+    fecdecoder_recovered_ratio = !fecdecoder_total_lost_bytes     ? 0. : (gdouble) (fecdecoder_total_repaired_bytes - fecdecoder_early_repaired_bytes) / (gdouble)fecdecoder_total_lost_bytes;
     mprtp_logger("fecdec_stat.csv",
-                 "%u,%u,%f\n",
-                 fecdecoder_early_repaired_bytes - this->fecdecoder_early_repaired_bytes,
-                 fecdecoder_total_repaired_bytes - this->fecdecoder_total_repaired_bytes,
-                 fecdecoder_ratio);
-    this->fecdecoder_early_repaired_bytes = fecdecoder_early_repaired_bytes;
-    this->fecdecoder_total_repaired_bytes = fecdecoder_total_repaired_bytes;
+                 "%u,%u,%u,%f,%f\n",
+                 (fecdecoder_early_repaired_bytes - this->fecdecoder_early_repaired_bytes[this->fecdecoder_index]) / 125,
+                 (fecdecoder_total_repaired_bytes - this->fecdecoder_total_repaired_bytes[this->fecdecoder_index]) / 125,
+                 (fecdecoder_total_lost_bytes     - this->fecdecoder_total_lost_bytes[this->fecdecoder_index]) / 125,
+                 fecdecoder_early_ratio,
+                 fecdecoder_recovered_ratio);
+
+
   }
 done:
   return;

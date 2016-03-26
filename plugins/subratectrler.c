@@ -585,7 +585,7 @@ _keep_stage(
   if(congestion){
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    _disable_controlling(this);
+//    _disable_controlling(this);
     target_rate = MIN(_RR(this) * .85, _TR(this) * _UF(this));
     goto done;
   }
@@ -636,7 +636,7 @@ _probe_stage(
 
 
   if(congestion){
-    _disable_monitoring(this);
+//    _disable_monitoring(this);
     _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
@@ -692,7 +692,7 @@ _increase_stage(
   target_rate = this->target_bitrate;
 
   if(congestion){
-    _disable_controlling(this);
+//    _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     target_rate = MIN(_RR(this) * .85, _TR(this) * _UF(this));

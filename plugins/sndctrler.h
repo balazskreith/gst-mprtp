@@ -60,6 +60,7 @@ struct _SndController
   gboolean                   enabled;
 
   FECEncoder*                fecencoder;
+  guint32                    fec_sum_bitrate;
 };
 
 struct _SndControllerClass{

@@ -157,7 +157,7 @@ PacketsSndQueue *make_packetssndqueue(void)
 void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_bitrate, gboolean pacing)
 {
   THIS_WRITELOCK(this);
-  this->target_rate         = target_bitrate>>3;
+  this->target_byterate         = target_bitrate>>3;
   switch(this->state){
     case PACKETSSNDQUEUE_PACING_DEACTIVE:
       if(!pacing){
@@ -166,7 +166,7 @@ void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_bitrate, gboolea
       this->pacing_started      = _now(this);
       this->pacing              = TRUE;
       this->state               = PACKETSSNDQUEUE_PACING_ACTIVE;
-      this->allowed_bytes_per_ms = this->target_rate / 1000;
+      this->allowed_bytes_per_ms = this->target_byterate / 1000;
       break;
     case PACKETSSNDQUEUE_PACING_ACTIVE:
       if(pacing){
@@ -175,7 +175,7 @@ void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_bitrate, gboolea
       this->pacing_ended        = _now(this);
       this->pacing              = TRUE;
       this->state               = PACKETSSNDQUEUE_PACING_DEACTIVATED;
-      this->allowed_bytes_per_ms = this->target_rate / 1000;
+      this->allowed_bytes_per_ms = this->target_byterate / 1000;
       break;
     case PACKETSSNDQUEUE_PACING_DEACTIVATED:
       if(!pacing){
@@ -184,7 +184,7 @@ void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_bitrate, gboolea
       this->pacing_started      = _now(this);
       this->pacing              = TRUE;
       this->state               = PACKETSSNDQUEUE_PACING_ACTIVE;
-      this->allowed_bytes_per_ms = this->target_rate / 1000;
+      this->allowed_bytes_per_ms = this->target_byterate / 1000;
       break;
     default:
     break;
@@ -203,7 +203,7 @@ void packetssndqueue_approve(PacketsSndQueue *this)
   if(this->state != PACKETSSNDQUEUE_PACING_DEACTIVATED){
     goto done;
   }
-  if(this->bytes < this->target_rate * .1){
+  if(this->bytes < this->target_byterate * .1){
     this->pacing = FALSE;
     this->state  = PACKETSSNDQUEUE_PACING_DEACTIVE;
     goto done;
@@ -267,6 +267,26 @@ again:
     result = _packetssndqueue_rem(this);
     goto done;
   }
+  //Todo check automatic skip
+  //automatic skip here.
+  if(0 < this->skip_interval && this->frame_tick % this->skip_interval == 0){
+      GstBuffer *buf;
+      guint32 first_timestamp, actual_timestamp;
+      actual_timestamp = first_timestamp = this->items[this->items_read_index].timestamp;
+      while(actual_timestamp == first_timestamp && 0 < this->counter){
+        buf = _packetssndqueue_rem(this);
+        if(!buf){
+          continue;
+        }
+        this->expected_lost = TRUE;
+        gst_buffer_unref(buf);
+        ++this->logged_drops;
+        actual_timestamp = this->items[this->items_read_index].timestamp;
+      }
+      ++this->frame_tick;
+      goto again;
+  }
+
   if(this->items[this->items_read_index].added < _now(this) - this->obsolation_treshold){
       GstBuffer *buf;
       buf = _packetssndqueue_rem(this);
@@ -278,6 +298,7 @@ again:
   if(this->approved_bytes < this->items[this->items_read_index].size){
     goto done;
   }
+  ++this->frame_tick;
   this->last_timestamp  = this->items[this->items_read_index].timestamp;
   this->approved_bytes -= this->items[this->items_read_index].size;
   result = _packetssndqueue_rem(this);
@@ -294,16 +315,29 @@ void _packetssndqueue_add(PacketsSndQueue *this, GstBuffer *buffer)
   {
     GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
     guint payload_len;
+    guint packet_len;
     gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
-    this->items[this->items_write_index].size = payload_len = gst_rtp_buffer_get_payload_len(&rtp);
+    payload_len = gst_rtp_buffer_get_payload_len(&rtp);
+    //Fixme: Decide what we need. with or without header length
+    packet_len = payload_len; // + 48; /*48 = IP + UDP + RTP fixed + MPRTP header + Abs time header*/
+
+    this->items[this->items_write_index].size = packet_len;
     this->items[this->items_write_index].timestamp = gst_rtp_buffer_get_timestamp(&rtp);
     gst_rtp_buffer_unmap(&rtp);
 
-    numstracker_add(this->incoming_bytes, payload_len);
+    numstracker_add(this->incoming_bytes, packet_len);
   }
   this->items[this->items_write_index].buffer = gst_buffer_ref(buffer);
   ++this->counter;
   this->bytes+=this->items[this->items_write_index].size;
+
+  if(this->target_byterate *.2 < this->bytes){
+    //Todo check automatic skip
+//      this->skip_interval = CONSTRAIN(2, 5, this->target_byterate / this->bytes);
+      this->skip_interval = 0;
+  }else{
+    this->skip_interval = 0;
+  }
 
   if(++this->items_write_index == PACKETSSNDQUEUE_MAX_ITEMS_NUM){
     this->items_write_index = 0;

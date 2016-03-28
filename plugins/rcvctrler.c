@@ -82,6 +82,7 @@ struct _Subflow
   GstClockTime                  LRR;
 
   gchar                        *logfile;
+  gchar                        *statfile;
 
   guint32                       discarded_bytes[10];
   guint                         discarded_bytes_index;
@@ -90,7 +91,16 @@ struct _Subflow
   guint                         rcvd_bytes_index;
   guint32                       rcvd_bytes_window;
 
+  guint32                       expected_window;
+  guint32                       expected[10];
+  guint                         expected_index;
+
+  guint32                       losts_window;
+  guint32                       losts[10];
+  guint                         losts_index;
+
 };
+
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
@@ -256,18 +266,24 @@ _logging (RcvController *this)
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     guint32 rcvd_bytes;
     guint32 discarded_bytes;
+    guint32 total_lost;
+    guint16 HSN;
+    gdouble fraction_lost;
+
     subflow = (Subflow *) val;
     if(!subflow->logfile){
       subflow->logfile = g_malloc0(255);
       sprintf(subflow->logfile, "sub_%d_rcv.csv", subflow->id);
+      subflow->statfile = g_malloc0(255);
+      sprintf(subflow->statfile, "sub_%d_stat.csv", subflow->id);
     }
 
     mprtpr_path_get_RR_stats(subflow->path,
-                             NULL,
+                             &HSN,
                              NULL,
                              &jitter,
                              NULL,
-                             NULL,
+                             &total_lost,
                              &rcvd_bytes);
 
     subflow->rcvd_bytes_window = subflow->rcvd_bytes[subflow->rcvd_bytes_index] = rcvd_bytes;
@@ -294,34 +310,48 @@ _logging (RcvController *this)
             GST_TIME_AS_USECONDS(median_delay),
             GST_TIME_AS_USECONDS(jitter));
 
+    subflow->expected_window      = subflow->expected[subflow->expected_index] = HSN;
+    if(++subflow->expected_index == 10) { subflow->expected_index = 0; }
+    subflow->expected_window      = _uint32_diff(subflow->expected[subflow->expected_index], subflow->expected_window);
+
+    subflow->losts_window      = subflow->losts[subflow->losts_index] = total_lost;
+    if(++subflow->losts_index == 10) { subflow->losts_index = 0; }
+    subflow->losts_window      = _uint32_diff(subflow->losts[subflow->losts_index], subflow->losts_window);
+
+    fraction_lost              = !subflow->expected_window ? 0. : (gdouble) subflow->losts_window / (gdouble) subflow->expected_window;
+
+    mprtp_logger(subflow->statfile,
+                 "%u,%f,%u\n",
+                 subflow->rcvd_bytes_window - subflow->discarded_bytes_window,
+                 fraction_lost,
+                 subflow->losts_window);
+
   }
 
   stream_joiner_get_stats(this->joiner, &playout_delay, &playout_buffer_len);
   mprtp_logger(main_file,"%f,%d\n", playout_delay,playout_buffer_len);
 
   {
-    guint32 fecdecoder_early_repaired_bytes, fecdecoder_total_repaired_bytes, fecdecoder_total_lost_bytes;
-    gdouble fecdecoder_early_ratio, fecdecoder_recovered_ratio;
+    guint32 fecdecoder_early_repaired_bytes, fecdecoder_total_repaired_bytes;
+    gdouble fecdecoder_early_ratio, FFRE;
 
     fecdecoder_get_stat(this->fecdecoder,
                         &fecdecoder_early_repaired_bytes,
                         &fecdecoder_total_repaired_bytes,
-                        &fecdecoder_total_lost_bytes);
+                        &FFRE);
 
     this->fecdecoder_early_repaired_bytes[this->fecdecoder_index] = fecdecoder_early_repaired_bytes;
     this->fecdecoder_total_repaired_bytes[this->fecdecoder_index] = fecdecoder_total_repaired_bytes;
-    this->fecdecoder_total_lost_bytes[this->fecdecoder_index]     = fecdecoder_total_lost_bytes;
     this->fecdecoder_index = (this->fecdecoder_index + 1) % 10;
 
     fecdecoder_early_ratio     = !fecdecoder_total_repaired_bytes ? 0. : (gdouble) fecdecoder_early_repaired_bytes / (gdouble) fecdecoder_total_repaired_bytes;
-    fecdecoder_recovered_ratio = !fecdecoder_total_lost_bytes     ? 0. : (gdouble) (fecdecoder_total_repaired_bytes - fecdecoder_early_repaired_bytes) / (gdouble)fecdecoder_total_lost_bytes;
     mprtp_logger("fecdec_stat.csv",
-                 "%u,%u,%u,%f,%f\n",
+                 "%u,%u,%f,%f\n",
                  (fecdecoder_early_repaired_bytes - this->fecdecoder_early_repaired_bytes[this->fecdecoder_index]) / 125,
                  (fecdecoder_total_repaired_bytes - this->fecdecoder_total_repaired_bytes[this->fecdecoder_index]) / 125,
-                 (fecdecoder_total_lost_bytes     - this->fecdecoder_total_lost_bytes[this->fecdecoder_index]) / 125,
                  fecdecoder_early_ratio,
-                 fecdecoder_recovered_ratio);
+                 FFRE
+                 );
 
 
   }
@@ -502,17 +532,24 @@ _orp_main(RcvController * this)
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
-    subflow = (Subflow *) val;
+    GstClockTime elapsed;
+    subflow  = (Subflow *) val;
     ricalcer = subflow->ricalcer;
+    elapsed  = GST_TIME_AS_MSECONDS(_now(this) - subflow->LRR);
+
+    //logging the intervals
+    memset(logfile, 0, 255);
+    sprintf(logfile, "sub_%d_rtcp_ints.csv", subflow->id);
+
     if(mprtpr_path_request_urgent_report(subflow->path)){
       ricalcer_urgent_report_request(ricalcer);
     }
 
     if(!ricalcer_do_report_now(ricalcer)){
+      mprtp_logger(logfile, "%lu,%lu\n", 0, elapsed);
       continue;
     }
-    memset(logfile, 0, 255);
-    sprintf(logfile, "rtcp_rr_%d.csv", subflow->id);
+
 
     report_producer_begin(this->report_producer, subflow->id);
     _orp_add_rr(this, subflow);
@@ -532,15 +569,18 @@ _orp_main(RcvController * this)
 
     mprtpr_path_set_chunks_reported(subflow->path);
 
-    mprtp_logger(logfile, "%lu,%d\n", GST_TIME_AS_MSECONDS(_now(this) - subflow->LRR), report_length);
-    subflow->LRR = _now(this);
-
     subflow->avg_rtcp_size += (report_length - subflow->avg_rtcp_size) / 4.;
     this->send_mprtcp_packet_func (this->send_mprtcp_packet_data, buffer);
 
     ricalcer_refresh_parameters(ricalcer,
                                 MIN_MEDIA_RATE,
                                 subflow->avg_rtcp_size);
+
+
+    mprtp_logger(logfile, "%lu,%lu\n", elapsed, elapsed);
+    subflow->LRR = _now(this);
+
+
   }
 
   DISABLE_LINE _uint16_diff(0,0);

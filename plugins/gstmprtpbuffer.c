@@ -95,8 +95,8 @@ void gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
   mprtp->fec_packet   = mprtp->payload_type == fec_payload_type;
   size=0;
   pointer = NULL;
-  if(gst_rtp_buffer_get_extension_onebyte_header(
-      &rtp, abs_time_ext_header_id, 0, &pointer, &size))
+  if(0 < abs_time_ext_header_id &&
+     gst_rtp_buffer_get_extension_onebyte_header(&rtp, abs_time_ext_header_id, 0, &pointer, &size))
   {
     guint32 rcv_chunk = (NTP_NOW >> 14) & 0x00ffffff;
     guint64 ntp_base = NTP_NOW;

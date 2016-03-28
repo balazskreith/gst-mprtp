@@ -77,7 +77,7 @@ static FECDecoderItem * _find_item_by_seq(GList *items, guint16 seq);
 static FECDecoderItem * _take_item_by_seq(GList **items, guint16 seq);
 static FECDecoderRequest * _find_request_by_seq(FECDecoder *this, guint16 seq);
 static void _remove_from_request(FECDecoder *this, FECDecoderRequest *request);
-static void _segment_dtor(FECDecoderSegment *segment);
+static void _segment_dtor(FECDecoder *this, FECDecoderSegment *segment);
 static FECDecoderSegment* _segment_ctor(void);
 static FECDecoderItem* _make_item(FECDecoder *this, GstMpRTPBuffer *mprtp);
 
@@ -150,7 +150,7 @@ void fecdecoder_reset(FECDecoder *this)
 void fecdecoder_get_stat(FECDecoder *this,
                          guint32 *early_repaired_bytes,
                          guint32 *total_repaired_bytes,
-                         guint32 *total_lost_bytes)
+                         gdouble *FFRE)
 {
   THIS_READLOCK(this);
   if(early_repaired_bytes){
@@ -161,9 +161,15 @@ void fecdecoder_get_stat(FECDecoder *this,
     *total_repaired_bytes = this->total_repaired_bytes;
   }
 
-  if(total_lost_bytes){
-    *total_lost_bytes = this->total_lost_bytes;
+  //frames recovery efficiency
+  if(FFRE){
+    if(!this->recovered && !this->lost){
+      *FFRE = 0.;
+    }else{
+      *FFRE = (gdouble)this->recovered / (gdouble)(this->recovered + this->lost);
+    }
   }
+
   THIS_READUNLOCK(this);
 }
 
@@ -175,14 +181,13 @@ FECDecoder *make_fecdecoder(void)
   return this;
 }
 
-void fecdecoder_request_repair(FECDecoder *this, guint16 seq, guint payload_bytes)
+void fecdecoder_request_repair(FECDecoder *this, guint16 seq)
 {
   FECDecoderRequest *request;
   THIS_WRITELOCK(this);
   request = mprtp_malloc(sizeof(FECDecoderRequest));
   request->added         = _now(this);
   request->seq_num       = seq;
-  request->payload_bytes = payload_bytes;
   this->requests   = g_list_prepend(this->requests, request);
   THIS_WRITEUNLOCK(this);
 }
@@ -218,6 +223,14 @@ void fecdecoder_set_payload_type(FECDecoder *this, guint8 payload_type)
 {
   THIS_WRITELOCK(this);
   this->payload_type = payload_type;
+  THIS_WRITEUNLOCK(this);
+}
+
+void fecdecoder_set_repair_window(FECDecoder *this, GstClockTime min, GstClockTime max)
+{
+  THIS_WRITELOCK(this);
+  this->repair_window_min = min;
+  this->repair_window_max = max;
   THIS_WRITEUNLOCK(this);
 }
 
@@ -303,7 +316,6 @@ void fecdecoder_clean(FECDecoder *this)
     FECDecoderRequest *request;
     request = it->data;
     if(request->added < now - this->repair_window_max){
-      this->total_lost_bytes+=request->payload_bytes;
       mprtp_free(request);
       continue;
     }
@@ -334,7 +346,7 @@ void fecdecoder_clean(FECDecoder *this)
     segment = it->data;
     if(segment->added < now - this->repair_window_max ||
        segment->complete){
-      _segment_dtor(segment);
+      _segment_dtor(this, segment);
       continue;
     }
     new_list = g_list_prepend(new_list, segment);
@@ -502,8 +514,15 @@ void _remove_from_request(FECDecoder *this, FECDecoderRequest *request)
   this->requests = g_list_remove(this->requests, request);
 }
 
-void _segment_dtor(FECDecoderSegment *segment)
+void _segment_dtor(FECDecoder *this, FECDecoderSegment *segment)
 {
+  if(!segment->complete){
+    if(segment->repaired){
+      ++this->recovered;
+    }else{
+      this->lost+=segment->missing;
+    }
+  }
   if(segment->items){
     g_list_free_full(segment->items, mprtp_free);
   }

@@ -119,6 +119,7 @@ enum
   PROP_SET_SENDING_TARGET,
   PROP_INITIAL_DISABLING,
   PROP_KEEP_ALIVE_PERIOD,
+  PROP_FEC_INTERVAL,
   PROP_LOG_ENABLED,
   PROP_SUBFLOWS_STATS,
 };
@@ -275,6 +276,20 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "set a keep-alive period for subflow",
           "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the period in ms",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_FEC_INTERVAL,
+      g_param_spec_uint ("fec-interval",
+          "Set a stable FEC interval applied on the media stream",
+          "The property value other than 0 request a FEC protection after a specified packet was sent. "
+          "The newly created FEC packet is going to be sent on the path actually selected if the plugin uses multipath.",
+          0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  //TODO: Implement this
+//  g_object_class_install_property (gobject_class, PROP_MULTIPATH_FEC_FILTERING,
+//      g_param_spec_boolean ("mpath-fec-filtering",
+//          "Enables a filtering on FEC protection based on path states.",
+//          "Enables a filtering on FEC protection based on path states.",
+//          FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_INITIAL_DISABLING,
       g_param_spec_uint64 ("initial-disabling",
@@ -482,6 +497,17 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       _change_auto_rate_and_cc (this, gboolean_value);
       THIS_WRITEUNLOCK (this);
       break;
+      //Todo: implement this
+//    case PROP_MULTIPATH_FEC_FILTERING:
+//      THIS_WRITELOCK (this);
+//      this->mpath_fec_filtering = g_value_get_boolean (value);
+//      THIS_WRITEUNLOCK (this);
+//      break;
+    case PROP_FEC_INTERVAL:
+      THIS_WRITELOCK (this);
+      this->fec_interval = g_value_get_uint (value);
+      THIS_WRITEUNLOCK (this);
+      break;
     case PROP_SET_SENDING_TARGET:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
@@ -572,6 +598,17 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
       THIS_READLOCK (this);
       g_value_set_string (value,
           gst_structure_to_string (_collect_infos (this)));
+      THIS_READUNLOCK (this);
+      break;
+      //Todo: implement this
+//    case PROP_MULTIPATH_FEC_FILTERING:
+//      THIS_READLOCK (this);
+//      g_value_set_boolean (value, this->mpath_fec_filtering);
+//      THIS_READUNLOCK (this);
+//      break;
+    case PROP_FEC_INTERVAL:
+      THIS_READLOCK (this);
+      g_value_set_uint (value, (guint) this->fec_interval);
       THIS_READUNLOCK (this);
       break;
     default:
@@ -1086,9 +1123,7 @@ again:
   if(!buffer) {
     goto done;
   }
-//  if(1 < buffer->mini_object.refcount){
-//    gst_buffer_unref(buffer);
-//  }
+  ++this->sent_packets;
   buffer = gst_buffer_make_writable (buffer);
   path = stream_splitter_get_next_path(this->splitter, buffer);
   if(!path){
@@ -1100,8 +1135,9 @@ again:
   fec_request |= mprtps_path_request_keep_alive(path);
 
   _setup_timestamp(this, buffer);
-  if(this->auto_rate_and_cc){
+  if(this->auto_rate_and_cc || 0 < this->fec_interval){
     fecencoder_add_rtpbuffer(this->fec_encoder, buffer);
+    fec_request |= (0 < this->fec_interval) && (this->sent_packets % this->fec_interval == 0);
     if(fec_request){
       rtpfecbuf = fecencoder_get_fec_packet(this->fec_encoder);
       fecencoder_assign_to_subflow(this->fec_encoder,

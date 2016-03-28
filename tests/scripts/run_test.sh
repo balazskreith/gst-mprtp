@@ -86,7 +86,7 @@ then
   DURATION=350
   
   #setup virtual ethernet interface controller script
-  echo "./scripts/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input scripts/test0_veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
+  echo "./scripts/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input scripts/test0/veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
   chmod 777 scripts/test_bw_veth0_snd.sh
 
   #start client and server
@@ -100,9 +100,9 @@ then
 
   echo "
   while true; do 
-    ./scripts/plots_generator.sh --testcase $TESTCASE --srcdir $LOGSDIR --dstdir $REPORTSDIR
+    ./scripts/test0/plots.sh --testcase $TESTCASE --srcdir $LOGSDIR --dstdir $REPORTSDIR
     mv $LOGSDIR/ccparams_1.log $REPORTSDIR/ccparams_1.log
-    ./scripts/test0_report.sh --srcdir $REPORTSDIR --author $REPORTAUTHORFILE --dst $REPORTEXFILE
+    ./scripts/test0/report.sh --srcdir $REPORTSDIR --author $REPORTAUTHORFILE --dst $REPORTEXFILE
     ./scripts/pdflatex.sh $REPORTEXFILE
     mv $REPORTPDF $REPORTSDIR/$REPORTPDF
     sleep $REPPERIOD

@@ -37,6 +37,7 @@ typedef struct _FECDecoderSegment
   guint8               fecbitstring[GST_RTPFEC_PARITY_BYTES_MAX_LENGTH];
   gint16               fecbitstring_length;
   GList*               items;
+
 }FECDecoderSegment;
 
 typedef struct _FECDecoderItem
@@ -53,7 +54,6 @@ typedef struct _FECDecoderRequest
 {
   GstClockTime         added;
   guint16              seq_num;
-  guint                payload_bytes;
 }FECDecoderRequest;
 
 
@@ -73,6 +73,9 @@ struct _FECDecoder
   GList*                     segments;
   GList*                     items;
   GList*                     requests;
+
+  guint32                    lost;
+  guint32                    recovered;
 };
 
 
@@ -86,14 +89,15 @@ struct _FECDecoderClass{
 
 GType fecdecoder_get_type (void);
 FECDecoder *make_fecdecoder(void);
-void fecdecoder_request_repair(FECDecoder *this, guint16 seq, guint bytes);
+void fecdecoder_request_repair(FECDecoder *this, guint16 seq);
 void fecdecoder_reset(FECDecoder *this);
 void fecdecoder_get_stat(FECDecoder *this,
                          guint32 *early_repaired_bytes,
                          guint32 *total_repaired_bytes,
-                         guint32 *total_lost_bytes);
+                         gdouble *FFRE);
 gboolean fecdecoder_has_repaired_rtpbuffer(FECDecoder *this, GstBuffer** repairedbuf);
 void fecdecoder_set_payload_type(FECDecoder *this, guint8 fec_payload_type);
+void fecdecoder_set_repair_window(FECDecoder *this, GstClockTime min, GstClockTime max);
 void fecdecoder_add_rtp_packet(FECDecoder *this, GstMpRTPBuffer* buffer);
 void fecdecoder_add_fec_packet(FECDecoder *this, GstMpRTPBuffer *mprtp);
 void fecdecoder_clean(FECDecoder *this);

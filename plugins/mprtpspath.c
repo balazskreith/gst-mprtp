@@ -509,7 +509,7 @@ again:
   next_read_index = (packets->read_index + 1) % packets->length;
 
   if(packets->read_index == packets->sent_obsolation_index){
-    g_print("Sent bytes subtracted by %d at refresh process\n", item->payload_bytes);
+//    g_print("Sent bytes subtracted by %d at refresh process\n", item->payload_bytes);
     packets->sent_bytes_in_1s -= item->payload_bytes;
     packets->sent_obsolation_index = next_read_index;
   }

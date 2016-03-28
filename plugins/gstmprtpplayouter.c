@@ -127,6 +127,8 @@ enum
   PROP_FORCED_DELAY,
   PROP_LATENCY_DISCARD,
   PROP_LATENCY_LOST,
+  PROP_REPAIR_WINDOW_MIN,
+  PROP_REPAIR_WINDOW_MAX,
   PROP_LIVE_STREAM,
   PROP_PLAYOUT_HALT_TIME,
 
@@ -215,6 +217,18 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           "Set or get the id for the RTP extension",
           "Sets or gets the id for the extension header the MpRTP based on. The default is 3",
           0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_REPAIR_WINDOW_MIN,
+      g_param_spec_uint ("fec-repair-window-min",
+          "Set the repair window minimum treshold for FEC recovery",
+          "Set the repair window minimum treshold for FEC recovery",
+          0, 10000, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_REPAIR_WINDOW_MAX,
+      g_param_spec_uint ("fec-repair-window-max",
+          "Set the repair window maximum treshold for FEC recovery",
+          "Set the repair window maximum treshold for FEC recovery",
+          0, 10000, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_ABS_TIME_EXT_HEADER_ID,
       g_param_spec_uint ("abs-time-ext-header-id",
@@ -509,6 +523,18 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       _setup_paths(this);
       THIS_WRITEUNLOCK (this);
       break;
+    case PROP_REPAIR_WINDOW_MIN:
+      THIS_WRITELOCK (this);
+      this->repair_window_min = (GstClockTime) g_value_get_uint (value) * GST_MSECOND;
+      fecdecoder_set_repair_window(this->fec_decoder, this->repair_window_min, this->repair_window_max);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_REPAIR_WINDOW_MAX:
+      THIS_WRITELOCK (this);
+      this->repair_window_max = (GstClockTime) g_value_get_uint (value) * GST_MSECOND;
+      fecdecoder_set_repair_window(this->fec_decoder, this->repair_window_min, this->repair_window_max);
+      THIS_WRITEUNLOCK (this);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -594,6 +620,18 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
     case PROP_LATENCY_LOST:
       THIS_READLOCK (this);
       g_value_set_uint (value, this->lost_latency);
+      _setup_paths(this);
+      THIS_READUNLOCK (this);
+      break;
+    case PROP_REPAIR_WINDOW_MIN:
+      THIS_READLOCK (this);
+      g_value_set_uint (value, this->repair_window_min / GST_MSECOND);
+      _setup_paths(this);
+      THIS_READUNLOCK (this);
+      break;
+    case PROP_REPAIR_WINDOW_MAX:
+      THIS_READLOCK (this);
+      g_value_set_uint (value, this->repair_window_max / GST_MSECOND);
       _setup_paths(this);
       THIS_READUNLOCK (this);
       break;
@@ -1177,7 +1215,7 @@ again:
   if(mprtp->abs_seq != this->expected_seq){
     if(_cmp_seq(this->expected_seq, mprtp->abs_seq) < 0){
       for(; this->expected_seq != mprtp->abs_seq; ++this->expected_seq){
-        fecdecoder_request_repair(this->fec_decoder, this->expected_seq, mprtp->payload_bytes);
+        fecdecoder_request_repair(this->fec_decoder, this->expected_seq);
       }
       ++this->expected_seq;
     }

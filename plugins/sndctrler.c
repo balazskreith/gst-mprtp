@@ -260,7 +260,8 @@ sndctrler_init (SndController * this)
 
 static void _fec_rate_refresh_per_subflow(Subflow *subflow, gpointer data)
 {
-  FECEncoder *fecencoder = data;
+  SndController *this = data;
+  FECEncoder *fecencoder = this->fecencoder;
   guint32 sum_fec_bytes;
 
   fecencoder_get_stats(fecencoder, subflow->id, &sum_fec_bytes);
@@ -273,12 +274,13 @@ static void _fec_rate_refresh_per_subflow(Subflow *subflow, gpointer data)
   if(subflow->rate_controller){
     subratectrler_set_monitored_bitrate(subflow->rate_controller, subflow->fec_bitrate);
   }
-
+  this->fec_sum_bitrate+=subflow->fec_bitrate;
 }
 
 void _fec_rate_refresher(SndController *this)
 {
-  _subflow_iterator(this, _fec_rate_refresh_per_subflow, this->fecencoder);
+  this->fec_sum_bitrate = 0;
+  _subflow_iterator(this, _fec_rate_refresh_per_subflow, this);
 }
 
 void _logging (SndController *this)
@@ -326,11 +328,12 @@ void _logging (SndController *this)
     gint32 encoder_bitrate = 0;
     encoder_bitrate = packetssndqueue_get_encoder_bitrate(this->pacer);
     queue_bytes     = packetssndqueue_get_bytes_in_queue(this->pacer);
-    mprtp_logger(main_file,"%d,%d,%d,%d\n",
+    mprtp_logger(main_file,"%d,%d,%d,%d,%u\n",
                  media_rate / 1000,
                  media_target / 1000,
                  encoder_bitrate / 1000,
-                 queue_bytes / 125
+                 queue_bytes / 125,
+                 this->fec_sum_bitrate / 1000
                  );
   }
 

@@ -54,7 +54,6 @@ struct _RcvController
   FECDecoder*       fecdecoder;
   guint32           fecdecoder_early_repaired_bytes[10];
   guint32           fecdecoder_total_repaired_bytes[10];
-  guint32           fecdecoder_total_lost_bytes[10];
   gint32            fecdecoder_index;
   gboolean          enabled;
 

@@ -86,6 +86,9 @@ struct _GstMprtpplayouter
   guint           lost_latency;
   guint           discard_latency;
 
+  GstClockTime    repair_window_max;
+  GstClockTime    repair_window_min;
+
   GHashTable*     paths;
   StreamJoiner*   joiner;
   gboolean          logging;

@@ -59,7 +59,9 @@ struct _PacketsSndQueue
   guint32                    last_timestamp;
   gint32                     approved_bytes;
   gint32                     allowed_bytes_per_ms;
-  gint32                     target_rate;
+  gint32                     target_byterate;
+  gint32                     skip_interval;
+  guint32                    frame_tick;
   GstClockTime               obsolation_treshold;
   gboolean                   expected_lost;
   GstClockTime               logging_interval;

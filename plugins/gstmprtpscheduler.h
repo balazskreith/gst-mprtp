@@ -79,6 +79,9 @@ struct _GstMprtpscheduler
   GstTask*                      thread;
   GRecMutex                     thread_mutex;
   FECEncoder*                   fec_encoder;
+  guint32                       fec_interval;
+  guint32                       sent_packets;
+
   GstMprtpschedulerPrivate*     priv;
 };
 

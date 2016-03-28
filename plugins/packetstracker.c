@@ -148,7 +148,7 @@ void packetstracker_add(PacketsTracker *this, GstRTPBuffer *rtp, guint16 sn)
     item = g_queue_pop_head(this->sent_in_1s);
     this->sent_in_1s_sum -= item->payload_bytes;
     if(--item->ref == 0){
-        g_print("free for %hu at sent_in_1s", item->seq_num);
+//        g_print("free for %hu at sent_in_1s\n", item->seq_num);
       mprtp_free(item);
     }
   }
@@ -186,7 +186,7 @@ void packetstracker_feedback_update(PacketsTracker *this, GstMPRTCPReportSummary
     item = g_queue_pop_head(this->acked);
     this->acked_in_1s -= item->payload_bytes;
     if(--item->ref == 0){
-        g_print("free for %hu at acked", item->seq_num);
+//        g_print("free for %hu at acked\n", item->seq_num);
       mprtp_free(item);
     }
   }
@@ -199,10 +199,6 @@ void packetstracker_feedback_update(PacketsTracker *this, GstMPRTCPReportSummary
   }
 
 done:
-g_print("checking: counters - sent_in_1s: %d, sent: %d, acked: %d\n",
-        g_queue_get_length(this->sent_in_1s),
-        g_queue_get_length(this->sent),
-        g_queue_get_length(this->acked));
   THIS_WRITEUNLOCK (this);
 }
 

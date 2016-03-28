@@ -147,6 +147,7 @@ void packetstracker_add(PacketsTracker *this, GstRTPBuffer *rtp, guint16 sn)
     }
     item = g_queue_pop_head(this->sent_in_1s);
     this->sent_in_1s_sum -= item->payload_bytes;
+    g_print("substract by %d\n", item->payload_bytes);
     if(--item->ref == 0){
       mprtp_free(item);
     }

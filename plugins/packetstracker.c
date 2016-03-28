@@ -100,8 +100,9 @@ void
 packetstracker_init (PacketsTracker * this)
 {
   g_rw_lock_init (&this->rwmutex);
-  this->sent     = g_queue_new();
-  this->acked = g_queue_new();
+  this->sent        = g_queue_new();
+  this->sent_in_1s  = g_queue_new();
+  this->acked       = g_queue_new();
   this->sysclock = gst_system_clock_obtain();
 }
 
@@ -139,7 +140,6 @@ void packetstracker_add(PacketsTracker *this, GstRTPBuffer *rtp, guint16 sn)
 
   this->sent_in_1s_sum += item->payload_bytes;
   g_queue_push_tail(this->sent_in_1s, item);
-
   while(!g_queue_is_empty(this->sent_in_1s)){
     item = g_queue_peek_head(this->sent_in_1s);
     if(now - GST_SECOND < item->sent){
@@ -147,7 +147,6 @@ void packetstracker_add(PacketsTracker *this, GstRTPBuffer *rtp, guint16 sn)
     }
     item = g_queue_pop_head(this->sent_in_1s);
     this->sent_in_1s_sum -= item->payload_bytes;
-    g_print("substract by %d\n", item->payload_bytes);
     if(--item->ref == 0){
       mprtp_free(item);
     }
@@ -205,10 +204,11 @@ void
 packetstracker_get_stats (PacketsTracker * this, PacketsTrackerStat* result)
 {
   THIS_READLOCK (this);
-  result->acked_in_1s    = this->acked_in_1s;
-  result->received_in_1s = this->received_in_1s;
-  result->goodput_in_1s  = this->goodput_in_1s;
-  result->sent_in_1s = this->sent_in_1s_sum;
+  result->acked_in_1s     = this->acked_in_1s;
+  result->received_in_1s  = this->received_in_1s;
+  result->goodput_in_1s   = this->goodput_in_1s;
+  result->sent_in_1s      = this->sent_in_1s_sum;
+  result->bytes_in_flight = this->bytes_in_flight;
   THIS_READUNLOCK (this);
 }
 

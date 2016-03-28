@@ -18,6 +18,7 @@
 #include "percentiletracker.h"
 #include "numstracker.h"
 #include "reportproc.h"
+#include "packetstracker.h"
 
 G_BEGIN_DECLS
 
@@ -110,7 +111,13 @@ struct _MPRTPSPath
 
   guint32                 monitoring_interval;
 
-  MPRTPSPathPackets       packets;
+//  MPRTPSPathPackets       packets;
+  PacketsTracker*         packetstracker;
+  PacketsTrackerStat      packetstracker_stat;
+  gboolean                packetstracker_activated;
+
+  guint32                 total_sent_packets_num;
+  guint32                 total_sent_payload_bytes;
 
   gboolean                expected_lost;
 
@@ -196,7 +203,6 @@ guint32 mprtps_path_get_goodput_bytes_in1s(MPRTPSPath *this);
 guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this);
 void mprtps_path_activate_packets_monitoring(MPRTPSPath * this, gint32 items_length);
 void mprtps_path_deactivate_packets_monitoring (MPRTPSPath * this);
-void mprtps_path_packets_refresh(MPRTPSPath *this);
 void mprtps_path_packets_feedback_update(MPRTPSPath *this, GstMPRTCPReportSummary *summary);
 
 

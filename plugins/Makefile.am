@@ -30,7 +30,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          subratectrler.c            \
                          fecdec.c                   \
                          fecenc.c                   \
-                         rtpfecbuffer.c    
+                         rtpfecbuffer.c             \
+                         packetstracker.c
                     
                     
 noinst_HEADERS = mprtpspath.h           \
@@ -55,7 +56,8 @@ noinst_HEADERS = mprtpspath.h           \
                  subratectrler.h        \
                  fecdec.h               \
                  fecenc.h               \
-                 rtpfecbuffer.h  
+                 rtpfecbuffer.h         \
+                 packetstracker.h
                           
 
 # compiler and linker flags used to compile this plugin, set in configure.ac

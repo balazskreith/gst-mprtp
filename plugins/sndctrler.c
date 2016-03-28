@@ -557,7 +557,6 @@ _irp_processor_main(SndController * this)
     if(subflow->process_state == NO_CONTROLLING){
       continue;
     }
-    mprtps_path_packets_refresh(subflow->path);
     sending_rate = mprtps_path_get_sent_bytes_in1s(subflow->path);
     percentiletracker_add(subflow->sr_window, sending_rate);
 

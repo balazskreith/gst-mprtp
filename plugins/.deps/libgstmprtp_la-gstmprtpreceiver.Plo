@@ -206,8 +206,9 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h mprtpdefs.h \
  mprtplogger.h gstmprtcpbuffer.h gstmprtpbuffer.h packetssndqueue.h \
  bintree.h numstracker.h bintree2.h percentiletracker.h reportproc.h \
- mprtprpath.h /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
- percentiletracker2.h streamjoiner.h ricalcer.h
+ streamjoiner.h mprtprpath.h \
+ /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
+ percentiletracker2.h ricalcer.h packetstracker.h
 
 /usr/include/stdc-predef.h:
 
@@ -703,12 +704,14 @@ percentiletracker.h:
 
 reportproc.h:
 
+streamjoiner.h:
+
 mprtprpath.h:
 
 /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h:
 
 percentiletracker2.h:
 
-streamjoiner.h:
-
 ricalcer.h:
+
+packetstracker.h:

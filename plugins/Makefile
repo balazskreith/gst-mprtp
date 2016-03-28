@@ -153,7 +153,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-sndratedistor.lo libgstmprtp_la-numstracker.lo \
 	libgstmprtp_la-floatsbuffer.lo libgstmprtp_la-subratectrler.lo \
 	libgstmprtp_la-fecdec.lo libgstmprtp_la-fecenc.lo \
-	libgstmprtp_la-rtpfecbuffer.lo
+	libgstmprtp_la-rtpfecbuffer.lo \
+	libgstmprtp_la-packetstracker.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -424,7 +425,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          subratectrler.c            \
                          fecdec.c                   \
                          fecenc.c                   \
-                         rtpfecbuffer.c    
+                         rtpfecbuffer.c             \
+                         packetstracker.c
 
 noinst_HEADERS = mprtpspath.h           \
                  sndctrler.h            \
@@ -448,7 +450,8 @@ noinst_HEADERS = mprtpspath.h           \
                  subratectrler.h        \
                  fecdec.h               \
                  fecenc.h               \
-                 rtpfecbuffer.h  
+                 rtpfecbuffer.h         \
+                 packetstracker.h
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -560,6 +563,7 @@ include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-netqanalyser.Plo
 include ./$(DEPDIR)/libgstmprtp_la-numstracker.Plo
 include ./$(DEPDIR)/libgstmprtp_la-packetssndqueue.Plo
+include ./$(DEPDIR)/libgstmprtp_la-packetstracker.Plo
 include ./$(DEPDIR)/libgstmprtp_la-percentiletracker.Plo
 include ./$(DEPDIR)/libgstmprtp_la-percentiletracker2.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rcvctrler.Plo
@@ -803,6 +807,13 @@ libgstmprtp_la-rtpfecbuffer.lo: rtpfecbuffer.c
 #	$(AM_V_CC)source='rtpfecbuffer.c' object='libgstmprtp_la-rtpfecbuffer.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-rtpfecbuffer.lo `test -f 'rtpfecbuffer.c' || echo '$(srcdir)/'`rtpfecbuffer.c
+
+libgstmprtp_la-packetstracker.lo: packetstracker.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-packetstracker.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-packetstracker.Tpo -c -o libgstmprtp_la-packetstracker.lo `test -f 'packetstracker.c' || echo '$(srcdir)/'`packetstracker.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-packetstracker.Tpo $(DEPDIR)/libgstmprtp_la-packetstracker.Plo
+#	$(AM_V_CC)source='packetstracker.c' object='libgstmprtp_la-packetstracker.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-packetstracker.lo `test -f 'packetstracker.c' || echo '$(srcdir)/'`packetstracker.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

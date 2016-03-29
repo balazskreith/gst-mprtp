@@ -174,6 +174,9 @@ void ricalcer_refresh_parameters(ReportIntervalCalculator * this, gdouble media_
 
 void ricalcer_urgent_report_request(ReportIntervalCalculator * this)
 {
+  if(_now(this) - 200 * GST_MSECOND < this->last_time){
+    return;
+  }
   this->urgent = TRUE;
   this->base_interval = MAX(this->min_interval, this->base_interval/2.);
 }

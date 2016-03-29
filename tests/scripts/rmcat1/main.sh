@@ -74,14 +74,13 @@ echo "Balázs Kreith" > $REPORTAUTHORFILE
   echo "./scripts/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input $TESTDIR/veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
   chmod 777 scripts/test_bw_veth0_snd.sh
 
+  #run a virtual ethernet interface controller script
+  sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
+  
   #start client and server
   sudo ip netns exec $NSRCV $CLIENT "--profile="$RPROFILE 2> $LOGSDIR"/"client.log &
   sleep 1
   sudo ip netns exec $NSSND $SERVER "--profile="$RPROFILE 2> $LOGSDIR"/"server.log &
-
-  sleep 1
-  #run a virtual ethernet interface controller script
-  sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
 
   echo "
   while true; do 

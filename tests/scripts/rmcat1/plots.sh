@@ -56,7 +56,7 @@ DURAUTOCORRS=1000
 DURRCVTHROUGHPUTS=1000
 DURSNDTHROUGHPUTS=1000
 DURRTCPINTVALS=500
-DURLOSTS=3000
+DURLOSTS=1000
 
 PLOTDIR="scripts/rmcat1"
 PLOTFEC="$PLOTDIR/fec.plot"
@@ -69,7 +69,8 @@ PLOTLOSTS="$PLOTDIR/losts.plot"
 
 
 SRCFEC="$SRCDIR/fecdec_stat.csv"
-SRCPLAYOUT="$SRCDIR/playouts.csv"
+SRCPLAYOUT="$SRCDIR/streamjoiner.csv"
+SRCPLAYOUT2="$SRCDIR/path_1_skews.csv"
 SRCAUTOCORRS="$SRCDIR/netqanalyser_1.csv"
 SRCRCVTHROUGHPUTS="$SRCDIR/sub_1_rcv.csv"
 SRCSNDTHROUGHPUTS="$SRCDIR/sub_snd_sum.csv"
@@ -92,6 +93,7 @@ DSTLOSTS="$DSTDIR/losts.pdf"
   gnuplot -e "duration='$DURPLAYOUT'" \
           -e "output_file='$DSTPLAYOUT'" \
           -e "playouts_file='$SRCPLAYOUT'" \
+          -e "skew_file='$SRCPLAYOUT2'" \
           "$PLOTPLAYOUT"
           
   gnuplot -e "duration='$DURAUTOCORRS'" \

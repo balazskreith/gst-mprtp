@@ -58,6 +58,10 @@ struct _StreamJoiner
   gboolean             init_delay_applied;
   guint64              last_snd_ntp_reference;
 
+  PercentileTracker*   snd_samplings;
+  GstClockTime         last_snd_sampling;
+  GstClockTime         sampling_time;
+
 };
 struct _StreamJoinerClass{
   GObjectClass parent_class;

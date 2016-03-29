@@ -217,6 +217,12 @@ static void _skews_min_pipe(gpointer data, gint64 value)
   this->min_skew = MAX(0, value);
 }
 
+static void _snd_sampling_stat_pipe(gpointer data, PercentileTrackerPipeData *stat)
+{
+  StreamJoiner* this = data;
+  this->sampling_time = stat->percentile;
+//  mprtp_logger("snd_samplings.log", "%lu\n", stat->percentile);
+}
 
 static void _iterate_subflows(StreamJoiner *this, void(*iterator)(Subflow *, gpointer), gpointer data)
 {
@@ -241,13 +247,16 @@ stream_joiner_init (StreamJoiner * this)
   this->flushing          = FALSE;
   this->playout_allowed   = TRUE;
   this->playout_halt      = FALSE;
-  this->playout_halt_time = 0;
-  this->init_delay        = 500 * GST_MSECOND;
+  this->playout_halt_time = 0 * GST_MSECOND;
+  this->init_delay        = 0 * GST_MSECOND;
   this->urgent            = g_queue_new();
   this->skews             = make_numstracker(256, 2 * GST_SECOND);
   this->made              = _now(this);
+  this->snd_samplings     = make_percentiletracker(100, 50);
 
+  percentiletracker_set_treshold(this->snd_samplings, 2 * GST_SECOND);
 
+  percentiletracker_set_stats_pipe(this->snd_samplings, _snd_sampling_stat_pipe, this);
   numstracker_add_plugin(this->skews,
                          (NumsTrackerPlugin*)make_numstracker_minmax_plugin(_skews_max_pipe, this,
                                                                             _skews_min_pipe, this));
@@ -300,7 +309,20 @@ GstMpRTPBuffer *stream_joiner_pop(StreamJoiner *this)
   }
 
   result = _rem_mprtp(this);
+  if(result){
+    if(!this->last_played_timestamp){
+        this->last_snd_sampling = get_epoch_time_from_ntp_in_ns(result->abs_snd_ntp_time);
+        this->last_played_timestamp = result->timestamp;
+    }else if(_cmp_seq32(this->last_played_timestamp, result->timestamp) < 0){
+        GstClockTime actual_snd_epoch;
+        actual_snd_epoch = get_epoch_time_from_ntp_in_ns(result->abs_snd_ntp_time);
+        percentiletracker_add(this->snd_samplings, actual_snd_epoch - this->last_snd_sampling);
+        this->last_snd_sampling = actual_snd_epoch;
+        this->last_played_timestamp = result->timestamp;
 
+    }
+  }
+  if(result) mprtp_logger("pop.log", "%lu,%u\n", GST_TIME_AS_MSECONDS(_now(this)), result->timestamp);
 done:
 //if(result) g_print("pop %p->%d\n", result->buffer, result->buffer->mini_object.refcount);
   THIS_WRITEUNLOCK (this);
@@ -486,6 +508,10 @@ GstMpRTPBuffer *_rem_mprtp(StreamJoiner *this)
   if(!frame->head){
     this->head = frame->next;
     _trash_frame(this, frame);
+    if(this->head){
+      frame = this->head;
+      frame->playout_time = _now(this) + 20 * GST_MSECOND + this->playout_delay;
+    }
   }
 
   this->last_playout = _now(this);
@@ -632,7 +658,7 @@ Frame* _make_frame(StreamJoiner *this, FrameNode *node)
   result->created = gst_clock_get_time(this->sysclock);
   result->ready = node->marker;
   result->last_seq = result->ready ? node->seq : 0;
-  result->playout_time = _now(this) + MAX(20 * GST_MSECOND, this->playout_delay);
+  result->playout_time = _now(this) + this->sampling_time + this->playout_delay;
   ++this->framecounter;
 
   return result;

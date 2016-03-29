@@ -83,7 +83,7 @@ mprtpr_path_init (MpRTPRPath * this)
   percentiletracker_set_stats_pipe(this->delays, _delays_stats_pipe, this);
 
   this->skews = make_percentiletracker2(100, 50);
-  percentiletracker2_set_treshold(this->skews, 1 * GST_SECOND);
+  percentiletracker2_set_treshold(this->skews, 2 * GST_SECOND);
 
   _owdrle(this).last_step = _now(this);
   _owdrle(this).read_index = _owdrle(this).write_index = 0;
@@ -509,9 +509,13 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
     this->total_payload_bytes += mprtp->payload_bytes;
     this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
     //Option 2: add skew after every packet
-    _add_skew(this, skew);
+//    _add_skew(this, skew);
   }
 
+  if(this->last_rtp_timestamp < mprtp->timestamp){
+    this->last_rtp_timestamp = mprtp->timestamp;
+    _add_skew(this, skew);
+  }
 
   if(_cmp_seq(mprtp->subflow_seq, this->highest_seq) <= 0){
     numstracker_add(this->lates, mprtp->subflow_seq);
@@ -527,8 +531,9 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
       //Fixme: Bookmark1 Option 1, skew only if packet is in order
 //    if(this->last_rtp_timestamp != mprtp->timestamp){
 //      this->last_rtp_timestamp = mprtp->timestamp;
-//      _add_skew(this, skew);
+//
 //    }
+//    _add_skew(this, skew);
   }
 
   if(65472 < this->highest_seq && mprtp->subflow_seq < 128){

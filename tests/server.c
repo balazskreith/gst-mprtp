@@ -236,6 +236,7 @@ make_video_yuvfile_session (guint sessionNum)
   GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
 //  GstElement *videoSrc = gst_element_factory_make ("autovideosrc", NULL);
   GstElement *videoSrc = gst_element_factory_make ("multifilesrc", NULL);
+  GstElement *queue    = gst_element_factory_make("queue", NULL);
   GstElement *identity = gst_element_factory_make ("identity", NULL);
   GstElement *videoParse = gst_element_factory_make ("videoparse", NULL);
   GstElement *videoConv = gst_element_factory_make("autovideoconvert", NULL);
@@ -255,7 +256,7 @@ make_video_yuvfile_session (guint sessionNum)
   g_object_set (encoder, "undershoot", 100, NULL);
   g_object_set (encoder, "cpu-used", 0, NULL);
 //  g_object_set (encoder, "keyframe-mode", 0, NULL);
-  gst_bin_add_many (videoBin, videoConv, videoSrc, identity, videoParse, encoder, payloader, NULL);
+  gst_bin_add_many (videoBin, videoConv, videoSrc, identity, videoParse, encoder, payloader, queue, NULL);
   if(test_parameters_.yuvsequence == FOREMAN){
     g_object_set (videoParse,
         "width", 352,
@@ -274,8 +275,10 @@ make_video_yuvfile_session (guint sessionNum)
   g_object_set (identity, "sync", TRUE, NULL);
 
   gst_element_link (videoSrc, videoParse);
-  gst_element_link (videoParse, identity);
-  gst_element_link (identity, encoder);
+    gst_element_link (videoParse, identity);
+    gst_element_link (identity, encoder);
+//    gst_element_link (videoParse, queue);
+//    gst_element_link (queue, encoder);
 //  gst_element_link (videoParse, encoder);
   gst_element_link (encoder, payloader);
 

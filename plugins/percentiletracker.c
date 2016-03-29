@@ -476,11 +476,15 @@ guint64 _get_median(PercentileTracker * this)
   guint64 result;
 
   if(this->Mnc == this->Mxc){
+//    g_print("mnc eq to mxc tops: %lu,%lu\n", bintree_get_top_value(this->maxtree), bintree_get_top_value(this->mintree));
     result = (bintree_get_top_value(this->maxtree) + bintree_get_top_value(this->mintree))>>1;
-  } else if(this->Mnc < this->Mxc)
+  } else if(this->Mnc < this->Mxc){
+//      g_print("mnc st to mxc top is: %lu\n", bintree_get_top_value(this->maxtree));
     result = bintree_get_top_value(this->maxtree);
-  else
+  }else{
+//    g_print("mnc gt to mxc top is: %lu\n", bintree_get_top_value(this->mintree));
     result = bintree_get_top_value(this->mintree);
+  }
 
   return result;
 }

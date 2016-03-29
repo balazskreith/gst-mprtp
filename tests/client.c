@@ -316,9 +316,6 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
 
   g_object_set(mprtpply, "logging", TRUE, NULL);
 
-  if(0 && test_parameters_.video_session == YUVFILE_SOURCE)
-    g_object_set(mprtpply, "delay-offset", 2 * GST_SECOND, NULL);
-
   g_print ("Connecting to %i/%i/%i/%i/%i/%i\n",
       basePort, basePort + 1, basePort + 5,
       basePort + 11, basePort + 12, basePort + 10);

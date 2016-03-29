@@ -131,6 +131,7 @@ AUTOCORRSPLOT="$SRCDIR/owd-autocorrs.pdf"
 RCVTHROUGHPUTSPLOT="$SRCDIR/rcv-throughputs.pdf"
 SNDTHROUGHPUTSPLOT="$SRCDIR/snd-throughputs.pdf"
 RTCPINTVALSPLOT="$SRCDIR/rtcp-intervals.pdf"
+LOSTSPLOT="$SRCDIR/losts.pdf"
 CCPARAMS="$SRCDIR/ccparams_1.log"
 STATFILE="$SRCDIR/stats.csv"
 
@@ -199,6 +200,13 @@ echo "
     \includegraphics[width=1\textwidth]{$RTCPINTVALSPLOT}
     \caption{Summary of RTCP intervals}
     \label{fig:sumrtcpintervals}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1\textwidth]{$LOSTSPLOT}
+    \caption{Summary of losts}
+    \label{fig:sumlosts}
 \end{figure}
 
 " >> $DST

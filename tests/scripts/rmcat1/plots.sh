@@ -51,11 +51,12 @@ echo "debug is 1"
 fi
 
 DURFEC=1000
-DURPLAYOUT=100000
+DURPLAYOUT=1000
 DURAUTOCORRS=1000
 DURRCVTHROUGHPUTS=1000
 DURSNDTHROUGHPUTS=1000
 DURRTCPINTVALS=500
+DURLOSTS=3000
 
 PLOTDIR="scripts/rmcat1"
 PLOTFEC="$PLOTDIR/fec.plot"
@@ -64,6 +65,7 @@ PLOTAUTOCORRS="$PLOTDIR/owd-autocorrs.plot"
 PLOTRCVTHROUGHPUTS="$PLOTDIR/rcv-throughputs.plot"
 PLOTSNDTHROUGHPUTS="$PLOTDIR/snd-throughputs.plot"
 PLOTRTCPINTVALS="$PLOTDIR/rtcp-intervals.plot"
+PLOTLOSTS="$PLOTDIR/losts.plot"
 
 
 SRCFEC="$SRCDIR/fecdec_stat.csv"
@@ -72,6 +74,7 @@ SRCAUTOCORRS="$SRCDIR/netqanalyser_1.csv"
 SRCRCVTHROUGHPUTS="$SRCDIR/sub_1_rcv.csv"
 SRCSNDTHROUGHPUTS="$SRCDIR/sub_snd_sum.csv"
 SRCRTCPINTVALS="$SRCDIR/sub_1_rtcp_ints.csv"
+SRCLOSTS="$SRCDIR/sub_1_stat.csv"
 
 DSTFEC="$DSTDIR/fec.pdf"
 DSTPLAYOUT="$DSTDIR/playouts.pdf"
@@ -79,6 +82,7 @@ DSTAUTOCORRS="$DSTDIR/owd-autocorrs.pdf"
 DSTRCVTHROUGHPUTS="$DSTDIR/rcv-throughputs.pdf"
 DSTSNDTHROUGHPUTS="$DSTDIR/snd-throughputs.pdf"
 DSTRTCPINTVALS="$DSTDIR/rtcp-intervals.pdf"
+DSTLOSTS="$DSTDIR/losts.pdf"
 
   gnuplot -e "duration='$DURFEC'" \
           -e "output_file='$DSTFEC'" \
@@ -110,5 +114,8 @@ DSTRTCPINTVALS="$DSTDIR/rtcp-intervals.pdf"
           -e "rtcp_file='$SRCRTCPINTVALS'" \
           "$PLOTRTCPINTVALS"
           
-                   
+  gnuplot -e "duration='$DURLOSTS'" \
+          -e "output_file='$DSTLOSTS'" \
+          -e "stat_file='$SRCLOSTS'" \
+          "$PLOTLOSTS"                  
 

@@ -28,6 +28,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include "mprtplogger.h"
 
 
@@ -143,11 +144,7 @@ _rem_mprtp(
     StreamJoiner *this);
 
 static void
-_playout_logging(
-    StreamJoiner *this);
-
-static void
-_readable_logging(
+_logging(
     StreamJoiner *this);
 
 //#define _trash_frame(this, frame)
@@ -208,16 +205,16 @@ stream_joiner_finalize (GObject * object)
 //  g_object_unref(this->playoutgate);
 }
 
-static void _delay_max_pipe(gpointer data, gint64 value)
+static void _skews_max_pipe(gpointer data, gint64 value)
 {
   StreamJoiner* this = data;
-  this->max_delay = MAX(0, value);
+  this->max_skew = MAX(0, value);
 }
 
-static void _delay_min_pipe(gpointer data, gint64 value)
+static void _skews_min_pipe(gpointer data, gint64 value)
 {
   StreamJoiner* this = data;
-  this->min_delay = MAX(0, value);
+  this->min_skew = MAX(0, value);
 }
 
 
@@ -241,24 +238,21 @@ stream_joiner_init (StreamJoiner * this)
   this->sysclock = gst_system_clock_obtain ();
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, _ruin_subflow);
 //  this->max_path_skew = 10 * GST_MSECOND;
-  this->HPSN              = 0;
   this->flushing          = FALSE;
   this->playout_allowed   = TRUE;
   this->playout_halt      = FALSE;
-  this->playout_halt_time = 100 * GST_MSECOND;
-  this->forced_delay      = 0;
+  this->playout_halt_time = 0;
+  this->init_delay        = 500 * GST_MSECOND;
   this->urgent            = g_queue_new();
-  this->delays             = make_numstracker(256, 2 * GST_SECOND);
+  this->skews             = make_numstracker(256, 2 * GST_SECOND);
   this->made              = _now(this);
 
 
-  numstracker_add_plugin(this->delays,
-                         (NumsTrackerPlugin*)make_numstracker_minmax_plugin(_delay_max_pipe, this,
-                                                                            _delay_min_pipe, this));
+  numstracker_add_plugin(this->skews,
+                         (NumsTrackerPlugin*)make_numstracker_minmax_plugin(_skews_max_pipe, this,
+                                                                            _skews_min_pipe, this));
 
   g_rw_lock_init (&this->rwmutex);
-  this->ticks = make_percentiletracker(1024, 50);
-  percentiletracker_add(this->ticks, 2 * GST_MSECOND);
 }
 
 StreamJoiner*
@@ -266,9 +260,14 @@ make_stream_joiner(void)
 {
   StreamJoiner *result;
   result = (StreamJoiner *) g_object_new (STREAM_JOINER_TYPE, NULL);
-  //Todo: elliminate fnc pointer from here.
-//  result->playoutgate = make_playoutgate(data, func);
   return result;
+}
+
+void stream_joiner_do_logging(StreamJoiner *this)
+{
+  THIS_READLOCK(this);
+  _logging(this);
+  THIS_READUNLOCK(this);
 }
 
 
@@ -277,20 +276,15 @@ GstMpRTPBuffer *stream_joiner_pop(StreamJoiner *this)
 
   GstMpRTPBuffer *result = NULL;
   GstClockTime now;
+
   THIS_WRITELOCK (this);
   now  = _now(this);
-  if(this->last_logging < now - GST_SECOND){
-    _readable_logging(this);
-    this->last_logging = now;
-  }
+
   if(this->last_playout_refresh < now - 20 * GST_MSECOND){
-    gdouble playout_delay;
-    playout_delay = this->max_delay - this->min_delay;
-    this->playout_delay = CONSTRAIN(0, 250 * GST_MSECOND, (124. * this->playout_delay + playout_delay ) / 125.);
+    this->playout_delay = this->playout_delay * .992 + this->max_skew * .008;
+    this->playout_delay = CONSTRAIN(0, 50 * GST_MSECOND, this->playout_delay);
     this->last_playout_refresh = now;
   }
-
-  _playout_logging(this);
 
   if(!this->playout_allowed){
     goto done;
@@ -313,59 +307,26 @@ done:
   return result;
 }
 
-void stream_joiner_push_monitoring_packet(StreamJoiner * this, GstMpRTPBuffer *mprtp)
-{
-  GstBuffer *recovered;
-  THIS_WRITELOCK(this);
-
-  //Todo: FEC packet processing here,
-  this->monitored_bytes += mprtp->payload_bytes;
-//  g_print("monitor buffer size: %d\n",  mprtp->payload_bytes);
-  if(recovered){
-    // push it into the frame... so continue the process with that. <- no just push!
-      //aftre mptp_process_done we doesn't need GstMpRTPBuffer literally.
-      //No lets assign the subflow of the path we received the FEC packet
-      //but it doesn't counted in the path statistics and we have the GstMPRTPBuffer then.
-  }
-  THIS_WRITEUNLOCK(this);
-}
-
-
 void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
 {
   Subflow *subflow;
-  gdouble delay;
+
   THIS_WRITELOCK(this);
   subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (mprtp->subflow_id));
 
   mprtpr_path_process_rtp_packet(subflow->path, mprtp);
 
   mprtpr_path_get_joiner_stats(subflow->path,
-                              &delay,
+                              NULL,
                               &subflow->skew,
                               &subflow->jitter);
 
-  if(!mprtpr_path_is_distorted(subflow->path)){
-    subflow->delay_avg = subflow->delay_avg * .99802 + delay * .00192;
-    numstracker_add(this->delays, subflow->delay_avg);
-  }
-
-//  this->playout_delay *= 124.;
-//  this->playout_delay += this->max_delay;
-//  this->playout_delay /= 125.;
+  numstracker_add(this->skews, subflow->skew);
 
   mprtp->buffer = gst_buffer_ref(mprtp->buffer);
-//  g_print("push %p->%d\n", mprtp->buffer, mprtp->buffer->mini_object.refcount);
   if(!_add_mprtp_packet(this, mprtp)){
     g_queue_push_tail(this->urgent, mprtp);
   }
-  THIS_WRITEUNLOCK(this);
-}
-
-void stream_joiner_set_monitor_payload_type(StreamJoiner *this, guint8 monitor_payload_type)
-{
-  THIS_WRITELOCK(this);
-  this->monitor_payload_type = monitor_payload_type;
   THIS_WRITEUNLOCK(this);
 }
 
@@ -422,18 +383,11 @@ stream_joiner_set_playout_allowed(StreamJoiner *this, gboolean playout_permissio
 }
 
 void
-stream_joiner_set_forced_delay(StreamJoiner *this, GstClockTime forced_delay)
+stream_joiner_set_initial_delay(StreamJoiner *this, GstClockTime init_delay)
 {
   THIS_WRITELOCK (this);
-  this->forced_delay = forced_delay;
-  THIS_WRITEUNLOCK (this);
-}
-
-void
-stream_joiner_set_stream_delay(StreamJoiner *this, GstClockTime stream_delay)
-{
-  THIS_WRITELOCK (this);
-  this->stream_delay = stream_delay;
+  this->init_delay = init_delay;
+  this->init_delay_applied = FALSE;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -442,7 +396,6 @@ stream_joiner_get_stats(StreamJoiner *this,
                         gdouble *playout_delay,
                         gint32 *playout_buffer_size)
 {
-  //Todo moving it to a logging function instead of let it called by rcvctrler.
   THIS_READLOCK(this);
   if(playout_delay) *playout_delay = this->playout_delay;
   if(playout_buffer_size) *playout_buffer_size = this->bytes_in_queue;
@@ -514,8 +467,17 @@ GstMpRTPBuffer *_rem_mprtp(StreamJoiner *this)
   }
 
   frame = this->head;
-  if(!frame) goto done;
-  if(!this->flushing && _now(this) < frame->playout_time) goto done;
+  if(!frame) {
+    goto done;
+  }
+  if(!this->init_delay_applied){
+    this->init_delay_applied = TRUE;
+    frame->playout_time = _now(this) + this->init_delay;
+    goto done;
+  }
+  if(!this->flushing && _now(this) < frame->playout_time) {
+    goto done;
+  }
   node = frame->head;
   result = node->mprtp;
   this->bytes_in_queue -= node->mprtp->payload_bytes;
@@ -525,6 +487,8 @@ GstMpRTPBuffer *_rem_mprtp(StreamJoiner *this)
     this->head = frame->next;
     _trash_frame(this, frame);
   }
+
+  this->last_playout = _now(this);
 done:
   return result;
 }
@@ -536,8 +500,8 @@ gboolean _add_mprtp_packet(StreamJoiner *this,
   guint32 timestamp;
   gint cmp;
   gboolean result = FALSE;
-  //If frame timestamp smaller than the last timestamp the packet is discarded.
-  //the frame timestamp comparsion must be considering the wrap around
+  //If frame timestamp smaller than the last timestamp the frame is already played out.
+  //the frame timestamp comparsion must considering the wrap around the sequence nums
   timestamp = mprtp->timestamp;
   cmp = _cmp_seq32(timestamp, this->last_played_timestamp);
   if(this->last_played_timestamp != 0 && cmp <= 0){
@@ -639,8 +603,9 @@ again:
   goto again;
 done:
 
+//Todo: bookmark <- byte scheduling joining time might be considered here.
   //refresh playout time
-  frame->playout_time+=MAX(0, this->playout_delay);
+  frame->playout_time+=0;
 
   //Check weather the frame is marked
   if(node->marker){
@@ -660,7 +625,6 @@ exit:
 Frame* _make_frame(StreamJoiner *this, FrameNode *node)
 {
   Frame *result;
-  gint32 playout_delay;
   //  result = g_slice_new0(Frame);
   result = mprtp_malloc(sizeof(Frame));
   result->head = result->tail = node;
@@ -668,14 +632,7 @@ Frame* _make_frame(StreamJoiner *this, FrameNode *node)
   result->created = gst_clock_get_time(this->sysclock);
   result->ready = node->marker;
   result->last_seq = result->ready ? node->seq : 0;
-
-//  playout_delay = MIN(MAX(0, this->max_skew), 20 * GST_MSECOND);
-//  playout_delay = CONSTRAIN(0, 20 * GST_MSECOND, this->playout_delay);
-  playout_delay = this->playout_delay;
-  if(node->mprtp->delay + playout_delay < this->forced_delay && 0 < node->mprtp->delay){
-    playout_delay += this->forced_delay - node->mprtp->delay;
-  }
-  result->playout_time = _now(this) + playout_delay;
+  result->playout_time = _now(this) + MAX(20 * GST_MSECOND, this->playout_delay);
   ++this->framecounter;
 
   return result;
@@ -693,70 +650,43 @@ FrameNode * _make_framenode(StreamJoiner *this, GstMpRTPBuffer *mprtp)
   return result;
 }
 
-void _playout_logging(StreamJoiner *this)
+static void _logging_helper(Subflow *subflow, gpointer data)
 {
-  gint32 playout_remaining = 0;
-  GstClockTime now = _now(this);
-  if(this->head && now < this->head->playout_time - GST_USECOND){
-    playout_remaining = GST_TIME_AS_USECONDS(this->head->playout_time - now);
-  }
-
-  mprtp_logger("playouts.csv", "%d,%d,%d\n",
-                this->bytes_in_queue / 1000,
-                playout_remaining,
-                GST_TIME_AS_USECONDS(this->max_delay));
-
+  gchar filename[255];
+  sprintf(filename, "path_%d_skews.csv", subflow->id);
+  mprtp_logger(filename, "%f\n", subflow->skew);
 }
 
-static void _log_subflow(Subflow *subflow, gpointer data)
+void _logging(StreamJoiner *this)
 {
-  mprtp_logger("streamjoiner.log",
-               "----------------------------------------------------------------\n"
-               "Subflow id: %d\n"
-               "delay: %lu | jitter: %u | skew: %f\n",
 
-               subflow->id,
-               subflow->delay_avg,
-               subflow->jitter,
-               subflow->skew
-               );
+  mprtp_logger("streamjoiner.csv",
+               "%f,%d\n",
+               this->playout_delay,
+               this->bytes_in_queue);
 
-}
+  _iterate_subflows(this, _logging_helper, this);
 
-void _readable_logging(StreamJoiner *this)
-{
   mprtp_logger("streamjoiner.log",
                  "###############################################################\n"
                  "Seconds: %lu\n"
-                 "PHSN: %d | framecounter: %d | bytes_in_queue: %d\n"
-                 "forced_delay: %lu\n"
+                 "framecounter: %d | bytes_in_queue: %d\n"
+                 "initial_delay: %lu\n"
                  "flushing: %d | playout_allowed: %d | playout_halt: %d\n"
-                 "halt_time: %lu | monitored bytes: %d\n"
+                 "halt_time: %lu | \n"
                  ,
                  GST_TIME_AS_SECONDS(_now(this) - this->made),
-                 this->HPSN,
                  this->framecounter,
                  this->bytes_in_queue,
-                 this->forced_delay,
+                 this->init_delay,
                  this->flushing,
                  this->playout_allowed,
                  this->playout_halt,
-                 this->playout_halt_time,
-                 this->monitored_bytes
+                 this->playout_halt_time
                  );
-
-  mprtp_logger("streamjoiner.csv",
-               "%d,%d,%d\n",
-               this->bytes_in_queue * 8,
-               this->monitored_bytes * 8,
-               this->max_delay
-               );
-
-  _iterate_subflows(this, _log_subflow, this);
-
 }
 
-#undef HEAP_CMP
+
 #undef THIS_READLOCK
 #undef THIS_READUNLOCK
 #undef THIS_WRITELOCK

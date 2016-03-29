@@ -32,35 +32,30 @@ typedef struct _Frame Frame;
 struct _StreamJoiner
 {
   GObject              object;
+  GstClock*            sysclock;
   GstClockTime         made;
   GHashTable*          subflows;
+  gint                 subflow_num;
   GRWLock              rwmutex;
-  guint8               monitor_payload_type;
   gboolean             playout_allowed;
   gboolean             playout_halt;
   GstClockTime         playout_halt_time;
-  gint32               monitored_bytes;
-  GstClockTime         stream_delay;
-  gint                 subflow_num;
-  GstClock*            sysclock;
   gdouble              playout_delay;
+  GstClockTime         last_playout;
   GstClockTime         last_playout_refresh;
-  NumsTracker*         delays;
-  GstClockTime         max_delay;
-  GstClockTime         min_delay;
-  GstClockTime         forced_delay;
+  NumsTracker*         skews;
+  GstClockTime         max_skew;
+  GstClockTime         min_skew;
+  GstClockTime         init_delay;
   Frame*               head;
   Frame*               tail;
-  guint16              HPSN;
   gint32               bytes_in_queue;
   guint32              last_played_timestamp;
   gboolean             flushing;
-  PercentileTracker*   ticks;
   gint32               framecounter;
 
-  GstClockTime         last_logging;
   GQueue*              urgent;
-
+  gboolean             init_delay_applied;
   guint64              last_snd_ntp_reference;
 
 };
@@ -70,6 +65,9 @@ struct _StreamJoinerClass{
 
 StreamJoiner*
 make_stream_joiner(void);
+
+void
+stream_joiner_do_logging(StreamJoiner *this);
 
 void
 stream_joiner_add_path(
@@ -83,11 +81,6 @@ stream_joiner_rem_path(
     guint8 subflow_id);
 
 void
-stream_joiner_push_monitoring_packet(
-    StreamJoiner * this,
-    GstMpRTPBuffer *mprtp);
-
-void
 stream_joiner_push(
     StreamJoiner * this,
     GstMpRTPBuffer *mprtp);
@@ -95,11 +88,6 @@ stream_joiner_push(
 GstMpRTPBuffer*
 stream_joiner_pop(
     StreamJoiner *this);
-
-void
-stream_joiner_set_monitor_payload_type(
-    StreamJoiner *this,
-    guint8 monitor_payload_type);
 
 void
 stream_joiner_get_stats(
@@ -118,14 +106,9 @@ stream_joiner_set_playout_allowed(
     gboolean playout_permission);
 
 void
-stream_joiner_set_forced_delay(
+stream_joiner_set_initial_delay(
     StreamJoiner *this,
     GstClockTime tick_interval);
-
-void
-stream_joiner_set_stream_delay(
-    StreamJoiner *this,
-    GstClockTime stream_delay);
 
 GType
 stream_joiner_get_type (void);

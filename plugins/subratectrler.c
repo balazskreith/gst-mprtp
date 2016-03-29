@@ -77,7 +77,7 @@ G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 #define QDELAY_KEEP_TRESHOLD  0.005
 
 //determines the qdelay trend treshold considered to be congestion
-#define QDELAY_CONGESTION_TRESHOLD 0.2
+#define QDELAY_CONGESTION_TRESHOLD 0.1
 
 //determines the minimum monitoring interval
 #define MIN_MONITORING_INTERVAL 2
@@ -586,7 +586,11 @@ _keep_stage(
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
 //    _disable_controlling(this);
-    target_rate = MIN(_RR(this) * .85, _TR(this) * _UF(this));
+    if(_qtrend_cng_th(this) < MIN(_q500(this),_q1000(this))){
+      target_rate = MIN(_RR(this) * .85, _TR(this) * _rdc_target_fac(this));
+    }else{
+      target_rate = MIN(_RR(this) * .85, _TR(this) * _UF(this));
+    }
     goto done;
   }
 
@@ -636,16 +640,20 @@ _probe_stage(
 
 
   if(congestion){
-//    _disable_monitoring(this);
-    _disable_controlling(this);
+    _disable_monitoring(this);
+//    _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = MIN(_RR(this) * .85, _TR(this) * _UF(this));
+    if(_qtrend_cng_th(this) < MIN(_q500(this),_q1000(this))){
+      target_rate = MIN(_RR(this) * .85, _TR(this) * _rdc_target_fac(this));
+    }else{
+      target_rate = MIN(_RR(this) * .85, _TR(this) * _UF(this));
+    }
     goto done;
   }
 
   if(distortion){
-    _disable_controlling(this);
+//    _disable_controlling(this);
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_KEEP, FALSE);
@@ -695,12 +703,16 @@ _increase_stage(
 //    _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = MIN(_RR(this) * .85, _TR(this) * _UF(this));
+    if(_qtrend_cng_th(this) < MIN(_q500(this),_q1000(this))){
+      target_rate = MIN(_RR(this) * .85, _TR(this) * _rdc_target_fac(this));
+    }else{
+      target_rate = MIN(_RR(this) * .85, _TR(this) * _UF(this));
+    }
     goto done;
   }
 
   if(distortion){
-    _disable_controlling(this);
+//    _disable_controlling(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     target_rate = MAX(_RR(this) * .95, _TR_t1(this));

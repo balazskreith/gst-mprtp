@@ -252,15 +252,10 @@ _logging (RcvController *this)
   GHashTableIter iter;
   gpointer key, val;
   Subflow *subflow;
-  gdouble playout_delay;
-  gint32 playout_buffer_len;
   guint32 jitter;
   GstClockTime median_delay;
-  gchar main_file[255];
 
   if(!this->joiner) goto done;
-  memset(main_file, 0, 255);
-  sprintf(main_file, "sub_rcv_sum.csv");
 
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
@@ -269,6 +264,7 @@ _logging (RcvController *this)
     guint32 total_lost;
     guint16 HSN;
     gdouble fraction_lost;
+    gdouble discarded_rate;
 
     subflow = (Subflow *) val;
     if(!subflow->logfile){
@@ -319,17 +315,18 @@ _logging (RcvController *this)
     subflow->losts_window      = _uint32_diff(subflow->losts[subflow->losts_index], subflow->losts_window);
 
     fraction_lost              = !subflow->expected_window ? 0. : (gdouble) subflow->losts_window / (gdouble) subflow->expected_window;
+    discarded_rate             = !subflow->rcvd_bytes_window ? 0. : (gdouble) subflow->discarded_bytes_window / (gdouble) subflow->rcvd_bytes_window;
 
     mprtp_logger(subflow->statfile,
-                 "%u,%f,%u\n",
+                 "%u,%f,%u,%f\n",
                  subflow->rcvd_bytes_window - subflow->discarded_bytes_window,
                  fraction_lost,
-                 subflow->losts_window);
+                 subflow->losts_window,
+                 discarded_rate);
 
   }
 
-  stream_joiner_get_stats(this->joiner, &playout_delay, &playout_buffer_len);
-  mprtp_logger(main_file,"%f,%d\n", playout_delay,playout_buffer_len);
+  stream_joiner_do_logging(this->joiner);
 
   {
     guint32 fecdecoder_early_repaired_bytes, fecdecoder_total_repaired_bytes;

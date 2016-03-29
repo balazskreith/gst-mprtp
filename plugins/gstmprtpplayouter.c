@@ -124,7 +124,7 @@ enum
   PROP_LOG_ENABLED,
   PROP_LOG_PATH,
   PROP_SUBFLOWS_STATS,
-  PROP_FORCED_DELAY,
+  PROP_INIT_DELAY,
   PROP_LATENCY_DISCARD,
   PROP_LATENCY_LOST,
   PROP_REPAIR_WINDOW_MIN,
@@ -291,10 +291,10 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           "a structure contains it",
           "NULL", G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_FORCED_DELAY,
-                                    g_param_spec_uint64 ("forced-delay",
-                                                         "forced delay for playout",
-                                                         "forced delay for playout",
+  g_object_class_install_property (gobject_class, PROP_INIT_DELAY,
+                                    g_param_spec_uint64 ("init-delay",
+                                                         "initial delay for playout",
+                                                         "initial delay for playout",
                                                          0, G_MAXUINT, 0,
                                                          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
@@ -495,9 +495,9 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       //Todo consider live stream here
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_FORCED_DELAY:
+    case PROP_INIT_DELAY:
       THIS_WRITELOCK (this);
-      stream_joiner_set_forced_delay(this->joiner, g_value_get_uint64 (value) * GST_MSECOND);
+      stream_joiner_set_initial_delay(this->joiner, g_value_get_uint64 (value) * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_PLAYOUT_HALT_TIME:

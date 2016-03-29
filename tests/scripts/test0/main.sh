@@ -4,8 +4,10 @@ programname=$0
 function usage {
     echo "usage: $programname [-r|-rtpprofile num]"
     echo "	-r --rtprofile		determines the rtp testing profile"
-    echo "				equal to the ./server --profile=profile_num"
-    echo "      -p --period             determines the period of the report generation"
+    echo "				        equal to the ./server --profile=profile_num"
+    echo "  -p --period             determines the period of the report generation"
+    echo "  --savnam			the name of the saving"
+    echo "  --savdir			the directory of the saving"
     exit 1
 }
  
@@ -17,6 +19,8 @@ fi
 
 RPROFILE=73
 REPPERIOD=5
+SAVDIR="0"
+SAVNAM="0"
 
 while [[ $# > 1 ]]
 do
@@ -30,6 +34,14 @@ case $key in
     REPPERIOD="$2"
     shift # past argument
     ;;
+    --savdir)
+    SAVDIR="$2"
+    shift # past argument
+    ;;
+    --savnam)
+    SAVNAM="$2"
+    shift # past argument
+    ;;       
     --default)
     ;;
     *)
@@ -71,8 +83,8 @@ echo "Balázs Kreith" > $REPORTAUTHORFILE
   DURATION=350
   
   #setup virtual ethernet interface controller script
-  echo "./scripts/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input $TESTDIR/veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
-  chmod 777 scripts/test_bw_veth0_snd.sh
+  echo "./$SCRIPTSDIR/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input $TESTDIR/veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
+  chmod 777 $SCRIPTSDIR/test_bw_veth0_snd.sh
 
   #start client and server
   sudo ip netns exec $NSRCV $CLIENT "--profile="$RPROFILE 2> $LOGSDIR"/"client.log &
@@ -124,6 +136,13 @@ trap control_c SIGINT
 ./$SCRIPTSDIR/auto_rep_generator.sh  > report.log &
 
 sleep $DURATION
+
+if [ "$SAVDIR" != "0" ]
+then
+  echo "./$TESTDIR/save.sh --logsdir $LOGSDIR --repsdir $REPORTSDIR --savnam $SAVNAM --savdir $SAVDIR" > $SCRIPTSDIR/saving.sh
+  chmod 777 $SCRIPTSDIR/saving.sh
+  ./$SCRIPTSDIR/saving.sh
+fi
 
 cleanup
 

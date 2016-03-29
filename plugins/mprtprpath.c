@@ -494,12 +494,6 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
     goto done;
   }
 
-  skew = (((gint64)this->last_mprtp_delay - (gint64)mprtp->delay));
-  this->last_mprtp_delay = mprtp->delay;
-  ++this->total_packets_received;
-  this->total_payload_bytes += mprtp->payload_bytes;
-  this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
-
   if(0 < mprtp->delay){
     _add_delay(this, mprtp->delay);
     if(_cmp_seq(this->reported_sequence_number, mprtp->subflow_seq) < 0 &&
@@ -508,7 +502,17 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
     {
       _add_discard(this, mprtp);
     }
+
+    skew = (((gint64)this->last_mprtp_delay - (gint64)mprtp->delay));
+    this->last_mprtp_delay = mprtp->delay;
+    ++this->total_packets_received;
+    this->total_payload_bytes += mprtp->payload_bytes;
+    this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
+    //Option 2: add skew after every packet
+    _add_skew(this, skew);
   }
+
+
   if(_cmp_seq(mprtp->subflow_seq, this->highest_seq) <= 0){
     numstracker_add(this->lates, mprtp->subflow_seq);
     goto done;
@@ -520,10 +524,11 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
     }
   }else{
     //packet is in order
-    if(this->last_rtp_timestamp != mprtp->timestamp){
-      this->last_rtp_timestamp = mprtp->timestamp;
-      _add_skew(this, skew);
-    }
+      //Fixme: Bookmark1 Option 1, skew only if packet is in order
+//    if(this->last_rtp_timestamp != mprtp->timestamp){
+//      this->last_rtp_timestamp = mprtp->timestamp;
+//      _add_skew(this, skew);
+//    }
   }
 
   if(65472 < this->highest_seq && mprtp->subflow_seq < 128){

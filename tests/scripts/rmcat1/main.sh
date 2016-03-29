@@ -4,8 +4,10 @@ programname=$0
 function usage {
     echo "usage: $programname [-r|-rtpprofile num]"
     echo "	-r --rtprofile		determines the rtp testing profile"
-    echo "				equal to the ./server --profile=profile_num"
-    echo "      -p --period             determines the period of the report generation"
+    echo "				        equal to the ./server --profile=profile_num"
+    echo "  -p --period             determines the period of the report generation"
+    echo "  --savnam			the name of the saving"
+    echo "  --savdir			the directory of the saving"
     exit 1
 }
  
@@ -17,6 +19,8 @@ fi
 
 RPROFILE=73
 REPPERIOD=5
+SAVDIR="0"
+SAVNAM="0"
 
 while [[ $# > 1 ]]
 do
@@ -30,6 +34,14 @@ case $key in
     REPPERIOD="$2"
     shift # past argument
     ;;
+    --savdir)
+    SAVDIR="$2"
+    shift # past argument
+    ;;
+    --savnam)
+    SAVNAM="$2"
+    shift # past argument
+    ;;     
     --default)
     ;;
     *)
@@ -123,6 +135,13 @@ trap control_c SIGINT
 ./$SCRIPTSDIR/auto_rep_generator.sh  > report.log &
 
 sleep $DURATION
+
+if [ "$SAVDIR" != "0" ]
+then
+  echo "./$TESTDIR/save.sh --logsdir $LOGSDIR --repsdir $REPORTSDIR --savnam $SAVNAM --savdir $SAVDIR" > $SCRIPTSDIR/saving.sh
+  chmod 777 $SCRIPTSDIR/saving.sh
+  ./$SCRIPTSDIR/saving.sh
+fi
 
 cleanup
 

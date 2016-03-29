@@ -137,23 +137,6 @@ PacketsSndQueue *make_packetssndqueue(void)
   return result;
 }
 
-//void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_bitrate, gboolean pacing)
-//{
-//  THIS_WRITELOCK(this);
-//  target_bitrate>>=3;
-//  this->target_rate = target_bitrate * .75;
-//  if(!this->pacing && pacing){
-//    this->approved_bytes = target_bitrate / 100;
-//    this->pacing_started = _now(this);
-//    this->pacing = TRUE;
-//  }else if(!pacing && this->pacing){
-//    this->pacing = _now(this) - this->pacing_started < 2 * GST_SECOND;
-//  }
-//
-//  this->allowed_rate_per_ms = target_bitrate / 1000;
-//  THIS_WRITEUNLOCK(this);
-//}
-
 void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_bitrate, gboolean pacing)
 {
   THIS_WRITELOCK(this);
@@ -213,8 +196,7 @@ void packetssndqueue_approve(PacketsSndQueue *this)
     gdouble x;
     x  = _now(this) - this->pacing_ended;
     x /= (gdouble) GST_SECOND;
-//    g_print("allowed per ms %d %f\n", this->allowed_bytes_per_ms, this->allowed_bytes_per_ms * log(8 * x + 1.));
-    this->approved_bytes += this->allowed_bytes_per_ms * MAX(0.,log(x));
+    this->approved_bytes += this->allowed_bytes_per_ms * MAX(0.,log(x/2));
   }
 done:
   THIS_WRITEUNLOCK(this);

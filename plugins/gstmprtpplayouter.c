@@ -614,25 +614,21 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
     case PROP_LATENCY_DISCARD:
       THIS_READLOCK (this);
       g_value_set_uint (value, this->discard_latency);
-      _setup_paths(this);
       THIS_READUNLOCK (this);
       break;
     case PROP_LATENCY_LOST:
       THIS_READLOCK (this);
       g_value_set_uint (value, this->lost_latency);
-      _setup_paths(this);
       THIS_READUNLOCK (this);
       break;
     case PROP_REPAIR_WINDOW_MIN:
       THIS_READLOCK (this);
       g_value_set_uint (value, this->repair_window_min / GST_MSECOND);
-      _setup_paths(this);
       THIS_READUNLOCK (this);
       break;
     case PROP_REPAIR_WINDOW_MAX:
       THIS_READLOCK (this);
       g_value_set_uint (value, this->repair_window_max / GST_MSECOND);
-      _setup_paths(this);
       THIS_READUNLOCK (this);
       break;
     default:

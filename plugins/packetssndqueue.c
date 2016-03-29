@@ -315,8 +315,8 @@ void _packetssndqueue_add(PacketsSndQueue *this, GstBuffer *buffer)
 
   if(this->target_byterate *.2 < this->bytes){
     //Todo check automatic skip
-//      this->skip_interval = CONSTRAIN(2, 5, this->target_byterate / this->bytes);
-      this->skip_interval = 0;
+      this->skip_interval = CONSTRAIN(2, 5, this->target_byterate / this->bytes);
+//      this->skip_interval = 0;
   }else{
     this->skip_interval = 0;
   }

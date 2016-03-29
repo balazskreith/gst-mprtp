@@ -112,10 +112,12 @@ static int path3_rx_rtcp_port = 5011;
 
 static int rtpbin_tx_rtcp_port = 5013;
 static int rtpbin_rx_rtcp_port = 5015;
+static gchar *logsdir = NULL;
 
 static GOptionEntry entries[] =
 {
     { "profile", 0, 0, G_OPTION_ARG_INT, &profile, "Profile", NULL },
+    { "logsdir", 0, 0, G_OPTION_ARG_STRING, &logsdir, "Logsdir", NULL },
     { "path1_tx_rtp_port", 0, 0, G_OPTION_ARG_INT, &path1_tx_rtp_port, "path1_tx_rtp_port", NULL },
     { "path1_tx_rtcp_port", 0, 0, G_OPTION_ARG_INT, &path1_tx_rtcp_port, "path1_tx_rtcp_port", NULL },
     { "path1_rx_rtp_port", 0, 0, G_OPTION_ARG_INT, &path1_rx_rtp_port, "path1_rx_rtp_port", NULL },
@@ -218,7 +220,7 @@ static void _print_info(void)
   println("######################################################################");
 
   println("\n\n");
-  _print_transfer_info();
+//  _print_transfer_info();
 }
 
 
@@ -238,7 +240,7 @@ static void _setup_test_params(guint profile)
   g_print("%s subflow 2\n", test_parameters_.subflow2_active?"Active":"Deactive");
   test_parameters_.subflow3_active = (profile & 4) ? TRUE : FALSE;
   g_print("%s subflow 3\n", test_parameters_.subflow3_active?"Active":"Deactive");
-
+  g_print("logsdir: %s\n", logsdir);
   test_parameters_.subflow_num+=test_parameters_.subflow1_active ? 1 : 0;
   test_parameters_.subflow_num+=test_parameters_.subflow2_active ? 1 : 0;
   test_parameters_.subflow_num+=test_parameters_.subflow3_active ? 1 : 0;
@@ -343,7 +345,12 @@ static void _setup_test_params(guint profile)
   if(rtpbin_rx_rtcp_port == 0){
       rtpbin_rx_rtcp_port = 5015;
   }
-  _print_transfer_info();
+
+  if(logsdir == NULL){
+    logsdir = g_malloc(255);
+    sprintf(logsdir, "logs/");
+  }
+//  _print_transfer_info();
 
 }
 

@@ -121,6 +121,7 @@ enum
   PROP_KEEP_ALIVE_PERIOD,
   PROP_FEC_INTERVAL,
   PROP_LOG_ENABLED,
+  PROP_LOG_PATH,
   PROP_SUBFLOWS_STATS,
 };
 
@@ -309,6 +310,13 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "Indicate weather a log for subflow is enabled or not",
           "Indicate weather a log for subflow is enabled or not",
           FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+
+  g_object_class_install_property (gobject_class, PROP_LOG_PATH,
+        g_param_spec_string ("logs-path",
+            "Determines the path for logfiles",
+            "Determines the path for logfiles",
+            "NULL", G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   _subflows_utilization =
       g_signal_new ("mprtp-subflows-utilization", G_TYPE_FROM_CLASS (klass),
@@ -548,6 +556,11 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
         disable_mprtp_logger();
       THIS_WRITEUNLOCK (this);
       break;
+    case PROP_LOG_PATH:
+      THIS_WRITELOCK (this);
+      mprtp_logger_set_target_directory(g_value_get_string(value));
+      THIS_WRITEUNLOCK (this);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -577,6 +590,15 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
     case PROP_ABS_TIME_EXT_HEADER_ID:
       THIS_READLOCK (this);
       g_value_set_uint (value, (guint) this->abs_time_ext_header_id);
+      THIS_READUNLOCK (this);
+      break;
+    case PROP_LOG_PATH:
+      THIS_READLOCK (this);
+      {
+        gchar string[255];
+        mprtp_logger_get_target_directory(string);
+        g_value_set_string (value, string);
+      }
       THIS_READUNLOCK (this);
       break;
     case PROP_FEC_PAYLOAD_TYPE:

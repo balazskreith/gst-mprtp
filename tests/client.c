@@ -315,6 +315,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
     g_object_set (mprtpply, "join-subflow", 3, NULL);
 
   g_object_set(mprtpply, "logging", TRUE, NULL);
+  g_object_set(mprtpply, "logs-path", logsdir, NULL);
 
   g_print ("Connecting to %i/%i/%i/%i/%i/%i\n",
       basePort, basePort + 1, basePort + 5,

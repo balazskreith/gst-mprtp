@@ -527,6 +527,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   }
 
   g_object_set(mprtpsch, "logging", TRUE, NULL);
+  g_object_set(mprtpsch, "logs-path", logsdir, NULL);
 
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");

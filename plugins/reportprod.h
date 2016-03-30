@@ -85,6 +85,12 @@ void report_producer_add_xr_owd(ReportProducer *this,
                                 guint32 min_delay,
                                 guint32 max_delay);
 
+void report_producer_add_afb(ReportProducer *this,
+                                guint32 media_source_ssrc,
+                                guint32  fci_id,
+                                gpointer fci_dat,
+                                guint fci_dat_len);
+
 void report_producer_add_sr(ReportProducer *this,
                                 guint64 ntp_timestamp,
                                 guint32 rtp_timestamp,

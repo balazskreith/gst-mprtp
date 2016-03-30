@@ -178,6 +178,25 @@ void report_producer_add_xr_owd(ReportProducer *this,
   THIS_WRITEUNLOCK(this);
 }
 
+void report_producer_add_afb(ReportProducer *this,
+                                guint32 media_source_ssrc,
+                                guint32  fci_id,
+                                gpointer fci_dat,
+                                guint fci_dat_len)
+{
+  guint16 length;
+//  guint8 block_length;
+  GstRTCPFB *fb;
+  THIS_WRITELOCK(this);
+  fb = this->actual;
+  gst_rtcp_afb_init(fb);
+  gst_rtcp_afb_change(fb, &this->ssrc, &media_source_ssrc, &fci_id);
+  gst_rtcp_afb_setup_fci_data(fb, fci_dat, fci_dat_len);
+  gst_rtcp_header_getdown (&fb->header, NULL, NULL, NULL, NULL, &length, NULL);
+  _add_length(this, length);
+  THIS_WRITEUNLOCK(this);
+}
+
 void report_producer_add_sr(ReportProducer *this,
                                 guint64 ntp_timestamp,
                                 guint32 rtp_timestamp,
@@ -288,7 +307,6 @@ GstBuffer *report_producer_end(ReportProducer *this, guint *length)
   if(length) {
     *length = this->length;
   }
-  DISABLE_LINE _add_length(this, 10);
   THIS_WRITEUNLOCK(this);
   return result;
 }

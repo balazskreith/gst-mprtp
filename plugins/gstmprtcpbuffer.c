@@ -1,35 +1,3 @@
-/* GStreamer
- * Copyright (C) 2015 FIXME <fixme@example.com>
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Library General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Library General Public License for more details.
- *
- * You should have received a copy of the GNU Library General Public
- * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 51 Franklin Street, Suite 500,
- * Boston, MA 02110-1335, USA.
- */
-/**
- * SECTION:element-gstmprtcpreceiver
- *
- * The mprtcpreceiver element does FIXME stuff.
- *
- * <refsect2>
- * <title>Example launch line</title>
- * |[
- * gst-launch -v fakesrc ! mprtcpreceiver ! FIXME ! fakesink
- * ]|
- * FIXME Describe what the pipeline does.
- * </refsect2>
- */
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -41,6 +9,7 @@
 #include "gstmprtcpbuffer.h"
 
 
+
 #define RTCPHEADER_BYTES 8
 #define RTCPHEADER_WORDS (RTCPHEADER_BYTES>>2)
 #define RTCPSRBLOCK_BYTES 20
@@ -49,8 +18,8 @@
 #define RTCPXR7243BLOCK_WORDS (RTCPXR7243BLOCK_BYTES>>2)
 #define RTCPXROWDBLOCK_BYTES 20
 #define RTCPXROWDBLOCK_WORDS (RTCPXROWDBLOCK_BYTES>>2)
-#define RTCPFBMPCCDBLOCK_BYTES 24
-#define RTCPFBMPCCBLOCK_WORDS (RTCPFBMPCCDBLOCK_BYTES>>2)
+#define RTCPFB_BYTES 8
+#define RTCPFB_WORDS (RTCPFB_BYTES>>2)
 #define RTCPRRBLOCK_BYTES 24
 #define RTCPRRBLOCK_WORDS (RTCPRRBLOCK_BYTES>>2)
 #define MPRTCPBLOCK_BYTES 4
@@ -624,6 +593,89 @@ gst_rtcp_xr_rfc7243_getdown (GstRTCPXR_RFC7243 * riport,
     *ssrc = g_ntohs (riport->ssrc);
   }
 }
+
+//------------------ RTCP FB ------------------------
+void
+gst_rtcp_afb_init (GstRTCPFB * report)
+{
+  gst_rtcp_header_init (&report->header);
+  gst_rtcp_header_setup (&report->header, FALSE, GST_RTCP_PSFB_TYPE_AFB,
+      GST_RTCP_TYPE_RTPFB, RTCPHEADER_WORDS - 1 + RTCPFB_WORDS, 0);
+  gst_rtcp_afb_setup (report, 0, 0, 0);
+}
+
+
+void
+gst_rtcp_afb_setup (GstRTCPFB * report,
+                    guint32 packet_source_ssrc,
+                    guint32 media_source_ssrc,
+                    guint32 fci_id)
+{
+  report->ssrc = g_htonl (media_source_ssrc);
+  report->fci_id = g_htonl (fci_id);
+}
+
+void
+gst_rtcp_afb_change (GstRTCPFB * report,
+                     guint32 *packet_source_ssrc,
+                     guint32 *media_source_ssrc,
+                     guint32 *fci_id)
+{
+  if (packet_source_ssrc) {
+      gst_rtcp_header_change(&report->header, NULL, NULL, NULL, NULL, NULL, packet_source_ssrc);
+  }
+  if (media_source_ssrc) {
+      report->ssrc = g_htonl (*media_source_ssrc);
+  }
+  if (fci_id) {
+      report->fci_id = g_htonl(*fci_id);
+  }
+}
+
+void
+gst_rtcp_afb_getdown (GstRTCPFB * report,
+                      guint32 *packet_source_ssrc,
+                      guint32 *media_source_ssrc,
+                      guint32 *fci_id)
+{
+  if (packet_source_ssrc) {
+      gst_rtcp_header_getdown(&report->header, NULL, NULL, NULL, NULL, NULL, packet_source_ssrc);
+  }
+  if (media_source_ssrc) {
+      *media_source_ssrc = g_ntohl(report->ssrc);
+  }
+  if (fci_id) {
+      *fci_id = g_ntohl(report->fci_id);
+  }
+}
+
+
+void
+gst_rtcp_afb_setup_fci_data(GstRTCPFB * report, gpointer fci_dat, guint fci_len)
+{
+  guint16 header_length;
+  memcpy(&report->fci_data, fci_dat, fci_len);
+  gst_rtcp_header_getdown(&report->header, NULL, NULL, NULL, NULL, &header_length, NULL);
+  header_length += (fci_len>>2) - 1;
+  gst_rtcp_header_change(&report->header, NULL, NULL, NULL, NULL, &header_length, NULL);
+}
+
+
+void
+gst_rtcp_afb_getdown_fci_data(GstRTCPFB * report, gchar *fci_dat, guint *fci_len)
+{
+  guint16 header_length, fci_length;
+  gst_rtcp_header_getdown(&report->header, NULL, NULL, NULL, NULL, &header_length, NULL);
+  fci_length = header_length - (RTCPHEADER_WORDS - 1) - (RTCPFB_WORDS - 1);
+  fci_length<<=2;
+  if(fci_len){
+    *fci_len = fci_length;
+  }
+  if(fci_dat){
+    memcpy(fci_dat, &report->fci_data, fci_length);
+  }
+}
+
 
 void
 gst_rtcp_xr_chunk_change (GstRTCPXR_Chunk *chunk,
@@ -1459,6 +1511,21 @@ gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * riport)
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%63X|\n", riport->block_type, interval_metric, early_bit, 0,
       g_ntohs (riport->block_length), ssrc, discarded_bytes);
+}
+
+
+void
+gst_print_rtcp_afb (GstRTCPFB * report)
+{
+  guint32 ssrc;
+  guint32 fci_id;
+
+  gst_rtcp_afb_getdown(report, NULL, &ssrc, &fci_id);
+  gst_print_rtcp_header (&report->header);
+  g_print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+      "|%63X|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63X|\n", ssrc, fci_id);
 }
 
 

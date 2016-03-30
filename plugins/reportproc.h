@@ -81,6 +81,14 @@ struct _GstMPRTCPReportSummary{
     guint16           length;
     gint32            total;
   }XR_RFC7097;
+
+  struct{
+    gboolean          processed;
+    guint32           media_source_ssrc;
+    guint32           fci_id;
+    gchar             fci_data[1400];
+    guint             fci_length;
+  }AFB;
 };
 
 

@@ -19,7 +19,6 @@ typedef struct _NetQueueAnalyserClass NetQueueAnalyserClass;
 #include "numstracker.h"
 #include "percentiletracker.h"
 #include "mprtpspath.h"
-#include "floatsbuffer.h"
 #include "reportproc.h"
 
 #define NETQANALYSER_TYPE             (netqueue_analyser_get_type())

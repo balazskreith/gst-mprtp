@@ -74,6 +74,11 @@ _processing_xr_7243 (
     GstMPRTCPReportSummary* summary);
 
 static void
+_processing_afb (ReportProcessor *this,
+                 GstRTCPFB *afb,
+                 GstMPRTCPReportSummary* summary);
+
+static void
 _processing_xr_owd (
     ReportProcessor *this,
     GstRTCPXR_OWD * xrb,
@@ -191,6 +196,7 @@ void _processing_mprtcp_subflow_block (
   guint8 pt;
   guint8 block_length;
   guint8 processed_length;
+  guint8 rsvd;
   guint16 actual_length;
   guint16 subflow_id;
   GstRTCPHeader *header;
@@ -201,7 +207,7 @@ void _processing_mprtcp_subflow_block (
   processed_length = 0;
 
 again:
-  gst_rtcp_header_getdown (header, NULL, NULL, NULL, &pt, &actual_length, NULL);
+  gst_rtcp_header_getdown (header, NULL, NULL, &rsvd, &pt, &actual_length, NULL);
 
   switch(pt){
     case GST_RTCP_TYPE_SR:
@@ -210,6 +216,12 @@ again:
         _processing_srblock (this, &sr->sender_block, summary);
       }
     break;
+    case GST_RTCP_TYPE_RTPFB:
+      if(rsvd == GST_RTCP_PSFB_TYPE_AFB){
+        GstRTCPFB *afb = (GstRTCPFB*) header;
+        _processing_afb(this, afb, summary);
+      }
+      break;
     case GST_RTCP_TYPE_RR:
       {
         GstRTCPRR* rr = (GstRTCPRR*)header;
@@ -304,6 +316,23 @@ _processing_xr_7243 (ReportProcessor *this,
                                &summary->XR_RFC7243.early_bit,
                                NULL,
                                &summary->XR_RFC7243.discarded_bytes);
+}
+
+
+void
+_processing_afb (ReportProcessor *this,
+                 GstRTCPFB *afb,
+                 GstMPRTCPReportSummary* summary)
+{
+  summary->AFB.processed = TRUE;
+  gst_rtcp_afb_getdown(afb,
+                       NULL,
+                       &summary->AFB.media_source_ssrc,
+                       &summary->AFB.fci_id);
+
+  gst_rtcp_afb_getdown_fci_data(afb,
+                                summary->AFB.fci_data,
+                                &summary->AFB.fci_length);
 }
 
 

@@ -49,10 +49,10 @@ G_DEFINE_TYPE (SubflowRateController, subratectrler, G_TYPE_OBJECT);
 
 
 //if target close to the bottleneck, the increasement will be multiplied by this factor
-#define BOTTLENECK_INCREASEMENT_FACTOR 0.75
+#define BOTTLENECK_INCREASEMENT_FACTOR 1.0
 
 //determine the epsilon factor around the target rate indicate weather we close to the bottleneck or not.
-#define BOTTLENECK_EPSILON .15
+#define BOTTLENECK_EPSILON .25
 
 //if target bitrate is close to the bottleneck, monitoring interval is requested for this interval
 //note if the target/interval is higher than the maximum ramp up speed, then monitoring is
@@ -850,21 +850,46 @@ void _reset_monitoring(SubflowRateController *this)
   this->monitoring_started = 0;
   this->monitored_bitrate = 0;
 }
+//
+//void _setup_monitoring(SubflowRateController *this)
+//{
+//  guint interval;
+//  gdouble plus_rate = 0, scl = 0;
+//  if(this->bottleneck_point * (1.-_btl_eps(this)) < _TR(this) && _TR(this) < this->bottleneck_point * (1.+_btl_eps(this))){
+//    plus_rate = this->target_bitrate / (gdouble)_btl_mon_int(this);
+//    goto done;
+//  }
+//  scl =  (gdouble) _priv(this)->min_target_bitrate;
+//  scl /= (gdouble) _TR(this);
+//  scl *= scl;
+//  scl = CONSTRAIN(1./(gdouble)_mon_max_int(this), 1./(gdouble)_mon_min_int(this), scl);
+//  plus_rate = _TR(this) * scl;
+//done:
+//  plus_rate = CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), plus_rate);
+//  interval = _calculate_monitoring_interval(this, plus_rate);
+//  _set_monitoring_interval(this, interval);
+//}
 
 void _setup_monitoring(SubflowRateController *this)
 {
   guint interval;
   gdouble plus_rate = 0, scl = 0;
-  if(this->bottleneck_point * (1.-_btl_eps(this)) < _TR(this) && _TR(this) < this->bottleneck_point * (1.+_btl_eps(this))){
-    plus_rate = this->target_bitrate / (gdouble)_btl_mon_int(this);
-    goto done;
+  guint mean;
+
+  mean = _priv(this)->min_target_bitrate + _priv(this)->max_target_bitrate;
+  mean>>=1;
+
+  if(0 < this->bottleneck_point){
+    scl  = _TR(this) - this->bottleneck_point;
+    scl /= this->bottleneck_point * _btl_eps(this);
+    scl *= scl;
+  }else{
+    scl =  (gdouble) _priv(this)->min_target_bitrate;
+    scl /= (gdouble) _TR(this);
+    scl *= scl;
   }
-  scl =  (gdouble) _priv(this)->min_target_bitrate;
-  scl /= (gdouble) _TR(this);
-  scl *= scl;
   scl = CONSTRAIN(1./(gdouble)_mon_max_int(this), 1./(gdouble)_mon_min_int(this), scl);
   plus_rate = _TR(this) * scl;
-done:
   plus_rate = CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), plus_rate);
   interval = _calculate_monitoring_interval(this, plus_rate);
   _set_monitoring_interval(this, interval);

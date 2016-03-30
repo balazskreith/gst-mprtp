@@ -26,7 +26,6 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          percentiletracker2.c       \
                          sndratedistor.c            \
                          numstracker.c              \
-                         floatsbuffer.c             \
                          subratectrler.c            \
                          fecdec.c                   \
                          fecenc.c                   \
@@ -52,7 +51,6 @@ noinst_HEADERS = mprtpspath.h           \
                  percentiletracker2.h   \
                  sndratedistor.h        \
                  numstracker.h          \
-                 floatsbuffer.h         \
                  subratectrler.h        \
                  fecdec.h               \
                  fecenc.h               \

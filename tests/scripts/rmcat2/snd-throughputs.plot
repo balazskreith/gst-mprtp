@@ -2,11 +2,11 @@ name=system("echo mprtp-subflow-")
 time=system("date +%Y_%m_%d_%H_%M_%S")
 
 if (!exists("plot_title")) plot_title='Subflow Receiver Rate Report'
-if (!exists("throughput_file")) throughput_file='logs/sub_snd_sum.csv'
+if (!exists("throughput_file"))   throughput_file='logs/sub_snd_sum.csv'
 if (!exists("bw_file")) bw_file='logs/veth0.csv'
 if (!exists("output_file")) output_file='reports/summary-snd-rates.pdf'
 if (!exists("duration")) duration=6000
-if (!exists("range")) range=3000
+if (!exists("range")) range=4500
 
 #-------------------------------------------------------------------------
 

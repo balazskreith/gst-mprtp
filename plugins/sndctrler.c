@@ -526,8 +526,11 @@ void _subflow_iterator(
 
 void _enable_controlling(Subflow *subflow, gpointer data)
 {
-//  SndController *this = data;
-  subratectrler_enable(subflow->rate_controller);
+  SndController *this = data;
+  guint32 target_bitrate_start;
+
+  target_bitrate_start = stream_splitter_get_sending_target(this->splitter, subflow->id);
+  subratectrler_enable(subflow->rate_controller, target_bitrate_start);
   mprtps_path_activate_packets_monitoring(subflow->path, DEFAULT_PATH_STAT_PACKETS_LENGTH);
 }
 

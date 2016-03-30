@@ -378,10 +378,11 @@ SubflowRateController *make_subratectrler(SendingRateDistributor* rate_controlll
   return result;
 }
 
-void subratectrler_enable(SubflowRateController *this)
+void subratectrler_enable(SubflowRateController *this, guint32 target_bitrate_start)
 {
   this->enabled = TRUE;
   this->disable_controlling = _now(this) + 10 * GST_SECOND;
+  this->target_bitrate = this->target_bitrate_t1 = target_bitrate_start;
 }
 
 void subratectrler_disable(SubflowRateController *this)

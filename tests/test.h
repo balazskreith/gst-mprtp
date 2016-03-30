@@ -95,6 +95,10 @@ static TestParams test_parameters_;
 static gint32 profile;
 static gint32 info;
 
+static int target_bitrate_start = 0;
+static int target_bitrate_min   = 0;
+static int target_bitrate_max   = 0;
+
 static int path1_tx_rtp_port  = 5000;
 static int path1_tx_rtcp_port = 5001;
 static int path1_rx_rtp_port  = 5002;
@@ -118,6 +122,9 @@ static GOptionEntry entries[] =
 {
     { "profile", 0, 0, G_OPTION_ARG_INT, &profile, "Profile", NULL },
     { "logsdir", 0, 0, G_OPTION_ARG_STRING, &logsdir, "Logsdir", NULL },
+    { "target_bitrate_start", 0, 0, G_OPTION_ARG_INT, &target_bitrate_start, "target_bitrate_start", NULL },
+    { "target_bitrate_min", 0, 0, G_OPTION_ARG_INT, &target_bitrate_min, "target_bitrate_min", NULL },
+    { "target_bitrate_max", 0, 0, G_OPTION_ARG_INT, &target_bitrate_max, "target_bitrate_max", NULL },
     { "path1_tx_rtp_port", 0, 0, G_OPTION_ARG_INT, &path1_tx_rtp_port, "path1_tx_rtp_port", NULL },
     { "path1_tx_rtcp_port", 0, 0, G_OPTION_ARG_INT, &path1_tx_rtcp_port, "path1_tx_rtcp_port", NULL },
     { "path1_rx_rtp_port", 0, 0, G_OPTION_ARG_INT, &path1_rx_rtp_port, "path1_rx_rtp_port", NULL },
@@ -241,6 +248,7 @@ static void _setup_test_params(guint profile)
   test_parameters_.subflow3_active = (profile & 4) ? TRUE : FALSE;
   g_print("%s subflow 3\n", test_parameters_.subflow3_active?"Active":"Deactive");
   g_print("logsdir: %s\n", logsdir);
+  test_parameters_.subflow_num = 0;
   test_parameters_.subflow_num+=test_parameters_.subflow1_active ? 1 : 0;
   test_parameters_.subflow_num+=test_parameters_.subflow2_active ? 1 : 0;
   test_parameters_.subflow_num+=test_parameters_.subflow3_active ? 1 : 0;
@@ -349,6 +357,14 @@ static void _setup_test_params(guint profile)
   if(logsdir == NULL){
     logsdir = g_malloc(255);
     sprintf(logsdir, "logs/");
+  }
+
+  if(target_bitrate_start == 0){
+      target_bitrate_start = 128000 * test_parameters_.subflow_num;
+  }
+
+  if(target_bitrate_min == 0){
+      target_bitrate_min = 500000;
   }
 //  _print_transfer_info();
 

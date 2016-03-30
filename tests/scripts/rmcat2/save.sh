@@ -3,6 +3,7 @@
 function usage {
     echo "usage: $programname [options value]"
     echo "	--logsdir 	determines the directory of the logfiles"
+    echo "	--logsdir2 	determines the directory of the logfiles2"    
     echo "	--repsdir 	determines the directory of the report pdfs"
     echo "	--savdir 	determines the directory of the destination"
     echo "	--savnam 	determines the name of the saving files"
@@ -17,6 +18,7 @@ then
 fi 
 
 LOGSDIR="logs"
+LOGSDIR2="logs2"
 REPSDIR="reports"
 SAVDIR=""
 SAVNAM=""
@@ -34,6 +36,10 @@ case $key in
     LOGSDIR="$2"
     shift # past argument
     ;;
+    --logsdir)
+    LOGSDIR2="$2"
+    shift # past argument
+    ;;    
     --repsdir)
     REPSDIR="$2"
     shift # past argument

@@ -4,6 +4,7 @@ function usage {
     echo "usage: $programname [options value]"
     echo "	--author 	determines the file used for reading the name of the author requested the tests"
     echo "	--srcdir 	determines the directory used as source of pdf plotfiles"
+    echo "	--srcdir2 	determines the directory used as source of pdf plotfiles"    
     echo "	--dst    	determines the path for the output"
     exit 1
 }
@@ -30,6 +31,10 @@ case $key in
     SRCDIR="$2"
     shift # past argument
     ;;
+    --srcdir2)
+    SRCDIR2="$2"
+    shift # past argument
+    ;;    
     --dst)
     DST="$2"
     shift # past argument
@@ -55,6 +60,7 @@ echo "\documentclass[a4paper]{article}
 \usepackage[colorinlistoftodos]{todonotes}
 \usepackage{pdfpages}
 \usepackage{url}
+\usepackage{subcaption}
 
 \title{
  Variable Available Capacity with Multiple RMCAT flows\\\[1cm]
@@ -165,6 +171,15 @@ RCVTHROUGHPUTSPLOT="$SRCDIR/rcv-throughputs.pdf"
 SNDTHROUGHPUTSPLOT="$SRCDIR/snd-throughputs.pdf"
 RTCPINTVALSPLOT="$SRCDIR/rtcp-intervals.pdf"
 LOSTSPLOT="$SRCDIR/losts.pdf"
+
+FECPLOT2="$SRCDIR/fec2.pdf"
+PLAYOUTPLOT2="$SRCDIR/playouts2.pdf"
+AUTOCORRSPLOT2="$SRCDIR/owd-autocorrs2.pdf"
+RCVTHROUGHPUTSPLOT2="$SRCDIR/rcv-throughputs2.pdf"
+SNDTHROUGHPUTSPLOT2="$SRCDIR/snd-throughputs2.pdf"
+RTCPINTVALSPLOT2="$SRCDIR/rtcp-intervals2.pdf"
+LOSTSPLOT2="$SRCDIR/losts2.pdf"
+
 CCPARAMS="$SRCDIR/ccparams_1.log"
 STATFILE="$SRCDIR/stats.csv"
 
@@ -192,54 +207,121 @@ echo "
 
 echo "
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=1\textwidth]{$SNDTHROUGHPUTSPLOT}
-    \caption{The measured throughputs at the sender side}
-    \label{fig:sndthroughputs}
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\textwidth]{$SNDTHROUGHPUTSPLOT}
+  \label{fig:sndthroughputs}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\textwidth]{$SNDTHROUGHPUTSPLOT2}
+  \label{fig:sndthroughputs}
+\end{subfigure}
+\caption{The measured throughputs at the sender side}
+\label{fig:test}
 \end{figure}
 
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=1\textwidth]{$RCVTHROUGHPUTSPLOT}
-    \caption{The measured throughputs at the receiver side}
-    \label{fig:rcvthroughputs}
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\textwidth]{$RCVTHROUGHPUTSPLOT}
+  \label{fig:sndthroughputs}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\textwidth]{$RCVTHROUGHPUTSPLOT2}
+  \label{fig:sndthroughputs}
+\end{subfigure}
+\caption{The measured throughputs at the receiver side}
+\label{fig:test}
 \end{figure}
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=1\textwidth]{$AUTOCORRSPLOT}
-    \caption{Reported one way delays and their multiple-$\tau$ autocorrelations}
-    \label{fig:mtauautocorrs}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\textwidth]{$AUTOCORRSPLOT}
+  \label{fig:sndthroughputs}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\textwidth]{$AUTOCORRSPLOT2}
+  \label{fig:sndthroughputs}
+\end{subfigure}
+\caption{Reported one way delays and their multiple-$\tau$ autocorrelations}
+\label{fig:test}
 \end{figure}
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=1\textwidth]{$PLAYOUTPLOT}
-    \caption{Playout delays and queue size}
-    \label{fig:playouts}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\textwidth]{$PLAYOUTPLOT}
+  \label{fig:sndthroughputs}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\textwidth]{$PLAYOUTPLOT2}
+  \label{fig:sndthroughputs}
+\end{subfigure}
+\caption{Playout delays and queue size}
+\label{fig:test}
 \end{figure}
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=1\textwidth]{$FECPLOT}
-    \caption{Summary of FEC recovery}
-    \label{fig:fec}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\textwidth]{$FECPLOT}
+  \label{fig:sndthroughputs}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\textwidth]{$FECPLOT2}
+  \label{fig:sndthroughputs}
+\end{subfigure}
+\caption{Summary of FEC recovery}
+\label{fig:test}
 \end{figure}
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=1\textwidth]{$RTCPINTVALSPLOT}
-    \caption{Summary of RTCP intervals}
-    \label{fig:sumrtcpintervals}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\textwidth]{$RTCPINTVALSPLOT}
+  \label{fig:sndthroughputs}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\textwidth]{$RTCPINTVALSPLOT2}
+  \label{fig:sndthroughputs}
+\end{subfigure}
+\caption{Summary of FEC recovery}
+\label{fig:test}
 \end{figure}
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=1\textwidth]{$LOSTSPLOT}
-    \caption{Summary of losts}
-    \label{fig:sumlosts}
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\textwidth]{$LOSTSPLOT}
+  \label{fig:sndthroughputs}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\textwidth]{$LOSTSPLOT2}
+  \label{fig:sndthroughputs}
+\end{subfigure}
+\caption{Summary of FEC recovery}
+\label{fig:test}
 \end{figure}
 
 

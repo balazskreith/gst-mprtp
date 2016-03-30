@@ -158,7 +158,7 @@ make_video_testsrc_session (guint sessionNum)
   g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 1, NULL);
   //g_object_set (payloader, "config-interval", 2, NULL);
 
-  g_object_set (encoder, "target-bitrate", 128000 * test_parameters_.subflow_num, NULL);
+  g_object_set (encoder, "target-bitrate", target_bitrate_start, NULL);
   g_object_set (encoder, "keyframe-max-dist", 20, NULL);
   g_object_set (encoder, "end-usage", 1, NULL);
   g_object_set (encoder, "deadline", 20000, NULL);
@@ -347,8 +347,8 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
            }
       else  if(test_parameters_.video_session == YUVFILE_SOURCE){
           if(test_parameters_.yuvsequence == FOREMAN){
-            ur->subflows[i].control.min_rate = 500000 / test_parameters_.subflow_num;
-            ur->subflows[i].control.max_rate = 3000000;
+            ur->subflows[i].control.min_rate = target_bitrate_min;
+            ur->subflows[i].control.max_rate = target_bitrate_max;
           }else if(test_parameters_.yuvsequence == KRISTEN_AND_SARA){
             ur->subflows[i].control.min_rate = 500000 / test_parameters_.subflow_num;
             ur->subflows[i].control.max_rate = 3000000;
@@ -507,6 +507,12 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
     g_object_set (mprtpsch, "join-subflow", 2, NULL);
   if(test_parameters_.subflow3_active)
     g_object_set (mprtpsch, "join-subflow", 3, NULL);
+
+  g_object_set (mprtpsch,
+            "setup-sending-target", (1 << 24) | target_bitrate_start,
+            "setup-sending-target", (2 << 24) | target_bitrate_start,
+            "setup-sending-target", (3 << 24) | target_bitrate_start,
+            NULL);
 
   if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING){
     g_object_set (mprtpsch, "auto-rate-and-cc", TRUE, NULL);

@@ -2,7 +2,7 @@ name=system("echo mprtp-subflow-")
 time=system("date +%Y_%m_%d_%H_%M_%S")
 
 if (!exists("plot_title"))  plot_title='Subflow RTCP Intervals'
-if (!exists("rtcp_file")) rtcp_file='logs/rtcp_rr_1.csv'
+if (!exists("rtcp_file"))  rtcp_file='logs/rtcp_rr_1.csv'
 if (!exists("output_file")) output_file='reports/sub_1_rtcp_intervals.pdf'
 if (!exists("duration"))  duration=100
 if (!exists("range"))  range=2000

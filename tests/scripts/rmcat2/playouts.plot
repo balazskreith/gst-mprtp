@@ -1,12 +1,12 @@
 name=system("echo mprtp-subflow-") 
 time=system("date +%Y_%m_%d_%H_%M_%S")
 
-if (!exists("plot_title"))    plot_title='Playouts summary'
-if (!exists("playouts_file")) playouts_file='logs/playouts.csv'
-if (!exists("skew_file"))     skew_file='logs/skews.csv'
-if (!exists("output_file"))   output_file='reports/summary-playouts.pdf'
-if (!exists("duration"))      duration=600000
-if (!exists("xtick_value"))   xtick_value=100000
+if (!exists("plot_title"))     plot_title='Playouts summary'
+if (!exists("playouts_file"))  playouts_file='logs/playouts.csv'
+if (!exists("skew_file"))      skew_file='logs/skews.csv'
+if (!exists("output_file"))    output_file='reports/summary-playouts.pdf'
+if (!exists("duration"))       duration=600000
+if (!exists("xtick_value"))    xtick_value=100000
 
 #-------------------------------------------------------------------------
 

@@ -21,6 +21,11 @@ typedef struct _ReportIntervalCalculatorClass ReportIntervalCalculatorClass;
 #define RICALCER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),RICALCER_TYPE))
 #define RICALCER_CAST(src)        ((ReportIntervalCalculator *)(src))
 
+typedef enum{
+  RTCP_INTERVAL_REGULAR_INTERVAL_MODE      = 0,
+  RTCP_INTERVAL_EARLY_RTCP_MODE            = 1,
+  RTCP_INTERVAL_IMMEDIATE_FEEDBACK_MODE    = 2,
+}RTCPIntervalMode;
 
 struct _ReportIntervalCalculator
 {
@@ -38,19 +43,24 @@ struct _ReportIntervalCalculator
   GstClockTime     last_time;
   GstClockTime     next_time;
   GstClockTime     actual_interval;
-  GstClockTime     last_interval;
   GstClockTime     urgent_time;
+
+  GstClockTime     t_rr_last;
+
+  RTCPIntervalMode  mode;
+  void            (*interval_calcer)(ReportIntervalCalculator * this);
 };
 
 struct _ReportIntervalCalculatorClass{
   GObjectClass parent_class;
 };
 
-
 GType ricalcer_get_type (void);
 ReportIntervalCalculator *make_ricalcer(gboolean sender_side);
-gboolean ricalcer_do_report_now (ReportIntervalCalculator * this);
-void ricalcer_do_next_report_time (ReportIntervalCalculator * this);
+void ricalcer_set_mode(ReportIntervalCalculator *this, RTCPIntervalMode mode);
+gboolean ricalcer_rtcp_regular_allowed(ReportIntervalCalculator * this);
+gboolean ricalcer_rtcp_fb_allowed(ReportIntervalCalculator * this);
+
 void ricalcer_refresh_parameters(ReportIntervalCalculator * this, gdouble media_rate, gdouble avg_rtcp_size);
 void ricalcer_urgent_report_request(ReportIntervalCalculator * this);
 

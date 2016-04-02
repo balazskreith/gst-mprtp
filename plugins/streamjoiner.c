@@ -64,9 +64,8 @@ struct _Subflow
 {
   guint8 id;
   MpRTPRPath  *path;
-  gdouble      delay_avg;
   gdouble      skew;
-  guint32      jitter;
+  gdouble      delay;
 };
 
 
@@ -145,7 +144,7 @@ _rem_mprtp(
 
 static void
 _logging(
-    StreamJoiner *this);
+    gpointer data);
 
 //#define _trash_frame(this, frame)
 //  g_slice_free(Frame, frame);
@@ -262,6 +261,8 @@ stream_joiner_init (StreamJoiner * this)
                                                                             _skews_min_pipe, this));
 
   g_rw_lock_init (&this->rwmutex);
+
+  mprtp_logger_add_logging_fnc(_logging, this, 10);
 }
 
 StreamJoiner*
@@ -270,13 +271,6 @@ make_stream_joiner(void)
   StreamJoiner *result;
   result = (StreamJoiner *) g_object_new (STREAM_JOINER_TYPE, NULL);
   return result;
-}
-
-void stream_joiner_do_logging(StreamJoiner *this)
-{
-  THIS_READLOCK(this);
-  _logging(this);
-  THIS_READUNLOCK(this);
 }
 
 
@@ -322,9 +316,7 @@ GstMpRTPBuffer *stream_joiner_pop(StreamJoiner *this)
 
     }
   }
-  if(result) mprtp_logger("pop.log", "%lu,%u\n", GST_TIME_AS_MSECONDS(_now(this)), result->timestamp);
 done:
-//if(result) g_print("pop %p->%d\n", result->buffer, result->buffer->mini_object.refcount);
   THIS_WRITEUNLOCK (this);
   return result;
 }
@@ -339,9 +331,8 @@ void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
   mprtpr_path_process_rtp_packet(subflow->path, mprtp);
 
   mprtpr_path_get_joiner_stats(subflow->path,
-                              NULL,
-                              &subflow->skew,
-                              &subflow->jitter);
+                              &subflow->delay,
+                              &subflow->skew);
 
   numstracker_add(this->skews, subflow->skew);
 
@@ -683,9 +674,10 @@ static void _logging_helper(Subflow *subflow, gpointer data)
   mprtp_logger(filename, "%f\n", subflow->skew);
 }
 
-void _logging(StreamJoiner *this)
+void _logging(gpointer data)
 {
 
+  StreamJoiner *this = data;
   mprtp_logger("streamjoiner.csv",
                "%f,%d\n",
                this->playout_delay,

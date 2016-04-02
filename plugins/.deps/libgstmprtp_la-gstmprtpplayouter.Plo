@@ -350,8 +350,8 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  /usr/include/x86_64-linux-gnu/bits/stdio.h \
  /usr/include/x86_64-linux-gnu/bits/stdio2.h mprtpspath.h \
  packetssndqueue.h reportproc.h packetstracker.h sndratedistor.h \
- streamsplitter.h reportprod.h fecenc.h rtpfecbuffer.h fecdec.h \
- /usr/include/glib-2.0/gio/gnetworking.h /usr/include/netdb.h \
+ streamsplitter.h reportprod.h fecenc.h rtpfecbuffer.h signalreport.h \
+ fecdec.h /usr/include/glib-2.0/gio/gnetworking.h /usr/include/netdb.h \
  /usr/include/netinet/in.h \
  /usr/lib/gcc/x86_64-linux-gnu/4.8/include/stdint.h /usr/include/stdint.h \
  /usr/include/x86_64-linux-gnu/bits/wchar.h \
@@ -1194,6 +1194,8 @@ reportprod.h:
 fecenc.h:
 
 rtpfecbuffer.h:
+
+signalreport.h:
 
 fecdec.h:
 

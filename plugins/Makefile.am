@@ -8,7 +8,6 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          gstmprtpplayouter.c        \
                          gstmprtpreceiver.c         \
                          gstmprtpsender.c           \
-                         netqanalyser.c             \
                          mprtprpath.c               \
                          mprtpspath.c               \
                          streamjoiner.c             \
@@ -30,14 +29,15 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          fecdec.c                   \
                          fecenc.c                   \
                          rtpfecbuffer.c             \
-                         packetstracker.c
+                         packetstracker.c           \
+                         marcfbproc.c               \
+                         signalreport.c
                     
                     
 noinst_HEADERS = mprtpspath.h           \
                  sndctrler.h            \
                  rcvctrler.c            \
                  mprtprpath.h           \
-                 netqanalyser.h         \
                  streamsplitter.h       \
                  streamjoiner.h         \
                  bintree.h              \
@@ -55,7 +55,9 @@ noinst_HEADERS = mprtpspath.h           \
                  fecdec.h               \
                  fecenc.h               \
                  rtpfecbuffer.h         \
-                 packetstracker.h
+                 packetstracker.h       \
+                 marcfbproc.h           \
+                 signalreport.h           
                           
 
 # compiler and linker flags used to compile this plugin, set in configure.ac

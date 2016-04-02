@@ -46,11 +46,9 @@ typedef struct _GstMprtpschedulerPrivate GstMprtpschedulerPrivate;
 struct _GstMprtpscheduler
 {
   GstElement                    base_object;
-
+  GRWLock                       rwmutex;
   GstPad*                       rtp_sinkpad;
   GstPad*                       mprtp_srcpad;
-  //GstPad        *rtcp_sinkpad;
-  //GstPad        *rtcp_srcpad;
   GstPad*                       mprtcp_rr_sinkpad;
   GstPad*                       mprtcp_sr_srcpad;
 
@@ -60,9 +58,9 @@ struct _GstMprtpscheduler
   guint                         auto_rate_and_cc;
   PacketsSndQueue*              sndqueue;
   GHashTable*                   paths;
-  GRWLock                       rwmutex;
   StreamSplitter*               splitter;
   SndController*                controller;
+  SendingRateDistributor*       sndrates;
   gboolean                      logging;
   gboolean                      riport_flow_signal_sent;
   guint                         active_subflows_num;

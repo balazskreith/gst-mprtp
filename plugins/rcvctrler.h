@@ -39,25 +39,24 @@ struct _RcvController
 
   GHashTable*       subflows;
   GRWLock           rwmutex;
+  GstClockTime      made;
   GstClock*         sysclock;
   StreamJoiner*     joiner;
   guint32           ssrc;
   void            (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
   gpointer          send_mprtcp_packet_data;
   gboolean          report_is_flowable;
-  gboolean          rfc7097_enabled;
-  gboolean          rfc7243_enabled;
-  gboolean          rfc3611_enabled;
+
   ReportProducer*   report_producer;
   ReportProcessor*  report_processor;
 
   FECDecoder*       fecdecoder;
-  guint32           fecdecoder_early_repaired_bytes[10];
-  guint32           fecdecoder_total_repaired_bytes[10];
-  gint32            fecdecoder_index;
-  gboolean          enabled;
+  gpointer          fec_early_repaired_bytes;
+  gpointer          fec_total_repaired_bytes;
+  gdouble           FFRE;
+  guint             orp_tick;
 
-
+  GstMPRTCPReportSummary reports_summary;
 };
 
 struct _RcvControllerClass{
@@ -70,6 +69,19 @@ struct _RcvControllerClass{
 void rcvctrler_setup(RcvController *this,
                      StreamJoiner* splitter,
                      FECDecoder*   fecdecoder);
+
+void
+rcvctrler_change_interval_type(
+    RcvController * this,
+    guint8 subflow_id,
+    guint type);
+
+void
+rcvctrler_change_reporting_mode(
+    RcvController *this,
+    guint8 subflow_id,
+    guint reports,
+    guint cngctrler);
 
 void
 rcvctrler_add_path (
@@ -97,13 +109,6 @@ rcvctrler_setup_callbacks(RcvController * this,
                           gpointer mprtcp_send_data,
                           GstBufferReceiverFunc mprtcp_send_func);
 
-
-void
-rcvctrler_set_additional_reports(RcvController * this,
-                          gboolean rfc3611_reports,
-                          gboolean rfc7097_reports,
-                          gboolean rfc7243_reports
-                          );
 
 
 GType rcvctrler_get_type (void);

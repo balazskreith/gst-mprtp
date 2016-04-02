@@ -305,7 +305,9 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
   g_object_set (mprtpply, "pivot-clock-rate", clockrate, NULL);
 
   if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING)
-    g_object_set (mprtpply, "auto-rate-and-cc", TRUE, NULL);
+    g_object_set (mprtpply,
+              "setup-reporting-mode", (255 << 24) | 2,
+              NULL);
 
   if(test_parameters_.subflow1_active)
     g_object_set (mprtpply, "join-subflow", 1, NULL);

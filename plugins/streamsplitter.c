@@ -42,17 +42,20 @@ G_DEFINE_TYPE (StreamSplitter, stream_splitter, G_TYPE_OBJECT);
 
 typedef struct _Subflow Subflow;
 
-
+#define SUBFLOW_SCHEDULED_BYTES_LENGTH 100
 struct _Subflow
 {
   guint8      id;
   MPRTPSPath *path;
-  gint32      sent_bytes;
   gint32      sending_target;
   gint        weight_for_tree;
   gboolean    key_path;
   gdouble     weight;
   gboolean    valid;
+
+  gint32      scheduled_bytes[SUBFLOW_SCHEDULED_BYTES_LENGTH];
+  gint32      scheduled_bytes_sum;
+  gint        scheduled_bytes_index;
 };
 
 struct _SchNode
@@ -175,7 +178,7 @@ _get_next_path (
 
 static void
 _logging(
-    StreamSplitter *this);
+    gpointer data);
 
 
 
@@ -463,7 +466,7 @@ static void _setup_node(SchNode * node, guint level)
   gint32   sent_bytes = 0;
   if(node->subflow != NULL){
     node->has_keynode = node->subflow->key_path;
-    node->sent_bytes = node->subflow->sent_bytes>>level;
+    node->sent_bytes = node->subflow->scheduled_bytes_sum>>level;
     return;
   }
 
@@ -516,7 +519,6 @@ void _create_nodes(Subflow *subflow, gpointer data)
   }
   subflow->weight = (gdouble)subflow->weight_for_tree / (gdouble)SCHTREE_MAX_VALUE;
   subflow->key_path = (mprtps_path_get_flags(subflow->path) & cdata->key_flag) == cdata->key_flag;
-  subflow->sent_bytes = mprtps_path_get_sent_bytes_in1s(subflow->path);
   _schtree_insert(&cdata->root, subflow, &subflow->weight_for_tree, SCHTREE_MAX_VALUE);
 }
 
@@ -613,9 +615,15 @@ schtree_get_next (SchNode * root, guint32 bytes_to_send, gboolean key_restrictio
     }
   }
   selected->sent_bytes += bytes_to_send;
+
 //  g_print("bytes to send: %u, frame to send: %u\n", bytes_to_send, frames_to_send);
 //  g_print("selected path: %d decision value: %u\n", selected->path->id, *selected->decision_value);
   result = selected->subflow;
+
+  result->scheduled_bytes_sum += bytes_to_send;
+  result->scheduled_bytes[result->scheduled_bytes_index] = bytes_to_send;
+  result->scheduled_bytes_index = (result->scheduled_bytes_index + 1) % SUBFLOW_SCHEDULED_BYTES_LENGTH;
+  result->scheduled_bytes_sum -= result->scheduled_bytes[result->scheduled_bytes_index];
 //  g_print("%d->", result->id);
   return result;
 }
@@ -680,18 +688,19 @@ static void _log_subflow(Subflow *subflow, gpointer data)
   mprtp_logger("streamsplitter.log",
                "----------------------------------------------------------------\n"
                "Subflow id: %d\n"
-               "Sending target: %d | Sent bytes: %d | weight: %f\n",
+               "Sending target: %d | scheduled_bytes_sum: %d | weight: %f\n",
 
                subflow->id,
                subflow->sending_target,
-               subflow->sent_bytes,
+               subflow->scheduled_bytes_sum,
                subflow->weight
                );
 
 }
 
-void _logging(StreamSplitter *this)
+void _logging(gpointer data)
 {
+  StreamSplitter *this = data;
   mprtp_logger("streamsplitter.log",
                "###############################################################\n"
                "Seconds: %lu\n"

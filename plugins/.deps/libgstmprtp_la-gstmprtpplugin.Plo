@@ -345,8 +345,8 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  /usr/include/x86_64-linux-gnu/bits/sys_errlist.h \
  /usr/include/x86_64-linux-gnu/bits/stdio.h \
  /usr/include/x86_64-linux-gnu/bits/stdio2.h sndratedistor.h \
- streamsplitter.h reportprod.h fecenc.h rtpfecbuffer.h gstmprtpsender.h \
- gstmprtpplayouter.h \
+ streamsplitter.h reportprod.h fecenc.h rtpfecbuffer.h signalreport.h \
+ gstmprtpsender.h gstmprtpplayouter.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h rcvctrler.h \
  fecdec.h /usr/include/glib-2.0/gio/gnetworking.h /usr/include/netdb.h \
  /usr/include/netinet/in.h \
@@ -1180,6 +1180,8 @@ reportprod.h:
 fecenc.h:
 
 rtpfecbuffer.h:
+
+signalreport.h:
 
 gstmprtpsender.h:
 

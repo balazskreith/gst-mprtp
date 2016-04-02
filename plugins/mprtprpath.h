@@ -38,40 +38,6 @@ typedef struct _MpRTPRReceivedItem  MpRTPRReceivedItem;
 
 #define SKEWS_ARRAY_LENGTH 256
 
-typedef struct _DiscardRunningLengthEncodingBlock DiscardRLEBlock;
-struct _DiscardRunningLengthEncodingBlock{
-  guint16      start_seq;
-  guint16      end_seq;
-  guint16      discarded_packets;
-  guint16      discarded_bytes;
-};
-
-typedef struct _DiscardRunningLengthEncoding DiscardRLE;
-struct _DiscardRunningLengthEncoding{
-  DiscardRLEBlock     blocks[MPRTP_PLUGIN_MAX_RLE_LENGTH];
-  guint               write_index;
-  guint               read_index;
-  GstClockTime        last_step;
-  GstClockTime        step_interval;
-};
-
-typedef struct _LostsRunningLengthEncodingBlock LostsRLEBlock;
-struct _LostsRunningLengthEncodingBlock{
-  guint16      start_seq;
-  guint16      end_seq;
-  guint16      lost_packets;
-  guint16      lost_bytes;
-};
-
-typedef struct _LostsRunningLengthEncoding LostsRLE;
-struct _LostsRunningLengthEncoding{
-  LostsRLEBlock       blocks[MPRTP_PLUGIN_MAX_RLE_LENGTH];
-  guint               write_index;
-  guint               read_index;
-  GstClockTime        last_step;
-  GstClockTime        step_interval;
-};
-
 typedef struct _OWDRunningLengthEncodingBlock OWDRLEBlock;
 struct _OWDRunningLengthEncodingBlock{
   guint16      start_seq;
@@ -89,51 +55,68 @@ struct _OWDRunningLengthEncoding{
 };
 
 
+typedef struct _MisorderedMPRTPPacket{
+  guint16      seq;
+  GstClockTime added;
+  gboolean     received;
+  gboolean     used; //indicate weather we can reuse it or not.
+  guint        payload_len;
+}MisorderedMPRTPPacket;
+
+typedef struct _ExpectedMPRTPPacket{
+  guint16      seq;
+  GstClockTime added;
+  gboolean     used; //indicate weather we can reuse it or not.
+  gboolean     received;
+  guint        payload_len;
+  guint32      total_payload_discarded;
+  guint32      total_packets_discarded;
+}ExpectedMPRTPPacket;
+
+
 struct _MpRTPReceiverPath
 {
-  GObject             object;
-  guint8              id;
-  GRWLock             rwmutex;
-  GstClock*           sysclock;
+  GObject                   object;
+  guint8                    id;
+  GRWLock                   rwmutex;
+  GstClock*                 sysclock;
 
-  gboolean            seq_initialized;
-  guint16             cycle_num;
-  guint32             total_late_discarded;
-  guint32             interval_late_discarded;
-  guint32             total_late_discarded_bytes;
-  guint32             interval_late_discarded_bytes;
-  guint32             total_payload_bytes;
-  gint32              jitter;
-  guint16             highest_seq;
-  guint16             reported_sequence_number;
-  GstClockTime        discard_latency;
+  gboolean                  seq_initialized;
+  guint16                   cycle_num;
 
-  guint64             ext_rtptime;
-  guint64             last_packet_skew;
-  GstClockTime        last_received_time;
+  gint32                    jitter;
+  guint16                   highest_seq;
+  GstClockTime              discard_treshold;
+  GstClockTime              lost_treshold;
 
-  OWDRLE              owd_rle;
-  LostsRLE            losts_rle;
-  DiscardRLE          discard_rle;
+  OWDRLE                    owd_rle;
 
-  guint32             total_packet_losts;
-  guint32             total_packets_received;
-  guint32             last_rtp_timestamp;
+  guint32                   total_packets_lost;
+  guint32                   total_packets_discarded;
+  guint32                   total_payload_discarded;
+  guint32                   total_packets_received;
+  guint32                   total_payload_received;
+  guint32                   last_rtp_timestamp;
 
 
-  gdouble             path_skew;
-  GstClockTime        last_mprtp_delay;
-  PercentileTracker*  delays;
-  PercentileTracker2* skews;
+  gdouble                   path_skew;
+  gdouble                   path_delay;
+  GstClockTime              last_mprtp_delay;
+  PercentileTracker*        delays;
+  PercentileTracker2*       skews;
 
-  gdouble             delay_avg;
-  gboolean            request_urgent_report;
+  GQueue*                   misordered;
+  MisorderedMPRTPPacket*    misordered_itemsbed;
+  gint                      misordered_itemsbed_index;
 
-  NumsTracker*        gaps;
-  NumsTracker*        lates;
-  gboolean            distorted;
+  GQueue*                   discarded;
+  MisorderedMPRTPPacket*    discarded_itemsbed;
+  gint                      discarded_itemsbed_index;
 
-
+  guint32                   receiver_packetrate;
+  guint32                   receiver_byterate;
+  guint32                   goodput_packetrate;
+  guint32                   goodput_byterate;
 };
 
 struct _MpRTPReceiverPathClass
@@ -155,7 +138,8 @@ MpRTPRPath *make_mprtpr_path (guint8 id);
 //guint64 mprtpr_path_get_packet_skew_median (MPRTPRPath * this);
 
 guint8 mprtpr_path_get_id (MpRTPRPath * this);
-void mprtpr_path_get_RR_stats(MpRTPRPath *this,
+guint16 mprtpr_path_get_HSSN (MpRTPRPath * this);
+void mprtpr_path_get_regular_stats(MpRTPRPath *this,
                               guint16 *HSN,
                               guint16 *cycle_num,
                               guint32 *jitter,
@@ -163,50 +147,34 @@ void mprtpr_path_get_RR_stats(MpRTPRPath *this,
                               guint32 *total_lost,
                               guint32 *received_bytes);
 
-void mprtpr_path_set_reported_sequence(
-    MpRTPRPath *this,
-    guint16 sequence_number);
-
 void mprtpr_path_get_total_discards (MpRTPRPath * this,
-                               guint16 *discarded,
-                               guint32 *discarded_bytes);
+                               guint32 *total_discarded_packets,
+                               guint32 *total_payload_discarded);
 
-void mprtpr_path_get_XR7243_stats(MpRTPRPath *this,
-                           guint16 *discarded,
-                           guint32 *discarded_bytes);
+void mprtpr_path_get_total_receivements (MpRTPRPath * this,
+                               guint32 *total_packets_received,
+                               guint32 *total_payload_received);
 
-void mprtpr_path_get_XROWD_stats(MpRTPRPath *this,
+void mprtpr_path_get_total_losts (MpRTPRPath * this,
+                                  guint32 *total_packets_lost);
+
+void mprtpr_path_get_owd_stats(MpRTPRPath *this,
                                  GstClockTime *median,
                                  GstClockTime *min,
                                  GstClockTime* max);
-gboolean
-mprtpr_path_request_urgent_report(MpRTPRPath *this);
 
 void
 mprtpr_path_set_chunks_reported(MpRTPRPath *this);
 
 void
-mprtpr_path_set_discard_latency(MpRTPRPath *this, GstClockTime latency);
+mprtpr_path_set_discard_treshold(MpRTPRPath *this, GstClockTime treshold);
 
 void
-mprtpr_path_set_lost_latency(MpRTPRPath *this, GstClockTime latency);
+mprtpr_path_set_lost_treshold(MpRTPRPath *this, GstClockTime treshold);
 
-GstRTCPXR_Chunk *
-mprtpr_path_get_XR7097_packet_nums_chunks(MpRTPRPath *this,
-                              guint *chunks_num,
-                              guint16 *begin_seq,
-                              guint16 *end_seq);
+void
+mprtpr_path_set_owd_window_treshold(MpRTPRPath *this, GstClockTime treshold);
 
-//#define mprtpr_path_get_XR7097_packet_nums_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 0, chunks_num, begin_seq, end_seq)
-//#define mprtpr_path_get_XR7097_sum_bytes_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 3, chunks_num, begin_seq, end_seq)
-//#define mprtpr_path_get_owd_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 1, chunks_num, begin_seq, end_seq)
-//#define mprtpr_path_get_XR3611_chunks(this, chunks_num, begin_seq, end_seq) mprtpr_path_get_chunks(this, 2, chunks_num, begin_seq, end_seq)
-
-GstRTCPXR_Chunk *
-mprtpr_path_get_lost_chunks(MpRTPRPath *this,
-                              guint *chunks_num,
-                              guint16 *begin_seq,
-                              guint16 *end_seq);
 
 GstRTCPXR_Chunk *
 mprtpr_path_get_owd_chunks(MpRTPRPath *this,
@@ -215,18 +183,19 @@ mprtpr_path_get_owd_chunks(MpRTPRPath *this,
                               guint16 *end_seq,
                               guint32 *offset);
 
-GstRTCPXR_Chunk *
-mprtpr_path_get_discard_chunks(MpRTPRPath *this,
-                              guint *chunks_num,
-                              guint16 *begin_seq,
-                              guint16 *end_seq);
+
 
 void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
                            gdouble       *path_delay,
-                           gdouble       *path_skew,
-                           guint32       *jitter);
+                           gdouble       *path_skew);
 
-gboolean mprtpr_path_is_distorted(MpRTPRPath *this);
+void mprtpr_path_get_1s_rate_stats(MpRTPRPath *this,
+                                   guint32 *expected_packetsrate,
+                                   guint32 *receiver_byterate,
+                                   guint32 *receiver_packetrate,
+                                   guint32 *goodput_byterate,
+                                   guint32 *goodput_packetrate);
+
 void mprtpr_path_tick(MpRTPRPath *this);
 void mprtpr_path_add_discard(MpRTPRPath *this, GstMpRTPBuffer *mprtp);
 void mprtpr_path_add_delay(MpRTPRPath *this, GstClockTime delay);

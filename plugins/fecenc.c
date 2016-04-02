@@ -63,6 +63,24 @@ static void fecencoder_finalize (GObject * object);
 static BitString* _make_bitstring(GstBuffer* buf);
 
 
+//------------------------- Utility functions --------------------------------
+typedef struct _Subflow{
+  guint8                     id;
+  MPRTPSPath*                path;
+  guint32                    total_payload_len;
+  guint32                    total_packets_sent;
+  guint16                    sequence_num;
+  guint16                    cycle_num;
+}Subflow;
+
+static Subflow *_subflow_ctor (void);
+static void _subflow_dtor (Subflow * this);
+static void _ruin_subflow (gpointer subflow);
+static Subflow *_make_subflow (MPRTPSPath * path);
+static void _reset_subflow (Subflow * this);
+static Subflow *_get_subflow(FECEncoder * this, guint8 subflow_id);
+static void _logging(gpointer data);
+
 void
 fecencoder_class_init (FECEncoderClass * klass)
 {
@@ -89,9 +107,14 @@ void
 fecencoder_init (FECEncoder * this)
 {
   g_rw_lock_init (&this->rwmutex);
+  this->subflows = g_hash_table_new_full (NULL, NULL,
+      NULL, (GDestroyNotify) _ruin_subflow);
+
   this->sysclock = gst_system_clock_obtain();
   this->max_protection_num = GST_RTPFEC_MAX_PROTECTION_NUM;
   this->bitstrings = g_queue_new();
+
+  mprtp_logger_add_logging_fnc(_logging, this, 1);
 }
 
 
@@ -118,15 +141,23 @@ void fecencoder_set_payload_type(FECEncoder *this, guint8 payload_type)
   THIS_WRITEUNLOCK(this);
 }
 
-void fecencoder_get_stats(FECEncoder *this, guint8 subflow_id, guint32 *sum_fec_payloads)
+void fecencoder_get_stats(FECEncoder *this, guint8 subflow_id, guint32 *packets, guint32 *payloads)
 {
+  Subflow *subflow;
   THIS_READLOCK(this);
-  if(sum_fec_payloads){
-    *sum_fec_payloads = this->subflows_pay[subflow_id];
+  subflow = _get_subflow(this, subflow_id);
+  if(!subflow){
+    goto done;
   }
+  if(packets){
+      *packets = subflow->total_packets_sent;
+    }
+  if(payloads){
+      *payloads = subflow->total_payload_len;
+    }
+done:
   THIS_READUNLOCK(this);
 }
-
 
 void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf)
 {
@@ -202,6 +233,21 @@ create:
   return result;
 }
 
+
+void
+fecencoder_add_path (FECEncoder * this, MPRTPSPath *path)
+{
+  Subflow *subflow;
+  subflow = _make_subflow(path);
+  g_hash_table_insert (this->subflows, GINT_TO_POINTER (subflow->id), subflow);
+}
+
+void
+fecencoder_rem_path (FECEncoder * this, guint8 subflow_id)
+{
+  g_hash_table_remove (this->subflows, GINT_TO_POINTER (subflow_id));
+}
+
 void
 fecencoder_assign_to_subflow (FECEncoder * this,
                   GstBuffer *buf,
@@ -210,12 +256,15 @@ fecencoder_assign_to_subflow (FECEncoder * this,
 {
   MPRTPSubflowHeaderExtension data;
   GstRTPBuffer                rtp = GST_RTP_BUFFER_INIT;
+  Subflow *subflow;
   THIS_WRITELOCK(this);
+  subflow = _get_subflow(this, subflow_id);
   gst_rtp_buffer_map(buf, GST_MAP_READWRITE, &rtp);
   data.id = subflow_id;
-  data.seq = ++this->subflows_seg[subflow_id];
+  data.seq = ++subflow->sequence_num;
   gst_rtp_buffer_add_extension_onebyte_header (&rtp, mprtp_ext_header_id, (gpointer) &data, sizeof (data));
-  this->subflows_pay[subflow_id] += gst_rtp_buffer_get_payload_len(&rtp);
+  subflow->total_payload_len += gst_rtp_buffer_get_payload_len(&rtp);
+  ++subflow->total_packets_sent;
   gst_rtp_buffer_unmap(&rtp);
   THIS_WRITEUNLOCK(this);
 }
@@ -233,6 +282,67 @@ BitString* _make_bitstring(GstBuffer* buf)
   return result;
 }
 
+
+
+//---------------------- Utility functions ----------------------------------
+Subflow *
+_subflow_ctor (void)
+{
+  Subflow *result;
+  result = mprtp_malloc (sizeof (Subflow));
+  return result;
+}
+
+void
+_subflow_dtor (Subflow * this)
+{
+  g_return_if_fail (this);
+  mprtp_free (this);
+}
+
+void
+_ruin_subflow (gpointer subflow)
+{
+  Subflow *this;
+  g_return_if_fail (subflow);
+  this = (Subflow *) subflow;
+  g_object_unref (this->path);
+  _subflow_dtor (this);
+}
+
+Subflow *
+_make_subflow (MPRTPSPath * path)
+{
+  Subflow *result;
+
+  result                  = _subflow_ctor ();
+  result->path            = g_object_ref (path);
+  result->id              = mprtps_path_get_id(path);
+
+  _reset_subflow (result);
+  return result;
+}
+
+void
+_reset_subflow (Subflow * this)
+{
+
+}
+
+Subflow *_get_subflow(FECEncoder * this, guint8 subflow_id)
+{
+  return g_hash_table_lookup (this->subflows, GINT_TO_POINTER (subflow_id));
+}
+
+void _logging(gpointer data)
+{
+  FECEncoder *this;
+
+  this = data;
+  THIS_READLOCK(this);
+
+  THIS_READUNLOCK(this);
+}
 
 #undef DEBUG_PRINT_TOOLS
 #undef THIS_WRITELOCK

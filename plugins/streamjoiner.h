@@ -71,9 +71,6 @@ StreamJoiner*
 make_stream_joiner(void);
 
 void
-stream_joiner_do_logging(StreamJoiner *this);
-
-void
 stream_joiner_add_path(
     StreamJoiner * this,
     guint8 subflow_id,

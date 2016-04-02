@@ -36,7 +36,13 @@
 
 GST_DEBUG_CATEGORY_STATIC (sndrate_distor_debug_category);
 #define GST_CAT_DEFAULT sndrate_distor_debug_category
-#define MOMENTS_LENGTH 8
+
+#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
+#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
+#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
+#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
+
+#define _now(this) gst_clock_get_time (this->sysclock)
 
 G_DEFINE_TYPE (SendingRateDistributor, sndrate_distor, G_TYPE_OBJECT);
 
@@ -46,15 +52,9 @@ typedef struct _Subflow Subflow;
 struct _Subflow{
   guint8                 id;
   MPRTPSPath*            path;
-  gboolean               initialized;
-  gboolean               ready;
-  gboolean               controlled;
 
-  gint32                 extra_rate;
-  gint32                 delta_rate;
-  gint32                 sending_target;
-  gint32                 supplied_bitrate;
-  gint32                 requested_bitrate;
+  gint32                 target_bitrate;
+  guint8                 flags;
 };
 
 //----------------------------------------------------------------------
@@ -65,29 +65,21 @@ static void
 sndrate_distor_finalize (
     GObject * object);
 
+static Subflow *_subflow_ctor (void);
+static void _subflow_dtor (Subflow * this);
+static void _ruin_subflow (gpointer subflow);
+static Subflow *_make_subflow (guint8 id, MPRTPSPath * path);
+static void _reset_subflow (Subflow * this);
 
-//--------------------UTILITIES-----------------------
-//static void
-//_refresh_targets(
-//    SendingRateDistributor* this,
-//    Subflow *subflow);
+//static Subflow* _get_subflow(SendingRateDistributor* this, gint subflow_id)
+//{
+//  Subflow* result;
+//  result =
+//        (Subflow *) g_hash_table_lookup (this->subflows,
+//        GINT_TO_POINTER (subflow_id));
+//  return result;
+//}
 
-static void
-_refresh_available_ids(
-    SendingRateDistributor* this);
-
-
-//#define _get_subflow(this, n) ((Subflow*)(this->subflows + n * sizeof(Subflow)))
-static Subflow* _get_subflow(SendingRateDistributor* this, gint n)
-{
-  Subflow* subflows = this->subflows;
-  return subflows+n;
-}
-
-#define foreach_subflows(this, i, subflow) \
-  for(i=0, subflow = _get_subflow(this, this->available_ids[0]); i < this->available_ids_length; subflow = _get_subflow(this,  this->available_ids[++i]))
-#define _get_next_sending_target(subflow) \
-  (subflow->target_rate + subflow->requested_bytes - subflow->supplied_bytes)
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -119,156 +111,135 @@ sndrate_distor_finalize (GObject * object)
 void
 sndrate_distor_init (SendingRateDistributor * this)
 {
-  gint i;
   this->sysclock = gst_system_clock_obtain();
-  this->controlled_num = 0;
-  this->subflows = mprtp_malloc(sizeof(Subflow)*MPRTP_PLUGIN_MAX_SUBFLOW_NUM);
-  this->ur.control.max_mtakover = .25;
-  this->ur.control.max_stakover = .125;
-  for(i=0; i<MPRTP_PLUGIN_MAX_SUBFLOW_NUM; ++i){
-    _get_subflow(this, i)->id = i;
-    _get_subflow(this, i)->controlled = FALSE;
-//    _get_subflow(this, i)->joint_subflow_ids[i] = 1;
-  }
+  this->subflows = g_hash_table_new_full (NULL, NULL, NULL, _ruin_subflow);
+
+  g_rw_lock_init (&this->rwmutex);
+
 }
 
 
-SendingRateDistributor *make_sndrate_distor(void)
+static void
+_iterate_subflows (SendingRateDistributor * this, void(*process)(Subflow *,gpointer), gpointer data)
+{
+  GHashTableIter iter;
+  gpointer key, val;
+  Subflow *subflow;
+
+  g_hash_table_iter_init (&iter, this->subflows);
+  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+    subflow = (Subflow *) val;
+    process(subflow, data);
+  }
+}
+
+SendingRateDistributor *make_sndrate_distor(StreamSplitter *splitter)
 {
   SendingRateDistributor *result;
   result = g_object_new (SNDRATEDISTOR_TYPE, NULL);
-  result->splitter = NULL;
-  result->pacer    = NULL;
+  result->splitter = splitter;
   return result;
 }
 
-void sndrate_distor_setup(SendingRateDistributor *this, StreamSplitter *splitter, PacketsSndQueue *pacer)
+
+static void _refresh_subflows_helper(Subflow *subflow, gpointer data)
 {
-  this->splitter = splitter;
-  this->pacer    = pacer;
+  SendingRateDistributor* this;
+  guint8 flags;
+
+  this = data;
+  flags = mprtps_path_get_flags(subflow->path);
+  subflow->target_bitrate = mprtps_path_get_target_bitrate(subflow->path);
+  this->urgent_rescheduling |= subflow->flags ^ flags;
+  subflow->flags = flags;
 }
 
-
-void sndrate_setup_report(
-    SendingRateDistributor *this,
-    guint8 id,
-    struct _SubflowUtilizationReport *report)
+void sndrate_distor_refresh_subflows(SendingRateDistributor* this)
 {
-  Subflow *subflow;
-  gint i;
-  subflow =  _get_subflow(this, id);
-  memcpy(&this->ur.subflows[id].report, report, sizeof(struct _SubflowUtilizationReport));
-  this->ready = subflow->ready = TRUE;
-  foreach_subflows(this, i, subflow)
-  {
-    this->ready &= subflow->ready;
+  THIS_WRITELOCK(this);
+  if(_now(this) - 100 * GST_MSECOND < this->last_subflow_refresh){
+    goto done;
   }
-}
-
-
-void sndrate_distor_add_controlled_subflow(SendingRateDistributor *this, guint8 id)
-{
-  Subflow *subflow;
-  subflow =  _get_subflow(this, id);
-  this->ur.subflows[id].controlled = subflow->controlled = TRUE;
-  _refresh_available_ids(this);
-}
-
-void sndrate_distor_rem_controlled_subflow(SendingRateDistributor *this, guint8 id)
-{
-  Subflow *subflow;
-  subflow =  _get_subflow(this, id);
-  this->ur.subflows[id].controlled = subflow->controlled = FALSE;
-  _refresh_available_ids(this);
-}
-
-MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this)
-{
-  gint i;
-  Subflow *subflow;
-  MPRTPPluginUtilization* result = NULL;
-  SubflowUtilization *su;
-  gdouble monitored_sr = 0., stable_sr = 0.;
-  gboolean pacing = FALSE;
-
-  this->delta_rate = this->target_bitrate = 0;
-  if(!this->splitter || !this->pacer || !this->ready) goto done;
-  this->ready = FALSE;
-
-  foreach_subflows(this, i, subflow)
-  {
-    su = &this->ur.subflows[subflow->id];
-    if(!su->controlled)
-      continue;
-
-    subflow->delta_rate      = su->report.target_rate - subflow->sending_target;
-    this->delta_rate        += subflow->delta_rate;
-    subflow->sending_target  = su->report.target_rate;
-    this->target_bitrate    += subflow->sending_target;
-    subflow->ready           = FALSE;
-
-    if(su->report.state == 0)       stable_sr    += su->report.sending_rate;
-    else if(su->report.state == 1)  monitored_sr += su->report.sending_rate;
-  }
-
-  result = &this->ur;
-  result->report.target_rate = this->target_bitrate;
-
-  if(0 <= this->delta_rate) goto distribute;
-//  g_print("negative delta rate is %d, stable sr is %f monitored sr is %f\n", this->delta_rate, stable_sr, monitored_sr);
-  //we try to distribute the reminaing bitrate amongst the stable subflows
-  foreach_subflows(this, i, subflow)
-  {
-    gint32 extra_bitrate;
-    gdouble takover, divider;
-    su = &this->ur.subflows[subflow->id];
-    if(su->report.state < 0  || subflow->delta_rate < 0) continue;
-    takover = su->report.state == 0 ? this->ur.control.max_stakover : this->ur.control.max_mtakover;
-    divider = su->report.state == 0 ? stable_sr : monitored_sr;
-    extra_bitrate = MIN(subflow->sending_target * takover,
-                         -1. * this->delta_rate * ((gdouble) su->report.sending_rate / divider));
-
-    subflow->delta_rate     += this->delta_rate += extra_bitrate;
-    subflow->sending_target += extra_bitrate;
-//    g_print("subflow %d take over %d bits, remining: %d\n", subflow->id, extra_bitrate,subflow->delta_rate);
-  }
-
-  //if remaining bitrate still available we apply pacing if it exceeds the 10% of the sending target;
-  pacing =this->last_target * .1 < -1* this->delta_rate;
-distribute:
-  this->last_target = this->target_bitrate;
-  packetssndqueue_setup(this->pacer, this->target_bitrate, pacing);
-  foreach_subflows(this, i, subflow)
-  {
-    stream_splitter_setup_sending_target(this->splitter, subflow->id, subflow->sending_target);
-  }
-  stream_splitter_commit_changes (this->splitter);
+  _iterate_subflows(this, _refresh_subflows_helper, this);
+  this->last_subflow_refresh = _now(this);
 done:
+  THIS_WRITEUNLOCK(this);
+}
+
+static void _refresh_splitter_helper(Subflow *subflow, gpointer data)
+{
+  SendingRateDistributor* this;
+  this = data;
+  stream_splitter_setup_sending_target(this->splitter, subflow->id, subflow->target_bitrate);
+}
+
+void sndrate_distor_refresh_splitter(SendingRateDistributor* this)
+{
+  THIS_WRITELOCK(this);
+  if(_now(this) < this->next_splitter_refresh && !this->urgent_rescheduling){
+    goto done;
+  }
+  //Todo: consider and implement flow redistribution here.
+  _iterate_subflows(this, _refresh_splitter_helper, this);
+  stream_splitter_commit_changes(this->splitter);
+  this->next_splitter_refresh = _now(this) + (g_random_double() + .5) * GST_SECOND;
+done:
+  THIS_WRITEUNLOCK(this);
+}
+
+void sndrate_distor_add_subflow(SendingRateDistributor *this, MPRTPSPath *path)
+{
+  Subflow *subflow;
+  subflow = _make_subflow(mprtps_path_get_id(path), path);
+  g_hash_table_insert (this->subflows, GINT_TO_POINTER (subflow->id), subflow);
+}
+
+void sndrate_distor_rem_subflow(SendingRateDistributor *this, guint8 subflow_id)
+{
+  g_hash_table_remove (this->subflows, GINT_TO_POINTER (subflow_id));
+}
+
+Subflow *
+_subflow_ctor (void)
+{
+  Subflow *result;
+  result = mprtp_malloc (sizeof (Subflow));
+  return result;
+}
+
+void
+_subflow_dtor (Subflow * this)
+{
+  g_return_if_fail (this);
+  mprtp_free (this);
+}
+
+void
+_ruin_subflow (gpointer subflow)
+{
+  Subflow *this;
+  g_return_if_fail (subflow);
+  this = (Subflow *) subflow;
+  g_object_unref (this->path);
+  _subflow_dtor (this);
+}
+
+Subflow *
+_make_subflow (guint8 id, MPRTPSPath * path)
+{
+  Subflow *result;
+
+  result                  = _subflow_ctor ();
+  result->path            = g_object_ref (path);
+  result->id              = id;
+  _reset_subflow (result);
   return result;
 }
 
 
-void sndrate_set_initial_disabling_time(SendingRateDistributor *this, guint64 initial_disabling_time)
+void
+_reset_subflow (Subflow * this)
 {
-  this->initial_disabling_time = initial_disabling_time;
+
 }
-
-guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id)
-{
-  return _get_subflow(this, id)->sending_target;
-}
-
-
-void _refresh_available_ids(SendingRateDistributor* this)
-{
-  gint id;
-  Subflow *subflow;
-  this->available_ids_length = 0;
-  for(id=0; id < MPRTP_PLUGIN_MAX_SUBFLOW_NUM; ++id){
-    subflow = _get_subflow(this, id);
-    if(!subflow->controlled) continue;
-    this->available_ids[this->available_ids_length++] = subflow->id;
-  }
-}
-
 

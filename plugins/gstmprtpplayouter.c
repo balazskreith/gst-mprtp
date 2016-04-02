@@ -50,6 +50,12 @@
 
 #include "rcvctrler.h"
 
+typedef struct _ReportingMode{
+  guint32  subflow_id : 8;
+  guint32  reports    : 20;
+  guint32  cngctrler  : 4;
+}ReportingMode;
+
 GST_DEBUG_CATEGORY_STATIC (gst_mprtpplayouter_debug_category);
 #define GST_CAT_DEFAULT gst_mprtpplayouter_debug_category
 
@@ -60,6 +66,10 @@ GST_DEBUG_CATEGORY_STATIC (gst_mprtpplayouter_debug_category);
 
 #define MPRTP_PLAYOUTER_DEFAULT_SSRC 0
 #define MPRTP_PLAYOUTER_DEFAULT_CLOCKRATE 90000
+
+#define DEFAULT_DISCARD_TRESHOLD     400 * GST_MSECOND
+#define DEFAULT_LOST_TRESHOLD        1 * GST_SECOND
+#define DEFAULT_OWD_WINDOW_TRESHOLD  1 * GST_SECOND
 
 static void gst_mprtpplayouter_set_property (GObject * object,
     guint property_id, const GValue * value, GParamSpec * pspec);
@@ -94,10 +104,9 @@ static void _join_path (GstMprtpplayouter * this, guint8 subflow_id);
 static void _detach_path (GstMprtpplayouter * this, guint8 subflow_id);
 static gboolean _try_get_path (GstMprtpplayouter * this, guint16 subflow_id,
     MpRTPRPath ** result);
-static void _change_auto_rate_and_cc (GstMprtpplayouter * this,
-                                 gboolean auto_rate_and_cc);
-static GstStructure *_collect_infos (GstMprtpplayouter * this);
-static void _setup_paths (GstMprtpplayouter * this);
+static void _setup_paths_lost_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold);
+static void _setup_paths_owd_window_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold);
+static void _setup_paths_discard_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold);
 static GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer);
 //static void _trash_mprtp_buffer(GstMprtpplayouter * this, GstMpRTPBuffer *mprtp);
 //#define _trash_mprtp_buffer(this, mprtp) pointerpool_add(this->mprtp_buffer_pool, mprtp);
@@ -119,17 +128,17 @@ enum
   PROP_JOIN_SUBFLOW,
   PROP_DETACH_SUBFLOW,
   PROP_PIVOT_CLOCK_RATE,
-  PROP_AUTO_RATE_AND_CC,
+  PROP_SETUP_REPORTING_MODE,
+  PROP_SETUP_RTCP_INTERVAL_TYPE,
   PROP_RTP_PASSTHROUGH,
   PROP_LOG_ENABLED,
   PROP_LOG_PATH,
-  PROP_SUBFLOWS_STATS,
   PROP_INIT_DELAY,
-  PROP_LATENCY_DISCARD,
-  PROP_LATENCY_LOST,
+  PROP_OWD_WINDOW_TRESHOLD,
+  PROP_DISCARD_TRESHOLD,
+  PROP_LOST_TRESHOLD,
   PROP_REPAIR_WINDOW_MIN,
   PROP_REPAIR_WINDOW_MAX,
-  PROP_LIVE_STREAM,
   PROP_PLAYOUT_HALT_TIME,
 
 };
@@ -252,13 +261,6 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
            "Detach a subflow with a given id.", 0,
            MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-
-  g_object_class_install_property (gobject_class, PROP_AUTO_RATE_AND_CC,
-      g_param_spec_boolean ("auto-rate-and-cc",
-                            "Automatic rate and congestion controll",
-                            "Automatic rate and congestion controll",
-                            FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
   g_object_class_install_property (gobject_class, PROP_RTP_PASSTHROUGH,
       g_param_spec_boolean ("rtp-passthrough",
           "Indicate the passthrough mode on no active subflow case",
@@ -278,19 +280,6 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
             "Determines the path for logfiles",
             "NULL", G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_LIVE_STREAM,
-      g_param_spec_boolean ("live-stream",
-          "Indicate weather the stream is live",
-          "Indicate weather the stream is live",
-          FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_SUBFLOWS_STATS,
-      g_param_spec_string ("subflow-stats",
-          "Extract subflow stats",
-          "Collect subflow statistics and return with "
-          "a structure contains it",
-          "NULL", G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
-
   g_object_class_install_property (gobject_class, PROP_INIT_DELAY,
                                     g_param_spec_uint64 ("init-delay",
                                                          "initial delay for playout",
@@ -305,19 +294,45 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                                                          0, G_MAXUINT, 0,
                                                          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_LATENCY_DISCARD,
-       g_param_spec_uint ("latency-discard",
-                          "A latency in ms after a packet considered to be discarded.",
-                          "A latency in ms after a packet considered to be discarded.",
+  g_object_class_install_property (gobject_class, PROP_OWD_WINDOW_TRESHOLD,
+       g_param_spec_uint ("owd-window-treshold",
+                          "set the window tresholds for owd sampling on subflows.",
+                          "A 32bit unsigned integer upper 8bit in host order are used to identify the subflow. "
+                          "If the value is 255 then the option will be applied on all subflow. The latter 24bits are identified as a value in ms",
                           0,
-                          5000, 400, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+                          4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_LATENCY_LOST,
-       g_param_spec_uint ("latency-lost",
-                          "A latency in ms after a packet considered to be lost.",
-                          "A latency in ms after a packet considered to be lost.",
+
+  g_object_class_install_property (gobject_class, PROP_DISCARD_TRESHOLD,
+       g_param_spec_uint ("discard-treshold",
+                          "A latency in ms after a packet considered to be discarded.",
+                          "A 32bit unsigned integer upper 8bit in host order are used to identify the subflow. "
+                          "If the value is 255 then the option will be applied on all subflow. The latter 24bits are identified as a value in ms",
                           0,
-                          10000, 1000, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+                          4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_LOST_TRESHOLD,
+        g_param_spec_uint ("lost-treshold",
+                           "A delay in ms after a packet gap in stream considered to be lost.",
+                           "A 32bit unsigned integer upper 8bit in host order are used to identify the subflow. "
+                           "If the value is 255 then the option will be applied on all subflow. The latter 24bits are identified as a value in ms",
+                           0,
+                           10000, 1000, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_SETUP_RTCP_INTERVAL_TYPE,
+        g_param_spec_uint ("setup-rtcp-interval-type",
+                           "RTCP interval types: 0 - regular, 1 - early, 2 - immediate feedback",
+                           "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the mode. "
+                           "RTCP interval types: 0 - regular, 1 - early, 2 - immediate feedback",
+                           0,
+                           4294967295, 2, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_SETUP_REPORTING_MODE,
+      g_param_spec_uint ("setup-reporting-mode",
+          "set the reports need to be sent to the receiver",
+          "A 32bit unsigned integer with the following struct:"
+          " The upper 8 bit in host order identifies the subflow, the latter 20 bits the reports (1 - RR, 2 - RFC243, 4 - OWD), the last 4 bit the congestion controller (1 - MARC) ",
+          0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   element_class->change_state =
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_change_state);
@@ -377,8 +392,6 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->paths                    = g_hash_table_new_full (NULL, NULL, NULL, mprtpr_path_destroy);
   this->joiner                   = make_stream_joiner();
   this->controller               = g_object_new(RCVCTRLER_TYPE, NULL);
-  this->discard_latency          = 400 * GST_MSECOND;
-  this->lost_latency             = GST_SECOND;
   this->fec_payload_type         = FEC_PAYLOAD_DEFAULT_ID;
   this->pivot_address_subflow_id = 0;
   this->pivot_address            = NULL;
@@ -388,8 +401,6 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
 
   rcvctrler_setup(this->controller, this->joiner, this->fec_decoder);
   rcvctrler_setup_callbacks(this->controller, this, gst_mprtpplayouter_mprtcp_sender);
-  rcvctrler_set_additional_reports(this->controller, FALSE, FALSE, TRUE);
-  _change_auto_rate_and_cc (this, FALSE);
 
   //Todo: consider stream joiner here
 //  stream_joiner_set_monitor_payload_type(this->joiner, this->fec_payload_type);
@@ -443,8 +454,6 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
     case PROP_FEC_PAYLOAD_TYPE:
       THIS_WRITELOCK (this);
       this->fec_payload_type = (guint8) g_value_get_uint (value);
-//      stream_joiner_set_monitor_payload_type(this->joiner, this->fec_payload_type);
-      //Todo: stream joiner refresh here.
       fecdecoder_set_payload_type(this->fec_decoder, this->fec_payload_type);
       THIS_WRITEUNLOCK (this);
       break;
@@ -489,12 +498,6 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       mprtp_logger_set_target_directory(g_value_get_string(value));
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_LIVE_STREAM:
-      THIS_WRITELOCK (this);
-      gboolean_value = g_value_get_boolean (value);
-      //Todo consider live stream here
-      THIS_WRITEUNLOCK (this);
-      break;
     case PROP_INIT_DELAY:
       THIS_WRITELOCK (this);
       stream_joiner_set_initial_delay(this->joiner, g_value_get_uint64 (value) * GST_MSECOND);
@@ -505,22 +508,69 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       stream_joiner_set_playout_halt_time(this->joiner, g_value_get_uint64 (value) * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_AUTO_RATE_AND_CC:
+    case PROP_OWD_WINDOW_TRESHOLD:
       THIS_WRITELOCK (this);
-      gboolean_value = g_value_get_boolean (value);
-      _change_auto_rate_and_cc (this, gboolean_value);
+      {
+        guint8 subflow_id;
+        guint guint_value;
+        guint64 owd_window_treshold;
+        guint_value = g_value_get_uint (value);
+        subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
+        owd_window_treshold = guint_value & 0x00FFFFFFUL;
+        owd_window_treshold *= GST_MSECOND;
+        _setup_paths_owd_window_treshold(this, subflow_id, owd_window_treshold);
+      }
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_LATENCY_DISCARD:
+    case PROP_DISCARD_TRESHOLD:
       THIS_WRITELOCK (this);
-      this->discard_latency = g_value_get_uint (value);
-      _setup_paths(this);
+      {
+        guint8 subflow_id;
+        guint guint_value;
+        guint64 discard_treshold;
+        guint_value = g_value_get_uint (value);
+        subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
+        discard_treshold = guint_value & 0x00FFFFFFUL;
+        discard_treshold *= GST_MSECOND;
+        _setup_paths_discard_treshold(this, subflow_id, discard_treshold);
+      }
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_LATENCY_LOST:
+    case PROP_LOST_TRESHOLD:
+        THIS_WRITELOCK (this);
+        {
+          guint8 subflow_id;
+          guint guint_value;
+          guint64 discard_treshold;
+          guint_value = g_value_get_uint (value);
+          subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
+          discard_treshold = guint_value & 0x00FFFFFFUL;
+          discard_treshold *= GST_MSECOND;
+          _setup_paths_lost_treshold(this, subflow_id, discard_treshold);
+        }
+        THIS_WRITEUNLOCK (this);
+        break;
+    case PROP_SETUP_RTCP_INTERVAL_TYPE:
       THIS_WRITELOCK (this);
-      this->lost_latency = g_value_get_uint (value);
-      _setup_paths(this);
+      {
+        guint8 subflow_id;
+        guint guint_value, interval_type;
+        guint_value = g_value_get_uint (value);
+        subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
+        interval_type = guint_value & 0x00FFFFFFUL;
+        rcvctrler_change_interval_type(this->controller, subflow_id, interval_type);
+      }
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_SETUP_REPORTING_MODE:
+      THIS_WRITELOCK (this);
+      {
+        guint guint_value;
+        ReportingMode *mode;
+        guint_value = g_value_get_uint (value);
+        mode = (ReportingMode*) &guint_value;
+        rcvctrler_change_reporting_mode(this->controller, mode->subflow_id, mode->reports, mode->cngctrler);
+      }
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_REPAIR_WINDOW_MIN:
@@ -576,20 +626,9 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
       g_value_set_uint (value, this->pivot_ssrc);
       THIS_READUNLOCK (this);
       break;
-    case PROP_AUTO_RATE_AND_CC:
-      THIS_READLOCK (this);
-      g_value_set_boolean (value, this->auto_rate_and_cc);
-      THIS_READUNLOCK (this);
-      break;
     case PROP_RTP_PASSTHROUGH:
       THIS_READLOCK (this);
       g_value_set_boolean (value, this->rtp_passthrough);
-      THIS_READUNLOCK (this);
-      break;
-    case PROP_SUBFLOWS_STATS:
-      THIS_READLOCK (this);
-      g_value_set_string (value,
-          gst_structure_to_string (_collect_infos (this)));
       THIS_READUNLOCK (this);
       break;
     case PROP_LOG_ENABLED:
@@ -604,21 +643,6 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
         mprtp_logger_get_target_directory(string);
         g_value_set_string (value, string);
       }
-      THIS_READUNLOCK (this);
-      break;
-    case PROP_LIVE_STREAM:
-      THIS_READLOCK (this);
-      //Todo consider live stream here
-      THIS_READUNLOCK (this);
-      break;
-    case PROP_LATENCY_DISCARD:
-      THIS_READLOCK (this);
-      g_value_set_uint (value, this->discard_latency);
-      THIS_READUNLOCK (this);
-      break;
-    case PROP_LATENCY_LOST:
-      THIS_READLOCK (this);
-      g_value_set_uint (value, this->lost_latency);
       THIS_READUNLOCK (this);
       break;
     case PROP_REPAIR_WINDOW_MIN:
@@ -638,81 +662,70 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
 }
 
 
-GstStructure *
-_collect_infos (GstMprtpplayouter * this)
+void
+_setup_paths_owd_window_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold)
 {
-  GstStructure *result;
   GHashTableIter iter;
   gpointer key, val;
   MpRTPRPath *path;
-  gint index = 0;
-  GValue g_value = { 0 };
-  gchar *field_name;
-  guint32 received_num = 0;
-  guint32 jitter = 0;
-  guint16 HSN = 0;
-  guint16 cycle_num = 0;
-  guint32 late_discarded = 0;
-  result = gst_structure_new ("PlayoutSubflowReports",
-      "length", G_TYPE_UINT, this->subflows_num, NULL);
-  g_value_init (&g_value, G_TYPE_UINT);
-  g_hash_table_iter_init (&iter, this->paths);
+  gboolean subflow_match = FALSE;
+
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     path = (MpRTPRPath *) val;
-
-    field_name = g_strdup_printf ("subflow-%d-id", index);
-    g_value_set_uint (&g_value, mprtpr_path_get_id (path));
-    gst_structure_set_value (result, field_name, &g_value);
-    mprtp_free (field_name);
-
-    field_name = g_strdup_printf ("subflow-%d-received_packet_num", index);
-    g_value_set_uint (&g_value,
-        received_num);
-    gst_structure_set_value (result, field_name, &g_value);
-    mprtp_free (field_name);
-
-    field_name = g_strdup_printf ("subflow-%d-jitter", index);
-    g_value_set_uint (&g_value, jitter);
-    gst_structure_set_value (result, field_name, &g_value);
-    mprtp_free (field_name);
-
-    field_name = g_strdup_printf ("subflow-%d-HSN", index);
-    g_value_set_uint (&g_value, HSN);
-    gst_structure_set_value (result, field_name, &g_value);
-    mprtp_free (field_name);
-
-    field_name = g_strdup_printf ("subflow-%d-cycle_num", index);
-    g_value_set_uint (&g_value, cycle_num);
-    gst_structure_set_value (result, field_name, &g_value);
-    mprtp_free (field_name);
-
-    field_name =
-        g_strdup_printf ("subflow-%d-late_discarded_packet_num", index);
-    g_value_set_uint (&g_value,
-        late_discarded);
-    gst_structure_set_value (result, field_name, &g_value);
-    mprtp_free (field_name);
-    ++index;
+    subflow_match = mprtpr_path_get_id(path) != subflow_id;
+    if(subflow_id != 255 && subflow_id != 0 && !subflow_match){
+      continue;
+    }
+    mprtpr_path_set_owd_window_treshold(path, treshold);
+    if(subflow_match){
+      break;
+    }
   }
-  return result;
+}
+
+
+void
+_setup_paths_discard_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold)
+{
+  GHashTableIter iter;
+  gpointer key, val;
+  MpRTPRPath *path;
+  gboolean subflow_match = FALSE;
+
+  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+    path = (MpRTPRPath *) val;
+    subflow_match = mprtpr_path_get_id(path) != subflow_id;
+    if(subflow_id != 255 && subflow_id != 0 && !subflow_match){
+      continue;
+    }
+    mprtpr_path_set_discard_treshold(path, treshold);
+    if(subflow_match){
+      break;
+    }
+  }
 }
 
 void
-_setup_paths (GstMprtpplayouter * this)
+_setup_paths_lost_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold)
 {
   GHashTableIter iter;
   gpointer key, val;
   MpRTPRPath *path;
-  GstClockTime latency;
+  gboolean subflow_match = FALSE;
 
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     path = (MpRTPRPath *) val;
-    latency = this->discard_latency;
-    mprtpr_path_set_discard_latency(path, latency * GST_MSECOND);
-    latency = this->lost_latency;
-    mprtpr_path_set_lost_latency(path, latency * GST_MSECOND);
+    subflow_match = mprtpr_path_get_id(path) != subflow_id;
+    if(subflow_id != 255 && subflow_id != 0 && !subflow_match){
+      continue;
+    }
+    mprtpr_path_set_lost_treshold(path, treshold);
+    if(subflow_match){
+      break;
+    }
   }
 }
+
 
 
 
@@ -839,8 +852,9 @@ _join_path (GstMprtpplayouter * this, guint8 subflow_id)
     goto exit;
   }
   path = make_mprtpr_path (subflow_id);
-  mprtpr_path_set_discard_latency(path, this->discard_latency);
-  mprtpr_path_set_lost_latency(path, this->lost_latency);
+  mprtpr_path_set_discard_treshold(path, DEFAULT_DISCARD_TRESHOLD);
+  mprtpr_path_set_lost_treshold(path, DEFAULT_LOST_TRESHOLD);
+  mprtpr_path_set_owd_window_treshold(path, DEFAULT_OWD_WINDOW_TRESHOLD);
   g_hash_table_insert (this->paths, GINT_TO_POINTER (subflow_id), path);
   stream_joiner_add_path (this->joiner, subflow_id, path);
   rcvctrler_add_path(this->controller, subflow_id, path);
@@ -1138,22 +1152,10 @@ _try_get_path (GstMprtpplayouter * this, guint16 subflow_id,
   return TRUE;
 }
 
-void
-_change_auto_rate_and_cc (GstMprtpplayouter * this,
-    gboolean auto_rate_and_cc)
-{
-  if(this->auto_rate_and_cc ^ auto_rate_and_cc){
-    if(auto_rate_and_cc) rcvctrler_enable_auto_rate_and_cc(this->controller);
-    else rcvctrler_disable_auto_rate_and_congestion_control(this->controller);
-  }
-  this->auto_rate_and_cc = auto_rate_and_cc;
-}
-
 
 GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer)
 {
   GstMpRTPBuffer *result;
-//  result = pointerpool_get(this->mprtp_buffer_pool);
 //  result = g_slice_new0(GstMpRTPBuffer);
   result = g_malloc0(sizeof(GstMpRTPBuffer));
   gst_mprtp_buffer_init(result,

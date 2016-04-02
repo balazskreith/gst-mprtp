@@ -281,7 +281,24 @@ typedef struct PACKED _GstRTCPFB
   guint32 fci_data;
 } GstRTCPFB;
 
+#define RTCP_AFB_FBRA_MARC_ID 0x4D415243 //MARC
 
+typedef struct PACKED _GstRTCPAFBMARCRecord{
+  guint16 HSSN;
+  guint8  fraction_lost;
+  guint8  rsvd;
+  guint32 discarded_bytes;
+  guint32 owd_sample;
+}GstRTCPAFBMARCRecord;
+
+#define RTCP_AFB_FBRA_MARC_RECORDS_NUM 1
+
+typedef struct PACKED _GstRTCPFB_FBRA_MARC{
+  guint8  rsvd;
+  guint8  records_num;
+  guint16 length;
+  GstRTCPAFBMARCRecord records[RTCP_AFB_FBRA_MARC_RECORDS_NUM];
+}GstRTCPFB_FBRA_MARC;
 
 /*MPRTCP struct polymorphism*/
 

@@ -91,13 +91,15 @@ _try_get_path (GstMprtpscheduler * this, guint16 subflow_id,
     MPRTPSPath ** result);
 static void _change_path_state (GstMprtpscheduler * this, guint8 subflow_id,
     gboolean set_congested, gboolean set_lossy);
-static void _change_auto_rate_and_cc (GstMprtpscheduler * this,
-    gboolean auto_rate_and_cc);
+static void _change_sending_rate(GstMprtpscheduler * this,
+    guint8 subflow_id, gint32 target_bitrate);
+static void _change_keep_alive_period(GstMprtpscheduler * this,
+                                      guint8 subflow_id, GstClockTime period);
+static MPRTPSPath *_get_path(GstMprtpscheduler * this, guint8 subflow_id);
 static gboolean gst_mprtpscheduler_mprtp_src_event (GstPad * pad,
     GstObject * parent, GstEvent * event);
 static gboolean gst_mprtpscheduler_sink_eventfunc (GstPad * srckpad, GstObject * parent,
                                                    GstEvent * event);
-static GstStructure *_collect_infos (GstMprtpscheduler * this);
 static void _setup_paths (GstMprtpscheduler * this);
 static void _mprtpscheduler_process_run(void *data);
 
@@ -115,14 +117,13 @@ enum
   PROP_DETACH_SUBFLOW,
   PROP_SET_SUBFLOW_NON_CONGESTED,
   PROP_SET_SUBFLOW_CONGESTED,
-  PROP_AUTO_RATE_AND_CC,
+  PROP_SETUP_CONTROLLING_MODE,
   PROP_SET_SENDING_TARGET,
-  PROP_INITIAL_DISABLING,
   PROP_KEEP_ALIVE_PERIOD,
+  PROP_SETUP_REPORT_TIMEOUT,
   PROP_FEC_INTERVAL,
   PROP_LOG_ENABLED,
   PROP_LOG_PATH,
-  PROP_SUBFLOWS_STATS,
 };
 
 /* signals and args */
@@ -260,12 +261,6 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "set the subflow non-congested", "Set the subflow non-congested", 0,
           MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_AUTO_RATE_AND_CC,
-      g_param_spec_boolean ("auto-rate-and-cc",
-          "Enables automatic rate and congestion controller",
-          "Enables automatic rate and congestion controller",
-          FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
   g_object_class_install_property (gobject_class, PROP_SET_SENDING_TARGET,
       g_param_spec_uint ("setup-sending-target",
           "set the sending target of the subflow",
@@ -278,32 +273,25 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the period in ms",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_SETUP_REPORT_TIMEOUT,
+      g_param_spec_uint ("setup-report-timeout",
+          "setup a timeout value for incoming reports on subflows",
+          "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the timeout in ms",
+          0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_SETUP_CONTROLLING_MODE,
+      g_param_spec_uint ("setup-controlling-mode",
+          "set the controlling mode to the subflow",
+          "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the mode. "
+          "0 - no sending rate controller, 1 - no controlling, but sending SRs, 2 - FBRA with MARC",
+          0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_FEC_INTERVAL,
       g_param_spec_uint ("fec-interval",
           "Set a stable FEC interval applied on the media stream",
           "The property value other than 0 request a FEC protection after a specified packet was sent. "
           "The newly created FEC packet is going to be sent on the path actually selected if the plugin uses multipath.",
           0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-  //TODO: Implement this
-//  g_object_class_install_property (gobject_class, PROP_MULTIPATH_FEC_FILTERING,
-//      g_param_spec_boolean ("mpath-fec-filtering",
-//          "Enables a filtering on FEC protection based on path states.",
-//          "Enables a filtering on FEC protection based on path states.",
-//          FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_INITIAL_DISABLING,
-      g_param_spec_uint64 ("initial-disabling",
-          "set an initial disabling time for rate controller in order to collect statistics at the beginning.",
-          "set an initial disabling time for rate controller in order to collect statistics at the beginning.",
-          0, 3600 * GST_SECOND, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_SUBFLOWS_STATS,
-      g_param_spec_string ("subflow-stats",
-          "Extract subflow stats",
-          "Collect subflow statistics and return with "
-          "a structure contains it",
-          "NULL", G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LOG_ENABLED,
       g_param_spec_boolean ("logging",
@@ -396,13 +384,14 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->controller = (SndController*) g_object_new(SNDCTRLER_TYPE, NULL);
   this->fec_encoder = make_fecencoder();
   this->sndqueue = make_packetssndqueue();
+  this->sndrates = make_sndrate_distor(this->splitter);
+
   sndctrler_setup(this->controller, this->splitter, this->sndqueue, this->fec_encoder);
   sndctrler_setup_callbacks(this->controller,
                             this, gst_mprtpscheduler_mprtcp_sender,
                             this, gst_mprtpscheduler_emit_signal
                             );
   fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
-  _change_auto_rate_and_cc (this, FALSE);
   _setup_paths(this);
 
 }
@@ -437,7 +426,10 @@ gst_mprtpscheduler_finalize (GObject * object)
 }
 
 
-
+typedef struct _SubflowSpecProp{
+  guint32  id     : 8;
+  guint32  value : 24;
+}SubflowSpecProp;
 
 void
 gst_mprtpscheduler_set_property (GObject * object, guint property_id,
@@ -446,11 +438,9 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
   GstMprtpscheduler *this = GST_MPRTPSCHEDULER (object);
   guint guint_value;
   gboolean gboolean_value;
-  guint8 subflow_id;
-  guint subflow_target;
-  guint64 guint64_value;
-  MPRTPSPath *path;
+  SubflowSpecProp *subflow_prop;
 
+  subflow_prop = (SubflowSpecProp*) &guint_value;
   GST_DEBUG_OBJECT (this, "set_property");
 
   switch (property_id) {
@@ -499,18 +489,6 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       _change_path_state (this, (guint8) guint_value, FALSE, FALSE);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_AUTO_RATE_AND_CC:
-      THIS_WRITELOCK (this);
-      gboolean_value = g_value_get_boolean (value);
-      _change_auto_rate_and_cc (this, gboolean_value);
-      THIS_WRITEUNLOCK (this);
-      break;
-      //Todo: implement this
-//    case PROP_MULTIPATH_FEC_FILTERING:
-//      THIS_WRITELOCK (this);
-//      this->mpath_fec_filtering = g_value_get_boolean (value);
-//      THIS_WRITEUNLOCK (this);
-//      break;
     case PROP_FEC_INTERVAL:
       THIS_WRITELOCK (this);
       this->fec_interval = g_value_get_uint (value);
@@ -519,31 +497,25 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
     case PROP_SET_SENDING_TARGET:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
-      subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
-      subflow_target = guint_value & 0x00FFFFFFUL;
-      stream_splitter_setup_sending_target (this->splitter, subflow_id,
-          subflow_target);
-      stream_splitter_commit_changes (this->splitter);
+      _change_sending_rate(this, subflow_prop->id, subflow_prop->value);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_INITIAL_DISABLING:
+    case PROP_SETUP_CONTROLLING_MODE:
       THIS_WRITELOCK (this);
-      guint64_value = g_value_get_uint64 (value);
-      sndctrler_set_initial_disabling(this->controller, guint64_value);
+      guint_value = g_value_get_uint (value);
+      sndctrler_change_controlling_mode(this->controller, subflow_prop->id, subflow_prop->value);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_KEEP_ALIVE_PERIOD:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
-      subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
-      guint64_value = guint_value & 0x00FFFFFFUL;
-      guint64_value *= GST_MSECOND;
-      path = (MPRTPSPath *) g_hash_table_lookup (this->paths, GINT_TO_POINTER (subflow_id));
-      if(!path){
-        GST_WARNING_OBJECT(this, "subflow with id %d doesn't exist.", subflow_id);
-      }else{
-        mprtps_path_set_keep_alive_period(path, guint64_value);
-      }
+      _change_keep_alive_period(this, subflow_prop->id, subflow_prop->value * GST_MSECOND);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_SETUP_REPORT_TIMEOUT:
+      THIS_WRITELOCK (this);
+      guint_value = g_value_get_uint (value);
+      sndctrler_setup_report_timeout(this->controller,  subflow_prop->id, subflow_prop->value * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_LOG_ENABLED:
@@ -606,28 +578,11 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
       g_value_set_uint (value, (guint) this->fec_payload_type);
       THIS_READUNLOCK (this);
       break;
-    case PROP_AUTO_RATE_AND_CC:
-      THIS_READLOCK (this);
-      g_value_set_boolean (value, this->auto_rate_and_cc);
-      THIS_READUNLOCK (this);
-      break;
     case PROP_LOG_ENABLED:
       THIS_READLOCK (this);
       g_value_set_boolean (value, this->logging);
       THIS_READUNLOCK (this);
       break;
-    case PROP_SUBFLOWS_STATS:
-      THIS_READLOCK (this);
-      g_value_set_string (value,
-          gst_structure_to_string (_collect_infos (this)));
-      THIS_READUNLOCK (this);
-      break;
-      //Todo: implement this
-//    case PROP_MULTIPATH_FEC_FILTERING:
-//      THIS_READLOCK (this);
-//      g_value_set_boolean (value, this->mpath_fec_filtering);
-//      THIS_READUNLOCK (this);
-//      break;
     case PROP_FEC_INTERVAL:
       THIS_READLOCK (this);
       g_value_set_uint (value, (guint) this->fec_interval);
@@ -637,44 +592,6 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
   }
-}
-
-GstStructure *
-_collect_infos (GstMprtpscheduler * this)
-{
-  GstStructure *result;
-  GHashTableIter iter;
-  gpointer key, val;
-  MPRTPSPath *path;
-  gint index = 0;
-  GValue g_value = { 0 };
-  gchar *field_name;
-  result = gst_structure_new ("SchedulerSubflowReports",
-      "length", G_TYPE_UINT, this->active_subflows_num, NULL);
-  g_value_init (&g_value, G_TYPE_UINT);
-  g_hash_table_iter_init (&iter, this->paths);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-    path = (MPRTPSPath *) val;
-
-    field_name = g_strdup_printf ("subflow-%d-id", index);
-    g_value_set_uint (&g_value, mprtps_path_get_id (path));
-    gst_structure_set_value (result, field_name, &g_value);
-    mprtp_free (field_name);
-
-    field_name = g_strdup_printf ("subflow-%d-sent_packet_num", index);
-    g_value_set_uint (&g_value, mprtps_path_get_total_sent_packets_num (path));
-    gst_structure_set_value (result, field_name, &g_value);
-    mprtp_free (field_name);
-
-    field_name = g_strdup_printf ("subflow-%d-sent_payload_bytes", index);
-    g_value_set_uint (&g_value,
-        mprtps_path_get_total_sent_payload_bytes (path));
-    gst_structure_set_value (result, field_name, &g_value);
-    mprtp_free (field_name);
-
-    ++index;
-  }
-  return result;
 }
 
 
@@ -716,16 +633,21 @@ void
 _join_subflow (GstMprtpscheduler * this, guint subflow_id)
 {
   MPRTPSPath *path;
-  path =
-      (MPRTPSPath *) g_hash_table_lookup (this->paths,
-      GINT_TO_POINTER (subflow_id));
-  if (path == NULL) {
-    path = make_mprtps_path ((guint8) subflow_id);
-    g_hash_table_insert (this->paths, GINT_TO_POINTER (subflow_id), path);
-    mprtps_path_set_mprtp_ext_header_id(path, this->mprtp_ext_header_id);
-    ++this->active_subflows_num;
+  path = _get_path(this, subflow_id);
+  if (path != NULL) {
+      GST_WARNING_OBJECT (this, "Join operation can not be done "
+              "due to not existed subflow id (%d)", subflow_id);
+    return;
   }
+  path = make_mprtps_path ((guint8) subflow_id);
+  g_hash_table_insert (this->paths, GINT_TO_POINTER (subflow_id), path);
+  mprtps_path_set_mprtp_ext_header_id(path, this->mprtp_ext_header_id);
+
+  stream_splitter_add_path(this->splitter, subflow_id, path, 0);
   sndctrler_add_path(this->controller, subflow_id, path);
+  fecencoder_add_path(this->fec_encoder, path);
+  sndrate_distor_add_subflow(this->sndrates, path);
+  ++this->active_subflows_num;
 }
 
 void
@@ -733,16 +655,17 @@ _detach_subflow (GstMprtpscheduler * this, guint subflow_id)
 {
   MPRTPSPath *path;
 
-  path =
-      (MPRTPSPath *) g_hash_table_lookup (this->paths,
-      GINT_TO_POINTER (subflow_id));
+  path = _get_path(this, subflow_id);
   if (path == NULL) {
     GST_WARNING_OBJECT (this, "Detach operation can not be done "
         "due to not existed subflow id (%d)", subflow_id);
     return;
   }
+  stream_splitter_rem_path(this->splitter, subflow_id);
   sndctrler_rem_path(this->controller, subflow_id);
-  //g_hash_table_remove (this->paths, GINT_TO_POINTER (subflow_id));
+  fecencoder_rem_path(this->fec_encoder, subflow_id);
+  sndrate_distor_rem_subflow(this->sndrates, subflow_id);
+  g_hash_table_remove (this->paths, GINT_TO_POINTER (subflow_id));
   --this->active_subflows_num;
 }
 
@@ -908,26 +831,9 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     }
     THIS_READUNLOCK (this);
   }
-//  gst_mprtpscheduler_mprtp_setup(this, buffer);
-//  gst_mprtpscheduler_mprtp_setup(this, buffer);
+
   packetssndqueue_push(this->sndqueue, buffer);
-//
-//  //the packet is rtp
-//  THIS_READLOCK (this);
-//  path = stream_splitter_get_next_path(this->splitter, buffer);
-//  if(!path){
-//    GST_WARNING_OBJECT(this, "No active subflow");
-//    goto done;
-//  }
-//  if(suggest_to_skip){
-//    gst_buffer_unref(buffer);
-//    goto done;
-//  }
-//  outbuf = gst_buffer_make_writable (buffer);
-//  mprtps_path_process_rtp_packet(path, outbuf);
   result = GST_FLOW_OK;
-//done:
-//  THIS_READUNLOCK (this);
   return result;
 }
 
@@ -1070,9 +976,7 @@ _try_get_path (GstMprtpscheduler * this, guint16 subflow_id,
     MPRTPSPath ** result)
 {
   MPRTPSPath *path;
-  path =
-      (MPRTPSPath *) g_hash_table_lookup (this->paths,
-      GINT_TO_POINTER (subflow_id));
+  path = _get_path(this, subflow_id);
   if (path == NULL) {
     return FALSE;
   }
@@ -1082,17 +986,6 @@ _try_get_path (GstMprtpscheduler * this, guint16 subflow_id,
   return TRUE;
 }
 
-
-void
-_change_auto_rate_and_cc (GstMprtpscheduler * this,
-    gboolean auto_rate_and_cc)
-{
-  if(this->auto_rate_and_cc ^ auto_rate_and_cc){
-    if(auto_rate_and_cc) sndctrler_enable_auto_rate_and_cc(this->controller);
-    else sndctrler_disable_auto_rate_and_cc(this->controller);
-  }
-  this->auto_rate_and_cc = auto_rate_and_cc;
-}
 
 
 void
@@ -1121,6 +1014,52 @@ _change_path_state (GstMprtpscheduler * this, guint8 subflow_id,
 
 }
 
+void _change_sending_rate(GstMprtpscheduler * this, guint8 subflow_id, gint32 target_bitrate)
+{
+  GHashTableIter iter;
+  gpointer key, val;
+  MPRTPSPath *path;
+  gboolean subflow_match = FALSE;
+
+  g_hash_table_iter_init (&iter, this->paths);
+  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+    path = (MPRTPSPath *) val;
+    subflow_match = mprtps_path_get_id(path) != subflow_id;
+    if(subflow_id != 255 && subflow_id != 0 && !subflow_match){
+      continue;
+    }
+    mprtps_path_set_target_bitrate(path, target_bitrate);
+    if(subflow_match){
+      break;
+    }
+  }
+}
+
+void _change_keep_alive_period(GstMprtpscheduler * this, guint8 subflow_id, GstClockTime period)
+{
+  GHashTableIter iter;
+  gpointer key, val;
+  MPRTPSPath *path;
+  gboolean subflow_match = FALSE;
+
+  g_hash_table_iter_init (&iter, this->paths);
+  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+    path = (MPRTPSPath *) val;
+    subflow_match = mprtps_path_get_id(path) != subflow_id;
+    if(subflow_id != 255 && subflow_id != 0 && !subflow_match){
+      continue;
+    }
+    mprtps_path_set_keep_alive_period(path, period);
+    if(subflow_match){
+      break;
+    }
+  }
+}
+
+MPRTPSPath *_get_path(GstMprtpscheduler * this, guint8 subflow_id)
+{
+  return g_hash_table_lookup (this->paths, GINT_TO_POINTER (subflow_id));
+}
 
 void
 _mprtpscheduler_process_run (void *data)
@@ -1132,7 +1071,7 @@ _mprtpscheduler_process_run (void *data)
   GstBuffer *buffer = NULL;
   GstBuffer *rtpfecbuf = NULL;
   gboolean fec_request = FALSE;
-
+  guint approve_retried = 0;
   this = (GstMprtpscheduler *) data;
 
   THIS_READLOCK (this);
@@ -1147,7 +1086,16 @@ again:
   }
   ++this->sent_packets;
   buffer = gst_buffer_make_writable (buffer);
+select:
   path = stream_splitter_get_next_path(this->splitter, buffer);
+  if(!mprtps_path_approve_request(path, buffer)){
+    if(++approve_retried < 128){
+      goto select;
+    }else{
+      //Todo: consider approval here.
+      approve_retried = 0;
+    }
+  }
   if(!path){
     GST_WARNING_OBJECT(this, "No active subflow");
     next_scheduler_time = _now(this) + 100 * GST_MSECOND;

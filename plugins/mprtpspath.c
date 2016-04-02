@@ -105,7 +105,7 @@ mprtps_path_init (MPRTPSPath * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
-  this->packetstracker = make_packetstracker();
+  this->packetstracker = NULL;
   mprtps_path_reset (this);
 }
 
@@ -271,6 +271,39 @@ mprtps_path_is_non_congested (MPRTPSPath * this)
 
 }
 
+void mprtps_path_set_target_bitrate(MPRTPSPath * this, gint32 target_bitrate)
+{
+  g_return_if_fail (this);
+  THIS_WRITELOCK (this);
+  this->target_bitrate = target_bitrate;
+  THIS_WRITEUNLOCK (this);
+}
+
+gint32 mprtps_path_get_target_bitrate(MPRTPSPath * this)
+{
+  gint32 result;
+  THIS_READLOCK (this);
+  result = this->target_bitrate;
+  THIS_READUNLOCK (this);
+  return result;
+}
+
+void mprtps_path_set_monitored_bitrate(MPRTPSPath * this, gint32 monitored_bitrate)
+{
+  g_return_if_fail (this);
+  THIS_WRITELOCK (this);
+  this->monitored_bitrate = monitored_bitrate;
+  THIS_WRITEUNLOCK (this);
+}
+
+gint32 mprtps_path_get_monitored_bitrate(MPRTPSPath * this)
+{
+  gint32 result;
+  THIS_READLOCK (this);
+  result = this->monitored_bitrate;
+  THIS_READUNLOCK (this);
+  return result;
+}
 
 void
 mprtps_path_set_congested (MPRTPSPath * this)
@@ -322,6 +355,34 @@ mprtps_path_set_keep_alive_period(MPRTPSPath *this, GstClockTime period)
   THIS_WRITEUNLOCK (this);
 }
 
+void
+mprtps_path_set_approval_process(MPRTPSPath *this, gpointer data, gboolean(*approval)(gpointer, GstBuffer *))
+{
+  THIS_WRITELOCK (this);
+  this->approval = approval;
+  this->approval_data = data;
+  THIS_WRITEUNLOCK (this);
+}
+
+gboolean mprtps_path_approve_request(MPRTPSPath *this, GstBuffer *buf)
+{
+  gboolean result;
+  THIS_READLOCK(this);
+  result = !this->approval ? TRUE : this->approval(this->approval_data, buf);
+  THIS_READUNLOCK(this);
+  return result;
+}
+
+void mprtps_path_set_packets_tracker(MPRTPSPath *this, PacketsTracker *tracker)
+{
+  THIS_WRITELOCK (this);
+  if(this->packetstracker){
+    g_object_unref(this->packetstracker);
+  }
+  this->packetstracker = g_object_ref(tracker);
+  THIS_WRITEUNLOCK (this);
+}
+
 
 gboolean
 mprtps_path_request_keep_alive(MPRTPSPath *this)
@@ -351,8 +412,6 @@ mprtps_path_get_total_sent_packets_num (MPRTPSPath * this)
 }
 
 
-
-
 guint32
 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this)
 {
@@ -361,99 +420,6 @@ mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this)
   result = this->total_sent_payload_bytes;
   THIS_READUNLOCK (this);
   return result;
-}
-
-
-guint32 mprtps_path_get_sent_bytes_in1s(MPRTPSPath *this)
-{
-  gint64 result = 0;
-  THIS_READLOCK(this);
-  if(!this->packetstracker_activated){
-    goto done;
-  }
-  result = this->packetstracker_stat.sent_in_1s;
-done:
-  THIS_READUNLOCK(this);
-  return result;
-}
-
-guint32 mprtps_path_get_received_bytes_in1s(MPRTPSPath *this)
-{
-  gint64 result = 0;
-  THIS_READLOCK(this);
-  if(!this->packetstracker_activated){
-    goto done;
-  }
-  result = this->packetstracker_stat.received_in_1s;
-done:
-  THIS_READUNLOCK(this);
-  return result;
-}
-
-guint32 mprtps_path_get_goodput_bytes_in1s(MPRTPSPath *this)
-{
-  gint64 result = 0;
-  THIS_READLOCK(this);
-  if(!this->packetstracker_activated){
-    goto done;
-  }
-  result = this->packetstracker_stat.goodput_in_1s;
-done:
-  THIS_READUNLOCK(this);
-  return result;
-}
-
-guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this)
-{
-  gint64 result = 0;
-  THIS_READLOCK(this);
-  if(!this->packetstracker_activated){
-    goto done;
-  }
-  result = this->packetstracker_stat.bytes_in_flight;
-done:
-  THIS_READUNLOCK(this);
-  return result;
-}
-
-
-
-void mprtps_path_activate_packets_monitoring(MPRTPSPath * this, gint32 items_length)
-{
-  THIS_WRITELOCK (this);
-  if(this->packetstracker_activated){
-    GST_WARNING_OBJECT(this, "Packets monitoring on subflow %d has already been activated.", this->id);
-    goto done;
-  }
-  this->packetstracker_activated = TRUE;
-  packetstracker_reset(this->packetstracker);
-
-done:
-  THIS_WRITEUNLOCK (this);
-}
-
-void mprtps_path_deactivate_packets_monitoring (MPRTPSPath * this)
-{
-  THIS_WRITELOCK (this);
-  if(!this->packetstracker_activated){
-    GST_WARNING_OBJECT(this, "Packets monitoring on subflow %d hasn't been activated.", this->id);
-    goto done;
-  }
-  this->packetstracker_activated = FALSE;
-done:
-  THIS_WRITEUNLOCK (this);
-}
-
-void mprtps_path_packets_feedback_update(MPRTPSPath *this, GstMPRTCPReportSummary *summary)
-{
-  THIS_WRITELOCK (this);
-  if(!this->packetstracker_activated){
-    goto done;
-  }
-  packetstracker_feedback_update(this->packetstracker, summary);
-  packetstracker_get_stats(this->packetstracker, &this->packetstracker_stat);
-done:
-  THIS_WRITEUNLOCK(this);
 }
 
 
@@ -515,8 +481,8 @@ _refresh_stat(MPRTPSPath * this,
   ++this->total_sent_packets_num;
   this->total_sent_payload_bytes += payload_bytes;
 
-  if(this->packetstracker_activated){
-    packetstracker_add(this->packetstracker, rtp, sn);
+  if(this->packetstracker){
+    packetstracker_add(this->packetstracker, payload_bytes, sn);
   }
 
 }

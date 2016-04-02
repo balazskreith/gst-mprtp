@@ -44,8 +44,6 @@ typedef enum
   MPRTPS_PATH_FLAG_ACTIVE        = 4,
 } MPRTPSPathFlags;
 
-//#define MAX_INT32_POSPART 32767
-#define MAX_INT32_POSPART 16383
 
 struct _MPRTPSPathPacketsItem{
   guint16      seq_num;
@@ -99,6 +97,9 @@ struct _MPRTPSPath
   guint                   abs_time_ext_header_id;
   guint                   mprtp_ext_header_id;
 
+  gint32                  target_bitrate;
+  gint32                  monitored_bitrate;
+
   GstClockTime            sent_passive;
   GstClockTime            sent_active;
   GstClockTime            sent_non_congested;
@@ -113,8 +114,6 @@ struct _MPRTPSPath
 
 //  MPRTPSPathPackets       packets;
   PacketsTracker*         packetstracker;
-  PacketsTrackerStat      packetstracker_stat;
-  gboolean                packetstracker_activated;
 
   guint32                 total_sent_packets_num;
   guint32                 total_sent_payload_bytes;
@@ -122,6 +121,9 @@ struct _MPRTPSPath
   gboolean                expected_lost;
 
   GstClockTime            keep_alive_period;
+
+  gpointer                approval_data;
+  gboolean              (*approval)(gpointer, GstBuffer *);
 };
 
 struct _MPRTPSPathClass
@@ -184,6 +186,12 @@ void mprtps_path_set_lossy (MPRTPSPath * this);
 void mprtps_path_set_non_lossy (MPRTPSPath * this);
 
 gboolean mprtps_path_is_non_congested (MPRTPSPath * this);
+void mprtps_path_set_target_bitrate(MPRTPSPath * this, gint32 target_bitrate);
+gint32 mprtps_path_get_target_bitrate(MPRTPSPath * this);
+
+void mprtps_path_set_monitored_bitrate(MPRTPSPath * this, gint32 monitored_bitrate);
+gint32 mprtps_path_get_monitored_bitrate(MPRTPSPath * this);
+
 void mprtps_path_set_congested (MPRTPSPath * this);
 void mprtps_path_set_non_congested (MPRTPSPath * this);
 
@@ -193,18 +201,15 @@ gboolean mprtps_path_has_expected_lost(MPRTPSPath * this);
 void mprtps_path_process_rtp_packet(MPRTPSPath * this, GstBuffer * buffer, gboolean *monitoring_request);
 
 void mprtps_path_set_keep_alive_period(MPRTPSPath *this, GstClockTime period);
+void mprtps_path_set_approval_process(MPRTPSPath *this, gpointer data, gboolean(*approval)(gpointer, GstBuffer *));
+gboolean mprtps_path_approve_request(MPRTPSPath *this, GstBuffer *buf);
+void mprtps_path_set_packets_tracker(MPRTPSPath *this, PacketsTracker *tracker);
+
+
 gboolean mprtps_path_request_keep_alive(MPRTPSPath *this);
 
 guint32 mprtps_path_get_total_sent_packets_num (MPRTPSPath * this);
 guint32 mprtps_path_get_total_sent_payload_bytes (MPRTPSPath * this);
-guint32 mprtps_path_get_sent_bytes_in1s(MPRTPSPath *this);
-guint32 mprtps_path_get_received_bytes_in1s(MPRTPSPath *this);
-guint32 mprtps_path_get_goodput_bytes_in1s(MPRTPSPath *this);
-guint32 mprtps_path_get_bytes_in_flight(MPRTPSPath *this);
-void mprtps_path_activate_packets_monitoring(MPRTPSPath * this, gint32 items_length);
-void mprtps_path_deactivate_packets_monitoring (MPRTPSPath * this);
-void mprtps_path_packets_feedback_update(MPRTPSPath *this, GstMPRTCPReportSummary *summary);
-
 
 guint8 mprtps_path_get_flags (MPRTPSPath * this);
 guint16 mprtps_path_get_actual_seq(MPRTPSPath * this);

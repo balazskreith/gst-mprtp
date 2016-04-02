@@ -157,14 +157,13 @@ void report_processor_set_ssrc(ReportProcessor *this, guint32 ssrc)
   THIS_WRITEUNLOCK(this);
 }
 
-GstMPRTCPReportSummary* report_processor_process_mprtcp(ReportProcessor * this, GstBuffer* buffer)
+void report_processor_process_mprtcp(ReportProcessor * this, GstBuffer* buffer, GstMPRTCPReportSummary* result)
 {
   guint32 ssrc;
-  GstMPRTCPReportSummary* result;
   GstMapInfo map = GST_MAP_INFO_INIT;
   GstMPRTCPSubflowReport *report;
   GstMPRTCPSubflowBlock *block;
-  result = mprtp_malloc(sizeof(GstMPRTCPReportSummary));
+
   gst_buffer_map(buffer, &map, GST_MAP_READ);
   report = (GstMPRTCPSubflowReport *)map.data;
   gst_mprtcp_report_getdown(report, &ssrc);
@@ -173,12 +172,11 @@ GstMPRTCPReportSummary* report_processor_process_mprtcp(ReportProcessor * this, 
       g_warning("Wrong SSRC to process");
   }
   result->ssrc = ssrc;
-  result->created = _now(this);
+  result->updated = _now(this);
   block = gst_mprtcp_get_first_block(report);
   _processing_mprtcp_subflow_block(this, block, result);
   _logging(this, result);
   gst_buffer_unmap(buffer, &map);
-  return result;
 }
 
 void report_processor_set_logfile(ReportProcessor *this, const gchar *logfile)

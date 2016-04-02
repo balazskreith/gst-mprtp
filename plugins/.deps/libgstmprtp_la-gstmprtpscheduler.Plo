@@ -352,7 +352,7 @@ libgstmprtp_la-gstmprtpscheduler.lo: gstmprtpscheduler.c \
  /usr/include/glib-2.0/gio/gmenuexporter.h \
  /usr/include/glib-2.0/gio/gdbusmenumodel.h \
  /usr/include/glib-2.0/gio/gnotification.h sndratedistor.h \
- streamsplitter.h reportprod.h fecenc.h rtpfecbuffer.h \
+ streamsplitter.h reportprod.h fecenc.h rtpfecbuffer.h signalreport.h \
  /usr/include/x86_64-linux-gnu/sys/timex.h \
  /usr/include/x86_64-linux-gnu/sys/time.h \
  /usr/include/x86_64-linux-gnu/bits/timex.h
@@ -1182,6 +1182,8 @@ reportprod.h:
 fecenc.h:
 
 rtpfecbuffer.h:
+
+signalreport.h:
 
 /usr/include/x86_64-linux-gnu/sys/timex.h:
 

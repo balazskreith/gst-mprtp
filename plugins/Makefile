@@ -140,8 +140,7 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-gstmprtpscheduler.lo \
 	libgstmprtp_la-gstmprtpplayouter.lo \
 	libgstmprtp_la-gstmprtpreceiver.lo \
-	libgstmprtp_la-gstmprtpsender.lo \
-	libgstmprtp_la-netqanalyser.lo libgstmprtp_la-mprtprpath.lo \
+	libgstmprtp_la-gstmprtpsender.lo libgstmprtp_la-mprtprpath.lo \
 	libgstmprtp_la-mprtpspath.lo libgstmprtp_la-streamjoiner.lo \
 	libgstmprtp_la-streamsplitter.lo libgstmprtp_la-sndctrler.lo \
 	libgstmprtp_la-rcvctrler.lo libgstmprtp_la-bintree.lo \
@@ -153,7 +152,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-sndratedistor.lo libgstmprtp_la-numstracker.lo \
 	libgstmprtp_la-subratectrler.lo libgstmprtp_la-fecdec.lo \
 	libgstmprtp_la-fecenc.lo libgstmprtp_la-rtpfecbuffer.lo \
-	libgstmprtp_la-packetstracker.lo
+	libgstmprtp_la-packetstracker.lo libgstmprtp_la-marcfbproc.lo \
+	libgstmprtp_la-signalreport.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -402,7 +402,6 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          gstmprtpplayouter.c        \
                          gstmprtpreceiver.c         \
                          gstmprtpsender.c           \
-                         netqanalyser.c             \
                          mprtprpath.c               \
                          mprtpspath.c               \
                          streamjoiner.c             \
@@ -424,13 +423,14 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          fecdec.c                   \
                          fecenc.c                   \
                          rtpfecbuffer.c             \
-                         packetstracker.c
+                         packetstracker.c           \
+                         marcfbproc.c               \
+                         signalreport.c
 
 noinst_HEADERS = mprtpspath.h           \
                  sndctrler.h            \
                  rcvctrler.c            \
                  mprtprpath.h           \
-                 netqanalyser.h         \
                  streamsplitter.h       \
                  streamjoiner.h         \
                  bintree.h              \
@@ -448,7 +448,9 @@ noinst_HEADERS = mprtpspath.h           \
                  fecdec.h               \
                  fecenc.h               \
                  rtpfecbuffer.h         \
-                 packetstracker.h
+                 packetstracker.h       \
+                 marcfbproc.h           \
+                 signalreport.h           
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -553,10 +555,10 @@ include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplugin.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
+include ./$(DEPDIR)/libgstmprtp_la-marcfbproc.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtplogger.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
-include ./$(DEPDIR)/libgstmprtp_la-netqanalyser.Plo
 include ./$(DEPDIR)/libgstmprtp_la-numstracker.Plo
 include ./$(DEPDIR)/libgstmprtp_la-packetssndqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-packetstracker.Plo
@@ -567,6 +569,7 @@ include ./$(DEPDIR)/libgstmprtp_la-reportproc.Plo
 include ./$(DEPDIR)/libgstmprtp_la-reportprod.Plo
 include ./$(DEPDIR)/libgstmprtp_la-ricalcer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rtpfecbuffer.Plo
+include ./$(DEPDIR)/libgstmprtp_la-signalreport.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndratedistor.Plo
 include ./$(DEPDIR)/libgstmprtp_la-streamjoiner.Plo
@@ -642,13 +645,6 @@ libgstmprtp_la-gstmprtpsender.lo: gstmprtpsender.c
 #	$(AM_V_CC)source='gstmprtpsender.c' object='libgstmprtp_la-gstmprtpsender.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtpsender.lo `test -f 'gstmprtpsender.c' || echo '$(srcdir)/'`gstmprtpsender.c
-
-libgstmprtp_la-netqanalyser.lo: netqanalyser.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-netqanalyser.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-netqanalyser.Tpo -c -o libgstmprtp_la-netqanalyser.lo `test -f 'netqanalyser.c' || echo '$(srcdir)/'`netqanalyser.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-netqanalyser.Tpo $(DEPDIR)/libgstmprtp_la-netqanalyser.Plo
-#	$(AM_V_CC)source='netqanalyser.c' object='libgstmprtp_la-netqanalyser.lo' libtool=yes \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-netqanalyser.lo `test -f 'netqanalyser.c' || echo '$(srcdir)/'`netqanalyser.c
 
 libgstmprtp_la-mprtprpath.lo: mprtprpath.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-mprtprpath.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-mprtprpath.Tpo -c -o libgstmprtp_la-mprtprpath.lo `test -f 'mprtprpath.c' || echo '$(srcdir)/'`mprtprpath.c
@@ -803,6 +799,20 @@ libgstmprtp_la-packetstracker.lo: packetstracker.c
 #	$(AM_V_CC)source='packetstracker.c' object='libgstmprtp_la-packetstracker.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-packetstracker.lo `test -f 'packetstracker.c' || echo '$(srcdir)/'`packetstracker.c
+
+libgstmprtp_la-marcfbproc.lo: marcfbproc.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-marcfbproc.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-marcfbproc.Tpo -c -o libgstmprtp_la-marcfbproc.lo `test -f 'marcfbproc.c' || echo '$(srcdir)/'`marcfbproc.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-marcfbproc.Tpo $(DEPDIR)/libgstmprtp_la-marcfbproc.Plo
+#	$(AM_V_CC)source='marcfbproc.c' object='libgstmprtp_la-marcfbproc.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-marcfbproc.lo `test -f 'marcfbproc.c' || echo '$(srcdir)/'`marcfbproc.c
+
+libgstmprtp_la-signalreport.lo: signalreport.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-signalreport.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-signalreport.Tpo -c -o libgstmprtp_la-signalreport.lo `test -f 'signalreport.c' || echo '$(srcdir)/'`signalreport.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-signalreport.Tpo $(DEPDIR)/libgstmprtp_la-signalreport.Plo
+#	$(AM_V_CC)source='signalreport.c' object='libgstmprtp_la-signalreport.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-signalreport.lo `test -f 'signalreport.c' || echo '$(srcdir)/'`signalreport.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

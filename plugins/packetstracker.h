@@ -26,8 +26,6 @@ typedef struct _PacketsTrackerStat
 {
   gint32                   bytes_in_flight;
   gint32                   acked_in_1s;
-  gint32                   received_in_1s;
-  gint32                   goodput_in_1s;
   gint32                   sent_in_1s;
 }PacketsTrackerStat;
 
@@ -42,8 +40,6 @@ struct _PacketsTracker
 
   gint32                   bytes_in_flight;
   gint32                   acked_in_1s;
-  gint32                   received_in_1s;
-  gint32                   goodput_in_1s;
   gint32                   sent_in_1s_sum;
 
 };
@@ -57,8 +53,8 @@ GType packetstracker_get_type (void);
 PacketsTracker *make_packetstracker(void);
 
 void packetstracker_reset(PacketsTracker *this);
-void packetstracker_add(PacketsTracker *this, GstRTPBuffer *rtp, guint16 sn);
+void packetstracker_add(PacketsTracker *this, guint payload_len, guint16 sn);
 void packetstracker_get_stats (PacketsTracker * this, PacketsTrackerStat* result);
-void packetstracker_feedback_update(PacketsTracker *this, GstMPRTCPReportSummary *summary);
+void packetstracker_update_hssn(PacketsTracker *this, guint16 hssn);
 
 #endif /* PACKETSTRACKER_H_ */

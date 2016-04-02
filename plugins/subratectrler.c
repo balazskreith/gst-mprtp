@@ -126,33 +126,18 @@ typedef enum{
 
 struct _Private{
   GstClockTime        time;
-  gboolean            discard;
-  gboolean            recent_discard;
-  gboolean            recent_lost;
-  gboolean            path_is_congested;
-  gboolean            path_is_lossy;
-  gint32              sender_bitrate;
-  gint32              receiver_bitrate;
-  gint32              goodput_bitrate;
-  gint32              goodput_bitrate_t1;
-  gdouble             fraction_lost;
-  gdouble             utilized_fraction;
-  gdouble             goodput_rate;
 
   Event               event;
   Stage               stage;
   Stage               stage_t1;
   GstClockTime        stage_changed;
   gboolean            controlled;
-  SubflowMeasurement* measurement;
   gdouble             rtt;
   gboolean            tr_correlated;
 
-  gint32              sending_bitrate_sum;
-  gint32              target_bitrate_sum;
-  gint32              sending_bitrates[SR_TR_ARRAY_LENGTH];
-  gint32              target_bitrates[SR_TR_ARRAY_LENGTH];
-  gint                sr_tr_index;
+  gboolean            congestion;
+  gboolean            distortion;
+  gdouble             trend;
 
   //Possible parameters
   gint32              min_monitoring_interval;
@@ -183,20 +168,20 @@ struct _Private{
 #define _event(this) _priv(this)->event
 #define _set_event(this, e) _event(this) = e
 #define _set_pending_event(this, e) this->pending_event = e
-#define _measurement(this) _priv(this)->measurement
-#define _anres(this) _measurement(this)->netq_analysation
-#define _q125(this) _anres(this).g_125
-#define _q250(this) _anres(this).g_250
-#define _q500(this) _anres(this).g_500
-#define _q1000(this) _anres(this).g_1000
+#define _marc(this) this->marc_result
+#define _corrH(this) _marc(this).corrH
+#define _q125(this) _marc(this).g_125
+#define _q250(this) _marc(this).g_250
+#define _q500(this) _marc(this).g_500
+#define _q1000(this) _marc(this).g_1000
 #define _TR(this) this->target_bitrate
 #define _TR_t1(this) this->target_bitrate_t1
-#define _SR(this) (_priv(this)->sender_bitrate)
-#define _RR(this) (_priv(this)->receiver_bitrate)
-#define _FL(this) (_priv(this)->fraction_lost)
-#define _UF(this) (_priv(this)->utilized_fraction)
-#define _GR(this) (_priv(this)->goodput_rate)
-#define _GP(this) (_priv(this)->goodput_bitrate)
+#define _SR(this) (_marc(this).sender_bitrate)
+#define _RR(this) (_marc(this).receiver_bitrate)
+#define _FL(this) (_marc(this).lost_rate)
+#define _UF(this) (_marc(this).utilized_rate)
+#define _GR(this) (_marc(this).goodput_bitrate)
+#define _GP(this) (_marc(this).goodput_bitrate)
 #define _GP_t1(this) (_priv(this)->goodput_bitrate_t1)
 #define _min_br(this) MIN(_SR(this), _TR(this))
 #define _max_br(this) MAX(_SR(this), _TR(this))
@@ -231,7 +216,6 @@ struct _Private{
 // const gdouble DT_ = 1.5; //Down Treshold
 
 
-//--------------------MEASUREMENTS-----------------------
 
 #define _now(this) (gst_clock_get_time(this->sysclock))
 
@@ -295,13 +279,16 @@ static void
 _change_target_bitrate(SubflowRateController *this, gint32 new_target);
 
 static void
-_logging(
-    SubflowRateController *this);
+_readable_logging(
+    gpointer data);
 
 static void
 _params_out(
     SubflowRateController *this);
 
+static void
+_log_rates(
+    gpointer data);
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -327,10 +314,9 @@ subratectrler_finalize (GObject * object)
   SubflowRateController *this;
   this = SUBRATECTRLER(object);
   mprtp_free(this->priv);
-  g_object_unref(this->analyser);
+  g_object_unref(this->fb_processor);
   g_object_unref(this->sysclock);
   g_object_unref(this->path);
-  g_object_unref(this->rate_controller);
 }
 
 void
@@ -360,29 +346,32 @@ subratectrler_init (SubflowRateController * this)
   _priv(this)->min_target_bitrate               = TARGET_BITRATE_MIN;
   _priv(this)->max_target_bitrate               = TARGET_BITRATE_MAX;
   _priv(this)->reduce_target_factor             = REDUCE_TARGET_FACTOR;
+
+  mprtp_logger_add_logging_fnc(_readable_logging, this, 10);
+  mprtp_logger_add_logging_fnc(_log_rates, this, 1);
+
 }
 
 
-SubflowRateController *make_subratectrler(SendingRateDistributor* rate_controlller, MPRTPSPath *path)
+SubflowRateController *make_subratectrler(MPRTPSPath *path)
 {
   SubflowRateController *result;
   result                      = g_object_new (SUBRATECTRLER_TYPE, NULL);
   result->path                = g_object_ref(path);
-  result->rate_controller     = g_object_ref(rate_controlller);
   result->id                  = mprtps_path_get_id(result->path);
-  result->setup_time          = _now(result);
   result->monitoring_interval = 3;
-  result->analyser            = make_netqueue_analyser(result->id);
+  result->made                = _now(result);
+  result->fb_processor        = make_marcfb_processor(path);
   _switch_stage_to(result, STAGE_KEEP, FALSE);
   _transit_state_to(result, SUBFLOW_STATE_STABLE);
   return result;
 }
 
-void subratectrler_enable(SubflowRateController *this, guint32 target_bitrate_start)
+void subratectrler_enable(SubflowRateController *this)
 {
   this->enabled = TRUE;
   this->disable_controlling = _now(this) + 10 * GST_SECOND;
-  this->target_bitrate = this->target_bitrate_t1 = target_bitrate_start;
+  this->target_bitrate = mprtps_path_get_target_bitrate(this->path);
 }
 
 void subratectrler_disable(SubflowRateController *this)
@@ -392,39 +381,27 @@ void subratectrler_disable(SubflowRateController *this)
   this->enabled = FALSE;
 }
 
-static void _update_congestion_indicators(SubflowRateController *this,
-                            SubflowMeasurement *measurement)
+static void _update_congestion_indicators(SubflowRateController *this)
 {
-  NetQueueAnalyserResult *anres;
-  anres = &measurement->netq_analysation;
-
-  anres->congestion = FALSE;
-  anres->distortion = FALSE;
+  _priv(this)->congestion = FALSE;
+  _priv(this)->distortion = FALSE;
+  _priv(this)->trend = 0.;
 
   if(mprtps_path_is_non_lossy(this->path)){
-      if(0.1 < measurement->reports->RR.lost_rate){
-        anres->congestion |= TRUE;
-      }else if(0. < measurement->reports->RR.lost_rate){
-        anres->distortion |= TRUE;
+      if(0.1 < _marc(this).lost_rate){
+        _priv(this)->congestion |= TRUE;
+      }else if(0. < _marc(this).lost_rate){
+        _priv(this)->distortion |= TRUE;
       }
   }
 
-  _priv(this)->fraction_lost = measurement->reports->RR.lost_rate;
-  _priv(this)->goodput_rate = (gdouble)_GP(this) / (gdouble)_RR(this);
-  _priv(this)->utilized_fraction = CONSTRAIN(.1, 1., MIN(1-_FL(this), _GR(this)));
-
 }
 
-static void _update_tr_corr(SubflowRateController *this,
-                            SubflowMeasurement *measurement)
+static void _update_tr_corr(SubflowRateController *this)
 {
   gdouble tr_corr;
 
-  _priv(this)->sender_bitrate   = measurement->sending_bitrate;
-  _priv(this)->receiver_bitrate = measurement->receiver_bitrate;
-  _priv(this)->goodput_bitrate_t1 = _priv(this)->goodput_bitrate;
-  _priv(this)->goodput_bitrate  = measurement->goodput_bitrate;
-  tr_corr =  (gdouble)measurement->sending_bitrate / (gdouble)this->target_bitrate;
+  tr_corr =  (gdouble)_marc(this).sender_bitrate / (gdouble)this->target_bitrate;
 
   _priv(this)->tr_correlated = .9 < tr_corr && tr_corr < 1.1;
 
@@ -460,29 +437,25 @@ static gint32 _get_increasement(SubflowRateController *this)
 
 }
 
-void subratectrler_measurement_update(
-                         SubflowRateController *this,
-                         SubflowMeasurement *measurement)
+void subratectrler_time_update(SubflowRateController *this)
 {
+  this->monitored_bitrate = mprtps_path_get_monitored_bitrate(this->path);
+}
 
-  struct _SubflowUtilizationReport *report = &this->utilization.report;
+void subratectrler_report_update(
+                         SubflowRateController *this,
+                         GstMPRTCPReportSummary *summary)
+{
 
   if(!this->enabled){
     goto done;
   }
-  _priv(this)->measurement   = measurement;
-
-  if(_priv(this)->rtt == 0.){
-    _priv(this)->rtt = measurement->reports->RR.RTT;
-  }else{
-    _priv(this)->rtt = .2 * measurement->reports->RR.RTT + .8 * _priv(this)->rtt;
-  }
-
-  netqueue_analyser_do(this->analyser, measurement->reports, &measurement->netq_analysation);
-  _update_tr_corr(this, measurement);
-  _update_congestion_indicators(this, measurement);
 
 
+  marcfb_processor_do(this->fb_processor, summary, &this->marc_result);
+
+  _update_tr_corr(this);
+  _update_congestion_indicators(this);
 
   if(0 < this->disable_controlling && this->disable_controlling < _now(this)){
       this->disable_controlling = 0;
@@ -503,31 +476,10 @@ void subratectrler_measurement_update(
 
   _priv(this)->stage_t1 = _priv(this)->stage;
 
-  _logging(this);
+  _readable_logging(this);
   ++this->measurements_num;
 done:
-  report->discarded_bytes = 0; //Fixme
-  report->lost_bytes      = 0;//Fixme
-  report->sending_rate    = _SR(this);
-  report->target_rate     = this->target_bitrate;
-  report->state           = _state(this);
-  report->rtt             = measurement->reports->RR.RTT;//Todo: RTT is wrong
-  _priv(this)->measurement = NULL;
-
-  sndrate_setup_report(this->rate_controller, this->id, report);
   return;
-}
-
-void subratectrler_setup_controls(
-                         SubflowRateController *this, struct _SubflowUtilizationControl* src)
-{
-  struct _SubflowUtilizationControl *ctrl = &this->utilization.control;
-  memcpy(ctrl, src, sizeof(struct _SubflowUtilizationControl));
-  _priv(this)->min_target_bitrate = ctrl->min_rate;
-  _priv(this)->max_target_bitrate = ctrl->max_rate;
-  if(this->target_bitrate < _priv(this)->min_target_bitrate){
-    this->target_bitrate = _priv(this)->min_target_bitrate;
-  }
 }
 
 void
@@ -538,9 +490,9 @@ _reduce_stage(
   gboolean congestion;
   gboolean distortion;
 
-  distortion  = 1.5 < _anres(this).corrH || _qtrend_keep_th(this) < _q500(this);
+  distortion  = 1.5 < _corrH(this) || _qtrend_keep_th(this) < _q500(this);
   congestion  = _qtrend_cng_th(this) < _q1000(this) || _UF(this) < .9;
-  congestion |= 1.5 < _anres(this).corrH && _priv(this)->stage_changed < _now(this) - 5 * GST_SECOND;
+  congestion |= 1.5 < _corrH(this) && _priv(this)->stage_changed < _now(this) - 5 * GST_SECOND;
   target_rate = this->target_bitrate;
 
   if(!congestion){
@@ -563,9 +515,9 @@ _reduce_stage(
   _disable_controlling(this);
 
 done:
-  _anres(this).congestion = congestion;
-  _anres(this).distortion = distortion;
-  _anres(this).trend      = _q1000(this);
+  _priv(this)->congestion = congestion;
+  _priv(this)->distortion = distortion;
+  _priv(this)->trend      = _q1000(this);
   return;
 }
 
@@ -578,8 +530,8 @@ _keep_stage(
   gboolean distortion;
   gdouble  trend;
 
-  congestion  = _anres(this).congestion;
-  distortion  = _anres(this).distortion || _qtrend_keep_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _anres(this).corrH;
+  congestion  = _priv(this)->congestion;
+  distortion  = _priv(this)->distortion || _qtrend_keep_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _marc(this).corrH;
   target_rate = this->target_bitrate;
   trend       = CONSTRAIN(0.05, 0.1, MAX(_q250(this), _q500(this)));
 
@@ -616,9 +568,9 @@ _keep_stage(
 done:
   _change_target_bitrate(this, target_rate);
 //exit:
-  _anres(this).congestion = congestion;
-  _anres(this).distortion = distortion;
-  _anres(this).trend      = trend;
+  _priv(this)->congestion = congestion;
+  _priv(this)->distortion = distortion;
+  _priv(this)->trend      = trend;
   return;
 }
 
@@ -633,8 +585,8 @@ _probe_stage(
   gboolean congestion;
   gdouble  trend;
 
-  congestion     = _anres(this).congestion || _qtrend_cng_th(this) < MAX(_q125(this), _q250(this));
-  distortion     = _anres(this).distortion || _qtrend_probe_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _anres(this).corrH;;
+  congestion     = _priv(this)->congestion || _qtrend_cng_th(this) < MAX(_q125(this), _q250(this));
+  distortion     = _priv(this)->distortion || _qtrend_probe_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _marc(this).corrH;;
   target_rate    = this->target_bitrate;
   trend          = CONSTRAIN(0.05, 0.1, MAX(_q125(this), _q250(this)));
   probe_interval = _get_probe_interval(this);
@@ -681,9 +633,9 @@ _probe_stage(
 done:
   _change_target_bitrate(this, target_rate);
 exit:
-  _anres(this).congestion = congestion;
-  _anres(this).distortion = distortion;
-  _anres(this).trend      = trend;
+  _priv(this)->congestion = congestion;
+  _priv(this)->distortion = distortion;
+  _priv(this)->trend      = trend;
   return;
 }
 
@@ -696,8 +648,8 @@ _increase_stage(
   gboolean distortion;
   gboolean congestion;
 
-  congestion = _anres(this).congestion || _qtrend_cng_th(this) < MAX(_q125(this), _q250(this));
-  distortion = _anres(this).distortion || _qtrend_probe_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _anres(this).corrH;
+  congestion = _priv(this)->congestion || _qtrend_cng_th(this) < MAX(_q125(this), _q250(this));
+  distortion = _priv(this)->distortion || _qtrend_probe_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _marc(this).corrH;
   target_rate = this->target_bitrate;
 
   if(congestion){
@@ -730,8 +682,8 @@ _increase_stage(
 done:
   _change_target_bitrate(this, target_rate);
 exit:
-  _anres(this).congestion = congestion;
-  _anres(this).distortion = distortion;
+  _priv(this)->congestion = congestion;
+  _priv(this)->distortion = distortion;
   return;
 }
 
@@ -824,20 +776,6 @@ void _switch_stage_to(
   }
 }
 
-gint32 subratectrler_get_target_bitrate(SubflowRateController *this)
-{
-  return this->target_bitrate;
-}
-
-gint32 subratectrler_get_monitoring_bitrate(SubflowRateController *this)
-{
-  return this->monitored_bitrate;
-}
-
-void subratectrler_set_monitored_bitrate(SubflowRateController *this, gint32 monitored_bitrate)
-{
-  this->monitored_bitrate = monitored_bitrate;
-}
 
 void _disable_controlling(SubflowRateController *this)
 {
@@ -955,16 +893,17 @@ void _change_target_bitrate(SubflowRateController *this, gint32 new_target)
   }
 }
 
-void _logging(SubflowRateController *this)
+void _readable_logging(gpointer data)
 {
+  SubflowRateController *this = data;
   gchar filename[255];
   sprintf(filename, "subratectrler_%d.log", this->id);
   mprtp_logger(filename,
                "############ S%d | State: %-2d | Disable time %lu | Ctrled: %d #################\n"
-               "SR:         %-10d| TR:      %-10d| botlnck: %-10d|\n"
+               "TR:         %-10d| botlnck: %-10d|\n"
                "abs_max:    %-10d| abs_min: %-10d| max_tbr: %-10d| min_tbr: %-10d|\n"
                "stage:      %-10d| event:   %-10d| pevent:  %-10d|\n"
-               "mon_br:     %-10d| mon_int: %-10d| tr_corr: %-10d| stability: %-9d\n"
+               "mon_int:    %-10d| tr_corr: %-10d|\n"
                "dist_level: %-10d| cong_lvl:%-10d| trend:   %-10f| GR: %-10.3f\n"
                "UF:         %-10.3f| RR:      %-10d| GP:      %-10d| corrH:   %-10.3f\n"
                "frac_lost:  %-10.3f| last_i:%-10lu| last_d: %-10lu|\n"
@@ -974,7 +913,6 @@ void _logging(SubflowRateController *this)
                this->disable_controlling > 0 ? GST_TIME_AS_MSECONDS(this->disable_controlling - _now(this)) : 0,
                _priv(this)->controlled,
 
-               _priv(this)->sender_bitrate,
                this->target_bitrate,
                this->bottleneck_point,
 
@@ -987,26 +925,24 @@ void _logging(SubflowRateController *this)
                _priv(this)->event,
                this->pending_event,
 
-               this->monitored_bitrate,
                this->monitoring_interval,
                _priv(this)->tr_correlated,
-               _anres(this).stability_time,
 
-               _anres(this).distortion,
-               _anres(this).congestion,
-               _anres(this).trend,
+               _priv(this)->distortion,
+               _priv(this)->congestion,
+               _priv(this)->trend,
                _GR(this),
 
                _UF(this),
                _RR(this),
                _GP(this),
-               _anres(this).corrH,
+               _marc(this).corrH,
 
                _FL(this),
                GST_TIME_AS_SECONDS(_now(this) - this->last_increase),
                GST_TIME_AS_SECONDS(_now(this) - this->last_decrease),
 
-              GST_TIME_AS_SECONDS(_now(this) - this->setup_time)
+              GST_TIME_AS_SECONDS(_now(this) - this->made)
 
   );
 
@@ -1078,3 +1014,16 @@ void _params_out(SubflowRateController *this)
 }
 
 
+void _log_rates(gpointer data)
+{
+  SubflowRateController *this = data;
+  gchar filename[255];
+  sprintf(filename, "snd_%d_ratestat.log", this->id);
+
+  mprtp_logger(filename, "%d,%d,%d,%f,%f\n",
+               _marc(this).goodput_bitrate,
+               _marc(this).receiver_bitrate,
+               _marc(this).sender_bitrate,
+               _marc(this).lost_rate,
+               _marc(this).utilized_rate);
+}

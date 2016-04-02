@@ -83,8 +83,6 @@ struct _GstMprtpplayouter
   GstPad*         mprtcp_sr_sinkpad;
   GstPad*         mprtcp_rr_srcpad;
 
-  guint           lost_latency;
-  guint           discard_latency;
 
   GstClockTime    repair_window_max;
   GstClockTime    repair_window_min;

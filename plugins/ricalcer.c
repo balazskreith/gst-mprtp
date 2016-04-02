@@ -44,6 +44,8 @@ G_DEFINE_TYPE (ReportIntervalCalculator, ricalcer, G_TYPE_OBJECT);
 static void ricalcer_finalize (GObject * object);
 static gdouble _calc_report_interval(ReportIntervalCalculator * this);
 
+static gboolean _do_report_now (ReportIntervalCalculator * this);
+
 static gdouble
 _get_rtcp_interval (
     gint senders,
@@ -78,6 +80,29 @@ ricalcer_finalize (GObject * object)
   g_object_unref(this->sysclock);
 }
 
+void ricalcer_set_mode(ReportIntervalCalculator *this, RTCPIntervalMode mode)
+{
+  this->mode = mode;
+}
+
+gboolean ricalcer_rtcp_regular_allowed(ReportIntervalCalculator * this)
+{
+  return _do_report_now(this);
+}
+
+gboolean ricalcer_rtcp_fb_allowed(ReportIntervalCalculator * this)
+{
+  gboolean result;
+  if(this->mode == RTCP_INTERVAL_IMMEDIATE_FEEDBACK_MODE){
+    result = TRUE;
+    goto done;
+  }
+  result = _do_report_now(this);
+done:
+  return result;
+}
+
+
 void
 ricalcer_init (ReportIntervalCalculator * this)
 {
@@ -100,66 +125,43 @@ ReportIntervalCalculator *make_ricalcer(gboolean sender_side)
   return result;
 }
 
-
-//
-//gboolean ricalcer_do_report_now (ReportIntervalCalculator * this)
-//{
-//  gboolean result = FALSE;
-//  GstClockTime now;
-//
-//  now = gst_clock_get_time (this->sysclock);
-//  if (!this->initialized) {
-//    this->urgent = TRUE;
-//    this->actual_interval = (GstClockTime)_calc_report_interval(this) * GST_SECOND;
-//    this->next_time = now + this->actual_interval;
-//    this->initialized = TRUE;
-//    goto done;
-//  }
-//  if (this->urgent && this->allow_early) {
-//    this->allow_early = FALSE;
-//    result = TRUE;
-//    goto done;
-//  }
-//
-//  if (now < this->next_time) {
-//    goto done;
-//  }
-//  this->allow_early = TRUE;
-//  result = TRUE;
-//done:
-//  return result;
-//}
-
-
-gboolean ricalcer_do_report_now (ReportIntervalCalculator * this)
+gboolean _do_report_now (ReportIntervalCalculator * this)
 {
   gboolean result = FALSE;
-  gdouble interval;
+
   if (!this->initialized) {
-    this->urgent = TRUE;
     this->actual_interval = (GstClockTime)(_calc_report_interval(this) * (gdouble)GST_SECOND);
     this->next_time = _now(this) + this->actual_interval;
     this->initialized = TRUE;
     goto done;
   }
-  if (this->urgent && this->allow_early) {
-    this->allow_early = FALSE;
+  if(this->mode == RTCP_INTERVAL_REGULAR_INTERVAL_MODE){
+    result = this->next_time <= _now(this);
+    if(result){
+      this->last_time = _now(this);
+      this->actual_interval = (GstClockTime)(_calc_report_interval(this) * (gdouble)GST_SECOND);
+      this->next_time = _now(this) + this->actual_interval;
+    }
+    goto done;
+  }
+  //early or immediate, do the same
+  if(this->urgent){
     this->urgent = FALSE;
-    result = TRUE;
-    goto done;
-  }else if(!this->urgent){
-    this->base_interval = MIN(this->max_interval, this->base_interval * 1.5);
+    if(this->allow_early){
+      result = TRUE;
+      this->allow_early = FALSE;
+      this->actual_interval = (GstClockTime)(_calc_report_interval(this) * (gdouble)GST_SECOND);
+      this->next_time = _now(this) + 2 * this->actual_interval;
+      goto done;
+    }
   }
-  if(_now(this) < this->next_time){
-    goto done;
+
+  result = this->next_time <= _now(this);
+  if(result){
+    this->last_time = _now(this);
+    this->actual_interval = (GstClockTime)(_calc_report_interval(this) * (gdouble)GST_SECOND);
+    this->next_time = _now(this) + this->actual_interval;
   }
-  this->last_interval = this->actual_interval;
-  this->last_time = _now(this);
-  interval = this->base_interval * g_random_double() + .5;
-  this->actual_interval = interval * (gdouble)GST_SECOND;
-  this->next_time = _now(this) + this->actual_interval;
-  this->allow_early = TRUE;
-  result = TRUE;
 done:
   return result;
 }
@@ -174,11 +176,7 @@ void ricalcer_refresh_parameters(ReportIntervalCalculator * this, gdouble media_
 
 void ricalcer_urgent_report_request(ReportIntervalCalculator * this)
 {
-  if(_now(this) - 200 * GST_MSECOND < this->last_time){
-    return;
-  }
   this->urgent = TRUE;
-  this->base_interval = MAX(this->min_interval, this->base_interval/2.);
 }
 
 gdouble _calc_report_interval(ReportIntervalCalculator * this)
@@ -192,6 +190,9 @@ gdouble _calc_report_interval(ReportIntervalCalculator * this)
         this->sender_side?1:0,    //we_sent
         this->avg_rtcp_size,      //avg_rtcp_size
         this->initialized?0:1);       //initial
+
+
+
   return result;
 }
 
@@ -242,7 +243,10 @@ _get_rtcp_interval (gint senders,
 
    */
   if (initial) {
-    rtcp_min_time /= 2;
+//    rtcp_min_time /= 2;
+      rtcp_min_time = RTCP_MIN_TIME;
+  }else{
+      rtcp_min_time = 0.;
   }
   /*
    * Dedicate a fraction of the RTCP bandwidth to senders unless

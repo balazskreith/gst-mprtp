@@ -28,15 +28,15 @@
 #include <string.h>
 #include <stdlib.h>     /* qsort */
 
-//#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-//#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-//#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-//#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
+#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
+#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
+#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
+#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
 
-#define THIS_READLOCK(this)
-#define THIS_READUNLOCK(this)
-#define THIS_WRITELOCK(this)
-#define THIS_WRITEUNLOCK(this)
+//#define THIS_READLOCK(this)
+//#define THIS_READUNLOCK(this)
+//#define THIS_WRITELOCK(this)
+//#define THIS_WRITEUNLOCK(this)
 
 #define _now(this) gst_clock_get_time (this->sysclock)
 
@@ -122,7 +122,7 @@ void packetstracker_reset(PacketsTracker *this)
 }
 
 
-void packetstracker_add(PacketsTracker *this, GstRTPBuffer *rtp, guint16 sn)
+void packetstracker_add(PacketsTracker *this, guint payload_len, guint16 sn)
 {
   PacketsTrackerItem* item;
   GstClockTime now;
@@ -130,7 +130,7 @@ void packetstracker_add(PacketsTracker *this, GstRTPBuffer *rtp, guint16 sn)
   now = _now(this);
   //make item
   item = mprtp_malloc(sizeof(PacketsTrackerItem));
-  item->payload_bytes = gst_rtp_buffer_get_payload_len(rtp);
+  item->payload_bytes = payload_len;
   item->sent          = now;
   item->seq_num       = sn;
   item->ref           = 2;
@@ -148,7 +148,6 @@ void packetstracker_add(PacketsTracker *this, GstRTPBuffer *rtp, guint16 sn)
     item = g_queue_pop_head(this->sent_in_1s);
     this->sent_in_1s_sum -= item->payload_bytes;
     if(--item->ref == 0){
-//        g_print("free for %hu at sent_in_1s\n", item->seq_num);
       mprtp_free(item);
     }
   }
@@ -156,7 +155,7 @@ void packetstracker_add(PacketsTracker *this, GstRTPBuffer *rtp, guint16 sn)
   THIS_WRITEUNLOCK (this);
 }
 
-void packetstracker_feedback_update(PacketsTracker *this, GstMPRTCPReportSummary *summary)
+void packetstracker_update_hssn(PacketsTracker *this, guint16 hssn)
 {
   PacketsTrackerItem* item;
   GstClockTime treshold;
@@ -165,7 +164,7 @@ void packetstracker_feedback_update(PacketsTracker *this, GstMPRTCPReportSummary
 
   while(!g_queue_is_empty(this->sent)){
     item = g_queue_peek_head(this->sent);
-    if(_cmp_uint16(summary->RR.HSSN, item->seq_num) < 0){
+    if(_cmp_uint16(hssn, item->seq_num) < 0){
       break;
     }
     item = g_queue_pop_head(this->sent);
@@ -186,16 +185,8 @@ void packetstracker_feedback_update(PacketsTracker *this, GstMPRTCPReportSummary
     item = g_queue_pop_head(this->acked);
     this->acked_in_1s -= item->payload_bytes;
     if(--item->ref == 0){
-//        g_print("free for %hu at acked\n", item->seq_num);
       mprtp_free(item);
     }
-  }
-  this->received_in_1s = this->acked_in_1s * (1. - summary->RR.lost_rate);
-
-  if(summary->XR_RFC7097.processed){
-    this->goodput_in_1s = this->received_in_1s - summary->XR_RFC7097.total;
-  }else if(summary->XR_RFC7243.processed){
-    this->goodput_in_1s = this->received_in_1s - summary->XR_RFC7243.discarded_bytes;
   }
 
 done:
@@ -207,8 +198,6 @@ packetstracker_get_stats (PacketsTracker * this, PacketsTrackerStat* result)
 {
   THIS_READLOCK (this);
   result->acked_in_1s     = this->acked_in_1s;
-  result->received_in_1s  = this->received_in_1s;
-  result->goodput_in_1s   = this->goodput_in_1s;
   result->sent_in_1s      = this->sent_in_1s_sum;
   result->bytes_in_flight = this->bytes_in_flight;
   THIS_READUNLOCK (this);

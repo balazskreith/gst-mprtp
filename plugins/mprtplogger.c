@@ -39,14 +39,24 @@
 #define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
 #define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
 
+#define LIST_READLOCK g_rw_lock_reader_lock(&list_mutex)
+#define LIST_READUNLOCK g_rw_lock_reader_unlock(&list_mutex)
+#define LIST_WRITELOCK g_rw_lock_writer_lock(&list_mutex)
+#define LIST_WRITEUNLOCK g_rw_lock_writer_unlock(&list_mutex)
+
 #define DATABED_LENGTH 1400
 
 GST_DEBUG_CATEGORY_STATIC (mprtp_logger_debug_category);
 #define GST_CAT_DEFAULT mprtp_logger_debug_category
 
+#define _now(this) (gst_clock_get_time (this->sysclock))
+
 G_DEFINE_TYPE (MPRTPLogger, mprtp_logger, G_TYPE_OBJECT);
 
 static MPRTPLogger *this = NULL;
+static GRWLock list_mutex;
+static GList* subscriptions = NULL;
+static GstClock*  listclock = NULL;
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
@@ -54,6 +64,8 @@ static MPRTPLogger *this = NULL;
 static void
 mprtp_logger_finalize (GObject * object);
 
+static void
+_logging_process(void *data);
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -103,14 +115,18 @@ mprtp_logger_finalize (GObject * object)
 {
   MPRTPLogger *this = MPRTPLOGGER (object);
   g_object_unref (this->sysclock);
+  g_object_unref(listclock);
+  g_list_free_full(subscriptions, mprtp_free);
 }
 
 void
 mprtp_logger_init (MPRTPLogger * this)
 {
   g_rw_lock_init (&this->rwmutex);
+  g_rw_lock_init (&list_mutex);
   this->enabled    = FALSE;
   this->sysclock   = gst_system_clock_obtain ();
+  listclock        = gst_system_clock_obtain ();
   strcpy(this->path, "logs/");
   this->touches    = g_hash_table_new(g_str_hash, g_str_equal);
 //  this->reserves   = g_hash_table_new(g_direct_hash, g_direct_equal);
@@ -129,6 +145,12 @@ void enable_mprtp_logger(void)
 {
   THIS_WRITELOCK(this);
   this->enabled = TRUE;
+
+  this->thread = gst_task_new (_logging_process, this, NULL);
+  g_rec_mutex_init (&this->thread_mutex);
+  gst_task_set_lock (this->thread, &this->thread_mutex);
+  gst_task_start (this->thread);
+
   THIS_WRITEUNLOCK(this);
 }
 
@@ -136,6 +158,8 @@ void disable_mprtp_logger(void)
 {
   THIS_WRITELOCK(this);
   this->enabled = FALSE;
+  gst_task_stop (this->thread);
+  gst_task_join (this->thread);
   THIS_WRITEUNLOCK(this);
 }
 
@@ -201,6 +225,52 @@ void mprtp_logger_rewrite(const gchar *filename, const gchar * format, ...)
   fclose(file);
 done:
   THIS_WRITEUNLOCK(this);
+}
+
+typedef struct{
+  void      (*logging_fnc)(gpointer);
+  gpointer    data;
+  guint       tick_th;
+  guint       tick_count;
+}Subscription;
+
+void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer),gpointer data, guint tick_th)
+{
+  Subscription *subscription;
+  LIST_WRITELOCK;
+  subscription = mprtp_malloc(sizeof(Subscription));
+  subscription->logging_fnc = logging_fnc;
+  subscription->data = data;
+  subscription->tick_th = tick_th;
+  subscriptions = g_list_prepend(subscriptions, subscription);
+  LIST_WRITEUNLOCK;
+}
+
+void _logging_process(void *data)
+{
+  GstClockTime next_scheduler_time;
+  GstClockID clock_id;
+  GList *it;
+  Subscription *subscription;
+  LIST_WRITELOCK;
+
+  for(it = subscriptions; it; it = it->next){
+      subscription = it->data;
+      if(++subscription->tick_count < subscription->tick_th){
+        continue;
+      }
+      subscription->tick_count=0;
+      subscription->logging_fnc(subscription->data);
+  }
+
+  next_scheduler_time = gst_clock_get_time (listclock) + 100 * GST_MSECOND;
+  LIST_WRITEUNLOCK;
+  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
+
+  if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
+    GST_WARNING_OBJECT (this, "The clock wait is interrupted");
+  }
+  gst_clock_id_unref (clock_id);
 }
 
 #undef MAX_RIPORT_INTERVAL

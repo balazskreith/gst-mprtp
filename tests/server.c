@@ -515,7 +515,9 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
             NULL);
 
   if(test_parameters_.test_directive == AUTO_RATE_AND_CC_CONTROLLING){
-    g_object_set (mprtpsch, "auto-rate-and-cc", TRUE, NULL);
+    g_object_set (mprtpsch,
+              "setup-rate-controller", (255 << 24) | 2,
+              NULL);
 
     if(test_parameters_.subflow1_active)
       g_object_set (mprtpsch, "setup-keep-alive-period", (1 << 24) | 100, NULL);

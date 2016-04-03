@@ -72,8 +72,6 @@ make_mprtps_path (guint8 id)
   result = g_object_new (MPRTPS_PATH_TYPE, NULL);
   THIS_WRITELOCK (result);
   result->id = id;
-  //  result->send_mprtp_func_data = func_this;
-//  result->send_mprtp_packet_func = send_func;
   THIS_WRITEUNLOCK (result);
   return result;
 }
@@ -87,13 +85,14 @@ make_mprtps_path (guint8 id)
 void
 mprtps_path_reset (MPRTPSPath * this)
 {
-  this->is_new = TRUE;
   this->seq = 0;
   this->cycle_num = 0;
   this->flags = MPRTPS_PATH_FLAG_ACTIVE |
       MPRTPS_PATH_FLAG_NON_CONGESTED | MPRTPS_PATH_FLAG_NON_LOSSY;
 
-  packetstracker_reset(this->packetstracker);
+  if(this->packetstracker){
+    packetstracker_reset(this->packetstracker);
+  }
 
   this->monitoring_interval = 0;
 
@@ -128,24 +127,6 @@ mprtps_path_get_id (MPRTPSPath * this)
   return result;
 }
 
-gboolean
-mprtps_path_is_new (MPRTPSPath * this)
-{
-  gboolean result;
-  THIS_READLOCK (this);
-  result = this->is_new;
-  THIS_READUNLOCK (this);
-  return result;
-}
-
-void
-mprtps_path_set_not_new (MPRTPSPath * this)
-{
-  g_return_if_fail (this);
-  THIS_WRITELOCK (this);
-  this->is_new = FALSE;
-  THIS_WRITEUNLOCK (this);
-}
 
 guint8
 mprtps_path_get_flags (MPRTPSPath * this)

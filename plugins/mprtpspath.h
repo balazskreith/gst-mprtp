@@ -88,7 +88,6 @@ struct _MPRTPSPath
   GObject   object;
 
   GRWLock                 rwmutex;
-  gboolean                is_new;
   GstClock*               sysclock;
   guint8                  id;
   guint16                 seq;

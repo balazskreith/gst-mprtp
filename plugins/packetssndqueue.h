@@ -46,27 +46,13 @@ struct _PacketsSndQueue
   GstClock*                  sysclock;
   GstClockTime               made;
   GRWLock                    rwmutex;
-  PacketsSndQueueItem        items[PACKETSSNDQUEUE_MAX_ITEMS_NUM];
-  gint32                     items_read_index;
-  gint32                     items_write_index;
-  gint32                     counter;
-  gint32                     bytes;
-  gint32                     logged_drops;
-  PacketsSndQueuePacingState state;
-  gboolean                   pacing;
-  GstClockTime               pacing_started;
-  GstClockTime               pacing_ended;
-  guint32                    last_timestamp;
-  gint32                     approved_bytes;
-  gint32                     allowed_bytes_per_ms;
-  gint32                     target_byterate;
-  gint32                     skip_interval;
-  guint32                    frame_tick;
+
   GstClockTime               obsolation_treshold;
   gboolean                   expected_lost;
-  GstClockTime               logging_interval;
   NumsTracker*               incoming_bytes;
-  GstClockTime               last_logging;
+  gint32                     bytes;
+
+  GQueue*                    items;
 
 };
 
@@ -81,14 +67,14 @@ struct _PacketsSndQueueClass{
 
 GType packetssndqueue_get_type (void);
 PacketsSndQueue *make_packetssndqueue(void);
-void packetssndqueue_setup(PacketsSndQueue *this, gint32 target_rate, gboolean pacing);
 void packetssndqueue_reset(PacketsSndQueue *this);
 gboolean packetssndqueue_expected_lost(PacketsSndQueue *this);
 gint32 packetssndqueue_get_encoder_bitrate(PacketsSndQueue *this);
 gint32 packetssndqueue_get_bytes_in_queue(PacketsSndQueue *this);
 void packetssndqueue_push(PacketsSndQueue *this, GstBuffer* buffer);
+void packetssndqueue_set_obsolation_treshold(PacketsSndQueue *this, GstClockTime treshold);
+GstBuffer * packetssndqueue_peek(PacketsSndQueue *this);
 GstBuffer * packetssndqueue_pop(PacketsSndQueue *this);
-void packetssndqueue_approve(PacketsSndQueue *this);
 
 
 #endif /* PACKETSSNDQUEUE_H_ */

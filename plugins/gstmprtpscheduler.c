@@ -380,12 +380,11 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
   this->abs_time_ext_header_id = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
   this->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
-  this->splitter = (StreamSplitter *) g_object_new (STREAM_SPLITTER_TYPE, NULL);
   this->controller = (SndController*) g_object_new(SNDCTRLER_TYPE, NULL);
   this->fec_encoder = make_fecencoder();
   this->sndqueue = make_packetssndqueue();
   this->sndrates = make_sndrate_distor(this->splitter);
-
+  this->splitter = make_stream_splitter(this->sndqueue);
   sndctrler_setup(this->controller, this->splitter, this->sndqueue, this->fec_encoder);
   sndctrler_setup_callbacks(this->controller,
                             this, gst_mprtpscheduler_mprtcp_sender,
@@ -641,7 +640,12 @@ _join_subflow (GstMprtpscheduler * this, guint subflow_id)
   }
   path = make_mprtps_path ((guint8) subflow_id);
   g_hash_table_insert (this->paths, GINT_TO_POINTER (subflow_id), path);
+
+  //setup the path
   mprtps_path_set_mprtp_ext_header_id(path, this->mprtp_ext_header_id);
+  mprtps_path_set_active (path);
+  mprtps_path_set_non_lossy (path);
+  mprtps_path_set_non_congested (path);
 
   stream_splitter_add_path(this->splitter, subflow_id, path, 0);
   sndctrler_add_path(this->controller, subflow_id, path);
@@ -1071,36 +1075,22 @@ _mprtpscheduler_process_run (void *data)
   GstBuffer *buffer = NULL;
   GstBuffer *rtpfecbuf = NULL;
   gboolean fec_request = FALSE;
-  guint approve_retried = 0;
   this = (GstMprtpscheduler *) data;
 
   THIS_READLOCK (this);
   next_scheduler_time = _now(this) + 1 * GST_MSECOND;
-
-  packetssndqueue_approve(this->sndqueue);
-
 again:
-  buffer = packetssndqueue_pop(this->sndqueue);
+  buffer = stream_splitter_pop(this->splitter, &path);
   if(!buffer) {
     goto done;
-  }
-  ++this->sent_packets;
-  buffer = gst_buffer_make_writable (buffer);
-select:
-  path = stream_splitter_get_next_path(this->splitter, buffer);
-  if(!mprtps_path_approve_request(path, buffer)){
-    if(++approve_retried < 128){
-      goto select;
-    }else{
-      //Todo: consider approval here.
-      approve_retried = 0;
-    }
   }
   if(!path){
     GST_WARNING_OBJECT(this, "No active subflow");
     next_scheduler_time = _now(this) + 100 * GST_MSECOND;
     goto done;
   }
+  ++this->sent_packets;
+  buffer = gst_buffer_make_writable (buffer);
   mprtps_path_process_rtp_packet(path, buffer, &fec_request);
   fec_request |= mprtps_path_request_keep_alive(path);
 

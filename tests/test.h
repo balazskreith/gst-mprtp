@@ -59,72 +59,94 @@
 
 #include <string.h>
 
-typedef enum{
-  NO_CONTROLLING               = 0,
-  MANUAL_RATE_CONTROLLING      = 1,
-  AUTO_RATE_AND_CC_CONTROLLING = 2,
-}TestSuite;
-
-typedef enum{
-  TEST_SOURCE    = 0,
-  YUVFILE_SOURCE = 1,
-  VL2SRC         = 2,
-}VideoSession;
-
-typedef enum{
-  FOREMAN          = 0,
-  KRISTEN_AND_SARA = 1,
-  EMPTY_1          = 2,
-  EMPTY_2          = 3,
-}YUVSequence;
-
-typedef struct _TestParams{
-  TestSuite    test_directive;
-  VideoSession video_session;
-  gboolean     random_detach;
-  gboolean     subflow1_active;
-  gboolean     subflow2_active;
-  gboolean     subflow3_active;
-  guint        subflow_num;
-  YUVSequence  yuvsequence;
-  gchar        yuvfile_str[255];
-//  gboolean     other_variable_used_for_debugging_because_i_am_tired_to_recompile_it_every_time;
-}TestParams;
-
-static TestParams test_parameters_;
-static gint32 profile;
 static gint32 info;
+static int path1_tx_rtp_port    = 5000;
+static int path1_tx_rtcp_port   = 5001;
+static int path1_rx_rtp_port    = 5002;
+static int path1_rx_rtcp_port   = 5003;
 
-static int target_bitrate_start = 0;
-static int target_bitrate_min   = 0;
-static int target_bitrate_max   = 0;
+static int path2_tx_rtp_port    = 5004;
+static int path2_tx_rtcp_port   = 5005;
+static int path2_rx_rtp_port    = 5006;
+static int path2_rx_rtcp_port   = 5007;
 
-static int path1_tx_rtp_port  = 5000;
-static int path1_tx_rtcp_port = 5001;
-static int path1_rx_rtp_port  = 5002;
-static int path1_rx_rtcp_port = 5003;
+static int path3_tx_rtp_port    = 5008;
+static int path3_tx_rtcp_port   = 5009;
+static int path3_rx_rtp_port    = 5010;
+static int path3_rx_rtcp_port   = 5011;
 
-static int path2_tx_rtp_port  = 5004;
-static int path2_tx_rtcp_port = 5005;
-static int path2_rx_rtp_port  = 5006;
-static int path2_rx_rtcp_port = 5007;
+static int rtpbin_tx_rtcp_port  = 5013;
+static int rtpbin_rx_rtcp_port  = 5015;
+static gchar *logsdir           = NULL;
+static gchar default_logsdir[255];
 
-static int path3_tx_rtp_port  = 5008;
-static int path3_tx_rtcp_port = 5009;
-static int path3_rx_rtp_port  = 5010;
-static int path3_rx_rtcp_port = 5011;
+//Todo: implement it
+static gchar *yuvsrc_file        = NULL;
+static gchar default_yuvsrc_file[255];
+static int yuvsrc_width          = 352;
+static int yuvsrc_height         = 288;
 
-static int rtpbin_tx_rtcp_port = 5013;
-static int rtpbin_rx_rtcp_port = 5015;
-static gchar *logsdir = NULL;
+static gchar *path_1_rx_ip      = NULL;
+static gchar default_path_1_rx_ip[255];
+static gchar *path_2_rx_ip      = NULL;
+static gchar default_path_2_rx_ip[255];
+static gchar *path_3_rx_ip      = NULL;
+static gchar default_path_3_rx_ip[255];
+
+static gchar *path_1_tx_ip      = NULL;
+static gchar default_path_1_tx_ip[255];
+static gchar *path_2_tx_ip      = NULL;
+static gchar default_path_2_tx_ip[255];
+static gchar *path_3_tx_ip      = NULL;
+static gchar default_path_3_tx_ip[255];
+
+static int logging              = 0;
+static int init_delay           = 0;
+static int owd_th               = 500;
+static int discard_th           = 400;
+static int lost_th              = 1000;
+static int rtcp_interval_type   = 2;
+static int report_timeout       = 0;
+static int controlling_mode     = 0;
+static int reporting_mode       = 0;
+static int sending_target       = 500000;
+static int path1_active         = 1;
+static int path2_active         = 0;
+static int path3_active         = 0;
+static int fec_interval         = 0;
+static int fec_min_window       = 10;
+static int fec_max_window       = 300;
+static int keep_alive_period    = 0;
 
 static GOptionEntry entries[] =
 {
-    { "profile", 0, 0, G_OPTION_ARG_INT, &profile, "Profile", NULL },
     { "logsdir", 0, 0, G_OPTION_ARG_STRING, &logsdir, "Logsdir", NULL },
-    { "target_bitrate_start", 0, 0, G_OPTION_ARG_INT, &target_bitrate_start, "target_bitrate_start", NULL },
-    { "target_bitrate_min", 0, 0, G_OPTION_ARG_INT, &target_bitrate_min, "target_bitrate_min", NULL },
-    { "target_bitrate_max", 0, 0, G_OPTION_ARG_INT, &target_bitrate_max, "target_bitrate_max", NULL },
+    { "yuvsrc_file", 0, 0, G_OPTION_ARG_STRING, &yuvsrc_file, "Yuvsrc file", NULL },
+    { "yuvsrc_width", 0, 0, G_OPTION_ARG_INT, &yuvsrc_width, "Yuvsrc width", NULL },
+    { "yuvsrc_height", 0, 0, G_OPTION_ARG_INT, &yuvsrc_height, "Yuvsrc width", NULL },
+    { "path_1_rx_ip", 0, 0, G_OPTION_ARG_STRING, &path_1_rx_ip, "path_1_rx_ip", NULL },
+    { "path_2_rx_ip", 0, 0, G_OPTION_ARG_STRING, &path_2_rx_ip, "path_2_rx_ip", NULL },
+    { "path_3_rx_ip", 0, 0, G_OPTION_ARG_STRING, &path_3_rx_ip, "path_3_rx_ip", NULL },
+    { "path_1_tx_ip", 0, 0, G_OPTION_ARG_STRING, &path_1_tx_ip, "path_1_tx_ip", NULL },
+    { "path_2_tx_ip", 0, 0, G_OPTION_ARG_STRING, &path_2_tx_ip, "path_2_tx_ip", NULL },
+    { "path_3_tx_ip", 0, 0, G_OPTION_ARG_STRING, &path_3_tx_ip, "path_3_tx_ip", NULL },
+    { "path1_active", 0, 0, G_OPTION_ARG_INT, &path1_active, "path1_active", NULL },
+    { "path2_active", 0, 0, G_OPTION_ARG_INT, &path2_active, "path2_active", NULL },
+    { "path3_active", 0, 0, G_OPTION_ARG_INT, &path3_active, "path3_active", NULL },
+    { "fec_interval", 0, 0, G_OPTION_ARG_INT, &fec_interval, "fec_interval", NULL },
+    { "fec_min_window", 0, 0, G_OPTION_ARG_INT, &fec_min_window, "fec_min_window", NULL },
+    { "fec_max_window", 0, 0, G_OPTION_ARG_INT, &fec_max_window, "fec_max_window", NULL },
+    { "keep_alive_period", 0, 0, G_OPTION_ARG_INT, &keep_alive_period, "keep_alive_period", NULL },
+    { "logging", 0, 0, G_OPTION_ARG_INT, &logging, "logging", NULL },
+    { "init_delay", 0, 0, G_OPTION_ARG_INT, &init_delay, "init_delay", NULL },
+    { "owd_th", 0, 0, G_OPTION_ARG_INT, &owd_th, "owd_th", NULL },
+    { "discard_th", 0, 0, G_OPTION_ARG_INT, &discard_th, "discard_th", NULL },
+    { "lost_th", 0, 0, G_OPTION_ARG_INT, &lost_th, "lost_th", NULL },
+    { "rtcp_interval_type", 0, 0, G_OPTION_ARG_INT, &rtcp_interval_type, "rtcp_interval_type", NULL },
+    { "report_timeout", 0, 0, G_OPTION_ARG_INT, &report_timeout, "report_timeout", NULL },
+    { "controlling_mode", 0, 0, G_OPTION_ARG_INT, &controlling_mode, "controlling_mode", NULL },
+    { "reporting_mode", 0, 0, G_OPTION_ARG_INT, &reporting_mode, "reporting_mode", NULL },
+    { "sending_target", 0, 0, G_OPTION_ARG_INT, &sending_target, "sending_target", NULL },
     { "path1_tx_rtp_port", 0, 0, G_OPTION_ARG_INT, &path1_tx_rtp_port, "path1_tx_rtp_port", NULL },
     { "path1_tx_rtcp_port", 0, 0, G_OPTION_ARG_INT, &path1_tx_rtcp_port, "path1_tx_rtcp_port", NULL },
     { "path1_rx_rtp_port", 0, 0, G_OPTION_ARG_INT, &path1_rx_rtp_port, "path1_rx_rtp_port", NULL },
@@ -206,106 +228,35 @@ static void _print_transfer_info(void)
 
 
 #define println(str) g_print(str"\n")
+
 static void _print_info(void)
 {
-  println("####################### Test profiles ################################");
-  println("#                                                                    #");
-  println("# profile = 0b00|0|00|00|0|0|0                                       #");
-  println("#              ^ ^  ^  ^ ^ ^ ^                                       #");
-  println("#              | |  |  | | | |0/1 - Deactivate/Activate subflow 1    #");
-  println("#              | |  |  | | |0/1 - Deactivate/Activate subflow 2      #");
-  println("#              | |  |  | |0/1 - Deactivate/Activate subflow 3        #");
-  println("#              | |  |  |0 - Test source,1 - yuv sequence, 2 - v4l2src#");
-  println("#              | |  |0 - No rate control, 1 - random rate ctrl,      #");
-  println("#              | |  |2 - auto rate and cc control                    #");
-  println("#              | |0/1 - join detach subflow continously              #");
-  println("#              |0 - foreman,                                         #");
-  println("# Examples:                                                          #");
-  println("# --profile=1 <- subflow 1, test source, no rate controller          #");
-  println("# --profile=3 <- subflow 1 and 2, test source, no rate controller    #");
-  println("# --profile=67 <- sub 1 and 2, test source, rate and cc              #");
-  println("######################################################################");
+  println("[server|client] [--option=value]");
+  println("--path[X]_[tx|rx]_[rtp|rtcp]_port\t "
+          "Set up the port for subflow (X) at sender (tx) or receiver (rx) side for rtp or rtcp");
+  println("--rtpbin_[rx|tx]_rtcp_port\tports for rtpbin");
+  println("--path_[X]_active\tset the X path to join");
+  println("--yuvsrc\tset the source of the yuv file");
+  println("--path[X]_[rx|tx]_ip\tset the destination IP for subflow (X) at the receiver (rx) and at the sender (tx) side");
+  println("--logging\tindicate weather the plugin do logging");
+  println("--logsdir\tindicate where to store the logfiles");
+  println("--owd_th\tone way delay window treshold at the receiver side");
+  println("--discard_th\ta delay at misordering queue at the receiver side after the packet considered to be discarded by the mprtp plugin.");
+  println("--lost_th\ta delay at discarded queue at the receiver side after the packet considered to be lost by the mprtp plugin.");
+  println("--rtcp_interval_type\tset the rtcp reporting interval type. 0 - regular, 1 - early, 2 - immediate.");
+  println("--report_timeout\tset the rtcp report timeout after the path considered to be passive at the sender side");
+  println("--controlling_mode\tset the controlling mode of the sending rate for subflow or "
+          "subflows at the sender side. 0 - no, 1 - no controlling but regular rtcp reports, 2 - fbra with marc");
+  println("--reporting_mode\treporting mode at the receiver side. 0 - no, 1 - regular, 2 - fbra with marc");
+  println("--fec_interval\t set the fec interval at the sender side");
+  println("--fec_min_window\t set the fec_min_window at the receiver side");
+  println("--fec_max_window\t set the fec_max_window at the receiver side");
 
-  println("\n\n");
-//  _print_transfer_info();
+
 }
 
-
-
-static void _setup_test_params(guint profile)
+static void _setup_test_params(void)
 {
-  memset(&test_parameters_, 0, sizeof(TestParams));
-  if(profile == 0){
-      profile = 1;
-//      _print_info();
-  }
-  g_print("Selected test profile: %d, it setups the following:\n", profile);
-
-  test_parameters_.subflow1_active = (profile & 1) ? TRUE : FALSE;
-  g_print("%s subflow 1\n", test_parameters_.subflow1_active?"Active":"Deactive");
-  test_parameters_.subflow2_active = (profile & 2) ? TRUE : FALSE;
-  g_print("%s subflow 2\n", test_parameters_.subflow2_active?"Active":"Deactive");
-  test_parameters_.subflow3_active = (profile & 4) ? TRUE : FALSE;
-  g_print("%s subflow 3\n", test_parameters_.subflow3_active?"Active":"Deactive");
-  g_print("logsdir: %s\n", logsdir);
-  test_parameters_.subflow_num = 0;
-  test_parameters_.subflow_num+=test_parameters_.subflow1_active ? 1 : 0;
-  test_parameters_.subflow_num+=test_parameters_.subflow2_active ? 1 : 0;
-  test_parameters_.subflow_num+=test_parameters_.subflow3_active ? 1 : 0;
-
-  test_parameters_.video_session =(VideoSession)((profile & 24)>>3);
-  switch (test_parameters_.video_session) {
-    case VL2SRC:
-      g_print("Vl2 source is selected\n");
-      break;
-    case YUVFILE_SOURCE:
-      g_print("Yuvfile sequence is selected\n");
-      break;
-    case TEST_SOURCE:
-    default:
-      g_print("Test video source is selected\n");
-      break;
-  }
-
-  test_parameters_.test_directive = (TestSuite)((profile & 96)>>5);
-  switch (test_parameters_.test_directive) {
-      case MANUAL_RATE_CONTROLLING:
-        g_print("Manual Rate controller is selected.\n");
-        break;
-      case AUTO_RATE_AND_CC_CONTROLLING:
-        g_print("Automatic rate and congestion controller mode is selected.\n");
-        break;
-      default:
-      case NO_CONTROLLING:
-        g_print("No rate or flow controlling is enabled.\n");
-        break;
-    }
-
-  test_parameters_.random_detach = (profile & 128) > 0 ? TRUE : FALSE;
-  if(test_parameters_.random_detach){
-    g_print("Random join/detach is activated\n");
-  }
-
-  test_parameters_.yuvsequence =(VideoSession)((profile & 768)>>8);
-  switch(test_parameters_.yuvsequence){
-    case KRISTEN_AND_SARA:
-      strcpy(test_parameters_.yuvfile_str, "KristenAndSara_1280x720_60.yuv");
-      break;
-    case EMPTY_1:
-      strcpy(test_parameters_.yuvfile_str, "foreman_cif.yuv");
-      break;
-    case EMPTY_2:
-      strcpy(test_parameters_.yuvfile_str, "foreman_cif.yuv");
-      break;
-    default:
-    case FOREMAN:
-      strcpy(test_parameters_.yuvfile_str, "foreman_cif.yuv");
-      break;
-  }
-
-  if(test_parameters_.video_session == YUVFILE_SOURCE) g_print("Yuv sequence: %s\n", test_parameters_.yuvfile_str);
-
-
 
   if(path1_tx_rtp_port == 0){
     path1_tx_rtp_port  = 5000;
@@ -355,17 +306,41 @@ static void _setup_test_params(guint profile)
   }
 
   if(logsdir == NULL){
-    logsdir = g_malloc(255);
-    sprintf(logsdir, "logs/");
-  }
+      sprintf(default_logsdir, "logs/");
+      logsdir = default_logsdir;
+    }
 
-  if(target_bitrate_start == 0){
-      target_bitrate_start = 128000 * test_parameters_.subflow_num;
-  }
+  if(yuvsrc_file == NULL){
+      sprintf(default_yuvsrc_file, "foreman.cif.yuv");
+      yuvsrc_file = default_yuvsrc_file;
+    }
 
-  if(target_bitrate_min == 0){
-      target_bitrate_min = 500000;
-  }
+  if(path_1_rx_ip == NULL){
+      sprintf(default_path_1_rx_ip, "10.0.0.1");
+      path_1_rx_ip = default_path_1_rx_ip;
+    }
+  if(path_2_rx_ip == NULL){
+      sprintf(default_path_2_rx_ip, "10.0.1.1");
+      path_2_rx_ip = default_path_2_rx_ip;
+    }
+  if(path_3_rx_ip == NULL){
+      sprintf(default_path_3_rx_ip, "10.0.2.1");
+      path_3_rx_ip = default_path_3_rx_ip;
+    }
+
+  if(path_1_tx_ip == NULL){
+      sprintf(default_path_1_tx_ip, "10.0.0.2");
+      path_1_tx_ip = default_path_1_tx_ip;
+    }
+  if(path_2_tx_ip == NULL){
+      sprintf(default_path_2_tx_ip, "10.0.1.2");
+      path_2_tx_ip = default_path_2_tx_ip;
+    }
+  if(path_3_tx_ip == NULL){
+      sprintf(default_path_3_tx_ip, "10.0.2.2");
+      path_3_tx_ip = default_path_3_tx_ip;
+    }
+
 //  _print_transfer_info();
 
 }

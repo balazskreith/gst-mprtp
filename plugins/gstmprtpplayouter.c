@@ -317,7 +317,7 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                            "A 32bit unsigned integer upper 8bit in host order are used to identify the subflow. "
                            "If the value is 255 then the option will be applied on all subflow. The latter 24bits are identified as a value in ms",
                            0,
-                           10000, 1000, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+                           10000, 1000, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SETUP_RTCP_INTERVAL_TYPE,
         g_param_spec_uint ("setup-rtcp-interval-type",
@@ -325,7 +325,7 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                            "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the mode. "
                            "RTCP interval types: 0 - regular, 1 - early, 2 - immediate feedback",
                            0,
-                           4294967295, 2, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+                           4294967295, 2, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SETUP_REPORTING_MODE,
       g_param_spec_uint ("setup-reporting-mode",

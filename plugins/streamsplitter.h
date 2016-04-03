@@ -29,28 +29,24 @@ typedef struct _SchNode SchNode;
 struct _StreamSplitter
 {
   GObject              object;
-  GstClockTime         made;
-  SchNode*             tree;
-  SchNode*             next_tree;
-
-  guint32              sending_target;
-
-  GHashTable*          subflows;
   GRWLock              rwmutex;
-
   GstClock*            sysclock;
+  GstClockTime         made;
+  GHashTable*          subflows;
+  SchNode*             tree;
+  PacketsSndQueue*     sndqueue;
+  GQueue*              approved;
 
-  guint8               active_subflow_num;
-
-  gboolean             separation_is_possible;
-  gboolean             last_delta_flag;
-  gboolean             first_delta_flag;
-
+  guint                active_subflow_num;
 };
 
 struct _StreamSplitterClass{
   GObjectClass parent_class;
 };
+
+StreamSplitter*
+make_stream_splitter(
+    PacketsSndQueue *sndqueue);
 
 //class functions
 void stream_splitter_add_path(StreamSplitter * this,
@@ -62,10 +58,10 @@ void stream_splitter_rem_path(
     StreamSplitter * this,
     guint8 subflow_id);
 
-MPRTPSPath*
-stream_splitter_get_next_path(
-    StreamSplitter* this,
-    GstBuffer* buf);
+GstBuffer *
+stream_splitter_pop(
+    StreamSplitter * this,
+    MPRTPSPath **out_path);
 
 void stream_splitter_setup_sending_target(
     StreamSplitter* this,

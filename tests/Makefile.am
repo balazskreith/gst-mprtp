@@ -1,13 +1,13 @@
-noinst_PROGRAMS = client             \
-                  server      
+noinst_PROGRAMS = sender             \
+                  receiver
 
 # FIXME 0.11: ignore GValueArray warnings for now until this is sorted
 ERROR_CFLAGS=
 
-server_SOURCES = server.c
-server_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
-server_LDADD = $(GST_LIBS)
+receiver_SOURCES = receiver.c
+receiver_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
+receiver_LDADD = $(GST_LIBS)
 
-client_SOURCES = client.c
-client_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
-client_LDADD = $(GST_LIBS)
+sender_SOURCES = sender.c
+sender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
+sender_LDADD = $(GST_LIBS)

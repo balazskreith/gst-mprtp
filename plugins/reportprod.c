@@ -97,13 +97,21 @@ report_producer_init (ReportProducer * this)
 
   this->sysclock   = gst_system_clock_obtain ();
   this->ssrc       = g_random_int();
-  this->report       = this->databed = g_malloc0(DATABED_LENGTH);
+  this->report     = this->databed = g_malloc0(DATABED_LENGTH);
+  this->made       = _now(this);
 }
 
 void report_producer_set_ssrc(ReportProducer *this, guint32 ssrc)
 {
   THIS_WRITELOCK(this);
   this->ssrc = ssrc;
+  THIS_WRITEUNLOCK(this);
+}
+
+void report_producer_set_logfile(ReportProducer *this, const gchar *logfile)
+{
+  THIS_WRITELOCK(this);
+  strcpy(this->logfile, logfile);
   THIS_WRITEUNLOCK(this);
 }
 
@@ -307,6 +315,12 @@ GstBuffer *report_producer_end(ReportProducer *this, guint *length)
   if(length) {
     *length = this->length;
   }
+
+  mprtp_logger_open_collector(this->logfile);
+  gst_printfnc_rtcp(data, mprtp_logger_collect);
+  mprtp_logger_collect("########### Report produced for after: %lu seconds ###########\n", GST_TIME_AS_SECONDS(_now(this) - this->made));
+  mprtp_logger_close_collector();
+
   THIS_WRITEUNLOCK(this);
   return result;
 }

@@ -34,6 +34,9 @@ struct _MPRTPLogger
 
   gchar             path[255];
   gboolean          enabled;
+
+  GString*          collector_string;
+  gchar             collector_filename[255];
 };
 
 struct _MPRTPLoggerClass{
@@ -53,6 +56,11 @@ void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer),gpointer data, gu
 void mprtp_logger_set_target_directory(const gchar *path);
 void mprtp_logger_get_target_directory(gchar* result);
 void mprtp_logger(const gchar *filename, const gchar * format, ...);
+
+void mprtp_logger_open_collector(const gchar *filename);
+void mprtp_logger_close_collector(void);
+void mprtp_logger_collect(const gchar * format, ...);
+
 void mprtp_logger_rewrite(const gchar *filename, const gchar * format, ...);
 
 GType mprtp_logger_get_type (void);

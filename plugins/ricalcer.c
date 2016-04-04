@@ -28,6 +28,9 @@
 #include <math.h>
 #include <gst/gst.h>
 #include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include "mprtplogger.h"
 
 
 GST_DEBUG_CATEGORY_STATIC (ricalcer_debug_category);
@@ -54,6 +57,8 @@ _get_rtcp_interval (
     gint we_sent,
     gdouble avg_rtcp_size,
     gint initial);
+
+static void _logging(gpointer data);
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -115,6 +120,8 @@ ricalcer_init (ReportIntervalCalculator * this)
   this->base_interval = 1.5;
   this->min_interval = .5;
   this->sysclock = gst_system_clock_obtain();
+
+  mprtp_logger_add_logging_fnc(_logging, this, 10);
 }
 
 ReportIntervalCalculator *make_ricalcer(gboolean sender_side)
@@ -155,7 +162,6 @@ gboolean _do_report_now (ReportIntervalCalculator * this)
       goto done;
     }
   }
-
   result = this->next_time <= _now(this);
   if(result){
     this->last_time = _now(this);
@@ -168,7 +174,9 @@ done:
 
 
 
-void ricalcer_refresh_parameters(ReportIntervalCalculator * this, gdouble media_rate, gdouble avg_rtcp_size)
+void ricalcer_refresh_parameters(ReportIntervalCalculator * this,
+                                 gdouble media_rate,
+                                 gdouble avg_rtcp_size)
 {
   this->media_rate = media_rate;
   this->avg_rtcp_size = avg_rtcp_size;
@@ -186,7 +194,7 @@ gdouble _calc_report_interval(ReportIntervalCalculator * this)
       _get_rtcp_interval (
         1,                        //senders
         2,                        //members
-        this->media_rate,         //rtcp_bw
+        this->media_rate * .05,         //rtcp_bw
         this->sender_side?1:0,    //we_sent
         this->avg_rtcp_size,      //avg_rtcp_size
         this->initialized?0:1);       //initial
@@ -287,3 +295,40 @@ _get_rtcp_interval (gint senders,
   return t;
 }
 
+
+void _logging(gpointer data)
+{
+  gchar logfile[255];
+  ReportIntervalCalculator *this;
+  this = data;
+
+  sprintf(logfile, "%s_ricalcer", this->sender_side ? "snd" : "rcv");
+
+  mprtp_logger(logfile,
+               "actual_interval: %lu\n"
+               "allow_early:     %d\n"
+               "avg_rtcp_size:   %f\n"
+               "base_interval:   %f\n"
+               "initialized:     %d\n"
+               "last_time:       %lu\n"
+               "media_rate:      %f\n"
+               "min_interval:    %f\n"
+               "mode:            %d\n"
+               "next_time:       %lu mseconds remain\n"
+               "urgent:          %d\n"
+               "#########################\n"
+               ,
+               this->actual_interval,
+               this->allow_early,
+               this->avg_rtcp_size,
+               this->base_interval,
+               this->initialized,
+               this->last_time,
+               this->media_rate,
+               this->min_interval,
+               this->mode,
+               GST_TIME_AS_MSECONDS(this->next_time - _now(this)),
+               this->urgent
+               );
+
+}

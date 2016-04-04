@@ -119,6 +119,7 @@ enum
   PROP_SET_SUBFLOW_CONGESTED,
   PROP_SETUP_CONTROLLING_MODE,
   PROP_SET_SENDING_TARGET,
+  PROP_SETUP_RTCP_INTERVAL_TYPE,
   PROP_KEEP_ALIVE_PERIOD,
   PROP_SETUP_REPORT_TIMEOUT,
   PROP_FEC_INTERVAL,
@@ -266,6 +267,14 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "set the sending target of the subflow",
           "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the target",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_SETUP_RTCP_INTERVAL_TYPE,
+     g_param_spec_uint ("setup-rtcp-interval-type",
+                        "RTCP interval types: 0 - regular, 1 - early, 2 - immediate feedback",
+                        "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the mode. "
+                        "RTCP interval types: 0 - regular, 1 - early, 2 - immediate feedback",
+                        0,
+                        4294967295, 2, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_KEEP_ALIVE_PERIOD,
       g_param_spec_uint ("setup-keep-alive-period",
@@ -426,8 +435,16 @@ gst_mprtpscheduler_finalize (GObject * object)
 
 
 typedef struct _SubflowSpecProp{
+
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
+  guint32  value : 24;
+  guint32  id     : 8;
+#elif G_BYTE_ORDER == G_BIG_ENDIAN
   guint32  id     : 8;
   guint32  value : 24;
+#else
+#error "G_BYTE_ORDER should be big or little endian."
+#endif
 }SubflowSpecProp;
 
 void
@@ -497,6 +514,13 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
       _change_sending_rate(this, subflow_prop->id, subflow_prop->value);
+      stream_splitter_refresh_targets(this->splitter);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_SETUP_RTCP_INTERVAL_TYPE:
+      THIS_WRITELOCK (this);
+      guint_value = g_value_get_uint (value);
+      sndctrler_change_interval_type(this->controller, subflow_prop->id, subflow_prop->value);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_SETUP_CONTROLLING_MODE:
@@ -1028,6 +1052,7 @@ void _change_sending_rate(GstMprtpscheduler * this, guint8 subflow_id, gint32 ta
   g_hash_table_iter_init (&iter, this->paths);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     path = (MPRTPSPath *) val;
+    g_print("path: %d\n", path->id);
     subflow_match = mprtps_path_get_id(path) != subflow_id;
     if(subflow_id != 255 && subflow_id != 0 && !subflow_match){
       continue;

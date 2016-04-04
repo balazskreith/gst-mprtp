@@ -62,7 +62,6 @@ struct _SchNode
 
   SchNode *left;
   SchNode *right;
-  Subflow *subflow;
   gint32   sent_bytes;
   gint16   highest_flag;
 };
@@ -337,6 +336,20 @@ done:
   return result;
 }
 
+static void _refresh_targets(Subflow *subflow, gpointer data)
+{
+  subflow->sending_target = mprtps_path_get_target_bitrate(subflow->path);
+}
+
+void
+stream_splitter_refresh_targets (StreamSplitter * this)
+{
+  THIS_WRITELOCK (this);
+  _iterate_subflows(this, _refresh_targets, NULL);
+  _refresh_splitter(this);
+  THIS_WRITEUNLOCK (this);
+}
+
 void
 stream_splitter_commit_changes (StreamSplitter * this)
 {
@@ -361,6 +374,7 @@ stream_splitter_pop(StreamSplitter * this, MPRTPSPath **out_path)
   if(!buffer){
     goto done;
   }
+
   if (G_UNLIKELY (!gst_rtp_buffer_map (buffer, GST_MAP_READ, &rtp))) {
     GST_WARNING_OBJECT (this, "The RTP packet is not readable");
     goto done;
@@ -395,7 +409,7 @@ done:
 }
 
 
-static void _iterate_subflows(StreamSplitter *this, void(*iterator)(Subflow *, gpointer), gpointer data)
+void _iterate_subflows(StreamSplitter *this, void(*iterator)(Subflow *, gpointer), gpointer data)
 {
   GHashTableIter iter;
   gpointer key, val;
@@ -572,7 +586,7 @@ _schnode_ctor (void)
   SchNode *result    = mprtp_malloc(sizeof(SchNode));
   result->left       = NULL;
   result->right      = NULL;
-  result->subflow    = NULL;
+  result->subflows   = NULL;
   result->sent_bytes = 0;
   result->remained   = 0;
   return result;
@@ -609,7 +623,10 @@ _schtree_get_next (SchNode * root, GstRTPBuffer * rtp, guint8 flag_restriction)
     }
   }
   selected->sent_bytes += bytes_to_send;
-  result = selected->subflow;
+  if(!selected->subflows){
+    g_warning("Problems with subflows at stream splitter");
+  }
+  result = selected->subflows->data;
 done:
   return result;
 }
@@ -636,14 +653,18 @@ static void _log_tree (SchNode * node, gint top, gint level)
   }
   for (i = 0; i < level; ++i)
     mprtp_logger ("streamsplitter.log","--");
-  if (node->subflow != NULL) {
+  if (node->subflows != NULL) {
+      GList *it;
       mprtp_logger ("streamsplitter.log",
-             "%d->%d:%d (L:%p,R:%p)\n",
+             "%d->sent_bytes:%d (L:%p,R:%p) subflows:",
              top >> level,
-             node->subflow->id,
              node->sent_bytes,
              node->left,
              node->right);
+    for(it = node->subflows; it; it = it->next){
+        mprtp_logger ("streamsplitter.log","%d ", ((Subflow*)it->data)->id);
+    }
+    mprtp_logger ("streamsplitter.log","\n");
   } else {
       mprtp_logger ("streamsplitter.log","%d->C:%d\n", top >> level, node->sent_bytes);
   }

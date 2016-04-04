@@ -1188,7 +1188,7 @@ gst_mprtcp_block_getdown (GstMPRTCPSubflowInfo * info,
 }
 
 void
-gst_print_rtcp_check_sr (GstRTCPBuffer * rtcp, gint offset)
+gst_printfnc_rtcp_check_sr (GstRTCPBuffer * rtcp, gint offset, printfnc print)
 {
   GstRTCPHeader *header;
   GstRTCPSR *riport;
@@ -1213,7 +1213,7 @@ gst_print_rtcp_check_sr (GstRTCPBuffer * rtcp, gint offset)
 
   gst_rtcp_header_getdown (header, &version, &padding, &reserved, &payload_type,
       &length, &header_ssrc);
-  g_print ("0               1               2               3          \n"
+  print ("0               1               2               3          \n"
       "0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%3d|%1d|%9d|%15d|%14d?=?%14d|\n"
@@ -1236,8 +1236,8 @@ gst_print_rtcp_check_sr (GstRTCPBuffer * rtcp, gint offset)
 
 
 void
-gst_print_rtcp_check_rrb (GstRTCPRRBlock * block, gint index,
-    GstRTCPPacket * packet)
+gst_printfnc_rtcp_check_rrb (GstRTCPRRBlock * block, gint index,
+    GstRTCPPacket * packet, printfnc print)
 {
   guint32 ssrc, exthighestseq, jitter, lsr, dlsr;
   guint32 packetslost;
@@ -1251,7 +1251,7 @@ gst_print_rtcp_check_rrb (GstRTCPRRBlock * block, gint index,
 
   gst_rtcp_rrb_getdown (block, &ssrc, &fraction_lost, &packetslost,
       &exthighestseq, &jitter, &lsr, &dlsr);
-  g_print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+  print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
       "|%29u ?=? %29u|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%7d?=?%6d|%21d ?=? %20d|\n"
@@ -1275,7 +1275,7 @@ gst_print_rtcp_check_rrb (GstRTCPRRBlock * block, gint index,
 }
 
 void
-gst_print_rtcp_check_srb (GstRTCPSRBlock * block, GstRTCPPacket * packet)
+gst_printfnc_rtcp_check_srb (GstRTCPSRBlock * block, GstRTCPPacket * packet, printfnc print)
 {
   guint32 r_ssrc, r_rtptime, r_packet_count, r_octet_count;
   guint64 r_ntptime;
@@ -1285,7 +1285,7 @@ gst_print_rtcp_check_srb (GstRTCPSRBlock * block, GstRTCPPacket * packet)
   gst_rtcp_packet_sr_get_sender_info (packet, &r_ssrc, &r_ntptime,
       &r_rtptime, &r_packet_count, &r_octet_count);
   gst_rtcp_srb_getdown (block, &ntptime, &rtptime, &packet_count, &octet_count);
-  g_print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+  print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
       "|%29lX ?=? %29lX|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%29X ?=? %29X|\n"
@@ -1305,18 +1305,19 @@ gst_print_rtcp_check_srb (GstRTCPSRBlock * block, GstRTCPPacket * packet)
 
 //------------------------------------
 
+
 void
-gst_print_rtcp_buffer (GstRTCPBuffer * buffer)
+gst_printfnc_rtcp_buffer (GstRTCPBuffer * buffer, printfnc print)
 {
-  g_print ("0               1               2               3          \n"
+  print ("0               1               2               3          \n"
       "0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2\n");
-  gst_print_rtcp ((GstRTCPHeader *) buffer->map.data);
-  g_print
+  gst_printfnc_rtcp ((GstRTCPHeader *) buffer->map.data, print);
+  print
       ("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n");
 }
 
 void
-gst_print_rtcp (GstRTCPHeader * header)
+gst_printfnc_rtcp (GstRTCPHeader * header, printfnc print)
 {
   gboolean ok = TRUE;
   guint16 offset = 0;
@@ -1329,28 +1330,28 @@ gst_print_rtcp (GstRTCPHeader * header)
         NULL, &payload_type, &length, NULL);
     switch (payload_type) {
       case MPRTCP_PACKET_TYPE_IDENTIFIER:
-        gst_print_mprtcp ((GstMPRTCPSubflowReport *) step);
+        gst_printfnc_mprtcp ((GstMPRTCPSubflowReport *) step, print);
         break;
       case GST_RTCP_TYPE_SR:
-        gst_print_rtcp_sr ((GstRTCPSR *) step);
+        gst_printfnc_rtcp_sr ((GstRTCPSR *) step, print);
         break;
       case GST_RTCP_TYPE_RR:
-        gst_print_rtcp_rr ((GstRTCPRR *) step);
+        gst_printfnc_rtcp_rr ((GstRTCPRR *) step, print);
         break;
       case GST_RTCP_TYPE_XR:
         {
           guint8 block_type;
           gst_rtcp_xr_block_getdown((GstRTCPXR*) step, &block_type, NULL, NULL);
           if(block_type == GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER)
-            gst_print_rtcp_xr_7243 ((GstRTCPXR_RFC7243 *) step);
+            gst_printfnc_rtcp_xr_7243 ((GstRTCPXR_RFC7243 *) step, print);
           else if(block_type == GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER)
-            gst_print_rtcp_xr_owd ((GstRTCPXR_OWD *) step);
+            gst_printfnc_rtcp_xr_owd ((GstRTCPXR_OWD *) step, print);
           else if(block_type == GST_RTCP_XR_RFC7097_BLOCK_TYPE_IDENTIFIER)
-            gst_print_rtcp_xr_7097((GstRTCPXR_RFC7097*) step);
+            gst_printfnc_rtcp_xr_7097((GstRTCPXR_RFC7097*) step, print);
           else if(block_type == GST_RTCP_XR_RFC3611_BLOCK_TYPE_IDENTIFIER)
-            gst_print_rtcp_xr_3611((GstRTCPXR_RFC3611*) step);
+            gst_printfnc_rtcp_xr_3611((GstRTCPXR_RFC3611*) step, print);
           else if(block_type == GST_RTCP_XR_OWD_RLE_BLOCK_TYPE_IDENTIFIER)
-            gst_print_rtcp_xr_owd_rle((GstRTCPXR_OWD_RLE*) step);
+            gst_printfnc_rtcp_xr_owd_rle((GstRTCPXR_OWD_RLE*) step, print);
         }
         break;
       default:
@@ -1373,7 +1374,7 @@ gst_printfnc_mprtcp (GstMPRTCPSubflowReport * riport, printfnc print)
   guint8 src;
   gst_mprtcp_report_getdown (riport, &ssrc);
 
-  gst_print_rtcp_header (riport_header);
+  gst_printfnc_rtcp_header (riport_header, print);
   gst_rtcp_header_getdown (riport_header, NULL, NULL, &src, NULL, NULL, NULL);
 
   print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
@@ -1381,7 +1382,7 @@ gst_printfnc_mprtcp (GstMPRTCPSubflowReport * riport, printfnc print)
 
   for (index = 0; index < src; ++index) {
     guint8 block_length;
-    gst_print_mprtcp_block (block, &block_length);
+    gst_printfnc_mprtcp_block (block, &block_length, print);
     block =
         (GstMPRTCPSubflowBlock *)
         ((guint8 *) block + ((block_length + 1) << 2));
@@ -1390,7 +1391,7 @@ gst_printfnc_mprtcp (GstMPRTCPSubflowReport * riport, printfnc print)
 
 
 void
-gst_print_mprtcp_block (GstMPRTCPSubflowBlock * block, guint8 * block_length)
+gst_printfnc_mprtcp_block (GstMPRTCPSubflowBlock * block, guint8 * block_length, printfnc print)
 {
   guint8 type;
   guint16 subflow_id;
@@ -1406,16 +1407,16 @@ gst_print_mprtcp_block (GstMPRTCPSubflowBlock * block, guint8 * block_length)
   info = &block->info;
   gst_mprtcp_block_getdown (info, &type, _block_length, &subflow_id);
 
-  g_print
+  print
       ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
       "|%15u|%15u|%31d|\n", type, *_block_length, subflow_id);
 
-  gst_print_rtcp (&block->block_header);
+  gst_printfnc_rtcp (&block->block_header, print);
 
 }
 
 void
-gst_print_rtcp_header (GstRTCPHeader * header)
+gst_printfnc_rtcp_header (GstRTCPHeader * header, printfnc print)
 {
   guint32 ssrc;
   guint8 version, payload_type, reserved;
@@ -1425,74 +1426,46 @@ gst_print_rtcp_header (GstRTCPHeader * header)
   gst_rtcp_header_getdown (header, &version, &padding,
       &reserved, &payload_type, &length, &ssrc);
 
-  g_print ("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+  print ("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%3d|%1d|%9d|%15d|%31d|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%63u|\n", version, padding, reserved, payload_type, length, ssrc);
 }
 
-/*
-void gst_print_mprtcp(GstMPRTCPSubflowRiport *riport_ptr)
-{
-  gint index;
-  GstMPRTCPSubflowBlock *block;
-  GstMPRTCPSubflowInfo *info;
-  guint8 rc = gst_mprtcp_riport_get_rc(riport_ptr);
-  gst_print_rtcp_header(&riport_ptr->header);
-  g_print(
-	   "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
-	   "|%63u|\n",
-	   gst_mprtcp_riport_get_ssrc(riport_ptr)
-	   );
-
-  for(index = 0; index < rc; ++index){
-	  block = &riport_ptr->blocks[index];
-	  info = &block->subflow_info;
-	  g_print(
-	  	   "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
-	  	   "|%15u|%15u|%31d|\n",
-	  	   gst_mprtcp_block_get_type(info),
-		   gst_mprtcp_block_get_length(info),
-		   gst_mprtcp_block_get_subflow_id(info)
-	  );
-	  gst_print_rtcp(&block->block_header);
-  }
-}
-*/
 void
-gst_print_rtcp_sr (GstRTCPSR * riport)
+gst_printfnc_rtcp_sr (GstRTCPSR * riport, printfnc print)
 {
   gint index;
   guint8 rc;
   GstRTCPRRBlock *block = &riport->receiver_blocks;
   gst_rtcp_header_getdown (&riport->header, NULL, NULL, &rc, NULL, NULL, NULL);
 
-  gst_print_rtcp_header (&riport->header);
+  gst_printfnc_rtcp_header (&riport->header, print);
 
-  gst_print_rtcp_srb (&riport->sender_block);
+  gst_printfnc_rtcp_srb (&riport->sender_block, print);
 
   for (index = 0; index < rc; ++index, ++block) {
-    gst_print_rtcp_rrb (block);
+    gst_printfnc_rtcp_rrb (block, print);
   }
 }
 
 void
-gst_print_rtcp_rr (GstRTCPRR * riport)
+gst_printfnc_rtcp_rr (GstRTCPRR * riport, printfnc print)
 {
   gint index;
   guint8 rc;
   GstRTCPRRBlock *block = &riport->blocks;
   gst_rtcp_header_getdown (&riport->header, NULL, NULL, &rc, NULL, NULL, NULL);
 
-  gst_print_rtcp_header (&riport->header);
+  gst_printfnc_rtcp_header (&riport->header, print);
 
   for (index = 0; index < rc; ++index, ++block) {
-    gst_print_rtcp_rrb (block);
+    gst_printfnc_rtcp_rrb (block, print);
   }
 }
 
 void
-gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * riport)
+gst_printfnc_rtcp_xr_7243 (GstRTCPXR_RFC7243 * riport, printfnc print)
 {
   guint8 interval_metric;
   gboolean early_bit;
@@ -1501,10 +1474,10 @@ gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * riport)
 
   gst_rtcp_header_getdown (&riport->header, NULL, NULL, NULL, NULL, NULL, NULL);
 
-  gst_print_rtcp_header (&riport->header);
+  gst_printfnc_rtcp_header (&riport->header, print);
   gst_rtcp_xr_rfc7243_getdown (riport, &interval_metric, &early_bit, &ssrc,
       &discarded_bytes);
-  g_print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+  print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
       "|%15d|%3d|%1d|%9d|%31d|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%63X|\n"
@@ -1515,14 +1488,14 @@ gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * riport)
 
 
 void
-gst_print_rtcp_afb (GstRTCPFB * report)
+gst_printfnc_rtcp_afb (GstRTCPFB * report, printfnc print)
 {
   guint32 ssrc;
   guint32 fci_id;
 
   gst_rtcp_afb_getdown(report, NULL, &ssrc, &fci_id);
-  gst_print_rtcp_header (&report->header);
-  g_print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+  gst_printfnc_rtcp_header (&report->header, print);
+  print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
       "|%63X|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%63X|\n", ssrc, fci_id);
@@ -1530,7 +1503,7 @@ gst_print_rtcp_afb (GstRTCPFB * report)
 
 
 void
-gst_print_rtcp_xr_owd (GstRTCPXR_OWD * report)
+gst_printfnc_rtcp_xr_owd (GstRTCPXR_OWD * report, printfnc print)
 {
   guint8 flag;
   guint32 median_delay;
@@ -1538,10 +1511,10 @@ gst_print_rtcp_xr_owd (GstRTCPXR_OWD * report)
   guint32 min_delay;
   guint32 max_delay;
 
-  gst_print_rtcp_header (&report->header);
+  gst_printfnc_rtcp_header (&report->header, print);
   gst_rtcp_xr_owd_getdown (report, &flag, &ssrc,
                            &median_delay, &min_delay, &max_delay);
-  g_print (
+  print (
       "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
       "|%15d|%2d|%12d|%31d|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
@@ -1560,7 +1533,7 @@ gst_print_rtcp_xr_owd (GstRTCPXR_OWD * report)
 }
 
 void
-gst_print_rtcp_xrchunks(GstRTCPXR_Chunk * chunk1, GstRTCPXR_Chunk * chunk2)
+gst_printfnc_rtcp_xrchunks(GstRTCPXR_Chunk * chunk1, GstRTCPXR_Chunk * chunk2, printfnc print)
 {
 
   gboolean chunk_type1;
@@ -1578,7 +1551,7 @@ gst_print_rtcp_xrchunks(GstRTCPXR_Chunk * chunk1, GstRTCPXR_Chunk * chunk2)
                                &chunk_type2,
                                &run_type2,
                                &run_length2);
-  g_print (
+  print (
         "|%1d|%1d|%27d|%1d|%1d|%27d|\n"
         "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
         ,
@@ -1587,7 +1560,7 @@ gst_print_rtcp_xrchunks(GstRTCPXR_Chunk * chunk1, GstRTCPXR_Chunk * chunk2)
 }
 
 void
-gst_print_rtcp_xr_7097(GstRTCPXR_RFC7097 * report)
+gst_printfnc_rtcp_xr_7097(GstRTCPXR_RFC7097 * report, printfnc print)
 {
   gboolean early_bit;
   guint chunk_index;
@@ -1597,10 +1570,10 @@ gst_print_rtcp_xr_7097(GstRTCPXR_RFC7097 * report)
   GstRTCPXR_Chunk *chunk1, *chunk2;
   guint16 begin_seq, end_seq;
 
-  gst_print_rtcp_header (&report->header);
+  gst_printfnc_rtcp_header (&report->header, print);
   gst_rtcp_xr_rfc7097_getdown (report, &early_bit, &thinning, &ssrc, &begin_seq, &end_seq);
 
-  g_print (
+  print (
       "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
       "|%15d|%5d|%1d|%7d|%31d|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
@@ -1620,13 +1593,13 @@ gst_print_rtcp_xr_7097(GstRTCPXR_RFC7097 * report)
    {
        chunk1 = gst_rtcp_xr_rfc7097_get_chunk(report, chunk_index);
        chunk2 = gst_rtcp_xr_rfc7097_get_chunk(report, chunk_index+1);
-       gst_print_rtcp_xrchunks(chunk1, chunk2);
+       gst_printfnc_rtcp_xrchunks(chunk1, chunk2, print);
    }
 }
 
 
 void
-gst_print_rtcp_xr_3611(GstRTCPXR_RFC3611 * report)
+gst_printfnc_rtcp_xr_3611(GstRTCPXR_RFC3611 * report, printfnc print)
 {
   gboolean early_bit;
   guint chunk_index;
@@ -1636,10 +1609,10 @@ gst_print_rtcp_xr_3611(GstRTCPXR_RFC3611 * report)
   GstRTCPXR_Chunk *chunk1, *chunk2;
   guint16 begin_seq, end_seq;
 
-  gst_print_rtcp_header (&report->header);
+  gst_printfnc_rtcp_header (&report->header, print);
   gst_rtcp_xr_rfc3611_getdown (report, &early_bit, &thinning, &ssrc, &begin_seq, &end_seq);
 
-  g_print (
+  print (
       "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
       "|%15d|%5d|%1d|%7d|%31d|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
@@ -1659,12 +1632,12 @@ gst_print_rtcp_xr_3611(GstRTCPXR_RFC3611 * report)
    {
        chunk1 = gst_rtcp_xr_rfc3611_get_chunk(report, chunk_index);
        chunk2 = gst_rtcp_xr_rfc3611_get_chunk(report, chunk_index+1);
-       gst_print_rtcp_xrchunks(chunk1, chunk2);
+       gst_printfnc_rtcp_xrchunks(chunk1, chunk2, print);
    }
 }
 
 void
-gst_print_rtcp_xr_owd_rle(GstRTCPXR_OWD_RLE * report)
+gst_printfnc_rtcp_xr_owd_rle(GstRTCPXR_OWD_RLE * report, printfnc print)
 {
   gboolean early_bit;
   guint chunk_index;
@@ -1675,10 +1648,10 @@ gst_print_rtcp_xr_owd_rle(GstRTCPXR_OWD_RLE * report)
   guint16 begin_seq, end_seq;
   guint32 offset;
 
-  gst_print_rtcp_header (&report->header);
+  gst_printfnc_rtcp_header (&report->header, print);
   gst_rtcp_xr_owd_rle_getdown (report, &early_bit, &resolution, &ssrc, &offset, &begin_seq, &end_seq);
 
-  g_print (
+  print (
       "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
       "|%15d|%5d|%1d|%7d|%31d|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
@@ -1700,14 +1673,14 @@ gst_print_rtcp_xr_owd_rle(GstRTCPXR_OWD_RLE * report)
    {
        chunk1 = gst_rtcp_xr_owd_rle_get_chunk(report, chunk_index);
        chunk2 = gst_rtcp_xr_owd_rle_get_chunk(report, chunk_index+1);
-       gst_print_rtcp_xrchunks(chunk1, chunk2);
+       gst_printfnc_rtcp_xrchunks(chunk1, chunk2, print);
    }
 }
 
 
 
 void
-gst_print_rtcp_rrb (GstRTCPRRBlock * block)
+gst_printfnc_rtcp_rrb (GstRTCPRRBlock * block, printfnc print)
 {
   guint32 ssrc, exthighestseq, jitter, lsr, dlsr;
   guint32 packetslost;
@@ -1717,7 +1690,7 @@ gst_print_rtcp_rrb (GstRTCPRRBlock * block)
   gst_rtcp_rrb_getdown (block, &ssrc, &fraction_lost, &packetslost,
       &exthighestseq, &jitter, &lsr, &dlsr);
 
-  g_print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+  print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
       "|%63u|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%15d|%47d|\n"
@@ -1733,14 +1706,14 @@ gst_print_rtcp_rrb (GstRTCPRRBlock * block)
 }
 
 void
-gst_print_rtcp_srb (GstRTCPSRBlock * block)
+gst_printfnc_rtcp_srb (GstRTCPSRBlock * block, printfnc print)
 {
   guint32 rtptime, packet_count, octet_count;
   guint64 ntptime;
 
   gst_rtcp_srb_getdown (block, &ntptime, &rtptime, &packet_count, &octet_count);
 
-  g_print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+  print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
       "|%63lX|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%63X|\n"
@@ -1752,20 +1725,20 @@ gst_print_rtcp_srb (GstRTCPSRBlock * block)
 
 
 void
-gst_print_rtp_buffer (GstBuffer * buf)
+gst_printfnc_rtp_buffer (GstBuffer * buf, printfnc print)
 {
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
-  gst_print_rtp_packet_info(&rtp);
+  gst_printfnc_rtp_packet_info(&rtp, print);
   gst_rtp_buffer_unmap(&rtp);
 }
 
 
 void
-gst_print_rtp_packet_info (GstRTPBuffer * rtp)
+gst_printfnc_rtp_packet_info (GstRTPBuffer * rtp, printfnc print)
 {
   gboolean extended;
-  g_print ("0               1               2               3          \n"
+  print ("0               1               2               3          \n"
       "0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 \n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%3d|%1d|%1d|%7d|%1d|%13d|%31d|\n"
@@ -1793,21 +1766,21 @@ gst_print_rtp_packet_info (GstRTPBuffer * rtp)
         &wordlen);
 
 
-    g_print
+    print
         ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
         "|0x%-29X|%31d|\n"
         "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n",
         bits, wordlen);
 
     for (index = 0; index < wordlen; ++index) {
-      g_print ("|0x%-5X = %5d|0x%-5X = %5d|0x%-5X = %5d|0x%-5X = %5d|\n"
+      print ("|0x%-5X = %5d|0x%-5X = %5d|0x%-5X = %5d|0x%-5X = %5d|\n"
           "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n",
           *(pdata + index * 4), *(pdata + index * 4),
           *(pdata + index * 4 + 1), *(pdata + index * 4 + 1),
           *(pdata + index * 4 + 2), *(pdata + index * 4 + 2),
           *(pdata + index * 4 + 3), *(pdata + index * 4 + 3));
     }
-    g_print
+    print
         ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n");
   }
 }

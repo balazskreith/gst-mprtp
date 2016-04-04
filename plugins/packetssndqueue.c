@@ -227,10 +227,14 @@ void _logging(gpointer data)
   mprtp_logger("packetssnqueue.log",
                "----------------------------------------------------\n"
                "Seconds: %lu\n"
-               "bytes in queue: %d \n",
+               "bytes in queue: %d \n"
+               "packets in queue: %d \n",
+
                GST_TIME_AS_SECONDS(_now(this) - this->made),
 
-               this->bytes
+               this->bytes,
+               g_queue_get_length(this->items)
+
                );
 }
 

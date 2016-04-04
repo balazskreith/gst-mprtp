@@ -670,6 +670,7 @@ _setup_paths_owd_window_treshold(GstMprtpplayouter * this, guint8 subflow_id, Gs
   MpRTPRPath *path;
   gboolean subflow_match = FALSE;
 
+  g_hash_table_iter_init (&iter, this->paths);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     path = (MpRTPRPath *) val;
     subflow_match = mprtpr_path_get_id(path) != subflow_id;
@@ -692,6 +693,7 @@ _setup_paths_discard_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstCl
   MpRTPRPath *path;
   gboolean subflow_match = FALSE;
 
+  g_hash_table_iter_init (&iter, this->paths);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     path = (MpRTPRPath *) val;
     subflow_match = mprtpr_path_get_id(path) != subflow_id;
@@ -713,6 +715,7 @@ _setup_paths_lost_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClock
   MpRTPRPath *path;
   gboolean subflow_match = FALSE;
 
+  g_hash_table_iter_init (&iter, this->paths);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     path = (MpRTPRPath *) val;
     subflow_match = mprtpr_path_get_id(path) != subflow_id;

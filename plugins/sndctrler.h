@@ -85,6 +85,12 @@ sndctrler_setup_callbacks(SndController *this,
                           GstSchedulerSignaling utilization_signal_func);
 
 void
+sndctrler_change_interval_type(
+    SndController * this,
+    guint8 subflow_id,
+    guint type);
+
+void
 sndctrler_change_controlling_mode(
     SndController * this,
     guint8 subflow_id,

@@ -30,9 +30,11 @@ struct _ReportProducer
 {
   GObject                  object;
   GRWLock                  rwmutex;
+  GstClockTime             made;
   GstClock*                sysclock;
   guint32                  ssrc;
   gpointer                 databed;
+  gchar                    logfile[255];
   GstMPRTCPSubflowReport*  report;
   GstMPRTCPSubflowBlock*   block;
   gpointer                 actual;
@@ -44,6 +46,7 @@ struct _ReportProducerClass{
 };
 
 void report_producer_set_ssrc(ReportProducer *this, guint32 ssrc);
+void report_producer_set_logfile(ReportProducer *this, const gchar *logfile);
 
 void report_producer_begin(ReportProducer *this, guint8 subflow_id);
 

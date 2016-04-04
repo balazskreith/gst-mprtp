@@ -117,15 +117,18 @@ static void
 refctrler_ticker (void *data);
 
 static void
-_logging (RcvController *this);
+_logging (
+    RcvController *this);
 
 static void
-_refresh_subflows (RcvController *this);
+_refresh_subflows (
+    RcvController *this);
 
 //------------------------ Outgoing Report Producer -------------------------
 
 static void
-_orp_main(RcvController * this);
+_orp_main(
+    RcvController * this);
 
 static void
 _orp_add_rr(
@@ -162,10 +165,12 @@ _make_subflow (
     MpRTPRPath * path);
 
 static void
-_ruin_subflow (gpointer * subflow);
+_ruin_subflow (
+    gpointer * subflow);
 
 static void
-_reset_subflow (Subflow * subflow);
+_reset_subflow (
+    Subflow * subflow);
 
 static Subflow*
 _subflow_ctor (void);
@@ -302,6 +307,7 @@ rcvctrler_init (RcvController * this)
   this->made               = _now(this);
 
   report_processor_set_logfile(this->report_processor, "rcv_reports.log");
+  report_producer_set_logfile(this->report_producer, "rcv_produced_reports.log");
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   this->thread = gst_task_new (refctrler_ticker, this, NULL);
@@ -377,9 +383,10 @@ refctrler_ticker (void *data)
   GstClockTime next_scheduler_time;
   RcvController *this;
   GstClockID clock_id;
-//  guint64 max_path_skew = 0;
+
   this = RCVCTRLER (data);
   THIS_WRITELOCK (this);
+
   _refresh_subflows(this);
   _logging(this);
   _orp_main(this);
@@ -388,13 +395,13 @@ refctrler_ticker (void *data)
 
   next_scheduler_time = _now(this) + 100 * GST_MSECOND;
   THIS_WRITEUNLOCK (this);
+
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
 
   if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
     GST_WARNING_OBJECT (this, "The playout clock wait is interrupted");
   }
   gst_clock_id_unref (clock_id);
-  //clockshot;
 }
 
 
@@ -486,8 +493,6 @@ rcvctrler_receive_mprtcp (RcvController *this, GstBuffer * buf)
     subflow->last_seen_report = summary->SR.ntptime;
   }
 
-  mprtp_free(summary);
-
 done:
   THIS_WRITEUNLOCK (this);
 }
@@ -557,7 +562,7 @@ _orp_main(RcvController * this)
   Subflow *subflow;
   guint report_length = 0;
   GstBuffer *buffer;
-  gchar logfile[255];
+  gchar interval_logfile[255];
   GstClockTime elapsed_x, elapsed_y;
 
   if (!this->report_is_flowable) {
@@ -599,11 +604,12 @@ _orp_main(RcvController * this)
       }
 
       //logging the report timeout
-      memset(logfile, 0, 255);
-      sprintf(logfile, "sub_%d_rtcp_ints.csv", subflow->id);
+      memset(interval_logfile, 0, 255);
+      sprintf(interval_logfile, "sub_%d_rtcp_ints.csv", subflow->id);
+
       elapsed_y  = GST_TIME_AS_MSECONDS(_now(this) - subflow->LRR);
       subflow->LRR = _now(this);
-      mprtp_logger(logfile, "%lu,%lu\n", elapsed_x, elapsed_y);
+      mprtp_logger(interval_logfile, "%lu,%lu\n", elapsed_x, elapsed_y);
     }
 
     if(subflow->fbra_marc_enabled){
@@ -617,7 +623,7 @@ _orp_main(RcvController * this)
     subflow->avg_rtcp_size += (report_length - subflow->avg_rtcp_size) / 4.;
 
     ricalcer_refresh_parameters(ricalcer,
-                                MIN_MEDIA_RATE,
+                                CONSTRAIN(MIN_MEDIA_RATE>>3  /*because we need bytes */, 25000, subflow->received_bytes.rate_value),
                                 subflow->avg_rtcp_size);
 
 

@@ -158,8 +158,10 @@ void disable_mprtp_logger(void)
 {
   THIS_WRITELOCK(this);
   this->enabled = FALSE;
-  gst_task_stop (this->thread);
-  gst_task_join (this->thread);
+  if(this->thread && gst_task_get_state(this->thread) == GST_TASK_STARTED){
+    gst_task_stop (this->thread);
+    gst_task_join (this->thread);
+  }
   THIS_WRITEUNLOCK(this);
 }
 
@@ -225,6 +227,55 @@ void mprtp_logger_rewrite(const gchar *filename, const gchar * format, ...)
   fclose(file);
 done:
   THIS_WRITEUNLOCK(this);
+}
+
+void mprtp_logger_open_collector(const gchar *filename)
+{
+  THIS_WRITELOCK(this);
+  if(!this->enabled){
+    goto done;
+  }
+  if(this->collector_string){
+    g_string_free(this->collector_string, TRUE);
+  }
+  this->collector_string = g_string_new(NULL);
+  strcpy(this->collector_filename, filename);
+done:
+  THIS_WRITEUNLOCK(this);
+}
+
+void mprtp_logger_close_collector(void)
+{
+  gchar *string = NULL;
+  gchar filename[255];
+  THIS_WRITELOCK(this);
+  if(!this->enabled){
+    goto done;
+  }
+  string = g_string_free(this->collector_string, FALSE);
+  this->collector_string = NULL;
+  memcpy(filename, this->collector_filename, 255);
+  memset(this->collector_filename, 0, 255);
+done:
+  THIS_WRITEUNLOCK(this);
+  if(string){
+    mprtp_logger(filename, "%s", string);
+  }
+}
+
+void mprtp_logger_collect(const gchar * format, ...)
+{
+  va_list args;
+  THIS_WRITELOCK(this);
+  if(!this->enabled){
+    goto done;
+  }
+  va_start (args, format);
+  g_string_append_vprintf(this->collector_string, format, args);
+  va_end (args);
+done:
+  THIS_WRITEUNLOCK(this);
+
 }
 
 typedef struct{

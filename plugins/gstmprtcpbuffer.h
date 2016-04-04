@@ -616,35 +616,94 @@ void gst_mprtcp_block_getdown (GstMPRTCPSubflowInfo * info,
 
 typedef void (*printfnc)(const gchar* format, ...);
 
-#define gst_print_mprtcp(report) gst_printfnc_mprtcp(report, g_print)
+#define gst_print_mprtcp(report) \
+  gst_printfnc_mprtcp(report, g_print)
 void gst_printfnc_mprtcp (GstMPRTCPSubflowReport * riport, printfnc print);
-void gst_print_mprtcp_block (GstMPRTCPSubflowBlock * block, guint8 *block_length);
-void gst_print_rtcp_check_sr (GstRTCPBuffer * rtcp, gint offset);
-void gst_print_rtcp_check_srb (GstRTCPSRBlock * block_ptr,
-    GstRTCPPacket * packet);
-void gst_print_rtcp_check_rrb (GstRTCPRRBlock * block_ptr, gint index,
-    GstRTCPPacket * packet);
 
-void gst_print_rtcp_buffer (GstRTCPBuffer * buffer);
-void gst_print_rtcp (GstRTCPHeader * header);
-void gst_print_rtcp_header (GstRTCPHeader * header);
-void gst_print_rtcp_sr (GstRTCPSR * report);
-void gst_print_rtcp_rr (GstRTCPRR * report);
-void gst_print_rtcp_xr_7243 (GstRTCPXR_RFC7243 * report);
-void gst_print_rtcp_afb (GstRTCPFB * report);
-void gst_print_rtcp_xr_owd (GstRTCPXR_OWD * report);
-void gst_print_rtcp_xrchunks(GstRTCPXR_Chunk * chunk1, GstRTCPXR_Chunk * chunk2);
-void gst_print_rtcp_xr_7097(GstRTCPXR_RFC7097 * report);
-void gst_print_rtcp_xr_3611(GstRTCPXR_RFC3611 * report);
-void gst_print_rtcp_xr_owd_rle(GstRTCPXR_OWD_RLE * report);
-void gst_print_rtcp_srb (GstRTCPSRBlock * block_ptr);
-void gst_print_rtcp_rrb (GstRTCPRRBlock * block_ptr);
+#define gst_print_mprtcp_block(block, block_length) \
+  gst_printfnc_mprtcp_block(block, block_length, g_print)
+void gst_printfnc_mprtcp_block (GstMPRTCPSubflowBlock * block, guint8 *block_length, printfnc print);
+
+#define gst_print_rtcp_check_sr(block, offset) \
+  gst_printfnc_mprtcp_block(block, offset, g_print)
+void gst_printfnc_rtcp_check_sr (GstRTCPBuffer * rtcp, gint offset, printfnc print);
+
+#define gst_print_rtcp_check_srb(block, packet) \
+    gst_printfnc_rtcp_check_srb(block, packet, g_print)
+void gst_printfnc_rtcp_check_srb (GstRTCPSRBlock * block_ptr,
+    GstRTCPPacket * packet, printfnc print);
+
+#define gst_print_rtcp_check_rrb(block, index, packet) \
+    gst_printfnc_rtcp_check_rrb(block, index, packet, g_print)
+void gst_printfnc_rtcp_check_rrb (GstRTCPRRBlock * block_ptr, gint index,
+    GstRTCPPacket * packet, printfnc print);
+
+#define gst_print_rtcp_buffer(buffer) \
+    gst_printfnc_rtcp_buffer(buffer, g_print)
+void gst_printfnc_rtcp_buffer (GstRTCPBuffer * buffer, printfnc print);
+
+#define gst_print_rtcp(header) \
+    gst_printfnc_rtcp(header, g_print)
+void gst_printfnc_rtcp (GstRTCPHeader * header, printfnc print);
+
+#define gst_print_rtcp_header(header) \
+    gst_printfnc_rtcp_header(header, g_print)
+void gst_printfnc_rtcp_header (GstRTCPHeader * header, printfnc print);
+
+#define gst_print_rtcp_sr(report) \
+    gst_printfnc_rtcp_sr(report, g_print)
+void gst_printfnc_rtcp_sr (GstRTCPSR * report, printfnc print);
+
+#define gst_print_rtcp_rr(report) \
+    gst_printfnc_rtcp_rr(report, g_print)
+void gst_printfnc_rtcp_rr (GstRTCPRR * report, printfnc print);
+
+#define gst_print_rtcp_xr_7243(report) \
+    gst_printfnc_rtcp_xr_7243(report, g_print)
+void gst_printfnc_rtcp_xr_7243 (GstRTCPXR_RFC7243 * report, printfnc print);
+
+#define gst_print_rtcp_afb(report) \
+    gst_printfnc_rtcp_afb(report, g_print)
+void gst_printfnc_rtcp_afb (GstRTCPFB * report, printfnc print);
+
+#define gst_print_rtcp_xr_owd(report) \
+    gst_printfnc_rtcp_xr_owd(report, g_print)
+void gst_printfnc_rtcp_xr_owd (GstRTCPXR_OWD * report, printfnc print);
+
+#define gst_print_rtcp_xrchunks(chunk1, chunk2) \
+    gst_printfnc_rtcp_xrchunks(chunk1, chunk2, g_print)
+void gst_printfnc_rtcp_xrchunks(GstRTCPXR_Chunk * chunk1, GstRTCPXR_Chunk * chunk2, printfnc print);
+
+#define gst_print_rtcp_xr_7097(report) \
+    gst_printfnc_rtcp_xr_7097(report, g_print)
+void gst_printfnc_rtcp_xr_7097(GstRTCPXR_RFC7097 * report, printfnc print);
+
+#define gst_print_rtcp_xr_3611(report) \
+    gst_printfnc_rtcp_xr_3611(report, g_print)
+void gst_printfnc_rtcp_xr_3611(GstRTCPXR_RFC3611 * report, printfnc print);
+
+#define gst_print_rtcp_xr_owd_rle(report) \
+    gst_printfnc_rtcp_xr_owd_rle(report, g_print)
+void gst_printfnc_rtcp_xr_owd_rle(GstRTCPXR_OWD_RLE * report, printfnc print);
+
+#define gst_print_rtcp_srb(block_ptr) \
+    gst_printfnc_rtcp_srb(block_ptr, g_print)
+void gst_printfnc_rtcp_srb (GstRTCPSRBlock * block_ptr, printfnc print);
+
+#define gst_print_rtcp_rrb(block_ptr) \
+    gst_printfnc_rtcp_rrb(block_ptr, g_print)
+void gst_printfnc_rtcp_rrb (GstRTCPRRBlock * block_ptr, printfnc print);
 
 
 
 #include <gst/rtp/gstrtpbuffer.h>
-void gst_print_rtp_buffer (GstBuffer * buf);
-void gst_print_rtp_packet_info (GstRTPBuffer * rtp);
+#define gst_print_rtp_buffer(buf) \
+    gst_printfnc_rtp_buffer(buf, g_print)
+void gst_printfnc_rtp_buffer (GstBuffer * buf, printfnc print);
+
+#define gst_print_rtp_packet_info(buf) \
+    gst_printfnc_rtp_packet_info(buf, g_print)
+void gst_printfnc_rtp_packet_info (GstRTPBuffer * rtp, printfnc print);
 
 gboolean gst_mprtp_get_subflow_extension(GstRTPBuffer *rtp,
                                          guint8 ext_header_id,

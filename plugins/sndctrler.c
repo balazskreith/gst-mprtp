@@ -230,12 +230,44 @@ sndctrler_init (SndController * this)
   this->mprtp_signal_data  = mprtp_malloc(sizeof(MPRTPPluginSignalData));
 
   report_processor_set_logfile(this->report_processor, "snd_reports.log");
+  report_producer_set_logfile(this->report_producer, "snd_produced_reports.log");
   g_rw_lock_init (&this->rwmutex);
   g_rec_mutex_init (&this->thread_mutex);
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
 
 
+}
+
+
+void sndctrler_change_interval_type(SndController * this, guint8 subflow_id, guint type)
+{
+  Subflow *subflow;
+  ReportIntervalCalculator *ricalcer;
+  GHashTableIter iter;
+  gpointer key, val;
+
+  THIS_WRITELOCK (this);
+  g_hash_table_iter_init (&iter, this->subflows);
+  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+    subflow = (Subflow *) val;
+    ricalcer = subflow->ricalcer;
+    if(subflow_id == 255 || subflow_id == 0 || subflow_id == subflow->id){
+      switch(type){
+        case 0:
+          ricalcer_set_mode(ricalcer, RTCP_INTERVAL_REGULAR_INTERVAL_MODE);
+        break;
+        case 1:
+          ricalcer_set_mode(ricalcer, RTCP_INTERVAL_EARLY_RTCP_MODE);
+        break;
+        case 2:
+        default:
+          ricalcer_set_mode(ricalcer, RTCP_INTERVAL_IMMEDIATE_FEEDBACK_MODE);
+        break;
+      }
+    }
+  }
+  THIS_WRITEUNLOCK (this);
 }
 
 static void _change_controlling_mode(Subflow *this, guint controlling_mode)
@@ -574,6 +606,10 @@ static void _orp_producer_helper(Subflow *subflow, gpointer data)
   this = data;
   ricalcer = subflow->ricalcer;
 
+  if(!subflow->controlling_mode){
+    goto done;
+  }
+
   send_regular = ricalcer_rtcp_regular_allowed(subflow->ricalcer);
 
   if(!send_regular){
@@ -589,7 +625,7 @@ static void _orp_producer_helper(Subflow *subflow, gpointer data)
       ((gfloat) report_length - subflow->avg_rtcp_size) / 4.;
 
   ricalcer_refresh_parameters(ricalcer,
-                              MIN_MEDIA_RATE,
+                              CONSTRAIN(MIN_MEDIA_RATE, 200000, mprtps_path_get_target_bitrate(subflow->path))>>3 /*because we need the bytes */,
                               subflow->avg_rtcp_size);
 
 done:

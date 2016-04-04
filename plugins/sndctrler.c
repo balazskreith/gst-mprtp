@@ -625,7 +625,7 @@ static void _orp_producer_helper(Subflow *subflow, gpointer data)
       ((gfloat) report_length - subflow->avg_rtcp_size) / 4.;
 
   ricalcer_refresh_parameters(ricalcer,
-                              CONSTRAIN(MIN_MEDIA_RATE, 200000, mprtps_path_get_target_bitrate(subflow->path))>>3 /*because we need the bytes */,
+                              CONSTRAIN(MIN_MEDIA_RATE, 100000, mprtps_path_get_target_bitrate(subflow->path))>>3 /*because we need the bytes */,
                               subflow->avg_rtcp_size);
 
 done:

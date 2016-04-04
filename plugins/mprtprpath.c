@@ -562,7 +562,7 @@ void _obsolate_misordered(MpRTPRPath *this)
       continue;
     }
     if(item->added < now - this->discard_treshold){
-      item = g_queue_pop_head(this->discarded);
+      item = g_queue_pop_head(this->misordered);
       _add_packet_to_discarded(this, item->seq, item->payload_len);
       item->used = FALSE;
       continue;

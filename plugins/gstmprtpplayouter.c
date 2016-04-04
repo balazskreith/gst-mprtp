@@ -50,11 +50,17 @@
 
 #include "rcvctrler.h"
 
-typedef struct _ReportingMode{
-  guint32  subflow_id : 8;
-  guint32  reports    : 20;
-  guint32  cngctrler  : 4;
-}ReportingMode;
+typedef struct _SubflowSpecProp{
+  #if G_BYTE_ORDER == G_LITTLE_ENDIAN
+    guint32  value : 24;
+    guint32  id     : 8;
+  #elif G_BYTE_ORDER == G_BIG_ENDIAN
+    guint32  id     : 8;
+    guint32  value : 24;
+  #else
+  #error "G_BYTE_ORDER should be big or little endian."
+  #endif
+  }SubflowSpecProp;
 
 GST_DEBUG_CATEGORY_STATIC (gst_mprtpplayouter_debug_category);
 #define GST_CAT_DEFAULT gst_mprtpplayouter_debug_category
@@ -128,7 +134,7 @@ enum
   PROP_JOIN_SUBFLOW,
   PROP_DETACH_SUBFLOW,
   PROP_PIVOT_CLOCK_RATE,
-  PROP_SETUP_REPORTING_MODE,
+  PROP_SETUP_CONTROLLING_MODE,
   PROP_SETUP_RTCP_INTERVAL_TYPE,
   PROP_RTP_PASSTHROUGH,
   PROP_LOG_ENABLED,
@@ -327,11 +333,11 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                            0,
                            4294967295, 2, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_SETUP_REPORTING_MODE,
-      g_param_spec_uint ("setup-reporting-mode",
-          "set the reports need to be sent to the receiver",
-          "A 32bit unsigned integer with the following struct:"
-          " The upper 8 bit in host order identifies the subflow, the latter 20 bits the reports (1 - RR, 2 - RFC243, 4 - OWD), the last 4 bit the congestion controller (1 - MARC) ",
+  g_object_class_install_property (gobject_class, PROP_SETUP_CONTROLLING_MODE,
+      g_param_spec_uint ("setup-controlling-mode",
+          "set the controlling mode to the subflow",
+          "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the mode. "
+          "0 - no sending rate controller, 1 - no controlling, but sending SRs, 2 - FBRA with MARC",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   element_class->change_state =
@@ -438,8 +444,11 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
 {
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (object);
   gboolean gboolean_value;
+  guint guint_value;
+  SubflowSpecProp *subflow_prop;
   GST_DEBUG_OBJECT (this, "set_property");
 
+  subflow_prop = (SubflowSpecProp*) &guint_value;
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
       THIS_WRITELOCK (this);
@@ -510,67 +519,32 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       break;
     case PROP_OWD_WINDOW_TRESHOLD:
       THIS_WRITELOCK (this);
-      {
-        guint8 subflow_id;
-        guint guint_value;
-        guint64 owd_window_treshold;
-        guint_value = g_value_get_uint (value);
-        subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
-        owd_window_treshold = guint_value & 0x00FFFFFFUL;
-        owd_window_treshold *= GST_MSECOND;
-        _setup_paths_owd_window_treshold(this, subflow_id, owd_window_treshold);
-      }
+      guint_value = g_value_get_uint (value);
+      _setup_paths_owd_window_treshold(this, subflow_prop->id, subflow_prop->value);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_DISCARD_TRESHOLD:
       THIS_WRITELOCK (this);
-      {
-        guint8 subflow_id;
-        guint guint_value;
-        guint64 discard_treshold;
-        guint_value = g_value_get_uint (value);
-        subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
-        discard_treshold = guint_value & 0x00FFFFFFUL;
-        discard_treshold *= GST_MSECOND;
-        _setup_paths_discard_treshold(this, subflow_id, discard_treshold);
-      }
+      guint_value = g_value_get_uint (value);
+      _setup_paths_discard_treshold(this, subflow_prop->id, subflow_prop->value);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_LOST_TRESHOLD:
         THIS_WRITELOCK (this);
-        {
-          guint8 subflow_id;
-          guint guint_value;
-          guint64 discard_treshold;
-          guint_value = g_value_get_uint (value);
-          subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
-          discard_treshold = guint_value & 0x00FFFFFFUL;
-          discard_treshold *= GST_MSECOND;
-          _setup_paths_lost_treshold(this, subflow_id, discard_treshold);
-        }
+        guint_value = g_value_get_uint (value);
+        _setup_paths_lost_treshold(this, subflow_prop->id, subflow_prop->value);
         THIS_WRITEUNLOCK (this);
         break;
     case PROP_SETUP_RTCP_INTERVAL_TYPE:
       THIS_WRITELOCK (this);
-      {
-        guint8 subflow_id;
-        guint guint_value, interval_type;
-        guint_value = g_value_get_uint (value);
-        subflow_id = (guint8) ((guint_value >> 24) & 0x000000FF);
-        interval_type = guint_value & 0x00FFFFFFUL;
-        rcvctrler_change_interval_type(this->controller, subflow_id, interval_type);
-      }
+      guint_value = g_value_get_uint (value);
+      rcvctrler_change_interval_type(this->controller, subflow_prop->id, subflow_prop->value);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_SETUP_REPORTING_MODE:
+    case PROP_SETUP_CONTROLLING_MODE:
       THIS_WRITELOCK (this);
-      {
-        guint guint_value;
-        ReportingMode *mode;
-        guint_value = g_value_get_uint (value);
-        mode = (ReportingMode*) &guint_value;
-        rcvctrler_change_reporting_mode(this->controller, mode->subflow_id, mode->reports, mode->cngctrler);
-      }
+      guint_value = g_value_get_uint (value);
+      rcvctrler_change_controlling_mode(this->controller, subflow_prop->id, subflow_prop->value);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_REPAIR_WINDOW_MIN:

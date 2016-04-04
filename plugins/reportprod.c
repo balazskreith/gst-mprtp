@@ -315,12 +315,12 @@ GstBuffer *report_producer_end(ReportProducer *this, guint *length)
   if(length) {
     *length = this->length;
   }
-
-  mprtp_logger_open_collector(this->logfile);
-  gst_printfnc_rtcp(data, mprtp_logger_collect);
-  mprtp_logger_collect("########### Report produced for after: %lu seconds ###########\n", GST_TIME_AS_SECONDS(_now(this) - this->made));
-  mprtp_logger_close_collector();
-
+  if(this->length){
+    mprtp_logger_open_collector(this->logfile);
+    gst_printfnc_rtcp(data, mprtp_logger_collect);
+    mprtp_logger_collect("########### Report produced for after: %lu seconds ###########\n", GST_TIME_AS_SECONDS(_now(this) - this->made));
+    mprtp_logger_close_collector();
+  }
   THIS_WRITEUNLOCK(this);
   return result;
 }

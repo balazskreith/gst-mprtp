@@ -33,7 +33,7 @@ typedef struct _MPRTPSubflowMARCRateController{
 }MPRTPSubflowMARCRateController;
 
 typedef union _MPRTPSubflowRateController{
-  MPRTPSubflowMARCRateController marc;
+  MPRTPSubflowMARCRateController fbra_marc;
 }MPRTPSubflowRateController;
 
 typedef struct _MPRTPSubflowExtendedReport{

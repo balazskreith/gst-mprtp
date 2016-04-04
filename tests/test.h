@@ -57,6 +57,58 @@
 #ifndef TESTS_TEST_H_
 #define TESTS_TEST_H_
 
+
+
+typedef struct _MPRTPSubflowMARCCngCtrlerParams{
+  //parameters can be changed
+  gint32     max_rate;
+  gint32     min_rate;
+
+}MPRTPSubflowMARCCngCtrlerParams;
+
+typedef struct _MPRTPSubflowMARCRateController{
+  guint32 target_bitrate;
+  gint8   state;
+  guint32 discarded_bitrate;
+  guint32 receiver_bitrate;
+  guint32 sending_bitrate;
+
+  MPRTPSubflowMARCCngCtrlerParams cngctrler;
+}MPRTPSubflowMARCRateController;
+
+typedef union _MPRTPSubflowRateController{
+  MPRTPSubflowMARCRateController fbra_marc;
+}MPRTPSubflowRateController;
+
+typedef struct _MPRTPSubflowExtendedReport{
+  guint32      total_discarded_bytes;
+  GstClockTime owd_median;
+  GstClockTime owd_min;
+  GstClockTime owd_max;
+}MPRTPSubflowExtendedReport;
+
+typedef struct _MPRTPSubflowReceiverReport{
+  GstClockTime RTT;
+  guint32      jitter;
+  gdouble      lost_rate;
+  guint16      HSSN;
+  guint16      cycle_num;
+  guint32      cum_packet_lost;
+}MPRTPSubflowReceiverReport;
+
+typedef struct _MPRTPSubflowUtilizationSignalData{
+  MPRTPSubflowReceiverReport receiver_report;
+  MPRTPSubflowExtendedReport extended_report;
+  MPRTPSubflowRateController ratectrler;
+}MPRTPSubflowUtilizationSignalData;
+
+typedef struct _MPRTPPluginSignalData{
+  MPRTPSubflowUtilizationSignalData subflow[32];
+}MPRTPPluginSignalData;
+
+
+
+
 #include <string.h>
 
 static gint32 info;
@@ -107,7 +159,6 @@ static int lost_th              = 1000;
 static int rtcp_interval_type   = 2;
 static int report_timeout       = 0;
 static int controlling_mode     = 1;
-static int reporting_mode       = 1;
 static int sending_target       = 500000;
 static int path1_active         = 1;
 static int path2_active         = 0;
@@ -144,7 +195,6 @@ static GOptionEntry entries[] =
     { "rtcp_interval_type", 0, 0, G_OPTION_ARG_INT, &rtcp_interval_type, "rtcp_interval_type", NULL },
     { "report_timeout", 0, 0, G_OPTION_ARG_INT, &report_timeout, "report_timeout", NULL },
     { "controlling_mode", 0, 0, G_OPTION_ARG_INT, &controlling_mode, "controlling_mode", NULL },
-    { "reporting_mode", 0, 0, G_OPTION_ARG_INT, &reporting_mode, "reporting_mode", NULL },
     { "sending_target", 0, 0, G_OPTION_ARG_INT, &sending_target, "sending_target", NULL },
     { "path1_tx_rtp_port", 0, 0, G_OPTION_ARG_INT, &path1_tx_rtp_port, "path1_tx_rtp_port", NULL },
     { "path1_tx_rtcp_port", 0, 0, G_OPTION_ARG_INT, &path1_tx_rtcp_port, "path1_tx_rtcp_port", NULL },

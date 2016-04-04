@@ -161,8 +161,9 @@ _orp_add_sr (
 
 //----------------------------------------------------------------------------
 
-//----------------------------- Split Controller -----------------------------
-
+static void
+_emit_signal(
+    SndController* this);
 //----------------------------------------------------------------------------
 static void
 _process_regular_reports(
@@ -475,6 +476,7 @@ sndctrler_ticker_run (void *data)
   _fec_rate_refresher(this);
   _subflow_iterator(this, _check_report_timeout, this);
   _subflow_iterator(this, _time_update, this);
+  _emit_signal(this);
 //  _system_notifier_main(this);
 
   next_scheduler_time = _now(this) + 100 * GST_MSECOND;
@@ -568,7 +570,6 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
     GST_WARNING_OBJECT (this,
         "MPRTCP riport can not be binded any "
         "subflow with the given id: %d", summary->subflow_id);
-    mprtp_free(summary);
     goto done;
   }
 
@@ -585,7 +586,6 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
   subflow->last_seen_report = _now(this);
 
 done:
-  g_object_unref(buf);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -671,7 +671,23 @@ _orp_add_sr (SndController * this, Subflow * subflow)
   subflow->octet_count = octet_count;
 
 }
-//Todo: check signal emit request;
+
+static void _emit_signal_helper(Subflow *subflow, gpointer data)
+{
+  gboolean *emit_signal = data;
+  *emit_signal |= subflow->emit_signal_request;
+  subflow->emit_signal_request = FALSE;
+}
+
+void _emit_signal(SndController* this)
+{
+  gboolean emit_signal = FALSE;
+  _subflow_iterator(this, _emit_signal_helper, &emit_signal);
+  if(emit_signal){
+    this->utilization_signal_func(this->utilization_signal_data, this->mprtp_signal_data);
+    memset(this->mprtp_signal_data, 0, sizeof(MPRTPPluginSignalData));
+  }
+}
 //---------------------------------------------------------------------------
 
 void _process_regular_reports(SndController* this, Subflow *subflow, GstMPRTCPReportSummary *summary)
@@ -681,7 +697,6 @@ void _process_regular_reports(SndController* this, Subflow *subflow, GstMPRTCPRe
 
   signaldata  = this->mprtp_signal_data;
   subflowdata = &signaldata->subflow[subflow->id];
-
   if(summary->RR.processed){
     MPRTPSubflowReceiverReport *report;
     report = &subflowdata->receiver_report;
@@ -689,7 +704,7 @@ void _process_regular_reports(SndController* this, Subflow *subflow, GstMPRTCPRe
     report->RTT = summary->RR.RTT;
     report->cum_packet_lost = summary->RR.cum_packet_lost;
     report->cycle_num = summary->RR.cycle_num;
-    report->lost_rate = summary->RR.lost_rate * 256.;
+    report->lost_rate = summary->RR.lost_rate;
     report->jitter = summary->RR.jitter;
     subflow->emit_signal_request = TRUE;
   }
@@ -710,6 +725,8 @@ void _process_regular_reports(SndController* this, Subflow *subflow, GstMPRTCPRe
     report->total_discarded_bytes = summary->XR_RFC7243.discarded_bytes;
     subflow->emit_signal_request = TRUE;
   }
+
+  //Todo: FBRA marc signal emit request here
 }
 
 //---------------------- Utility functions ----------------------------------

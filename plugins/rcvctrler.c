@@ -92,7 +92,6 @@ struct _Subflow
   gchar                        *logfile;
   gchar                        *statfile;
 
-  gboolean                      reporting;
   gboolean                      rfc3550_enabled;
   gboolean                      rfc7243_enabled;
   gboolean                      owd_enabled;
@@ -178,13 +177,6 @@ _subflow_ctor (void);
 static void
 _subflow_dtor (Subflow * this);
 
-static void
-_change_reporting_mode(
-    Subflow *this,
-    guint mode,
-    guint cngctrler);
-
-
 static guint32
 _uint32_diff (
     guint32 a,
@@ -259,7 +251,33 @@ void rcvctrler_change_interval_type(RcvController * this, guint8 subflow_id, gui
   THIS_WRITEUNLOCK (this);
 }
 
-void rcvctrler_change_reporting_mode(RcvController * this, guint8 subflow_id, guint reports, guint cngctrler)
+
+static void _change_controlling_mode(Subflow *this, guint controlling_mode)
+{
+  this->rfc3550_enabled = FALSE;
+  this->rfc7243_enabled = FALSE;
+  this->owd_enabled     = FALSE;
+  this->fbra_marc_enabled = FALSE;
+
+  switch(controlling_mode){
+    case 0:
+      GST_DEBUG_OBJECT(this, "subflow %d set to no controlling mode", this->id);
+      break;
+    case 1:
+      this->rfc3550_enabled = TRUE;
+      GST_DEBUG_OBJECT(this, "subflow %d set to only report processing mode", this->id);
+      break;
+    case 2:
+      this->rfc3550_enabled   = TRUE;
+      this->fbra_marc_enabled = TRUE;
+      break;
+    default:
+      g_warning("Unknown controlling mode requested for subflow %d", this->id);
+      break;
+  }
+}
+
+void rcvctrler_change_controlling_mode(RcvController * this, guint8 subflow_id, guint controlling_mode)
 {
   Subflow *subflow;
   GHashTableIter iter;
@@ -269,10 +287,11 @@ void rcvctrler_change_reporting_mode(RcvController * this, guint8 subflow_id, gu
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     subflow = (Subflow *) val;
     if(subflow_id == 255 || subflow_id == 0 || subflow_id == subflow->id){
-      _change_reporting_mode(subflow, reports, cngctrler);
+      _change_controlling_mode(subflow, controlling_mode);
     }
   }
   THIS_WRITEUNLOCK (this);
+
 }
 
 
@@ -564,6 +583,7 @@ _orp_main(RcvController * this)
   GstBuffer *buffer;
   gchar interval_logfile[255];
   GstClockTime elapsed_x, elapsed_y;
+  gboolean created = FALSE;
 
   if (!this->report_is_flowable) {
       //Todo: fix this;
@@ -578,8 +598,7 @@ _orp_main(RcvController * this)
     gboolean send_regular, send_fb;
     subflow  = (Subflow *) val;
     ricalcer = subflow->ricalcer;
-
-    if(!subflow->reporting){
+    if(!subflow->rfc3550_enabled){
       continue;
     }
 
@@ -593,8 +612,11 @@ _orp_main(RcvController * this)
       continue;
     }
 
-    report_producer_begin(this->report_producer, subflow->id);
     if(send_regular){
+
+      created = TRUE;
+      report_producer_begin(this->report_producer, subflow->id);
+
       _orp_add_rr(this, subflow);
       if(subflow->owd_enabled){
         _orp_add_xr_owd(this, subflow);
@@ -612,13 +634,18 @@ _orp_main(RcvController * this)
       mprtp_logger(interval_logfile, "%lu,%lu\n", elapsed_x, elapsed_y);
     }
 
-    if(subflow->fbra_marc_enabled){
+    if(send_fb && subflow->fbra_marc_enabled){
+      if(!created){
+        created = TRUE;
+        report_producer_begin(this->report_producer, subflow->id);
+      }
       _orp_fbra_marc_feedback(this, subflow);
     }
 
-    buffer = report_producer_end(this->report_producer, &report_length);
-    this->send_mprtcp_packet_func(this->send_mprtcp_packet_data, buffer);
-
+    if(created){
+      buffer = report_producer_end(this->report_producer, &report_length);
+      this->send_mprtcp_packet_func(this->send_mprtcp_packet_data, buffer);
+    }
     report_length += 12 /* RTCP HEADER*/ + (28<<3) /*UDP+IP HEADER*/;
     subflow->avg_rtcp_size += (report_length - subflow->avg_rtcp_size) / 4.;
 
@@ -659,13 +686,16 @@ void _orp_add_rr(RcvController * this, Subflow *subflow)
 
   expected      = _uint32_diff(subflow->HSSN, HSSN);
   received      = total_received - subflow->total_received;
-  lost          = expected - received;
+  lost          = received < expected ? expected - received : 0;
 
   fraction_lost = (expected == 0 || lost <= 0) ? 0 : (lost << 8) / expected;
   ext_hsn       = (((guint32) cycle_num) << 16) | ((guint32) HSSN);
 
-  subflow->HSSN            = HSSN;
-  subflow->total_lost     = total_lost;
+//  g_print("expected: %u received: %u lost: %u fraction_lost: %d cycle num: %d\n",
+//          expected, received, lost, fraction_lost, cycle_num);
+
+  subflow->HSSN           = HSSN;
+  subflow->total_lost    += lost;
   subflow->total_received = total_received;
 
   LSR = (guint32) (subflow->last_seen_report >> 16);
@@ -828,28 +858,6 @@ _subflow_dtor (Subflow * this)
 {
   g_return_if_fail (this);
   mprtp_free (this);
-}
-
-void _change_reporting_mode(Subflow *this, guint reports, guint cngctrler)
-{
-
-  this->rfc3550_enabled = (reports & 1) > 0;
-  this->rfc7243_enabled = (reports & 2) > 0;
-  this->owd_enabled = (reports & 4) > 0;
-  switch(cngctrler){
-    case 1:
-      this->fbra_marc_enabled = TRUE;
-      break;
-    case 0:
-    default:
-
-    break;
-  }
-
-  this->reporting = this->rfc3550_enabled ||
-                    this->rfc7243_enabled ||
-                    this->owd_enabled     ||
-                    this->fbra_marc_enabled;
 }
 
 guint32

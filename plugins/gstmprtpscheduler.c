@@ -435,7 +435,6 @@ gst_mprtpscheduler_finalize (GObject * object)
 
 
 typedef struct _SubflowSpecProp{
-
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
   guint32  value : 24;
   guint32  id     : 8;

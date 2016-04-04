@@ -76,12 +76,12 @@ rcvctrler_change_interval_type(
     guint8 subflow_id,
     guint type);
 
+
 void
-rcvctrler_change_reporting_mode(
-    RcvController *this,
+rcvctrler_change_controlling_mode(
+    RcvController * this,
     guint8 subflow_id,
-    guint reports,
-    guint cngctrler);
+    guint controlling_mode);
 
 void
 rcvctrler_add_path (

@@ -299,7 +299,6 @@ _processing_rrblock (ReportProcessor *this,
   }
 
   summary->RR.lost_rate = ((gdouble) fraction_lost) / 256.;
-  g_print("fraction lost: %d lost_rate: %f\n", fraction_lost, summary->RR.lost_rate);
 
 }
 

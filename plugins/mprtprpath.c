@@ -90,11 +90,14 @@ mprtpr_path_init (MpRTPRPath * this)
   _owdrle(this).read_index = _owdrle(this).write_index = 0;
   _owdrle(this).step_interval = 100 * GST_MSECOND;
 
+
   this->misordered = g_queue_new();
   this->misordered_itemsbed = mprtp_malloc(sizeof(MisorderedMPRTPPacket) * MPRTPR_MISORDERED_ITEMSBED_LENGTH);
+  this->discard_treshold = 300 * GST_MSECOND;
 
   this->discarded = g_queue_new();
   this->discarded_itemsbed = mprtp_malloc(sizeof(MisorderedMPRTPPacket) * MPRTPR_DISCARDED_ITEMSBED_LENGTH);
+  this->lost_treshold = 700 * GST_MSECOND;
 
   mprtpr_path_reset (this);
 }
@@ -181,6 +184,15 @@ void mprtpr_path_get_total_discards (MpRTPRPath * this,
   if(total_discarded_packets) *total_discarded_packets = this->total_packets_discarded;
   if(total_payload_discarded) *total_payload_discarded = this->total_payload_discarded;
   THIS_READUNLOCK (this);
+}
+
+guint32 mprtpr_path_get_total_discarded_or_lost_packets (MpRTPRPath * this)
+{
+  guint32 result;
+  THIS_READLOCK (this);
+  result = this->total_packets_discarded_or_lost;
+  THIS_READUNLOCK (this);
+  return result;
 }
 
 void mprtpr_path_get_total_receivements (MpRTPRPath * this,
@@ -500,8 +512,6 @@ void _add_skew(MpRTPRPath *this, gint64 skew)
   this->path_skew = this->path_skew * .99 + (gdouble) median_skew * .01;
 }
 
-
-
 void _obsolate_discarded(MpRTPRPath *this)
 {
   MisorderedMPRTPPacket* item;
@@ -545,7 +555,7 @@ void _add_packet_to_discarded(MpRTPRPath *this, guint16 seq, guint payload_len)
   item->payload_len = payload_len;
 
   g_queue_push_tail(this->discarded, item);
-
+  ++this->total_packets_discarded_or_lost;
 }
 
 void _obsolate_misordered(MpRTPRPath *this)

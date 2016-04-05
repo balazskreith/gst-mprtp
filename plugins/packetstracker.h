@@ -25,8 +25,11 @@ typedef struct _PacketsTrackerClass PacketsTrackerClass;
 typedef struct _PacketsTrackerStat
 {
   gint32                   bytes_in_flight;
-  gint32                   acked_in_1s;
-  gint32                   sent_in_1s;
+  gint32                   packets_in_flight;
+  gint32                   acked_bytes_in_1s;
+  gint32                   acked_packets_in_1s;
+  gint32                   sent_bytes_in_1s;
+  gint32                   sent_packets_in_1s;
 }PacketsTrackerStat;
 
 struct _PacketsTracker
@@ -39,8 +42,12 @@ struct _PacketsTracker
   GQueue*                  acked;
 
   gint32                   bytes_in_flight;
-  gint32                   acked_in_1s;
-  gint32                   sent_in_1s_sum;
+  gint32                   packets_in_flight;
+  gint32                   acked_bytes_in_1s;
+  gint32                   acked_packets_in_1s;
+  gint32                   sent_bytes_in_1s;
+  gint32                   sent_packets_in_1s;
+
 
 };
 

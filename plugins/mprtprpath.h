@@ -91,6 +91,7 @@ struct _MpRTPReceiverPath
 
   OWDRLE                    owd_rle;
 
+  guint32                   total_packets_discarded_or_lost;
   guint32                   total_packets_lost;
   guint32                   total_packets_discarded;
   guint32                   total_payload_discarded;
@@ -150,6 +151,8 @@ void mprtpr_path_get_regular_stats(MpRTPRPath *this,
 void mprtpr_path_get_total_discards (MpRTPRPath * this,
                                guint32 *total_discarded_packets,
                                guint32 *total_payload_discarded);
+
+guint32 mprtpr_path_get_total_discarded_or_lost_packets (MpRTPRPath * this);
 
 void mprtpr_path_get_total_receivements (MpRTPRPath * this,
                                guint32 *total_packets_received,

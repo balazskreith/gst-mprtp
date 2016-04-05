@@ -15,7 +15,7 @@
 #include <gst/gst.h>
 #include "mprtpdefs.h"
 
-typedef struct _MPRTPSubflowMARCCngCtrlerParams{
+typedef struct _MPRTPSubflowFBRACngCtrlerParams{
   //parameters can be changed
   gint32     max_rate;
   gint32     min_rate;
@@ -30,10 +30,10 @@ typedef struct _MPRTPSubflowMARCRateController{
   guint32 sending_bitrate;
 
   MPRTPSubflowMARCCngCtrlerParams cngctrler;
-}MPRTPSubflowMARCRateController;
+}MPRTPSubflowFECBasedRateAdaption;
 
 typedef union _MPRTPSubflowRateController{
-  MPRTPSubflowMARCRateController fbra_marc;
+  MPRTPSubflowFECBasedRateAdaption fbra;
 }MPRTPSubflowRateController;
 
 typedef struct _MPRTPSubflowExtendedReport{

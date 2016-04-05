@@ -649,6 +649,75 @@ gst_rtcp_afb_getdown (GstRTCPFB * report,
   }
 }
 
+void
+gst_rtcp_afb_rmdi_change (GstRTCPAFB_RMDI * report,
+                     guint8 *rsvd,
+                     guint8 *records_num,
+                     guint16 *length)
+{
+  if(rsvd){
+    report->rsvd = *rsvd;
+  }
+  if(records_num){
+    report->records_num = *records_num;
+  }
+  if(length){
+    report->length = g_htons(*length);
+  }
+}
+
+void
+gst_rtcp_afb_rmdi_getdown (GstRTCPAFB_RMDI * report,
+                      guint8 *rsvd,
+                      guint8 *records_num,
+                      guint16 *length)
+{
+  if(rsvd){
+      *rsvd = report->rsvd;
+  }
+  if(records_num){
+      *records_num = report->records_num;
+  }
+  if(length){
+      *length = g_ntohs(report->length);
+  }
+}
+
+void
+gst_rtcp_afb_rmdi_record_change (GstRTCPAFB_RMDIRecord * record,
+                      guint16 *HSSN,
+                      guint16 *disc_packets_num,
+                      guint32 *owd_sample)
+{
+  if(HSSN){
+      record->HSSN = g_htons(*HSSN);
+  }
+  if(disc_packets_num){
+      record->disc_packets_num = *disc_packets_num;
+  }
+  if(owd_sample){
+      record->owd_sample = g_ntohl(*owd_sample);
+  }
+}
+
+
+void
+gst_rtcp_afb_rmdi_record_getdown (GstRTCPAFB_RMDIRecord * record,
+                                  guint16 *HSSN,
+                                  guint16 *disc_packets_num,
+                                  guint32 *owd_sample)
+{
+  if(HSSN){
+      *HSSN = g_ntohs(record->HSSN);
+  }
+  if(disc_packets_num){
+      *disc_packets_num = g_ntohs(record->disc_packets_num);
+  }
+  if(owd_sample){
+      *owd_sample = g_ntohl(record->owd_sample);
+  }
+}
+
 
 void
 gst_rtcp_afb_setup_fci_data(GstRTCPFB * report, gpointer fci_dat, guint fci_len)
@@ -1322,12 +1391,13 @@ gst_printfnc_rtcp (GstRTCPHeader * header, printfnc print)
   gboolean ok = TRUE;
   guint16 offset = 0;
   guint8 payload_type;
+  guint8 rsvd;
   guint16 length;
   guint8 *step = (guint8 *) header;
 
   for (; ok; step = (guint8 *) step + offset) {
     gst_rtcp_header_getdown ((GstRTCPHeader *) step, NULL, NULL,
-        NULL, &payload_type, &length, NULL);
+        &rsvd, &payload_type, &length, NULL);
     switch (payload_type) {
       case MPRTCP_PACKET_TYPE_IDENTIFIER:
         gst_printfnc_mprtcp ((GstMPRTCPSubflowReport *) step, print);
@@ -1337,6 +1407,18 @@ gst_printfnc_rtcp (GstRTCPHeader * header, printfnc print)
         break;
       case GST_RTCP_TYPE_RR:
         gst_printfnc_rtcp_rr ((GstRTCPRR *) step, print);
+        break;
+      case GST_RTCP_TYPE_RTPFB:
+        if(rsvd == GST_RTCP_PSFB_TYPE_AFB){
+          GstRTCPFB *afb = (GstRTCPFB *) step;
+          guint32 fci_id;
+          gst_rtcp_afb_getdown(afb, NULL, NULL, &fci_id);
+          gst_printfnc_rtcp_afb(afb, print);
+          if(fci_id == RTCP_AFB_RMDI_ID){
+              gst_printfnc_rtcp_afb_rmdi(&afb->fci_data, print);
+          }
+
+        }
         break;
       case GST_RTCP_TYPE_XR:
         {
@@ -1499,6 +1581,44 @@ gst_printfnc_rtcp_afb (GstRTCPFB * report, printfnc print)
       "|%63X|\n"
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%63X|\n", ssrc, fci_id);
+
+
+}
+
+void
+gst_printfnc_rtcp_afb_rmdi (gpointer data, printfnc print)
+{
+  GstRTCPAFB_RMDIRecord *record;
+  GstRTCPAFB_RMDI *fbm; //feedback message
+  guint8 rsvd, records_num;
+  guint16 length;
+  gint i;
+  fbm = data;
+  gst_rtcp_afb_rmdi_getdown(fbm, &rsvd, &records_num, &length);
+  print (
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%15d|%31hu|%15d|\n"
+      ,
+      rsvd,
+      records_num,
+      length
+      );
+
+  record = &fbm->records[0];
+  for(i=0; i< records_num; ++i, ++record){
+      guint16 HSSN,disc_packets_num;
+      guint32 owd;
+      gst_rtcp_afb_rmdi_record_getdown(record, &HSSN, &disc_packets_num, &owd);
+      print (
+            "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+            "|%31hu|%31hu|\n"
+            "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+            "|%63X|\n"
+          ,
+          g_ntohs(record->HSSN), g_ntohs(record->disc_packets_num),
+          g_ntohl(record->owd_sample)
+          );
+  }
 }
 
 

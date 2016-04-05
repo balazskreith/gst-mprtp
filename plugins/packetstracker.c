@@ -101,7 +101,7 @@ packetstracker_init (PacketsTracker * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sent        = g_queue_new();
-  this->sent_in_1s  = g_queue_new();
+  this->sent_bytes_in_1s  = g_queue_new();
   this->acked       = g_queue_new();
   this->sysclock = gst_system_clock_obtain();
 }
@@ -136,9 +136,11 @@ void packetstracker_add(PacketsTracker *this, guint payload_len, guint16 sn)
   item->ref           = 2;
 
   this->bytes_in_flight+= item->payload_bytes;
+  ++this->packets_in_flight;
   g_queue_push_tail(this->sent, item);
 
-  this->sent_in_1s_sum += item->payload_bytes;
+  this->sent_bytes_in_1s += item->payload_bytes;
+  ++this->sent_packets_in_1s;
   g_queue_push_tail(this->sent_in_1s, item);
   while(!g_queue_is_empty(this->sent_in_1s)){
     item = g_queue_peek_head(this->sent_in_1s);
@@ -146,7 +148,8 @@ void packetstracker_add(PacketsTracker *this, guint payload_len, guint16 sn)
       break;
     }
     item = g_queue_pop_head(this->sent_in_1s);
-    this->sent_in_1s_sum -= item->payload_bytes;
+    this->sent_bytes_in_1s -= item->payload_bytes;
+    --this->sent_packets_in_1s;
     if(--item->ref == 0){
       mprtp_free(item);
     }
@@ -168,8 +171,10 @@ void packetstracker_update_hssn(PacketsTracker *this, guint16 hssn)
       break;
     }
     item = g_queue_pop_head(this->sent);
-    this->bytes_in_flight -= item->payload_bytes;
-    this->acked_in_1s     += item->payload_bytes;
+    this->bytes_in_flight    -= item->payload_bytes;
+    --this->packets_in_flight;
+    this->acked_bytes_in_1s  += item->payload_bytes;
+    ++this->acked_packets_in_1s;
     g_queue_push_tail(this->acked, item);
   }
   if(g_queue_is_empty(this->acked)){
@@ -183,7 +188,8 @@ void packetstracker_update_hssn(PacketsTracker *this, guint16 hssn)
       break;
     }
     item = g_queue_pop_head(this->acked);
-    this->acked_in_1s -= item->payload_bytes;
+    this->acked_bytes_in_1s -= item->payload_bytes;
+    --this->acked_packets_in_1s;
     if(--item->ref == 0){
       mprtp_free(item);
     }
@@ -197,9 +203,12 @@ void
 packetstracker_get_stats (PacketsTracker * this, PacketsTrackerStat* result)
 {
   THIS_READLOCK (this);
-  result->acked_in_1s     = this->acked_in_1s;
-  result->sent_in_1s      = this->sent_in_1s_sum;
-  result->bytes_in_flight = this->bytes_in_flight;
+  result->acked_bytes_in_1s     = this->acked_bytes_in_1s;
+  result->sent_bytes_in_1s      = this->sent_bytes_in_1s;
+  result->bytes_in_flight       = this->bytes_in_flight;
+  result->acked_packets_in_1s   = this->acked_packets_in_1s;
+  result->sent_packets_in_1s    = this->sent_packets_in_1s;
+  result->packets_in_flight     = this->packets_in_flight;
   THIS_READUNLOCK (this);
 }
 

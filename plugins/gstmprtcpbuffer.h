@@ -281,24 +281,22 @@ typedef struct PACKED _GstRTCPFB
   guint32 fci_data;
 } GstRTCPFB;
 
-#define RTCP_AFB_FBRA_MARC_ID 0x4D415243 //MARC
+#define RTCP_AFB_RMDI_ID 0x524D4449 //RMDI - Receiver Measured Delay Impact
 
-typedef struct PACKED _GstRTCPAFBMARCRecord{
+typedef struct PACKED _GstRTCPAFB_RMDIRecord{
   guint16 HSSN;
-  guint8  fraction_lost;
-  guint8  rsvd;
-  guint32 discarded_bytes;
+  guint16 disc_packets_num;
   guint32 owd_sample;
-}GstRTCPAFBMARCRecord;
+}GstRTCPAFB_RMDIRecord;
 
-#define RTCP_AFB_FBRA_MARC_RECORDS_NUM 1
+#define RTCP_AFB_RMDI_RECORDS_NUM 4
 
-typedef struct PACKED _GstRTCPFB_FBRA_MARC{
-  guint8  rsvd;
-  guint8  records_num;
-  guint16 length;
-  GstRTCPAFBMARCRecord records[RTCP_AFB_FBRA_MARC_RECORDS_NUM];
-}GstRTCPFB_FBRA_MARC;
+typedef struct PACKED _GstRTCPAFB_RMDI{
+  guint8                rsvd;
+  guint8                records_num;
+  guint16               length;
+  GstRTCPAFB_RMDIRecord records[RTCP_AFB_RMDI_RECORDS_NUM];
+}GstRTCPAFB_RMDI;
 
 /*MPRTCP struct polymorphism*/
 
@@ -335,6 +333,7 @@ typedef struct PACKED _GstMPRTCPSubflowBlock
     GstRTCPXR_RFC3611 xr_rfc3611_report;
     GstRTCPXR_OWD_RLE xr_owd_rle_report;
     GstRTCPXR_OWD     xr_owd;
+    GstRTCPFB         feedback;
   };
 } GstMPRTCPSubflowBlock;
 
@@ -465,6 +464,30 @@ gst_rtcp_afb_getdown (GstRTCPFB * report,
                       guint32 *packet_source_ssrc,
                       guint32 *media_source_ssrc,
                       guint32 *fci_id);
+
+void
+gst_rtcp_afb_rmdi_change (GstRTCPAFB_RMDI * report,
+                     guint8 *rsvd,
+                     guint8 *records_num,
+                     guint16 *length);
+void
+gst_rtcp_afb_rmdi_getdown (GstRTCPAFB_RMDI * report,
+                      guint8 *rsvd,
+                      guint8 *records_num,
+                      guint16 *length);
+
+void
+gst_rtcp_afb_rmdi_record_change (GstRTCPAFB_RMDIRecord * record,
+                      guint16 *HSSN,
+                      guint16 *disc_packets_num,
+                      guint32 *owd_sample);
+void
+gst_rtcp_afb_rmdi_record_getdown (GstRTCPAFB_RMDIRecord * record,
+                                  guint16 *HSSN,
+                                  guint16 *disc_packets_num,
+                                  guint32 *owd_sample);
+
+
 void
 gst_rtcp_afb_setup_fci_data(
     GstRTCPFB * report,
@@ -665,6 +688,10 @@ void gst_printfnc_rtcp_xr_7243 (GstRTCPXR_RFC7243 * report, printfnc print);
 #define gst_print_rtcp_afb(report) \
     gst_printfnc_rtcp_afb(report, g_print)
 void gst_printfnc_rtcp_afb (GstRTCPFB * report, printfnc print);
+
+#define gst_print_rtcp_afb_rmdi(data) \
+    gst_printfnc_rtcp_afb_rmdi(data, g_print)
+void gst_printfnc_rtcp_afb_rmdi (gpointer data, printfnc print);
 
 #define gst_print_rtcp_xr_owd(report) \
     gst_printfnc_rtcp_xr_owd(report, g_print)

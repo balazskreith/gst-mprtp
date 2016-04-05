@@ -94,6 +94,10 @@ void report_producer_add_afb(ReportProducer *this,
                                 gpointer fci_dat,
                                 guint fci_dat_len);
 
+void report_producer_add_afb_rmdi(ReportProducer *this,
+                                  guint32 media_source_ssrc,
+                                  GstRTCPAFB_RMDIRecord *src_records);
+
 void report_producer_add_sr(ReportProducer *this,
                                 guint64 ntp_timestamp,
                                 guint32 rtp_timestamp,

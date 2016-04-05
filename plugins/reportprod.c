@@ -68,6 +68,13 @@ _add_length(
     ReportProducer *this,
     guint16 additional_length);
 
+static void
+_add_afb(ReportProducer *this,
+         guint32 media_source_ssrc,
+         guint32  fci_id,
+         gpointer fci_dat,
+         guint fci_dat_len);
+
 void
 report_producer_class_init (ReportProducerClass * klass)
 {
@@ -192,18 +199,34 @@ void report_producer_add_afb(ReportProducer *this,
                                 gpointer fci_dat,
                                 guint fci_dat_len)
 {
-  guint16 length;
-//  guint8 block_length;
-  GstRTCPFB *fb;
   THIS_WRITELOCK(this);
-  fb = this->actual;
-  gst_rtcp_afb_init(fb);
-  gst_rtcp_afb_change(fb, &this->ssrc, &media_source_ssrc, &fci_id);
-  gst_rtcp_afb_setup_fci_data(fb, fci_dat, fci_dat_len);
-  gst_rtcp_header_getdown (&fb->header, NULL, NULL, NULL, NULL, &length, NULL);
-  _add_length(this, length);
+  _add_afb(this, media_source_ssrc, fci_id, fci_dat, fci_dat_len);
   THIS_WRITEUNLOCK(this);
 }
+
+void report_producer_add_afb_rmdi(
+    ReportProducer *this,
+    guint32 media_source_ssrc,
+    GstRTCPAFB_RMDIRecord *src_records)
+{
+  guint8 records_num = RTCP_AFB_RMDI_RECORDS_NUM;
+  GstRTCPAFB_RMDI rmdi;
+  guint16 length;
+  gint i;
+  THIS_WRITELOCK(this);
+  length = (sizeof(GstRTCPAFB_RMDIRecord) * records_num)>>2;
+  gst_rtcp_afb_rmdi_change(&rmdi, NULL, &records_num, &length);
+  for(i=0; i<records_num; ++i){
+    gst_rtcp_afb_rmdi_record_change(&rmdi.records[i],
+                                    &src_records[i].HSSN,
+                                    &src_records[i].disc_packets_num,
+                                    &src_records[i].owd_sample);
+  }
+  _add_afb(this, media_source_ssrc, RTCP_AFB_RMDI_ID, &rmdi, sizeof(GstRTCPAFB_RMDI));
+  THIS_WRITEUNLOCK(this);
+}
+
+
 
 void report_producer_add_sr(ReportProducer *this,
                                 guint64 ntp_timestamp,
@@ -341,7 +364,21 @@ void _add_length(ReportProducer *this, guint16 length)
 }
 
 
-
+void _add_afb(ReportProducer *this,
+                                guint32 media_source_ssrc,
+                                guint32  fci_id,
+                                gpointer fci_dat,
+                                guint fci_dat_len)
+{
+  guint16 length;
+  GstRTCPFB *fb;
+  fb = this->actual;
+  gst_rtcp_afb_init(fb);
+  gst_rtcp_afb_change(fb, &this->ssrc, &media_source_ssrc, &fci_id);
+  gst_rtcp_afb_setup_fci_data(fb, fci_dat, fci_dat_len);
+  gst_rtcp_header_getdown (&fb->header, NULL, NULL, NULL, NULL, &length, NULL);
+  _add_length(this, length);
+}
 
 
 #undef THIS_READLOCK

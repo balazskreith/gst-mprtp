@@ -12,8 +12,8 @@
 #include "mprtpspath.h"
 #include "bintree.h"
 #include "sndratedistor.h"
-#include "marcfbproc.h"
 #include "reportproc.h"
+#include "rmdiproc.h"
 
 
 typedef struct _SubflowRateController SubflowRateController;
@@ -55,8 +55,8 @@ struct _SubflowRateController
   GRWLock                   rwmutex;
   GstClock*                 sysclock;
   MPRTPSPath*               path;
-  MARCFBProcessor*          fb_processor;
-  MARCFBProcessorResult     marc_result;
+  RMDIProcessor*            fb_processor;
+  RMDIProcessorResult       rmdi_result;
 
   GstClockTime              made;
   GstClockTime              disable_controlling;

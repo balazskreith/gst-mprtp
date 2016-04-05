@@ -103,6 +103,10 @@ struct _Subflow
   RateWindow                    received_packets;
   RateWindow                    received_bytes;
   RateWindow                    HSSNs;
+
+  union{
+    GstRTCPAFB_RMDIRecord   rmdi_records[RTCP_AFB_RMDI_RECORDS_NUM];
+  }feedbacks;
 };
 
 //----------------------------------------------------------------------
@@ -145,7 +149,7 @@ _orp_add_xr_owd(
     Subflow *subflow);
 
 void
-_orp_fbra_marc_feedback(
+_orp_fbra_rmdi_feedback(
     RcvController * this,
     Subflow *subflow);
 
@@ -639,7 +643,7 @@ _orp_main(RcvController * this)
         created = TRUE;
         report_producer_begin(this->report_producer, subflow->id);
       }
-      _orp_fbra_marc_feedback(this, subflow);
+      _orp_fbra_rmdi_feedback(this, subflow);
     }
 
     if(created){
@@ -756,40 +760,30 @@ void _orp_add_xr_owd(RcvController * this, Subflow *subflow)
                              u32_max_delay);
 }
 
-void _orp_fbra_marc_feedback(RcvController * this, Subflow *subflow)
+void _orp_fbra_rmdi_feedback(RcvController * this, Subflow *subflow)
 {
   GstClockTime median_delay;
   guint32 owd_sampling;
-  guint16 HSSN;
-  GstRTCPFB_FBRA_MARC fbra_marc;
-  guint32 expected,received,lost;
-  guint8 fraction_lost;
+  GstRTCPAFB_RMDIRecord *records;
+  gint i;
+  records = &subflow->feedbacks.rmdi_records[0];
+
+  //shift
+  for(i=RTCP_AFB_RMDI_RECORDS_NUM-1; 0 < i; --i){
+    records[i].HSSN              = records[i-1].HSSN;
+    records[i].disc_packets_num  = records[i-1].disc_packets_num;
+    records[i].owd_sample        = records[i-1].owd_sample;
+  }
+
 
   mprtpr_path_get_owd_stats(subflow->path, &median_delay, NULL, NULL);
-
-  HSSN = mprtpr_path_get_HSSN(subflow->path);
   owd_sampling = get_ntp_from_epoch_ns(median_delay)>>16;
 
-  fbra_marc.rsvd = 0;
-  fbra_marc.records_num = RTCP_AFB_FBRA_MARC_RECORDS_NUM;
-  fbra_marc.length = g_htons(((sizeof(GstRTCPAFBMARCRecord) * RTCP_AFB_FBRA_MARC_RECORDS_NUM)>>2)-1);
-  fbra_marc.records[0].HSSN = g_htons(HSSN);
-  fbra_marc.records[0].owd_sample = g_htonl(owd_sampling);
-  fbra_marc.records[0].discarded_bytes = g_htonl(subflow->discarded_bytes.rate_value);
+  records[i].HSSN              = mprtpr_path_get_HSSN(subflow->path);
+  records[i].disc_packets_num  = mprtpr_path_get_total_discarded_or_lost_packets(subflow->path);
+  records[i].owd_sample        = owd_sampling;
 
-  expected      = subflow->HSSNs.rate_value;
-  received      = subflow->received_packets.rate_value;
-  lost          = expected - received;
-
-  fraction_lost = (expected == 0 || lost <= 0) ? 0 : (lost << 8) / expected;
-
-  fbra_marc.records[0].fraction_lost = fraction_lost;
-
-  report_producer_add_afb(this->report_producer,
-                          this->ssrc,
-                          RTCP_AFB_FBRA_MARC_ID,
-                          &fbra_marc,
-                          sizeof(GstRTCPFB_FBRA_MARC));
+  report_producer_add_afb_rmdi(this->report_producer, this->ssrc, records);
 
 }
 

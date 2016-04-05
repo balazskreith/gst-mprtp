@@ -168,20 +168,18 @@ struct _Private{
 #define _event(this) _priv(this)->event
 #define _set_event(this, e) _event(this) = e
 #define _set_pending_event(this, e) this->pending_event = e
-#define _marc(this) this->marc_result
-#define _corrH(this) _marc(this).corrH
-#define _q125(this) _marc(this).g_125
-#define _q250(this) _marc(this).g_250
-#define _q500(this) _marc(this).g_500
-#define _q1000(this) _marc(this).g_1000
+#define _rmdi(this) this->rmdi_result
+#define _corrH(this) _rmdi(this).corrH
+#define _q125(this) _rmdi(this).g_125
+#define _q250(this) _rmdi(this).g_250
+#define _q500(this) _rmdi(this).g_500
+#define _q1000(this) _rmdi(this).g_1000
 #define _TR(this) this->target_bitrate
 #define _TR_t1(this) this->target_bitrate_t1
-#define _SR(this) (_marc(this).sender_bitrate)
-#define _RR(this) (_marc(this).receiver_bitrate)
-#define _FL(this) (_marc(this).lost_rate)
-#define _UF(this) (_marc(this).utilized_rate)
-#define _GR(this) (_marc(this).goodput_bitrate)
-#define _GP(this) (_marc(this).goodput_bitrate)
+#define _SR(this) (_rmdi(this).sender_bitrate)
+#define _UF(this) (_rmdi(this).utilized_rate)
+#define _GR(this) (_rmdi(this).goodput_bitrate)
+#define _GP(this) (_rmdi(this).goodput_bitrate)
 #define _GP_t1(this) (_priv(this)->goodput_bitrate_t1)
 #define _min_br(this) MIN(_SR(this), _TR(this))
 #define _max_br(this) MAX(_SR(this), _TR(this))
@@ -361,7 +359,7 @@ SubflowRateController *make_subratectrler(MPRTPSPath *path)
   result->id                  = mprtps_path_get_id(result->path);
   result->monitoring_interval = 3;
   result->made                = _now(result);
-  result->fb_processor        = make_marcfb_processor(path);
+  result->fb_processor        = make_rmdi_processor(path);
   _switch_stage_to(result, STAGE_KEEP, FALSE);
   _transit_state_to(result, SUBFLOW_STATE_STABLE);
   return result;
@@ -388,9 +386,9 @@ static void _update_congestion_indicators(SubflowRateController *this)
   _priv(this)->trend = 0.;
 
   if(mprtps_path_is_non_lossy(this->path)){
-      if(0.1 < _marc(this).lost_rate){
+      if(0.1 < _rmdi(this).lost_rate){
         _priv(this)->congestion |= TRUE;
-      }else if(0. < _marc(this).lost_rate){
+      }else if(0. < _rmdi(this).lost_rate){
         _priv(this)->distortion |= TRUE;
       }
   }
@@ -401,7 +399,7 @@ static void _update_tr_corr(SubflowRateController *this)
 {
   gdouble tr_corr;
 
-  tr_corr =  (gdouble)_marc(this).sender_bitrate / (gdouble)this->target_bitrate;
+  tr_corr =  (gdouble)_rmdi(this).sender_bitrate / (gdouble)this->target_bitrate;
 
   _priv(this)->tr_correlated = .9 < tr_corr && tr_corr < 1.1;
 
@@ -452,8 +450,8 @@ void subratectrler_report_update(
   }
 
 
-  marcfb_processor_do(this->fb_processor, summary, &this->marc_result);
-
+  rmdi_processor_do(this->fb_processor, summary, &this->rmdi_result);
+  goto done;
   _update_tr_corr(this);
   _update_congestion_indicators(this);
 
@@ -531,7 +529,7 @@ _keep_stage(
   gdouble  trend;
 
   congestion  = _priv(this)->congestion;
-  distortion  = _priv(this)->distortion || _qtrend_keep_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _marc(this).corrH;
+  distortion  = _priv(this)->distortion || _qtrend_keep_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _rmdi(this).corrH;
   target_rate = this->target_bitrate;
   trend       = CONSTRAIN(0.05, 0.1, MAX(_q250(this), _q500(this)));
 
@@ -586,7 +584,7 @@ _probe_stage(
   gdouble  trend;
 
   congestion     = _priv(this)->congestion || _qtrend_cng_th(this) < MAX(_q125(this), _q250(this));
-  distortion     = _priv(this)->distortion || _qtrend_probe_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _marc(this).corrH;;
+  distortion     = _priv(this)->distortion || _qtrend_probe_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _rmdi(this).corrH;;
   target_rate    = this->target_bitrate;
   trend          = CONSTRAIN(0.05, 0.1, MAX(_q125(this), _q250(this)));
   probe_interval = _get_probe_interval(this);
@@ -649,7 +647,7 @@ _increase_stage(
   gboolean congestion;
 
   congestion = _priv(this)->congestion || _qtrend_cng_th(this) < MAX(_q125(this), _q250(this));
-  distortion = _priv(this)->distortion || _qtrend_probe_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _marc(this).corrH;
+  distortion = _priv(this)->distortion || _qtrend_probe_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _rmdi(this).corrH;
   target_rate = this->target_bitrate;
 
   if(congestion){
@@ -936,7 +934,7 @@ void _readable_logging(gpointer data)
                _UF(this),
                _RR(this),
                _GP(this),
-               _marc(this).corrH,
+               _rmdi(this).corrH,
 
                _FL(this),
                GST_TIME_AS_SECONDS(_now(this) - this->last_increase),
@@ -1020,10 +1018,8 @@ void _log_rates(gpointer data)
   gchar filename[255];
   sprintf(filename, "snd_%d_ratestat.log", this->id);
 
-  mprtp_logger(filename, "%d,%d,%d,%f,%f\n",
-               _marc(this).goodput_bitrate,
-               _marc(this).receiver_bitrate,
-               _marc(this).sender_bitrate,
-               _marc(this).lost_rate,
-               _marc(this).utilized_rate);
+  mprtp_logger(filename, "%d,%d,%f\n",
+               _rmdi(this).goodput_bitrate,
+               _rmdi(this).sender_bitrate,
+               _rmdi(this).utilized_rate);
 }

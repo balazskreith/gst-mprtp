@@ -30,7 +30,7 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          fecenc.c                   \
                          rtpfecbuffer.c             \
                          packetstracker.c           \
-                         marcfbproc.c               \
+                         rmdiproc.c                 \
                          signalreport.c
                     
                     
@@ -56,7 +56,7 @@ noinst_HEADERS = mprtpspath.h           \
                  fecenc.h               \
                  rtpfecbuffer.h         \
                  packetstracker.h       \
-                 marcfbproc.h           \
+                 rmdiproc.c             \
                  signalreport.h           
                           
 

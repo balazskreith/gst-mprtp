@@ -165,6 +165,7 @@ void report_processor_process_mprtcp(ReportProcessor * this, GstBuffer* buffer, 
   if(0 && ssrc != this->ssrc){
       g_warning("Wrong SSRC to process");
   }
+  result->created = _now(this);
   result->ssrc = ssrc;
   result->updated = _now(this);
   block = gst_mprtcp_get_first_block(report);
@@ -437,7 +438,7 @@ void _logging(ReportProcessor *this, GstMPRTCPReportSummary* summary)
                "Subflow id: %hu\n"
                "SSRC: %u\n"
                ,
-               summary->created,
+               GST_TIME_AS_MSECONDS(summary->created),
                summary->subflow_id,
                summary->ssrc
    );

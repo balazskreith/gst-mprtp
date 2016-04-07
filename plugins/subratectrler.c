@@ -123,10 +123,10 @@ void subratectrler_change(SubflowRateController *this, SubRateControllerType typ
 {
   THIS_WRITELOCK(this);
   if(this->type ^ type){
-    DISABLE_LINE _disable(this);
+    _disable(this);
   }
   this->type = type;
-  DISABLE_LINE _enable(this);
+  _enable(this);
   THIS_WRITEUNLOCK(this);
   return;
 }
@@ -162,6 +162,7 @@ void _enable(SubflowRateController *this)
   switch(this->type){
     case SUBRATECTRLER_FBRA_MARC:
       this->controller = make_fbrasubctrler(this->path);
+      fbrasubctrler_enable(this->controller);
       break;
     default:
     case SUBRATECTRLER_NO_CTRL:

@@ -269,6 +269,24 @@ gint32 mprtps_path_get_target_bitrate(MPRTPSPath * this)
   return result;
 }
 
+
+void mprtps_path_set_state(MPRTPSPath * this, MPRTPSPathState new_state)
+{
+  g_return_if_fail (this);
+  THIS_WRITELOCK (this);
+  this->actual_state = new_state;
+  THIS_WRITEUNLOCK (this);
+}
+
+MPRTPSPathState mprtps_path_get_state(MPRTPSPath * this)
+{
+  MPRTPSPathState result;
+  THIS_READLOCK (this);
+  result = this->actual_state;
+  THIS_READUNLOCK (this);
+  return result;
+}
+
 void mprtps_path_set_monitored_bitrate(MPRTPSPath * this, gint32 monitored_bitrate)
 {
   g_return_if_fail (this);
@@ -385,16 +403,6 @@ PacketsSndTracker* mprtps_path_unref_packetstracker(MPRTPSPath *this)
 done:
   THIS_WRITEUNLOCK(this);
   return result;
-}
-
-void mprtps_path_set_packets_tracker(MPRTPSPath *this, PacketsSndTracker *tracker)
-{
-  THIS_WRITELOCK (this);
-  if(this->packetstracker){
-    g_object_unref(this->packetstracker);
-  }
-  this->packetstracker = g_object_ref(tracker);
-  THIS_WRITEUNLOCK (this);
 }
 
 

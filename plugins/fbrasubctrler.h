@@ -31,12 +31,6 @@ typedef void (*SubRateCtrlerFnc)(FBRASubController*);
 typedef void (*SubRateAction)(FBRASubController*);
 typedef void (*SubTargetRateCtrler)(FBRASubController*, gint32);
 
-typedef enum{
-  SUBFLOW_STATE_OVERUSED       = -1,
-  SUBFLOW_STATE_STABLE         =  0,
-  SUBFLOW_STATE_UNDERUSED      =  1,
-}SubflowState;
-
 
 struct _FBRASubController
 {
@@ -62,8 +56,6 @@ struct _FBRASubController
   GstClockTime              last_settled;
   GstClockTime              last_increase;
 
-  SubflowState              state;
-  SubflowState              state_t1;
   gboolean                  enabled;
 
   //Need for monitoring

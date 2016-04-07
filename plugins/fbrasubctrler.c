@@ -135,9 +135,9 @@ struct _Private{
   gboolean            tr_correlated;
 
   gboolean            fcongestion;
-  gboolean            bcongstion;
-  gboolean            distortion;
-  gdouble             trend;
+  gboolean            bcongestion;
+  gboolean            fdistortion;
+  gboolean            bdistortion;
 
   //Possible parameters
   gint32              min_monitoring_interval;
@@ -159,29 +159,34 @@ struct _Private{
   gdouble             reduce_target_factor;
 };
 
-//Todo: Fix it
-#define _RR(this) 0
-#define _FL(this) 0
-
 #define _priv(this) ((Private*)this->priv)
-#define _state(this) this->state
-#define _state_t1(this) this->state_t1
-#define _stage(this) _priv(this)->stage
-#define _stage_t1(this) _priv(this)->stage_t1
-#define _event(this) _priv(this)->event
-#define _set_event(this, e) _event(this) = e
-#define _set_pending_event(this, e) this->pending_event = e
 #define _rmdi(this) this->rmdi_result
 #define _corrH(this) _rmdi(this).corrH
 #define _q125(this) _rmdi(this).g_125
 #define _q250(this) _rmdi(this).g_250
 #define _q500(this) _rmdi(this).g_500
 #define _q1000(this) _rmdi(this).g_1000
+#define _fcongestion(this) _priv(this)->fcongestion
+#define _bcongestion(this) _priv(this)->bcongestion
+#define _fdistortion(this) _priv(this)->fdistortion
+#define _bdistortion(this) _priv(this)->bdistortion
+#define _tr_is_corred(this) _priv(this)->tr_correlated
+#define _btlp(this) this->bottleneck_point
+#define _mon_int(this) this->monitoring_interval
+#define _mon_br(this) this->monitored_bitrate
+#define _UF(this) _rmdi(this).utilized_fraction
+
+#define _state(this) mprtps_path_get_state(this->path)
+#define _state_t1(this) this->state_t1
+#define _stage(this) _priv(this)->stage
+#define _stage_t1(this) _priv(this)->stage_t1
+#define _event(this) _priv(this)->event
+#define _set_event(this, e) _event(this) = e
+#define _set_pending_event(this, e) this->pending_event = e
+
 #define _TR(this) this->target_bitrate
 #define _TR_t1(this) this->target_bitrate_t1
 #define _SR(this) (_rmdi(this).sender_bitrate)
-#define _UF(this) (_rmdi(this).utilized_rate)
-#define _GR(this) (_rmdi(this).goodput_bitrate)
 #define _GP(this) (_rmdi(this).goodput_bitrate)
 #define _GP_t1(this) (_priv(this)->goodput_bitrate_t1)
 #define _min_br(this) MIN(_SR(this), _TR(this))
@@ -225,15 +230,15 @@ _reduce_stage(
     FBRASubController *this);
 
 static void
-_increase_stage(
-    FBRASubController *this);
-
-static void
 _keep_stage(
     FBRASubController *this);
 
 static void
 _probe_stage(
+    FBRASubController *this);
+
+static void
+_increase_stage(
     FBRASubController *this);
 
 static void
@@ -280,7 +285,7 @@ static void
 _change_target_bitrate(FBRASubController *this, gint32 new_target);
 
 static void
-_readable_logging(
+_logging(
     gpointer data);
 
 static void
@@ -348,7 +353,8 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->max_target_bitrate               = TARGET_BITRATE_MAX;
   _priv(this)->reduce_target_factor             = REDUCE_TARGET_FACTOR;
 
-  mprtp_logger_add_logging_fnc(_readable_logging, this, 10);
+  //Todo: fix this
+  mprtp_logger_add_logging_fnc(_logging, this, 10);
   mprtp_logger_add_logging_fnc(_log_rates, this, 1);
 
 }
@@ -363,8 +369,10 @@ FBRASubController *make_fbrasubctrler(MPRTPSPath *path)
   result->monitoring_interval = 3;
   result->made                = _now(result);
   result->fb_processor        = make_rmdi_processor(path);
+
   _switch_stage_to(result, STAGE_KEEP, FALSE);
-  _transit_state_to(result, SUBFLOW_STATE_STABLE);
+  mprtps_path_set_state(result->path, MPRTPS_PATH_STATE_STABLE);
+
   return result;
 }
 
@@ -378,17 +386,14 @@ void fbrasubctrler_enable(FBRASubController *this)
 void fbrasubctrler_disable(FBRASubController *this)
 {
   _switch_stage_to(this, STAGE_KEEP, FALSE);
-  _transit_state_to(this, SUBFLOW_STATE_STABLE);
+  mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_STABLE);
   this->enabled = FALSE;
 }
 
-static void _update_congestion_indicators(FBRASubController *this)
+static void _reset_congestion_indicators(FBRASubController *this)
 {
-  //Todo: we need forward_congestion and backward congestion indicator
   _priv(this)->fcongestion = FALSE;
-  _priv(this)->distortion  = FALSE;
-  _priv(this)->trend       = 0.;
-
+  _priv(this)->fdistortion  = FALSE;
 
 }
 
@@ -441,16 +446,18 @@ void fbrasubctrler_report_update(
                          FBRASubController *this,
                          GstMPRTCPReportSummary *summary)
 {
-
   if(!this->enabled){
     goto done;
   }
+  if(summary->RR.processed && summary->RR.RTT){
+    _priv(this)->rtt = summary->RR.RTT;
+  }
 
-
-  //rmdi_processor_do(this->fb_processor, summary, &this->rmdi_result);
+  rmdi_processor_do(this->fb_processor, summary, &this->rmdi_result);
+  //Fixme
   goto done;
   _update_tr_corr(this);
-  _update_congestion_indicators(this);
+  _reset_congestion_indicators(this);
 
   if(0 < this->disable_controlling && this->disable_controlling < _now(this)){
       this->disable_controlling = 0;
@@ -471,49 +478,80 @@ void fbrasubctrler_report_update(
 
   _priv(this)->stage_t1 = _priv(this)->stage;
 
-  _readable_logging(this);
   ++this->measurements_num;
 done:
   return;
+}
+
+static void
+_reduce_stage_helper(
+    FBRASubController *this)
+{
+  gboolean congestion = FALSE;
+  gboolean distortion = FALSE;
+
+  if(1.2 < _corrH(this)){
+    distortion = TRUE;
+  }else if(_qtrend_keep_th(this) < _q500(this)){
+    distortion = TRUE;
+  }
+
+  if(_qtrend_cng_th(this) < _q1000(this)){
+    congestion = TRUE;
+  }else if(_UF(this) < .9){
+    congestion = TRUE;
+  }else if(1.5 < _corrH(this) && _priv(this)->stage_changed < _now(this) - 5 * GST_SECOND){
+    congestion = TRUE;
+  }
+
+  _fcongestion(this) = congestion;
+  _fdistortion(this) = distortion;
 }
 
 void
 _reduce_stage(
     FBRASubController *this)
 {
-  gint32   target_rate;
-  gboolean congestion;
-  gboolean distortion;
+  gint32   target_rate  = this->target_bitrate;;
 
-  distortion  = 1.5 < _corrH(this) || _qtrend_keep_th(this) < _q500(this);
-  congestion  = _qtrend_cng_th(this) < _q1000(this) || _UF(this) < .9;
-  congestion |= 1.5 < _corrH(this) && _priv(this)->stage_changed < _now(this) - 5 * GST_SECOND;
-  target_rate = this->target_bitrate;
+  _reduce_stage_helper(this);
 
-  if(!congestion){
-    this->bottleneck_point = (_TR(this) + _RR(this)) / 2;
-    if(!distortion){
+  if(!_fcongestion(this)){
+    this->bottleneck_point = (_TR(this) + _GP(this)) / 2;
+    if(!_fdistortion(this) && !_bcongestion(this)){
       _switch_stage_to(this, STAGE_KEEP, FALSE);
     }
     goto done;
   }
 
   if(_TR(this) < _SR(this) * .9){
-    target_rate = MIN(_RR(this) * .85, target_rate);
+    target_rate = MIN(_GP(this) * .85, target_rate);
   }else if(.2 < _q1000(this)){
-    target_rate = MIN(_RR(this) * .85, _TR(this) * _rdc_target_fac(this));
+    target_rate = MIN(_GP(this) * .85, _TR(this) * _rdc_target_fac(this));
   }else{
-    target_rate = MIN(_RR(this) * .85, _TR(this) * _UF(this));
+    target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
   }
   _change_target_bitrate(this, target_rate);
   _reset_monitoring(this);
   _disable_controlling(this);
 
 done:
-  _priv(this)->fcongestion = congestion;
-  _priv(this)->distortion = distortion;
-  _priv(this)->trend      = _q1000(this);
   return;
+}
+
+
+static void
+_keep_stage_helper(
+    FBRASubController *this)
+{
+  gboolean congestion = FALSE;
+  gboolean distortion = FALSE;
+
+  congestion  = _priv(this)->fcongestion;
+  distortion  = _priv(this)->fdistortion || _qtrend_keep_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _rmdi(this).corrH;
+
+  _fcongestion(this) = congestion;
+  _fdistortion(this) = distortion;
 }
 
 void
@@ -521,28 +559,26 @@ _keep_stage(
     FBRASubController *this)
 {
   gint32   target_rate;
-  gboolean congestion;
-  gboolean distortion;
   gdouble  trend;
 
-  congestion  = _priv(this)->fcongestion;
-  distortion  = _priv(this)->distortion || _qtrend_keep_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _rmdi(this).corrH;
+  _keep_stage_helper(this);
+
   target_rate = this->target_bitrate;
   trend       = CONSTRAIN(0.05, 0.1, MAX(_q250(this), _q500(this)));
 
-  if(congestion){
+  if(_fcongestion(this)){
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-//    _disable_controlling(this);
+    _disable_controlling(this);
     if(_qtrend_cng_th(this) < MIN(_q500(this),_q1000(this))){
-      target_rate = MIN(_RR(this) * .85, _TR(this) * _rdc_target_fac(this));
+      target_rate = MIN(_GP(this) * .85, _TR(this) * _rdc_target_fac(this));
     }else{
-      target_rate = MIN(_RR(this) * .85, _TR(this) * _UF(this));
+      target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
     }
     goto done;
   }
 
-  if(distortion){
+  if(_fdistortion(this)){
     if(this->last_settled < _now(this) - _max_dist_keep(this) * GST_SECOND){
       target_rate *= 1.-trend;
     }
@@ -550,7 +586,7 @@ _keep_stage(
     goto done;
   }
 
-  if(_state(this) != SUBFLOW_STATE_STABLE){
+  if(_state(this) != MPRTPS_PATH_STATE_OVERUSED){
     _set_event(this, EVENT_SETTLED);
     goto done;
   }
@@ -562,46 +598,50 @@ _keep_stage(
   _switch_stage_to(this, STAGE_PROBE, FALSE);
 done:
   _change_target_bitrate(this, target_rate);
-//exit:
-  _priv(this)->fcongestion = congestion;
-  _priv(this)->distortion = distortion;
-  _priv(this)->trend      = trend;
   return;
 }
 
+static void
+_probe_stage_helper(
+    FBRASubController *this)
+{
+  gboolean congestion = FALSE;
+  gboolean distortion = FALSE;
+
+  congestion     = _priv(this)->fcongestion || _qtrend_cng_th(this) < MAX(_q125(this), _q250(this));
+  distortion     = _priv(this)->fdistortion || _qtrend_probe_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _rmdi(this).corrH;;
+
+  _fcongestion(this) = congestion;
+  _fdistortion(this) = distortion;
+}
 
 void
 _probe_stage(
     FBRASubController *this)
 {
-  gint32   target_rate;
+  gint32   target_rate = this->target_bitrate;
   gint32   probe_interval;
-  gboolean distortion;
-  gboolean congestion;
   gdouble  trend;
 
-  congestion     = _priv(this)->fcongestion || _qtrend_cng_th(this) < MAX(_q125(this), _q250(this));
-  distortion     = _priv(this)->distortion || _qtrend_probe_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _rmdi(this).corrH;;
-  target_rate    = this->target_bitrate;
+  _probe_stage_helper(this);
+
   trend          = CONSTRAIN(0.05, 0.1, MAX(_q125(this), _q250(this)));
   probe_interval = _get_probe_interval(this);
 
-
-  if(congestion){
+  if(_fcongestion(this)){
     _disable_monitoring(this);
-//    _disable_controlling(this);
+    _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     if(_qtrend_cng_th(this) < MIN(_q500(this),_q1000(this))){
-      target_rate = MIN(_RR(this) * .85, _TR(this) * _rdc_target_fac(this));
+      target_rate = MIN(_GP(this) * .85, _TR(this) * _rdc_target_fac(this));
     }else{
-      target_rate = MIN(_RR(this) * .85, _TR(this) * _UF(this));
+      target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
     }
     goto done;
   }
 
-  if(distortion){
-//    _disable_controlling(this);
+  if(_fdistortion(this)){
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_KEEP, FALSE);
@@ -616,54 +656,60 @@ _probe_stage(
   }
 
   if(_priv(this)->tr_correlated){
-    target_rate = MIN(1.5 * _RR(this), target_rate + _get_increasement(this));
+    target_rate = MIN(1.5 * _GP(this), target_rate + _get_increasement(this));
   }else if(target_rate < _SR(this) * .9){
-    target_rate = MIN(1.5 * _RR(this), target_rate + _get_increasement(this));
+    target_rate = MIN(1.5 * _GP(this), target_rate + _get_increasement(this));
     goto exit;
   }
 
-  _disable_monitoring(this);
   _switch_stage_to(this, STAGE_INCREASE, FALSE);
   _set_event(this, EVENT_READY);
 done:
   _change_target_bitrate(this, target_rate);
 exit:
-  _priv(this)->fcongestion = congestion;
-  _priv(this)->distortion = distortion;
-  _priv(this)->trend      = trend;
   return;
 }
 
+static void
+_increase_stage_helper(
+    FBRASubController *this)
+{
+  gboolean congestion = FALSE;
+  gboolean distortion = FALSE;
+
+  congestion = _priv(this)->fcongestion || _qtrend_cng_th(this) < MAX(_q125(this), _q250(this));
+  distortion = _priv(this)->fdistortion || _qtrend_probe_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _rmdi(this).corrH;
+
+  _fcongestion(this) = congestion;
+  _fdistortion(this) = distortion;
+}
 
 void
 _increase_stage(
     FBRASubController *this)
 {
-  gint32   target_rate;
-  gboolean distortion;
-  gboolean congestion;
+  gint32   target_rate = this->target_bitrate;
 
-  congestion = _priv(this)->fcongestion || _qtrend_cng_th(this) < MAX(_q125(this), _q250(this));
-  distortion = _priv(this)->distortion || _qtrend_probe_th(this) < MAX(_q125(this), _q250(this)) || 1.5 < _rmdi(this).corrH;
-  target_rate = this->target_bitrate;
+  _increase_stage_helper(this);
 
-  if(congestion){
-//    _disable_controlling(this);
+  if(_fcongestion(this)){
+    _disable_monitoring(this);
+    _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     if(_qtrend_cng_th(this) < MIN(_q500(this),_q1000(this))){
-      target_rate = MIN(_RR(this) * .85, _TR(this) * _rdc_target_fac(this));
+      target_rate = MIN(_GP(this) * .85, _TR(this) * _rdc_target_fac(this));
     }else{
-      target_rate = MIN(_RR(this) * .85, _TR(this) * _UF(this));
+      target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
     }
     goto done;
   }
 
-  if(distortion){
-//    _disable_controlling(this);
+  if(_fdistortion(this)){
+    _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = MAX(_RR(this) * .95, _TR_t1(this));
+    target_rate = MAX(_GP(this) * .95, _TR_t1(this));
     goto done;
   }
 
@@ -677,8 +723,6 @@ _increase_stage(
 done:
   _change_target_bitrate(this, target_rate);
 exit:
-  _priv(this)->fcongestion = congestion;
-  _priv(this)->distortion = distortion;
   return;
 }
 
@@ -688,49 +732,48 @@ _fire(
     Event event)
 {
   switch(_state(this)){
-    case SUBFLOW_STATE_OVERUSED:
+    case MPRTPS_PATH_STATE_OVERUSED:
       switch(event){
         case EVENT_CONGESTION:
         break;
         case EVENT_SETTLED:
           this->last_settled = _now(this);
           mprtps_path_set_non_congested(this->path);
-          _transit_state_to(this, SUBFLOW_STATE_STABLE);
+          mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_STABLE);
         break;
         case EVENT_FI:
         default:
         break;
       }
     break;
-    case SUBFLOW_STATE_STABLE:
+    case MPRTPS_PATH_STATE_STABLE:
       switch(event){
         case EVENT_CONGESTION:
           mprtps_path_set_congested(this->path);
-          _transit_state_to(this, SUBFLOW_STATE_OVERUSED);
+          mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_OVERUSED);
         break;
         case EVENT_DISTORTION:
-          _transit_state_to(this, SUBFLOW_STATE_OVERUSED);
+          mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_OVERUSED);
           break;
         case EVENT_READY:
-          _transit_state_to(this, SUBFLOW_STATE_UNDERUSED);
+          mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_UNDERUSED);
           break;
         case EVENT_FI:
         default:
         break;
       }
     break;
-    case SUBFLOW_STATE_UNDERUSED:
+    case MPRTPS_PATH_STATE_UNDERUSED:
       switch(event){
         case EVENT_CONGESTION:
           mprtps_path_set_congested(this->path);
-          _transit_state_to(this, SUBFLOW_STATE_OVERUSED);
+          mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_OVERUSED);
         break;
         case EVENT_DISTORTION:
-          _transit_state_to(this, SUBFLOW_STATE_OVERUSED);
+          mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_OVERUSED);
         break;
         case EVENT_READY:
-
-          _transit_state_to(this, SUBFLOW_STATE_STABLE);
+          mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_STABLE);
         break;
         case EVENT_FI:
         default:
@@ -774,6 +817,9 @@ void _switch_stage_to(
 
 void _disable_controlling(FBRASubController *this)
 {
+  if(_priv(this)->rtt){
+    this->disable_controlling = _now(this) +  CONSTRAIN(200 * GST_MSECOND, 1.5 * GST_SECOND, _priv(this)->rtt * 2.);
+  }
   this->disable_controlling = _now(this) +  CONSTRAIN(500 * GST_MSECOND, 1.5 * GST_SECOND, _priv(this)->rtt * 2.);
 }
 
@@ -783,25 +829,6 @@ void _reset_monitoring(FBRASubController *this)
   this->monitoring_started = 0;
   this->monitored_bitrate = 0;
 }
-//
-//void _setup_monitoring(SubflowRateController *this)
-//{
-//  guint interval;
-//  gdouble plus_rate = 0, scl = 0;
-//  if(this->bottleneck_point * (1.-_btl_eps(this)) < _TR(this) && _TR(this) < this->bottleneck_point * (1.+_btl_eps(this))){
-//    plus_rate = this->target_bitrate / (gdouble)_btl_mon_int(this);
-//    goto done;
-//  }
-//  scl =  (gdouble) _priv(this)->min_target_bitrate;
-//  scl /= (gdouble) _TR(this);
-//  scl *= scl;
-//  scl = CONSTRAIN(1./(gdouble)_mon_max_int(this), 1./(gdouble)_mon_min_int(this), scl);
-//  plus_rate = _TR(this) * scl;
-//done:
-//  plus_rate = CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), plus_rate);
-//  interval = _calculate_monitoring_interval(this, plus_rate);
-//  _set_monitoring_interval(this, interval);
-//}
 
 void _setup_monitoring(FBRASubController *this)
 {
@@ -888,61 +915,57 @@ void _change_target_bitrate(FBRASubController *this, gint32 new_target)
   }
 }
 
-void _readable_logging(gpointer data)
+void _logging(gpointer data)
 {
   FBRASubController *this = data;
   gchar filename[255];
   sprintf(filename, "fbractrler_%d.log", this->id);
   mprtp_logger(filename,
                "############ S%d | State: %-2d | Disable time %lu | Ctrled: %d #################\n"
-               "TR:         %-10d| botlnck: %-10d|\n"
-               "abs_max:    %-10d| abs_min: %-10d| max_tbr: %-10d| min_tbr: %-10d|\n"
-               "stage:      %-10d| event:   %-10d| pevent:  %-10d|\n"
-               "mon_int:    %-10d| tr_corr: %-10d|\n"
-               "dist_level: %-10d| cong_lvl:%-10d| trend:   %-10f| GR: %-10.3f\n"
-               "UF:         %-10.3f| RR:      %-10d| GP:      %-10d| corrH:   %-10.3f\n"
-               "frac_lost:  %-10.3f| last_i:%-10lu| last_d: %-10lu|\n"
-               "############################ Seconds since setup: %lu ##########################################\n",
+               "# Stage:                       %-10d| Sending Rate:               %-10d#\n"
+               "# Forward distortion:          %-10d| Backward distortion:        %-10d#\n"
+               "# Forward congestion:          %-10d| Backward congestion:        %-10d#\n"
+               "# Actual Target:               %-10d| tr_is_corred:               %-10d#\n"
+               "# Minimum Bitrate:             %-10d| R(100):                     %-10f#\n"
+               "# Maximum Bitrate:             %-10d| R(200):                     %-10f#\n"
+               "# Bottleneck point:            %-10d| R(400):                     %-10f#\n"
+               "# Monitoring Interval:         %-10d| R(800):                     %-10f#\n"
+               "# Monitoring Bitrate:          %-10d| UF:                         %-10f#\n"
+                "############################ Seconds since setup: %lu #############################\n"
+               ,
+               _stage(this),
+               _SR(this),
 
-               this->id, _state(this),
-               this->disable_controlling > 0 ? GST_TIME_AS_MSECONDS(this->disable_controlling - _now(this)) : 0,
-               _priv(this)->controlled,
+               _fdistortion(this),
+               _bdistortion(this),
 
-               this->target_bitrate,
-               this->bottleneck_point,
+               _fcongestion(this),
+               _bcongestion(this),
+
+               _TR(this),
+               _tr_is_corred(this),
+
+               _priv(this)->min_target_bitrate,
+               _q125(this),
 
                _priv(this)->max_target_bitrate,
-               _priv(this)->min_target_bitrate,
-               this->max_target_point,
-               this->min_target_point,
+               _q250(this),
 
-               _priv(this)->stage,
-               _priv(this)->event,
-               this->pending_event,
+               _btlp(this),
+               _q500(this),
 
-               this->monitoring_interval,
-               _priv(this)->tr_correlated,
+               _mon_int(this),
+               _q1000(this),
 
-               _priv(this)->distortion,
-               _priv(this)->fcongestion,
-               _priv(this)->trend,
-               _GR(this),
+               _mon_br(this),
+               _UF(this)
 
-               _UF(this),
-               _RR(this),
-               _GP(this),
-               _rmdi(this).corrH,
-
-               _FL(this),
-               GST_TIME_AS_SECONDS(_now(this) - this->last_increase),
-               GST_TIME_AS_SECONDS(_now(this) - this->last_decrease),
-
-              GST_TIME_AS_SECONDS(_now(this) - this->made)
-
-  );
+               );
 
   _params_out(this);
+  _log_rates(data);
 }
+
 
 void _params_out(FBRASubController *this)
 {
@@ -1018,5 +1041,5 @@ void _log_rates(gpointer data)
   mprtp_logger(filename, "%d,%d,%f\n",
                _rmdi(this).goodput_bitrate,
                _rmdi(this).sender_bitrate,
-               _rmdi(this).utilized_rate);
+               _rmdi(this).utilized_fraction);
 }

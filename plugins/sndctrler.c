@@ -91,7 +91,7 @@ struct _Subflow
   SubflowRateController*     rate_controller;
 
   GstClockTime               joined_time;
-  GstClockTime               last_seen_report;
+  GstClockTime               last_SR_report_sent;
   GstClockTime               report_timeout;
   guint8                     lost_history;
   gboolean                   lost;
@@ -515,11 +515,11 @@ _check_report_timeout (Subflow * subflow, gpointer data)
   path_is_active = mprtps_path_is_active(subflow->path);
 
   if(path_is_active) {
-    GstClockTime touched = MAX(subflow->last_seen_report, subflow->joined_time);
+    GstClockTime touched = MAX(subflow->last_SR_report_sent, subflow->joined_time);
     if(touched < _now(this) - subflow->report_timeout){
       mprtps_path_set_passive(subflow->path);
     }
-  }else if(_now(this) - subflow->report_timeout < subflow->last_seen_report){
+  }else if(_now(this) - subflow->report_timeout < subflow->last_SR_report_sent){
       mprtps_path_set_active(subflow->path);
   }
 }
@@ -532,7 +532,7 @@ _time_update (Subflow * subflow, gpointer data)
   if(!subflow->controlling_mode){
     return;
   }
-  //subratectrler_time_update(subflow->rate_controller);
+  subratectrler_time_update(subflow->rate_controller);
 
 }
 
@@ -563,9 +563,9 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
   }
 
   _process_regular_reports(this, subflow, summary);
-  //subratectrler_report_update(subflow->rate_controller, summary);
+  subratectrler_report_update(subflow->rate_controller, summary);
 
-  subflow->last_seen_report = _now(this);
+  subflow->last_SR_report_sent = _now(this);
 
 done:
   THIS_WRITEUNLOCK (this);

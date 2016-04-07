@@ -97,6 +97,8 @@ rmdi_processor_finalize (GObject * object)
 
   mprtp_free(this->priv);
   g_object_unref(this->sysclock);
+  this->packetstracker = mprtps_path_unref_packetstracker(this->path);
+  g_object_unref(this->path);
 }
 
 void
@@ -114,6 +116,12 @@ static void _delay80th_pipe(gpointer data, PercentileTrackerPipeData *stats)
   _priv(this)->min_delay = stats->min;
 }
 
+static void _max_bytes_in_flight(gpointer data, gint64 value)
+{
+  RMDIProcessor *this = data;
+  this->result.max_bytes_in_flight = value;
+}
+
 RMDIProcessor *make_rmdi_processor(MPRTPSPath *path)
 {
   RMDIProcessor *this;
@@ -125,10 +133,11 @@ RMDIProcessor *make_rmdi_processor(MPRTPSPath *path)
   this->path                   = g_object_ref(path);
   this->made                   = _now(this);
   this->delays                 = make_percentiletracker(600, 80);
-  this->packetstracker         = make_packetssndtracker();
+  this->packetstracker         = mprtps_path_ref_packetstracker(path);
+  this->bytes_in_flight        = make_numstracker(50, 5 * GST_SECOND);
 
-
-  mprtps_path_set_packets_tracker(path, this->packetstracker);
+  numstracker_add_plugin(this->bytes_in_flight,
+                         (NumsTrackerPlugin*)make_numstracker_minmax_plugin(_max_bytes_in_flight, this, NULL, NULL));
 
   percentiletracker_set_treshold(this->delays, 60 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->delays, _delay80th_pipe, this);
@@ -204,69 +213,71 @@ void rmdi_processor_get_acfs_history(RMDIProcessor *this,
   }
 }
 
-static void _process_rmdi(RMDIProcessor *this, GstRTCPAFB_RMDI *rmdi)
+static void _process_discarded_rle(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
 {
-  guint8 records_num;
-  gint16 actual_record_index;
-  GstClockTime delay;
-  guint16 HSSN, disc_packets_num;
-  guint32 owd_sample;
-  GstRTCPAFB_RMDIRecord *record;
+  PacketsSndTrackerStat trackerstat;
+  packetssndtracker_update_hssn(this->packetstracker, xrsummary->DiscardedRLE.end_seq);
+  packetssndtracker_add_discarded_bitvector(this->packetstracker,
+                                            xrsummary->DiscardedRLE.begin_seq,
+                                            xrsummary->DiscardedRLE.end_seq,
+                                            (GstRTCPXRBitvectorChunk *)xrsummary->DiscardedRLE.chunks);
+  packetssndtracker_get_stats(this->packetstracker, &trackerstat);
+  if(_cmp_seq(this->last_HSSN, xrsummary->DiscardedRLE.end_seq) < 0){
+    this->last_HSSN = xrsummary->DiscardedRLE.end_seq;
+  }
 
-  gst_rtcp_afb_rmdi_getdown(rmdi, NULL, &records_num, NULL);
-  actual_record_index = records_num;
-again:
-  if(--actual_record_index < 0){
+  this->result.goodput_bitrate =
+      packetssndtracker_get_goodput_bytes_from_acked(this->packetstracker, &this->result.utilized_fraction)<<3;
+  this->result.sender_bitrate = trackerstat.sent_bytes_in_1s << 3;
+  numstracker_add(this->bytes_in_flight, trackerstat.bytes_in_flight);
+}
+
+static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
+{
+  if(!xrsummary->OWD.median_delay){
+    this->result.g_125             = 0.;
+    this->result.g_250             = 0.;
+    this->result.g_500             = 0.;
+    this->result.g_1000            = 0.;
     goto done;
   }
-  record = &rmdi->records[actual_record_index];
-  gst_rtcp_afb_rmdi_record_getdown(record, &HSSN, &disc_packets_num, &owd_sample);
-  if(_cmp_seq(HSSN, this->last_HSSN) < 1){
-    goto again;
-  }
 
-  delay = get_epoch_time_from_ntp_in_ns(((guint64) owd_sample)<<16);
-  percentiletracker_add(this->delays, delay);
+  percentiletracker_add(this->delays, xrsummary->OWD.median_delay);
 
-  _priv(this)->cblocks[0].Iu0 = GST_TIME_AS_USECONDS(delay) / 50.;
+  _priv(this)->cblocks[0].Iu0 = GST_TIME_AS_USECONDS(xrsummary->OWD.median_delay) / 50.;
   _execute_corrblocks(_priv(this), _priv(this)->cblocks);
   _execute_corrblocks(_priv(this), _priv(this)->cblocks);
-  _priv(this)->cblocks[0].Id1 = GST_TIME_AS_USECONDS(delay) / 50.;
+  _priv(this)->cblocks[0].Id1 = GST_TIME_AS_USECONDS(xrsummary->OWD.median_delay) / 50.;
+  this->last_delay            = xrsummary->OWD.median_delay;
 
-  this->last_delay            = delay;
-  this->last_disc_packets_num = disc_packets_num;
-  this->last_HSSN             = HSSN;
+  this->result.corrH             = !_priv(this)->delay80th ? 0. : (gdouble)this->last_delay / (gdouble)_priv(this)->delay80th;
+  this->result.g_125             = _priv(this)->cblocks[0].g;
+  this->result.g_250             = _priv(this)->cblocks[1].g;
+  this->result.g_500             = _priv(this)->cblocks[2].g;
+  this->result.g_1000            = _priv(this)->cblocks[3].g;
 
-  _csv_logging(this, delay);
+  _csv_logging(this, xrsummary->OWD.median_delay);
   _readable_logging(this);
-  goto again;
 done:
   return;
 }
 
 void rmdi_processor_do(RMDIProcessor       *this,
-                          GstMPRTCPReportSummary *summary,
-                          RMDIProcessorResult *result)
+                       GstMPRTCPReportSummary *summary,
+                       RMDIProcessorResult *result)
 {
-  PacketsSndTrackerStat trackerstat;
-  if(!summary->AFB.processed || summary->AFB.fci_id != RTCP_AFB_RMDI_ID){
+
+  if(!summary->XR.DiscardedRLE.processed && !summary->XR.OWD.processed){
     goto done;
   }
-  _process_rmdi(this, (GstRTCPAFB_RMDI*) summary->AFB.fci_data);
+  if(summary->XR.DiscardedRLE.processed){
+    _process_discarded_rle(this, &summary->XR);
+  }
+  if(summary->XR.OWD.processed){
+    _process_owd(this, &summary->XR);
+  }
 
-
-  packetssndtracker_update_hssn(this->packetstracker, this->last_HSSN);
-  packetssndtracker_get_stats(this->packetstracker, &trackerstat);
-
-
-  result->sender_bitrate    = trackerstat.sent_bytes_in_1s * 8;
-  result->utilized_rate     = (gdouble)(trackerstat.acked_packets_in_1s - this->last_disc_packets_num) / (gdouble) trackerstat.acked_packets_in_1s;
-  result->goodput_bitrate   = trackerstat.acked_bytes_in_1s * result->utilized_rate;
-  result->corrH             = !_priv(this)->delay80th ? 0. : (gdouble)this->last_delay / (gdouble)_priv(this)->delay80th;
-  result->g_125             = _priv(this)->cblocks[0].g;
-  result->g_250             = _priv(this)->cblocks[1].g;
-  result->g_500             = _priv(this)->cblocks[2].g;
-  result->g_1000            = _priv(this)->cblocks[3].g;
+  memcpy(result, &this->result, sizeof(RMDIProcessorResult));
 
   _readable_result(this, result);
 
@@ -390,13 +401,28 @@ void _readable_result(RMDIProcessor *this, RMDIProcessorResult *result)
 {
   gchar filename[255];
   memset(filename, 0, 255);
-  sprintf(filename, "fbra2helper_%d.log", this->id);
+  sprintf(filename, "rmdiproc_%d.log", this->id);
   mprtp_logger(filename,
-               "############ Network Queue Analyser Results #################\n"
-               "corrH: %f\n"
+               "############ Receiver Measured Delay Impact Processor Result #################\n"
+               "max_bytes_in_flight: %d\n"
+               "sender_bitrate:      %d\n"
+               "goodput_bitrate:     %d\n"
+               "utilized_fraction:   %f\n"
+               "corrH:               %f\n"
+               "g_125:               %f\n"
+               "g_250:               %f\n"
+               "g_500:               %f\n"
+               "g_1000:              %f\n"
                ,
-
-               result->corrH
+               result->max_bytes_in_flight,
+               result->sender_bitrate,
+               result->goodput_bitrate,
+               result->utilized_fraction,
+               result->corrH,
+               result->g_125,
+               result->g_250,
+               result->g_500,
+               result->g_1000
   );
 }
 

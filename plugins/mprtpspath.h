@@ -41,6 +41,13 @@ typedef enum
   MPRTPS_PATH_FLAG_ACTIVE        = 4,
 } MPRTPSPathFlags;
 
+typedef enum
+{
+  MPRTPS_PATH_STATE_OVERUSED     = -1,
+  MPRTPS_PATH_STATE_STABLE       = 0,
+  MPRTPS_PATH_STATE_UNDERUSED     = 1,
+} MPRTPSPathState;
+
 struct _MPRTPSPath
 {
   GObject   object;
@@ -74,6 +81,8 @@ struct _MPRTPSPath
 
   guint32                 total_sent_packets_num;
   guint32                 total_sent_payload_bytes;
+
+  MPRTPSPathState         actual_state;
 
   gboolean                expected_lost;
 
@@ -111,6 +120,9 @@ gboolean mprtps_path_is_non_congested (MPRTPSPath * this);
 void mprtps_path_set_target_bitrate(MPRTPSPath * this, gint32 target_bitrate);
 gint32 mprtps_path_get_target_bitrate(MPRTPSPath * this);
 
+void mprtps_path_set_state(MPRTPSPath * this, MPRTPSPathState new_state);
+MPRTPSPathState mprtps_path_get_state(MPRTPSPath * this);
+
 void mprtps_path_set_monitored_bitrate(MPRTPSPath * this, gint32 monitored_bitrate);
 gint32 mprtps_path_get_monitored_bitrate(MPRTPSPath * this);
 
@@ -128,7 +140,6 @@ gboolean mprtps_path_approve_request(MPRTPSPath *this, GstBuffer *buf);
 
 PacketsSndTracker *mprtps_path_ref_packetstracker(MPRTPSPath *this);
 PacketsSndTracker* mprtps_path_unref_packetstracker(MPRTPSPath *this);
-void mprtps_path_set_packets_tracker(MPRTPSPath *this, PacketsSndTracker *tracker);
 
 
 gboolean mprtps_path_request_keep_alive(MPRTPSPath *this);

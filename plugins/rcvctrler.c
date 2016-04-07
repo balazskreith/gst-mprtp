@@ -88,7 +88,8 @@ struct _Subflow
   guint32                       total_received;
   guint32                       total_discarded_bytes;
   guint16                       HSSN;
-  guint64                       last_seen_report;
+  guint64                       last_SR_report_sent;
+  guint64                       last_SR_report_rcvd;
   GstClockTime                  LRR;
 
   gchar                        *logfile;
@@ -491,7 +492,8 @@ rcvctrler_receive_mprtcp (RcvController *this, GstBuffer * buf)
     this->report_is_flowable = TRUE;
     mprtpr_path_add_delay(subflow->path, get_epoch_time_from_ntp_in_ns(NTP_NOW - summary->SR.ntptime));
     report_producer_set_ssrc(this->report_producer, summary->ssrc);
-    subflow->last_seen_report = summary->SR.ntptime;
+    subflow->last_SR_report_sent = summary->SR.ntptime;
+    subflow->last_SR_report_rcvd = NTP_NOW;
   }
 
 done:
@@ -540,7 +542,8 @@ _orp_main(RcvController * this)
     if(!send_regular && _now(this) < subflow->next_feedback){
       continue;
     }
-    send_fb = ricalcer_rtcp_fb_allowed(subflow->ricalcer);
+
+    send_fb = ricalcer_rtcp_fb_allowed(subflow->ricalcer) && subflow->next_feedback < _now(this);
 
 
     if(!send_regular && !send_fb){
@@ -631,13 +634,13 @@ void _orp_add_rr(RcvController * this, Subflow *subflow)
   subflow->total_lost    += lost;
   subflow->total_received = total_received;
 
-  LSR = (guint32) (subflow->last_seen_report >> 16);
+  LSR = (guint32) (subflow->last_SR_report_sent >> 16);
 
-  if (subflow->last_seen_report == 0) {
+  if (subflow->last_SR_report_sent == 0) {
       DLSR = 0;
   } else {
       guint64 temp;
-      temp = NTP_NOW - subflow->last_seen_report;
+      temp = NTP_NOW - subflow->last_SR_report_rcvd;
       DLSR = (guint32)(temp>>16);
   }
 

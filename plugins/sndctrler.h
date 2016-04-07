@@ -61,6 +61,8 @@ struct _SndController
   guint32                    fec_sum_bitrate;
   guint32                    fec_sum_packetsrate;
 
+  SendingRateDistributor*    sndratedistor;
+
   GstMPRTCPReportSummary     reports_summary;
 };
 
@@ -74,7 +76,7 @@ struct _SndControllerClass{
 //Class functions
 void sndctrler_setup(SndController* this,
                      StreamSplitter* splitter,
-                     PacketsSndQueue *pacer,
+                     SendingRateDistributor *pacer,
                      FECEncoder* fecencoder);
 
 void

@@ -53,6 +53,7 @@ struct _Subflow{
   guint8                 id;
   MPRTPSPath*            path;
 
+  gint32                 target_bitrate_t1;
   gint32                 target_bitrate;
   guint8                 flags;
 };
@@ -149,21 +150,13 @@ static void _refresh_subflows_helper(Subflow *subflow, gpointer data)
 
   this = data;
   flags = mprtps_path_get_flags(subflow->path);
+  subflow->target_bitrate_t1 = subflow->target_bitrate;
   subflow->target_bitrate = mprtps_path_get_target_bitrate(subflow->path);
   this->urgent_rescheduling |= subflow->flags ^ flags;
+  this->urgent_rescheduling |= subflow->target_bitrate < subflow->target_bitrate_t1 * .9;
+  this->urgent_rescheduling |= subflow->target_bitrate_t1 * 1.1 < subflow->target_bitrate;
   subflow->flags = flags;
-}
-
-void sndrate_distor_refresh_subflows(SendingRateDistributor* this)
-{
-  THIS_WRITELOCK(this);
-  if(_now(this) - 100 * GST_MSECOND < this->last_subflow_refresh){
-    goto done;
-  }
-  _iterate_subflows(this, _refresh_subflows_helper, this);
-  this->last_subflow_refresh = _now(this);
-done:
-  THIS_WRITEUNLOCK(this);
+  this->target_media_rate += subflow->target_bitrate;
 }
 
 static void _refresh_splitter_helper(Subflow *subflow, gpointer data)
@@ -173,12 +166,20 @@ static void _refresh_splitter_helper(Subflow *subflow, gpointer data)
   stream_splitter_setup_sending_target(this->splitter, subflow->id, subflow->target_bitrate);
 }
 
-void sndrate_distor_refresh_splitter(SendingRateDistributor* this)
+void sndrate_distor_refresh(SendingRateDistributor* this)
 {
   THIS_WRITELOCK(this);
+
+  if(this->last_subflow_refresh < _now(this) - 100 * GST_MSECOND){
+    this->target_media_rate = 0;
+    _iterate_subflows(this, _refresh_subflows_helper, this);
+    this->last_subflow_refresh = _now(this);
+  }
+
   if(_now(this) < this->next_splitter_refresh && !this->urgent_rescheduling){
     goto done;
   }
+  this->urgent_rescheduling = FALSE;
   //Todo: consider and implement flow redistribution here.
   _iterate_subflows(this, _refresh_splitter_helper, this);
   stream_splitter_commit_changes(this->splitter);

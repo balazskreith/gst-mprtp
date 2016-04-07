@@ -35,6 +35,7 @@ struct _StreamSplitter
   GHashTable*          subflows;
   SchNode*             tree;
   PacketsSndQueue*     sndqueue;
+
   guint                active_subflow_num;
 };
 

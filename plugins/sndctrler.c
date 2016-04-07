@@ -404,11 +404,12 @@ exit:
 void
 sndctrler_setup (SndController   *this,
                  StreamSplitter  *splitter,
-                 PacketsSndQueue *pacer,
+                 SendingRateDistributor *sndratedistor,
                  FECEncoder      *fecencoder)
 {
   THIS_WRITELOCK (this);
   this->fecencoder = fecencoder;
+  this->sndratedistor = sndratedistor;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -450,7 +451,6 @@ sndctrler_report_can_flow (SndController *this)
   THIS_WRITEUNLOCK (this);
 }
 
-
 //---------------------------------- Ticker ----------------------------------
 void
 sndctrler_ticker_run (void *data)
@@ -466,6 +466,7 @@ sndctrler_ticker_run (void *data)
   _subflow_iterator(this, _check_report_timeout, this);
   _subflow_iterator(this, _time_update, this);
   _emit_signal(this);
+  sndrate_distor_refresh(this->sndratedistor);
 //  _system_notifier_main(this);
 
   next_scheduler_time = _now(this) + 100 * GST_MSECOND;

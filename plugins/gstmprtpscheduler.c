@@ -392,8 +392,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->controller = (SndController*) g_object_new(SNDCTRLER_TYPE, NULL);
   this->fec_encoder = make_fecencoder();
   this->sndqueue = make_packetssndqueue();
-  this->sndrates = make_sndrate_distor(this->splitter);
   this->splitter = make_stream_splitter(this->sndqueue);
+  this->sndrates = make_sndrate_distor(this->splitter);
   sndctrler_setup(this->controller, this->splitter, this->sndrates, this->fec_encoder);
   sndctrler_setup_callbacks(this->controller,
                             this, gst_mprtpscheduler_mprtcp_sender,

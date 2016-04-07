@@ -466,7 +466,9 @@ sndctrler_ticker_run (void *data)
   _subflow_iterator(this, _check_report_timeout, this);
   _subflow_iterator(this, _time_update, this);
   _emit_signal(this);
-  sndrate_distor_refresh(this->sndratedistor);
+  if(this->sndratedistor){
+    sndrate_distor_refresh(this->sndratedistor);
+  }
 //  _system_notifier_main(this);
 
   next_scheduler_time = _now(this) + 100 * GST_MSECOND;

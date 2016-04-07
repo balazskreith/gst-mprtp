@@ -284,6 +284,11 @@ _calculate_monitoring_interval(
 static void
 _change_target_bitrate(FBRASubController *this, gint32 new_target);
 
+static gboolean
+_path_approver(
+    gpointer data,
+    GstBuffer *buffer);
+
 static void
 _logging(
     gpointer data);
@@ -381,6 +386,7 @@ void fbrasubctrler_enable(FBRASubController *this)
   this->enabled = TRUE;
   this->disable_controlling = _now(this) + 10 * GST_SECOND;
   this->target_bitrate = mprtps_path_get_target_bitrate(this->path);
+  mprtps_path_set_approval_process(this->path, this, _path_approver);
 }
 
 void fbrasubctrler_disable(FBRASubController *this)
@@ -388,6 +394,7 @@ void fbrasubctrler_disable(FBRASubController *this)
   _switch_stage_to(this, STAGE_KEEP, FALSE);
   mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_STABLE);
   this->enabled = FALSE;
+  mprtps_path_set_approval_process(this->path, NULL, NULL);
 }
 
 static void _reset_congestion_indicators(FBRASubController *this)
@@ -486,7 +493,7 @@ void fbrasubctrler_report_update(
 
   rmdi_processor_do(this->fb_processor, summary, &this->rmdi_result);
   //Fixme
-  goto done;
+//  goto done;
   _update_tr_corr(this);
   _reset_congestion_indicators(this);
 
@@ -980,6 +987,12 @@ void _change_target_bitrate(FBRASubController *this, gint32 new_target)
   }
 }
 
+gboolean _path_approver(gpointer data, GstBuffer *buffer)
+{
+//  FBRASubController *this = data;
+  return TRUE;
+}
+
 void _logging(gpointer data)
 {
   FBRASubController *this = data;
@@ -998,6 +1011,12 @@ void _logging(gpointer data)
                "# Monitoring Bitrate:          %-10d| UF:                         %-10f#\n"
                 "############################ Seconds since setup: %lu #############################\n"
                ,
+
+               this->id,
+               _state(this),
+               this->disable_controlling ? GST_TIME_AS_MSECONDS(this->disable_controlling - _now(this)) : 0,
+               _priv(this)->controlled,
+
                _stage(this),
                _SR(this),
 

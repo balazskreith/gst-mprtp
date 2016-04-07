@@ -114,7 +114,6 @@ sndrate_distor_init (SendingRateDistributor * this)
 {
   this->sysclock = gst_system_clock_obtain();
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, _ruin_subflow);
-
   g_rw_lock_init (&this->rwmutex);
 
 }

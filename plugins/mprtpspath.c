@@ -191,7 +191,7 @@ void mprtps_path_set_skip_duration(MPRTPSPath * this, GstClockTime duration)
 }
 
 
-void mprtps_path_set_monitor_packet_interval(MPRTPSPath *this, guint monitoring_interval)
+void mprtps_path_set_monitoring_interval(MPRTPSPath *this, guint monitoring_interval)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);

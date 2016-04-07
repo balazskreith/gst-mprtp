@@ -151,6 +151,6 @@ guint8 mprtps_path_get_flags (MPRTPSPath * this);
 guint16 mprtps_path_get_actual_seq(MPRTPSPath * this);
 void mprtps_path_set_skip_duration(MPRTPSPath * this, GstClockTime duration);
 void mprtps_path_set_mprtp_ext_header_id(MPRTPSPath *this, guint ext_header_id);
-void mprtps_path_set_monitor_packet_interval(MPRTPSPath *this, guint monitoring_interval);
+void mprtps_path_set_monitoring_interval(MPRTPSPath *this, guint monitoring_interval);
 G_END_DECLS
 #endif /* MPRTPSPATH_H_ */

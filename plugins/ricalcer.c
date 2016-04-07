@@ -160,7 +160,7 @@ gboolean _do_report_now (ReportIntervalCalculator * this)
       this->allow_early = FALSE;
       this->actual_interval = (GstClockTime)(_calc_report_interval(this) * (gdouble)GST_SECOND);
       this->next_time = _now(this) + 2 * this->actual_interval;
-      this->interval_spread = 1.;
+      this->interval_spread = MAX(1., this->interval_spread * .2);
       goto done;
     }
   }

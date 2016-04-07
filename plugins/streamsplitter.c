@@ -227,7 +227,6 @@ stream_splitter_init (StreamSplitter * this)
   this->sysclock = gst_system_clock_obtain ();
   this->subflows               = g_hash_table_new_full (NULL, NULL, NULL, mprtp_free);
   this->made                   = _now(this);
-  this->approved               = g_queue_new();
 
   g_rw_lock_init (&this->rwmutex);
 }

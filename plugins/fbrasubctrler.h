@@ -56,6 +56,10 @@ struct _FBRASubController
   GstClockTime              last_settled;
   GstClockTime              last_increase;
 
+  GstClockTime              last_report_arrived_t1;
+  GstClockTime              last_report_arrived;
+  GstClockTime              report_interval;
+
   gboolean                  enabled;
 
   //Need for monitoring

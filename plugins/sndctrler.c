@@ -529,7 +529,7 @@ void
 _time_update (Subflow * subflow, gpointer data)
 {
 
-  if(!subflow->controlling_mode){
+  if(subflow->controlling_mode < 2){
     return;
   }
   subratectrler_time_update(subflow->rate_controller);
@@ -709,6 +709,14 @@ void _process_regular_reports(SndController* this, Subflow *subflow, GstMPRTCPRe
   }
 
   //Todo: FBRA marc signal emit request here
+
+  //check weather the path is lossy
+  if(0. < summary->RR.lost_rate){
+    mprtps_path_set_lossy(subflow->path);
+  }else if(!mprtps_path_is_non_lossy(subflow->path)){
+    mprtps_path_set_non_lossy(subflow->path);
+  }
+
 }
 
 //---------------------- Utility functions ----------------------------------

@@ -111,7 +111,7 @@ static void _detach_path (GstMprtpplayouter * this, guint8 subflow_id);
 static gboolean _try_get_path (GstMprtpplayouter * this, guint16 subflow_id,
     MpRTPRPath ** result);
 static void _setup_paths_lost_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold);
-static void _setup_paths_owd_window_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold);
+static void _setup_paths_owd_window_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold_in_ms);
 static void _setup_paths_discard_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold);
 static GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer);
 //static void _trash_mprtp_buffer(GstMprtpplayouter * this, GstMpRTPBuffer *mprtp);
@@ -637,7 +637,7 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
 
 
 void
-_setup_paths_owd_window_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold)
+_setup_paths_owd_window_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold_in_ms)
 {
   GHashTableIter iter;
   gpointer key, val;
@@ -651,7 +651,7 @@ _setup_paths_owd_window_treshold(GstMprtpplayouter * this, guint8 subflow_id, Gs
     if(subflow_id != 255 && subflow_id != 0 && !subflow_match){
       continue;
     }
-    mprtpr_path_set_owd_window_treshold(path, treshold);
+    mprtpr_path_set_owd_window_treshold(path, treshold_in_ms * GST_MSECOND);
     if(subflow_match){
       break;
     }

@@ -119,6 +119,7 @@ ricalcer_init (ReportIntervalCalculator * this)
   this->max_interval = 1.5;
   this->base_interval = 1.5;
   this->min_interval = .5;
+  this->interval_spread = 1.;
   this->sysclock = gst_system_clock_obtain();
 
   mprtp_logger_add_logging_fnc(_logging, this, 10);
@@ -159,13 +160,20 @@ gboolean _do_report_now (ReportIntervalCalculator * this)
       this->allow_early = FALSE;
       this->actual_interval = (GstClockTime)(_calc_report_interval(this) * (gdouble)GST_SECOND);
       this->next_time = _now(this) + 2 * this->actual_interval;
+      this->interval_spread = 1.;
       goto done;
     }
   }
   result = this->next_time <= _now(this);
   if(result){
+    gdouble actual_interval;
+    actual_interval = _calc_report_interval(this);
+    this->allow_early = TRUE;
     this->last_time = _now(this);
-    this->actual_interval = (GstClockTime)(_calc_report_interval(this) * (gdouble)GST_SECOND);
+    this->actual_interval = (GstClockTime)((MIN(g_random_double_range(2.5, 7.5),
+                                                actual_interval * this->interval_spread) * (gdouble)GST_SECOND));
+    this->interval_spread = MIN(100., this->interval_spread * g_random_double_range(1., 2.));
+//    g_print("Actual Interval: %lu (%f)\n", this->actual_interval, this->interval_spread);
     this->next_time = _now(this) + this->actual_interval;
   }
 done:

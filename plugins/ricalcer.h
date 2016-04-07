@@ -43,6 +43,7 @@ struct _ReportIntervalCalculator
   GstClockTime     last_time;
   GstClockTime     next_time;
   GstClockTime     actual_interval;
+  gdouble          interval_spread;
   GstClockTime     urgent_time;
 
   GstClockTime     t_rr_last;

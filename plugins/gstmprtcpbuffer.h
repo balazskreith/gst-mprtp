@@ -61,11 +61,10 @@
 #define MPRTCP_PACKET_TYPE_IDENTIFIER 212
 #define GST_RTCP_TYPE_XR 207
 #define GST_MPRTCP_BLOCK_TYPE_SUBFLOW_INFO 0
-#define GST_RTCP_XR_RFC3611_BLOCK_TYPE_IDENTIFIER 1
-#define GST_RTCP_XR_RFC7097_BLOCK_TYPE_IDENTIFIER 25
-#define GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER 26
+#define GST_RTCP_XR_LOSS_RLE_BLOCK_TYPE_IDENTIFIER 1
+#define GST_RTCP_XR_DISCARDED_RLE_BLOCK_TYPE_IDENTIFIER 25
+#define GST_RTCP_XR_DISCARDED_BYTES_BLOCK_TYPE_IDENTIFIER 26
 #define GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER 28
-#define GST_RTCP_XR_OWD_RLE_BLOCK_TYPE_IDENTIFIER 29
 #define RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION 2
 #define RTCP_XR_RFC7243_I_FLAG_SAMPLED_METRIC 1
 #define RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION 3
@@ -140,35 +139,24 @@ typedef struct PACKED _GstRTCPRR
   GstRTCPRRBlock blocks;
 } GstRTCPRR;
 
-typedef struct PACKED _GstRTCPXR
-{
-  GstRTCPHeader header;
-  guint8 block_type;
-  guint8 reserved;
-  guint16 block_length;
-}GstRTCPXR;
 
-typedef struct PACKED _GstRTCPXR_RFC7243
-{                               //RTCP extended riport Discarded bytes
-  GstRTCPHeader header;
-  guint8 block_type;
+//---- Extended Reports
+
+
+typedef struct PACKED _GstRTCPXRBitvectorChunk{
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
-  guint8 reserved:5;
-  guint8 early_bit:1;
-  guint8 interval_metric:2;
+  guint16 chunk_type:1;
+  guint16 bitvector : 15;
 #elif G_BYTE_ORDER == G_BIG_ENDIAN
-  guint8 interval_metric:2;
-  guint8 early_bit:1;
-  guint8 reserved:5;
+  guint16 bitvector : 15;
+  guint16 chunk_type:1;
 #else
 #error "G_BYTE_ORDER should be big or little endian."
 #endif
-  guint16 block_length;
-  guint32 ssrc;
-  guint32 discarded_bytes;
-} GstRTCPXR_RFC7243;
+}GstRTCPXRBitvectorChunk;
 
-typedef struct PACKED _GstRTCPXR_Chunk{
+
+typedef struct PACKED _GstRTCPXRRLEChunk{
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
   guint16 chunk_type:1;
   guint16 run_type:1;
@@ -180,42 +168,23 @@ typedef struct PACKED _GstRTCPXR_Chunk{
 #else
 #error "G_BYTE_ORDER should be big or little endian."
 #endif
-}GstRTCPXR_Chunk;
+}GstRTCPXRRLEChunk;
 
-typedef struct PACKED _GstRTCPXR_RFC7097
-{                               //RTCP extended riport Discarded bytes
-  GstRTCPHeader header;
+
+typedef union PACKED _GstRTCPXRChunk{
+  GstRTCPXRRLEChunk       RLE;
+  GstRTCPXRBitvectorChunk Bitvector;
+}GstRTCPXRChunk;
+
+typedef struct PACKED _GstRTCPXRDiscardedRLEBlock
+{  //RTCP extended riport Discarded bytes
   guint8 block_type;
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
   guint8 reserved:3;
   guint8 early_bit:1;
   guint8 thinning:4;
 #elif G_BYTE_ORDER == G_BIG_ENDIAN
-  guint8 resolution:4;
-  guint8 early_bit:1;
-  guint8 reserved:3;
-#else
-#error "G_BYTE_ORDER should be big or little endian."
-#endif
-  guint16 block_length;
-  guint32 ssrc;
-  guint16 begin_seq;
-  guint16 end_seq;
-  GstRTCPXR_Chunk chunks[2];
-} GstRTCPXR_RFC7097;
-
-
-
-typedef struct PACKED _GstRTCPXR_RFC3611
-{                               //RTCP extended riport Discarded bytes
-  GstRTCPHeader header;
-  guint8 block_type;
-#if G_BYTE_ORDER == G_LITTLE_ENDIAN
-  guint8 reserved:3;
-  guint8 early_bit:1;
   guint8 thinning:4;
-#elif G_BYTE_ORDER == G_BIG_ENDIAN
-  guint8 resolution:4;
   guint8 early_bit:1;
   guint8 reserved:3;
 #else
@@ -225,36 +194,12 @@ typedef struct PACKED _GstRTCPXR_RFC3611
   guint32 ssrc;
   guint16 begin_seq;
   guint16 end_seq;
-  GstRTCPXR_Chunk chunks[2];
-} GstRTCPXR_RFC3611;
+  GstRTCPXRChunk chunks[2];
+} GstRTCPXRDiscardedRLEBlock;
 
 
-typedef struct PACKED _GstRTCPXR_OWDRLE
-{                               //RTCP extended riport Discarded bytes
-  GstRTCPHeader header;
-  guint8 block_type;
-#if G_BYTE_ORDER == G_LITTLE_ENDIAN
-  guint8 reserved:3;
-  guint8 early_bit:1;
-  guint8 resolution:4;
-#elif G_BYTE_ORDER == G_BIG_ENDIAN
-  guint8 resolution:4;
-  guint8 early_bit:1;
-  guint8 reserved:3;
-#else
-#error "G_BYTE_ORDER should be big or little endian."
-#endif
-  guint16 block_length;
-  guint32 ssrc;
-  guint32 offset;
-  guint16 begin_seq;
-  guint16 end_seq;
-  GstRTCPXR_Chunk chunks[2];
-} GstRTCPXR_OWD_RLE;
-
-typedef struct PACKED _GstRTCPXR_OWD
+typedef struct PACKED _GstRTCPXROWDBlock
 {
-  GstRTCPHeader header;
   guint8 block_type;
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
   guint8 reserved:6;
@@ -270,7 +215,44 @@ typedef struct PACKED _GstRTCPXR_OWD
   guint32 median_delay;
   guint32 max_delay;
   guint32 min_delay;
-} GstRTCPXR_OWD;
+} GstRTCPXROWDBlock;
+
+typedef struct PACKED _GstRTCPXRDiscardedBlock
+{                               //RTCP extended riport Discarded bytes
+  guint8 block_type;
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
+  guint8 reserved:5;
+  guint8 early_bit:1;
+  guint8 interval_metric:2;
+#elif G_BYTE_ORDER == G_BIG_ENDIAN
+  guint8 interval_metric:2;
+  guint8 early_bit:1;
+  guint8 reserved:5;
+#else
+#error "G_BYTE_ORDER should be big or little endian."
+#endif
+  guint16 block_length;
+  guint32 ssrc;
+  guint32 discarded_bytes;
+} GstRTCPXRDiscardedBlock;
+
+typedef union PACKED _GstRTCPXRBlock
+{
+  struct{
+    guint8 block_type;
+    guint8 reserved;
+    guint16 block_length;
+  };
+  GstRTCPXROWDBlock          owd;
+  GstRTCPXRDiscardedBlock    discarded;
+  GstRTCPXRDiscardedRLEBlock discarded_rle;
+}GstRTCPXRBlock;
+
+typedef struct PACKED _GstRTCPXR
+{
+  GstRTCPHeader  header;
+  GstRTCPXRBlock blocks;
+}GstRTCPXR;
 
 
 typedef struct PACKED _GstRTCPFB
@@ -328,12 +310,7 @@ typedef struct PACKED _GstMPRTCPSubflowBlock
     GstRTCPRR receiver_riport;
     GstRTCPSR sender_riport;
     GstRTCPXR xr_header;
-    GstRTCPXR_RFC7243 xr_rfc7243_riport;
-    GstRTCPXR_RFC7097 xr_rfc7097_report;
-    GstRTCPXR_RFC3611 xr_rfc3611_report;
-    GstRTCPXR_OWD_RLE xr_owd_rle_report;
-    GstRTCPXR_OWD     xr_owd;
-    GstRTCPFB         feedback;
+    GstRTCPFB feedback;
   };
 } GstMPRTCPSubflowBlock;
 
@@ -368,29 +345,14 @@ GstMPRTCPSubflowReport *gst_mprtcp_add_riport (GstRTCPHeader * header);
 GstMPRTCPSubflowBlock *gst_mprtcp_riport_add_block_begin (GstMPRTCPSubflowReport
     * report, guint16 subflow_id);
 
-void
-gst_mprtcp_riport_append_block (GstMPRTCPSubflowReport * report,
-    GstMPRTCPSubflowBlock * block);
 
 GstRTCPSR *gst_mprtcp_riport_block_add_sr (GstMPRTCPSubflowBlock * block);
 
 GstRTCPRR *gst_mprtcp_riport_block_add_rr (GstMPRTCPSubflowBlock * block);
 
-GstRTCPXR_RFC7243 *gst_mprtcp_riport_block_add_xr_rfc7243 (GstMPRTCPSubflowBlock
-    * block);
+GstRTCPXR *gst_mprtcp_riport_block_add_xr (GstMPRTCPSubflowBlock * block);
 
-GstRTCPXR_OWD *
-gst_mprtcp_riport_block_add_xr_owd (GstMPRTCPSubflowBlock * block);
-
-GstRTCPXR_RFC7097 *
-gst_mprtcp_riport_block_add_xr_rfc7097 (GstMPRTCPSubflowBlock * block);
-
-GstRTCPXR_RFC3611 *
-gst_mprtcp_riport_block_add_xr_rfc3611 (GstMPRTCPSubflowBlock * block);
-
-
-GstRTCPXR_OWD_RLE *
-gst_mprtcp_riport_block_add_xr_owd_rle (GstMPRTCPSubflowBlock * block);
+GstRTCPFB *gst_mprtcp_riport_block_add_fb (GstMPRTCPSubflowBlock * block);
 
 void
 gst_mprtcp_riport_add_block_end (GstMPRTCPSubflowReport * report,
@@ -429,20 +391,38 @@ void gst_rtcp_rrb_setup (GstRTCPRRBlock * block_ptr, guint32 ssrc,
     guint32 ext_hsn, guint32 jitter, guint32 LSR, guint32 DLSR);
 void gst_rtcp_copy_rrb_ntoh (GstRTCPRRBlock * from, GstRTCPRRBlock * to);
 
-void gst_rtcp_xr_block_getdown (GstRTCPXR *report, guint8 *block_type,
-    guint16 * block_length, guint8 *reserved);
-void
-gst_rtcp_xr_block_change (GstRTCPXR *riport, guint8 *block_type,
-    guint16 * block_length, guint8 *reserved);
 
-void gst_rtcp_xr_rfc7243_init (GstRTCPXR_RFC7243 * report);
-void gst_rtcp_xr_rfc7243_setup (GstRTCPXR_RFC7243 * report,
+void gst_rtcp_xr_init (
+    GstRTCPXR * report);
+
+void gst_rtcp_xr_change (
+    GstRTCPXR *report,
+    guint32 *ssrc);
+
+void gst_rtcp_xr_add_content (
+    GstRTCPXR *report,
+    gpointer content,
+    guint16 content_length_in_bytes);
+
+void gst_rtcp_xr_block_getdown (
+    GstRTCPXRBlock *block,
+    guint8 *block_type,
+    guint16 * block_length,
+    guint8 *reserved);
+
+void gst_rtcp_xr_block_change (
+    GstRTCPXRBlock *block,
+    guint8 *block_type,
+    guint16 * block_length,
+    guint8 *reserved);
+
+void gst_rtcp_xr_discarded_bytes_setup (GstRTCPXRDiscardedBlock * block,
     guint8 interval_metric, gboolean early_bit,
     guint32 ssrc, guint32 discarded_bytes);
-void gst_rtcp_xr_rfc7243_change (GstRTCPXR_RFC7243 * report,
+void gst_rtcp_xr_discarded_bytes_change (GstRTCPXRDiscardedBlock * block,
     guint8 * interval_metric, gboolean * early_bit, guint32 * ssrc,
     guint32 * discarded_bytes);
-void gst_rtcp_xr_rfc7243_getdown (GstRTCPXR_RFC7243 * report,
+void gst_rtcp_xr_discarded_bytes_getdown (GstRTCPXRDiscardedBlock *block,
     guint8 * interval_metric, gboolean * early_bit, guint32 * ssrc,
     guint32 * discarded_bytes);
 
@@ -500,119 +480,56 @@ gst_rtcp_afb_getdown_fci_data(GstRTCPFB * report,
                               guint *fci_len);
 
 void
-gst_rtcp_xr_chunk_getdown (GstRTCPXR_Chunk *chunk,
-                           gboolean *chunk_type,
-                           gboolean *run_type,
-                           guint16  *run_length);
-void
-gst_rtcp_xr_chunk_change (GstRTCPXR_Chunk *chunk,
-                           gboolean *chunk_type,
-                           gboolean *run_type,
-                           guint16  *run_length);
-
-
-void gst_rtcp_xr_rfc3611_init (GstRTCPXR_RFC3611 * report);
+gst_rtcp_xr_chunk_ntoh_cpy (GstRTCPXRChunk *dst_chunk,
+                       GstRTCPXRChunk *src_chunk);
 
 void
-gst_rtcp_xr_rfc3611_setup(GstRTCPXR_RFC3611 *report,
+gst_rtcp_xr_chunk_hton_cpy (GstRTCPXRChunk *dst_chunk,
+                       GstRTCPXRChunk *src_chunk);
+
+
+void
+gst_rtcp_xr_discarded_rle_setup(GstRTCPXRDiscardedRLEBlock *block,
                       gboolean early_bit,
                       guint8 thinning,
                       guint32 ssrc,
                       guint16 begin_seq,
                       guint16 end_seq);
-void gst_rtcp_xr_rfc3611_getdown (GstRTCPXR_RFC3611 *report,
-                                       gboolean *early_bit,
-                                       guint8 *thinning,
-                                       guint32 *ssrc,
-                                       guint16 *begin_seq,
-                                       guint16 *end_seq);
-void gst_rtcp_xr_rfc3611_change (GstRTCPXR_RFC3611 *report,
+
+void gst_rtcp_xr_discarded_rle_getdown (GstRTCPXRDiscardedRLEBlock *block,
                              gboolean *early_bit,
                              guint8 *thinning,
                              guint32 *ssrc,
                              guint16 *begin_seq,
                              guint16 *end_seq);
 
-guint gst_rtcp_xr_rfc3611_get_chunks_num(GstRTCPXR_RFC3611 *report);
-GstRTCPXR_Chunk *gst_rtcp_xr_rfc3611_get_chunk(GstRTCPXR_RFC3611 *report,
-                                               guint chunk_index);
-
-
-
-
-void gst_rtcp_xr_rfc7097_init (GstRTCPXR_RFC7097 * report);
-
-void
-gst_rtcp_xr_rfc7097_setup(GstRTCPXR_RFC7097 *report,
-                      gboolean early_bit,
-                      guint8 thinning,
-                      guint32 ssrc,
-                      guint16 begin_seq,
-                      guint16 end_seq);
-void gst_rtcp_xr_rfc7097_getdown (GstRTCPXR_RFC7097 *report,
-                                       gboolean *early_bit,
-                                       guint8 *thinning,
-                                       guint32 *ssrc,
-                                       guint16 *begin_seq,
-                                       guint16 *end_seq);
-void gst_rtcp_xr_rfc7097_change (GstRTCPXR_RFC7097 *report,
+void gst_rtcp_xr_discarded_rle_change (GstRTCPXRDiscardedRLEBlock *block,
                              gboolean *early_bit,
                              guint8 *thinning,
                              guint32 *ssrc,
                              guint16 *begin_seq,
                              guint16 *end_seq);
 
-guint gst_rtcp_xr_rfc7097_get_chunks_num(GstRTCPXR_RFC7097 *report);
-GstRTCPXR_Chunk *gst_rtcp_xr_rfc7097_get_chunk(GstRTCPXR_RFC7097 *report,
-                                               guint chunk_index);
+guint gst_rtcp_xr_discarded_rle_block_get_chunks_num(GstRTCPXRDiscardedRLEBlock *block);
 
 
 
-void gst_rtcp_xr_owd_rle_init (GstRTCPXR_OWD_RLE * report);
-void
-gst_rtcp_xr_owd_rle_setup(GstRTCPXR_OWD_RLE *report,
-                      gboolean early_bit,
-                      guint8 thinning,
-                      guint32 ssrc,
-                      guint32 offset,
-                      guint16 begin_seq,
-                      guint16 end_seq);
-void gst_rtcp_xr_owd_rle_getdown (GstRTCPXR_OWD_RLE *report,
-                                       gboolean *early_bit,
-                                       guint8 *thinning,
-                                       guint32 *ssrc,
-                                       guint32 *offset,
-                                       guint16 *begin_seq,
-                                       guint16 *end_seq);
-void gst_rtcp_xr_owd_rle_change (GstRTCPXR_OWD_RLE *report,
-                             gboolean *early_bit,
-                             guint8 *thinning,
-                             guint32 *ssrc,
-                             guint32 *offset,
-                             guint16 *begin_seq,
-                             guint16 *end_seq);
 
-guint gst_rtcp_xr_owd_rle_get_chunks_num(GstRTCPXR_OWD_RLE *report);
-GstRTCPXR_Chunk *gst_rtcp_xr_owd_rle_get_chunk(GstRTCPXR_OWD_RLE *report,
-                                               guint chunk_index);
-
-void gst_rtcp_xr_owd_init (GstRTCPXR_OWD * report);
-
-void gst_rtcp_xr_owd_setup(GstRTCPXR_OWD *report,
+void gst_rtcp_xr_owd_block_setup(GstRTCPXROWDBlock *report,
                             guint8  interval_metric,
                             guint32 ssrc,
                             guint32 median_delay,
                             guint32 min_delay,
                             guint32 max_delay);
 
-void gst_rtcp_xr_owd_change (GstRTCPXR_OWD *report,
+void gst_rtcp_xr_owd_block_change (GstRTCPXROWDBlock *block,
                              guint8  *interval_metric,
                             guint32 *ssrc,
                             guint32 *median_delay,
                             guint32 *min_delay,
                             guint32 *max_delay);
 
-void gst_rtcp_xr_owd_getdown(GstRTCPXR_OWD *report,
+void gst_rtcp_xr_owd_block_getdown(GstRTCPXROWDBlock *block,
                              guint8  *interval_metric,
                              guint32 *ssrc,
                              guint32 *median_delay,
@@ -681,9 +598,13 @@ void gst_printfnc_rtcp_sr (GstRTCPSR * report, printfnc print);
     gst_printfnc_rtcp_rr(report, g_print)
 void gst_printfnc_rtcp_rr (GstRTCPRR * report, printfnc print);
 
-#define gst_print_rtcp_xr_7243(report) \
-    gst_printfnc_rtcp_xr_7243(report, g_print)
-void gst_printfnc_rtcp_xr_7243 (GstRTCPXR_RFC7243 * report, printfnc print);
+#define gst_print_rtcp_xr(report) \
+    gst_printfnc_rtcp_xr(report, g_print)
+void gst_printfnc_rtcp_xr (GstRTCPXR * report, printfnc print);
+
+#define gst_print_rtcp_xr_discarded_bytes(report) \
+    gst_printfnc_rtcp_xr_discarded_bytes_block(report, g_print)
+void gst_printfnc_rtcp_xr_discarded_bytes_block (GstRTCPXRDiscardedBlock * block, printfnc print);
 
 #define gst_print_rtcp_afb(report) \
     gst_printfnc_rtcp_afb(report, g_print)
@@ -694,24 +615,16 @@ void gst_printfnc_rtcp_afb (GstRTCPFB * report, printfnc print);
 void gst_printfnc_rtcp_afb_rmdi (gpointer data, printfnc print);
 
 #define gst_print_rtcp_xr_owd(report) \
-    gst_printfnc_rtcp_xr_owd(report, g_print)
-void gst_printfnc_rtcp_xr_owd (GstRTCPXR_OWD * report, printfnc print);
+    gst_printfnc_rtcp_xr_owd_block(report, g_print)
+void gst_printfnc_rtcp_xr_owd_block (GstRTCPXROWDBlock * block, printfnc print);
 
 #define gst_print_rtcp_xrchunks(chunk1, chunk2) \
     gst_printfnc_rtcp_xrchunks(chunk1, chunk2, g_print)
-void gst_printfnc_rtcp_xrchunks(GstRTCPXR_Chunk * chunk1, GstRTCPXR_Chunk * chunk2, printfnc print);
+void gst_printfnc_rtcp_xrchunks(GstRTCPXRChunk * chunk1, GstRTCPXRChunk * chunk2, printfnc print);
 
 #define gst_print_rtcp_xr_7097(report) \
     gst_printfnc_rtcp_xr_7097(report, g_print)
-void gst_printfnc_rtcp_xr_7097(GstRTCPXR_RFC7097 * report, printfnc print);
-
-#define gst_print_rtcp_xr_3611(report) \
-    gst_printfnc_rtcp_xr_3611(report, g_print)
-void gst_printfnc_rtcp_xr_3611(GstRTCPXR_RFC3611 * report, printfnc print);
-
-#define gst_print_rtcp_xr_owd_rle(report) \
-    gst_printfnc_rtcp_xr_owd_rle(report, g_print)
-void gst_printfnc_rtcp_xr_owd_rle(GstRTCPXR_OWD_RLE * report, printfnc print);
+void gst_printfnc_rtcp_xr_discarded_rle_block(GstRTCPXRDiscardedRLEBlock * block, printfnc print);
 
 #define gst_print_rtcp_srb(block_ptr) \
     gst_printfnc_rtcp_srb(block_ptr, g_print)

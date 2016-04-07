@@ -651,17 +651,10 @@ gst_mprtpreceiver_sink_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
 
   if (packet_type == PACKET_IS_MPRTCP) {
     result = _send_mprtcp_buffer (this, buf);
-    gst_buffer_unmap (buf, &map);
   } else if(packet_type == PACKET_IS_MPRTP_MONITORING){
     gst_buffer_unmap (buf, &map);
     result = gst_pad_push (this->mprtcp_sr_srcpad, buf);
   }else{
-//    {
-//      GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-//      gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
-//      g_print("Rec-Seq: %hu\n", gst_rtp_buffer_get_seq(&rtp));
-//      gst_rtp_buffer_unmap(&rtp);
-//    }
     gst_buffer_unmap (buf, &map);
     result = gst_pad_push (this->mprtp_srcpad, buf);
   }
@@ -696,21 +689,21 @@ _send_mprtcp_buffer (GstMprtpreceiver * this, GstBuffer * buf)
 
   report = (GstMPRTCPSubflowReport *) gst_rtcp_get_first_header (&rtcp);
   block = gst_mprtcp_get_first_block (report);
-  outpad = this->mprtcp_sr_srcpad;
-
+  outpad = this->mprtcp_rr_srcpad;
   gst_mprtcp_block_getdown(&block->info, NULL, &block_length, NULL);
   actual = databed = header = &block->block_header;
 
   for(processed_length = 0; processed_length < block_length; )
   {
       gst_rtcp_header_getdown (header, NULL, NULL, NULL, &pt, &actual_length, NULL);
-      if(pt == GST_RTCP_TYPE_RR){
-        outpad = this->mprtcp_rr_srcpad;
+      if(pt == GST_RTCP_TYPE_SR){
+        outpad = this->mprtcp_sr_srcpad;
       }
       processed_length +=actual_length + 1;
       header = actual = processed_length * 4 + (gchar*)databed;
   }
-  return gst_pad_push (outpad, buf);
+  result = gst_pad_push (outpad, buf);
+  return result;
 }
 
 

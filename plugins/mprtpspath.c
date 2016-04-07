@@ -91,7 +91,7 @@ mprtps_path_reset (MPRTPSPath * this)
       MPRTPS_PATH_FLAG_NON_CONGESTED | MPRTPS_PATH_FLAG_NON_LOSSY;
 
   if(this->packetstracker){
-    packetstracker_reset(this->packetstracker);
+    packetssndtracker_reset(this->packetstracker);
   }
 
   this->monitoring_interval = 0;
@@ -354,7 +354,40 @@ gboolean mprtps_path_approve_request(MPRTPSPath *this, GstBuffer *buf)
   return result;
 }
 
-void mprtps_path_set_packets_tracker(MPRTPSPath *this, PacketsTracker *tracker)
+PacketsSndTracker *mprtps_path_ref_packetstracker(MPRTPSPath *this)
+{
+  PacketsSndTracker *result;
+  THIS_WRITELOCK(this);
+  if(!this->packetstracker){
+    result = this->packetstracker = make_packetssndtracker();
+  }else{
+    result = g_object_ref(this->packetstracker);
+  }
+  THIS_WRITEUNLOCK(this);
+  return result;
+}
+
+
+PacketsSndTracker* mprtps_path_unref_packetstracker(MPRTPSPath *this)
+{
+  PacketsSndTracker *result = NULL;
+  THIS_WRITELOCK(this);
+  if(!this->packetstracker){
+    goto done;
+  }
+  result = this->packetstracker;
+  if(1 < this->packetstracker->object.ref_count){
+    g_object_unref(this->packetstracker);
+    goto done;
+  }
+  g_object_unref(this->packetstracker);
+  result = this->packetstracker = NULL;
+done:
+  THIS_WRITEUNLOCK(this);
+  return result;
+}
+
+void mprtps_path_set_packets_tracker(MPRTPSPath *this, PacketsSndTracker *tracker)
 {
   THIS_WRITELOCK (this);
   if(this->packetstracker){
@@ -463,7 +496,7 @@ _refresh_stat(MPRTPSPath * this,
   this->total_sent_payload_bytes += payload_bytes;
 
   if(this->packetstracker){
-    packetstracker_add(this->packetstracker, payload_bytes, sn);
+    packetssndtracker_add(this->packetstracker, payload_bytes, sn);
   }
 
 }

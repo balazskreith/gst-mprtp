@@ -227,7 +227,6 @@ sndctrler_init (SndController * this)
   this->report_processor   = g_object_new(REPORTPROCESSOR_TYPE, NULL);
   this->thread             = gst_task_new (sndctrler_ticker_run, this, NULL);
   this->made               = _now(this);
-
   this->mprtp_signal_data  = mprtp_malloc(sizeof(MPRTPPluginSignalData));
 
   report_processor_set_logfile(this->report_processor, "snd_reports.log");
@@ -276,31 +275,23 @@ static void _change_controlling_mode(Subflow *this, guint controlling_mode)
   if(this->controlling_mode == controlling_mode){
     return;
   }
-  if(0 < this->controlling_mode){
-      //reset everything
-    subratectrler_disable(this->rate_controller);
-    g_object_unref(this->rate_controller);
-    this->rate_controller = NULL;
-  }
 
   this->controlling_mode = controlling_mode;
 
   switch(this->controlling_mode){
     case 0:
-      GST_DEBUG_OBJECT(this, "subflow %d set to no controlling mode", this->id);
+      subratectrler_change(this->rate_controller, SUBRATECTRLER_NO_CTRL);
       break;
     case 1:
-      GST_DEBUG_OBJECT(this, "subflow %d set to only report processing mode", this->id);
+      subratectrler_change(this->rate_controller, SUBRATECTRLER_NO_CTRL);
       break;
     case 2:
-      this->rate_controller = make_subratectrler(this->path);
-      subratectrler_enable(this->rate_controller);
+      subratectrler_change(this->rate_controller, SUBRATECTRLER_FBRA_MARC);
       break;
     default:
       g_warning("Unknown controlling mode requested for subflow %d", this->id);
       break;
   }
-
 }
 
 void sndctrler_change_controlling_mode(SndController * this, guint8 subflow_id, guint controlling_mode)
@@ -318,7 +309,6 @@ void sndctrler_change_controlling_mode(SndController * this, guint8 subflow_id, 
     }
   }
   THIS_WRITEUNLOCK (this);
-
 }
 
 void sndctrler_setup_report_timeout(SndController * this, guint8 subflow_id, GstClockTime report_timeout)
@@ -471,7 +461,6 @@ sndctrler_ticker_run (void *data)
 
   this = SNDCTRLER (data);
   THIS_WRITELOCK (this);
-
   _orp_producer_main(this);
   _fec_rate_refresher(this);
   _subflow_iterator(this, _check_report_timeout, this);
@@ -543,10 +532,7 @@ _time_update (Subflow * subflow, gpointer data)
   if(!subflow->controlling_mode){
     return;
   }
-
-  if(subflow->controlling_mode == 2){
-    subratectrler_time_update(subflow->rate_controller);
-  }
+  //subratectrler_time_update(subflow->rate_controller);
 
 }
 
@@ -556,7 +542,6 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
   Subflow *subflow;
   GstMPRTCPReportSummary *summary;
   THIS_WRITELOCK (this);
-
   summary = &this->reports_summary;
   memset(summary, 0, sizeof(GstMPRTCPReportSummary));
 
@@ -578,10 +563,7 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
   }
 
   _process_regular_reports(this, subflow, summary);
-
-  if(subflow->controlling_mode == 2){
-    subratectrler_report_update(subflow->rate_controller, summary);
-  }
+  //subratectrler_report_update(subflow->rate_controller, summary);
 
   subflow->last_seen_report = _now(this);
 
@@ -709,20 +691,20 @@ void _process_regular_reports(SndController* this, Subflow *subflow, GstMPRTCPRe
     subflow->emit_signal_request = TRUE;
   }
 
-  if(summary->XR_OWD.processed){
+  if(summary->XR.OWD.processed){
     MPRTPSubflowExtendedReport *report;
     report = &subflowdata->extended_report;
-    report->owd_max = summary->XR_OWD.max_delay;
-    report->owd_min = summary->XR_OWD.min_delay;
-    report->owd_median = summary->XR_OWD.median_delay;
+    report->owd_max = summary->XR.OWD.max_delay;
+    report->owd_min = summary->XR.OWD.min_delay;
+    report->owd_median = summary->XR.OWD.median_delay;
     subflow->emit_signal_request = TRUE;
   }
 
 
-  if(summary->XR_RFC7243.processed){
+  if(summary->XR.DiscardedBytes.processed){
     MPRTPSubflowExtendedReport *report;
     report = &subflowdata->extended_report;
-    report->total_discarded_bytes = summary->XR_RFC7243.discarded_bytes;
+    report->total_discarded_bytes = summary->XR.DiscardedBytes.discarded_bytes;
     subflow->emit_signal_request = TRUE;
   }
 
@@ -752,6 +734,7 @@ _ruin_subflow (gpointer subflow)
   g_return_if_fail (subflow);
   this = (Subflow *) subflow;
   g_object_unref (this->path);
+  g_object_unref(this->rate_controller);
   _subflow_dtor (this);
 }
 
@@ -765,7 +748,7 @@ _make_subflow (SndController * this, guint8 id, MPRTPSPath * path)
   result->id              = id;
   result->joined_time     = _now(this);
   result->ricalcer        = make_ricalcer(TRUE);
-
+  result->rate_controller = make_subratectrler(path);
   _reset_subflow (result);
   return result;
 }

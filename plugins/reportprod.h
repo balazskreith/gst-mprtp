@@ -39,6 +39,13 @@ struct _ReportProducer
   GstMPRTCPSubflowBlock*   block;
   gpointer                 actual;
   gsize                    length;
+
+  struct{
+    GstRTCPXRBlock*          head_block;
+    gpointer                 actual_block;
+    gsize                    length;
+    gpointer                 databed;
+  }xr;
 };
 
 struct _ReportProducerClass{
@@ -58,32 +65,21 @@ void report_producer_add_rr(ReportProducer *this,
                             guint32 LSR,
                             guint32 DLSR);
 
-void report_producer_add_xr_rfc7097(ReportProducer *this,
-                                    guint8 thinning,
-                                    guint16 begin_seq,
-                                    guint16 end_seq,
-                                    GstRTCPXR_Chunk *chunks,
-                                    guint chunks_num);
+void report_producer_add_xr_discarded_rle(ReportProducer *this,
+                                          gboolean early_bit,
+                                          guint8 thinning,
+                                          guint16 begin_seq,
+                                          guint16 end_seq,
+                                          GstRTCPXRChunk *chunks,
+                                          guint chunks_len);
 
-void report_producer_add_xr_owd_rle(ReportProducer *this,
-                                    guint8 thinning,
-                                    guint16 begin_seq,
-                                    guint16 end_seq,
-                                    GstRTCPXR_Chunk *chunks,
-                                    guint chunks_num,
-                                    guint32 offset);
-
-void report_producer_add_xr_rfc3611(ReportProducer *this,
-                                    guint8 thinning,
-                                    guint16 begin_seq,
-                                    guint16 end_seq,
-                                    GstRTCPXR_Chunk *chunks,
-                                    guint chunks_num);
-
-void report_producer_add_xr_rfc7243(ReportProducer *this,
-                                    guint32 late_discarded_bytes);
+void report_producer_add_xr_discarded_bytes(ReportProducer *this,
+                                    guint8 interval_metric_flag,
+                                    gboolean early_bit,
+                                    guint32 payload_bytes_discarded);
 
 void report_producer_add_xr_owd(ReportProducer *this,
+                                guint8 interval_metric_flag,
                                 guint32 median_delay,
                                 guint32 min_delay,
                                 guint32 max_delay);

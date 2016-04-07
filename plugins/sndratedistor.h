@@ -52,6 +52,4 @@ void sndrate_distor_refresh_subflows(SendingRateDistributor* this);
 void sndrate_distor_refresh_splitter(SendingRateDistributor* this);
 void sndrate_distor_add_subflow(SendingRateDistributor *this, MPRTPSPath *path);
 void sndrate_distor_rem_subflow(SendingRateDistributor *this, guint8 subflow_id);
-MPRTPPluginUtilization* sndrate_distor_time_update(SendingRateDistributor *this);
-guint32 sndrate_distor_get_sending_rate(SendingRateDistributor *this, guint8 id);
 #endif /* SNDRATEDISTOR_H_ */

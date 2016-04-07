@@ -25,6 +25,35 @@ typedef struct _GstMPRTCPReportSummary GstMPRTCPReportSummary;
 #define REPORTPROCESSOR_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),REPORTPROCESSOR_TYPE))
 #define REPORTPROCESSOR_CAST(src)        ((ReportProcessor *)(src))
 
+
+typedef struct _GstMPRTCPXRReportSummary{
+  gboolean            processed;
+  struct{
+    gboolean          processed;
+    GstClockTime      min_delay;
+    GstClockTime      max_delay;
+    GstClockTime      median_delay;
+    guint8            interval_metric;
+  }OWD;
+
+  struct{
+    gboolean          processed;
+    GstRTCPXRChunk    chunks[100];
+    guint16           length;
+    gboolean          early_bit;
+    guint8            thinning;
+    guint16           begin_seq;
+    guint16           end_seq;
+  }DiscardedRLE;
+
+  struct{
+    gboolean          processed;
+    guint8            interval_metric;
+    gboolean          early_bit;
+    guint32           discarded_bytes;
+  }DiscardedBytes;
+}GstMPRTCPXRReportSummary;
+
 struct _GstMPRTCPReportSummary{
   GstClockTime        created;
   GstClockTime        updated;
@@ -48,40 +77,7 @@ struct _GstMPRTCPReportSummary{
     guint32           octet_count;
   }SR;
 
-  struct{
-    gboolean          processed;
-    GstClockTime      values[100];
-    guint16           length;
-    GstClockTime      offset;
-  }XR_OWD_RLE;
-
-  struct{
-    gboolean          processed;
-    guint8            interval_metric;
-    GstClockTime      min_delay;
-    GstClockTime      max_delay;
-    GstClockTime      median_delay;
-  }XR_OWD;
-
-  struct{
-    gboolean          processed;
-    guint16           values[100];
-    guint16           length;
-  }XR_RFC3611;
-
-  struct{
-    gboolean          processed;
-    guint8            interval_metric;
-    gboolean          early_bit;
-    guint32           discarded_bytes;
-  }XR_RFC7243;
-
-  struct{
-    gboolean          processed;
-    guint16           values[100];
-    guint16           length;
-    gint32            total;
-  }XR_RFC7097;
+  GstMPRTCPXRReportSummary XR;
 
   struct{
     gboolean          processed;

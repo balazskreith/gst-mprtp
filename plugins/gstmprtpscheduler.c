@@ -903,8 +903,9 @@ gst_mprtpscheduler_mprtcp_rr_sink_chain (GstPad * pad, GstObject * parent,
 
   this = GST_MPRTPSCHEDULER (parent);
   GST_DEBUG_OBJECT (this, "RTCP/MPRTCP sink");
+  g_print("here0\n");
   THIS_READLOCK (this);
-
+  g_print("here01\n");
   sndctrler_receive_mprtcp(this->controller, buf);
 
   result = GST_FLOW_OK;

@@ -57,8 +57,6 @@
 #ifndef TESTS_TEST_H_
 #define TESTS_TEST_H_
 
-
-
 typedef struct _MPRTPSubflowFBRACngCtrlerParams{
   //parameters can be changed
   gint32     max_rate;
@@ -153,19 +151,19 @@ static gchar default_path_3_tx_ip[255];
 
 static int logging              = 1;
 static int init_delay           = 0;
-static int owd_th               = 500;
-static int discard_th           = 400;
+static int owd_th               = 1000;
+static int discard_th           = 100;
 static int lost_th              = 1000;
 static int rtcp_interval_type   = 2;
 static int report_timeout       = 0;
-static int controlling_mode     = 1;
-static int sending_target       = 500000;
+static int controlling_mode     = 2;
+static int sending_target       = 200000;
 static int path1_active         = 1;
 static int path2_active         = 0;
 static int path3_active         = 0;
 static int fec_interval         = 0;
 static int fec_min_window       = 10;
-static int fec_max_window       = 300;
+static int fec_max_window       = 100;
 static int keep_alive_period    = 0;
 
 static GOptionEntry entries[] =

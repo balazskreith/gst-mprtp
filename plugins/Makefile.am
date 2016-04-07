@@ -25,13 +25,15 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          percentiletracker2.c       \
                          sndratedistor.c            \
                          numstracker.c              \
-                         subratectrler.c            \
+                         fbrasubctrler.c            \
                          fecdec.c                   \
                          fecenc.c                   \
                          rtpfecbuffer.c             \
-                         packetstracker.c           \
+                         packetssndtracker.c        \
+                         packetsrcvtracker.c        \
                          rmdiproc.c                 \
-                         signalreport.c
+                         signalreport.c             \
+                         subratectrler.c
                     
                     
 noinst_HEADERS = mprtpspath.h           \
@@ -51,13 +53,15 @@ noinst_HEADERS = mprtpspath.h           \
                  percentiletracker2.h   \
                  sndratedistor.h        \
                  numstracker.h          \
-                 subratectrler.h        \
+                 fbrasubctrler.h        \
                  fecdec.h               \
                  fecenc.h               \
                  rtpfecbuffer.h         \
-                 packetstracker.h       \
+                 packetssndtracker.h    \
+                 packetsrcvtracker.h    \
                  rmdiproc.c             \
-                 signalreport.h           
+                 signalreport.h         \
+                 subratectrler.h
                           
 
 # compiler and linker flags used to compile this plugin, set in configure.ac

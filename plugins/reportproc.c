@@ -68,9 +68,9 @@ _processing_rrblock (
     GstMPRTCPReportSummary* summary);
 
 static void
-_processing_xr_7243 (
+_processing_xr_discarded_bytes_block (
     ReportProcessor *this,
-    GstRTCPXR_RFC7243 * xrb,
+    GstRTCPXRDiscardedBlock * xrb,
     GstMPRTCPReportSummary* summary);
 
 static void
@@ -79,34 +79,28 @@ _processing_afb (ReportProcessor *this,
                  GstMPRTCPReportSummary* summary);
 
 static void
-_processing_xr_owd (
+_processing_xr_owd_block (
     ReportProcessor *this,
-    GstRTCPXR_OWD * xrb,
+    GstRTCPXROWDBlock * xrb,
     GstMPRTCPReportSummary* summary);
 
 static void
-_processing_xr_rfc7097 (
+_processing_xr_discarded_rle_block (
     ReportProcessor *this,
-    GstRTCPXR_RFC7097 * xrb,
+    GstRTCPXRDiscardedRLEBlock * xrb,
     GstMPRTCPReportSummary* summary);
 
-static void
-_processing_xr_rfc3611 (
-    ReportProcessor *this,
-    GstRTCPXR_RFC3611 * xrb,
-    GstMPRTCPReportSummary* summary);
-
-static void
-_processing_xr_owd_rle(
-    ReportProcessor *this,
-    GstRTCPXR_OWD_RLE * xrb,
-    GstMPRTCPReportSummary* summary);
 
 static void
 _processing_srblock (
     ReportProcessor *this,
     GstRTCPSRBlock * rrb,
     GstMPRTCPReportSummary* summary);
+
+static void
+_processing_xr(ReportProcessor *this,
+                    GstRTCPXR * xr,
+                    GstMPRTCPReportSummary* summary);
 
 static void
 _logging(
@@ -228,29 +222,8 @@ again:
     break;
     case GST_RTCP_TYPE_XR:
     {
-      guint8 xr_block_type;
       GstRTCPXR* xr = (GstRTCPXR*) header;
-      gst_rtcp_xr_block_getdown(xr, &xr_block_type, NULL,  NULL);
-      switch(xr_block_type){
-        case GST_RTCP_XR_RFC3611_BLOCK_TYPE_IDENTIFIER:
-          _processing_xr_rfc3611(this, (GstRTCPXR_RFC3611*)xr, summary);
-        break;
-        case GST_RTCP_XR_RFC7243_BLOCK_TYPE_IDENTIFIER:
-          _processing_xr_7243(this, (GstRTCPXR_RFC7243*)xr, summary);
-        break;
-        case GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER:
-          _processing_xr_owd(this, (GstRTCPXR_OWD*)xr, summary);
-        break;
-        case GST_RTCP_XR_RFC7097_BLOCK_TYPE_IDENTIFIER:
-          _processing_xr_rfc7097(this, (GstRTCPXR_RFC7097*)xr, summary);
-          break;
-        case GST_RTCP_XR_OWD_RLE_BLOCK_TYPE_IDENTIFIER:
-          _processing_xr_owd_rle(this, (GstRTCPXR_OWD_RLE*)xr, summary);
-          break;
-        default:
-          GST_WARNING_OBJECT(this, "Unrecognized RTCP XR REPORT (%d)", xr_block_type);
-        break;
-      }
+      _processing_xr(this, xr, summary);
     }
     break;
     default:
@@ -304,16 +277,16 @@ _processing_rrblock (ReportProcessor *this,
 
 
 void
-_processing_xr_7243 (ReportProcessor *this,
-                     GstRTCPXR_RFC7243 * xrb,
-                     GstMPRTCPReportSummary* summary)
+_processing_xr_discarded_bytes_block (ReportProcessor *this,
+                                GstRTCPXRDiscardedBlock * xrb,
+                                GstMPRTCPReportSummary* summary)
 {
-  summary->XR_RFC7243.processed = TRUE;
-  gst_rtcp_xr_rfc7243_getdown (xrb,
-                               &summary->XR_RFC7243.interval_metric,
-                               &summary->XR_RFC7243.early_bit,
+  summary->XR.DiscardedBytes.processed = TRUE;
+  gst_rtcp_xr_discarded_bytes_getdown (xrb,
+                               &summary->XR.DiscardedBytes.interval_metric,
+                               &summary->XR.DiscardedBytes.early_bit,
                                NULL,
-                               &summary->XR_RFC7243.discarded_bytes);
+                               &summary->XR.DiscardedBytes.discarded_bytes);
 }
 
 
@@ -335,30 +308,30 @@ _processing_afb (ReportProcessor *this,
 
 
 void
-_processing_xr_owd (ReportProcessor *this,
-                    GstRTCPXR_OWD * xrb,
+_processing_xr_owd_block (ReportProcessor *this,
+                    GstRTCPXROWDBlock * xrb,
                     GstMPRTCPReportSummary* summary)
 {
   guint32 median_delay,min_delay,max_delay;
 
-  summary->XR_OWD.processed = TRUE;
+  summary->XR.OWD.processed = TRUE;
 
-  gst_rtcp_xr_owd_getdown(xrb,
-                          &summary->XR_OWD.interval_metric,
+  gst_rtcp_xr_owd_block_getdown(xrb,
+                          &summary->XR.OWD.interval_metric,
                           NULL,
                           &median_delay,
                           &min_delay,
                           &max_delay);
 
-  summary->XR_OWD.median_delay = median_delay;
-  summary->XR_OWD.median_delay<<=16;
-  summary->XR_OWD.median_delay = get_epoch_time_from_ntp_in_ns(summary->XR_OWD.median_delay);
-  summary->XR_OWD.min_delay = min_delay;
-  summary->XR_OWD.min_delay<<=16;
-  summary->XR_OWD.min_delay = get_epoch_time_from_ntp_in_ns(summary->XR_OWD.min_delay);
-  summary->XR_OWD.max_delay = max_delay;
-  summary->XR_OWD.max_delay<<=16;
-  summary->XR_OWD.max_delay = get_epoch_time_from_ntp_in_ns(summary->XR_OWD.max_delay);
+  summary->XR.OWD.median_delay = median_delay;
+  summary->XR.OWD.median_delay<<=16;
+  summary->XR.OWD.median_delay = get_epoch_time_from_ntp_in_ns(summary->XR.OWD.median_delay);
+  summary->XR.OWD.min_delay = min_delay;
+  summary->XR.OWD.min_delay<<=16;
+  summary->XR.OWD.min_delay = get_epoch_time_from_ntp_in_ns(summary->XR.OWD.min_delay);
+  summary->XR.OWD.max_delay = max_delay;
+  summary->XR.OWD.max_delay<<=16;
+  summary->XR.OWD.max_delay = get_epoch_time_from_ntp_in_ns(summary->XR.OWD.max_delay);
 
 //  gst_print_rtcp_xr_owd(xrb);
   //--------------------------
@@ -369,101 +342,28 @@ _processing_xr_owd (ReportProcessor *this,
 
 
 void
-_processing_xr_rfc7097 (ReportProcessor *this,
-                        GstRTCPXR_RFC7097 * xrb,
+_processing_xr_discarded_rle_block (ReportProcessor *this,
+                        GstRTCPXRDiscardedRLEBlock * xrb,
                         GstMPRTCPReportSummary* summary)
 {
-  guint chunks_num, chunk_index;
-  guint16 running_length;
-  GstRTCPXR_Chunk *chunk;
+  guint chunks_num;
+  GstRTCPXRChunk *chunk;
+  guint16 *i;
 
-  summary->XR_RFC7097.processed = TRUE;
-  summary->XR_RFC7097.length = 0;
-  summary->XR_RFC7097.total  = 0;
+  summary->XR.DiscardedRLE.processed = TRUE;
 
-  chunks_num = gst_rtcp_xr_rfc7097_get_chunks_num(xrb);
-  for(chunk_index = 0;
-      chunk_index < chunks_num;
-      ++chunk_index)
-  {
-      chunk = gst_rtcp_xr_rfc7097_get_chunk(xrb, chunk_index);
+  gst_rtcp_xr_discarded_rle_getdown(xrb,
+                                    &summary->XR.DiscardedRLE.early_bit,
+                                    &summary->XR.DiscardedRLE.thinning,
+                                    NULL,
+                                    &summary->XR.DiscardedRLE.begin_seq,
+                                    &summary->XR.DiscardedRLE.end_seq);
 
-      //Terminate chunk
-      if(chunk->chunk_type == 0 && chunk->run_length == 0 && chunk->run_type == 0) break;
-      gst_rtcp_xr_chunk_getdown(chunk, NULL, NULL, &running_length);
-      summary->XR_RFC7097.values[chunk_index] = running_length;
-      summary->XR_RFC7097.total += running_length;
-      ++summary->XR_RFC7097.length;
-  }
-}
+  i = &summary->XR.DiscardedRLE.length;
+  chunks_num = gst_rtcp_xr_discarded_rle_block_get_chunks_num(xrb);
 
-void
-_processing_xr_rfc3611 (ReportProcessor *this,
-                        GstRTCPXR_RFC3611 * xrb,
-                        GstMPRTCPReportSummary* summary)
-{
-  guint chunks_num, chunk_index;
-  guint16 running_length;
-  GstRTCPXR_Chunk *chunk;
-
-  summary->XR_RFC3611.processed = TRUE;
-//  summary->XR_RFC3611.length = 0;
-
-  chunks_num = gst_rtcp_xr_rfc3611_get_chunks_num(xrb);
-  for(chunk_index = 0;
-      chunk_index < chunks_num;
-      ++chunk_index)
-  {
-      chunk = gst_rtcp_xr_rfc3611_get_chunk(xrb, chunk_index);
-
-      //Terminate chunk
-      if(chunk->chunk_type == 0 && chunk->run_length == 0 && chunk->run_type == 0) break;
-      gst_rtcp_xr_chunk_getdown(chunk, NULL, NULL, &running_length);
-      summary->XR_RFC3611.values[chunk_index] = running_length;
-      ++summary->XR_RFC3611.length;
-  }
-}
-
-
-
-void
-_processing_xr_owd_rle(ReportProcessor *this,
-                       GstRTCPXR_OWD_RLE * xrb,
-                       GstMPRTCPReportSummary* summary)
-{
-  guint chunks_num, chunk_index;
-  guint16 running_length;
-  guint64 owd;
-  GstRTCPXR_Chunk *chunk;
-  guint32 offset;
-  GstClockTime abs_offset;
-  summary->XR_OWD_RLE.processed = TRUE;
-  summary->XR_OWD_RLE.length = 0;
-
-  gst_rtcp_xr_owd_rle_getdown(xrb, NULL, NULL, NULL, &offset, NULL, NULL);
-  abs_offset = offset;
-  abs_offset *= GST_SECOND;
-  summary->XR_OWD_RLE.offset = abs_offset;
-  chunks_num = gst_rtcp_xr_owd_rle_get_chunks_num(xrb);
-  for(chunk_index = 0;
-      chunk_index < chunks_num;
-      ++chunk_index)
-  {
-      chunk = gst_rtcp_xr_owd_rle_get_chunk(xrb, chunk_index);
-
-      //Terminate chunk
-      if(chunk->chunk_type == 0 && chunk->run_length == 0 && chunk->run_type == 0) break;
-      gst_rtcp_xr_chunk_getdown(chunk, NULL, NULL, &running_length);
-      if(running_length < 0x3FFF){
-        gdouble x = (gdouble) running_length / 16384.;
-        x *= (gdouble) GST_SECOND;
-        owd = x;
-      }else{
-        owd = GST_SECOND;
-      }
-      //_irt0(subflow)->rle_delays.values[chunk_index] = (GstClockTime)running_length * GST_MSECOND;
-      summary->XR_OWD_RLE.values[chunk_index] = owd;
-      ++summary->XR_OWD_RLE.length;
+  for(*i = 0, chunk = &xrb->chunks[0]; *i < chunks_num; ++chunk, ++*i){
+      gst_rtcp_xr_chunk_ntoh_cpy(&summary->XR.DiscardedRLE.chunks[*i], chunk);
   }
 }
 
@@ -480,6 +380,53 @@ _processing_srblock(ReportProcessor *this,
                        &summary->SR.rtptime,
                        &summary->SR.packet_count,
                        &summary->SR.octet_count);
+}
+
+
+
+void
+_processing_xr(ReportProcessor *this,
+                GstRTCPXR * xr,
+                GstMPRTCPReportSummary* summary)
+{
+  GstRTCPXRBlock *block;
+  guint8 block_type;
+  guint16 block_words;
+  guint16 header_words;
+  guint16 read_words;
+
+  summary->XR.processed = TRUE;
+
+  gst_rtcp_header_getdown(&xr->header, NULL, NULL, NULL, NULL, &header_words, NULL);
+  block = &xr->blocks;
+  read_words = 1;
+again:
+  gst_rtcp_xr_block_getdown(block, &block_type, &block_words, NULL);
+  switch(block_type){
+    case GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER:
+        _processing_xr_owd_block(this, (GstRTCPXROWDBlock*) block, summary);
+        break;
+    case GST_RTCP_XR_DISCARDED_RLE_BLOCK_TYPE_IDENTIFIER:
+        _processing_xr_discarded_rle_block(this, (GstRTCPXRDiscardedRLEBlock*) block, summary);
+        break;
+    case GST_RTCP_XR_DISCARDED_BYTES_BLOCK_TYPE_IDENTIFIER:
+        _processing_xr_discarded_bytes_block(this, (GstRTCPXRDiscardedBlock*) block, summary);
+        break;
+    default:
+      GST_WARNING_OBJECT(this, "Unrecognized XR block to process");
+      goto done;
+      break;
+  }
+  read_words += block_words + 1;
+  if(read_words < header_words){
+    guint8 *pos;
+    pos = (guint8*)block;
+    pos += (block_words + 1) << 2;
+    block = (GstRTCPXRBlock*) pos;
+    goto again;
+  }
+done:
+  return;
 }
 
 void _logging(ReportProcessor *this, GstMPRTCPReportSummary* summary)
@@ -531,7 +478,7 @@ void _logging(ReportProcessor *this, GstMPRTCPReportSummary* summary)
     );
   }
 
-  if(summary->XR_OWD.processed){
+  if(summary->XR.processed && summary->XR.OWD.processed){
 
     mprtp_logger(this->logfile,
                  "-------------------------- XR OWD ---------------------------\n"
@@ -540,14 +487,14 @@ void _logging(ReportProcessor *this, GstMPRTCPReportSummary* summary)
                  "min_delay:          %lu\n"
                  "median_delay:       %lu\n"
                  ,
-                 summary->XR_OWD.interval_metric,
-                 summary->XR_OWD.max_delay,
-                 summary->XR_OWD.min_delay,
-                 summary->XR_OWD.median_delay
+                 summary->XR.OWD.interval_metric,
+                 summary->XR.OWD.max_delay,
+                 summary->XR.OWD.min_delay,
+                 summary->XR.OWD.median_delay
     );
   }
 
-  if(summary->XR_RFC7243.processed){
+  if(summary->XR.processed && summary->XR.DiscardedBytes.processed){
 
     mprtp_logger(this->logfile,
                  "-------------------------- XR_RFC7243 ---------------------------\n"
@@ -555,64 +502,34 @@ void _logging(ReportProcessor *this, GstMPRTCPReportSummary* summary)
                  "early_bit:          %d\n"
                  "discarded_bytes:    %u\n"
                  ,
-                 summary->XR_RFC7243.interval_metric,
-                 summary->XR_RFC7243.early_bit,
-                 summary->XR_RFC7243.discarded_bytes
+                 summary->XR.DiscardedBytes.interval_metric,
+                 summary->XR.DiscardedBytes.early_bit,
+                 summary->XR.DiscardedBytes.discarded_bytes
     );
   }
 
-  if(summary->XR_OWD_RLE.processed){
-      gint i;
-      mprtp_logger(this->logfile,
-                   "-------------------------- XR OWD RLE ---------------------------\n"
-                   "length:    %d\n"
-                   "offset:    %lu\n"
-                   ,
-                   summary->XR_OWD_RLE.length,
-                   summary->XR_OWD_RLE.offset
-      );
-      for(i=0; i<summary->XR_OWD_RLE.length; ++i){
-          mprtp_logger(this->logfile,
-                           "value %d:    %lu\n"
-                           ,
-                           i, summary->XR_OWD_RLE.values[i]
-              );
-      }
-    }
 
-  if(summary->XR_RFC3611.processed){
-      gint i;
-      mprtp_logger(this->logfile,
-                   "-------------------------- XR_RFC3611 ---------------------------\n"
-                   "length:    %d\n"
-                   ,
-                   summary->XR_RFC3611.length
-      );
-      for(i=0; i<summary->XR_RFC3611.length; ++i){
-          mprtp_logger(this->logfile,
-                           "value %d:    %hu\n"
-                           ,
-                           i, summary->XR_RFC3611.values[i]
-              );
-      }
-    }
-
-  if(summary->XR_RFC7097.processed){
+  if(summary->XR.processed && summary->XR.DiscardedRLE.processed){
       gint i;
       mprtp_logger(this->logfile,
                    "-------------------------- XR_RFC7097 ---------------------------\n"
+                   "begin_seq: %hu\n"
+                   "end_seq:   %hu\n"
                    "length:    %d\n"
                    ,
-                   summary->XR_RFC7097.length
+                   summary->XR.DiscardedRLE.begin_seq,
+                   summary->XR.DiscardedRLE.end_seq,
+                   summary->XR.DiscardedRLE.length
       );
-      for(i=0; i<summary->XR_RFC7097.length; ++i){
+      for(i=0; i<summary->XR.DiscardedRLE.length; ++i){
           mprtp_logger(this->logfile,
-                           "value %d:    %hu\n"
+                           "value %d:    %X\n"
                            ,
-                           i, summary->XR_RFC7097.values[i]
+                           i, summary->XR.DiscardedRLE.chunks[i].Bitvector.bitvector
               );
       }
     }
+
 }
 
 #undef THIS_READLOCK

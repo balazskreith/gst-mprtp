@@ -17,16 +17,13 @@
 #include "packetssndqueue.h"
 #include "percentiletracker.h"
 #include "numstracker.h"
+#include "packetssndtracker.h"
 #include "reportproc.h"
-#include "packetstracker.h"
 
 G_BEGIN_DECLS
 
 typedef struct _MPRTPSPath MPRTPSPath;
 typedef struct _MPRTPSPathClass MPRTPSPathClass;
-typedef struct _MPRTPSPathPackets MPRTPSPathPackets;
-typedef struct _MPRTPSPathPacketsItem MPRTPSPathPacketsItem;
-typedef struct _MPRTPSPathPacketsSummary MPRTPSPathPacketsSummary;
 
 #define MPRTPS_PATH_TYPE             (mprtps_path_get_type())
 #define MPRTPS_PATH(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),MPRTPS_PATH_TYPE,MPRTPSPath))
@@ -43,45 +40,6 @@ typedef enum
   MPRTPS_PATH_FLAG_NON_CONGESTED = 2,
   MPRTPS_PATH_FLAG_ACTIVE        = 4,
 } MPRTPSPathFlags;
-
-
-struct _MPRTPSPathPacketsItem{
-  guint16      seq_num;
-  guint16      payload_bytes;
-  GstClockTime sent;
-};
-
-struct _MPRTPSPathPacketsSummary{
-  gint32                   bytes_in_flight;
-  gint32                   receiver_bitrate;
-  gint32                   goodput_bitrate;
-  guint32                  total_sent_packets_num;
-  guint32                  total_sent_bytes;
-};
-
-struct _MPRTPSPathPackets
-{
-  gboolean                 activated;
-
-  MPRTPSPathPacketsItem*   items;
-  gint32                   length;
-  gint32                   counter;
-  gint32                   read_index;
-  gint32                   write_index;
-  gint32                   sent_obsolation_index;
-  guint16                  last_hssn;
-  gboolean                 unkown_last_hssn;
-
-  gint32                   received_bytes_in_1s;
-  gint32                   goodput_bytes_in_1s;
-  gint32                   sent_bytes_in_1s;
-  gint32                   bytes_in_flight;
-
-  guint32                  last_sent_frame_timestamp;
-  guint32                  total_sent_packets_num;
-  guint32                  total_sent_payload_bytes;
-  NumsTracker*             sent_bytes;
-};
 
 struct _MPRTPSPath
 {
@@ -112,7 +70,7 @@ struct _MPRTPSPath
   guint32                 monitoring_interval;
 
 //  MPRTPSPathPackets       packets;
-  PacketsTracker*         packetstracker;
+  PacketsSndTracker*         packetstracker;
 
   guint32                 total_sent_packets_num;
   guint32                 total_sent_payload_bytes;
@@ -133,42 +91,7 @@ struct _MPRTPSPathClass
 };
 
 
-typedef struct _SubflowUtilization{
-  gboolean   controlled;
-  struct _SubflowUtilizationReport{
-    gint32   lost_bytes;
-    gint32   discarded_bytes;
-    gint32   target_rate;
-    gint32   sending_rate;
-    guint64  owd;
-    gdouble  rtt;
-    gint     state;
-  }report;
-  struct _SubflowUtilizationControl{
-    //values for congestion controlling
-    gint32   max_rate;
-    gint32   min_rate;
-
-
-    //Todo: add this
-    //gdouble  aggressivity;
-  }control;
-}SubflowUtilization;
-
-typedef struct _MPRTPPluginUtilization{
-  struct{
-    gint32 target_rate;
-  }report;
-  struct{
-    gint32  max_rate,min_rate;
-    gdouble max_mtakover,max_stakover;
-  }control;
-  SubflowUtilization subflows[32];
-}MPRTPPluginUtilization;
-
-
 GType mprtps_path_get_type (void);
-//MPRTPSPath *make_mprtps_path (guint8 id, void (*send_func)(gpointer, GstBuffer*), gpointer func_this);
 MPRTPSPath *make_mprtps_path (guint8 id);
 
 guint8 mprtps_path_get_id (MPRTPSPath * this);
@@ -202,7 +125,10 @@ void mprtps_path_process_rtp_packet(MPRTPSPath * this, GstBuffer * buffer, gbool
 void mprtps_path_set_keep_alive_period(MPRTPSPath *this, GstClockTime period);
 void mprtps_path_set_approval_process(MPRTPSPath *this, gpointer data, gboolean(*approval)(gpointer, GstBuffer *));
 gboolean mprtps_path_approve_request(MPRTPSPath *this, GstBuffer *buf);
-void mprtps_path_set_packets_tracker(MPRTPSPath *this, PacketsTracker *tracker);
+
+PacketsSndTracker *mprtps_path_ref_packetstracker(MPRTPSPath *this);
+PacketsSndTracker* mprtps_path_unref_packetstracker(MPRTPSPath *this);
+void mprtps_path_set_packets_tracker(MPRTPSPath *this, PacketsSndTracker *tracker);
 
 
 gboolean mprtps_path_request_keep_alive(MPRTPSPath *this);

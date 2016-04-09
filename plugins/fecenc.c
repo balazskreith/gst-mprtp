@@ -79,7 +79,6 @@ static void _ruin_subflow (gpointer subflow);
 static Subflow *_make_subflow (MPRTPSPath * path);
 static void _reset_subflow (Subflow * this);
 static Subflow *_get_subflow(FECEncoder * this, guint8 subflow_id);
-static void _logging(gpointer data);
 
 void
 fecencoder_class_init (FECEncoderClass * klass)
@@ -114,7 +113,6 @@ fecencoder_init (FECEncoder * this)
   this->max_protection_num = GST_RTPFEC_MAX_PROTECTION_NUM;
   this->bitstrings = g_queue_new();
 
-  mprtp_logger_add_logging_fnc(_logging, this, 1);
 }
 
 
@@ -329,19 +327,26 @@ _reset_subflow (Subflow * this)
 
 }
 
+//static void _subflow_iterator(
+//    FECEncoder * this,
+//    void(*process)(Subflow*,gpointer),
+//    gpointer data)
+//{
+//  GHashTableIter iter;
+//  gpointer       key, val;
+//  Subflow*       subflow;
+//
+//  g_hash_table_iter_init (&iter, this->subflows);
+//  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
+//  {
+//    subflow = (Subflow *) val;
+//    process(subflow, data);
+//  }
+//}
+
 Subflow *_get_subflow(FECEncoder * this, guint8 subflow_id)
 {
   return g_hash_table_lookup (this->subflows, GINT_TO_POINTER (subflow_id));
-}
-
-void _logging(gpointer data)
-{
-  FECEncoder *this;
-
-  this = data;
-  THIS_READLOCK(this);
-
-  THIS_READUNLOCK(this);
 }
 
 #undef DEBUG_PRINT_TOOLS

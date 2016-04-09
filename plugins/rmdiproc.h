@@ -34,11 +34,12 @@ typedef struct _RMDIProcessorResult RMDIProcessorResult;
 
 struct _RMDIProcessorResult{
   guint32        max_bytes_in_flight;
+  guint32        sent_packets;
   guint32        sender_bitrate;
   guint32        goodput_bitrate;
   gdouble        utilized_fraction;
   gdouble        corrH;
-  gdouble        g_125,g_250,g_500,g_1000;
+  gdouble        g1,g_250,g_500,g_1000;
 };
 
 struct _RMDIProcessor

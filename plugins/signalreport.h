@@ -24,16 +24,19 @@ typedef struct _MPRTPSubflowFBRACngCtrlerParams{
 
 typedef struct _MPRTPSubflowMARCRateController{
   guint32 target_bitrate;
-  gint8   state;
-  guint32 discarded_bitrate;
-  guint32 receiver_bitrate;
+  guint32 goodput_bitrate;
   guint32 sending_bitrate;
-
   MPRTPSubflowMARCCngCtrlerParams cngctrler;
 }MPRTPSubflowFECBasedRateAdaption;
 
+typedef struct _MPRTPSubflowManualRateController{
+  gint8   path_state;
+  gint32  target_bitrate;
+}MPRTPSubflowManualRateController;
+
 typedef union _MPRTPSubflowRateController{
   MPRTPSubflowFECBasedRateAdaption fbra;
+  MPRTPSubflowManualRateController manual;
 }MPRTPSubflowRateController;
 
 typedef struct _MPRTPSubflowExtendedReport{
@@ -55,6 +58,7 @@ typedef struct _MPRTPSubflowReceiverReport{
 typedef struct _MPRTPSubflowUtilizationSignalData{
   MPRTPSubflowReceiverReport receiver_report;
   MPRTPSubflowExtendedReport extended_report;
+  guint                      controlling_mode;
   MPRTPSubflowRateController ratectrler;
 }MPRTPSubflowUtilizationSignalData;
 

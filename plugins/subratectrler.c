@@ -94,10 +94,55 @@ SubflowRateController *make_subratectrler(MPRTPSPath *path)
   result                      = g_object_new (SUBRATECTRLER_TYPE, NULL);
   result->path                = g_object_ref(path);
   result->id                  = mprtps_path_get_id(result->path);
+  mprtps_path_set_approval_process(path, result, subratectrler_packet_approver);
   return result;
 }
 
 void subratectrler_time_update(SubflowRateController *this)
+{
+  THIS_WRITELOCK(this);
+  if(!this->enabled){
+    goto done;
+  }
+
+  switch(this->type){
+    case SUBRATECTRLER_FBRA_MARC:
+      fbrasubctrler_time_update(this->controller);
+      break;
+    default:
+    case SUBRATECTRLER_NO_CTRL:
+      goto done;
+      break;
+  }
+
+done:
+  THIS_WRITEUNLOCK(this);
+  return;
+}
+
+void subratectrler_signal_update(SubflowRateController *this, MPRTPSubflowRateController *params)
+{
+  THIS_WRITELOCK(this);
+  if(!this->enabled){
+    goto done;
+  }
+
+  switch(this->type){
+    case SUBRATECTRLER_FBRA_MARC:
+      fbrasubctrler_signal_update(this->controller, &params->fbra);
+      break;
+    default:
+    case SUBRATECTRLER_NO_CTRL:
+      goto done;
+      break;
+  }
+
+done:
+  THIS_WRITEUNLOCK(this);
+  return;
+}
+
+void subratectrler_signal_request(SubflowRateController *this, MPRTPSubflowRateController *params)
 {
   THIS_READLOCK(this);
   if(!this->enabled){
@@ -106,7 +151,7 @@ void subratectrler_time_update(SubflowRateController *this)
 
   switch(this->type){
     case SUBRATECTRLER_FBRA_MARC:
-      fbrasubctrler_time_update(this->controller);
+      fbrasubctrler_signal_request(this->controller, &params->fbra);
       break;
     default:
     case SUBRATECTRLER_NO_CTRL:
@@ -135,7 +180,7 @@ void subratectrler_report_update(
                          SubflowRateController *this,
                          GstMPRTCPReportSummary *summary)
 {
-  THIS_READLOCK(this);
+  THIS_WRITELOCK(this);
   if(!this->enabled){
     goto done;
   }
@@ -151,9 +196,37 @@ void subratectrler_report_update(
   }
 
 done:
-  THIS_READUNLOCK(this);
+  THIS_WRITEUNLOCK(this);
 
   return;
+}
+
+gboolean subratectrler_packet_approver(
+                         gpointer data,
+                         GstBuffer *buf)
+{
+  gboolean result = TRUE;
+  SubflowRateController *this = data;
+  THIS_WRITELOCK(this);
+  if(!this->enabled){
+    goto done;
+  }
+
+  switch(this->type){
+    case SUBRATECTRLER_FBRA_MARC:
+      result = fbrasubctrler_path_approver(this->controller, buf);
+      break;
+    default:
+    case SUBRATECTRLER_NO_CTRL:
+      result = TRUE;
+      goto done;
+      break;
+  }
+
+done:
+  THIS_WRITEUNLOCK(this);
+
+  return result;
 }
 
 

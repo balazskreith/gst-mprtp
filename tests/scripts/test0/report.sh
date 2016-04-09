@@ -202,13 +202,6 @@ echo "
     \label{fig:sumrtcpintervals}
 \end{figure}
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=1\textwidth]{$LOSTSPLOT}
-    \caption{Summary of losts}
-    \label{fig:sumlosts}
-\end{figure}
-
 " >> $DST
 
 

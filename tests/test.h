@@ -162,8 +162,8 @@ static int path1_active         = 1;
 static int path2_active         = 0;
 static int path3_active         = 0;
 static int fec_interval         = 0;
-static int fec_min_window       = 10;
-static int fec_max_window       = 100;
+static int fec_min_window       = 5;
+static int fec_max_window       = 20;
 static int keep_alive_period    = 0;
 
 static GOptionEntry entries[] =

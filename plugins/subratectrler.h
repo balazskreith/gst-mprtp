@@ -7,7 +7,7 @@
 #include "sndratedistor.h"
 #include "reportproc.h"
 #include "rmdiproc.h"
-
+#include "signalreport.h"
 
 typedef struct _SubflowRateController SubflowRateController;
 typedef struct _SubflowRateControllerClass SubflowRateControllerClass;
@@ -47,5 +47,7 @@ SubflowRateController *make_subratectrler(MPRTPSPath *path);
 void subratectrler_change(SubflowRateController *this, SubRateControllerType type);
 void subratectrler_report_update(SubflowRateController *this, GstMPRTCPReportSummary *summary);
 void subratectrler_time_update(SubflowRateController *this);
-
+void subratectrler_signal_update(SubflowRateController *this, MPRTPSubflowRateController *ratectrler_params);
+void subratectrler_signal_request(SubflowRateController *this, MPRTPSubflowRateController *ratectrler_params);
+gboolean subratectrler_packet_approver(gpointer data,GstBuffer *buf);
 #endif /* SUBRATECTRLER_H_ */

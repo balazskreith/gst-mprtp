@@ -816,6 +816,7 @@ _logging (gpointer data)
   guint32 fec_total_repaired_bytes;
 
   this = data;
+  THIS_READLOCK(this);
 
   if(!this->joiner) goto done;
 
@@ -839,6 +840,7 @@ _logging (gpointer data)
                );
 
 done:
+  THIS_READUNLOCK(this);
   return;
 }
 

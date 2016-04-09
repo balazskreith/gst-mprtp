@@ -229,13 +229,14 @@ static void _process_discarded_rle(RMDIProcessor *this, GstMPRTCPXRReportSummary
   this->result.goodput_bitrate =
       packetssndtracker_get_goodput_bytes_from_acked(this->packetstracker, &this->result.utilized_fraction)<<3;
   this->result.sender_bitrate = trackerstat.sent_bytes_in_1s << 3;
+  this->result.sent_packets   = trackerstat.sent_packets_in_1s;
   numstracker_add(this->bytes_in_flight, trackerstat.bytes_in_flight);
 }
 
 static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
 {
   if(!xrsummary->OWD.median_delay){
-    this->result.g_125             = 0.;
+    this->result.g1             = 0.;
     this->result.g_250             = 0.;
     this->result.g_500             = 0.;
     this->result.g_1000            = 0.;
@@ -251,7 +252,7 @@ static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummar
   this->last_delay            = xrsummary->OWD.median_delay;
 
   this->result.corrH             = !_priv(this)->delay80th ? 0. : (gdouble)this->last_delay / (gdouble)_priv(this)->delay80th;
-  this->result.g_125             = _priv(this)->cblocks[0].g;
+  this->result.g1             = _priv(this)->cblocks[0].g;
   this->result.g_250             = _priv(this)->cblocks[1].g;
   this->result.g_500             = _priv(this)->cblocks[2].g;
   this->result.g_1000            = _priv(this)->cblocks[3].g;
@@ -399,11 +400,15 @@ void _readable_logging(RMDIProcessor *this)
 
 void _readable_result(RMDIProcessor *this, RMDIProcessorResult *result)
 {
+  GstClockTime secs, msecs;
   gchar filename[255];
   memset(filename, 0, 255);
   sprintf(filename, "rmdiproc_%d.log", this->id);
+  secs  = GST_TIME_AS_SECONDS(_now(this) - this->made);
+  msecs = GST_TIME_AS_MSECONDS(_now(this) - this->made);
   mprtp_logger(filename,
                "############ Receiver Measured Delay Impact Processor Result #################\n"
+               "time since started:  %ds (%dms)\n"
                "max_bytes_in_flight: %d\n"
                "sender_bitrate:      %d\n"
                "goodput_bitrate:     %d\n"
@@ -414,12 +419,16 @@ void _readable_result(RMDIProcessor *this, RMDIProcessorResult *result)
                "g_500:               %f\n"
                "g_1000:              %f\n"
                ,
+
+               secs,
+               msecs,
+
                result->max_bytes_in_flight,
                result->sender_bitrate,
                result->goodput_bitrate,
                result->utilized_fraction,
                result->corrH,
-               result->g_125,
+               result->g1,
                result->g_250,
                result->g_500,
                result->g_1000

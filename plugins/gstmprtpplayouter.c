@@ -674,7 +674,7 @@ _setup_paths_discard_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstCl
     if(subflow_id != 255 && subflow_id != 0 && !subflow_match){
       continue;
     }
-    mprtpr_path_set_discard_treshold(path, treshold);
+    mprtpr_path_set_discard_treshold(path, treshold * GST_MSECOND);
     if(subflow_match){
       break;
     }
@@ -696,7 +696,7 @@ _setup_paths_lost_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClock
     if(subflow_id != 255 && subflow_id != 0 && !subflow_match){
       continue;
     }
-    mprtpr_path_set_lost_treshold(path, treshold);
+    mprtpr_path_set_lost_treshold(path, treshold * GST_MSECOND);
     if(subflow_match){
       break;
     }

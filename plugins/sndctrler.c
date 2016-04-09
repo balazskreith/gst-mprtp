@@ -347,6 +347,11 @@ static void _fec_rate_refresh_per_subflow(Subflow *subflow, gpointer data)
 
   this->fec_sum_bitrate     += fec_byterate * 8;
   this->fec_sum_packetsrate += fec_packetsrate;
+
+  mprtp_logger("fecrates.csv",
+                 "%u,",
+                 fec_byterate + 28 * 8 /*rtp+UDP fixed header*/ * fec_packetsrate
+    );
 }
 
 void _fec_rate_refresher(SndController *this)
@@ -354,6 +359,11 @@ void _fec_rate_refresher(SndController *this)
   this->fec_sum_packetsrate = 0;
   this->fec_sum_bitrate = 0;
   _subflow_iterator(this, _fec_rate_refresh_per_subflow, this);
+
+  mprtp_logger("fecrates.csv",
+                   "%u\n",
+                   this->fec_sum_bitrate + 28 * 8 /*rtp+UDP fixed header*/ *  this->fec_sum_packetsrate
+      );
 }
 
 

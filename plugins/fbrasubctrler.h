@@ -14,6 +14,7 @@
 #include "sndratedistor.h"
 #include "reportproc.h"
 #include "rmdiproc.h"
+#include "signalreport.h"
 
 
 typedef struct _FBRASubController FBRASubController;
@@ -82,10 +83,15 @@ struct _FBRASubControllerClass{
 GType fbrasubctrler_get_type (void);
 FBRASubController *make_fbrasubctrler(MPRTPSPath *path);
 
+gboolean fbrasubctrler_path_approver(gpointer data,    GstBuffer *buffer);
+
 void fbrasubctrler_enable(FBRASubController *this);
 void fbrasubctrler_disable(FBRASubController *this);
 
 void fbrasubctrler_report_update(FBRASubController *this, GstMPRTCPReportSummary *summary);
 void fbrasubctrler_time_update(FBRASubController *this);
+
+void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *params);
+void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *result);
 
 #endif /* FBRASUBCTRLER_H_ */

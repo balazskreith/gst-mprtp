@@ -224,6 +224,7 @@ done:
 void _logging(gpointer data)
 {
   PacketsSndQueue *this = data;
+  THIS_READLOCK(this);
   mprtp_logger("packetssnqueue.log",
                "----------------------------------------------------\n"
                "Seconds: %lu\n"
@@ -236,6 +237,8 @@ void _logging(gpointer data)
                g_queue_get_length(this->items)
 
                );
+
+  THIS_READUNLOCK(this);
 }
 
 

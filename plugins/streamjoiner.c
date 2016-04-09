@@ -676,8 +676,9 @@ static void _logging_helper(Subflow *subflow, gpointer data)
 
 void _logging(gpointer data)
 {
-
   StreamJoiner *this = data;
+  THIS_READLOCK(this);
+
   mprtp_logger("streamjoiner.csv",
                "%f,%d\n",
                this->playout_delay,
@@ -702,6 +703,8 @@ void _logging(gpointer data)
                  this->playout_halt,
                  this->playout_halt_time
                  );
+
+  THIS_READUNLOCK(this);
 }
 
 

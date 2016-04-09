@@ -167,10 +167,10 @@ struct _Private{
 #define _rmdi(this) this->rmdi_result
 #define _corrH(this) _rmdi(this).corrH //todo: elliminate this one as well
 //Todo: elliminate it.
-#define _q125(this) _rmdi(this).g1
-#define _q250(this) _rmdi(this).g_250
-#define _q500(this) _rmdi(this).g_500
-#define _q1000(this) _rmdi(this).g_1000
+#define _q1(this) _rmdi(this).g1
+#define _q2(this) _rmdi(this).g2
+#define _q3(this) _rmdi(this).g3
+#define _q4(this) _rmdi(this).g4
 
 #define _fcongestion(this) _priv(this)->fcongestion
 #define _bcongestion(this) _priv(this)->bcongestion
@@ -362,8 +362,8 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->reduce_target_factor             = REDUCE_TARGET_FACTOR;
 
   _priv(this)->gkeep                            = &_rmdi(this).g1;
-  _priv(this)->gprobe                           = &_rmdi(this).g1;
-  _priv(this)->gcong                            = &_rmdi(this).g1;
+  _priv(this)->gprobe                           = &_rmdi(this).g2;
+  _priv(this)->gcong                            = &_rmdi(this).g4;
 
   //Todo: fix this
   mprtp_logger_add_logging_fnc(_logging, this, 2);
@@ -547,7 +547,15 @@ done:
 static gint32 _undershoot(FBRASubController *this)
 {
   gint32 target_rate = this->target_bitrate;
-  if(_gcong_th(this) < MIN(_q500(this),_q1000(this))){
+//  if(_gcong_th(this) < MIN(_q3(this),_q4(this))){
+//    target_rate = MIN(_GP(this) * .85, _TR(this) * _rdc_target_fac(this));
+//  }else{
+//    target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
+//  }
+
+  if(_TR(this) < _SR(this) * .9){
+    target_rate = MIN(_GP(this) * .85, target_rate);
+  }else if(_gcong_th(this) < _gcong(this)){
     target_rate = MIN(_GP(this) * .85, _TR(this) * _rdc_target_fac(this));
   }else{
     target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
@@ -563,7 +571,7 @@ _reduce_stage_helper(
   gboolean congestion = FALSE;
   gboolean distortion = FALSE;
 
-  if(_gcong_th(this) < _q1000(this)){
+  if(_gcong_th(this) < _gcong(this)){
     congestion = TRUE;
   }else if(_UF(this) < .8){
     congestion = TRUE;
@@ -571,9 +579,9 @@ _reduce_stage_helper(
     congestion = TRUE;
   }
 
-  if(1.2 < _corrH(this)){
+  if(1.5 < _corrH(this)){
     distortion = TRUE;
-  }else if(_gkeep_th(this) < _q500(this)){
+  }else if(_gkeep_th(this) < _gkeep(this)){
     distortion = TRUE;
   }
 
@@ -597,13 +605,8 @@ _reduce_stage(
     goto done;
   }
 
-  if(_TR(this) < _SR(this) * .9){
-    target_rate = MIN(_GP(this) * .85, target_rate);
-  }else if(.2 < _q1000(this)){
-    target_rate = MIN(_GP(this) * .85, _TR(this) * _rdc_target_fac(this));
-  }else{
-    target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
-  }
+  target_rate = _undershoot(this);
+
   _change_target_bitrate(this, target_rate);
   _reset_monitoring(this);
   _disable_controlling(this);
@@ -656,13 +659,14 @@ _keep_stage(
 
   if(_fdistortion(this)){
     if(this->last_settled < _now(this) - _max_dist_keep(this) * GST_SECOND){
-      target_rate *= 1. - CONSTRAIN(0.05, 0.15, MAX(_q250(this), _q500(this)));
+      target_rate *= .9;
+      this->last_settled = _now(this);
     }
     _set_event(this, EVENT_DISTORTION);
     goto done;
   }
 
-  if(_state(this) != MPRTPS_PATH_STATE_OVERUSED){
+  if(_state(this) != MPRTPS_PATH_STATE_STABLE){
     _set_event(this, EVENT_SETTLED);
     goto done;
   }
@@ -713,7 +717,7 @@ _probe_stage(
 
   _probe_stage_helper(this);
 
-  trend          = CONSTRAIN(0.05, 0.1, MAX(_q125(this), _q250(this)));
+  trend          = CONSTRAIN(0.05, 0.1, MAX(_q1(this), _q2(this)));
   probe_interval = _get_probe_interval(this);
 
   if(_bcongestion(this) || _fcongestion(this)){
@@ -1051,16 +1055,16 @@ void _logging(gpointer data)
                _tr_is_corred(this),
 
                _priv(this)->min_target_bitrate,
-               _q125(this),
+               _q1(this),
 
                _priv(this)->max_target_bitrate,
-               _q250(this),
+               _q2(this),
 
                _btlp(this),
-               _q500(this),
+               _q3(this),
 
                _mon_int(this),
-               _q1000(this),
+               _q4(this),
 
                _mon_br(this),
                _UF(this),

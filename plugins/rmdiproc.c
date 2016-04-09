@@ -237,9 +237,9 @@ static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummar
 {
   if(!xrsummary->OWD.median_delay){
     this->result.g1             = 0.;
-    this->result.g_250             = 0.;
-    this->result.g_500             = 0.;
-    this->result.g_1000            = 0.;
+    this->result.g2             = 0.;
+    this->result.g3             = 0.;
+    this->result.g4            = 0.;
     goto done;
   }
 
@@ -253,9 +253,9 @@ static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummar
 
   this->result.corrH             = !_priv(this)->delay80th ? 0. : (gdouble)this->last_delay / (gdouble)_priv(this)->delay80th;
   this->result.g1             = _priv(this)->cblocks[0].g;
-  this->result.g_250             = _priv(this)->cblocks[1].g;
-  this->result.g_500             = _priv(this)->cblocks[2].g;
-  this->result.g_1000            = _priv(this)->cblocks[3].g;
+  this->result.g2             = _priv(this)->cblocks[1].g;
+  this->result.g3             = _priv(this)->cblocks[2].g;
+  this->result.g4            = _priv(this)->cblocks[3].g;
 
   _csv_logging(this, xrsummary->OWD.median_delay);
   _readable_logging(this);
@@ -429,9 +429,9 @@ void _readable_result(RMDIProcessor *this, RMDIProcessorResult *result)
                result->utilized_fraction,
                result->corrH,
                result->g1,
-               result->g_250,
-               result->g_500,
-               result->g_1000
+               result->g2,
+               result->g3,
+               result->g4
   );
 }
 

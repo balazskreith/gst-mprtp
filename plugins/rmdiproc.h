@@ -39,7 +39,7 @@ struct _RMDIProcessorResult{
   guint32        goodput_bitrate;
   gdouble        utilized_fraction;
   gdouble        corrH;
-  gdouble        g1,g_250,g_500,g_1000;
+  gdouble        g1,g2,g3,g4;
 };
 
 struct _RMDIProcessor

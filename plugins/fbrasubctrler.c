@@ -460,6 +460,11 @@ void fbrasubctrler_time_update(FBRASubController *this)
   }
   //check backward congestion
   this->monitored_bitrate = mprtps_path_get_monitored_bitrate(this->path, &this->monitored_packets);
+  if(_max_ramp_up(this) < this->monitored_bitrate){
+      this->monitoring_interval = CONSTRAIN(_mon_min_int(this), _mon_max_int(this), this->monitoring_interval + 1);
+      _set_monitoring_interval(this, this->monitoring_interval);
+  }
+
   if(_bcongestion(this)){
     if(this->last_report_arrived < _now(this) - 2 * this->report_interval){
       goto done;
@@ -929,10 +934,6 @@ void _setup_monitoring(FBRASubController *this)
 {
   guint interval;
   gdouble plus_rate = 0, scl = 0;
-  guint mean;
-
-  mean = _priv(this)->min_target_bitrate + _priv(this)->max_target_bitrate;
-  mean>>=1;
 
   if(0 < this->bottleneck_point){
     scl  = _TR(this) - this->bottleneck_point;

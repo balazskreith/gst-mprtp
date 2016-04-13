@@ -146,6 +146,10 @@ static void
 _logging(
     gpointer data);
 
+static void
+_logging2(
+    gpointer data);
+
 //#define _trash_frame(this, frame)
 //  g_slice_free(Frame, frame);
 //  --this->framecounter;
@@ -262,7 +266,8 @@ stream_joiner_init (StreamJoiner * this)
 
   g_rw_lock_init (&this->rwmutex);
 
-  mprtp_logger_add_logging_fnc(_logging, this, 10, &this->rwmutex);
+  mprtp_logger_add_logging_fnc(_logging, this, 1, &this->rwmutex);
+  mprtp_logger_add_logging_fnc(_logging2, this, 10, &this->rwmutex);
 }
 
 StreamJoiner*
@@ -684,6 +689,30 @@ void _logging(gpointer data)
                this->bytes_in_queue);
 
   _iterate_subflows(this, _logging_helper, this);
+
+  mprtp_logger("streamjoiner.log",
+                 "###############################################################\n"
+                 "Seconds: %lu\n"
+                 "framecounter: %d | bytes_in_queue: %d\n"
+                 "initial_delay: %lu\n"
+                 "flushing: %d | playout_allowed: %d | playout_halt: %d\n"
+                 "halt_time: %lu | \n"
+                 ,
+                 GST_TIME_AS_SECONDS(_now(this) - this->made),
+                 this->framecounter,
+                 this->bytes_in_queue,
+                 this->init_delay,
+                 this->flushing,
+                 this->playout_allowed,
+                 this->playout_halt,
+                 this->playout_halt_time
+                 );
+
+}
+
+void _logging2(gpointer data)
+{
+  StreamJoiner *this = data;
 
   mprtp_logger("streamjoiner.log",
                  "###############################################################\n"

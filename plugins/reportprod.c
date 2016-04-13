@@ -32,15 +32,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define THIS_READLOCK(this)
-#define THIS_READUNLOCK(this)
-#define THIS_WRITELOCK(this)
-#define THIS_WRITEUNLOCK(this)
+//#define THIS_READLOCK(this)
+//#define THIS_READUNLOCK(this)
+//#define THIS_WRITELOCK(this)
+//#define THIS_WRITEUNLOCK(this)
 
-//#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-//#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-//#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-//#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
+#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
+#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
+#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
+#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
 
 #define DATABED_LENGTH 1400
 
@@ -317,10 +317,10 @@ GstBuffer *report_producer_end(ReportProducer *this, guint *length)
   if(length) {
     *length = this->length;
   }
-  mprtp_logger_open_collector(this->logfile);
-  gst_printfnc_rtcp(data, mprtp_logger_collect);
-  mprtp_logger_collect("########### Report produced for after: %lu seconds ###########\n", GST_TIME_AS_SECONDS(_now(this) - this->made));
-  mprtp_logger_close_collector();
+//  mprtp_logger_open_collector(this->logfile);
+//  gst_printfnc_rtcp(data, mprtp_logger_collect);
+//  mprtp_logger_collect("########### Report produced for after: %lu seconds ###########\n", GST_TIME_AS_SECONDS(_now(this) - this->made));
+//  mprtp_logger_close_collector();
 done:
   THIS_WRITEUNLOCK(this);
   return result;

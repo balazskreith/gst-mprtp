@@ -294,7 +294,10 @@ static void _change_controlling_mode(Subflow *this, guint controlling_mode)
   }
 }
 
-void sndctrler_change_controlling_mode(SndController * this, guint8 subflow_id, guint controlling_mode)
+void sndctrler_change_controlling_mode(SndController * this,
+                                       guint8 subflow_id,
+                                       guint controlling_mode,
+                                       gboolean *enable_fec)
 {
   Subflow *subflow;
   GHashTableIter iter;
@@ -306,6 +309,9 @@ void sndctrler_change_controlling_mode(SndController * this, guint8 subflow_id, 
     subflow = (Subflow *) val;
     if(subflow_id == 255 || subflow_id == 0 || subflow_id == subflow->id){
       _change_controlling_mode(subflow, controlling_mode);
+    }
+    if(enable_fec && subflow->controlling_mode == 2){
+      *enable_fec = TRUE;
     }
   }
   THIS_WRITEUNLOCK (this);
@@ -342,15 +348,14 @@ static void _fec_rate_refresh_per_subflow(Subflow *subflow, gpointer data)
   fecencoder_get_stats(fecencoder, subflow->id, &fec_packets_num, &fec_payload_bytes);
   fec_byterate    = _update_ratewindow(&subflow->fec_byterate, fec_payload_bytes);
   fec_packetsrate = _update_ratewindow(&subflow->fec_packets, fec_packets_num);
-
-  mprtps_path_set_monitored_bitrate(subflow->path, fec_byterate * 8);
+  mprtps_path_set_monitored_bitrate(subflow->path, fec_byterate * 8, fec_packetsrate);
 
   this->fec_sum_bitrate     += fec_byterate * 8;
   this->fec_sum_packetsrate += fec_packetsrate;
 
   mprtp_logger("fecrates.csv",
                  "%u,",
-                 fec_byterate + 28 * 8 /*rtp+UDP fixed header*/ * fec_packetsrate
+                 (fec_byterate + 28 * 8 /*rtp+UDP fixed header*/ * fec_packetsrate) / 1000
     );
 }
 
@@ -362,7 +367,7 @@ void _fec_rate_refresher(SndController *this)
 
   mprtp_logger("fecrates.csv",
                    "%u\n",
-                   this->fec_sum_bitrate + 28 * 8 /*rtp+UDP fixed header*/ *  this->fec_sum_packetsrate
+                   (this->fec_sum_bitrate + 28 * 8 /*rtp+UDP fixed header*/ *  this->fec_sum_packetsrate) / 1000
       );
 }
 
@@ -475,10 +480,11 @@ sndctrler_ticker_run (void *data)
   _fec_rate_refresher(this);
   _subflow_iterator(this, _check_report_timeout, this);
   _subflow_iterator(this, _time_update, this);
-  _emit_signal(this);
   if(this->sndratedistor){
-    sndrate_distor_refresh(this->sndratedistor);
+    this->target_bitrate_t1 = this->target_bitrate;
+    this->target_bitrate = sndrate_distor_refresh(this->sndratedistor);
   }
+  _emit_signal(this);
 //  _system_notifier_main(this);
 
   next_scheduler_time = _now(this) + 100 * GST_MSECOND;
@@ -541,12 +547,16 @@ _check_report_timeout (Subflow * subflow, gpointer data)
 void
 _time_update (Subflow * subflow, gpointer data)
 {
-
+  SndController *this = data;
+  MPRTPSubflowUtilizationSignalData *subsignal;
   if(subflow->controlling_mode < 2){
     return;
   }
+  subsignal = &this->mprtp_signal_data->subflow[subflow->id];
   subratectrler_time_update(subflow->rate_controller);
-
+  subratectrler_signal_request(subflow->rate_controller, &subsignal->ratectrler);
+  subsignal->path_state     = mprtps_path_get_state(subflow->path);
+  subsignal->target_bitrate = mprtps_path_get_target_bitrate(subflow->path);
 }
 
 void
@@ -678,10 +688,18 @@ void _emit_signal(SndController* this)
 {
   gboolean emit_signal = FALSE;
   _subflow_iterator(this, _emit_signal_helper, &emit_signal);
-  if(emit_signal){
-    this->utilization_signal_func(this->utilization_signal_data, this->mprtp_signal_data);
-    memset(this->mprtp_signal_data, 0, sizeof(MPRTPPluginSignalData));
+
+  emit_signal |= this->target_bitrate_t1 * 1.1 < this->target_bitrate;
+  emit_signal |= this->target_bitrate < this->target_bitrate_t1 * .9;
+
+  if(!emit_signal){
+    goto done;
   }
+
+  this->mprtp_signal_data->target_media_rate = this->target_bitrate;
+  this->utilization_signal_func(this->utilization_signal_data, this->mprtp_signal_data);
+done:
+  return;
 }
 //---------------------------------------------------------------------------
 

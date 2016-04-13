@@ -165,16 +165,21 @@ static void _refresh_splitter_helper(Subflow *subflow, gpointer data)
   stream_splitter_setup_sending_target(this->splitter, subflow->id, subflow->target_bitrate);
 }
 
-void sndrate_distor_refresh(SendingRateDistributor* this)
+gint32 sndrate_distor_refresh(SendingRateDistributor* this)
 {
+  gint32 result;
   THIS_WRITELOCK(this);
 
   if(this->last_subflow_refresh < _now(this) - 100 * GST_MSECOND){
+    this->target_media_rate_t1 = this->target_media_rate;
     this->target_media_rate = 0;
     _iterate_subflows(this, _refresh_subflows_helper, this);
+    this->urgent_rescheduling |= this->target_media_rate_t1 * 1.1 < this->target_media_rate;
+    this->urgent_rescheduling |= this->target_media_rate < this->target_media_rate_t1 * .9;
     this->last_subflow_refresh = _now(this);
   }
 
+  result = this->target_media_rate;
   if(_now(this) < this->next_splitter_refresh && !this->urgent_rescheduling){
     goto done;
   }
@@ -185,6 +190,7 @@ void sndrate_distor_refresh(SendingRateDistributor* this)
   this->next_splitter_refresh = _now(this) + (g_random_double() + .5) * GST_SECOND;
 done:
   THIS_WRITEUNLOCK(this);
+  return result;
 }
 
 void sndrate_distor_add_subflow(SendingRateDistributor *this, MPRTPSPath *path)

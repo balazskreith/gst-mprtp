@@ -51,6 +51,14 @@ void subratectrler_finalize (GObject * object);
 static void _enable(SubflowRateController *this);
 static void _disable(SubflowRateController *this);
 
+static void
+_logging(
+    gpointer data);
+
+static void
+_log2csv(
+    gpointer data);
+
 #define _now(this) (gst_clock_get_time(this->sysclock))
 
 //----------------------------------------------------------------------
@@ -85,6 +93,9 @@ subratectrler_init (SubflowRateController * this)
 {
   this->sysclock = gst_system_clock_obtain();
   g_rw_lock_init (&this->rwmutex);
+
+  mprtp_logger_add_logging_fnc(_logging, this, 2, &this->rwmutex);
+  mprtp_logger_add_logging_fnc(_log2csv, this, 1, &this->rwmutex);
 }
 
 
@@ -258,4 +269,35 @@ void _disable(SubflowRateController *this)
   }
   this->controller = NULL;
   this->enabled = FALSE;
+}
+
+static void
+_logging(
+    gpointer data)
+{
+  SubflowRateController *this = data;
+
+  switch(this->type){
+    case SUBRATECTRLER_FBRA_MARC:
+      fbrasubctrler_logging(this->controller);
+      break;
+    default:
+    case SUBRATECTRLER_NO_CTRL:
+      break;
+  }
+}
+
+static void
+_log2csv(
+    gpointer data)
+{
+  SubflowRateController *this = data;
+  switch(this->type){
+    case SUBRATECTRLER_FBRA_MARC:
+      fbrasubctrler_logging2csv(this->controller);
+      break;
+    default:
+    case SUBRATECTRLER_NO_CTRL:
+      break;
+  }
 }

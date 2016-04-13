@@ -262,7 +262,7 @@ stream_joiner_init (StreamJoiner * this)
 
   g_rw_lock_init (&this->rwmutex);
 
-  mprtp_logger_add_logging_fnc(_logging, this, 10);
+  mprtp_logger_add_logging_fnc(_logging, this, 10, &this->rwmutex);
 }
 
 StreamJoiner*
@@ -677,7 +677,6 @@ static void _logging_helper(Subflow *subflow, gpointer data)
 void _logging(gpointer data)
 {
   StreamJoiner *this = data;
-  THIS_READLOCK(this);
 
   mprtp_logger("streamjoiner.csv",
                "%f,%d\n",
@@ -704,7 +703,6 @@ void _logging(gpointer data)
                  this->playout_halt_time
                  );
 
-  THIS_READUNLOCK(this);
 }
 
 

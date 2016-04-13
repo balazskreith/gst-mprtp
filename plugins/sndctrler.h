@@ -61,6 +61,9 @@ struct _SndController
   guint32                    fec_sum_bitrate;
   guint32                    fec_sum_packetsrate;
 
+  gint32                     target_bitrate_t1;
+  gint32                     target_bitrate;
+
   SendingRateDistributor*    sndratedistor;
 
   GstMPRTCPReportSummary     reports_summary;
@@ -96,7 +99,8 @@ void
 sndctrler_change_controlling_mode(
     SndController * this,
     guint8 subflow_id,
-    guint mode);
+    guint mode,
+    gboolean *fec_enable);
 
 void sndctrler_setup_report_timeout(
     SndController * this,

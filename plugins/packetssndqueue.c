@@ -106,7 +106,7 @@ packetssndqueue_init (PacketsSndQueue * this)
   this->obsolation_treshold = 400 * GST_MSECOND;
   this->incoming_bytes = make_numstracker(2048, GST_SECOND);
   this->items = g_queue_new();
-  mprtp_logger_add_logging_fnc(_logging,this, 10);
+  mprtp_logger_add_logging_fnc(_logging,this, 10, &this->rwmutex);
 }
 
 
@@ -224,7 +224,6 @@ done:
 void _logging(gpointer data)
 {
   PacketsSndQueue *this = data;
-  THIS_READLOCK(this);
   mprtp_logger("packetssnqueue.log",
                "----------------------------------------------------\n"
                "Seconds: %lu\n"
@@ -238,7 +237,6 @@ void _logging(gpointer data)
 
                );
 
-  THIS_READUNLOCK(this);
 }
 
 

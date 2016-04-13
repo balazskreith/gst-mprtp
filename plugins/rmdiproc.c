@@ -239,7 +239,7 @@ static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummar
     this->result.g1             = 0.;
     this->result.g2             = 0.;
     this->result.g3             = 0.;
-    this->result.g4            = 0.;
+    this->result.g4             = 0.;
     goto done;
   }
 

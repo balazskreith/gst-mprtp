@@ -53,7 +53,7 @@ GST_DEBUG_CATEGORY_STATIC (mprtp_logger_debug_category);
 
 G_DEFINE_TYPE (MPRTPLogger, mprtp_logger, G_TYPE_OBJECT);
 
-static MPRTPLogger *this = NULL;
+static MPRTPLogger *loggerptr = NULL;
 static GRWLock list_mutex;
 static GList* subscriptions = NULL;
 static GstClock*  listclock = NULL;
@@ -134,49 +134,49 @@ mprtp_logger_init (MPRTPLogger * this)
 
 void init_mprtp_logger(void)
 {
-  if(this != NULL){
+  if(loggerptr != NULL){
     return;
   }
-  this = g_object_new(MPRTPLOGGER_TYPE, NULL);
+  loggerptr = g_object_new(MPRTPLOGGER_TYPE, NULL);
 }
 
 
 void enable_mprtp_logger(void)
 {
-  THIS_WRITELOCK(this);
-  this->enabled = TRUE;
+  THIS_WRITELOCK(loggerptr);
+  loggerptr->enabled = TRUE;
 
-  this->thread = gst_task_new (_logging_process, this, NULL);
-  g_rec_mutex_init (&this->thread_mutex);
-  gst_task_set_lock (this->thread, &this->thread_mutex);
-  gst_task_start (this->thread);
+  loggerptr->thread = gst_task_new (_logging_process, loggerptr, NULL);
+  g_rec_mutex_init (&loggerptr->thread_mutex);
+  gst_task_set_lock (loggerptr->thread, &loggerptr->thread_mutex);
+  gst_task_start (loggerptr->thread);
 
-  THIS_WRITEUNLOCK(this);
+  THIS_WRITEUNLOCK(loggerptr);
 }
 
 void disable_mprtp_logger(void)
 {
-  THIS_WRITELOCK(this);
-  this->enabled = FALSE;
-  if(this->thread && gst_task_get_state(this->thread) == GST_TASK_STARTED){
-    gst_task_stop (this->thread);
-    gst_task_join (this->thread);
+  THIS_WRITELOCK(loggerptr);
+  loggerptr->enabled = FALSE;
+  if(loggerptr->thread && gst_task_get_state(loggerptr->thread) == GST_TASK_STARTED){
+    gst_task_stop (loggerptr->thread);
+    gst_task_join (loggerptr->thread);
   }
-  THIS_WRITEUNLOCK(this);
+  THIS_WRITEUNLOCK(loggerptr);
 }
 
 void mprtp_logger_set_target_directory(const gchar *path)
 {
-  THIS_WRITELOCK(this);
-  strcpy(this->path, path);
-  THIS_WRITEUNLOCK(this);
+  THIS_WRITELOCK(loggerptr);
+  strcpy(loggerptr->path, path);
+  THIS_WRITEUNLOCK(loggerptr);
 }
 
 void mprtp_logger_get_target_directory(gchar* result)
 {
-  THIS_READLOCK(this);
-  strcpy(result, this->path);
-  THIS_READUNLOCK(this);
+  THIS_READLOCK(loggerptr);
+  strcpy(result, loggerptr->path);
+  THIS_READUNLOCK(loggerptr);
 }
 
 void mprtp_logger(const gchar *filename, const gchar * format, ...)
@@ -184,15 +184,15 @@ void mprtp_logger(const gchar *filename, const gchar * format, ...)
   FILE *file;
   va_list args;
   gchar writable[255];
-  THIS_WRITELOCK(this);
-  if(!this->enabled){
+  THIS_WRITELOCK(loggerptr);
+  if(!loggerptr->enabled){
     goto done;
   }
-  strcpy(writable, this->path);
+  strcpy(writable, loggerptr->path);
   strcat(writable, filename);
 //  strcpy(writable, filename);
-  if(!g_hash_table_lookup(this->touches, writable)){
-    g_hash_table_insert(this->touches, writable, writable);
+  if(!g_hash_table_lookup(loggerptr->touches, writable)){
+    g_hash_table_insert(loggerptr->touches, writable, writable);
     file = fopen(writable, "w");
   }else{
     file = fopen(writable, "a");
@@ -202,7 +202,7 @@ void mprtp_logger(const gchar *filename, const gchar * format, ...)
   va_end (args);
   fclose(file);
 done:
-  THIS_WRITEUNLOCK(this);
+  THIS_WRITEUNLOCK(loggerptr);
 }
 
 void mprtp_logger_rewrite(const gchar *filename, const gchar * format, ...)
@@ -210,15 +210,15 @@ void mprtp_logger_rewrite(const gchar *filename, const gchar * format, ...)
   FILE *file;
   va_list args;
   gchar writable[255];
-  THIS_WRITELOCK(this);
-  if(!this->enabled){
+  THIS_WRITELOCK(loggerptr);
+  if(!loggerptr->enabled){
     goto done;
   }
-  strcpy(writable, this->path);
+  strcpy(writable, loggerptr->path);
   strcat(writable, filename);
 //  strcpy(writable, filename);
-  if(!g_hash_table_lookup(this->touches, writable)){
-    g_hash_table_insert(this->touches, writable, writable);
+  if(!g_hash_table_lookup(loggerptr->touches, writable)){
+    g_hash_table_insert(loggerptr->touches, writable, writable);
   }
   file = fopen(writable, "w");
   va_start (args, format);
@@ -226,38 +226,38 @@ void mprtp_logger_rewrite(const gchar *filename, const gchar * format, ...)
   va_end (args);
   fclose(file);
 done:
-  THIS_WRITEUNLOCK(this);
+  THIS_WRITEUNLOCK(loggerptr);
 }
 
 void mprtp_logger_open_collector(const gchar *filename)
 {
-  THIS_WRITELOCK(this);
-  if(!this->enabled){
+  THIS_WRITELOCK(loggerptr);
+  if(!loggerptr->enabled){
     goto done;
   }
-  if(this->collector_string){
-    g_string_free(this->collector_string, TRUE);
+  if(loggerptr->collector_string){
+    g_string_free(loggerptr->collector_string, TRUE);
   }
-  this->collector_string = g_string_new(NULL);
-  strcpy(this->collector_filename, filename);
+  loggerptr->collector_string = g_string_new(NULL);
+  strcpy(loggerptr->collector_filename, filename);
 done:
-  THIS_WRITEUNLOCK(this);
+  THIS_WRITEUNLOCK(loggerptr);
 }
 
 void mprtp_logger_close_collector(void)
 {
   gchar *string = NULL;
   gchar filename[255];
-  THIS_WRITELOCK(this);
-  if(!this->enabled){
+  THIS_WRITELOCK(loggerptr);
+  if(!loggerptr->enabled){
     goto done;
   }
-  string = g_string_free(this->collector_string, FALSE);
-  this->collector_string = NULL;
-  memcpy(filename, this->collector_filename, 255);
-  memset(this->collector_filename, 0, 255);
+  string = g_string_free(loggerptr->collector_string, FALSE);
+  loggerptr->collector_string = NULL;
+  memcpy(filename, loggerptr->collector_filename, 255);
+  memset(loggerptr->collector_filename, 0, 255);
 done:
-  THIS_WRITEUNLOCK(this);
+  THIS_WRITEUNLOCK(loggerptr);
   if(string){
     mprtp_logger(filename, "%s", string);
   }
@@ -266,15 +266,15 @@ done:
 void mprtp_logger_collect(const gchar * format, ...)
 {
   va_list args;
-  THIS_WRITELOCK(this);
-  if(!this->enabled){
+  THIS_WRITELOCK(loggerptr);
+  if(!loggerptr->enabled){
     goto done;
   }
   va_start (args, format);
-  g_string_append_vprintf(this->collector_string, format, args);
+  g_string_append_vprintf(loggerptr->collector_string, format, args);
   va_end (args);
 done:
-  THIS_WRITEUNLOCK(this);
+  THIS_WRITEUNLOCK(loggerptr);
 
 }
 
@@ -283,9 +283,11 @@ typedef struct{
   gpointer    data;
   guint       tick_th;
   guint       tick_count;
+  GRWLock*    rwmutex;
 }Subscription;
 
-void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer),gpointer data, guint tick_th)
+
+void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer),gpointer data, guint tick_th, GRWLock *rwmutex)
 {
   Subscription *subscription;
   LIST_WRITELOCK;
@@ -293,6 +295,7 @@ void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer),gpointer data, gu
   subscription->logging_fnc = logging_fnc;
   subscription->data = data;
   subscription->tick_th = tick_th;
+  subscription->rwmutex = rwmutex;
   subscriptions = g_list_prepend(subscriptions, subscription);
   LIST_WRITEUNLOCK;
 }
@@ -311,15 +314,17 @@ void _logging_process(void *data)
         continue;
       }
       subscription->tick_count=0;
+      g_rw_lock_writer_lock(subscription->rwmutex);
       subscription->logging_fnc(subscription->data);
+      g_rw_lock_writer_unlock(subscription->rwmutex);
   }
 
   next_scheduler_time = gst_clock_get_time (listclock) + 100 * GST_MSECOND;
   LIST_WRITEUNLOCK;
-  clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
+  clock_id = gst_clock_new_single_shot_id (loggerptr->sysclock, next_scheduler_time);
 
   if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
-    GST_WARNING_OBJECT (this, "The clock wait is interrupted");
+    GST_WARNING_OBJECT (loggerptr, "The clock wait is interrupted");
   }
   gst_clock_id_unref (clock_id);
 }

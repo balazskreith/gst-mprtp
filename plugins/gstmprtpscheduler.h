@@ -55,7 +55,7 @@ struct _GstMprtpscheduler
   guint8                        mprtp_ext_header_id;
   guint8                        abs_time_ext_header_id;
   guint32                       ssrc_filter;
-  guint                         auto_rate_and_cc;
+  gboolean                      enable_fec;
   PacketsSndQueue*              sndqueue;
   GHashTable*                   paths;
   StreamSplitter*               splitter;

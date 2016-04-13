@@ -63,6 +63,7 @@ struct _MPRTPSPath
 
   gint32                  target_bitrate;
   gint32                  monitored_bitrate;
+  gint32                  monitored_packets;
 
   GstClockTime            sent_passive;
   GstClockTime            sent_active;
@@ -123,8 +124,8 @@ gint32 mprtps_path_get_target_bitrate(MPRTPSPath * this);
 void mprtps_path_set_state(MPRTPSPath * this, MPRTPSPathState new_state);
 MPRTPSPathState mprtps_path_get_state(MPRTPSPath * this);
 
-void mprtps_path_set_monitored_bitrate(MPRTPSPath * this, gint32 monitored_bitrate);
-gint32 mprtps_path_get_monitored_bitrate(MPRTPSPath * this);
+void mprtps_path_set_monitored_bitrate(MPRTPSPath * this, gint32 monitored_bitrate, gint32 monitored_packets);
+gint32 mprtps_path_get_monitored_bitrate(MPRTPSPath * this, guint32 *packets_num);
 
 void mprtps_path_set_congested (MPRTPSPath * this);
 void mprtps_path_set_non_congested (MPRTPSPath * this);

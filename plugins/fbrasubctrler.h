@@ -48,6 +48,7 @@ struct _FBRASubController
   guint                     measurements_num;
 
   gint32                    monitored_bitrate;
+  guint32                   monitored_packets;
   gint32                    bottleneck_point;
   gint32                    max_target_point;
   gint32                    min_target_point;
@@ -94,4 +95,6 @@ void fbrasubctrler_time_update(FBRASubController *this);
 void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *params);
 void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *result);
 
+void fbrasubctrler_logging2csv(FBRASubController *this);
+void fbrasubctrler_logging(FBRASubController *this);
 #endif /* FBRASUBCTRLER_H_ */

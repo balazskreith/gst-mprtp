@@ -52,7 +52,7 @@ void mprtp_free(gpointer ptr);
 void init_mprtp_logger(void);
 void enable_mprtp_logger(void);
 void disable_mprtp_logger(void);
-void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer),gpointer data, guint tick_th);
+void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer),gpointer data, guint tick_th, GRWLock *rwmutex);
 void mprtp_logger_set_target_directory(const gchar *path);
 void mprtp_logger_get_target_directory(gchar* result);
 void mprtp_logger(const gchar *filename, const gchar * format, ...);

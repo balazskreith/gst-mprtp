@@ -30,6 +30,7 @@ typedef enum{
 struct _ReportIntervalCalculator
 {
   GObject          object;
+  GRWLock          rwmutex;
   gdouble          media_rate;
   gboolean         sender_side;
   gdouble          avg_rtcp_size;

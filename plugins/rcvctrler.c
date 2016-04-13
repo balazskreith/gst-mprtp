@@ -36,6 +36,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+
+
 #define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
 #define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
 #define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
@@ -49,6 +51,15 @@ GST_DEBUG_CATEGORY_STATIC (rcvctrler_debug_category);
 #define GST_CAT_DEFAULT rcvctrler_debug_category
 
 G_DEFINE_TYPE (RcvController, rcvctrler, G_TYPE_OBJECT);
+
+#define PROFILING(func) \
+{  \
+  GstClockTime start, elapsed; \
+  start = _now(this); \
+  func; \
+  elapsed = GST_TIME_AS_MSECONDS(_now(this) - start); \
+  if(0 < elapsed) g_print("elapsed time in ms: %lu\n", elapsed); \
+} \
 
 #define REGULAR_REPORT_PERIOD_TIME (5*GST_SECOND)
 
@@ -378,7 +389,7 @@ rcvctrler_init (RcvController * this)
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
 
-  mprtp_logger_add_logging_fnc(_logging, this, 1);
+  mprtp_logger_add_logging_fnc(_logging, this, 1, &this->rwmutex);
 }
 
 void
@@ -391,7 +402,8 @@ refctrler_ticker (void *data)
   this = RCVCTRLER (data);
   THIS_WRITELOCK (this);
 
-  _orp_main(this);
+  PROFILING(_orp_main(this));
+//  _orp_main(this);
 
   _system_notifier_main(this);
 
@@ -504,7 +516,7 @@ done:
 //------------------------ Outgoing Report Producer -------------------------
 
 
-static void
+void
 _orp_main(RcvController * this)
 {
   ReportIntervalCalculator* ricalcer;
@@ -533,7 +545,6 @@ _orp_main(RcvController * this)
     if(!subflow->rfc3550_enabled){
       continue;
     }
-
     if(mprtpr_path_is_urgent_request(subflow->path)){
       ricalcer_urgent_report_request(subflow->ricalcer);
     }
@@ -816,7 +827,6 @@ _logging (gpointer data)
   guint32 fec_total_repaired_bytes;
 
   this = data;
-  THIS_READLOCK(this);
 
   if(!this->joiner) goto done;
 
@@ -840,7 +850,6 @@ _logging (gpointer data)
                );
 
 done:
-  THIS_READUNLOCK(this);
   return;
 }
 

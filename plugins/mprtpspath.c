@@ -287,19 +287,21 @@ MPRTPSPathState mprtps_path_get_state(MPRTPSPath * this)
   return result;
 }
 
-void mprtps_path_set_monitored_bitrate(MPRTPSPath * this, gint32 monitored_bitrate)
+void mprtps_path_set_monitored_bitrate(MPRTPSPath * this, gint32 monitored_bitrate, gint32 monitored_packets)
 {
   g_return_if_fail (this);
   THIS_WRITELOCK (this);
   this->monitored_bitrate = monitored_bitrate;
+  this->monitored_packets = monitored_packets;
   THIS_WRITEUNLOCK (this);
 }
 
-gint32 mprtps_path_get_monitored_bitrate(MPRTPSPath * this)
+gint32 mprtps_path_get_monitored_bitrate(MPRTPSPath * this, guint32 *packets_num)
 {
   gint32 result;
   THIS_READLOCK (this);
   result = this->monitored_bitrate;
+  if(packets_num) *packets_num = this->monitored_packets;
   THIS_READUNLOCK (this);
   return result;
 }

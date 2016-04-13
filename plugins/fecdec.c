@@ -80,7 +80,6 @@ static void _remove_from_request(FECDecoder *this, FECDecoderRequest *request);
 static void _segment_dtor(FECDecoder *this, FECDecoderSegment *segment);
 static FECDecoderSegment* _segment_ctor(void);
 static FECDecoderItem* _make_item(FECDecoder *this, GstMpRTPBuffer *mprtp);
-static void _logging(gpointer data);
 
 static void
 _print_segment(FECDecoderSegment *segment)
@@ -138,7 +137,6 @@ fecdecoder_init (FECDecoder * this)
   this->repair_window_max = 300 * GST_MSECOND;
   this->repair_window_min = 10 * GST_MSECOND;
 
-  mprtp_logger_add_logging_fnc(_logging, this, 1);
 }
 
 
@@ -549,15 +547,6 @@ FECDecoderItem* _make_item(FECDecoder *this, GstMpRTPBuffer *mprtp)
   return result;
 }
 
-void _logging(gpointer data)
-{
-  FECDecoder *this;
-
-  this = data;
-  THIS_READLOCK(this);
-
-  THIS_READUNLOCK(this);
-}
 
 #undef THIS_WRITELOCK
 #undef THIS_WRITEUNLOCK

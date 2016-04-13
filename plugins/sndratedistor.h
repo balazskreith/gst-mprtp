@@ -38,6 +38,7 @@ struct _SendingRateDistributor
   GstClockTime              last_subflow_refresh;
   GstClockTime              next_splitter_refresh;
 
+  gint32                    target_media_rate_t1;
   gint32                    target_media_rate;
 };
 
@@ -50,7 +51,7 @@ struct _SendingRateDistributorClass{
 GType sndrate_distor_get_type (void);
 SendingRateDistributor *make_sndrate_distor(StreamSplitter *splitter);
 
-void sndrate_distor_refresh(SendingRateDistributor* this);
+gint32 sndrate_distor_refresh(SendingRateDistributor* this);
 void sndrate_distor_add_subflow(SendingRateDistributor *this, MPRTPSPath *path);
 void sndrate_distor_rem_subflow(SendingRateDistributor *this, guint8 subflow_id);
 #endif /* SNDRATEDISTOR_H_ */

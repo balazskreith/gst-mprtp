@@ -30,8 +30,7 @@ typedef struct _MPRTPSubflowMARCRateController{
 }MPRTPSubflowFECBasedRateAdaption;
 
 typedef struct _MPRTPSubflowManualRateController{
-  gint8   path_state;
-  gint32  target_bitrate;
+
 }MPRTPSubflowManualRateController;
 
 typedef union _MPRTPSubflowRateController{
@@ -59,11 +58,14 @@ typedef struct _MPRTPSubflowUtilizationSignalData{
   MPRTPSubflowReceiverReport receiver_report;
   MPRTPSubflowExtendedReport extended_report;
   guint                      controlling_mode;
+  gint8                      path_state;
+  gint32                     target_bitrate;
   MPRTPSubflowRateController ratectrler;
 }MPRTPSubflowUtilizationSignalData;
 
 typedef struct _MPRTPPluginSignalData{
   MPRTPSubflowUtilizationSignalData subflow[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  gint32                            target_media_rate;
 }MPRTPPluginSignalData;
 
 

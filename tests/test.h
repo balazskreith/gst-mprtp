@@ -57,6 +57,7 @@
 #ifndef TESTS_TEST_H_
 #define TESTS_TEST_H_
 
+
 typedef struct _MPRTPSubflowFBRACngCtrlerParams{
   //parameters can be changed
   gint32     max_rate;
@@ -66,16 +67,18 @@ typedef struct _MPRTPSubflowFBRACngCtrlerParams{
 
 typedef struct _MPRTPSubflowMARCRateController{
   guint32 target_bitrate;
-  gint8   state;
-  guint32 discarded_bitrate;
-  guint32 receiver_bitrate;
+  guint32 goodput_bitrate;
   guint32 sending_bitrate;
-
   MPRTPSubflowMARCCngCtrlerParams cngctrler;
 }MPRTPSubflowFECBasedRateAdaption;
 
+typedef struct _MPRTPSubflowManualRateController{
+
+}MPRTPSubflowManualRateController;
+
 typedef union _MPRTPSubflowRateController{
-  MPRTPSubflowFECBasedRateAdaption fbra_marc;
+  MPRTPSubflowFECBasedRateAdaption fbra;
+  MPRTPSubflowManualRateController manual;
 }MPRTPSubflowRateController;
 
 typedef struct _MPRTPSubflowExtendedReport{
@@ -97,14 +100,16 @@ typedef struct _MPRTPSubflowReceiverReport{
 typedef struct _MPRTPSubflowUtilizationSignalData{
   MPRTPSubflowReceiverReport receiver_report;
   MPRTPSubflowExtendedReport extended_report;
+  guint                      controlling_mode;
+  gint8                      path_state;
+  gint32                     target_bitrate;
   MPRTPSubflowRateController ratectrler;
 }MPRTPSubflowUtilizationSignalData;
 
 typedef struct _MPRTPPluginSignalData{
   MPRTPSubflowUtilizationSignalData subflow[32];
+  gint32                            target_media_rate;
 }MPRTPPluginSignalData;
-
-
 
 
 #include <string.h>
@@ -149,7 +154,7 @@ static gchar default_path_2_tx_ip[255];
 static gchar *path_3_tx_ip      = NULL;
 static gchar default_path_3_tx_ip[255];
 
-static int logging              = 1;
+static int logging              = 0;
 static int init_delay           = 0;
 static int owd_th               = 1000;
 static int discard_th           = 100;

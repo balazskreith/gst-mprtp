@@ -39,7 +39,7 @@
 //#define THIS_WRITELOCK(this)
 //#define THIS_WRITEUNLOCK(this)
 
-#define PACKETSRCVTRACKER_ITEMSBED_LENGTH 1000
+#define PACKETSRCVTRACKER_ITEMSBED_LENGTH 10000
 
 #define _now(this) gst_clock_get_time (this->sysclock)
 
@@ -395,7 +395,7 @@ PacketsRcvTrackerItem *_make_item(PacketsRcvTracker * this, guint16 sn)
   PacketsRcvTrackerItem *result = NULL;
   result = &this->itemsbed[this->itemsbed_index];
   if(0 < result->ref){
-    GST_WARNING_OBJECT(this, "Itemsbed seems to be small.");
+    g_warning("Itemsbed seems to be small for Packetsrcvtracker.");
     goto done;
   }
   this->itemsbed_index = (this->itemsbed_index + 1) % PACKETSRCVTRACKER_ITEMSBED_LENGTH;

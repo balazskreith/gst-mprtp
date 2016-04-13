@@ -41,9 +41,6 @@ struct _PacketsSndTracker
   GQueue*                  sent_in_1s;
   GQueue*                  acked;
 
-  //RLE
-  GQueue*                  discards;
-
   gint32                   bytes_in_flight;
   gint32                   packets_in_flight;
   gint32                   acked_bytes_in_1s;
@@ -51,7 +48,8 @@ struct _PacketsSndTracker
   gint32                   sent_bytes_in_1s;
   gint32                   sent_packets_in_1s;
 
-
+  gint32                   actual_discarded_bytes;
+  gint32                   actual_discarded_packets;
 };
 
 struct _PacketsSndTrackerClass{

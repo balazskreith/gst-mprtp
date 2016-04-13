@@ -48,12 +48,8 @@ typedef struct _PacketsSndTrackerItem{
   guint16      seq_num;
   guint32      payload_bytes;
   GstClockTime sent;
-}PacketsSndTrackerItem;
-
-typedef struct _PacketsSndTrackerDiscardedItem{
-  guint16      seq_num;
   gboolean     discarded;
-}PacketsSndTrackerDiscardedItem;
+}PacketsSndTrackerItem;
 
 G_DEFINE_TYPE (PacketsSndTracker, packetssndtracker, G_TYPE_OBJECT);
 
@@ -62,7 +58,7 @@ G_DEFINE_TYPE (PacketsSndTracker, packetssndtracker, G_TYPE_OBJECT);
 //----------------------------------------------------------------------
 
 static void packetssndtracker_finalize (GObject * object);
-
+static PacketsSndTrackerItem* _find_item(PacketsSndTracker * this, guint16 sn);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -108,7 +104,6 @@ packetssndtracker_init (PacketsSndTracker * this)
   this->sent        = g_queue_new();
   this->sent_in_1s  = g_queue_new();
   this->acked       = g_queue_new();
-  this->discards    = g_queue_new();
   this->sysclock = gst_system_clock_obtain();
 }
 
@@ -157,6 +152,10 @@ void packetssndtracker_add(PacketsSndTracker *this, guint payload_len, guint16 s
     this->sent_bytes_in_1s -= item->payload_bytes;
     --this->sent_packets_in_1s;
     if(--item->ref == 0){
+      if(item->discarded){
+        this->actual_discarded_bytes -= item->payload_bytes;
+        --this->actual_discarded_packets;
+      }
       mprtp_free(item);
     }
   }
@@ -169,71 +168,51 @@ void packetssndtracker_add_discarded_bitvector(PacketsSndTracker *this,
                                             guint16 end_seq,
                                             GstRTCPXRBitvectorChunk *chunks)
 {
-  PacketsSndTrackerDiscardedItem* item;
-  gint vec_i,bit_i;
+  PacketsSndTrackerItem* item;
+  gint bit_i;
   guint16 actual_seq = begin_seq;
-  gint32 first_seq = -1;
+  GstRTCPXRBitvectorChunk *actual;
   THIS_WRITELOCK (this);
   if(!chunks){
     goto done;
   }
-  if(!g_queue_is_empty(this->discards)){
-    first_seq = ((PacketsSndTrackerDiscardedItem*) g_queue_peek_tail(this->discards))->seq_num;
+  actual = chunks;
+again:
+  if(_cmp_uint16(end_seq, actual_seq) <= 0){
+    goto done;
   }
-  for(vec_i = 0; actual_seq != end_seq ;++vec_i){
-    for(bit_i = 0; bit_i<15 && actual_seq != end_seq; ++bit_i, ++actual_seq){
-      if(first_seq != -1 && _cmp_uint16(actual_seq, first_seq) <= 0) continue;
-      item = mprtp_malloc(sizeof(PacketsSndTrackerDiscardedItem));
-      item->discarded = ((chunks[vec_i].bitvector>>bit_i) & 1) == 0;
-      item->seq_num = actual_seq;
-      g_queue_push_tail(this->discards, item);
-    }
+  if(actual->bitvector == 0x7FFF){
+    actual_seq+=15;
+    ++actual;
+    goto again;
   }
+  for(bit_i = 0; bit_i<15 && actual_seq != end_seq; ++actual_seq, ++bit_i){
+    if((actual->bitvector>>bit_i) == 1) continue;
+    item = _find_item(this, actual_seq);
+    if(!item) continue;
+    item->discarded = TRUE;
+    this->actual_discarded_bytes += item->payload_bytes;
+    ++this->actual_discarded_packets;
+  }
+  ++actual;
+  goto again;
 done:
   THIS_WRITEUNLOCK (this);
 }
 
 guint32 packetssndtracker_get_goodput_bytes_from_acked(PacketsSndTracker *this, gdouble *fraction_utilized)
 {
-  PacketsSndTrackerDiscardedItem *disc_item;
-  PacketsSndTrackerItem *acked_item;
-  GList *ait;
   guint32 result;
-  guint acked_num = 0, discarded_num = 0;
-  THIS_WRITELOCK (this);
-  result = this->acked_bytes_in_1s;
-  ait = this->acked->head;
-again:
-  if(g_queue_is_empty(this->discards) || !ait){
-    goto done;
-  }
-  disc_item = g_queue_peek_head(this->discards);
-  acked_item     = ait->data;
-  if(acked_item->seq_num < disc_item->seq_num){
-    ait = ait->next;
-    goto again;
-  }
-  if(disc_item->seq_num < acked_item->seq_num){
-    mprtp_free(g_queue_pop_head(this->discards));
-    goto again;
-  }
-  if(disc_item->discarded){
-    result -= acked_item->payload_bytes;
-    ++discarded_num;
-  }
-  ++acked_num;
-  mprtp_free(g_queue_pop_head(this->discards));
-  ait = ait->next;
-  goto again;
-done:
+  THIS_READLOCK (this);
+  result = this->acked_bytes_in_1s - this->actual_discarded_bytes;
   if(fraction_utilized){
-    if(!acked_num){
-      *fraction_utilized = 0.;
+    if(!this->acked_packets_in_1s){
+      *fraction_utilized = 1.;
     }else{
-      *fraction_utilized = (gdouble)(acked_num - discarded_num) / (gdouble) acked_num;
+      *fraction_utilized = (gdouble)(this->acked_packets_in_1s - this->actual_discarded_packets) / (gdouble) this->acked_packets_in_1s;
     }
   }
-  THIS_WRITEUNLOCK (this);
+  THIS_READUNLOCK (this);
   return result;
 }
 
@@ -270,6 +249,10 @@ void packetssndtracker_update_hssn(PacketsSndTracker *this, guint16 hssn)
     this->acked_bytes_in_1s -= item->payload_bytes;
     --this->acked_packets_in_1s;
     if(--item->ref == 0){
+      if(item->discarded){
+        this->actual_discarded_bytes -= item->payload_bytes;
+        --this->actual_discarded_packets;
+      }
       mprtp_free(item);
     }
   }
@@ -291,7 +274,32 @@ packetssndtracker_get_stats (PacketsSndTracker * this, PacketsSndTrackerStat* re
   THIS_READUNLOCK (this);
 }
 
+static gint _find_packet_helper(gconstpointer ptr2item, gconstpointer ptr2searched_seq)
+{
+  const guint16 *seq;
+  const PacketsRcvTrackerItem*item;
+  seq = ptr2searched_seq;
+  item = ptr2item;
+  return item->seq == *seq ? 0 : -1;
+}
 
+PacketsSndTrackerItem* _find_item(PacketsSndTracker * this, guint16 sn)
+{
+  GList *it;
+  PacketsSndTrackerItem *result = NULL;
+  it = g_queue_find_custom(this->sent, &sn, _find_packet_helper);
+  if(it){
+    result = it->data;
+    goto done;
+  }
+  it = g_queue_find_custom(this->acked, &sn, _find_packet_helper);
+  if(it){
+    result = it->data;
+    goto done;
+  }
+done:
+  return result;
+}
 
 #undef THIS_WRITELOCK
 #undef THIS_WRITEUNLOCK

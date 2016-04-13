@@ -38,6 +38,11 @@ GST_DEBUG_CATEGORY_STATIC (ricalcer_debug_category);
 
 #define _now(this) (gst_clock_get_time (this->sysclock))
 
+#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
+#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
+#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
+#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
+
 G_DEFINE_TYPE (ReportIntervalCalculator, ricalcer, G_TYPE_OBJECT);
 
 //----------------------------------------------------------------------
@@ -87,23 +92,31 @@ ricalcer_finalize (GObject * object)
 
 void ricalcer_set_mode(ReportIntervalCalculator *this, RTCPIntervalMode mode)
 {
+  THIS_WRITELOCK(this);
   this->mode = mode;
+  THIS_WRITEUNLOCK(this);
 }
 
 gboolean ricalcer_rtcp_regular_allowed(ReportIntervalCalculator * this)
 {
-  return _do_report_now(this);
+  gboolean result;
+  THIS_WRITELOCK(this);
+  result = _do_report_now(this);
+  THIS_WRITEUNLOCK(this);
+  return result;
 }
 
 gboolean ricalcer_rtcp_fb_allowed(ReportIntervalCalculator * this)
 {
   gboolean result;
+  THIS_WRITELOCK(this);
   if(this->mode == RTCP_INTERVAL_IMMEDIATE_FEEDBACK_MODE){
     result = TRUE;
     goto done;
   }
   result = _do_report_now(this);
 done:
+  THIS_WRITEUNLOCK(this);
   return result;
 }
 
@@ -121,8 +134,8 @@ ricalcer_init (ReportIntervalCalculator * this)
   this->min_interval = .5;
   this->interval_spread = 1.;
   this->sysclock = gst_system_clock_obtain();
-
-  mprtp_logger_add_logging_fnc(_logging, this, 10);
+  g_rw_lock_init (&this->rwmutex);
+  mprtp_logger_add_logging_fnc(_logging, this, 10, &this->rwmutex);
 }
 
 ReportIntervalCalculator *make_ricalcer(gboolean sender_side)
@@ -186,13 +199,17 @@ void ricalcer_refresh_parameters(ReportIntervalCalculator * this,
                                  gdouble media_rate,
                                  gdouble avg_rtcp_size)
 {
+  THIS_WRITELOCK(this);
   this->media_rate = media_rate;
   this->avg_rtcp_size = avg_rtcp_size;
+  THIS_WRITEUNLOCK(this);
 }
 
 void ricalcer_urgent_report_request(ReportIntervalCalculator * this)
 {
+  THIS_WRITELOCK(this);
   this->urgent = TRUE;
+  THIS_WRITEUNLOCK(this);
 }
 
 gdouble _calc_report_interval(ReportIntervalCalculator * this)
@@ -338,5 +355,6 @@ void _logging(gpointer data)
                GST_TIME_AS_MSECONDS(this->next_time - _now(this)),
                this->urgent
                );
+
 
 }

@@ -156,9 +156,9 @@ static gchar default_path_3_tx_ip[255];
 
 static int logging              = 0;
 static int init_delay           = 0;
-static int owd_th               = 1000;
-static int discard_th           = 100;
-static int lost_th              = 1000;
+static int owd_th               = 200;
+static int discard_th           = 50;
+static int lost_th              = 500;
 static int rtcp_interval_type   = 2;
 static int report_timeout       = 0;
 static int controlling_mode     = 2;
@@ -167,9 +167,10 @@ static int path1_active         = 1;
 static int path2_active         = 0;
 static int path3_active         = 0;
 static int fec_interval         = 0;
-static int fec_min_window       = 5;
+static int fec_min_window       = 0;
 static int fec_max_window       = 20;
 static int keep_alive_period    = 0;
+static int obsolation_th        = 0;
 
 static GOptionEntry entries[] =
 {
@@ -189,6 +190,7 @@ static GOptionEntry entries[] =
     { "fec_interval", 0, 0, G_OPTION_ARG_INT, &fec_interval, "fec_interval", NULL },
     { "fec_min_window", 0, 0, G_OPTION_ARG_INT, &fec_min_window, "fec_min_window", NULL },
     { "fec_max_window", 0, 0, G_OPTION_ARG_INT, &fec_max_window, "fec_max_window", NULL },
+    { "obsolation_th", 0, 0, G_OPTION_ARG_INT, &obsolation_th, "obsolation_th", NULL },
     { "keep_alive_period", 0, 0, G_OPTION_ARG_INT, &keep_alive_period, "keep_alive_period", NULL },
     { "logging", 0, 0, G_OPTION_ARG_INT, &logging, "logging", NULL },
     { "init_delay", 0, 0, G_OPTION_ARG_INT, &init_delay, "init_delay", NULL },

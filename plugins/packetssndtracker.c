@@ -187,12 +187,14 @@ again:
     goto again;
   }
   for(bit_i = 0; bit_i<15 && actual_seq != end_seq; ++actual_seq, ++bit_i){
-    if((actual->bitvector>>bit_i) == 1) continue;
+    if(((actual->bitvector>>bit_i)&1) == 1) continue;
     item = _find_item(this, actual_seq);
     if(!item) continue;
+    if(_cmp_uint16(item->seq_num, this->highest_discarded_seq) < 0) continue;
     item->discarded = TRUE;
     this->actual_discarded_bytes += item->payload_bytes;
     ++this->actual_discarded_packets;
+    this->highest_discarded_seq = item->seq_num;
   }
   ++actual;
   goto again;
@@ -277,10 +279,10 @@ packetssndtracker_get_stats (PacketsSndTracker * this, PacketsSndTrackerStat* re
 static gint _find_packet_helper(gconstpointer ptr2item, gconstpointer ptr2searched_seq)
 {
   const guint16 *seq;
-  const PacketsRcvTrackerItem*item;
+  const PacketsSndTrackerItem*item;
   seq = ptr2searched_seq;
   item = ptr2item;
-  return item->seq == *seq ? 0 : -1;
+  return item->seq_num == *seq ? 0 : -1;
 }
 
 PacketsSndTrackerItem* _find_item(PacketsSndTracker * this, guint16 sn)

@@ -101,6 +101,7 @@ static gboolean gst_mprtpscheduler_mprtp_src_event (GstPad * pad,
 static gboolean gst_mprtpscheduler_sink_eventfunc (GstPad * srckpad, GstObject * parent,
                                                    GstEvent * event);
 static void _setup_paths (GstMprtpscheduler * this);
+static gboolean _mprtpscheduler_send_buffer (GstMprtpscheduler * this, GstBuffer *buffer);
 static void _mprtpscheduler_process_run(void *data);
 
 static guint _subflows_utilization;
@@ -113,6 +114,7 @@ enum
   PROP_MPRTP_EXT_HEADER_ID,
   PROP_ABS_TIME_EXT_HEADER_ID,
   PROP_FEC_PAYLOAD_TYPE,
+  PROP_OBSOLATION_TRESHOLD,
   PROP_JOIN_SUBFLOW,
   PROP_DETACH_SUBFLOW,
   PROP_SET_SUBFLOW_NON_CONGESTED,
@@ -240,6 +242,12 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "Set or get the payload type of FEC packets",
           "Set or get the payload type of FEC packets. The default is 126",
           0, 127, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_OBSOLATION_TRESHOLD,
+      g_param_spec_uint ("obsolation-treshold",
+          "Set the obsolation treshold at the packet sender queue.",
+          "Set the obsolation treshold at the packet sender queue.",
+          0, 10000, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_JOIN_SUBFLOW,
       g_param_spec_uint ("join-subflow", "the subflow id requested to join",
@@ -487,6 +495,11 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       _join_subflow (this, g_value_get_uint (value));
       THIS_WRITEUNLOCK (this);
       break;
+    case PROP_OBSOLATION_TRESHOLD:
+      THIS_WRITELOCK (this);
+      packetssndqueue_set_obsolation_treshold(this->sndqueue, (GstClockTime) g_value_get_uint (value) * GST_MSECOND);
+      THIS_WRITEUNLOCK (this);
+      break;
     case PROP_DETACH_SUBFLOW:
       THIS_WRITELOCK (this);
       _detach_subflow (this, g_value_get_uint (value));
@@ -601,6 +614,11 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
     case PROP_FEC_PAYLOAD_TYPE:
       THIS_READLOCK (this);
       g_value_set_uint (value, (guint) this->fec_payload_type);
+      THIS_READUNLOCK (this);
+      break;
+    case PROP_OBSOLATION_TRESHOLD:
+      THIS_READLOCK (this);
+      g_value_set_uint(value, packetssndqueue_get_obsolation_treshold(this->sndqueue) / GST_MSECOND);
       THIS_READUNLOCK (this);
       break;
     case PROP_LOG_ENABLED:
@@ -862,7 +880,25 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     THIS_READUNLOCK (this);
   }
 
-  packetssndqueue_push(this->sndqueue, buffer);
+  //approve from stream splitter
+  again:
+  {
+    GstBuffer *item;
+    if((item = packetssndqueue_peek(this->sndqueue)) != NULL){
+      if(!_mprtpscheduler_send_buffer(this, item)){
+        goto done;
+      }
+      item = packetssndqueue_pop(this->sndqueue);
+      goto again;
+    }
+  }
+  if(!_mprtpscheduler_send_buffer(this, buffer)){
+    packetssndqueue_push(this->sndqueue, buffer);
+  }
+
+
+//  packetssndqueue_push(this->sndqueue, buffer);
+done:
   result = GST_FLOW_OK;
   return result;
 }
@@ -1091,6 +1127,64 @@ MPRTPSPath *_get_path(GstMprtpscheduler * this, guint8 subflow_id)
   return g_hash_table_lookup (this->paths, GINT_TO_POINTER (subflow_id));
 }
 
+
+gboolean
+_mprtpscheduler_send_buffer (GstMprtpscheduler * this, GstBuffer *buffer)
+{
+  gboolean result = FALSE;
+  MPRTPSPath *path = NULL;
+  GstBuffer *rtpfecbuf = NULL;
+  gboolean fec_request = FALSE;
+
+  THIS_READLOCK (this);
+  if(!stream_splitter_approve_buffer(this->splitter, buffer, &path)){
+    goto done;
+  }
+  if(!path){
+    GST_WARNING_OBJECT(this, "No active subflow");
+    goto done;
+  }
+
+  result = TRUE;
+  ++this->sent_packets;
+  buffer = gst_buffer_make_writable (buffer);
+  mprtps_path_process_rtp_packet(path, buffer, &fec_request);
+  fec_request |= mprtps_path_request_keep_alive(path);
+  _setup_timestamp(this, buffer);
+
+  if(this->enable_fec || 0 < this->fec_interval){
+    fecencoder_add_rtpbuffer(this->fec_encoder, buffer);
+    fec_request |= (0 < this->fec_interval) && (this->sent_packets % this->fec_interval == 0);
+    if(fec_request){
+      rtpfecbuf = fecencoder_get_fec_packet(this->fec_encoder);
+      fecencoder_assign_to_subflow(this->fec_encoder,
+                                   rtpfecbuf,
+                                   this->mprtp_ext_header_id,
+                                   mprtps_path_get_id(path));
+    }
+  }
+
+
+  {
+    GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+    gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
+    mprtp_logger("push.log", "%lu,%u\n", GST_TIME_AS_MSECONDS(_now(this)), gst_rtp_buffer_get_timestamp(&rtp));
+    gst_rtp_buffer_unmap(&rtp);
+  }
+  gst_pad_push (this->mprtp_srcpad, buffer);
+  if(rtpfecbuf){
+    gst_pad_push (this->mprtp_srcpad, rtpfecbuf);
+    rtpfecbuf = NULL;
+  }
+  if (!this->riport_flow_signal_sent) {
+    this->riport_flow_signal_sent = TRUE;
+    sndctrler_report_can_flow(this->controller);
+  }
+done:
+  THIS_READUNLOCK (this);
+  return result;
+}
+
 void
 _mprtpscheduler_process_run (void *data)
 {
@@ -1104,10 +1198,15 @@ _mprtpscheduler_process_run (void *data)
   this = (GstMprtpscheduler *) data;
 
   THIS_READLOCK (this);
-  next_scheduler_time = _now(this) + 1 * GST_MSECOND;
+  next_scheduler_time = _now(this) + 100 * GST_MSECOND;
+  //Fixme when we introduce approvement!!!
+  goto done;
 again:
   buffer = stream_splitter_pop(this->splitter, &path);
+
   if(!buffer) {
+    g_print("buf: %p path:%p - items:%d\n", buffer, path, g_queue_get_length(this->sndqueue->items));
+    next_scheduler_time = _now(this) + 1 * GST_MSECOND;
     goto done;
   }
   if(!path){

@@ -59,12 +59,10 @@ struct _PacketsRcvTracker
 
   PacketsRcvTrackerStat    trackerstat;
 
-  PacketsRcvTrackerItem*   itemsbed;
-  gint32                   itemsbed_index;
-  //RLE
 
   guint16                  cycle_num;
   gboolean                 initialized;
+
 
 };
 

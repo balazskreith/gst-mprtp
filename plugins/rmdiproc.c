@@ -220,7 +220,7 @@ static void _process_discarded_rle(RMDIProcessor *this, GstMPRTCPXRReportSummary
   packetssndtracker_add_discarded_bitvector(this->packetstracker,
                                             xrsummary->DiscardedRLE.begin_seq,
                                             xrsummary->DiscardedRLE.end_seq,
-                                            (GstRTCPXRBitvectorChunk *)xrsummary->DiscardedRLE.chunks);
+                                            (GstRTCPXRBitvectorChunk *)&xrsummary->DiscardedRLE.chunks[0]);
   packetssndtracker_get_stats(this->packetstracker, &trackerstat);
   if(_cmp_seq(this->last_HSSN, xrsummary->DiscardedRLE.end_seq) < 0){
     this->last_HSSN = xrsummary->DiscardedRLE.end_seq;

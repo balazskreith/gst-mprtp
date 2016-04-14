@@ -275,7 +275,6 @@ static void _change_controlling_mode(Subflow *this, guint controlling_mode)
   if(this->controlling_mode == controlling_mode){
     return;
   }
-
   this->controlling_mode = controlling_mode;
 
   switch(this->controlling_mode){

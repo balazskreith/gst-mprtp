@@ -50,6 +50,8 @@ struct _PacketsSndTracker
 
   gint32                   actual_discarded_bytes;
   gint32                   actual_discarded_packets;
+
+  guint16                  highest_discarded_seq;
 };
 
 struct _PacketsSndTrackerClass{

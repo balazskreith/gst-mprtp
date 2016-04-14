@@ -103,7 +103,7 @@ packetssndqueue_init (PacketsSndQueue * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain();
-  this->obsolation_treshold = 400 * GST_MSECOND;
+  this->obsolation_treshold = 0;
   this->incoming_bytes = make_numstracker(2048, GST_SECOND);
   this->items = g_queue_new();
   mprtp_logger_add_logging_fnc(_logging,this, 10, &this->rwmutex);
@@ -160,6 +160,15 @@ void packetssndqueue_set_obsolation_treshold(PacketsSndQueue *this, GstClockTime
   THIS_WRITELOCK(this);
   this->obsolation_treshold = treshold;
   THIS_WRITEUNLOCK(this);
+}
+
+GstClockTime packetssndqueue_get_obsolation_treshold(PacketsSndQueue *this)
+{
+  GstClockTime result;
+  THIS_READLOCK(this);
+  result = this->obsolation_treshold;
+  THIS_READUNLOCK(this);
+  return result;
 }
 
 void packetssndqueue_push(PacketsSndQueue *this, GstBuffer *buffer)

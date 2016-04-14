@@ -57,6 +57,12 @@ void stream_splitter_rem_path(
     StreamSplitter * this,
     guint8 subflow_id);
 
+gboolean
+stream_splitter_approve_buffer(
+    StreamSplitter * this,
+    GstBuffer *buf,
+    MPRTPSPath **path);
+
 GstBuffer *
 stream_splitter_pop(
     StreamSplitter * this,

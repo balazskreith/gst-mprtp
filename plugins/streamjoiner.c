@@ -251,7 +251,7 @@ stream_joiner_init (StreamJoiner * this)
   this->playout_allowed   = TRUE;
   this->playout_halt      = FALSE;
   this->playout_halt_time = 0 * GST_MSECOND;
-  this->init_delay        = 0 * GST_MSECOND;
+  this->init_delay        = 500 * GST_MSECOND;
   this->urgent            = g_queue_new();
   this->skews             = make_numstracker(256, 2 * GST_SECOND);
   this->made              = _now(this);

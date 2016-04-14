@@ -512,8 +512,6 @@ void fbrasubctrler_report_update(
   this->report_interval        = this->last_report_arrived - this->last_report_arrived_t1;
 
   rmdi_processor_do(this->fb_processor, summary, &this->rmdi_result);
-  //Fixme
-//  goto done;
   _update_tr_corr(this);
   _reset_congestion_indicators(this);
 
@@ -568,6 +566,9 @@ _reduce_stage_helper(
 {
   gboolean congestion = FALSE;
   gboolean distortion = FALSE;
+  if(_corrH(this) < 1.2 && _UF(this) == 1.){
+    goto done;
+  }
 
   if(_gcong_th(this) < _gcong(this)){
     congestion = TRUE;
@@ -582,7 +583,7 @@ _reduce_stage_helper(
   }else if(_gkeep_th(this) < _gkeep(this)){
     distortion = TRUE;
   }
-
+done:
   _fcongestion(this) = congestion;
   _fdistortion(this) = distortion;
 }
@@ -620,6 +621,9 @@ _keep_stage_helper(
 {
   gboolean congestion = FALSE;
   gboolean distortion = FALSE;
+  if(_corrH(this) < 1.2 && _UF(this) == 1.){
+    goto done;
+  }
 
   if(_gcong_th(this) < _gcong(this)){
     congestion = TRUE;
@@ -634,7 +638,7 @@ _keep_stage_helper(
   }else if(_UF(this) < 1.){
     distortion = TRUE;
   }
-
+done:
   _fcongestion(this) = congestion;
   _fdistortion(this) = distortion;
 }
@@ -688,6 +692,9 @@ _probe_stage_helper(
 {
   gboolean congestion = FALSE;
   gboolean distortion = FALSE;
+  if(_corrH(this) < 1.2 && _UF(this) == 1.){
+    goto done;
+  }
 
   if(_gcong_th(this) < _gcong(this)){
     congestion = TRUE;
@@ -702,7 +709,7 @@ _probe_stage_helper(
   }else if(_UF(this) < 1.){
     distortion = TRUE;
   }
-
+done:
   _fcongestion(this) = congestion;
   _fdistortion(this) = distortion;
 }
@@ -762,6 +769,9 @@ _increase_stage_helper(
 {
   gboolean congestion = FALSE;
   gboolean distortion = FALSE;
+  if(_corrH(this) < 1.2 && _UF(this) == 1.){
+    goto done;
+  }
 
   if(_gcong_th(this) < _gcong(this)){
     congestion = TRUE;
@@ -776,7 +786,7 @@ _increase_stage_helper(
   }else if(_UF(this) < 1.){
     distortion = TRUE;
   }
-
+done:
   _fcongestion(this) = congestion;
   _fdistortion(this) = distortion;
 }

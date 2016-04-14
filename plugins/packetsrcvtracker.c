@@ -39,8 +39,6 @@
 //#define THIS_WRITELOCK(this)
 //#define THIS_WRITEUNLOCK(this)
 
-#define PACKETSRCVTRACKER_ITEMSBED_LENGTH 10000
-
 #define _now(this) gst_clock_get_time (this->sysclock)
 
 GST_DEBUG_CATEGORY_STATIC (packetsrcvtracker_debug_category);
@@ -126,8 +124,6 @@ packetsrcvtracker_init (PacketsRcvTracker * this)
   this->discarded = g_queue_new();
   this->lost_treshold = 1000 * GST_MSECOND;
 
-  this->itemsbed = mprtp_malloc(sizeof(PacketsRcvTrackerItem) * PACKETSRCVTRACKER_ITEMSBED_LENGTH);
-  this->itemsbed_index = 0;
 }
 
 PacketsRcvTracker *make_packetsrcvtracker(void)
@@ -393,20 +389,11 @@ done:
 PacketsRcvTrackerItem *_make_item(PacketsRcvTracker * this, guint16 sn)
 {
   PacketsRcvTrackerItem *result = NULL;
-  result = &this->itemsbed[this->itemsbed_index];
-  if(0 < result->ref){
-    g_warning("Itemsbed seems to be small for Packetsrcvtracker.");
-    goto done;
-  }
-  this->itemsbed_index = (this->itemsbed_index + 1) % PACKETSRCVTRACKER_ITEMSBED_LENGTH;
-  memset(result, 0, sizeof(PacketsRcvTrackerItem));
-
+  result = mprtp_malloc(sizeof(PacketsRcvTrackerItem));
   result->seq = sn;
   result->added = _now(this);
   result->ref = 1;
 
-//  g_print("make item index at %d for %hu\n", this->itemsbed_index, sn);
-done:
   return result;
 }
 

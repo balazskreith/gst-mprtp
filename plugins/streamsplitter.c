@@ -60,6 +60,7 @@ struct _SchNode
   gint   remained;
   GList* subflows;
 
+  SchNode *parent;
   SchNode *left;
   SchNode *right;
   gint32   sent_bytes;
@@ -158,12 +159,23 @@ _schnode_rdtor (
     SchNode * node);
 
 
+static SchNode *
+_schtree_select_next (
+    SchNode * root,
+    GstRTPBuffer * rtp,
+    guint8 flag_restriction);
+
+
 static Subflow *
 _schtree_get_next (
     SchNode * root,
     GstRTPBuffer * rtp,
     guint8 key_restriction);
 
+static void
+_schtree_approve_next (
+    SchNode * selected,
+    guint bytes_to_send);
 
 static void
 _refresh_splitter (
@@ -357,6 +369,43 @@ stream_splitter_commit_changes (StreamSplitter * this)
   THIS_WRITEUNLOCK (this);
 }
 
+gboolean
+stream_splitter_approve_buffer(StreamSplitter * this, GstBuffer *buffer, MPRTPSPath **path)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  gboolean result;
+  guint8 flag_restriction;
+  SchNode *selected;
+
+  result = FALSE;
+  *path = NULL;
+
+  THIS_WRITELOCK (this);
+  if (this->tree == NULL) {
+    GST_WARNING_OBJECT (this, "No active subflow");
+    goto done;
+  }
+  if (G_UNLIKELY (!gst_rtp_buffer_map (buffer, GST_MAP_READ, &rtp))) {
+    GST_WARNING_OBJECT (this, "The RTP packet is not readable");
+    goto done;
+  }
+  flag_restriction = 0; //Fixme: flag restriction considering the type of buffer here....
+  selected = _schtree_select_next(this->tree, &rtp, flag_restriction);
+  if(!selected){
+    gst_rtp_buffer_unmap (&rtp);
+    goto done;
+  }
+
+  result = TRUE;
+  *path = ((Subflow*)selected->subflows->data)->path;
+
+  _schtree_approve_next(selected, gst_rtp_buffer_get_payload_len(&rtp));
+  gst_rtp_buffer_unmap (&rtp);
+done:
+  THIS_WRITEUNLOCK (this);
+  return result;
+}
+
 GstBuffer *
 stream_splitter_pop(StreamSplitter * this, MPRTPSPath **out_path)
 {
@@ -373,7 +422,6 @@ stream_splitter_pop(StreamSplitter * this, MPRTPSPath **out_path)
   if(!buffer){
     goto done;
   }
-
   if (G_UNLIKELY (!gst_rtp_buffer_map (buffer, GST_MAP_READ, &rtp))) {
     GST_WARNING_OBJECT (this, "The RTP packet is not readable");
     goto done;
@@ -532,6 +580,7 @@ _schtree_insert (SchNode * node, gint * value, Subflow * subflow, gint level_val
 
   if(!node->left){
     node->left = _make_schnode(level_value>>1);
+    node->left->parent = node;
   }
   if(0 < node->left->remained){
     node->left->subflows = g_list_prepend(node->left->subflows, subflow);
@@ -544,6 +593,7 @@ _schtree_insert (SchNode * node, gint * value, Subflow * subflow, gint level_val
 
   if(!node->right){
     node->right = _make_schnode(level_value>>1);
+    node->right->parent = node;
   }
   if(0 < node->right->remained){
     node->right->subflows = g_list_prepend(node->right->subflows, subflow);
@@ -591,6 +641,48 @@ _schnode_ctor (void)
   return result;
 }
 
+
+SchNode *
+_schtree_select_next (SchNode * root, GstRTPBuffer * rtp, guint8 flag_restriction)
+{
+  SchNode *selected, *left, *right;
+  gboolean left_allowed,right_allowed;
+
+  selected = root;
+  while (selected->left != NULL && selected->right != NULL) {
+    left          = selected->left;
+    right         = selected->right;
+    left_allowed  = _allowed(left, rtp, flag_restriction);
+    right_allowed = _allowed(right, rtp, flag_restriction);
+
+    if(!left_allowed && !right_allowed){
+      selected = NULL;
+      goto done;
+    }
+    if(!left_allowed){
+      selected = right;
+    }else if(!right_allowed){
+      selected = left;
+    }else{
+      selected = left->sent_bytes <= right->sent_bytes ? left : right;
+    }
+  }
+  if(!selected->subflows){
+    g_warning("Problems with subflows at stream splitter");
+  }
+done:
+  return selected;
+}
+
+
+void
+_schtree_approve_next (SchNode * selected, guint bytes_to_send)
+{
+  while (selected != NULL) {
+    selected->sent_bytes += bytes_to_send;
+    selected = selected->parent;
+  }
+}
 
 
 Subflow *

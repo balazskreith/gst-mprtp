@@ -57,6 +57,9 @@
 #ifndef TESTS_TEST_H_
 #define TESTS_TEST_H_
 
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 typedef struct _MPRTPSubflowFBRACngCtrlerParams{
   //parameters can be changed
@@ -173,6 +176,12 @@ static int keep_alive_period    = 0;
 static int obsolation_th        = 0;
 static int join_min_th          = 10;
 static int join_max_th          = 100;
+static int join_window_th       = 60;
+static double join_betha_factor = .2;
+static int playout_lowest_rate  = 50;
+static int playout_highest_rate = 10;
+static int playout_clock_rate   = 90000;
+static double playout_spread_factor = 1.1;
 
 static GOptionEntry entries[] =
 {
@@ -194,6 +203,12 @@ static GOptionEntry entries[] =
     { "fec_max_window", 0, 0, G_OPTION_ARG_INT, &fec_max_window, "fec_max_window", NULL },
     { "join_min_th", 0, 0, G_OPTION_ARG_INT, &join_min_th, "join_min_th", NULL },
     { "join_max_th", 0, 0, G_OPTION_ARG_INT, &join_max_th, "join_max_th", NULL },
+    { "join_window_th", 0, 0, G_OPTION_ARG_INT, &join_window_th, "join_window_th", NULL },
+    { "join_betha_factor", 0, 0, G_OPTION_ARG_DOUBLE, &join_betha_factor, "join_betha_factor", NULL },
+    { "playout_lowest_rate", 0, 0, G_OPTION_ARG_INT, &playout_lowest_rate, "playout_lowest_rate", NULL },
+    { "playout_highest_rate", 0, 0, G_OPTION_ARG_INT, &playout_highest_rate, "playout_highest_rate", NULL },
+    { "playout_clock_rate", 0, 0, G_OPTION_ARG_INT, &playout_clock_rate, "playout_clock_rate", NULL },
+    { "playout_spread_factor", 0, 0, G_OPTION_ARG_DOUBLE, &playout_spread_factor, "playout_spread_factor", NULL },
     { "obsolation_th", 0, 0, G_OPTION_ARG_INT, &obsolation_th, "obsolation_th", NULL },
     { "keep_alive_period", 0, 0, G_OPTION_ARG_INT, &keep_alive_period, "keep_alive_period", NULL },
     { "logging", 0, 0, G_OPTION_ARG_INT, &logging, "logging", NULL },

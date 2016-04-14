@@ -143,8 +143,12 @@ enum
   PROP_OWD_WINDOW_TRESHOLD,
   PROP_JOIN_MIN_TRESHOLD,
   PROP_JOIN_MAX_TRESHOLD,
-  PROP_JOIN_WINDOW_SIZE,
+  PROP_JOIN_WINDOW_TRESHOLD,
   PROP_JOIN_BETHA_FACTOR,
+  PROP_PLAYOUT_LOWEST_RATE,
+  PROP_PLAYOUT_HIGHEST_RATE,
+  PROP_PLAYOUT_CLOCK_RATE,
+  PROP_PLAYOUT_SPREAD_FACTOR,
   PROP_DISCARD_TRESHOLD,
   PROP_LOST_TRESHOLD,
   PROP_REPAIR_WINDOW_MIN,
@@ -313,32 +317,60 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                           4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_JOIN_MIN_TRESHOLD,
-       g_param_spec_uint ("join-min-treshold",
-                          "set the minimum treshold for streamjoiner in ms.",
-                          "set the minimum treshold for streamjoiner in ms.",
-                          0,
-                          4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+         g_param_spec_uint ("join-min-treshold",
+                            "set the minimum treshold for streamjoiner in ms.",
+                            "set the minimum treshold for streamjoiner in ms.",
+                            0,
+                            4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_JOIN_MAX_TRESHOLD,
-       g_param_spec_uint ("join-max-treshold",
-                          "set the maximum treshold for streamjoiner in ms.",
-                          "set the maxumum treshold for streamjoiner in ms.",
-                          0,
-                          4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+    g_object_class_install_property (gobject_class, PROP_JOIN_MAX_TRESHOLD,
+         g_param_spec_uint ("join-max-treshold",
+                            "set the maximum treshold for streamjoiner in ms.",
+                            "set the maxumum treshold for streamjoiner in ms.",
+                            0,
+                            4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_JOIN_WINDOW_SIZE,
-       g_param_spec_uint ("join-window-treshold",
-                          "set the window treshold for streamjoiner in seconds.",
-                          "set the window treshold for streamjoiner in seconds.",
-                          0,
-                          4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+    g_object_class_install_property (gobject_class, PROP_JOIN_WINDOW_TRESHOLD,
+         g_param_spec_uint ("join-window-treshold",
+                            "set the window treshold for streamjoiner in seconds.",
+                            "set the window treshold for streamjoiner in seconds.",
+                            0,
+                            4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_JOIN_BETHA_FACTOR,
-        g_param_spec_double ("join-betha-factor",
-                             "set the betha factor for streamjoiner.",
-                             "set the betha factor for streamjoiner.",
-                             0.0, 10.0, 0.,
-                             G_PARAM_WRITABLE  | G_PARAM_STATIC_STRINGS));
+    g_object_class_install_property (gobject_class, PROP_JOIN_BETHA_FACTOR,
+          g_param_spec_double ("join-betha-factor",
+                               "set the betha factor for streamjoiner.",
+                               "set the betha factor for streamjoiner.",
+                               0.0, 10.0, 0.,
+                               G_PARAM_WRITABLE  | G_PARAM_STATIC_STRINGS));
+
+    g_object_class_install_property (gobject_class, PROP_PLAYOUT_LOWEST_RATE,
+           g_param_spec_uint ("playout-lowest-rate",
+                              "set the minimum playout rate in ms.",
+                              "set the minimum playout rate in ms.",
+                              0,
+                              4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+      g_object_class_install_property (gobject_class, PROP_PLAYOUT_HIGHEST_RATE,
+           g_param_spec_uint ("playout-highest-rate",
+                              "set the minimum playout rate in ms.",
+                              "set the minimum playout rate in ms.",
+                              0,
+                              4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+      g_object_class_install_property (gobject_class, PROP_PLAYOUT_CLOCK_RATE,
+           g_param_spec_uint ("playout-clock-rate",
+                              "set the clock rate playout.",
+                              "set the clock rate playout",
+                              0,
+                              4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+      g_object_class_install_property (gobject_class, PROP_PLAYOUT_SPREAD_FACTOR,
+            g_param_spec_double ("playout-spread-factor",
+                                 "set the spread factor for playout.",
+                                 "set the spread factor for playout.",
+                                 0.0, 10.0, 1.,
+                                 G_PARAM_WRITABLE  | G_PARAM_STATIC_STRINGS));
 
 
   g_object_class_install_property (gobject_class, PROP_DISCARD_TRESHOLD,
@@ -571,7 +603,7 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       stream_joiner_set_max_treshold(this->joiner, (GstClockTime)guint_value * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_JOIN_WINDOW_SIZE:
+    case PROP_JOIN_WINDOW_TRESHOLD:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
       stream_joiner_set_window_treshold(this->joiner, (GstClockTime)guint_value * GST_SECOND);
@@ -581,6 +613,30 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       THIS_WRITELOCK (this);
       gdouble_value = g_value_get_double (value);
       stream_joiner_set_betha_factor(this->joiner, gdouble_value);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_PLAYOUT_LOWEST_RATE:
+      THIS_WRITELOCK (this);
+      guint_value = g_value_get_uint (value);
+      packetsrcvqueue_set_lowest_playoutrate(this->rcvqueue, (GstClockTime)guint_value * GST_MSECOND);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_PLAYOUT_HIGHEST_RATE:
+      THIS_WRITELOCK (this);
+      guint_value = g_value_get_uint (value);
+      packetsrcvqueue_set_highest_playoutrate(this->rcvqueue, (GstClockTime)guint_value * GST_MSECOND);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_PLAYOUT_CLOCK_RATE:
+      THIS_WRITELOCK (this);
+      guint_value = g_value_get_uint (value);
+      packetsrcvqueue_set_clock_rate(this->rcvqueue, guint_value);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_PLAYOUT_SPREAD_FACTOR:
+      THIS_WRITELOCK (this);
+      gdouble_value = g_value_get_double (value);
+      packetsrcvqueue_set_spread_factor(this->rcvqueue, gdouble_value);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_DISCARD_TRESHOLD:

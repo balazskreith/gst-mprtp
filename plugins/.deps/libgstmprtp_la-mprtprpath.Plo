@@ -215,7 +215,7 @@ libgstmprtp_la-mprtprpath.lo: mprtprpath.c /usr/include/stdc-predef.h \
  gstmprtcpbuffer.h gstmprtpbuffer.h mprtpdefs.h bintree.h mprtplogger.h \
  numstracker.h bintree2.h percentiletracker2.h percentiletracker.h \
  packetsrcvtracker.h mprtpspath.h packetssndqueue.h packetssndtracker.h \
- reportproc.h streamjoiner.h ricalcer.h
+ reportproc.h streamjoiner.h packetsrcvqueue.h ricalcer.h
 
 /usr/include/stdc-predef.h:
 
@@ -738,5 +738,7 @@ packetssndtracker.h:
 reportproc.h:
 
 streamjoiner.h:
+
+packetsrcvqueue.h:
 
 ricalcer.h:

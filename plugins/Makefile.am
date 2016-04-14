@@ -18,6 +18,7 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          bintree2.c                 \
                          mprtplogger.c              \
                          packetssndqueue.c          \
+                         packetsrcvqueue.c          \
                          ricalcer.c                 \
                          reportproc.c               \
                          reportprod.c               \
@@ -46,6 +47,7 @@ noinst_HEADERS = mprtpspath.h           \
                  bintree2.h             \
                  mprtplogger.h          \
                  packetssndqueue.h      \
+                 packetsrcvqueue.h      \
                  ricalcer.h             \
                  reportproc.h           \
                  reportprod.h           \

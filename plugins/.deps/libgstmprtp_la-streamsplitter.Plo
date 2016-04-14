@@ -199,7 +199,7 @@ libgstmprtp_la-streamsplitter.lo: streamsplitter.c \
  streamsplitter.h mprtpspath.h mprtpdefs.h mprtplogger.h \
  gstmprtcpbuffer.h gstmprtpbuffer.h packetssndqueue.h bintree.h \
  numstracker.h bintree2.h percentiletracker.h packetssndtracker.h \
- reportproc.h streamjoiner.h mprtprpath.h \
+ reportproc.h streamjoiner.h packetsrcvqueue.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
  percentiletracker2.h packetsrcvtracker.h ricalcer.h /usr/include/math.h \
  /usr/include/x86_64-linux-gnu/bits/huge_val.h \
@@ -682,6 +682,8 @@ packetssndtracker.h:
 reportproc.h:
 
 streamjoiner.h:
+
+packetsrcvqueue.h:
 
 mprtprpath.h:
 

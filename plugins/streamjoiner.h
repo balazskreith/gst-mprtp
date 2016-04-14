@@ -9,6 +9,7 @@
 #define STREAM_JOINER_H_
 
 #include <gst/gst.h>
+#include "packetsrcvqueue.h"
 
 typedef struct _StreamJoiner StreamJoiner;
 typedef struct _StreamJoinerClass StreamJoinerClass;
@@ -46,31 +47,6 @@ struct _StreamJoiner
   guint                bytes_in_queue;
   guint                packets_in_queue;
 
-//  gboolean             playout_allowed;
-//  gboolean             playout_halt;
-//  GstClockTime         playout_halt_time;
-//  gdouble              playout_delay;
-//  GstClockTime         last_playout;
-
-//  NumsTracker*         skews;
-//  GstClockTime         max_skew;
-//  GstClockTime         min_skew;
-//  GstClockTime         init_delay;
-//  Frame*               head;
-//  Frame*               tail;
-//  gint32               bytes_in_queue;
-//  guint32              last_played_timestamp;
-//  gboolean             flushing;
-//  gint32               framecounter;
-//
-//  GQueue*              urgent;
-//  gboolean             init_delay_applied;
-//  guint64              last_snd_ntp_reference;
-
-//  PercentileTracker*   snd_samplings;
-//  GstClockTime         last_snd_sampling;
-//  GstClockTime         sampling_time;
-
   PacketsRcvQueue*     rcvqueue;
   GQueue*              retained_buffers;
 
@@ -80,7 +56,7 @@ struct _StreamJoinerClass{
 };
 
 StreamJoiner*
-make_stream_joiner(void);
+make_stream_joiner(PacketsRcvQueue *rcvqueue);
 
 void
 stream_joiner_set_min_treshold (

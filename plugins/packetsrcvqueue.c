@@ -43,6 +43,25 @@
 #define THIS_WRITELOCK(this)
 #define THIS_WRITEUNLOCK(this)
 
+
+typedef struct _FrameNode{
+  GstMpRTPBuffer* mprtp;
+  guint16         seq;
+  gboolean        marker;
+  FrameNode*      next;
+}FrameNode;
+
+typedef struct _Frame
+{
+  guint32         timestamp;
+  gboolean        ready;
+  gboolean        marked;
+  gboolean        intact;
+  guint32         last_seq;
+  GstClockTime    added;
+  GList*          nodes;
+}Frame;
+
 static gint
 _cmp_uint16 (guint16 x, guint16 y)
 {
@@ -108,23 +127,6 @@ GST_DEBUG_CATEGORY_STATIC (packetsrcvqueue_debug_category);
 
 G_DEFINE_TYPE (PacketsRcvQueue, packetsrcvqueue, G_TYPE_OBJECT);
 
-typedef struct _FrameNode{
-  GstMpRTPBuffer* mprtp;
-  guint16         seq;
-  gboolean        marker;
-  FrameNode*      next;
-}FrameNode;
-
-typedef struct _Frame
-{
-  guint32         timestamp;
-  gboolean        ready;
-  gboolean        marked;
-  gboolean        intact;
-  guint32         last_seq;
-  GstClockTime    added;
-  GList*          nodes;
-}Frame;
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
@@ -183,15 +185,6 @@ void packetsrcvqueue_reset(PacketsRcvQueue *this)
 }
 
 
-gboolean packetsrcvqueue_expected_lost(PacketsRcvQueue *this)
-{
-  gboolean result;
-  THIS_READLOCK(this);
-
-  THIS_READUNLOCK(this);
-  return result;
-}
-
 PacketsRcvQueue *make_packetsrcvqueue(void)
 {
   PacketsRcvQueue *result;
@@ -213,8 +206,8 @@ void
 packetsrcvqueue_set_initial_delay(PacketsRcvQueue *this, GstClockTime init_delay)
 {
   THIS_WRITELOCK (this);
-  this->init_delay = init_delay;
-  this->init_delay_applied = FALSE;
+//  this->init_delay = init_delay;
+//  this->init_delay_applied = FALSE;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -238,7 +231,7 @@ void packetsrcvqueue_push(PacketsRcvQueue *this, GstMpRTPBuffer *mprtp)
   it = g_queue_find_custom(this->frames, &mprtp->timestamp, _find_frame_helper);
   if(it){
     frame = it->data;
-    g_list_insert_sorted(frame->nodes, _make_framenode(this, mprtp), _compare_nodes);
+    frame->nodes = g_list_insert_sorted(frame->nodes, _make_framenode(this, mprtp), _compare_nodes);
     goto done;
   }
   frame = _make_frame(this, mprtp);
@@ -323,14 +316,9 @@ void _logging(gpointer data)
   PacketsRcvQueue *this = data;
   mprtp_logger("packetsrcvqueue.log",
                "----------------------------------------------------\n"
-               "Seconds: %lu\n"
-               "bytes in queue: %d \n"
-               "packets in queue: %d \n",
+               "Seconds: %lu\n",
 
-               GST_TIME_AS_SECONDS(_now(this) - this->made),
-
-               this->bytes,
-               g_queue_get_length(this->frames)
+               GST_TIME_AS_SECONDS(_now(this) - this->made)
 
                );
 

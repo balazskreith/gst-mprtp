@@ -242,6 +242,7 @@ void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
   mprtp->buffer = gst_buffer_ref(mprtp->buffer);
   if(this->join_delay < mprtp->delay){
     packetsrcvqueue_push(this->rcvqueue, mprtp);
+    goto done;
   }
 
   g_queue_push_tail(this->retained_buffers, mprtp);

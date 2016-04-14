@@ -526,12 +526,14 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       break;
     case PROP_INIT_DELAY:
       THIS_WRITELOCK (this);
-      stream_joiner_set_initial_delay(this->joiner, g_value_get_uint64 (value) * GST_MSECOND);
+      //Todo decide this
+//      stream_joiner_set_initial_delay(this->joiner, g_value_get_uint64 (value) * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_PLAYOUT_HALT_TIME:
       THIS_WRITELOCK (this);
-      stream_joiner_set_playout_halt_time(this->joiner, g_value_get_uint64 (value) * GST_MSECOND);
+      //Todo decide this
+//      stream_joiner_set_playout_halt_time(this->joiner, g_value_get_uint64 (value) * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_OWD_WINDOW_TRESHOLD:

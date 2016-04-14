@@ -145,7 +145,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-streamsplitter.lo libgstmprtp_la-sndctrler.lo \
 	libgstmprtp_la-rcvctrler.lo libgstmprtp_la-bintree.lo \
 	libgstmprtp_la-bintree2.lo libgstmprtp_la-mprtplogger.lo \
-	libgstmprtp_la-packetssndqueue.lo libgstmprtp_la-ricalcer.lo \
+	libgstmprtp_la-packetssndqueue.lo \
+	libgstmprtp_la-packetsrcvqueue.lo libgstmprtp_la-ricalcer.lo \
 	libgstmprtp_la-reportproc.lo libgstmprtp_la-reportprod.lo \
 	libgstmprtp_la-percentiletracker.lo \
 	libgstmprtp_la-percentiletracker2.lo \
@@ -413,6 +414,7 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          bintree2.c                 \
                          mprtplogger.c              \
                          packetssndqueue.c          \
+                         packetsrcvqueue.c          \
                          ricalcer.c                 \
                          reportproc.c               \
                          reportprod.c               \
@@ -440,6 +442,7 @@ noinst_HEADERS = mprtpspath.h           \
                  bintree2.h             \
                  mprtplogger.h          \
                  packetssndqueue.h      \
+                 packetsrcvqueue.h      \
                  ricalcer.h             \
                  reportproc.h           \
                  reportprod.h           \
@@ -565,6 +568,7 @@ include ./$(DEPDIR)/libgstmprtp_la-mprtplogger.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-numstracker.Plo
+include ./$(DEPDIR)/libgstmprtp_la-packetsrcvqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-packetsrcvtracker.Plo
 include ./$(DEPDIR)/libgstmprtp_la-packetssndqueue.Plo
 include ./$(DEPDIR)/libgstmprtp_la-packetssndtracker.Plo
@@ -722,6 +726,13 @@ libgstmprtp_la-packetssndqueue.lo: packetssndqueue.c
 #	$(AM_V_CC)source='packetssndqueue.c' object='libgstmprtp_la-packetssndqueue.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-packetssndqueue.lo `test -f 'packetssndqueue.c' || echo '$(srcdir)/'`packetssndqueue.c
+
+libgstmprtp_la-packetsrcvqueue.lo: packetsrcvqueue.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-packetsrcvqueue.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-packetsrcvqueue.Tpo -c -o libgstmprtp_la-packetsrcvqueue.lo `test -f 'packetsrcvqueue.c' || echo '$(srcdir)/'`packetsrcvqueue.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-packetsrcvqueue.Tpo $(DEPDIR)/libgstmprtp_la-packetsrcvqueue.Plo
+#	$(AM_V_CC)source='packetsrcvqueue.c' object='libgstmprtp_la-packetsrcvqueue.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-packetsrcvqueue.lo `test -f 'packetsrcvqueue.c' || echo '$(srcdir)/'`packetsrcvqueue.c
 
 libgstmprtp_la-ricalcer.lo: ricalcer.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-ricalcer.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-ricalcer.Tpo -c -o libgstmprtp_la-ricalcer.lo `test -f 'ricalcer.c' || echo '$(srcdir)/'`ricalcer.c

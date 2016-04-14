@@ -24,6 +24,10 @@ typedef struct _PacketsRcvQueueClass PacketsRcvQueueClass;
 
 #define PACKETSRCVQUEUE_MAX_ITEMS_NUM 100
 
+typedef enum{
+  PACKETSRCVQUEUE_NO_PLAYOUT_CONTROL = 0,
+}PlayoutOperationMode;
+
 struct _PacketsRcvQueue
 {
   GObject                    object;
@@ -36,6 +40,7 @@ struct _PacketsRcvQueue
   GQueue*                    normal;
 
   gboolean                   playout_allowed;
+  PlayoutOperationMode       operation_mode;
 };
 
 

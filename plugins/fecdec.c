@@ -75,8 +75,6 @@ static GstBuffer *_repair_rtpbuf_by_segment(FECDecoder *this, FECDecoderSegment 
 static gint _find_item_by_seq_helper(gconstpointer item_ptr, gconstpointer desired_seq);
 static FECDecoderItem * _find_item_by_seq(GList *items, guint16 seq);
 static FECDecoderItem * _take_item_by_seq(GList **items, guint16 seq);
-static FECDecoderRequest * _find_request_by_seq(FECDecoder *this, guint16 seq);
-static void _remove_from_request(FECDecoder *this, FECDecoderRequest *request);
 static void _segment_dtor(FECDecoder *this, FECDecoderSegment *segment);
 static FECDecoderSegment* _segment_ctor(void);
 static FECDecoderItem* _make_item(FECDecoder *this, GstMpRTPBuffer *mprtp);
@@ -181,39 +179,40 @@ FECDecoder *make_fecdecoder(void)
   return this;
 }
 
-void fecdecoder_request_repair(FECDecoder *this, guint16 seq)
-{
-  FECDecoderRequest *request;
-  THIS_WRITELOCK(this);
-  request = mprtp_malloc(sizeof(FECDecoderRequest));
-  request->added         = _now(this);
-  request->seq_num       = seq;
-  this->requests   = g_list_prepend(this->requests, request);
-  THIS_WRITEUNLOCK(this);
-}
-
-gboolean fecdecoder_has_repaired_rtpbuffer(FECDecoder *this, GstBuffer** repairedbuf)
+gboolean fecdecoder_has_repaired_rtpbuffer(FECDecoder *this, guint16 hpsn, GstBuffer** repairedbuf /*highest played sequence number*/)
 {
   FECDecoderSegment *segment;
-  FECDecoderRequest *request;
-  GList *it;
+  GList *segi;
   gboolean result = FALSE;
   THIS_WRITELOCK(this);
-  for(it = this->requests; it; it = it->next){
-    request = it->data;
-    if(_now(this) - this->repair_window_min < request->added){
+  for(segi = this->segments; segi; segi = segi->next){
+    guint16 item_seq;
+    gint32 missing_seq = -1;
+    segment = segi->data;
+    if(segment->missing != 1 || segment->repaired) {
       continue;
     }
-    segment = _find_segment_by_seq(this, request->seq_num);
-    if(!segment || segment->missing != 1){
+    if(_cmp_uint16(hpsn, segment->base_sn) < 0){
       continue;
     }
+    if(_now(this) - this->repair_window_min < segment->added){
+      continue;
+    }
+    if(segment->added < _now(this) - this->repair_window_max){
+      continue;
+    }
+    for(item_seq = segment->base_sn; item_seq != (segment->high_sn+1); ++item_seq){
+      if(_find_item_by_seq(segment->items, item_seq) == NULL){
+        missing_seq = item_seq;
+      }
+    }
+    if(missing_seq == -1){
+      continue;
+    }
+    *repairedbuf = _repair_rtpbuf_by_segment(this, segment, missing_seq);
+    segment->repaired = TRUE;
     result = TRUE;
-    *repairedbuf = _repair_rtpbuf_by_segment(this, segment, request->seq_num);
-    _remove_from_request(this, request);
-    goto done;
   }
-done:
   THIS_WRITEUNLOCK(this);
   return result;
 
@@ -237,12 +236,7 @@ void fecdecoder_set_repair_window(FECDecoder *this, GstClockTime min, GstClockTi
 void fecdecoder_add_rtp_packet(FECDecoder *this, GstMpRTPBuffer *mprtp)
 {
   FECDecoderSegment *segment;
-  FECDecoderRequest *request;
   THIS_WRITELOCK(this);
-  request = _find_request_by_seq(this, mprtp->abs_seq);
-  if(request){
-    _remove_from_request(this, request);
-  }
   segment =_find_segment_by_seq(this, mprtp->abs_seq);
   if(!segment){
     _add_rtp_packet_to_items(this, mprtp);
@@ -309,20 +303,6 @@ void fecdecoder_clean(FECDecoder *this)
   GstClockTime now;
   THIS_WRITELOCK(this);
   now = _now(this);
-
-  //filter request elements
-  new_list = NULL;
-  for(it = this->requests; it; it = it->next){
-    FECDecoderRequest *request;
-    request = it->data;
-    if(request->added < now - this->repair_window_max){
-      mprtp_free(request);
-      continue;
-    }
-    new_list = g_list_prepend(new_list, request);
-  }
-  g_list_free(this->requests);
-  this->requests = new_list;
 
   //filter out items
   new_list = NULL;
@@ -405,11 +385,11 @@ void _add_rtp_packet_to_segment(FECDecoder *this, GstMpRTPBuffer *mprtp, FECDeco
 {
   FECDecoderItem *item = NULL;
   if(_find_item_by_seq(segment->items, mprtp->abs_seq) != NULL){
-    GST_WARNING_OBJECT(this, "Duplicated sequece number %hu for RTP packet", mprtp->abs_seq);
+      g_warning("Duplicated sequece number %hu for RTP packet", mprtp->abs_seq);
     goto done;
   }
   if(--segment->missing < 0){
-    GST_WARNING_OBJECT(this, "Duplicated or corrupted FEC segment.");
+    g_warning("Duplicated or corrupted FEC segment.");
     goto done;
   }
   item = _make_item(this, mprtp);
@@ -487,31 +467,6 @@ FECDecoderItem * _take_item_by_seq(GList **items, guint16 seq)
     *items = g_list_remove(*items, result);
   }
   return result;
-}
-
-static gint _find_request_by_seq_helper(gconstpointer item_ptr, gconstpointer seq_ptr)
-{
-  const guint16 *seq = seq_ptr;
-  const FECDecoderRequest *request = item_ptr;
-  return request->seq_num == *seq ? 0 : -1;
-}
-
-FECDecoderRequest * _find_request_by_seq(FECDecoder *this, guint16 seq)
-{
-  FECDecoderRequest *result = NULL;
-  GList *item;
-  item = g_list_find_custom(this->requests, &seq, _find_request_by_seq_helper);
-  if(!item){
-    goto done;
-  }
-  result = item->data;
-done:
-  return result;
-}
-
-void _remove_from_request(FECDecoder *this, FECDecoderRequest *request)
-{
-  this->requests = g_list_remove(this->requests, request);
 }
 
 void _segment_dtor(FECDecoder *this, FECDecoderSegment *segment)

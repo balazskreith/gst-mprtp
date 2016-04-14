@@ -173,6 +173,7 @@ packetsrcvqueue_init (PacketsRcvQueue * this)
   this->frames = g_queue_new();
   this->urgent = g_queue_new();
   this->normal = g_queue_new();
+  this->operation_mode = PACKETSRCVQUEUE_NO_PLAYOUT_CONTROL;
   mprtp_logger_add_logging_fnc(_logging,this, 10, &this->rwmutex);
 }
 
@@ -245,14 +246,23 @@ void packetsrcvqueue_refresh(PacketsRcvQueue *this)
   GList *it = NULL;
   Frame *head;
   FrameNode* node;
+  gboolean playout_allowed = FALSE;
   THIS_WRITELOCK(this);
 again:
   if(g_queue_is_empty(this->frames)){
     goto done;
   }
-  head = g_queue_peek_head(this->frames);
 
-  //Todo: check playout time
+  switch(this->operation_mode){
+    case PACKETSRCVQUEUE_NO_PLAYOUT_CONTROL:
+    default:
+      playout_allowed = TRUE;
+      break;
+  }
+
+  if(!playout_allowed){
+    goto done;
+  }
   head = g_queue_pop_head(this->frames);
   for(it = head->nodes; it; it = it->next){
     node = it->data;

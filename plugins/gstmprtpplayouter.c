@@ -1226,18 +1226,16 @@ again:
     this->expected_seq = mprtp->abs_seq;
   }
 
+  while(fecdecoder_has_repaired_rtpbuffer(this->fec_decoder, this->expected_seq, &repairedbuf)){
+    gst_pad_push(this->mprtp_srcpad, repairedbuf);
+  }
+
   if(mprtp->abs_seq != this->expected_seq){
     if(_cmp_seq(this->expected_seq, mprtp->abs_seq) < 0){
-      for(; this->expected_seq != mprtp->abs_seq; ++this->expected_seq){
-        fecdecoder_request_repair(this->fec_decoder, this->expected_seq);
-      }
-      ++this->expected_seq;
+      this->expected_seq = mprtp->abs_seq + 1;
     }
   }else{
       ++this->expected_seq;
-  }
-  while(fecdecoder_has_repaired_rtpbuffer(this->fec_decoder, &repairedbuf)){
-    gst_pad_push(this->mprtp_srcpad, repairedbuf);
   }
 
   _trash_mprtp_buffer(this, mprtp);

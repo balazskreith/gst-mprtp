@@ -59,6 +59,13 @@ struct _MpRTPReceiverPath
   PacketsRcvTracker*        packetstracker;
 
   gboolean                  urgent;
+
+  gboolean                  spike_mode;
+  GstClockTime              spike_var;
+  GstClockTime              spike_var_treshold;
+  GstClockTime              spike_delay_treshold;
+  GstClockTime              last_added_delay;
+  GstClockTime              last_last_added_delay;
 };
 
 struct _MpRTPReceiverPathClass
@@ -89,6 +96,12 @@ void mprtpr_path_get_owd_stats(MpRTPRPath *this,
                                  GstClockTime *median,
                                  GstClockTime *min,
                                  GstClockTime* max);
+gboolean
+mprtpr_path_is_in_spike_mode(MpRTPRPath *this);
+
+void
+mprtpr_path_set_spike_treshold(MpRTPRPath *this, GstClockTime delay_treshold, GstClockTime var_treshold);
+
 gboolean
 mprtpr_path_is_urgent_request(MpRTPRPath *this);
 

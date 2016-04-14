@@ -223,7 +223,6 @@ again:
     this->expected_lost = TRUE;
     goto again;
   }
-  item = g_queue_peek_head(this->items);
   result = item->buffer;
 done:
   THIS_WRITEUNLOCK(this);

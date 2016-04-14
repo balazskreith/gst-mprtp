@@ -24,12 +24,6 @@ typedef struct _PacketsSndQueueClass PacketsSndQueueClass;
 
 typedef struct _PacketsSndQueueItem PacketsSndQueueItem;
 
-typedef enum{
-  PACKETSSNDQUEUE_PACING_DEACTIVE    = 0,
-  PACKETSSNDQUEUE_PACING_ACTIVE      = 1,
-  PACKETSSNDQUEUE_PACING_DEACTIVATED = 2
-}PacketsSndQueuePacingState;
-
 struct _PacketsSndQueueItem
 {
   GstClockTime         added;

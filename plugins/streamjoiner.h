@@ -37,30 +37,42 @@ struct _StreamJoiner
   GHashTable*          subflows;
   gint                 subflow_num;
   GRWLock              rwmutex;
-  gboolean             playout_allowed;
-  gboolean             playout_halt;
-  GstClockTime         playout_halt_time;
-  gdouble              playout_delay;
-  GstClockTime         last_playout;
-  GstClockTime         last_playout_refresh;
-  NumsTracker*         skews;
-  GstClockTime         max_skew;
-  GstClockTime         min_skew;
-  GstClockTime         init_delay;
-  Frame*               head;
-  Frame*               tail;
-  gint32               bytes_in_queue;
-  guint32              last_played_timestamp;
-  gboolean             flushing;
-  gint32               framecounter;
+  GstClockTime         join_delay;
+  GstClockTime         join_min_treshold;
+  GstClockTime         join_max_treshold;
+  GstClockTime         last_join_refresh;
+  PercentileTracker*   delays;
 
-  GQueue*              urgent;
-  gboolean             init_delay_applied;
-  guint64              last_snd_ntp_reference;
+  guint                bytes_in_queue;
+  guint                packets_in_queue;
 
-  PercentileTracker*   snd_samplings;
-  GstClockTime         last_snd_sampling;
-  GstClockTime         sampling_time;
+//  gboolean             playout_allowed;
+//  gboolean             playout_halt;
+//  GstClockTime         playout_halt_time;
+//  gdouble              playout_delay;
+//  GstClockTime         last_playout;
+
+//  NumsTracker*         skews;
+//  GstClockTime         max_skew;
+//  GstClockTime         min_skew;
+//  GstClockTime         init_delay;
+//  Frame*               head;
+//  Frame*               tail;
+//  gint32               bytes_in_queue;
+//  guint32              last_played_timestamp;
+//  gboolean             flushing;
+//  gint32               framecounter;
+//
+//  GQueue*              urgent;
+//  gboolean             init_delay_applied;
+//  guint64              last_snd_ntp_reference;
+
+//  PercentileTracker*   snd_samplings;
+//  GstClockTime         last_snd_sampling;
+//  GstClockTime         sampling_time;
+
+  PacketsRcvQueue*     rcvqueue;
+  GQueue*              retained_buffers;
 
 };
 struct _StreamJoinerClass{
@@ -69,6 +81,16 @@ struct _StreamJoinerClass{
 
 StreamJoiner*
 make_stream_joiner(void);
+
+void
+stream_joiner_set_min_treshold (
+    StreamJoiner * this,
+    GstClockTime treshold);
+
+void
+stream_joiner_set_max_treshold (
+    StreamJoiner * this,
+    GstClockTime treshold);
 
 void
 stream_joiner_add_path(
@@ -86,15 +108,10 @@ stream_joiner_push(
     StreamJoiner * this,
     GstMpRTPBuffer *mprtp);
 
-GstMpRTPBuffer*
-stream_joiner_pop(
+void
+stream_joiner_transfer(
     StreamJoiner *this);
 
-void
-stream_joiner_get_stats(
-    StreamJoiner *this,
-    gdouble *playout_delay,
-    gint32 *playout_buffer_size);
 
 void
 stream_joiner_set_playout_halt_time(
@@ -106,10 +123,6 @@ stream_joiner_set_playout_allowed(
     StreamJoiner *this,
     gboolean playout_permission);
 
-void
-stream_joiner_set_initial_delay(
-    StreamJoiner *this,
-    GstClockTime tick_interval);
 
 GType
 stream_joiner_get_type (void);

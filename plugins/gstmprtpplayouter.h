@@ -88,6 +88,7 @@ struct _GstMprtpplayouter
   GstClockTime    repair_window_min;
 
   GHashTable*     paths;
+  PacketsRcvQueue* rcvqueue;
   StreamJoiner*   joiner;
   gboolean          logging;
   RcvController*    controller;

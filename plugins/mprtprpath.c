@@ -69,7 +69,8 @@ mprtpr_path_init (MpRTPRPath * this)
 
   this->skews = make_percentiletracker2(100, 50);
   percentiletracker2_set_treshold(this->skews, 2 * GST_SECOND);
-
+  this->spike_var_treshold = 20 * GST_MSECOND;
+  this->spike_delay_treshold = 375 * GST_MSECOND;
   mprtpr_path_reset (this);
 }
 
@@ -98,6 +99,7 @@ mprtpr_path_reset (MpRTPRPath * this)
   this->cycle_num = 0;
   this->highest_seq = 0;
   this->jitter = 0;
+
 }
 
 guint8
@@ -145,6 +147,26 @@ void mprtpr_path_get_owd_stats(MpRTPRPath *this,
   if(median) *median = median_delay;
   THIS_READUNLOCK (this);
 }
+
+gboolean
+mprtpr_path_is_in_spike_mode(MpRTPRPath *this)
+{
+  gboolean result;
+  THIS_READLOCK (this);
+  result = this->spike_mode;
+  THIS_READUNLOCK (this);
+  return result;
+}
+
+void
+mprtpr_path_set_spike_treshold(MpRTPRPath *this, GstClockTime delay_treshold, GstClockTime var_treshold)
+{
+  THIS_WRITELOCK (this);
+  this->spike_delay_treshold = delay_treshold;
+  this->spike_var_treshold = var_treshold;
+  THIS_WRITEUNLOCK (this);
+}
+
 
 gboolean
 mprtpr_path_is_urgent_request(MpRTPRPath *this)
@@ -304,6 +326,7 @@ _cmp_seq32 (guint32 x, guint32 y)
 
 void _add_delay(MpRTPRPath *this, GstClockTime delay)
 {
+  GstClockTime ddelay;
   gint64 median_delay;
   percentiletracker_add(this->delays, delay);
   median_delay = percentiletracker_get_stats(this->delays, NULL, NULL, NULL);
@@ -311,6 +334,27 @@ void _add_delay(MpRTPRPath *this, GstClockTime delay)
   if(this->path_avg_delay * 2. < delay){
     this->urgent = TRUE;
   }
+
+  ddelay = ABS(delay - this->last_added_delay);
+  if (ddelay > this->spike_delay_treshold) {
+  // A new "delay spike" has started
+    this->spike_mode = TRUE;
+    this->spike_var = 0;
+  }else {
+    if (this->spike_mode) {
+      GstClockTime vdelay;
+      // We're within a delay spike; maintain slope estimate
+      this->spike_var = this->spike_var>>1;
+      vdelay = (ABS(delay - this->last_added_delay) + ABS(delay - this->last_last_added_delay))/8;
+      this->spike_var = this->spike_var + vdelay;
+      if (this->spike_var < this->spike_var_treshold) {
+        // Slope is flat; return to normal operation
+        this->spike_mode = FALSE;
+      }
+    }
+  }
+  this->last_last_added_delay = this->last_added_delay;
+  this->last_added_delay = delay;
 }
 
 void _add_skew(MpRTPRPath *this, gint64 skew)

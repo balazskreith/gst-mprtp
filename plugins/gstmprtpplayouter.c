@@ -141,6 +141,8 @@ enum
   PROP_LOG_PATH,
   PROP_INIT_DELAY,
   PROP_OWD_WINDOW_TRESHOLD,
+  PROP_JOIN_MIN_TRESHOLD,
+  PROP_JOIN_MAX_TRESHOLD,
   PROP_DISCARD_TRESHOLD,
   PROP_LOST_TRESHOLD,
   PROP_REPAIR_WINDOW_MIN,
@@ -308,6 +310,20 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                           0,
                           4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_JOIN_MIN_TRESHOLD,
+       g_param_spec_uint ("join-min-treshold",
+                          "set the minimum treshold for streamjoiner in ms.",
+                          "set the minimum treshold for streamjoiner in ms.",
+                          0,
+                          4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_JOIN_MAX_TRESHOLD,
+       g_param_spec_uint ("join-max-treshold",
+                          "set the maximum treshold for streamjoiner in ms.",
+                          "set the maxumum treshold for streamjoiner in ms.",
+                          0,
+                          4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
 
   g_object_class_install_property (gobject_class, PROP_DISCARD_TRESHOLD,
        g_param_spec_uint ("discard-treshold",
@@ -396,7 +412,8 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->pivot_clock_rate         = MPRTP_PLAYOUTER_DEFAULT_CLOCKRATE;
   this->pivot_ssrc               = MPRTP_PLAYOUTER_DEFAULT_SSRC;
   this->paths                    = g_hash_table_new_full (NULL, NULL, NULL, mprtpr_path_destroy);
-  this->joiner                   = make_stream_joiner();
+  this->rcvqueue                 = make_packetsrcvqueue();
+  this->joiner                   = make_stream_joiner(this->rcvqueue);
   this->controller               = g_object_new(RCVCTRLER_TYPE, NULL);
   this->fec_payload_type         = FEC_PAYLOAD_DEFAULT_ID;
   this->pivot_address_subflow_id = 0;
@@ -411,7 +428,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   //Todo: consider stream joiner here
 //  stream_joiner_set_monitor_payload_type(this->joiner, this->fec_payload_type);
   fecdecoder_set_payload_type(this->fec_decoder, this->fec_payload_type);
-  stream_joiner_set_playout_allowed(this->joiner, FALSE);
+  packetsrcvqueue_set_playout_allowed(this->rcvqueue, FALSE);
 
 }
 
@@ -521,6 +538,18 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
       _setup_paths_owd_window_treshold(this, subflow_prop->id, subflow_prop->value);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_JOIN_MIN_TRESHOLD:
+      THIS_WRITELOCK (this);
+      guint_value = g_value_get_uint (value);
+      stream_joiner_set_min_treshold(this->joiner, (GstClockTime)guint_value * GST_MSECOND);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_JOIN_MAX_TRESHOLD:
+      THIS_WRITELOCK (this);
+      guint_value = g_value_get_uint (value);
+      stream_joiner_set_max_treshold(this->joiner, (GstClockTime)guint_value * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_DISCARD_TRESHOLD:
@@ -888,7 +917,7 @@ gst_mprtpplayouter_change_state (GstElement * element,
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
         gst_task_set_lock (this->thread, &this->thread_mutex);
         gst_task_start (this->thread);
-        stream_joiner_set_playout_allowed(this->joiner, TRUE);
+        packetsrcvqueue_set_playout_allowed(this->rcvqueue, TRUE);
         break;
       default:
         break;
@@ -900,7 +929,7 @@ gst_mprtpplayouter_change_state (GstElement * element,
 
     switch (transition) {
       case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
-        stream_joiner_set_playout_allowed(this->joiner, FALSE);
+        packetsrcvqueue_set_playout_allowed(this->rcvqueue, FALSE);
         gst_task_stop (this->thread);
         break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
@@ -1175,8 +1204,16 @@ _mprtpplayouter_process_run (void *data)
     this->last_fec_clean = _now(this);
   }
 
+  stream_joiner_transfer(this->joiner);
+  packetsrcvqueue_refresh(this->rcvqueue);
+
+  //flush the urgent queue
+  for(mprtp = packetsrcvqueue_pop_urgent(this->rcvqueue); mprtp;
+      mprtp = packetsrcvqueue_pop_urgent(this->rcvqueue)){
+      gst_pad_push (this->mprtp_srcpad, buffer);
+  }
 again:
-  mprtp = stream_joiner_pop(this->joiner);
+  mprtp = packetsrcvqueue_pop_normal(this->rcvqueue);
   if(!mprtp){
     goto done;
   }
@@ -1197,7 +1234,7 @@ again:
   }else{
       ++this->expected_seq;
   }
-  if(fecdecoder_has_repaired_rtpbuffer(this->fec_decoder, &repairedbuf)){
+  while(fecdecoder_has_repaired_rtpbuffer(this->fec_decoder, &repairedbuf)){
     gst_pad_push(this->mprtp_srcpad, repairedbuf);
   }
 

@@ -171,6 +171,8 @@ static int fec_min_window       = 0;
 static int fec_max_window       = 20;
 static int keep_alive_period    = 0;
 static int obsolation_th        = 0;
+static int join_min_th          = 10;
+static int join_max_th          = 100;
 
 static GOptionEntry entries[] =
 {
@@ -190,6 +192,8 @@ static GOptionEntry entries[] =
     { "fec_interval", 0, 0, G_OPTION_ARG_INT, &fec_interval, "fec_interval", NULL },
     { "fec_min_window", 0, 0, G_OPTION_ARG_INT, &fec_min_window, "fec_min_window", NULL },
     { "fec_max_window", 0, 0, G_OPTION_ARG_INT, &fec_max_window, "fec_max_window", NULL },
+    { "join_min_th", 0, 0, G_OPTION_ARG_INT, &join_min_th, "join_min_th", NULL },
+    { "join_max_th", 0, 0, G_OPTION_ARG_INT, &join_max_th, "join_max_th", NULL },
     { "obsolation_th", 0, 0, G_OPTION_ARG_INT, &obsolation_th, "obsolation_th", NULL },
     { "keep_alive_period", 0, 0, G_OPTION_ARG_INT, &keep_alive_period, "keep_alive_period", NULL },
     { "logging", 0, 0, G_OPTION_ARG_INT, &logging, "logging", NULL },

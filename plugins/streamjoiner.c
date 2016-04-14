@@ -58,7 +58,7 @@ GST_DEBUG_CATEGORY_STATIC (stream_joiner_debug_category);
 
 #define MAX_TRESHOLD_TIME 200 * GST_MSECOND
 #define MIN_TRESHOLD_TIME 10 * GST_MSECOND
-#define BETHA_FACTOR .2
+#define BETHA_FACTOR 1.2
 
 G_DEFINE_TYPE (StreamJoiner, stream_joiner, G_TYPE_OBJECT);
 
@@ -174,7 +174,7 @@ static void _delays_stat_pipe(gpointer data, PercentileTrackerPipeData* stat)
   }
 
   this->last_join_refresh = _now(this);
-  join_delay = stat->percentile * (1 + this->betha);
+  join_delay = stat->percentile * this->betha;
   this->join_delay = CONSTRAIN(this->join_min_treshold, this->join_max_treshold, join_delay);
 }
 
@@ -188,6 +188,7 @@ stream_joiner_init (StreamJoiner * this)
   this->join_max_treshold = MAX_TRESHOLD_TIME;
   this->join_min_treshold = MIN_TRESHOLD_TIME;
   this->betha             = BETHA_FACTOR;
+  this->retained_buffers  = g_queue_new();
   g_rw_lock_init (&this->rwmutex);
 
   this->delays = make_percentiletracker(4096, 80);

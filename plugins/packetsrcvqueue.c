@@ -302,6 +302,10 @@ void packetsrcvqueue_push(PacketsRcvQueue *this, GstMpRTPBuffer *mprtp)
   Frame *tail, *head, *frame;
   GList *it;
   THIS_WRITELOCK(this);
+  if(g_queue_is_empty(this->frames)){
+    g_queue_push_tail(this->urgent, mprtp);
+    goto done;
+  }
   head = g_queue_peek_head(this->frames);
   if(_cmp_uint16(mprtp->timestamp, head->timestamp) < 0){
     g_queue_push_tail(this->urgent, mprtp);

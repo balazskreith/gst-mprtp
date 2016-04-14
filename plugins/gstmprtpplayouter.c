@@ -341,7 +341,7 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           g_param_spec_double ("join-betha-factor",
                                "set the betha factor for streamjoiner.",
                                "set the betha factor for streamjoiner.",
-                               0.0, 10.0, 0.,
+                               0.0, 10.0, 1.,
                                G_PARAM_WRITABLE  | G_PARAM_STATIC_STRINGS));
 
     g_object_class_install_property (gobject_class, PROP_PLAYOUT_LOWEST_RATE,
@@ -1299,7 +1299,10 @@ _mprtpplayouter_process_run (void *data)
   //flush the urgent queue
   for(mprtp = packetsrcvqueue_pop_urgent(this->rcvqueue); mprtp;
       mprtp = packetsrcvqueue_pop_urgent(this->rcvqueue)){
+      buffer = mprtp->buffer;
+      _trash_mprtp_buffer(this, mprtp);
       gst_pad_push (this->mprtp_srcpad, buffer);
+
   }
 again:
   mprtp = packetsrcvqueue_pop_normal(this->rcvqueue);

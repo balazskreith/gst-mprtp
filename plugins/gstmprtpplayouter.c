@@ -143,6 +143,8 @@ enum
   PROP_OWD_WINDOW_TRESHOLD,
   PROP_JOIN_MIN_TRESHOLD,
   PROP_JOIN_MAX_TRESHOLD,
+  PROP_JOIN_WINDOW_SIZE,
+  PROP_JOIN_BETHA_FACTOR,
   PROP_DISCARD_TRESHOLD,
   PROP_LOST_TRESHOLD,
   PROP_REPAIR_WINDOW_MIN,
@@ -324,6 +326,20 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                           0,
                           4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_JOIN_WINDOW_SIZE,
+       g_param_spec_uint ("join-window-treshold",
+                          "set the window treshold for streamjoiner in seconds.",
+                          "set the window treshold for streamjoiner in seconds.",
+                          0,
+                          4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_JOIN_BETHA_FACTOR,
+        g_param_spec_double ("join-betha-factor",
+                             "set the betha factor for streamjoiner.",
+                             "set the betha factor for streamjoiner.",
+                             0.0, 10.0, 0.,
+                             G_PARAM_WRITABLE  | G_PARAM_STATIC_STRINGS));
+
 
   g_object_class_install_property (gobject_class, PROP_DISCARD_TRESHOLD,
        g_param_spec_uint ("discard-treshold",
@@ -462,6 +478,7 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (object);
   gboolean gboolean_value;
   guint guint_value;
+  gdouble gdouble_value;
   SubflowSpecProp *subflow_prop;
   GST_DEBUG_OBJECT (this, "set_property");
 
@@ -552,6 +569,18 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
       stream_joiner_set_max_treshold(this->joiner, (GstClockTime)guint_value * GST_MSECOND);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_JOIN_WINDOW_SIZE:
+      THIS_WRITELOCK (this);
+      guint_value = g_value_get_uint (value);
+      stream_joiner_set_window_treshold(this->joiner, (GstClockTime)guint_value * GST_SECOND);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_JOIN_BETHA_FACTOR:
+      THIS_WRITELOCK (this);
+      gdouble_value = g_value_get_double (value);
+      stream_joiner_set_betha_factor(this->joiner, gdouble_value);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_DISCARD_TRESHOLD:
@@ -1200,6 +1229,8 @@ _mprtpplayouter_process_run (void *data)
   this = (GstMprtpplayouter *) data;
 
   THIS_READLOCK (this);
+
+  //Todo: we need more time than one msecond, so it will sleep with the rate.
   next_scheduler_time = _now(this) + 1 * GST_MSECOND;
   if(this->last_fec_clean < _now(this) - 200 * GST_MSECOND){
     fecdecoder_clean(this->fec_decoder);

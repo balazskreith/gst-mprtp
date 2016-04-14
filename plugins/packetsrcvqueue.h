@@ -11,6 +11,7 @@
 #include <gst/gst.h>
 #include "bintree.h"
 #include "gstmprtpbuffer.h"
+#include "percentiletracker.h"
 
 typedef struct _PacketsRcvQueue PacketsRcvQueue;
 typedef struct _PacketsRcvQueueClass PacketsRcvQueueClass;
@@ -24,10 +25,6 @@ typedef struct _PacketsRcvQueueClass PacketsRcvQueueClass;
 
 #define PACKETSRCVQUEUE_MAX_ITEMS_NUM 100
 
-typedef enum{
-  PACKETSRCVQUEUE_NO_PLAYOUT_CONTROL = 0,
-}PlayoutOperationMode;
-
 struct _PacketsRcvQueue
 {
   GObject                    object;
@@ -40,7 +37,19 @@ struct _PacketsRcvQueue
   GQueue*                    normal;
 
   gboolean                   playout_allowed;
-  PlayoutOperationMode       operation_mode;
+
+  guint                      desired_framenum;
+  guint                      clock_rate;
+  GstClockTime               highest_playoutrate;
+  GstClockTime               lowest_playoutrate;
+  gdouble                    spread_factor;
+
+  gboolean                   flush;
+  GstClockTime               timestamp_t1;
+  GstClockTime               timestamp_t2;
+
+  PercentileTracker*         samplings;
+  GstClockTime               mean_rate;
 };
 
 
@@ -56,7 +65,13 @@ GType packetsrcvqueue_get_type (void);
 PacketsRcvQueue *make_packetsrcvqueue(void);
 void packetsrcvqueue_reset(PacketsRcvQueue *this);
 void packetsrcvqueue_set_playout_allowed(PacketsRcvQueue *this, gboolean playout_permission);
-void packetsrcvqueue_set_initial_delay(PacketsRcvQueue *this, GstClockTime init_delay);
+void packetsrcvqueue_set_desired_framenum(PacketsRcvQueue *this, guint desired_framenum);
+void packetsrcvqueue_set_clock_rate(PacketsRcvQueue *this, guint clock_rate);
+void packetsrcvqueue_flush(PacketsRcvQueue *this);
+void packetsrcvqueue_set_highest_playoutrate(PacketsRcvQueue *this, GstClockTime highest_playoutrate);
+void packetsrcvqueue_set_lowest_playoutrate(PacketsRcvQueue *this, GstClockTime lowest_playoutrate);
+void packetsrcvqueue_set_spread_factor(PacketsRcvQueue *this, gdouble spread_factor);
+GstClockTime packetsrcvqueue_get_playout_point(PacketsRcvQueue *this);
 void packetsrcvqueue_push(PacketsRcvQueue *this, GstMpRTPBuffer* buffer);
 void packetsrcvqueue_refresh(PacketsRcvQueue *this);
 GstMpRTPBuffer * packetsrcvqueue_pop_normal(PacketsRcvQueue *this);

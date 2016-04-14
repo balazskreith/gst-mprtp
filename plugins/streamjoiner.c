@@ -56,6 +56,10 @@ GST_DEBUG_CATEGORY_STATIC (stream_joiner_debug_category);
 
 #define _now(this) gst_clock_get_time (this->sysclock)
 
+#define MAX_TRESHOLD_TIME 200 * GST_MSECOND
+#define MIN_TRESHOLD_TIME 10 * GST_MSECOND
+#define BETHA_FACTOR .2
+
 G_DEFINE_TYPE (StreamJoiner, stream_joiner, G_TYPE_OBJECT);
 
 typedef struct _Subflow Subflow;
@@ -164,12 +168,14 @@ static void _iterate_subflows(StreamJoiner *this, void(*iterator)(Subflow *, gpo
 static void _delays_stat_pipe(gpointer data, PercentileTrackerPipeData* stat)
 {
   StreamJoiner * this = data;
+  GstClockTime join_delay;
   if(_now(this) - 20 * GST_MSECOND < this->last_join_refresh){
     return;
   }
 
   this->last_join_refresh = _now(this);
-  this->join_delay = CONSTRAIN(this->join_min_treshold, this->join_max_treshold, stat->percentile * 1.2);
+  join_delay = stat->percentile * (1 + this->betha);
+  this->join_delay = CONSTRAIN(this->join_min_treshold, this->join_max_treshold, join_delay);
 }
 
 void
@@ -179,11 +185,12 @@ stream_joiner_init (StreamJoiner * this)
   this->subflows = g_hash_table_new_full (NULL, NULL, NULL, _ruin_subflow);
   this->made              = _now(this);
   this->join_delay        = 0;
-  this->join_max_treshold = 200 * GST_MSECOND;
-  this->join_min_treshold = 10  * GST_MSECOND;
+  this->join_max_treshold = MAX_TRESHOLD_TIME;
+  this->join_min_treshold = MIN_TRESHOLD_TIME;
+  this->betha             = BETHA_FACTOR;
   g_rw_lock_init (&this->rwmutex);
 
-  this->delays = make_percentiletracker(1024, 80);
+  this->delays = make_percentiletracker(4096, 80);
   percentiletracker_set_treshold(this->delays, 60 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->delays, _delays_stat_pipe, this);
 
@@ -280,6 +287,22 @@ stream_joiner_set_max_treshold (StreamJoiner * this, GstClockTime treshold)
 }
 
 void
+stream_joiner_set_window_treshold (StreamJoiner * this, GstClockTime treshold)
+{
+  THIS_WRITELOCK (this);
+  percentiletracker_set_treshold(this->delays, treshold);
+  THIS_WRITEUNLOCK (this);
+}
+
+void
+stream_joiner_set_betha_factor (StreamJoiner * this, gdouble betha)
+{
+  THIS_WRITELOCK (this);
+  this->betha = betha;
+  THIS_WRITEUNLOCK (this);
+}
+
+void
 stream_joiner_add_path (StreamJoiner * this, guint8 subflow_id,
     MpRTPRPath * path)
 {
@@ -369,6 +392,9 @@ void _logging(gpointer data)
 
 }
 
+#undef MAX_TRESHOLD_TIME
+#undef MIN_TRESHOLD_TIME
+#undef BETHA_FACTOR
 
 #undef THIS_READLOCK
 #undef THIS_READUNLOCK

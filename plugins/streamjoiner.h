@@ -44,6 +44,8 @@ struct _StreamJoiner
   GstClockTime         last_join_refresh;
   PercentileTracker*   delays;
 
+  gdouble              betha;
+
   guint                bytes_in_queue;
   guint                packets_in_queue;
 
@@ -67,6 +69,16 @@ void
 stream_joiner_set_max_treshold (
     StreamJoiner * this,
     GstClockTime treshold);
+
+void
+stream_joiner_set_window_treshold (
+    StreamJoiner * this,
+    GstClockTime treshold);
+
+void
+stream_joiner_set_betha_factor (
+    StreamJoiner * this,
+    gdouble betha);
 
 void
 stream_joiner_add_path(

@@ -529,9 +529,8 @@ _orp_main(RcvController * this)
   GstClockTime elapsed_x, elapsed_y;
   gboolean created = FALSE;
 
-  if (!this->report_is_flowable) {
-      //Todo: fix this;
-      //goto done;
+  if(!this->report_is_flowable) {
+    goto done;
   }
 
   ++this->orp_tick;
@@ -607,6 +606,8 @@ _orp_main(RcvController * this)
   }
 
   DISABLE_LINE _uint16_diff(0,0);
+done:
+  return;
 }
 
 

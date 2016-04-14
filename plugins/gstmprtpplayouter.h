@@ -100,6 +100,7 @@ struct _GstMprtpplayouter
   guint16         expected_seq;
   gboolean        expected_seq_init;
   guint32         rtcp_sent_octet_sum;
+  GstClockTime    playout_point;
 
   GstTask*                      thread;
   GRecMutex                     thread_mutex;

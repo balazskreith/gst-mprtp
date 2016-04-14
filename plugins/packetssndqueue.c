@@ -176,7 +176,7 @@ void packetssndqueue_push(PacketsSndQueue *this, GstBuffer *buffer)
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   PacketsSndQueueItem *item;
   THIS_WRITELOCK(this);
-  item = g_slice_new(PacketsSndQueueItem);
+  item = g_slice_new0(PacketsSndQueueItem);
   item->added = _now(this);
   item->buffer = gst_buffer_ref(buffer);
 

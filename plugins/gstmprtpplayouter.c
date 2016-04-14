@@ -139,21 +139,19 @@ enum
   PROP_RTP_PASSTHROUGH,
   PROP_LOG_ENABLED,
   PROP_LOG_PATH,
-  PROP_INIT_DELAY,
   PROP_OWD_WINDOW_TRESHOLD,
   PROP_JOIN_MIN_TRESHOLD,
   PROP_JOIN_MAX_TRESHOLD,
   PROP_JOIN_WINDOW_TRESHOLD,
   PROP_JOIN_BETHA_FACTOR,
-  PROP_PLAYOUT_LOWEST_RATE,
-  PROP_PLAYOUT_HIGHEST_RATE,
-  PROP_PLAYOUT_CLOCK_RATE,
+  PROP_PLAYOUT_MAX_RATE,
+  PROP_PLAYOUT_MIN_RATE,
+  PROP_PLAYOUT_DESIRED_FRAMENUM,
   PROP_PLAYOUT_SPREAD_FACTOR,
   PROP_DISCARD_TRESHOLD,
   PROP_LOST_TRESHOLD,
   PROP_REPAIR_WINDOW_MIN,
   PROP_REPAIR_WINDOW_MAX,
-  PROP_PLAYOUT_HALT_TIME,
 
 };
 
@@ -294,20 +292,6 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
             "Determines the path for logfiles",
             "NULL", G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_INIT_DELAY,
-                                    g_param_spec_uint64 ("init-delay",
-                                                         "initial delay for playout",
-                                                         "initial delay for playout",
-                                                         0, G_MAXUINT, 0,
-                                                         G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_PLAYOUT_HALT_TIME,
-                                    g_param_spec_uint64 ("halt-time",
-                                                         "set halt time for playout",
-                                                         "set halt time for playout",
-                                                         0, G_MAXUINT, 0,
-                                                         G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
   g_object_class_install_property (gobject_class, PROP_OWD_WINDOW_TRESHOLD,
        g_param_spec_uint ("owd-window-treshold",
                           "set the window tresholds for owd sampling on subflows.",
@@ -344,24 +328,24 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                                0.0, 10.0, 1.,
                                G_PARAM_WRITABLE  | G_PARAM_STATIC_STRINGS));
 
-    g_object_class_install_property (gobject_class, PROP_PLAYOUT_LOWEST_RATE,
-           g_param_spec_uint ("playout-lowest-rate",
+    g_object_class_install_property (gobject_class, PROP_PLAYOUT_MAX_RATE,
+           g_param_spec_uint ("playout-max-rate",
+                              "set the maximum playout rate in ms.",
+                              "set the maximum playout rate in ms.",
+                              0,
+                              4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+      g_object_class_install_property (gobject_class, PROP_PLAYOUT_MIN_RATE,
+           g_param_spec_uint ("playout-min-rate",
                               "set the minimum playout rate in ms.",
                               "set the minimum playout rate in ms.",
                               0,
                               4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-      g_object_class_install_property (gobject_class, PROP_PLAYOUT_HIGHEST_RATE,
-           g_param_spec_uint ("playout-highest-rate",
-                              "set the minimum playout rate in ms.",
-                              "set the minimum playout rate in ms.",
-                              0,
-                              4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-      g_object_class_install_property (gobject_class, PROP_PLAYOUT_CLOCK_RATE,
-           g_param_spec_uint ("playout-clock-rate",
-                              "set the clock rate playout.",
-                              "set the clock rate playout",
+      g_object_class_install_property (gobject_class, PROP_PLAYOUT_DESIRED_FRAMENUM,
+           g_param_spec_uint ("playout-desired-framenum",
+                              "set the desired frame num in the rcvqueue at playout.",
+                              "set the desired frame num in the rcvqueue at playout.",
                               0,
                               4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
@@ -473,8 +457,6 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   rcvctrler_setup(this->controller, this->joiner, this->fec_decoder);
   rcvctrler_setup_callbacks(this->controller, this, gst_mprtpplayouter_mprtcp_sender);
 
-  //Todo: consider stream joiner here
-//  stream_joiner_set_monitor_payload_type(this->joiner, this->fec_payload_type);
   fecdecoder_set_payload_type(this->fec_decoder, this->fec_payload_type);
   packetsrcvqueue_set_playout_allowed(this->rcvqueue, FALSE);
 
@@ -573,18 +555,6 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       mprtp_logger_set_target_directory(g_value_get_string(value));
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_INIT_DELAY:
-      THIS_WRITELOCK (this);
-      //Todo decide this
-//      stream_joiner_set_initial_delay(this->joiner, g_value_get_uint64 (value) * GST_MSECOND);
-      THIS_WRITEUNLOCK (this);
-      break;
-    case PROP_PLAYOUT_HALT_TIME:
-      THIS_WRITELOCK (this);
-      //Todo decide this
-//      stream_joiner_set_playout_halt_time(this->joiner, g_value_get_uint64 (value) * GST_MSECOND);
-      THIS_WRITEUNLOCK (this);
-      break;
     case PROP_OWD_WINDOW_TRESHOLD:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
@@ -615,22 +585,22 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       stream_joiner_set_betha_factor(this->joiner, gdouble_value);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_PLAYOUT_LOWEST_RATE:
+    case PROP_PLAYOUT_MAX_RATE:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
-      packetsrcvqueue_set_lowest_playoutrate(this->rcvqueue, (GstClockTime)guint_value * GST_MSECOND);
+      packetsrcvqueue_set_max_playoutrate(this->rcvqueue, (GstClockTime)guint_value * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_PLAYOUT_HIGHEST_RATE:
+    case PROP_PLAYOUT_MIN_RATE:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
-      packetsrcvqueue_set_highest_playoutrate(this->rcvqueue, (GstClockTime)guint_value * GST_MSECOND);
+      packetsrcvqueue_set_min_playoutrate(this->rcvqueue, (GstClockTime)guint_value * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_PLAYOUT_CLOCK_RATE:
+    case PROP_PLAYOUT_DESIRED_FRAMENUM:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
-      packetsrcvqueue_set_clock_rate(this->rcvqueue, guint_value);
+      packetsrcvqueue_set_desired_framenum(this->rcvqueue, guint_value);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_PLAYOUT_SPREAD_FACTOR:
@@ -1281,21 +1251,20 @@ _mprtpplayouter_process_run (void *data)
   GstMpRTPBuffer *mprtp;
   GstBuffer *buffer = NULL;
   GstBuffer *repairedbuf = NULL;
+  GstClockTime now;
 
   this = (GstMprtpplayouter *) data;
 
   THIS_READLOCK (this);
-
+  now = _now(this);
   //Todo: we need more time than one msecond, so it will sleep with the rate.
   next_scheduler_time = _now(this) + 1 * GST_MSECOND;
-  if(this->last_fec_clean < _now(this) - 200 * GST_MSECOND){
+  if(this->last_fec_clean < now - 200 * GST_MSECOND){
     fecdecoder_clean(this->fec_decoder);
-    this->last_fec_clean = _now(this);
+    this->last_fec_clean = now;
   }
 
   stream_joiner_transfer(this->joiner);
-  packetsrcvqueue_refresh(this->rcvqueue);
-
   //flush the urgent queue
   for(mprtp = packetsrcvqueue_pop_urgent(this->rcvqueue); mprtp;
       mprtp = packetsrcvqueue_pop_urgent(this->rcvqueue)){
@@ -1304,6 +1273,13 @@ _mprtpplayouter_process_run (void *data)
       gst_pad_push (this->mprtp_srcpad, buffer);
 
   }
+
+  if(now < this->playout_point){
+    goto done;
+  }
+  packetsrcvqueue_refresh(this->rcvqueue);
+  this->playout_point = packetsrcvqueue_get_playout_point(this->rcvqueue);
+
 again:
   mprtp = packetsrcvqueue_pop_normal(this->rcvqueue);
   if(!mprtp){
@@ -1319,7 +1295,6 @@ again:
   while(fecdecoder_has_repaired_rtpbuffer(this->fec_decoder, this->expected_seq, &repairedbuf)){
     gst_pad_push(this->mprtp_srcpad, repairedbuf);
   }
-
   if(mprtp->abs_seq != this->expected_seq){
     if(_cmp_seq(this->expected_seq, mprtp->abs_seq) < 0){
       this->expected_seq = mprtp->abs_seq + 1;

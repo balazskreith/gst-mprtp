@@ -48,7 +48,6 @@ typedef struct _FrameNode{
   GstMpRTPBuffer* mprtp;
   guint16         seq;
   gboolean        marker;
-  FrameNode*      next;
 }FrameNode;
 
 typedef struct _Frame
@@ -135,7 +134,8 @@ G_DEFINE_TYPE (PacketsRcvQueue, packetsrcvqueue, G_TYPE_OBJECT);
 static void packetsrcvqueue_finalize (GObject * object);
 static Frame* _make_frame(PacketsRcvQueue *this, GstMpRTPBuffer *mprtp);
 static FrameNode* _make_framenode(PacketsRcvQueue *this, GstMpRTPBuffer *mprtp);
-static void _logging(gpointer data);
+static void _csv_logging(gpointer data);
+static void _readable_logging(gpointer data);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -169,11 +169,11 @@ static void _samplings_stat_pipe(gpointer data, PercentileTrackerPipeData* stat)
 {
   PacketsRcvQueue * this = data;
   if(!stat->percentile){
-    this->mean_rate = this->lowest_playoutrate;
+    this->mean_rate = this->max_playoutrate;
     return;
   }
 
-  this->mean_rate = ((gdouble)stat->percentile / (gdouble) this->clock_rate) * GST_SECOND;
+  this->mean_rate = stat->percentile;
 }
 
 void
@@ -185,15 +185,19 @@ packetsrcvqueue_init (PacketsRcvQueue * this)
   this->urgent = g_queue_new();
   this->normal = g_queue_new();
 
-  this->samplings = make_percentiletracker(100, 50);
-  percentiletracker_set_treshold(this->samplings, 60 * GST_SECOND);
-  percentiletracker_set_stats_pipe(this->samplings, _samplings_stat_pipe, this);
+  this->bytes_in_normal_queue = 0;
+
+  this->dsampling = make_percentiletracker(100, 50);
+  percentiletracker_set_treshold(this->dsampling, 60 * GST_SECOND);
+  percentiletracker_set_stats_pipe(this->dsampling, _samplings_stat_pipe, this);
   this->desired_framenum = 1;
-  this->clock_rate = 90000;
-  this->highest_playoutrate = .01 * GST_SECOND;
-  this->lowest_playoutrate =  .04 * GST_SECOND;
-  this->spread_factor = 1.1;
-  mprtp_logger_add_logging_fnc(_logging,this, 10, &this->rwmutex);
+  this->min_playoutrate = .01 * GST_SECOND;
+  this->max_playoutrate =  .04 * GST_SECOND;
+  this->spread_factor = 2.;
+
+  mprtp_logger_add_logging_fnc(_csv_logging,this, 1, &this->rwmutex);
+  mprtp_logger_add_logging_fnc(_readable_logging,this, 10, &this->rwmutex);
+
 }
 
 
@@ -229,27 +233,20 @@ packetsrcvqueue_set_desired_framenum(PacketsRcvQueue *this, guint desired_framen
   THIS_WRITEUNLOCK (this);
 }
 
+
 void
-packetsrcvqueue_set_clock_rate(PacketsRcvQueue *this, guint clock_rate)
+packetsrcvqueue_set_min_playoutrate(PacketsRcvQueue *this, GstClockTime min_playoutrate)
 {
   THIS_WRITELOCK (this);
-  this->clock_rate = clock_rate;
+  this->min_playoutrate = min_playoutrate;
   THIS_WRITEUNLOCK (this);
 }
 
 void
-packetsrcvqueue_set_highest_playoutrate(PacketsRcvQueue *this, GstClockTime highest_playoutrate)
+packetsrcvqueue_set_max_playoutrate(PacketsRcvQueue *this, GstClockTime max_playoutrate)
 {
   THIS_WRITELOCK (this);
-  this->highest_playoutrate = highest_playoutrate;
-  THIS_WRITEUNLOCK (this);
-}
-
-void
-packetsrcvqueue_set_lowest_playoutrate(PacketsRcvQueue *this, GstClockTime lowest_playoutrate)
-{
-  THIS_WRITELOCK (this);
-  this->lowest_playoutrate = lowest_playoutrate;
+  this->max_playoutrate = max_playoutrate;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -273,23 +270,22 @@ GstClockTime
 packetsrcvqueue_get_playout_point(PacketsRcvQueue *this)
 {
   GstClockTime result;
-  guint actual_framenum;
+  gint actual_framenum;
   gdouble factor;
-  GstClockTime playout_rate;
   THIS_WRITELOCK (this);
   actual_framenum = g_queue_get_length(this->frames);
-  if(!this->timestamp_t1 || !this->timestamp_t2){
-    result = _now(this) + this->lowest_playoutrate;
+  if(!this->sampling_t1 || !this->sampling_t2){
+    result = _now(this) + this->max_playoutrate;
     goto done;
   }
-  percentiletracker_add(this->samplings, this->timestamp_t1 - this->timestamp_t2);
+  percentiletracker_add(this->dsampling, this->sampling_t1 - this->sampling_t2);
   if(!actual_framenum){
-    result = _now(this) + this->lowest_playoutrate;
+    result = _now(this) + this->max_playoutrate;
     goto done;
   }
-  factor = pow(this->spread_factor, actual_framenum - this->desired_framenum);
-  playout_rate = CONSTRAIN(this->highest_playoutrate, this->lowest_playoutrate, this->mean_rate * factor);
-  result = _now(this) + playout_rate;
+  factor = pow(this->spread_factor, this->desired_framenum - actual_framenum);
+  this->playout_rate = CONSTRAIN(this->min_playoutrate, this->max_playoutrate, this->mean_rate * factor);
+  result = _now(this) + this->playout_rate;
 done:
   THIS_WRITEUNLOCK (this);
   return result;
@@ -299,23 +295,20 @@ done:
 
 void packetsrcvqueue_push(PacketsRcvQueue *this, GstMpRTPBuffer *mprtp)
 {
-  Frame *tail, *head, *frame;
+  Frame *frame;
   GList *it;
   THIS_WRITELOCK(this);
   if(g_queue_is_empty(this->frames)){
-    g_queue_push_tail(this->urgent, mprtp);
-    goto done;
-  }
-  head = g_queue_peek_head(this->frames);
-  if(_cmp_uint16(mprtp->timestamp, head->timestamp) < 0){
-    g_queue_push_tail(this->urgent, mprtp);
-    goto done;
-  }
-  tail = g_queue_peek_tail(this->frames);
-  if(_cmp_uint16(tail->timestamp, mprtp->timestamp) < 0){
+    this->bytes_in_normal_queue += mprtp->payload_bytes;
     g_queue_push_tail(this->frames, _make_frame(this, mprtp));
     goto done;
   }
+  if(this->played_timestamp && _cmp_uint32(mprtp->timestamp, this->played_timestamp) < 0){
+    this->bytes_in_urgent_queue += mprtp->payload_bytes;
+    g_queue_push_tail(this->urgent, mprtp);
+    goto done;
+  }
+  this->bytes_in_normal_queue += mprtp->payload_bytes;
   it = g_queue_find_custom(this->frames, &mprtp->timestamp, _find_frame_helper);
   if(it){
     frame = it->data;
@@ -334,6 +327,8 @@ void packetsrcvqueue_refresh(PacketsRcvQueue *this)
   GList *it = NULL;
   Frame *head;
   FrameNode* node;
+  GstClockTime sndsum = 0;
+  guint sndnum = 0;
   THIS_WRITELOCK(this);
 again:
   if(g_queue_is_empty(this->frames)){
@@ -343,11 +338,13 @@ again:
   head = g_queue_pop_head(this->frames);
   for(it = head->nodes; it; it = it->next){
     node = it->data;
+    sndsum += get_epoch_time_from_ntp_in_ns(node->mprtp->abs_snd_ntp_time);
+    ++sndnum;
     g_queue_push_tail(this->normal, node->mprtp);
     g_slice_free(FrameNode, node);
   }
-  this->timestamp_t2 = this->timestamp_t1;
-  this->timestamp_t1 = head->timestamp;
+  this->sampling_t2 = this->sampling_t1;
+  this->sampling_t1 = sndsum / sndnum;
   g_slice_free(Frame, head);
   if(this->flush){
     goto again;
@@ -364,6 +361,8 @@ GstMpRTPBuffer* packetsrcvqueue_pop_normal(PacketsRcvQueue *this)
     goto done;
   }
   result = g_queue_pop_head(this->normal);
+  this->bytes_in_normal_queue -= result->payload_bytes;
+  this->played_timestamp = result->timestamp;
 done:
   THIS_WRITEUNLOCK(this);
   return result;
@@ -377,6 +376,7 @@ GstMpRTPBuffer* packetsrcvqueue_pop_urgent(PacketsRcvQueue *this)
     goto done;
   }
   result = g_queue_pop_head(this->urgent);
+  this->bytes_in_urgent_queue -= result->payload_bytes;
 done:
   THIS_WRITEUNLOCK(this);
   return result;
@@ -385,32 +385,65 @@ done:
 Frame* _make_frame(PacketsRcvQueue *this, GstMpRTPBuffer *mprtp)
 {
   Frame *result;
-  result = g_slice_new(Frame);
+  result = g_slice_new0(Frame);
   result->added = _now(this);
   result->timestamp = mprtp->timestamp;
   result->nodes = g_list_prepend(result->nodes, _make_framenode(this, mprtp));
-
   return result;
 }
 
 FrameNode* _make_framenode(PacketsRcvQueue *this, GstMpRTPBuffer *mprtp)
 {
   FrameNode *result;
-  result = g_slice_new(FrameNode);
+  result = g_slice_new0(FrameNode);
   result->seq = mprtp->abs_seq;
   result->mprtp = mprtp;
   return result;
 }
 
-void _logging(gpointer data)
+void _csv_logging(gpointer data)
+{
+  PacketsRcvQueue *this = data;
+    mprtp_logger("packetsrcvqueue.csv",
+                 "%d,%d,%d,%lu"
+                 ,
+                 g_queue_get_length(this->frames),
+                 this->bytes_in_normal_queue,
+                 this->bytes_in_urgent_queue,
+                 this->playout_rate
+                 );
+}
+
+void _readable_logging(gpointer data)
 {
   PacketsRcvQueue *this = data;
   mprtp_logger("packetsrcvqueue.log",
                "----------------------------------------------------\n"
-               "Seconds: %lu\n",
+               "Seconds: %lu\n"
+               "Min playoutrate: %lu\n"
+               "Max playoutrate: %lu\n"
+               "Mean playoutrate: %lu\n"
+               "Actual playoutrate: %lu\n"
+               "desired framenum: %d\n"
+               "actual framenum: %d\n"
+               "bytes in normal queue: %d\n"
+               "bytes in urgent queue: %d\n"
+               "Flush: %d\n"
+               "Playout allowed: %d\n"
 
-               GST_TIME_AS_SECONDS(_now(this) - this->made)
+               ,
 
+               GST_TIME_AS_SECONDS(_now(this) - this->made),
+               this->min_playoutrate,
+               this->max_playoutrate,
+               this->mean_rate,
+               this->playout_rate,
+               this->desired_framenum,
+               g_queue_get_length(this->frames),
+               this->bytes_in_normal_queue,
+               this->bytes_in_urgent_queue,
+               this->flush,
+               this->playout_allowed
                );
 
 }

@@ -38,17 +38,22 @@ struct _PacketsRcvQueue
 
   gboolean                   playout_allowed;
 
-  guint                      desired_framenum;
-  guint                      clock_rate;
-  GstClockTime               highest_playoutrate;
-  GstClockTime               lowest_playoutrate;
+  gint                       desired_framenum;
+  GstClockTime               min_playoutrate;
+  GstClockTime               max_playoutrate;
   gdouble                    spread_factor;
 
-  gboolean                   flush;
-  GstClockTime               timestamp_t1;
-  GstClockTime               timestamp_t2;
+  GstClockTime               playout_rate;
+  gint32                     bytes_in_normal_queue;
+  gint32                     bytes_in_urgent_queue;
 
-  PercentileTracker*         samplings;
+  guint32                    played_timestamp;
+
+  gboolean                   flush;
+  GstClockTime               sampling_t1;
+  GstClockTime               sampling_t2;
+
+  PercentileTracker*         dsampling;
   GstClockTime               mean_rate;
 };
 
@@ -66,10 +71,9 @@ PacketsRcvQueue *make_packetsrcvqueue(void);
 void packetsrcvqueue_reset(PacketsRcvQueue *this);
 void packetsrcvqueue_set_playout_allowed(PacketsRcvQueue *this, gboolean playout_permission);
 void packetsrcvqueue_set_desired_framenum(PacketsRcvQueue *this, guint desired_framenum);
-void packetsrcvqueue_set_clock_rate(PacketsRcvQueue *this, guint clock_rate);
 void packetsrcvqueue_flush(PacketsRcvQueue *this);
-void packetsrcvqueue_set_highest_playoutrate(PacketsRcvQueue *this, GstClockTime highest_playoutrate);
-void packetsrcvqueue_set_lowest_playoutrate(PacketsRcvQueue *this, GstClockTime lowest_playoutrate);
+void packetsrcvqueue_set_min_playoutrate(PacketsRcvQueue *this, GstClockTime min_playoutrate);
+void packetsrcvqueue_set_max_playoutrate(PacketsRcvQueue *this, GstClockTime max_playoutrate);
 void packetsrcvqueue_set_spread_factor(PacketsRcvQueue *this, gdouble spread_factor);
 GstClockTime packetsrcvqueue_get_playout_point(PacketsRcvQueue *this);
 void packetsrcvqueue_push(PacketsRcvQueue *this, GstMpRTPBuffer* buffer);

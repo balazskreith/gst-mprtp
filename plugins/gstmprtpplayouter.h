@@ -69,7 +69,6 @@ struct _GstMprtpplayouter
   guint8          abs_time_ext_header_id;
   guint32         pivot_ssrc;
   guint32         pivot_clock_rate;
-  GstClockTime    delay_offset;
   GSocketAddress *pivot_address;
   guint8          pivot_address_subflow_id;
   guint8          fec_payload_type;

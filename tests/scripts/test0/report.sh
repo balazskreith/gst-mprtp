@@ -126,7 +126,7 @@ TEXTTOREPLACE
 " >> $DST
 
 FECPLOT="$SRCDIR/fec.pdf"
-PLAYOUTPLOT="$SRCDIR/playouts.pdf"
+RCVQUEUEPLOT="$SRCDIR/rcvqueue.pdf"
 AUTOCORRSPLOT="$SRCDIR/owd-autocorrs.pdf"
 RCVTHROUGHPUTSPLOT="$SRCDIR/rcv-throughputs.pdf"
 SNDTHROUGHPUTSPLOT="$SRCDIR/snd-throughputs.pdf"
@@ -183,7 +183,7 @@ echo "
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1\textwidth]{$PLAYOUTPLOT}
+    \includegraphics[width=1\textwidth]{$RCVQUEUEPLOT}
     \caption{Playout delays and queue size}
     \label{fig:playouts}
 \end{figure}

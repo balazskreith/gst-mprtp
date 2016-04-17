@@ -2,8 +2,7 @@ name=system("echo mprtp-subflow-")
 time=system("date +%Y_%m_%d_%H_%M_%S")
 
 if (!exists("plot_title"))    plot_title='Playouts summary'
-if (!exists("playouts_file")) playouts_file='logs/playouts.csv'
-if (!exists("skew_file"))     skew_file='logs/skews.csv'
+if (!exists("rcvqueue_file")) rcvqueue_file='logs/packetsrcvqueue.csv'
 if (!exists("output_file"))   output_file='reports/summary-playouts.pdf'
 if (!exists("duration"))      duration=6000
 if (!exists("xtick_value"))   xtick_value=1000
@@ -27,7 +26,7 @@ set rmargin 5
 set xrange [0:duration]
 set yrange [-10:200]
 set ytics 50
-set ylabel "Remaining time (ms)"
+set ylabel "time (ms)"
 
 #set multiplot layout 2,1 title plot_title
 set multiplot layout 3,1 font ",18"
@@ -54,16 +53,15 @@ set xrange [0:duration]
 set xtics xtick_value
 unset xlabel
 
-plot playouts_file using 0:($1/1000000) with lines ls 1 title "Playout delay", \
-     skew_file u 0:($1/1000000) w lines ls 2 title "Path 1 skew" 
+plot rcvqueue_file using 0:($4/1000000) with lines ls 1 title "Playout Rate"
 
 set key inside horizontal top right 
 set tics scale 0
-set ylabel "Size (KBytes)"
+set ylabel "Size (Bytes)"
 set yrange [0:100]
 set ytics  20
 set xrange [0:duration]
 
-plot playouts_file using 0:($2/1000) with lines ls 2 title "Playout buffer"
+plot rcvqueue_file using 0:($2/1000) with lines ls 2 title "Playout buffer"
 
 unset multiplot

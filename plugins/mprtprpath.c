@@ -240,6 +240,23 @@ mprtpr_path_set_owd_window_treshold(MpRTPRPath *this, GstClockTime treshold)
 }
 
 
+void
+mprtpr_path_set_spike_delay_treshold(MpRTPRPath *this, GstClockTime delay_treshold)
+{
+  THIS_WRITELOCK (this);
+  this->spike_delay_treshold = delay_treshold;
+  THIS_WRITEUNLOCK (this);
+}
+
+void
+mprtpr_path_set_spike_var_treshold(MpRTPRPath *this, GstClockTime var_treshold)
+{
+  THIS_WRITELOCK (this);
+  this->spike_var_treshold = var_treshold;
+  THIS_WRITEUNLOCK (this);
+}
+
+
 
 void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
                            gdouble       *path_delay,
@@ -295,7 +312,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   _add_delay(this, mprtp->delay);
 
   if(this->packetstracker){
-    packetsrcvtracker_add(this->packetstracker, mprtp->payload_bytes, mprtp->subflow_seq);
+    packetsrcvtracker_add(this->packetstracker, mprtp);
   }
 
   //consider cycle num increase with allowance of a little gap

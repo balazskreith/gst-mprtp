@@ -592,7 +592,7 @@ void
 _reduce_stage(
     FBRASubController *this)
 {
-  gint32   target_rate  = this->target_bitrate;;
+  gint32   target_rate  = this->target_bitrate;
 
   _reduce_stage_helper(this);
 

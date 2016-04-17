@@ -151,7 +151,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-percentiletracker.lo \
 	libgstmprtp_la-percentiletracker2.lo \
 	libgstmprtp_la-sndratedistor.lo libgstmprtp_la-numstracker.lo \
-	libgstmprtp_la-fbrasubctrler.lo libgstmprtp_la-fecdec.lo \
+	libgstmprtp_la-fbrasubctrler.lo \
+	libgstmprtp_la-screamsubctrler.lo libgstmprtp_la-fecdec.lo \
 	libgstmprtp_la-fecenc.lo libgstmprtp_la-rtpfecbuffer.lo \
 	libgstmprtp_la-packetssndtracker.lo \
 	libgstmprtp_la-packetsrcvtracker.lo libgstmprtp_la-rmdiproc.lo \
@@ -423,6 +424,7 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          sndratedistor.c            \
                          numstracker.c              \
                          fbrasubctrler.c            \
+                         screamsubctrler.c          \
                          fecdec.c                   \
                          fecenc.c                   \
                          rtpfecbuffer.c             \
@@ -451,6 +453,7 @@ noinst_HEADERS = mprtpspath.h           \
                  sndratedistor.h        \
                  numstracker.h          \
                  fbrasubctrler.h        \
+                 screamsubctrler.h      \
                  fecdec.h               \
                  fecenc.h               \
                  rtpfecbuffer.h         \
@@ -580,6 +583,7 @@ include ./$(DEPDIR)/libgstmprtp_la-reportprod.Plo
 include ./$(DEPDIR)/libgstmprtp_la-ricalcer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rmdiproc.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rtpfecbuffer.Plo
+include ./$(DEPDIR)/libgstmprtp_la-screamsubctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-signalreport.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndratedistor.Plo
@@ -789,6 +793,13 @@ libgstmprtp_la-fbrasubctrler.lo: fbrasubctrler.c
 #	$(AM_V_CC)source='fbrasubctrler.c' object='libgstmprtp_la-fbrasubctrler.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-fbrasubctrler.lo `test -f 'fbrasubctrler.c' || echo '$(srcdir)/'`fbrasubctrler.c
+
+libgstmprtp_la-screamsubctrler.lo: screamsubctrler.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-screamsubctrler.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-screamsubctrler.Tpo -c -o libgstmprtp_la-screamsubctrler.lo `test -f 'screamsubctrler.c' || echo '$(srcdir)/'`screamsubctrler.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-screamsubctrler.Tpo $(DEPDIR)/libgstmprtp_la-screamsubctrler.Plo
+#	$(AM_V_CC)source='screamsubctrler.c' object='libgstmprtp_la-screamsubctrler.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-screamsubctrler.lo `test -f 'screamsubctrler.c' || echo '$(srcdir)/'`screamsubctrler.c
 
 libgstmprtp_la-fecdec.lo: fecdec.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-fecdec.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-fecdec.Tpo -c -o libgstmprtp_la-fecdec.lo `test -f 'fecdec.c' || echo '$(srcdir)/'`fecdec.c

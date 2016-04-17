@@ -51,7 +51,7 @@ echo "debug is 1"
 fi
 
 DURFEC=3000
-DURPLAYOUT=3000
+DURRCVQUEUE=3000
 DURAUTOCORRS=2400
 DURRCVTHROUGHPUTS=3000
 DURSNDTHROUGHPUTS=3000
@@ -60,15 +60,14 @@ DURLOSTS=3000
 
 PLOTDIR="scripts/test0"
 PLOTFEC="$PLOTDIR/fec.plot"
-PLOTPLAYOUT="$PLOTDIR/playouts.plot"
+PLOTRCVQUEUE="$PLOTDIR/rcvqueue.plot"
 PLOTAUTOCORRS="$PLOTDIR/owd-autocorrs.plot"
 PLOTRCVTHROUGHPUTS="$PLOTDIR/rcv-throughputs.plot"
 PLOTSNDTHROUGHPUTS="$PLOTDIR/snd-throughputs.plot"
 PLOTRTCPINTVALS="$PLOTDIR/rtcp-intervals.plot"
 
 SRCFEC="$SRCDIR/fecdec_stat.csv"
-SRCPLAYOUT="$SRCDIR/streamjoiner.csv"
-SRCPLAYOUT2="$SRCDIR/path_1_skews.csv"
+SRCRCVQUEUE="$SRCDIR/packetsrcvqueue.csv"
 SRCAUTOCORRS="$SRCDIR/rmdiautocorrs_1.csv"
 SRCRCVTHROUGHPUTS="$SRCDIR/sub_1_rcv.csv"
 SRCSNDTHROUGHPUTS="$SRCDIR/snd_1_ratestat.csv"
@@ -76,7 +75,7 @@ SRCFECRATES="$SRCDIR/fecrates.csv"
 SRCRTCPINTVALS="$SRCDIR/sub_1_rtcp_ints.csv"
 
 DSTFEC="$DSTDIR/fec.pdf"
-DSTPLAYOUT="$DSTDIR/playouts.pdf"
+DSTRCVQUEUE="$DSTDIR/rcvqueue.pdf"
 DSTAUTOCORRS="$DSTDIR/owd-autocorrs.pdf"
 DSTRCVTHROUGHPUTS="$DSTDIR/rcv-throughputs.pdf"
 DSTSNDTHROUGHPUTS="$DSTDIR/snd-throughputs.pdf"
@@ -87,11 +86,10 @@ DSTRTCPINTVALS="$DSTDIR/rtcp-intervals.pdf"
           -e "fec_file='$SRCFEC'" \
           "$PLOTFEC"
           
-  gnuplot -e "duration='$DURPLAYOUT'" \
-          -e "output_file='$DSTPLAYOUT'" \
-          -e "playouts_file='$SRCPLAYOUT'" \
-          -e "skew_file='$SRCPLAYOUT2'" \
-          "$PLOTPLAYOUT"
+  gnuplot -e "duration='$DURRCVQUEUE'" \
+          -e "output_file='$DSTRCVQUEUE'" \
+          -e "rcvqueue_file='$SRCRCVQUEUE'" \
+          "$PLOTRCVQUEUE"
           
   gnuplot -e "duration='$DURAUTOCORRS'" \
           -e "output_file='$DSTAUTOCORRS'" \

@@ -139,6 +139,7 @@ report_processor_init (ReportProcessor * this)
 
   this->sysclock   = gst_system_clock_obtain ();
   this->ssrc       = g_random_int();
+  this->made       = _now(this);
 
   memset(this->logfile, 0, 255);
   sprintf(this->logfile, "report_processor.log");
@@ -434,11 +435,11 @@ void _logging(ReportProcessor *this, GstMPRTCPReportSummary* summary)
 {
   mprtp_logger(this->logfile,
                "###################################################################\n"
-               "Summary created at %lu\n"
+               "Elapsed ms: %lu\n"
                "Subflow id: %hu\n"
                "SSRC: %u\n"
                ,
-               GST_TIME_AS_MSECONDS(summary->created),
+               GST_TIME_AS_MSECONDS(_now(this) - this->made),
                summary->subflow_id,
                summary->ssrc
    );

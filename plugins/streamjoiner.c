@@ -249,6 +249,10 @@ void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
   THIS_WRITELOCK(this);
   mprtp->buffer = gst_buffer_ref(mprtp->buffer);
   if(this->join_delay < mprtp->delay){
+    subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (mprtp->subflow_id));
+    if(subflow){
+      mprtpr_path_process_rtp_packet(subflow->path, mprtp);
+    }
     packetsrcvqueue_push(this->rcvqueue, mprtp);
     goto done;
   }
@@ -261,6 +265,7 @@ void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
   if(subflow){
     subflow->bytes_in_queue += mprtp->payload_bytes;
     ++subflow->packets_in_queue;
+    mprtpr_path_process_rtp_packet(subflow->path, mprtp);
     if(!mprtpr_path_is_in_spike_mode(subflow->path)){
       percentiletracker_add(this->delays, mprtp->delay);
     }
@@ -275,6 +280,7 @@ stream_joiner_set_min_treshold (StreamJoiner * this, GstClockTime treshold)
 {
   THIS_WRITELOCK (this);
   this->join_min_treshold = treshold;
+  this->join_delay = MAX(this->join_min_treshold, this->join_delay);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -284,6 +290,7 @@ stream_joiner_set_max_treshold (StreamJoiner * this, GstClockTime treshold)
 {
   THIS_WRITELOCK (this);
   this->join_max_treshold = treshold;
+  this->join_delay = MIN(this->join_max_treshold, this->join_delay);
   THIS_WRITEUNLOCK (this);
 }
 

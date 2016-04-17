@@ -10,6 +10,8 @@
 
 #include <gst/gst.h>
 #include "gstmprtcpbuffer.h"
+#include "gstmprtpbuffer.h"
+#include "percentiletracker2.h"
 
 typedef struct _PacketsRcvTracker PacketsRcvTracker;
 typedef struct _PacketsRcvTrackerClass PacketsRcvTrackerClass;
@@ -63,6 +65,13 @@ struct _PacketsRcvTracker
   guint16                  cycle_num;
   gboolean                 initialized;
 
+  struct{
+    guint64 last_ntp_snd_time;
+    guint64 last_ntp_rcv_time;
+    guint32 last_timestamp;
+  }devar;
+
+  PercentileTracker2*     devars;
 
 };
 
@@ -76,7 +85,7 @@ PacketsRcvTracker *make_packetsrcvtracker(void);
 void packetsrcvtracker_reset(PacketsRcvTracker *this);
 void packetsrcvtracker_set_lost_treshold(PacketsRcvTracker *this, GstClockTime treshold);
 void packetsrcvtracker_set_discarded_treshold(PacketsRcvTracker *this, GstClockTime treshold);
-void packetsrcvtracker_add(PacketsRcvTracker *this, guint payload_len, guint16 sn);
+void packetsrcvtracker_add(PacketsRcvTracker *this, GstMpRTPBuffer *mprtp);
 void packetsrcvtracker_update_reported_sn(PacketsRcvTracker *this, guint16 reported_sn);
 void packetsrcvtracker_set_bitvectors(PacketsRcvTracker * this,
                                      guint16 *begin_seq,

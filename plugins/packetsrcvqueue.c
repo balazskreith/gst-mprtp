@@ -278,7 +278,9 @@ packetsrcvqueue_get_playout_point(PacketsRcvQueue *this)
     result = _now(this) + this->max_playoutrate;
     goto done;
   }
-  percentiletracker_add(this->dsampling, this->sampling_t1 - this->sampling_t2);
+  if(this->sampling_t2 < this->sampling_t1){
+    percentiletracker_add(this->dsampling, this->sampling_t1 - this->sampling_t2);
+  }
   if(!actual_framenum){
     result = _now(this) + this->max_playoutrate;
     goto done;
@@ -405,7 +407,7 @@ void _csv_logging(gpointer data)
 {
   PacketsRcvQueue *this = data;
     mprtp_logger("packetsrcvqueue.csv",
-                 "%d,%d,%d,%lu"
+                 "%d,%d,%d,%lu\n"
                  ,
                  g_queue_get_length(this->frames),
                  this->bytes_in_normal_queue,

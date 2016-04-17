@@ -95,6 +95,7 @@ struct _ReportProcessor
   GObject                  object;
   GRWLock                  rwmutex;
   GstClock*                sysclock;
+  GstClockTime             made;
   guint32                  ssrc;
   gsize                    length;
   gchar                    logfile[255];

@@ -48,7 +48,7 @@ G_DEFINE_TYPE (PacketsRcvTracker, packetsrcvtracker, G_TYPE_OBJECT);
 
 
 static void packetsrcvtracker_finalize (GObject * object);
-
+static void _refresh_delay_variation(PacketsRcvTracker * this, GstMpRTPBuffer *mprtp);
 static void _obsolate_discarded(PacketsRcvTracker *this);
 static void _add_packet_to_discarded(PacketsRcvTracker *this, PacketsRcvTrackerItem* item);
 static void _obsolate_misordered(PacketsRcvTracker *this);
@@ -73,6 +73,18 @@ _cmp_seq (guint16 x, guint16 y)
   if(x > y && x - y < 32768) return 1;
   return 0;
 }
+
+static gint
+_cmp_uint32 (guint32 x, guint32 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 2147483648) return -1;
+  if(x > y && x - y > 2147483648) return -1;
+  if(x < y && y - x > 2147483648) return 1;
+  if(x > y && x - y < 2147483648) return 1;
+  return 0;
+}
+
 
 void
 packetsrcvtracker_class_init (PacketsRcvTrackerClass * klass)
@@ -124,6 +136,9 @@ packetsrcvtracker_init (PacketsRcvTracker * this)
   this->discarded = g_queue_new();
   this->lost_treshold = 1000 * GST_MSECOND;
 
+  this->devars = make_percentiletracker2(1024, 50);
+  percentiletracker2_set_treshold(this->devars, 2000 * GST_MSECOND);
+
 }
 
 PacketsRcvTracker *make_packetsrcvtracker(void)
@@ -156,32 +171,32 @@ void packetsrcvtracker_set_discarded_treshold(PacketsRcvTracker *this, GstClockT
 }
 
 
-void packetsrcvtracker_add(PacketsRcvTracker *this, guint payload_len, guint16 sn)
+void packetsrcvtracker_add(PacketsRcvTracker *this, GstMpRTPBuffer *mprtp)
 {
   PacketsRcvTrackerItem *item;
   THIS_WRITELOCK (this);
 
   ++_trackerstat(this).total_packets_received;
-  _trackerstat(this).total_payload_received += payload_len;
+  _trackerstat(this).total_payload_received += mprtp->payload_bytes;
 
   if(!this->initialized){
     this->initialized = TRUE;
-    item = _make_item(this, sn);
-    item->payload_len = payload_len;
+    item = _make_item(this, mprtp->subflow_seq);
+    item->payload_len = mprtp->payload_bytes;
     item->received    = TRUE;
     _add_packet(this, item);
-    _trackerstat(this).highest_seq = sn;
+    _trackerstat(this).highest_seq = mprtp->subflow_seq;
     goto done;
   }
 
-  if(_cmp_seq(sn, _trackerstat(this).highest_seq) <= 0){
-    _find_misordered_packet(this, sn, payload_len);
+  if(_cmp_seq(mprtp->subflow_seq, _trackerstat(this).highest_seq) <= 0){
+    _find_misordered_packet(this, mprtp->subflow_seq, mprtp->payload_bytes);
     goto done;
   }
 
-  if(_cmp_seq(_trackerstat(this).highest_seq + 1, sn) < 0){
+  if(_cmp_seq(_trackerstat(this).highest_seq + 1, mprtp->subflow_seq) < 0){
     guint16 seq = _trackerstat(this).highest_seq + 1;
-    for(; _cmp_seq(seq, sn) < 0; ++seq){
+    for(; _cmp_seq(seq, mprtp->subflow_seq) < 0; ++seq){
       item = _make_item(this, seq);
       _add_packet(this, item);
       _add_packet_to_missed(this, item);
@@ -191,18 +206,18 @@ void packetsrcvtracker_add(PacketsRcvTracker *this, guint payload_len, guint16 s
     //packet is in order
   }
 
-  item = _make_item(this, sn);
-  item->payload_len = payload_len;
+  item = _make_item(this, mprtp->subflow_seq);
+  item->payload_len = mprtp->payload_bytes;
   item->received    = TRUE;
   _add_packet(this, item);
-
+  _refresh_delay_variation(this, mprtp);
   //consider cycle num increase with allowance of a little gap
-  if(65472 < _trackerstat(this).highest_seq && sn < 128){
+  if(65472 < _trackerstat(this).highest_seq && mprtp->subflow_seq < 128){
     ++_trackerstat(this).cycle_num;
   }
 
   //set the new packet seq as the highest seq
-  _trackerstat(this).highest_seq = sn;
+  _trackerstat(this).highest_seq = mprtp->subflow_seq;
 done:
   THIS_WRITEUNLOCK (this);
 }
@@ -237,6 +252,8 @@ void packetsrcvtracker_set_bitvectors(PacketsRcvTracker * this,
   PacketsRcvTrackerItem *item;
 
   THIS_READLOCK(this);
+  mprtp_logger("devars.csv", "%ld\n", percentiletracker2_get_stats(this->devars, NULL, NULL, NULL));
+
   if(g_queue_is_empty(this->packets)){
     goto done;
   }
@@ -279,6 +296,47 @@ packetsrcvtracker_get_stat (PacketsRcvTracker * this, PacketsRcvTrackerStat* res
   THIS_READUNLOCK (this);
 }
 
+
+void _refresh_delay_variation(PacketsRcvTracker * this, GstMpRTPBuffer *mprtp)
+{
+  gint64 devar, drcv, dsnd;
+  gint cmp;
+
+//  percentiletracker2_add(this->devars, mprtp->delay);
+
+  if(this->devar.last_ntp_rcv_time == 0){
+    this->devar.last_timestamp    = mprtp->timestamp;
+    this->devar.last_ntp_snd_time = mprtp->abs_snd_ntp_time;
+    this->devar.last_ntp_rcv_time = mprtp->abs_rcv_ntp_time;
+    return;
+  }
+
+  cmp = _cmp_uint32(mprtp->timestamp, this->devar.last_timestamp);
+  if(cmp < 0){
+    return;
+  }
+  if(cmp == 0){
+    this->devar.last_ntp_snd_time = mprtp->abs_snd_ntp_time;
+    this->devar.last_ntp_rcv_time = mprtp->abs_rcv_ntp_time;
+    return;
+  }
+
+  drcv = (mprtp->abs_rcv_ntp_time - this->devar.last_ntp_rcv_time);
+  dsnd = (mprtp->abs_snd_ntp_time - this->devar.last_ntp_snd_time);
+  if(mprtp->abs_rcv_ntp_time < this->devar.last_ntp_rcv_time ||
+     mprtp->abs_snd_ntp_time < this->devar.last_ntp_snd_time)
+  {
+      g_warning("PROBLEMS WITH RCV OR SND NTP TIME");
+  }
+
+  devar = drcv - dsnd;
+  percentiletracker2_add(this->devars, MAX(devar, -1*devar));
+
+
+  this->devar.last_timestamp = mprtp->timestamp;
+  this->devar.last_ntp_snd_time = mprtp->abs_snd_ntp_time;
+  this->devar.last_ntp_rcv_time = mprtp->abs_rcv_ntp_time;
+}
 
 void _obsolate_discarded(PacketsRcvTracker *this)
 {

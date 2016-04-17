@@ -190,7 +190,7 @@ again:
     if(((actual->bitvector>>bit_i)&1) == 1) continue;
     item = _find_item(this, actual_seq);
     if(!item) continue;
-    if(_cmp_uint16(item->seq_num, this->highest_discarded_seq) < 0) continue;
+    if(_cmp_uint16(item->seq_num, this->highest_discarded_seq) <= 0) continue;
     item->discarded = TRUE;
     this->actual_discarded_bytes += item->payload_bytes;
     ++this->actual_discarded_packets;

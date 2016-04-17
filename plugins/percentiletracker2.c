@@ -534,6 +534,10 @@ void _percentile_balancer(PercentileTracker2 *this)
   else
     ratio = (gdouble) this->Mxc / (gdouble) this->Mnc;
 
+  if(this->Mxc == 0 || this->Mnc == 0){
+    goto done;
+  }
+
   if(ratio < this->ratio)
     goto balancing_mintree;
   else
@@ -541,7 +545,7 @@ void _percentile_balancer(PercentileTracker2 *this)
 
 balancing_mintree:
   ratio = (gdouble) (this->Mxc + 1) / (gdouble) (this->Mnc - 1);
-  if(this->ratio < ratio) goto done;
+  if(this->ratio < ratio || this->Mnc < 2) goto done;
   value = bintree2_get_top_value(this->mintree);
   bintree2_delete_value(this->mintree, value);
   bintree2_insert_value(this->maxtree, value);
@@ -550,7 +554,7 @@ balancing_mintree:
 
 balancing_maxtree:
   ratio = (gdouble) (this->Mxc - 1) / (gdouble) (this->Mnc + 1);
-  if(ratio < this->ratio) goto done;
+  if(ratio < this->ratio || this->Mxc < 2) goto done;
   value = bintree2_get_top_value(this->maxtree);
   bintree2_delete_value(this->maxtree, value);
   bintree2_insert_value(this->mintree, value);

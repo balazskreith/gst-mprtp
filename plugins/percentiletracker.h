@@ -51,6 +51,8 @@ struct _PercentileTracker
   gboolean                 ready;
   guint                    required;
 
+  guint32                (*expandfnc)(GstClockTime);
+
   void                   (*stats_pipe)(gpointer, PercentileTrackerPipeData*);
   gpointer                 stats_pipe_data;
 };
@@ -82,6 +84,7 @@ PercentileTracker *make_percentiletracker_full(BinTreeCmpFunc cmp_min,
 
 void percentiletracker_test(void);
 void percentiletracker_set_treshold(PercentileTracker *this, GstClockTime treshold);
+void percentiletracker_set_expandfnc(PercentileTracker *this, guint32 (*expandfnc)(GstClockTime));
 void percentiletracker_set_stats_pipe(PercentileTracker *this, void(*stats_pipe)(gpointer, PercentileTrackerPipeData*),gpointer stats_pipe_data);
 guint32 percentiletracker_get_num(PercentileTracker *this);
 guint64 percentiletracker_get_last(PercentileTracker *this);

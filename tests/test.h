@@ -161,6 +161,8 @@ static int logging              = 0;
 static int owd_th               = 200;
 static int discard_th           = 50;
 static int lost_th              = 500;
+static int spike_delay_th       = 150;
+static int spike_var_th         = 32;
 static int rtcp_interval_type   = 2;
 static int report_timeout       = 0;
 static int controlling_mode     = 1;
@@ -214,6 +216,8 @@ static GOptionEntry entries[] =
     { "owd_th", 0, 0, G_OPTION_ARG_INT, &owd_th, "owd_th", NULL },
     { "discard_th", 0, 0, G_OPTION_ARG_INT, &discard_th, "discard_th", NULL },
     { "lost_th", 0, 0, G_OPTION_ARG_INT, &lost_th, "lost_th", NULL },
+    { "spike_delay_th", 0, 0, G_OPTION_ARG_INT, &spike_delay_th, "spike_delay_th", NULL },
+    { "spike_var_th", 0, 0, G_OPTION_ARG_INT, &spike_var_th, "spike_var_th", NULL },
     { "rtcp_interval_type", 0, 0, G_OPTION_ARG_INT, &rtcp_interval_type, "rtcp_interval_type", NULL },
     { "report_timeout", 0, 0, G_OPTION_ARG_INT, &report_timeout, "report_timeout", NULL },
     { "controlling_mode", 0, 0, G_OPTION_ARG_INT, &controlling_mode, "controlling_mode", NULL },

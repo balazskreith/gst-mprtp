@@ -27,6 +27,7 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          sndratedistor.c            \
                          numstracker.c              \
                          fbrasubctrler.c            \
+                         screamsubctrler.c          \
                          fecdec.c                   \
                          fecenc.c                   \
                          rtpfecbuffer.c             \
@@ -56,6 +57,7 @@ noinst_HEADERS = mprtpspath.h           \
                  sndratedistor.h        \
                  numstracker.h          \
                  fbrasubctrler.h        \
+                 screamsubctrler.h      \
                  fecdec.h               \
                  fecenc.h               \
                  rtpfecbuffer.h         \

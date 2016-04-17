@@ -71,7 +71,7 @@ static void rmdi_processor_finalize (GObject * object);
 
 static void _execute_corrblocks(RMDIProcessorPrivate *this, CorrBlock *blocks);
 static void _execute_corrblock(CorrBlock* this);
-static void _csv_logging(RMDIProcessor *this, GstClockTime delay);
+static void _csv_logging(RMDIProcessor *this, gint64 delay);
 static void _readable_logging(RMDIProcessor *this);
 static void _readable_result(RMDIProcessor *this, RMDIProcessorResult *result);
 static gint _cmp_seq (guint16 x, guint16 y);
@@ -132,7 +132,7 @@ RMDIProcessor *make_rmdi_processor(MPRTPSPath *path)
   this->id                     = mprtps_path_get_id(path);
   this->path                   = g_object_ref(path);
   this->made                   = _now(this);
-  this->delays                 = make_percentiletracker(600, 80);
+  this->delays                 = make_percentiletracker(600, 50);
   this->packetstracker         = mprtps_path_ref_packetstracker(path);
   this->bytes_in_flight        = make_numstracker(50, 5 * GST_SECOND);
 
@@ -158,10 +158,10 @@ RMDIProcessor *make_rmdi_processor(MPRTPSPath *path)
   _priv(this)->cblocks[6].id   = 6;
   _priv(this)->cblocks[7].id   = 7;
 
-  _priv(this)->cblocks[0].N    = 8;
+  _priv(this)->cblocks[0].N    = 4;
   _priv(this)->cblocks[1].N    = 4;
   _priv(this)->cblocks[2].N    = 4;
-  _priv(this)->cblocks[3].N    = 8;
+  _priv(this)->cblocks[3].N    = 4;
 
   _priv(this)->cblocks[4].N    = 4;
   _priv(this)->cblocks[5].N    = 4;
@@ -235,6 +235,7 @@ static void _process_discarded_rle(RMDIProcessor *this, GstMPRTCPXRReportSummary
 
 static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
 {
+  gint64 impulse;
   if(!xrsummary->OWD.median_delay){
     this->result.g1             = 0.;
     this->result.g2             = 0.;
@@ -242,22 +243,23 @@ static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummar
     this->result.g4             = 0.;
     goto done;
   }
-
   percentiletracker_add(this->delays, xrsummary->OWD.median_delay);
-
-  _priv(this)->cblocks[0].Iu0 = GST_TIME_AS_USECONDS(xrsummary->OWD.median_delay) / 50.;
+//  impulse = ((gint64)xrsummary->OWD.median_delay - (gint64)_priv(this)->delay80th) / 1000000;
+  impulse = (gint64)xrsummary->OWD.median_delay - 2 * GST_SECOND;
+  impulse/= 1000;
+  _priv(this)->cblocks[0].Iu0 = impulse;
   _execute_corrblocks(_priv(this), _priv(this)->cblocks);
   _execute_corrblocks(_priv(this), _priv(this)->cblocks);
-  _priv(this)->cblocks[0].Id1 = GST_TIME_AS_USECONDS(xrsummary->OWD.median_delay) / 50.;
+  _priv(this)->cblocks[0].Id1 = impulse;
   this->last_delay            = xrsummary->OWD.median_delay;
 
-  this->result.corrH             = !_priv(this)->delay80th ? 0. : (gdouble)this->last_delay / (gdouble)_priv(this)->delay80th;
+  this->result.corrH          = !_priv(this)->delay80th ? 0. : (gdouble)this->last_delay / (gdouble)_priv(this)->delay80th;
   this->result.g1             = _priv(this)->cblocks[0].g;
   this->result.g2             = _priv(this)->cblocks[1].g;
   this->result.g3             = _priv(this)->cblocks[2].g;
-  this->result.g4            = _priv(this)->cblocks[3].g;
+  this->result.g4             = _priv(this)->cblocks[3].g;
 
-  _csv_logging(this, xrsummary->OWD.median_delay);
+  _csv_logging(this, impulse);
   _readable_logging(this);
 done:
   return;
@@ -339,6 +341,8 @@ void _execute_corrblock(CorrBlock* this)
     this->g  = this->G01 * (this->N);
     this->g /= this->M0 * this->M1;
     this->g -= 1.;
+  }else{
+    this->g = 0.;
   }
   if(++this->index == this->N) {
     this->index = 0;
@@ -356,15 +360,15 @@ void _execute_corrblock(CorrBlock* this)
 }
 
 
-void _csv_logging(RMDIProcessor *this, GstClockTime delay)
+void _csv_logging(RMDIProcessor *this, gint64 delay)
 {
   gchar filename[255];
   memset(filename, 0, 255);
   sprintf(filename, "rmdiautocorrs_%d.csv", this->id);
   mprtp_logger(filename,
-               "%lu,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f\n",
+               "%ld,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f\n",
 
-               GST_TIME_AS_USECONDS(delay),
+               delay,
 
               _priv(this)->cblocks[0].g,
               _priv(this)->cblocks[1].g,

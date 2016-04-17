@@ -24,8 +24,8 @@ set bmargin 0
 set lmargin 15
 set rmargin 3
 set xrange [0:duration]
-set yrange [0:1000]
-set ytics 250
+set yrange [-20:2000]
+set ytics 1000
 set xrange [0:duration]
 set ylabel "time (ms)"
 set xtics xtick_value

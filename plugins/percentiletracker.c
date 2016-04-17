@@ -152,6 +152,24 @@ PercentileTracker *make_percentiletracker_debug(
   return this;
 }
 
+
+static void _reserve_items(PercentileTracker *this, guint32 length)
+{
+  PercentileTrackerItem *items;
+  if(this->items && length <= this->length){
+    return;
+  }
+
+  items =  mprtp_malloc(sizeof(PercentileTrackerItem)*length);
+  if(this->items){
+    memcpy(items, this->items, sizeof(PercentileTrackerItem)*this->length);
+    mprtp_free(this->items);
+    this->items = NULL;
+  }
+  this->items = items;
+  this->length = length;
+}
+
 PercentileTracker *make_percentiletracker_full(BinTreeCmpFunc cmp_min,
                                   BinTreeCmpFunc cmp_max,
                                   guint32 length,
@@ -161,9 +179,9 @@ PercentileTracker *make_percentiletracker_full(BinTreeCmpFunc cmp_min,
   this = g_object_new (PERCENTILETRACKER_TYPE, NULL);
   THIS_WRITELOCK (this);
   this->ratio = (gdouble)percentile / (gdouble)(100 - percentile);
-  this->items = mprtp_malloc(sizeof(PercentileTrackerItem)*length);
   this->percentile = percentile;
-  this->length = length;
+  this->expandfnc = NULL;
+  _reserve_items(this, length);
   this->maxtree = make_bintree(this->maxtree_cmp = cmp_max);
   this->mintree = make_bintree(this->mintree_cmp = cmp_min);
 
@@ -315,8 +333,19 @@ void percentiletracker_set_treshold(PercentileTracker *this, GstClockTime tresho
 {
   THIS_WRITELOCK (this);
   this->treshold = treshold;
+  if(this->expandfnc){
+      _reserve_items(this, this->expandfnc(treshold));
+  }
   THIS_WRITEUNLOCK (this);
 }
+
+void percentiletracker_set_expandfnc(PercentileTracker *this, guint32 (*expandfnc)(GstClockTime))
+{
+  THIS_WRITELOCK (this);
+  this->expandfnc = expandfnc;
+  THIS_WRITEUNLOCK (this);
+}
+
 
 void percentiletracker_set_stats_pipe(PercentileTracker *this, void(*stats_pipe)(gpointer, PercentileTrackerPipeData*),gpointer stats_pipe_data)
 {
@@ -542,6 +571,10 @@ void _percentile_balancer(PercentileTracker *this)
   else
     ratio = (gdouble) this->Mxc / (gdouble) this->Mnc;
 
+  if(this->Mxc == 0 || this->Mnc == 0){
+    goto done;
+  }
+
   if(ratio < this->ratio)
     goto balancing_mintree;
   else
@@ -549,7 +582,7 @@ void _percentile_balancer(PercentileTracker *this)
 
 balancing_mintree:
   ratio = (gdouble) (this->Mxc + 1) / (gdouble) (this->Mnc - 1);
-  if(this->ratio < ratio) goto done;
+  if(this->ratio < ratio || this->Mnc < 2) goto done;
   value = bintree_get_top_value(this->mintree);
   bintree_delete_value(this->mintree, value);
   bintree_insert_value(this->maxtree, value);
@@ -558,7 +591,7 @@ balancing_mintree:
 
 balancing_maxtree:
   ratio = (gdouble) (this->Mxc - 1) / (gdouble) (this->Mnc + 1);
-  if(ratio < this->ratio) goto done;
+  if(ratio < this->ratio || this->Mxc < 2) goto done;
   value = bintree_get_top_value(this->maxtree);
   bintree_delete_value(this->maxtree, value);
   bintree_insert_value(this->mintree, value);

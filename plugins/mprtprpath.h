@@ -120,6 +120,11 @@ mprtpr_path_unref_packetstracker(MpRTPRPath *this);
 void
 mprtpr_path_set_owd_window_treshold(MpRTPRPath *this, GstClockTime treshold);
 
+void
+mprtpr_path_set_spike_delay_treshold(MpRTPRPath *this, GstClockTime delay_treshold);
+
+void
+mprtpr_path_set_spike_var_treshold(MpRTPRPath *this, GstClockTime var_treshold);
 
 void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
                            gdouble       *path_delay,

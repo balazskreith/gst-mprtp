@@ -110,9 +110,13 @@ static void _join_path (GstMprtpplayouter * this, guint8 subflow_id);
 static void _detach_path (GstMprtpplayouter * this, guint8 subflow_id);
 static gboolean _try_get_path (GstMprtpplayouter * this, guint16 subflow_id,
     MpRTPRPath ** result);
-static void _setup_paths_lost_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold);
-static void _setup_paths_owd_window_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold_in_ms);
-static void _setup_paths_discard_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold);
+static void
+_setup_paths_tresholds(
+    GstMprtpplayouter * this,
+    guint8 subflow_id,
+    void (*cb)(MpRTPRPath*,GstClockTime),
+    GstClockTime treshold);
+
 static GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer);
 //static void _trash_mprtp_buffer(GstMprtpplayouter * this, GstMpRTPBuffer *mprtp);
 //#define _trash_mprtp_buffer(this, mprtp) pointerpool_add(this->mprtp_buffer_pool, mprtp);
@@ -149,6 +153,8 @@ enum
   PROP_PLAYOUT_DESIRED_FRAMENUM,
   PROP_PLAYOUT_SPREAD_FACTOR,
   PROP_DISCARD_TRESHOLD,
+  PROP_SPIKE_DELAY_TRESHOLD,
+  PROP_SPIKE_VAR_TRESHOLD,
   PROP_LOST_TRESHOLD,
   PROP_REPAIR_WINDOW_MIN,
   PROP_REPAIR_WINDOW_MAX,
@@ -357,13 +363,29 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                                  G_PARAM_WRITABLE  | G_PARAM_STATIC_STRINGS));
 
 
-  g_object_class_install_property (gobject_class, PROP_DISCARD_TRESHOLD,
-       g_param_spec_uint ("discard-treshold",
-                          "A latency in ms after a packet considered to be discarded.",
-                          "A 32bit unsigned integer upper 8bit in host order are used to identify the subflow. "
-                          "If the value is 255 then the option will be applied on all subflow. The latter 24bits are identified as a value in ms",
-                          0,
-                          4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+      g_object_class_install_property (gobject_class, PROP_DISCARD_TRESHOLD,
+           g_param_spec_uint ("discard-treshold",
+                              "A latency in ms after a packet considered to be discarded.",
+                              "A 32bit unsigned integer upper 8bit in host order are used to identify the subflow. "
+                              "If the value is 255 then the option will be applied on all subflow. The latter 24bits are identified as a value in ms",
+                              0,
+                              4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+      g_object_class_install_property (gobject_class, PROP_SPIKE_DELAY_TRESHOLD,
+           g_param_spec_uint ("spike-delay-treshold",
+                              "if the actual packet delay larger than the average plus this delay value in ms a path considered to be in spike mode.",
+                              "A 32bit unsigned integer upper 8bit in host order are used to identify the subflow. "
+                              "If the value is 255 then the option will be applied on all subflow. The latter 24bits are identified as a value in ms",
+                              0,
+                              4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+      g_object_class_install_property (gobject_class, PROP_SPIKE_VAR_TRESHOLD,
+           g_param_spec_uint ("spike-var-treshold",
+                              "if the path is in spike mode this variance value is used to determine weather we can turn it on into a normal mode again.",
+                              "A 32bit unsigned integer upper 8bit in host order are used to identify the subflow. "
+                              "If the value is 255 then the option will be applied on all subflow. The latter 24bits are identified as a value in ms",
+                              0,
+                              4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LOST_TRESHOLD,
         g_param_spec_uint ("lost-treshold",
@@ -558,7 +580,10 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
     case PROP_OWD_WINDOW_TRESHOLD:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
-      _setup_paths_owd_window_treshold(this, subflow_prop->id, subflow_prop->value);
+      _setup_paths_tresholds(this,
+                             subflow_prop->id,
+                             mprtpr_path_set_owd_window_treshold,
+                             (GstClockTime) subflow_prop->value * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_JOIN_MIN_TRESHOLD:
@@ -612,13 +637,37 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
     case PROP_DISCARD_TRESHOLD:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
-      _setup_paths_discard_treshold(this, subflow_prop->id, subflow_prop->value);
+      _setup_paths_tresholds(this,
+                             subflow_prop->id,
+                             mprtpr_path_set_discard_treshold,
+                             (GstClockTime) subflow_prop->value * GST_MSECOND);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_SPIKE_DELAY_TRESHOLD:
+      THIS_WRITELOCK (this);
+      guint_value = g_value_get_uint (value);
+      _setup_paths_tresholds(this,
+                             subflow_prop->id,
+                             mprtpr_path_set_spike_delay_treshold,
+                             (GstClockTime) subflow_prop->value * GST_MSECOND);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_SPIKE_VAR_TRESHOLD:
+      THIS_WRITELOCK (this);
+      guint_value = g_value_get_uint (value);
+      _setup_paths_tresholds(this,
+                             subflow_prop->id,
+                             mprtpr_path_set_spike_var_treshold,
+                             (GstClockTime) subflow_prop->value * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_LOST_TRESHOLD:
         THIS_WRITELOCK (this);
         guint_value = g_value_get_uint (value);
-        _setup_paths_lost_treshold(this, subflow_prop->id, subflow_prop->value);
+        _setup_paths_tresholds(this,
+                               subflow_prop->id,
+                               mprtpr_path_set_lost_treshold,
+                               (GstClockTime) subflow_prop->value * GST_MSECOND);
         THIS_WRITEUNLOCK (this);
         break;
     case PROP_SETUP_RTCP_INTERVAL_TYPE:
@@ -721,9 +770,12 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
   }
 }
 
-
 void
-_setup_paths_owd_window_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold_in_ms)
+_setup_paths_tresholds(
+    GstMprtpplayouter * this,
+    guint8 subflow_id,
+    void (*cb)(MpRTPRPath*,GstClockTime),
+    GstClockTime treshold)
 {
   GHashTableIter iter;
   gpointer key, val;
@@ -737,59 +789,9 @@ _setup_paths_owd_window_treshold(GstMprtpplayouter * this, guint8 subflow_id, Gs
     if(subflow_id != 255 && subflow_id != 0 && !subflow_match){
       continue;
     }
-    mprtpr_path_set_owd_window_treshold(path, treshold_in_ms * GST_MSECOND);
-    if(subflow_match){
-      break;
-    }
+    cb(path, treshold);
   }
 }
-
-
-void
-_setup_paths_discard_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold)
-{
-  GHashTableIter iter;
-  gpointer key, val;
-  MpRTPRPath *path;
-  gboolean subflow_match = FALSE;
-
-  g_hash_table_iter_init (&iter, this->paths);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-    path = (MpRTPRPath *) val;
-    subflow_match = mprtpr_path_get_id(path) != subflow_id;
-    if(subflow_id != 255 && subflow_id != 0 && !subflow_match){
-      continue;
-    }
-    mprtpr_path_set_discard_treshold(path, treshold * GST_MSECOND);
-    if(subflow_match){
-      break;
-    }
-  }
-}
-
-void
-_setup_paths_lost_treshold(GstMprtpplayouter * this, guint8 subflow_id, GstClockTime treshold)
-{
-  GHashTableIter iter;
-  gpointer key, val;
-  MpRTPRPath *path;
-  gboolean subflow_match = FALSE;
-
-  g_hash_table_iter_init (&iter, this->paths);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-    path = (MpRTPRPath *) val;
-    subflow_match = mprtpr_path_get_id(path) != subflow_id;
-    if(subflow_id != 255 && subflow_id != 0 && !subflow_match){
-      continue;
-    }
-    mprtpr_path_set_lost_treshold(path, treshold * GST_MSECOND);
-    if(subflow_match){
-      break;
-    }
-  }
-}
-
-
 
 
 gboolean
@@ -1225,7 +1227,6 @@ GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer)
                     buffer,
                     this->mprtp_ext_header_id,
                     this->abs_time_ext_header_id,
-                    this->delay_offset,
                     this->fec_payload_type);
   return result;
 }

@@ -69,7 +69,6 @@ void gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
                                GstBuffer *buffer,
                                guint8 mprtp_ext_header_id,
                                guint8 abs_time_ext_header_id,
-                               GstClockTime delay_offset,
                                guint8 fec_payload_type)
 {
   gpointer pointer = NULL;
@@ -127,10 +126,6 @@ void gst_mprtp_buffer_init(GstMpRTPBuffer *mprtp,
     if(mprtp->abs_rcv_ntp_time < mprtp->abs_snd_ntp_time){
       g_print("VALAMI PROBLÉMA VAN MÁR MEGINT\n");
     }
-    if(delay_offset < mprtp->delay)
-      mprtp->delay -= delay_offset;
-    else if(0 < delay_offset)
-      mprtp->delay = 100 * GST_MSECOND;
   }else{
     mprtp->abs_snd_ntp_time = 0;
     mprtp->delay = 0;

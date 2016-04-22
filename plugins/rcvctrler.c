@@ -579,7 +579,7 @@ _orp_main(RcvController * this)
 
       elapsed_y  = GST_TIME_AS_MSECONDS(_now(this) - subflow->LRR);
       subflow->LRR = _now(this);
-      mprtp_logger(interval_logfile, "%lu,%lu\n", elapsed_x, elapsed_y);
+      mprtp_logger(interval_logfile, "%lu,%f\n", elapsed_x/100, (gdouble)elapsed_y / 1000.);
     }
 
     if(send_fb && 1 < subflow->controlling_mode){

@@ -281,12 +281,16 @@ packetsrcvqueue_get_playout_point(PacketsRcvQueue *this)
   if(this->sampling_t2 < this->sampling_t1){
     percentiletracker_add(this->dsampling, this->sampling_t1 - this->sampling_t2);
   }
+
   if(!actual_framenum){
     result = _now(this) + this->max_playoutrate;
     goto done;
   }
-  factor = pow(this->spread_factor, this->desired_framenum - actual_framenum);
-  this->playout_rate = CONSTRAIN(this->min_playoutrate, this->max_playoutrate, this->mean_rate * factor);
+
+  factor = (gdouble)(this->desired_framenum - actual_framenum) / (gdouble)actual_framenum;
+  this->playout_rate = CONSTRAIN(this->min_playoutrate, this->max_playoutrate, this->mean_rate * (1.+factor));
+//  g_print("actual framenum: %d desired framenum: %d factor: %f - rate: %lu\n",
+//          actual_framenum, this->desired_framenum, factor, this->playout_rate);
   result = _now(this) + this->playout_rate;
 done:
   THIS_WRITEUNLOCK (this);
@@ -348,6 +352,9 @@ again:
   this->sampling_t2 = this->sampling_t1;
   this->sampling_t1 = sndsum / sndnum;
   g_slice_free(Frame, head);
+  if(this->desired_framenum < g_queue_get_length(this->frames)){
+    goto again;
+  }
   if(this->flush){
     goto again;
   }

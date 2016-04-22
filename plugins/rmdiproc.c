@@ -265,12 +265,6 @@ static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummar
     this->result.owd_corr = 1.;
   }
 
-//  this->result.corrH          = !_priv(this)->delay80th ? 0. : (gdouble)this->last_delay / (gdouble)_priv(this)->delay80th;
-//  this->result.g1             = _priv(this)->cblocks[0].g;
-//  this->result.g2             = _priv(this)->cblocks[1].g;
-//  this->result.g3             = _priv(this)->cblocks[2].g;
-//  this->result.g4             = _priv(this)->cblocks[3].g;
-
   _csv_logging(this, impulse);
   _readable_logging(this);
 done:

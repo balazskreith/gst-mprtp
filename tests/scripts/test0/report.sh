@@ -176,13 +176,6 @@ echo "
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1\textwidth]{$AUTOCORRSPLOT}
-    \caption{Reported one way delays and their multiple-$\tau$ autocorrelations}
-    \label{fig:mtauautocorrs}
-\end{figure}
-
-\begin{figure}[h]
-    \centering
     \includegraphics[width=1\textwidth]{$RCVQUEUEPLOT}
     \caption{Playout delays and queue size}
     \label{fig:playouts}

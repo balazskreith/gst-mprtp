@@ -55,7 +55,7 @@ DURRCVQUEUE=3000
 DURAUTOCORRS=2400
 DURRCVTHROUGHPUTS=3000
 DURSNDTHROUGHPUTS=3000
-DURRTCPINTVALS=500
+DURRTCPINTVALS=3000
 DURLOSTS=3000
 
 PLOTDIR="scripts/test0"
@@ -90,11 +90,6 @@ DSTRTCPINTVALS="$DSTDIR/rtcp-intervals.pdf"
           -e "output_file='$DSTRCVQUEUE'" \
           -e "rcvqueue_file='$SRCRCVQUEUE'" \
           "$PLOTRCVQUEUE"
-          
-  gnuplot -e "duration='$DURAUTOCORRS'" \
-          -e "output_file='$DSTAUTOCORRS'" \
-          -e "autocorr_file='$SRCAUTOCORRS'" \
-          "$PLOTAUTOCORRS"
           
   gnuplot -e "duration='$DURRCVTHROUGHPUTS'" \
           -e "output_file='$DSTRCVTHROUGHPUTS'" \

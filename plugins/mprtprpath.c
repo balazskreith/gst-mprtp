@@ -352,7 +352,7 @@ void _add_delay(MpRTPRPath *this, GstClockTime delay)
     this->urgent = TRUE;
   }
 
-  ddelay = ABS(delay - this->last_added_delay);
+  ddelay = ABS((gint64)delay - (gint64)this->last_added_delay);
   if (ddelay > this->spike_delay_treshold) {
   // A new "delay spike" has started
     this->spike_mode = TRUE;
@@ -362,7 +362,8 @@ void _add_delay(MpRTPRPath *this, GstClockTime delay)
       GstClockTime vdelay;
       // We're within a delay spike; maintain slope estimate
       this->spike_var = this->spike_var>>1;
-      vdelay = (ABS(delay - this->last_added_delay) + ABS(delay - this->last_last_added_delay))/8;
+      vdelay = (ABS((gint64)delay - (gint64)this->last_added_delay) +
+                ABS((gint64)delay - (gint64)this->last_last_added_delay))/8;
       this->spike_var = this->spike_var + vdelay;
       if (this->spike_var < this->spike_var_treshold) {
         // Slope is flat; return to normal operation

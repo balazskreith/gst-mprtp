@@ -212,19 +212,17 @@ void stream_joiner_transfer(StreamJoiner *this)
 {
 
   GstMpRTPBuffer *mprtp = NULL;
-  GstClockTime now;
   Subflow *subflow;
   guint c,i;
 
   THIS_WRITELOCK (this);
-  now  = _now(this);
   if(g_queue_is_empty(this->retained_buffers)){
     goto done;
   }
   c = g_queue_get_length(this->retained_buffers);
   for(i = 0; i < c; ++i){
     mprtp = g_queue_pop_head(this->retained_buffers);
-    if(now - get_epoch_time_from_ntp_in_ns(mprtp->abs_snd_ntp_time) < this->join_delay){
+    if(get_epoch_time_from_ntp_in_ns(NTP_NOW - mprtp->abs_snd_ntp_time) < this->join_delay){
       g_queue_push_tail(this->retained_buffers, mprtp);
       continue;
     }

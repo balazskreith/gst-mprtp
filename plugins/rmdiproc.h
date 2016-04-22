@@ -34,12 +34,15 @@ typedef struct _RMDIProcessorResult RMDIProcessorResult;
 
 struct _RMDIProcessorResult{
   guint32        max_bytes_in_flight;
+  guint32        bytes_in_flight;
   guint32        sent_packets;
   guint32        sender_bitrate;
   guint32        goodput_bitrate;
   gdouble        utilized_fraction;
-  gdouble        corrH;
-  gdouble        g1,g2,g3,g4;
+  GstClockTime   qdelay_actual;
+  GstClockTime   qdelay_median;
+  gboolean       owd_processed;
+  gdouble        owd_corr;
 };
 
 struct _RMDIProcessor
@@ -58,6 +61,8 @@ struct _RMDIProcessor
   guint16                  last_HSSN;
   guint32                  last_disc_packets_num;
   GstClockTime             last_delay;
+  GstClockTime             last_delay_t1;
+  GstClockTime             last_delay_t2;
 
   RMDIProcessorResult      result;
 };
@@ -78,6 +83,8 @@ RMDIProcessor *make_rmdi_processor(MPRTPSPath *path);
 void rmdi_processor_do(RMDIProcessor       *this,
                          GstMPRTCPReportSummary *summary,
                          RMDIProcessorResult *result);
+
+void rmdi_processor_approve_owd(RMDIProcessor *this);
 
 void rmdi_processor_set_acfs_history(RMDIProcessor *this,
                                         gint32 g125_length,

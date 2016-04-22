@@ -1187,12 +1187,12 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
   }
 
   if(mprtp->fec_packet){
-    if(this->auto_rate_and_cc){
+    if(0 < this->repair_window_max){
       fecdecoder_add_fec_packet(this->fec_decoder, mprtp);
     }
     _trash_mprtp_buffer(this, mprtp);
   }else{
-    if(this->auto_rate_and_cc){
+    if(0 < this->repair_window_max){
       fecdecoder_add_rtp_packet(this->fec_decoder, mprtp);
     }
     stream_joiner_push(this->joiner, mprtp);

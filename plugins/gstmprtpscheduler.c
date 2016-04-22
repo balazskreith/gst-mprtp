@@ -737,7 +737,7 @@ gst_mprtpscheduler_change_state (GstElement * element,
       break;
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
        gst_task_set_lock (this->thread, &this->thread_mutex);
-       gst_task_start (this->thread);
+//       gst_task_start (this->thread);//Fixme elliminate if doesn't want this.
        break;
      default:
        break;
@@ -886,6 +886,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     GstBuffer *item;
     if((item = packetssndqueue_peek(this->sndqueue)) != NULL){
       if(!_mprtpscheduler_send_buffer(this, item)){
+        packetssndqueue_push(this->sndqueue, buffer);
         goto done;
       }
       item = packetssndqueue_pop(this->sndqueue);
@@ -1191,67 +1192,25 @@ _mprtpscheduler_process_run (void *data)
   GstMprtpscheduler *this;
   GstClockID clock_id;
   GstClockTime next_scheduler_time;
-  MPRTPSPath *path;
-  GstBuffer *buffer = NULL;
-  GstBuffer *rtpfecbuf = NULL;
-  gboolean fec_request = FALSE;
+  GstBuffer *item;
+
   this = (GstMprtpscheduler *) data;
 
-  THIS_READLOCK (this);
-  next_scheduler_time = _now(this) + 100 * GST_MSECOND;
-  //Fixme when we introduce approvement!!!
-  goto done;
 again:
-  buffer = stream_splitter_pop(this->splitter, &path);
-
-  if(!buffer) {
-    g_print("buf: %p path:%p - items:%d\n", buffer, path, g_queue_get_length(this->sndqueue->items));
+  item = packetssndqueue_peek(this->sndqueue);
+  if(!item){
     next_scheduler_time = _now(this) + 1 * GST_MSECOND;
     goto done;
   }
-  if(!path){
-    GST_WARNING_OBJECT(this, "No active subflow");
-    next_scheduler_time = _now(this) + 100 * GST_MSECOND;
+
+  if(!_mprtpscheduler_send_buffer(this, item)){
+    next_scheduler_time = _now(this) + 1 * GST_MSECOND;
     goto done;
   }
-  ++this->sent_packets;
-  buffer = gst_buffer_make_writable (buffer);
-  mprtps_path_process_rtp_packet(path, buffer, &fec_request);
-  fec_request |= mprtps_path_request_keep_alive(path);
-  _setup_timestamp(this, buffer);
-
-  if(this->enable_fec || 0 < this->fec_interval){
-    fecencoder_add_rtpbuffer(this->fec_encoder, buffer);
-    fec_request |= (0 < this->fec_interval) && (this->sent_packets % this->fec_interval == 0);
-    if(fec_request){
-      rtpfecbuf = fecencoder_get_fec_packet(this->fec_encoder);
-      fecencoder_assign_to_subflow(this->fec_encoder,
-                                   rtpfecbuf,
-                                   this->mprtp_ext_header_id,
-                                   mprtps_path_get_id(path));
-    }
-  }
-
-
-  {
-    GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-    gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
-    mprtp_logger("push.log", "%lu,%u\n", GST_TIME_AS_MSECONDS(_now(this)), gst_rtp_buffer_get_timestamp(&rtp));
-    gst_rtp_buffer_unmap(&rtp);
-  }
-  gst_pad_push (this->mprtp_srcpad, buffer);
-  if(rtpfecbuf){
-    gst_pad_push (this->mprtp_srcpad, rtpfecbuf);
-    rtpfecbuf = NULL;
-  }
-  if (!this->riport_flow_signal_sent) {
-    this->riport_flow_signal_sent = TRUE;
-    sndctrler_report_can_flow(this->controller);
-  }
+  item = packetssndqueue_pop(this->sndqueue);
   goto again;
 done:
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
-  THIS_READUNLOCK (this);
 
   if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
     GST_WARNING_OBJECT (this, "The scheduler clock wait is interrupted");

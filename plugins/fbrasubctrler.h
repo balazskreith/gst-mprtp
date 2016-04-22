@@ -44,7 +44,9 @@ struct _FBRASubController
   RMDIProcessorResult       rmdi_result;
 
   GstClockTime              made;
-  GstClockTime              disable_controlling;
+  gboolean                  disable_controlling;
+  GstClockTime              disable_interval;
+  GstClockTime              disable_end;
   guint                     measurements_num;
 
   gint32                    monitored_bitrate;
@@ -72,6 +74,11 @@ struct _FBRASubController
   SubRateAction             stage_fnc;
 
   GstClockTime              congestion_detected;
+
+  guint                     consecutive_ok;
+  guint                     consecutive_nok;
+  GstClockTime              last_distorted;
+  GstClockTime              last_tr_uncorr_point;
 
   gpointer                  priv;
 

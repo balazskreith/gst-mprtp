@@ -110,6 +110,7 @@ enum
   PROP_0,
   PROP_MPRTP_EXT_HEADER_ID,
   PROP_FEC_PAYLOAD_TYPE,
+  PROP_ASYNC_FEC,
   PROP_PIVOT_OUTPAD,
 };
 
@@ -333,6 +334,13 @@ gst_mprtpsender_class_init (GstMprtpsenderClass * klass)
           "Set or get the payload type of fec packets",
           "Set or get the payload type of fec packets. The default is 126",
           0, 127, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_ASYNC_FEC,
+      g_param_spec_boolean ("async-fec",
+          "Indicate weather the FEC packet is sent on async outpad if that linked.",
+          "Indicate weather the FEC packet is sent on async outpad if that linked.",
+          TRUE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
 }
 
 
@@ -379,11 +387,12 @@ gst_mprtpsender_init (GstMprtpsender * mprtpsender)
 
   gst_segment_init (&mprtpsender->segment, GST_FORMAT_UNDEFINED);
   mprtpsender->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
-  mprtpsender->pivot_outpad = NULL;
-  mprtpsender->event_segment = NULL;
-  mprtpsender->event_caps = NULL;
-  mprtpsender->event_stream_start = NULL;
-  mprtpsender->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
+  mprtpsender->pivot_outpad        = NULL;
+  mprtpsender->event_segment       = NULL;
+  mprtpsender->event_caps          = NULL;
+  mprtpsender->event_stream_start  = NULL;
+  mprtpsender->fec_payload_type    = FEC_PAYLOAD_DEFAULT_ID;
+  mprtpsender->async_fec           = FALSE;
   //mprtpsender->events = g_queue_new();
   g_rw_lock_init (&mprtpsender->rwmutex);
 }
@@ -418,6 +427,11 @@ gst_mprtpsender_set_property (GObject * object, guint property_id,
       this->fec_payload_type = (guint8) g_value_get_uint (value);
       THIS_WRITEUNLOCK (this);
       break;
+    case PROP_ASYNC_FEC:
+      THIS_WRITELOCK (this);
+      this->async_fec = g_value_get_boolean (value);
+      THIS_WRITEUNLOCK (this);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -443,6 +457,11 @@ gst_mprtpsender_get_property (GObject * object, guint property_id,
      g_value_set_uint (value, (guint) this->fec_payload_type);
      THIS_READUNLOCK (this);
      break;
+    case PROP_ASYNC_FEC:
+      THIS_READLOCK (this);
+      g_value_set_boolean (value, this->async_fec);
+      THIS_READUNLOCK (this);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -753,7 +772,7 @@ gst_mprtpsender_src_unlink_done:
 typedef enum
 {
   PACKET_IS_MPRTP_SYNC,
-  PACKET_IS_MPRTP_ASYNC,
+  PACKET_IS_MPRTP_FEC,
   PACKET_IS_MPRTCP,
   PACKET_IS_NOT_MP,
 } PacketTypes;
@@ -817,7 +836,7 @@ _get_packet_mptype (GstMprtpsender * this,
 //            (gpointer) subflow_infos, sizeof (*subflow_infos));
     }
     if(gst_rtp_buffer_get_payload_type(&rtp) == this->fec_payload_type){
-      result = PACKET_IS_MPRTP_ASYNC;
+      result = PACKET_IS_MPRTP_FEC;
     }else{
       result = PACKET_IS_MPRTP_SYNC;
     }
@@ -916,8 +935,10 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   }
   packet_type = _get_packet_mptype (this, buf, &map, &subflow_id);
   if (packet_type != PACKET_IS_NOT_MP && _select_subflow (this, subflow_id, &subflow) != FALSE) {
-    if(packet_type == PACKET_IS_MPRTP_ASYNC || packet_type == PACKET_IS_MPRTCP){
+    if(packet_type == PACKET_IS_MPRTCP){
       outpad = subflow->async_outpad ? subflow->async_outpad : subflow->outpad;
+    }else if(packet_type == PACKET_IS_MPRTP_FEC){
+      outpad = this->async_fec && subflow->async_outpad ? subflow->async_outpad : subflow->outpad;
     }else
       outpad = subflow->outpad;
   } else if (this->pivot_outpad != NULL &&

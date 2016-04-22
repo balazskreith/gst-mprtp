@@ -218,6 +218,15 @@ guint32 packetssndtracker_get_goodput_bytes_from_acked(PacketsSndTracker *this, 
   return result;
 }
 
+gint32 packetssndtracker_get_sent_bytes_in_1s(PacketsSndTracker *this)
+{
+  guint32 result;
+  THIS_READLOCK (this);
+  result = this->sent_bytes_in_1s;
+  THIS_READUNLOCK (this);
+  return result;
+}
+
 void packetssndtracker_update_hssn(PacketsSndTracker *this, guint16 hssn)
 {
   PacketsSndTrackerItem* item;

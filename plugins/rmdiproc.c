@@ -112,8 +112,9 @@ rmdi_processor_init (RMDIProcessor * this)
 static void _delay80th_pipe(gpointer data, PercentileTrackerPipeData *stats)
 {
   RMDIProcessor *this = data;
-  _priv(this)->delay80th = stats->percentile;
+  this->result.qdelay_median = _priv(this)->delay80th = stats->percentile;
   _priv(this)->min_delay = stats->min;
+
 }
 
 static void _max_bytes_in_flight(gpointer data, gint64 value)
@@ -231,33 +232,44 @@ static void _process_discarded_rle(RMDIProcessor *this, GstMPRTCPXRReportSummary
   this->result.sender_bitrate = trackerstat.sent_bytes_in_1s << 3;
   this->result.sent_packets   = trackerstat.sent_packets_in_1s;
   numstracker_add(this->bytes_in_flight, trackerstat.bytes_in_flight);
+  this->result.bytes_in_flight = trackerstat.bytes_in_flight;
 }
 
 static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
 {
   gint64 impulse;
+
+  this->result.owd_processed = xrsummary->OWD.median_delay;
+
   if(!xrsummary->OWD.median_delay){
-    this->result.g1             = 0.;
-    this->result.g2             = 0.;
-    this->result.g3             = 0.;
-    this->result.g4             = 0.;
     goto done;
   }
-  percentiletracker_add(this->delays, xrsummary->OWD.median_delay);
+
+  this->result.qdelay_actual = xrsummary->OWD.median_delay;
+
 //  impulse = ((gint64)xrsummary->OWD.median_delay - (gint64)_priv(this)->delay80th) / 1000000;
-  impulse = (gint64)xrsummary->OWD.median_delay - 2 * GST_SECOND;
+  impulse = (gint64)xrsummary->OWD.median_delay;
   impulse/= 1000;
   _priv(this)->cblocks[0].Iu0 = impulse;
   _execute_corrblocks(_priv(this), _priv(this)->cblocks);
   _execute_corrblocks(_priv(this), _priv(this)->cblocks);
   _priv(this)->cblocks[0].Id1 = impulse;
+  this->last_delay_t2         = this->last_delay_t1;
+  this->last_delay_t1         = this->last_delay;
   this->last_delay            = xrsummary->OWD.median_delay;
 
-  this->result.corrH          = !_priv(this)->delay80th ? 0. : (gdouble)this->last_delay / (gdouble)_priv(this)->delay80th;
-  this->result.g1             = _priv(this)->cblocks[0].g;
-  this->result.g2             = _priv(this)->cblocks[1].g;
-  this->result.g3             = _priv(this)->cblocks[2].g;
-  this->result.g4             = _priv(this)->cblocks[3].g;
+  if(this->result.qdelay_median){
+    this->result.owd_corr =  .5 * this->last_delay + .25 * this->last_delay_t1 + .25 * this->last_delay_t2;
+    this->result.owd_corr /=  this->result.qdelay_median;
+  }else{
+    this->result.owd_corr = 1.;
+  }
+
+//  this->result.corrH          = !_priv(this)->delay80th ? 0. : (gdouble)this->last_delay / (gdouble)_priv(this)->delay80th;
+//  this->result.g1             = _priv(this)->cblocks[0].g;
+//  this->result.g2             = _priv(this)->cblocks[1].g;
+//  this->result.g3             = _priv(this)->cblocks[2].g;
+//  this->result.g4             = _priv(this)->cblocks[3].g;
 
   _csv_logging(this, impulse);
   _readable_logging(this);
@@ -286,6 +298,12 @@ void rmdi_processor_do(RMDIProcessor       *this,
 
 done:
   return;
+
+}
+
+void rmdi_processor_approve_owd(RMDIProcessor *this)
+{
+  percentiletracker_add(this->delays, this->last_delay);
 
 }
 
@@ -417,11 +435,6 @@ void _readable_result(RMDIProcessor *this, RMDIProcessorResult *result)
                "sender_bitrate:      %d\n"
                "goodput_bitrate:     %d\n"
                "utilized_fraction:   %f\n"
-               "corrH:               %f\n"
-               "g_125:               %f\n"
-               "g_250:               %f\n"
-               "g_500:               %f\n"
-               "g_1000:              %f\n"
                ,
 
                secs,
@@ -430,12 +443,7 @@ void _readable_result(RMDIProcessor *this, RMDIProcessorResult *result)
                result->max_bytes_in_flight,
                result->sender_bitrate,
                result->goodput_bitrate,
-               result->utilized_fraction,
-               result->corrH,
-               result->g1,
-               result->g2,
-               result->g3,
-               result->g4
+               result->utilized_fraction
   );
 }
 

@@ -56,30 +56,31 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 //if target bitrate is close to the bottleneck, monitoring interval is requested for this interval
 //note if the target/interval is higher than the maximum ramp up speed, then monitoring is
 //restricted to the max_ramp_up
-#define BOTTLENECK_MONITORING_INTERVAL 5
+#define BOTTLENECK_MONITORING_INTERVAL 14
 
 //determine the minimum interval in seconds must be stay in probe stage
 //before the target considered to be accepted
-#define NORMAL_PROBE_INTERVAL 1
+#define NORMAL_PROBE_INTERVAL 2.5
 
 //determine the maximum interval in seconds must be stay in probe stage
 //before the target considered to be accepted
-#define BOTTLENECK_PROBE_INTERVAL 3
+#define BOTTLENECK_PROBE_INTERVAL 5.
 
 //determines the maximum time in seconds the target can be mitigated after it is increased in probe stage
-#define INCREASEMENT_MITIGATION_TRESHOLD 5
+#define INCREASEMENT_MITIGATION_TRESHOLD 2
 
-//determines the qdelay trend treshold considered to be distortion at probe stage
-#define QDELAY_PROBE_TRESHOLD 0.001
+//determines the maximum delay amplitude from median considered to be distortion at PROBE or INCREASE stage
+#define QDELAY_PROBE_TRESHOLD 80
 
-//determines the qdelay trend treshold considered to be distortion at keep stage
-#define QDELAY_KEEP_TRESHOLD  0.005
+//determines the maximum delay in ms variance from the long term median that
+//considered to be distortion at KEEP stage
+#define QDELAY_KEEP_TRESHOLD  80
 
 //determines the qdelay trend treshold considered to be congestion
-#define QDELAY_CONGESTION_TRESHOLD 0.1
+#define QDELAY_CONGESTION_TRESHOLD 100
 
 //determines the minimum monitoring interval
-#define MIN_MONITORING_INTERVAL 2
+#define MIN_MONITORING_INTERVAL 10
 
 //determines the maximum monitoring interval
 #define MAX_MONITORING_INTERVAL 14
@@ -123,6 +124,12 @@ typedef enum{
 
 #define SR_TR_ARRAY_LENGTH 3
 
+typedef enum{
+  RESTRICTOR_STATE_ACTIVE           =  1,
+  RESTRICTOR_STATE_DEACTIVATED      =  0,
+  PACING_STATE_DEACTIVE         = -1,
+}RestrictorState;
+
 struct _Private{
   GstClockTime        time;
 
@@ -133,22 +140,26 @@ struct _Private{
   gboolean            controlled;
   gdouble             rtt;
   gboolean            tr_correlated;
+  gboolean            gp_correlated;
 
   gboolean            fcongestion;
   gboolean            bcongestion;
   gboolean            fdistortion;
-  gboolean            bdistortion;
+
+  PacketsSndTracker*  packetstracker;
+
+  struct{
+    RestrictorState state;
+    gboolean  (*approver)(FBRASubController*,GstBuffer*);
+    GstClockTime deactivated, activated;
+  }restrictor;
 
   //Possible parameters
   gint32              min_monitoring_interval;
   gint32              max_monitoring_interval;
   gdouble             bottleneck_epsilon;
-  gint32              bottleneck_monitoring_interval;
-  gint32              normal_probe_interval;
-  gint32              bottleneck_probe_interval;
-  gdouble             qdelay_probe_treshold;
-  gdouble             qdelay_keep_treshold;
-  gdouble             qdelay_congestion_treshold;
+  gdouble             normal_probe_interval;
+  gdouble             bottleneck_probe_interval;
   gint32              max_distortion_keep_time;
   gint32              increasement_mitigation_treshold;
   gdouble             bottleneck_increasement_factor;
@@ -158,29 +169,30 @@ struct _Private{
   gint32              max_target_bitrate;
   gdouble             reduce_target_factor;
 
-  gdouble            *gcong;
-  gdouble            *gkeep;
-  gdouble            *gprobe;
+  GstClockTime        qdelay_distortion_keep_th;
+  GstClockTime        qdelay_distortion_probe_th;
+  GstClockTime        qdelay_congestion_treshold;
+  gdouble             discad_cong_treshold;
+
+  gdouble             actual_ratio;
+
 };
 
 #define _priv(this) ((Private*)this->priv)
 #define _rmdi(this) this->rmdi_result
-#define _corrH(this) _rmdi(this).corrH //todo: elliminate this one as well
-//Todo: elliminate it.
-#define _q1(this) _rmdi(this).g1
-#define _q2(this) _rmdi(this).g2
-#define _q3(this) _rmdi(this).g3
-#define _q4(this) _rmdi(this).g4
+#define _restrictor(this) _priv(this)->restrictor
 
 #define _fcongestion(this) _priv(this)->fcongestion
 #define _bcongestion(this) _priv(this)->bcongestion
 #define _fdistortion(this) _priv(this)->fdistortion
-#define _bdistortion(this) _priv(this)->bdistortion
 #define _tr_is_corred(this) _priv(this)->tr_correlated
 #define _btlp(this) this->bottleneck_point
 #define _mon_int(this) this->monitoring_interval
 #define _mon_br(this) this->monitored_bitrate
 #define _UF(this) _rmdi(this).utilized_fraction
+#define _qdelay_actual(this) _rmdi(this).qdelay_actual
+#define _qdelay_median(this) _rmdi(this).qdelay_median
+#define _qdelay_processed(this) _rmdi(this).owd_processed
 
 #define _state(this) mprtps_path_get_state(this->path)
 #define _state_t1(this) this->state_t1
@@ -190,6 +202,8 @@ struct _Private{
 #define _set_event(this, e) _event(this) = e
 #define _set_pending_event(this, e) this->pending_event = e
 
+
+
 #define _TR(this) this->target_bitrate
 #define _TR_t1(this) this->target_bitrate_t1
 #define _SR(this) (_rmdi(this).sender_bitrate)
@@ -197,25 +211,30 @@ struct _Private{
 #define _GP_t1(this) (_priv(this)->goodput_bitrate_t1)
 #define _min_br(this) MIN(_SR(this), _TR(this))
 #define _max_br(this) MAX(_SR(this), _TR(this))
+#define _trend(this) _rmdi(this).owd_corr
 
-#define _btl_inc_fac(this)     _priv(this)->bottleneck_increasement_factor
-#define _btl_eps(this)         _priv(this)->bottleneck_epsilon
-#define _btl_mon_int(this)     _priv(this)->bottleneck_monitoring_interval
-#define _btl_probe_int(this)   _priv(this)->bottleneck_probe_interval
-#define _norm_pbobe_int(this)  _priv(this)->normal_probe_interval
-#define _inc_mit_th(this)      _priv(this)->increasement_mitigation_treshold
-#define _gprobe_th(this)       _priv(this)->qdelay_probe_treshold
-#define _gkeep_th(this)        _priv(this)->qdelay_keep_treshold
-#define _gcong_th(this)        _priv(this)->qdelay_congestion_treshold
-#define _mon_min_int(this)     _priv(this)->min_monitoring_interval
-#define _mon_max_int(this)     _priv(this)->max_monitoring_interval
-#define _max_dist_keep(this)   _priv(this)->max_distortion_keep_time
-#define _min_ramp_up(this)     _priv(this)->min_ramp_up_bitrate
-#define _max_ramp_up(this)     _priv(this)->max_ramp_up_bitrate
-#define _rdc_target_fac(this)  _priv(this)->reduce_target_factor
 
-#define _gkeep(this)           *(_priv(this)->gkeep)
-#define _gprobe(this)          *(_priv(this)->gprobe)
+#define _btl_inc_fac(this)            _priv(this)->bottleneck_increasement_factor
+#define _btl_eps(this)                _priv(this)->bottleneck_epsilon
+#define _btl_probe_int(this)          _priv(this)->bottleneck_probe_interval
+#define _norm_pbobe_int(this)         _priv(this)->normal_probe_interval
+#define _inc_mit_th(this)             _priv(this)->increasement_mitigation_treshold
+#define _gprobe_th(this)              _priv(this)->qdelay_probe_treshold
+#define _gkeep_th(this)               _priv(this)->qdelay_keep_treshold
+#define _gcong_th(this)               _priv(this)->qdelay_congestion_treshold
+
+#define _qdelay_cong_th(this)         _priv(this)->qdelay_congestion_treshold
+#define _qdelay_dist_probe_th(this)   _priv(this)->qdelay_distortion_probe_th
+#define _qdelay_dist_keep_th(this)    _priv(this)->qdelay_distortion_keep_th
+#define _discard_cong_th(this)        _priv(this)->discad_cong_treshold
+
+#define _mon_min_int(this)            _priv(this)->min_monitoring_interval
+#define _mon_max_int(this)            _priv(this)->max_monitoring_interval
+#define _max_dist_keep(this)          _priv(this)->max_distortion_keep_time
+#define _min_ramp_up(this)            _priv(this)->min_ramp_up_bitrate
+#define _max_ramp_up(this)            _priv(this)->max_ramp_up_bitrate
+#define _rdc_target_fac(this)         _priv(this)->reduce_target_factor
+
 #define _gcong(this)         *(_priv(this)->gcong)
 
 //----------------------------------------------------------------------
@@ -228,7 +247,6 @@ struct _Private{
 // const gdouble ST_ = 1.1; //Stable treshold
 // const gdouble OT_ = 2.;  //Overused treshold
 // const gdouble DT_ = 1.5; //Down Treshold
-
 
 
 #define _now(this) (gst_clock_get_time(this->sysclock))
@@ -294,6 +312,20 @@ _change_target_bitrate(FBRASubController *this, gint32 new_target);
 
 
 static void
+_activate_restrictor(
+    FBRASubController *this);
+
+static gboolean
+_approving_in_deactive_mode(
+    FBRASubController *this,
+    GstBuffer *buffer);
+
+static gboolean
+_approving_in_active_mode(
+    FBRASubController *this,
+    GstBuffer *buffer);
+
+static void
 _params_out(
     FBRASubController *this);
 
@@ -338,13 +370,12 @@ fbrasubctrler_init (FBRASubController * this)
 
   _priv(this)->bottleneck_increasement_factor   = BOTTLENECK_INCREASEMENT_FACTOR;
   _priv(this)->bottleneck_epsilon               = BOTTLENECK_EPSILON;
-  _priv(this)->bottleneck_monitoring_interval   = BOTTLENECK_MONITORING_INTERVAL;
   _priv(this)->normal_probe_interval            = NORMAL_PROBE_INTERVAL;
   _priv(this)->bottleneck_probe_interval        = BOTTLENECK_PROBE_INTERVAL;
   _priv(this)->increasement_mitigation_treshold = INCREASEMENT_MITIGATION_TRESHOLD;
-  _priv(this)->qdelay_probe_treshold            = QDELAY_PROBE_TRESHOLD;
-  _priv(this)->qdelay_keep_treshold             = QDELAY_KEEP_TRESHOLD;
-  _priv(this)->qdelay_congestion_treshold       = QDELAY_CONGESTION_TRESHOLD;
+  _priv(this)->qdelay_distortion_probe_th       = QDELAY_PROBE_TRESHOLD * GST_MSECOND;
+  _priv(this)->qdelay_distortion_keep_th        = QDELAY_KEEP_TRESHOLD * GST_MSECOND;
+  _priv(this)->qdelay_congestion_treshold       = QDELAY_CONGESTION_TRESHOLD * GST_MSECOND;
   _priv(this)->min_monitoring_interval          = MIN_MONITORING_INTERVAL;
   _priv(this)->max_monitoring_interval          = MAX_MONITORING_INTERVAL;
   _priv(this)->max_distortion_keep_time         = MAX_DISTORTION_KEEP_TIME;
@@ -353,19 +384,17 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->min_target_bitrate               = TARGET_BITRATE_MIN;
   _priv(this)->max_target_bitrate               = TARGET_BITRATE_MAX;
   _priv(this)->reduce_target_factor             = REDUCE_TARGET_FACTOR;
+  _priv(this)->discad_cong_treshold             = .8;
 
-  _priv(this)->gkeep                            = &_rmdi(this).g1;
-  _priv(this)->gprobe                           = &_rmdi(this).g2;
-  _priv(this)->gcong                            = &_rmdi(this).g4;
-
+  _restrictor(this).approver = _approving_in_deactive_mode;
 
 }
 
 
 gboolean fbrasubctrler_path_approver(gpointer data, GstBuffer *buffer)
 {
-//  FBRASubController *this = data;
-  return TRUE;
+  FBRASubController *this = data;
+  return _restrictor(this).approver(this, buffer);
 }
 
 FBRASubController *make_fbrasubctrler(MPRTPSPath *path)
@@ -381,14 +410,18 @@ FBRASubController *make_fbrasubctrler(MPRTPSPath *path)
   _switch_stage_to(result, STAGE_KEEP, FALSE);
   mprtps_path_set_state(result->path, MPRTPS_PATH_STATE_STABLE);
 
+  _priv(result)->packetstracker         = mprtps_path_ref_packetstracker(result->path);
+
   return result;
 }
 
 void fbrasubctrler_enable(FBRASubController *this)
 {
-  this->enabled = TRUE;
-  this->disable_controlling = _now(this) + 10 * GST_SECOND;
-  this->target_bitrate = mprtps_path_get_target_bitrate(this->path);
+  this->enabled             = TRUE;
+  this->disable_controlling = TRUE;
+  this->disable_interval    = 10 * GST_SECOND;
+  this->target_bitrate      = mprtps_path_get_target_bitrate(this->path);
+  this->last_distorted      = _now(this);
 }
 
 void fbrasubctrler_disable(FBRASubController *this)
@@ -404,31 +437,45 @@ static void _reset_congestion_indicators(FBRASubController *this)
   _priv(this)->fcongestion = FALSE;
   _priv(this)->fdistortion  = FALSE;
 
+//  if(_qdelay_median(this) + _qdelay_cong_th(this) < _qdelay_actual(this)){
+//    _priv(this)->fcongestion = TRUE;
+//  }else
+  if(_UF(this) < _discard_cong_th(this)){
+    _priv(this)->fcongestion = TRUE;
+  }
+
 }
 
 static void _update_tr_corr(FBRASubController *this)
 {
   gdouble tr_corr;
+  gdouble gp_corr;
 
-  tr_corr =  (gdouble)_rmdi(this).sender_bitrate / (gdouble)this->target_bitrate;
+  tr_corr =  (gdouble) _rmdi(this).sender_bitrate / (gdouble)this->target_bitrate;
+  gp_corr =  (gdouble) _rmdi(this).goodput_bitrate / (gdouble) _rmdi(this).sender_bitrate;
+  _priv(this)->gp_correlated = .9 < gp_corr && gp_corr < 1.1;
 
-  _priv(this)->tr_correlated = .9 < tr_corr && tr_corr < 1.1;
-
+  if(.9 < tr_corr && tr_corr < 1.1){
+    _priv(this)->tr_correlated = TRUE;
+  }else{
+    _priv(this)->tr_correlated = FALSE;
+    this->last_tr_uncorr_point = _now(this);
+  }
 }
 
 
-static gint32 _get_probe_interval(FBRASubController *this)
+static GstClockTime _get_probe_interval(FBRASubController *this)
 {
   if(!this->bottleneck_point){
-    return _norm_pbobe_int(this);
+    return _norm_pbobe_int(this) * GST_SECOND;
   }
   if(this->target_bitrate < this->bottleneck_point * (1.-_btl_eps(this))){
-    return _norm_pbobe_int(this);
+    return _norm_pbobe_int(this) * GST_SECOND;
   }
   if(this->bottleneck_point * (1.+_btl_eps(this)) < this->target_bitrate){
-    return _norm_pbobe_int(this);
+    return _norm_pbobe_int(this) * GST_SECOND;
   }
-  return _btl_probe_int(this);
+  return _btl_probe_int(this) * GST_SECOND;
 }
 
 static gboolean _does_near_to_bottleneck_point(FBRASubController *this)
@@ -447,10 +494,14 @@ static gboolean _does_near_to_bottleneck_point(FBRASubController *this)
 
 static gint32 _get_increasement(FBRASubController *this)
 {
+  gint32 increasement;
+
   if(_does_near_to_bottleneck_point(this)){
-    return this->monitored_bitrate * _btl_inc_fac(this);
+      increasement = this->monitored_bitrate * _btl_inc_fac(this);
+  }else{
+    increasement = this->monitored_bitrate;
   }
-  return this->monitored_bitrate;
+  return CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), increasement);
 }
 
 void fbrasubctrler_time_update(FBRASubController *this)
@@ -475,6 +526,7 @@ void fbrasubctrler_time_update(FBRASubController *this)
     _bcongestion(this) = FALSE;
     goto done;
   }
+
   if(0 < this->disable_controlling && this->disable_controlling < _now(this)){
     goto done;
   }
@@ -492,6 +544,17 @@ void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRa
 void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *result)
 {
 
+}
+
+static void _actual_ratio_updater(FBRASubController *this)
+{
+  if(1.001 < _trend(this)){
+    this->last_distorted = _now(this);
+  }
+
+  if(1.01 < _trend(this)){
+    this->bottleneck_point = MIN(_SR(this), _GP(this));
+  }
 }
 
 void fbrasubctrler_report_update(
@@ -514,11 +577,19 @@ void fbrasubctrler_report_update(
   rmdi_processor_do(this->fb_processor, summary, &this->rmdi_result);
   _update_tr_corr(this);
   _reset_congestion_indicators(this);
+  _actual_ratio_updater(this);
 
-  if(0 < this->disable_controlling && this->disable_controlling < _now(this)){
-      this->disable_controlling = 0;
+  if(this->disable_controlling){
+    if(!this->disable_end){
+      this->disable_end = _now(this) + this->disable_interval;
+    }
+
+    if(0 < this->disable_end && this->disable_end < _now(this)){
+      this->disable_controlling = FALSE;
+    }
   }
-  if(5 < this->measurements_num && this->disable_controlling == 0LU){
+
+  if(5 < this->measurements_num && !this->disable_controlling){
     if(this->pending_event != EVENT_FI){
       _fire(this, this->pending_event);
       this->pending_event = EVENT_FI;
@@ -528,12 +599,15 @@ void fbrasubctrler_report_update(
     _fire(this, _event(this));
     _priv(this)->event = EVENT_FI;
     _priv(this)->controlled = TRUE;
+
   }else{
     _priv(this)->controlled = FALSE;
   }
 
-  _priv(this)->stage_t1 = _priv(this)->stage;
-
+//  _priv(this)->stage_t1 = _priv(this)->stage;
+  if(_priv(this)->stage != STAGE_REDUCE){
+      rmdi_processor_approve_owd(this->fb_processor);
+  }
   ++this->measurements_num;
 done:
   return;
@@ -543,50 +617,28 @@ done:
 static gint32 _undershoot(FBRASubController *this)
 {
   gint32 target_rate = this->target_bitrate;
-//  if(_gcong_th(this) < MIN(_q3(this),_q4(this))){
-//    target_rate = MIN(_GP(this) * .85, _TR(this) * _rdc_target_fac(this));
-//  }else{
-//    target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
-//  }
 
-  if(_TR(this) < _SR(this) * .9){
-    target_rate = MIN(_GP(this) * .85, target_rate);
-  }else if(_gcong_th(this) < _gcong(this)){
-    target_rate = MIN(_GP(this) * .85, _TR(this) * _rdc_target_fac(this));
-  }else{
-    target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
+  if(_TR(this) < _SR(this) * .9 ){
+    goto done;
   }
+
+  if(!_fcongestion(this) && !_fdistortion(this)){
+    if(_bcongestion(this)){
+      target_rate *= .85;
+    }
+    goto done;
+  }
+
+  if(!_fcongestion(this)){
+    target_rate = MIN(_GP(this) * .85, _TR_t1(this));
+  }else{
+    target_rate = MIN(_GP(this) * .85, _TR(this) * _rdc_target_fac(this));
+  }
+done:
   return target_rate;
 }
 
 
-static void
-_reduce_stage_helper(
-    FBRASubController *this)
-{
-  gboolean congestion = FALSE;
-  gboolean distortion = FALSE;
-  if(_corrH(this) < 1.2 && _UF(this) == 1.){
-    goto done;
-  }
-
-  if(_gcong_th(this) < _gcong(this)){
-    congestion = TRUE;
-  }else if(_UF(this) < .8){
-    congestion = TRUE;
-  }else if(1.5 < _corrH(this) && _priv(this)->stage_changed < _now(this) - 5 * GST_SECOND){
-    congestion = TRUE;
-  }
-
-  if(1.5 < _corrH(this)){
-    distortion = TRUE;
-  }else if(_gkeep_th(this) < _gkeep(this)){
-    distortion = TRUE;
-  }
-done:
-  _fcongestion(this) = congestion;
-  _fdistortion(this) = distortion;
-}
 
 void
 _reduce_stage(
@@ -594,17 +646,16 @@ _reduce_stage(
 {
   gint32   target_rate  = this->target_bitrate;
 
-  _reduce_stage_helper(this);
-
   if(!_fcongestion(this)){
-    this->bottleneck_point = (_TR(this) + _GP(this)) / 2;
-    if(!_fdistortion(this) && !_bcongestion(this)){
+    if(!_bcongestion(this)){
       _switch_stage_to(this, STAGE_KEEP, FALSE);
     }
     goto done;
   }
 
-  target_rate = _undershoot(this);
+  if(_tr_is_corred(this)){
+    target_rate = _undershoot(this);
+  }
 
   _change_target_bitrate(this, target_rate);
   _reset_monitoring(this);
@@ -619,28 +670,32 @@ static void
 _keep_stage_helper(
     FBRASubController *this)
 {
-  gboolean congestion = FALSE;
   gboolean distortion = FALSE;
-  if(_corrH(this) < 1.2 && _UF(this) == 1.){
-    goto done;
-  }
 
-  if(_gcong_th(this) < _gcong(this)){
-    congestion = TRUE;
-  }else if(_UF(this) < .8){
-    congestion = TRUE;
-  }
-
-  if(_gkeep_th(this) < _gkeep(this)){
-    distortion = TRUE;
-  }else if(1.5 < _rmdi(this).corrH){
+  if(1. < _trend(this)){
     distortion = TRUE;
   }else if(_UF(this) < 1.){
     distortion = TRUE;
   }
-done:
-  _fcongestion(this) = congestion;
+
   _fdistortion(this) = distortion;
+}
+
+
+static void _start_monitoring(FBRASubController *this)
+{
+  _set_monitoring_interval(this, 14);
+}
+
+static gboolean _check_monitoring(FBRASubController *this)
+{
+  GstClockTime wait_time;
+  wait_time = _get_probe_interval(this);
+  DISABLE_LINE  wait_time = MAX(2500 * GST_MSECOND, 2 * _priv(this)->rtt);
+  if(_now(this) - wait_time < this->monitoring_started){
+    return FALSE;
+  }
+  return TRUE;
 }
 
 void
@@ -651,20 +706,19 @@ _keep_stage(
 
   _keep_stage_helper(this);
 
-  if(_fcongestion(this)){
+  if(_bcongestion(this) || _fcongestion(this)){
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     _disable_controlling(this);
-    target_rate = _undershoot(this);
+    if(_tr_is_corred(this)){
+      target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
+    }
     goto done;
   }
 
-//  target_rate *= 1.-_q4(this);
-  if(_fdistortion(this)){
-    this->bottleneck_point = target_rate;
-    if(this->last_settled < _now(this) - _max_dist_keep(this) * GST_SECOND){
-      target_rate *= _tr_is_corred(this) ? 1. : .9;
-      this->last_settled = _now(this);
+  if(1.01 < _trend(this)){
+    if(_priv(this)->stage_changed < _now(this) - 3 * GST_SECOND){
+      target_rate *= _tr_is_corred(this) ? .95 : 1.;
     }
     _set_event(this, EVENT_DISTORTION);
     goto done;
@@ -675,9 +729,11 @@ _keep_stage(
     goto done;
   }
 
-  if(_bcongestion(this) || _gprobe_th(this) < _gprobe(this)){
+  if(1. < _trend(this) || _now(this) - GST_SECOND < this->last_distorted){
     goto done;
   }
+
+  DISABLE_LINE _start_monitoring(this);
 
   _setup_monitoring(this);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
@@ -686,75 +742,48 @@ done:
   return;
 }
 
-static void
-_probe_stage_helper(
-    FBRASubController *this)
-{
-  gboolean congestion = FALSE;
-  gboolean distortion = FALSE;
-  if(_corrH(this) < 1.2 && _UF(this) == 1.){
-    goto done;
-  }
-
-  if(_gcong_th(this) < _gcong(this)){
-    congestion = TRUE;
-  }else if(_UF(this) < .8){
-    congestion = TRUE;
-  }
-
-  if(_gprobe_th(this) < _gprobe(this)){
-    distortion = TRUE;
-  }else if(1.5 < _rmdi(this).corrH){
-    distortion = TRUE;
-  }else if(_UF(this) < 1.){
-    distortion = TRUE;
-  }
-done:
-  _fcongestion(this) = congestion;
-  _fdistortion(this) = distortion;
-}
 
 void
 _probe_stage(
     FBRASubController *this)
 {
-  gint32   target_rate = this->target_bitrate;
-  gint32   probe_interval;
-
-  _probe_stage_helper(this);
-
-  probe_interval = _get_probe_interval(this);
+  gint32   target_rate = this->target_bitrate * CONSTRAIN(.95,1.05, 2.-_trend(this));
 
   if(_bcongestion(this) || _fcongestion(this)){
     _disable_monitoring(this);
     _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _undershoot(this);
-    goto done;
-  }
-
-  if(_fdistortion(this)){
-    _disable_monitoring(this);
-    _set_event(this, EVENT_DISTORTION);
-    _switch_stage_to(this, STAGE_KEEP, FALSE);
-    if(_now(this) - _inc_mit_th(this) * GST_SECOND < this->last_increase){
-      target_rate *= .95;
+    if(_tr_is_corred(this)){
+      target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
     }
     goto done;
   }
 
-  if(_now(this) - probe_interval * GST_SECOND < _priv(this)->stage_changed){
+  if(1.01 < _trend(this)){
+     _disable_monitoring(this);
+     _set_event(this, EVENT_DISTORTION);
+     _switch_stage_to(this, STAGE_KEEP, FALSE);
+     if(_tr_is_corred(this)){
+       target_rate = MIN(_GP(this) * .95, _TR(this) * _UF(this));
+     }
+     goto done;
+   }
+
+  if(!_check_monitoring(this)){
+    goto exit;
+  }
+
+
+  if(target_rate < _SR(this) * .9){
     goto exit;
   }
 
   if(_priv(this)->tr_correlated){
     target_rate = MIN(1.5 * _GP(this), target_rate + _get_increasement(this));
-  }else if(target_rate < _SR(this) * .9){
-//    target_rate = MIN(1.5 * _GP(this), target_rate + _get_increasement(this));
-    goto exit;
   }
 
+  _disable_monitoring(this);
   _switch_stage_to(this, STAGE_INCREASE, FALSE);
   _set_event(this, EVENT_READY);
 done:
@@ -767,27 +796,14 @@ static void
 _increase_stage_helper(
     FBRASubController *this)
 {
-  gboolean congestion = FALSE;
   gboolean distortion = FALSE;
-  if(_corrH(this) < 1.2 && _UF(this) == 1.){
-    goto done;
-  }
 
-  if(_gcong_th(this) < _gcong(this)){
-    congestion = TRUE;
-  }else if(_UF(this) < .8){
-    congestion = TRUE;
-  }
-
-  if(_gprobe_th(this) < _gprobe(this)){
-    distortion = TRUE;
-  }else if(1.5 < _rmdi(this).corrH){
+  if(1.02 < _trend(this)){
     distortion = TRUE;
   }else if(_UF(this) < 1.){
     distortion = TRUE;
   }
-done:
-  _fcongestion(this) = congestion;
+
   _fdistortion(this) = distortion;
 }
 
@@ -795,7 +811,7 @@ void
 _increase_stage(
     FBRASubController *this)
 {
-  gint32   target_rate = this->target_bitrate;
+  gint32   target_rate = this->target_bitrate * CONSTRAIN(.95,1.05, 2.-_trend(this));
 
   _increase_stage_helper(this);
 
@@ -804,32 +820,29 @@ _increase_stage(
     _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _undershoot(this);
+    if(_tr_is_corred(this)){
+      target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
+    }
     goto done;
   }
 
-  if(_fdistortion(this)){
+  if(1.01 < _trend(this)){
+    _disable_controlling(this);
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = MAX(_GP(this) * .95, _TR_t1(this));
+    if(_tr_is_corred(this)){
+      target_rate = MIN(_GP(this) * .95, _TR(this) * _UF(this));
+    }
     goto done;
   }
 
-  if(!_priv(this)->tr_correlated){
+  if(!_priv(this)->tr_correlated || !_priv(this)->gp_correlated){
     goto exit;
   }
 
-  if(_does_near_to_bottleneck_point(this)){
-    _switch_stage_to(this, STAGE_PROBE, FALSE);
-    _set_event(this, EVENT_READY);
-  }else if(_now(this) - _norm_pbobe_int(this) * GST_SECOND < _priv(this)->stage_changed){
-    goto exit;
-  }else{
-    target_rate = MIN(1.5 * _GP(this), target_rate + this->monitored_bitrate);
-    _setup_monitoring(this);
-    _switch_stage_to(this, STAGE_INCREASE, FALSE);
-  }
+  _start_monitoring(this);
+  _switch_stage_to(this, STAGE_PROBE, FALSE);
 done:
   _change_target_bitrate(this, target_rate);
 exit:
@@ -859,10 +872,12 @@ _fire(
     case MPRTPS_PATH_STATE_STABLE:
       switch(event){
         case EVENT_CONGESTION:
+          _activate_restrictor(this);
           mprtps_path_set_congested(this->path);
           mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_OVERUSED);
         break;
         case EVENT_DISTORTION:
+          _activate_restrictor(this);
           mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_OVERUSED);
           break;
         case EVENT_READY:
@@ -876,10 +891,12 @@ _fire(
     case MPRTPS_PATH_STATE_UNDERUSED:
       switch(event){
         case EVENT_CONGESTION:
+          _activate_restrictor(this);
           mprtps_path_set_congested(this->path);
           mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_OVERUSED);
         break;
         case EVENT_DISTORTION:
+          _activate_restrictor(this);
           mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_OVERUSED);
         break;
         case EVENT_READY:
@@ -927,10 +944,13 @@ void _switch_stage_to(
 
 void _disable_controlling(FBRASubController *this)
 {
-  if(_priv(this)->rtt){
-    this->disable_controlling = _now(this) +  CONSTRAIN(200 * GST_MSECOND, 1.5 * GST_SECOND, _priv(this)->rtt * 2.);
+  this->disable_controlling = TRUE;
+  if(0. < _priv(this)->rtt){
+    this->disable_interval = CONSTRAIN(300 * GST_MSECOND, 20 * GST_SECOND, _priv(this)->rtt * 2.);
+  }else{
+    this->disable_interval = 1.5 * GST_SECOND;
   }
-  this->disable_controlling = _now(this) +  CONSTRAIN(500 * GST_MSECOND, 1.5 * GST_SECOND, _priv(this)->rtt * 2.);
+  this->disable_end = 0;
 }
 
 void _reset_monitoring(FBRASubController *this)
@@ -939,6 +959,7 @@ void _reset_monitoring(FBRASubController *this)
   this->monitoring_started = 0;
   this->monitored_bitrate = 0;
 }
+
 
 void _setup_monitoring(FBRASubController *this)
 {
@@ -1023,6 +1044,31 @@ void _change_target_bitrate(FBRASubController *this, gint32 new_target)
   mprtps_path_set_target_bitrate(this->path, this->target_bitrate);
 }
 
+void _activate_restrictor(FBRASubController *this)
+{
+  _restrictor(this).state     = RESTRICTOR_STATE_ACTIVE;
+  _restrictor(this).activated = _now(this);
+  _restrictor(this).approver  = _approving_in_active_mode;
+}
+
+gboolean _approving_in_active_mode(FBRASubController *this, GstBuffer *buffer)
+{
+  gdouble dt;
+  gint32 sr;
+  dt = GST_TIME_AS_MSECONDS(_now(this) - _restrictor(this).activated);
+  if(2000. < dt || _state(this) != MPRTPS_PATH_STATE_OVERUSED){
+      _restrictor(this).state       = PACING_STATE_DEACTIVE;
+      _restrictor(this).approver    = _approving_in_deactive_mode;
+  }
+  sr = packetssndtracker_get_sent_bytes_in_1s(_priv(this)->packetstracker) * 8;
+//  g_print("%d<%f\n", sr, _TR(this) * (1. + log(dt / 1000. + 1)));
+  return sr < _TR(this) * (1. + log(dt / 1000.));
+}
+
+gboolean _approving_in_deactive_mode(FBRASubController *this, GstBuffer *buffer)
+{
+  return TRUE;
+}
 
 
 void fbrasubctrler_logging(FBRASubController *this)
@@ -1035,8 +1081,8 @@ void fbrasubctrler_logging(FBRASubController *this)
                "# Forward distortion:          %-10d| Backward distortion:        %-10d#\n"
                "# Forward congestion:          %-10d| Backward congestion:        %-10d#\n"
                "# Actual Target:               %-10d| tr_is_corred:               %-10d#\n"
-               "# Minimum Bitrate:             %-10d| R(100):                     %-10f#\n"
-               "# Maximum Bitrate:             %-10d| R(200):                     %-10f#\n"
+               "# Minimum Bitrate:             %-10d| OWD Median:                 %-10lu#\n"
+               "# Maximum Bitrate:             %-10d| OWD Actual:                 %-10lu#\n"
                "# Bottleneck point:            %-10d| R(400):                     %-10f#\n"
                "# Monitoring Interval:         %-10d| R(800):                     %-10f#\n"
                "# Monitoring Bitrate:          %-10d| UF:                         %-10f#\n"
@@ -1047,14 +1093,14 @@ void fbrasubctrler_logging(FBRASubController *this)
                this->id,
                _state(this),
                _stage(this),
-               this->disable_controlling ? GST_TIME_AS_MSECONDS(this->disable_controlling - _now(this)) : 0,
+               this->disable_controlling ? GST_TIME_AS_MSECONDS(this->disable_end + this->disable_interval - _now(this)) : 0,
                _priv(this)->controlled,
 
                _GP(this),
                _SR(this),
 
                _fdistortion(this),
-               _bdistortion(this),
+               0,
 
                _fcongestion(this),
                _bcongestion(this),
@@ -1063,21 +1109,21 @@ void fbrasubctrler_logging(FBRASubController *this)
                _tr_is_corred(this),
 
                _priv(this)->min_target_bitrate,
-               _q1(this),
+               _qdelay_median(this),
 
                _priv(this)->max_target_bitrate,
-               _q2(this),
+               _qdelay_actual(this),
 
                _btlp(this),
-               _q3(this),
+               _rmdi(this).owd_corr,
 
                _mon_int(this),
-               _q4(this),
+               0.,
 
                _mon_br(this),
                _UF(this),
 
-               _corrH(this),
+               0.,
 
                GST_TIME_AS_MSECONDS(_now(this) - this->made)
 
@@ -1100,19 +1146,11 @@ void _params_out(FBRASubController *this)
    "|                                               |                   |\n"
    "| bottleneck_epsilon                            | %-18.3f|\n"
    "|                                               |                   |\n"
-   "| bottleneck_monitoring_interval                | %-18d|\n"
-   "|                                               |                   |\n"
    "| normal_probe_interval                         | %-18d|\n"
    "|                                               |                   |\n"
    "| bottleneck_probe_interval                     | %-18d|\n"
    "|                                               |                   |\n"
    "| increasement_mitigation_treshold              | %-18d|\n"
-   "|                                               |                   |\n"
-   "| qdelay_probe_treshold                         | %-18.3f|\n"
-   "|                                               |                   |\n"
-   "| qdelay_keep_treshold                          | %-18.3f|\n"
-   "|                                               |                   |\n"
-   "| qdelay_congestion_treshold                    | %-18.3f|\n"
    "|                                               |                   |\n"
    "| min_monitoring_interval                       | %-18d|\n"
    "|                                               |                   |\n"
@@ -1133,13 +1171,9 @@ void _params_out(FBRASubController *this)
 
    _priv(this)->bottleneck_increasement_factor   ,
    _priv(this)->bottleneck_epsilon               ,
-   _priv(this)->bottleneck_monitoring_interval   ,
    _priv(this)->normal_probe_interval            ,
    _priv(this)->bottleneck_probe_interval        ,
    _priv(this)->increasement_mitigation_treshold ,
-   _priv(this)->qdelay_probe_treshold            ,
-   _priv(this)->qdelay_keep_treshold             ,
-   _priv(this)->qdelay_congestion_treshold       ,
    _priv(this)->min_monitoring_interval          ,
    _priv(this)->max_monitoring_interval          ,
    _priv(this)->max_distortion_keep_time         ,

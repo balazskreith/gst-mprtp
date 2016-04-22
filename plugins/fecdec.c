@@ -257,7 +257,6 @@ void fecdecoder_add_fec_packet(FECDecoder *this, GstMpRTPBuffer *mprtp)
   GstRTPBuffer       rtp = GST_RTP_BUFFER_INIT;
 
   THIS_WRITELOCK(this);
-
   gst_rtp_buffer_map(mprtp->buffer, GST_MAP_READ, &rtp);
   payload = gst_rtp_buffer_get_payload(&rtp);
   payload_length = gst_rtp_buffer_get_payload_len(&rtp);

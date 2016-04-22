@@ -71,5 +71,6 @@ void packetssndtracker_add_discarded_bitvector(PacketsSndTracker *this,
                                                guint16 end_seq,
                                                GstRTCPXRBitvectorChunk *chunks);
 guint32 packetssndtracker_get_goodput_bytes_from_acked(PacketsSndTracker *this, gdouble *fraction_utilized);
+gint32 packetssndtracker_get_sent_bytes_in_1s(PacketsSndTracker *this);
 
 #endif /* PACKETSSNDTRACKER_H_ */

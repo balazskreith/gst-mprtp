@@ -669,6 +669,8 @@ _schtree_select_next (SchNode * root, GstRTPBuffer * rtp, guint8 flag_restrictio
   }
   if(!selected->subflows){
     g_warning("Problems with subflows at stream splitter");
+  }else if(!_allowed(selected, rtp, flag_restriction)){
+    selected = NULL;
   }
 done:
   return selected;

@@ -222,7 +222,6 @@ gboolean subratectrler_packet_approver(
   if(!this->enabled){
     goto done;
   }
-
   switch(this->type){
     case SUBRATECTRLER_FBRA_MARC:
       result = fbrasubctrler_path_approver(this->controller, buf);

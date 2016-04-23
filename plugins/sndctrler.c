@@ -144,6 +144,11 @@ _time_update (
     Subflow * subflow,
     gpointer data);
 
+static void
+_signal_update (
+    Subflow *subflow,
+    gpointer data);
+
 //Actions
 typedef void (*Action) (SndController *, Subflow *);
 //static void _action_recalc (SndEventBasedController * this, Subflow * subflow);
@@ -558,6 +563,19 @@ _time_update (Subflow * subflow, gpointer data)
   subsignal->target_bitrate = mprtps_path_get_target_bitrate(subflow->path);
 }
 
+
+void
+_signal_update (Subflow * subflow, gpointer data)
+{
+  SndController *this = data;
+  MPRTPSubflowUtilizationSignalData *subsignal;
+  if(subflow->controlling_mode < 2){
+    return;
+  }
+  subsignal = &this->mprtp_signal_data->subflow[subflow->id];
+  subratectrler_signal_update(subflow->rate_controller, &subsignal->ratectrler);
+}
+
 void
 sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
 {
@@ -697,6 +715,7 @@ void _emit_signal(SndController* this)
 
   this->mprtp_signal_data->target_media_rate = this->target_bitrate;
   this->utilization_signal_func(this->utilization_signal_data, this->mprtp_signal_data);
+  _subflow_iterator(this, _signal_update, this);
 done:
   return;
 }

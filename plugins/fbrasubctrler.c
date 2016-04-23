@@ -235,6 +235,8 @@ struct _Private{
 #define _min_ramp_up(this)            _priv(this)->min_ramp_up_bitrate
 #define _max_ramp_up(this)            _priv(this)->max_ramp_up_bitrate
 #define _rdc_target_fac(this)         _priv(this)->reduce_target_factor
+#define _min_target(this)             _priv(this)->min_target_bitrate
+#define _max_target(this)             _priv(this)->max_target_bitrate
 
 #define _gcong(this)         *(_priv(this)->gcong)
 
@@ -538,12 +540,51 @@ done:
 
 void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *params)
 {
+  MPRTPSubflowFBRA2CngCtrlerParams *cngctrler;
+  cngctrler = &params->cngctrler;
+
+  _priv(this)->bottleneck_increasement_factor   = cngctrler->bottleneck_increasement_factor;
+  _priv(this)->bottleneck_epsilon               = cngctrler->bottleneck_epsilon;
+  _priv(this)->normal_monitoring_interval       = cngctrler->normal_monitoring_interval;
+  _priv(this)->bottleneck_monitoring_interval   = cngctrler->bottleneck_monitoring_interval;
+  _priv(this)->qdelay_congestion_treshold       = cngctrler->qdelay_congestion_treshold;
+  _priv(this)->min_monitoring_interval          = cngctrler->min_monitoring_interval;
+  _priv(this)->max_monitoring_interval          = cngctrler->max_monitoring_interval;
+  _priv(this)->max_distortion_keep_time         = cngctrler->max_distortion_keep_time;
+  _priv(this)->min_ramp_up_bitrate              = cngctrler->min_ramp_up_bitrate;
+  _priv(this)->max_ramp_up_bitrate              = cngctrler->max_ramp_up_bitrate;
+  _priv(this)->min_target_bitrate               = cngctrler->min_target_bitrate;
+  _priv(this)->max_target_bitrate               = cngctrler->max_target_bitrate;
+  _priv(this)->reduce_target_factor             = cngctrler->reduce_target_factor;
+  _priv(this)->discad_cong_treshold             = cngctrler->discad_cong_treshold;
+  _priv(this)->distorted_trend_th               = cngctrler->distorted_trend_th;
+  _priv(this)->keep_trend_th                    = cngctrler->keep_trend_th;
 
 }
 
 void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *result)
 {
+  MPRTPSubflowFBRA2CngCtrlerParams *cngctrler;
+  cngctrler = &result->cngctrler;
 
+  cngctrler->min_target_bitrate             = _min_target(this);
+  cngctrler->max_target_bitrate             = _max_target(this);
+  cngctrler->bottleneck_epsilon             = _btl_eps(this);
+  cngctrler->normal_monitoring_interval     = _norm_mon_int(this);
+  cngctrler->bottleneck_monitoring_interval = _btl_mon_int(this);
+  cngctrler->max_distortion_keep_time       = _max_dist_keep(this);
+  cngctrler->bottleneck_increasement_factor = _btl_inc_fac(this);
+  cngctrler->min_ramp_up_bitrate            = _min_ramp_up(this);
+  cngctrler->max_ramp_up_bitrate            = _max_ramp_up(this);
+  cngctrler->max_monitoring_interval        = _mon_max_int(this);
+  cngctrler->min_monitoring_interval        = _mon_min_int(this);
+  cngctrler->reduce_target_factor           = _rdc_target_fac(this);
+
+  cngctrler->qdelay_congestion_treshold     = _qdelay_cong_th(this);
+  cngctrler->discad_cong_treshold           = _discard_cong_th(this);
+
+  cngctrler->distorted_trend_th             = _dist_trend_th(this);
+  cngctrler->keep_trend_th                  = _keep_trend_th(this);
 }
 
 static void _actual_ratio_updater(FBRASubController *this)

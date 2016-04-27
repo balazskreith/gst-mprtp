@@ -425,6 +425,7 @@ void _add_value(PercentileTracker *this, guint64 value)
   if(this->counter < this->required){
     goto done;
   }
+
   this->ready = TRUE;
   //sort the array
   qsort (this->collection, this->required, sizeof(guint64), _compare);

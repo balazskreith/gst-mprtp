@@ -122,6 +122,10 @@ struct _Subflow
   RateWindow                    received_bytes;
   RateWindow                    HSSNs;
 
+  NumsTracker*                  received_bytes_window;
+  gfloat                        rcv_max;
+  gfloat                        rcv_min;
+
   GstClockTime                  next_feedback;
   GstClockTime                (*feedback_interval_calcer)(Subflow*);
   void                        (*feedback_message_appender)(RcvController*,Subflow*);
@@ -171,6 +175,11 @@ _orp_add_xr_owd(
     RcvController *this,
     Subflow *subflow);
 
+static void
+_orp_add_xr_remb(
+    RcvController * this,
+    Subflow *subflow);
+
 void
 _orp_fbra_marc_feedback(
     RcvController * this,
@@ -189,10 +198,10 @@ static void
 _default_feedback_appender(RcvController *this,Subflow* subflow);
 
 static GstClockTime
-_fbra_marc_interval_calcer(Subflow *subflow);
+_fbra2_interval_calcer(Subflow *subflow);
 
 static void
-_fbra_marc_feedback_appender(RcvController *this, Subflow* subflow);
+_fbra2_feedback_appender(RcvController *this, Subflow* subflow);
 
 //------------------------- Utility functions --------------------------------
 static Subflow*
@@ -323,8 +332,8 @@ static void _change_controlling_mode(Subflow *this, guint controlling_mode)
       GST_DEBUG_OBJECT(this, "subflow %d set to only report processing mode", this->id);
       break;
     case 2:
-      this->feedback_interval_calcer = _fbra_marc_interval_calcer;
-      this->feedback_message_appender = _fbra_marc_feedback_appender;
+      this->feedback_interval_calcer = _fbra2_interval_calcer;
+      this->feedback_message_appender = _fbra2_feedback_appender;
       this->rfc3550_enabled   = TRUE;
       this->fbra_marc_enabled = TRUE;
       break;
@@ -726,6 +735,27 @@ void _orp_add_xr_owd(RcvController * this, Subflow *subflow)
                              u32_max_delay);
 }
 
+void _orp_add_xr_remb(RcvController * this, Subflow *subflow)
+{
+  gfloat estimation;
+
+  numstracker_add(subflow->received_bytes_window, subflow->received_bytes.rate_value * 8);
+
+  if(mprtpr_path_is_in_spike_mode(subflow->path)){
+    estimation = subflow->rcv_min;
+  }else{
+    estimation = subflow->rcv_max;
+  }
+
+  report_producer_add_afb_remb(this->report_producer,
+                               this->ssrc,
+                               1,
+                               estimation,
+                               this->ssrc);
+}
+
+
+
 void _orp_fbra_marc_feedback(RcvController * this, Subflow *subflow)
 {
   GstClockTime median_delay;
@@ -866,15 +896,16 @@ void _default_feedback_appender(RcvController *this,Subflow* subflow)
   DISABLE_LINE      _orp_add_xr_rfc7243(this, subflow);
 }
 
-GstClockTime _fbra_marc_interval_calcer(Subflow *subflow)
+GstClockTime _fbra2_interval_calcer(Subflow *subflow)
 {
-  return 100 * GST_MSECOND;
+  return (1.0/MIN(50,MAX(10,(subflow->received_bytes.rate_value * 8)/20000))) * GST_SECOND;
 }
 
-void _fbra_marc_feedback_appender(RcvController *this, Subflow* subflow)
+void _fbra2_feedback_appender(RcvController *this, Subflow* subflow)
 {
   _orp_add_xr_owd(this, subflow);
   _orp_add_xr_rfc7097(this, subflow);
+  _orp_add_xr_remb(this, subflow);
 }
 
 //------------------------- Utility functions --------------------------------
@@ -886,6 +917,20 @@ static void _removed_reported_seq(gpointer data, gint64 removed_HSSN)
   if(subflow->packetstracker){
     packetsrcvtracker_update_reported_sn(subflow->packetstracker, removed_HSSN);
   }
+}
+
+static void _rcv_bytes_max_pipe(gpointer data, gint64 max)
+{
+  Subflow *this;
+  this = data;
+  this->rcv_max = max;
+}
+
+static void _rcv_bytes_min_pipe(gpointer data, gint64 min)
+{
+  Subflow *this;
+  this = data;
+  this->rcv_min = min;
 }
 
 Subflow *
@@ -902,6 +947,13 @@ _make_subflow (guint8 id, MpRTPRPath * path)
   result->feedback_interval_calcer  = _default_interval_calcer;
   result->feedback_message_appender = _default_feedback_appender;
   numstracker_add_rem_pipe(result->reported_seqs, _removed_reported_seq, result);
+
+  result->received_bytes_window     = make_numstracker(50, 2 * GST_SECOND);
+  numstracker_add_plugin(result->received_bytes_window,
+                         (NumsTrackerPlugin*) make_numstracker_minmax_plugin(_rcv_bytes_max_pipe,
+                                                                             result,
+                                                                             _rcv_bytes_min_pipe,
+                                                                             result));
   _reset_subflow (result);
   return result;
 }
@@ -986,6 +1038,11 @@ guint32 _update_ratewindow(RateWindow *window, guint32 value)
   window->rate_value = value - window->items[window->index];
   return window->rate_value;
 }
+
+
+
+
+
 
 #undef MAX_RIPORT_INTERVAL
 #undef THIS_READLOCK

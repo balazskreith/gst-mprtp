@@ -188,7 +188,6 @@ void packetsrcvtracker_add(PacketsRcvTracker *this, GstMpRTPBuffer *mprtp)
     _trackerstat(this).highest_seq = mprtp->subflow_seq;
     goto done;
   }
-
   if(_cmp_seq(mprtp->subflow_seq, _trackerstat(this).highest_seq) <= 0){
     _find_misordered_packet(this, mprtp->subflow_seq, mprtp->payload_bytes);
     goto done;
@@ -199,7 +198,12 @@ void packetsrcvtracker_add(PacketsRcvTracker *this, GstMpRTPBuffer *mprtp)
     for(; _cmp_seq(seq, mprtp->subflow_seq) < 0; ++seq){
       item = _make_item(this, seq);
       _add_packet(this, item);
-      _add_packet_to_missed(this, item);
+      if(0 < this->discard_treshold){
+        _add_packet_to_missed(this, item);
+      }else{
+        _add_packet_to_discarded(this, item);
+      }
+
     }
   }else{
 
@@ -210,7 +214,9 @@ void packetsrcvtracker_add(PacketsRcvTracker *this, GstMpRTPBuffer *mprtp)
   item->payload_len = mprtp->payload_bytes;
   item->received    = TRUE;
   _add_packet(this, item);
-  _refresh_delay_variation(this, mprtp);
+
+  //Todo: add it to different congestion controller algorithm
+  DISABLE_LINE _refresh_delay_variation(this, mprtp);
   //consider cycle num increase with allowance of a little gap
   if(65472 < _trackerstat(this).highest_seq && mprtp->subflow_seq < 128){
     ++_trackerstat(this).cycle_num;
@@ -252,7 +258,6 @@ void packetsrcvtracker_set_bitvectors(PacketsRcvTracker * this,
   PacketsRcvTrackerItem *item;
 
   THIS_READLOCK(this);
-  mprtp_logger("devars.csv", "%ld\n", percentiletracker2_get_stats(this->devars, NULL, NULL, NULL));
 
   if(g_queue_is_empty(this->packets)){
     goto done;
@@ -366,6 +371,7 @@ void _add_packet_to_discarded(PacketsRcvTracker *this, PacketsRcvTrackerItem* it
 {
   _obsolate_discarded(this);
   _ref_item(item);
+  item->received  = FALSE;
   item->discarded = TRUE;
   g_queue_push_tail(this->discarded, item);
   ++_trackerstat(this).total_packets_discarded_or_lost;
@@ -384,6 +390,7 @@ void _obsolate_misordered(PacketsRcvTracker *this)
       _unref_item(item);
       continue;
     }
+
     if(item->added < now - this->discard_treshold){
       item = g_queue_pop_head(this->missed);
       _add_packet_to_discarded(this, item);

@@ -279,6 +279,20 @@ void report_producer_add_afb_rmdi(
   THIS_WRITEUNLOCK(this);
 }
 
+void report_producer_add_afb_remb(
+    ReportProducer *this,
+    guint32 media_source_ssrc,
+    guint32 num_ssrc,
+    gfloat float_num,
+    guint32 ssrc_feedback)
+{
+  GstRTCPAFB_REMB remb;
+  THIS_WRITELOCK(this);
+  gst_rtcp_afb_remb_change(&remb, &num_ssrc, &float_num, &ssrc_feedback);
+  _add_afb(this, media_source_ssrc, RTCP_AFB_REMB_ID, &remb, sizeof(GstRTCPAFB_REMB));
+  THIS_WRITEUNLOCK(this);
+}
+
 
 
 void report_producer_add_sr(ReportProducer *this,

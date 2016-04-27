@@ -280,6 +280,14 @@ typedef struct PACKED _GstRTCPAFB_RMDI{
   GstRTCPAFB_RMDIRecord records[RTCP_AFB_RMDI_RECORDS_NUM];
 }GstRTCPAFB_RMDI;
 
+#define RTCP_AFB_REMB_ID 0x52454042 //REMB - Receiver Estimated Maximum Bitrate
+
+typedef struct PACKED _GstRTCPAFB_REMB{
+  guint32               num_ssrc : 8;
+  guint32               float_num : 24;
+  guint32               ssrc_feedback;
+}GstRTCPAFB_REMB;
+
 /*MPRTCP struct polymorphism*/
 
 typedef struct PACKED _GstMPRTCPSubflowInfo
@@ -455,6 +463,17 @@ gst_rtcp_afb_rmdi_getdown (GstRTCPAFB_RMDI * report,
                       guint8 *rsvd,
                       guint8 *records_num,
                       guint16 *length);
+
+void
+gst_rtcp_afb_remb_change (GstRTCPAFB_REMB * report,
+                          guint32 *num_ssrc,
+                          gfloat *float_num,
+                          guint32 *ssrc_feedback);
+void
+gst_rtcp_afb_remb_getdown (GstRTCPAFB_REMB * report,
+                           guint32 *num_ssrc,
+                           gfloat *float_num,
+                           guint32 *ssrc_feedback);
 
 void
 gst_rtcp_afb_rmdi_record_change (GstRTCPAFB_RMDIRecord * record,

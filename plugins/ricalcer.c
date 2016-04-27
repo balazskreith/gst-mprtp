@@ -173,7 +173,7 @@ gboolean _do_report_now (ReportIntervalCalculator * this)
       this->allow_early = FALSE;
       this->actual_interval = (GstClockTime)(_calc_report_interval(this) * (gdouble)GST_SECOND);
       this->next_time = _now(this) + 2 * this->actual_interval;
-      this->interval_spread = MAX(1., this->interval_spread * .2);
+      this->interval_spread = MAX(10., this->interval_spread * 0.2);
       goto done;
     }
   }
@@ -183,10 +183,10 @@ gboolean _do_report_now (ReportIntervalCalculator * this)
     actual_interval = _calc_report_interval(this);
     this->allow_early = TRUE;
     this->last_time = _now(this);
-    this->actual_interval = (GstClockTime)((MIN(g_random_double_range(2.5, 7.5),
+    this->actual_interval = (GstClockTime)((MIN(g_random_double_range(5.0, 7.5),
                                                 actual_interval * this->interval_spread) * (gdouble)GST_SECOND));
     this->interval_spread = MIN(100., this->interval_spread * g_random_double_range(1., 2.));
-//    g_print("Actual Interval: %lu (%f)\n", this->actual_interval, this->interval_spread);
+//    g_print("Actual Interval: %f (%f) -> %lu\n", actual_interval, this->interval_spread, this->actual_interval / GST_MSECOND);
     this->next_time = _now(this) + this->actual_interval;
   }
 done:

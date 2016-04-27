@@ -60,11 +60,11 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 
 //determine the minimum interval in seconds must be stay in probe stage
 //before the target considered to be accepted
-#define NORMAL_PROBE_INTERVAL 2.5
+#define NORMAL_PROBE_INTERVAL 0.5
 
 //determine the maximum interval in seconds must be stay in probe stage
 //before the target considered to be accepted
-#define BOTTLENECK_PROBE_INTERVAL 5.
+#define BOTTLENECK_PROBE_INTERVAL 2.
 
 //determines the qdelay trend treshold considered to be congestion
 #define QDELAY_CONGESTION_TRESHOLD 250
@@ -96,13 +96,16 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 #define REDUCE_TARGET_FACTOR 0.6
 
 //determines the treshold for utilization, in which below the path considered to be congested
-#define DISCARD_CONGESTION_TRESHOLD 0.8
+#define DISCARD_CONGESTION_TRESHOLD 1.0
 
 //determines a treshold for trend calculations, in which above the path considered to be distorted
 #define DISTORTION_TREND_TRESHOLD 1.01
 
 //determines a treshold for trend calculations, in which above the KEEP stage not let it to PROBE
 #define KEEP_TREND_TRESHOLD 1.001
+
+//determines weather the pacing allowed or not
+#define PACING_ALLOWED_DEFAULT FALSE
 
 typedef struct _Private Private;
 
@@ -124,7 +127,7 @@ typedef enum{
 #define SR_TR_ARRAY_LENGTH 3
 
 typedef enum{
-  RESTRICTOR_STATE_ACTIVE           =  1,
+  PACING_STATE_ACTIVE           =  1,
   RESTRICTOR_STATE_DEACTIVATED      =  0,
   PACING_STATE_DEACTIVE         = -1,
 }RestrictorState;
@@ -139,6 +142,8 @@ struct _Private{
   gboolean            controlled;
   gdouble             rtt;
   gboolean            tr_correlated;
+  gboolean            tr_approved;
+  GstClockTime        tr_approved_time;
   gboolean            gp_correlated;
 
   gboolean            fcongestion;
@@ -147,10 +152,14 @@ struct _Private{
 
   PacketsSndTracker*  packetstracker;
 
+  gboolean            pacing_allowed;
   struct{
     RestrictorState state;
     gboolean  (*approver)(FBRASubController*,GstBuffer*);
     GstClockTime deactivated, activated;
+    GstClockTime last_sent;
+    guint        group_size;
+    guint32      last_approved_ts;
   }restrictor;
 
   //Possible parameters
@@ -179,7 +188,7 @@ struct _Private{
 
 #define _priv(this) ((Private*)this->priv)
 #define _rmdi(this) this->rmdi_result
-#define _restrictor(this) _priv(this)->restrictor
+#define _pacer(this) _priv(this)->restrictor
 
 #define _fcongestion(this) _priv(this)->fcongestion
 #define _bcongestion(this) _priv(this)->bcongestion
@@ -192,6 +201,7 @@ struct _Private{
 #define _qdelay_actual(this) _rmdi(this).qdelay_actual
 #define _qdelay_median(this) _rmdi(this).qdelay_median
 #define _qdelay_processed(this) _rmdi(this).owd_processed
+#define _rdiscards(this) _rmdi(this).recent_discards
 
 #define _state(this) mprtps_path_get_state(this->path)
 #define _state_t1(this) this->state_t1
@@ -210,6 +220,7 @@ struct _Private{
 #define _min_br(this) MIN(_SR(this), _TR(this))
 #define _max_br(this) MAX(_SR(this), _TR(this))
 #define _trend(this) _rmdi(this).owd_corr
+#define _remb(this) _rmdi(this).rcv_est_max_bitrate
 
 
 #define _dist_trend_th(this)          _priv(this)->distorted_trend_th
@@ -315,16 +326,21 @@ _change_target_bitrate(FBRASubController *this, gint32 new_target);
 
 
 static void
-_activate_restrictor(
+_activate_pacer(
     FBRASubController *this);
 
+static void
+_deactivate_pacer(
+    FBRASubController *this);
+
+
 static gboolean
-_approving_in_deactive_mode(
+_active_pacing_mode(
     FBRASubController *this,
     GstBuffer *buffer);
 
 static gboolean
-_approving_in_active_mode(
+_deactivated_pacing_mode(
     FBRASubController *this,
     GstBuffer *buffer);
 
@@ -388,7 +404,11 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->distorted_trend_th               = DISTORTION_TREND_TRESHOLD;
   _priv(this)->keep_trend_th                    = KEEP_TREND_TRESHOLD;
 
-  _restrictor(this).approver = _approving_in_deactive_mode;
+  _priv(this)->pacing_allowed                   = PACING_ALLOWED_DEFAULT;
+
+  _priv(this)->tr_approved = TRUE;
+
+  _pacer(this).approver = _deactivated_pacing_mode;
 
 }
 
@@ -396,7 +416,7 @@ fbrasubctrler_init (FBRASubController * this)
 gboolean fbrasubctrler_path_approver(gpointer data, GstBuffer *buffer)
 {
   FBRASubController *this = data;
-  return _restrictor(this).approver(this, buffer);
+  return _pacer(this).approver(this, buffer);
 }
 
 FBRASubController *make_fbrasubctrler(MPRTPSPath *path)
@@ -559,6 +579,7 @@ void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRa
   _priv(this)->discad_cong_treshold             = cngctrler->discad_cong_treshold;
   _priv(this)->distorted_trend_th               = cngctrler->distorted_trend_th;
   _priv(this)->keep_trend_th                    = cngctrler->keep_trend_th;
+  _priv(this)->pacing_allowed                   = cngctrler->pacing_allowed;
 
 }
 
@@ -585,6 +606,9 @@ void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedR
 
   cngctrler->distorted_trend_th             = _dist_trend_th(this);
   cngctrler->keep_trend_th                  = _keep_trend_th(this);
+
+  cngctrler->pacing_allowed                 = _priv(this)->pacing_allowed;
+
 }
 
 static void _actual_ratio_updater(FBRASubController *this)
@@ -607,6 +631,7 @@ void fbrasubctrler_report_update(
   }
   if(summary->RR.processed && summary->RR.RTT){
     _priv(this)->rtt = summary->RR.RTT;
+    rmdi_processor_set_rtt(this->fb_processor, _priv(this)->rtt);
   }
   if(!summary->XR.processed){
     goto done;
@@ -620,14 +645,21 @@ void fbrasubctrler_report_update(
   _reset_congestion_indicators(this);
   _actual_ratio_updater(this);
 
+  if(!_priv(this)->tr_approved){
+    if(_remb(this) == 0){
+        _priv(this)->tr_approved = _rmdi(this).sender_bitrate * .9 < _TR(this) && _TR(this) < _rmdi(this).sender_bitrate * 1.1;
+    }
+    _priv(this)->tr_approved = _remb(this) * .9 < _TR(this) && _TR(this) < _remb(this) * 1.1;
+    if(_priv(this)->tr_approved){
+      _priv(this)->tr_approved_time = _now(this);
+    }
+  }
+
   if(this->disable_controlling){
-    if(!this->disable_end){
+    if(!this->disable_end || !_priv(this)->tr_approved){
       this->disable_end = _now(this) + this->disable_interval;
     }
-
-    if(0 < this->disable_end && this->disable_end < _now(this)){
-      this->disable_controlling = FALSE;
-    }
+    this->disable_controlling = _now(this) < this->disable_end;
   }
 
   if(5 < this->measurements_num && !this->disable_controlling){
@@ -654,13 +686,27 @@ done:
   return;
 }
 
+static gint32
+_undershoot_target(FBRASubController *this)
+{
+  gint32   target_rate  = this->target_bitrate;
+//  g_print("undershoor MIN (%d * .85, %f)\n", _remb(this), _TR(this) * _rdc_target_fac(this));
+  if(_now(this) - 2 * _priv(this)->rtt < _priv(this)->tr_approved_time){
+    goto done;
+  }
+
+  target_rate = MIN(_remb(this) * .85, _TR(this) * _rdc_target_fac(this));
+
+done:
+  return target_rate;
+}
+
 
 void
 _reduce_stage(
     FBRASubController *this)
 {
   gint32   target_rate  = this->target_bitrate;
-
   if(!_fcongestion(this)){
     if(!_bcongestion(this)){
       _switch_stage_to(this, STAGE_KEEP, FALSE);
@@ -668,9 +714,7 @@ _reduce_stage(
     goto done;
   }
 
-  if(_tr_is_corred(this)){
-    target_rate = MIN(_GP(this) * .85, _TR(this) * _rdc_target_fac(this));
-  }
+  target_rate = _undershoot_target(this);
 
   _change_target_bitrate(this, target_rate);
   _reset_monitoring(this);
@@ -705,16 +749,14 @@ _keep_stage(
   if(_bcongestion(this) || _fcongestion(this)){
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    _disable_controlling(this);
-    if(_tr_is_corred(this)){
-      target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
-    }
+//    _disable_controlling(this);
+    target_rate = _undershoot_target(this);
     goto done;
   }
 
   if(1.01 < _trend(this)){
     if(_priv(this)->stage_changed < _now(this) - 3 * GST_SECOND){
-      target_rate *= _tr_is_corred(this) ? .95 : 1.;
+      target_rate = _remb(this) * .95;
     }
     _set_event(this, EVENT_DISTORTION);
     goto done;
@@ -747,24 +789,22 @@ _probe_stage(
 
   if(_bcongestion(this) || _fcongestion(this)){
     _disable_monitoring(this);
-    _disable_controlling(this);
+//    _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    if(_tr_is_corred(this)){
-      target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
-    }
+    target_rate = _undershoot_target(this);
     goto done;
   }
 
   if(1.01 < _trend(this)){
-     _disable_monitoring(this);
-     _set_event(this, EVENT_DISTORTION);
-     _switch_stage_to(this, STAGE_KEEP, FALSE);
-     if(_tr_is_corred(this)){
-       target_rate = MIN(_GP(this) * .95, _TR(this) * _UF(this));
-     }
-     goto done;
+   _disable_monitoring(this);
+   _set_event(this, EVENT_DISTORTION);
+   _switch_stage_to(this, STAGE_KEEP, FALSE);
+   if(_tr_is_corred(this)){
+       target_rate = _remb(this) * .95;
    }
+   goto done;
+ }
 
   if(!_check_monitoring(this)){
     goto exit;
@@ -813,22 +853,20 @@ _increase_stage(
 
   if(_bcongestion(this) || _fcongestion(this)){
     _disable_monitoring(this);
-    _disable_controlling(this);
+//    _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    if(_tr_is_corred(this)){
-      target_rate = MIN(_GP(this) * .85, _TR(this) * _UF(this));
-    }
+    target_rate = _undershoot_target(this);
     goto done;
   }
 
   if(1.01 < _trend(this)){
     _disable_controlling(this);
-    _disable_monitoring(this);
+//    _disable_controlling(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     if(_tr_is_corred(this)){
-      target_rate = MIN(_GP(this) * .95, _TR(this) * _UF(this));
+      target_rate = _remb(this) * .95;
     }
     goto done;
   }
@@ -854,8 +892,10 @@ _fire(
     case MPRTPS_PATH_STATE_OVERUSED:
       switch(event){
         case EVENT_CONGESTION:
+        _activate_pacer(this);
         break;
         case EVENT_SETTLED:
+          _deactivate_pacer(this);
           this->last_settled = _now(this);
           mprtps_path_set_non_congested(this->path);
           mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_STABLE);
@@ -868,12 +908,12 @@ _fire(
     case MPRTPS_PATH_STATE_STABLE:
       switch(event){
         case EVENT_CONGESTION:
-          _activate_restrictor(this);
+          _activate_pacer(this);
           mprtps_path_set_congested(this->path);
           mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_OVERUSED);
         break;
         case EVENT_DISTORTION:
-          _activate_restrictor(this);
+          _activate_pacer(this);
           mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_OVERUSED);
           break;
         case EVENT_READY:
@@ -887,12 +927,12 @@ _fire(
     case MPRTPS_PATH_STATE_UNDERUSED:
       switch(event){
         case EVENT_CONGESTION:
-          _activate_restrictor(this);
+          _activate_pacer(this);
           mprtps_path_set_congested(this->path);
           mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_OVERUSED);
         break;
         case EVENT_DISTORTION:
-          _activate_restrictor(this);
+          _activate_pacer(this);
           mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_OVERUSED);
         break;
         case EVENT_READY:
@@ -942,7 +982,7 @@ void _disable_controlling(FBRASubController *this)
 {
   this->disable_controlling = TRUE;
   if(0. < _priv(this)->rtt){
-    this->disable_interval = CONSTRAIN(300 * GST_MSECOND, 20 * GST_SECOND, _priv(this)->rtt * 2.);
+    this->disable_interval = CONSTRAIN(300 * GST_MSECOND, 2 * GST_SECOND, _priv(this)->rtt * 2.);
   }else{
     this->disable_interval = 1.5 * GST_SECOND;
   }
@@ -1023,6 +1063,9 @@ exit:
 
 void _change_target_bitrate(FBRASubController *this, gint32 new_target)
 {
+  if(this->target_bitrate == new_target){
+    goto done;
+  }
   this->target_bitrate_t1 = this->target_bitrate;
   this->target_bitrate = new_target;
   if(0 < _priv(this)->min_target_bitrate){
@@ -1036,37 +1079,84 @@ void _change_target_bitrate(FBRASubController *this, gint32 new_target)
   }else if(this->target_bitrate_t1 < this->target_bitrate){
     this->last_increase = _now(this);
   }
-
+  _priv(this)->tr_approved = FALSE;
+done:
   mprtps_path_set_target_bitrate(this->path, this->target_bitrate);
 }
 
-void _activate_restrictor(FBRASubController *this)
+void _activate_pacer(FBRASubController *this)
 {
-  _restrictor(this).state     = RESTRICTOR_STATE_ACTIVE;
-  _restrictor(this).activated = _now(this);
-  _restrictor(this).approver  = _approving_in_active_mode;
-}
-
-gboolean _approving_in_active_mode(FBRASubController *this, GstBuffer *buffer)
-{
-  gdouble dt;
-  gint32 sr;
-  dt = GST_TIME_AS_MSECONDS(_now(this) - _restrictor(this).activated);
-  if(2000. < dt || _state(this) != MPRTPS_PATH_STATE_OVERUSED){
-      _restrictor(this).state       = PACING_STATE_DEACTIVE;
-      _restrictor(this).approver    = _approving_in_deactive_mode;
+  if(!_priv(this)->pacing_allowed){
+    _pacer(this).approver  = _deactivated_pacing_mode;
+    return;
   }
-  sr = packetssndtracker_get_sent_bytes_in_1s(_priv(this)->packetstracker) * 8;
-  dt /= 200.;
-//  g_print("%d<%f\n", sr, _TR(this) * (1. + log(dt / 1000. + 1)));
-  return sr < _TR(this) * (1. + (dt == 0.) ? 4. : 1. / dt);
+  if(_pacer(this).state == PACING_STATE_ACTIVE){
+    return;
+  }
+  _pacer(this).state     = PACING_STATE_ACTIVE;
+  _pacer(this).activated = _now(this);
+  _pacer(this).approver  = _active_pacing_mode;
 }
 
-gboolean _approving_in_deactive_mode(FBRASubController *this, GstBuffer *buffer)
+void _deactivate_pacer(FBRASubController *this)
+{
+  if(!_priv(this)->pacing_allowed){
+    _pacer(this).approver  = _deactivated_pacing_mode;
+    return;
+  }
+  if(_pacer(this).state != PACING_STATE_ACTIVE){
+    return;
+  }
+  _pacer(this).deactivated = _now(this);
+  _pacer(this).state       = PACING_STATE_DEACTIVE;
+}
+
+gboolean _active_pacing_mode(FBRASubController *this, GstBuffer *buffer)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  gdouble pacing_sec;
+  GstClockTime pacing;
+  gdouble dt;
+  gdouble slack = 1.0;
+
+  if(_pacer(this).state == PACING_STATE_ACTIVE){
+    dt = GST_TIME_AS_MSECONDS(_now(this) - _pacer(this).activated);
+    slack = 2.1 - MIN(dt/1000., 1.0);
+  }else if(_pacer(this).state == PACING_STATE_DEACTIVE){
+    dt = GST_TIME_AS_MSECONDS(_now(this) - _pacer(this).deactivated);
+    slack = 1.0 + MIN(dt/1000., 1.0);
+    if(1200. < dt){
+      _pacer(this).approver  = _deactivated_pacing_mode;
+    }
+  }
+  if(!gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp)){
+    return TRUE;
+  }
+  if(_pacer(this).last_approved_ts == gst_rtp_buffer_get_timestamp(&rtp)){
+    goto send;
+  }
+  dt = GST_TIME_AS_MSECONDS(_now(this) - _pacer(this).activated);
+  pacing_sec = (gdouble) _pacer(this).group_size / (gdouble) (_TR(this) * slack);
+  pacing = GST_SECOND * pacing_sec;
+  if(_now(this) - _pacer(this).last_sent < pacing){
+    goto exit;
+  }
+  _pacer(this).group_size = 0;
+  _pacer(this).last_approved_ts = gst_rtp_buffer_get_timestamp(&rtp);
+send:
+  _pacer(this).group_size += gst_rtp_buffer_get_payload_len(&rtp);
+  _pacer(this).last_sent = _now(this);
+  gst_rtp_buffer_unmap(&rtp);
+  return TRUE;
+exit:
+  gst_rtp_buffer_unmap(&rtp);
+  return FALSE;
+}
+
+gboolean _deactivated_pacing_mode(FBRASubController *this, GstBuffer *buffer)
 {
   return TRUE;
 }
-
 
 void fbrasubctrler_logging(FBRASubController *this)
 {
@@ -1081,7 +1171,7 @@ void fbrasubctrler_logging(FBRASubController *this)
                "# Minimum Bitrate:             %-10d| OWD Median:                 %-10lu#\n"
                "# Maximum Bitrate:             %-10d| OWD Actual:                 %-10lu#\n"
                "# Bottleneck point:            %-10d| R(400):                     %-10f#\n"
-               "# Monitoring Interval:         %-10d| R(800):                     %-10f#\n"
+               "# Monitoring Interval:         %-10d| tr_is_approved:             %-10d#\n"
                "# Monitoring Bitrate:          %-10d| UF:                         %-10f#\n"
                "# CorrH:                       %-10f|                                  #\n"
                "###################### MSeconds since setup: %lu ######################\n"
@@ -1090,7 +1180,7 @@ void fbrasubctrler_logging(FBRASubController *this)
                this->id,
                _state(this),
                _stage(this),
-               this->disable_controlling ? GST_TIME_AS_MSECONDS(this->disable_end + this->disable_interval - _now(this)) : 0,
+               this->disable_controlling ? GST_TIME_AS_MSECONDS(this->disable_end - _now(this)) : 0,
                _priv(this)->controlled,
 
                _GP(this),
@@ -1115,7 +1205,7 @@ void fbrasubctrler_logging(FBRASubController *this)
                _rmdi(this).owd_corr,
 
                _mon_int(this),
-               0.,
+               _priv(this)->tr_approved,
 
                _mon_br(this),
                _UF(this),
@@ -1186,12 +1276,14 @@ void fbrasubctrler_logging2csv(FBRASubController *this)
 
   sprintf(filename, "snd_%d_ratestat.csv", this->id);
 
-  mprtp_logger(filename, "%d,%d,%d,%f,%d\n",
+  mprtp_logger(filename, "%d,%d,%d,%f,%d,%ld\n",
                this->target_bitrate / 1000,
                _rmdi(this).goodput_bitrate,
                (_rmdi(this).sender_bitrate + 48 * 8 * _rmdi(this).sent_packets) / 1000,
                _rmdi(this).utilized_fraction,
-               (this->monitored_bitrate + 40 * 8 * this->monitored_packets) / 1000);
+               (this->monitored_bitrate + 40 * 8 * this->monitored_packets) / 1000,
+               g_get_real_time () / (1000 * 100)
+               );
 
   THIS_READUNLOCK(this);
 }

@@ -2,22 +2,14 @@
 programname=$0
 
 function usage {
-    echo "usage: $programname [-r|-rtpprofile num]"
-    echo "	-r --rtprofile		determines the rtp testing profile"
-    echo "				        equal to the ./server --profile=profile_num"
-    echo "  -p --period             determines the period of the report generation"
-    echo "  --savnam			the name of the saving"
-    echo "  --savdir			the directory of the saving"
+    echo "usage: $programname [-p|--period]"
+    echo "  -p --period         determines the period of the report generation"
+    echo "  --savnam		the name of the saving"
+    echo "  --savdir		the directory of the saving"
     exit 1
 }
  
-if [[ $# < 2 ]]
-then
-  usage
-fi
 
-
-RPROFILE=73
 REPPERIOD=5
 SAVDIR="0"
 SAVNAM="0"
@@ -26,10 +18,6 @@ while [[ $# > 1 ]]
 do
 key="$1"
 case $key in
-    -r|--rtpprofile)
-    RPROFILE="$2"
-    shift # past argument
-    ;;
     -p|--period)
     REPPERIOD="$2"
     shift # past argument
@@ -41,7 +29,7 @@ case $key in
     --savnam)
     SAVNAM="$2"
     shift # past argument
-    ;;     
+    ;;       
     --default)
     ;;
     *)
@@ -51,18 +39,10 @@ esac
 shift # past argument or value
 done
 
-
-echo ".-------------------------------------------------------------."
-echo "| Test starts with the following parameters                   |"
-echo "| RTP profile:   "$RPROFILE
-echo "| Report period: "$REPPERIOD
-echo "'-------------------------------------------------------------'"
-
-
 NSSND="ns_snd"
 NSRCV="ns_rcv"
-SERVER="./server"
-CLIENT="./client"
+SENDER="sender"
+RECEIVER="receiver"
 LOGSDIR="logs"
 REPORTSDIR="reports"
 REPORTEXFILE="report.tex"
@@ -80,22 +60,35 @@ REPORTAUTHORFILE=$LOGSDIR"/author.txt"
 echo "Balázs Kreith" > $REPORTAUTHORFILE
 
   #setup duration
-  DURATION=120
+  DURATION=130
   
   #setup virtual ethernet interface controller script
-  echo "./scripts/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input $TESTDIR/veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
-  chmod 777 scripts/test_bw_veth0_snd.sh
+  echo "./$SCRIPTSDIR/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input $TESTDIR/veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
+  chmod 777 $SCRIPTSDIR/test_bw_veth0_snd.sh
+  
+  PEER1_SND="$SCRIPTSDIR/sender_1.sh"
+  echo -n "./$SENDER" > $PEER1_SND
+  ./$TESTDIR/peer1params.sh >> $PEER1_SND
+  chmod 777 $PEER1_SND
 
+  PEER1_RCV="$SCRIPTSDIR/receiver_1.sh"
+  echo -n "./$RECEIVER" > $PEER1_RCV
+  ./$TESTDIR/peer1params.sh >> $PEER1_RCV
+  chmod 777 $PEER1_RCV
+
+
+  #start receiver and sender
+  sudo ip netns exec $NSRCV ./$PEER1_RCV 2> $LOGSDIR"/"receiver.log &
+  #sleep 1
+  sudo ip netns exec $NSSND ./$PEER1_SND 2> $LOGSDIR"/"sender.log &
+
+  #sleep 1
   #run a virtual ethernet interface controller script
   sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
-  
-  #start client and server
-  sudo ip netns exec $NSRCV $CLIENT "--profile="$RPROFILE 2> $LOGSDIR"/"client.log &
-  sleep 1
-  sudo ip netns exec $NSSND $SERVER "--profile="$RPROFILE 2> $LOGSDIR"/"server.log &
 
   echo "
   while true; do 
+    ./$TESTDIR/etl.sh
     ./$TESTDIR/plots.sh --srcdir $LOGSDIR --dstdir $REPORTSDIR
     ./$TESTDIR/stats.sh --srcdir $LOGSDIR --dst $REPORTSDIR/$STATFILE
     mv $LOGSDIR/ccparams_1.log $REPORTSDIR/ccparams_1.log
@@ -114,8 +107,8 @@ echo "Balázs Kreith" > $REPORTAUTHORFILE
 cleanup()
 # example cleanup function
 {
-  pkill client
-  pkill server
+  pkill receiver
+  pkill sender
   ps -ef | grep 'veth_ctrler.sh' | grep -v grep | awk '{print $2}' | xargs kill
   ps -ef | grep 'report_generato' | grep -v grep | awk '{print $2}' | xargs kill
   ps -ef | grep 'main.sh' | grep -v grep | awk '{print $2}' | xargs kill

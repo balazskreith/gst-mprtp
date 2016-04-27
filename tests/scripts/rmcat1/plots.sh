@@ -51,55 +51,45 @@ echo "debug is 1"
 fi
 
 DURFEC=1000
-DURPLAYOUT=1000
-DURAUTOCORRS=1000
+DURRCVQUEUE=1000
 DURRCVTHROUGHPUTS=1000
 DURSNDTHROUGHPUTS=1000
-DURRTCPINTVALS=500
+DURRTCPINTVALS=1000
 DURLOSTS=1000
 
 PLOTDIR="scripts/rmcat1"
 PLOTFEC="$PLOTDIR/fec.plot"
-PLOTPLAYOUT="$PLOTDIR/playouts.plot"
+PLOTRCVQUEUE="$PLOTDIR/rcvqueue.plot"
 PLOTAUTOCORRS="$PLOTDIR/owd-autocorrs.plot"
 PLOTRCVTHROUGHPUTS="$PLOTDIR/rcv-throughputs.plot"
 PLOTSNDTHROUGHPUTS="$PLOTDIR/snd-throughputs.plot"
 PLOTRTCPINTVALS="$PLOTDIR/rtcp-intervals.plot"
-PLOTLOSTS="$PLOTDIR/losts.plot"
-
 
 SRCFEC="$SRCDIR/fecdec_stat.csv"
-SRCPLAYOUT="$SRCDIR/streamjoiner.csv"
-SRCPLAYOUT2="$SRCDIR/path_1_skews.csv"
-SRCAUTOCORRS="$SRCDIR/netqanalyser_1.csv"
+SRCRCVQUEUE="$SRCDIR/packetsrcvqueue.csv"
+SRCAUTOCORRS="$SRCDIR/rmdiautocorrs_1.csv"
 SRCRCVTHROUGHPUTS="$SRCDIR/sub_1_rcv.csv"
-SRCSNDTHROUGHPUTS="$SRCDIR/sub_snd_sum.csv"
+SRCSNDTHROUGHPUTS="$SRCDIR/snd_1_ratestat.csv"
+SRCFECRATES="$SRCDIR/fecrates.csv"
 SRCRTCPINTVALS="$SRCDIR/sub_1_rtcp_ints.csv"
-SRCLOSTS="$SRCDIR/sub_1_stat.csv"
+
+SRCVETH0="$SRCDIR/veth0.csv"
+SRCVETH02="$SRCDIR/veth02.csv"
+SRCSNDTHROUGHPUTS2="$SRCDIR/snd_sum_ratestat.csv"
+sort -u -t',' -k1,1 "$SRCVETH0" > $SRCVETH02
+join -t , -1 6 -2 1 "$SRCSNDTHROUGHPUTS" "$SRCVETH02" > "$SRCSNDTHROUGHPUTS2"
 
 DSTFEC="$DSTDIR/fec.pdf"
-DSTPLAYOUT="$DSTDIR/playouts.pdf"
+DSTRCVQUEUE="$DSTDIR/rcvqueue.pdf"
 DSTAUTOCORRS="$DSTDIR/owd-autocorrs.pdf"
 DSTRCVTHROUGHPUTS="$DSTDIR/rcv-throughputs.pdf"
 DSTSNDTHROUGHPUTS="$DSTDIR/snd-throughputs.pdf"
 DSTRTCPINTVALS="$DSTDIR/rtcp-intervals.pdf"
-DSTLOSTS="$DSTDIR/losts.pdf"
 
   gnuplot -e "duration='$DURFEC'" \
           -e "output_file='$DSTFEC'" \
           -e "fec_file='$SRCFEC'" \
           "$PLOTFEC"
-          
-  gnuplot -e "duration='$DURPLAYOUT'" \
-          -e "output_file='$DSTPLAYOUT'" \
-          -e "playouts_file='$SRCPLAYOUT'" \
-          -e "skew_file='$SRCPLAYOUT2'" \
-          "$PLOTPLAYOUT"
-          
-  gnuplot -e "duration='$DURAUTOCORRS'" \
-          -e "output_file='$DSTAUTOCORRS'" \
-          -e "autocorr_file='$SRCAUTOCORRS'" \
-          "$PLOTAUTOCORRS"
           
   gnuplot -e "duration='$DURRCVTHROUGHPUTS'" \
           -e "output_file='$DSTRCVTHROUGHPUTS'" \
@@ -108,16 +98,14 @@ DSTLOSTS="$DSTDIR/losts.pdf"
           
   gnuplot -e "duration='$DURSNDTHROUGHPUTS'" \
           -e "output_file='$DSTSNDTHROUGHPUTS'" \
-          -e "throughput_file='$SRCSNDTHROUGHPUTS'" \
+          -e "throughput_file='$SRCSNDTHROUGHPUTS2'" \
+	  -e "fecrates_file='$SRCFECRATES'" \
           "$PLOTSNDTHROUGHPUTS"
+
+#          -e "throughput_file='$SRCSNDTHROUGHPUTS'" \
           
   gnuplot -e "duration='$DURRTCPINTVALS'" \
           -e "output_file='$DSTRTCPINTVALS'" \
           -e "rtcp_file='$SRCRTCPINTVALS'" \
           "$PLOTRTCPINTVALS"
-          
-  gnuplot -e "duration='$DURLOSTS'" \
-          -e "output_file='$DSTLOSTS'" \
-          -e "stat_file='$SRCLOSTS'" \
-          "$PLOTLOSTS"                  
 

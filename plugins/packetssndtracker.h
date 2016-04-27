@@ -51,7 +51,12 @@ struct _PacketsSndTracker
   gint32                   actual_discarded_bytes;
   gint32                   actual_discarded_packets;
 
+  gint32                   recent_discarded_bytes;
+  gint32                   recent_discarded_packets;
+
   guint16                  highest_discarded_seq;
+
+  GstClockTime             rtt;
 };
 
 struct _PacketsSndTrackerClass{
@@ -66,11 +71,14 @@ void packetssndtracker_reset(PacketsSndTracker *this);
 void packetssndtracker_add(PacketsSndTracker *this, guint payload_len, guint16 sn);
 void packetssndtracker_get_stats (PacketsSndTracker * this, PacketsSndTrackerStat* result);
 void packetssndtracker_update_hssn(PacketsSndTracker *this, guint16 hssn);
+void packetssndtracker_set_rtt(PacketsSndTracker *this, GstClockTime rtt);
 void packetssndtracker_add_discarded_bitvector(PacketsSndTracker *this,
                                                guint16 begin_seq,
                                                guint16 end_seq,
                                                GstRTCPXRBitvectorChunk *chunks);
-guint32 packetssndtracker_get_goodput_bytes_from_acked(PacketsSndTracker *this, gdouble *fraction_utilized);
+guint32 packetssndtracker_get_goodput_bytes_from_acked(PacketsSndTracker *this,
+                                                       gdouble *fraction_utilized,
+                                                       gboolean *recent_discards);
 gint32 packetssndtracker_get_sent_bytes_in_1s(PacketsSndTracker *this);
 
 #endif /* PACKETSSNDTRACKER_H_ */

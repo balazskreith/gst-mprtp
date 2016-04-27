@@ -39,10 +39,12 @@ struct _RMDIProcessorResult{
   guint32        sender_bitrate;
   guint32        goodput_bitrate;
   gdouble        utilized_fraction;
+  gboolean       recent_discards;
   GstClockTime   qdelay_actual;
   GstClockTime   qdelay_median;
   gboolean       owd_processed;
   gdouble        owd_corr;
+  guint32        rcv_est_max_bitrate;
 };
 
 struct _RMDIProcessor
@@ -79,7 +81,8 @@ GType rmdi_processor_get_type (void);
 void rmdi_processor_reset(RMDIProcessor *this);
 RMDIProcessor *make_rmdi_processor(MPRTPSPath *path);
 
-
+void rmdi_processor_set_rtt(RMDIProcessor       *this,
+                            GstClockTime         rtt);
 void rmdi_processor_do(RMDIProcessor       *this,
                          GstMPRTCPReportSummary *summary,
                          RMDIProcessorResult *result);

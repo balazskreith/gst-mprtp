@@ -65,7 +65,7 @@ mprtpr_path_init (MpRTPRPath * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
   this->delays = make_percentiletracker(512, 50);
-  percentiletracker_set_treshold(this->delays, 1000 * GST_MSECOND);
+  percentiletracker_set_treshold(this->delays, 100 * GST_MSECOND);
 
   this->skews = make_percentiletracker2(100, 50);
   percentiletracker2_set_treshold(this->skews, 2 * GST_SECOND);
@@ -357,7 +357,7 @@ void _add_delay(MpRTPRPath *this, GstClockTime delay)
   // A new "delay spike" has started
     this->spike_mode = TRUE;
     this->spike_var = 0;
-  }else {
+  }else{
     if (this->spike_mode) {
       GstClockTime vdelay;
       // We're within a delay spike; maintain slope estimate

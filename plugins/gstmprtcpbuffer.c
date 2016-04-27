@@ -657,6 +657,68 @@ gst_rtcp_afb_rmdi_getdown (GstRTCPAFB_RMDI * report,
   }
 }
 
+static guint32 g_htonfloat(gfloat value){
+    union v {
+        gfloat      f;
+        guint32     i;
+    }val;
+    val.f = value;
+    val.i = g_htonl(val.i);
+    return val.i;
+};
+
+static gfloat g_ntohfloat(guint32 value){
+    union v {
+        gfloat      f;
+        guint32     i;
+    }val;
+    val.i = g_ntohl(value);
+    return val.f;
+};
+
+void
+gst_rtcp_afb_remb_change (GstRTCPAFB_REMB * report,
+                          guint32 *num_ssrc,
+                          gfloat *float_num,
+                          guint32 *ssrc_feedback)
+{
+  if(num_ssrc){
+      report->num_ssrc = *num_ssrc;
+  }
+  if(float_num){
+      report->float_num = g_htonfloat(*float_num);
+//      {
+//        guint32 n;
+//        guint8 *c,*k;
+//        n = g_htonfloat(*float_num);
+//        c = (guint8*)&n;
+//        k = (guint8*)report;
+//        g_print("0x%X%X%X%X-0x%X%X%X%X\n", *c, *(c+1), *(c+2), *(c+3), *k, *(k+1), *(k+2), *(k+3));
+//      }
+  }
+  if(ssrc_feedback){
+      report->ssrc_feedback = g_htonl(*ssrc_feedback);
+  }
+}
+
+void
+gst_rtcp_afb_remb_getdown (GstRTCPAFB_REMB * report,
+                           guint32 *num_ssrc,
+                           gfloat *float_num,
+                           guint32 *ssrc_feedback)
+{
+
+  if(num_ssrc){
+      *num_ssrc = report->num_ssrc;
+  }
+  if(float_num){
+    *float_num = g_ntohfloat(report->float_num);
+  }
+  if(ssrc_feedback){
+      *ssrc_feedback = g_ntohs(report->ssrc_feedback);
+  }
+}
+
 void
 gst_rtcp_afb_rmdi_record_change (GstRTCPAFB_RMDIRecord * record,
                       guint16 *HSSN,

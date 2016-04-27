@@ -71,6 +71,21 @@ struct _PacketsRcvTracker
     guint32 last_timestamp;
   }devar;
 
+//  struct{
+//    guint         group_size_t0;
+//    guint         group_size_t1;
+//    GstClockTime  rcv_time_t0;
+//    GstClockTime  rcv_time_t1;
+//    GstClockTime  snd_time_t0;
+//    GstClockTime  snd_time_t1;
+//    gdouble       theta_hat[2];
+//    gdouble       h_bar[2];
+//    gdouble       E;
+//    gdouble       var_v_hat;
+//    gdouble       k_bar[2];
+//    NumsTracker*  f_max;
+//  }kfilter;
+
   PercentileTracker2*     devars;
 
 };

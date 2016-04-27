@@ -2,22 +2,14 @@
 programname=$0
 
 function usage {
-    echo "usage: $programname [-r|-rtpprofile num]"
-    echo "	-r --rtprofile		determines the rtp testing profile"
-    echo "				        equal to the ./SENDER --profile=profile_num"
-    echo "  -p --period             determines the period of the report generation"
-    echo "  --savnam			the name of the saving"
-    echo "  --savdir			the directory of the saving"
+    echo "usage: $programname [-p|--period]"
+    echo "  -p --period         determines the period of the report generation"
+    echo "  --savnam		the name of the saving"
+    echo "  --savdir		the directory of the saving"
     exit 1
 }
  
-if [[ $# < 2 ]]
-then
-  usage
-fi
 
-
-RPROFILE=73
 REPPERIOD=5
 SAVDIR="0"
 SAVNAM="0"
@@ -26,10 +18,6 @@ while [[ $# > 1 ]]
 do
 key="$1"
 case $key in
-    -r|--rtpprofile)
-    RPROFILE="$2"
-    shift # past argument
-    ;;
     -p|--period)
     REPPERIOD="$2"
     shift # past argument
@@ -50,14 +38,6 @@ case $key in
 esac
 shift # past argument or value
 done
-
-
-echo ".-------------------------------------------------------------."
-echo "| Test starts with the following parameters                   |"
-echo "| RTP profile:   "$RPROFILE
-echo "| Report period: "$REPPERIOD
-echo "'-------------------------------------------------------------'"
-
 
 NSSND="ns_snd"
 NSRCV="ns_rcv"

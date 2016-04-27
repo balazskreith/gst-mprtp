@@ -228,7 +228,9 @@ static void _process_discarded_rle(RMDIProcessor *this, GstMPRTCPXRReportSummary
   }
 
   this->result.goodput_bitrate =
-      packetssndtracker_get_goodput_bytes_from_acked(this->packetstracker, &this->result.utilized_fraction)<<3;
+      packetssndtracker_get_goodput_bytes_from_acked(this->packetstracker,
+                                                     &this->result.utilized_fraction,
+                                                     &this->result.recent_discards)<<3;
   this->result.sender_bitrate = trackerstat.sent_bytes_in_1s << 3;
   this->result.sent_packets   = trackerstat.sent_packets_in_1s;
   numstracker_add(this->bytes_in_flight, trackerstat.bytes_in_flight);
@@ -259,7 +261,7 @@ static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummar
   this->last_delay            = xrsummary->OWD.median_delay;
 
   if(this->result.qdelay_median){
-    this->result.owd_corr =  .5 * this->last_delay + .25 * this->last_delay_t1 + .25 * this->last_delay_t2;
+    this->result.owd_corr =  .99 * this->last_delay + .005 * this->last_delay_t1 + .005 * this->last_delay_t2;
     this->result.owd_corr /=  this->result.qdelay_median;
   }else{
     this->result.owd_corr = 1.;
@@ -269,6 +271,22 @@ static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummar
   _readable_logging(this);
 done:
   return;
+}
+
+static void _process_afb(RMDIProcessor *this, guint32 id, GstRTCPAFB_REMB *remb)
+{
+  gfloat estimation;
+  if(id != RTCP_AFB_REMB_ID){
+    return;
+  }
+  gst_rtcp_afb_remb_getdown(remb, NULL, &estimation, NULL);
+  this->result.rcv_est_max_bitrate = estimation;
+}
+
+void rmdi_processor_set_rtt(RMDIProcessor       *this,
+                            GstClockTime         rtt)
+{
+  packetssndtracker_set_rtt(this->packetstracker, rtt);
 }
 
 void rmdi_processor_do(RMDIProcessor       *this,
@@ -285,11 +303,13 @@ void rmdi_processor_do(RMDIProcessor       *this,
   if(summary->XR.OWD.processed){
     _process_owd(this, &summary->XR);
   }
+  if(summary->AFB.processed){
+    _process_afb(this, summary->AFB.fci_id, (GstRTCPAFB_REMB *)summary->AFB.fci_data);
+  }
 
   memcpy(result, &this->result, sizeof(RMDIProcessorResult));
 
   _readable_result(this, result);
-
 done:
   return;
 

@@ -60,7 +60,7 @@ REPORTAUTHORFILE=$LOGSDIR"/author.txt"
 echo "Balázs Kreith" > $REPORTAUTHORFILE
 
   #setup duration
-  DURATION=130
+  DURATION=106.6
   
   #setup virtual ethernet interface controller script
   echo "./$SCRIPTSDIR/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input $TESTDIR/veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
@@ -79,16 +79,15 @@ echo "Balázs Kreith" > $REPORTAUTHORFILE
 
   #start receiver and sender
   sudo ip netns exec $NSRCV ./$PEER1_RCV 2> $LOGSDIR"/"receiver.log &
-  #sleep 1
+#  sleep 5
   sudo ip netns exec $NSSND ./$PEER1_SND 2> $LOGSDIR"/"sender.log &
 
-  #sleep 1
+  sleep 2
   #run a virtual ethernet interface controller script
   sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
 
   echo "
   while true; do 
-    ./$TESTDIR/etl.sh
     ./$TESTDIR/plots.sh --srcdir $LOGSDIR --dstdir $REPORTSDIR
     ./$TESTDIR/stats.sh --srcdir $LOGSDIR --dst $REPORTSDIR/$STATFILE
     mv $LOGSDIR/ccparams_1.log $REPORTSDIR/ccparams_1.log

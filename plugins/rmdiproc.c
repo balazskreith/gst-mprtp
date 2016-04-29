@@ -143,31 +143,14 @@ RMDIProcessor *make_rmdi_processor(MPRTPSPath *path)
   percentiletracker_set_treshold(this->delays, 60 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->delays, _delay80th_pipe, this);
 
-  _priv(this)->cblocks[0].next = &_priv(this)->cblocks[1];
-  _priv(this)->cblocks[1].next = &_priv(this)->cblocks[2];
-  _priv(this)->cblocks[2].next = &_priv(this)->cblocks[3];
-  _priv(this)->cblocks[3].next = &_priv(this)->cblocks[4];
-  _priv(this)->cblocks[4].next = &_priv(this)->cblocks[5];
-  _priv(this)->cblocks[5].next = &_priv(this)->cblocks[6];
-  _priv(this)->cblocks[6].next = &_priv(this)->cblocks[7];
-  _priv(this)->cblocks[0].id   = 0;
-  _priv(this)->cblocks[1].id   = 1;
-  _priv(this)->cblocks[2].id   = 2;
-  _priv(this)->cblocks[3].id   = 3;
-  _priv(this)->cblocks[4].id   = 4;
-  _priv(this)->cblocks[5].id   = 5;
-  _priv(this)->cblocks[6].id   = 6;
-  _priv(this)->cblocks[7].id   = 7;
-
-  _priv(this)->cblocks[0].N    = 4;
-  _priv(this)->cblocks[1].N    = 4;
-  _priv(this)->cblocks[2].N    = 4;
-  _priv(this)->cblocks[3].N    = 4;
-
-  _priv(this)->cblocks[4].N    = 4;
-  _priv(this)->cblocks[5].N    = 4;
-  _priv(this)->cblocks[6].N    = 4;
-  _priv(this)->cblocks[7].N    = 4;
+  {
+    gint i;
+    for(i=0; i < 7; ++i){
+      _priv(this)->cblocks[i].next = &_priv(this)->cblocks[i + 1];
+      _priv(this)->cblocks[i].id   = i;
+      _priv(this)->cblocks[i].N    = 4;
+    }
+  }
   _priv(this)->cblocks_counter = 1;
 
   THIS_WRITEUNLOCK (this);
@@ -261,7 +244,7 @@ static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummar
   this->last_delay            = xrsummary->OWD.median_delay;
 
   if(this->result.qdelay_median){
-    this->result.owd_corr =  .99 * this->last_delay + .005 * this->last_delay_t1 + .005 * this->last_delay_t2;
+    this->result.owd_corr =  1.0 * this->last_delay + 0. * this->last_delay_t1 + 0. * this->last_delay_t2;
     this->result.owd_corr /=  this->result.qdelay_median;
   }else{
     this->result.owd_corr = 1.;

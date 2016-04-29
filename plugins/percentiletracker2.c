@@ -326,11 +326,7 @@ guint32 percentiletracker2_get_num(PercentileTracker2 *this)
 {
   guint32 result;
   THIS_READLOCK(this);
-  if(this->read_index <= this->write_index)
-    result = this->write_index - this->read_index;
-  else
-    result = this->length - this->read_index + this->write_index;
-//  result = bintree2_get_num(this->maxtree) + bintree2_get_num(this->mintree);
+  result = this->Mxc + this->Mnc;
   THIS_READUNLOCK(this);
   return result;
 }
@@ -380,7 +376,7 @@ void _add_value(PercentileTracker2 *this, gint64 value)
   this->items[this->write_index].value = value;
   this->items[this->write_index].added = _now(this);
   if(++this->write_index == this->length){
-    this->write_index=0;
+    this->write_index = 0;
   }
 
   if(this->ready){

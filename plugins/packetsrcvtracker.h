@@ -28,6 +28,7 @@ typedef struct _PacketsRcvTrackerItem{
   guint16      seq;
   GstClockTime added;
   gboolean     received;
+  gboolean     missed;
   gboolean     discarded;
   gboolean     lost;
   guint        ref;
@@ -42,9 +43,13 @@ typedef struct _PacketsRcvTrackerStat
   guint32                  total_payload_discarded;
   guint32                  total_packets_received;
   guint32                  total_payload_received;
+  guint32                  good_packets_in_1s;
+  guint32                  good_payload_bytes_in_1s;
   guint16                  highest_seq;
   guint16                  cycle_num;
 }PacketsRcvTrackerStat;
+
+typedef struct _CorrBlock CorrBlock;
 
 struct _PacketsRcvTracker
 {
@@ -56,6 +61,7 @@ struct _PacketsRcvTracker
   GQueue*                  discarded;
   GQueue*                  packets;
 
+  gint32                   reported_seq;
   GstClockTime             discard_treshold;
   GstClockTime             lost_treshold;
 
@@ -68,8 +74,16 @@ struct _PacketsRcvTracker
   struct{
     guint64 last_ntp_snd_time;
     guint64 last_ntp_rcv_time;
+    GstClockTime last_delay;
     guint32 last_timestamp;
   }devar;
+
+  guint32 cblocks_counter;
+  CorrBlock *blocks;
+  guint block_index;
+  guint remb_state;
+  GstClockTime remb_ts;
+
 
 //  struct{
 //    guint         group_size_t0;
@@ -87,6 +101,7 @@ struct _PacketsRcvTracker
 //  }kfilter;
 
   PercentileTracker2*     devars;
+  gdouble                 path_skew;
 
 };
 
@@ -102,6 +117,7 @@ void packetsrcvtracker_set_lost_treshold(PacketsRcvTracker *this, GstClockTime t
 void packetsrcvtracker_set_discarded_treshold(PacketsRcvTracker *this, GstClockTime treshold);
 void packetsrcvtracker_add(PacketsRcvTracker *this, GstMpRTPBuffer *mprtp);
 void packetsrcvtracker_update_reported_sn(PacketsRcvTracker *this, guint16 reported_sn);
+gdouble packetsrcvtracker_get_remb(PacketsRcvTracker * this);
 void packetsrcvtracker_set_bitvectors(PacketsRcvTracker * this,
                                      guint16 *begin_seq,
                                      guint16 *end_seq,

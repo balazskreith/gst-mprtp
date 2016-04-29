@@ -122,10 +122,6 @@ struct _Subflow
   RateWindow                    received_bytes;
   RateWindow                    HSSNs;
 
-  NumsTracker*                  received_bytes_window;
-  gfloat                        rcv_max;
-  gfloat                        rcv_min;
-
   GstClockTime                  next_feedback;
   GstClockTime                (*feedback_interval_calcer)(Subflow*);
   void                        (*feedback_message_appender)(RcvController*,Subflow*);
@@ -739,13 +735,7 @@ void _orp_add_xr_remb(RcvController * this, Subflow *subflow)
 {
   gfloat estimation;
 
-  numstracker_add(subflow->received_bytes_window, subflow->received_bytes.rate_value * 8);
-
-  if(mprtpr_path_is_in_spike_mode(subflow->path)){
-    estimation = subflow->rcv_min;
-  }else{
-    estimation = subflow->rcv_max;
-  }
+  estimation = packetsrcvtracker_get_remb(subflow->packetstracker) ;
 
   report_producer_add_afb_remb(this->report_producer,
                                this->ssrc,
@@ -919,20 +909,6 @@ static void _removed_reported_seq(gpointer data, gint64 removed_HSSN)
   }
 }
 
-static void _rcv_bytes_max_pipe(gpointer data, gint64 max)
-{
-  Subflow *this;
-  this = data;
-  this->rcv_max = max;
-}
-
-static void _rcv_bytes_min_pipe(gpointer data, gint64 min)
-{
-  Subflow *this;
-  this = data;
-  this->rcv_min = min;
-}
-
 Subflow *
 _make_subflow (guint8 id, MpRTPRPath * path)
 {
@@ -948,12 +924,6 @@ _make_subflow (guint8 id, MpRTPRPath * path)
   result->feedback_message_appender = _default_feedback_appender;
   numstracker_add_rem_pipe(result->reported_seqs, _removed_reported_seq, result);
 
-  result->received_bytes_window     = make_numstracker(50, 2 * GST_SECOND);
-  numstracker_add_plugin(result->received_bytes_window,
-                         (NumsTrackerPlugin*) make_numstracker_minmax_plugin(_rcv_bytes_max_pipe,
-                                                                             result,
-                                                                             _rcv_bytes_min_pipe,
-                                                                             result));
   _reset_subflow (result);
   return result;
 }

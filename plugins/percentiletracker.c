@@ -170,21 +170,10 @@ static void _reserve_items(PercentileTracker *this, guint32 length)
   this->length = length;
 }
 
-PercentileTracker *make_percentiletracker_full(BinTreeCmpFunc cmp_min,
-                                  BinTreeCmpFunc cmp_max,
-                                  guint32 length,
-                                  guint percentile)
+static void _setup_bounds(PercentileTracker *this, guint percentile)
 {
-  PercentileTracker *this;
-  this = g_object_new (PERCENTILETRACKER_TYPE, NULL);
-  THIS_WRITELOCK (this);
   this->ratio = (gdouble)percentile / (gdouble)(100 - percentile);
   this->percentile = percentile;
-  this->expandfnc = NULL;
-  _reserve_items(this, length);
-  this->maxtree = make_bintree(this->maxtree_cmp = cmp_max);
-  this->mintree = make_bintree(this->mintree_cmp = cmp_min);
-
   if(this->ratio < 1.){
     this->required = (1./this->ratio) + 1;
     this->median = FALSE;
@@ -197,9 +186,33 @@ PercentileTracker *make_percentiletracker_full(BinTreeCmpFunc cmp_min,
   }
   this->ready = FALSE;
   this->collection = (guint64*) mprtp_malloc(sizeof(guint64) * this->required);
+}
+
+PercentileTracker *make_percentiletracker_full(BinTreeCmpFunc cmp_min,
+                                  BinTreeCmpFunc cmp_max,
+                                  guint32 length,
+                                  guint percentile)
+{
+  PercentileTracker *this;
+  this = g_object_new (PERCENTILETRACKER_TYPE, NULL);
+  THIS_WRITELOCK (this);
+  this->expandfnc = NULL;
+  _reserve_items(this, length);
+  this->maxtree = make_bintree(this->maxtree_cmp = cmp_max);
+  this->mintree = make_bintree(this->mintree_cmp = cmp_min);
+  _setup_bounds(this, percentile);
   THIS_WRITEUNLOCK (this);
 
   return this;
+}
+
+void percentiletracker_change_percentile(PercentileTracker *this, guint percentile)
+{
+  THIS_WRITELOCK (this);
+
+
+
+  THIS_WRITEUNLOCK (this);
 }
 
 static void _print_items(PercentileTracker *this)
@@ -429,6 +442,12 @@ void _add_value(PercentileTracker *this, guint64 value)
   this->ready = TRUE;
   //sort the array
   qsort (this->collection, this->required, sizeof(guint64), _compare);
+  if(!this->maxtree){
+    this->maxtree = make_bintree(this->maxtree_cmp);
+  }
+  if(!this->mintree){
+    this->mintree = make_bintree(this->mintree_cmp);
+  }
   //distribute
   if(this->ratio == 1.){
     bintree_insert_value(this->maxtree, this->collection[0]);
@@ -640,23 +659,32 @@ void _rem_value(PercentileTracker * this)
     --this->Mnc;
   }
 
+  if(_counter(this) < this->required){
+    this->ready = FALSE;
+
+  }
+
   if(this->required <= _counter(this)){
     goto done;
   }
 collect:
-  {
-    gint i,j,c = _counter(this);
-    this->ready = FALSE;
-    this->counter = c;
-    this->Mxc = this->Mnc = 0;
-    g_object_unref(this->maxtree);
-    g_object_unref(this->mintree);
-    this->maxtree = make_bintree(this->maxtree_cmp);
-    this->mintree = make_bintree(this->mintree_cmp);
-    if(c < 1) goto done;
-    for(j = 0, i = this->read_index; j < c; i = (i + 1) % this->length, ++j){
-      this->collection[j] = this->items[i].value;
-    }
+  _collect_items(this);
+done:
+  return;
+}
+
+void _collect_items(PercentileTracker * this)
+{
+  gint i,j,c = _counter(this);
+  this->counter = c;
+  this->Mxc = this->Mnc = 0;
+  g_object_unref(this->maxtree);
+  g_object_unref(this->mintree);
+  this->maxtree = NULL;
+  this->mintree = NULL;
+  if(c < 1) goto done;
+  for(j = 0, i = this->read_index; j < c; i = (i + 1) % this->length, ++j){
+    this->collection[j] = this->items[i].value;
   }
 done:
   return;

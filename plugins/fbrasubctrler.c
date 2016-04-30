@@ -708,7 +708,7 @@ _get_reduced_target(FBRASubController *this)
   }
 
 //  target_rate = MIN(_TR(this), _remb(this) * CONSTRAIN(.6, .95, 2.-_trend(this)/2.));
-  target_rate = MIN(_TR(this), _remb(this));
+  this->bottleneck_point = target_rate = MIN(_TR(this), _remb(this));
   _priv(this)->rr_approved = FALSE;
   _priv(this)->reduce_trend = _trend(this);
   _priv(this)->reduce_started = _now(this);
@@ -1174,7 +1174,6 @@ gboolean _active_pacing_mode(FBRASubController *this, GstBuffer *buffer)
   if(_pacer(this).last_approved_ts == gst_rtp_buffer_get_timestamp(&rtp)){
     goto send;
   }
-  dt = GST_TIME_AS_MSECONDS(_now(this) - _pacer(this).activated);
   pacing_sec = (gdouble) _pacer(this).group_size / (gdouble) (_TR(this) * slack);
   pacing = GST_SECOND * pacing_sec;
   if(_now(this) - _pacer(this).last_sent < pacing){

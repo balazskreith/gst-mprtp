@@ -141,7 +141,6 @@ static void _devars_pipe(gpointer data, PercentileTracker2PipeData *stats)
     this->path_skew = 0.;
     return;
   }
-
   this->path_skew = get_epoch_time_from_ntp_in_ns(stats->percentile);
 //  g_print("path skew: %f\n", this->path_skew);
 }
@@ -245,7 +244,6 @@ void packetsrcvtracker_add(PacketsRcvTracker *this, GstMpRTPBuffer *mprtp)
 
     }
   }else{
-
     //packet is in order
   }
 
@@ -383,6 +381,7 @@ done:
   if(chunks_length){
     *chunks_length = vec_i + 1;
   }
+
   THIS_READUNLOCK(this);
 }
 
@@ -487,7 +486,6 @@ void _obsolate_packets(PacketsRcvTracker *this)
 
 void _add_packet(PacketsRcvTracker *this, PacketsRcvTrackerItem *item)
 {
-
   _obsolate_packets(this);
   g_queue_push_tail(this->packets, item);
 }
@@ -572,7 +570,7 @@ void _refresh_delay_variation(PacketsRcvTracker * this, GstMpRTPBuffer *mprtp)
 
   percentiletracker2_add(this->devars, devar);
   //mprtp_logger("devars.csv", "%lu\n", MIN(this->devar.last_delay - mprtp->delay, mprtp->delay - this->devar.last_delay));
-  this->devar.last_timestamp = mprtp->timestamp;
+  this->devar.last_timestamp    = mprtp->timestamp;
   this->devar.last_ntp_snd_time = mprtp->abs_snd_ntp_time;
   this->devar.last_ntp_rcv_time = mprtp->abs_rcv_ntp_time;
   this->devar.last_delay        = mprtp->delay;

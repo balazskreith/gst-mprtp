@@ -214,6 +214,7 @@ static void _process_discarded_rle(RMDIProcessor *this, GstMPRTCPXRReportSummary
       packetssndtracker_get_goodput_bytes_from_acked(this->packetstracker,
                                                      &this->result.utilized_fraction,
                                                      &this->result.recent_discards)<<3;
+
   this->result.sender_bitrate = trackerstat.sent_bytes_in_1s << 3;
   this->result.sent_packets   = trackerstat.sent_packets_in_1s;
   numstracker_add(this->bytes_in_flight, trackerstat.bytes_in_flight);

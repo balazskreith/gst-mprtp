@@ -48,7 +48,7 @@ GST_DEBUG_CATEGORY_STATIC (fbrasubctrler_debug_category);
 G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 
 //if target close to the bottleneck, the increasement will be multiplied by this factor
-#define BOTTLENECK_INCREASEMENT_FACTOR 1.0
+#define BOTTLENECK_INCREASEMENT_FACTOR 0.75
 
 //determine the epsilon factor around the target rate indicate weather we close to the bottleneck or not.
 #define BOTTLENECK_EPSILON .25
@@ -60,11 +60,11 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 
 //determine the minimum interval in seconds must be stay in probe stage
 //before the target considered to be accepted
-#define NORMAL_PROBE_INTERVAL 0.5
+#define NORMAL_PROBE_INTERVAL 1.0
 
 //determine the maximum interval in seconds must be stay in probe stage
 //before the target considered to be accepted
-#define BOTTLENECK_PROBE_INTERVAL 2.
+#define BOTTLENECK_PROBE_INTERVAL 3.
 
 //determines the minimum monitoring interval
 #define MIN_MONITORING_INTERVAL 10
@@ -107,13 +107,11 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 //determines the qdelay trend treshold considered to be congestion
 #define QDELAY_CONGESTION_TRESHOLD 250
 
-
-
 //determines weather the pacing allowed or not
 #define PACING_ALLOWED_DEFAULT FALSE
 
 //determines the constrict time in s for pacing
-#define PACING_CONSTRICT_TIME 0.5
+#define PACING_CONSTRICT_TIME 0.1
 
 //determines the deflate time in s for pacing
 #define PACING_DEFLATE_TIME 2.0
@@ -658,14 +656,6 @@ void fbrasubctrler_report_update(
   _update_tr_corr(this);
   _reset_congestion_indicators(this);
 
-  //Todo: place it
-  if(!_priv(this)->tr_approved){
-      _priv(this)->tr_approved = _SR(this) * .9 < _TR(this) && _TR(this) < _SR(this) * 1.1;
-      if(_priv(this)->tr_approved){
-        _priv(this)->tr_approved_time = _now(this);
-      }
-    }
-
   if(this->disable_controlling){
     if(!this->disable_end || !_priv(this)->tr_approved){
       this->disable_end = _now(this) + this->disable_interval;
@@ -708,7 +698,7 @@ _get_reduced_target(FBRASubController *this)
   }
 
 //  target_rate = MIN(_TR(this), _remb(this) * CONSTRAIN(.6, .95, 2.-_trend(this)/2.));
-  this->bottleneck_point = target_rate = MIN(_TR(this), _remb(this));
+  this->bottleneck_point = target_rate = MIN(_TR(this), _remb(this) );
   _priv(this)->rr_approved = FALSE;
   _priv(this)->reduce_trend = _trend(this);
   _priv(this)->reduce_started = _now(this);
@@ -770,13 +760,13 @@ _keep_stage(
   if(_bcongestion(this) || _fcongestion(this)){
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_reduced_target(this);
+    target_rate = _get_reduced_target(this) *.8;
     goto done;
   }
 
   if(_dist_trend_th(this) < _trend(this)){
     _set_event(this, EVENT_DISTORTION);
-    target_rate = _get_reduced_target(this);
+    target_rate = _get_reduced_target(this) *.95;
     goto done;
   }else if(_state(this) != MPRTPS_PATH_STATE_STABLE){
     _set_event(this, EVENT_SETTLED);
@@ -788,7 +778,7 @@ _keep_stage(
     goto done;
   }
 
-  if(_now(this) - 3 * _priv(this)->rtt < this->last_distorted){
+  if(_now(this) - MAX(3 * _priv(this)->rtt, 1 * GST_SECOND) < this->last_distorted){
     goto done;
   }
 
@@ -832,14 +822,14 @@ _probe_stage(
     _disable_monitoring(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_reduced_target(this);
+    target_rate = _get_reduced_target(this) *.8;
     goto done;
   }
   if(_dist_trend_th(this) < _trend(this)){
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_reduced_target(this);
+    target_rate = _get_reduced_target(this) *.95;
     goto done;
   }
 
@@ -872,7 +862,7 @@ _increase_stage(
     _disable_monitoring(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_reduced_target(this);
+    target_rate = _get_reduced_target(this) *.8;
     goto done;
   }
 
@@ -880,7 +870,7 @@ _increase_stage(
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_reduced_target(this);
+    target_rate = _get_reduced_target(this) *.95;
     goto done;
   }
 

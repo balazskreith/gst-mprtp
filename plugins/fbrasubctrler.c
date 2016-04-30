@@ -111,10 +111,10 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 #define PACING_ALLOWED_DEFAULT FALSE
 
 //determines the constrict time in s for pacing
-#define PACING_CONSTRICT_TIME 0.1
+#define PACING_CONSTRICT_TIME 0.0
 
 //determines the deflate time in s for pacing
-#define PACING_DEFLATE_TIME 2.0
+#define PACING_DEFLATE_TIME 5.0
 
 
 
@@ -139,7 +139,7 @@ typedef enum{
 
 typedef enum{
   PACING_STATE_ACTIVE           =  1,
-  RESTRICTOR_STATE_DEACTIVATED      =  0,
+  PACING_STATE_DEACTIVATED      =  0,
   PACING_STATE_DEACTIVE         = -1,
 }RestrictorState;
 
@@ -773,7 +773,7 @@ _keep_stage(
     goto done;
   }
 
-  if(_probe_trend_th(this) < _trend(this)){
+  if(_probe_trend_th(this) < _trend(this) || _pacer(this).state != PACING_STATE_DEACTIVE){
     this->last_distorted = _now(this);
     goto done;
   }
@@ -1129,7 +1129,7 @@ void _deactivate_pacer(FBRASubController *this)
     return;
   }
   _pacer(this).deactivated = _now(this);
-  _pacer(this).state       = PACING_STATE_DEACTIVE;
+  _pacer(this).state       = PACING_STATE_DEACTIVATED;
 }
 
 gboolean _active_pacing_mode(FBRASubController *this, GstBuffer *buffer)
@@ -1147,7 +1147,7 @@ gboolean _active_pacing_mode(FBRASubController *this, GstBuffer *buffer)
     }else{
       slack = 1.0;
     }
-  }else if(_pacer(this).state == PACING_STATE_DEACTIVE){
+  }else if(_pacer(this).state == PACING_STATE_DEACTIVATED){
     dt = GST_TIME_AS_MSECONDS(_now(this) - _pacer(this).deactivated);
     if(_pacer(this).slack_allowed && 0. < _priv(this)->pacing_deflate_time){
       slack = 1.0 + MIN(dt/(_priv(this)->pacing_deflate_time * 1000.), 1.0);
@@ -1156,6 +1156,7 @@ gboolean _active_pacing_mode(FBRASubController *this, GstBuffer *buffer)
     }
     if(!_priv(this)->pacing_deflate_time || _priv(this)->pacing_deflate_time < dt){
       _pacer(this).approver  = _deactivated_pacing_mode;
+      _pacer(this).state = PACING_STATE_DEACTIVE;
     }
   }
   if(!gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp)){

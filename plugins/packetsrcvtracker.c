@@ -320,7 +320,17 @@ gdouble packetsrcvtracker_get_remb(PacketsRcvTracker * this)
 //    }
 //  }
 //  g_print("state: %d block3 g: %f\n", this->remb_state, this->blocks[3].g);
-  result *= 1. - CONSTRAIN(0., .2, this->blocks[3].g);
+//  this->aaaa = this->aaaa * .99802 +
+//               (this->blocks[1].g) * .00198;
+//  g_print("g0: %-10f (%-10f) | g1: %-10f | g2: %-10f | g3: %-10f | g4: %-10f | g5: %-10f\n",
+//          this->blocks[0].g,
+//          this->aaaa,
+//          this->blocks[1].g,
+//          this->blocks[2].g,
+//          this->blocks[3].g,
+//          this->blocks[4].g,
+//          this->blocks[5].g);
+//  result *= 1. - CONSTRAIN(0., .2, this->aaaa);
   THIS_READUNLOCK(this);
   return result;
 }
@@ -626,7 +636,7 @@ void _execute_corrblocks(PacketsRcvTracker *this, CorrBlock *blocks)
           _execute_corrblock(blocks + 4);
         break;
     case 64:
-//          _execute_corrblock(blocks + 5);
+          _execute_corrblock(blocks + 5);
         break;
     case 128:
 //          _execute_corrblock(blocks + 6);

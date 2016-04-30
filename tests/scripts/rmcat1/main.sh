@@ -60,7 +60,7 @@ REPORTAUTHORFILE=$LOGSDIR"/author.txt"
 echo "Balázs Kreith" > $REPORTAUTHORFILE
 
   #setup duration
-  DURATION=106.6
+  DURATION=105
   
   #setup virtual ethernet interface controller script
   echo "./$SCRIPTSDIR/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input $TESTDIR/veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh

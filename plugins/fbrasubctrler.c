@@ -96,13 +96,13 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 #define DISCARD_CONGESTION_TRESHOLD 1.0
 
 //determines a treshold for trend calculations, in which above the KEEP stage not let it to PROBE
-#define PROBE_TREND_TRESHOLD 1.1
+#define PROBE_TREND_TRESHOLD 1.5
 
 //determines a treshold for trend calculations, in which above the path considered to be distorted
-#define DISTORTION_TREND_TRESHOLD 1.2
+#define DISTORTION_TREND_TRESHOLD 1.8
 
 //determines a treshold for trend calculations, in which above the path considered to be congested
-#define CONGESTION_TREND_TRESHOLD 1.5
+#define CONGESTION_TREND_TRESHOLD 2.0
 
 //determines the qdelay trend treshold considered to be congestion
 #define QDELAY_CONGESTION_TRESHOLD 250
@@ -165,9 +165,10 @@ struct _Private{
   gboolean            bcongestion;
   gboolean            fdistortion;
 
-  PacketsSndTracker*  packetstracker;
-
+  gdouble             reduce_trend;
   GstClockTime        reduce_started;
+
+  PacketsSndTracker*  packetstracker;
 
   gboolean            pacing_allowed;
   gdouble             pacing_constrict_time;
@@ -688,16 +689,17 @@ void fbrasubctrler_report_update(
   }
 
 //  _priv(this)->stage_t1 = _priv(this)->stage;
-  if(_priv(this)->stage != STAGE_REDUCE){
-      rmdi_processor_approve_owd(this->fb_processor);
-  }
+//  if(_priv(this)->stage != STAGE_REDUCE){
+//      rmdi_processor_approve_owd(this->fb_processor);
+//  }
+  rmdi_processor_approve_owd(this->fb_processor);
   ++this->measurements_num;
 done:
   return;
 }
 
 static gint32
-_get_remb_target(FBRASubController *this)
+_get_reduced_target(FBRASubController *this)
 {
   gint32 target_rate = this->target_bitrate;
 
@@ -708,6 +710,8 @@ _get_remb_target(FBRASubController *this)
 //  target_rate = MIN(_TR(this), _remb(this) * CONSTRAIN(.6, .95, 2.-_trend(this)/2.));
   target_rate = MIN(_TR(this), _remb(this));
   _priv(this)->rr_approved = FALSE;
+  _priv(this)->reduce_trend = _trend(this);
+  _priv(this)->reduce_started = _now(this);
 
 done:
   return target_rate;
@@ -718,25 +722,6 @@ _reduce_stage(
     FBRASubController *this)
 {
   gint32   target_rate = this->target_bitrate;
-  gint32   remb;
-
-  remb = _get_remb_target(this);
-
-  if(!_priv(this)->reduce_started){
-    _priv(this)->reduce_started = _now(this);
-    this->bottleneck_point =  target_rate = remb;
-    goto done;
-  }
-
-  if(remb * 1.1 <  this->bottleneck_point){
-    this->bottleneck_point = target_rate = remb;
-    goto done;
-  }
-
-  if(_dist_trend_th(this) < _trend(this)){
-    target_rate = this->bottleneck_point;
-    goto done;
-  }
 
   if(!_priv(this)->rr_approved){
     _priv(this)->rr_approved = target_rate * .95 < _SR(this) && _SR(this) < target_rate * 1.05;
@@ -746,11 +731,28 @@ _reduce_stage(
     goto done;
   }
 
+  if(_now(this) - 1 * _priv(this)->rtt < _priv(this)->reduce_started){
+    this->bottleneck_point =  target_rate = MIN(_TR(this), _remb(this));
+    goto done;
+  }
+
+  if(_priv(this)->reduce_trend * 1.5 < _trend(this)){
+    gboolean was_approved = _priv(this)->rr_approved;
+    this->bottleneck_point =  target_rate = _get_reduced_target(this);
+    target_rate *= (was_approved && _now(this) - _priv(this)->rtt < _priv(this)->rr_approved_time) ? .8 : 1.0;
+    goto done;
+  }
+
+
+  if(_dist_trend_th(this) < _trend(this)){
+    goto done;
+  }
+
+
   if(_now(this) - 2 * _priv(this)->rtt < _priv(this)->rr_approved_time){
     goto done;
   }
 
-  _priv(this)->reduce_started = 0;
   _set_event(this, EVENT_SETTLED);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
   _reset_monitoring(this);
@@ -768,13 +770,13 @@ _keep_stage(
   if(_bcongestion(this) || _fcongestion(this)){
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_remb_target(this);
+    target_rate = _get_reduced_target(this);
     goto done;
   }
 
   if(_dist_trend_th(this) < _trend(this)){
     _set_event(this, EVENT_DISTORTION);
-    target_rate = _get_remb_target(this);
+    target_rate = _get_reduced_target(this);
     goto done;
   }else if(_state(this) != MPRTPS_PATH_STATE_STABLE){
     _set_event(this, EVENT_SETTLED);
@@ -830,14 +832,14 @@ _probe_stage(
     _disable_monitoring(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_remb_target(this);
+    target_rate = _get_reduced_target(this);
     goto done;
   }
   if(_dist_trend_th(this) < _trend(this)){
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_remb_target(this);
+    target_rate = _get_reduced_target(this);
     goto done;
   }
 
@@ -870,7 +872,7 @@ _increase_stage(
     _disable_monitoring(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_remb_target(this);
+    target_rate = _get_reduced_target(this);
     goto done;
   }
 
@@ -878,7 +880,7 @@ _increase_stage(
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_remb_target(this);
+    target_rate = _get_reduced_target(this);
     goto done;
   }
 

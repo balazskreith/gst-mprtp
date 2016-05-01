@@ -286,6 +286,8 @@ typedef struct PACKED _GstRTCPAFB_REMB{
   guint32               num_ssrc : 8;
   guint32               float_num : 24;
   guint32               ssrc_feedback;
+  guint16               hssn;
+  guint16               reserved;
 }GstRTCPAFB_REMB;
 
 /*MPRTCP struct polymorphism*/
@@ -468,12 +470,14 @@ void
 gst_rtcp_afb_remb_change (GstRTCPAFB_REMB * report,
                           guint32 *num_ssrc,
                           gfloat *float_num,
-                          guint32 *ssrc_feedback);
+                          guint32 *ssrc_feedback,
+                          guint16 *hssn);
 void
 gst_rtcp_afb_remb_getdown (GstRTCPAFB_REMB * report,
                            guint32 *num_ssrc,
                            gfloat *float_num,
-                           guint32 *ssrc_feedback);
+                           guint32 *ssrc_feedback,
+                           guint16 *hssn);
 
 void
 gst_rtcp_afb_rmdi_record_change (GstRTCPAFB_RMDIRecord * record,

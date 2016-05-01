@@ -55,8 +55,6 @@ struct _CorrBlock{
 };
 
 typedef struct _RMDIProcessorPrivate{
-  CorrBlock           cblocks[8];
-  guint32             cblocks_counter;
   GstClockTime        delay80th;
   GstClockTime        min_delay;
 }RMDIProcessorPrivate;
@@ -69,12 +67,7 @@ typedef struct _RMDIProcessorPrivate{
 //----------------------------------------------------------------------
 static void rmdi_processor_finalize (GObject * object);
 
-static void _execute_corrblocks(RMDIProcessorPrivate *this, CorrBlock *blocks);
-static void _execute_corrblock(CorrBlock* this);
-static void _csv_logging(RMDIProcessor *this, gint64 delay);
-static void _readable_logging(RMDIProcessor *this);
 static void _readable_result(RMDIProcessor *this, RMDIProcessorResult *result);
-static gint _cmp_seq (guint16 x, guint16 y);
 void
 rmdi_processor_class_init (RMDIProcessorClass * klass)
 {
@@ -143,16 +136,6 @@ RMDIProcessor *make_rmdi_processor(MPRTPSPath *path)
   percentiletracker_set_treshold(this->delays, 60 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->delays, _delay80th_pipe, this);
 
-  {
-    gint i;
-    for(i=0; i < 7; ++i){
-      _priv(this)->cblocks[i].next = &_priv(this)->cblocks[i + 1];
-      _priv(this)->cblocks[i].id   = i;
-      _priv(this)->cblocks[i].N    = 4;
-    }
-  }
-  _priv(this)->cblocks_counter = 1;
-
   THIS_WRITEUNLOCK (this);
   return this;
 }
@@ -164,67 +147,8 @@ void rmdi_processor_reset(RMDIProcessor *this)
   THIS_WRITEUNLOCK (this);
 }
 
-
-void rmdi_processor_set_acfs_history(RMDIProcessor *this,
-                                        gint32 g125_length,
-                                        gint32 g250_length,
-                                        gint32 g500_length,
-                                        gint32 g1000_length)
-{
-  _priv(this)->cblocks[0].N    = g125_length;
-  _priv(this)->cblocks[1].N    = g250_length;
-  _priv(this)->cblocks[2].N    = g500_length;
-  _priv(this)->cblocks[3].N    = g1000_length;
-}
-
-void rmdi_processor_get_acfs_history(RMDIProcessor *this,
-                                        gint32 *g125_length,
-                                        gint32 *g250_length,
-                                        gint32 *g500_length,
-                                        gint32 *g1000_length)
-{
-  if(g125_length){
-      *g125_length =  _priv(this)->cblocks[0].N;
-  }
-  if(g250_length){
-      *g250_length =  _priv(this)->cblocks[1].N;
-  }
-  if(g500_length){
-      *g500_length =  _priv(this)->cblocks[2].N;
-  }
-  if(g1000_length){
-      *g1000_length = _priv(this)->cblocks[3].N;
-  }
-}
-
-static void _process_discarded_rle(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
-{
-  PacketsSndTrackerStat trackerstat;
-  packetssndtracker_update_hssn(this->packetstracker, xrsummary->DiscardedRLE.end_seq);
-  packetssndtracker_add_discarded_bitvector(this->packetstracker,
-                                            xrsummary->DiscardedRLE.begin_seq,
-                                            xrsummary->DiscardedRLE.end_seq,
-                                            (GstRTCPXRBitvectorChunk *)&xrsummary->DiscardedRLE.chunks[0]);
-  packetssndtracker_get_stats(this->packetstracker, &trackerstat);
-  if(_cmp_seq(this->last_HSSN, xrsummary->DiscardedRLE.end_seq) < 0){
-    this->last_HSSN = xrsummary->DiscardedRLE.end_seq;
-  }
-
-  this->result.goodput_bitrate =
-      packetssndtracker_get_goodput_bytes_from_acked(this->packetstracker,
-                                                     &this->result.utilized_fraction,
-                                                     &this->result.recent_discards)<<3;
-
-  this->result.sender_bitrate = trackerstat.sent_bytes_in_1s << 3;
-  this->result.sent_packets   = trackerstat.sent_packets_in_1s;
-  numstracker_add(this->bytes_in_flight, trackerstat.bytes_in_flight);
-  this->result.bytes_in_flight = trackerstat.bytes_in_flight;
-}
-
 static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
 {
-  gint64 impulse;
-
   this->result.owd_processed = xrsummary->OWD.median_delay;
 
   if(!xrsummary->OWD.median_delay){
@@ -233,13 +157,6 @@ static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummar
 
   this->result.qdelay_actual = xrsummary->OWD.median_delay;
 
-//  impulse = ((gint64)xrsummary->OWD.median_delay - (gint64)_priv(this)->delay80th) / 1000000;
-  impulse = (gint64)xrsummary->OWD.median_delay;
-  impulse/= 1000;
-  _priv(this)->cblocks[0].Iu0 = impulse;
-  _execute_corrblocks(_priv(this), _priv(this)->cblocks);
-  _execute_corrblocks(_priv(this), _priv(this)->cblocks);
-  _priv(this)->cblocks[0].Id1 = impulse;
   this->last_delay_t2         = this->last_delay_t1;
   this->last_delay_t1         = this->last_delay;
   this->last_delay            = xrsummary->OWD.median_delay;
@@ -251,20 +168,30 @@ static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummar
     this->result.owd_corr = 1.;
   }
 
-  _csv_logging(this, impulse);
-  _readable_logging(this);
 done:
   return;
 }
 
 static void _process_afb(RMDIProcessor *this, guint32 id, GstRTCPAFB_REMB *remb)
 {
-  gfloat estimation;
+  PacketsSndTrackerStat trackerstat;
+  gfloat                estimation;
+  guint16               hssn;
+
   if(id != RTCP_AFB_REMB_ID){
     return;
   }
-  gst_rtcp_afb_remb_getdown(remb, NULL, &estimation, NULL);
+  gst_rtcp_afb_remb_getdown(remb, NULL, &estimation, NULL, &hssn);
   this->result.rcv_est_max_bitrate = estimation;
+
+
+  packetssndtracker_update_hssn(this->packetstracker, hssn);
+  packetssndtracker_get_stats(this->packetstracker, &trackerstat);
+
+  this->result.sender_bitrate = trackerstat.sent_bytes_in_1s << 3;
+  this->result.sent_packets   = trackerstat.sent_packets_in_1s;
+  numstracker_add(this->bytes_in_flight, trackerstat.bytes_in_flight);
+  this->result.bytes_in_flight = trackerstat.bytes_in_flight;
 }
 
 void rmdi_processor_set_rtt(RMDIProcessor       *this,
@@ -281,15 +208,14 @@ void rmdi_processor_do(RMDIProcessor       *this,
   if(!summary->XR.DiscardedRLE.processed && !summary->XR.OWD.processed){
     goto done;
   }
-  if(summary->XR.DiscardedRLE.processed){
-    _process_discarded_rle(this, &summary->XR);
-  }
   if(summary->XR.OWD.processed){
     _process_owd(this, &summary->XR);
   }
   if(summary->AFB.processed){
     _process_afb(this, summary->AFB.fci_id, (GstRTCPAFB_REMB *)summary->AFB.fci_data);
   }
+
+  this->result.sender_bitrate = packetssndtracker_get_sent_bytes_in_1s(this->packetstracker) * 8;
 
   memcpy(result, &this->result, sizeof(RMDIProcessorResult));
 
@@ -303,119 +229,6 @@ void rmdi_processor_approve_owd(RMDIProcessor *this)
 {
   percentiletracker_add(this->delays, this->last_delay);
 
-}
-
-//----------------------------------------------------------------------------------------
-//                  Queue Delay Analyzation
-//----------------------------------------------------------------------------------------
-
-
-void _execute_corrblocks(RMDIProcessorPrivate *this, CorrBlock *blocks)
-{
-  guint32 X = (this->cblocks_counter ^ (this->cblocks_counter-1))+1;
-  switch(X){
-    case 2:
-      _execute_corrblock(blocks);
-    break;
-    case 4:
-          _execute_corrblock(blocks + 1);
-        break;
-    case 8:
-          _execute_corrblock(blocks + 2);
-        break;
-    case 16:
-          _execute_corrblock(blocks + 3);
-        break;
-    case 32:
-          _execute_corrblock(blocks + 4);
-        break;
-    case 64:
-          _execute_corrblock(blocks + 5);
-        break;
-    case 128:
-          _execute_corrblock(blocks + 6);
-        break;
-    case 256:
-          _execute_corrblock(blocks + 7);
-        break;
-    default:
-//      g_print("not execute: %u\n", X);
-      break;
-  }
-
-  ++this->cblocks_counter;
-}
-
-void _execute_corrblock(CorrBlock* this)
-{
-  this->M1   = this->M0;
-  this->M0  -= this->M_[this->index];
-  this->G01 -= this->G_[this->index];
-  this->M0  += this->M_[this->index] = this->Iu0;
-  this->G01 += this->G_[this->index] = this->Iu0 * this->Id1;
-  if(this->M0 && this->M1){
-    this->g  = this->G01 * (this->N);
-    this->g /= this->M0 * this->M1;
-    this->g -= 1.;
-  }else{
-    this->g = 0.;
-  }
-  if(++this->index == this->N) {
-    this->index = 0;
-  }
-
-  if(this->next){
-    CorrBlock *next = this->next;
-    next->Iu0 = this->Iu0 + this->Iu1;
-    next->Id1 = this->Id2 + this->Id3;
-  }
-
-  this->Iu1  = this->Iu0;
-  this->Id3  = this->Id2;
-  this->Id2  = this->Id1;
-}
-
-
-void _csv_logging(RMDIProcessor *this, gint64 delay)
-{
-  gchar filename[255];
-  memset(filename, 0, 255);
-  sprintf(filename, "rmdiautocorrs_%d.csv", this->id);
-  mprtp_logger(filename,
-               "%ld,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f,%10.8f\n",
-
-               delay,
-
-              _priv(this)->cblocks[0].g,
-              _priv(this)->cblocks[1].g,
-              _priv(this)->cblocks[2].g,
-              _priv(this)->cblocks[3].g,
-              _priv(this)->cblocks[4].g,
-              _priv(this)->cblocks[5].g,
-              _priv(this)->cblocks[6].g,
-              _priv(this)->cblocks[7].g
-
-  );
-}
-
-void _readable_logging(RMDIProcessor *this)
-{
-  gchar filename[255];
-  memset(filename, 0, 255);
-  sprintf(filename, "fbra2helper_%d.log", this->id);
-  mprtp_logger(filename,
-               "############ Network Queue Analyser log after %lu seconds #################\n"
-               "g(0): %-10.8f| g(0): %-10.8f| g(0): %-10.8f| g(0): %-10.8f| g(0): %-10.8f|\n"
-               ,
-
-               GST_TIME_AS_SECONDS(_now(this) - this->made),
-
-              _priv(this)->cblocks[0].g,
-              _priv(this)->cblocks[1].g,
-              _priv(this)->cblocks[2].g,
-              _priv(this)->cblocks[3].g
-
-  );
 }
 
 void _readable_result(RMDIProcessor *this, RMDIProcessorResult *result)
@@ -443,17 +256,6 @@ void _readable_result(RMDIProcessor *this, RMDIProcessorResult *result)
                result->goodput_bitrate,
                result->utilized_fraction
   );
-}
-
-gint
-_cmp_seq (guint16 x, guint16 y)
-{
-  if(x == y) return 0;
-  if(x < y && y - x < 32768) return -1;
-  if(x > y && x - y > 32768) return -1;
-  if(x < y && y - x > 32768) return 1;
-  if(x > y && x - y < 32768) return 1;
-  return 0;
 }
 
 #undef THIS_WRITELOCK

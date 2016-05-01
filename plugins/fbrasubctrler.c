@@ -93,7 +93,7 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 #define REDUCE_TARGET_FACTOR 0.6
 
 //determines the treshold for utilization, in which below the path considered to be congested
-#define DISCARD_CONGESTION_TRESHOLD 1.0
+#define DISCARD_CONGESTION_TRESHOLD 0.0
 
 //determines a treshold for trend calculations, in which above the KEEP stage not let it to PROBE
 #define PROBE_TREND_TRESHOLD 1.5
@@ -427,6 +427,7 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->tr_approved = TRUE;
 
   _pacer(this).approver = _deactivated_pacing_mode;
+  _pacer(this).state    = PACING_STATE_DEACTIVE;
 
 }
 
@@ -597,7 +598,7 @@ void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRa
   _priv(this)->reduce_target_factor             = cngctrler->reduce_target_factor;
   _priv(this)->discad_cong_treshold             = cngctrler->discad_cong_treshold;
   _priv(this)->distorted_trend_th               = cngctrler->distorted_trend_th;
-  _priv(this)->probe_trend_th                    = cngctrler->keep_trend_th;
+  _priv(this)->probe_trend_th                   = cngctrler->keep_trend_th;
   _priv(this)->pacing_allowed                   = cngctrler->pacing_allowed;
   _priv(this)->pacing_deflate_time              = cngctrler->pacing_deflate_time;
   _priv(this)->pacing_constrict_time            = cngctrler->pacing_constrict_time;
@@ -727,9 +728,9 @@ _reduce_stage(
   }
 
   if(_priv(this)->reduce_trend * 1.5 < _trend(this)){
-    gboolean was_approved = _priv(this)->rr_approved;
+    //gboolean was_approved = _priv(this)->rr_approved;
     this->bottleneck_point =  target_rate = _get_reduced_target(this);
-    target_rate *= (was_approved && _now(this) - _priv(this)->rtt < _priv(this)->rr_approved_time) ? .8 : 1.0;
+    //target_rate *= (was_approved && _now(this) - _priv(this)->rtt < _priv(this)->rr_approved_time) ? .8 : 1.0;
     goto done;
   }
 
@@ -760,13 +761,13 @@ _keep_stage(
   if(_bcongestion(this) || _fcongestion(this)){
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_reduced_target(this) *.8;
+    target_rate = _get_reduced_target(this) * 1.0;
     goto done;
   }
 
   if(_dist_trend_th(this) < _trend(this)){
     _set_event(this, EVENT_DISTORTION);
-    target_rate = _get_reduced_target(this) *.95;
+    target_rate = _get_reduced_target(this) * 1.0;
     goto done;
   }else if(_state(this) != MPRTPS_PATH_STATE_STABLE){
     _set_event(this, EVENT_SETTLED);
@@ -822,14 +823,14 @@ _probe_stage(
     _disable_monitoring(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_reduced_target(this) *.8;
+    target_rate = _get_reduced_target(this) * 1.0;
     goto done;
   }
   if(_dist_trend_th(this) < _trend(this)){
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_reduced_target(this) *.95;
+    target_rate = _get_reduced_target(this) * 1.0;
     goto done;
   }
 
@@ -862,7 +863,7 @@ _increase_stage(
     _disable_monitoring(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_reduced_target(this) *.8;
+    target_rate = _get_reduced_target(this) * 1.0;
     goto done;
   }
 
@@ -870,7 +871,7 @@ _increase_stage(
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_reduced_target(this) *.95;
+    target_rate = _get_reduced_target(this) * 1.0;
     goto done;
   }
 
@@ -1167,13 +1168,24 @@ gboolean _active_pacing_mode(FBRASubController *this, GstBuffer *buffer)
   }
   pacing_sec = (gdouble) _pacer(this).group_size / (gdouble) (_TR(this) * slack);
   pacing = GST_SECOND * pacing_sec;
-  if(_now(this) - _pacer(this).last_sent < pacing){
-    goto exit;
-  }
+//  g_print("group_size: %u tr: %d pacing: %lu\n", _pacer(this).group_size, _TR(this), pacing);
+    if(0 && _now(this) - _pacer(this).last_sent < pacing){
+      goto exit;
+    }
+//    g_print("bytes_in_flight: %u max_bytes_in_flight: %f\n",
+//            _rmdi(this).bytes_in_flight,
+//            _rmdi(this).max_bytes_in_flight * .8);
+//      if(_rmdi(this).max_bytes_in_flight < _rmdi(this).bytes_in_flight * .8){
+//        goto exit;
+//      }
+//    g_print("TR: %f SR: %d\n", _TR(this) * 1.2, _SR(this));
+//  if(_TR(this) * 1.2 < _SR(this)){
+//    goto exit;
+//  }
   _pacer(this).group_size = 0;
   _pacer(this).last_approved_ts = gst_rtp_buffer_get_timestamp(&rtp);
 send:
-  _pacer(this).group_size += gst_rtp_buffer_get_payload_len(&rtp);
+  _pacer(this).group_size += gst_rtp_buffer_get_payload_len(&rtp) * 8;
   _pacer(this).last_sent = _now(this);
   gst_rtp_buffer_unmap(&rtp);
   return TRUE;

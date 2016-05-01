@@ -98,7 +98,8 @@ void report_producer_add_afb_remb(ReportProducer *this,
                                   guint32 media_source_ssrc,
                                   guint32 num_ssrc,
                                   gfloat float_num,
-                                  guint32 ssrc_feedback);
+                                  guint32 ssrc_feedback,
+                                  guint16 hssn);
 
 void report_producer_add_sr(ReportProducer *this,
                                 guint64 ntp_timestamp,

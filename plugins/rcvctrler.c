@@ -734,14 +734,16 @@ void _orp_add_xr_owd(RcvController * this, Subflow *subflow)
 void _orp_add_xr_remb(RcvController * this, Subflow *subflow)
 {
   gfloat estimation;
+  guint16 hssn;
 
-  estimation = packetsrcvtracker_get_remb(subflow->packetstracker) ;
+  estimation = packetsrcvtracker_get_remb(subflow->packetstracker, &hssn);
 
   report_producer_add_afb_remb(this->report_producer,
                                this->ssrc,
                                1,
                                estimation,
-                               this->ssrc);
+                               this->ssrc,
+                               hssn);
 }
 
 

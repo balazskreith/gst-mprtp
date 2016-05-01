@@ -85,23 +85,6 @@ struct _PacketsRcvTracker
   guint remb_state;
   GstClockTime remb_ts;
 
-
-//  struct{
-//    guint         group_size_t0;
-//    guint         group_size_t1;
-//    GstClockTime  rcv_time_t0;
-//    GstClockTime  rcv_time_t1;
-//    GstClockTime  snd_time_t0;
-//    GstClockTime  snd_time_t1;
-//    gdouble       theta_hat[2];
-//    gdouble       h_bar[2];
-//    gdouble       E;
-//    gdouble       var_v_hat;
-//    gdouble       k_bar[2];
-//    NumsTracker*  f_max;
-//  }kfilter;
-
-  PercentileTracker2*     devars;
   gdouble                 path_skew;
 
 };
@@ -118,7 +101,7 @@ void packetsrcvtracker_set_lost_treshold(PacketsRcvTracker *this, GstClockTime t
 void packetsrcvtracker_set_discarded_treshold(PacketsRcvTracker *this, GstClockTime treshold);
 void packetsrcvtracker_add(PacketsRcvTracker *this, GstMpRTPBuffer *mprtp);
 void packetsrcvtracker_update_reported_sn(PacketsRcvTracker *this, guint16 reported_sn);
-gdouble packetsrcvtracker_get_remb(PacketsRcvTracker * this);
+gdouble packetsrcvtracker_get_remb(PacketsRcvTracker * this, guint16 *hssn);
 void packetsrcvtracker_set_bitvectors(PacketsRcvTracker * this,
                                      guint16 *begin_seq,
                                      guint16 *end_seq,

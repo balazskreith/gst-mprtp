@@ -134,17 +134,6 @@ packetsrcvtracker_finalize (GObject * object)
   g_object_unref(this->sysclock);
 }
 
-static void _devars_pipe(gpointer data, PercentileTracker2PipeData *stats)
-{
-  PacketsRcvTracker *this = data;
-  if(stats->percentile < 1){
-    this->path_skew = 0.;
-    return;
-  }
-  this->path_skew = get_epoch_time_from_ntp_in_ns(stats->percentile);
-//  g_print("path skew: %f\n", this->path_skew);
-}
-
 void
 packetsrcvtracker_init (PacketsRcvTracker * this)
 {
@@ -172,10 +161,6 @@ packetsrcvtracker_init (PacketsRcvTracker * this)
   }
   this->block_index = 1;
   this->cblocks_counter = 1;
-
-  this->devars = make_percentiletracker2(256, 50);
-  percentiletracker2_set_treshold(this->devars, 2 * GST_SECOND);
-  percentiletracker2_set_stats_pipe(this->devars, _devars_pipe, this);
 
 }
 
@@ -257,7 +242,6 @@ void packetsrcvtracker_add(PacketsRcvTracker *this, GstMpRTPBuffer *mprtp)
   _add_packet(this, item);
 
   _refresh_delay_variation(this, mprtp);
-  //consider cycle num increase with allowance of a little gap
   if(65472 < _trackerstat(this).highest_seq && mprtp->subflow_seq < 128){
     ++_trackerstat(this).cycle_num;
   }
@@ -275,51 +259,14 @@ void packetsrcvtracker_update_reported_sn(PacketsRcvTracker *this, guint16 repor
   THIS_WRITEUNLOCK (this);
 }
 
-gdouble packetsrcvtracker_get_remb(PacketsRcvTracker * this)
+gdouble packetsrcvtracker_get_remb(PacketsRcvTracker * this, guint16 *hssn)
 {
   gdouble result;
   THIS_READLOCK(this);
+  if(hssn){
+    *hssn = _trackerstat(this).highest_seq;
+  }
   result = _trackerstat(this).good_payload_bytes_in_1s * 8;
-//  if(1000 * GST_MSECOND < this->path_skew){
-//    gdouble overused_factor = 0.;
-//    overused_factor = log10(this->path_skew / (gdouble)(10 * GST_MSECOND));
-//    overused_factor /= 10.;
-//    overused_factor = 0.8;
-////    g_print("path skew: %f overused factor: %f\n", this->path_skew, overused_factor);
-//    result *= MAX(.2, 1.- overused_factor);
-//  }
-//  {
-//    if(this->block_index < 5 && .1 < this->blocks[this->block_index].g){
-//      ++this->block_index;
-//    }else if(1 < this->block_index && this->blocks[this->block_index].g < .05){
-//      --this->block_index;
-//    }
-//    g_print("block_index: %d N: %d factor: %f->%f\n",
-//            this->block_index,
-//            this->blocks[this->block_index].N,
-//            this->blocks[this->block_index].g,
-//            1. - CONSTRAIN(0. , .9 , this->blocks[this->block_index].g ));
-//    result *= 1. - CONSTRAIN(0. , .9 , this->blocks[this->block_index].g );
-//  }
-
-//  if(this->remb_state == 0){
-//    if(.1 < this->blocks[3].g){
-//      result *= .6;
-//      this->remb_state = 1;
-//    }
-//  }else if(this->remb_state == 1){
-//    if(.05 < this->blocks[3].g){
-//      result *= .6;
-//      this->remb_ts = _now(this);
-//    }else if(this->remb_ts < _now(this) - 3 * GST_SECOND){
-//      this->remb_state = 0;
-//    }else{
-//      result *= .6;
-//    }
-//  }
-//  g_print("state: %d block3 g: %f\n", this->remb_state, this->blocks[3].g);
-//  this->aaaa = this->aaaa * .99802 +
-//               (this->blocks[1].g) * .00198;
 //  g_print("g0: %-10f (%-10f) | g1: %-10f | g2: %-10f | g3: %-10f | g4: %-10f | g5: %-10f\n",
 //          this->blocks[0].g,
 //          this->aaaa,
@@ -328,7 +275,7 @@ gdouble packetsrcvtracker_get_remb(PacketsRcvTracker * this)
 //          this->blocks[3].g,
 //          this->blocks[4].g,
 //          this->blocks[5].g);
-//  result *= 1. - CONSTRAIN(0., .2, this->aaaa);
+  result *= 1. - CONSTRAIN(0., .3, this->blocks[1].g);
   THIS_READUNLOCK(this);
   return result;
 }
@@ -529,9 +476,6 @@ done:
 void _refresh_delay_variation(PacketsRcvTracker * this, GstMpRTPBuffer *mprtp)
 {
   gint64 devar, drcv, dsnd;
-  gint cmp;
-
-//  percentiletracker2_add(this->devars, mprtp->delay);
 
   if(this->devar.last_ntp_rcv_time == 0){
     this->devar.last_timestamp    = mprtp->timestamp;
@@ -541,15 +485,12 @@ void _refresh_delay_variation(PacketsRcvTracker * this, GstMpRTPBuffer *mprtp)
     return;
   }
 
-  DISABLE_LINE cmp = _cmp_uint32(mprtp->timestamp, this->devar.last_timestamp);
-  if(0 && cmp);
+  DISABLE_LINE _cmp_uint32(mprtp->timestamp, this->devar.last_timestamp);
+
   if(mprtp->abs_snd_ntp_time < this->devar.last_ntp_snd_time){
     return;
   }
   if(mprtp->abs_snd_ntp_time < this->devar.last_ntp_snd_time  + get_ntp_from_epoch_ns(5 * GST_MSECOND)){
-    //this->devar.last_ntp_snd_time = mprtp->abs_snd_ntp_time;
-    //this->devar.last_ntp_rcv_time = mprtp->abs_rcv_ntp_time;
-//    this->devar.last_delay        = mprtp->delay;
     return;
   }
 
@@ -568,7 +509,6 @@ void _refresh_delay_variation(PacketsRcvTracker * this, GstMpRTPBuffer *mprtp)
   this->blocks[0].Id1 = MAX(devar, -1 * devar);
 
 
-  percentiletracker2_add(this->devars, devar);
   //mprtp_logger("devars.csv", "%lu\n", MIN(this->devar.last_delay - mprtp->delay, mprtp->delay - this->devar.last_delay));
   this->devar.last_timestamp    = mprtp->timestamp;
   this->devar.last_ntp_snd_time = mprtp->abs_snd_ntp_time;

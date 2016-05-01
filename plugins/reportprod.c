@@ -284,11 +284,12 @@ void report_producer_add_afb_remb(
     guint32 media_source_ssrc,
     guint32 num_ssrc,
     gfloat float_num,
-    guint32 ssrc_feedback)
+    guint32 ssrc_feedback,
+    guint16 hssn)
 {
   GstRTCPAFB_REMB remb;
   THIS_WRITELOCK(this);
-  gst_rtcp_afb_remb_change(&remb, &num_ssrc, &float_num, &ssrc_feedback);
+  gst_rtcp_afb_remb_change(&remb, &num_ssrc, &float_num, &ssrc_feedback, &hssn);
   _add_afb(this, media_source_ssrc, RTCP_AFB_REMB_ID, &remb, sizeof(GstRTCPAFB_REMB));
   THIS_WRITEUNLOCK(this);
 }

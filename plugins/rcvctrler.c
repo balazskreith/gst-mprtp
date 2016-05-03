@@ -560,7 +560,6 @@ _orp_main(RcvController * this)
 
     send_fb = ricalcer_rtcp_fb_allowed(subflow->ricalcer) && subflow->next_feedback < _now(this);
 
-
     if(!send_regular && !send_fb){
       continue;
     }
@@ -896,7 +895,7 @@ GstClockTime _fbra2_interval_calcer(Subflow *subflow)
 void _fbra2_feedback_appender(RcvController *this, Subflow* subflow)
 {
   _orp_add_xr_owd(this, subflow);
-  _orp_add_xr_rfc7097(this, subflow);
+  DISABLE_LINE _orp_add_xr_rfc7097(this, subflow);
   _orp_add_xr_remb(this, subflow);
 }
 

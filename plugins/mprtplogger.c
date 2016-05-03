@@ -127,6 +127,7 @@ mprtp_logger_init (MPRTPLogger * this)
   this->enabled    = FALSE;
   this->sysclock   = gst_system_clock_obtain ();
   listclock        = gst_system_clock_obtain ();
+  this->made       = _now(this);
   strcpy(this->path, "logs/");
   this->touches    = g_hash_table_new(g_str_hash, g_str_equal);
 //  this->reserves   = g_hash_table_new(g_direct_hash, g_direct_equal);
@@ -179,6 +180,15 @@ void mprtp_logger_get_target_directory(gchar* result)
   THIS_READUNLOCK(loggerptr);
 }
 
+gboolean mprtp_logger_is_signaled(void)
+{
+  gboolean result;
+  THIS_READLOCK(loggerptr);
+  result = loggerptr->signaled;
+  THIS_READUNLOCK(loggerptr);
+  return result;
+}
+
 void mprtp_logger(const gchar *filename, const gchar * format, ...)
 {
   FILE *file;
@@ -187,6 +197,18 @@ void mprtp_logger(const gchar *filename, const gchar * format, ...)
   THIS_WRITELOCK(loggerptr);
   if(!loggerptr->enabled){
     goto done;
+  }
+  if(_now(loggerptr) - 10 * GST_SECOND < loggerptr->made){
+    goto done;
+  }
+  if(!loggerptr->signaled){
+    gchar writable[255];
+    strcpy(writable, loggerptr->path);
+    strcat(writable, "signal.log");
+    file = fopen(writable, "w");
+    fprintf(file, "1");
+    fclose(file);
+    loggerptr->signaled = TRUE;
   }
   strcpy(writable, loggerptr->path);
   strcat(writable, filename);
@@ -314,9 +336,13 @@ void _logging_process(void *data)
         continue;
       }
       subscription->tick_count=0;
-      g_rw_lock_writer_lock(subscription->rwmutex);
+      if(subscription->rwmutex){
+        g_rw_lock_writer_lock(subscription->rwmutex);
+      }
       subscription->logging_fnc(subscription->data);
-      g_rw_lock_writer_unlock(subscription->rwmutex);
+      if(subscription->rwmutex){
+        g_rw_lock_writer_unlock(subscription->rwmutex);
+      }
   }
 
   next_scheduler_time = gst_clock_get_time (listclock) + 100 * GST_MSECOND;

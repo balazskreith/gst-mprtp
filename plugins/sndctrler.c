@@ -157,7 +157,8 @@ typedef void (*Action) (SndController *, Subflow *);
 
 //------------------------ Outgoing Report Producer -------------------------
 static void
-_orp_producer_main(SndController * this);
+_orp_producer_main(
+    SndController * this);
 
 static void
 _orp_add_sr (
@@ -823,6 +824,7 @@ guint32 _update_ratewindow(RateWindow *window, guint32 value)
   window->rate_value = value - window->items[window->index];
   return window->rate_value;
 }
+
 
 #undef REPORTTIMEOUT
 #undef THIS_READLOCK

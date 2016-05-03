@@ -75,8 +75,8 @@ SRCRTCPINTVALS="$SRCDIR/sub_1_rtcp_ints.csv"
 
 SRCVETH0="$SRCDIR/veth0.csv"
 #SRCVETH02="$SRCDIR/veth02.csv"
-SRCSNDTHROUGHPUTS2="$SRCDIR/snd_sum_ratestat.csv"
-cat $SRCSNDTHROUGHPUTS | tail -1000 > $SRCSNDTHROUGHPUTS2
+#SRCSNDTHROUGHPUTS2="$SRCDIR/snd_sum_ratestat.csv"
+#cat $SRCSNDTHROUGHPUTS | tail -1000 > $SRCSNDTHROUGHPUTS2
 #sort -u -t',' -k1,1 "$SRCVETH0" > $SRCVETH02
 #join -t , -1 6 -2 1 "$SRCSNDTHROUGHPUTS" "$SRCVETH02" > "$SRCSNDTHROUGHPUTS2"
 
@@ -99,7 +99,7 @@ DSTRTCPINTVALS="$DSTDIR/rtcp-intervals.pdf"
           
   gnuplot -e "duration='$DURSNDTHROUGHPUTS'" \
           -e "output_file='$DSTSNDTHROUGHPUTS'" \
-          -e "throughput_file='$SRCSNDTHROUGHPUTS2'" \
+          -e "throughput_file='$SRCSNDTHROUGHPUTS'" \
           -e "bw_file='$SRCVETH0'" \
 	  -e "fecrates_file='$SRCFECRATES'" \
           "$PLOTSNDTHROUGHPUTS"

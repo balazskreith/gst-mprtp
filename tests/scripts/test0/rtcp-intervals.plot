@@ -47,6 +47,6 @@ set style line 2 linecolor rgb '#b43894' linetype 2 linewidth 1
 set style line 3 linecolor rgb '#185aa9' linetype 3 linewidth 1
 set style line 4 linecolor rgb '#a21d21' linetype 4 linewidth 1	
 
-plot rtcp_file using 1:2 with linespoints title "RTCP timeout"
+plot rtcp_file using 1:2 with linespoints smooth bezier title "RTCP timeout"
      
 

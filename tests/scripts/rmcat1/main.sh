@@ -59,13 +59,23 @@ mkdir $LOGSDIR
 REPORTAUTHORFILE=$LOGSDIR"/author.txt"
 echo "Balázs Kreith" > $REPORTAUTHORFILE
 
+function log_bw() {
+        let "W=$1*10"
+        for j in `seq 1 $W`;
+	do
+	  echo -n "$2" >> $3
+          echo "" >> $3
+	done
+}
+
   #setup duration
-  DURATION=106.3
+  DURATION=120
   
-  #setup virtual ethernet interface controller script
-  echo "./$SCRIPTSDIR/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input $TESTDIR/veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
-  chmod 777 $SCRIPTSDIR/test_bw_veth0_snd.sh
-  
+  log_bw 40 1000 $LOGSDIR/veth0.csv
+  log_bw 20 2500 $LOGSDIR/veth0.csv
+  log_bw 20 600 $LOGSDIR/veth0.csv
+  log_bw 20 1000 $LOGSDIR/veth0.csv
+
   PEER1_SND="$SCRIPTSDIR/sender_1.sh"
   echo -n "./$SENDER" > $PEER1_SND
   ./$TESTDIR/peer1params.sh >> $PEER1_SND
@@ -76,15 +86,17 @@ echo "Balázs Kreith" > $REPORTAUTHORFILE
   ./$TESTDIR/peer1params.sh >> $PEER1_RCV
   chmod 777 $PEER1_RCV
 
+  rm $LOGSDIR"/signal.log"
 
   #start receiver and sender
   sudo ip netns exec $NSRCV ./$PEER1_RCV 2> $LOGSDIR"/"receiver.log &
 #  sleep 5
   sudo ip netns exec $NSSND ./$PEER1_SND 2> $LOGSDIR"/"sender.log &
 
-  sleep 2
-  #run a virtual ethernet interface controller script
-  sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
+  while [ ! -f $LOGSDIR"/signal.log" ]
+  do
+    sleep 0.05
+  done
 
   echo "
   while true; do 

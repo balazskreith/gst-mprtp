@@ -168,6 +168,12 @@ static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummar
     this->result.owd_corr = 1.;
   }
 
+  if(this->last_delay && this->last_delay_t1){
+    GstClockTime ddelay;
+    ddelay = this->last_delay < this->last_delay_t1 ? this->last_delay_t1 - this->last_delay : this->last_delay - this->last_delay_t1;
+    this->result.jitter += (ddelay - this->result.jitter) / 16.;
+  }
+
 done:
   return;
 }

@@ -81,6 +81,12 @@ struct _GstMprtpscheduler
   guint32                       sent_packets;
 
   GstMprtpschedulerPrivate*     priv;
+
+
+  guint test_wait;
+  guint seen_line;
+  gboolean test_enabled;
+  gchar test_seq[255];
 };
 
 struct _GstMprtpschedulerClass

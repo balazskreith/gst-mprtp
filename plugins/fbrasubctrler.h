@@ -60,6 +60,8 @@ struct _FBRASubController
   GstClockTime              last_settled;
   GstClockTime              last_increase;
 
+  gdouble                   rand_factor;
+
   GstClockTime              last_report_arrived_t1;
   GstClockTime              last_report_arrived;
   GstClockTime              report_interval;

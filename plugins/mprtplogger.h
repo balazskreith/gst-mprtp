@@ -26,6 +26,7 @@ struct _MPRTPLogger
   GObject           object;
   GRWLock           rwmutex;
   GstClock*         sysclock;
+  GstClockTime      made;
   GHashTable*       touches;
 //  GHashTable*       reserves;
 
@@ -34,6 +35,8 @@ struct _MPRTPLogger
 
   gchar             path[255];
   gboolean          enabled;
+
+  gboolean          signaled;
 
   GString*          collector_string;
   gchar             collector_filename[255];
@@ -55,6 +58,7 @@ void disable_mprtp_logger(void);
 void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer),gpointer data, guint tick_th, GRWLock *rwmutex);
 void mprtp_logger_set_target_directory(const gchar *path);
 void mprtp_logger_get_target_directory(gchar* result);
+gboolean mprtp_logger_is_signaled(void);
 void mprtp_logger(const gchar *filename, const gchar * format, ...);
 
 void mprtp_logger_open_collector(const gchar *filename);

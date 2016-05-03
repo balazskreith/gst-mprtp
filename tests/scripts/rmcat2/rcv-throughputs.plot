@@ -2,7 +2,7 @@ name=system("echo mprtp-subflow-")
 time=system("date +%Y_%m_%d_%H_%M_%S")
 
 if (!exists("plot_title")) plot_title='Subflow Receiver Rate Report'
-if (!exists("throughput_file"))  throughput_file='logs/sub_1_rcv.csv'
+if (!exists("throughput_file")) throughput_file='logs/sub_1_rcv.csv'
 if (!exists("output_file")) output_file='reports/sub_1_rcv.pdf'
 if (!exists("duration")) duration=6000
 
@@ -20,8 +20,8 @@ set tmargin 5
 set bmargin 5
 set lmargin 7
 set rmargin 7
-set yrange [0:375]
-set ytics 100
+set yrange [0:3000]
+set ytics 500
 set xrange [0:duration]
 set xtics 500
 set ylabel "Size (KBytes)"

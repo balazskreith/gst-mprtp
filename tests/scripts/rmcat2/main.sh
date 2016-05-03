@@ -2,22 +2,14 @@
 programname=$0
 
 function usage {
-    echo "usage: $programname [-r|-rtpprofile num]"
-    echo "	-r --rtprofile		determines the rtp testing profile"
-    echo "				        equal to the ./server --profile=profile_num"
-    echo "  -p --period             determines the period of the report generation"
-    echo "  --savnam			the name of the saving"
-    echo "  --savdir			the directory of the saving"
+    echo "usage: $programname [-p|--period]"
+    echo "  -p --period         determines the period of the report generation"
+    echo "  --savnam		the name of the saving"
+    echo "  --savdir		the directory of the saving"
     exit 1
 }
  
-if [[ $# < 2 ]]
-then
-  usage
-fi
 
-
-RPROFILE=73
 REPPERIOD=5
 SAVDIR="0"
 SAVNAM="0"
@@ -26,10 +18,6 @@ while [[ $# > 1 ]]
 do
 key="$1"
 case $key in
-    -r|--rtpprofile)
-    RPROFILE="$2"
-    shift # past argument
-    ;;
     -p|--period)
     REPPERIOD="$2"
     shift # past argument
@@ -41,7 +29,7 @@ case $key in
     --savnam)
     SAVNAM="$2"
     shift # past argument
-    ;;     
+    ;;       
     --default)
     ;;
     *)
@@ -51,20 +39,11 @@ esac
 shift # past argument or value
 done
 
-
-echo ".-------------------------------------------------------------."
-echo "| Test starts with the following parameters                   |"
-echo "| RTP profile:   "$RPROFILE
-echo "| Report period: "$REPPERIOD
-echo "'-------------------------------------------------------------'"
-
-
 NSSND="ns_snd"
 NSRCV="ns_rcv"
-SERVER="./server"
-CLIENT="./client"
+SENDER="sender"
+RECEIVER="receiver"
 LOGSDIR="logs"
-LOGSDIR2="logs2"
 REPORTSDIR="reports"
 REPORTEXFILE="report.tex"
 STATFILE="stats.csv"
@@ -74,46 +53,67 @@ SCRIPTSDIR="scripts"
 TESTDIR="$SCRIPTSDIR/rmcat2"
 
 rm -R $LOGSDIR
-rm -R $LOGSDIR2
 mkdir $LOGSDIR
-mkdir $LOGSDIR2
 
 #Report author
 REPORTAUTHORFILE=$LOGSDIR"/author.txt"
 echo "Balázs Kreith" > $REPORTAUTHORFILE
 
+function log_bw() {
+        let "W=$1*10"
+        for j in `seq 1 $W`;
+	do
+	  echo -n "$2" >> $3
+          echo "" >> $3
+	done
+}
+
+
   #setup duration
-  DURATION=150
+  DURATION=150.0
   
-  #setup virtual ethernet interface controller script
-  echo "./scripts/veth_ctrler.sh --veth 0 --output $LOGSDIR/veth0.csv --input $TESTDIR/veth0.csv --roothandler 1 --leafhandler 2" > scripts/test_bw_veth0_snd.sh
-  chmod 777 scripts/test_bw_veth0_snd.sh
+  tc qdisc change dev veth0 parent 1: handle 2: tbf rate 4000kbit burst 15400 latency 300ms minburst 1540
+  log_bw 25 4000 $LOGSDIR/veth0.csv
+  log_bw 25 2000 $LOGSDIR/veth0.csv
+  log_bw 25 3500 $LOGSDIR/veth0.csv
+  log_bw 25 1000 $LOGSDIR/veth0.csv
+  log_bw 25 2000 $LOGSDIR/veth0.csv  
 
-  #run a virtual ethernet interface controller script
-  sudo ip netns exec $NSSND ./scripts/test_bw_veth0_snd.sh &
+  PEER1_SND="$SCRIPTSDIR/sender_1.sh"
+  echo -n "./$SENDER" > $PEER1_SND
+  ./$TESTDIR/peer1params.sh >> $PEER1_SND
+  chmod 777 $PEER1_SND
 
-  echo "./server --profile=$RPROFILE --logsdir=$LOGSDIR/  --target_bitrate_min=300000 --target_bitrate_start=1000000 --path1_tx_rtp_port=5000 --path1_tx_rtcp_port=5001 --path1_rx_rtp_port=5002 --path1_rx_rtcp_port=5003 --path2_tx_rtp_port=5004 --path2_tx_rtcp_port=5005 --path2_rx_rtp_port=5006 --path2_rx_rtcp_port=5007 --path3_tx_rtp_port=5008 --path3_tx_rtcp_port=5009 --path3_rx_rtp_port=5010 --path3_rx_rtcp_port=5011 --rtpbin_tx_rtcp_port=5013 --rtpbin_rx_rtcp_port=5015" > "$TESTDIR/server1.sh"
-  echo "./server --profile=$RPROFILE --logsdir=$LOGSDIR2/ --target_bitrate_min=300000 --target_bitrate_start=1000000 --path1_tx_rtp_port=5016 --path1_tx_rtcp_port=5017 --path1_rx_rtp_port=5018 --path1_rx_rtcp_port=5019 --path2_tx_rtp_port=5020 --path2_tx_rtcp_port=5021 --path2_rx_rtp_port=5022 --path2_rx_rtcp_port=5023 --path3_tx_rtp_port=5024 --path3_tx_rtcp_port=5025 --path3_rx_rtp_port=5026 --path3_rx_rtcp_port=5027 --rtpbin_tx_rtcp_port=5028 --rtpbin_rx_rtcp_port=5029" > "$TESTDIR/server2.sh"
-  				 
-  echo "./client --profile=$RPROFILE --logsdir=$LOGSDIR/  --target_bitrate_min=300000 --target_bitrate_start=1000000 --path1_tx_rtp_port=5000 --path1_tx_rtcp_port=5001 --path1_rx_rtp_port=5002 --path1_rx_rtcp_port=5003 --path2_tx_rtp_port=5004 --path2_tx_rtcp_port=5005 --path2_rx_rtp_port=5006 --path2_rx_rtcp_port=5007 --path3_tx_rtp_port=5008 --path3_tx_rtcp_port=5009 --path3_rx_rtp_port=5010 --path3_rx_rtcp_port=5011 --rtpbin_tx_rtcp_port=5013 --rtpbin_rx_rtcp_port=5015" > "$TESTDIR/client1.sh"
-  echo "./client --profile=$RPROFILE --logsdir=$LOGSDIR2/ --target_bitrate_min=300000 --target_bitrate_start=1000000 --path1_tx_rtp_port=5016 --path1_tx_rtcp_port=5017 --path1_rx_rtp_port=5018 --path1_rx_rtcp_port=5019 --path2_tx_rtp_port=5020 --path2_tx_rtcp_port=5021 --path2_rx_rtp_port=5022 --path2_rx_rtcp_port=5023 --path3_tx_rtp_port=5024 --path3_tx_rtcp_port=5025 --path3_rx_rtp_port=5026 --path3_rx_rtcp_port=5027 --rtpbin_tx_rtcp_port=5028 --rtpbin_rx_rtcp_port=5029" > "$TESTDIR/client2.sh"
-				 
-  chmod 777 $TESTDIR/client2.sh
-  chmod 777 $TESTDIR/client1.sh
-  chmod 777 $TESTDIR/server2.sh
-  chmod 777 $TESTDIR/server1.sh
-  
-  #start client and server
-  sudo ip netns exec $NSRCV $TESTDIR/client2.sh 2> $LOGSDIR"/"client1.log &
-  sudo ip netns exec $NSRCV $TESTDIR/client1.sh 2> $LOGSDIR2"/"client2.log &
-  sleep 1
-  sudo ip netns exec $NSSND $TESTDIR/server2.sh 2> $LOGSDIR2"/"server2.log &
-  sudo ip netns exec $NSSND $TESTDIR/server1.sh 2> $LOGSDIR"/"server1.log &
+  PEER1_RCV="$SCRIPTSDIR/receiver_1.sh"
+  echo -n "./$RECEIVER" > $PEER1_RCV
+  ./$TESTDIR/peer1params.sh >> $PEER1_RCV
+  chmod 777 $PEER1_RCV
+
+  PEER2_SND="$SCRIPTSDIR/sender_2.sh"
+  echo -n "./$SENDER" > $PEER2_SND
+  ./$TESTDIR/peer2params.sh >> $PEER2_SND
+  chmod 777 $PEER2_SND
+
+  PEER2_RCV="$SCRIPTSDIR/receiver_2.sh"
+  echo -n "./$RECEIVER" > $PEER2_RCV
+  ./$TESTDIR/peer2params.sh >> $PEER2_RCV
+  chmod 777 $PEER2_RCV
+
+  rm $LOGSDIR"/signal.log"
+
+  #start receiver and sender
+  sudo ip netns exec $NSRCV ./$PEER1_RCV 2> $LOGSDIR"/"receiver.log &
+#  sleep 5
+  sudo ip netns exec $NSSND ./$PEER1_SND 2> $LOGSDIR"/"sender.log &
+
+  sudo ip netns exec $NSRCV ./$PEER2_RCV 2> $LOGSDIR"/"receiver2.log &
+#  sleep 5
+  sudo ip netns exec $NSSND ./$PEER2_SND 2> $LOGSDIR"/"sender2.log &
 
   echo "
   while true; do 
-    ./$TESTDIR/plots.sh --srcdir $LOGSDIR --srcdir2 $LOGSDIR2 --dstdir $REPORTSDIR
-    ./$TESTDIR/stats.sh --srcdir $LOGSDIR --srcdir2 $LOGSDIR2 --dst $REPORTSDIR/$STATFILE
+    ./$TESTDIR/plots.sh --srcdir $LOGSDIR --dstdir $REPORTSDIR
+    ./$TESTDIR/stats.sh --srcdir $LOGSDIR --dst $REPORTSDIR/$STATFILE
     mv $LOGSDIR/ccparams_1.log $REPORTSDIR/ccparams_1.log
     ./$TESTDIR/report.sh --srcdir $REPORTSDIR --author $REPORTAUTHORFILE --dst $REPORTEXFILE
     ./$SCRIPTSDIR/pdflatex.sh $REPORTEXFILE
@@ -130,8 +130,8 @@ echo "Balázs Kreith" > $REPORTAUTHORFILE
 cleanup()
 # example cleanup function
 {
-  pkill client
-  pkill server
+  pkill receiver
+  pkill sender
   ps -ef | grep 'veth_ctrler.sh' | grep -v grep | awk '{print $2}' | xargs kill
   ps -ef | grep 'report_generato' | grep -v grep | awk '{print $2}' | xargs kill
   ps -ef | grep 'main.sh' | grep -v grep | awk '{print $2}' | xargs kill
@@ -154,7 +154,7 @@ sleep $DURATION
 
 if [ "$SAVDIR" != "0" ]
 then
-  echo "./$TESTDIR/save.sh --logsdir $LOGSDIR --logsdir2 $LOGSDIR2 --repsdir $REPORTSDIR --savnam $SAVNAM --savdir $SAVDIR" > $SCRIPTSDIR/saving.sh
+  echo "./$TESTDIR/save.sh --logsdir $LOGSDIR --repsdir $REPORTSDIR --savnam $SAVNAM --savdir $SAVDIR" > $SCRIPTSDIR/saving.sh
   chmod 777 $SCRIPTSDIR/saving.sh
   ./$SCRIPTSDIR/saving.sh
 fi

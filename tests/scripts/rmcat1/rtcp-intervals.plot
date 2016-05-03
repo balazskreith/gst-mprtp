@@ -5,7 +5,7 @@ if (!exists("plot_title"))  plot_title='Subflow RTCP Intervals'
 if (!exists("rtcp_file")) rtcp_file='logs/rtcp_rr_1.csv'
 if (!exists("output_file")) output_file='reports/sub_1_rtcp_intervals.pdf'
 if (!exists("duration"))  duration=100
-if (!exists("range"))  range=2000
+if (!exists("range"))  range=8
 
 #-------------------------------------------------------------------------
 
@@ -22,11 +22,11 @@ set bmargin 5
 set lmargin 7
 set rmargin 7
 set yrange [0:range]
-set ytics 1000
+set ytics 0.5
 set xrange [0:duration]
-set xtics 6000
+set xtics 100
 set xlabel "Report counter"
-set ylabel "Intervals length (ms)"
+set ylabel "Intervals length (s)"
 
 # set title plot_title font ",18"
 
@@ -47,6 +47,10 @@ set style line 2 linecolor rgb '#b43894' linetype 2 linewidth 1
 set style line 3 linecolor rgb '#185aa9' linetype 3 linewidth 1
 set style line 4 linecolor rgb '#a21d21' linetype 4 linewidth 1	
 
-plot rtcp_file using 0:(($1 == 0) ? 1/0 : $1) with points title "RTCP timeout"
+#plot rtcp_file using 1:2 with points smooth csplines title "RTCP timeout"
+
+plot rtcp_file using 1:2 notitle with points linestyle 1, \
+     rtcp_file using 1:2 notitle smooth csplines with lines linestyle 1, \
+     1 / 0 title "title" with linespoints linestyle 1
      
 

@@ -106,6 +106,7 @@ static void _mprtpscheduler_process_run(void *data);
 
 static guint _subflows_utilization;
 
+static void _tester(void *data);
 
 enum
 {
@@ -127,6 +128,7 @@ enum
   PROP_FEC_INTERVAL,
   PROP_LOG_ENABLED,
   PROP_LOG_PATH,
+  PROP_TEST_SEQ,
 };
 
 /* signals and args */
@@ -323,6 +325,12 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
             "Determines the path for logfiles",
             "NULL", G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_TEST_SEQ,
+        g_param_spec_string ("testseq",
+            "Determines the path for test sequence",
+            "Determines the path for test sequence",
+            "NULL", G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   _subflows_utilization =
       g_signal_new ("mprtp-subflows-utilization", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (GstMprtpschedulerClass, mprtp_media_rate_utilization),
@@ -409,7 +417,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
                             );
   fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
   _setup_paths(this);
-
+  mprtp_logger_add_logging_fnc(_tester, this, 1, NULL);
 }
 
 
@@ -571,6 +579,12 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       mprtp_logger_set_target_directory(g_value_get_string(value));
       THIS_WRITEUNLOCK (this);
       break;
+    case PROP_TEST_SEQ:
+      THIS_WRITELOCK (this);
+      strcpy(this->test_seq, g_value_get_string(value));
+      this->test_enabled = TRUE;
+      THIS_WRITEUNLOCK (this);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -609,6 +623,11 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
         mprtp_logger_get_target_directory(string);
         g_value_set_string (value, string);
       }
+      THIS_READUNLOCK (this);
+      break;
+    case PROP_TEST_SEQ:
+      THIS_READLOCK (this);
+      g_value_set_string (value, this->test_seq);
       THIS_READUNLOCK (this);
       break;
     case PROP_FEC_PAYLOAD_TYPE:
@@ -1216,6 +1235,58 @@ done:
     GST_WARNING_OBJECT (this, "The scheduler clock wait is interrupted");
   }
   gst_clock_id_unref (clock_id);
+}
+
+
+void _tester(void *data)
+{
+  FILE * fp;
+  char * line = NULL;
+  size_t len = 0;
+  ssize_t read;
+  guint seen_line = 0, i=0, read_num, wait_num;
+  GstMprtpscheduler *this;
+
+  this = data;
+  if(!this->test_enabled || !mprtp_logger_is_signaled()){
+    return;
+  }
+  if(0 < this->test_wait){
+    --this->test_wait;
+    return;
+  }
+  fp = fopen(this->test_seq, "r");
+  if (fp == NULL){
+    g_warning("test_commands doesn't exist");
+    return;
+  }
+
+  while ((read = getline(&line, &len, fp)) != -1) {
+    if(seen_line++ < this->seen_line) continue;
+    break;
+  }
+  if (read == -1) {
+    this->test_enabled = FALSE;
+    return;
+  }
+
+  sscanf(line, "%d %d", &read_num, &wait_num);
+  ++this->seen_line;
+  this->test_wait = wait_num * 10;
+  for(i=0; i<read_num; ++i){
+    if(getline(&line, &len, fp) == -1){
+      break;
+    }
+    g_print("execute: %s\n", line);
+    if(system(line) == -1){
+      break;
+    }
+    ++this->seen_line;
+  }
+
+  fclose(fp);
+  if (line)
+      free(line);
 }
 
 #undef THIS_WRITELOCK

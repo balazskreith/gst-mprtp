@@ -180,6 +180,14 @@ mprtpr_path_is_urgent_request(MpRTPRPath *this)
 }
 
 void
+mprtpr_path_set_urgent_request(MpRTPRPath *this)
+{
+  THIS_WRITELOCK (this);
+  this->urgent = TRUE;
+  THIS_WRITEUNLOCK (this);
+}
+
+void
 mprtpr_path_set_discard_treshold(MpRTPRPath *this, GstClockTime treshold)
 {
   THIS_WRITELOCK (this);

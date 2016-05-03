@@ -45,6 +45,7 @@ struct _RMDIProcessorResult{
   gboolean       owd_processed;
   gdouble        owd_corr;
   guint32        rcv_est_max_bitrate;
+  gdouble        jitter;
 };
 
 struct _RMDIProcessor

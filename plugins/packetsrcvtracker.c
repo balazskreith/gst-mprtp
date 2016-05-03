@@ -267,15 +267,15 @@ gdouble packetsrcvtracker_get_remb(PacketsRcvTracker * this, guint16 *hssn)
     *hssn = _trackerstat(this).highest_seq;
   }
   result = _trackerstat(this).good_payload_bytes_in_1s * 8;
-  g_print("g0: %-10f (%-10f) | g1: %-10f | g2: %-10f | g3: %-10f | g4: %-10f | g5: %-10f\n",
-          this->blocks[0].g,
-          this->aaaa,
-          this->blocks[1].g,
-          this->blocks[2].g,
-          this->blocks[3].g,
-          this->blocks[4].g,
-          this->blocks[5].g);
-  result *= 1. - CONSTRAIN(0., .3, this->blocks[1].g);
+//  g_print("g0: %-10f (%-10f) | g1: %-10f | g2: %-10f | g3: %-10f | g4: %-10f | g5: %-10f\n",
+//          this->blocks[0].g,
+//          this->aaaa,
+//          this->blocks[1].g,
+//          this->blocks[2].g,
+//          this->blocks[3].g,
+//          this->blocks[4].g,
+//          this->blocks[5].g);
+  result *= 1. - CONSTRAIN(0., .8, this->blocks[1].g);
   THIS_READUNLOCK(this);
   return result;
 }

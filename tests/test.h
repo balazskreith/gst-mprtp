@@ -176,6 +176,9 @@ static gchar default_path_2_tx_ip[255];
 static gchar *path_3_tx_ip      = NULL;
 static gchar default_path_3_tx_ip[255];
 
+static gchar *testseq      = NULL;
+static gchar default_testseq[255];
+
 static int logging              = 0;
 static int owd_th               = 200;
 static int discard_th           = 50;
@@ -185,7 +188,7 @@ static int spike_var_th         = 32;
 static int rtcp_interval_type   = 2;
 static int report_timeout       = 0;
 static int controlling_mode     = 2;
-static int sending_target       = 200000;
+static int sending_target       = 500000;
 static int path1_active         = 1;
 static int path2_active         = 0;
 static int path3_active         = 0;
@@ -203,6 +206,7 @@ static int playout_min_rate = 10;
 static int playout_desired_framenum   = 3;
 static double playout_spread_factor = 1.1;
 
+
 static GOptionEntry entries[] =
 {
     { "logsdir", 0, 0, G_OPTION_ARG_STRING, &logsdir, "Logsdir", NULL },
@@ -215,6 +219,7 @@ static GOptionEntry entries[] =
     { "path_1_tx_ip", 0, 0, G_OPTION_ARG_STRING, &path_1_tx_ip, "path_1_tx_ip", NULL },
     { "path_2_tx_ip", 0, 0, G_OPTION_ARG_STRING, &path_2_tx_ip, "path_2_tx_ip", NULL },
     { "path_3_tx_ip", 0, 0, G_OPTION_ARG_STRING, &path_3_tx_ip, "path_3_tx_ip", NULL },
+    { "testseq", 0, 0, G_OPTION_ARG_STRING, &testseq, "testseq", NULL },
     { "path1_active", 0, 0, G_OPTION_ARG_INT, &path1_active, "path1_active", NULL },
     { "path2_active", 0, 0, G_OPTION_ARG_INT, &path2_active, "path2_active", NULL },
     { "path3_active", 0, 0, G_OPTION_ARG_INT, &path3_active, "path3_active", NULL },

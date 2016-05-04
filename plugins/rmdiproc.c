@@ -173,6 +173,7 @@ static void _process_owd(RMDIProcessor *this, GstMPRTCPXRReportSummary *xrsummar
     ddelay = this->last_delay < this->last_delay_t1 ? this->last_delay_t1 - this->last_delay : this->last_delay - this->last_delay_t1;
     this->result.jitter += (ddelay - this->result.jitter) / 16.;
   }
+  this->result.delay_avg = this->result.delay_avg * .75 + this->last_delay * .25;
 
 done:
   return;

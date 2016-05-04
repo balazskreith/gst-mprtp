@@ -840,6 +840,7 @@ _probe_stage(
 
   if(_probe_trend_th(this) < _trend(this)){
     _disable_monitoring(this);
+    _set_event(this, EVENT_SETTLED);
     _switch_stage_to(this, STAGE_KEEP, FALSE);
     target_rate = _TR(this) * 1.0;
     goto done;
@@ -888,7 +889,7 @@ _increase_stage(
     goto done;
   }
 
-  if(!_priv(this)->rr_approved){
+  if(_min_target(this) * 10 < _TR(this) && !_priv(this)->rr_approved){
     _priv(this)->rr_approved = target_rate * .9 < _remb(this) && _remb(this) < target_rate * 1.1;
     if(_priv(this)->rr_approved){
       _priv(this)->rr_approved_time = _now(this);
@@ -896,10 +897,11 @@ _increase_stage(
     goto done;
   }
 
-  if(_now(this) -  this->rand_factor * _priv(this)->rtt < _priv(this)->tr_approved_time){
+  if(_min_target(this) * 5 < _TR(this) && _now(this) -  this->rand_factor * _priv(this)->rtt < _priv(this)->tr_approved_time){
     goto done;
   }
-  if(_now(this) -  this->rand_factor * _priv(this)->rtt < _priv(this)->rr_approved_time){
+
+  if(_min_target(this) * 10 < _TR(this) && _now(this) -  this->rand_factor * _priv(this)->rtt < _priv(this)->rr_approved_time){
     goto done;
   }
 
@@ -948,6 +950,7 @@ _fire(
         case EVENT_READY:
           mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_UNDERUSED);
           break;
+        case EVENT_SETTLED:
         case EVENT_FI:
         default:
         break;
@@ -964,7 +967,7 @@ _fire(
           _activate_pacer(this, TRUE);
           mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_OVERUSED);
         break;
-        case EVENT_READY:
+        case EVENT_SETTLED:
           mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_STABLE);
         break;
         case EVENT_FI:
@@ -1221,7 +1224,7 @@ void fbrasubctrler_logging(FBRASubController *this)
                "# Bottleneck point:            %-10d| OWD Corr:                   %-10f#\n"
                "# Monitoring Interval:         %-10d| tr_is_approved:             %-10d#\n"
                "# Monitoring Bitrate:          %-10d| rr_is_approved:             %-10d#\n"
-               "# Jitter:                      %-10f| REMB:                       %-10d#\n"
+               "# Delay avg:              %-10.3f| REMB:                       %-10d#\n"
                "###################### MSeconds since setup: %lu ######################\n"
                ,
 
@@ -1258,7 +1261,7 @@ void fbrasubctrler_logging(FBRASubController *this)
                _mon_br(this),
                _priv(this)->rr_approved,
 
-               _rmdi(this).jitter,
+               _rmdi(this).delay_avg,
                _remb(this),
 
                GST_TIME_AS_MSECONDS(_now(this) - this->made)

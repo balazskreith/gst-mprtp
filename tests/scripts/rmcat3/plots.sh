@@ -55,49 +55,32 @@ echo "debug is 1"
   set -x
 fi
 
-DURFEC=1250
-DURRCVQUEUE=1250
-DURRCVTHROUGHPUTS=1250
-DURSNDTHROUGHPUTS=1250
-DURRTCPINTVALS=1250
-DURLOSTS=1250
+DURRCVTHROUGHPUTS=1000
+DURSNDTHROUGHPUTS=1000
+DURRTCPINTVALS=1000
 
-PLOTDIR="scripts/rmcat2"
-PLOTFEC="$PLOTDIR/fec.plot"
-PLOTRCVQUEUE="$PLOTDIR/rcvqueue.plot"
-PLOTAUTOCORRS="$PLOTDIR/owd-autocorrs.plot"
+PLOTDIR="scripts/rmcat3"
 PLOTRCVTHROUGHPUTS="$PLOTDIR/rcv-throughputs.plot"
 PLOTSNDTHROUGHPUTS="$PLOTDIR/snd-throughputs.plot"
 PLOTRTCPINTVALS="$PLOTDIR/rtcp-intervals.plot"
 
-SRCFEC="$SRCDIR/fecdec_stat.csv"
-SRCRCVQUEUE="$SRCDIR/packetsrcvqueue.csv"
-SRCAUTOCORRS="$SRCDIR/rmdiautocorrs_1.csv"
 SRCRCVTHROUGHPUTS="$SRCDIR/sub_1_rcv.csv"
 SRCSNDTHROUGHPUTS="$SRCDIR/snd_1_ratestat.csv"
-SRCSNDTHROUGHPUTS3="$SRCDIR2/snd_1_ratestat.csv"
-SRCFECRATES="$SRCDIR/fecrates.csv"
 SRCRTCPINTVALS="$SRCDIR/sub_1_rtcp_ints.csv"
 
-SRCVETH0="$SRCDIR/veth0.csv"
-#SRCVETH02="$SRCDIR/veth02.csv"
-SRCSNDTHROUGHPUTS2="$SRCDIR/snd_sum_ratestat.csv"
-cat $SRCSNDTHROUGHPUTS | tail -1250 > $SRCSNDTHROUGHPUTS2
+SRCRCVTHROUGHPUTS2="$SRCDIR2/sub_1_rcv.csv"
+SRCSNDTHROUGHPUTS2="$SRCDIR2/snd_1_ratestat.csv"
 
-DSTFEC="$DSTDIR/fec.pdf"
-DSTRCVQUEUE="$DSTDIR/rcvqueue.pdf"
-DSTAUTOCORRS="$DSTDIR/owd-autocorrs.pdf"
+SRCVETH0="$SRCDIR/veth0.csv"
+SRCVETH1="$SRCDIR2/veth1.csv"
+
 DSTRCVTHROUGHPUTS="$DSTDIR/rcv-throughputs.pdf"
 DSTSNDTHROUGHPUTS="$DSTDIR/snd-throughputs.pdf"
 DSTRTCPINTVALS="$DSTDIR/rtcp-intervals.pdf"
 
-echo "$SRCSNDTHROUGHPUTS3" > log123.txt
+DSTRCVTHROUGHPUTS2="$DSTDIR/rcv-throughputs2.pdf"
+DSTSNDTHROUGHPUTS2="$DSTDIR/snd-throughputs2.pdf"
 
-  gnuplot -e "duration='$DURFEC'" \
-          -e "output_file='$DSTFEC'" \
-          -e "fec_file='$SRCFEC'" \
-          "$PLOTFEC"
-          
   gnuplot -e "duration='$DURRCVTHROUGHPUTS'" \
           -e "output_file='$DSTRCVTHROUGHPUTS'" \
           -e "throughput_file='$SRCRCVTHROUGHPUTS'" \
@@ -106,13 +89,17 @@ echo "$SRCSNDTHROUGHPUTS3" > log123.txt
   gnuplot -e "duration='$DURSNDTHROUGHPUTS'" \
           -e "output_file='$DSTSNDTHROUGHPUTS'" \
           -e "throughput_file='$SRCSNDTHROUGHPUTS'" \
-          -e "throughput_file2='$SRCSNDTHROUGHPUTS3'" \
           -e "bw_file='$SRCVETH0'" \
-	      -e "fecrates_file='$SRCFECRATES'" \
           "$PLOTSNDTHROUGHPUTS"
 
-  gnuplot -e "duration='$DURRTCPINTVALS'" \
-          -e "output_file='$DSTRTCPINTVALS'" \
-          -e "rtcp_file='$SRCRTCPINTVALS'" \
-          "$PLOTRTCPINTVALS"
+  #gnuplot -e "duration='$DURRCVTHROUGHPUTS'" \
+  #        -e "output_file='$DSTRCVTHROUGHPUTS2'" \
+  #        -e "throughput_file='$SRCRCVTHROUGHPUTS2'" \
+  #        "$PLOTRCVTHROUGHPUTS2"
+          
+  #gnuplot -e "duration='$DURSNDTHROUGHPUTS'" \
+  #        -e "output_file='$DSTSNDTHROUGHPUTS2'" \
+  #        -e "throughput_file='$SRCSNDTHROUGHPUTS2'" \
+  #        -e "bw_file='$SRCVETH1'" \
+  #        "$PLOTSNDTHROUGHPUTS2"
 

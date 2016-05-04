@@ -284,6 +284,10 @@ struct _Private{
 
 #define _now(this) (gst_clock_get_time(this->sysclock))
 
+static gint32
+_get_reduced_target(
+    FBRASubController *this);
+
 static void
 _reduce_stage(
     FBRASubController *this);
@@ -559,29 +563,26 @@ void fbrasubctrler_time_update(FBRASubController *this)
   if(!this->enabled){
     goto done;
   }
-  //check backward congestion
+
+  //check weather monitoring interval doesn't exceed max ramp up limit.
   this->monitored_bitrate = mprtps_path_get_monitored_bitrate(this->path, &this->monitored_packets);
   if(_max_ramp_up(this) < this->monitored_bitrate){
       this->monitoring_interval = CONSTRAIN(_mon_min_int(this), _mon_max_int(this), this->monitoring_interval + 1);
       _set_monitoring_interval(this, this->monitoring_interval);
   }
 
-  if(_bcongestion(this)){
-    if(this->last_report_arrived < _now(this) - 2 * this->report_interval){
-      goto done;
-    }
-    if(this->last_report_arrived_t1 < _now(this) - 2 * this->report_interval){
-      goto done;
-    }
-    _bcongestion(this) = FALSE;
-    goto done;
-  }
-
   if(0 < this->disable_controlling && this->disable_controlling < _now(this)){
     goto done;
   }
-  //Todo: backward congestion detect here
-//  _bcongestion(this) = this->last_report_arrived < _now(this) - MAX(500 * GST_MSECOND, 3 * this->report_interval);
+
+  //check backward congestion
+  if(!_bcongestion(this) && this->last_report_arrived < _now(this) - 3 * this->report_interval){
+    //backward congestion -> direct change to REDUCE STAGE
+    _set_event(this, EVENT_CONGESTION);
+    _switch_stage_to(this, STAGE_REDUCE, FALSE);
+    _change_target_bitrate(this, _get_reduced_target(this));
+    goto done;
+  }
 
 done:
   return;
@@ -660,7 +661,8 @@ void fbrasubctrler_report_update(
   }
   this->last_report_arrived_t1 = this->last_report_arrived;
   this->last_report_arrived    = _now(this);
-  this->report_interval        = this->last_report_arrived - this->last_report_arrived_t1;
+  this->report_interval        = MAX(200 * GST_MSECOND, this->last_report_arrived - this->last_report_arrived_t1);
+  _bcongestion(this)           = FALSE;
 
   rmdi_processor_do(this->fb_processor, summary, &this->rmdi_result);
   _update_tr_corr(this);
@@ -698,7 +700,7 @@ done:
   return;
 }
 
-static gint32
+gint32
 _get_reduced_target(FBRASubController *this)
 {
   gint32 target_rate = this->target_bitrate;
@@ -708,7 +710,7 @@ _get_reduced_target(FBRASubController *this)
   }
 
 //  target_rate = MIN(_TR(this), _remb(this) * CONSTRAIN(.6, .95, 2.-_trend(this)/2.));
-  this->bottleneck_point = target_rate = MIN(_TR(this), _remb(this) );
+  this->bottleneck_point = target_rate = MIN( MIN(_TR(this), _TR_t1(this)), _remb(this) );
   _priv(this)->rr_approved = FALSE;
   _priv(this)->reduce_trend = _trend(this);
   _priv(this)->reduce_started = _now(this);
@@ -761,7 +763,7 @@ _keep_stage(
 {
   gint32   target_rate = this->target_bitrate;
 
-  if(_bcongestion(this) || _fcongestion(this)){
+  if(_fcongestion(this)){
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     target_rate = _get_reduced_target(this) * BETHA;
@@ -794,16 +796,6 @@ done:
   return;
 }
 
-static gboolean _check_monitoring(FBRASubController *this)
-{
-  GstClockTime wait_time;
-  wait_time = _get_probe_interval(this) * this->rand_factor;
-  if(_now(this) - wait_time < this->monitoring_started){
-    return FALSE;
-  }
-  return TRUE;
-}
-
 static gint32
 _get_next_target(FBRASubController *this)
 {
@@ -823,7 +815,7 @@ _probe_stage(
 {
   gint32   target_rate = this->target_bitrate;
 
-  if(_bcongestion(this) || _fcongestion(this)){
+  if(_fcongestion(this)){
     _disable_monitoring(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
@@ -846,7 +838,7 @@ _probe_stage(
     goto done;
   }
 
-  if(!_check_monitoring(this)){
+  if(_now(this) - _get_probe_interval(this) * this->rand_factor < this->monitoring_started){
     goto done;
   }
 
@@ -865,7 +857,7 @@ _increase_stage(
 {
   gint32 target_rate = this->target_bitrate;
 
-  if(_bcongestion(this) || _fcongestion(this)){
+  if(_fcongestion(this)){
     _disable_monitoring(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);

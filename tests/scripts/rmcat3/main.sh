@@ -50,7 +50,7 @@ STATFILE="stats.csv"
 REPORTPDF="report.pdf"
 
 SCRIPTSDIR="scripts"
-TESTDIR="$SCRIPTSDIR/rmcat2"
+TESTDIR="$SCRIPTSDIR/rmcat3"
 
 rm -R $LOGSDIR
 mkdir $LOGSDIR
@@ -70,15 +70,19 @@ function log_bw() {
 
 
   #setup duration
-  DURATION=150.0
+  DURATION=120.0
   
-  sudo ip netns exec $NSSND tc qdisc change dev veth0 parent 1: handle 2: tbf rate 4000kbit burst 15400 latency 300ms minburst 1540
+  sudo ip netns exec $NSSND tc qdisc change dev veth0 parent 1: handle 2: tbf rate 2000kbit burst 15400 latency 300ms minburst 1540
+#  sudo ip netns exec $NSRCV tc qdisc change dev veth1 parent 1: handle 2: tbf rate 2000kbit burst 15400 latency 300ms minburst 1540
 
-  log_bw 25 4000 $LOGSDIR/veth0.csv
-  log_bw 25 2000 $LOGSDIR/veth0.csv
-  log_bw 25 3500 $LOGSDIR/veth0.csv
-  log_bw 25 1000 $LOGSDIR/veth0.csv
-  log_bw 25 2000 $LOGSDIR/veth0.csv  
+  log_bw 20 2000 $LOGSDIR/veth0.csv
+  log_bw 20 1000 $LOGSDIR/veth0.csv
+  log_bw 20 500 $LOGSDIR/veth0.csv
+  log_bw 40 2000 $LOGSDIR/veth0.csv
+
+  log_bw 35 2000 $LOGSDIR/veth1.csv
+  log_bw 35 800 $LOGSDIR/veth1.csv
+  log_bw 30 2000 $LOGSDIR/veth1.csv
 
   PEER1_SND="$SCRIPTSDIR/sender_1.sh"
   echo -n "./$SENDER" > $PEER1_SND
@@ -104,18 +108,15 @@ function log_bw() {
 
   #start receiver and sender
   sudo ip netns exec $NSRCV ./$PEER1_RCV 2> $LOGSDIR"/"receiver.log &
-#  sleep 5
   sudo ip netns exec $NSSND ./$PEER1_SND 2> $LOGSDIR"/"sender.log &
 
-  sudo ip netns exec $NSRCV ./$PEER2_RCV 2> $LOGSDIR"/"receiver2.log &
-#  sleep 5
-  sudo ip netns exec $NSSND ./$PEER2_SND 2> $LOGSDIR"/"sender2.log &
+  sudo ip netns exec $NSSND ./$PEER2_RCV 2> $LOGSDIR"/"receiver2.log &
+  sudo ip netns exec $NSRCV ./$PEER2_SND 2> $LOGSDIR"/"sender2.log &
 
   echo "
   while true; do 
     ./$TESTDIR/plots.sh --srcdir $LOGSDIR --dstdir $REPORTSDIR
     ./$TESTDIR/stats.sh --srcdir $LOGSDIR --dst $REPORTSDIR/$STATFILE
-    mv $LOGSDIR/ccparams_1.log $REPORTSDIR/ccparams_1.log
     ./$TESTDIR/report.sh --srcdir $REPORTSDIR --author $REPORTAUTHORFILE --dst $REPORTEXFILE
     ./$SCRIPTSDIR/pdflatex.sh $REPORTEXFILE
 

@@ -110,32 +110,13 @@ echo "
 \pagebreak
 \section{Results}
 
-The choosen algorithm is a multiple-$\tau$ auocorrelation based congestion controller algorithm.
-
-\begin{figure}[h]
-\begin{verbatim}
-
-TEXTTOREPLACE
-
-\end{verbatim}
-\caption{Parameters name and their values}
-\label{fig:ascii-box}
-\end{figure}
-
-
 " >> $DST
 
 FECPLOT="$SRCDIR/fec.pdf"
-RCVQUEUEPLOT="$SRCDIR/rcvqueue.pdf"
-AUTOCORRSPLOT="$SRCDIR/owd-autocorrs.pdf"
 RCVTHROUGHPUTSPLOT="$SRCDIR/rcv-throughputs.pdf"
 SNDTHROUGHPUTSPLOT="$SRCDIR/snd-throughputs.pdf"
 RTCPINTVALSPLOT="$SRCDIR/rtcp-intervals.pdf"
-LOSTSPLOT="$SRCDIR/losts.pdf"
-CCPARAMS="$SRCDIR/ccparams_1.log"
 STATFILE="$SRCDIR/stats.csv"
-
-sed -e '/TEXTTOREPLACE/ {' -e 'r '$CCPARAMS -e 'd' -e '}' -i $DST
 
 read GP_AVG GP_DEV FL_AVG FL_DEV LOSTS_AVG LOSTS_DEV< $STATFILE
 
@@ -172,13 +153,6 @@ echo "
     \includegraphics[width=1\textwidth]{$RCVTHROUGHPUTSPLOT}
     \caption{The measured throughputs at the receiver side}
     \label{fig:rcvthroughputs}
-\end{figure}
-
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=1\textwidth]{$RCVQUEUEPLOT}
-    \caption{Playout delays and queue size}
-    \label{fig:playouts}
 \end{figure}
 
 \begin{figure}[h]

@@ -3,7 +3,6 @@ time=system("date +%Y_%m_%d_%H_%M_%S")
 
 if (!exists("plot_title")) plot_title='Subflow Receiver Rate Report'
 if (!exists("throughput_file")) throughput_file='logs/sub_snd_sum.csv'
-if (!exists("throughput_file2")) throughput_file2='logs/sub_snd_sum.csv'
 if (!exists("bw_file")) bw_file='logs/veth0.csv'
 if (!exists("output_file")) output_file='reports/summary-snd-rates.pdf'
 if (!exists("duration")) duration=6000
@@ -48,7 +47,9 @@ set style line 4 linecolor rgb '#a21d21' linetype 4 linewidth 1
 set style line 5 linecolor rgb '#662c91' linetype 5 linewidth 1	
 
  plot throughput_file using 0:3 with lines ls 1 title "Sending Rate", \
-      throughput_file2 using 0:3 with lines ls 2 title "Sending Rate2", \
+      throughput_file using 0:1 with lines ls 2 title "Target Rate", \
+      throughput_file using 0:5 with lines ls 3 title "FEC Rate", \
       bw_file using 0:1 with lines ls 4 title "Path Capacity"
+
 
 

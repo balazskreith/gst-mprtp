@@ -1,10 +1,8 @@
-1 25
-tc qdisc change dev veth0 parent 1: handle 2: tbf rate 4000kbit burst 15400 latency 300ms minburst 1540
-1 25
+1 20
 tc qdisc change dev veth0 parent 1: handle 2: tbf rate 2000kbit burst 15400 latency 300ms minburst 1540
-1 25
-tc qdisc change dev veth0 parent 1: handle 2: tbf rate 3500kbit burst 15400 latency 300ms minburst 1540
-1 25
+1 20
 tc qdisc change dev veth0 parent 1: handle 2: tbf rate 1000kbit burst 15400 latency 300ms minburst 1540
-1 25
+1 20
+tc qdisc change dev veth0 parent 1: handle 2: tbf rate 500kbit burst 15400 latency 300ms minburst 1540
+1 20
 tc qdisc change dev veth0 parent 1: handle 2: tbf rate 2000kbit burst 15400 latency 300ms minburst 1540

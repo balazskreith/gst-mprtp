@@ -47,6 +47,7 @@ struct _RMDIProcessorResult{
   guint32        rcv_est_max_bitrate;
   gdouble        jitter;
   gdouble        delay_avg;
+  gboolean       congestion_notification;
 };
 
 struct _RMDIProcessor

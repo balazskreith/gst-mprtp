@@ -52,6 +52,13 @@ typedef struct _GstMPRTCPXRReportSummary{
     gboolean          early_bit;
     guint32           discarded_bytes;
   }DiscardedBytes;
+
+  struct{
+    gboolean          processed;
+    guint8            interval_metric;
+    gboolean          early_bit;
+    guint32           discarded_packets;
+  }DiscardedPackets;
 }GstMPRTCPXRReportSummary;
 
 struct _GstMPRTCPReportSummary{

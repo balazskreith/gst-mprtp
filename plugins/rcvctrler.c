@@ -98,6 +98,7 @@ struct _Subflow
   guint32                       total_lost;
   guint32                       total_received;
   guint32                       total_discarded_bytes;
+  guint32                       total_packets_discarded_or_lost;
   guint16                       HSSN;
   guint64                       last_SR_report_sent;
   guint64                       last_SR_report_rcvd;
@@ -159,6 +160,11 @@ _orp_add_rr(
 static void
 _orp_add_xr_rfc7243(
     RcvController *this,
+    Subflow *subflow);
+
+static void
+_orp_add_xr_rfc7002(
+    RcvController * this,
     Subflow *subflow);
 
 static void
@@ -686,6 +692,27 @@ void _orp_add_xr_rfc7243(RcvController * this, Subflow *subflow)
                                          FALSE,
                                          trackerstat.total_payload_discarded);
 
+  subflow->total_discarded_bytes = trackerstat.total_payload_discarded;
+
+done:
+  return;
+}
+
+void _orp_add_xr_rfc7002(RcvController * this, Subflow *subflow)
+{
+  PacketsRcvTrackerStat trackerstat;
+  packetsrcvtracker_get_stat(subflow->packetstracker, &trackerstat);
+  if(trackerstat.total_packets_discarded_or_lost == subflow->total_packets_discarded_or_lost){
+    goto done;
+  }
+
+  report_producer_add_xr_discarded_packets(this->report_producer,
+                                         RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION,
+                                         FALSE,
+                                         trackerstat.total_packets_discarded_or_lost);
+
+  subflow->total_packets_discarded_or_lost = trackerstat.total_packets_discarded_or_lost;
+
 done:
   return;
 }
@@ -896,6 +923,8 @@ void _fbra2_feedback_appender(RcvController *this, Subflow* subflow)
 {
   _orp_add_xr_owd(this, subflow);
   DISABLE_LINE _orp_add_xr_rfc7097(this, subflow);
+  DISABLE_LINE _orp_add_xr_rfc7243(this, subflow);
+  _orp_add_xr_rfc7002(this, subflow);
   _orp_add_xr_remb(this, subflow);
 }
 

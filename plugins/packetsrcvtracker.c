@@ -380,7 +380,6 @@ void _obsolate_misordered(PacketsRcvTracker *this)
   GstClockTime now;
 
   _obsolate_discarded(this);
-
   now = _now(this);
   while(!g_queue_is_empty(this->missed)){
     item = g_queue_peek_head(this->missed);
@@ -402,6 +401,8 @@ void _obsolate_misordered(PacketsRcvTracker *this)
 
 void _add_packet_to_missed(PacketsRcvTracker *this, PacketsRcvTrackerItem* item)
 {
+  _obsolate_misordered(this);
+
   _ref_item(item);
   item->received = FALSE;
   item->missed   = TRUE;

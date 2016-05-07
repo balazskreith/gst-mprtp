@@ -192,6 +192,23 @@ void report_producer_add_xr_discarded_bytes(ReportProducer *this,
   THIS_WRITEUNLOCK(this);
 }
 
+void report_producer_add_xr_discarded_packets(ReportProducer *this,
+                                    guint8 interval_metric_flag,
+                                    gboolean early_bit,
+                                    guint32 discarded_packets_num)
+{
+  GstRTCPXRDiscardedBlock block;
+  THIS_WRITELOCK(this);
+  gst_rtcp_xr_discarded_packets_setup(&block,
+                                    interval_metric_flag,
+                                    early_bit,
+                                    this->ssrc,
+                                    discarded_packets_num);
+
+  _add_xrblock(this, (GstRTCPXRBlock*) &block);
+  THIS_WRITEUNLOCK(this);
+}
+
 void report_producer_add_xr_owd(ReportProducer *this,
                                  guint8 interval_metric_flag,
                                  guint32 median_delay,

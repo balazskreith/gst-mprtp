@@ -62,6 +62,7 @@
 #define GST_RTCP_TYPE_XR 207
 #define GST_MPRTCP_BLOCK_TYPE_SUBFLOW_INFO 0
 #define GST_RTCP_XR_LOSS_RLE_BLOCK_TYPE_IDENTIFIER 1
+#define GST_RTCP_XR_DISCARDED_PACKETS_BLOCK_TYPE_IDENTIFIER 24
 #define GST_RTCP_XR_DISCARDED_RLE_BLOCK_TYPE_IDENTIFIER 25
 #define GST_RTCP_XR_DISCARDED_BYTES_BLOCK_TYPE_IDENTIFIER 26
 #define GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER 28
@@ -233,7 +234,7 @@ typedef struct PACKED _GstRTCPXRDiscardedBlock
 #endif
   guint16 block_length;
   guint32 ssrc;
-  guint32 discarded_bytes;
+  guint32 discarded_bytes_or_packets;
 } GstRTCPXRDiscardedBlock;
 
 typedef union PACKED _GstRTCPXRBlock
@@ -425,6 +426,15 @@ void gst_rtcp_xr_block_change (
     guint8 *block_type,
     guint16 * block_length,
     guint8 *reserved);
+
+
+void
+gst_rtcp_xr_discarded_packets_setup (GstRTCPXRDiscardedBlock * block, guint8 interval_metric,
+    gboolean early_bit, guint32 ssrc, guint32 discarded_packets);
+void
+gst_rtcp_xr_discarded_packets_getdown (GstRTCPXRDiscardedBlock *block,
+    guint8 * interval_metric, gboolean * early_bit, guint32 * ssrc,
+    guint32 * discarded_packets);
 
 void gst_rtcp_xr_discarded_bytes_setup (GstRTCPXRDiscardedBlock * block,
     guint8 interval_metric, gboolean early_bit,
@@ -624,6 +634,11 @@ void gst_printfnc_rtcp_rr (GstRTCPRR * report, printfnc print);
 #define gst_print_rtcp_xr(report) \
     gst_printfnc_rtcp_xr(report, g_print)
 void gst_printfnc_rtcp_xr (GstRTCPXR * report, printfnc print);
+
+#define gst_print_rtcp_xr_discarded_packets(report) \
+    gst_printfnc_rtcp_xr_discarded_packets_block(report, g_print)
+void
+gst_printfnc_rtcp_xr_discarded_packets_block (GstRTCPXRDiscardedBlock * block, printfnc print);
 
 #define gst_print_rtcp_xr_discarded_bytes(report) \
     gst_printfnc_rtcp_xr_discarded_bytes_block(report, g_print)

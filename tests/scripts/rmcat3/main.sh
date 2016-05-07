@@ -44,6 +44,7 @@ NSRCV="ns_rcv"
 SENDER="sender"
 RECEIVER="receiver"
 LOGSDIR="logs"
+LOGSDIR2="logs2"
 REPORTSDIR="reports"
 REPORTEXFILE="report.tex"
 STATFILE="stats.csv"
@@ -54,6 +55,8 @@ TESTDIR="$SCRIPTSDIR/rmcat3"
 
 rm -R $LOGSDIR
 mkdir $LOGSDIR
+rm -R $LOGSDIR2
+mkdir $LOGSDIR2
 
 #Report author
 REPORTAUTHORFILE=$LOGSDIR"/author.txt"
@@ -80,9 +83,9 @@ function log_bw() {
   log_bw 20 500 $LOGSDIR/veth0.csv
   log_bw 40 2000 $LOGSDIR/veth0.csv
 
-  log_bw 35 2000 $LOGSDIR/veth1.csv
-  log_bw 35 800 $LOGSDIR/veth1.csv
-  log_bw 30 2000 $LOGSDIR/veth1.csv
+  log_bw 35 2000 $LOGSDIR2/veth1.csv
+  log_bw 35 800 $LOGSDIR2/veth1.csv
+  log_bw 30 2000 $LOGSDIR2/veth1.csv
 
   PEER1_SND="$SCRIPTSDIR/sender_1.sh"
   echo -n "./$SENDER" > $PEER1_SND
@@ -108,15 +111,14 @@ function log_bw() {
 
   #start receiver and sender
   sudo ip netns exec $NSRCV ./$PEER1_RCV 2> $LOGSDIR"/"receiver.log &
-  sudo ip netns exec $NSSND ./$PEER1_SND 2> $LOGSDIR"/"sender.log &
-
   sudo ip netns exec $NSSND ./$PEER2_RCV 2> $LOGSDIR"/"receiver2.log &
+  sleep 2
+  sudo ip netns exec $NSSND ./$PEER1_SND 2> $LOGSDIR"/"sender.log &
   sudo ip netns exec $NSRCV ./$PEER2_SND 2> $LOGSDIR"/"sender2.log &
 
   echo "
   while true; do 
     ./$TESTDIR/plots.sh --srcdir $LOGSDIR --dstdir $REPORTSDIR
-    ./$TESTDIR/stats.sh --srcdir $LOGSDIR --dst $REPORTSDIR/$STATFILE
     ./$TESTDIR/report.sh --srcdir $REPORTSDIR --author $REPORTAUTHORFILE --dst $REPORTEXFILE
     ./$SCRIPTSDIR/pdflatex.sh $REPORTEXFILE
 

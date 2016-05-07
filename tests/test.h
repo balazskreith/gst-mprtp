@@ -201,6 +201,7 @@ static int join_min_th          = 10;
 static int join_max_th          = 100;
 static int join_window_th       = 60;
 static double join_betha_factor = 1.2;
+static int retain_time = 0;
 static int playout_max_rate  = 70;
 static int playout_min_rate = 10;
 static int playout_desired_framenum   = 3;
@@ -220,6 +221,7 @@ static GOptionEntry entries[] =
     { "path_2_tx_ip", 0, 0, G_OPTION_ARG_STRING, &path_2_tx_ip, "path_2_tx_ip", NULL },
     { "path_3_tx_ip", 0, 0, G_OPTION_ARG_STRING, &path_3_tx_ip, "path_3_tx_ip", NULL },
     { "testseq", 0, 0, G_OPTION_ARG_STRING, &testseq, "testseq", NULL },
+    { "retain_time", 0, 0, G_OPTION_ARG_INT, &retain_time, "retain_time", NULL },
     { "path1_active", 0, 0, G_OPTION_ARG_INT, &path1_active, "path1_active", NULL },
     { "path2_active", 0, 0, G_OPTION_ARG_INT, &path2_active, "path2_active", NULL },
     { "path3_active", 0, 0, G_OPTION_ARG_INT, &path3_active, "path3_active", NULL },

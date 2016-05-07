@@ -124,8 +124,8 @@ echo "
 
 RCVTHROUGHPUTSPLOT="$SRCDIR/rcv-throughputs.pdf"
 SNDTHROUGHPUTSPLOT="$SRCDIR/snd-throughputs.pdf"
-RCVTHROUGHPUTSPLOT="$SRCDIR/rcv-throughputs2.pdf"
-SNDTHROUGHPUTSPLOT="$SRCDIR/snd-throughputs2.pdf"
+RCVTHROUGHPUTSPLOT2="$SRCDIR/rcv-throughputs2.pdf"
+SNDTHROUGHPUTSPLOT2="$SRCDIR/snd-throughputs2.pdf"
 
 
 echo "

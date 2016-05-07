@@ -504,10 +504,10 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_OBSOLATION_TRESHOLD:
-      THIS_WRITELOCK (this);
-      packetssndqueue_set_obsolation_treshold(this->sndqueue, (GstClockTime) g_value_get_uint (value) * GST_MSECOND);
-      THIS_WRITEUNLOCK (this);
-      break;
+        THIS_WRITELOCK (this);
+        packetssndqueue_set_obsolation_treshold(this->sndqueue, (GstClockTime) g_value_get_uint (value) * GST_MSECOND);
+        THIS_WRITEUNLOCK (this);
+        break;
     case PROP_DETACH_SUBFLOW:
       THIS_WRITELOCK (this);
       _detach_subflow (this, g_value_get_uint (value));
@@ -1169,9 +1169,9 @@ _mprtpscheduler_send_buffer (GstMprtpscheduler * this, GstBuffer *buffer)
   ++this->sent_packets;
   buffer = gst_buffer_make_writable (buffer);
   mprtps_path_process_rtp_packet(path, buffer, &fec_request);
-  fec_request |= mprtps_path_request_keep_alive(path);
   _setup_timestamp(this, buffer);
 
+  fec_request |= mprtps_path_request_keep_alive(path);
   if(this->enable_fec || 0 < this->fec_interval){
     fecencoder_add_rtpbuffer(this->fec_encoder, buffer);
     fec_request |= (0 < this->fec_interval) && (this->sent_packets % this->fec_interval == 0);

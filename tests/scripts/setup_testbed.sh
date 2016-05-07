@@ -11,6 +11,12 @@ PATH2_VETH2_R="veth3"
 PATH3_VETH4_S="veth4"
 PATH3_VETH4_R="veth5"
 
+PATH4_VETH6_S="veth6"
+PATH4_VETH6_R="veth7"
+
+PATH5_VETH8_S="veth8"
+PATH5_VETH8_R="veth9"
+
 NS_SND="ns_snd"
 NS_RCV="ns_rcv"
 
@@ -22,11 +28,15 @@ sudo ip netns del $NS_RCV
 sudo ip link del $PATH1_VETH0_S
 sudo ip link del $PATH2_VETH2_S
 sudo ip link del $PATH3_VETH4_S
+sudo ip link del $PATH4_VETH6_S
+sudo ip link del $PATH5_VETH8_S
 
 #Create veth pairs
 sudo ip link add $PATH1_VETH0_S type veth peer name $PATH1_VETH0_R
 sudo ip link add $PATH2_VETH2_S type veth peer name $PATH2_VETH2_R
 sudo ip link add $PATH3_VETH4_S type veth peer name $PATH3_VETH4_R
+sudo ip link add $PATH4_VETH6_S type veth peer name $PATH4_VETH6_R
+sudo ip link add $PATH5_VETH8_S type veth peer name $PATH5_VETH8_R
 
 #Bring up
 sudo ip link set dev $PATH1_VETH0_S up
@@ -37,6 +47,12 @@ sudo ip link set dev $PATH2_VETH2_R up
 
 sudo ip link set dev $PATH3_VETH4_S up
 sudo ip link set dev $PATH3_VETH4_R up
+
+sudo ip link set dev $PATH4_VETH6_S up
+sudo ip link set dev $PATH4_VETH6_R up
+
+sudo ip link set dev $PATH5_VETH8_S up
+sudo ip link set dev $PATH5_VETH8_R up
 
 
 #Create the specific namespaces
@@ -52,6 +68,12 @@ sudo ip link set $PATH2_VETH2_R netns $NS_RCV
 
 sudo ip link set $PATH3_VETH4_S netns $NS_SND
 sudo ip link set $PATH3_VETH4_R netns $NS_RCV
+
+sudo ip link set $PATH4_VETH6_S netns $NS_SND
+sudo ip link set $PATH4_VETH6_R netns $NS_RCV
+
+sudo ip link set $PATH5_VETH8_S netns $NS_SND
+sudo ip link set $PATH5_VETH8_R netns $NS_RCV
 
 #Configure the loopback interface in namespace
 sudo ip netns exec $NS_SND ip address add 127.0.0.1/8 dev lo
@@ -74,6 +96,16 @@ sudo ip netns exec $NS_SND ip link set dev $PATH3_VETH4_S up
 sudo ip netns exec $NS_SND ip address add 10.0.2.1/24 dev $PATH3_VETH4_S
 sudo ip netns exec $NS_RCV ip link set dev $PATH3_VETH4_R up
 sudo ip netns exec $NS_RCV ip address add 10.0.2.2/24 dev $PATH3_VETH4_R
+
+sudo ip netns exec $NS_SND ip link set dev $PATH4_VETH6_S up
+sudo ip netns exec $NS_SND ip address add 10.0.3.1/24 dev $PATH4_VETH6_S
+sudo ip netns exec $NS_RCV ip link set dev $PATH4_VETH6_R up
+sudo ip netns exec $NS_RCV ip address add 10.0.3.2/24 dev $PATH4_VETH6_R
+
+sudo ip netns exec $NS_SND ip link set dev $PATH5_VETH8_S up
+sudo ip netns exec $NS_SND ip address add 10.0.4.1/24 dev $PATH5_VETH8_S
+sudo ip netns exec $NS_RCV ip link set dev $PATH5_VETH8_R up
+sudo ip netns exec $NS_RCV ip address add 10.0.4.2/24 dev $PATH5_VETH8_R
 
 sudo ip netns exec $NS_SND "./scripts/setup_ns_snd.sh"
 sudo ip netns exec $NS_RCV "./scripts/setup_ns_rcv.sh"

@@ -646,9 +646,10 @@ gst_mprtpreceiver_sink_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
     result = GST_FLOW_CUSTOM_ERROR;
     goto exit;
   }
-  THIS_READLOCK (this);
-  packet_type = _get_packet_mptype (this, buf, &map, &subflow_id);
 
+  THIS_READLOCK (this);
+
+  packet_type = _get_packet_mptype (this, buf, &map, &subflow_id);
   if (packet_type == PACKET_IS_MPRTCP) {
     result = _send_mprtcp_buffer (this, buf);
   } else if(packet_type == PACKET_IS_MPRTP_MONITORING){
@@ -686,7 +687,6 @@ _send_mprtcp_buffer (GstMprtpreceiver * this, GstBuffer * buf)
     GST_WARNING_OBJECT (this, "The RTCP packet is not readable");
     return result;
   }
-
   report = (GstMPRTCPSubflowReport *) gst_rtcp_get_first_header (&rtcp);
   block = gst_mprtcp_get_first_block (report);
   outpad = this->mprtcp_rr_srcpad;

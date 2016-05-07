@@ -122,6 +122,8 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 //A factor used to multiply the remb at congestion
 #define BETHA 1.0;
 
+#define GAMMA 0.6;
+
 
 typedef struct _Private Private;
 
@@ -470,6 +472,7 @@ void fbrasubctrler_enable(FBRASubController *this)
   this->enabled             = TRUE;
   this->disable_controlling = TRUE;
   this->disable_interval    = 10 * GST_SECOND;
+  this->disable_end         = _now(this) + this->disable_interval;
   this->target_bitrate      = mprtps_path_get_target_bitrate(this->path);
   this->last_distorted      = _now(this);
 }
@@ -580,7 +583,9 @@ void fbrasubctrler_time_update(FBRASubController *this)
     //backward congestion -> direct change to REDUCE STAGE
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    _change_target_bitrate(this, _get_reduced_target(this));
+    _change_target_bitrate(this, MIN(_TR(this), _TR_t1(this)));
+    _bcongestion(this) = TRUE;
+    g_print("backward congestion\n");
     goto done;
   }
 
@@ -661,7 +666,7 @@ void fbrasubctrler_report_update(
   }
   this->last_report_arrived_t1 = this->last_report_arrived;
   this->last_report_arrived    = _now(this);
-  this->report_interval        = MAX(200 * GST_MSECOND, this->last_report_arrived - this->last_report_arrived_t1);
+  this->report_interval        = CONSTRAIN(20 * GST_MSECOND, 100 * GST_MSECOND, this->last_report_arrived - this->last_report_arrived_t1);
   _bcongestion(this)           = FALSE;
 
   rmdi_processor_do(this->fb_processor, summary, &this->rmdi_result);
@@ -688,6 +693,10 @@ void fbrasubctrler_report_update(
 
   }else{
     _priv(this)->controlled = FALSE;
+  }
+
+  if(!_priv(this)->controlled){
+      this->disable_end = MIN(_now(this) + 10 * GST_SECOND, this->disable_end);
   }
 
 //  _priv(this)->stage_t1 = _priv(this)->stage;
@@ -763,6 +772,15 @@ _keep_stage(
 {
   gint32   target_rate = this->target_bitrate;
 
+  if(_rmdi(this).congestion_notification){
+    _disable_monitoring(this);
+    _disable_controlling(this);
+    _set_event(this, EVENT_CONGESTION);
+    _switch_stage_to(this, STAGE_REDUCE, FALSE);
+    target_rate = _TR(this) * GAMMA;
+    goto done;
+  }
+
   if(_fcongestion(this)){
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
@@ -815,6 +833,15 @@ _probe_stage(
 {
   gint32   target_rate = this->target_bitrate;
 
+  if(_rmdi(this).congestion_notification){
+    _disable_monitoring(this);
+    _disable_controlling(this);
+    _set_event(this, EVENT_CONGESTION);
+    _switch_stage_to(this, STAGE_REDUCE, FALSE);
+    target_rate = _TR(this) * GAMMA;
+    goto done;
+  }
+
   if(_fcongestion(this)){
     _disable_monitoring(this);
     _set_event(this, EVENT_CONGESTION);
@@ -856,6 +883,15 @@ _increase_stage(
     FBRASubController *this)
 {
   gint32 target_rate = this->target_bitrate;
+
+  if(_rmdi(this).congestion_notification){
+    _disable_monitoring(this);
+    _disable_controlling(this);
+    _set_event(this, EVENT_CONGESTION);
+    _switch_stage_to(this, STAGE_REDUCE, FALSE);
+    target_rate = _TR(this) * GAMMA;
+    goto done;
+  }
 
   if(_fcongestion(this)){
     _disable_monitoring(this);
@@ -902,7 +938,6 @@ _increase_stage(
   this->monitoring_started = _now(this);
 done:
   _change_target_bitrate(this, target_rate);
-  DISABLE_LINE _disable_controlling(this);
   return;
 }
 
@@ -1006,7 +1041,7 @@ void _disable_controlling(FBRASubController *this)
 {
   this->disable_controlling = TRUE;
   if(0. < _priv(this)->rtt){
-    this->disable_interval = CONSTRAIN(300 * GST_MSECOND, 2 * GST_SECOND, _priv(this)->rtt * 2.);
+    this->disable_interval = CONSTRAIN(300 * GST_MSECOND, 2 * GST_SECOND, _priv(this)->rtt * 3.);
   }else{
     this->disable_interval = 1.5 * GST_SECOND;
   }

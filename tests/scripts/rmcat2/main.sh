@@ -104,11 +104,11 @@ function log_bw() {
 
   #start receiver and sender
   sudo ip netns exec $NSRCV ./$PEER1_RCV 2> $LOGSDIR"/"receiver.log &
-#  sleep 5
+  sleep 2
   sudo ip netns exec $NSSND ./$PEER1_SND 2> $LOGSDIR"/"sender.log &
 
   sudo ip netns exec $NSRCV ./$PEER2_RCV 2> $LOGSDIR"/"receiver2.log &
-#  sleep 5
+  sleep 2
   sudo ip netns exec $NSSND ./$PEER2_SND 2> $LOGSDIR"/"sender2.log &
 
   echo "

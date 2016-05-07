@@ -92,14 +92,14 @@ DSTSNDTHROUGHPUTS2="$DSTDIR/snd-throughputs2.pdf"
           -e "bw_file='$SRCVETH0'" \
           "$PLOTSNDTHROUGHPUTS"
 
-  #gnuplot -e "duration='$DURRCVTHROUGHPUTS'" \
-  #        -e "output_file='$DSTRCVTHROUGHPUTS2'" \
-  #        -e "throughput_file='$SRCRCVTHROUGHPUTS2'" \
-  #        "$PLOTRCVTHROUGHPUTS2"
+  gnuplot -e "duration='$DURRCVTHROUGHPUTS'" \
+          -e "output_file='$DSTRCVTHROUGHPUTS2'" \
+          -e "throughput_file='$SRCRCVTHROUGHPUTS2'" \
+          "$PLOTRCVTHROUGHPUTS"
           
-  #gnuplot -e "duration='$DURSNDTHROUGHPUTS'" \
-  #        -e "output_file='$DSTSNDTHROUGHPUTS2'" \
-  #        -e "throughput_file='$SRCSNDTHROUGHPUTS2'" \
-  #        -e "bw_file='$SRCVETH1'" \
-  #        "$PLOTSNDTHROUGHPUTS2"
+  gnuplot -e "duration='$DURSNDTHROUGHPUTS'" \
+          -e "output_file='$DSTSNDTHROUGHPUTS2'" \
+          -e "throughput_file='$SRCSNDTHROUGHPUTS2'" \
+          -e "bw_file='$SRCVETH1'" \
+          "$PLOTSNDTHROUGHPUTS"
 

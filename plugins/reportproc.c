@@ -73,6 +73,12 @@ _processing_xr_discarded_bytes_block (
     GstRTCPXRDiscardedBlock * xrb,
     GstMPRTCPReportSummary* summary);
 
+void
+_processing_xr_discarded_packets_block (
+    ReportProcessor *this,
+    GstRTCPXRDiscardedBlock * xrb,
+    GstMPRTCPReportSummary* summary);
+
 static void
 _processing_afb (ReportProcessor *this,
                  GstRTCPFB *afb,
@@ -291,6 +297,19 @@ _processing_xr_discarded_bytes_block (ReportProcessor *this,
                                &summary->XR.DiscardedBytes.discarded_bytes);
 }
 
+void
+_processing_xr_discarded_packets_block (ReportProcessor *this,
+                                GstRTCPXRDiscardedBlock * xrb,
+                                GstMPRTCPReportSummary* summary)
+{
+  summary->XR.DiscardedPackets.processed = TRUE;
+  gst_rtcp_xr_discarded_packets_getdown (xrb,
+                               &summary->XR.DiscardedPackets.interval_metric,
+                               &summary->XR.DiscardedPackets.early_bit,
+                               NULL,
+                               &summary->XR.DiscardedPackets.discarded_packets);
+}
+
 
 void
 _processing_afb (ReportProcessor *this,
@@ -413,6 +432,9 @@ again:
         break;
     case GST_RTCP_XR_DISCARDED_BYTES_BLOCK_TYPE_IDENTIFIER:
         _processing_xr_discarded_bytes_block(this, (GstRTCPXRDiscardedBlock*) block, summary);
+        break;
+    case GST_RTCP_XR_DISCARDED_PACKETS_BLOCK_TYPE_IDENTIFIER:
+        _processing_xr_discarded_packets_block(this, (GstRTCPXRDiscardedBlock*) block, summary);
         break;
     default:
       GST_WARNING_OBJECT(this, "Unrecognized XR block to process");

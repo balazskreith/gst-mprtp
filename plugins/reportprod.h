@@ -78,6 +78,11 @@ void report_producer_add_xr_discarded_bytes(ReportProducer *this,
                                     gboolean early_bit,
                                     guint32 payload_bytes_discarded);
 
+void report_producer_add_xr_discarded_packets(ReportProducer *this,
+                                    guint8 interval_metric_flag,
+                                    gboolean early_bit,
+                                    guint32 discarded_packets_num);
+
 void report_producer_add_xr_owd(ReportProducer *this,
                                 guint8 interval_metric_flag,
                                 guint32 median_delay,

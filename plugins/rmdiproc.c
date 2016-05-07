@@ -55,7 +55,7 @@ struct _CorrBlock{
 };
 
 typedef struct _RMDIProcessorPrivate{
-  GstClockTime        delay80th;
+  GstClockTime        delay50th;
   GstClockTime        min_delay;
 }RMDIProcessorPrivate;
 
@@ -102,10 +102,10 @@ rmdi_processor_init (RMDIProcessor * this)
   this->priv = g_malloc0(sizeof(RMDIProcessorPrivate));
 }
 
-static void _delay80th_pipe(gpointer data, PercentileTrackerPipeData *stats)
+static void _delay50th_pipe(gpointer data, PercentileTrackerPipeData *stats)
 {
   RMDIProcessor *this = data;
-  this->result.qdelay_median = _priv(this)->delay80th = stats->percentile;
+  this->result.qdelay_median = _priv(this)->delay50th = stats->percentile;
   _priv(this)->min_delay = stats->min;
 
 }
@@ -134,7 +134,7 @@ RMDIProcessor *make_rmdi_processor(MPRTPSPath *path)
                          (NumsTrackerPlugin*)make_numstracker_minmax_plugin(_max_bytes_in_flight, this, NULL, NULL));
 
   percentiletracker_set_treshold(this->delays, 60 * GST_SECOND);
-  percentiletracker_set_stats_pipe(this->delays, _delay80th_pipe, this);
+  percentiletracker_set_stats_pipe(this->delays, _delay50th_pipe, this);
 
   THIS_WRITEUNLOCK (this);
   return this;
@@ -212,9 +212,14 @@ void rmdi_processor_do(RMDIProcessor       *this,
                        RMDIProcessorResult *result)
 {
 
-  if(!summary->XR.DiscardedRLE.processed && !summary->XR.OWD.processed){
+  if(!summary->AFB.processed && !summary->XR.OWD.processed){
     goto done;
   }
+  this->result.congestion_notification = FALSE;
+  if(summary->XR.DiscardedPackets.processed){
+    this->result.congestion_notification = summary->XR.DiscardedPackets.processed;
+  }
+
   if(summary->XR.OWD.processed){
     _process_owd(this, &summary->XR);
   }

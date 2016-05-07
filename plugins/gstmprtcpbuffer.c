@@ -514,6 +514,40 @@ gst_rtcp_xr_block_change (GstRTCPXRBlock *block, guint8 *block_type,
   }
 }
 
+//------------------ XR7002 ------------------------
+
+void
+gst_rtcp_xr_discarded_packets_setup (GstRTCPXRDiscardedBlock * block, guint8 interval_metric,
+    gboolean early_bit, guint32 ssrc, guint32 discarded_packets)
+{
+  block->block_length = g_htons (2);
+  block->block_type = GST_RTCP_XR_DISCARDED_PACKETS_BLOCK_TYPE_IDENTIFIER;
+  block->discarded_bytes_or_packets = g_htonl (discarded_packets);
+  block->early_bit = early_bit;
+  block->interval_metric = interval_metric;
+  block->reserved = 0;
+  block->ssrc = g_htonl (ssrc);
+}
+
+void
+gst_rtcp_xr_discarded_packets_getdown (GstRTCPXRDiscardedBlock *block,
+    guint8 * interval_metric, gboolean * early_bit, guint32 * ssrc,
+    guint32 * discarded_packets)
+{
+  if (discarded_packets) {
+    *discarded_packets = g_ntohl (block->discarded_bytes_or_packets);
+  }
+  if (early_bit) {
+    *early_bit = block->early_bit;
+  }
+  if (interval_metric) {
+    *interval_metric = block->interval_metric;
+  }
+  if (ssrc) {
+    *ssrc = g_ntohs (block->ssrc);
+  }
+}
+
 //------------------ XR7243 ------------------------
 
 
@@ -523,7 +557,7 @@ gst_rtcp_xr_discarded_bytes_setup (GstRTCPXRDiscardedBlock * block, guint8 inter
 {
   block->block_length = g_htons (2);
   block->block_type = GST_RTCP_XR_DISCARDED_BYTES_BLOCK_TYPE_IDENTIFIER;
-  block->discarded_bytes = g_htonl (discarded_bytes);
+  block->discarded_bytes_or_packets = g_htonl (discarded_bytes);
   block->early_bit = early_bit;
   block->interval_metric = interval_metric;
   block->reserved = 0;
@@ -536,7 +570,7 @@ gst_rtcp_xr_discarded_bytes_change (GstRTCPXRDiscardedBlock * block,
     guint32 * discarded_bytes)
 {
   if (discarded_bytes) {
-      block->discarded_bytes = g_htonl (*discarded_bytes);
+      block->discarded_bytes_or_packets = g_htonl (*discarded_bytes);
   }
   if (early_bit) {
       block->early_bit = *early_bit;
@@ -555,7 +589,7 @@ gst_rtcp_xr_discarded_bytes_getdown (GstRTCPXRDiscardedBlock *block,
     guint32 * discarded_bytes)
 {
   if (discarded_bytes) {
-    *discarded_bytes = g_ntohl (block->discarded_bytes);
+    *discarded_bytes = g_ntohl (block->discarded_bytes_or_packets);
   }
   if (early_bit) {
     *early_bit = block->early_bit;
@@ -1335,6 +1369,9 @@ again:
     case GST_RTCP_XR_LOSS_RLE_BLOCK_TYPE_IDENTIFIER:
         //todo: implement
         break;
+    case GST_RTCP_XR_DISCARDED_PACKETS_BLOCK_TYPE_IDENTIFIER:
+      gst_printfnc_rtcp_xr_discarded_packets_block((GstRTCPXRDiscardedBlock*) block, print);
+        break;
     case GST_RTCP_XR_DISCARDED_RLE_BLOCK_TYPE_IDENTIFIER:
         gst_printfnc_rtcp_xr_discarded_rle_block((GstRTCPXRDiscardedRLEBlock*)block, print);
         break;
@@ -1356,6 +1393,26 @@ again:
   }
 done:
   return;
+}
+
+
+void
+gst_printfnc_rtcp_xr_discarded_packets_block (GstRTCPXRDiscardedBlock * block, printfnc print)
+{
+  guint8 interval_metric;
+  gboolean early_bit;
+  guint32 ssrc;
+  guint32 discarded_packets;
+
+  gst_rtcp_xr_discarded_packets_getdown (block, &interval_metric, &early_bit, &ssrc,
+      &discarded_packets);
+  print ("+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+      "|%15d|%3d|%1d|%9d|%31d|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63X|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63X|\n", block->block_type, interval_metric, early_bit, 0,
+      g_ntohs (block->block_length), ssrc, discarded_packets);
 }
 
 void

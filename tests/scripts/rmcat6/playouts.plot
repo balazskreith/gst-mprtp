@@ -3,8 +3,9 @@ time=system("date +%Y_%m_%d_%H_%M_%S")
 
 if (!exists("plot_title"))    plot_title='Playouts summary'
 if (!exists("playouts_file")) playouts_file='logs/playouts.csv'
+if (!exists("skew_file"))     skew_file='logs/skews.csv'
 if (!exists("output_file"))   output_file='reports/summary-playouts.pdf'
-if (!exists("duration"))    duration=600000
+if (!exists("duration"))      duration=600000
 if (!exists("xtick_value"))   xtick_value=100000
 
 #-------------------------------------------------------------------------
@@ -24,11 +25,9 @@ set bmargin 0
 set lmargin 15
 set rmargin 5
 set xrange [0:duration]
-set yrange [0:200]
+set yrange [-10:200]
 set ytics 50
-set xrange [0:duration]
 set ylabel "Remaining time (ms)"
-unset xlabel
 
 #set multiplot layout 2,1 title plot_title
 set multiplot layout 3,1 font ",18"
@@ -52,10 +51,11 @@ set style line 4 linecolor rgb '#a21d21' linetype 4 linewidth 1
 set style line 5 linecolor rgb '#f47d23' linetype 4 linewidth 1	
 
 set xrange [0:duration]
-set xlabel "Elapsed time (ms)"
 set xtics xtick_value
+unset xlabel
 
-plot playouts_file using 0:($2/1000) with lines ls 1 title "Playout buffer" 
+plot playouts_file using 0:($1/1000000) with lines ls 1 title "Playout delay", \
+     skew_file u 0:($1/1000000) w lines ls 2 title "Path 1 skew" 
 
 set key inside horizontal top right 
 set tics scale 0
@@ -64,6 +64,6 @@ set yrange [0:100]
 set ytics  20
 set xrange [0:duration]
 
-plot playouts_file using 0:1 with lines ls 2 title "Playout buffer"
+plot playouts_file using 0:($2/1000) with lines ls 2 title "Playout buffer"
 
 unset multiplot

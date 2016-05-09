@@ -116,6 +116,9 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 //determines the deflate time in s for pacing
 #define PACING_DEFLATE_TIME 5.0
 
+//approvement epsilon
+#define APPROVEMENT_EPSILON 0.1
+
 //A factor used to multiply the remb at distortion
 #define ALPHA 1.0
 
@@ -123,6 +126,7 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 #define BETHA 1.0;
 
 #define GAMMA 0.6;
+
 
 
 typedef struct _Private Private;
@@ -201,6 +205,7 @@ struct _Private{
   gint32              min_target_bitrate;
   gint32              max_target_bitrate;
   gdouble             reduce_target_factor;
+  gdouble             approvement_epsilon;
 
   GstClockTime        qdelay_congestion_treshold;
   gdouble             discad_cong_treshold;
@@ -258,6 +263,8 @@ struct _Private{
 #define _btl_eps(this)                _priv(this)->bottleneck_epsilon
 #define _btl_mon_int(this)            _priv(this)->bottleneck_monitoring_interval
 #define _norm_mon_int(this)           _priv(this)->normal_monitoring_interval
+
+#define _appr_eps(this)               _priv(this)->approvement_epsilon
 
 #define _qdelay_cong_th(this)         _priv(this)->qdelay_congestion_treshold
 #define _discard_cong_th(this)        _priv(this)->discad_cong_treshold
@@ -430,6 +437,8 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->distorted_trend_th               = DISTORTION_TREND_TRESHOLD;
   _priv(this)->congestion_trend_th              = CONGESTION_TREND_TRESHOLD;
   _priv(this)->probe_trend_th                   = PROBE_TREND_TRESHOLD;
+
+  _priv(this)->approvement_epsilon              = APPROVEMENT_EPSILON;
 
   _priv(this)->pacing_allowed                   = PACING_ALLOWED_DEFAULT;
   _priv(this)->pacing_constrict_time            = PACING_CONSTRICT_TIME;
@@ -618,6 +627,8 @@ void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRa
   _priv(this)->pacing_deflate_time              = cngctrler->pacing_deflate_time;
   _priv(this)->pacing_constrict_time            = cngctrler->pacing_constrict_time;
 
+  //TODO: Approvement epilon here
+
 }
 
 void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *result)
@@ -674,7 +685,10 @@ void fbrasubctrler_report_update(
   _reset_congestion_indicators(this);
 
   if(this->disable_controlling){
-    if(!this->disable_end || !_priv(this)->tr_approved){
+    gboolean tr_approved;
+    tr_approved = _TR(this) * (1. - _appr_eps(this)) < _SR(this) && _SR(this) < _TR(this) * (1. + _appr_eps(this));
+//    g_print("%f < %d < %f -> %d\n", _TR(this) * .95, _SR(this), _TR(this) * 1.05, tr_approved);
+    if(!this->disable_end || !tr_approved){
       this->disable_end = _now(this) + this->disable_interval;
     }
     this->disable_controlling = _now(this) < this->disable_end;
@@ -735,7 +749,8 @@ _reduce_stage(
   gint32   target_rate = this->target_bitrate;
 
   if(!_priv(this)->rr_approved){
-    _priv(this)->rr_approved = target_rate * .95 < _SR(this) && _SR(this) < target_rate * 1.05;
+    _priv(this)->rr_approved = target_rate * (1. - _appr_eps(this)) < _SR(this) &&
+                               _SR(this) < target_rate * (1. + _appr_eps(this));
     if(_priv(this)->rr_approved){
       _priv(this)->rr_approved_time = _now(this);
     }
@@ -777,7 +792,9 @@ _keep_stage(
     _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _TR(this) * GAMMA;
+    if(_cng_trend_th(this) < _trend(this)){
+      target_rate = _TR(this) * GAMMA;
+    }
     goto done;
   }
 
@@ -838,7 +855,9 @@ _probe_stage(
     _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _TR(this) * GAMMA;
+    if(_cng_trend_th(this) < _trend(this)){
+      target_rate = _TR(this) * GAMMA;
+    }
     goto done;
   }
 
@@ -889,7 +908,9 @@ _increase_stage(
     _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _TR(this) * GAMMA;
+    if(_cng_trend_th(this) < _trend(this)){
+      target_rate = _TR(this) * GAMMA;
+    }
     goto done;
   }
 
@@ -918,7 +939,8 @@ _increase_stage(
   }
 
   if(_min_target(this) * 10 < _TR(this) && !_priv(this)->rr_approved){
-    _priv(this)->rr_approved = target_rate * .9 < _remb(this) && _remb(this) < target_rate * 1.1;
+    _priv(this)->rr_approved = target_rate * (1. - _appr_eps(this)) < _remb(this) &&
+                               _remb(this) < target_rate * (1. + _appr_eps(this));
     if(_priv(this)->rr_approved){
       _priv(this)->rr_approved_time = _now(this);
     }
@@ -1252,6 +1274,7 @@ void fbrasubctrler_logging(FBRASubController *this)
                "# Monitoring Interval:         %-10d| tr_is_approved:             %-10d#\n"
                "# Monitoring Bitrate:          %-10d| rr_is_approved:             %-10d#\n"
                "# Delay avg:              %-10.3f| REMB:                       %-10d#\n"
+               "# cong not:               %10d| ---                           %10d|\n"
                "###################### MSeconds since setup: %lu ######################\n"
                ,
 
@@ -1290,6 +1313,9 @@ void fbrasubctrler_logging(FBRASubController *this)
 
                _rmdi(this).delay_avg,
                _remb(this),
+
+               _rmdi(this).congestion_notification,
+               0,
 
                GST_TIME_AS_MSECONDS(_now(this) - this->made)
 

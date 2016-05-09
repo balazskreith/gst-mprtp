@@ -53,7 +53,6 @@ GST_DEBUG_CATEGORY_STATIC (gst_mprtpsender_debug_category);
 #define PACKET_IS_DTLS(b) (b > 0x13 && b < 0x40)
 #define PACKET_IS_RTCP(b) (b > 192 && b < 223)
 
-#define _now(this) gst_clock_get_time (this->sysclock)
 
 static void gst_mprtpsender_set_property (GObject * object,
     guint property_id, const GValue * value, GParamSpec * pspec);
@@ -113,7 +112,6 @@ enum
   PROP_FEC_PAYLOAD_TYPE,
   PROP_ASYNC_FEC,
   PROP_PIVOT_OUTPAD,
-  PROP_RETAIN_TIME,
 };
 
 /* pad templates */
@@ -343,12 +341,6 @@ gst_mprtpsender_class_init (GstMprtpsenderClass * klass)
           "Indicate weather the FEC packet is sent on async outpad if that linked.",
           TRUE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_RETAIN_TIME,
-        g_param_spec_uint ("retain-time",
-            "Set an additional retainment time.",
-            "Set an additional retainment time.",
-            0, 10000, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
 }
 
 
@@ -401,9 +393,6 @@ gst_mprtpsender_init (GstMprtpsender * mprtpsender)
   mprtpsender->event_stream_start  = NULL;
   mprtpsender->fec_payload_type    = FEC_PAYLOAD_DEFAULT_ID;
   mprtpsender->async_fec           = FALSE;
-  mprtpsender->sysclock            = gst_system_clock_obtain ();
-  mprtpsender->retains             = g_queue_new();
-  mprtpsender->retain_time         = 0;
   //mprtpsender->events = g_queue_new();
   g_rw_lock_init (&mprtpsender->rwmutex);
 }
@@ -443,11 +432,6 @@ gst_mprtpsender_set_property (GObject * object, guint property_id,
       this->async_fec = g_value_get_boolean (value);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_RETAIN_TIME:
-      THIS_WRITELOCK (this);
-      this->retain_time = g_value_get_uint (value) * GST_MSECOND;
-      THIS_WRITEUNLOCK (this);
-      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -476,11 +460,6 @@ gst_mprtpsender_get_property (GObject * object, guint property_id,
     case PROP_ASYNC_FEC:
       THIS_READLOCK (this);
       g_value_set_boolean (value, this->async_fec);
-      THIS_READUNLOCK (this);
-      break;
-    case PROP_RETAIN_TIME:
-      THIS_READLOCK (this);
-      g_value_set_uint(value, this->retain_time / GST_MSECOND);
       THIS_READUNLOCK (this);
       break;
     default:
@@ -920,11 +899,6 @@ static void _init_all_subflows(GstMprtpsender *this, GstBuffer *buf)
   return;
 }
 
-typedef struct _RetainedItem{
-  GstBuffer    *buffer;
-  GstClockTime  added;
-}RetainedItem;
-
 static GstFlowReturn
 gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buf)
@@ -938,7 +912,6 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   gint n, r;
   GstPad *outpad;
   GstClockTime position, duration;
-  gboolean doagain = FALSE;
 
 
   this = GST_MPRTPSENDER (parent);
@@ -954,30 +927,6 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     this->dirty = FALSE;
   }
 
-  if(0 < this->retain_time){
-    RetainedItem* item;
-    item = g_slice_new0(RetainedItem);
-    item->added = _now(this);
-    item->buffer = buf;
-    g_queue_push_tail(this->retains,  buf);
-  }
-again:
-  if(0 < this->retain_time){
-    RetainedItem* item;
-    if(g_queue_is_empty(this->retains)){
-      result = GST_FLOW_OK;
-      goto done;
-    }
-    item = g_queue_peek_head(this->retains);
-    if(_now(this) - this->retain_time < item->added){
-      result = GST_FLOW_OK;
-      goto done;
-    }
-    item = g_queue_pop_head(this->retains);
-    buf = item->buffer;
-    g_slice_free(RetainedItem, item);
-    doagain = TRUE;
-  }
 
   n = g_list_length (this->subflows);
   if (n < 1) {
@@ -1024,9 +973,6 @@ again:
     this->segment.position = position;
   }
   result = gst_pad_push (outpad, buf);
-  if(doagain){
-    goto again;
-  }
 done:
   THIS_READUNLOCK (this);
 exit:

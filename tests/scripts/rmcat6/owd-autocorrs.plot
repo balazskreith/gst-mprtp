@@ -5,7 +5,7 @@ if (!exists("plot_title"))  plot_title='Subflow Multiple-tau autocorrelations'
 if (!exists("autocorr_file")) autocorr_file='logs/netqanalyser_1.csv'
 if (!exists("output_file")) output_file='reports/sub_1_mtau_corrs.pdf'
 if (!exists("duration"))  duration=1000
-if (!exists("xtick_value"))  xtick_value=500
+if (!exists("xtick_value"))  xtick_value=600
 
 #-------------------------------------------------------------------------
 
@@ -26,9 +26,8 @@ set rmargin 3
 set xrange [0:duration]
 set yrange [0:1000]
 set ytics 250
-set xrange [0:duration]
 set ylabel "time (ms)"
-set xtics xtick_value
+#set xtics xtick_value
 unset xlabel
 unset xrange
 
@@ -73,13 +72,5 @@ plot autocorr_file using 0:4 with lines ls 4 title "g(400ms)"
 set xlabel "running length (100ms)"
 
 plot autocorr_file using 0:5 with lines ls 5 title "g(800ms)"
-
-#plot autocorr_file using 0:6 with lines ls 6 title "g(2000ms)"
-
-#plot autocorr_file using 0:7 with lines ls 7 title "g(4000ms)"
-
-#plot autocorr_file using 0:8 with lines ls 8 title "g(8000ms)"
-
-
 
 unset multiplot

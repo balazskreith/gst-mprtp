@@ -39,8 +39,6 @@ struct _GstMprtpsender
   guint8 mprtp_ext_header_id;
   guint8 fec_payload_type;
   gboolean async_fec;
-  GstClockTime retain_time;
-  GQueue *retains;
   GList *subflows;
   gboolean dirty;
   GstSegment segment;

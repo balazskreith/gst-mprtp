@@ -1,9 +1,9 @@
 name=system("echo mprtp-subflow-") 
 time=system("date +%Y_%m_%d_%H_%M_%S")
 
-if (!exists("plot_title")) plot_title='Subflow Receiver Delays Report'
-if (!exists("latency_file_1")) latency_file_1='logs/sub_1_rcv.csv'
-if (!exists("output_file")) output_file='reports/summary_delays.pdf'
+if (!exists("plot_title")) plot_title='Subflow Receiver Rate Report'
+if (!exists("throughput_file")) throughput_file='logs/sub_1_rcv.csv'
+if (!exists("output_file")) output_file='reports/sub_1_rcv.pdf'
 if (!exists("duration")) duration=6000
 
 #-------------------------------------------------------------------------
@@ -15,15 +15,17 @@ set origin 0,0
 set size ratio 0.5
 set datafile separator "," 
 
-set key inside horizontal top right 
-set tmargin 0
+set key inside horizontal top left 
+set tmargin 5
 set bmargin 5
 set lmargin 7
 set rmargin 7
-set yrange [0:300000]
-set ytics 100000
+set yrange [0:3000]
+set ytics 500
 set xrange [0:duration]
 set xtics 500
+set ylabel "Size (KBytes)"
+set xlabel "time (100ms)"
 
 # set title plot_title font ",18"
 
@@ -43,17 +45,6 @@ set style line 1 linecolor rgb '#008c48' linetype 1 linewidth 1
 set style line 2 linecolor rgb '#b43894' linetype 2 linewidth 1
 set style line 3 linecolor rgb '#185aa9' linetype 3 linewidth 1
 set style line 4 linecolor rgb '#a21d21' linetype 4 linewidth 1	
-
-if (!exists("latency_file_2")) {
-  plot latency_file_1 using 0:3 with lines ls 1 title "Path 1 latency"
-}else{
- if (!exists("latency_file_3")) {
-    plot latency_file_1 using 0:3 with lines ls 1 title "Path 1 latency", \
-         latency_file_2 using 0:3 with lines ls 2 title "Path 2 latency"
-  }else{
-      plot latency_file_1 using 0:3 with lines ls 1 title "Path 1 latency", \
-           latency_file_2 using 0:3 with lines ls 2 title "Path 2 latency", \
-           latency_file_3 using 0:3 with lines ls 3 title "Path 3 latency"
-  }
-} 
+plot throughput_file using 0:1 with lines ls 1 title "Received", \
+     throughput_file using 0:2 with lines ls 2 title "Discarded"
 

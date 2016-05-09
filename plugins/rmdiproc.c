@@ -217,7 +217,7 @@ void rmdi_processor_do(RMDIProcessor       *this,
   }
   this->result.congestion_notification = FALSE;
   if(summary->XR.DiscardedPackets.processed){
-    this->result.congestion_notification = summary->XR.DiscardedPackets.processed;
+    this->result.congestion_notification = TRUE;
   }
 
   if(summary->XR.OWD.processed){

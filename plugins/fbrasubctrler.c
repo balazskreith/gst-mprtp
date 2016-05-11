@@ -165,6 +165,7 @@ struct _Private{
   gdouble             rtt;
   gboolean            tr_correlated;
   gboolean            tr_approved;
+  gboolean            retractive;
   GstClockTime        tr_approved_time;
   gboolean            rr_approved;
   GstClockTime        rr_approved_time;
@@ -254,7 +255,7 @@ struct _Private{
 #define _trend(this) _rmdi(this).owd_corr
 #define _remb(this) _rmdi(this).rcv_est_max_bitrate
 
-
+#define _retractive(this)             _priv(this)->retractive
 #define _dist_trend_th(this)          _priv(this)->distorted_trend_th
 #define _cng_trend_th(this)           _priv(this)->congestion_trend_th
 #define _probe_trend_th(this)         _priv(this)->probe_trend_th
@@ -445,7 +446,7 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->pacing_deflate_time              = PACING_DEFLATE_TIME;
 
   _priv(this)->tr_approved                      = TRUE;
-
+  _priv(this)->retractive                       = TRUE;
   _pacer(this).approver = _deactivated_pacing_mode;
   _pacer(this).state    = PACING_STATE_DEACTIVE;
 
@@ -480,7 +481,7 @@ void fbrasubctrler_enable(FBRASubController *this)
 {
   this->enabled             = TRUE;
   this->disable_controlling = TRUE;
-  this->disable_interval    = 10 * GST_SECOND;
+  this->disable_interval    = 5 * GST_SECOND;
   this->disable_end         = _now(this) + this->disable_interval;
   this->target_bitrate      = mprtps_path_get_target_bitrate(this->path);
   this->last_distorted      = _now(this);
@@ -587,14 +588,11 @@ void fbrasubctrler_time_update(FBRASubController *this)
     goto done;
   }
 
-  //check backward congestion
   if(!_bcongestion(this) && this->last_report_arrived < _now(this) - 3 * this->report_interval){
-    //backward congestion -> direct change to REDUCE STAGE
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     _change_target_bitrate(this, MIN(_TR(this), _TR_t1(this)));
     _bcongestion(this) = TRUE;
-    g_print("backward congestion\n");
     goto done;
   }
 
@@ -709,14 +707,6 @@ void fbrasubctrler_report_update(
     _priv(this)->controlled = FALSE;
   }
 
-  if(!_priv(this)->controlled){
-      this->disable_end = MIN(_now(this) + 10 * GST_SECOND, this->disable_end);
-  }
-
-//  _priv(this)->stage_t1 = _priv(this)->stage;
-  if(_priv(this)->stage != STAGE_REDUCE){
-//      rmdi_processor_approve_owd(this->fb_processor);
-  }
   rmdi_processor_approve_owd(this->fb_processor);
   ++this->measurements_num;
 done:
@@ -792,7 +782,7 @@ _keep_stage(
     _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    if(_cng_trend_th(this) < _trend(this)){
+    if(_retractive(this) || _cng_trend_th(this) < _trend(this)){
       target_rate = _TR(this) * GAMMA;
     }
     goto done;
@@ -825,7 +815,10 @@ _keep_stage(
 
   _setup_monitoring(this);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
-  this->rand_factor =  g_random_double_range(1.0, 2.0);
+  this->rand_factor =  1.0;
+  if(0 < _min_target(this) && _min_target(this) < _TR(this)){
+     this->rand_factor += MIN(0.0, g_random_double_range(0.0, _TR(this) / _min_target(this) - 1));
+  }
 done:
   _change_target_bitrate(this, target_rate);
   return;
@@ -855,7 +848,7 @@ _probe_stage(
     _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    if(_cng_trend_th(this) < _trend(this)){
+    if(_retractive(this) || _cng_trend_th(this) < _trend(this)){
       target_rate = _TR(this) * GAMMA;
     }
     goto done;
@@ -908,7 +901,7 @@ _increase_stage(
     _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    if(_cng_trend_th(this) < _trend(this)){
+    if(_retractive(this) || _cng_trend_th(this) < _trend(this)){
       target_rate = _TR(this) * GAMMA;
     }
     goto done;
@@ -938,7 +931,7 @@ _increase_stage(
     goto done;
   }
 
-  if(_min_target(this) * 10 < _TR(this) && !_priv(this)->rr_approved){
+  if(!_priv(this)->rr_approved){
     _priv(this)->rr_approved = target_rate * (1. - _appr_eps(this)) < _remb(this) &&
                                _remb(this) < target_rate * (1. + _appr_eps(this));
     if(_priv(this)->rr_approved){
@@ -947,16 +940,19 @@ _increase_stage(
     goto done;
   }
 
-  if(_min_target(this) * 5 < _TR(this) && _now(this) -  this->rand_factor * _priv(this)->rtt < _priv(this)->tr_approved_time){
+  if(_now(this) -  this->rand_factor * _priv(this)->rtt < _priv(this)->tr_approved_time){
     goto done;
   }
 
-  if(_min_target(this) * 10 < _TR(this) && _now(this) -  this->rand_factor * _priv(this)->rtt < _priv(this)->rr_approved_time){
+  if(_now(this) -  this->rand_factor * _priv(this)->rtt < _priv(this)->rr_approved_time){
     goto done;
   }
 
   _switch_stage_to(this, STAGE_PROBE, FALSE);
-  this->rand_factor =  g_random_double_range(1.0, 2.0);
+  this->rand_factor =  1.0;
+  if(0 < _min_target(this) && _min_target(this) < _TR(this)){
+     this->rand_factor += MIN(0.0, g_random_double_range(0.0, _TR(this) / _min_target(this) - 1));
+  }
   this->monitoring_started = _now(this);
 done:
   _change_target_bitrate(this, target_rate);

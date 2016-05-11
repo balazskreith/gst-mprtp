@@ -25,7 +25,7 @@ set rmargin 7
 set yrange [0:range]
 set ytics 1000
 set xrange [0:duration]
-set xtics 100
+set xtics 1000
 set ylabel "Throughput (KBits)"
 set xlabel "time (100ms)"
 

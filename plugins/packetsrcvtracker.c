@@ -157,6 +157,7 @@ packetsrcvtracker_init (PacketsRcvTracker * this)
       this->blocks[i].next = &this->blocks[i + 1];
       this->blocks[i].id   = i;
       this->blocks[i].N    = 64>>i;
+      this->blocks[i].N    = 16;
     }
   }
   this->block_index = 1;
@@ -275,7 +276,7 @@ gdouble packetsrcvtracker_get_remb(PacketsRcvTracker * this, guint16 *hssn)
 //          this->blocks[3].g,
 //          this->blocks[4].g,
 //          this->blocks[5].g);
-  result *= 1. - CONSTRAIN(0., .8, this->blocks[1].g);
+  result *= 1. - CONSTRAIN(0., .5, this->blocks[1].g);
   THIS_READUNLOCK(this);
   return result;
 }

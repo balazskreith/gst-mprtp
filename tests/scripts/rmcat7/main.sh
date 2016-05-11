@@ -50,7 +50,7 @@ STATFILE="stats.csv"
 REPORTPDF="report.pdf"
 
 SCRIPTSDIR="scripts"
-TESTDIR="$SCRIPTSDIR/rmcat6"
+TESTDIR="$SCRIPTSDIR/rmcat7"
 
 rm -R $LOGSDIR
 mkdir $LOGSDIR
@@ -69,9 +69,9 @@ function log_bw() {
 }
 
   #setup duration
-  DURATION=140
+  DURATION=310
   
-  log_bw 120 2000 $LOGSDIR/veth0.csv
+  log_bw 310 2000 $LOGSDIR/veth0.csv
 
   PEER1_SND="$SCRIPTSDIR/sender_1.sh"
   echo -n "./$SENDER" > $PEER1_SND
@@ -82,13 +82,27 @@ function log_bw() {
   echo -n "./$RECEIVER" > $PEER1_RCV
   ./$TESTDIR/peer1params.sh >> $PEER1_RCV
   chmod 777 $PEER1_RCV
+  
+  echo "" > iperf_client.sh
+  max=900    # number of kilobytes
+  elapsed=0;
+  echo "#!/bin/bash" > wgets.sh
+  for ((counter=1; counter<=10; counter++))
+  do
+    dd bs=1K count=$(($RANDOM%max + 101)) if=/dev/urandom of=$TESTDIR/file$counter
+    echo "iperf -c 10.0.0.2 -p 1234 -F $TESTDIR/file$counter" >> iperf_client.sh
+    let "s=$RANDOM%20"
+    echo "sleep $s " >> iperf_client.sh
+  done
+  chmod 777 iperf_client.sh
 
   #start receiver and sender
   sudo ip netns exec $NSRCV ./$PEER1_RCV 2> $LOGSDIR"/"receiver.log &
   sudo ip netns exec $NSRCV iperf -s -p 1234&
   sleep 2
   sudo ip netns exec $NSSND ./$PEER1_SND 2> $LOGSDIR"/"sender.log &
-  sudo ip netns exec $NSSND iperf -c 10.0.0.2 -t 120 -p 1234&
+  sudo ip netns exec $NSSND iperf -c 10.0.0.2 -t 300 -p 1234&
+  sudo ip netns exec $NSSND iperf_client.sh
 
   echo "
   while true; do 

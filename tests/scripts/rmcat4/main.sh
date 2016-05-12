@@ -76,11 +76,13 @@ function log_bw() {
 
   #setup duration
   DURATION=140
-  
+  OWD=300
+
   log_bw 120 3500 $LOGSDIR/veth0.csv
 
   PEER1_SND="$SCRIPTSDIR/sender_1.sh"
-  echo -n "./$SENDER" > $PEER1_SND
+  echo "tc qdisc change dev veth0 root handle 1: netem delay "$OWD"ms" > $PEER1_SND
+  echo -n "./$SENDER" >> $PEER1_SND
   ./$TESTDIR/peer1params.sh >> $PEER1_SND
   chmod 777 $PEER1_SND
 
@@ -98,7 +100,8 @@ function log_bw() {
 
 
   PEER1_RCV="$SCRIPTSDIR/receiver_1.sh"
-  echo -n "./$RECEIVER" > $PEER1_RCV
+  echo "tc qdisc change dev veth1 root handle 1: netem delay "$OWD"ms" > $PEER1_RCV
+  echo -n "./$RECEIVER" >> $PEER1_RCV
   ./$TESTDIR/peer1params.sh >> $PEER1_RCV
   chmod 777 $PEER1_RCV
 
@@ -135,10 +138,10 @@ function log_bw() {
   echo "
   while true; do 
     ./$TESTDIR/plots.sh --srcdir $LOGSDIR --dstdir $REPORTSDIR
-    ./$TESTDIR/report.sh --srcdir $REPORTSDIR --author $REPORTAUTHORFILE --dst $REPORTEXFILE
-    ./$SCRIPTSDIR/pdflatex.sh $REPORTEXFILE
+    #./$TESTDIR/report.sh --srcdir $REPORTSDIR --author $REPORTAUTHORFILE --dst $REPORTEXFILE
+    #./$SCRIPTSDIR/pdflatex.sh $REPORTEXFILE
 
-    mv $REPORTPDF $REPORTSDIR/$REPORTPDF
+    #mv $REPORTPDF $REPORTSDIR/$REPORTPDF
     sleep $REPPERIOD
   done
 

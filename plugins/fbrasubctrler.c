@@ -123,9 +123,9 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 #define ALPHA 1.0
 
 //A factor used to multiply the remb at congestion
-#define BETHA 1.0;
+#define BETHA 1.0
 
-#define GAMMA 0.6;
+#define GAMMA 0.6
 
 
 
@@ -481,7 +481,7 @@ void fbrasubctrler_enable(FBRASubController *this)
 {
   this->enabled             = TRUE;
   this->disable_controlling = TRUE;
-  this->disable_interval    = 5 * GST_SECOND;
+  this->disable_interval    = 10 * GST_SECOND;
   this->disable_end         = _now(this) + this->disable_interval;
   this->target_bitrate      = mprtps_path_get_target_bitrate(this->path);
   this->last_distorted      = _now(this);
@@ -682,11 +682,13 @@ void fbrasubctrler_report_update(
   _update_tr_corr(this);
   _reset_congestion_indicators(this);
 
+  _priv(this)->retractive = _min_target(this) * 10 < _TR(this);
+
   if(this->disable_controlling){
     gboolean tr_approved;
     tr_approved = _TR(this) * (1. - _appr_eps(this)) < _SR(this) && _SR(this) < _TR(this) * (1. + _appr_eps(this));
-//    g_print("%f < %d < %f -> %d\n", _TR(this) * .95, _SR(this), _TR(this) * 1.05, tr_approved);
-    if(!this->disable_end || !tr_approved){
+//    g_print("%f < %d < %f -> %d\n", _TR(this) * (1.-_appr_eps(this)), _SR(this), _TR(this) * (1.+_appr_eps(this)), tr_approved);
+    if(!this->disable_end && tr_approved){
       this->disable_end = _now(this) + this->disable_interval;
     }
     this->disable_controlling = _now(this) < this->disable_end;
@@ -782,9 +784,8 @@ _keep_stage(
     _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    if(_retractive(this) || _cng_trend_th(this) < _trend(this)){
-      target_rate = _TR(this) * GAMMA;
-    }
+    if(_retractive(this) || _cng_trend_th(this) < _trend(this))
+      target_rate = MAX(_min_target(this), MIN(_remb(this), _TR(this) * GAMMA));
     goto done;
   }
 
@@ -815,10 +816,7 @@ _keep_stage(
 
   _setup_monitoring(this);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
-  this->rand_factor =  1.0;
-  if(0 < _min_target(this) && _min_target(this) < _TR(this)){
-     this->rand_factor += MIN(0.0, g_random_double_range(0.0, _TR(this) / _min_target(this) - 1));
-  }
+  this->rand_factor =  1.0 + g_random_double_range(0.0, 1.0);
 done:
   _change_target_bitrate(this, target_rate);
   return;
@@ -848,9 +846,8 @@ _probe_stage(
     _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    if(_retractive(this) || _cng_trend_th(this) < _trend(this)){
-      target_rate = _TR(this) * GAMMA;
-    }
+    if(_retractive(this) || _cng_trend_th(this) < _trend(this))
+      target_rate = MAX(_min_target(this), MIN(_remb(this), _TR(this) * GAMMA));
     goto done;
   }
 
@@ -901,9 +898,8 @@ _increase_stage(
     _disable_controlling(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    if(_retractive(this) || _cng_trend_th(this) < _trend(this)){
-      target_rate = _TR(this) * GAMMA;
-    }
+    if(_retractive(this) || _cng_trend_th(this) < _trend(this))
+      target_rate = MAX(_min_target(this), MIN(_remb(this), _TR(this) * GAMMA));
     goto done;
   }
 
@@ -931,28 +927,12 @@ _increase_stage(
     goto done;
   }
 
-  if(!_priv(this)->rr_approved){
-    _priv(this)->rr_approved = target_rate * (1. - _appr_eps(this)) < _remb(this) &&
-                               _remb(this) < target_rate * (1. + _appr_eps(this));
-    if(_priv(this)->rr_approved){
-      _priv(this)->rr_approved_time = _now(this);
-    }
-    goto done;
-  }
-
   if(_now(this) -  this->rand_factor * _priv(this)->rtt < _priv(this)->tr_approved_time){
     goto done;
   }
 
-  if(_now(this) -  this->rand_factor * _priv(this)->rtt < _priv(this)->rr_approved_time){
-    goto done;
-  }
-
   _switch_stage_to(this, STAGE_PROBE, FALSE);
-  this->rand_factor =  1.0;
-  if(0 < _min_target(this) && _min_target(this) < _TR(this)){
-     this->rand_factor += MIN(0.0, g_random_double_range(0.0, _TR(this) / _min_target(this) - 1));
-  }
+  this->rand_factor =  1.0 + g_random_double_range(0.0, 1.0);
   this->monitoring_started = _now(this);
 done:
   _change_target_bitrate(this, target_rate);

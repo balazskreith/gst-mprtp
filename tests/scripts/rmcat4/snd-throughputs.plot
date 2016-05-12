@@ -22,14 +22,16 @@ set datafile separator ","
 set key inside horizontal top left 
 set tmargin 5
 set bmargin 5
-set lmargin 7
+set lmargin 10
 set rmargin 7
 set yrange [0:range]
-set ytics 1000
+set ytics 500
 set xrange [0:duration]
 set xtics 100
 set ylabel "Throughput (KBits)"
 set xlabel "time (100ms)"
+set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
+set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
 
 
 # Line width of the axes

@@ -22,7 +22,7 @@ set datafile separator ","
 set key inside horizontal top left 
 set tmargin 5
 set bmargin 5
-set lmargin 7
+set lmargin 10
 set rmargin 7
 set yrange [0:range]
 set ytics 1000

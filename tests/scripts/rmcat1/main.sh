@@ -70,6 +70,7 @@ function log_bw() {
 
   #setup duration
   DURATION=120
+  OWD=300
   
   log_bw 40 1000 $LOGSDIR/veth0.csv
   log_bw 20 2500 $LOGSDIR/veth0.csv
@@ -77,13 +78,13 @@ function log_bw() {
   log_bw 20 1000 $LOGSDIR/veth0.csv
 
   PEER1_SND="$SCRIPTSDIR/sender_1.sh"
-  echo "tc qdisc change dev veth0 root handle 1: netem delay 150ms" > $PEER1_SND
+  echo "tc qdisc change dev veth0 root handle 1: netem delay "$OWD"ms" > $PEER1_SND
   echo -n "./$SENDER" >> $PEER1_SND
   ./$TESTDIR/peer1params.sh >> $PEER1_SND
   chmod 777 $PEER1_SND
 
   PEER1_RCV="$SCRIPTSDIR/receiver_1.sh"
-  echo "tc qdisc change dev veth1 root handle 1: netem delay 150ms" > $PEER1_RCV
+  echo "tc qdisc change dev veth1 root handle 1: netem delay "$OWD"ms" > $PEER1_RCV
   echo -n "./$RECEIVER" >> $PEER1_RCV
   ./$TESTDIR/peer1params.sh >> $PEER1_RCV
   chmod 777 $PEER1_RCV

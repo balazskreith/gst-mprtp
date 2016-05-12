@@ -71,7 +71,8 @@ function log_bw() {
 
   #setup duration
   DURATION=150.0
-  
+  OWD=50
+
   sudo ip netns exec $NSSND tc qdisc change dev veth0 parent 1: handle 2: tbf rate 4000kbit burst 15400 latency 300ms minburst 1540
 
   log_bw 25 4000 $LOGSDIR/veth0.csv
@@ -80,12 +81,15 @@ function log_bw() {
   log_bw 25 1000 $LOGSDIR/veth0.csv
   log_bw 25 2000 $LOGSDIR/veth0.csv  
 
+
   PEER1_SND="$SCRIPTSDIR/sender_1.sh"
-  echo -n "./$SENDER" > $PEER1_SND
+  echo "tc qdisc change dev veth0 root handle 1: netem delay "$OWD"ms" > $PEER1_SND
+  echo -n "./$SENDER" >> $PEER1_SND
   ./$TESTDIR/peer1params.sh >> $PEER1_SND
   chmod 777 $PEER1_SND
 
   PEER1_RCV="$SCRIPTSDIR/receiver_1.sh"
+  echo "tc qdisc change dev veth1 root handle 1: netem delay "$OWD"ms" > $PEER1_RCV
   echo -n "./$RECEIVER" > $PEER1_RCV
   ./$TESTDIR/peer1params.sh >> $PEER1_RCV
   chmod 777 $PEER1_RCV
@@ -104,22 +108,19 @@ function log_bw() {
 
   #start receiver and sender
   sudo ip netns exec $NSRCV ./$PEER1_RCV 2> $LOGSDIR"/"receiver.log &
-  sleep 2
-  sudo ip netns exec $NSSND ./$PEER1_SND 2> $LOGSDIR"/"sender.log &
-
   sudo ip netns exec $NSRCV ./$PEER2_RCV 2> $LOGSDIR"/"receiver2.log &
-  sleep 2
+  sleep 4
+  sudo ip netns exec $NSSND ./$PEER1_SND 2> $LOGSDIR"/"sender.log &
   sudo ip netns exec $NSSND ./$PEER2_SND 2> $LOGSDIR"/"sender2.log &
 
   echo "
   while true; do 
     ./$TESTDIR/plots.sh --srcdir $LOGSDIR --dstdir $REPORTSDIR
-    ./$TESTDIR/stats.sh --srcdir $LOGSDIR --dst $REPORTSDIR/$STATFILE
-    mv $LOGSDIR/ccparams_1.log $REPORTSDIR/ccparams_1.log
-    ./$TESTDIR/report.sh --srcdir $REPORTSDIR --author $REPORTAUTHORFILE --dst $REPORTEXFILE
-    ./$SCRIPTSDIR/pdflatex.sh $REPORTEXFILE
+    #./$TESTDIR/stats.sh --srcdir $LOGSDIR --dst $REPORTSDIR/$STATFILE
+    #./$TESTDIR/report.sh --srcdir $REPORTSDIR --author $REPORTAUTHORFILE --dst $REPORTEXFILE
+    #./$SCRIPTSDIR/pdflatex.sh $REPORTEXFILE
 
-    mv $REPORTPDF $REPORTSDIR/$REPORTPDF
+    #mv $REPORTPDF $REPORTSDIR/$REPORTPDF
     sleep $REPPERIOD
   done
 

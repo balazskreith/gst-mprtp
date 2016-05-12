@@ -49,7 +49,6 @@ set style line 4 linecolor rgb '#a21d21' linetype 4 linewidth 1
 set style line 5 linecolor rgb '#662c91' linetype 5 linewidth 1	
 
  plot throughput_file using 0:3 with lines ls 1 title "Sending Rate", \
-      throughput_file using 0:1 with lines ls 2 title "Target Rate", \
       throughput_file using 0:5 with lines ls 3 title "FEC Rate", \
       bw_file using 0:1 with lines ls 4 title "Path Capacity"
 

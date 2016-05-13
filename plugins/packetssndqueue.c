@@ -106,7 +106,8 @@ packetssndqueue_init (PacketsSndQueue * this)
   this->obsolation_treshold = 0;
   this->incoming_bytes = make_numstracker(2048, GST_SECOND);
   this->items = g_queue_new();
-  mprtp_logger_add_logging_fnc(_logging,this, 10, &this->rwmutex);
+
+  DISABLE_LINE mprtp_logger_add_logging_fnc(_logging,this, 10, &this->rwmutex);
 }
 
 

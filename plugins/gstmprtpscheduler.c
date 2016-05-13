@@ -1185,12 +1185,14 @@ _mprtpscheduler_send_buffer (GstMprtpscheduler * this, GstBuffer *buffer)
   }
 
 
+  if(0)
   {
     GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
     gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
     mprtp_logger("push.log", "%lu,%u\n", GST_TIME_AS_MSECONDS(_now(this)), gst_rtp_buffer_get_timestamp(&rtp));
     gst_rtp_buffer_unmap(&rtp);
   }
+
   gst_pad_push (this->mprtp_srcpad, buffer);
   if(rtpfecbuf){
     gst_pad_push (this->mprtp_srcpad, rtpfecbuf);

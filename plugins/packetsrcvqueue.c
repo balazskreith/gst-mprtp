@@ -195,8 +195,8 @@ packetsrcvqueue_init (PacketsRcvQueue * this)
   this->max_playoutrate =  .04 * GST_SECOND;
   this->spread_factor = 2.;
 
-  mprtp_logger_add_logging_fnc(_csv_logging,this, 1, &this->rwmutex);
-  mprtp_logger_add_logging_fnc(_readable_logging,this, 10, &this->rwmutex);
+  DISABLE_LINE mprtp_logger_add_logging_fnc(_csv_logging,this, 1, &this->rwmutex);
+  DISABLE_LINE mprtp_logger_add_logging_fnc(_readable_logging,this, 10, &this->rwmutex);
 
 }
 

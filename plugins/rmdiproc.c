@@ -44,16 +44,6 @@ GST_DEBUG_CATEGORY_STATIC (rmdi_processor_debug_category);
 
 G_DEFINE_TYPE (RMDIProcessor, rmdi_processor, G_TYPE_OBJECT);
 
-typedef struct _CorrBlock CorrBlock;
-
-struct _CorrBlock{
-  guint           id,N;
-  gint64          Iu0,Iu1,Id1,Id2,Id3,G01,M0,M1,G_[64],M_[64];
-  gint            index;
-  gdouble         g;
-  CorrBlock*     next;
-};
-
 typedef struct _RMDIProcessorPrivate{
   GstClockTime        delay50th;
   GstClockTime        min_delay;
@@ -231,7 +221,7 @@ void rmdi_processor_do(RMDIProcessor       *this,
 
   memcpy(result, &this->result, sizeof(RMDIProcessorResult));
 
-  _readable_result(this, result);
+  DISABLE_LINE _readable_result(this, result);
 done:
   return;
 

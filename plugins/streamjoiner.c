@@ -195,7 +195,7 @@ stream_joiner_init (StreamJoiner * this)
   percentiletracker_set_treshold(this->delays, 60 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->delays, _delays_stat_pipe, this);
 
-  mprtp_logger_add_logging_fnc(_logging, this, 1, &this->rwmutex);
+  DISABLE_LINE mprtp_logger_add_logging_fnc(_logging, this, 1, &this->rwmutex);
 }
 
 StreamJoiner*

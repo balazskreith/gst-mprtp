@@ -94,7 +94,7 @@ subratectrler_init (SubflowRateController * this)
   this->sysclock = gst_system_clock_obtain();
   g_rw_lock_init (&this->rwmutex);
 
-  mprtp_logger_add_logging_fnc(_logging, this, 2, &this->rwmutex);
+  DISABLE_LINE mprtp_logger_add_logging_fnc(_logging, this, 2, &this->rwmutex);
   mprtp_logger_add_logging_fnc(_log2csv, this, 1, &this->rwmutex);
 }
 

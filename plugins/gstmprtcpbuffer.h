@@ -291,6 +291,13 @@ typedef struct PACKED _GstRTCPAFB_REMB{
   guint16               reserved;
 }GstRTCPAFB_REMB;
 
+
+//Receiver Estimated Path Stability
+typedef struct PACKED _GstRTCPAFB_REPS{
+  guint32               sampling_num : 8;
+  guint32               stability : 24;
+}GstRTCPAFB_REPS;
+
 /*MPRTCP struct polymorphism*/
 
 typedef struct PACKED _GstMPRTCPSubflowInfo

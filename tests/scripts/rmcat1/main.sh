@@ -99,12 +99,8 @@ function log_bw() {
   echo "
   while true; do 
     ./$TESTDIR/plots.sh --srcdir $LOGSDIR --dstdir $REPORTSDIR
-    ./$TESTDIR/stats.sh --srcdir $LOGSDIR --dst $REPORTSDIR/$STATFILE
-    mv $LOGSDIR/ccparams_1.log $REPORTSDIR/ccparams_1.log
-    ./$TESTDIR/report.sh --srcdir $REPORTSDIR --author $REPORTAUTHORFILE --dst $REPORTEXFILE
-    ./$SCRIPTSDIR/pdflatex.sh $REPORTEXFILE
+#    ./$TESTDIR/stats.sh --srcdir $LOGSDIR --dst $REPORTSDIR/$STATFILE
 
-    mv $REPORTPDF $REPORTSDIR/$REPORTPDF
     sleep $REPPERIOD
   done
 
@@ -118,7 +114,6 @@ cleanup()
 {
   pkill receiver
   pkill sender
-  ps -ef | grep 'veth_ctrler.sh' | grep -v grep | awk '{print $2}' | xargs kill
   ps -ef | grep 'report_generato' | grep -v grep | awk '{print $2}' | xargs kill
   ps -ef | grep 'main.sh' | grep -v grep | awk '{print $2}' | xargs kill
 

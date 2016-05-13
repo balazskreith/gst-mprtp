@@ -156,7 +156,7 @@ packetsrcvtracker_init (PacketsRcvTracker * this)
     for(i=0; i < 6; ++i){
       this->blocks[i].next = &this->blocks[i + 1];
       this->blocks[i].id   = i;
-      this->blocks[i].N    = 64>>i;
+//      this->blocks[i].N    = 64>>i;
       this->blocks[i].N    = 16;
     }
   }
@@ -477,7 +477,7 @@ done:
 
 void _refresh_delay_variation(PacketsRcvTracker * this, GstMpRTPBuffer *mprtp)
 {
-  gint64 devar, drcv, dsnd;
+  gint64 diff, drcv, dsnd;
 
   if(this->devar.last_ntp_rcv_time == 0){
     this->devar.last_timestamp    = mprtp->timestamp;
@@ -504,11 +504,11 @@ void _refresh_delay_variation(PacketsRcvTracker * this, GstMpRTPBuffer *mprtp)
       g_warning("PROBLEMS WITH RCV OR SND NTP TIME");
   }
 
-  devar = drcv - dsnd;
-  this->blocks[0].Iu0 = MAX(devar, -1 * devar);
+  diff = dsnd < drcv ? drcv - dsnd : dsnd - drcv;
+  this->blocks[0].Iu0 = diff;
   _execute_corrblocks(this, this->blocks);
   _execute_corrblocks(this, this->blocks);
-  this->blocks[0].Id1 = MAX(devar, -1 * devar);
+  this->blocks[0].Id1 = diff;
 
 
   //mprtp_logger("devars.csv", "%lu\n", MIN(this->devar.last_delay - mprtp->delay, mprtp->delay - this->devar.last_delay));

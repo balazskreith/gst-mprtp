@@ -31,6 +31,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "mprtplogger.h"
+#include "mprtpdefs.h"
 
 
 GST_DEBUG_CATEGORY_STATIC (ricalcer_debug_category);
@@ -135,7 +136,7 @@ ricalcer_init (ReportIntervalCalculator * this)
   this->interval_spread = 1.;
   this->sysclock = gst_system_clock_obtain();
   g_rw_lock_init (&this->rwmutex);
-  mprtp_logger_add_logging_fnc(_logging, this, 10, &this->rwmutex);
+  DISABLE_LINE mprtp_logger_add_logging_fnc(_logging, this, 10, &this->rwmutex);
 }
 
 ReportIntervalCalculator *make_ricalcer(gboolean sender_side)

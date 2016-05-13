@@ -400,7 +400,7 @@ rcvctrler_init (RcvController * this)
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
 
-  mprtp_logger_add_logging_fnc(_logging, this, 1, &this->rwmutex);
+  DISABLE_LINE mprtp_logger_add_logging_fnc(_logging, this, 1, &this->rwmutex);
 }
 
 void
@@ -513,7 +513,7 @@ rcvctrler_receive_mprtcp (RcvController *this, GstBuffer * buf)
 
   if(summary->SR.processed){
     this->report_is_flowable = TRUE;
-    mprtpr_path_add_delay(subflow->path, get_epoch_time_from_ntp_in_ns(NTP_NOW - summary->SR.ntptime));
+//    mprtpr_path_add_delay(subflow->path, get_epoch_time_from_ntp_in_ns(NTP_NOW - summary->SR.ntptime));
     report_producer_set_ssrc(this->report_producer, summary->ssrc);
     subflow->last_SR_report_sent = summary->SR.ntptime;
     subflow->last_SR_report_rcvd = NTP_NOW;
@@ -1038,9 +1038,6 @@ guint32 _update_ratewindow(RateWindow *window, guint32 value)
   window->rate_value = value - window->items[window->index];
   return window->rate_value;
 }
-
-
-
 
 
 

@@ -198,18 +198,12 @@ void mprtp_logger(const gchar *filename, const gchar * format, ...)
   if(!loggerptr->enabled){
     goto done;
   }
-  if(_now(loggerptr) - 10 * GST_SECOND < loggerptr->made){
+  if(_now(loggerptr) - 1 * GST_SECOND < loggerptr->made){
     goto done;
-  }
-  if(!loggerptr->signaled){
-    gchar writable[255];
-    strcpy(writable, loggerptr->path);
-    strcat(writable, "signal.log");
-    file = fopen(writable, "w");
-    fprintf(file, "1");
-    fclose(file);
+  }else if(!loggerptr->signaled){
     loggerptr->signaled = TRUE;
   }
+
   strcpy(writable, loggerptr->path);
   strcat(writable, filename);
 //  strcpy(writable, filename);

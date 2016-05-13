@@ -450,7 +450,7 @@ _refresh_splitter (StreamSplitter *this)
   }
 
   this->tree = _tree_ctor(this);
-  _logging(this);
+  DISABLE_LINE _logging(this);
 done:
   return;
 }

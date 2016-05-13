@@ -177,7 +177,9 @@ void report_processor_process_mprtcp(ReportProcessor * this, GstBuffer* buffer, 
   result->updated = _now(this);
   block = gst_mprtcp_get_first_block(report);
   _processing_mprtcp_subflow_block(this, block, result);
-  _logging(this, result);
+
+  DISABLE_LINE _logging(this, result);
+
   gst_buffer_unmap(buffer, &map);
 }
 

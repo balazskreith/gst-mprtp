@@ -6,7 +6,6 @@
 #include "bintree.h"
 #include "sndratedistor.h"
 #include "reportproc.h"
-#include "rmdiproc.h"
 #include "signalreport.h"
 
 typedef struct _SubflowRateController SubflowRateController;

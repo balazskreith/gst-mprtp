@@ -73,9 +73,6 @@ GST_DEBUG_CATEGORY_STATIC (gst_mprtpplayouter_debug_category);
 #define MPRTP_PLAYOUTER_DEFAULT_SSRC 0
 #define MPRTP_PLAYOUTER_DEFAULT_CLOCKRATE 90000
 
-#define DEFAULT_DISCARD_TRESHOLD     400 * GST_MSECOND
-#define DEFAULT_LOST_TRESHOLD        1 * GST_SECOND
-#define DEFAULT_OWD_WINDOW_TRESHOLD  1 * GST_SECOND
 
 static void gst_mprtpplayouter_set_property (GObject * object,
     guint property_id, const GValue * value, GParamSpec * pspec);
@@ -118,9 +115,6 @@ _setup_paths_tresholds(
     GstClockTime treshold);
 
 static GstMpRTPBuffer *_make_mprtp_buffer(GstMprtpplayouter * this, GstBuffer *buffer);
-//static void _trash_mprtp_buffer(GstMprtpplayouter * this, GstMpRTPBuffer *mprtp);
-//#define _trash_mprtp_buffer(this, mprtp) pointerpool_add(this->mprtp_buffer_pool, mprtp);
-//#define _trash_mprtp_buffer(this, mprtp) g_slice_free(GstMpRTPBuffer, mprtp)
 #define _trash_mprtp_buffer(this, mprtp) mprtp_free(mprtp)
 
 #define _now(this) gst_clock_get_time (this->sysclock)
@@ -152,10 +146,8 @@ enum
   PROP_PLAYOUT_MIN_RATE,
   PROP_PLAYOUT_DESIRED_FRAMENUM,
   PROP_PLAYOUT_SPREAD_FACTOR,
-  PROP_DISCARD_TRESHOLD,
   PROP_SPIKE_DELAY_TRESHOLD,
   PROP_SPIKE_VAR_TRESHOLD,
-  PROP_LOST_TRESHOLD,
   PROP_REPAIR_WINDOW_MIN,
   PROP_REPAIR_WINDOW_MAX,
 
@@ -363,14 +355,6 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                                  G_PARAM_WRITABLE  | G_PARAM_STATIC_STRINGS));
 
 
-      g_object_class_install_property (gobject_class, PROP_DISCARD_TRESHOLD,
-           g_param_spec_uint ("discard-treshold",
-                              "A latency in ms after a packet considered to be discarded.",
-                              "A 32bit unsigned integer upper 8bit in host order are used to identify the subflow. "
-                              "If the value is 255 then the option will be applied on all subflow. The latter 24bits are identified as a value in ms",
-                              0,
-                              4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
       g_object_class_install_property (gobject_class, PROP_SPIKE_DELAY_TRESHOLD,
            g_param_spec_uint ("spike-delay-treshold",
                               "if the actual packet delay larger than the average plus this delay value in ms a path considered to be in spike mode.",
@@ -386,14 +370,6 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                               "If the value is 255 then the option will be applied on all subflow. The latter 24bits are identified as a value in ms",
                               0,
                               4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_LOST_TRESHOLD,
-        g_param_spec_uint ("lost-treshold",
-                           "A delay in ms after a packet gap in stream considered to be lost.",
-                           "A 32bit unsigned integer upper 8bit in host order are used to identify the subflow. "
-                           "If the value is 255 then the option will be applied on all subflow. The latter 24bits are identified as a value in ms",
-                           0,
-                           10000, 1000, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SETUP_RTCP_INTERVAL_TYPE,
         g_param_spec_uint ("setup-rtcp-interval-type",
@@ -634,15 +610,6 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       packetsrcvqueue_set_spread_factor(this->rcvqueue, gdouble_value);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_DISCARD_TRESHOLD:
-      THIS_WRITELOCK (this);
-      guint_value = g_value_get_uint (value);
-      _setup_paths_tresholds(this,
-                             subflow_prop->id,
-                             mprtpr_path_set_discard_treshold,
-                             (GstClockTime) subflow_prop->value * GST_MSECOND);
-      THIS_WRITEUNLOCK (this);
-      break;
     case PROP_SPIKE_DELAY_TRESHOLD:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
@@ -661,15 +628,6 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
                              (GstClockTime) subflow_prop->value * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_LOST_TRESHOLD:
-        THIS_WRITELOCK (this);
-        guint_value = g_value_get_uint (value);
-        _setup_paths_tresholds(this,
-                               subflow_prop->id,
-                               mprtpr_path_set_lost_treshold,
-                               (GstClockTime) subflow_prop->value * GST_MSECOND);
-        THIS_WRITEUNLOCK (this);
-        break;
     case PROP_SETUP_RTCP_INTERVAL_TYPE:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
@@ -917,9 +875,6 @@ _join_path (GstMprtpplayouter * this, guint8 subflow_id)
     goto exit;
   }
   path = make_mprtpr_path (subflow_id);
-  mprtpr_path_set_discard_treshold(path, DEFAULT_DISCARD_TRESHOLD);
-  mprtpr_path_set_lost_treshold(path, DEFAULT_LOST_TRESHOLD);
-  mprtpr_path_set_owd_window_treshold(path, DEFAULT_OWD_WINDOW_TRESHOLD);
   g_hash_table_insert (this->paths, GINT_TO_POINTER (subflow_id), path);
   stream_joiner_add_path (this->joiner, subflow_id, path);
   rcvctrler_add_path(this->controller, subflow_id, path);

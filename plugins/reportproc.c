@@ -113,9 +113,18 @@ _logging(
     ReportProcessor *this,
     GstMPRTCPReportSummary* summary);
 
-//----------------------------------------------------------------------
-//--------- Private functions implementations to SchTree object --------
-//----------------------------------------------------------------------
+
+static gint
+_cmp_seq (guint16 x, guint16 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 32768) return -1;
+  if(x > y && x - y > 32768) return -1;
+  if(x < y && y - x > 32768) return 1;
+  if(x > y && x - y < 32768) return 1;
+  return 0;
+}
+
 
 void
 report_processor_class_init (ReportProcessorClass * klass)
@@ -370,11 +379,13 @@ _processing_xr_discarded_rle_block (ReportProcessor *this,
                         GstMPRTCPReportSummary* summary)
 {
   guint chunks_num;
-  GstRTCPXRChunk *chunk;
-  guint16 *i;
+  GstRTCPXRChunk chunk, *src;
+  guint chunk_i, bit_i;
+  guint16 seq;
 
   summary->XR.DiscardedRLE.processed = TRUE;
-
+  src = xrb->chunks;
+  summary->XR.DiscardedRLE.vector_length = 0;
   gst_rtcp_xr_discarded_rle_getdown(xrb,
                                     &summary->XR.DiscardedRLE.early_bit,
                                     &summary->XR.DiscardedRLE.thinning,
@@ -382,11 +393,15 @@ _processing_xr_discarded_rle_block (ReportProcessor *this,
                                     &summary->XR.DiscardedRLE.begin_seq,
                                     &summary->XR.DiscardedRLE.end_seq);
 
-  i = &summary->XR.DiscardedRLE.length;
+  seq = summary->XR.DiscardedRLE.begin_seq;
   chunks_num = gst_rtcp_xr_discarded_rle_block_get_chunks_num(xrb);
 
-  for(*i = 0, chunk = &xrb->chunks[0]; *i < chunks_num; ++chunk, ++*i){
-      gst_rtcp_xr_chunk_ntoh_cpy(&summary->XR.DiscardedRLE.chunks[*i], chunk);
+  for(chunk_i = 0; chunk_i < chunks_num; ++chunk_i){
+    gst_rtcp_xr_chunk_ntoh_cpy(&chunk, src + chunk_i);
+    for(bit_i = 0; bit_i < 15 && _cmp_seq(seq, summary->XR.DiscardedRLE.end_seq) <= 0; ++bit_i){
+      summary->XR.DiscardedRLE.vector[summary->XR.DiscardedRLE.vector_length++] =
+          0 < (chunk.Bitvector.bitvector & (guint16)(1<<bit_i)) ? TRUE : FALSE;
+    }
   }
 }
 
@@ -541,17 +556,15 @@ void _logging(ReportProcessor *this, GstMPRTCPReportSummary* summary)
                    "-------------------------- XR_RFC7097 ---------------------------\n"
                    "begin_seq: %hu\n"
                    "end_seq:   %hu\n"
-                   "length:    %d\n"
                    ,
                    summary->XR.DiscardedRLE.begin_seq,
-                   summary->XR.DiscardedRLE.end_seq,
-                   summary->XR.DiscardedRLE.length
+                   summary->XR.DiscardedRLE.end_seq
       );
-      for(i=0; i<summary->XR.DiscardedRLE.length; ++i){
+      for(i=0; i<summary->XR.DiscardedRLE.vector_length; ++i){
           mprtp_logger(this->logfile,
                            "value %d:    %X\n"
                            ,
-                           i, summary->XR.DiscardedRLE.chunks[i].Bitvector.bitvector
+                           i, summary->XR.DiscardedRLE.vector[i]
               );
       }
     }

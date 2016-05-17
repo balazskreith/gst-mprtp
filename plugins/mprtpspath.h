@@ -17,7 +17,6 @@
 #include "packetssndqueue.h"
 #include "percentiletracker.h"
 #include "numstracker.h"
-#include "packetssndtracker.h"
 #include "reportproc.h"
 
 G_BEGIN_DECLS
@@ -77,9 +76,6 @@ struct _MPRTPSPath
 
   guint32                 monitoring_interval;
 
-//  MPRTPSPathPackets       packets;
-  PacketsSndTracker*         packetstracker;
-
   guint32                 total_sent_packets_num;
   guint32                 total_sent_payload_bytes;
 
@@ -88,6 +84,9 @@ struct _MPRTPSPath
   gboolean                expected_lost;
 
   GstClockTime            keep_alive_period;
+
+  void                  (*packetstracker)(gpointer, guint, guint16);
+  gpointer                packetstracker_data;
 
   gpointer                approval_data;
   gboolean              (*approval)(gpointer, GstBuffer *);
@@ -139,9 +138,7 @@ void mprtps_path_set_keep_alive_period(MPRTPSPath *this, GstClockTime period);
 void mprtps_path_set_approval_process(MPRTPSPath *this, gpointer data, gboolean(*approval)(gpointer, GstBuffer *));
 gboolean mprtps_path_approve_request(MPRTPSPath *this, GstBuffer *buf);
 
-PacketsSndTracker *mprtps_path_ref_packetstracker(MPRTPSPath *this);
-PacketsSndTracker* mprtps_path_unref_packetstracker(MPRTPSPath *this);
-
+void mprtps_path_set_packetstracker(MPRTPSPath *this, void(*packetstracker)(gpointer,  guint, guint16), gpointer data);
 
 gboolean mprtps_path_request_keep_alive(MPRTPSPath *this);
 

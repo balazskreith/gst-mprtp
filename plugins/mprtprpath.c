@@ -188,62 +188,10 @@ mprtpr_path_set_urgent_request(MpRTPRPath *this)
 }
 
 void
-mprtpr_path_set_discard_treshold(MpRTPRPath *this, GstClockTime treshold)
-{
-  THIS_WRITELOCK (this);
-  if(this->packetstracker){
-    packetsrcvtracker_set_discarded_treshold(this->packetstracker, treshold);
-  }
-  THIS_WRITEUNLOCK (this);
-}
-
-void
-mprtpr_path_set_lost_treshold(MpRTPRPath *this, GstClockTime treshold)
-{
-  THIS_WRITELOCK (this);
-  if(this->packetstracker){
-    packetsrcvtracker_set_lost_treshold(this->packetstracker, treshold);
-  }
-  THIS_WRITEUNLOCK (this);
-}
-
-PacketsRcvTracker *mprtpr_path_ref_packetstracker(MpRTPRPath *this)
-{
-  PacketsRcvTracker *result;
-  THIS_WRITELOCK(this);
-  if(!this->packetstracker){
-    result = this->packetstracker = make_packetsrcvtracker();
-  }else{
-    result = g_object_ref(this->packetstracker);
-  }
-  THIS_WRITEUNLOCK(this);
-  return result;
-}
-
-PacketsRcvTracker* mprtpr_path_unref_packetstracker(MpRTPRPath *this)
-{
-  PacketsRcvTracker *result = NULL;
-  THIS_WRITELOCK(this);
-  if(!this->packetstracker){
-    goto done;
-  }
-  result = this->packetstracker;
-  if(1 < this->packetstracker->object.ref_count){
-    g_object_unref(this->packetstracker);
-    goto done;
-  }
-  g_object_unref(this->packetstracker);
-  result = this->packetstracker = NULL;
-done:
-  THIS_WRITEUNLOCK(this);
-  return result;
-}
-
-void
 mprtpr_path_set_owd_window_treshold(MpRTPRPath *this, GstClockTime treshold)
 {
   THIS_WRITELOCK (this);
-  percentiletracker_set_treshold(this->delays, treshold);
+
   THIS_WRITEUNLOCK (this);
 }
 
@@ -254,6 +202,15 @@ mprtpr_path_set_spike_delay_treshold(MpRTPRPath *this, GstClockTime delay_tresho
   THIS_WRITELOCK (this);
   this->spike_delay_treshold = delay_treshold;
   THIS_WRITEUNLOCK (this);
+}
+
+void
+mprtpr_path_set_packetstracker(MpRTPRPath *this, void(*packetstracker)(gpointer,  GstMpRTPBuffer*), gpointer data)
+{
+  THIS_WRITELOCK(this);
+  this->packetstracker = packetstracker;
+  this->packetstracker_data = data;
+  THIS_WRITEUNLOCK(this);
 }
 
 void
@@ -320,7 +277,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   _add_delay(this, mprtp->delay);
 
   if(this->packetstracker){
-    packetsrcvtracker_add(this->packetstracker, mprtp);
+    this->packetstracker(this->packetstracker_data, mprtp);
   }
 
   //consider cycle num increase with allowance of a little gap
@@ -330,8 +287,6 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
 
   //set the new packet seq as the highest seq
   this->highest_seq = mprtp->subflow_seq;
-
-
 
 done:
   THIS_WRITEUNLOCK(this);

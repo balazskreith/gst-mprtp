@@ -13,8 +13,8 @@
 #include "bintree.h"
 #include "sndratedistor.h"
 #include "reportproc.h"
-#include "rmdiproc.h"
 #include "signalreport.h"
+#include "fbrafbproc.h"
 
 
 typedef struct _FBRASubController FBRASubController;
@@ -40,8 +40,6 @@ struct _FBRASubController
   GRWLock                   rwmutex;
   GstClock*                 sysclock;
   MPRTPSPath*               path;
-  RMDIProcessor*            fb_processor;
-  RMDIProcessorResult       rmdi_result;
 
   GstClockTime              made;
   gboolean                  disable_controlling;
@@ -62,12 +60,14 @@ struct _FBRASubController
 
   gdouble                   rand_factor;
 
-  GstClockTime              last_report_arrived_t1;
-  GstClockTime              last_report_arrived;
-  GstClockTime              report_interval;
+  GstClockTime              last_fb_arrived_t1;
+  GstClockTime              last_fb_arrived;
+  GstClockTime              fb_interval;
 
   gboolean                  enabled;
 
+  FBRAFBProcessor*          fbprocessor;
+  FBRAFBProcessorStat       fbstat;
   //Need for monitoring
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;

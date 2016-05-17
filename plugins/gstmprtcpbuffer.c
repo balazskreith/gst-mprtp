@@ -21,7 +21,7 @@
 #define RTCPXR7243BLOCK_WORDS (RTCPXR7243BLOCK_BYTES>>2)
 #define RTCPXROWDBLOCK_BYTES 20
 #define RTCPXROWDBLOCK_WORDS (RTCPXROWDBLOCK_BYTES>>2)
-#define RTCPFB_BYTES 8
+#define RTCPFB_BYTES 12
 #define RTCPFB_WORDS (RTCPFB_BYTES>>2)
 #define RTCPRRBLOCK_BYTES 24
 #define RTCPRRBLOCK_WORDS (RTCPRRBLOCK_BYTES>>2)
@@ -657,39 +657,6 @@ gst_rtcp_afb_getdown (GstRTCPFB * report,
   }
 }
 
-void
-gst_rtcp_afb_rmdi_change (GstRTCPAFB_RMDI * report,
-                     guint8 *rsvd,
-                     guint8 *records_num,
-                     guint16 *length)
-{
-  if(rsvd){
-    report->rsvd = *rsvd;
-  }
-  if(records_num){
-    report->records_num = *records_num;
-  }
-  if(length){
-    report->length = g_htons(*length);
-  }
-}
-
-void
-gst_rtcp_afb_rmdi_getdown (GstRTCPAFB_RMDI * report,
-                      guint8 *rsvd,
-                      guint8 *records_num,
-                      guint16 *length)
-{
-  if(rsvd){
-      *rsvd = report->rsvd;
-  }
-  if(records_num){
-      *records_num = report->records_num;
-  }
-  if(length){
-      *length = g_ntohs(report->length);
-  }
-}
 
 static guint32 g_htonfloat(gfloat value){
     union v {
@@ -753,41 +720,32 @@ gst_rtcp_afb_remb_getdown (GstRTCPAFB_REMB * report,
   }
 }
 
+
 void
-gst_rtcp_afb_rmdi_record_change (GstRTCPAFB_RMDIRecord * record,
-                      guint16 *HSSN,
-                      guint16 *disc_packets_num,
-                      guint32 *owd_sample)
+gst_rtcp_afb_reps_change (GstRTCPAFB_REPS * report,
+                          guint8 *sampling_num,
+                          gfloat *stability)
 {
-  if(HSSN){
-      record->HSSN = g_htons(*HSSN);
+  if(sampling_num){
+      report->sampling_num = *sampling_num;
   }
-  if(disc_packets_num){
-      record->disc_packets_num = *disc_packets_num;
-  }
-  if(owd_sample){
-      record->owd_sample = g_ntohl(*owd_sample);
+  if(stability){
+    report->stability = g_htonfloat(*stability);
   }
 }
 
-
 void
-gst_rtcp_afb_rmdi_record_getdown (GstRTCPAFB_RMDIRecord * record,
-                                  guint16 *HSSN,
-                                  guint16 *disc_packets_num,
-                                  guint32 *owd_sample)
+gst_rtcp_afb_reps_getdown (GstRTCPAFB_REPS * report,
+                           guint8 *sampling_num,
+                           gfloat *stability)
 {
-  if(HSSN){
-      *HSSN = g_ntohs(record->HSSN);
-  }
-  if(disc_packets_num){
-      *disc_packets_num = g_ntohs(record->disc_packets_num);
-  }
-  if(owd_sample){
-      *owd_sample = g_ntohl(record->owd_sample);
+    if(sampling_num){
+        *sampling_num = report->sampling_num;
+    }
+  if(stability){
+    *stability = g_ntohfloat(report->stability);
   }
 }
-
 
 void
 gst_rtcp_afb_setup_fci_data(GstRTCPFB * report, gpointer fci_dat, guint fci_len)
@@ -1223,10 +1181,6 @@ gst_printfnc_rtcp (GstRTCPHeader * header, printfnc print)
           guint32 fci_id;
           gst_rtcp_afb_getdown(afb, NULL, NULL, &fci_id);
           gst_printfnc_rtcp_afb(afb, print);
-          if(fci_id == RTCP_AFB_RMDI_ID){
-              gst_printfnc_rtcp_afb_rmdi(&afb->fci_data, print);
-          }
-
         }
         break;
       case GST_RTCP_TYPE_XR:
@@ -1448,42 +1402,22 @@ gst_printfnc_rtcp_afb (GstRTCPFB * report, printfnc print)
       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
       "|%63X|\n", ssrc, fci_id);
 
+  gst_printfnc_rtcp_afb_data(report, print);
 
 }
 
 void
-gst_printfnc_rtcp_afb_rmdi (gpointer data, printfnc print)
+gst_printfnc_rtcp_afb_data (GstRTCPFB * report, printfnc print)
 {
-  GstRTCPAFB_RMDIRecord *record;
-  GstRTCPAFB_RMDI *fbm; //feedback message
-  guint8 rsvd, records_num;
-  guint16 length;
-  gint i;
-  fbm = data;
-  gst_rtcp_afb_rmdi_getdown(fbm, &rsvd, &records_num, &length);
-  print (
-      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
-      "|%15d|%31hu|%15d|\n"
-      ,
-      rsvd,
-      records_num,
-      length
-      );
+  gchar fci_data[1000];
+  guint fci_len, i;
 
-  record = &fbm->records[0];
-  for(i=0; i< records_num; ++i, ++record){
-      guint16 HSSN,disc_packets_num;
-      guint32 owd;
-      gst_rtcp_afb_rmdi_record_getdown(record, &HSSN, &disc_packets_num, &owd);
-      print (
-            "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
-            "|%31hu|%31hu|\n"
-            "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
-            "|%63X|\n"
-          ,
-          g_ntohs(record->HSSN), g_ntohs(record->disc_packets_num),
-          g_ntohl(record->owd_sample)
-          );
+  gst_rtcp_afb_getdown_fci_data(report, fci_data, &fci_len);
+  for(i=0; i<fci_len; i+=4){
+      print ("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+            "|%63X|\n",
+            *((guint32*)(fci_data + i))
+            );
   }
 }
 

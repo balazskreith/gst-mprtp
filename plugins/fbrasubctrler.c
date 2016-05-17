@@ -123,7 +123,7 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 #define ALPHA 1.0
 
 //A factor used to multiply the remb at congestion
-#define BETHA 1.0
+#define BETA 1.0
 
 #define GAMMA 0.6
 
@@ -178,8 +178,6 @@ struct _Private{
   gdouble             reduce_trend;
   GstClockTime        reduce_started;
 
-  PacketsSndTracker*  packetstracker;
-
   gboolean            pacing_allowed;
   gdouble             pacing_constrict_time;
   gdouble             pacing_deflate_time;
@@ -219,7 +217,7 @@ struct _Private{
 };
 
 #define _priv(this) ((Private*)this->priv)
-#define _rmdi(this) this->rmdi_result
+#define _fbstat(this) this->fbstat
 #define _pacer(this) _priv(this)->restrictor
 
 #define _fcongestion(this) _priv(this)->fcongestion
@@ -229,11 +227,10 @@ struct _Private{
 #define _btlp(this) this->bottleneck_point
 #define _mon_int(this) this->monitoring_interval
 #define _mon_br(this) this->monitored_bitrate
-#define _UF(this) _rmdi(this).utilized_fraction
-#define _qdelay_actual(this) _rmdi(this).qdelay_actual
-#define _qdelay_median(this) _rmdi(this).qdelay_median
-#define _qdelay_processed(this) _rmdi(this).owd_processed
-#define _rdiscards(this) _rmdi(this).recent_discards
+#define _owd_stt_median(this) _fbstat(this).owd_stt_median
+#define _owd_ltt_median(this) _fbstat(this).owd_ltt_median
+#define _qdelay_processed(this) _fbstat(this).owd_processed
+#define _rdiscards(this) _fbstat(this).recent_discards
 
 
 #define _state(this) mprtps_path_get_state(this->path)
@@ -247,17 +244,17 @@ struct _Private{
 
 #define _TR(this) this->target_bitrate
 #define _TR_t1(this) this->target_bitrate_t1
-#define _SR(this) (_rmdi(this).sender_bitrate)
-#define _GP(this) (_rmdi(this).goodput_bitrate)
+#define _SR(this) (_fbstat(this).packets_in_flight * 8)
+#define _GP(this) (_fbstat(this).goodput_bytes * 8)
 #define _GP_t1(this) (_priv(this)->goodput_bitrate_t1)
 #define _min_br(this) MIN(_SR(this), _TR(this))
 #define _max_br(this) MAX(_SR(this), _TR(this))
-#define _trend(this) _rmdi(this).owd_corr
-#define _remb(this) _rmdi(this).rcv_est_max_bitrate
+#define _owd_corr(this) _fbstat(this).owd_corr
+#define _stability(this) _fbstat(this).stability
 
 #define _retractive(this)             _priv(this)->retractive
 #define _dist_trend_th(this)          _priv(this)->distorted_trend_th
-#define _cng_trend_th(this)           _priv(this)->congestion_trend_th
+#define _cng_owd_corr_th(this)           _priv(this)->congestion_trend_th
 #define _probe_trend_th(this)         _priv(this)->probe_trend_th
 
 #define _btl_inc_fac(this)            _priv(this)->bottleneck_increasement_factor
@@ -406,7 +403,7 @@ fbrasubctrler_finalize (GObject * object)
   FBRASubController *this;
   this = FBRASUBCTRLER(object);
   mprtp_free(this->priv);
-  g_object_unref(this->fb_processor);
+  g_object_unref(this->fbprocessor);
   g_object_unref(this->sysclock);
   g_object_unref(this->path);
 }
@@ -467,12 +464,11 @@ FBRASubController *make_fbrasubctrler(MPRTPSPath *path)
   result->id                  = mprtps_path_get_id(result->path);
   result->monitoring_interval = 3;
   result->made                = _now(result);
-  result->fb_processor        = make_rmdi_processor(path);
-  result->report_interval     = 200 * GST_MSECOND;
+  result->fbprocessor         = make_fbrafbprocessor();
+  result->fb_interval     = 200 * GST_MSECOND;
   _switch_stage_to(result, STAGE_KEEP, FALSE);
   mprtps_path_set_state(result->path, MPRTPS_PATH_STATE_STABLE);
-
-  _priv(result)->packetstracker         = mprtps_path_ref_packetstracker(result->path);
+  mprtps_path_set_packetstracker(result->path, fbrafbprocessor_track, result->fbprocessor);
 
   return result;
 }
@@ -499,15 +495,11 @@ static void _reset_congestion_indicators(FBRASubController *this)
 {
   _fcongestion(this) = FALSE;
 
-  if(_cng_trend_th(this) < _trend(this)){
+  if(_cng_owd_corr_th(this) < _owd_corr(this)){
     _fcongestion(this) = TRUE;
   }
 
-  if(_qdelay_median(this) + _qdelay_cong_th(this) < _qdelay_actual(this)){
-    _fcongestion(this) = TRUE;
-  }
-
-  if(_UF(this) < _discard_cong_th(this)){
+  if(_owd_ltt_median(this) + _qdelay_cong_th(this) < _owd_stt_median(this)){
     _fcongestion(this) = TRUE;
   }
 
@@ -518,8 +510,8 @@ static void _update_tr_corr(FBRASubController *this)
   gdouble tr_corr;
   gdouble gp_corr;
 
-  tr_corr =  (gdouble) _rmdi(this).sender_bitrate / (gdouble)this->target_bitrate;
-  gp_corr =  (gdouble) _rmdi(this).goodput_bitrate / (gdouble) _rmdi(this).sender_bitrate;
+  tr_corr =  (gdouble) _GP(this) / (gdouble) _TR(this);
+  gp_corr =  (gdouble) _GP(this) / (gdouble) _SR(this);
   _priv(this)->gp_correlated = .9 < gp_corr && gp_corr < 1.1;
 
   if(.9 < tr_corr && tr_corr < 1.1){
@@ -588,7 +580,7 @@ void fbrasubctrler_time_update(FBRASubController *this)
     goto done;
   }
 
-  if(!_bcongestion(this) && this->last_report_arrived < _now(this) - 3 * this->report_interval){
+  if(!_bcongestion(this) && this->last_fb_arrived < _now(this) - 3 * this->fb_interval){
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     _change_target_bitrate(this, MIN(_TR(this), _TR_t1(this)));
@@ -666,19 +658,18 @@ void fbrasubctrler_report_update(
   if(!this->enabled){
     goto done;
   }
-  if(summary->RR.processed && summary->RR.RTT){
-    _priv(this)->rtt = summary->RR.RTT;
-    rmdi_processor_set_rtt(this->fb_processor, _priv(this)->rtt);
-  }
   if(!summary->XR.processed){
     goto done;
   }
-  this->last_report_arrived_t1 = this->last_report_arrived;
-  this->last_report_arrived    = _now(this);
-  this->report_interval        = CONSTRAIN(20 * GST_MSECOND, 100 * GST_MSECOND, this->last_report_arrived - this->last_report_arrived_t1);
+  this->last_fb_arrived_t1 = this->last_fb_arrived;
+  this->last_fb_arrived    = _now(this);
+  this->fb_interval        *= .8;
+  this->fb_interval        += .2 * (this->last_fb_arrived - this->last_fb_arrived_t1);
+  this->fb_interval        = CONSTRAIN(20 * GST_MSECOND, 100 * GST_MSECOND, this->fb_interval);
   _bcongestion(this)           = FALSE;
 
-  rmdi_processor_do(this->fb_processor, summary, &this->rmdi_result);
+  fbrafbprocessor_update(this->fbprocessor, summary);
+  fbrafbprocessor_get_stats(this->fbprocessor, &this->fbstat);
   _update_tr_corr(this);
   _reset_congestion_indicators(this);
 
@@ -709,7 +700,7 @@ void fbrasubctrler_report_update(
     _priv(this)->controlled = FALSE;
   }
 
-  rmdi_processor_approve_owd(this->fb_processor);
+  fbrafbprocessor_approve_owd(this->fbprocessor);
   ++this->measurements_num;
 done:
   return;
@@ -724,10 +715,10 @@ _get_reduced_target(FBRASubController *this)
     goto done;
   }
 
-//  target_rate = MIN(_TR(this), _remb(this) * CONSTRAIN(.6, .95, 2.-_trend(this)/2.));
-  this->bottleneck_point = target_rate = MIN( MIN(_TR(this), _TR_t1(this)), _remb(this) );
+//  target_rate = MIN(_TR(this), _GP(this) * CONSTRAIN(.6, .95, 2.-_trend(this)/2.));
+  this->bottleneck_point = target_rate = MIN( MIN(_TR(this), _TR_t1(this)), _GP(this) );
   _priv(this)->rr_approved = FALSE;
-  _priv(this)->reduce_trend = _trend(this);
+  _priv(this)->reduce_trend = _owd_corr(this);
   _priv(this)->reduce_started = _now(this);
 
 done:
@@ -748,15 +739,15 @@ _reduce_stage(
     }
   }
 
-  if(_priv(this)->reduce_trend * 1.5 < _trend(this) && _priv(this)->rr_approved){
+  if(_priv(this)->reduce_trend * 1.5 < _owd_corr(this) && _priv(this)->rr_approved){
     this->bottleneck_point =  target_rate = _get_reduced_target(this);
     goto done;
   }else{
-    this->bottleneck_point =  target_rate = MIN(_TR(this), _remb(this));
+    this->bottleneck_point =  target_rate = MIN(_TR(this), _GP(this));
   }
 
-  if(_dist_trend_th(this) < _trend(this)){
-    target_rate = MIN(_TR(this), _remb(this));
+  if(_dist_trend_th(this) < _owd_corr(this)){
+    target_rate = MIN(_TR(this), _GP(this));
     goto done;
   }
 
@@ -773,53 +764,55 @@ done:
   return;
 }
 
+//  if(_fbstat(this).congestion_notification){
+//    _disable_monitoring(this);
+//    _disable_controlling(this);
+//    _set_event(this, EVENT_CONGESTION);
+//    _switch_stage_to(this, STAGE_REDUCE, FALSE);
+//    if(_retractive(this) || _cng_trend_th(this) < _owd_corr(this))
+//      target_rate = MAX(_min_target(this), MIN(_GP(this), _TR(this) * GAMMA));
+//    goto done;
+//  }
+
 void
 _keep_stage(
     FBRASubController *this)
 {
   gint32   target_rate = this->target_bitrate;
 
-  if(_rmdi(this).congestion_notification){
-    _disable_monitoring(this);
-    _disable_controlling(this);
+  if(_cng_owd_corr_th(this)  < _owd_corr(this)){
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    if(_retractive(this) || _cng_trend_th(this) < _trend(this))
-      target_rate = MAX(_min_target(this), MIN(_remb(this), _TR(this) * GAMMA));
+    target_rate = _get_reduced_target(this) * BETA;
     goto done;
   }
 
-  if(_fcongestion(this)){
-    _set_event(this, EVENT_CONGESTION);
-    _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_reduced_target(this) * BETHA;
-    goto done;
-  }
-
-  if(_dist_trend_th(this)  < _trend(this)){
-    _set_event(this, EVENT_DISTORTION);
-    target_rate = _get_reduced_target(this) * ALPHA;
-    goto done;
-  }else if(_state(this) != MPRTPS_PATH_STATE_STABLE){
-    _set_event(this, EVENT_SETTLED);
-    goto done;
-  }
-
-  if(_probe_trend_th(this)  < _trend(this) || _pacer(this).state != PACING_STATE_DEACTIVE){
-    this->last_distorted = _now(this);
-    goto done;
-  }
-
-  if(_now(this) - MIN(1 * _priv(this)->rtt, 1.5 * GST_SECOND) < this->last_distorted){
-    goto done;
-  }
-
-  _setup_monitoring(this);
-  _switch_stage_to(this, STAGE_PROBE, FALSE);
-  this->rand_factor =  1.0 + g_random_double_range(0.0, 1.0);
+//  if(_stability(this)  < .8){
+//    _set_event(this, EVENT_DISTORTION);
+//    target_rate = _get_reduced_target(this) * ALPHA;
+//    goto done;
+//  }else if(_state(this) != MPRTPS_PATH_STATE_STABLE){
+//    _set_event(this, EVENT_SETTLED);
+//    goto done;
+//  }
+//
+//  if(_probe_trend_th(this)  < _owd_corr(this) || _pacer(this).state != PACING_STATE_DEACTIVE){
+//    this->last_distorted = _now(this);
+//    goto done;
+//  }
+//
+//  if(_now(this) - MIN(1 * _priv(this)->rtt, 1.5 * GST_SECOND) < this->last_distorted){
+//    goto done;
+//  }
+//
+//  _setup_monitoring(this);
+//  _switch_stage_to(this, STAGE_PROBE, FALSE);
+//  this->rand_factor =  1.0 + g_random_double_range(0.0, 1.0);
+  DISABLE_LINE _setup_monitoring(this);
+  DISABLE_LINE _disable_controlling(this);
 done:
   _change_target_bitrate(this, target_rate);
-  return;
+//  return;
 }
 
 static gint32
@@ -827,7 +820,7 @@ _get_next_target(FBRASubController *this)
 {
   gint32 target_rate = this->target_bitrate;
 
-//  target_rate = MIN(_remb(this), _SR(this)) + _get_increasement(this);
+//  target_rate = MIN(_GP(this), _SR(this)) + _get_increasement(this);
   target_rate += _get_increasement(this);
   _priv(this)->tr_approved = FALSE;
   _priv(this)->rr_approved = FALSE;
@@ -841,24 +834,14 @@ _probe_stage(
 {
   gint32   target_rate = this->target_bitrate;
 
-  if(_rmdi(this).congestion_notification){
-    _disable_monitoring(this);
-    _disable_controlling(this);
-    _set_event(this, EVENT_CONGESTION);
-    _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    if(_retractive(this) || _cng_trend_th(this) < _trend(this))
-      target_rate = MAX(_min_target(this), MIN(_remb(this), _TR(this) * GAMMA));
-    goto done;
-  }
-
   if(_fcongestion(this)){
     _disable_monitoring(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_reduced_target(this) * BETHA;
+    target_rate = _get_reduced_target(this) * BETA;
     goto done;
   }
-  if(_dist_trend_th(this) < _trend(this)){
+  if(_dist_trend_th(this) < _owd_corr(this)){
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
@@ -866,7 +849,7 @@ _probe_stage(
     goto done;
   }
 
-  if(_probe_trend_th(this) < _trend(this)){
+  if(_probe_trend_th(this) < _owd_corr(this)){
     _disable_monitoring(this);
     _set_event(this, EVENT_SETTLED);
     _switch_stage_to(this, STAGE_KEEP, FALSE);
@@ -893,25 +876,15 @@ _increase_stage(
 {
   gint32 target_rate = this->target_bitrate;
 
-  if(_rmdi(this).congestion_notification){
-    _disable_monitoring(this);
-    _disable_controlling(this);
-    _set_event(this, EVENT_CONGESTION);
-    _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    if(_retractive(this) || _cng_trend_th(this) < _trend(this))
-      target_rate = MAX(_min_target(this), MIN(_remb(this), _TR(this) * GAMMA));
-    goto done;
-  }
-
   if(_fcongestion(this)){
     _disable_monitoring(this);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = _get_reduced_target(this) * BETHA;
+    target_rate = _get_reduced_target(this) * BETA;
     goto done;
   }
 
-  if(_dist_trend_th(this) < _trend(this)){
+  if(_dist_trend_th(this) < _owd_corr(this)){
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
@@ -1249,8 +1222,7 @@ void fbrasubctrler_logging(FBRASubController *this)
                "# Bottleneck point:            %-10d| OWD Corr:                   %-10f#\n"
                "# Monitoring Interval:         %-10d| tr_is_approved:             %-10d#\n"
                "# Monitoring Bitrate:          %-10d| rr_is_approved:             %-10d#\n"
-               "# Delay avg:              %-10.3f| REMB:                       %-10d#\n"
-               "# cong not:               %10d| ---                           %10d|\n"
+               "# Recent Discarded:            %-10d| ---                         %-10d#\n"
                "###################### MSeconds since setup: %lu ######################\n"
                ,
 
@@ -1273,13 +1245,13 @@ void fbrasubctrler_logging(FBRASubController *this)
                _tr_is_corred(this),
 
                _priv(this)->min_target_bitrate,
-               _qdelay_median(this),
+               _owd_ltt_median(this),
 
                _priv(this)->max_target_bitrate,
-               _qdelay_actual(this),
+               _owd_stt_median(this),
 
                _btlp(this),
-               _rmdi(this).owd_corr,
+               _fbstat(this).owd_corr,
 
                _mon_int(this),
                _priv(this)->tr_approved,
@@ -1287,10 +1259,7 @@ void fbrasubctrler_logging(FBRASubController *this)
                _mon_br(this),
                _priv(this)->rr_approved,
 
-               _rmdi(this).delay_avg,
-               _remb(this),
-
-               _rmdi(this).congestion_notification,
+               _fbstat(this).recent_discarded,
                0,
 
                GST_TIME_AS_MSECONDS(_now(this) - this->made)
@@ -1357,13 +1326,12 @@ void fbrasubctrler_logging2csv(FBRASubController *this)
 
   sprintf(filename, "snd_%d_ratestat.csv", this->id);
 
-  mprtp_logger(filename, "%d,%d,%d,%f,%d,%ld\n",
+  mprtp_logger(filename, "%d,%d,%d,%f,%d\n",
                this->target_bitrate / 1000,
-               _rmdi(this).goodput_bitrate,
-               (_rmdi(this).sender_bitrate + 48 * 8 * _rmdi(this).sent_packets) / 1000,
-               _rmdi(this).utilized_fraction,
-               (this->monitored_bitrate + 40 * 8 * this->monitored_packets) / 1000,
-               g_get_real_time () / (1000 * 100)
+               _SR(this),
+               (_SR(this) + 48 * 8 * _fbstat(this).sent_packets_in_1s) / 1000,
+               0.,
+               (this->monitored_bitrate + 40 * 8 * this->monitored_packets) / 1000
                );
 
   THIS_READUNLOCK(this);

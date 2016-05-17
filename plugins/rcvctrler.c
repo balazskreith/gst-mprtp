@@ -30,7 +30,7 @@
 #include "streamjoiner.h"
 #include "ricalcer.h"
 #include "mprtplogger.h"
-#include "packetsrcvtracker.h"
+#include "fbrafbprod.h"
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
@@ -92,7 +92,6 @@ struct _Subflow
   GstClock*                     sysclock;
   GstClockTime                  joined_time;
   ReportIntervalCalculator*     ricalcer;
-  NumsTracker*                  reported_seqs;
 
   gdouble                       avg_rtcp_size;
   guint32                       total_lost;
@@ -107,29 +106,15 @@ struct _Subflow
   gchar                        *logfile;
   gchar                        *statfile;
   gboolean                      log_initialized;
-  PacketsRcvTracker*            packetstracker;
 
-  gboolean                      rfc3550_enabled;
-  gboolean                      rfc7243_enabled;
-  gboolean                      owd_enabled;
-  guint                         fbra_marc_enabled;
-
+  gboolean                      regular_report_enabled;
   guint                         controlling_mode;
 
-  RateWindow                    discarded_payload_bytes;
-  RateWindow                    discarded_packets;
-  RateWindow                    lost_packets;
-  RateWindow                    received_packets;
-  RateWindow                    received_bytes;
-  RateWindow                    HSSNs;
-
   GstClockTime                  next_feedback;
-  GstClockTime                (*feedback_interval_calcer)(Subflow*);
-  void                        (*feedback_message_appender)(RcvController*,Subflow*);
+  gpointer                      fbproducer;
+  GstClockTime                (*feedback_interval_calcer)(gpointer data);
+  void                        (*feedback_setup_feedback)(gpointer data, ReportProducer *reportprod);
 
-  union{
-    GstRTCPAFB_RMDIRecord   rmdi_records[RTCP_AFB_RMDI_RECORDS_NUM];
-  }feedbacks;
 };
 
 //----------------------------------------------------------------------
@@ -142,10 +127,6 @@ rcvctrler_finalize (GObject * object);
 static void
 refctrler_ticker (void *data);
 
-static void
-_logging (
-    gpointer data);
-
 //------------------------ Outgoing Report Producer -------------------------
 
 static void
@@ -157,53 +138,17 @@ _orp_add_rr(
     RcvController *this,
     Subflow *subflow);
 
-static void
-_orp_add_xr_rfc7243(
-    RcvController *this,
-    Subflow *subflow);
-
-static void
-_orp_add_xr_rfc7002(
-    RcvController * this,
-    Subflow *subflow);
-
-static void
-_orp_add_xr_rfc7097(
-    RcvController * this,
-    Subflow *subflow);
-
-static void
-_orp_add_xr_owd(
-    RcvController *this,
-    Subflow *subflow);
-
-static void
-_orp_add_xr_remb(
-    RcvController * this,
-    Subflow *subflow);
-
-void
-_orp_fbra_marc_feedback(
-    RcvController * this,
-    Subflow *subflow);
-
-
 //----------------------------- System Notifier ------------------------------
 static void
 _system_notifier_main(RcvController * this);
 
 //----- feedback specific functions
 static GstClockTime
-_default_interval_calcer(Subflow *subflow);
+_default_interval_calcer(gpointer data);
 
 static void
-_default_feedback_appender(RcvController *this,Subflow* subflow);
+_default_feedback_appender(gpointer data, ReportProducer *reportprod);
 
-static GstClockTime
-_fbra2_interval_calcer(Subflow *subflow);
-
-static void
-_fbra2_feedback_appender(RcvController *this, Subflow* subflow);
 
 //------------------------- Utility functions --------------------------------
 static Subflow*
@@ -241,15 +186,6 @@ _uint16_diff (
     guint16 a,
     guint16 b);
 
-static guint32
-_update_ratewindow(
-    RateWindow *window,
-    guint32 value);
-
-//----------------------------------------------------------------------
-//--------- Private functions implementations to SchTree object --------
-//----------------------------------------------------------------------
-
 
 void
 rcvctrler_class_init (RcvControllerClass * klass)
@@ -283,6 +219,9 @@ void rcvctrler_change_interval_type(RcvController * this, guint8 subflow_id, gui
   gpointer key, val;
 
   THIS_WRITELOCK (this);
+
+  DISABLE_LINE _subflow_iterator(this, NULL, NULL);
+
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     subflow = (Subflow *) val;
@@ -306,41 +245,36 @@ void rcvctrler_change_interval_type(RcvController * this, guint8 subflow_id, gui
 }
 
 
-static void _change_controlling_mode(Subflow *this, guint controlling_mode)
+static void _change_controlling_mode(RcvController *this, Subflow *subflow, guint controlling_mode)
 {
-  if(this->controlling_mode == 0 && controlling_mode != 0){
-    this->packetstracker = mprtpr_path_ref_packetstracker(this->path);
-  }else if(this->controlling_mode != 0 && controlling_mode == 0){
-    this->packetstracker = mprtpr_path_unref_packetstracker(this->path);
+  subflow->regular_report_enabled   = FALSE;
+
+  if(subflow->controlling_mode != controlling_mode && !subflow->fbproducer){
+    g_object_unref(subflow->fbproducer);
   }
 
-  this->rfc3550_enabled   = FALSE;
-  this->rfc7243_enabled   = FALSE;
-  this->owd_enabled       = FALSE;
-  this->fbra_marc_enabled = FALSE;
-
-  this->controlling_mode = controlling_mode;
-
+  subflow->controlling_mode = controlling_mode;
   switch(controlling_mode){
     case 0:
-      this->feedback_interval_calcer  = _default_interval_calcer;
-      this->feedback_message_appender = _default_feedback_appender;
-      GST_DEBUG_OBJECT(this, "subflow %d set to no controlling mode", this->id);
+      subflow->feedback_interval_calcer  = _default_interval_calcer;
+      subflow->feedback_setup_feedback = _default_feedback_appender;
+      GST_DEBUG_OBJECT(subflow, "subflow %d set to no controlling mode", subflow->id);
       break;
     case 1:
-      this->feedback_interval_calcer = _default_interval_calcer;
-      this->feedback_message_appender = _default_feedback_appender;
-      this->rfc3550_enabled = TRUE;
-      GST_DEBUG_OBJECT(this, "subflow %d set to only report processing mode", this->id);
+      subflow->feedback_interval_calcer = _default_interval_calcer;
+      subflow->feedback_setup_feedback = _default_feedback_appender;
+      subflow->regular_report_enabled = TRUE;
+      GST_DEBUG_OBJECT(subflow, "subflow %d set to only report processing mode", subflow->id);
       break;
     case 2:
-      this->feedback_interval_calcer = _fbra2_interval_calcer;
-      this->feedback_message_appender = _fbra2_feedback_appender;
-      this->rfc3550_enabled   = TRUE;
-      this->fbra_marc_enabled = TRUE;
+      subflow->fbproducer = make_fbrafbproducer(this->ssrc);
+      subflow->feedback_interval_calcer = fbrafbproducer_get_interval;
+      subflow->feedback_setup_feedback = fbrafbproducer_setup_feedback;
+      mprtpr_path_set_packetstracker(subflow->path, fbrafbproducer_track, subflow->fbproducer);
+      subflow->regular_report_enabled   = TRUE;
       break;
     default:
-      g_warning("Unknown controlling mode requested for subflow %d", this->id);
+      g_warning("Unknown controlling mode requested for subflow %d", subflow->id);
       break;
   }
 }
@@ -355,7 +289,7 @@ void rcvctrler_change_controlling_mode(RcvController * this, guint8 subflow_id, 
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
     subflow = (Subflow *) val;
     if(subflow_id == 255 || subflow_id == 0 || subflow_id == subflow->id){
-      _change_controlling_mode(subflow, controlling_mode);
+      _change_controlling_mode(this, subflow, controlling_mode);
     }
   }
   THIS_WRITEUNLOCK (this);
@@ -400,7 +334,6 @@ rcvctrler_init (RcvController * this)
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
 
-  DISABLE_LINE mprtp_logger_add_logging_fnc(_logging, this, 1, &this->rwmutex);
 }
 
 void
@@ -552,7 +485,7 @@ _orp_main(RcvController * this)
     gboolean send_regular, send_fb;
     subflow  = (Subflow *) val;
     ricalcer = subflow->ricalcer;
-    if(!subflow->rfc3550_enabled){
+    if(!subflow->regular_report_enabled){
       continue;
     }
     if(mprtpr_path_is_urgent_request(subflow->path)){
@@ -571,17 +504,10 @@ _orp_main(RcvController * this)
     }
 
     if(send_regular){
-
       created = TRUE;
       report_producer_begin(this->report_producer, subflow->id);
 
       _orp_add_rr(this, subflow);
-      if(subflow->owd_enabled){
-        _orp_add_xr_owd(this, subflow);
-      }
-      if(subflow->rfc7243_enabled){
-        _orp_add_xr_rfc7243(this, subflow);
-      }
 
       //logging the report timeout
       memset(interval_logfile, 0, 255);
@@ -597,8 +523,8 @@ _orp_main(RcvController * this)
         created = TRUE;
         report_producer_begin(this->report_producer, subflow->id);
       }
-      subflow->feedback_message_appender(this, subflow);
-      subflow->next_feedback = _now(this) + subflow->feedback_interval_calcer(subflow);
+      subflow->feedback_setup_feedback(subflow->fbproducer, this->report_producer);
+      subflow->next_feedback = _now(this) + subflow->feedback_interval_calcer(subflow->fbproducer);
     }
 
     if(created){
@@ -609,7 +535,7 @@ _orp_main(RcvController * this)
     subflow->avg_rtcp_size += (report_length - subflow->avg_rtcp_size) / 4.;
 
     ricalcer_refresh_parameters(ricalcer,
-                                CONSTRAIN(MIN_MEDIA_RATE>>3  /*because we need bytes */, 25000, subflow->received_bytes.rate_value),
+                                CONSTRAIN(MIN_MEDIA_RATE>>3  /*because we need bytes */, 25000, 250000/*Todo: change it to the receiver rate somehow*/),
                                 subflow->avg_rtcp_size);
 
 
@@ -679,130 +605,6 @@ void _orp_add_rr(RcvController * this, Subflow *subflow)
 }
 
 
-void _orp_add_xr_rfc7243(RcvController * this, Subflow *subflow)
-{
-  PacketsRcvTrackerStat trackerstat;
-  packetsrcvtracker_get_stat(subflow->packetstracker, &trackerstat);
-  if(trackerstat.total_payload_discarded == subflow->total_discarded_bytes){
-    goto done;
-  }
-
-  report_producer_add_xr_discarded_bytes(this->report_producer,
-                                         RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION,
-                                         FALSE,
-                                         trackerstat.total_payload_discarded);
-
-  subflow->total_discarded_bytes = trackerstat.total_payload_discarded;
-
-done:
-  return;
-}
-
-void _orp_add_xr_rfc7002(RcvController * this, Subflow *subflow)
-{
-  PacketsRcvTrackerStat trackerstat;
-  packetsrcvtracker_get_stat(subflow->packetstracker, &trackerstat);
-  if(trackerstat.total_packets_discarded_or_lost == subflow->total_packets_discarded_or_lost){
-    goto done;
-  }
-
-  report_producer_add_xr_discarded_packets(this->report_producer,
-                                         RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION,
-                                         FALSE,
-                                         trackerstat.total_packets_discarded_or_lost);
-
-  subflow->total_packets_discarded_or_lost = trackerstat.total_packets_discarded_or_lost;
-
-done:
-  return;
-}
-
-void _orp_add_xr_rfc7097(RcvController * this, Subflow *subflow)
-{
-  GstRTCPXRChunk chunks[100];
-  guint16 begin_seq = 0, end_seq = 0;
-  guint chunks_len = 0;
-  memset(&chunks, 0, sizeof(GstRTCPXRChunk) * 100);
-  packetsrcvtracker_set_bitvectors(subflow->packetstracker, &begin_seq, &end_seq, chunks, &chunks_len);
-  report_producer_add_xr_discarded_rle(this->report_producer,
-                                       FALSE,
-                                       0,
-                                       begin_seq,
-                                       end_seq,
-                                       chunks,
-                                       chunks_len
-                                       );
-
-  numstracker_add(subflow->reported_seqs, end_seq);
-  return;
-}
-
-void _orp_add_xr_owd(RcvController * this, Subflow *subflow)
-{
-  GstClockTime median_delay, min_delay, max_delay;
-  guint32      u32_median_delay, u32_min_delay, u32_max_delay;
-
-  mprtpr_path_get_owd_stats(subflow->path,
-                                 &median_delay,
-                                 &min_delay,
-                                 &max_delay);
-  u32_median_delay = (guint32)(get_ntp_from_epoch_ns(median_delay)>>16);
-  u32_min_delay    = (guint32)(get_ntp_from_epoch_ns(min_delay)>>16);
-  u32_max_delay    = (guint32)(get_ntp_from_epoch_ns(max_delay)>>16);
-
-  report_producer_add_xr_owd(this->report_producer,
-                             RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION,
-                             u32_median_delay,
-                             u32_min_delay,
-                             u32_max_delay);
-}
-
-void _orp_add_xr_remb(RcvController * this, Subflow *subflow)
-{
-  gfloat estimation;
-  guint16 hssn;
-
-  estimation = packetsrcvtracker_get_remb(subflow->packetstracker, &hssn);
-
-  report_producer_add_afb_remb(this->report_producer,
-                               this->ssrc,
-                               1,
-                               estimation,
-                               this->ssrc,
-                               hssn);
-}
-
-
-
-void _orp_fbra_marc_feedback(RcvController * this, Subflow *subflow)
-{
-  GstClockTime median_delay;
-  guint32 owd_sampling;
-  GstRTCPAFB_RMDIRecord *records;
-  gint i;
-  records = &subflow->feedbacks.rmdi_records[0];
-
-  //shift
-  for(i=RTCP_AFB_RMDI_RECORDS_NUM-1; 0 < i; --i){
-    records[i].HSSN              = records[i-1].HSSN;
-    records[i].disc_packets_num  = records[i-1].disc_packets_num;
-    records[i].owd_sample        = records[i-1].owd_sample;
-  }
-
-
-  mprtpr_path_get_owd_stats(subflow->path, &median_delay, NULL, NULL);
-  owd_sampling = get_ntp_from_epoch_ns(median_delay)>>16;
-
-  records[i].HSSN              = mprtpr_path_get_HSSN(subflow->path);
-  //Todo: fix this
-  records[i].disc_packets_num  = 0; //mprtpr_path_get_total_discarded_or_lost_packets(subflow->path);
-  records[i].owd_sample        = owd_sampling;
-
-  report_producer_add_afb_rmdi(this->report_producer, this->ssrc, records);
-
-}
-
-
 
 //----------------------------- System Notifier ------------------------------
 void
@@ -814,130 +616,19 @@ _system_notifier_main(RcvController * this)
 //----------------------------- Logging -----------------------------
 
 
-static void _logging_helper(Subflow *subflow, gpointer data)
-{
-  PacketsRcvTrackerStat trackerstat;
-  GstClockTime median_delay;
-  gdouble fraction_lost;
-  guint32 goodput_bytes;
-  guint32 goodput_packets;
-  guint32 u32_HSSN;
-
-  if(!subflow->logfile){
-    subflow->logfile = g_malloc0(255);
-    sprintf(subflow->logfile, "sub_%d_rcv.csv", subflow->id);
-    subflow->statfile = g_malloc0(255);
-    sprintf(subflow->statfile, "sub_%d_stat.csv", subflow->id);
-  }
-  if(!subflow->log_initialized){
-    subflow->packetstracker = mprtpr_path_ref_packetstracker(subflow->path);
-  }
-
-  packetsrcvtracker_get_stat(subflow->packetstracker, &trackerstat);
-
-  u32_HSSN = (((guint32) trackerstat.cycle_num)<<16) | ((guint32) trackerstat.highest_seq);
-
-  _update_ratewindow(&subflow->discarded_payload_bytes, trackerstat.total_payload_discarded);
-  _update_ratewindow(&subflow->discarded_packets, trackerstat.total_packets_discarded);
-  _update_ratewindow(&subflow->received_packets, trackerstat.total_packets_received);
-  _update_ratewindow(&subflow->received_bytes, trackerstat.total_payload_received);
-  _update_ratewindow(&subflow->lost_packets, trackerstat.total_packets_lost);
-  _update_ratewindow(&subflow->HSSNs, u32_HSSN);
-
-  mprtpr_path_get_owd_stats(subflow->path, &median_delay, NULL, NULL);
-
-  fraction_lost = (gdouble)subflow->HSSNs.rate_value / (gdouble)subflow->received_packets.rate_value;
-  goodput_bytes = subflow->received_bytes.rate_value - subflow->discarded_payload_bytes.rate_value;
-  goodput_packets = subflow->received_packets.rate_value - subflow->received_packets.rate_value;
-
-
-  mprtp_logger(subflow->logfile, "%u,%u,%lu,%u\n",
-               (subflow->received_bytes.rate_value  * 8 + 48 * 8 * subflow->received_packets.rate_value )/1000, //KBit
-               (subflow->discarded_payload_bytes.rate_value  * 8 + 48 * 8 * subflow->discarded_packets.rate_value)/1000, //KBit
-          GST_TIME_AS_USECONDS(median_delay),
-          0);
-
-
-  mprtp_logger(subflow->statfile,
-               "%u,%f,%u,%f\n",
-               goodput_bytes * 8 + (goodput_packets * 48 /*bytes overhead */ * 8),
-               fraction_lost,
-               subflow->lost_packets.rate_value,
-               (subflow->discarded_payload_bytes.rate_value * 8 + 48 * 8 * subflow->discarded_packets.rate_value )/1000);
-
-}
-
-void
-_logging (gpointer data)
-{
-  RcvController *this;
-  gdouble fecdecoder_early_ratio;
-  guint32 fec_early_repaired_bytes;
-  guint32 fec_total_repaired_bytes;
-
-  this = data;
-
-  if(!this->joiner) goto done;
-
-  _subflow_iterator(this, _logging_helper, NULL);
-
-  fecdecoder_get_stat(this->fecdecoder,
-                            &fec_early_repaired_bytes,
-                            &fec_total_repaired_bytes,
-                            &this->FFRE);
-
-    _update_ratewindow(this->fec_early_repaired_bytes, fec_early_repaired_bytes);
-    _update_ratewindow(this->fec_total_repaired_bytes, fec_total_repaired_bytes);
-
-  fecdecoder_early_ratio     = !((RateWindow*) this->fec_total_repaired_bytes)->rate_value ? 0. : (gdouble) ((RateWindow*) this->fec_early_repaired_bytes)->rate_value / (gdouble) ((RateWindow*) this->fec_total_repaired_bytes)->rate_value;
-  mprtp_logger("fecdec_stat.csv",
-               "%u,%u,%f,%f\n",
-               ((RateWindow*) this->fec_early_repaired_bytes)->rate_value,
-               ((RateWindow*) this->fec_total_repaired_bytes)->rate_value,
-               fecdecoder_early_ratio,
-               this->FFRE
-               );
-
-done:
-  return;
-}
-
 //-------------------------Controller feedbacks and intervals ---------------
-GstClockTime _default_interval_calcer(Subflow *subflow)
+GstClockTime _default_interval_calcer(gpointer data)
 {
   return 100 * GST_MSECOND;
 }
 
-void _default_feedback_appender(RcvController *this,Subflow* subflow)
+void _default_feedback_appender(gpointer data, ReportProducer *reportprod)
 {
-  DISABLE_LINE      _orp_fbra_marc_feedback(this, subflow);
-  DISABLE_LINE      _orp_add_xr_rfc7243(this, subflow);
+
 }
 
-GstClockTime _fbra2_interval_calcer(Subflow *subflow)
-{
-  return (1.0/MIN(50,MAX(10,(subflow->received_bytes.rate_value * 8)/20000))) * GST_SECOND;
-}
-
-void _fbra2_feedback_appender(RcvController *this, Subflow* subflow)
-{
-  _orp_add_xr_owd(this, subflow);
-  DISABLE_LINE _orp_add_xr_rfc7097(this, subflow);
-  DISABLE_LINE _orp_add_xr_rfc7243(this, subflow);
-  _orp_add_xr_rfc7002(this, subflow);
-  _orp_add_xr_remb(this, subflow);
-}
 
 //------------------------- Utility functions --------------------------------
-
-static void _removed_reported_seq(gpointer data, gint64 removed_HSSN)
-{
-  Subflow *subflow;
-  subflow = data;
-  if(subflow->packetstracker){
-    packetsrcvtracker_update_reported_sn(subflow->packetstracker, removed_HSSN);
-  }
-}
 
 Subflow *
 _make_subflow (guint8 id, MpRTPRPath * path)
@@ -949,11 +640,8 @@ _make_subflow (guint8 id, MpRTPRPath * path)
   result->joined_time               = gst_clock_get_time (result->sysclock);
   result->ricalcer                  = make_ricalcer(FALSE);
   result->LRR                       = _now(result);
-  result->reported_seqs             = make_numstracker(20, GST_SECOND);
   result->feedback_interval_calcer  = _default_interval_calcer;
-  result->feedback_message_appender = _default_feedback_appender;
-  numstracker_add_rem_pipe(result->reported_seqs, _removed_reported_seq, result);
-
+  result->feedback_setup_feedback = _default_feedback_appender;
   _reset_subflow (result);
   return result;
 }
@@ -968,10 +656,6 @@ _ruin_subflow (gpointer * subflow)
   g_object_unref (this->sysclock);
   g_object_unref (this->path);
   g_object_unref (this->ricalcer);
-  if(this->logfile){
-    mprtp_free(this->logfile);
-    this->packetstracker = mprtpr_path_unref_packetstracker(this->path);
-  }
   _subflow_dtor (this);
 }
 
@@ -1029,14 +713,6 @@ _uint16_diff (guint16 start, guint16 end)
     return end - start;
   }
   return ~((guint16) (start - end));
-}
-
-guint32 _update_ratewindow(RateWindow *window, guint32 value)
-{
-  window->items[window->index] = value;
-  window->index = (window->index + 1) % RATEWINDOW_LENGTH;
-  window->rate_value = value - window->items[window->index];
-  return window->rate_value;
 }
 
 

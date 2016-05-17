@@ -264,23 +264,6 @@ typedef struct PACKED _GstRTCPFB
   guint32 fci_data;
 } GstRTCPFB;
 
-#define RTCP_AFB_RMDI_ID 0x524D4449 //RMDI - Receiver Measured Delay Impact
-
-typedef struct PACKED _GstRTCPAFB_RMDIRecord{
-  guint16 HSSN;
-  guint16 disc_packets_num;
-  guint32 owd_sample;
-}GstRTCPAFB_RMDIRecord;
-
-#define RTCP_AFB_RMDI_RECORDS_NUM 4
-
-typedef struct PACKED _GstRTCPAFB_RMDI{
-  guint8                rsvd;
-  guint8                records_num;
-  guint16               length;
-  GstRTCPAFB_RMDIRecord records[RTCP_AFB_RMDI_RECORDS_NUM];
-}GstRTCPAFB_RMDI;
-
 #define RTCP_AFB_REMB_ID 0x52454042 //REMB - Receiver Estimated Maximum Bitrate
 
 typedef struct PACKED _GstRTCPAFB_REMB{
@@ -291,12 +274,23 @@ typedef struct PACKED _GstRTCPAFB_REMB{
   guint16               reserved;
 }GstRTCPAFB_REMB;
 
+#define RTCP_AFB_REPS_ID 0x52455053 //REPS - Receiver Estimated Maximum Bitrate
 
 //Receiver Estimated Path Stability
 typedef struct PACKED _GstRTCPAFB_REPS{
-  guint32               sampling_num : 8;
-  guint32               stability : 24;
+//  guint32 stability;
+  #if G_BYTE_ORDER == G_LITTLE_ENDIAN
+    guint32               sampling_num : 8;
+    guint32               stability : 24;
+  #elif G_BYTE_ORDER == G_BIG_ENDIAN
+    guint32               stability : 24;
+    guint32               sampling_num : 8;
+  #else
+  #error "G_BYTE_ORDER should be big or little endian."
+  #endif
 }GstRTCPAFB_REPS;
+
+
 
 /*MPRTCP struct polymorphism*/
 
@@ -473,17 +467,6 @@ gst_rtcp_afb_getdown (GstRTCPFB * report,
                       guint32 *fci_id);
 
 void
-gst_rtcp_afb_rmdi_change (GstRTCPAFB_RMDI * report,
-                     guint8 *rsvd,
-                     guint8 *records_num,
-                     guint16 *length);
-void
-gst_rtcp_afb_rmdi_getdown (GstRTCPAFB_RMDI * report,
-                      guint8 *rsvd,
-                      guint8 *records_num,
-                      guint16 *length);
-
-void
 gst_rtcp_afb_remb_change (GstRTCPAFB_REMB * report,
                           guint32 *num_ssrc,
                           gfloat *float_num,
@@ -497,16 +480,14 @@ gst_rtcp_afb_remb_getdown (GstRTCPAFB_REMB * report,
                            guint16 *hssn);
 
 void
-gst_rtcp_afb_rmdi_record_change (GstRTCPAFB_RMDIRecord * record,
-                      guint16 *HSSN,
-                      guint16 *disc_packets_num,
-                      guint32 *owd_sample);
-void
-gst_rtcp_afb_rmdi_record_getdown (GstRTCPAFB_RMDIRecord * record,
-                                  guint16 *HSSN,
-                                  guint16 *disc_packets_num,
-                                  guint32 *owd_sample);
+gst_rtcp_afb_reps_change (GstRTCPAFB_REPS * report,
+                          guint8 *sampling_num,
+                          gfloat *stability);
 
+void
+gst_rtcp_afb_reps_getdown (GstRTCPAFB_REPS * report,
+                           guint8 *sampling_num,
+                           gfloat *stability);
 
 void
 gst_rtcp_afb_setup_fci_data(
@@ -655,9 +636,9 @@ void gst_printfnc_rtcp_xr_discarded_bytes_block (GstRTCPXRDiscardedBlock * block
     gst_printfnc_rtcp_afb(report, g_print)
 void gst_printfnc_rtcp_afb (GstRTCPFB * report, printfnc print);
 
-#define gst_print_rtcp_afb_rmdi(data) \
-    gst_printfnc_rtcp_afb_rmdi(data, g_print)
-void gst_printfnc_rtcp_afb_rmdi (gpointer data, printfnc print);
+#define gst_print_rtcp_afb_data(report) \
+    gst_printfnc_rtcp_afb_data(report, g_print)
+void gst_printfnc_rtcp_afb_data (GstRTCPFB * report, printfnc print);
 
 #define gst_print_rtcp_xr_owd(report) \
     gst_printfnc_rtcp_xr_owd_block(report, g_print)

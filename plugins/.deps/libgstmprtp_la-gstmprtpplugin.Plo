@@ -198,10 +198,10 @@ libgstmprtp_la-gstmprtpplugin.lo: gstmprtpplugin.c \
  gstmprtpbuffer.h /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtpdefs.h \
  mprtpspath.h mprtplogger.h packetssndqueue.h bintree.h numstracker.h \
- bintree2.h percentiletracker.h packetssndtracker.h reportproc.h \
- streamjoiner.h packetsrcvqueue.h mprtprpath.h \
+ bintree2.h percentiletracker.h reportproc.h streamjoiner.h \
+ packetsrcvqueue.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
- percentiletracker2.h packetsrcvtracker.h ricalcer.h sndctrler.h \
+ percentiletracker2.h ricalcer.h sndctrler.h \
  /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
  /usr/include/glib-2.0/gio/gactiongroup.h \
@@ -844,8 +844,6 @@ bintree2.h:
 
 percentiletracker.h:
 
-packetssndtracker.h:
-
 reportproc.h:
 
 streamjoiner.h:
@@ -857,8 +855,6 @@ mprtprpath.h:
 /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h:
 
 percentiletracker2.h:
-
-packetsrcvtracker.h:
 
 ricalcer.h:
 

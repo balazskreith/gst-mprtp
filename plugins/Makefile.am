@@ -27,13 +27,12 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          sndratedistor.c            \
                          numstracker.c              \
                          fbrasubctrler.c            \
+                         fbrafbproc.c               \
+                         fbrafbprod.c               \
                          screamsubctrler.c          \
                          fecdec.c                   \
                          fecenc.c                   \
                          rtpfecbuffer.c             \
-                         packetssndtracker.c        \
-                         packetsrcvtracker.c        \
-                         rmdiproc.c                 \
                          signalreport.c             \
                          subratectrler.c
                     
@@ -57,13 +56,12 @@ noinst_HEADERS = mprtpspath.h           \
                  sndratedistor.h        \
                  numstracker.h          \
                  fbrasubctrler.h        \
-                 screamsubctrler.h      \
+	             fbrafbproc.h           \
+	             fbrafbprod.h           \
+	             screamsubctrler.h      \
                  fecdec.h               \
                  fecenc.h               \
                  rtpfecbuffer.h         \
-                 packetssndtracker.h    \
-                 packetsrcvtracker.h    \
-                 rmdiproc.c             \
                  signalreport.h         \
                  subratectrler.h
                           

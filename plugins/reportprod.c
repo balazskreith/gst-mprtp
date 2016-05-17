@@ -227,33 +227,51 @@ void report_producer_add_xr_owd(ReportProducer *this,
   THIS_WRITEUNLOCK(this);
 }
 
+
 void report_producer_add_xr_discarded_rle(ReportProducer *this,
                                  gboolean early_bit,
                                  guint8 thinning,
                                  guint16 begin_seq,
                                  guint16 end_seq,
-                                 GstRTCPXRChunk *chunks,
-                                 guint chunks_len)
+                                 gboolean *vector,
+                                 guint vector_length)
 {
   gchar databed[1024];
   GstRTCPXRDiscardedRLEBlock *block;
-  gint i;
+  GstRTCPXRChunk chunk;
+  gint bit_i, chunks_length, vector_i;
+  gboolean last_is_copied = TRUE;
   THIS_WRITELOCK(this);
   memset(databed, 0, 1024);
+  memset(&chunk, 0, sizeof(GstRTCPXRChunk));
   block = (GstRTCPXRDiscardedRLEBlock*) databed;
   gst_rtcp_xr_discarded_rle_setup(block, early_bit, thinning, this->ssrc, begin_seq, end_seq);
-  for(i = 0; i < chunks_len; ++i){
-    gst_rtcp_xr_chunk_hton_cpy(&block->chunks[i], &chunks[i]);
-  }
-  if(i % 2 == 0){
-    memset(&block->chunks[i], 0, sizeof(GstRTCPXRChunk));
+  for(chunks_length = 0, bit_i = 0, vector_i=0; vector_i<vector_length; ++vector_i){
+      if(vector[vector_i]){
+        chunk.Bitvector.bitvector |= (guint16)(1<<bit_i);
+      }
+      if(++bit_i < 15) {
+          last_is_copied = FALSE;
+          continue;
+      }
+      chunk.Bitvector.chunk_type = TRUE;
+      gst_rtcp_xr_chunk_hton_cpy(&block->chunks[chunks_length], &chunk);
+      last_is_copied = TRUE;
+      memset(&chunk, 0, sizeof(GstRTCPXRChunk));
+      bit_i = 0;
+      ++chunks_length;
   }
 
-  if(2 < chunks_len){
+  if(!last_is_copied){
+    chunk.Bitvector.chunk_type = TRUE;
+    gst_rtcp_xr_chunk_hton_cpy(&block->chunks[chunks_length], &chunk);
+  }
+
+  if(2 < chunks_length){
     guint16 plus;
     guint16 block_length;
     gst_rtcp_xr_block_getdown((GstRTCPXRBlock*) block, NULL, &block_length, NULL);
-    plus = chunks_len-2;
+    plus = chunks_length-2;
     plus += plus % 2 == 1 ? 1 : 0;
     block_length += plus>>1;
     gst_rtcp_xr_block_change((GstRTCPXRBlock*) block, NULL, &block_length, NULL);
@@ -274,28 +292,6 @@ void report_producer_add_afb(ReportProducer *this,
   THIS_WRITEUNLOCK(this);
 }
 
-void report_producer_add_afb_rmdi(
-    ReportProducer *this,
-    guint32 media_source_ssrc,
-    GstRTCPAFB_RMDIRecord *src_records)
-{
-  guint8 records_num = RTCP_AFB_RMDI_RECORDS_NUM;
-  GstRTCPAFB_RMDI rmdi;
-  guint16 length;
-  gint i;
-  THIS_WRITELOCK(this);
-  length = (sizeof(GstRTCPAFB_RMDIRecord) * records_num)>>2;
-  gst_rtcp_afb_rmdi_change(&rmdi, NULL, &records_num, &length);
-  for(i=0; i<records_num; ++i){
-    gst_rtcp_afb_rmdi_record_change(&rmdi.records[i],
-                                    &src_records[i].HSSN,
-                                    &src_records[i].disc_packets_num,
-                                    &src_records[i].owd_sample);
-  }
-  _add_afb(this, media_source_ssrc, RTCP_AFB_RMDI_ID, &rmdi, sizeof(GstRTCPAFB_RMDI));
-  THIS_WRITEUNLOCK(this);
-}
-
 void report_producer_add_afb_remb(
     ReportProducer *this,
     guint32 media_source_ssrc,
@@ -308,6 +304,19 @@ void report_producer_add_afb_remb(
   THIS_WRITELOCK(this);
   gst_rtcp_afb_remb_change(&remb, &num_ssrc, &float_num, &ssrc_feedback, &hssn);
   _add_afb(this, media_source_ssrc, RTCP_AFB_REMB_ID, &remb, sizeof(GstRTCPAFB_REMB));
+  THIS_WRITEUNLOCK(this);
+}
+
+void report_producer_add_afb_reps(
+    ReportProducer *this,
+    guint32 media_source_ssrc,
+    guint8 sampling_num,
+    gfloat float_num)
+{
+  GstRTCPAFB_REPS reps;
+  THIS_WRITELOCK(this);
+  gst_rtcp_afb_reps_change(&reps, &sampling_num, &float_num);
+  _add_afb(this, media_source_ssrc, RTCP_AFB_REPS_ID, &reps, sizeof(GstRTCPAFB_REPS));
   THIS_WRITEUNLOCK(this);
 }
 

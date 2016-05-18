@@ -50,6 +50,7 @@ set style line 5 linecolor rgb '#662c91' linetype 5 linewidth 1
 
  plot throughput_file using 0:3 with lines ls 1 title "Sending Rate", \
       throughput_file using 0:5 with lines ls 3 title "FEC Rate", \
+      throughput_file using 0:1 with lines ls 2 title "Target Rate", \
       bw_file using 0:1 with lines ls 4 title "Path Capacity"
 
 #      throughput_file using 0:4 with lines ls 5 title "Pacing Queue", 

@@ -49,7 +49,7 @@ typedef struct _FBRAFBProcessorItem{
   guint32      payload_bytes;
   GstClockTime sent;
   gboolean     discarded;
-  gboolean     seen;
+//  gboolean     seen;
 }FBRAFBProcessorItem;
 
 G_DEFINE_TYPE (FBRAFBProcessor, fbrafbprocessor, G_TYPE_OBJECT);
@@ -114,10 +114,10 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->sent        = g_queue_new();
   this->sent_in_1s  = g_queue_new();
   this->acked       = g_queue_new();
-  this->sysclock = gst_system_clock_obtain();
-  this->rtt      = GST_SECOND;
-  this->owd_ltt  = make_percentiletracker(600, 50);
-  percentiletracker_set_treshold(this->owd_ltt, 60 * GST_SECOND);
+  this->sysclock    = gst_system_clock_obtain();
+  this->stat.RTT    = GST_SECOND;
+  this->owd_ltt     = make_percentiletracker(600, 50);
+  percentiletracker_set_treshold(this->owd_ltt, 30 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->owd_ltt, _owd_ltt_pipe, this);
 }
 
@@ -165,15 +165,15 @@ static void _obsolate_acked_packet(FBRAFBProcessor *this)
 
   item = g_queue_peek_tail(this->acked);
   treshold = item->sent - GST_SECOND;
-  g_print("reference seq: %hu, sent: %lu, treshold: %lu\n", item->seq_num, GST_TIME_AS_MSECONDS(item->sent), GST_TIME_AS_MSECONDS(treshold));
+//  g_print("reference seq: %hu, sent: %lu, treshold: %lu\n", item->seq_num, GST_TIME_AS_MSECONDS(item->sent), GST_TIME_AS_MSECONDS(treshold));
 
   while(!g_queue_is_empty(this->acked)){
     item = g_queue_peek_head(this->acked);
-    if(treshold <= item->sent){
+    if(treshold < item->sent){
       break;
     }
     item = g_queue_pop_head(this->acked);
-    if(!item->discarded && item->seen){
+    if(!item->discarded){
       this->stat.goodput_bytes-=item->payload_bytes;
 //      g_print("-gp:%u(%hu) ",item->payload_bytes, item->seq_num);
     }
@@ -215,11 +215,11 @@ void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summa
 {
   THIS_WRITELOCK (this);
   if(summary->RR.processed){
-    this->rtt = summary->RR.RTT;
+    this->stat.RTT = summary->RR.RTT;
   }
   if(summary->XR.DiscardedRLE.processed){
     _process_rle_discvector(this, &summary->XR);
-    this->stat.recent_discarded = 0 < this->last_discard && _now(this) < this->last_discard + this->rtt;
+    this->stat.recent_discarded = 0 < this->last_discard && _now(this) < this->last_discard + this->stat.RTT;
   }
   if(summary->XR.OWD.processed){
     _process_owd(this, &summary->XR);
@@ -294,7 +294,7 @@ done:
 }
 
 
-#define _done_if_sent_queue_is_empty(this)                                 \
+#define _done_if_sent_queue_is_empty(this)                            \
     if(g_queue_is_empty(this->sent)){                                 \
       g_warning("sent queue is empty. What do you want to track?");   \
       goto done;                                                      \
@@ -303,49 +303,41 @@ done:
 void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr)
 {
   FBRAFBProcessorItem* item;
-  gboolean *vector;
-  guint length, i;
-  GstClockTime now;
+  guint i;
+  GList *it = NULL;
 
-  now = _now(this);
   _done_if_sent_queue_is_empty(this);
 
   item = g_queue_peek_head(this->sent);
-  while(_cmp_uint16(item->seq_num, xr->DiscardedRLE.begin_seq) < 0){
+  while(_cmp_uint16(item->seq_num, xr->DiscardedRLE.end_seq) <= 0){
     this->stat.bytes_in_flight -= item->payload_bytes;
     --this->stat.packets_in_flight;
+    this->stat.goodput_bytes += item->payload_bytes;
     g_queue_push_tail(this->acked, g_queue_pop_head(this->sent));
-    _done_if_sent_queue_is_empty(this);
-    item = g_queue_peek_head(this->sent);
-  }
-
-  _done_if_sent_queue_is_empty(this);
-
-  vector = xr->DiscardedRLE.vector;
-  length = xr->DiscardedRLE.vector_length;
-  for(i = 0; i < length && _cmp_uint16(item->seq_num, xr->DiscardedRLE.end_seq) <= 0; ++i){
-    if(!vector[i]){
-      item->discarded = TRUE;
-      this->last_discard = now;
-    }else{
-//        g_print("+gp:%u(%hu) ",item->payload_bytes, item->seq_num);
-        this->stat.goodput_bytes += item->payload_bytes;
+    if(_cmp_uint16(item->seq_num, xr->DiscardedRLE.begin_seq) == 0){
+      it = g_queue_peek_tail_link(this->acked);
     }
-    item->seen = TRUE;
-    this->stat.bytes_in_flight -= item->payload_bytes;
-    --this->stat.packets_in_flight;
-    g_queue_push_tail(this->acked, g_queue_pop_head(this->sent));
-    _done_if_sent_queue_is_empty(this);
+    if(g_queue_is_empty(this->sent)){
+      break;
+    }
     item = g_queue_peek_head(this->sent);
   }
-//  g_print("rle begin_seq: %hu, rle end_seq: %hu | acked_head: %hu, acked tail: %hu, sent head: %hu, sent tail: %hu, gp btw: %d\n",
-//            xr->DiscardedRLE.begin_seq,
-//            xr->DiscardedRLE.end_seq,
-//            ((FBRAFBProcessorItem*)g_queue_peek_head(this->acked))->seq_num,
-//            ((FBRAFBProcessorItem*)g_queue_peek_tail(this->acked))->seq_num,
-//            ((FBRAFBProcessorItem*)g_queue_peek_head(this->sent))->seq_num,
-//            ((FBRAFBProcessorItem*)g_queue_peek_tail(this->sent))->seq_num,
-//            this->stat.goodput_bytes);
+  if(g_queue_is_empty(this->acked) || !it){
+    goto done;
+  }
+
+  item = it->data;
+  for(i = 0; _cmp_uint16(item->seq_num, xr->DiscardedRLE.end_seq) <= 0; ++i){
+    if(!xr->DiscardedRLE.vector[i]){
+      this->stat.goodput_bytes -= item->payload_bytes;
+      item->discarded = TRUE;
+    }
+    if(!it->next){
+      break;
+    }
+    it = it->next;
+    item = it->data;
+  }
 
   _obsolate_acked_packet(this);
 
@@ -360,13 +352,10 @@ void _unref_item(FBRAFBProcessor * this, FBRAFBProcessorItem* item)
   if(0 < --item->ref){
     return;
   }
-  g_print("Drop an item seq is %hu, %s discarded and %s seen\n",
-          item->seq_num,
-          !item->discarded?"doesn't":" ",
-          item->seen?"doesn't":" ");
-  if(!item->seen){
-
-  }
+//  g_print("Drop an item seq is %hu, %s discarded, gp: %d\n",
+//          item->seq_num,
+//          !item->discarded?"doesn't":" ",
+//          this->stat.goodput_bytes * 8);
   g_slice_free(FBRAFBProcessorItem, item);
 }
 

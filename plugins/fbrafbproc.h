@@ -34,6 +34,7 @@ typedef struct _FBRAFBProcessorStat
   gdouble                  owd_corr;
   gboolean                 recent_discarded;
   gdouble                  stability;
+  GstClockTime             RTT;
 }FBRAFBProcessorStat;
 
 struct _FBRAFBProcessor
@@ -45,8 +46,8 @@ struct _FBRAFBProcessor
   GQueue*                  sent_in_1s;
   GQueue*                  acked;
 
+
   FBRAFBProcessorStat      stat;
-  GstClockTime             rtt;
   PercentileTracker*       owd_ltt;
 
   GstClockTime             last_discard;

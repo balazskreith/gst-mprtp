@@ -114,6 +114,7 @@ struct _NumsTrackerStatData{
   gdouble           avg;
   gdouble           dev;
   gdouble           var;
+  guint32           num;
 };
 
 

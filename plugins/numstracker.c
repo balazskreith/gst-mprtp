@@ -460,7 +460,7 @@ _ewma_add_activator(gpointer pdata, gint64 value)
 NumsTrackerStatPlugin *
 make_numstracker_stat_plugin(void (*stat_pipe)(gpointer,NumsTrackerStatData*), gpointer stat_data)
 {
-  NumsTrackerStatPlugin *this = mprtp_malloc(sizeof(NumsTrackerStatPlugin));;
+  NumsTrackerStatPlugin *this = mprtp_malloc(sizeof(NumsTrackerStatPlugin));
   this->base.add_activator = _stat_add_activator;
   this->base.rem_activator = _stat_rem_activator;
   this->stat_pipe = stat_pipe;
@@ -484,6 +484,7 @@ static void _stat_pipe(NumsTrackerStatPlugin *this)
   stat.avg = this->avg;
   stat.dev = this->dev;
   stat.var = this->var;
+  stat.num = this->counter;
   this->stat_pipe(this->stat_pipe_data, &stat);
 }
 

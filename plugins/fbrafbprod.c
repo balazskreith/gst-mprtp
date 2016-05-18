@@ -58,7 +58,6 @@ struct _CorrBlock{
 
 static void fbrafbproducer_finalize (GObject * object);
 
-static void _refresh_delay_variation(FBRAFBProducer * this, GstMpRTPBuffer *mprtp);
 static void _setup_xr_rfc7097(FBRAFBProducer * this, ReportProducer *reportproducer);
 static void _setup_xr_owd(FBRAFBProducer * this, ReportProducer *reportproducer);
 static void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer);
@@ -101,14 +100,11 @@ static void _owd_stt_pipe(gpointer data, PercentileTrackerPipeData *stats)
 static void _stat_pipe(gpointer data, NumsTrackerStatData *stats)
 {
   FBRAFBProducer *this = data;
-  this->dev_delay = stats->dev;
-  if(stats->avg < 0.){
-      this->stability = 1.;
-  }else{
+  this->stability = 1.;
+  if(0. < stats->avg){
     this->stability = 1. - stats->avg;
   }
-  g_print("avg: %f| num: %u| sum:%ld| stability: %f|\n",
-          stats->avg, stats->num, stats->sum, this->stability);
+  this->sampling_num = MIN(255, stats->num);
 }
 
 
@@ -132,7 +128,7 @@ fbrafbproducer_finalize (GObject * object)
   FBRAFBProducer *this;
   this = FBRAFBPRODUCER(object);
   g_object_unref(this->sysclock);
-  mprtp_free(this->blocks);
+  mprtp_free(this->vector);
 }
 
 void
@@ -146,23 +142,10 @@ fbrafbproducer_init (FBRAFBProducer * this)
   percentiletracker_set_treshold(this->owd_stt, 200 * GST_MSECOND);
   percentiletracker_set_stats_pipe(this->owd_stt, _owd_stt_pipe, this);
 
-  this->blocks   = mprtp_malloc(sizeof(CorrBlock) * 10);
   this->vector   = mprtp_malloc(sizeof(gboolean)  * 1000);
   this->vector_length = 0;
-  {
-    gint i;
-    for(i=0; i < 6; ++i){
-      this->blocks[i].next = &this->blocks[i + 1];
-      this->blocks[i].id   = i;
-//      this->blocks[i].N    = 64>>i;
-      this->blocks[i].N    = 64>>i;
-      this->blocks[i].N    = 5;
-    }
-  }
-  this->block_index = 1;
-  this->cblocks_counter = 1;
 
-  this->devars = make_numstracker(1000, 2 * GST_SECOND);
+  this->devars = make_numstracker(200, 2 * GST_SECOND);
   numstracker_add_plugin(this->devars, (NumsTrackerPlugin*)make_numstracker_stat_plugin(_stat_pipe, this));
 
 }
@@ -193,9 +176,13 @@ void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold
 void fbrafbproducer_track(gpointer data, GstMpRTPBuffer *mprtp)
 {
   FBRAFBProducer *this;
+  gint devar;
+
   this = data;
   THIS_WRITELOCK (this);
-  _refresh_delay_variation(this, mprtp);
+
+  devar = this->median_delay < mprtp->delay ? 1 : -1;
+  numstracker_add(this->devars, devar);
   percentiletracker_add(this->owd_stt, mprtp->delay);
 
   if(!this->initialized){
@@ -286,190 +273,9 @@ void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer)
 {
   guint sampling_ok;
   gfloat estimation;
-//  sampling_ok = _cmp_seq(this->begin_seq, this->end_seq) <= 0 ? 1 : 0;
   sampling_ok = 1;
-//  estimation = 1. - CONSTRAIN(0.0, 1.0, this->blocks[2].g);
-//  estimation = 1. - CONSTRAIN(0.0, 1.0, this->blocks[2].g);
-  estimation = this->values_sum < 0 ? 1.0 : 1.- (gdouble)this->values_sum / 100.;
-//  g_print("estimation: %f\n", estimation);
-  report_producer_add_afb_reps(reportproducer, this->ssrc, sampling_ok, estimation);
+  report_producer_add_afb_reps(reportproducer, this->ssrc, &this->sampling_num, this->stability);
 
-}
-
-
-//void _refresh_delay_variation(FBRAFBProducer * this, GstMpRTPBuffer *mprtp)
-//{
-//  GstClockTime diff;
-//  gint cmp;
-//
-//  if(this->devar.last_timestamp == 0){
-//    this->devar.last_delay        = mprtp->delay;
-//    this->devar.last_timestamp    = mprtp->timestamp;
-//    return;
-//  }
-//
-//  cmp = _cmp_timestamp(mprtp->timestamp, this->devar.last_timestamp);
-//  if(cmp < 0){
-//    return;
-//  }
-//
-//  if(!cmp){
-//    this->devar.last_delay = .5 * this->devar.last_delay +  .5 * mprtp->delay;
-//    return;
-//  }
-//
-//  if(!this->devar.last_delay_t1){
-//    this->devar.last_delay_t1 = this->devar.last_delay;
-//    return;
-//  }
-//
-//  g_print("last delay_t1: %lu last delay: %lu timestamp: %u payload: %u",
-//          this->devar.last_delay_t1,
-//          this->devar.last_delay,
-//          mprtp->timestamp,
-//          mprtp->payload_bytes);
-//
-//  diff = this->devar.last_delay_t1 < this->devar.last_delay ?
-//      this->devar.last_delay - this->devar.last_delay_t1 : this->devar.last_delay_t1 - this->devar.last_delay;
-//  diff = GST_TIME_AS_MSECONDS(diff);
-//
-//  this->blocks[0].Iu0 = diff;
-//  _execute_corrblocks(this, this->blocks);
-//  _execute_corrblocks(this, this->blocks);
-//  this->blocks[0].Id1 = diff;
-//
-//  g_print("diff: %ld| g0: %f| g1: %f| g2: %f| g3: %f\n",
-//          diff,
-//          this->blocks[0].g,
-//          this->blocks[1].g,
-//          this->blocks[2].g,
-//          this->blocks[3].g);
-//
-//  this->devar.last_delay_t1  = this->devar.last_delay;
-//  this->devar.last_delay     = mprtp->delay;
-//  this->devar.last_timestamp = mprtp->timestamp;
-//
-//}
-
-//
-//void _refresh_delay_variation(FBRAFBProducer * this, GstMpRTPBuffer *mprtp)
-//{
-//  GstClockTime diff;
-//
-////  if(_now(this) - 10 * GST_MSECOND < this->devar.last_sampling){
-////    return;
-////  }
-//
-////  this->devar.last_sampling = _now(this);
-////
-////  if(!this->devar.last_median){
-////    this->devar.last_median  = this->median_delay;
-////    return;
-////  }
-//  //
-//  //  diff = this->devar.last_median < this->median_delay ?
-//  //      this->median_delay - this->devar.last_median :
-//  //      this->devar.last_median - this->median_delay;
-//
-////    diff = mprtp->delay < this->median_delay ?
-////        this->median_delay - mprtp->delay :
-////        mprtp->delay - this->median_delay;
-////  diff /= 1000;
-//  diff = this->median_delay < mprtp->delay ? 1 : 0;
-//  this->blocks[0].Iu0 = diff;
-//  _execute_corrblocks(this, this->blocks);
-//  _execute_corrblocks(this, this->blocks);
-//  this->blocks[0].Id1 = diff;
-//
-//  this->devar.last_median = this->median_delay;
-//
-//  g_print("diff: %ld| g0: %f| g1: %f| g2: %f| g3: %f\n",
-//          diff,
-//          this->blocks[0].g,
-//          this->blocks[1].g,
-//          this->blocks[2].g,
-//          this->blocks[3].g);
-//
-//}
-
-
-void _refresh_delay_variation(FBRAFBProducer * this, GstMpRTPBuffer *mprtp)
-{
-
-  numstracker_add(this->devars, this->median_delay < mprtp->delay ? 1 : -1);
-
-  this->values_sum -= this->values[this->values_index];
-  this->values[this->values_index] = (this->median_delay < mprtp->delay) ? 1 : -1;
-  this->values_sum += this->values[this->values_index];
-  if(++this->values_index == 100){
-    this->values_index = 0;
-  }
-
-  g_print("actual: %d| sum: %d|\n",  this->values[this->values_index], this->values_sum);
-    this->blocks[0].Iu0 = 0;
-    _execute_corrblocks(this, this->blocks);
-    _execute_corrblocks(this, this->blocks);
-    this->blocks[0].Id1 = 0;
-}
-
-
-
-
-void _execute_corrblocks(FBRAFBProducer *this, CorrBlock *blocks)
-{
-  guint32 X = (this->cblocks_counter ^ (this->cblocks_counter-1))+1;
-  switch(X){
-    case 2:
-      _execute_corrblock(blocks);
-    break;
-    case 4:
-      if(3 < this->cblocks_counter) _execute_corrblock(blocks + 1);
-      break;
-    case 8:
-      if(22 < this->cblocks_counter) _execute_corrblock(blocks + 2);
-      break;
-    case 16:
-      if(60 < this->cblocks_counter) _execute_corrblock(blocks + 3);
-      break;
-    case 32:
-      if(136 < this->cblocks_counter) _execute_corrblock(blocks + 4);
-      break;
-    case 64:
-      if(288 < this->cblocks_counter) _execute_corrblock(blocks + 5);
-      break;
-  }
-
-  ++this->cblocks_counter;
-}
-
-void _execute_corrblock(CorrBlock* this)
-{
-  this->M1   = this->M0;
-  this->M0  -= this->M_[this->index];
-  this->G01 -= this->G_[this->index];
-  this->M0  += this->M_[this->index] = this->Iu0;
-  this->G01 += this->G_[this->index] = this->Iu0 * this->Id1;
-
-  if(this->M0 && this->M1){
-    this->g  = this->G01 / (gdouble)(this->N-1);
-    this->g /= this->M0 / (gdouble)(this->N)  * this->M1 / (gdouble)(this->N-1);
-    this->g -= 1.;
-  }else{
-    this->g = 0.;
-  }
-  if(++this->index == this->N) {
-    this->index = 0;
-  }
-
-  if(this->next && this->id < 6){
-    CorrBlock *next = this->next;
-    next->Iu0 = this->Iu0 + this->Iu1;
-    next->Id1 = this->Id2 + this->Id3;
-  }
-
-  this->Iu1  = this->Iu0;
-  this->Id3  = this->Id2;
-  this->Id2  = this->Id1;
 }
 
 #undef THIS_WRITELOCK

@@ -45,33 +45,15 @@ struct _FBRAFBProducer
   guint                    vector_length;
 
   NumsTracker*             received_bytes;
+  NumsTracker*             devars;
   PercentileTracker*       owd_stt;
   GstClockTime             median_delay;
   GstClockTime             min_delay;
   GstClockTime             max_delay;
-  GstClockTime             dev_delay;
 
-  gint32 values[500], values_sum, values_index;
-  gdouble stability;
+  gdouble                  stability;
+  guint                    sampling_num;
 
-  struct{
-    guint64 last_ntp_snd_time;
-    guint64 last_ntp_rcv_time;
-    GstClockTime last_delay;
-    GstClockTime last_delay_t1;
-    guint32      last_timestamp;
-
-    GstClockTime last_median, last_min, last_max, last_sampling;
-  }devar;
-
-  guint32 cblocks_counter;
-  CorrBlock *blocks;
-  guint block_index;
-  guint remb_state;
-  GstClockTime remb_ts;
-  NumsTracker *devars;
-
-  gdouble                 path_skew;
 
 };
 

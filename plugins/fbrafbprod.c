@@ -47,24 +47,12 @@ GST_DEBUG_CATEGORY_STATIC (fbrafbproducer_debug_category);
 G_DEFINE_TYPE (FBRAFBProducer, fbrafbproducer, G_TYPE_OBJECT);
 
 
-struct _CorrBlock{
-  guint           id,N;
-  gdouble         Iu0,Iu1,Id1,Id2,Id3,G01,M0,M1,G_[64],M_[64];
-  gint            index;
-  gdouble         g;
-  CorrBlock*      next;
-};
-
 
 static void fbrafbproducer_finalize (GObject * object);
 
 static void _setup_xr_rfc7097(FBRAFBProducer * this, ReportProducer *reportproducer);
 static void _setup_xr_owd(FBRAFBProducer * this, ReportProducer *reportproducer);
 static void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer);
-static void _execute_corrblocks(FBRAFBProducer *this, CorrBlock *blocks);
-static void _execute_corrblock(CorrBlock* this);
-
-#define _trackerstat(this) this->trackerstat
 
 
 static gint
@@ -145,7 +133,7 @@ fbrafbproducer_init (FBRAFBProducer * this)
   this->vector   = mprtp_malloc(sizeof(gboolean)  * 1000);
   this->vector_length = 0;
 
-  this->devars = make_numstracker(200, 2 * GST_SECOND);
+  this->devars = make_numstracker(100, 1000 * GST_MSECOND);
   numstracker_add_plugin(this->devars, (NumsTrackerPlugin*)make_numstracker_stat_plugin(_stat_pipe, this));
 
 }
@@ -172,17 +160,24 @@ void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold
   THIS_WRITEUNLOCK (this);
 }
 
+static void _refresh_devar(FBRAFBProducer *this, GstMpRTPBuffer *mprtp)
+{
+  if(mprtp->delay <= this->median_delay){
+    numstracker_add(this->devars, -1);
+  }else if(this->median_delay < mprtp->delay){
+    numstracker_add(this->devars, 1);
+  }
+}
 
 void fbrafbproducer_track(gpointer data, GstMpRTPBuffer *mprtp)
 {
   FBRAFBProducer *this;
-  gint devar;
+
 
   this = data;
   THIS_WRITELOCK (this);
 
-  devar = this->median_delay < mprtp->delay ? 1 : -1;
-  numstracker_add(this->devars, devar);
+  _refresh_devar(this, mprtp);
   percentiletracker_add(this->owd_stt, mprtp->delay);
 
   if(!this->initialized){
@@ -271,11 +266,7 @@ void _setup_xr_owd(FBRAFBProducer * this, ReportProducer *reportproducer)
 
 void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer)
 {
-  guint sampling_ok;
-  gfloat estimation;
-  sampling_ok = 1;
-  report_producer_add_afb_reps(reportproducer, this->ssrc, &this->sampling_num, this->stability);
-
+  report_producer_add_afb_reps(reportproducer, this->ssrc, this->sampling_num, this->stability);
 }
 
 #undef THIS_WRITELOCK

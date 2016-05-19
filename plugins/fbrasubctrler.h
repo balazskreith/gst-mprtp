@@ -54,15 +54,12 @@ struct _FBRASubController
   gint32                    min_target_point;
   gint32                    target_bitrate;
   gint32                    target_bitrate_t1;
-  GstClockTime              last_decrease;
+  GstClockTime              last_tr_changed;
   GstClockTime              last_settled;
-  GstClockTime              last_increase;
 
   gdouble                   rand_factor;
 
-  GstClockTime              last_fb_arrived_t1;
   GstClockTime              last_fb_arrived;
-  GstClockTime              fb_interval;
 
   gboolean                  enabled;
 
@@ -76,11 +73,13 @@ struct _FBRASubController
   SubRateAction             stage_fnc;
 
   GstClockTime              congestion_detected;
+  gboolean                  owd_approvement;
 
   guint                     consecutive_ok;
   guint                     consecutive_nok;
   GstClockTime              last_distorted;
-  GstClockTime              last_tr_uncorr_point;
+
+  GstClockTime              adjustment_time;
 
   gpointer                  priv;
 

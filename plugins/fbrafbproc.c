@@ -119,6 +119,7 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->owd_ltt     = make_percentiletracker(600, 50);
   percentiletracker_set_treshold(this->owd_ltt, 30 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->owd_ltt, _owd_ltt_pipe, this);
+
 }
 
 FBRAFBProcessor *make_fbrafbprocessor(void)
@@ -251,6 +252,15 @@ fbrafbprocessor_get_stats (FBRAFBProcessor * this, FBRAFBProcessorStat* result)
   THIS_READUNLOCK (this);
 }
 
+GstClockTime fbrafbprocessor_get_fbinterval(FBRAFBProcessor *this)
+{
+  GstClockTime result;
+  THIS_READLOCK (this);
+  result = (1.0/MIN(50,MAX(10,(this->stat.goodput_bytes * 8)/20000))) * GST_SECOND;
+  THIS_READUNLOCK(this);
+  return result;
+}
+
 void fbrafbprocessor_approve_owd(FBRAFBProcessor *this)
 {
   THIS_WRITELOCK (this);
@@ -268,6 +278,7 @@ void _process_afb(FBRAFBProcessor *this, guint32 id, GstRTCPAFB_REPS *reps)
   }
   gst_rtcp_afb_reps_getdown(reps, &sampling_num, &stability);
   this->stat.stability = 0 < sampling_num ? stability : 1.;
+
 }
 
 void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
@@ -331,6 +342,7 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
     if(!xr->DiscardedRLE.vector[i]){
       this->stat.goodput_bytes -= item->payload_bytes;
       item->discarded = TRUE;
+      this->last_discard = _now(this);
     }
     if(!it->next){
       break;

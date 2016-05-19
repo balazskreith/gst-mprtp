@@ -51,8 +51,8 @@ struct _FBRAFBProducer
   GstClockTime             min_delay;
   GstClockTime             max_delay;
 
-  gdouble                  stability;
-  guint                    sampling_num;
+  gfloat                   stability;
+  guint8                   sampling_num;
 
 
 };

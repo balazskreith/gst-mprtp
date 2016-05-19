@@ -67,6 +67,7 @@ FBRAFBProcessor *make_fbrafbprocessor(void);
 void fbrafbprocessor_reset(FBRAFBProcessor *this);
 void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn);
 void fbrafbprocessor_get_stats (FBRAFBProcessor * this, FBRAFBProcessorStat* result);
+GstClockTime fbrafbprocessor_get_fbinterval(FBRAFBProcessor *this);
 void fbrafbprocessor_approve_owd(FBRAFBProcessor *this);
 void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary);
 

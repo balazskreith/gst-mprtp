@@ -37,6 +37,8 @@ struct _StreamSplitter
   PacketsSndQueue*     sndqueue;
 
   guint                active_subflow_num;
+  guint8               max_flag;
+  guint                keyframe_filtering;
 };
 
 struct _StreamSplitterClass{
@@ -56,6 +58,11 @@ void stream_splitter_add_path(StreamSplitter * this,
 void stream_splitter_rem_path(
     StreamSplitter * this,
     guint8 subflow_id);
+
+void
+stream_splitter_set_mpath_keyframe_filtering(
+    StreamSplitter * this,
+    guint keyframe_filtering);
 
 gboolean
 stream_splitter_approve_buffer(

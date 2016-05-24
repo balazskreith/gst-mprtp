@@ -78,7 +78,7 @@ typedef struct _Subflow Subflow;
 //                        | Delays
 //                        V
 
-#define RATEWINDOW_LENGTH 10
+#define RATEWINDOW_LENGTH 100
 typedef struct _RateWindow{
   guint32 items[RATEWINDOW_LENGTH];
   gint    index;
@@ -108,12 +108,17 @@ struct _Subflow
   gboolean                      log_initialized;
 
   gboolean                      regular_report_enabled;
+  gboolean                      fb_report_enabled;
+  GstClockTime                  next_regular_report;
   guint                         controlling_mode;
 
   GstClockTime                  next_feedback;
   gpointer                      fbproducer;
   GstClockTime                (*feedback_interval_calcer)(gpointer data);
   void                        (*feedback_setup_feedback)(gpointer data, ReportProducer *reportprod);
+
+  RateWindow                    received_bytes;
+  guint32                       receiver_rate;
 
 };
 
@@ -186,6 +191,14 @@ _uint16_diff (
     guint16 a,
     guint16 b);
 
+static void
+_update_receiver_rate(
+    Subflow* subflow);
+
+static guint32
+_update_ratewindow(
+    RateWindow *window,
+    guint32 value);
 
 void
 rcvctrler_class_init (RcvControllerClass * klass)
@@ -248,6 +261,7 @@ void rcvctrler_change_interval_type(RcvController * this, guint8 subflow_id, gui
 static void _change_controlling_mode(RcvController *this, Subflow *subflow, guint controlling_mode)
 {
   subflow->regular_report_enabled   = FALSE;
+  subflow->fb_report_enabled        = FALSE;
 
   if(subflow->controlling_mode != controlling_mode && !subflow->fbproducer){
     g_object_unref(subflow->fbproducer);
@@ -272,6 +286,10 @@ static void _change_controlling_mode(RcvController *this, Subflow *subflow, guin
       subflow->feedback_setup_feedback = fbrafbproducer_setup_feedback;
       mprtpr_path_set_packetstracker(subflow->path, fbrafbproducer_track, subflow->fbproducer);
       subflow->regular_report_enabled   = TRUE;
+      subflow->fb_report_enabled        = TRUE;
+      if(ricalcer_rtcp_fb_allowed(subflow->ricalcer) == FALSE){
+        g_warning("RTCP Immediate feedback message is not allowed, although FBRA requires it. FBRA will send it anyway.");
+      }
       break;
     default:
       g_warning("Unknown controlling mode requested for subflow %d", subflow->id);
@@ -470,45 +488,35 @@ _orp_main(RcvController * this)
   guint report_length = 0;
   GstBuffer *buffer;
   gchar interval_logfile[255];
-  GstClockTime elapsed_x, elapsed_y;
-  gboolean created = FALSE;
+  GstClockTime elapsed_x, elapsed_y, now;
 
   if(!this->report_is_flowable) {
     goto done;
   }
+  now = _now(this);
 
   ++this->orp_tick;
   elapsed_x  = GST_TIME_AS_MSECONDS(_now(this) - this->made);
   g_hash_table_iter_init (&iter, this->subflows);
   while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
   {
-    gboolean send_regular, send_fb;
+    gboolean report_created = FALSE;
+
     subflow  = (Subflow *) val;
     ricalcer = subflow->ricalcer;
     if(!subflow->regular_report_enabled){
       continue;
     }
-    if(mprtpr_path_is_urgent_request(subflow->path)){
-      ricalcer_urgent_report_request(subflow->ricalcer);
-    }
 
-    send_regular = ricalcer_rtcp_regular_allowed(subflow->ricalcer);
-    if(!send_regular && _now(this) < subflow->next_feedback){
-      continue;
-    }
+    _update_receiver_rate(subflow);
 
-    send_fb = ricalcer_rtcp_fb_allowed(subflow->ricalcer) && subflow->next_feedback < _now(this);
-
-    if(!send_regular && !send_fb){
-      continue;
-    }
-
-    if(send_regular){
-      created = TRUE;
+    if(subflow->next_regular_report <= now){
+      gdouble interval;
       report_producer_begin(this->report_producer, subflow->id);
-
       _orp_add_rr(this, subflow);
-
+      interval = ricalcer_get_next_regular_interval(subflow->ricalcer);
+      subflow->next_regular_report = now;
+      subflow->next_regular_report += interval * GST_SECOND;
       //logging the report timeout
       memset(interval_logfile, 0, 255);
       sprintf(interval_logfile, "sub_%d_rtcp_ints.csv", subflow->id);
@@ -516,28 +524,32 @@ _orp_main(RcvController * this)
       elapsed_y  = GST_TIME_AS_MSECONDS(_now(this) - subflow->LRR);
       subflow->LRR = _now(this);
       mprtp_logger(interval_logfile, "%lu,%f\n", elapsed_x/100, (gdouble)elapsed_y / 1000.);
+      report_created = TRUE;
     }
 
-    if(send_fb && 1 < subflow->controlling_mode){
-      if(!created){
-        created = TRUE;
+    if(subflow->fb_report_enabled && subflow->next_feedback <= now){
+      if(!report_created){
         report_producer_begin(this->report_producer, subflow->id);
       }
       subflow->feedback_setup_feedback(subflow->fbproducer, this->report_producer);
-      subflow->next_feedback = _now(this) + subflow->feedback_interval_calcer(subflow->fbproducer);
+      subflow->next_feedback = now + subflow->feedback_interval_calcer(subflow->fbproducer);
+      report_created = TRUE;
     }
 
-    if(created){
-      buffer = report_producer_end(this->report_producer, &report_length);
-      this->send_mprtcp_packet_func(this->send_mprtcp_packet_data, buffer);
+    if(!report_created){
+        continue;
     }
+
+    buffer = report_producer_end(this->report_producer, &report_length);
+    this->send_mprtcp_packet_func(this->send_mprtcp_packet_data, buffer);
     report_length += 12 /* RTCP HEADER*/ + (28<<3) /*UDP+IP HEADER*/;
     subflow->avg_rtcp_size += (report_length - subflow->avg_rtcp_size) / 4.;
 
-    ricalcer_refresh_parameters(ricalcer,
-                                CONSTRAIN(MIN_MEDIA_RATE>>3  /*because we need bytes */, 25000, 250000/*Todo: change it to the receiver rate somehow*/),
-                                subflow->avg_rtcp_size);
-
+    ricalcer_refresh_rate_parameters(ricalcer,
+                              CONSTRAIN(MIN_MEDIA_RATE>>3  /*because we need bytes */,
+                                        250000,
+                                        subflow->receiver_rate),
+                              subflow->avg_rtcp_size);
 
   }
 
@@ -601,6 +613,8 @@ void _orp_add_rr(RcvController * this, Subflow *subflow)
                          LSR,
                          DLSR
                          );
+
+  ricalcer_refresh_packets_rate(subflow->ricalcer, received, lost, lost);
 
 }
 
@@ -715,6 +729,21 @@ _uint16_diff (guint16 start, guint16 end)
   return ~((guint16) (start - end));
 }
 
+void _update_receiver_rate(Subflow* subflow)
+{
+  guint32 total_packets, total_payloads;
+  mprtpr_path_get_total_receivements(subflow->path, &total_packets, &total_payloads);
+  subflow->receiver_rate = _update_ratewindow(&subflow->received_bytes,
+                                              (total_payloads + 48 * 8 * total_packets));
+}
+
+guint32 _update_ratewindow(RateWindow *window, guint32 value)
+{
+  window->items[window->index] = value;
+  window->index = (window->index + 1) % RATEWINDOW_LENGTH;
+  window->rate_value = value - window->items[window->index];
+  return window->rate_value;
+}
 
 
 #undef MAX_RIPORT_INTERVAL

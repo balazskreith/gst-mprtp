@@ -64,7 +64,7 @@ struct _GstMprtpscheduler
   gboolean                      logging;
   gboolean                      riport_flow_signal_sent;
   guint                         active_subflows_num;
-
+  guint                         mpath_keyframe_filtering;
   GstSegment                    segment;
   GstClockTime                  position_out;
 

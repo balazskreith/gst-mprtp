@@ -22,22 +22,25 @@ typedef struct _MPRTPSubflowFBRACngCtrlerParams{
   gdouble             bottleneck_epsilon;
   gdouble             normal_monitoring_interval;
   gdouble             bottleneck_monitoring_interval;
-  gint32              max_distortion_keep_time;
   gdouble             bottleneck_increasement_factor;
   gint32              min_ramp_up_bitrate;
   gint32              max_ramp_up_bitrate;
   gint32              min_target_bitrate;
   gint32              max_target_bitrate;
   gdouble             reduce_target_factor;
+  gdouble             approvement_epsilon;
 
-  GstClockTime        qdelay_congestion_treshold;
   gdouble             discad_cong_treshold;
+  gdouble             stability_treshold;
+  gdouble             owd_corr_cng_th;
 
-  gdouble             distorted_trend_th;
   gdouble             keep_trend_th;
+  gdouble             probe_trend_th;
+
   gboolean            pacing_allowed;
   gdouble             pacing_deflate_time;
   gdouble             pacing_constrict_time;
+
 
 }MPRTPSubflowFBRA2CngCtrlerParams;
 

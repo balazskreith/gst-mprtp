@@ -89,7 +89,7 @@ struct _MPRTPSPath
   gpointer                packetstracker_data;
 
   gpointer                approval_data;
-  gboolean              (*approval)(gpointer, GstBuffer *);
+  gboolean              (*approval)(gpointer, GstRTPBuffer *);
 };
 
 struct _MPRTPSPathClass
@@ -135,8 +135,8 @@ gboolean mprtps_path_has_expected_lost(MPRTPSPath * this);
 void mprtps_path_process_rtp_packet(MPRTPSPath * this, GstBuffer * buffer, gboolean *monitoring_request);
 
 void mprtps_path_set_keep_alive_period(MPRTPSPath *this, GstClockTime period);
-void mprtps_path_set_approval_process(MPRTPSPath *this, gpointer data, gboolean(*approval)(gpointer, GstBuffer *));
-gboolean mprtps_path_approve_request(MPRTPSPath *this, GstBuffer *buf);
+void mprtps_path_set_approval_process(MPRTPSPath *this, gpointer data, gboolean(*approval)(gpointer, GstRTPBuffer *));
+gboolean mprtps_path_approve_request(MPRTPSPath *this, GstRTPBuffer *buf);
 
 void mprtps_path_set_packetstracker(MPRTPSPath *this, void(*packetstracker)(gpointer,  guint, guint16), gpointer data);
 

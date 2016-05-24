@@ -35,6 +35,8 @@ typedef struct _FBRAFBProcessorStat
   gboolean                 recent_discarded;
   gdouble                  stability;
   GstClockTime             RTT;
+  gint32                   discarded_packets_in_1s;
+  gint32                   received_packets_in_1s;
 }FBRAFBProcessorStat;
 
 struct _FBRAFBProcessor

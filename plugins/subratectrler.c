@@ -215,7 +215,7 @@ done:
 
 gboolean subratectrler_packet_approver(
                          gpointer data,
-                         GstBuffer *buf)
+                         GstRTPBuffer *rtp)
 {
   gboolean result = TRUE;
   SubflowRateController *this = data;
@@ -225,7 +225,7 @@ gboolean subratectrler_packet_approver(
   }
   switch(this->type){
     case SUBRATECTRLER_FBRA_MARC:
-      result = fbrasubctrler_path_approver(this->controller, buf);
+      result = fbrasubctrler_path_approver(this->controller, rtp);
       break;
     default:
     case SUBRATECTRLER_NO_CTRL:

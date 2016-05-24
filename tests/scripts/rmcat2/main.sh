@@ -71,7 +71,7 @@ function log_bw() {
 
   #setup duration
   DURATION=150.0
-  OWD=50
+  OWD=300
 
   sudo ip netns exec $NSSND tc qdisc change dev veth0 parent 1: handle 2: tbf rate 4000kbit burst 15400 latency 300ms minburst 1540
 

@@ -46,16 +46,12 @@ struct _MpRTPReceiverPath
   gint32                    jitter;
   guint16                   highest_seq;
   guint32                   total_packets_received;
+  guint32                   total_payload_received;
 
   guint32                   last_rtp_timestamp;
 
   gdouble                   path_skew;
-  gdouble                   path_avg_delay;
   GstClockTime              last_mprtp_delay;
-  PercentileTracker*        delays;
-  PercentileTracker2*       skews;
-
-  gboolean                  urgent;
 
   gboolean                  spike_mode;
   GstClockTime              spike_var;
@@ -92,10 +88,6 @@ void mprtpr_path_get_total_receivements (MpRTPRPath * this,
                                guint32 *total_packets_received,
                                guint32 *total_payload_received);
 
-void mprtpr_path_get_owd_stats(MpRTPRPath *this,
-                                 GstClockTime *median,
-                                 GstClockTime *min,
-                                 GstClockTime* max);
 gboolean
 mprtpr_path_is_in_spike_mode(MpRTPRPath *this);
 
@@ -104,9 +96,6 @@ mprtpr_path_set_spike_treshold(MpRTPRPath *this, GstClockTime delay_treshold, Gs
 
 gboolean
 mprtpr_path_is_urgent_request(MpRTPRPath *this);
-
-void
-mprtpr_path_set_urgent_request(MpRTPRPath *this);
 
 void
 mprtpr_path_set_owd_window_treshold(MpRTPRPath *this, GstClockTime treshold);
@@ -119,10 +108,6 @@ mprtpr_path_set_packetstracker(MpRTPRPath *this, void(*packetstracker)(gpointer,
 
 void
 mprtpr_path_set_spike_var_treshold(MpRTPRPath *this, GstClockTime var_treshold);
-
-void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
-                           gdouble       *path_delay,
-                           gdouble       *path_skew);
 
 void mprtpr_path_add_delay(MpRTPRPath *this, GstClockTime delay);
 

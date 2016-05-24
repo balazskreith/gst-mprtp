@@ -92,7 +92,7 @@ struct _FBRASubControllerClass{
 GType fbrasubctrler_get_type (void);
 FBRASubController *make_fbrasubctrler(MPRTPSPath *path);
 
-gboolean fbrasubctrler_path_approver(gpointer data,    GstBuffer *buffer);
+gboolean fbrasubctrler_path_approver(gpointer data, GstRTPBuffer *buffer);
 
 void fbrasubctrler_enable(FBRASubController *this);
 void fbrasubctrler_disable(FBRASubController *this);

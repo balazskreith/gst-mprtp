@@ -93,6 +93,7 @@ struct _Subflow
   GstClockTime               joined_time;
   GstClockTime               last_SR_report_sent;
   GstClockTime               report_timeout;
+  GstClockTime               next_regular_report;
   guint8                     lost_history;
   gboolean                   lost;
   gdouble                    avg_rtcp_size;
@@ -623,21 +624,24 @@ static void _orp_producer_helper(Subflow *subflow, gpointer data)
   SndController*            this;
   ReportIntervalCalculator* ricalcer;
   GstBuffer*                buf;
-  gboolean                  send_regular;
   guint                     report_length = 0;
+  GstClockTime              now;
 
-  this = data;
+  this     = data;
   ricalcer = subflow->ricalcer;
+  now      = _now(this);
 
   if(!subflow->controlling_mode){
     goto done;
   }
 
-  send_regular = ricalcer_rtcp_regular_allowed(subflow->ricalcer);
-
-  if(!send_regular){
+  if(now < subflow->next_regular_report){
     goto done;
   }
+
+  subflow->next_regular_report = now;
+  subflow->next_regular_report += ricalcer_get_next_regular_interval(subflow->ricalcer) * GST_SECOND;
+
   report_producer_begin(this->report_producer, subflow->id);
   _orp_add_sr(this, subflow);
   buf = report_producer_end(this->report_producer, &report_length);
@@ -647,7 +651,7 @@ static void _orp_producer_helper(Subflow *subflow, gpointer data)
   subflow->avg_rtcp_size +=
       ((gfloat) report_length - subflow->avg_rtcp_size) / 4.;
 
-  ricalcer_refresh_parameters(ricalcer,
+  ricalcer_refresh_rate_parameters(ricalcer,
                               CONSTRAIN(MIN_MEDIA_RATE, 100000, mprtps_path_get_target_bitrate(subflow->path))>>3 /*because we need the bytes */,
                               subflow->avg_rtcp_size);
 

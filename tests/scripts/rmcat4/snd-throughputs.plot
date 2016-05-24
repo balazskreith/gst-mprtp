@@ -14,22 +14,29 @@ if (!exists("range")) range=4000
 
 set terminal pdf enhanced rounded size 10,6
 set output output_file
+set key font ",32"
+set xtics font ",32"
+set ytics font ",32"
+set ylabel font ",32"
+set xlabel font ",32"
 
 set origin 0,0
 set size ratio 0.5
 set datafile separator "," 
 
-set key inside horizontal top left 
+set key inside vertical center right
+#unset key  
 set tmargin 5
 set bmargin 5
-set lmargin 10
+#set lmargin 23
+set lmargin 12
 set rmargin 7
 set yrange [0:range]
-set ytics 500
+set ytics 1000
 set xrange [0:duration]
-set xtics 100
-set ylabel "Throughput (KBits)"
-set xlabel "time (100ms)"
+set xtics 20 offset 0,-1
+#set ylabel "Throughput (KBits)" offset -8
+set xlabel "time (s)" offset 0,-2
 set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
 
@@ -51,8 +58,8 @@ set style line 3 linecolor rgb '#185aa9' linetype 3 linewidth 1
 set style line 4 linecolor rgb '#a21d21' linetype 4 linewidth 1	
 set style line 5 linecolor rgb '#662c91' linetype 5 linewidth 1	
 
- plot throughput_file using 0:3 with lines ls 1 title "S1 Sending Rate", \
-      throughput_file2 using ($0 + 200):3 with lines ls 2 title "S2 Sending Rate", \
-      throughput_file3 using ($0 + 400):3 with lines ls 3 title "S3 Sending Rate", \
+ plot throughput_file using ($0*0.1):3 with lines ls 1 title "S1 Sending Rate", \
+      throughput_file2 using ($0 * 0.1 + 20):3 with lines ls 2 title "S2 Sending Rate", \
+      throughput_file3 using ($0 * 0.1 + 40):3 with lines ls 3 title "S3 Sending Rate", \
       bw_file using 0:1 with lines ls 4 title "Path Capacity"
 

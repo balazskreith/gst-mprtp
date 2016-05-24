@@ -50,12 +50,12 @@ echo "debug is 1"
   set -x
 fi
 
-DURFEC=3000
-DURRCVQUEUE=3000
-DURRCVTHROUGHPUTS=3000
-DURSNDTHROUGHPUTS=3000
-DURRTCPINTVALS=3000
-DURLOSTS=3000
+DURFEC=300
+DURRCVQUEUE=300
+DURRCVTHROUGHPUTS=300
+DURSNDTHROUGHPUTS=300
+DURRTCPINTVALS=300
+DURLOSTS=300
 
 PLOTDIR="scripts/rmcat7"
 PLOTFEC="$PLOTDIR/fec.plot"
@@ -87,15 +87,6 @@ DSTRCVTHROUGHPUTS="$DSTDIR/rcv-throughputs.pdf"
 DSTSNDTHROUGHPUTS="$DSTDIR/snd-throughputs.pdf"
 DSTRTCPINTVALS="$DSTDIR/rtcp-intervals.pdf"
 
-  gnuplot -e "duration='$DURFEC'" \
-          -e "output_file='$DSTFEC'" \
-          -e "fec_file='$SRCFEC'" \
-          "$PLOTFEC"
-          
-  gnuplot -e "duration='$DURRCVTHROUGHPUTS'" \
-          -e "output_file='$DSTRCVTHROUGHPUTS'" \
-          -e "throughput_file='$SRCRCVTHROUGHPUTS'" \
-          "$PLOTRCVTHROUGHPUTS"
           
   gnuplot -e "duration='$DURSNDTHROUGHPUTS'" \
           -e "output_file='$DSTSNDTHROUGHPUTS'" \
@@ -106,8 +97,4 @@ DSTRTCPINTVALS="$DSTDIR/rtcp-intervals.pdf"
 
 #          -e "throughput_file='$SRCSNDTHROUGHPUTS'" \
           
-  gnuplot -e "duration='$DURRTCPINTVALS'" \
-          -e "output_file='$DSTRTCPINTVALS'" \
-          -e "rtcp_file='$SRCRTCPINTVALS'" \
-          "$PLOTRTCPINTVALS"
 

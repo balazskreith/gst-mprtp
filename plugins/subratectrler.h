@@ -48,5 +48,5 @@ void subratectrler_report_update(SubflowRateController *this, GstMPRTCPReportSum
 void subratectrler_time_update(SubflowRateController *this);
 void subratectrler_signal_update(SubflowRateController *this, MPRTPSubflowRateController *ratectrler_params);
 void subratectrler_signal_request(SubflowRateController *this, MPRTPSubflowRateController *ratectrler_params);
-gboolean subratectrler_packet_approver(gpointer data,GstBuffer *buf);
+gboolean subratectrler_packet_approver(gpointer data,GstRTPBuffer *buf);
 #endif /* SUBRATECTRLER_H_ */

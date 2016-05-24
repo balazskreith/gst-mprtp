@@ -50,12 +50,12 @@ echo "debug is 1"
   set -x
 fi
 
-DURFEC=1000
-DURRCVQUEUE=1000
-DURRCVTHROUGHPUTS=1000
-DURSNDTHROUGHPUTS=1000
-DURRTCPINTVALS=1000
-DURLOSTS=1000
+DURFEC=100
+DURRCVQUEUE=100
+DURRCVTHROUGHPUTS=100
+DURSNDTHROUGHPUTS=100
+DURRTCPINTVALS=100
+DURLOSTS=100
 
 PLOTDIR="scripts/rmcat6"
 PLOTFEC="$PLOTDIR/fec.plot"
@@ -72,42 +72,23 @@ SRCRCVTHROUGHPUTS="$SRCDIR/sub_1_rcv.csv"
 SRCSNDTHROUGHPUTS="$SRCDIR/snd_1_ratestat.csv"
 SRCFECRATES="$SRCDIR/fecrates.csv"
 SRCRTCPINTVALS="$SRCDIR/sub_1_rtcp_ints.csv"
-
+SRCTCPSTAT="$SRCDIR/tcpstat.csv"
 SRCVETH0="$SRCDIR/veth0.csv"
-#SRCVETH02="$SRCDIR/veth02.csv"
-#SRCSNDTHROUGHPUTS2="$SRCDIR/snd_sum_ratestat.csv"
-#cat $SRCSNDTHROUGHPUTS | tail -1000 > $SRCSNDTHROUGHPUTS2
-#sort -u -t',' -k1,1 "$SRCVETH0" > $SRCVETH02
-#join -t , -1 6 -2 1 "$SRCSNDTHROUGHPUTS" "$SRCVETH02" > "$SRCSNDTHROUGHPUTS2"
 
-DSTFEC="$DSTDIR/fec.pdf"
-DSTRCVQUEUE="$DSTDIR/rcvqueue.pdf"
-DSTAUTOCORRS="$DSTDIR/owd-autocorrs.pdf"
-DSTRCVTHROUGHPUTS="$DSTDIR/rcv-throughputs.pdf"
 DSTSNDTHROUGHPUTS="$DSTDIR/snd-throughputs.pdf"
 DSTRTCPINTVALS="$DSTDIR/rtcp-intervals.pdf"
 
-  gnuplot -e "duration='$DURFEC'" \
-          -e "output_file='$DSTFEC'" \
-          -e "fec_file='$SRCFEC'" \
-          "$PLOTFEC"
-          
-  gnuplot -e "duration='$DURRCVTHROUGHPUTS'" \
-          -e "output_file='$DSTRCVTHROUGHPUTS'" \
-          -e "throughput_file='$SRCRCVTHROUGHPUTS'" \
-          "$PLOTRCVTHROUGHPUTS"
+#  gnuplot -e "duration='$DURFEC'" \
+#          -e "output_file='$DSTFEC'" \
+#          -e "fec_file='$SRCFEC'" \
+#          "$PLOTFEC"
           
   gnuplot -e "duration='$DURSNDTHROUGHPUTS'" \
           -e "output_file='$DSTSNDTHROUGHPUTS'" \
           -e "throughput_file='$SRCSNDTHROUGHPUTS'" \
           -e "bw_file='$SRCVETH0'" \
+          -e "tcpstat='$SRCTCPSTAT'" \
 	  -e "fecrates_file='$SRCFECRATES'" \
           "$PLOTSNDTHROUGHPUTS"
 
-#          -e "throughput_file='$SRCSNDTHROUGHPUTS'" \
-          
-  gnuplot -e "duration='$DURRTCPINTVALS'" \
-          -e "output_file='$DSTRTCPINTVALS'" \
-          -e "rtcp_file='$SRCRTCPINTVALS'" \
-          "$PLOTRTCPINTVALS"
 

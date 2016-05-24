@@ -70,7 +70,7 @@ function log_bw() {
 
   #setup duration
   DURATION=120
-  OWD=100
+  OWD=50
   
   log_bw 40 1000 $LOGSDIR/veth0.csv
   log_bw 20 2500 $LOGSDIR/veth0.csv

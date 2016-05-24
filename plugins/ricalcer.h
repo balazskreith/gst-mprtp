@@ -41,11 +41,12 @@ struct _ReportIntervalCalculator
   gdouble          min_interval;
   gdouble          base_interval;
   GstClock*        sysclock;
-  GstClockTime     last_time;
-  GstClockTime     next_time;
-  GstClockTime     actual_interval;
-  gdouble          interval_spread;
+  gdouble          actual_interval;
   GstClockTime     urgent_time;
+
+  gint32 received;
+  gint32 discarded;
+  gint32 lost;
 
   GstClockTime     t_rr_last;
 
@@ -60,10 +61,13 @@ struct _ReportIntervalCalculatorClass{
 GType ricalcer_get_type (void);
 ReportIntervalCalculator *make_ricalcer(gboolean sender_side);
 void ricalcer_set_mode(ReportIntervalCalculator *this, RTCPIntervalMode mode);
-gboolean ricalcer_rtcp_regular_allowed(ReportIntervalCalculator * this);
 gboolean ricalcer_rtcp_fb_allowed(ReportIntervalCalculator * this);
-
-void ricalcer_refresh_parameters(ReportIntervalCalculator * this, gdouble media_rate, gdouble avg_rtcp_size);
+gdouble ricalcer_get_next_regular_interval(ReportIntervalCalculator * this);
+void ricalcer_refresh_rate_parameters(ReportIntervalCalculator * this, gdouble media_rate, gdouble avg_rtcp_size);
+void ricalcer_refresh_packets_rate(ReportIntervalCalculator * this,
+                                          gint32 received,
+                                          gint32 discarded,
+                                          gint32 lost);
 void ricalcer_urgent_report_request(ReportIntervalCalculator * this);
 
 #endif /* RICALCER_H_ */

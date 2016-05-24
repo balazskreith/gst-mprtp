@@ -177,7 +177,10 @@ static void _obsolate_acked_packet(FBRAFBProcessor *this)
     if(!item->discarded){
       this->stat.goodput_bytes-=item->payload_bytes;
 //      g_print("-gp:%u(%hu) ",item->payload_bytes, item->seq_num);
+    }else{
+      --this->stat.discarded_packets_in_1s;
     }
+    --this->stat.received_packets_in_1s;
     _unref_item(this, item);
   }
 
@@ -221,6 +224,7 @@ void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summa
   if(summary->XR.DiscardedRLE.processed){
     _process_rle_discvector(this, &summary->XR);
     this->stat.recent_discarded = 0 < this->last_discard && _now(this) < this->last_discard + this->stat.RTT;
+
   }
   if(summary->XR.OWD.processed){
     _process_owd(this, &summary->XR);
@@ -324,6 +328,7 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
     this->stat.bytes_in_flight -= item->payload_bytes;
     --this->stat.packets_in_flight;
     this->stat.goodput_bytes += item->payload_bytes;
+    ++this->stat.received_packets_in_1s;
     g_queue_push_tail(this->acked, g_queue_pop_head(this->sent));
     if(_cmp_uint16(item->seq_num, xr->DiscardedRLE.begin_seq) == 0){
       it = g_queue_peek_tail_link(this->acked);
@@ -343,6 +348,7 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
       this->stat.goodput_bytes -= item->payload_bytes;
       item->discarded = TRUE;
       this->last_discard = _now(this);
+      ++this->stat.discarded_packets_in_1s;
     }
     if(!it->next){
       break;

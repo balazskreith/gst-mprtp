@@ -31,7 +31,6 @@ static void mprtpr_path_finalize (GObject * object);
 static void mprtpr_path_reset (MpRTPRPath * this);
 static gint _cmp_seq32 (guint32 x, guint32 y);
 static void _add_delay(MpRTPRPath *this, GstClockTime delay);
-static void _add_skew(MpRTPRPath *this, gint64 skew);
 
 void
 mprtpr_path_class_init (MpRTPRPathClass * klass)
@@ -64,11 +63,6 @@ mprtpr_path_init (MpRTPRPath * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain ();
-  this->delays = make_percentiletracker(512, 50);
-  percentiletracker_set_treshold(this->delays, 100 * GST_MSECOND);
-
-  this->skews = make_percentiletracker2(100, 50);
-  percentiletracker2_set_treshold(this->skews, 2 * GST_SECOND);
   this->spike_var_treshold = 20 * GST_MSECOND;
   this->spike_delay_treshold = 375 * GST_MSECOND;
   mprtpr_path_reset (this);
@@ -136,16 +130,12 @@ void mprtpr_path_get_regular_stats(MpRTPRPath *this,
   THIS_READUNLOCK (this);
 }
 
-void mprtpr_path_get_owd_stats(MpRTPRPath *this,
-                                 GstClockTime *median,
-                                 GstClockTime *min,
-                                 GstClockTime* max)
+void mprtpr_path_get_total_receivements (MpRTPRPath * this,
+                                              guint32 *total_packets_received,
+                                              guint32 *total_payload_received)
 {
-  GstClockTime median_delay;
-  THIS_READLOCK (this);
-  median_delay = percentiletracker_get_stats(this->delays, min, max, NULL);
-  if(median) *median = median_delay;
-  THIS_READUNLOCK (this);
+  if(total_packets_received) *total_packets_received = this->total_packets_received;
+  if(total_payload_received) *total_payload_received = this->total_payload_received;
 }
 
 gboolean
@@ -168,24 +158,6 @@ mprtpr_path_set_spike_treshold(MpRTPRPath *this, GstClockTime delay_treshold, Gs
 }
 
 
-gboolean
-mprtpr_path_is_urgent_request(MpRTPRPath *this)
-{
-  gboolean result;
-  THIS_WRITELOCK (this);
-  result = this->urgent;
-  this->urgent = FALSE;
-  THIS_WRITEUNLOCK (this);
-  return result;
-}
-
-void
-mprtpr_path_set_urgent_request(MpRTPRPath *this)
-{
-  THIS_WRITELOCK (this);
-  this->urgent = TRUE;
-  THIS_WRITEUNLOCK (this);
-}
 
 void
 mprtpr_path_set_owd_window_treshold(MpRTPRPath *this, GstClockTime treshold)
@@ -222,17 +194,6 @@ mprtpr_path_set_spike_var_treshold(MpRTPRPath *this, GstClockTime var_treshold)
 }
 
 
-
-void mprtpr_path_get_joiner_stats(MpRTPRPath *this,
-                           gdouble       *path_delay,
-                           gdouble       *path_skew)
-{
-  THIS_READLOCK (this);
-  if(path_delay) *path_delay = this->path_avg_delay;
-  if(path_skew)  *path_skew = this->path_skew; //this->estimated_skew;
-  THIS_READUNLOCK (this);
-}
-
 void mprtpr_path_add_delay(MpRTPRPath *this, GstClockTime delay)
 {
   THIS_WRITELOCK (this);
@@ -255,6 +216,7 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   if (this->seq_initialized == FALSE) {
     this->highest_seq = mprtp->subflow_seq;
     this->total_packets_received = 1;
+    this->total_payload_received = mprtp->payload_bytes;
     this->last_rtp_timestamp = mprtp->timestamp;
     this->last_mprtp_delay = mprtp->delay;
     _add_delay(this, mprtp->delay);
@@ -267,12 +229,11 @@ mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
   this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
   this->last_mprtp_delay = mprtp->delay;
   ++this->total_packets_received;
-
+  this->total_payload_received += mprtp->payload_bytes;
 
   //collect and evaluate skew in another way
   if(_cmp_seq32(this->last_rtp_timestamp, mprtp->timestamp) < 0){
     this->last_rtp_timestamp = mprtp->timestamp;
-    _add_skew(this, skew);
   }
   _add_delay(this, mprtp->delay);
 
@@ -307,13 +268,6 @@ _cmp_seq32 (guint32 x, guint32 y)
 void _add_delay(MpRTPRPath *this, GstClockTime delay)
 {
   GstClockTime ddelay;
-  gint64 median_delay;
-  percentiletracker_add(this->delays, delay);
-  median_delay = percentiletracker_get_stats(this->delays, NULL, NULL, NULL);
-  this->path_avg_delay = this->path_avg_delay * .99 + (gdouble) median_delay * .01;
-  if(this->path_avg_delay * 2. < delay){
-    this->urgent = TRUE;
-  }
 
   ddelay = ABS((gint64)delay - (gint64)this->last_added_delay);
   if (ddelay > this->spike_delay_treshold) {
@@ -338,13 +292,6 @@ void _add_delay(MpRTPRPath *this, GstClockTime delay)
   this->last_added_delay = delay;
 }
 
-void _add_skew(MpRTPRPath *this, gint64 skew)
-{
-  gint64 median_skew;
-  percentiletracker2_add(this->skews, skew);
-  median_skew = percentiletracker2_get_stats(this->skews, NULL, NULL, NULL);
-  this->path_skew = this->path_skew * .99 + (gdouble) median_skew * .01;
-}
 
 
 #undef THIS_READLOCK

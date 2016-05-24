@@ -152,6 +152,8 @@ make_video_yuvfile_session (guint sessionNum)
       "lag-in-frames", 0,
       "timebase", 1, 90000,
       "error-resilient", 1,
+//      "keyframe-mode", 1, /* VPX_KF_DISABLED */
+//      "keyframe-max-dist", 128,
       NULL);
 
 
@@ -351,6 +353,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
             "setup-keep-alive-period", keep_alive_period,
             "setup-sending-target", sending_target,
             "setup-controlling-mode", controlling_mode,
+            "mpath-keyframe-filtering", mpath_keyfiltering,
             NULL);
 
   if(testseq){

@@ -115,7 +115,8 @@ enum
   PROP_MPRTP_EXT_HEADER_ID,
   PROP_ABS_TIME_EXT_HEADER_ID,
   PROP_FEC_PAYLOAD_TYPE,
-  PROP_OBSOLATION_TRESHOLD,
+  PROP_MPATH_KEYFRAME_FILTERING,
+  PROP_PACKET_OBSOLATION_TRESHOLD,
   PROP_JOIN_SUBFLOW,
   PROP_DETACH_SUBFLOW,
   PROP_SET_SUBFLOW_NON_CONGESTED,
@@ -245,7 +246,13 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "Set or get the payload type of FEC packets. The default is 126",
           0, 127, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_OBSOLATION_TRESHOLD,
+  g_object_class_install_property (gobject_class, PROP_MPATH_KEYFRAME_FILTERING,
+      g_param_spec_uint ("mpath-keyframe-filtering",
+          "Set or get the keyframe filtering for multiple path",
+          "Set or get the keyframe filtering for multiple path. 0 - no keyframe filtering, 1 - vp8 enc/dec filtering",
+          0, 255, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_PACKET_OBSOLATION_TRESHOLD,
       g_param_spec_uint ("obsolation-treshold",
           "Set the obsolation treshold at the packet sender queue.",
           "Set the obsolation treshold at the packet sender queue.",
@@ -503,7 +510,13 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       _join_subflow (this, g_value_get_uint (value));
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_OBSOLATION_TRESHOLD:
+    case PROP_MPATH_KEYFRAME_FILTERING:
+      THIS_WRITELOCK (this);
+      this->mpath_keyframe_filtering = g_value_get_uint (value);
+      stream_splitter_set_mpath_keyframe_filtering(this->splitter, this->mpath_keyframe_filtering);
+      THIS_WRITEUNLOCK (this);
+      break;
+    case PROP_PACKET_OBSOLATION_TRESHOLD:
         THIS_WRITELOCK (this);
         packetssndqueue_set_obsolation_treshold(this->sndqueue, (GstClockTime) g_value_get_uint (value) * GST_MSECOND);
         THIS_WRITEUNLOCK (this);
@@ -630,12 +643,17 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
       g_value_set_string (value, this->test_seq);
       THIS_READUNLOCK (this);
       break;
+    case PROP_MPATH_KEYFRAME_FILTERING:
+      THIS_READLOCK (this);
+      g_value_set_uint (value, (guint) this->mpath_keyframe_filtering);
+      THIS_READUNLOCK (this);
+      break;
     case PROP_FEC_PAYLOAD_TYPE:
       THIS_READLOCK (this);
       g_value_set_uint (value, (guint) this->fec_payload_type);
       THIS_READUNLOCK (this);
       break;
-    case PROP_OBSOLATION_TRESHOLD:
+    case PROP_PACKET_OBSOLATION_TRESHOLD:
       THIS_READLOCK (this);
       g_value_set_uint(value, packetssndqueue_get_obsolation_treshold(this->sndqueue) / GST_MSECOND);
       THIS_READUNLOCK (this);

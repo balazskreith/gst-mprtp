@@ -37,6 +37,12 @@ GST_DEBUG_CATEGORY_STATIC (stream_splitter_debug_category);
 #define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
 #define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
 
+/* Evaluates to a mask with n bits set */
+#define BITS_MASK(n) ((1<<(n))-1)
+
+/* Returns len bits, with the LSB at position bit */
+#define BITS_GET(val, bit, len) (((val)>>(bit))&BITS_MASK(len))
+
 /* class initialization */
 G_DEFINE_TYPE (StreamSplitter, stream_splitter, G_TYPE_OBJECT);
 
@@ -186,6 +192,14 @@ static Subflow *
 _make_subflow (
     MPRTPSPath * path);
 
+static guint8
+_get_key_restriction(
+    StreamSplitter *this,
+    GstRTPBuffer *rtp);
+
+static gboolean
+_vp8_keyframe_filter(
+    GstRTPBuffer *rtp);
 
 static MPRTPSPath *
 _get_next_path (
@@ -369,6 +383,14 @@ stream_splitter_commit_changes (StreamSplitter * this)
   THIS_WRITEUNLOCK (this);
 }
 
+void
+stream_splitter_set_mpath_keyframe_filtering(StreamSplitter * this, guint keyframe_filtering)
+{
+  THIS_WRITELOCK (this);
+  this->keyframe_filtering = keyframe_filtering;
+  THIS_WRITEUNLOCK (this);
+}
+
 gboolean
 stream_splitter_approve_buffer(StreamSplitter * this, GstBuffer *buffer, MPRTPSPath **path)
 {
@@ -389,7 +411,8 @@ stream_splitter_approve_buffer(StreamSplitter * this, GstBuffer *buffer, MPRTPSP
     GST_WARNING_OBJECT (this, "The RTP packet is not readable");
     goto done;
   }
-  flag_restriction = 0; //Fixme: flag restriction considering the type of buffer here....
+
+  flag_restriction = _get_key_restriction(this, &rtp);
   selected = _schtree_select_next(this->tree, &rtp, flag_restriction);
   if(!selected){
     gst_rtp_buffer_unmap (&rtp);
@@ -471,7 +494,9 @@ void _iterate_subflows(StreamSplitter *this, void(*iterator)(Subflow *, gpointer
 
 void _refresh_flags(Subflow *subflow, gpointer data)
 {
+  StreamSplitter * this = data;
   subflow->flags_value = mprtps_path_get_flags(subflow->path);
+  this->max_flag = MAX(this->max_flag, subflow->flags_value);
 }
 
 MPRTPSPath *
@@ -479,8 +504,8 @@ _get_next_path (StreamSplitter * this, GstRTPBuffer * rtp)
 {
   Subflow *subflow = NULL;
 
-  gboolean flag_restriction;
-  flag_restriction = 0; //Fixme: flag restriction considering the type of buffer here....
+  guint8 flag_restriction;
+  flag_restriction = _get_key_restriction(this, rtp);
 
   subflow = _schtree_get_next(this->tree, rtp, flag_restriction);
   return subflow ? subflow->path : NULL;
@@ -536,7 +561,8 @@ _tree_ctor (StreamSplitter *this)
   sdata.valid = wdata.total_weight = 0;
   cdata.root = NULL;
   sdata.total = 0;
-  _iterate_subflows(this, _refresh_flags, NULL);
+  this->max_flag = 0;
+  _iterate_subflows(this, _refresh_flags, this);
   _iterate_subflows(this, _summarize_sending_rates, &sdata);
   sdata.valid = 0;
   _iterate_subflows(this, _validate_sending_rates, &sdata);
@@ -612,7 +638,7 @@ gboolean _allowed(SchNode *node, GstRTPBuffer *rtp, guint8 flag_restriction)
 
   for(it = node->subflows; it; it = it->next){
     subflow = it->data;
-    if(flag_restriction <= subflow->flags_value && mprtps_path_approve_request(subflow->path, rtp->buffer)){
+    if(flag_restriction <= subflow->flags_value && mprtps_path_approve_request(subflow->path, rtp)){
       return TRUE;
     }
   }
@@ -736,6 +762,32 @@ _make_subflow (MPRTPSPath * path)
   return result;
 }
 
+guint8 _get_key_restriction(StreamSplitter *this, GstRTPBuffer *rtp)
+{
+  switch(this->keyframe_filtering){
+    case 1:
+      return _vp8_keyframe_filter(rtp) ? this->max_flag : 0;
+    case 0:
+    default:
+      return 0;
+  }
+  return 0;
+}
+
+gboolean
+_vp8_keyframe_filter(GstRTPBuffer *rtp)
+{
+  guint8 *p;
+  gboolean is_keyframe;
+  unsigned long raw;
+  p = gst_rtp_buffer_get_payload(rtp);
+  /* The frame header is defined as a three byte little endian
+  * value
+  */
+  raw = p[0] | (p[1] << 8) | (p[2] << 16);
+  is_keyframe     = !BITS_GET(raw, 0, 1);
+  return is_keyframe;
+}
 
 
 static void _log_tree (SchNode * node, gint top, gint level)

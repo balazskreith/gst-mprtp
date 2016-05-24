@@ -70,14 +70,17 @@ function log_bw() {
 
   #setup duration
   DURATION=140
-  OWD=300
+  OWD=50
 
   log_bw 120 2000 $LOGSDIR/veth0.csv
 
   PEER1_SND="$SCRIPTSDIR/sender_1.sh"
   echo "tc qdisc change dev veth0 root handle 1: netem delay "$OWD"ms" > $PEER1_SND
+#  echo "dstat -n -N veth0 --tcp --output tcpstat.csv 1> /dev/null&" >> $PEER1_SND
+  echo "sar -n TCP 1 100 | tr -s \" \" \",\" > tcpstat.csv &" >> $PEER1_SND 
   echo -n "./$SENDER" >> $PEER1_SND
   ./$TESTDIR/peer1params.sh >> $PEER1_SND
+  echo "" >> $PEER1_SND
   chmod 777 $PEER1_SND
 
   PEER1_RCV="$SCRIPTSDIR/receiver_1.sh"
@@ -94,18 +97,16 @@ function log_bw() {
   sudo ip netns exec $NSSND iperf -c 10.0.0.2 -t 120 -p 1234&
 
   echo "
+  rm tcpstat.csv
   while true; do 
     ./$TESTDIR/plots.sh --srcdir $LOGSDIR --dstdir $REPORTSDIR
     #./$TESTDIR/stats.sh --srcdir $LOGSDIR --dst $REPORTSDIR/$STATFILE
-    #mv $LOGSDIR/ccparams_1.log $REPORTSDIR/ccparams_1.log
-    #./$TESTDIR/report.sh --srcdir $REPORTSDIR --author $REPORTAUTHORFILE --dst $REPORTEXFILE
-    #./$SCRIPTSDIR/pdflatex.sh $REPORTEXFILE
-
-    #mv $REPORTPDF $REPORTSDIR/$REPORTPDF
     sleep $REPPERIOD
   done
 
   " > scripts/auto_rep_generator.sh
+
+#    tail -n 3 $LOGSDIR/tcpstat1.csv > $LOGSDIR/tcpstat.csv
 
   chmod 777 scripts/auto_rep_generator.sh
 
@@ -116,6 +117,7 @@ cleanup()
   pkill receiver
   pkill sender
   pkill iperf
+  pkill dstat
   ps -ef | grep 'veth_ctrler.sh' | grep -v grep | awk '{print $2}' | xargs kill
   ps -ef | grep 'report_generato' | grep -v grep | awk '{print $2}' | xargs kill
   ps -ef | grep 'main.sh' | grep -v grep | awk '{print $2}' | xargs kill
@@ -135,6 +137,7 @@ trap control_c SIGINT
 ./$SCRIPTSDIR/auto_rep_generator.sh  > report.log &
 
 sleep $DURATION
+tail tcpstat.csv -n +4 | head -n -3 > $LOGSDIR/tcpstat.csv
 
 if [ "$SAVDIR" != "0" ]
 then

@@ -1226,14 +1226,13 @@ _mprtpplayouter_process_run (void *data)
       mprtp = packetsrcvqueue_pop_urgent(this->rcvqueue)){
       buffer = mprtp->buffer;
       _trash_mprtp_buffer(this, mprtp);
+//      g_print("pushed urgently towards %d-%hu-%hu\n", mprtp->subflow_id, mprtp->subflow_seq, mprtp->abs_seq);
       gst_pad_push (this->mprtp_srcpad, buffer);
-
   }
 
   if(now < this->playout_point){
     goto done;
   }
-  packetsrcvqueue_refresh(this->rcvqueue);
   this->playout_point = packetsrcvqueue_get_playout_point(this->rcvqueue);
 
 again:
@@ -1258,7 +1257,7 @@ again:
   }else{
       ++this->expected_seq;
   }
-
+//  g_print("pushed normally towards %d-%hu-%hu\n", mprtp->subflow_id, mprtp->subflow_seq, mprtp->abs_seq);
   _trash_mprtp_buffer(this, mprtp);
   if(!buffer) {
     goto done;

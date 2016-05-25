@@ -713,6 +713,7 @@ void
 _join_subflow (GstMprtpscheduler * this, guint subflow_id)
 {
   MPRTPSPath *path;
+  g_print("join subflow %d\n", subflow_id);
   path = _get_path(this, subflow_id);
   if (path != NULL) {
       GST_WARNING_OBJECT (this, "Join operation can not be done "
@@ -1133,9 +1134,6 @@ void _change_sending_rate(GstMprtpscheduler * this, guint8 subflow_id, gint32 ta
       continue;
     }
     mprtps_path_set_target_bitrate(path, target_bitrate);
-    if(subflow_match){
-      break;
-    }
   }
 }
 
@@ -1154,9 +1152,6 @@ void _change_keep_alive_period(GstMprtpscheduler * this, guint8 subflow_id, GstC
       continue;
     }
     mprtps_path_set_keep_alive_period(path, period);
-    if(subflow_match){
-      break;
-    }
   }
 }
 
@@ -1189,6 +1184,7 @@ _mprtpscheduler_send_buffer (GstMprtpscheduler * this, GstBuffer *buffer)
   mprtps_path_process_rtp_packet(path, buffer, &fec_request);
   _setup_timestamp(this, buffer);
 
+//  g_print("sent on: %d\n", path->id);
   fec_request |= mprtps_path_request_keep_alive(path);
   if(this->enable_fec || 0 < this->fec_interval){
     fecencoder_add_rtpbuffer(this->fec_encoder, buffer);

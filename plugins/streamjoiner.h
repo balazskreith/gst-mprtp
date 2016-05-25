@@ -26,8 +26,8 @@ typedef struct _StreamJoinerClass StreamJoinerClass;
 #define MPRTP_SENDER_SCHTREE_MAX_PATH_NUM 32
 #define MAX_SKEWS_ARRAY_LENGTH 256
 
-typedef struct _FrameNode FrameNode;
-typedef struct _Frame Frame;
+//typedef struct _FrameNode FrameNode;
+//typedef struct _Frame Frame;
 
 
 struct _StreamJoiner
@@ -50,7 +50,15 @@ struct _StreamJoiner
   guint                packets_in_queue;
 
   PacketsRcvQueue*     rcvqueue;
-  GQueue*              retained_buffers;
+
+  guint32              next_ts;
+  gboolean             frame_ended;
+  gboolean             frame_is_dirty;
+  GQueue*              frame;
+  GstMpRTPBuffer*      ts_packet;
+  GstClockTime         frame_started;
+  gboolean             HSSN_initialized;
+  guint16              HSSN;
 
 };
 struct _StreamJoinerClass{

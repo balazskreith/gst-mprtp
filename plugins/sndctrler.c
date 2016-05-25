@@ -711,8 +711,8 @@ void _emit_signal(SndController* this)
   gboolean emit_signal = FALSE;
   _subflow_iterator(this, _emit_signal_helper, &emit_signal);
 
-  emit_signal |= this->target_bitrate_t1 * 1.1 < this->target_bitrate;
-  emit_signal |= this->target_bitrate < this->target_bitrate_t1 * .9;
+  emit_signal |= this->target_bitrate_t1 * 1.05 < this->target_bitrate;
+  emit_signal |= this->target_bitrate < this->target_bitrate_t1 * .95;
 
   if(!emit_signal){
     goto done;

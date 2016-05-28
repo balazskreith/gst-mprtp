@@ -207,6 +207,10 @@ _get_next_path (
     GstRTPBuffer * rtp);
 
 static void
+_logging_csv(
+    gpointer data);
+
+static void
 _logging(
     gpointer data);
 
@@ -255,6 +259,7 @@ stream_splitter_init (StreamSplitter * this)
   this->made                   = _now(this);
 
   g_rw_lock_init (&this->rwmutex);
+  mprtp_logger_add_logging_fnc(_logging_csv, this, 1, &this->rwmutex);
 }
 
 void
@@ -830,6 +835,22 @@ static void _log_subflow(Subflow *subflow, gpointer data)
                subflow->weight
                );
 
+}
+
+static void _log_subflow_csv(Subflow *subflow, gpointer data)
+{
+  mprtp_logger("streamsplitter.csv",
+                   "%f,"
+                   ,
+                   subflow->weight
+                   );
+}
+
+void _logging_csv(gpointer data)
+{
+  StreamSplitter *this = data;
+  _iterate_subflows(this, _log_subflow_csv, this);
+  mprtp_logger("streamsplitter.csv","\n");
 }
 
 void _logging(gpointer data)

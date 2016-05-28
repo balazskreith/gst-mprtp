@@ -333,7 +333,11 @@ void _logging_process(void *data)
       if(subscription->rwmutex){
         g_rw_lock_writer_lock(subscription->rwmutex);
       }
-      subscription->logging_fnc(subscription->data);
+      if(!subscription->data){
+        g_warning("subscripted logging function data param is NULL. Potentional nightmare might ended up with segfault.");
+      }else{
+        subscription->logging_fnc(subscription->data);
+      }
       if(subscription->rwmutex){
         g_rw_lock_writer_unlock(subscription->rwmutex);
       }

@@ -190,7 +190,7 @@ static int spike_delay_th       = 150;
 static int spike_var_th         = 32;
 static int rtcp_interval_type   = 2;
 static int report_timeout       = 0;
-static int controlling_mode     = 2;
+static int controlling_mode     = 1;
 static int sending_target       = 500000;
 static int path1_active         = 1;
 static int path2_active         = 1;
@@ -205,8 +205,8 @@ static int join_max_th          = 300;
 static int join_window_th       = 60;
 static double join_betha_factor = 1.1;
 static int retain_time = 0;
-static int playout_max_rate  = 70;
-static int playout_min_rate = 10;
+static int playout_high_watermark = 0;
+static int playout_low_watermark  = 0;
 static int playout_desired_framenum   = 3;
 static double playout_spread_factor = 1.1;
 static int mpath_keyfiltering = 0;
@@ -237,8 +237,8 @@ static GOptionEntry entries[] =
     { "join_max_th", 0, 0, G_OPTION_ARG_INT, &join_max_th, "join_max_th", NULL },
     { "join_window_th", 0, 0, G_OPTION_ARG_INT, &join_window_th, "join_window_th", NULL },
     { "join_betha_factor", 0, 0, G_OPTION_ARG_DOUBLE, &join_betha_factor, "join_betha_factor", NULL },
-    { "playout_max_rate", 0, 0, G_OPTION_ARG_INT, &playout_max_rate, "playout_max_rate", NULL },
-    { "playout_min_rate", 0, 0, G_OPTION_ARG_INT, &playout_min_rate, "playout_min_rate", NULL },
+    { "playout_high_watermark", 0, 0, G_OPTION_ARG_INT, &playout_high_watermark, "playout_high_watermark", NULL },
+    { "playout_low_watermark", 0, 0, G_OPTION_ARG_INT, &playout_low_watermark, "playout_low_watermark", NULL },
     { "playout_desired_framenum", 0, 0, G_OPTION_ARG_INT, &playout_desired_framenum, "playout_desired_framenum", NULL },
     { "playout_spread_factor", 0, 0, G_OPTION_ARG_DOUBLE, &playout_spread_factor, "playout_spread_factor", NULL },
     { "obsolation_th", 0, 0, G_OPTION_ARG_INT, &obsolation_th, "obsolation_th", NULL },

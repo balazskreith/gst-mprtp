@@ -20,7 +20,7 @@ typedef struct _SubflowRateControllerClass SubflowRateControllerClass;
 
 typedef enum{
   SUBRATECTRLER_NO_CTRL     = 0,
-  SUBRATECTRLER_FBRA_MARC   = 2,
+  SUBRATECTRLER_FBRA   = 2,
 }SubRateControllerType;
 
 

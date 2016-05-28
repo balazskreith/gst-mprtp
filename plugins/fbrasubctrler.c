@@ -1272,7 +1272,7 @@ void fbrasubctrler_logging(FBRASubController *this)
 
                );
 
-  _params_out(this);
+  DISABLE_LINE _params_out(this);
 }
 
 

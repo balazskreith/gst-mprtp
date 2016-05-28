@@ -32,33 +32,27 @@ struct _PacketsRcvQueue
   GstClockTime               made;
   GRWLock                    rwmutex;
 
-  GQueue*                    urgent;
-  GQueue*                    normal;
+  GQueue*                    discarded;
+  GQueue*                    packets;
 
   gboolean                   playout_allowed;
 
   gint                       desired_framenum;
-  GstClockTime               min_playoutrate;
-  GstClockTime               max_playoutrate;
+  GstClockTime               high_watermark;
+  GstClockTime               low_watermark;
   gdouble                    spread_factor;
 
-  GstClockTime               last_normal_pushed;
-  GstClockTime               last_playout_point;
+  gboolean                   hwmark_reached;
+
+  guint32                    playout_ts;
+  guint16                    HSSN;
+  gboolean                   HSSN_initialized;
 
   GstClockTime               playout_rate;
   guint32                    played_timestamp;
 
   gboolean                   flush;
-  GstClockTime               sampling_t1;
-  GstClockTime               sampling_t2;
-  GstClockTime               sampling_updated;
-  GstClockTime               sampling_checked;
 
-  PercentileTracker*         dsampling;
-  GstClockTime               mean_rate;
-
-  gdouble                    sndsum;
-  guint                      sndnum;
 };
 
 
@@ -76,14 +70,12 @@ void packetsrcvqueue_reset(PacketsRcvQueue *this);
 void packetsrcvqueue_set_playout_allowed(PacketsRcvQueue *this, gboolean playout_permission);
 void packetsrcvqueue_set_desired_framenum(PacketsRcvQueue *this, guint desired_framenum);
 void packetsrcvqueue_flush(PacketsRcvQueue *this);
-void packetsrcvqueue_set_min_playoutrate(PacketsRcvQueue *this, GstClockTime min_playoutrate);
-void packetsrcvqueue_set_max_playoutrate(PacketsRcvQueue *this, GstClockTime max_playoutrate);
-void packetsrcvqueue_set_spread_factor(PacketsRcvQueue *this, gdouble spread_factor);
-GstClockTime packetsrcvqueue_get_playout_point(PacketsRcvQueue *this);
-void packetsrcvqueue_push_urgent(PacketsRcvQueue *this, GstMpRTPBuffer *mprtp);
+void packetsrcvqueue_set_high_watermark(PacketsRcvQueue *this, GstClockTime min_playoutrate);
+void packetsrcvqueue_set_low_watermark(PacketsRcvQueue *this, GstClockTime max_playoutrate);
+void packetsrcvqueue_push_discarded(PacketsRcvQueue *this, GstMpRTPBuffer *mprtp);
 void packetsrcvqueue_push(PacketsRcvQueue *this, GstMpRTPBuffer* buffer);
-GstMpRTPBuffer * packetsrcvqueue_pop_normal(PacketsRcvQueue *this);
-GstMpRTPBuffer* packetsrcvqueue_pop_urgent(PacketsRcvQueue *this);
+GstMpRTPBuffer *packetsrcvqueue_pop(PacketsRcvQueue *this);
+GstMpRTPBuffer *packetsrcvqueue_pop_discarded(PacketsRcvQueue *this);
 
 
 #endif /* PACKETSRCVQUEUE_H_ */

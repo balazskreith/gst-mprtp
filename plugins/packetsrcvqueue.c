@@ -44,23 +44,6 @@
 #define THIS_WRITEUNLOCK(this)
 
 
-//typedef struct _FrameNode{
-//  GstMpRTPBuffer* mprtp;
-//  guint16         seq;
-//  gboolean        marker;
-//}FrameNode;
-
-//typedef struct _Frame
-//{
-//  guint32         timestamp;
-//  gboolean        ready;
-//  gboolean        marked;
-//  gboolean        intact;
-//  guint32         last_seq;
-//  GstClockTime    added;
-//  GList*          nodes;
-//}Frame;
-
 static gint
 _cmp_uint16 (guint16 x, guint16 y)
 {
@@ -72,17 +55,16 @@ _cmp_uint16 (guint16 x, guint16 y)
   return 0;
 }
 
-static gint
-_cmp_uint32 (guint32 x, guint32 y)
-{
-  if(x == y) return 0;
-  if(x < y && y - x < 2147483648) return -1;
-  if(x > y && x - y > 2147483648) return -1;
-  if(x < y && y - x > 2147483648) return 1;
-  if(x > y && x - y < 2147483648) return 1;
-  return 0;
-}
-
+//static gint
+//_cmp_uint32 (guint32 x, guint32 y)
+//{
+//  if(x == y) return 0;
+//  if(x < y && y - x < 2147483648) return -1;
+//  if(x > y && x - y > 2147483648) return -1;
+//  if(x < y && y - x > 2147483648) return 1;
+//  if(x > y && x - y < 2147483648) return 1;
+//  return 0;
+//}
 
 GST_DEBUG_CATEGORY_STATIC (packetsrcvqueue_debug_category);
 #define GST_CAT_DEFAULT packetsrcvqueue_debug_category
@@ -121,35 +103,22 @@ packetsrcvqueue_finalize (GObject * object)
   PacketsRcvQueue *this;
   this = PACKETSRCVQUEUE(object);
   g_object_unref(this->sysclock);
-  g_object_unref(this->urgent);
-  g_object_unref(this->normal);
+  g_object_unref(this->discarded);
+  g_object_unref(this->packets);
 }
 
-static void _samplings_stat_pipe(gpointer data, PercentileTrackerPipeData* stat)
-{
-  PacketsRcvQueue * this = data;
-  if(!stat->percentile){
-    this->mean_rate = this->max_playoutrate;
-    return;
-  }
-
-  this->mean_rate = stat->percentile;
-}
 
 void
 packetsrcvqueue_init (PacketsRcvQueue * this)
 {
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain();
-  this->urgent = g_queue_new();
-  this->normal = g_queue_new();
+  this->discarded = g_queue_new();
+  this->packets = g_queue_new();
 
-  this->dsampling = make_percentiletracker(100, 50);
-  percentiletracker_set_treshold(this->dsampling, 60 * GST_SECOND);
-  percentiletracker_set_stats_pipe(this->dsampling, _samplings_stat_pipe, this);
   this->desired_framenum = 1;
-  this->min_playoutrate = .01 * GST_SECOND;
-  this->max_playoutrate =  .04 * GST_SECOND;
+  this->high_watermark = .01 * GST_SECOND;
+  this->low_watermark =  .04 * GST_SECOND;
   this->spread_factor = 2.;
 
   DISABLE_LINE mprtp_logger_add_logging_fnc(_csv_logging,this, 1, &this->rwmutex);
@@ -192,18 +161,18 @@ packetsrcvqueue_set_desired_framenum(PacketsRcvQueue *this, guint desired_framen
 
 
 void
-packetsrcvqueue_set_min_playoutrate(PacketsRcvQueue *this, GstClockTime min_playoutrate)
+packetsrcvqueue_set_high_watermark(PacketsRcvQueue *this, GstClockTime high_watermark)
 {
   THIS_WRITELOCK (this);
-  this->min_playoutrate = min_playoutrate;
+  this->high_watermark = high_watermark;
   THIS_WRITEUNLOCK (this);
 }
 
 void
-packetsrcvqueue_set_max_playoutrate(PacketsRcvQueue *this, GstClockTime max_playoutrate)
+packetsrcvqueue_set_low_watermark(PacketsRcvQueue *this, GstClockTime low_watermark)
 {
   THIS_WRITELOCK (this);
-  this->max_playoutrate = max_playoutrate;
+  this->low_watermark = low_watermark;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -215,52 +184,6 @@ packetsrcvqueue_flush(PacketsRcvQueue *this)
   THIS_WRITEUNLOCK (this);
 }
 
-void
-packetsrcvqueue_set_spread_factor(PacketsRcvQueue *this, gdouble spread_factor)
-{
-  THIS_WRITELOCK (this);
-  this->spread_factor = spread_factor;
-  THIS_WRITEUNLOCK (this);
-}
-
-GstClockTime
-packetsrcvqueue_get_playout_point(PacketsRcvQueue *this)
-{
-  gdouble factor = 1.0;
-  THIS_WRITELOCK (this);
-  if(this->sampling_checked < this->sampling_updated){
-    percentiletracker_add(this->dsampling, this->sampling_t1 - this->sampling_t2);
-  }
-  this->sampling_checked = _now(this);
-  if(!this->mean_rate){
-    this->last_playout_point = _now(this) + this->max_playoutrate;
-    goto done;
-  }
-
-  if(this->last_normal_pushed < this->last_playout_point){
-    factor = this->spread_factor;
-  }
-
-  this->playout_rate = CONSTRAIN(this->min_playoutrate, this->max_playoutrate, this->mean_rate * factor);
-  this->last_playout_point = _now(this) + this->playout_rate;
-done:
-//  g_print("mean rate: %lu mn: %lu mx: %lu play: %lu => factor: %f\n",
-//          this->mean_rate,
-//          this->min_playoutrate,
-//          this->max_playoutrate,
-//          this->playout_rate,
-//          factor);
-  THIS_WRITEUNLOCK (this);
-  return this->last_playout_point;
-}
-
-void packetsrcvqueue_push_urgent(PacketsRcvQueue *this, GstMpRTPBuffer *mprtp)
-{
-  THIS_WRITELOCK(this);
-  g_queue_push_tail(this->urgent, mprtp);
-  THIS_WRITEUNLOCK(this);
-}
-
 static gint _mprtp_queue_sort_helper(gconstpointer a, gconstpointer b, gpointer user_data)
 {
   const GstMpRTPBuffer *ai = a;
@@ -268,64 +191,70 @@ static gint _mprtp_queue_sort_helper(gconstpointer a, gconstpointer b, gpointer 
   return _cmp_uint16(ai->abs_seq, bi->abs_seq);
 }
 
-void packetsrcvqueue_push(PacketsRcvQueue *this, GstMpRTPBuffer *mprtp)
+void packetsrcvqueue_push_discarded(PacketsRcvQueue *this, GstMpRTPBuffer *mprtp)
 {
-  GstMpRTPBuffer *item;
+  GstMpRTPBuffer *head;
   THIS_WRITELOCK(this);
-  //Decide weather it is urgent or not
-  if(g_queue_is_empty(this->normal)){
-    this->last_normal_pushed = _now(this);
-    g_queue_push_tail(this->normal, mprtp);
+  if(g_queue_is_empty(this->packets)){
+    g_queue_push_tail(this->packets, mprtp);
     goto done;
   }
-  item = g_queue_peek_head(this->normal);
-  if(_cmp_uint32(mprtp->timestamp, item->timestamp) < 0){
-    g_queue_push_tail(this->urgent, mprtp);
+  head = g_queue_peek_head(this->packets);
+  if(_cmp_uint16(mprtp->abs_seq, head->abs_seq) < 0){
+    g_queue_push_tail(this->discarded, mprtp);
     goto done;
   }
-  this->last_normal_pushed = _now(this);
-  item = g_queue_peek_tail(this->normal);
-  if(_cmp_uint16(item->abs_seq + 1, mprtp->abs_seq) == 0){
-    g_queue_push_tail(this->normal, mprtp);
-  }else{
-    g_queue_insert_sorted(this->normal, mprtp, _mprtp_queue_sort_helper, NULL);
-  }
+  g_queue_insert_sorted(this->packets, mprtp, _mprtp_queue_sort_helper, NULL);
 done:
   THIS_WRITEUNLOCK(this);
 }
 
-GstMpRTPBuffer* packetsrcvqueue_pop_normal(PacketsRcvQueue *this)
+
+void packetsrcvqueue_push(PacketsRcvQueue *this, GstMpRTPBuffer *mprtp)
+{
+  THIS_WRITELOCK(this);
+//  g_print("%hu is transferred at %d\n", mprtp->abs_seq, mprtp->subflow_id);
+  g_queue_push_tail(this->packets, mprtp);
+  THIS_WRITEUNLOCK(this);
+}
+
+GstMpRTPBuffer* packetsrcvqueue_pop(PacketsRcvQueue *this)
 {
   GstMpRTPBuffer *result = NULL;
+  gint32 packets_num = 0;
   THIS_WRITELOCK(this);
-  if(!this->playout_allowed || g_queue_is_empty(this->normal)){
+  if(!this->playout_allowed || g_queue_is_empty(this->packets)){
     goto done;
   }
-  result = g_queue_pop_head(this->normal);
-  if(this->played_timestamp == result->timestamp){
-    this->sndsum += get_epoch_time_from_ntp_in_ns(result->abs_snd_ntp_time);
-    ++this->sndnum;
-  }else{
-    this->sampling_t2 = this->sampling_t1;
-    this->sampling_t1 = this->sndsum / (gdouble)this->sndnum;
-    this->sndnum = 0.;
-    this->sndsum = 0;
-    this->sampling_updated = this->sampling_t1 && this->sampling_t2 ? _now(this) : 0;
+  if(!this->low_watermark || !this->high_watermark){
+    result = g_queue_pop_head(this->packets);
+    goto done;
   }
-  this->played_timestamp = result->timestamp;
+
+  packets_num = g_queue_get_length(this->packets);
+  if(!this->hwmark_reached){
+    if(this->high_watermark < packets_num){
+       this->hwmark_reached = TRUE;
+    }
+    goto done;
+  }
+  if(packets_num < this->low_watermark){
+    this->hwmark_reached = FALSE;
+  }
+  result = g_queue_pop_head(this->packets);
 done:
   THIS_WRITEUNLOCK(this);
   return result;
 }
 
-GstMpRTPBuffer* packetsrcvqueue_pop_urgent(PacketsRcvQueue *this)
+GstMpRTPBuffer* packetsrcvqueue_pop_discarded(PacketsRcvQueue *this)
 {
   GstMpRTPBuffer *result = NULL;
   THIS_WRITELOCK(this);
-  if(!this->playout_allowed || g_queue_is_empty(this->urgent)){
+  if(!this->playout_allowed || g_queue_is_empty(this->discarded)){
     goto done;
   }
-  result = g_queue_pop_head(this->urgent);
+  result = g_queue_pop_head(this->discarded);
 done:
   THIS_WRITEUNLOCK(this);
   return result;
@@ -347,9 +276,8 @@ void _readable_logging(gpointer data)
   mprtp_logger("packetsrcvqueue.log",
                "----------------------------------------------------\n"
                "Seconds: %lu\n"
-               "Min playoutrate: %lu\n"
-               "Max playoutrate: %lu\n"
-               "Mean playoutrate: %lu\n"
+               "high_watermark: %lu\n"
+               "low_watermark: %lu\n"
                "Actual playoutrate: %lu\n"
                "desired framenum: %d\n"
                "Flush: %d\n"
@@ -358,9 +286,8 @@ void _readable_logging(gpointer data)
                ,
 
                GST_TIME_AS_SECONDS(_now(this) - this->made),
-               this->min_playoutrate,
-               this->max_playoutrate,
-               this->mean_rate,
+               this->high_watermark,
+               this->low_watermark,
                this->playout_rate,
                this->desired_framenum,
                this->flush,

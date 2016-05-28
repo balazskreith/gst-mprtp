@@ -68,13 +68,12 @@ struct _Subflow
 {
   guint8 id;
   MpRTPRPath  *path;
-  guint        bytes_in_queue;
-  guint        packets_in_queue;
-
-  GQueue*      packets;
 };
 
-
+typedef struct _Packet{
+  gboolean        timegrab;
+  GstMpRTPBuffer *mprtp;
+}Packet;
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
@@ -108,16 +107,16 @@ _cmp_seq (guint16 x, guint16 y)
   return 0;
 }
 
-static gint
-_cmp_ts (guint32 x, guint32 y)
-{
-  if(x == y) return 0;
-  if(x < y && y - x < 2147483648) return -1;
-  if(x > y && x - y > 2147483648) return -1;
-  if(x < y && y - x > 2147483648) return 1;
-  if(x > y && x - y < 2147483648) return 1;
-  return 0;
-}
+//static gint
+//_cmp_ts (guint32 x, guint32 y)
+//{
+//  if(x == y) return 0;
+//  if(x < y && y - x < 2147483648) return -1;
+//  if(x > y && x - y > 2147483648) return -1;
+//  if(x < y && y - x > 2147483648) return 1;
+//  if(x > y && x - y < 2147483648) return 1;
+//  return 0;
+//}
 
 
 //----------------------------------------------------------------------
@@ -143,7 +142,6 @@ stream_joiner_finalize (GObject * object)
   StreamJoiner *this = STREAM_JOINER (object);
   g_hash_table_destroy (this->subflows);
   g_object_unref (this->sysclock);
-  g_object_unref(this->frame);
   g_object_unref(this->rcvqueue);
 }
 
@@ -185,15 +183,17 @@ static void _delays_stat_pipe(gpointer data, PercentileTrackerPipeData* stat)
 void
 stream_joiner_init (StreamJoiner * this)
 {
-  this->sysclock = gst_system_clock_obtain ();
-  this->subflows = g_hash_table_new_full (NULL, NULL, NULL, _ruin_subflow);
-  this->made              = _now(this);
-  this->join_delay        = 0;
-  this->join_max_treshold = MAX_TRESHOLD_TIME;
-  this->join_min_treshold = MIN_TRESHOLD_TIME;
-  this->betha             = BETHA_FACTOR;
-  this->frame             = g_queue_new();
-  this->HSSN_initialized  = FALSE;
+  this->sysclock           = gst_system_clock_obtain ();
+  this->subflows           = g_hash_table_new_full (NULL, NULL, NULL, _ruin_subflow);
+  this->made               = _now(this);
+  this->join_delay         = 0;
+  this->join_max_treshold  = MAX_TRESHOLD_TIME;
+  this->join_min_treshold  = MIN_TRESHOLD_TIME;
+  this->betha              = BETHA_FACTOR;
+  this->HFSN_initialized   = FALSE;
+  this->flush              = FALSE;
+  this->packets_by_arrival = g_queue_new();
+  this->packets_by_seq     = g_queue_new();
   g_rw_lock_init (&this->rwmutex);
 
   this->delays = make_percentiletracker(4096, 80);
@@ -212,174 +212,87 @@ make_stream_joiner(PacketsRcvQueue *rcvqueue)
   return result;
 }
 
-static void _get_ts_packet(Subflow *subflow, gpointer data)
-{
-  StreamJoiner *this = data;
-  GstMpRTPBuffer *mprtp;
-  if(g_queue_is_empty(subflow->packets) || this->ts_packet){
-    goto done;
-  }
-  mprtp = g_queue_peek_head(subflow->packets);
-  if(mprtp->timestamp != this->next_ts){
-    goto done;
-  }
-  this->ts_packet = g_queue_pop_head(subflow->packets);
-done:
-  return;
-}
-
-
-static gint _frame_queue_sort_helper(gconstpointer a, gconstpointer b, gpointer user_data)
-{
-  const GstMpRTPBuffer *ai = a;
-  const GstMpRTPBuffer *bi = b;
-  return _cmp_seq(ai->abs_seq, bi->abs_seq);
-}
-
-static gboolean _frame_complete(StreamJoiner *this)
-{
-  guint16 hssn;
-  GList *it;
-  GstMpRTPBuffer *mprtp;
-  if(g_queue_is_empty(this->frame)){
-    return FALSE;
-  }
-  if(this->frame_is_dirty){
-    g_queue_sort(this->frame, _frame_queue_sort_helper, NULL);
-    this->frame_is_dirty = FALSE;
-  }
-  hssn = this->HSSN;
-  if(!this->HSSN_initialized){
-    mprtp = g_queue_peek_head(this->frame);
-    hssn = mprtp->abs_seq;
-    --hssn;
-  }
-  for(it = g_queue_peek_head_link(this->frame); it; it = it->next){
-    //Todo: check weather this goes to the right direction
-    mprtp = it->data;
-    if((guint16)(hssn + 1) != mprtp->abs_seq){
-      return FALSE;
-    }
-    ++hssn;
-  }
-
-//  g_print("frame is complete and the frame is ended: %d->HSSN: %hu frame first: %hu last: %hu\n",
-//          this->frame_ended,
-//          this->HSSN,
-//          ((GstMpRTPBuffer*) g_queue_peek_head(this->frame))->abs_seq,
-//          ((GstMpRTPBuffer*) g_queue_peek_tail(this->frame))->abs_seq);
-
-  return TRUE;
-}
-
-static void _set_next_ts(Subflow *subflow, gpointer data)
-{
-  StreamJoiner *this = data;
-  GstMpRTPBuffer *mprtp;
-  if(g_queue_is_empty(subflow->packets)){
-    goto done;
-  }
-  mprtp = g_queue_peek_head(subflow->packets);
-  if(this->next_ts == 0 || _cmp_ts(mprtp->timestamp, this->next_ts) < 0){
-    this->next_ts = mprtp->timestamp;
-  }
-done:
-  return;
-}
-
 void stream_joiner_transfer(StreamJoiner *this)
 {
   GstMpRTPBuffer *mprtp = NULL;
-  GstClockTime join_th;
+  GstClockTime tail_rcvd, head_rcvd;
+  Packet* packet;
 
   THIS_WRITELOCK (this);
-  if(!this->next_ts){
-    goto done;
+  if(g_queue_is_empty(this->packets_by_arrival)){
+    goto transfer;
   }
-  do{
-    this->ts_packet = NULL;
-    _iterate_subflows(this, _get_ts_packet, this);
-    if(!this->ts_packet){
+  packet = g_queue_peek_tail(this->packets_by_arrival);
+  mprtp  = packet->mprtp;
+  tail_rcvd = get_epoch_time_from_ntp_in_ns(mprtp->abs_rcv_ntp_time);
+
+  while(!g_queue_is_empty(this->packets_by_arrival)){
+    packet = g_queue_peek_head(this->packets_by_arrival);
+    mprtp = packet->mprtp;
+    head_rcvd = get_epoch_time_from_ntp_in_ns(mprtp->abs_rcv_ntp_time);
+    if(tail_rcvd - head_rcvd < this->join_delay && !this->flush){
       break;
     }
-    if(g_queue_is_empty(this->frame)){
-      this->frame_started = _now(this);
-    }
-    mprtp = this->ts_packet;
-    this->frame_ended |= mprtp->marker;
-    g_queue_push_tail(this->frame, mprtp);
-    this->frame_is_dirty = TRUE;
-  }while(this->ts_packet);
-
-  join_th = _now(this) - this->join_delay;
-  g_print("frame elapsed: %lu - join delay: %lu frame complete: %d frame ended: %d ts: %d\n",
-          _now(this) - this->frame_started, this->join_delay,
-          _frame_complete(this), this->frame_ended, this->next_ts);
-  if(join_th < this->frame_started){
-    if(!this->frame_ended || !_frame_complete(this)){
-      goto done;
-    }
-  }else if(this->frame_is_dirty){
-    g_queue_sort(this->frame, _frame_queue_sort_helper, NULL);
-    this->frame_is_dirty = FALSE;
+    packet->timegrab = FALSE;
+    g_queue_pop_head(this->packets_by_arrival);
   }
-  g_print("playout point %lu\n", _now(this));
-  while(!g_queue_is_empty(this->frame)){
-    mprtp = g_queue_pop_head(this->frame);
-    this->HSSN = mprtp->abs_seq;
-    this->HSSN_initialized = TRUE;
+
+transfer:
+  while(!g_queue_is_empty(this->packets_by_seq)){
+    packet = g_queue_peek_head(this->packets_by_seq);
+    if(packet->timegrab){
+      break;
+    }
+    packet = g_queue_pop_head(this->packets_by_seq);
+    mprtp = packet->mprtp;
+    g_slice_free(Packet, packet);
+    this->HFSN = mprtp->abs_seq;
+    this->HFSN_initialized = TRUE;
     packetsrcvqueue_push(this->rcvqueue, mprtp);
   }
-  this->next_ts = 0;
-  _iterate_subflows(this, _set_next_ts, this);
-  this->frame_ended = FALSE;
-
-done:
   THIS_WRITEUNLOCK (this);
 }
 
 static gint _packets_queue_sort_helper(gconstpointer a, gconstpointer b, gpointer user_data)
 {
-  const GstMpRTPBuffer *ai = a;
-  const GstMpRTPBuffer *bi = b;
-  return _cmp_seq(ai->abs_seq, bi->abs_seq);
+  const Packet *ai = a;
+  const Packet *bi = b;
+  return _cmp_seq(ai->mprtp->abs_seq, bi->mprtp->abs_seq);
 }
 
 void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
 {
   Subflow *subflow;
-  GstMpRTPBuffer *item = NULL;
+  Packet* packet;
 
   THIS_WRITELOCK(this);
   mprtp->buffer = gst_buffer_ref(mprtp->buffer);
   subflow = (Subflow *) g_hash_table_lookup (this->subflows, GINT_TO_POINTER (mprtp->subflow_id));
   if(!subflow){
-    GST_WARNING_OBJECT(this, "the incoming packet belongs to a subflow (%d) not added to StreamJoiner", mprtp->subflow_id);
+//      g_print("subflow is not found %d\n", mprtp->subflow_id);
+    GST_WARNING_OBJECT(this, "the incoming packet belongs to a subflow (%d), which is not added to StreamJoiner", mprtp->subflow_id);
     packetsrcvqueue_push(this->rcvqueue, mprtp);
     goto done;
   }
   mprtpr_path_process_rtp_packet(subflow->path, mprtp);
-  if(this->HSSN_initialized && _cmp_seq(mprtp->abs_seq, this->HSSN) < 0){
-      packetsrcvqueue_push_urgent(this->rcvqueue, mprtp);
+//  g_print("inserted %hu - %d\n", mprtp->abs_seq, mprtp->subflow_id);
+//  subflow->payload_bytes += mprtp->payload_bytes;
+//  g_print("%d bytes: %u\n", subflow->id, subflow->payload_bytes);
+  if(this->HFSN_initialized && _cmp_seq(mprtp->abs_seq, this->HFSN) < 0){
+    packetsrcvqueue_push_discarded(this->rcvqueue, mprtp);
     goto done;
   }
-  g_queue_insert_sorted(subflow->packets, mprtp, _packets_queue_sort_helper, NULL);
+  packet = g_slice_new0(Packet);
+  packet->timegrab = TRUE;
+  packet->mprtp    = mprtp;
+  g_queue_push_tail(this->packets_by_arrival, packet);
+  g_queue_insert_sorted(this->packets_by_seq, packet, _packets_queue_sort_helper, NULL);
 
-  item = g_queue_peek_head(subflow->packets);
-  if(this->next_ts == 0 || _cmp_ts(item->timestamp, this->next_ts) < 0){
-    this->next_ts = item->timestamp;
-  }
-//
-//  g_print("queue for subflow %d length: %d bytes: %d\n",
-//          subflow->id,
-//          subflow->packets_in_queue,
-//          subflow->bytes_in_queue
-//  );
-
-  subflow->bytes_in_queue += mprtp->payload_bytes;
-  ++subflow->packets_in_queue;
   if(!mprtpr_path_is_in_spike_mode(subflow->path)){
+//      g_print("path not in spike mode: %d\n", subflow->id);
     percentiletracker_add(this->delays, mprtp->delay);
+  }else{
+//      g_print("path in spike mode: %d\n", subflow->id);
   }
 
 done:
@@ -470,7 +383,6 @@ _make_subflow (MpRTPRPath * path)
   Subflow *result = mprtp_malloc (sizeof (Subflow));
   result->path = path;
   result->id = mprtpr_path_get_id (path);
-  result->packets = g_queue_new();
   return result;
 }
 
@@ -486,7 +398,8 @@ static void _logging_helper(Subflow *subflow, gpointer data)
 {
   gchar filename[255];
   sprintf(filename, "path_%d_joindat.csv", subflow->id);
-  mprtp_logger(filename, "%d,%d\n", subflow->bytes_in_queue, subflow->packets_in_queue);
+  mprtp_logger(filename, "\n");
+  //  mprtp_logger(filename, "\n", subflow->bytes_in_queue, subflow->packets_in_queue);
 }
 
 void _logging(gpointer data)
@@ -494,20 +407,16 @@ void _logging(gpointer data)
   StreamJoiner *this = data;
 
   mprtp_logger("streamjoiner.csv",
-               "%lu,%d\n",
-               this->join_delay,
-               this->bytes_in_queue);
+               "%lu\n",
+               this->join_delay);
 
   _iterate_subflows(this, _logging_helper, this);
 
   mprtp_logger("streamjoiner.log",
                  "###############################################################\n"
                  "Seconds: %lu\n"
-                 "packets_in_queue: %d | bytes_in_queue: %d\n"
                  ,
-                 GST_TIME_AS_SECONDS(_now(this) - this->made),
-                 this->packets_in_queue,
-                 this->bytes_in_queue
+                 GST_TIME_AS_SECONDS(_now(this) - this->made)
                  );
 
 }

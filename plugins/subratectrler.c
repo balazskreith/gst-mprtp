@@ -118,7 +118,7 @@ void subratectrler_time_update(SubflowRateController *this)
   }
 
   switch(this->type){
-    case SUBRATECTRLER_FBRA_MARC:
+    case SUBRATECTRLER_FBRA:
       fbrasubctrler_time_update(this->controller);
       break;
     default:
@@ -140,7 +140,7 @@ void subratectrler_signal_update(SubflowRateController *this, MPRTPSubflowRateCo
   }
 
   switch(this->type){
-    case SUBRATECTRLER_FBRA_MARC:
+    case SUBRATECTRLER_FBRA:
       fbrasubctrler_signal_update(this->controller, &params->fbra);
       break;
     default:
@@ -162,7 +162,7 @@ void subratectrler_signal_request(SubflowRateController *this, MPRTPSubflowRateC
   }
 
   switch(this->type){
-    case SUBRATECTRLER_FBRA_MARC:
+    case SUBRATECTRLER_FBRA:
       fbrasubctrler_signal_request(this->controller, &params->fbra);
       break;
     default:
@@ -198,7 +198,7 @@ void subratectrler_report_update(
   }
 
   switch(this->type){
-    case SUBRATECTRLER_FBRA_MARC:
+    case SUBRATECTRLER_FBRA:
       fbrasubctrler_report_update(this->controller, summary);
       break;
     default:
@@ -224,7 +224,7 @@ gboolean subratectrler_packet_approver(
     goto done;
   }
   switch(this->type){
-    case SUBRATECTRLER_FBRA_MARC:
+    case SUBRATECTRLER_FBRA:
       result = fbrasubctrler_path_approver(this->controller, rtp);
       break;
     default:
@@ -244,7 +244,7 @@ done:
 void _enable(SubflowRateController *this)
 {
   switch(this->type){
-    case SUBRATECTRLER_FBRA_MARC:
+    case SUBRATECTRLER_FBRA:
       this->controller = make_fbrasubctrler(this->path);
       fbrasubctrler_enable(this->controller);
       break;
@@ -259,7 +259,7 @@ void _enable(SubflowRateController *this)
 void _disable(SubflowRateController *this)
 {
   switch(this->type){
-    case SUBRATECTRLER_FBRA_MARC:
+    case SUBRATECTRLER_FBRA:
       fbrasubctrler_disable(this->controller);
       g_object_unref(this->controller);
       break;
@@ -276,9 +276,13 @@ _logging(
     gpointer data)
 {
   SubflowRateController *this = data;
+  if(!this->controller){
+    g_warning("No controller for logging");
+    return;
+  }
 
   switch(this->type){
-    case SUBRATECTRLER_FBRA_MARC:
+    case SUBRATECTRLER_FBRA:
       fbrasubctrler_logging(this->controller);
       break;
     default:
@@ -292,8 +296,13 @@ _log2csv(
     gpointer data)
 {
   SubflowRateController *this = data;
+  if(!this->controller){
+    g_warning("No controller for logging");
+    return;
+  }
+
   switch(this->type){
-    case SUBRATECTRLER_FBRA_MARC:
+    case SUBRATECTRLER_FBRA:
       fbrasubctrler_logging2csv(this->controller);
       break;
     default:

@@ -292,7 +292,7 @@ static void _change_controlling_mode(Subflow *this, guint controlling_mode)
       subratectrler_change(this->rate_controller, SUBRATECTRLER_NO_CTRL);
       break;
     case 2:
-      subratectrler_change(this->rate_controller, SUBRATECTRLER_FBRA_MARC);
+      subratectrler_change(this->rate_controller, SUBRATECTRLER_FBRA);
       break;
     default:
       g_warning("Unknown controlling mode requested for subflow %d", this->id);

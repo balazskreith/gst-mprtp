@@ -470,6 +470,7 @@ void _pipe_stats(PercentileTracker * this)
   PercentileTrackerPipeData pdata;
   if(!this->stats_pipe) return;
   pdata.percentile = _get_stats(this, &pdata.min, &pdata.max, &pdata.sum);
+  pdata.num = this->Mxc + this->Mnc;
   this->stats_pipe(this->stats_pipe_data, &pdata);
 }
 

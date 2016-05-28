@@ -142,10 +142,9 @@ enum
   PROP_JOIN_MAX_TRESHOLD,
   PROP_JOIN_WINDOW_TRESHOLD,
   PROP_JOIN_BETHA_FACTOR,
-  PROP_PLAYOUT_MAX_RATE,
-  PROP_PLAYOUT_MIN_RATE,
+  PROP_PLAYOUT_LOW_WATERMARK,
+  PROP_PLAYOUT_HIGH_WATERMARK,
   PROP_PLAYOUT_DESIRED_FRAMENUM,
-  PROP_PLAYOUT_SPREAD_FACTOR,
   PROP_SPIKE_DELAY_TRESHOLD,
   PROP_SPIKE_VAR_TRESHOLD,
   PROP_REPAIR_WINDOW_MIN,
@@ -326,17 +325,17 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                                0.0, 10.0, 1.,
                                G_PARAM_WRITABLE  | G_PARAM_STATIC_STRINGS));
 
-    g_object_class_install_property (gobject_class, PROP_PLAYOUT_MAX_RATE,
-           g_param_spec_uint ("playout-max-rate",
-                              "set the maximum playout rate in ms.",
-                              "set the maximum playout rate in ms.",
+    g_object_class_install_property (gobject_class, PROP_PLAYOUT_LOW_WATERMARK,
+           g_param_spec_uint ("playout-low-watermark",
+                              "set the low watermark at playoutqueue.",
+                              "set the low watermark at playoutqueue.",
                               0,
                               4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-      g_object_class_install_property (gobject_class, PROP_PLAYOUT_MIN_RATE,
-           g_param_spec_uint ("playout-min-rate",
-                              "set the minimum playout rate in ms.",
-                              "set the minimum playout rate in ms.",
+      g_object_class_install_property (gobject_class, PROP_PLAYOUT_HIGH_WATERMARK,
+           g_param_spec_uint ("playout-high-watermark",
+                              "set the high watermark at playoutqueue.",
+                              "set the high watermark at playoutqueue.",
                               0,
                               4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
@@ -346,14 +345,6 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
                               "set the desired frame num in the rcvqueue at playout.",
                               0,
                               4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-      g_object_class_install_property (gobject_class, PROP_PLAYOUT_SPREAD_FACTOR,
-            g_param_spec_double ("playout-spread-factor",
-                                 "set the spread factor for playout.",
-                                 "set the spread factor for playout.",
-                                 0.0, 10.0, 1.,
-                                 G_PARAM_WRITABLE  | G_PARAM_STATIC_STRINGS));
-
 
       g_object_class_install_property (gobject_class, PROP_SPIKE_DELAY_TRESHOLD,
            g_param_spec_uint ("spike-delay-treshold",
@@ -586,28 +577,22 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       stream_joiner_set_betha_factor(this->joiner, gdouble_value);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_PLAYOUT_MAX_RATE:
+    case PROP_PLAYOUT_LOW_WATERMARK:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
-      packetsrcvqueue_set_max_playoutrate(this->rcvqueue, (GstClockTime)guint_value * GST_MSECOND);
+      packetsrcvqueue_set_low_watermark(this->rcvqueue, (GstClockTime)guint_value * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
-    case PROP_PLAYOUT_MIN_RATE:
+    case PROP_PLAYOUT_HIGH_WATERMARK:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
-      packetsrcvqueue_set_min_playoutrate(this->rcvqueue, (GstClockTime)guint_value * GST_MSECOND);
+      packetsrcvqueue_set_high_watermark(this->rcvqueue, (GstClockTime)guint_value * GST_MSECOND);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_PLAYOUT_DESIRED_FRAMENUM:
       THIS_WRITELOCK (this);
       guint_value = g_value_get_uint (value);
       packetsrcvqueue_set_desired_framenum(this->rcvqueue, guint_value);
-      THIS_WRITEUNLOCK (this);
-      break;
-    case PROP_PLAYOUT_SPREAD_FACTOR:
-      THIS_WRITELOCK (this);
-      gdouble_value = g_value_get_double (value);
-      packetsrcvqueue_set_spread_factor(this->rcvqueue, gdouble_value);
       THIS_WRITEUNLOCK (this);
       break;
     case PROP_SPIKE_DELAY_TRESHOLD:
@@ -1222,21 +1207,16 @@ _mprtpplayouter_process_run (void *data)
 
   stream_joiner_transfer(this->joiner);
   //flush the urgent queue
-  for(mprtp = packetsrcvqueue_pop_urgent(this->rcvqueue); mprtp;
-      mprtp = packetsrcvqueue_pop_urgent(this->rcvqueue)){
+  for(mprtp = packetsrcvqueue_pop_discarded(this->rcvqueue); mprtp;
+      mprtp = packetsrcvqueue_pop_discarded(this->rcvqueue)){
       buffer = mprtp->buffer;
       _trash_mprtp_buffer(this, mprtp);
 //      g_print("pushed urgently towards %d-%hu-%hu\n", mprtp->subflow_id, mprtp->subflow_seq, mprtp->abs_seq);
       gst_pad_push (this->mprtp_srcpad, buffer);
   }
 
-  if(now < this->playout_point){
-    goto done;
-  }
-  this->playout_point = packetsrcvqueue_get_playout_point(this->rcvqueue);
-
 again:
-  mprtp = packetsrcvqueue_pop_normal(this->rcvqueue);
+  mprtp = packetsrcvqueue_pop(this->rcvqueue);
   if(!mprtp){
     goto done;
   }
@@ -1265,7 +1245,9 @@ again:
 //  if(1 < buffer->mini_object.refcount){
 //    gst_buffer_unref(buffer);
 //  }
+
   gst_pad_push (this->mprtp_srcpad, buffer);
+//  goto done;
   goto again;
 done:
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);

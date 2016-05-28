@@ -46,19 +46,14 @@ struct _StreamJoiner
 
   gdouble              betha;
 
-  guint                bytes_in_queue;
-  guint                packets_in_queue;
+  GQueue*              packets_by_seq;
+  GQueue*              packets_by_arrival;
 
   PacketsRcvQueue*     rcvqueue;
 
-  guint32              next_ts;
-  gboolean             frame_ended;
-  gboolean             frame_is_dirty;
-  GQueue*              frame;
-  GstMpRTPBuffer*      ts_packet;
-  GstClockTime         frame_started;
-  gboolean             HSSN_initialized;
-  guint16              HSSN;
+  gboolean             flush;
+  gboolean             HFSN_initialized;
+  guint16              HFSN;
 
 };
 struct _StreamJoinerClass{

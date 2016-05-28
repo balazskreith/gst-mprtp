@@ -313,8 +313,8 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
                 "join-max-treshold", join_max_th,
                 "join-window-treshold", join_window_th,
                 "join-betha-factor", join_betha_factor,
-                "playout-max-rate", playout_max_rate,
-                "playout-min-rate", playout_min_rate,
+                "playout-high-watermark", playout_high_watermark,
+                "playout-low-watermark", playout_low_watermark,
                 "playout-desired-framenum", playout_desired_framenum,
                 "playout-spread-factor", playout_spread_factor,
                 "logging", logging,
@@ -410,8 +410,8 @@ main (int argc, char **argv)
 
   rtpBin = gst_element_factory_make ("rtpbin", NULL);
   gst_bin_add (GST_BIN (pipe), rtpBin);
-  g_object_set (rtpBin, "latency", 200, "do-retransmission", TRUE,
-      "rtp-profile", GST_RTP_PROFILE_AVPF, NULL);
+//  g_object_set (rtpBin, "latency", 200, "do-retransmission", TRUE,
+//      "rtp-profile", GST_RTP_PROFILE_AVPF, NULL);
 
   videoSession = make_video_session (0);
 

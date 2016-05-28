@@ -24,6 +24,7 @@ typedef struct _PercentileTrackerClass PercentileTrackerClass;
 typedef struct _PercentileTrackerItem PercentileTrackerItem;
 typedef struct _PercentileTrackerPipeData{
   guint64 min,max,sum,percentile;
+  gint32 num;
 }PercentileTrackerPipeData;
 
 struct _PercentileTracker

@@ -76,6 +76,7 @@ struct _GstMprtpplayouter
   gboolean        auto_rate_and_cc;
   gboolean        rtp_passthrough;
 
+  GstClockTime    playout_point;
 
   GstPad*         mprtp_srcpad;
   GstPad*         mprtp_sinkpad;
@@ -99,7 +100,6 @@ struct _GstMprtpplayouter
   guint16         expected_seq;
   gboolean        expected_seq_init;
   guint32         rtcp_sent_octet_sum;
-  GstClockTime    playout_point;
 
   GstTask*                      thread;
   GRecMutex                     thread_mutex;

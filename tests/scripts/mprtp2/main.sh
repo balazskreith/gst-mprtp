@@ -50,7 +50,7 @@ STATFILE="stats.csv"
 REPORTPDF="report.pdf"
 
 SCRIPTSDIR="scripts"
-TESTDIR="$SCRIPTSDIR/mprtp1"
+TESTDIR="$SCRIPTSDIR/mprtp2"
 
 rm -R $LOGSDIR
 mkdir $LOGSDIR
@@ -69,12 +69,22 @@ function log_bw() {
 }
 
   #setup duration
-  DURATION=320
+  DURATION=170
   OWD1=100
   OWD2=100
 
-  log_bw 310 1000 $LOGSDIR/veth0.csv
-  log_bw 310 2000 $LOGSDIR/veth2.csv
+  log_bw 40 1000 $LOGSDIR/veth0.csv
+  log_bw 20 2800 $LOGSDIR/veth0.csv
+  log_bw 20 600 $LOGSDIR/veth0.csv
+  log_bw 20 2000 $LOGSDIR/veth0.csv
+  log_bw 20 2000 $LOGSDIR/veth0.csv
+  log_bw 40 1000 $LOGSDIR/veth0.csv
+
+  log_bw 80 2000 $LOGSDIR/veth2.csv
+  log_bw 20 1000 $LOGSDIR/veth2.csv
+  log_bw 20 1500 $LOGSDIR/veth2.csv
+  log_bw 20 1000 $LOGSDIR/veth2.csv
+  log_bw 20 2000 $LOGSDIR/veth2.csv
 
   PEER1_SND="$SCRIPTSDIR/sender_1.sh"
   echo "tc qdisc change dev veth0 root handle 1: netem delay "$OWD1"ms" > $PEER1_SND

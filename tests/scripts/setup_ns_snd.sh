@@ -22,7 +22,7 @@ LATENCY=100
 BURST=15400
 
 tc qdisc del dev "$VETH2" root
-tc qdisc add dev "$VETH2" root handle 2: netem delay "$LATENCY"ms 
+tc qdisc add dev "$VETH2" root handle 1: netem delay "$LATENCY"ms 
 tc qdisc add dev "$VETH2" parent 1: handle 2: tbf rate "$BW"kbit burst "$BURST" latency 300ms minburst 1540
 
 VETH4="veth4"
@@ -32,7 +32,7 @@ LATENCY=100
 BURST=100
 
 tc qdisc del dev "$VETH4" root
-tc qdisc add dev "$VETH4" root handle 3: netem delay "$LATENCY"ms 
+tc qdisc add dev "$VETH4" root handle 1: netem delay "$LATENCY"ms 
 tc qdisc add dev "$VETH4" parent 1: handle 2: tbf rate "$BW"kbit burst "$BURST" latency 300ms minburst 1540
 
 VETH6="veth6"
@@ -42,7 +42,7 @@ LATENCY=100
 BURST=15400
 
 tc qdisc del dev "$VETH6" root
-tc qdisc add dev "$VETH6" root handle 4: netem delay "$LATENCY"ms 
+tc qdisc add dev "$VETH6" root handle 1: netem delay "$LATENCY"ms 
 tc qdisc add dev "$VETH6" parent 1: handle 2: tbf rate "$BW"kbit burst "$BURST" latency 300ms minburst 1540
 
 VETH8="veth8"
@@ -52,7 +52,7 @@ LATENCY=100
 BURST=15400
 
 tc qdisc del dev "$VETH8" root
-tc qdisc add dev "$VETH8" root handle 5: netem delay "$LATENCY"ms 
+tc qdisc add dev "$VETH8" root handle 1: netem delay "$LATENCY"ms 
 tc qdisc add dev "$VETH8" parent 1: handle 2: tbf rate "$BW"kbit burst "$BURST" latency 300ms minburst 1540
 
 

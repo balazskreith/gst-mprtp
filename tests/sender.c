@@ -393,6 +393,7 @@ main (int argc, char **argv)
   GstElement *rtpBin;
   GMainLoop *loop;
   gchar *testfile = NULL;
+  GObject *rtp_session;
 
   GError *error = NULL;
   GOptionContext *context;
@@ -416,13 +417,20 @@ main (int argc, char **argv)
   gst_object_unref (bus);
 
   rtpBin = gst_element_factory_make ("rtpbin", NULL);
-  g_object_set (rtpBin, "rtp-profile", GST_RTP_PROFILE_AVPF, NULL);
+  g_object_set (rtpBin, "rtp-profile", GST_RTP_PROFILE_SAVPF, NULL);
 
   gst_bin_add (GST_BIN (pipe), rtpBin);
 
   if(argc > 1) testfile = argv[1];
   videoSession = make_video_yuvfile_session(0);
   add_stream (pipe, rtpBin, videoSession, testfile);
+
+  g_signal_emit_by_name(rtpBin, "get-internal-session", videoSession->sessionNum, &rtp_session);
+  g_object_set(rtp_session,
+               "rtcp-min-interval", GST_SECOND,
+               "bandwidth", 0.0,
+               "rtp-profile", GST_RTP_PROFILE_SAVPF,
+               NULL);
 
   g_print ("starting server pipeline\n");
   {

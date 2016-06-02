@@ -67,7 +67,7 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 #define BOTTLENECK_PROBE_INTERVAL 0.5
 
 //determines the minimum monitoring interval
-#define MIN_MONITORING_INTERVAL 8
+#define MIN_MONITORING_INTERVAL 5
 
 //determines the maximum monitoring interval
 #define MAX_MONITORING_INTERVAL 12
@@ -311,6 +311,10 @@ _disable_controlling(
 
 static void
 _reset_monitoring(
+    FBRASubController *this);
+
+static void
+_start_monitoring(
     FBRASubController *this);
 
 static void
@@ -825,7 +829,8 @@ _keep_stage(
     goto done;
   }
 
-  _setup_monitoring(this);
+  _start_monitoring(this);
+  DISABLE_LINE _setup_monitoring(this);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
   this->rand_factor =  1.0;// + g_random_double_range(0.0, 0.0);
   DISABLE_LINE _disable_controlling(this);
@@ -918,6 +923,7 @@ _increase_stage(
     goto done;
   }
 
+  _start_monitoring(this);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
   this->rand_factor =  1.0; // + g_random_double_range(0.0, 0.0);
   this->monitoring_started = _now(this);
@@ -1041,6 +1047,21 @@ void _reset_monitoring(FBRASubController *this)
   this->monitored_bitrate = 0;
 }
 
+void _start_monitoring(FBRASubController *this)
+{
+  guint interval;
+  if(_does_near_to_bottleneck_point(this)){
+      interval = 14;
+  }else{
+    gdouble off;
+    off = _TR(this) - MAX(_btlp(this), _min_target(this));
+    off /= _TR(this);
+    off = MAX(0., off);
+    interval = (1.-off) * _mon_min_int(this) + off * _mon_max_int(this);
+  }
+//  g_print("interval: %d\n", interval);
+  _set_monitoring_interval(this, interval);
+}
 
 void _setup_monitoring(FBRASubController *this)
 {

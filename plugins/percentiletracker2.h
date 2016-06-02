@@ -78,6 +78,9 @@ PercentileTracker2 *make_percentiletracker2_full(BinTree2CmpFunc cmp_min,
                                   guint32 length,
                                   guint percentile);
 
+void percentiletracker2_compare(const gchar *filename,
+                                guint window_size,
+                                guint32 samples_num);
 void percentiletracker2_test(void);
 void percentiletracker2_set_treshold(PercentileTracker2 *this, GstClockTime treshold);
 void percentiletracker2_set_stats_pipe(PercentileTracker2 *this, void(*stats_pipe)(gpointer, PercentileTracker2PipeData*),gpointer stats_pipe_data);

@@ -202,6 +202,24 @@ numstracker_iterate (NumsTracker * this,
   return;
 }
 
+gint64*
+numstracker_get_values (NumsTracker * this, guint *length)
+{
+  gint64* result;
+  gint32 c,i;
+  NumsTrackerItem *item;
+  THIS_READLOCK (this);
+  result = g_malloc0(sizeof(gint64) * this->counter);
+  for(c = 0, i = this->read_index; c < this->counter; ++c){
+    item = this->items + i;
+    result[c] = item->value;
+    if(++i == this->length) i = 0;
+  }
+  if(length) *length = this->counter;
+  THIS_READUNLOCK (this);
+  return result;
+}
+
 void numstracker_add(NumsTracker *this, gint64 value)
 {
   THIS_WRITELOCK (this);

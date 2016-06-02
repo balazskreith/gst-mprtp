@@ -246,7 +246,8 @@ void _ruin_full(BinTree2 *this, BinTree2Node *node)
   if(!node) return;
   _ruin_full(this, node->left);
   _ruin_full(this, node->right);
-  _trash_bintree2node(this, node);
+  mprtp_free(node);
+//  _trash_bintree2node(this, node);
   --this->counter;
 }
 

@@ -50,7 +50,7 @@ STATFILE="stats.csv"
 REPORTPDF="report.pdf"
 
 SCRIPTSDIR="scripts"
-TESTDIR="$SCRIPTSDIR/rmcat6"
+TESTDIR="$SCRIPTSDIR/fbra_tcp"
 
 rm -R $LOGSDIR
 mkdir $LOGSDIR

@@ -218,6 +218,16 @@ static void _print_items(PercentileTracker *this)
   mprtp_free(items);
 }
 
+#define PROFILING(func) \
+{  \
+  GstClockTime start, elapsed; \
+  start = _now(this); \
+  func; \
+  elapsed = GST_TIME_AS_MSECONDS(_now(this) - start); \
+  if(0 < elapsed) g_print("elapsed time in ms: %lu\n", elapsed); \
+} \
+
+
 void percentiletracker_test(void)
 {
   gint i;

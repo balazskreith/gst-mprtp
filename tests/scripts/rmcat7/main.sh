@@ -69,14 +69,14 @@ function log_bw() {
 }
 
   #setup duration
-  DURATION=320
-  OWD=300
+  DURATION=920
+  OWD=240
 
-  log_bw 310 2000 $LOGSDIR/veth0.csv
+  log_bw 910 5000 $LOGSDIR/veth0.csv
 
   PEER1_SND="$SCRIPTSDIR/sender_1.sh"
   echo "tc qdisc change dev veth0 root handle 1: netem delay "$OWD"ms" > $PEER1_SND
-  #echo "sar -n TCP 1 320 | tr -s \" \" \",\" > tcpstat.csv &" >> $PEER1_SND 
+  echo "sar -n TCP 1 920 | tr -s \" \" \",\" > tcpstat.csv &" >> $PEER1_SND 
   echo -n "./$SENDER" >> $PEER1_SND
   ./$TESTDIR/peer1params.sh >> $PEER1_SND
   chmod 777 $PEER1_SND
@@ -88,25 +88,36 @@ function log_bw() {
   chmod 777 $PEER1_RCV
   
   echo "" > iperf_client.sh
-  max=900    # number of kilobytes
+  max=1400    # number of kilobytes
   elapsed=0;
   echo "#!/bin/bash" > wgets.sh
   for ((counter=1; counter<=10; counter++))
   do
-    dd bs=1K count=$(($RANDOM%max + 101)) if=/dev/urandom of=$TESTDIR/file$counter
-    echo "iperf -c 10.0.0.2 -p 1234 -F $TESTDIR/file$counter" >> iperf_client.sh
-    let "s=$RANDOM%20"
-    echo "sleep $s " >> iperf_client.sh
+    dd bs=1K count=$((($RANDOM%max) + 100)) if=/dev/urandom of=$TESTDIR/file$counter
   done
-  chmod 777 iperf_client.sh
+  for ((fc=1; fc<=10; fc++))
+  do
+    echo "" > "iperf_client"$fc.sh
+    for ((counter=1; counter<=10; counter++))
+    do
+      let "s=($RANDOM%90)+50"
+      echo "sleep $s " >> "iperf_client"$fc.sh
+      echo "iperf -c 10.0.0.2 -p 1234 -F $TESTDIR/file$counter" >> "iperf_client"$fc.sh
+    done
+  chmod 777 "iperf_client"$fc.sh
+  done
 
   #start receiver and sender
   sudo ip netns exec $NSRCV ./$PEER1_RCV 2> $LOGSDIR"/"receiver.log &
-  sudo ip netns exec $NSRCV iperf -s -p 1234&
+  sudo ip netns exec $NSRCV iperf -s -p 1234 &
   sleep 2
   sudo ip netns exec $NSSND ./$PEER1_SND 2> $LOGSDIR"/"sender.log &
-  sudo ip netns exec $NSSND iperf -c 10.0.0.2 -t 300 -p 1234&
-  sudo ip netns exec $NSSND iperf_client.sh
+#  sudo ip netns exec $NSSND iperf -c 10.0.0.2 -t 300 -p 1234&
+  for ((fc=1; fc<=10; fc++))
+  do
+    sudo ip netns exec $NSSND "./iperf_client"$fc.sh &
+  done
+
 
   echo "
   rm tcpstat.csv
@@ -145,6 +156,7 @@ trap control_c SIGINT
 ./$SCRIPTSDIR/auto_rep_generator.sh  > report.log &
 
 sleep $DURATION
+tail tcpstat.csv -n +4 | head -n -3 > $LOGSDIR/tcpstat.csv
 
 if [ "$SAVDIR" != "0" ]
 then

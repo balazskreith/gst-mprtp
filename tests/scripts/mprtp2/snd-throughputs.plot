@@ -27,17 +27,14 @@ set multiplot layout 3,1
 
 set key inside horizontal top right
 unset key  
-#set tmargin 5
-#set bmargin 5
+set tmargin 1
+set bmargin 2
 #set lmargin 23
-#set lmargin 12
-#set rmargin 7
+set lmargin 10
+set rmargin 3
 set yrange [0:3500]
 set ytics 1000
-set xrange [0:duration]
-set xtics 50 offset 0,-1
 #set ylabel "bitrate (KBits)" offset -8
-set xlabel "time (s)" offset 0,-2
 set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
 
@@ -58,15 +55,25 @@ set style line 3 linecolor rgb '#185aa9' linetype 3 linewidth 1
 set style line 4 linecolor rgb '#a21d21' linetype 4 linewidth 1	
 set style line 5 linecolor rgb '#662c91' linetype 5 linewidth 1	
 
+unset xtics 
+set y2label "Path 1" offset 2
  plot throughput_file using ($0 * 0.1):($3+$5) with lines ls 1 title "Path 1 SR + FEC", \
       throughput_file using ($0 * 0.1):11 with lines ls 4 title "Path 1 Capacity"
-      
+
+set y2label "Path 2" offset 2      
  plot throughput_file using ($0 * 0.1):($8+$10) with lines ls 1 title "Path 2 SR + FEC", \
       throughput_file using ($0 * 0.1):12 with lines ls 4 title "Path 2 Capacity"
       
       
 set yrange [0:6000]
 set ytics 2000
+set xrange [0:duration]
+#set xtics 50 offset 0,-1
+set xtics 40
+set xlabel "time (s)" offset 0,-2
+#set bmargin 3
+
+set y2label "Aggregated" offset 2
   plot throughput_file using ($0 * 0.1):($3+$5+$8+$10) with lines ls 1 title "Path 2 SR + FEC", \
        throughput_file using ($0 * 0.1):($11 + $12) with lines ls 4 title "Path 2 Capacity"
       

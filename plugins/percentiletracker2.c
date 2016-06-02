@@ -200,6 +200,65 @@ static void _print_items(PercentileTracker2 *this)
   mprtp_free(items);
 }
 
+
+static int _cmpfunc (const void * a, const void * b)
+{
+   return ( *(gint64*)a - *(gint64*)b );
+}
+#include "numstracker.h"
+void percentiletracker2_compare(const gchar *filename,
+                                guint window_size,
+                                guint32 samples_num)
+{
+  PercentileTracker2 *tracker1;
+  NumsTracker *tracker2;
+  guint32 number, i;
+  GstClockTime start, elapsed1, elapsed2;
+  gint64 *values;
+  guint values_length;
+  gint64 median;
+
+  tracker1 = make_percentiletracker2(window_size, 50);
+  tracker2 = make_numstracker(window_size, GST_SECOND);
+
+  elapsed1 = elapsed2 = 0;
+  for(i=0; i < samples_num; ++i){
+    number = g_random_int();
+    start = _now(tracker1);
+    percentiletracker2_add(tracker1, number);
+    elapsed1 += GST_TIME_AS_USECONDS(_now(tracker1) - start);
+
+    start = _now(tracker1);
+    numstracker_add(tracker2, number);
+    elapsed2 += GST_TIME_AS_USECONDS(_now(tracker1) - start);
+
+    if(i < window_size){
+      continue;
+    }
+
+    start = _now(tracker1);
+    median = percentiletracker2_get_stats(tracker1, NULL, NULL, NULL);
+    elapsed1 += GST_TIME_AS_USECONDS(_now(tracker1) - start);
+//g_print("%ld - ", median);
+    start = _now(tracker1);
+    values = numstracker_get_values(tracker2, &values_length);
+    qsort(values, values_length, sizeof(gint64), _cmpfunc);
+    if(values_length % 2 == 0){
+      median = values[(values_length>>1)] + values[(values_length>>1) - 1];
+      median>>=1;
+    }else{
+      median = values[values_length>>1];
+    }
+    g_free(values);
+    elapsed2 += GST_TIME_AS_USECONDS(_now(tracker1) - start);
+//g_print("%ld\n", median);
+  }
+
+  mprtp_logger(filename, "%lu,%lu\n", elapsed1, elapsed2);
+  g_object_unref(tracker1);
+  g_object_unref(tracker2);
+}
+
 void percentiletracker2_test(void)
 {
   gint i;

@@ -421,7 +421,21 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   sndctrler_setup_callbacks(this->controller,
                             this, gst_mprtpscheduler_mprtcp_sender,
                             this, gst_mprtpscheduler_emit_signal
-                            );
+  );
+
+  //Rat race
+//  {
+//    gint i = 0;
+//    PercentileTracker *p = NULL;
+//    for(i = 0; i < 100; ++i){
+//        percentiletracker2_compare("medianrace_100.csv",     20,     100);
+//        percentiletracker2_compare("medianrace_1000.csv",    200,    1000);
+//        percentiletracker2_compare("medianrace_10000.csv",   2000,   10000);
+//        percentiletracker2_compare("medianrace_100000.csv",  20000,  100000);
+//    }
+//    p->Mnc = 0;
+//  }
+
   fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
   _setup_paths(this);
   mprtp_logger_add_logging_fnc(_tester, this, 1, NULL);

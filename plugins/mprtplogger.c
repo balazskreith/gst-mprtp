@@ -188,17 +188,18 @@ gboolean mprtp_logger_is_signaled(void)
   THIS_READUNLOCK(loggerptr);
   return result;
 }
-
+static GstClockTime treshdold = 0 * GST_SECOND;
 void mprtp_logger(const gchar *filename, const gchar * format, ...)
 {
   FILE *file;
   va_list args;
   gchar writable[255];
   THIS_WRITELOCK(loggerptr);
-  if(!loggerptr->enabled){
-    goto done;
-  }
-  if(_now(loggerptr) - 1 * GST_SECOND < loggerptr->made){
+//  if(!loggerptr->enabled){
+//    goto done;
+//  }
+
+  if(_now(loggerptr) - treshdold < loggerptr->made){
     goto done;
   }else if(!loggerptr->signaled){
     loggerptr->signaled = TRUE;

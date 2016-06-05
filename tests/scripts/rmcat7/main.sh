@@ -100,7 +100,7 @@ function log_bw() {
     echo "" > "iperf_client"$fc.sh
     for ((counter=1; counter<=10; counter++))
     do
-      let "s=($RANDOM%90)+50"
+      let "s=($RANDOM%45)+45"
       echo "sleep $s " >> "iperf_client"$fc.sh
       echo "iperf -c 10.0.0.2 -p 1234 -F $TESTDIR/file$counter" >> "iperf_client"$fc.sh
     done

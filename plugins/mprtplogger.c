@@ -188,7 +188,7 @@ gboolean mprtp_logger_is_signaled(void)
   THIS_READUNLOCK(loggerptr);
   return result;
 }
-static GstClockTime treshdold = 0 * GST_SECOND;
+static GstClockTime treshdold = 1 * GST_SECOND;
 void mprtp_logger(const gchar *filename, const gchar * format, ...)
 {
   FILE *file;

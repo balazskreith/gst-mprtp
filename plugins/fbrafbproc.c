@@ -83,6 +83,23 @@ static void _owd_ltt_pipe(gpointer data, PercentileTrackerPipeData *stats)
 {
   FBRAFBProcessor *this = data;
   this->stat.owd_ltt_median = stats->percentile;
+
+//  {
+//    gdouble bw;
+//    bw = this->stat.max_bytes_in_flight * 8;
+//    bw /= (gdouble)(stats->percentile * 2.) / (gdouble)GST_SECOND;
+//    g_print("bw est: %f\n", bw);
+//  }
+}
+
+static void _BiF_max_pipe(gpointer data, gint64 max)
+{
+  FBRAFBProcessor *this = data;
+  if(!max){
+    this->stat.max_bytes_in_flight = 15000;
+  }else{
+    this->stat.max_bytes_in_flight = max;
+  }
 }
 
 void
@@ -111,15 +128,17 @@ void
 fbrafbprocessor_init (FBRAFBProcessor * this)
 {
   g_rw_lock_init (&this->rwmutex);
-  this->sent        = g_queue_new();
-  this->sent_in_1s  = g_queue_new();
-  this->acked       = g_queue_new();
-  this->sysclock    = gst_system_clock_obtain();
-  this->stat.RTT    = GST_SECOND;
-  this->owd_ltt     = make_percentiletracker(600, 50);
+  this->sent            = g_queue_new();
+  this->sent_in_1s      = g_queue_new();
+  this->acked           = g_queue_new();
+  this->sysclock        = gst_system_clock_obtain();
+  this->stat.RTT        = GST_SECOND;
+  this->owd_ltt         = make_percentiletracker(600, 50);
+  this->bytes_in_flight = make_numstracker(300, 5 * GST_SECOND);
   percentiletracker_set_treshold(this->owd_ltt, 30 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->owd_ltt, _owd_ltt_pipe, this);
-
+  numstracker_add_plugin(this->bytes_in_flight,
+                         (NumsTrackerPlugin*) make_numstracker_minmax_plugin(_BiF_max_pipe, this, NULL, NULL));
 }
 
 FBRAFBProcessor *make_fbrafbprocessor(void)
@@ -256,6 +275,16 @@ fbrafbprocessor_get_stats (FBRAFBProcessor * this, FBRAFBProcessorStat* result)
   THIS_READUNLOCK (this);
 }
 
+gint32 fbrafbprocessor_get_sent_bytes_in_1s(FBRAFBProcessor *this)
+{
+  gint32 result;
+  THIS_READLOCK (this);
+  _obsolate_sent_packet(this);
+  result = this->stat.sent_bytes_in_1s;
+  THIS_READUNLOCK(this);
+  return result;
+}
+
 GstClockTime fbrafbprocessor_get_fbinterval(FBRAFBProcessor *this)
 {
   GstClockTime result;
@@ -323,6 +352,8 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
 
   _done_if_sent_queue_is_empty(this);
 
+  //g_print("RLE processed\n");
+
   item = g_queue_peek_head(this->sent);
   while(_cmp_uint16(item->seq_num, xr->DiscardedRLE.end_seq) <= 0){
     this->stat.bytes_in_flight -= item->payload_bytes;
@@ -338,6 +369,9 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
     }
     item = g_queue_peek_head(this->sent);
   }
+
+  numstracker_add(this->bytes_in_flight, this->stat.bytes_in_flight);
+
   if(g_queue_is_empty(this->acked) || !it){
     goto done;
   }

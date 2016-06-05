@@ -37,6 +37,8 @@ typedef struct _FBRAFBProcessorStat
   GstClockTime             RTT;
   gint32                   discarded_packets_in_1s;
   gint32                   received_packets_in_1s;
+
+  gint64                   max_bytes_in_flight;
 }FBRAFBProcessorStat;
 
 struct _FBRAFBProcessor
@@ -51,6 +53,7 @@ struct _FBRAFBProcessor
 
   FBRAFBProcessorStat      stat;
   PercentileTracker*       owd_ltt;
+  NumsTracker*             bytes_in_flight;
 
   GstClockTime             last_discard;
   GstClockTime             last_delay;
@@ -69,6 +72,7 @@ FBRAFBProcessor *make_fbrafbprocessor(void);
 void fbrafbprocessor_reset(FBRAFBProcessor *this);
 void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn);
 void fbrafbprocessor_get_stats (FBRAFBProcessor * this, FBRAFBProcessorStat* result);
+gint32 fbrafbprocessor_get_sent_bytes_in_1s(FBRAFBProcessor *this);
 GstClockTime fbrafbprocessor_get_fbinterval(FBRAFBProcessor *this);
 void fbrafbprocessor_approve_owd(FBRAFBProcessor *this);
 void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary);

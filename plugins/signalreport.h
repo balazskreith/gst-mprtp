@@ -37,10 +37,6 @@ typedef struct _MPRTPSubflowFBRACngCtrlerParams{
   gdouble             keep_trend_th;
   gdouble             probe_trend_th;
 
-  gboolean            pacing_allowed;
-  gdouble             pacing_deflate_time;
-  gdouble             pacing_constrict_time;
-
 
 }MPRTPSubflowFBRA2CngCtrlerParams;
 

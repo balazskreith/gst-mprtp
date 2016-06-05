@@ -42,14 +42,17 @@ struct _FBRASubController
   MPRTPSPath*               path;
 
   GstClockTime              made;
-  gboolean                  disable_controlling;
-  GstClockTime              disable_interval;
+//  gboolean                  disable_controlling;
+  GstClockTime              last_executed;
   GstClockTime              disable_end;
   guint                     measurements_num;
 
   gint32                    monitored_bitrate;
   guint32                   monitored_packets;
   gint32                    bottleneck_point;
+
+  gdouble                   gp_hat;
+
   gint32                    max_target_point;
   gint32                    min_target_point;
   gint32                    target_bitrate;
@@ -68,6 +71,7 @@ struct _FBRASubController
   //Need for monitoring
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;
+  GstClockTime              increasement_started;
 
   guint                     pending_event;
   SubRateAction             stage_fnc;

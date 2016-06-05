@@ -1,8 +1,7 @@
 
+  rm tcpstat.csv
   while true; do 
-    ./scripts/rmcat1/plots.sh --srcdir logs --dstdir reports
-#    ./scripts/rmcat1/stats.sh --srcdir logs --dst reports/stats.csv
-
+    ./scripts/rmcat7/plots.sh --srcdir logs --dstdir reports
     sleep 5
   done
 

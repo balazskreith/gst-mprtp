@@ -71,7 +71,8 @@ function log_bw() {
 
   #setup duration
   DURATION=150.0
-  OWD=300
+  OWD_SND=300
+  OWD_RCV=100
 
   sudo ip netns exec $NSSND tc qdisc change dev veth0 parent 1: handle 2: tbf rate 4000kbit burst 15400 latency 300ms minburst 1540
 
@@ -83,13 +84,13 @@ function log_bw() {
 
 
   PEER1_SND="$SCRIPTSDIR/sender_1.sh"
-  echo "tc qdisc change dev veth0 root handle 1: netem delay "$OWD"ms" > $PEER1_SND
+  echo "tc qdisc change dev veth0 root handle 1: netem delay "$OWD_SND"ms" > $PEER1_SND
   echo -n "./$SENDER" >> $PEER1_SND
   ./$TESTDIR/peer1params.sh >> $PEER1_SND
   chmod 777 $PEER1_SND
 
   PEER1_RCV="$SCRIPTSDIR/receiver_1.sh"
-  echo "tc qdisc change dev veth1 root handle 1: netem delay "$OWD"ms" > $PEER1_RCV
+  echo "tc qdisc change dev veth1 root handle 1: netem delay "$OWD_RCV"ms" > $PEER1_RCV
   echo -n "./$RECEIVER" > $PEER1_RCV
   ./$TESTDIR/peer1params.sh >> $PEER1_RCV
   chmod 777 $PEER1_RCV

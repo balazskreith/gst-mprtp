@@ -82,8 +82,11 @@ _cmp_uint16 (guint16 x, guint16 y)
 static void _owd_ltt_pipe(gpointer data, PercentileTrackerPipeData *stats)
 {
   FBRAFBProcessor *this = data;
+  if(this->measurements_num < 5){
+    this->stat.owd_ltt_median = 0;
+    return;
+  }
   this->stat.owd_ltt_median = stats->percentile;
-
 //  {
 //    gdouble bw;
 //    bw = this->stat.max_bytes_in_flight * 8;
@@ -128,13 +131,14 @@ void
 fbrafbprocessor_init (FBRAFBProcessor * this)
 {
   g_rw_lock_init (&this->rwmutex);
-  this->sent            = g_queue_new();
-  this->sent_in_1s      = g_queue_new();
-  this->acked           = g_queue_new();
-  this->sysclock        = gst_system_clock_obtain();
-  this->stat.RTT        = GST_SECOND;
-  this->owd_ltt         = make_percentiletracker(600, 50);
-  this->bytes_in_flight = make_numstracker(300, 5 * GST_SECOND);
+  this->sent             = g_queue_new();
+  this->sent_in_1s       = g_queue_new();
+  this->acked            = g_queue_new();
+  this->sysclock         = gst_system_clock_obtain();
+  this->measurements_num = 0;
+  this->stat.RTT         = GST_SECOND;
+  this->owd_ltt          = make_percentiletracker(600, 50);
+  this->bytes_in_flight  = make_numstracker(300, 5 * GST_SECOND);
   percentiletracker_set_treshold(this->owd_ltt, 30 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->owd_ltt, _owd_ltt_pipe, this);
   numstracker_add_plugin(this->bytes_in_flight,
@@ -152,7 +156,7 @@ FBRAFBProcessor *make_fbrafbprocessor(void)
 void fbrafbprocessor_reset(FBRAFBProcessor *this)
 {
   THIS_WRITELOCK (this);
-
+  this->measurements_num = 0;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -251,6 +255,7 @@ void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summa
   if(summary->AFB.processed){
     _process_afb(this, summary->AFB.fci_id, (GstRTCPAFB_REPS *)summary->AFB.fci_data);
   }
+  ++this->measurements_num;
   THIS_WRITEUNLOCK (this);
 }
 
@@ -297,7 +302,7 @@ GstClockTime fbrafbprocessor_get_fbinterval(FBRAFBProcessor *this)
 void fbrafbprocessor_approve_owd(FBRAFBProcessor *this)
 {
   THIS_WRITELOCK (this);
-  percentiletracker_add(this->owd_ltt, this->last_delay);
+  percentiletracker_add(this->owd_ltt, this->stat.owd_stt_median);
   THIS_WRITEUNLOCK (this);
 }
 
@@ -322,12 +327,13 @@ void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
 
   this->stat.owd_stt_median = xrsummary->OWD.median_delay;
 
-  this->last_delay_t2         = this->last_delay_t1;
-  this->last_delay_t1         = this->last_delay;
-  this->last_delay            = xrsummary->OWD.median_delay;
+//  this->last_delay_t2         = this->last_delay_t1;
+//  this->last_delay_t1         = this->last_delay;
+//  this->last_delay            = xrsummary->OWD.median_delay;
 
   if(this->stat.owd_ltt_median){
-    this->stat.owd_corr =  1.0 * this->last_delay + 0. * this->last_delay_t1 + 0. * this->last_delay_t2;
+//    this->stat.owd_corr =  1.0 * this->last_delay + 0. * this->last_delay_t1 + 0. * this->last_delay_t2;
+    this->stat.owd_corr =  (gdouble) this->stat.owd_stt_median;
     this->stat.owd_corr /=  (gdouble)this->stat.owd_ltt_median;
   }else{
     this->stat.owd_corr = 1.;

@@ -1281,8 +1281,7 @@ void _tester(void *data)
   if(!this->test_enabled || !mprtp_logger_is_signaled()){
     return;
   }
-  if(0 < this->test_wait){
-    --this->test_wait;
+  if(_now(this) < this->test_wait){
     return;
   }
   fp = fopen(this->test_seq, "r");
@@ -1302,7 +1301,7 @@ void _tester(void *data)
 
   sscanf(line, "%d %d", &read_num, &wait_num);
   ++this->seen_line;
-  this->test_wait = wait_num * 10;
+  this->test_wait = _now(this) + wait_num * GST_SECOND;
   for(i=0; i<read_num; ++i){
     if(getline(&line, &len, fp) == -1){
       break;

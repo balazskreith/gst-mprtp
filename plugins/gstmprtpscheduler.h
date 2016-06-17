@@ -83,7 +83,7 @@ struct _GstMprtpscheduler
   GstMprtpschedulerPrivate*     priv;
 
 
-  guint test_wait;
+  GstClockTime test_wait;
   guint seen_line;
   gboolean test_enabled;
   gchar test_seq[255];

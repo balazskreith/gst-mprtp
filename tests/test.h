@@ -63,25 +63,20 @@
 
 typedef struct _MPRTPSubflowFBRACngCtrlerParams{
   //parameters can be changed
-  gint32              min_monitoring_interval;
-  gint32              max_monitoring_interval;
-  gdouble             bottleneck_epsilon;
-  gdouble             normal_monitoring_interval;
-  gdouble             bottleneck_monitoring_interval;
-  gdouble             bottleneck_increasement_factor;
+  gdouble             min_approve_interval;
+  gdouble             max_approve_interval;
   gint32              min_ramp_up_bitrate;
   gint32              max_ramp_up_bitrate;
   gint32              min_target_bitrate;
   gint32              max_target_bitrate;
-  gdouble             reduce_target_factor;
+  gdouble             restrictivity_factor;
   gdouble             approvement_epsilon;
 
   gdouble             discad_cong_treshold;
   gdouble             stability_treshold;
   gdouble             owd_corr_cng_th;
 
-  gdouble             keep_trend_th;
-  gdouble             probe_trend_th;
+  gdouble             owd_corr_dist_th;
 
 }MPRTPSubflowFBRA2CngCtrlerParams;
 

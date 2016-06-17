@@ -82,6 +82,7 @@ struct _FBRASubController
   guint                     consecutive_ok;
   guint                     consecutive_nok;
   GstClockTime              last_distorted;
+  GstClockTime              last_corrigated;
 
   GstClockTime              adjustment_time;
 

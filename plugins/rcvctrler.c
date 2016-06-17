@@ -364,8 +364,8 @@ refctrler_ticker (void *data)
   this = RCVCTRLER (data);
   THIS_WRITELOCK (this);
 
-  PROFILING(_orp_main(this));
-//  _orp_main(this);
+//  PROFILING(_orp_main(this));
+  _orp_main(this);
 
   _system_notifier_main(this);
 

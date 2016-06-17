@@ -48,29 +48,29 @@ GST_DEBUG_CATEGORY_STATIC (fbrasubctrler_debug_category);
 G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 
 //if target close to the bottleneck, the increasement will be multiplied by this factor
-#define BOTTLENECK_INCREASEMENT_FACTOR 0.75
+#define RESTRICTIVITY_FACTOR 0.5
 
 //determine the epsilon factor around the target rate indicate weather we close to the bottleneck or not.
-#define BOTTLENECK_EPSILON .25
+//#define BOTTLENECK_EPSILON .25
 
 //if target bitrate is close to the bottleneck, monitoring interval is requested for this interval
 //note if the target/interval is higher than the maximum ramp up speed, then monitoring is
 //restricted to the max_ramp_up
-#define BOTTLENECK_MONITORING_INTERVAL 14
+//#define BOTTLENECK_MONITORING_INTERVAL 14
 
 //determine the minimum interval in seconds must be stay in probe stage
 //before the target considered to be accepted
-#define NORMAL_APPROVE_INTERVAL 1.0
+#define MIN_APPROVE_INTERVAL 1.0
 
 //determine the maximum interval in seconds must be stay in probe stage
 //before the target considered to be accepted
-#define BOTTLENECK_APPROVE_INTERVAL 3.0
+#define MAX_APPROVE_INTERVAL 3.0
 
 //determines the minimum monitoring interval
-#define MIN_MONITORING_INTERVAL 8
+#define MIN_MONITORING_INTERVAL 2
 
 //determines the maximum monitoring interval
-#define MAX_MONITORING_INTERVAL 12
+#define MAX_MONITORING_INTERVAL 14
 
 //determines the minimum ramp up bitrate
 #define RAMP_UP_MIN_SPEED 50000
@@ -86,7 +86,7 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 #define TARGET_BITRATE_MAX 0
 
 //determines the reduction factor applies on the target bitrate if it is in reduced stage
-#define REDUCE_TARGET_FACTOR 0.6
+//#define REDUCE_TARGET_FACTOR 0.6
 
 //determines the treshold for utilization, in which below the path considered to be congested
 #define DISCARD_CONGESTION_TRESHOLD 0.1
@@ -148,26 +148,23 @@ struct _Private{
   gdouble             avg_rtp_payload;
   gdouble             rtt;
 
-//  guint16             highest_sent_seq;
-
   gboolean            bcongestion;
 
   gdouble             reduce_trend;
   GstClockTime        reduce_started;
 
+  gint32              corrigate_num;
+
   //Possible parameters
   gint32              min_monitoring_interval;
   gint32              max_monitoring_interval;
-  gint32              btl_monitoring_interval;
-  gdouble             bottleneck_epsilon;
-  gdouble             normal_probe_interval;
-  gdouble             bottleneck_probe_interval;
-  gdouble             bottleneck_increasement_factor;
+  gdouble             min_approve_interval;
+  gdouble             max_approve_interval;
+  gdouble             restrictivity_factor;
   gint32              min_ramp_up_bitrate;
   gint32              max_ramp_up_bitrate;
   gint32              min_target_bitrate;
   gint32              max_target_bitrate;
-  gdouble             reduce_target_factor;
   gdouble             approvement_epsilon;
   gdouble             stability_treshold;
 
@@ -216,23 +213,19 @@ struct _Private{
 #define _owd_corr_cng_th(this)        _priv(this)->owd_corr_cng_th
 #define _owd_corr_dist_th(this)       _priv(this)->owd_corr_dist_th
 
-#define _btl_inc_fac(this)            _priv(this)->bottleneck_increasement_factor
-#define _btl_eps(this)                _priv(this)->bottleneck_epsilon
-#define _btl_probe_int(this)            _priv(this)->bottleneck_probe_interval
-#define _norm_probe_int(this)           _priv(this)->normal_probe_interval
-
 #define _appr_eps(this)               _priv(this)->approvement_epsilon
 
 #define _FD_cong_th(this)        _priv(this)->discad_cong_treshold
 
-#define _mon_btl_int(this)            _priv(this)->btl_monitoring_interval
+#define _min_appr_int(this)           _priv(this)->min_approve_interval
+#define _max_appr_int(this)           _priv(this)->max_approve_interval
 #define _mon_min_int(this)            _priv(this)->min_monitoring_interval
 #define _mon_max_int(this)            _priv(this)->max_monitoring_interval
 #define _min_ramp_up(this)            _priv(this)->min_ramp_up_bitrate
 #define _max_ramp_up(this)            _priv(this)->max_ramp_up_bitrate
-#define _rdc_target_fac(this)         _priv(this)->reduce_target_factor
 #define _min_target(this)             _priv(this)->min_target_bitrate
 #define _max_target(this)             _priv(this)->max_target_bitrate
+#define _restrict_fac(this)           _priv(this)->restrictivity_factor
 
 
 //----------------------------------------------------------------------
@@ -335,6 +328,7 @@ fbrasubctrler_class_init (FBRASubControllerClass * klass)
 
 }
 
+
 void
 fbrasubctrler_finalize (GObject * object)
 {
@@ -345,6 +339,7 @@ fbrasubctrler_finalize (GObject * object)
   g_object_unref(this->sysclock);
   g_object_unref(this->path);
 }
+
 
 void
 fbrasubctrler_init (FBRASubController * this)
@@ -357,18 +352,16 @@ fbrasubctrler_init (FBRASubController * this)
   this->target_bitrate   = SUBFLOW_DEFAULT_SENDING_RATE;
   _priv(this)->adjust_th = 20 * GST_MSECOND;
 
-  _priv(this)->bottleneck_increasement_factor   = BOTTLENECK_INCREASEMENT_FACTOR;
-  _priv(this)->bottleneck_epsilon               = BOTTLENECK_EPSILON;
-  _priv(this)->normal_probe_interval            = NORMAL_APPROVE_INTERVAL;
-  _priv(this)->bottleneck_probe_interval        = BOTTLENECK_APPROVE_INTERVAL;
   _priv(this)->min_monitoring_interval          = MIN_MONITORING_INTERVAL;
   _priv(this)->max_monitoring_interval          = MAX_MONITORING_INTERVAL;
-  _priv(this)->btl_monitoring_interval          = BOTTLENECK_MONITORING_INTERVAL;
+
+  _priv(this)->restrictivity_factor             = RESTRICTIVITY_FACTOR;
+  _priv(this)->min_approve_interval             = MIN_APPROVE_INTERVAL;
+  _priv(this)->max_approve_interval             = MAX_APPROVE_INTERVAL;
   _priv(this)->min_ramp_up_bitrate              = RAMP_UP_MIN_SPEED;
   _priv(this)->max_ramp_up_bitrate              = RAMP_UP_MAX_SPEED;
   _priv(this)->min_target_bitrate               = TARGET_BITRATE_MIN;
   _priv(this)->max_target_bitrate               = TARGET_BITRATE_MAX;
-  _priv(this)->reduce_target_factor             = REDUCE_TARGET_FACTOR;
   _priv(this)->discad_cong_treshold             = DISCARD_CONGESTION_TRESHOLD;
   _priv(this)->owd_corr_cng_th                  = OWD_CORR_CONGESTION_TRESHOLD;
   _priv(this)->owd_corr_dist_th                 = OWD_CORR_DISTORTION_TRESHOLD;
@@ -389,6 +382,7 @@ gboolean fbrasubctrler_path_approver(gpointer data, GstRTPBuffer *rtp)
   return TRUE;
 }
 
+
 FBRASubController *make_fbrasubctrler(MPRTPSPath *path)
 {
   FBRASubController *result;
@@ -408,7 +402,7 @@ FBRASubController *make_fbrasubctrler(MPRTPSPath *path)
 void fbrasubctrler_enable(FBRASubController *this)
 {
   this->enabled             = TRUE;
-  this->disable_end         = _now(this) + 5 * GST_SECOND;
+  this->disable_end         = _now(this) + 0 * GST_SECOND;
   this->target_bitrate      = mprtps_path_get_target_bitrate(this->path);
   this->last_distorted      = _now(this);
   this->last_tr_changed     = _now(this);
@@ -460,25 +454,53 @@ static void _update_rate_correlations(FBRASubController *this)
 }
 
 
-static gboolean _does_near_to_bottleneck_point(FBRASubController *this)
+//static gboolean _does_near_to_bottleneck_point(FBRASubController *this)
+//{
+//  if(!this->bottleneck_point){
+//    return FALSE;
+//  }
+//  if(this->target_bitrate < this->bottleneck_point * (1.-_btl_eps(this))){
+//    return FALSE;
+//  }
+//  if(this->bottleneck_point * (1.+_btl_eps(this)) < this->target_bitrate){
+//    return FALSE;
+//  }
+//  return TRUE;
+//}
+
+static gdouble _off_target(FBRASubController *this)
 {
-  if(!this->bottleneck_point){
-    return FALSE;
-  }
-  if(this->target_bitrate < this->bottleneck_point * (1.-_btl_eps(this))){
-    return FALSE;
-  }
-  if(this->bottleneck_point * (1.+_btl_eps(this)) < this->target_bitrate){
-    return FALSE;
-  }
-  return TRUE;
+  gint32 refpoint;
+  gdouble result;
+
+  refpoint = MAX(_min_target(this), this->bottleneck_point);
+  result = _TR(this) - refpoint;
+  result /= _TR(this);
+  result = MAX(0., result);
+
+  return result;
+}
+
+static gdouble _off2_target(FBRASubController *this)
+{
+  gint32 refpoint;
+  gdouble result;
+
+  refpoint = MAX(_min_target(this), this->bottleneck_point);
+  result = _TR(this) - refpoint;
+  result /= _TR(this) * .25;
+  result = CONSTRAIN(0.,1., result * result);
+
+  return result;
 }
 
 static GstClockTime _get_approval_interval(FBRASubController *this)
 {
+  gdouble off;
   gdouble interval;
-  interval = _does_near_to_bottleneck_point(this) ? _btl_probe_int(this) : _norm_probe_int(this);
-  return interval * MIN(GST_SECOND, _RTT(this));
+  off = _off2_target(this);
+  interval = off * _min_appr_int(this) + (1.-off) * _max_appr_int(this);
+  return MIN(GST_SECOND, interval * _RTT(this));
 }
 
 static void _execute_stage(FBRASubController *this)
@@ -509,7 +531,7 @@ done:
 void fbrasubctrler_time_update(FBRASubController *this)
 {
   GstClockTime fbinterval_th;
-  if(!this->enabled || _now(this) < this->disable_end){
+  if(!this->enabled || _now(this) < this->disable_end || this->measurements_num < 5){
     goto done;
   }
 
@@ -537,22 +559,20 @@ void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRa
   MPRTPSubflowFBRA2CngCtrlerParams *cngctrler;
   cngctrler = &params->cngctrler;
 
-  _priv(this)->bottleneck_increasement_factor   = cngctrler->bottleneck_increasement_factor;
-  _priv(this)->bottleneck_epsilon               = cngctrler->bottleneck_epsilon;
-  _priv(this)->normal_probe_interval            = cngctrler->normal_monitoring_interval;
-  _priv(this)->bottleneck_probe_interval        = cngctrler->bottleneck_monitoring_interval;
-  _priv(this)->min_monitoring_interval          = cngctrler->min_monitoring_interval;
-  _priv(this)->max_monitoring_interval          = cngctrler->max_monitoring_interval;
-  _priv(this)->min_ramp_up_bitrate              = cngctrler->min_ramp_up_bitrate;
-  _priv(this)->max_ramp_up_bitrate              = cngctrler->max_ramp_up_bitrate;
-  _priv(this)->min_target_bitrate               = cngctrler->min_target_bitrate;
-  _priv(this)->max_target_bitrate               = cngctrler->max_target_bitrate;
-  _priv(this)->reduce_target_factor             = cngctrler->reduce_target_factor;
-  _priv(this)->discad_cong_treshold             = cngctrler->discad_cong_treshold;
-  _priv(this)->owd_corr_cng_th                  = cngctrler->owd_corr_cng_th;
-  _priv(this)->stability_treshold               = cngctrler->stability_treshold;
-  _priv(this)->owd_corr_dist_th                 = cngctrler->keep_trend_th;
-  _priv(this)->approvement_epsilon              = cngctrler->approvement_epsilon;
+  _min_appr_int(this)                           = cngctrler->min_approve_interval;
+  _max_appr_int(this)                           = cngctrler->max_approve_interval;
+  _min_ramp_up(this)                            = cngctrler->min_ramp_up_bitrate;
+  _max_ramp_up(this)                            = cngctrler->max_ramp_up_bitrate;
+  _min_target(this)                             = cngctrler->min_target_bitrate;
+  _max_target(this)                             = cngctrler->max_target_bitrate;
+  _restrict_fac(this)                           = cngctrler->restrictivity_factor;
+  _appr_eps(this)                               = cngctrler->approvement_epsilon;
+
+  _FD_cong_th(this)                             = cngctrler->discad_cong_treshold;
+  _stability_th(this)                           = cngctrler->stability_treshold;
+  _owd_corr_cng_th(this)                        = cngctrler->owd_corr_cng_th;
+  _owd_corr_dist_th(this)                       = cngctrler->owd_corr_dist_th;
+
 
 }
 
@@ -561,24 +581,20 @@ void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedR
   MPRTPSubflowFBRA2CngCtrlerParams *cngctrler;
   cngctrler = &result->cngctrler;
 
-  cngctrler->min_target_bitrate             = _min_target(this);
-  cngctrler->max_target_bitrate             = _max_target(this);
-  cngctrler->bottleneck_epsilon             = _btl_eps(this);
-  cngctrler->normal_monitoring_interval     = _norm_probe_int(this);
-  cngctrler->bottleneck_monitoring_interval = _btl_probe_int(this);
-  cngctrler->bottleneck_increasement_factor = _btl_inc_fac(this);
+  cngctrler->min_approve_interval           = _min_appr_int(this);
+  cngctrler->max_approve_interval           = _max_appr_int(this);
   cngctrler->min_ramp_up_bitrate            = _min_ramp_up(this);
   cngctrler->max_ramp_up_bitrate            = _max_ramp_up(this);
-  cngctrler->max_monitoring_interval        = _mon_max_int(this);
-  cngctrler->min_monitoring_interval        = _mon_min_int(this);
-  cngctrler->reduce_target_factor           = _rdc_target_fac(this);
-  cngctrler->stability_treshold             = _stability_th(this);
+  cngctrler->min_target_bitrate             = _min_target(this);
+  cngctrler->max_target_bitrate             = _max_target(this);
 
-  cngctrler->owd_corr_cng_th                = _owd_corr_cng_th(this);
-  cngctrler->discad_cong_treshold           = _FD_cong_th(this);
-  cngctrler->keep_trend_th                  = _owd_corr_dist_th(this);
-
+  cngctrler->restrictivity_factor           = _restrict_fac(this);
   cngctrler->approvement_epsilon            = _appr_eps(this);
+
+  cngctrler->discad_cong_treshold           = _FD_cong_th(this);
+  cngctrler->stability_treshold             = _stability_th(this);
+  cngctrler->owd_corr_cng_th                = _owd_corr_cng_th(this);
+  cngctrler->owd_corr_dist_th               = _owd_corr_dist_th(this);
 
 }
 
@@ -695,18 +711,11 @@ done:
 static void _reduce_target(FBRASubController *this, gint32 *target)
 {
   gint32 result;
+  gdouble factor;
 //  g_print("tfrc: %d, rtt: %f\n", _get_tfrc(this), _RTT(this));
-
   this->bottleneck_point = MIN(_TR(this), _GP(this));
-  if(_FD(this) < 0.02){
-    result = CONSTRAIN(.6, .9, _fbstat(this).stability / _stability_th(this)) * _SR(this);
-    g_print("fd < .02: %f * %d ->%d\n",
-            CONSTRAIN(.6, .9, _fbstat(this).stability / _stability_th(this)),
-            _SR(this), result);
-  }else{
-    result = CONSTRAIN(.6, .9, 1.-_FD(this)/2.) * _SR(this);
-    g_print("fd > .02: %f * %d - tfrc: %d->%d\n", CONSTRAIN(.6, .9, 1.-_FD(this)/2.), _SR(this), _get_tfrc(this), result);
-  }
+  factor = (_FD(this) < 0.02) ? (_fbstat(this).stability / _stability_th(this)) : (1.-_FD(this)/2.);
+  result = CONSTRAIN(.6, .9, factor) * _SR(this);
   *target = result;
 }
 
@@ -717,11 +726,19 @@ static void _corrigate_taget(FBRASubController *this, gint32 *target)
 //  }else{
 //    *target = _GP(this) * .9;
 //  }
-  if(this->gp_hat < _TR(this) * .9){
-    *target = this->gp_hat * .6;
+  if(_priv(this)->corrigate_num <= 2){
+    *target *= .9;
+  }else if(_priv(this)->corrigate_num <= 4){
+    *target *= .8;
   }else{
-    *target =  this->gp_hat * .9;
+    *target *= .6;
   }
+  ++_priv(this)->corrigate_num;
+//  if(this->gp_hat < _TR(this) * .9){
+//    *target = this->gp_hat * .6;
+//  }else{
+//    *target =  this->gp_hat * .9;
+//  }
 }
 
 void
@@ -731,19 +748,18 @@ _reduce_stage(
   gint32   target_rate = this->target_bitrate;
   GstClockTime approve_interval = MIN(GST_SECOND, _RTT(this));
 
-  if(_GP(this) < _TR(this)){
-    this->bottleneck_point = _GP(this);
-    _corrigate_taget(this, &target_rate);
-    goto done;
-  }
-
   if(_owd_corr_cng_th(this) < _owd_corr(this)){
+    if(_GP(this) < _TR(this) && this->last_corrigated < _now(this) - _RTT(this)){
+      this->bottleneck_point = _GP(this);
+      _corrigate_taget(this, &target_rate);
+      this->last_corrigated = _now(this);
+    }
     goto done;
   }else if(!_priv(this)->tr_gp_approved || _now(this) - approve_interval < _priv(this)->tr_gp_approve_started){
     goto done;
   }
 
-  this->owd_approvement = TRUE;
+//  this->owd_approvement = TRUE;
   _set_event(this, EVENT_SETTLED);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
   _reset_monitoring(this);
@@ -853,13 +869,6 @@ _increase_stage(
   }else if(_now(this) - _get_approval_interval(this) < this->increasement_started){
     goto done;
   }
-//  if(!_priv(this)->tr_approved || !_priv(this)->gp_approved){
-//    goto done;
-//  }else if(_now(this) - 2 * _RTT(this) < _priv(this)->tr_approved_time){
-//    goto done;
-//  }else if(_now(this) - 2 * _RTT(this) < _priv(this)->gp_approved_time){
-//    goto done;
-//  }
 
   _start_monitoring(this);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
@@ -941,6 +950,7 @@ void _switch_stage_to(
        this->stage_fnc = _keep_stage;
      break;
      case STAGE_REDUCE:
+       _priv(this)->corrigate_num = 0;
        this->congestion_detected = _now(this);
        this->stage_fnc = _reduce_stage;
      break;
@@ -962,13 +972,21 @@ void _switch_stage_to(
 void _start_increasemet(FBRASubController *this, gint32 *increased_target_rate)
 {
   gint32 increasement = 0;
+  gdouble restriction;
+  gdouble off;
+
   *increased_target_rate = MIN(_GP(this), _SR(this));
-  if(_does_near_to_bottleneck_point(this)){
-    increasement = this->monitored_bitrate * _btl_inc_fac(this);
+  off = _off2_target(this);
+  restriction = (1.-off) * _restrict_fac(this);
+
+//  g_print("btl: %d, tr: %d, restriction: %f\n", this->bottleneck_point, this->target_bitrate, restriction);
+
+  increasement = this->monitored_bitrate * (1.-restriction);
+  if(_max_ramp_up(this)){
+    increasement = CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), increasement);
   }else{
-    increasement = this->monitored_bitrate;
+    increasement = MAX(_min_ramp_up(this), increasement);
   }
-  increasement = CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), increasement);
   *increased_target_rate += increasement;
   this->increasement_started = _now(this);
 }
@@ -983,26 +1001,20 @@ void _reset_monitoring(FBRASubController *this)
 void _start_monitoring(FBRASubController *this)
 {
   guint interval;
-  if(_does_near_to_bottleneck_point(this) && _min_target(this) * 1.5 < this->bottleneck_point){
-    if(_TR(this) < this->bottleneck_point){
-      gdouble factor;
-      factor = 1.+ 1./(gdouble)_mon_btl_int(this);
-      interval = _calculate_monitoring_interval(this, this->bottleneck_point * factor);
-    }else{
-      interval = _mon_btl_int(this);
-    }
-    interval = MAX(_mon_min_int(this), interval);
-  }else{
-    gdouble off;
-    off = _TR(this) - MAX(_btlp(this), _min_target(this));
-    off /= _TR(this);
-    off = MAX(0., off);
-    interval = (1.-off) * _mon_min_int(this) + off * _mon_max_int(this);
-  }
+  gdouble off;
+  off = _off_target(this);
+  interval = (1.-off) * _mon_min_int(this) + off * _mon_max_int(this);
+
   while(_TR(this) / interval < _min_ramp_up(this) && _mon_min_int(this) < interval){
     --interval;
   }
-  g_print("tr: %d interval: %d btl: %d\n", _TR(this), interval, this->bottleneck_point);
+  while(_max_ramp_up(this) < _TR(this) / interval && interval < _mon_max_int(this)){
+    ++interval;
+  }
+
+//  g_print("btl: %d, tr: %d, interval: %d\n", this->bottleneck_point, this->target_bitrate, interval);
+
+//  g_print("tr: %d interval: %d btl: %d\n", _TR(this), interval, this->bottleneck_point);
   _set_monitoring_interval(this, interval);
   this->monitoring_started = _now(this);
 }
@@ -1014,7 +1026,7 @@ void _setup_monitoring(FBRASubController *this)
 
   if(0 < this->bottleneck_point){
     scl  = _TR(this) - this->bottleneck_point;
-    scl /= this->bottleneck_point * _btl_eps(this);
+    scl /= this->bottleneck_point * _restrict_fac(this);
     scl *= scl;
   }else{
     scl =  (gdouble) _priv(this)->min_target_bitrate;
@@ -1157,8 +1169,6 @@ void _params_out(FBRASubController *this)
    "|                                               |                   |\n"
    "| bottleneck_increasement_factor                | %-18.3f|\n"
    "|                                               |                   |\n"
-   "| bottleneck_epsilon                            | %-18.3f|\n"
-   "|                                               |                   |\n"
    "| normal_monitoring_interval                    | %-18.3f|\n"
    "|                                               |                   |\n"
    "| bottleneck_monitoring_interval                | %-18.3f|\n"
@@ -1174,21 +1184,18 @@ void _params_out(FBRASubController *this)
    "| min_target_bitrate                            | %-18d|\n"
    "|                                               |                   |\n"
    "| max_target_bitrate                            | %-18d|\n"
-   "|                                               |                   |\n"
-   "| reduce_target_factor                          | %-18.3f|\n"
    "+-----------------------------------------------+-------------------+\n",
 
-   _priv(this)->bottleneck_increasement_factor   ,
-   _priv(this)->bottleneck_epsilon               ,
-   _priv(this)->normal_probe_interval       ,
-   _priv(this)->bottleneck_probe_interval   ,
+   _priv(this)->restrictivity_factor   ,
+   _priv(this)->min_approve_interval       ,
+   _priv(this)->max_approve_interval   ,
    _priv(this)->min_monitoring_interval          ,
    _priv(this)->max_monitoring_interval          ,
    _priv(this)->min_ramp_up_bitrate              ,
    _priv(this)->max_ramp_up_bitrate              ,
    _priv(this)->min_target_bitrate               ,
-   _priv(this)->max_target_bitrate               ,
-   _priv(this)->reduce_target_factor
+   _priv(this)->max_target_bitrate
+
    );
 }
 

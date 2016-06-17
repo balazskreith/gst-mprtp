@@ -50,15 +50,17 @@ struct _FBRAFBProcessor
   GQueue*                  sent_in_1s;
   GQueue*                  acked;
 
+  gint32                   measurements_num;
+
 
   FBRAFBProcessorStat      stat;
   PercentileTracker*       owd_ltt;
   NumsTracker*             bytes_in_flight;
 
   GstClockTime             last_discard;
-  GstClockTime             last_delay;
-  GstClockTime             last_delay_t1;
-  GstClockTime             last_delay_t2;
+//  GstClockTime             last_delay;
+//  GstClockTime             last_delay_t1;
+//  GstClockTime             last_delay_t2;
 };
 
 struct _FBRAFBProcessorClass{

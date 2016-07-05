@@ -72,7 +72,8 @@ typedef struct _MPRTPSubflowFBRACngCtrlerParams{
   gdouble             restrictivity_factor;
   gdouble             approvement_epsilon;
 
-  gdouble             discad_cong_treshold;
+  gdouble             discard_cong_treshold;
+  gdouble             discard_dist_treshold;
   gdouble             stability_treshold;
   gdouble             owd_corr_cng_th;
 
@@ -172,7 +173,7 @@ static gchar default_path_3_tx_ip[255];
 static gchar *testseq      = NULL;
 static gchar default_testseq[255];
 
-static int logging              = 1;
+static int logging              = 0;
 static int owd_th               = 200;
 static int discard_th           = 50;
 static int lost_th              = 500;
@@ -180,10 +181,10 @@ static int spike_delay_th       = 150;
 static int spike_var_th         = 32;
 static int rtcp_interval_type   = 2;
 static int report_timeout       = 0;
-static int controlling_mode     = 1;
+static int controlling_mode     = 2;
 static int sending_target       = 500000;
 static int path1_active         = 1;
-static int path2_active         = 1;
+static int path2_active         = 0;
 static int path3_active         = 0;
 static int fec_interval         = 0;
 static int fec_min_window       = 0;
@@ -425,15 +426,15 @@ static void _setup_test_params(void)
     }
 
   if(path_1_tx_ip == NULL){
-      sprintf(default_path_1_tx_ip, "10.0.0.2");
+      sprintf(default_path_1_tx_ip, "10.0.0.6");
       path_1_tx_ip = default_path_1_tx_ip;
     }
   if(path_2_tx_ip == NULL){
-      sprintf(default_path_2_tx_ip, "10.0.1.2");
+      sprintf(default_path_2_tx_ip, "10.0.1.6");
       path_2_tx_ip = default_path_2_tx_ip;
     }
   if(path_3_tx_ip == NULL){
-      sprintf(default_path_3_tx_ip, "10.0.2.2");
+      sprintf(default_path_3_tx_ip, "10.0.2.6");
       path_3_tx_ip = default_path_3_tx_ip;
     }
 

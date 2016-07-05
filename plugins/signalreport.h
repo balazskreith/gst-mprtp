@@ -26,7 +26,8 @@ typedef struct _MPRTPSubflowFBRACngCtrlerParams{
   gdouble             restrictivity_factor;
   gdouble             approvement_epsilon;
 
-  gdouble             discad_cong_treshold;
+  gdouble             discard_dist_treshold;
+  gdouble             discard_cong_treshold;
   gdouble             stability_treshold;
   gdouble             owd_corr_cng_th;
 

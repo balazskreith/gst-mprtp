@@ -288,7 +288,7 @@ static void _change_controlling_mode(RcvController *this, Subflow *subflow, guin
       subflow->regular_report_enabled   = TRUE;
       subflow->fb_report_enabled        = TRUE;
       if(ricalcer_rtcp_fb_allowed(subflow->ricalcer) == FALSE){
-        g_warning("RTCP Immediate feedback message is not allowed, although FBRA requires it. FBRA will send it anyway.");
+        g_warning("RTCP Immediate feedback message is not allowed, although FBRA+ requires it. FBRA+ will send it anyway.");
       }
       break;
     default:

@@ -50,14 +50,6 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 //if target close to the bottleneck, the increasement will be multiplied by this factor
 #define RESTRICTIVITY_FACTOR 0.5
 
-//determine the epsilon factor around the target rate indicate weather we close to the bottleneck or not.
-//#define BOTTLENECK_EPSILON .25
-
-//if target bitrate is close to the bottleneck, monitoring interval is requested for this interval
-//note if the target/interval is higher than the maximum ramp up speed, then monitoring is
-//restricted to the max_ramp_up
-//#define BOTTLENECK_MONITORING_INTERVAL 14
-
 //determine the minimum interval in seconds must be stay in probe stage
 //before the target considered to be accepted
 #define MIN_APPROVE_INTERVAL 1.0
@@ -85,11 +77,11 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 //Max target_bitrate [bps] - 0 means infinity
 #define TARGET_BITRATE_MAX 0
 
-//determines the reduction factor applies on the target bitrate if it is in reduced stage
-//#define REDUCE_TARGET_FACTOR 0.6
-
 //determines the treshold for utilization, in which below the path considered to be congested
-#define DISCARD_CONGESTION_TRESHOLD 0.1
+#define DISCARD_CONGESTION_TRESHOLD 0.25
+
+//determines the treshold for utilization, in which below the path considered to be distorted
+#define DISCARD_DISTORTION_TRESHOLD 0.0
 
 //determines a treshold for trend calculations, in which above the KEEP stage not let it to PROBE
 #define OWD_CORR_DISTORTION_TRESHOLD 1.75
@@ -101,7 +93,7 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 #define THROTTLING_ALLOWED FALSE
 
 //approvement epsilon
-#define APPROVEMENT_EPSILON 0.15
+#define APPROVEMENT_EPSILON 0.25
 
 //Stability treshold
 #define STABILITY_TRESHOLD 0.5
@@ -169,6 +161,7 @@ struct _Private{
   gdouble             stability_treshold;
 
   gdouble             discad_cong_treshold;
+  gdouble             discad_dist_treshold;
 
   gdouble             owd_corr_dist_th;
   gdouble             owd_corr_cng_th;
@@ -215,7 +208,8 @@ struct _Private{
 
 #define _appr_eps(this)               _priv(this)->approvement_epsilon
 
-#define _FD_cong_th(this)        _priv(this)->discad_cong_treshold
+#define _FD_cong_th(this)             _priv(this)->discad_cong_treshold
+#define _FD_dist_th(this)             _priv(this)->discad_dist_treshold
 
 #define _min_appr_int(this)           _priv(this)->min_approve_interval
 #define _max_appr_int(this)           _priv(this)->max_approve_interval
@@ -290,18 +284,9 @@ _start_monitoring(
     FBRASubController *this);
 
 static void
-_setup_monitoring(
-    FBRASubController *this);
-
-static void
 _set_monitoring_interval(
     FBRASubController *this,
     guint interval);
-
-static guint
-_calculate_monitoring_interval(
-    FBRASubController *this,
-    guint32 desired_bitrate);
 
 static void
 _change_target_bitrate(FBRASubController *this, gint32 new_target);
@@ -363,6 +348,7 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->min_target_bitrate               = TARGET_BITRATE_MIN;
   _priv(this)->max_target_bitrate               = TARGET_BITRATE_MAX;
   _priv(this)->discad_cong_treshold             = DISCARD_CONGESTION_TRESHOLD;
+  _priv(this)->discad_dist_treshold             = DISCARD_DISTORTION_TRESHOLD;
   _priv(this)->owd_corr_cng_th                  = OWD_CORR_CONGESTION_TRESHOLD;
   _priv(this)->owd_corr_dist_th                 = OWD_CORR_DISTORTION_TRESHOLD;
 
@@ -379,6 +365,7 @@ gboolean fbrasubctrler_path_approver(gpointer data, GstRTPBuffer *rtp)
   FBRASubController *this = data;
   _priv(this)->avg_rtp_payload *= .9;
   _priv(this)->avg_rtp_payload += gst_rtp_buffer_get_payload_len(rtp) * .1;
+
   return TRUE;
 }
 
@@ -438,6 +425,9 @@ static void _update_rate_correlations(FBRASubController *this)
       _priv(this)->gp_approved_time = _now(this);
     }
   }
+
+//  g_print("TR appr: %d, %f - %d - %f\n", _priv(this)->tr_approved, _TR(this) * (1. - _appr_eps(this)), _SR(this), _TR(this) * (1. + _appr_eps(this)));
+//  g_print("GP appr: %d, %f - %d - %f\n", _priv(this)->gp_approved, _TR(this) * (1. - _appr_eps(this)), _GP(this), _TR(this) * (1. + _appr_eps(this)));
 
   if(_priv(this)->tr_approved && _priv(this)->gp_approved){
     if(!_priv(this)->tr_gp_approved){
@@ -568,7 +558,8 @@ void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRa
   _restrict_fac(this)                           = cngctrler->restrictivity_factor;
   _appr_eps(this)                               = cngctrler->approvement_epsilon;
 
-  _FD_cong_th(this)                             = cngctrler->discad_cong_treshold;
+  _FD_cong_th(this)                             = cngctrler->discard_cong_treshold;
+  _FD_dist_th(this)                             = cngctrler->discard_dist_treshold;
   _stability_th(this)                           = cngctrler->stability_treshold;
   _owd_corr_cng_th(this)                        = cngctrler->owd_corr_cng_th;
   _owd_corr_dist_th(this)                       = cngctrler->owd_corr_dist_th;
@@ -591,7 +582,8 @@ void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedR
   cngctrler->restrictivity_factor           = _restrict_fac(this);
   cngctrler->approvement_epsilon            = _appr_eps(this);
 
-  cngctrler->discad_cong_treshold           = _FD_cong_th(this);
+  cngctrler->discard_dist_treshold          = _FD_dist_th(this);
+  cngctrler->discard_cong_treshold          = _FD_cong_th(this);
   cngctrler->stability_treshold             = _stability_th(this);
   cngctrler->owd_corr_cng_th                = _owd_corr_cng_th(this);
   cngctrler->owd_corr_dist_th               = _owd_corr_dist_th(this);
@@ -677,12 +669,13 @@ void fbrasubctrler_report_update(
     this->gp_hat = alpha * _GP(this) + (1.-alpha) * this->gp_hat;
 //    g_print("gp_hat: %f (alpha: %f) gp: %d\n", this->gp_hat, alpha, _GP(this));
   }
+
   this->owd_approvement = FALSE;
   _execute_stage(this);
   this->owd_approvement |= _priv(this)->stage != STAGE_REDUCE;
 
 //
-//    g_print("TR: %-7d|GP:%-7d|tr_appred: %1d|owd_stt: %-3lu/owd_ltt: %-3lu=%3.2f|SR: %-7d|stb: %3.2f|stg: %d|sta: %d|btl: %-7d|rtt: %-3.2f\n",
+//    g_print("TR: %-7d|GP:%-7d|tr_appred: %1d|owd_stt: %-3lu/owd_ltt: %-3lu=%3.2f|SR: %-7d|stb: %3.2f|stg: %d|sta: %d|FD: %-7f|rtt: %-3.2f\n",
 //            _TR(this),
 //            _fbstat(this).goodput_bytes * 8,
 //            _priv(this)->tr_gp_approved,
@@ -693,7 +686,7 @@ void fbrasubctrler_report_update(
 //            _fbstat(this).stability,
 //            _priv(this)->stage,
 //            mprtps_path_get_state(this->path),
-//            this->bottleneck_point,
+//            _FD(this),
 //            GST_TIME_AS_MSECONDS(_RTT(this))
 //        );
 
@@ -701,8 +694,6 @@ void fbrasubctrler_report_update(
     fbrafbprocessor_approve_owd(this->fbprocessor);
   }
   ++this->measurements_num;
-
-  DISABLE_LINE _setup_monitoring(this);
 
 done:
   return;
@@ -721,11 +712,7 @@ static void _reduce_target(FBRASubController *this, gint32 *target)
 
 static void _corrigate_taget(FBRASubController *this, gint32 *target)
 {
-//  if(_GP(this) < _TR(this) * .9){
-//    *target = _GP(this) * .6;
-//  }else{
-//    *target = _GP(this) * .9;
-//  }
+
   if(_priv(this)->corrigate_num <= 2){
     *target *= .9;
   }else if(_priv(this)->corrigate_num <= 4){
@@ -734,11 +721,6 @@ static void _corrigate_taget(FBRASubController *this, gint32 *target)
     *target *= .6;
   }
   ++_priv(this)->corrigate_num;
-//  if(this->gp_hat < _TR(this) * .9){
-//    *target = this->gp_hat * .6;
-//  }else{
-//    *target =  this->gp_hat * .9;
-//  }
 }
 
 void
@@ -782,7 +764,7 @@ _keep_stage(
     goto done;
   }
 
-  if(_owd_stability(this) < _stability_th(this) || _owd_corr_dist_th(this) < _owd_corr(this) || _fbstat(this).recent_discarded){
+  if(_owd_stability(this) < _stability_th(this) || _owd_corr_dist_th(this) < _owd_corr(this) || _FD_dist_th(this) < _FD(this)){
     _set_event(this, EVENT_DISTORTION);
     this->last_distorted = now;
   }else if(_state(this) != MPRTPS_PATH_STATE_STABLE){
@@ -817,7 +799,7 @@ _probe_stage(
     goto done;
   }
 
-  if(_owd_stability(this) < _stability_th(this) || _owd_corr_dist_th(this) < _owd_corr(this) || _fbstat(this).recent_discarded){
+  if(_owd_stability(this) < _stability_th(this) || _owd_corr_dist_th(this) < _owd_corr(this) || _FD_dist_th(this) < _FD(this)){
     this->bottleneck_point = MIN(_TR(this), _GP(this));
     target_rate = this->bottleneck_point * .85;
     _disable_monitoring(this);
@@ -853,7 +835,7 @@ _increase_stage(
     goto done;
   }
 
-  if(_owd_stability(this) < _stability_th(this) || _owd_corr_dist_th(this) < _owd_corr(this) || _fbstat(this).recent_discarded){
+  if(_owd_stability(this) < _stability_th(this) || _owd_corr_dist_th(this) < _owd_corr(this) || _FD_dist_th(this) < _FD(this)){
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
@@ -975,7 +957,9 @@ void _start_increasemet(FBRASubController *this, gint32 *increased_target_rate)
   gdouble restriction;
   gdouble off;
 
-  *increased_target_rate = MIN(_GP(this), _SR(this));
+//  *increased_target_rate = MIN(_GP(this), _SR(this));
+//  *increased_target_rate = MAX(_GP(this), _SR(this));
+  *increased_target_rate = (_GP(this) + _SR(this))>>1;
   off = _off2_target(this);
   restriction = (1.-off) * _restrict_fac(this);
 
@@ -1019,26 +1003,6 @@ void _start_monitoring(FBRASubController *this)
   this->monitoring_started = _now(this);
 }
 
-void _setup_monitoring(FBRASubController *this)
-{
-  guint interval;
-  gdouble plus_rate = 0, scl = 0;
-
-  if(0 < this->bottleneck_point){
-    scl  = _TR(this) - this->bottleneck_point;
-    scl /= this->bottleneck_point * _restrict_fac(this);
-    scl *= scl;
-  }else{
-    scl =  (gdouble) _priv(this)->min_target_bitrate;
-    scl /= (gdouble) _TR(this);
-    scl *= scl;
-  }
-  scl = CONSTRAIN(1./(gdouble)_mon_max_int(this), 1./(gdouble)_mon_min_int(this), scl);
-  plus_rate = _TR(this) * scl;
-  plus_rate = CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), plus_rate);
-  interval = _calculate_monitoring_interval(this, plus_rate);
-  _set_monitoring_interval(this, interval);
-}
 
 void _set_monitoring_interval(FBRASubController *this, guint interval)
 {
@@ -1050,37 +1014,6 @@ void _set_monitoring_interval(FBRASubController *this, guint interval)
   this->monitored_bitrate = 0;
   mprtps_path_set_monitoring_interval(this->path, this->monitoring_interval);
   return;
-}
-
-guint _calculate_monitoring_interval(FBRASubController *this, guint32 desired_bitrate)
-{
-  gdouble actual, target, ratio;
-  guint monitoring_interval = 0;
-  if(desired_bitrate <= 0){
-     goto exit;
-   }
-  actual = _TR(this);
-  //target = actual + (gdouble) desired_bitrate;
-  target = desired_bitrate;
-  ratio = target / actual;
-
-  if(ratio > 1.49) monitoring_interval = 2;
-  else if(ratio > 1.329) monitoring_interval = 3;
-  else if(ratio > 1.249) monitoring_interval = 4;
-  else if(ratio > 1.19) monitoring_interval = 5;
-  else if(ratio > 1.159) monitoring_interval = 6;
-  else if(ratio > 1.139) monitoring_interval = 7;
-  else if(ratio > 1.119) monitoring_interval = 8;
-  else if(ratio > 1.109) monitoring_interval = 9;
-  else if(ratio > 1.09) monitoring_interval = 10;
-  else if(ratio > 1.089) monitoring_interval = 11;
-  else if(ratio > 1.079) monitoring_interval = 12;
-  else if(ratio > 1.069) monitoring_interval = 13;
-  else  monitoring_interval = 14;
-
-exit:
-  return monitoring_interval;
-
 }
 
 void _change_target_bitrate(FBRASubController *this, gint32 new_target)

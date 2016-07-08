@@ -34,7 +34,7 @@ typedef struct _GstMprtpreceiverClass GstMprtpreceiverClass;
 struct _GstMprtpreceiver
 {
   GstElement base_mprtpreceiver;
-
+  GstClock *sysclock;
   GRWLock rwmutex;
   GList*  subflows;
   GstPad* mprtp_srcpad;

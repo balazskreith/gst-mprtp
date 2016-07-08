@@ -528,7 +528,11 @@ void fbrasubctrler_time_update(FBRASubController *this)
   //check weather monitoring interval doesn't exceed max ramp up limit.
   this->monitored_bitrate = mprtps_path_get_monitored_bitrate(this->path, &this->monitored_packets);
 
-  fbinterval_th = CONSTRAIN(100 * GST_MSECOND, 300 * GST_MSECOND, fbrafbprocessor_get_fbinterval(this->fbprocessor) * 3);
+  //This sophisticated solution for backward congestion indicator simply too sensitive
+  //fbinterval_th = CONSTRAIN(100 * GST_MSECOND, 300 * GST_MSECOND, fbrafbprocessor_get_fbinterval(this->fbprocessor) * 3);
+
+  //This might be harsher
+  fbinterval_th = 300 * GST_MSECOND;
 
   if(!_bcongestion(this) && this->last_fb_arrived < _now(this) - fbinterval_th){
     _disable_monitoring(this);
@@ -625,18 +629,6 @@ static gint32 _get_tfrc(FBRASubController *this)
   return result;
 }
 
-//static gint32 _get_tfrc2(FBRASubController *this)
-//{
-//  gdouble result = 0.;
-//  gdouble rtt,p;
-//  rtt = _fbstat(this).RTT;
-//  rtt /= (gdouble) GST_SECOND;
-//  p   =  _FD(this);
-//  if(p == 0. ) p= 0.001;
-//  result = _priv(this)->avg_rtp_payload + 48;
-//  result /= (rtt * (sqrt((2.*p)/3.)));
-//  return result * 8;
-//}
 
 void fbrasubctrler_report_update(
                          FBRASubController *this,

@@ -52,6 +52,23 @@ GST_DEBUG_CATEGORY_STATIC (sndctrler_debug_category);
 
 G_DEFINE_TYPE (SndController, sndctrler, G_TYPE_OBJECT);
 
+#define PROFILING(func) \
+{  \
+  GstClockTime start, elapsed; \
+  start = _now(this); \
+  func; \
+  elapsed = GST_TIME_AS_MSECONDS(_now(this) - start); \
+  if(0 < elapsed) g_print("elapsed time in ms: %lu\n", elapsed); \
+} \
+
+#define PROFILING2(msg, func) \
+{  \
+  GstClockTime start, elapsed; \
+  start = _now(this); \
+  func; \
+  elapsed = GST_TIME_AS_MSECONDS(_now(this) - start); \
+  if(0 < elapsed) {g_print(msg" elapsed time in ms: %lu\n", elapsed); }\
+} \
 
 typedef struct _Subflow Subflow;
 
@@ -359,10 +376,6 @@ static void _fec_rate_refresh_per_subflow(Subflow *subflow, gpointer data)
   this->fec_sum_bitrate     += fec_byterate * 8;
   this->fec_sum_packetsrate += fec_packetsrate;
 
-  mprtp_logger("fecrates.csv",
-                 "%u,",
-                 (fec_byterate + 28 * 8 /*rtp+UDP fixed header*/ * fec_packetsrate) / 1000
-    );
 }
 
 void _fec_rate_refresher(SndController *this)
@@ -371,10 +384,6 @@ void _fec_rate_refresher(SndController *this)
   this->fec_sum_bitrate = 0;
   _subflow_iterator(this, _fec_rate_refresh_per_subflow, this);
 
-  mprtp_logger("fecrates.csv",
-                   "%u\n",
-                   (this->fec_sum_bitrate + 28 * 8 /*rtp+UDP fixed header*/ *  this->fec_sum_packetsrate) / 1000
-      );
 }
 
 
@@ -481,6 +490,7 @@ sndctrler_ticker_run (void *data)
   GstClockID clock_id;
 
   this = SNDCTRLER (data);
+
   THIS_WRITELOCK (this);
   _orp_producer_main(this);
   _fec_rate_refresher(this);
@@ -496,6 +506,8 @@ sndctrler_ticker_run (void *data)
   next_scheduler_time = _now(this) + 100 * GST_MSECOND;
   ++this->ticknum;
   THIS_WRITEUNLOCK (this);
+
+
   clock_id = gst_clock_new_single_shot_id (this->sysclock, next_scheduler_time);
 
   if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
@@ -578,12 +590,14 @@ _signal_update (Subflow * subflow, gpointer data)
   subratectrler_signal_update(subflow->rate_controller, &subsignal->ratectrler);
 }
 
+
 void
 sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
 {
   Subflow *subflow;
   GstMPRTCPReportSummary *summary;
   THIS_WRITELOCK (this);
+
   summary = &this->reports_summary;
   memset(summary, 0, sizeof(GstMPRTCPReportSummary));
 

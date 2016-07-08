@@ -155,6 +155,7 @@ static gchar *yuvsrc_file        = NULL;
 static gchar default_yuvsrc_file[255];
 static int yuvsrc_width          = 352;
 static int yuvsrc_height         = 288;
+static int save_received_yuvfile = 0;
 
 static gchar *path_1_rx_ip      = NULL;
 static gchar default_path_1_rx_ip[255];
@@ -206,6 +207,7 @@ static int mpath_keyfiltering = 0;
 static GOptionEntry entries[] =
 {
     { "logsdir", 0, 0, G_OPTION_ARG_STRING, &logsdir, "Logsdir", NULL },
+    { "save_received_yuvfile", 0, 0, G_OPTION_ARG_INT, &save_received_yuvfile, "Save received YUVfile", NULL },
     { "yuvsrc_file", 0, 0, G_OPTION_ARG_STRING, &yuvsrc_file, "Yuvsrc file", NULL },
     { "yuvsrc_width", 0, 0, G_OPTION_ARG_INT, &yuvsrc_width, "Yuvsrc width", NULL },
     { "yuvsrc_height", 0, 0, G_OPTION_ARG_INT, &yuvsrc_height, "Yuvsrc width", NULL },

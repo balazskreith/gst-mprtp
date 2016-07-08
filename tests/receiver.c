@@ -91,6 +91,7 @@ setup_ghost_sink (GstElement * sink, GstBin * bin)
   gst_element_add_pad (GST_ELEMENT (bin), binPad);
 }
 
+
 static SessionData *
 make_video_session (guint sessionNum)
 {
@@ -121,6 +122,57 @@ make_video_session (guint sessionNum)
       );
 
   g_object_set (sink, "sync", FALSE, NULL);
+  return ret;
+}
+
+
+
+static SessionData *
+make_video_session_and_save_yuvfile (guint sessionNum)
+{
+  gint framerate = 25;
+  SessionData *ret = session_new (sessionNum);
+  GstBin *bin = GST_BIN (gst_bin_new ("video"));
+  GstElement *queue = gst_element_factory_make ("queue", "q1");
+  GstElement *depayloader = gst_element_factory_make ("rtpvp8depay", "depayloader");
+  GstElement *decoder = gst_element_factory_make ("vp8dec", "decoder");
+
+  GstElement *converter = gst_element_factory_make ("videoconvert", "converter");
+  GstElement *autovideosink = gst_element_factory_make ("autovideosink", "autovideoplayer");
+
+  GstElement *tee       = gst_element_factory_make("tee", "splitter");
+  GstElement *ply_queue = gst_element_factory_make("queue", "playqueue");
+  GstElement *rec_queue = gst_element_factory_make("queue", "recorderqueue");
+  GstElement *filesink  = gst_element_factory_make("filesink", "recorder");
+
+  g_object_set (filesink, "location", "destination.yuv", NULL);
+//  gst_bin_add_many (bin, depayloader, decoder, converter, queue, autovideosink, NULL);
+//  gst_element_link_many (queue, depayloader, decoder, converter, autovideosink, NULL);
+
+  gst_bin_add_many (bin, queue, depayloader, decoder, converter, tee, ply_queue,
+                    autovideosink, rec_queue, filesink, NULL);
+  gst_element_link_many (queue, depayloader, decoder, converter, tee, NULL);
+
+  gst_element_link_pads (tee, "src_1", ply_queue, "sink");
+  gst_element_link_many (ply_queue, autovideosink, NULL);
+
+  gst_element_link_pads (tee, "src_2", rec_queue, "sink");
+  gst_element_link_many (rec_queue, filesink, NULL);
+
+  setup_ghost_sink (queue, bin);
+
+  ret->output = GST_ELEMENT (bin);
+
+  ret->caps = gst_caps_new_simple ("application/x-rtp",
+      "media", G_TYPE_STRING, "video",
+      "clock-rate", G_TYPE_INT, 90000,
+      "width", G_TYPE_INT, yuvsrc_width,
+      "height", G_TYPE_INT, yuvsrc_height,
+      "framerate", GST_TYPE_FRACTION, framerate, 1,
+      "encoding-name", G_TYPE_STRING, "VP8", NULL
+      );
+
+  g_object_set (autovideosink, "sync", FALSE, NULL);
   return ret;
 }
 
@@ -413,7 +465,11 @@ main (int argc, char **argv)
 //  g_object_set (rtpBin, "latency", 200, "do-retransmission", TRUE,
 //      "rtp-profile", GST_RTP_PROFILE_AVPF, NULL);
 
-  videoSession = make_video_session (0);
+  if(save_received_yuvfile){
+    videoSession = make_video_session_and_save_yuvfile (0);
+  }else{
+    videoSession = make_video_session (0);
+  }
 
   join_session (GST_ELEMENT (pipe), rtpBin, videoSession, 90000);
 

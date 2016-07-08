@@ -54,18 +54,19 @@ done
 
   PEER2_SND="$TEMPDIR/sender_2.sh"
   echo -n "./$SENDER" > $PEER2_SND
-  ./$CONFDIR/peer2params.sh >> $PEER2_SND
+  ./$CONFDIR/peer2params_ns_rcv.sh >> $PEER2_SND
   chmod 777 $PEER2_SND
 
   PEER1_RCV="$TEMPDIR/receiver_1.sh"
   echo "ntrt -c$CONFDIR/ntrt_rcv_meas.ini -m$CONFDIR/ntrt_rcv_rmcat3.cmds -t$DURATION &" > $PEER1_RCV
   echo -n "./$RECEIVER" >> $PEER1_RCV
   ./$CONFDIR/peer1params.sh >> $PEER1_RCV
+  echo -n "--save_received_yuvfile=0 " >> $PEER1_RCV 
   chmod 777 $PEER1_RCV
 
   PEER2_RCV="$TEMPDIR/receiver_2.sh"
   echo -n "./$RECEIVER" > $PEER2_RCV
-  ./$CONFDIR/peer2params.sh >> $PEER2_RCV
+  ./$CONFDIR/peer2params_ns_rcv.sh >> $PEER2_RCV
   chmod 777 $PEER2_RCV
 
   #start receiver and sender

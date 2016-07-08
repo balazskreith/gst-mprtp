@@ -16,7 +16,7 @@ RUNDIR=$SCRIPTSDIR"/runs"
 rm -R -f $LOGSDIR/*
 
 #setup defaults
-DURATION=180
+DURATION=150
 OWD_SND=100
 OWD_RCV=100
 
@@ -61,6 +61,7 @@ done
   echo "ntrt -c$CONFDIR/ntrt_rcv_meas.ini -t$DURATION &" > $PEER1_RCV
   echo -n "./$RECEIVER" >> $PEER1_RCV
   ./$CONFDIR/peer1params.sh >> $PEER1_RCV
+  echo -n "--save_received_yuvfile=0 " >> $PEER1_RCV 
   chmod 777 $PEER1_RCV
 
   PEER2_RCV="$TEMPDIR/receiver_2.sh"

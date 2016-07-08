@@ -113,6 +113,7 @@ setup_ghost (GstElement * src, GstBin * bin)
 }
 static GstElement *encoder;
 
+
 static SessionData *
 make_video_yuvfile_session (guint sessionNum)
 {
@@ -183,6 +184,100 @@ make_video_yuvfile_session (guint sessionNum)
 
   return session;
 }
+
+//-------------------------- ALTERNATE make_video_yuvfile_session BEGIN -------------------
+
+
+//This version of make_video_yuvfile_session saves the source yuv either!
+
+
+
+//static SessionData *
+//make_video_yuvfile_session (guint sessionNum)
+//{
+//  GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
+////  GstElement *videoSrc = gst_element_factory_make ("autovideosrc", NULL);
+//  GstElement *videoSrc = gst_element_factory_make ("multifilesrc", NULL);
+//  GstElement *videoParse = gst_element_factory_make ("videoparse", NULL);
+//  GstElement *videoConv = gst_element_factory_make("autovideoconvert", NULL);
+//  GstElement *payloader = gst_element_factory_make ("rtpvp8pay", NULL);
+//
+//  GstElement *plyqueue    = gst_element_factory_make("queue", "plyqueue");
+//  GstElement *recqueue    = gst_element_factory_make("queue", "recqueue");
+//  GstElement *recorder    = gst_element_factory_make("filesink", "recorder");
+//  GstElement *splitter    = gst_element_factory_make("tee", "splitter");
+//
+//
+//  GstCaps *videoCaps;
+//  SessionData *session;
+//  g_object_set (videoSrc,
+//                "location", yuvsrc_file,
+//                "loop", TRUE,
+//                NULL);
+//
+//  encoder = gst_element_factory_make ("vp8enc", NULL);
+//  //g_object_set (payloader, "config-interval", 2, NULL);
+//  g_object_set (encoder, "target-bitrate", sending_target, NULL);
+////  g_object_set (encoder, "end-usage", 1, NULL);
+////  g_object_set (encoder, "deadline", 20000, NULL);
+////  g_object_set (encoder, "undershoot", 100, NULL);
+////  g_object_set (encoder, "cpu-used", 0, NULL);
+////  g_object_set (encoder, "keyframe-mode", 0, NULL);
+///* values are inspired by webrtc.org values in vp8_impl.cc */
+//  g_object_set(encoder,
+//      "end-usage", 1, /* VPX_CBR */
+//      "deadline", G_GINT64_CONSTANT(1), /* VPX_DL_REALTIME */
+//      "cpu-used", -6,
+//      "min-quantizer", 2,
+//      "buffer-initial-size", 300,
+//      "buffer-optimal-size", 300,
+//      "buffer-size", 400,
+//      "dropframe-threshold", 30,
+//      "lag-in-frames", 0,
+//      "timebase", 1, 90000,
+//      "error-resilient", 1,
+////      "keyframe-mode", 1, /* VPX_KF_DISABLED */
+////      "keyframe-max-dist", 128,
+//      NULL);
+//
+//
+//  gst_bin_add_many (videoBin, videoConv, videoSrc, videoParse, encoder, payloader, NULL);
+//
+//  gst_bin_add_many (videoBin, plyqueue, recqueue, recorder, splitter, NULL);
+//  g_object_set (recorder, "location", "source.yuv", NULL);
+//
+//
+//  g_object_set (videoParse,
+//      "width", yuvsrc_width,
+//      "height", yuvsrc_height,
+//      "framerate", 25, 1,
+//      "format", 2,
+//      NULL);
+//
+////  gst_element_link (videoSrc, videoParse);
+//  gst_element_link (videoSrc, splitter);
+//  gst_element_link_pads (splitter, "src_1", plyqueue, "sink");
+//  gst_element_link_pads (splitter, "src_2", recqueue, "sink");
+//  gst_element_link (recqueue, recorder);
+//  gst_element_link (plyqueue, videoParse);
+//
+//
+//  gst_element_link (videoParse, encoder);
+//  gst_element_link (encoder, payloader);
+//
+////  g_object_set(videoSrc, "filter-caps", videoCaps, NULL);
+//
+//  setup_ghost (payloader, videoBin);
+//
+//  session = session_new (sessionNum);
+//  session->input = GST_ELEMENT (videoBin);
+//
+//  return session;
+//}
+
+
+//-------------------------- ALTERNATE make_video_yuvfile_session END -------------------
+
 
 static GstElement *
 request_aux_sender (GstElement * rtpbin, guint sessid, SessionData * session)

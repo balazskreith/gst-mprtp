@@ -57,6 +57,7 @@ struct _FBRAFBProcessor
   PercentileTracker*       owd_ltt;
   NumsTracker*             bytes_in_flight;
 
+  GstClockTime             congestion_detected;
   GstClockTime             last_discard;
 //  GstClockTime             last_delay;
 //  GstClockTime             last_delay_t1;
@@ -76,6 +77,7 @@ void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn);
 void fbrafbprocessor_get_stats (FBRAFBProcessor * this, FBRAFBProcessorStat* result);
 gint32 fbrafbprocessor_get_sent_bytes_in_1s(FBRAFBProcessor *this);
 GstClockTime fbrafbprocessor_get_fbinterval(FBRAFBProcessor *this);
+void fbrafbprocessor_record_congestion(FBRAFBProcessor *this);
 void fbrafbprocessor_approve_owd(FBRAFBProcessor *this);
 void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary);
 

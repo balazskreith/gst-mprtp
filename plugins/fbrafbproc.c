@@ -60,6 +60,7 @@ G_DEFINE_TYPE (FBRAFBProcessor, fbrafbprocessor, G_TYPE_OBJECT);
 
 static void fbrafbprocessor_finalize (GObject * object);
 static void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr);
+static GstClockTime _get_fbinterval(FBRAFBProcessor *this);
 static void _process_afb(FBRAFBProcessor *this, guint32 id, GstRTCPAFB_REPS *remb);
 static void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary);
 static void _unref_item(FBRAFBProcessor * this, FBRAFBProcessorItem* item);
@@ -84,9 +85,10 @@ static void _owd_ltt_pipe(gpointer data, PercentileTrackerPipeData *stats)
   FBRAFBProcessor *this = data;
   if(this->measurements_num < 5){
     this->stat.owd_ltt_median = 0;
-    return;
+  }else{
+    this->stat.owd_ltt_median = stats->percentile;
   }
-  this->stat.owd_ltt_median = stats->percentile;
+
 //  {
 //    gdouble bw;
 //    bw = this->stat.max_bytes_in_flight * 8;
@@ -94,6 +96,38 @@ static void _owd_ltt_pipe(gpointer data, PercentileTrackerPipeData *stats)
 //    g_print("bw est: %f\n", bw);
 //  }
 }
+
+//static gdouble _off_congestion(FBRASubController *this)
+//{
+//  GstClockTime elapsed,th_l,th_h;
+//  if(!this->congestion_detected){
+//    return 1.;
+//  }
+//  elapsed = GST_TIME_AS_MSECONDS(_now(this) - this->congestion_detected);
+//  th_l = GST_TIME_AS_MSECONDS(this->srtt);
+//  th_h = th_l * 3;
+//  if(th_h < elapsed){
+//    return 1.;
+//  }
+//  if(elapsed < th_l){
+//    return 0.;
+//  }
+//  elapsed -= th_l;
+//  return (gdouble)elapsed / (gdouble)th_h;
+//}
+
+
+//
+//static gdouble _owd_ltt_alpha(FBRASubController *this)
+//{
+//  gdouble scl;
+//  gdouble result;
+//  scl    = 1000 / GST_TIME_AS_MSECONDS(fbrafbprocessor_get_fbinterval(this->fbprocessor));
+//  result = _off_congestion(this) * _fbstat(this).stability;
+//  result *= result;
+//  result /= scl;
+//  return result;
+//}
 
 static void _BiF_max_pipe(gpointer data, gint64 max)
 {
@@ -294,9 +328,16 @@ GstClockTime fbrafbprocessor_get_fbinterval(FBRAFBProcessor *this)
 {
   GstClockTime result;
   THIS_READLOCK (this);
-  result = (1.0/MIN(50,MAX(10,(this->stat.goodput_bytes * 8)/20000))) * GST_SECOND;
+  result = _get_fbinterval(this);
   THIS_READUNLOCK(this);
   return result;
+}
+
+void fbrafbprocessor_record_congestion(FBRAFBProcessor *this)
+{
+  THIS_WRITELOCK (this);
+  this->congestion_detected = _now(this);
+  THIS_WRITEUNLOCK (this);
 }
 
 void fbrafbprocessor_approve_owd(FBRAFBProcessor *this)
@@ -304,6 +345,11 @@ void fbrafbprocessor_approve_owd(FBRAFBProcessor *this)
   THIS_WRITELOCK (this);
   percentiletracker_add(this->owd_ltt, this->stat.owd_stt_median);
   THIS_WRITEUNLOCK (this);
+}
+
+GstClockTime _get_fbinterval(FBRAFBProcessor *this)
+{
+  return (1.0/MIN(50,MAX(10,(this->stat.goodput_bytes * 8)/20000))) * GST_SECOND;
 }
 
 void _process_afb(FBRAFBProcessor *this, guint32 id, GstRTCPAFB_REPS *reps)

@@ -72,18 +72,18 @@ set style line 5 linecolor rgb '#662c91' linetype 5 linewidth 1
 if (flownum == 1){
   plot throughput_file using ($0*0.1):($1/125) with lines ls 1 title "Sending Rate", \
        throughput_file using ($0*0.1):($2/125) with boxes ls 3 title "FEC Rate", \
-       throughput_file using ($0*0.1):20 with lines ls 4 title "Path Capacity"
+       throughput_file using ($0*0.1):22 with lines ls 4 title "Path Capacity"
 }
 
 if (flownum == 2){
     plot throughput_file using ($0*0.1):(($1+$2)/125) with lines ls 1 title "Sending Rate", \
          throughput_file using ($0*0.1):(($7+$8)/125) with lines ls 2 title "Sending Rate 2", \
-         throughput_file using ($0*0.1):20 with lines ls 4 title "Path Capacity"
+         throughput_file using ($0*0.1):22 with lines ls 4 title "Path Capacity"
 }
 
 if (flownum == 3){
     plot throughput_file using ($0*0.1):(($1+$2)/125) with lines ls 1 title "Sending Rate", \
          throughput_file using ($0*0.1):(($7+$8)/125) with lines ls 2 title "Sending Rate 2", \
          throughput_file using ($0*0.1):(($13+$14)/125) with lines ls 3 title "Sending Rate 2", \
-         throughput_file using ($0*0.1):20 with lines ls 4 title "Path Capacity"
+         throughput_file using ($0*0.1):22 with lines ls 4 title "Path Capacity"
 }

@@ -51,8 +51,6 @@ struct _FBRASubController
   guint32                   monitored_packets;
   gint32                    bottleneck_point;
 
-  gdouble                   gp_hat;
-
   gint32                    max_target_point;
   gint32                    min_target_point;
   gint32                    target_bitrate;

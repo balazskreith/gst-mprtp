@@ -72,7 +72,7 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 
 //Min target_bitrate [bps]
 //#define TARGET_BITRATE_MIN 500000
-#define TARGET_BITRATE_MIN (SUBFLOW_DEFAULT_SENDING_RATE>>1)
+#define TARGET_BITRATE_MIN SUBFLOW_DEFAULT_SENDING_RATE
 
 //Max target_bitrate [bps] - 0 means infinity
 #define TARGET_BITRATE_MAX 0
@@ -532,13 +532,13 @@ void fbrasubctrler_time_update(FBRASubController *this)
   //fbinterval_th = CONSTRAIN(100 * GST_MSECOND, 300 * GST_MSECOND, fbrafbprocessor_get_fbinterval(this->fbprocessor) * 3);
 
   //This might be harsher
-  fbinterval_th = 300 * GST_MSECOND;
+  fbinterval_th = 150 * GST_MSECOND;
 
   if(!_bcongestion(this) && this->last_fb_arrived < _now(this) - fbinterval_th){
     _disable_monitoring(this);
-    _set_event(this, EVENT_CONGESTION);
+//    _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    _change_target_bitrate(this, MIN(_TR(this) * .9, _TR_t1(this)));
+    _change_target_bitrate(this, MIN(_TR(this) * 1.0, _TR_t1(this)));
     g_print("backward congestion fbinterval: %lu\n", fbinterval_th);
     _bcongestion(this) = TRUE;
     goto done;
@@ -629,7 +629,6 @@ static gint32 _get_tfrc(FBRASubController *this)
   return result;
 }
 
-
 void fbrasubctrler_report_update(
                          FBRASubController *this,
                          GstMPRTCPReportSummary *summary)
@@ -655,16 +654,17 @@ void fbrasubctrler_report_update(
 
   _update_rate_correlations(this);
   _update_fraction_discarded(this);
-  {
-    gdouble alpha;
-    alpha = MIN(.5, _fbstat(this).stability / 2.);
-    this->gp_hat = alpha * _GP(this) + (1.-alpha) * this->gp_hat;
-//    g_print("gp_hat: %f (alpha: %f) gp: %d\n", this->gp_hat, alpha, _GP(this));
-  }
 
-  this->owd_approvement = FALSE;
+//  this->owd_approvement = FALSE;
   _execute_stage(this);
-  this->owd_approvement |= _priv(this)->stage != STAGE_REDUCE;
+
+
+  if(0 < _RTT(this)){
+    this->owd_approvement = _RTT(this) < _now(this) - this->congestion_detected;
+  }else{
+    this->owd_approvement = TRUE;
+  }
+//  this->owd_approvement |= _priv(this)->stage != STAGE_REDUCE;
 
 //
 //    g_print("TR: %-7d|GP:%-7d|tr_appred: %1d|owd_stt: %-3lu/owd_ltt: %-3lu=%3.2f|SR: %-7d|stb: %3.2f|stg: %d|sta: %d|FD: %-7f|rtt: %-3.2f\n",
@@ -792,7 +792,7 @@ _probe_stage(
   }
 
   if(_owd_stability(this) < _stability_th(this) || _owd_corr_dist_th(this) < _owd_corr(this) || _FD_dist_th(this) < _FD(this)){
-    this->bottleneck_point = MIN(_TR(this), _GP(this));
+    this->bottleneck_point = MAX(_TR(this), _GP(this));
     target_rate = this->bottleneck_point * .85;
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
@@ -831,7 +831,7 @@ _increase_stage(
     _disable_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    target_rate = MIN(_TR_t1(this), _GP(this) * .85);
+    target_rate = MAX(_TR_t1(this), _GP(this) * .85);
     this->bottleneck_point = MIN(_TR(this), _GP(this));
     goto done;
   }

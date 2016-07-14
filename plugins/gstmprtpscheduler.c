@@ -106,8 +106,6 @@ static void _mprtpscheduler_process_run(void *data);
 
 static guint _subflows_utilization;
 
-static void _tester(void *data);
-
 enum
 {
   PROP_0,
@@ -438,7 +436,6 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
   _setup_paths(this);
-  mprtp_logger_add_logging_fnc(_tester, this, 1, NULL);
 }
 
 
@@ -1213,14 +1210,6 @@ _mprtpscheduler_send_buffer (GstMprtpscheduler * this, GstBuffer *buffer)
   }
 
 
-  if(0)
-  {
-    GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-    gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
-    mprtp_logger("push.log", "%lu,%u\n", GST_TIME_AS_MSECONDS(_now(this)), gst_rtp_buffer_get_timestamp(&rtp));
-    gst_rtp_buffer_unmap(&rtp);
-  }
-
   gst_pad_push (this->mprtp_srcpad, buffer);
   if(rtpfecbuf){
     gst_pad_push (this->mprtp_srcpad, rtpfecbuf);
@@ -1265,57 +1254,6 @@ done:
     GST_WARNING_OBJECT (this, "The scheduler clock wait is interrupted");
   }
   gst_clock_id_unref (clock_id);
-}
-
-
-void _tester(void *data)
-{
-  FILE * fp;
-  char * line = NULL;
-  size_t len = 0;
-  ssize_t read;
-  guint seen_line = 0, i=0, read_num, wait_num;
-  GstMprtpscheduler *this;
-
-  this = data;
-  if(!this->test_enabled || !mprtp_logger_is_signaled()){
-    return;
-  }
-  if(_now(this) < this->test_wait){
-    return;
-  }
-  fp = fopen(this->test_seq, "r");
-  if (fp == NULL){
-    g_warning("test_commands doesn't exist");
-    return;
-  }
-
-  while ((read = getline(&line, &len, fp)) != -1) {
-    if(seen_line++ < this->seen_line) continue;
-    break;
-  }
-  if (read == -1) {
-    this->test_enabled = FALSE;
-    return;
-  }
-
-  sscanf(line, "%d %d", &read_num, &wait_num);
-  ++this->seen_line;
-  this->test_wait = _now(this) + wait_num * GST_SECOND;
-  for(i=0; i<read_num; ++i){
-    if(getline(&line, &len, fp) == -1){
-      break;
-    }
-    g_print("execute: %s\n", line);
-    if(system(line) == -1){
-      break;
-    }
-    ++this->seen_line;
-  }
-
-  fclose(fp);
-  if (line)
-      free(line);
 }
 
 #undef THIS_WRITELOCK

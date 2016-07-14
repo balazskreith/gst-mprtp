@@ -254,7 +254,6 @@ void percentiletracker2_compare(const gchar *filename,
 //g_print("%ld\n", median);
   }
 
-  mprtp_logger(filename, "%lu,%lu\n", elapsed1, elapsed2);
   g_object_unref(tracker1);
   g_object_unref(tracker2);
 }

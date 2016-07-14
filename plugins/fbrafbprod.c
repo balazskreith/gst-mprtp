@@ -26,6 +26,7 @@
 #include "fbrafbprod.h"
 #include "mprtplogger.h"
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>     /* qsort */
 
@@ -133,16 +134,19 @@ fbrafbproducer_init (FBRAFBProducer * this)
   this->vector   = mprtp_malloc(sizeof(gboolean)  * 1000);
   this->vector_length = 0;
 
+  this->data_sw       = make_slidingwindow(600, 30 * GST_SECOND);
+
   this->devars = make_numstracker(100, 1000 * GST_MSECOND);
   numstracker_add_plugin(this->devars, (NumsTrackerPlugin*)make_numstracker_stat_plugin(_stat_pipe, this));
 
 }
 
-FBRAFBProducer *make_fbrafbproducer(guint32 ssrc)
+FBRAFBProducer *make_fbrafbproducer(guint32 ssrc, guint8 subflow_id)
 {
     FBRAFBProducer *this;
     this = g_object_new (FBRAFBPRODUCER_TYPE, NULL);
     this->ssrc = ssrc;
+    this->subflow_id = subflow_id;
     return this;
 }
 

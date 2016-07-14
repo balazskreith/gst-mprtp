@@ -77,8 +77,6 @@ G_DEFINE_TYPE (PacketsRcvQueue, packetsrcvqueue, G_TYPE_OBJECT);
 //----------------------------------------------------------------------
 
 static void packetsrcvqueue_finalize (GObject * object);
-static void _csv_logging(gpointer data);
-static void _readable_logging(gpointer data);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -120,9 +118,6 @@ packetsrcvqueue_init (PacketsRcvQueue * this)
   this->high_watermark = .01 * GST_SECOND;
   this->low_watermark =  .04 * GST_SECOND;
   this->spread_factor = 2.;
-
-  DISABLE_LINE mprtp_logger_add_logging_fnc(_csv_logging,this, 1, &this->rwmutex);
-  DISABLE_LINE mprtp_logger_add_logging_fnc(_readable_logging,this, 10, &this->rwmutex);
 
 }
 
@@ -260,41 +255,6 @@ done:
   return result;
 }
 
-void _csv_logging(gpointer data)
-{
-  PacketsRcvQueue *this = data;
-    mprtp_logger("packetsrcvqueue.csv",
-                 "%lu\n"
-                 ,
-                 this->playout_rate
-                 );
-}
-
-void _readable_logging(gpointer data)
-{
-  PacketsRcvQueue *this = data;
-  mprtp_logger("packetsrcvqueue.log",
-               "----------------------------------------------------\n"
-               "Seconds: %lu\n"
-               "high_watermark: %lu\n"
-               "low_watermark: %lu\n"
-               "Actual playoutrate: %lu\n"
-               "desired framenum: %d\n"
-               "Flush: %d\n"
-               "Playout allowed: %d\n"
-
-               ,
-
-               GST_TIME_AS_SECONDS(_now(this) - this->made),
-               this->high_watermark,
-               this->low_watermark,
-               this->playout_rate,
-               this->desired_framenum,
-               this->flush,
-               this->playout_allowed
-               );
-
-}
 
 #undef THIS_WRITELOCK
 #undef THIS_WRITEUNLOCK

@@ -74,7 +74,7 @@ _print_tree (BinTree * tree, BinTreeNode* node, gint level)
   }
   if (!level)
     g_print ("Tree %p TOP is: %lu Counter: %u\n", tree, tree->top?tree->top->value : 0,
-        tree->counter);
+        tree->node_counter);
   for (i = 0; i < level && i < 10; ++i)
     g_print ("--");
   g_print ("%d->%p->value:%lu ->ref: %u ->left:%p ->right:%p\n",
@@ -202,24 +202,24 @@ void bintree_test(void)
   tree2 = make_bintree(test_cmp);
   bintree_reset(tree1);
   g_print("POP CASE. Insert 5,7,7,6,8,8,2,2,3,1 into tree1\n");
-  bintree_insert_value(tree1, 5);
-  bintree_insert_value(tree1, 7);
-  bintree_insert_value(tree1, 7);
-  bintree_insert_value(tree1, 6);
-  bintree_insert_value(tree1, 8);
-  bintree_insert_value(tree1, 8);
-  bintree_insert_value(tree1, 2);
-  bintree_insert_value(tree1, 2);
-  bintree_insert_value(tree1, 3);
-  bintree_insert_value(tree1, 1);
+  bintree_insert_data(tree1, 5);
+  bintree_insert_data(tree1, 7);
+  bintree_insert_data(tree1, 7);
+  bintree_insert_data(tree1, 6);
+  bintree_insert_data(tree1, 8);
+  bintree_insert_data(tree1, 8);
+  bintree_insert_data(tree1, 2);
+  bintree_insert_data(tree1, 2);
+  bintree_insert_data(tree1, 3);
+  bintree_insert_data(tree1, 1);
 
   g_print("POP CASE. Insert 5,7,7,2,3,1 into tree2\n");
-  bintree_insert_value(tree2, 5);
-  bintree_insert_value(tree2, 7);
-  bintree_insert_value(tree2, 7);
-  bintree_insert_value(tree2, 2);
-  bintree_insert_value(tree2, 3);
-  bintree_insert_value(tree2, 1);
+  bintree_insert_data(tree2, 5);
+  bintree_insert_data(tree2, 7);
+  bintree_insert_data(tree2, 7);
+  bintree_insert_data(tree2, 2);
+  bintree_insert_data(tree2, 3);
+  bintree_insert_data(tree2, 1);
 
   g_print("POP TOP FROM tree1 and insert to tree2\n");
   node = bintree_pop_top_node(tree1);
@@ -249,7 +249,7 @@ void _ruin_full(BinTree *this, BinTreeNode *node)
   _ruin_full(this, node->right);
   mprtp_free(node);
   //_trash_bintreenode(this, node);
-  --this->counter;
+  --this->node_counter;
 }
 
 BinTreeNode *bintree_pop_top_node(BinTree *this)
@@ -272,7 +272,7 @@ BinTreeNode *bintree_pop_bottom_node(BinTree *this)
   return result;
 }
 
-gint64 bintree_get_top_value(BinTree *this)
+gint64 bintree_get_top_data(BinTree *this)
 {
   guint64 result;
   THIS_READLOCK (this);
@@ -282,7 +282,7 @@ gint64 bintree_get_top_value(BinTree *this)
   return result;
 }
 
-gint64 bintree_get_bottom_value(BinTree *this)
+gint64 bintree_get_bottom_data(BinTree *this)
 {
   guint64 result;
   THIS_READLOCK (this);
@@ -312,7 +312,7 @@ void bintree_insert_node(BinTree* this, BinTreeNode* node)
   THIS_WRITEUNLOCK (this);
 }
 
-void bintree_insert_value(BinTree* this, gint64 value)
+void bintree_insert_data(BinTree* this, gint64 value)
 {
   BinTreeNode* node;
   THIS_WRITELOCK (this);
@@ -338,11 +338,25 @@ void bintree_trash_node(BinTree *this, BinTreeNode *node)
 
 }
 
-guint32 bintree_get_num(BinTree *this)
+guint32 bintree_get_nodenum(BinTree *this)
 {
   guint32 result;
   THIS_READLOCK(this);
-  result = this->counter;
+  result = this->node_counter;
+  THIS_READUNLOCK(this);
+  return result;
+}
+
+
+guint32 bintree_get_refnum(BinTree *this)
+{
+  guint32 result;
+  THIS_READLOCK(this);
+  if(this->duplicate_counter < 0){
+      g_warning("duplicate number is below zero. something is wrong");
+      this->duplicate_counter = 0;
+  }
+  result = this->node_counter + this->duplicate_counter;
   THIS_READUNLOCK(this);
   return result;
 }
@@ -376,7 +390,7 @@ BinTreeNode * _insert(BinTree *this, BinTreeNode *actual, BinTreeNode *insert)
 {
   BinTreeNode *result;
   result = _insert_into_tree(this, actual, &insert);
-  if(this->counter == 1) this->top = this->bottom = insert;
+  if(this->node_counter == 1) this->top = this->bottom = insert;
   else {
     BinTreeNode *top,*bottom;
     top = this->top;
@@ -390,11 +404,12 @@ BinTreeNode * _insert(BinTree *this, BinTreeNode *actual, BinTreeNode *insert)
 BinTreeNode * _insert_into_tree(BinTree *this, BinTreeNode *actual, BinTreeNode **insert)
 {
   gint cmp_result;
-  if (!actual) {++this->counter; return *insert;}
+  if (!actual) {++this->node_counter; return *insert;}
   cmp_result = this->cmp (actual->value, (*insert)->value);
   if (!cmp_result) {
     GST_DEBUG_OBJECT (this, "DUPLICATED: %lu, %p will be merged and dropped",
                       (*insert)->value, *insert);
+    ++this->duplicate_counter;
     actual->ref+=(*insert)->ref;
     _trash_bintreenode(this, *insert);
     *insert = actual;
@@ -440,6 +455,7 @@ survive:
   GST_DEBUG_OBJECT (this, "%lu SURVIVE in %p\n", node->value, this);
 //  g_print("%lu SURVIVE in %p\n", node->value, this);
   --node->ref;
+  --this->duplicate_counter;
   return;
 remove:
   GST_DEBUG_OBJECT (this, "ELEMENT FOUND TO REMOVE: %lu\n", node->value);
@@ -452,7 +468,7 @@ remove:
   else
     parent->right = candidate;
   _trash_bintreenode(this, node);
-  --this->counter;
+  --this->node_counter;
   return;
 replace:
 //g_print("ELEMENT FOUND TO REPLACE: %lu->%lu\n", node->value, candidate->value);
@@ -505,10 +521,11 @@ remove:
     parent->left = candidate;
   else
     parent->right = candidate;
-  --this->counter;
+  --this->node_counter;
   node->left = node->right = NULL;
+  this->duplicate_counter-=node->ref-1;
   if(node == this->top) _refresh_top(this);
-  else if(candidate == this->bottom) _refresh_bottom(this);
+  if(node == this->bottom) _refresh_bottom(this);
   return node;
 replace:
   GST_DEBUG_OBJECT (this, "ELEMENT FOUND TO REPLACE: %lu->%lu\n",
@@ -529,7 +546,7 @@ replace:
       candidate->left = candidate->right = NULL;
   }
   if(candidate == this->top) _refresh_top(this);
-  else if(candidate == this->bottom) _refresh_bottom(this);
+  if(candidate == this->bottom) _refresh_bottom(this);
   return candidate;
 }
 
@@ -576,7 +593,7 @@ void _trash_bintreenode(BinTree *this, BinTreeNode *node)
 {
   if(node){
     if(node == this->top) _refresh_top(this);
-    else if(node == this->bottom) _refresh_bottom(this);
+    if(node == this->bottom) _refresh_bottom(this);
 //    g_slice_free(BinTreeNode, node);
     mprtp_free(node);
   }

@@ -10,6 +10,7 @@
 
 #include <gst/gst.h>
 #include "reportproc.h"
+#include "lib_swplugins.h"
 
 typedef struct _FBRAFBProcessor FBRAFBProcessor;
 typedef struct _FBRAFBProcessorClass FBRAFBProcessorClass;
@@ -35,6 +36,7 @@ typedef struct _FBRAFBProcessorStat
   gboolean                 recent_discarded;
   gdouble                  stability;
   GstClockTime             RTT;
+  gdouble                  srtt;
   gint32                   discarded_packets_in_1s;
   gint32                   received_packets_in_1s;
 
@@ -49,10 +51,11 @@ struct _FBRAFBProcessor
   GQueue*                  sent;
   GQueue*                  sent_in_1s;
   GQueue*                  acked;
+  guint8                   subflow_id;
 
   gint32                   measurements_num;
 
-
+  SlidingWindow           *owd_sw;
   FBRAFBProcessorStat      stat;
   PercentileTracker*       owd_ltt;
   NumsTracker*             bytes_in_flight;
@@ -70,7 +73,7 @@ struct _FBRAFBProcessorClass{
 };
 
 GType fbrafbprocessor_get_type (void);
-FBRAFBProcessor *make_fbrafbprocessor(void);
+FBRAFBProcessor *make_fbrafbprocessor(guint8 subflow_id);
 
 void fbrafbprocessor_reset(FBRAFBProcessor *this);
 void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn);

@@ -70,7 +70,6 @@ static void packetssndqueue_finalize (GObject * object);
 //#define _trash_node(this, node) g_slice_free(PacketsSndQueueNode, node)
 #define _trash_node(this, node) g_free(node)
 
-static void _logging(gpointer data);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -107,7 +106,6 @@ packetssndqueue_init (PacketsSndQueue * this)
   this->incoming_bytes = make_numstracker(2048, GST_SECOND);
   this->items = g_queue_new();
 
-  DISABLE_LINE mprtp_logger_add_logging_fnc(_logging,this, 10, &this->rwmutex);
 }
 
 
@@ -230,23 +228,6 @@ done:
   return result;
 }
 
-void _logging(gpointer data)
-{
-  PacketsSndQueue *this = data;
-  mprtp_logger("packetssnqueue.log",
-               "----------------------------------------------------\n"
-               "Seconds: %lu\n"
-               "bytes in queue: %d \n"
-               "packets in queue: %d \n",
-
-               GST_TIME_AS_SECONDS(_now(this) - this->made),
-
-               this->bytes,
-               g_queue_get_length(this->items)
-
-               );
-
-}
 
 
 #undef DEBUG_PRINT_TOOLS

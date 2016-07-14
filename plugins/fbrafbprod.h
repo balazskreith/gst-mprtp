@@ -11,10 +11,10 @@
 #include <gst/gst.h>
 #include "gstmprtcpbuffer.h"
 #include "gstmprtpbuffer.h"
-#include "percentiletracker2.h"
 #include "percentiletracker.h"
 #include "numstracker.h"
 #include "reportprod.h"
+#include "lib_swplugins.h"
 
 typedef struct _FBRAFBProducer FBRAFBProducer;
 typedef struct _FBRAFBProducerClass FBRAFBProducerClass;
@@ -38,14 +38,20 @@ struct _FBRAFBProducer
   gboolean                 initialized;
 
   guint32                  ssrc;
+  guint8                   subflow_id;
 
   guint16                  begin_seq;
   guint16                  end_seq;
   gboolean*                vector;
   guint                    vector_length;
 
+  SlidingWindow           *payloadbytes_sw;
+  SlidingWindow           *owds_sw;
+  SlidingWindow           *stability_sw;
+
   NumsTracker*             received_bytes;
   NumsTracker*             devars;
+
   PercentileTracker*       owd_stt;
   GstClockTime             median_delay;
   GstClockTime             min_delay;
@@ -63,7 +69,7 @@ struct _FBRAFBProducerClass{
 };
 
 GType fbrafbproducer_get_type (void);
-FBRAFBProducer *make_fbrafbproducer(guint32 ssrc);
+FBRAFBProducer *make_fbrafbproducer(guint32 ssrc, guint8 subflow_id);
 void fbrafbproducer_reset(FBRAFBProducer *this);
 void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold);
 void fbrafbproducer_track(gpointer data, GstMpRTPBuffer *mprtp);

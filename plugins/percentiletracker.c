@@ -441,34 +441,34 @@ void _add_value(PercentileTracker *this, guint64 value)
   qsort (this->collection, this->required, sizeof(guint64), _compare);
   //distribute
   if(this->ratio == 1.){
-    bintree_insert_value(this->maxtree, this->collection[0]);
-    bintree_insert_value(this->mintree, this->collection[1]);
+    bintree_insert_data(this->maxtree, this->collection[0]);
+    bintree_insert_data(this->mintree, this->collection[1]);
     this->Mxc = this->Mnc = 1;
   }else if(this->ratio < 1.){
     gint i,c = this->required - 1;
     for(i = 0; i < c; ++i){
-      bintree_insert_value(this->maxtree, this->collection[i]);
+      bintree_insert_data(this->maxtree, this->collection[i]);
       ++this->Mxc;
     }
-    bintree_insert_value(this->mintree, this->collection[c]);
+    bintree_insert_data(this->mintree, this->collection[c]);
     ++this->Mnc;
   }else if(1. < this->ratio){
     gint i;
     for(i = this->required - 1; 0 < i; --i) {
-      bintree_insert_value(this->mintree, this->collection[i]);
+      bintree_insert_data(this->mintree, this->collection[i]);
       ++this->Mnc;
     }
-    bintree_insert_value(this->maxtree, this->collection[0]);
+    bintree_insert_data(this->maxtree, this->collection[0]);
     ++this->Mxc;
   }
   goto done;
 
 add2tree:
-  if(value <= bintree_get_top_value(this->maxtree)){
-    bintree_insert_value(this->maxtree, value);
+  if(value <= bintree_get_top_data(this->maxtree)){
+    bintree_insert_data(this->maxtree, value);
     ++this->Mxc;
   }else{
-    bintree_insert_value(this->mintree, value);
+    bintree_insert_data(this->mintree, value);
     ++this->Mnc;
   }
 done:
@@ -499,14 +499,14 @@ _get_stats (PercentileTracker * this,
 
   if(!this->Mnc && !this->Mxc) goto done;
   if(!this->Mxc){
-    if(min) *min = bintree_get_top_value(this->mintree);
-    if(max) *max = bintree_get_bottom_value(this->mintree);
+    if(min) *min = bintree_get_top_data(this->mintree);
+    if(max) *max = bintree_get_bottom_data(this->mintree);
   }else if(!this->Mnc){
-    if(min) *min = bintree_get_bottom_value(this->maxtree);
-    if(max) *max = bintree_get_top_value(this->maxtree);
+    if(min) *min = bintree_get_bottom_data(this->maxtree);
+    if(max) *max = bintree_get_top_data(this->maxtree);
   }else{
-    if(min) *min = bintree_get_bottom_value(this->maxtree);
-    if(max) *max = bintree_get_bottom_value(this->mintree);
+    if(min) *min = bintree_get_bottom_data(this->maxtree);
+    if(max) *max = bintree_get_bottom_data(this->mintree);
   }
   done:
   return result;
@@ -518,13 +518,13 @@ guint64 _get_median(PercentileTracker * this)
 
   if(this->Mnc == this->Mxc){
 //    g_print("mnc eq to mxc tops: %lu,%lu\n", bintree_get_top_value(this->maxtree), bintree_get_top_value(this->mintree));
-    result = (bintree_get_top_value(this->maxtree) + bintree_get_top_value(this->mintree))>>1;
+    result = (bintree_get_top_data(this->maxtree) + bintree_get_top_data(this->mintree))>>1;
   } else if(this->Mnc < this->Mxc){
 //      g_print("mnc st to mxc top is: %lu\n", bintree_get_top_value(this->maxtree));
-    result = bintree_get_top_value(this->maxtree);
+    result = bintree_get_top_data(this->maxtree);
   }else{
 //    g_print("mnc gt to mxc top is: %lu\n", bintree_get_top_value(this->mintree));
-    result = bintree_get_top_value(this->mintree);
+    result = bintree_get_top_data(this->mintree);
   }
 
   return result;
@@ -534,17 +534,17 @@ guint64 _get_percentile(PercentileTracker * this)
 {
   gdouble ratio;
   if(!this->Mnc)
-    return bintree_get_top_value(this->maxtree);
+    return bintree_get_top_data(this->maxtree);
   if(!this->Mxc)
-    return bintree_get_top_value(this->mintree);
+    return bintree_get_top_data(this->mintree);
 
   ratio = (gdouble) this->Mxc / (gdouble) this->Mnc;
   if(ratio == this->ratio)
-    return (bintree_get_top_value(this->maxtree) + bintree_get_top_value(this->mintree))>>1;
+    return (bintree_get_top_data(this->maxtree) + bintree_get_top_data(this->mintree))>>1;
   if(this->ratio < ratio)
-    return bintree_get_top_value(this->maxtree);
+    return bintree_get_top_data(this->maxtree);
   else
-    return bintree_get_top_value(this->mintree);
+    return bintree_get_top_data(this->mintree);
 }
 
 void _median_balancer(PercentileTracker *this)
@@ -556,14 +556,14 @@ again:
   diff = this->Mxc - this->Mnc;
   if(-2 < diff && diff < 2) goto done;
   if (diff < -1) {
-    value = bintree_get_top_value(this->mintree);
+    value = bintree_get_top_data(this->mintree);
     bintree_delete_value(this->mintree, value);
-    bintree_insert_value(this->maxtree, value);
+    bintree_insert_data(this->maxtree, value);
     --this->Mnc; ++this->Mxc;
   } else if (1 < diff) {
-    value = bintree_get_top_value(this->maxtree);
+    value = bintree_get_top_data(this->maxtree);
     bintree_delete_value(this->maxtree, value);
-    bintree_insert_value(this->mintree, value);
+    bintree_insert_data(this->mintree, value);
     --this->Mxc; ++this->Mnc;
   }
   goto again;
@@ -595,18 +595,18 @@ void _percentile_balancer(PercentileTracker *this)
 balancing_mintree:
   ratio = (gdouble) (this->Mxc + 1) / (gdouble) (this->Mnc - 1);
   if(this->ratio < ratio || this->Mnc < 2) goto done;
-  value = bintree_get_top_value(this->mintree);
+  value = bintree_get_top_data(this->mintree);
   bintree_delete_value(this->mintree, value);
-  bintree_insert_value(this->maxtree, value);
+  bintree_insert_data(this->maxtree, value);
   --this->Mnc; ++this->Mxc;
   goto balancing_mintree;
 
 balancing_maxtree:
   ratio = (gdouble) (this->Mxc - 1) / (gdouble) (this->Mnc + 1);
   if(ratio < this->ratio || this->Mxc < 2) goto done;
-  value = bintree_get_top_value(this->maxtree);
+  value = bintree_get_top_data(this->maxtree);
   bintree_delete_value(this->maxtree, value);
-  bintree_insert_value(this->mintree, value);
+  bintree_insert_data(this->mintree, value);
   --this->Mxc; ++this->Mnc;
   goto balancing_maxtree;
 
@@ -643,7 +643,7 @@ void _rem_value(PercentileTracker * this)
   if(!this->ready){
     goto collect;
   }
-  if(value <= bintree_get_top_value(this->maxtree)){
+  if(value <= bintree_get_top_data(this->maxtree)){
     bintree_delete_value(this->maxtree, value);
     --this->Mxc;
   }else{

@@ -281,7 +281,7 @@ static void _change_controlling_mode(RcvController *this, Subflow *subflow, guin
       GST_DEBUG_OBJECT(subflow, "subflow %d set to only report processing mode", subflow->id);
       break;
     case 2:
-      subflow->fbproducer = make_fbrafbproducer(this->ssrc);
+      subflow->fbproducer = make_fbrafbproducer(this->ssrc, subflow->id);
       subflow->feedback_interval_calcer = fbrafbproducer_get_interval;
       subflow->feedback_setup_feedback = fbrafbproducer_setup_feedback;
       mprtpr_path_set_packetstracker(subflow->path, fbrafbproducer_track, subflow->fbproducer);

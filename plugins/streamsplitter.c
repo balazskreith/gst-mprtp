@@ -25,6 +25,8 @@
 #include <gst/rtp/gstrtcpbuffer.h>
 #include "streamsplitter.h"
 #include "mprtpspath.h"
+#include <string.h>
+#include <stdio.h>
 #include <math.h>
 
 
@@ -208,7 +210,8 @@ _get_next_path (
 
 static void
 _logging_csv(
-    gpointer data);
+    gpointer data,
+    gchar *string);
 
 static void
 _logging(
@@ -259,7 +262,7 @@ stream_splitter_init (StreamSplitter * this)
   this->made                   = _now(this);
 
   g_rw_lock_init (&this->rwmutex);
-  mprtp_logger_add_logging_fnc(_logging_csv, this, 1, &this->rwmutex);
+  mprtp_logger_add_logging_fnc(_logging_csv, this, "streamsplitter.csv");
 }
 
 void
@@ -839,18 +842,16 @@ static void _log_subflow(Subflow *subflow, gpointer data)
 
 static void _log_subflow_csv(Subflow *subflow, gpointer data)
 {
-  mprtp_logger("streamsplitter.csv",
-                   "%f,"
-                   ,
-                   subflow->weight
-                   );
+  gchar appendum[255];
+  sprintf(appendum, "%f,", subflow->weight);
+  strcat((gchar*)data, appendum);
 }
 
-void _logging_csv(gpointer data)
+void _logging_csv(gpointer data, gchar* string)
 {
   StreamSplitter *this = data;
-  _iterate_subflows(this, _log_subflow_csv, this);
-  mprtp_logger("streamsplitter.csv","\n");
+  _iterate_subflows(this, _log_subflow_csv, string);
+  strcat(string, "\n");
 }
 
 void _logging(gpointer data)

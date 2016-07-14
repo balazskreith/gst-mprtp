@@ -34,7 +34,10 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          fecenc.c                   \
                          rtpfecbuffer.c             \
                          signalreport.c             \
-                         subratectrler.c
+                         slidingwindow.c            \
+                         lib_bintree.c              \
+                         lib_swplugins.c            \
+                         subratectrler.c            
                     
                     
 noinst_HEADERS = mprtpspath.h           \
@@ -63,6 +66,7 @@ noinst_HEADERS = mprtpspath.h           \
                  fecenc.h               \
                  rtpfecbuffer.h         \
                  signalreport.h         \
+                 slidingwindow.h        \
                  subratectrler.h
                           
 

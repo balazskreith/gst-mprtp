@@ -48,7 +48,6 @@ struct _PacketsRcvQueue
   guint16                    HSSN;
   gboolean                   HSSN_initialized;
 
-  GstClockTime               playout_rate;
   guint32                    played_timestamp;
 
   gboolean                   flush;

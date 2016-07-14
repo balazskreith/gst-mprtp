@@ -91,10 +91,6 @@ static void
 _ruin_subflow (
     gpointer data);
 
-static void
-_logging(
-    gpointer data);
-
 
 static gint
 _cmp_seq (guint16 x, guint16 y)
@@ -144,19 +140,19 @@ stream_joiner_finalize (GObject * object)
   g_object_unref (this->sysclock);
   g_object_unref(this->rcvqueue);
 }
-
-static void _iterate_subflows(StreamJoiner *this, void(*iterator)(Subflow *, gpointer), gpointer data)
-{
-  GHashTableIter iter;
-  gpointer key, val;
-  Subflow *subflow;
-
-  g_hash_table_iter_init (&iter, this->subflows);
-  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
-    subflow = (Subflow *) val;
-    iterator(subflow, data);
-  }
-}
+//
+//static void _iterate_subflows(StreamJoiner *this, void(*iterator)(Subflow *, gpointer), gpointer data)
+//{
+//  GHashTableIter iter;
+//  gpointer key, val;
+//  Subflow *subflow;
+//
+//  g_hash_table_iter_init (&iter, this->subflows);
+//  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val)) {
+//    subflow = (Subflow *) val;
+//    iterator(subflow, data);
+//  }
+//}
 
 static void _delays_stat_pipe(gpointer data, PercentileTrackerPipeData* stat)
 {
@@ -200,7 +196,6 @@ stream_joiner_init (StreamJoiner * this)
   percentiletracker_set_treshold(this->delays, 60 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->delays, _delays_stat_pipe, this);
 
-  DISABLE_LINE mprtp_logger_add_logging_fnc(_logging, this, 1, &this->rwmutex);
 }
 
 StreamJoiner*
@@ -392,33 +387,6 @@ _ruin_subflow (gpointer data)
   Subflow *this;
   this = (Subflow *) data;
   GST_DEBUG_OBJECT (this, "Subflow %d destroyed", this->id);
-}
-
-static void _logging_helper(Subflow *subflow, gpointer data)
-{
-  gchar filename[255];
-  sprintf(filename, "path_%d_joindat.csv", subflow->id);
-  mprtp_logger(filename, "\n");
-  //  mprtp_logger(filename, "\n", subflow->bytes_in_queue, subflow->packets_in_queue);
-}
-
-void _logging(gpointer data)
-{
-  StreamJoiner *this = data;
-
-  mprtp_logger("streamjoiner.csv",
-               "%lu\n",
-               this->join_delay);
-
-  _iterate_subflows(this, _logging_helper, this);
-
-  mprtp_logger("streamjoiner.log",
-                 "###############################################################\n"
-                 "Seconds: %lu\n"
-                 ,
-                 GST_TIME_AS_SECONDS(_now(this) - this->made)
-                 );
-
 }
 
 #undef MAX_TRESHOLD_TIME

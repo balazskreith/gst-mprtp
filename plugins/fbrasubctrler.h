@@ -106,6 +106,4 @@ void fbrasubctrler_time_update(FBRASubController *this);
 void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *params);
 void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *result);
 
-void fbrasubctrler_logging2csv(FBRASubController *this);
-void fbrasubctrler_logging(FBRASubController *this);
 #endif /* FBRASUBCTRLER_H_ */

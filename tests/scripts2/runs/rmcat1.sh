@@ -42,6 +42,9 @@ shift # past argument or value
 done
 
 
+  rm $TEMPDIR/peer1/*
+  rm $TEMPDIR/peer2/*
+  rm $TEMPDIR/peer3/*
 
   sudo ip netns exec ns_mid tc qdisc change dev veth2 root handle 1: netem delay "$OWD_SND"ms
   sudo ip netns exec ns_mid tc qdisc change dev veth1 root handle 1: netem delay "$OWD_RCV"ms
@@ -56,7 +59,7 @@ done
   echo "ntrt -c$CONFDIR/ntrt_rcv_meas.ini -t$DURATION &" > $PEER1_RCV
   echo -n "./$RECEIVER" >> $PEER1_RCV
   ./$CONFDIR/peer1params.sh >> $PEER1_RCV
-  echo -n "--save_received_yuvfile=0 " >> $PEER1_RCV 
+  echo -n "--save_received_yuvfile=1 " >> $PEER1_RCV 
   chmod 777 $PEER1_RCV
 
   #start receiver and sender

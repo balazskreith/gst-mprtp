@@ -291,10 +291,6 @@ _set_monitoring_interval(
 static void
 _change_target_bitrate(FBRASubController *this, gint32 new_target);
 
-static void
-_params_out(
-    FBRASubController *this);
-
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -378,7 +374,7 @@ FBRASubController *make_fbrasubctrler(MPRTPSPath *path)
   result->id                  = mprtps_path_get_id(result->path);
   result->monitoring_interval = 3;
   result->made                = _now(result);
-  result->fbprocessor         = make_fbrafbprocessor();
+  result->fbprocessor         = make_fbrafbprocessor(result->id);
   _switch_stage_to(result, STAGE_KEEP, FALSE);
   mprtps_path_set_state(result->path, MPRTPS_PATH_STATE_STABLE);
   mprtps_path_set_packetstracker(result->path, fbrafbprocessor_track, result->fbprocessor);
@@ -1029,115 +1025,4 @@ done:
 }
 
 
-void fbrasubctrler_logging(FBRASubController *this)
-{
-  gchar filename[255];
-  sprintf(filename, "fbractrler_%d.log", this->id);
-  mprtp_logger(filename,
-               "############## S%d | State: %-2d | Stage: %1d | Ctrled: %d ###################\n"
-               "# Goodput:                     %-10d| Sending Rate:               %-10d#\n"
-               "# Actual Target:               %-10d| tr_is_corred:               %-10d#\n"
-               "# Minimum Bitrate:             %-10d| OWD Median:                 %-10lu#\n"
-               "# Maximum Bitrate:             %-10d| OWD Actual:                 %-10lu#\n"
-               "# Bottleneck point:            %-10d| OWD Corr:                   %-10f#\n"
-               "# Monitoring Interval:         %-10d| tr_is_approved:             %-10d#\n"
-               "# Monitoring Bitrate:          %-10d| rr_is_approved:             %-10d#\n"
-               "# Recent Discarded:            %-10d| stability:                  %-10.6f#\n"
-               "###################### MSeconds since setup: %lu ######################\n"
-               ,
 
-               this->id,
-               _state(this),
-               _stage(this),
-               _priv(this)->controlled,
-
-               _GP(this),
-               _SR(this),
-
-               _TR(this),
-               0,
-
-               _priv(this)->min_target_bitrate,
-               _owd_ltt_median(this),
-
-               _priv(this)->max_target_bitrate,
-               _owd_stt_median(this),
-
-               _btlp(this),
-               _fbstat(this).owd_corr,
-
-               _mon_int(this),
-               _priv(this)->tr_approved,
-
-               _mon_br(this),
-               _priv(this)->gp_approved,
-
-               _fbstat(this).recent_discarded,
-               _fbstat(this).stability,
-
-               GST_TIME_AS_MSECONDS(_now(this) - this->made)
-
-               );
-
-  DISABLE_LINE _params_out(this);
-}
-
-
-void _params_out(FBRASubController *this)
-{
-  gchar filename[255];
-  sprintf(filename, "ccparams_%d.log", this->id);
-  mprtp_logger_rewrite(filename,
-   "+-----------------------------------------------+-------------------+\n"
-   "| Name                                          | Value             |\n"
-   "+-----------------------------------------------+-------------------+\n"
-   "|                                               |                   |\n"
-   "| bottleneck_increasement_factor                | %-18.3f|\n"
-   "|                                               |                   |\n"
-   "| normal_monitoring_interval                    | %-18.3f|\n"
-   "|                                               |                   |\n"
-   "| bottleneck_monitoring_interval                | %-18.3f|\n"
-   "|                                               |                   |\n"
-   "| min_monitoring_interval                       | %-18d|\n"
-   "|                                               |                   |\n"
-   "| max_monitoring_interval                       | %-18d|\n"
-   "|                                               |                   |\n"
-   "| min_ramp_up_bitrate                           | %-18d|\n"
-   "|                                               |                   |\n"
-   "| max_ramp_up_bitrate                           | %-18d|\n"
-   "|                                               |                   |\n"
-   "| min_target_bitrate                            | %-18d|\n"
-   "|                                               |                   |\n"
-   "| max_target_bitrate                            | %-18d|\n"
-   "+-----------------------------------------------+-------------------+\n",
-
-   _priv(this)->restrictivity_factor   ,
-   _priv(this)->min_approve_interval       ,
-   _priv(this)->max_approve_interval   ,
-   _priv(this)->min_monitoring_interval          ,
-   _priv(this)->max_monitoring_interval          ,
-   _priv(this)->min_ramp_up_bitrate              ,
-   _priv(this)->max_ramp_up_bitrate              ,
-   _priv(this)->min_target_bitrate               ,
-   _priv(this)->max_target_bitrate
-
-   );
-}
-
-void fbrasubctrler_logging2csv(FBRASubController *this)
-{
-  gchar filename[255];
-  THIS_READLOCK(this);
-
-  sprintf(filename, "snd_%d_ratestat.csv", this->id);
-
-  mprtp_logger(filename, "%d,%d,%d,%f,%d\n",
-               this->target_bitrate / 1000,
-               _SR(this),
-               (_SR(this) + 48 * 8 * _fbstat(this).sent_packets_in_1s) / 1000,
-               0.,
-               (this->monitored_bitrate + 40 * 8 * this->monitored_packets) / 1000
-               );
-
-  THIS_READUNLOCK(this);
-}

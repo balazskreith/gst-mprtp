@@ -66,7 +66,6 @@ _get_rtcp_interval (
     gdouble avg_rtcp_size,
     gint initial);
 
-static void _logging(gpointer data);
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -123,7 +122,6 @@ ricalcer_init (ReportIntervalCalculator * this)
   this->min_interval = .5;
   this->sysclock = gst_system_clock_obtain();
   g_rw_lock_init (&this->rwmutex);
-  DISABLE_LINE mprtp_logger_add_logging_fnc(_logging, this, 10, &this->rwmutex);
 }
 
 ReportIntervalCalculator *make_ricalcer(gboolean sender_side)
@@ -297,37 +295,3 @@ _get_rtcp_interval (gint senders,
   return t;
 }
 
-
-void _logging(gpointer data)
-{
-  gchar logfile[255];
-  ReportIntervalCalculator *this;
-  this = data;
-
-  sprintf(logfile, "%s_ricalcer", this->sender_side ? "snd" : "rcv");
-
-  mprtp_logger(logfile,
-               "actual_interval: %lu\n"
-               "allow_early:     %d\n"
-               "avg_rtcp_size:   %f\n"
-               "base_interval:   %f\n"
-               "initialized:     %d\n"
-               "media_rate:      %f\n"
-               "min_interval:    %f\n"
-               "mode:            %d\n"
-               "urgent:          %d\n"
-               "#########################\n"
-               ,
-               this->actual_interval,
-               this->allow_early,
-               this->avg_rtcp_size,
-               this->base_interval,
-               this->initialized,
-               this->media_rate,
-               this->min_interval,
-               this->mode,
-               this->urgent
-               );
-
-
-}

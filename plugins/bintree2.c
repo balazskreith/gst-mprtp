@@ -74,7 +74,7 @@ _print_tree (BinTree2 * tree, BinTree2Node* node, gint level)
   }
   if (!level)
     g_print ("Tree %p TOP is: %lu Counter: %u\n", tree, tree->top?tree->top->value : 0,
-        tree->counter);
+        tree->node_counter);
   for (i = 0; i < level && i < 10; ++i)
     g_print ("--");
   g_print ("%d->%p->value:%lu ->ref: %u ->left:%p ->right:%p\n",
@@ -248,7 +248,7 @@ void _ruin_full(BinTree2 *this, BinTree2Node *node)
   _ruin_full(this, node->right);
   mprtp_free(node);
 //  _trash_bintree2node(this, node);
-  --this->counter;
+  --this->node_counter;
 }
 
 BinTree2Node *bintree2_pop_top_node(BinTree2 *this)
@@ -333,11 +333,24 @@ void bintree2_trash_node(BinTree2 *this, BinTree2Node *node)
 
 }
 
-guint32 bintree2_get_num(BinTree2 *this)
+guint32 bintree2_get_nodenum(BinTree2 *this)
 {
   guint32 result;
   THIS_READLOCK(this);
-  result = this->counter;
+  result = this->node_counter;
+  THIS_READUNLOCK(this);
+  return result;
+}
+
+guint32 bintree2_get_refnum(BinTree2 *this)
+{
+  guint32 result;
+  THIS_READLOCK(this);
+  if(this->duplicate_counter < 0){
+      g_warning("duplicate number is below zero. something is wrong");
+      this->duplicate_counter = 0;
+  }
+  result = this->node_counter + this->duplicate_counter;
   THIS_READUNLOCK(this);
   return result;
 }
@@ -371,7 +384,7 @@ BinTree2Node * _insert(BinTree2 *this, BinTree2Node *actual, BinTree2Node *inser
 {
   BinTree2Node *result;
   result = _insert_into_tree(this, actual, &insert);
-  if(this->counter == 1) this->top = this->bottom = insert;
+  if(this->node_counter == 1) this->top = this->bottom = insert;
   else {
     BinTree2Node *top,*bottom;
     top = this->top;
@@ -385,11 +398,12 @@ BinTree2Node * _insert(BinTree2 *this, BinTree2Node *actual, BinTree2Node *inser
 BinTree2Node * _insert_into_tree(BinTree2 *this, BinTree2Node *actual, BinTree2Node **insert)
 {
   gint cmp_result;
-  if (!actual) {++this->counter; return *insert;}
+  if (!actual) {++this->node_counter; return *insert;}
   cmp_result = this->cmp (actual->value, (*insert)->value);
   if (!cmp_result) {
     GST_DEBUG_OBJECT (this, "DUPLICATED: %lu, %p will be merged and dropped",
                       (*insert)->value, *insert);
+    ++this->duplicate_counter;
     actual->ref+=(*insert)->ref;
     _trash_bintree2node(this, *insert);
     *insert = actual;
@@ -435,6 +449,7 @@ survive:
   GST_DEBUG_OBJECT (this, "%lu SURVIVE in %p\n", node->value, this);
 //  g_print("%lu SURVIVE in %p\n", node->value, this);
   --node->ref;
+  --this->duplicate_counter;
   return;
 remove:
   GST_DEBUG_OBJECT (this, "ELEMENT FOUND TO REMOVE: %lu\n", node->value);
@@ -447,7 +462,7 @@ remove:
   else
     parent->right = candidate;
   _trash_bintree2node(this, node);
-  --this->counter;
+  --this->node_counter;
   return;
 replace:
 //g_print("ELEMENT FOUND TO REPLACE: %lu->%lu\n", node->value, candidate->value);
@@ -500,10 +515,11 @@ remove:
     parent->left = candidate;
   else
     parent->right = candidate;
-  --this->counter;
+  --this->node_counter;
+  this->duplicate_counter -= node->ref-1;
   node->left = node->right = NULL;
   if(node == this->top) _refresh_top(this);
-  else if(candidate == this->bottom) _refresh_bottom(this);
+  if(node == this->bottom) _refresh_bottom(this);
   return node;
 replace:
   GST_DEBUG_OBJECT (this, "ELEMENT FOUND TO REPLACE: %lu->%lu\n",
@@ -515,16 +531,17 @@ replace:
       gint64 value;
 
       //copy values
-      ref = node->ref;
-      value = node->value;
-      node->value = candidate->value;
-      node->ref = candidate->ref;
-      candidate->ref = ref;
+      ref    = node->ref;
+      value  = node->value;
+
+      node->value      = candidate->value;
+      node->ref        = candidate->ref;
+      candidate->ref   = ref;
       candidate->value = value;
-      candidate->left = candidate->right = NULL;
+      candidate->left  = candidate->right = NULL;
   }
   if(candidate == this->top) _refresh_top(this);
-  else if(candidate == this->bottom) _refresh_bottom(this);
+  if(candidate == this->bottom) _refresh_bottom(this);
   return candidate;
 }
 
@@ -570,7 +587,7 @@ void _trash_bintree2node(BinTree2 *this, BinTree2Node *node)
 {
   if(node){
     if(node == this->top) _refresh_top(this);
-    else if(node == this->bottom) _refresh_bottom(this);
+    if(node == this->bottom) _refresh_bottom(this);
 //    g_slice_free(BinTree2Node, node);
     mprtp_free(node);
   }

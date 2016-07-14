@@ -32,7 +32,8 @@ struct _BinTree2
   BinTree2CmpFunc           cmp;
   GRWLock                   rwmutex;
 //  GQueue*                  node_pool;
-  guint32                   counter;
+  guint32                   node_counter;
+  gint32                    duplicate_counter;
 
 };
 
@@ -61,7 +62,8 @@ void bintree2_insert_value(BinTree2* this, gint64 value);
 BinTree2Node* bintree2_pop_node(BinTree2* this, gint64 value);
 void bintree2_delete_value(BinTree2* this, gint64 value);
 void bintree2_trash_node(BinTree2 *this, BinTree2Node *node);
-guint32 bintree2_get_num(BinTree2 *this);
+guint32 bintree2_get_nodenum(BinTree2 *this);
+guint32 bintree2_get_refnum(BinTree2 *this);
 
 
 

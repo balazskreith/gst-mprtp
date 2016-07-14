@@ -155,6 +155,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-fbrafbprod.lo libgstmprtp_la-screamsubctrler.lo \
 	libgstmprtp_la-fecdec.lo libgstmprtp_la-fecenc.lo \
 	libgstmprtp_la-rtpfecbuffer.lo libgstmprtp_la-signalreport.lo \
+	libgstmprtp_la-slidingwindow.lo libgstmprtp_la-lib_bintree.lo \
+	libgstmprtp_la-lib_swplugins.lo \
 	libgstmprtp_la-subratectrler.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
@@ -430,7 +432,10 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          fecenc.c                   \
                          rtpfecbuffer.c             \
                          signalreport.c             \
-                         subratectrler.c
+                         slidingwindow.c            \
+                         lib_bintree.c              \
+                         lib_swplugins.c            \
+                         subratectrler.c            
 
 noinst_HEADERS = mprtpspath.h           \
                  sndctrler.h            \
@@ -458,6 +463,7 @@ noinst_HEADERS = mprtpspath.h           \
                  fecenc.h               \
                  rtpfecbuffer.h         \
                  signalreport.h         \
+                 slidingwindow.h        \
                  subratectrler.h
 
 
@@ -566,6 +572,8 @@ include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplugin.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
+include ./$(DEPDIR)/libgstmprtp_la-lib_bintree.Plo
+include ./$(DEPDIR)/libgstmprtp_la-lib_swplugins.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtplogger.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtprpath.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpspath.Plo
@@ -581,6 +589,7 @@ include ./$(DEPDIR)/libgstmprtp_la-ricalcer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rtpfecbuffer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-screamsubctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-signalreport.Plo
+include ./$(DEPDIR)/libgstmprtp_la-slidingwindow.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndratedistor.Plo
 include ./$(DEPDIR)/libgstmprtp_la-streamjoiner.Plo
@@ -838,6 +847,27 @@ libgstmprtp_la-signalreport.lo: signalreport.c
 #	$(AM_V_CC)source='signalreport.c' object='libgstmprtp_la-signalreport.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-signalreport.lo `test -f 'signalreport.c' || echo '$(srcdir)/'`signalreport.c
+
+libgstmprtp_la-slidingwindow.lo: slidingwindow.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-slidingwindow.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-slidingwindow.Tpo -c -o libgstmprtp_la-slidingwindow.lo `test -f 'slidingwindow.c' || echo '$(srcdir)/'`slidingwindow.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-slidingwindow.Tpo $(DEPDIR)/libgstmprtp_la-slidingwindow.Plo
+#	$(AM_V_CC)source='slidingwindow.c' object='libgstmprtp_la-slidingwindow.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-slidingwindow.lo `test -f 'slidingwindow.c' || echo '$(srcdir)/'`slidingwindow.c
+
+libgstmprtp_la-lib_bintree.lo: lib_bintree.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-lib_bintree.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-lib_bintree.Tpo -c -o libgstmprtp_la-lib_bintree.lo `test -f 'lib_bintree.c' || echo '$(srcdir)/'`lib_bintree.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-lib_bintree.Tpo $(DEPDIR)/libgstmprtp_la-lib_bintree.Plo
+#	$(AM_V_CC)source='lib_bintree.c' object='libgstmprtp_la-lib_bintree.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-lib_bintree.lo `test -f 'lib_bintree.c' || echo '$(srcdir)/'`lib_bintree.c
+
+libgstmprtp_la-lib_swplugins.lo: lib_swplugins.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-lib_swplugins.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-lib_swplugins.Tpo -c -o libgstmprtp_la-lib_swplugins.lo `test -f 'lib_swplugins.c' || echo '$(srcdir)/'`lib_swplugins.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-lib_swplugins.Tpo $(DEPDIR)/libgstmprtp_la-lib_swplugins.Plo
+#	$(AM_V_CC)source='lib_swplugins.c' object='libgstmprtp_la-lib_swplugins.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-lib_swplugins.lo `test -f 'lib_swplugins.c' || echo '$(srcdir)/'`lib_swplugins.c
 
 libgstmprtp_la-subratectrler.lo: subratectrler.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-subratectrler.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-subratectrler.Tpo -c -o libgstmprtp_la-subratectrler.lo `test -f 'subratectrler.c' || echo '$(srcdir)/'`subratectrler.c

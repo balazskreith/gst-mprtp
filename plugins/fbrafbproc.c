@@ -27,6 +27,7 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>     /* qsort */
+#include <stdio.h>
 
 #define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
 #define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
@@ -139,6 +140,34 @@ static void _BiF_max_pipe(gpointer data, gint64 max)
   }
 }
 
+static void owd_logger(gpointer data, gchar* string)
+{
+  FBRAFBProcessor *this = data;
+  THIS_READLOCK(this);
+
+  sprintf(string, "%lu,%lu\n",
+               GST_TIME_AS_USECONDS(this->stat.owd_stt_median),
+               GST_TIME_AS_USECONDS(this->stat.owd_ltt_median)
+               );
+
+  THIS_READUNLOCK(this);
+
+}
+
+static void rtt_logger(gpointer data, gchar* string)
+{
+  FBRAFBProcessor *this = data;
+  THIS_READLOCK(this);
+
+  sprintf(string, "%lu,%lu\n",
+               GST_TIME_AS_USECONDS(this->stat.RTT),
+               (GstClockTime)this->stat.srtt / 1000
+               );
+
+  THIS_READUNLOCK(this);
+
+}
+
 void
 fbrafbprocessor_class_init (FBRAFBProcessorClass * klass)
 {
@@ -171,18 +200,34 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->sysclock         = gst_system_clock_obtain();
   this->measurements_num = 0;
   this->stat.RTT         = GST_SECOND;
+  this->stat.srtt        = 0;
+
   this->owd_ltt          = make_percentiletracker(600, 50);
   this->bytes_in_flight  = make_numstracker(300, 5 * GST_SECOND);
+
   percentiletracker_set_treshold(this->owd_ltt, 30 * GST_SECOND);
   percentiletracker_set_stats_pipe(this->owd_ltt, _owd_ltt_pipe, this);
   numstracker_add_plugin(this->bytes_in_flight,
                          (NumsTrackerPlugin*) make_numstracker_minmax_plugin(_BiF_max_pipe, this, NULL, NULL));
 }
 
-FBRAFBProcessor *make_fbrafbprocessor(void)
+FBRAFBProcessor *make_fbrafbprocessor(guint8 subflow_id)
 {
     FBRAFBProcessor *this;
     this = g_object_new (FBRAFBPROCESSOR_TYPE, NULL);
+    this->subflow_id = subflow_id;
+
+    {
+      gchar filename[255];
+      sprintf(filename, "owd_%d.csv", this->subflow_id);
+      mprtp_logger_add_logging_fnc(owd_logger, this, filename);
+    }
+    {
+      gchar filename[255];
+      sprintf(filename, "rtt_%d.csv", this->subflow_id);
+      mprtp_logger_add_logging_fnc(rtt_logger, this, filename);
+    }
+
     return this;
 }
 
@@ -276,7 +321,8 @@ void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summa
 {
   THIS_WRITELOCK (this);
   if(summary->RR.processed){
-    this->stat.RTT = summary->RR.RTT;
+    this->stat.RTT  = summary->RR.RTT;
+    this->stat.srtt = (this->stat.srtt == 0.) ? summary->RR.RTT : (summary->RR.RTT * .1 + this->stat.srtt * .9);
   }
   if(summary->XR.DiscardedRLE.processed){
     _process_rle_discvector(this, &summary->XR);

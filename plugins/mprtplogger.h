@@ -24,22 +24,25 @@ typedef struct _MPRTPLoggerClass MPRTPLoggerClass;
 struct _MPRTPLogger
 {
   GObject           object;
-  GRWLock           rwmutex;
+  GMutex            mutex;
   GstClock*         sysclock;
   GstClockTime      made;
-  GHashTable*       touches;
 //  GHashTable*       reserves;
 
-  GstTask*          thread;
-  GRecMutex         thread_mutex;
+  GstTask*          caller;
+  GRecMutex         caller_mutex;
 
   gchar             path[255];
   gboolean          enabled;
 
-  gboolean          signaled;
-
   GString*          collector_string;
   gchar             collector_filename[255];
+
+  GstTask*          writer;
+  GRecMutex         writer_mutex;
+  GQueue*           writer_queue;
+  GCond             writer_cond;
+  gboolean          writer_wait;
 };
 
 struct _MPRTPLoggerClass{
@@ -55,17 +58,10 @@ void mprtp_free(gpointer ptr);
 void init_mprtp_logger(void);
 void enable_mprtp_logger(void);
 void disable_mprtp_logger(void);
-void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer),gpointer data, guint tick_th, GRWLock *rwmutex);
+void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer,gchar*),gpointer data, const gchar* filename);
 void mprtp_logger_set_target_directory(const gchar *path);
 void mprtp_logger_get_target_directory(gchar* result);
-gboolean mprtp_logger_is_signaled(void);
 void mprtp_logger(const gchar *filename, const gchar * format, ...);
-
-void mprtp_logger_open_collector(const gchar *filename);
-void mprtp_logger_close_collector(void);
-void mprtp_logger_collect(const gchar * format, ...);
-
-void mprtp_logger_rewrite(const gchar *filename, const gchar * format, ...);
 
 GType mprtp_logger_get_type (void);
 #endif /* MPRTP_LOGGER_H_ */

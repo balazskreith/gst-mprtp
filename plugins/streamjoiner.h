@@ -10,6 +10,7 @@
 
 #include <gst/gst.h>
 #include "packetsrcvqueue.h"
+#include "lib_swplugins.h"
 
 typedef struct _StreamJoiner StreamJoiner;
 typedef struct _StreamJoinerClass StreamJoinerClass;
@@ -42,7 +43,7 @@ struct _StreamJoiner
   GstClockTime         join_min_treshold;
   GstClockTime         join_max_treshold;
   GstClockTime         last_join_refresh;
-  PercentileTracker*   delays;
+  SlidingWindow*       delays;
 
   gdouble              betha;
 

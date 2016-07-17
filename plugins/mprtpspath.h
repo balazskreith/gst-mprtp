@@ -15,8 +15,6 @@
 #include "mprtplogger.h"
 #include "gstmprtcpbuffer.h"
 #include "packetssndqueue.h"
-#include "percentiletracker.h"
-#include "numstracker.h"
 #include "reportproc.h"
 
 G_BEGIN_DECLS

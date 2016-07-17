@@ -13,11 +13,7 @@
 #include <gst/rtp/gstrtcpbuffer.h>
 #include <gst/base/gstqueuearray.h>
 #include "gstmprtcpbuffer.h"
-#include "bintree.h"
-#include "numstracker.h"
-#include "percentiletracker2.h"
 #include "gstmprtpbuffer.h"
-#include "percentiletracker.h"
 
 G_BEGIN_DECLS
 

@@ -78,23 +78,46 @@ _cmp_seq (guint16 x, guint16 y)
 //  return 0;
 //}
 
-static void _owd_stt_pipe(gpointer data, PercentileTrackerPipeData *stats)
+static void _owd_percentile_pipe(gpointer data, swpercentilecandidates_t *candidates)
 {
   FBRAFBProducer *this = data;
-  this->median_delay = stats->percentile;
-  this->min_delay    = stats->min;
-  this->max_delay    = stats->max;
+  if(!candidates->processed){
+    return;
+  }
+  if(!candidates->left){
+    this->median_delay = *(GstClockTime*)candidates->right;
+  }else if(!candidates->right){
+    this->median_delay = *(GstClockTime*)candidates->left;
+  }else{
+    this->median_delay = *(GstClockTime*)candidates->left;
+    this->median_delay += *(GstClockTime*)candidates->right;
+    this->median_delay>>=1;
+  }
+
+  this->min_delay = *(GstClockTime*)candidates->min;
+  this->max_delay = *(GstClockTime*)candidates->max;
 }
 
-static void _stat_pipe(gpointer data, NumsTrackerStatData *stats)
+static void _stabilitystat_pipe(gpointer data, swint32stat_t *stat)
 {
   FBRAFBProducer *this = data;
+
   this->stability = 1.;
-  if(0. < stats->avg){
-    this->stability = 1. - stats->avg;
+  if(0. < stat->avg){
+    this->stability = 1. - stat->avg;
   }
-  this->sampling_num = MIN(255, stats->num);
+  this->sampling_num = MIN(255, stat->counter);
 }
+
+
+static void _payloadstat_pipe(gpointer data, swint32stat_t *stat)
+{
+  FBRAFBProducer *this = data;
+
+  this->received_bytes = stat->sum;
+}
+
+
 
 
 void
@@ -126,18 +149,17 @@ fbrafbproducer_init (FBRAFBProducer * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain();
 
-  this->received_bytes = make_numstracker(1000, GST_SECOND);
-  this->owd_stt  = make_percentiletracker(1000, 50);
-  percentiletracker_set_treshold(this->owd_stt, 200 * GST_MSECOND);
-  percentiletracker_set_stats_pipe(this->owd_stt, _owd_stt_pipe, this);
-
   this->vector   = mprtp_malloc(sizeof(gboolean)  * 1000);
   this->vector_length = 0;
 
-  this->data_sw       = make_slidingwindow(600, 30 * GST_SECOND);
 
-  this->devars = make_numstracker(100, 1000 * GST_MSECOND);
-  numstracker_add_plugin(this->devars, (NumsTrackerPlugin*)make_numstracker_stat_plugin(_stat_pipe, this));
+  this->owds_sw         = make_slidingwindow_uint64(600, 200 * GST_MSECOND);
+  this->stability_sw    = make_slidingwindow_int32(50, GST_SECOND);
+  this->payloadbytes_sw = make_slidingwindow_int32(1000, GST_SECOND);
+
+  slidingwindow_add_plugin(this->owds_sw,         make_swpercentile(50, bintree3cmp_uint64, _owd_percentile_pipe, this));
+  slidingwindow_add_plugin(this->stability_sw,    make_swint32_stater(_stabilitystat_pipe, this));
+  slidingwindow_add_plugin(this->payloadbytes_sw, make_swint32_stater(_payloadstat_pipe, this));
 
 }
 
@@ -160,16 +182,16 @@ void fbrafbproducer_reset(FBRAFBProducer *this)
 void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold)
 {
   THIS_WRITELOCK (this);
-  percentiletracker_set_treshold(this->owd_stt, treshold);
+  slidingwindow_set_treshold(this->owds_sw, treshold);
   THIS_WRITEUNLOCK (this);
 }
 
 static void _refresh_devar(FBRAFBProducer *this, GstMpRTPBuffer *mprtp)
 {
   if(mprtp->delay <= this->median_delay){
-    numstracker_add(this->devars, -1);
-  }else if(this->median_delay < mprtp->delay){
-    numstracker_add(this->devars, 1);
+    slidingwindow_add_int(this->stability_sw, -1);
+  }else{
+    slidingwindow_add_int(this->stability_sw, 1);
   }
 }
 
@@ -182,7 +204,7 @@ void fbrafbproducer_track(gpointer data, GstMpRTPBuffer *mprtp)
   THIS_WRITELOCK (this);
 
   _refresh_devar(this, mprtp);
-  percentiletracker_add(this->owd_stt, mprtp->delay);
+  slidingwindow_add_data(this->owds_sw, &mprtp->delay);
 
   if(!this->initialized){
     this->initialized = TRUE;
@@ -190,7 +212,7 @@ void fbrafbproducer_track(gpointer data, GstMpRTPBuffer *mprtp)
     goto done;
   }
 
-  numstracker_add(this->received_bytes, mprtp->payload_bytes);
+  slidingwindow_add_int(this->payloadbytes_sw, mprtp->payload_bytes);
 
   if(_cmp_seq(mprtp->subflow_seq, this->end_seq) <= 0){
     goto done;
@@ -224,13 +246,11 @@ void fbrafbproducer_setup_feedback(gpointer data, ReportProducer *reportprod)
 
 GstClockTime fbrafbproducer_get_interval(gpointer data)
 {
-  gint64 received_bytes = 0;
   GstClockTime result;
   FBRAFBProducer *this;
   this = data;
   THIS_READLOCK (this);
-  numstracker_get_stats(this->received_bytes, &received_bytes);
-  result = (1.0/MIN(50,MAX(10,(received_bytes * 8)/20000))) * GST_SECOND;
+  result = (1.0/MIN(50,MAX(10,(this->received_bytes * 8)/20000))) * GST_SECOND;
   THIS_READUNLOCK(this);
   return result;
 }

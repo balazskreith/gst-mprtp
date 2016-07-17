@@ -13,7 +13,6 @@
 #include <stdio.h>
 
 #include "mprtpspath.h"
-#include "bintree.h"
 #include "sndratedistor.h"
 #include "streamsplitter.h"
 #include "reportprod.h"

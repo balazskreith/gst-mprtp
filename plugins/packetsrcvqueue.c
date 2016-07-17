@@ -27,7 +27,6 @@
 #include "gstmprtcpbuffer.h"
 #include <math.h>
 #include <string.h>
-#include "bintree.h"
 #include "mprtpspath.h"
 #include "rtpfecbuffer.h"
 

@@ -27,11 +27,9 @@
 #include <math.h>
 #include <gst/gst.h>
 #include <stdlib.h>
-#include "percentiletracker.h"
 #include <string.h>
 #include "streamsplitter.h"
 #include "sndctrler.h"
-#include "numstracker.h"
 
 
 GST_DEBUG_CATEGORY_STATIC (sndrate_distor_debug_category);

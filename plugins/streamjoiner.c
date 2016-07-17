@@ -154,27 +154,29 @@ stream_joiner_finalize (GObject * object)
 //  }
 //}
 
-static void _delays_stat_pipe(gpointer data, PercentileTrackerPipeData* stat)
+static void _delays_stat_pipe(gpointer udata, swpercentilecandidates_t* candidates)
 {
-  StreamJoiner * this = data;
-  GstClockTime join_delay;
-  if(_now(this) - 20 * GST_MSECOND < this->last_join_refresh){
+  GstClockTime join_delay, min_delay;
+  StreamJoiner *this = udata;
+  if(!candidates->processed){
+    this->join_delay = MAX(this->join_delay, this->join_min_treshold);
     return;
   }
 
-  this->last_join_refresh = _now(this);
-  join_delay = stat->percentile * this->betha;
-  this->join_delay = CONSTRAIN(this->join_min_treshold, this->join_max_treshold, join_delay - stat->min);
-
-//  g_print("join delay: min_th: %lu max_th: %lu jd: mn: %lu mx: %lu perc: %lu - %lu %lu\n",
-//          this->join_min_treshold,
-//          this->join_max_treshold,
-//          stat->min,
-//          stat->max,
-//          stat->percentile,
-//          join_delay,
-//          this->join_delay);
+  if(!candidates->left){
+    join_delay = *(GstClockTime*)candidates->right;
+  }else if(!candidates->right){
+    join_delay = *(GstClockTime*)candidates->left;
+  }else{
+    join_delay = *(GstClockTime*)candidates->left;
+    join_delay += *(GstClockTime*)candidates->right;
+    join_delay>>=1;
+  }
+  min_delay = *(GstClockTime*)candidates->min;
+  join_delay *= this->betha;
+  this->join_delay = CONSTRAIN(this->join_min_treshold, this->join_max_treshold, join_delay - min_delay);
 }
+
 
 void
 stream_joiner_init (StreamJoiner * this)
@@ -192,9 +194,8 @@ stream_joiner_init (StreamJoiner * this)
   this->packets_by_seq     = g_queue_new();
   g_rw_lock_init (&this->rwmutex);
 
-  this->delays = make_percentiletracker(4096, 80);
-  percentiletracker_set_treshold(this->delays, 60 * GST_SECOND);
-  percentiletracker_set_stats_pipe(this->delays, _delays_stat_pipe, this);
+  this->delays = make_slidingwindow_uint64(4096, 60 * GST_SECOND);
+  slidingwindow_add_plugin(this->delays, make_swpercentile(80, bintree3cmp_uint64, _delays_stat_pipe, this));
 
 }
 
@@ -285,7 +286,7 @@ void stream_joiner_push(StreamJoiner * this, GstMpRTPBuffer *mprtp)
 
   if(!mprtpr_path_is_in_spike_mode(subflow->path)){
 //      g_print("path not in spike mode: %d\n", subflow->id);
-    percentiletracker_add(this->delays, mprtp->delay);
+    slidingwindow_add_data(this->delays, &mprtp->delay);
   }else{
 //      g_print("path in spike mode: %d\n", subflow->id);
   }
@@ -317,7 +318,7 @@ void
 stream_joiner_set_window_treshold (StreamJoiner * this, GstClockTime treshold)
 {
   THIS_WRITELOCK (this);
-  percentiletracker_set_treshold(this->delays, treshold);
+  slidingwindow_set_treshold(this->delays, treshold);
   THIS_WRITEUNLOCK (this);
 }
 

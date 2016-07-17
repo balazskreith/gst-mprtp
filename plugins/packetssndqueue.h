@@ -9,8 +9,6 @@
 #define PACKETSSNDQUEUE_H_
 
 #include <gst/gst.h>
-#include "bintree.h"
-#include "numstracker.h"
 
 typedef struct _PacketsSndQueue PacketsSndQueue;
 typedef struct _PacketsSndQueueClass PacketsSndQueueClass;
@@ -43,7 +41,6 @@ struct _PacketsSndQueue
 
   GstClockTime               obsolation_treshold;
   gboolean                   expected_lost;
-  NumsTracker*               incoming_bytes;
   gint32                     bytes;
 
   GQueue*                    items;

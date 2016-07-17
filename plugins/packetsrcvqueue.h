@@ -9,9 +9,7 @@
 #define PACKETSRCVQUEUE_H_
 
 #include <gst/gst.h>
-#include "bintree.h"
 #include "gstmprtpbuffer.h"
-#include "percentiletracker.h"
 
 typedef struct _PacketsRcvQueue PacketsRcvQueue;
 typedef struct _PacketsRcvQueueClass PacketsRcvQueueClass;

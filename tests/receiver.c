@@ -97,7 +97,8 @@ make_video_session (guint sessionNum)
 {
   gint framerate = 25;
   SessionData *ret = session_new (sessionNum);
-  GstBin *bin = GST_BIN (gst_bin_new ("video"));
+//  GstBin *bin = GST_BIN (gst_bin_new ("video"));
+  GstBin *bin = GST_BIN (gst_bin_new (NULL));
   GstElement *queue = gst_element_factory_make ("queue", NULL);
   GstElement *depayloader = gst_element_factory_make ("rtpvp8depay", NULL);
   GstElement *decoder = gst_element_factory_make ("vp8dec", NULL);

@@ -41,7 +41,9 @@ esac
 shift # past argument or value
 done
 
-
+  rm $TEMPDIR/peer1/*
+  rm $TEMPDIR/peer2/*
+  rm $TEMPDIR/peer3/*
 
   sudo ip netns exec ns_mid tc qdisc change dev veth2 root handle 1: netem delay "$OWD_SND"ms
   sudo ip netns exec ns_mid tc qdisc change dev veth1 root handle 1: netem delay "$OWD_RCV"ms

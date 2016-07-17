@@ -30,6 +30,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "mprtplogger.h"
 
 #define THIS_READLOCK(this)
 #define THIS_READUNLOCK(this)

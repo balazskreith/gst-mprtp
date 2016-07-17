@@ -27,9 +27,9 @@
 #include "gstmprtcpbuffer.h"
 #include <math.h>
 #include <string.h>
-#include "bintree.h"
 #include "mprtpspath.h"
 #include "rtpfecbuffer.h"
+#include "lib_swplugins.h"
 
 #define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
 #define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
@@ -103,7 +103,6 @@ packetssndqueue_init (PacketsSndQueue * this)
   g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain();
   this->obsolation_treshold = 0;
-  this->incoming_bytes = make_numstracker(2048, GST_SECOND);
   this->items = g_queue_new();
 
 }
@@ -112,7 +111,6 @@ packetssndqueue_init (PacketsSndQueue * this)
 void packetssndqueue_reset(PacketsSndQueue *this)
 {
   THIS_WRITELOCK(this);
-  numstracker_reset(this->incoming_bytes);
   THIS_WRITEUNLOCK(this);
 }
 
@@ -140,7 +138,8 @@ gint32 packetssndqueue_get_encoder_bitrate(PacketsSndQueue *this)
 {
   gint64 result;
   THIS_READLOCK(this);
-  numstracker_get_stats(this->incoming_bytes, &result);
+  result = 0;
+  g_warning("Encoder rate not tracked yet");
   THIS_READUNLOCK(this);
   return result * 8;
 }

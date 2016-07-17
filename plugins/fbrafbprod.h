@@ -11,8 +11,6 @@
 #include <gst/gst.h>
 #include "gstmprtcpbuffer.h"
 #include "gstmprtpbuffer.h"
-#include "percentiletracker.h"
-#include "numstracker.h"
 #include "reportprod.h"
 #include "lib_swplugins.h"
 
@@ -49,16 +47,13 @@ struct _FBRAFBProducer
   SlidingWindow           *owds_sw;
   SlidingWindow           *stability_sw;
 
-  NumsTracker*             received_bytes;
-  NumsTracker*             devars;
-
-  PercentileTracker*       owd_stt;
   GstClockTime             median_delay;
   GstClockTime             min_delay;
   GstClockTime             max_delay;
 
   gfloat                   stability;
   guint8                   sampling_num;
+  gint32                   received_bytes;
 
 
 };

@@ -212,10 +212,15 @@ libgstmprtp_la-mprtprpath.lo: mprtprpath.c /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/bits/mathcalls.h \
  /usr/include/x86_64-linux-gnu/bits/mathinline.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h \
- gstmprtcpbuffer.h gstmprtpbuffer.h mprtpdefs.h bintree.h mprtplogger.h \
- numstracker.h bintree2.h percentiletracker2.h percentiletracker.h \
- mprtpspath.h packetssndqueue.h reportproc.h streamjoiner.h \
- packetsrcvqueue.h ricalcer.h
+ gstmprtcpbuffer.h gstmprtpbuffer.h mprtpdefs.h mprtpspath.h \
+ mprtplogger.h packetssndqueue.h reportproc.h streamjoiner.h \
+ packetsrcvqueue.h lib_swplugins.h \
+ /usr/include/x86_64-linux-gnu/bits/waitflags.h \
+ /usr/include/x86_64-linux-gnu/bits/waitstatus.h /usr/include/alloca.h \
+ /usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h \
+ /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
+ /usr/include/x86_64-linux-gnu/bits/stdlib.h /usr/include/ctype.h \
+ /usr/include/assert.h slidingwindow.h lib_bintree.h ricalcer.h
 
 /usr/include/stdc-predef.h:
 
@@ -715,19 +720,9 @@ gstmprtpbuffer.h:
 
 mprtpdefs.h:
 
-bintree.h:
+mprtpspath.h:
 
 mprtplogger.h:
-
-numstracker.h:
-
-bintree2.h:
-
-percentiletracker2.h:
-
-percentiletracker.h:
-
-mprtpspath.h:
 
 packetssndqueue.h:
 
@@ -736,5 +731,27 @@ reportproc.h:
 streamjoiner.h:
 
 packetsrcvqueue.h:
+
+lib_swplugins.h:
+
+/usr/include/x86_64-linux-gnu/bits/waitflags.h:
+
+/usr/include/x86_64-linux-gnu/bits/waitstatus.h:
+
+/usr/include/alloca.h:
+
+/usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h:
+
+/usr/include/x86_64-linux-gnu/bits/stdlib-float.h:
+
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:
+
+/usr/include/ctype.h:
+
+/usr/include/assert.h:
+
+slidingwindow.h:
+
+lib_bintree.h:
 
 ricalcer.h:

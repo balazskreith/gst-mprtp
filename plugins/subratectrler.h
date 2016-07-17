@@ -3,7 +3,6 @@
 
 #include <gst/gst.h>
 #include "mprtpspath.h"
-#include "bintree.h"
 #include "sndratedistor.h"
 #include "reportproc.h"
 #include "signalreport.h"

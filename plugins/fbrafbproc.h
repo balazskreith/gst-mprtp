@@ -39,8 +39,7 @@ typedef struct _FBRAFBProcessorStat
   gdouble                  srtt;
   gint32                   discarded_packets_in_1s;
   gint32                   received_packets_in_1s;
-
-  gint64                   max_bytes_in_flight;
+//  gint64                   max_bytes_in_flight;
 }FBRAFBProcessorStat;
 
 struct _FBRAFBProcessor
@@ -53,18 +52,18 @@ struct _FBRAFBProcessor
   GQueue*                  acked;
   guint8                   subflow_id;
 
+  struct{
+    GstClockTime median,min,max;
+  }owd_stat;
+
   gint32                   measurements_num;
 
   SlidingWindow           *owd_sw;
   FBRAFBProcessorStat      stat;
-  PercentileTracker*       owd_ltt;
-  NumsTracker*             bytes_in_flight;
 
   GstClockTime             congestion_detected;
   GstClockTime             last_discard;
-//  GstClockTime             last_delay;
-//  GstClockTime             last_delay_t1;
-//  GstClockTime             last_delay_t2;
+
 };
 
 struct _FBRAFBProcessorClass{
@@ -81,7 +80,7 @@ void fbrafbprocessor_get_stats (FBRAFBProcessor * this, FBRAFBProcessorStat* res
 gint32 fbrafbprocessor_get_sent_bytes_in_1s(FBRAFBProcessor *this);
 GstClockTime fbrafbprocessor_get_fbinterval(FBRAFBProcessor *this);
 void fbrafbprocessor_record_congestion(FBRAFBProcessor *this);
-void fbrafbprocessor_approve_owd(FBRAFBProcessor *this);
+void fbrafbprocessor_refresh_owd_ltt(FBRAFBProcessor *this);
 void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary);
 
 #endif /* FBRAFBPROCESSOR_H_ */

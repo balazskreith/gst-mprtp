@@ -27,7 +27,6 @@
 #include "gstmprtcpbuffer.h"
 #include <math.h>
 #include <string.h>
-#include "bintree.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -78,16 +77,16 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 #define TARGET_BITRATE_MAX 0
 
 //determines the treshold for utilization, in which below the path considered to be congested
-#define DISCARD_CONGESTION_TRESHOLD 0.25
+#define DISCARD_CONGESTION_TRESHOLD 0.15
 
 //determines the treshold for utilization, in which below the path considered to be distorted
-#define DISCARD_DISTORTION_TRESHOLD 0.0
+#define DISCARD_DISTORTION_TRESHOLD 0.05
 
 //determines a treshold for trend calculations, in which above the KEEP stage not let it to PROBE
-#define OWD_CORR_DISTORTION_TRESHOLD 1.75
+#define OWD_CORR_DISTORTION_TRESHOLD 1.25
 
 //determines a treshold for trend calculations, in which above the path considered to be congested
-#define OWD_CORR_CONGESTION_TRESHOLD 2.0
+#define OWD_CORR_CONGESTION_TRESHOLD 1.5
 
 //determines weather the pacing allowed or not
 #define THROTTLING_ALLOWED FALSE
@@ -96,7 +95,7 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 #define APPROVEMENT_EPSILON 0.25
 
 //Stability treshold
-#define STABILITY_TRESHOLD 0.5
+#define STABILITY_TRESHOLD 0.75
 
 
 
@@ -651,36 +650,29 @@ void fbrasubctrler_report_update(
   _update_rate_correlations(this);
   _update_fraction_discarded(this);
 
-//  this->owd_approvement = FALSE;
   _execute_stage(this);
 
-
-  if(0 < _RTT(this)){
-    this->owd_approvement = _RTT(this) < _now(this) - this->congestion_detected;
-  }else{
-    this->owd_approvement = TRUE;
+  if(_FD(this) <= _FD_cong_th(this)){
+    fbrafbprocessor_refresh_owd_ltt(this->fbprocessor);
   }
 //  this->owd_approvement |= _priv(this)->stage != STAGE_REDUCE;
 
 //
-//    g_print("TR: %-7d|GP:%-7d|tr_appred: %1d|owd_stt: %-3lu/owd_ltt: %-3lu=%3.2f|SR: %-7d|stb: %3.2f|stg: %d|sta: %d|FD: %-7f|rtt: %-3.2f\n",
-//            _TR(this),
-//            _fbstat(this).goodput_bytes * 8,
-//            _priv(this)->tr_gp_approved,
-//            GST_TIME_AS_MSECONDS(_fbstat(this).owd_stt_median),
-//            GST_TIME_AS_MSECONDS(_fbstat(this).owd_ltt_median),
-//            _fbstat(this).owd_corr,
-//            _fbstat(this).sent_bytes_in_1s  * 8,
-//            _fbstat(this).stability,
-//            _priv(this)->stage,
-//            mprtps_path_get_state(this->path),
-//            _FD(this),
-//            GST_TIME_AS_MSECONDS(_RTT(this))
-//        );
+    g_print("TR: %-7d|GP:%-7d|tr_appred: %1d|owd_stt: %-3lu/owd_ltt: %-3lu=%3.2f|SR: %-7d|stb: %3.2f|stg: %d|sta: %d|FD: %-7f|rtt: %-3.2f\n",
+            _TR(this),
+            _fbstat(this).goodput_bytes * 8,
+            _priv(this)->tr_gp_approved,
+            GST_TIME_AS_MSECONDS(_fbstat(this).owd_stt_median),
+            GST_TIME_AS_MSECONDS(_fbstat(this).owd_ltt_median),
+            _fbstat(this).owd_corr,
+            _fbstat(this).sent_bytes_in_1s  * 8,
+            _fbstat(this).stability,
+            _priv(this)->stage,
+            mprtps_path_get_state(this->path),
+            _FD(this),
+            GST_TIME_AS_MSECONDS(_RTT(this))
+        );
 
-  if(this->owd_approvement){
-    fbrafbprocessor_approve_owd(this->fbprocessor);
-  }
   ++this->measurements_num;
 
 done:
@@ -922,6 +914,7 @@ void _switch_stage_to(
      case STAGE_REDUCE:
        _priv(this)->corrigate_num = 0;
        this->congestion_detected = _now(this);
+       fbrafbprocessor_record_congestion(this->fbprocessor);
        this->stage_fnc = _reduce_stage;
      break;
      case STAGE_INCREASE:

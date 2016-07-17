@@ -1,0 +1,52 @@
+
+
+1. Structural overview of MPRTP Plugin elements 
+-----------------------------------------------
+
+
+                  | RTP/RTCP                                   ^
+                  V                                            | MPRTP/RTCP
+            .-------------.                             .-------------. 
+    .------>| MPScheduler |                             | MPPlayouter |<-----.
+    |       '-------------'                             '-------------'      |
+    |              | MPRTP/RTCP                                ^             |
+  M |              V                                           | MPRTP/RTCP  | M
+  P |              .                                           .             | P
+  R |       (DTLS, SRTP, etc.)                         (DTLS, SRTP, etc.)    | R
+  T |              .                                           .             | T
+  C |              | MPRTP/RTCP                                ^             | C
+  P |              V                                           | MPRTP/RTCP  | P 
+    |       .-------------.                             .-------------.      |
+    |       |             | .-------------------------->|             |      |
+    '-------|  MPSender   |/                            |  MPReceiver |------'
+            |             |\   MPRTP/RTCP               |             |
+            |             | '-------------------------->|             |
+            '-------------'                             '-------------'
+
+
+
+2. Functional overview of MPRTP Plugin elements
+-------------------------------------------------
+
+2.1. Sender Side
+-------------------                             
+     MPRTCP                                   | RTP                                                               MPRTP
+    ---------.                                V                                                                .-------->
+              \.------------.  MPRTCP   .-------------.   MPRTP                      MPRTP/OTHER  .----------./
+               | MPReceiver |---------->| MPScheduler |----------> ...DTLS/SRTP/... ------------->| MPSender |
+     MPRTCP   /'------------'           '-------------'                                           '----------'\   MPRTP
+    ---------'                                                                                                 '-------->
+
+
+2.2. Receiver Side
+-------------------
+
+      MPRTP                                                                     ^                                 MPRTP
+    ---------.                                                                  | RTP                          .-------->
+              \.------------.                                  MPRTP    .-------------.  MPRTCP   .----------./
+               | MPReceiver |----------> ...DTLS/SRTP/... ------------->| MPPlayouter |---------->| MPSender |
+     MPRTP    /'------------'                                           '-------------'           '----------'\  MPRTP
+    ---------'                                                                                                 '-------->
+
+
+

@@ -250,7 +250,7 @@ GstClockTime fbrafbproducer_get_interval(gpointer data)
   FBRAFBProducer *this;
   this = data;
   THIS_READLOCK (this);
-  result = (1.0/MIN(50,MAX(10,(this->received_bytes * 8)/20000))) * GST_SECOND;
+  result = (1.0/MIN(33,MAX(10,(this->received_bytes * 8)/20000))) * GST_SECOND;
   THIS_READUNLOCK(this);
   return result;
 }

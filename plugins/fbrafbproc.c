@@ -139,7 +139,7 @@ static void owd_logger(gpointer data, gchar* string)
 
 }
 
-static void _owd_percentile_pipe(gpointer udata, swpercentilecandidates_t *candidates)
+static void _owd_ltt50_percentile_pipe(gpointer udata, swpercentilecandidates_t *candidates)
 {
   FBRAFBProcessor *this = udata;
   if(!candidates->processed){
@@ -196,7 +196,10 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->stat.RTT         = GST_SECOND;
   this->stat.srtt        = 0;
   this->owd_sw           = make_slidingwindow_uint64(600, 60 * GST_SECOND);
-  slidingwindow_add_plugin(this->owd_sw, make_swpercentile_with_sprint(50, bintree3cmp_uint64, _owd_percentile_pipe, this, swprinter_uint64));
+  slidingwindow_add_plugins(this->owd_sw,
+                            make_swpercentile(50, bintree3cmp_uint64, _owd_ltt50_percentile_pipe, this),
+                            //make_swpercentile(80, bintree3cmp_uint64, _owd_ltt80_percentile_pipe, this),
+                           NULL);
   //slidingwindow_add_plugin(this->owd_sw, make_swpercentile(50, bintree3cmp_uint64, _owd_percentile_pipe, this));
 
 }
@@ -418,7 +421,7 @@ void fbrafbprocessor_refresh_owd_ltt(FBRAFBProcessor *this)
 
 gdouble _get_fbinterval_in_sec(FBRAFBProcessor *this)
 {
-  return (1.0/MIN(50,MAX(10,(this->stat.goodput_bytes * 8)/20000)));
+  return (1.0/MIN(33,MAX(10,(this->stat.goodput_bytes * 8)/20000)));
 }
 
 void _process_afb(FBRAFBProcessor *this, guint32 id, GstRTCPAFB_REPS *reps)

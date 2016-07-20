@@ -52,15 +52,6 @@ GST_DEBUG_CATEGORY_STATIC (rcvctrler_debug_category);
 
 G_DEFINE_TYPE (RcvController, rcvctrler, G_TYPE_OBJECT);
 
-#define PROFILING(func) \
-{  \
-  GstClockTime start, elapsed; \
-  start = _now(this); \
-  func; \
-  elapsed = GST_TIME_AS_MSECONDS(_now(this) - start); \
-  if(0 < elapsed) g_print("elapsed time in ms: %lu\n", elapsed); \
-} \
-
 #define REGULAR_REPORT_PERIOD_TIME (5*GST_SECOND)
 
 typedef struct _Subflow Subflow;
@@ -365,7 +356,7 @@ refctrler_ticker (void *data)
   THIS_WRITELOCK (this);
 
 //  PROFILING(_orp_main(this));
-  _orp_main(this);
+  PROFILING("refctrler_ticker",_orp_main(this));
 
   _system_notifier_main(this);
 

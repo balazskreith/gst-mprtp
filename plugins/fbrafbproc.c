@@ -82,47 +82,6 @@ _cmp_uint16 (guint16 x, guint16 y)
   return 0;
 }
 
-
-//  {
-//    gdouble bw;
-//    bw = this->stat.max_bytes_in_flight * 8;
-//    bw /= (gdouble)(stats->percentile * 2.) / (gdouble)GST_SECOND;
-//    g_print("bw est: %f\n", bw);
-//  }
-
-//static gdouble _off_congestion(FBRASubController *this)
-//{
-//  GstClockTime elapsed,th_l,th_h;
-//  if(!this->congestion_detected){
-//    return 1.;
-//  }
-//  elapsed = GST_TIME_AS_MSECONDS(_now(this) - this->congestion_detected);
-//  th_l = GST_TIME_AS_MSECONDS(this->srtt);
-//  th_h = th_l * 3;
-//  if(th_h < elapsed){
-//    return 1.;
-//  }
-//  if(elapsed < th_l){
-//    return 0.;
-//  }
-//  elapsed -= th_l;
-//  return (gdouble)elapsed / (gdouble)th_h;
-//}
-
-
-//
-//static gdouble _owd_ltt_alpha(FBRASubController *this)
-//{
-//  gdouble scl;
-//  gdouble result;
-//  scl    = 1000 / GST_TIME_AS_MSECONDS(fbrafbprocessor_get_fbinterval(this->fbprocessor));
-//  result = _off_congestion(this) * _fbstat(this).stability;
-//  result *= result;
-//  result /= scl;
-//  return result;
-//}
-
-
 static void owd_logger(gpointer data, gchar* string)
 {
   FBRAFBProcessor *this = data;
@@ -130,7 +89,7 @@ static void owd_logger(gpointer data, gchar* string)
 
   sprintf(string, "%lu,%lu,%lu,%lu\n",
                GST_TIME_AS_USECONDS(this->stat.owd_stt_median),
-               GST_TIME_AS_USECONDS(this->stat.owd_ltt_median),
+               GST_TIME_AS_USECONDS(this->stat.owd_ltt80),
                GST_TIME_AS_USECONDS(this->stat.RTT),
                (GstClockTime)this->stat.srtt / 1000
                );
@@ -139,27 +98,52 @@ static void owd_logger(gpointer data, gchar* string)
 
 }
 
-static void _owd_ltt50_percentile_pipe(gpointer udata, swpercentilecandidates_t *candidates)
+
+static void _owd_ltt80_percentile_pipe(gpointer udata, swpercentilecandidates_t *candidates)
 {
   FBRAFBProcessor *this = udata;
   if(!candidates->processed){
-      this->owd_stat.median = this->owd_stat.min = this->owd_stat.max = this->stat.owd_stt_median;
-      g_warning("Not enough owd_stt to calculate the median");
+      this->owd_stat.ltt80th = this->owd_stat.min = this->owd_stat.max = this->stat.owd_stt_median;
+      g_warning("Not enough owd_stt to calculate the ltt80th");
     return;
   }
 
   if(!candidates->left){
-    this->owd_stat.median = *(GstClockTime*)candidates->right;
+    this->owd_stat.ltt80th = *(GstClockTime*)candidates->right;
   }else if(!candidates->right){
-    this->owd_stat.median = *(GstClockTime*)candidates->left;
+    this->owd_stat.ltt80th = *(GstClockTime*)candidates->left;
   }else{
-    this->owd_stat.median = *(GstClockTime*)candidates->left;
-    this->owd_stat.median += *(GstClockTime*)candidates->right;
-    this->owd_stat.median>>=1;
+    this->owd_stat.ltt80th = *(GstClockTime*)candidates->left;
+    this->owd_stat.ltt80th += *(GstClockTime*)candidates->right;
+    this->owd_stat.ltt80th>>=1;
   }
   this->owd_stat.min = *(GstClockTime*)candidates->min;
   this->owd_stat.max = *(GstClockTime*)candidates->max;
+
+  this->stat.owd_th1  = CONSTRAIN(5 * GST_MSECOND,
+                                  50 * GST_MSECOND,
+                                  this->owd_stat.min * .1);
+
+  this->stat.owd_th2  = CONSTRAIN(5 * GST_MSECOND,
+                                  50 * GST_MSECOND,
+                                  this->owd_stat.ltt80th * .2 );
 }
+
+//static void _owdstat(gpointer udata, swuint64stat_t* stat)
+//{
+//  FBRAFBProcessor *this = udata;
+//  gdouble dev = 0.;
+//
+//  if(stat->counter < 2){
+//    goto done;
+//  }
+//
+//  dev  = stat->dev;
+//done:
+//  this->stat.owd_th1  = CONSTRAIN(5, 50, dev ) * GST_MSECOND;
+//  this->stat.owd_th2  = CONSTRAIN(5, 50, 2 * dev ) * GST_MSECOND;
+//  return;
+//}
 
 
 void
@@ -197,8 +181,9 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->stat.srtt        = 0;
   this->owd_sw           = make_slidingwindow_uint64(600, 60 * GST_SECOND);
   slidingwindow_add_plugins(this->owd_sw,
-                            make_swpercentile(50, bintree3cmp_uint64, _owd_ltt50_percentile_pipe, this),
-                            //make_swpercentile(80, bintree3cmp_uint64, _owd_ltt80_percentile_pipe, this),
+//                            make_swpercentile(40, bintree3cmp_uint64, _owd_ltt40_percentile_pipe, this),
+                            make_swpercentile(80, bintree3cmp_uint64, _owd_ltt80_percentile_pipe, this),
+//                            make_swuint64_stater(_owdstat, this),
                            NULL);
   //slidingwindow_add_plugin(this->owd_sw, make_swpercentile(50, bintree3cmp_uint64, _owd_percentile_pipe, this));
 
@@ -307,21 +292,25 @@ void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn)
 
 void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary)
 {
-  THIS_WRITELOCK (this);
+
+  //TODO: This is the function where we have Profiling problem!
+
+  PROFILING("THIS_WRITELOCK", THIS_WRITELOCK (this));
+
   if(summary->RR.processed){
     this->stat.RTT  = summary->RR.RTT;
     this->stat.srtt = (this->stat.srtt == 0.) ? summary->RR.RTT : (summary->RR.RTT * .1 + this->stat.srtt * .9);
   }
   if(summary->XR.DiscardedRLE.processed){
-    _process_rle_discvector(this, &summary->XR);
+    PROFILING("_process_rle_discvector", _process_rle_discvector(this, &summary->XR));
     this->stat.recent_discarded = 0 < this->last_discard && _now(this) < this->last_discard + this->stat.RTT;
 
   }
   if(summary->XR.OWD.processed){
-    _process_owd(this, &summary->XR);
+      PROFILING("_process_owd",_process_owd(this, &summary->XR));
   }
   if(summary->AFB.processed){
-    _process_afb(this, summary->AFB.fci_id, (GstRTCPAFB_REPS *)summary->AFB.fci_data);
+      PROFILING("_process_afb",_process_afb(this, summary->AFB.fci_id, (GstRTCPAFB_REPS *)summary->AFB.fci_data));
   }
   ++this->measurements_num;
   THIS_WRITEUNLOCK (this);
@@ -373,46 +362,46 @@ void fbrafbprocessor_record_congestion(FBRAFBProcessor *this)
   this->congestion_detected = _now(this);
   THIS_WRITEUNLOCK (this);
 }
-
-static gboolean _off_congestion(FBRAFBProcessor *this)
-{
-  GstClockTime now, elapsed;
-  if(!this->congestion_detected){
-      return 1.;
-  }
-  now = _now(this);
-  if(now - this->stat.srtt < this->congestion_detected){
-    return 0.;
-  }
-  if(this->congestion_detected < now - 3 * this->stat.srtt){
-    return 1.;
-  }
-  elapsed = now - this->congestion_detected;
-  return (gdouble)elapsed / this->stat.srtt;
-}
-
-
-static void _refresh_owd_ltt_ewma(FBRAFBProcessor *this)
-{
-  gdouble alpha;
-  alpha = this->stat.stability * _off_congestion(this);
-  alpha *= alpha;
-  alpha *= _get_fbinterval_in_sec(this);
-  this->stat.owd_ltt_median *= 1.-alpha;
-  this->stat.owd_ltt_median += alpha * this->stat.owd_stt_median;
-}
+//
+//static gboolean _off_congestion(FBRAFBProcessor *this)
+//{
+//  GstClockTime now, elapsed;
+//  if(!this->congestion_detected){
+//      return 1.;
+//  }
+//  now = _now(this);
+//  if(now - this->stat.srtt < this->congestion_detected){
+//    return 0.;
+//  }
+//  if(this->congestion_detected < now - 3 * this->stat.srtt){
+//    return 1.;
+//  }
+//  elapsed = now - this->congestion_detected;
+//  return (gdouble)elapsed / this->stat.srtt;
+//}
+//
+//
+//static void _refresh_owd_ltt_ewma(FBRAFBProcessor *this)
+//{
+//  gdouble alpha;
+//  alpha = this->stat.stability * _off_congestion(this);
+//  alpha *= alpha;
+//  alpha *= _get_fbinterval_in_sec(this);
+//  this->stat.owd_ltt80 *= 1.-alpha;
+//  this->stat.owd_ltt80 += alpha * this->stat.owd_stt_median;
+//}
 
 static void _refresh_owd_ltt_median(FBRAFBProcessor *this)
 {
   slidingwindow_add_data(this->owd_sw, &this->stat.owd_stt_median);
-  this->stat.owd_ltt_median = this->owd_stat.median;
+  this->stat.owd_ltt80 = this->owd_stat.ltt80th;
+//  this->stat.owd_ltt40 = this->owd_stat.ltt40th;
 }
 
 void fbrafbprocessor_refresh_owd_ltt(FBRAFBProcessor *this)
 {
   THIS_WRITELOCK (this);
 
-  DISABLE_LINE _refresh_owd_ltt_ewma(this);
   _refresh_owd_ltt_median(this);
 
   THIS_WRITEUNLOCK (this);
@@ -449,12 +438,11 @@ void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
 //  this->last_delay_t1         = this->last_delay;
 //  this->last_delay            = xrsummary->OWD.median_delay;
 
-  if(this->stat.owd_ltt_median){
-//    this->stat.owd_corr =  1.0 * this->last_delay + 0. * this->last_delay_t1 + 0. * this->last_delay_t2;
-    this->stat.owd_corr =  (gdouble) this->stat.owd_stt_median;
-    this->stat.owd_corr /=  (gdouble)this->stat.owd_ltt_median;
+  if(this->stat.owd_ltt80){
+    this->stat.owdh_corr =  (gdouble) this->stat.owd_stt_median;
+    this->stat.owdh_corr /=  (gdouble)this->stat.owd_ltt80;
   }else{
-    this->stat.owd_corr = 1.;
+    this->stat.owdh_corr = /*this->stat.owdl_corr = */ 1.;
   }
 
 done:

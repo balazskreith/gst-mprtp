@@ -45,13 +45,13 @@ struct _FBRAFBProducer
 
   SlidingWindow           *payloadbytes_sw;
   SlidingWindow           *owds_sw;
-  SlidingWindow           *stability_sw;
+  SlidingWindow           *tendency_sw;
 
   GstClockTime             median_delay;
   GstClockTime             min_delay;
   GstClockTime             max_delay;
 
-  gfloat                   stability;
+  gfloat                   tendency;
   guint8                   sampling_num;
   gint32                   received_bytes;
 

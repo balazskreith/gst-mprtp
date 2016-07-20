@@ -101,11 +101,11 @@ static void _owd_percentile_pipe(gpointer data, swpercentilecandidates_t *candid
 static void _stabilitystat_pipe(gpointer data, swint32stat_t *stat)
 {
   FBRAFBProducer *this = data;
-
-  this->stability = 1.;
-  if(0. < stat->avg){
-    this->stability = 1. - stat->avg;
-  }
+//  this->stability = 1.;
+//  if(0. < stat->avg){
+//    this->stability = 1. - stat->avg;
+//  }
+  this->stability = stat->avg;
   this->sampling_num = MIN(255, stat->counter);
 }
 
@@ -153,12 +153,12 @@ fbrafbproducer_init (FBRAFBProducer * this)
   this->vector_length = 0;
 
 
-  this->owds_sw         = make_slidingwindow_uint64(600, 200 * GST_MSECOND);
-  this->stability_sw    = make_slidingwindow_int32(50, GST_SECOND);
-  this->payloadbytes_sw = make_slidingwindow_int32(1000, GST_SECOND);
+  this->owds_sw         = make_slidingwindow_uint64(50, 200 * GST_MSECOND);
+  this->tendency_sw    = make_slidingwindow_int32(100, GST_SECOND);
+  this->payloadbytes_sw = make_slidingwindow_int32(2000, GST_SECOND);
 
   slidingwindow_add_plugin(this->owds_sw,         make_swpercentile(50, bintree3cmp_uint64, _owd_percentile_pipe, this));
-  slidingwindow_add_plugin(this->stability_sw,    make_swint32_stater(_stabilitystat_pipe, this));
+  slidingwindow_add_plugin(this->tendency_sw,    make_swint32_stater(_stabilitystat_pipe, this));
   slidingwindow_add_plugin(this->payloadbytes_sw, make_swint32_stater(_payloadstat_pipe, this));
 
 }
@@ -189,9 +189,9 @@ void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold
 static void _refresh_devar(FBRAFBProducer *this, GstMpRTPBuffer *mprtp)
 {
   if(mprtp->delay <= this->median_delay){
-    slidingwindow_add_int(this->stability_sw, -1);
+    slidingwindow_add_int(this->tendency_sw, -1);
   }else{
-    slidingwindow_add_int(this->stability_sw, 1);
+    slidingwindow_add_int(this->tendency_sw, 1);
   }
 }
 
@@ -251,6 +251,10 @@ GstClockTime fbrafbproducer_get_interval(gpointer data)
   this = data;
   THIS_READLOCK (this);
   result = (1.0/MIN(33,MAX(10,(this->received_bytes * 8)/20000))) * GST_SECOND;
+
+  //slidingwindow_set_treshold(this->stability_sw, result);
+  slidingwindow_set_act_limit(this->tendency_sw, (this->received_bytes * 8) / 50000);
+//  g_print("tendency window: %d, actual_count: %d\n", this->tendency_sw->num_act_limit, this->tendency_sw->items->count);
   THIS_READUNLOCK(this);
   return result;
 }
@@ -286,6 +290,8 @@ void _setup_xr_owd(FBRAFBProducer * this, ReportProducer *reportproducer)
                              u32_median_delay,
                              u32_min_delay,
                              u32_max_delay);
+
+
 }
 
 void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer)

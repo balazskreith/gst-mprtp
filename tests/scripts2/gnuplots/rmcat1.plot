@@ -7,18 +7,19 @@ if (!exists("output_file")) output_file='reports/summary-snd-rates.pdf'
 if (!exists("path_delay")) path_delay=50000
 
 duration=100
-range=3000
+range=2900
 
 font_size=18
 #-------------------------------------------------------------------------
 
 set terminal pdf enhanced rounded size 10,6
 set output output_file
-set key font ",32"
-set xtics font ",32"
-set ytics font ",32"
-set ylabel font ",32"
-set xlabel font ",32"
+set key font ",20"
+set xtics font ",20"
+set ytics font ",20"
+set ylabel font ",20"
+set xlabel font ",20"
+ 
  
 set origin 0,0
 set size ratio 0.25
@@ -32,20 +33,19 @@ if (!exists("legends")) {
   set key inside vertical top right
 }
    
-#set tmargin 5
-#set bmargin 5
+set tmargin 3
+set bmargin 5
 
 if (!exists("labels")){
   set lmargin 12  
 }else{
   set lmargin 23
 }
-
 set rmargin 7
 set yrange [0:range]
 set ytics 1000
 set xrange [0:duration]
-set xtics 20 offset 0,-1
+set xtics 10 offset 0,-1
 if (exists("labels")){
   set ylabel "Throughput (KBits)" offset -8
 }
@@ -71,26 +71,35 @@ set style line 4 linecolor rgb '#a21d21' linetype 4 linewidth 1
 set style line 5 linecolor rgb '#662c91' linetype 5 linewidth 1	
 
 unset xlabel
-unset xtics  
+set format x ""
+#unset xtics  
+
+set title "Throughput (kbps)" font ", 20"
+
 plot throughput_file using ($0*0.1):($1/125) with lines ls 1 title "Sending Rate", \
      throughput_file using ($0*0.1):($2/125) with boxes ls 3 title "FEC Rate", \
      throughput_file using ($0*0.1):22 with lines ls 4 title "Path Capacity"
        
        
-set yrange [0:500]
-set ytics 100
+set yrange [0:1]
+set ytics 0.5
 set xrange [0:duration]
-set xtics 20 offset 0,-1
-set xtics font ", 32"
-set xlabel font ", 32"
+set xtics 10 offset 0,-1
+set xtics font ", 20"
+set xlabel font ", 20"
 
+unset format x 
+
+unset title
+set title "Network Delay (s)" font ", 20"
+ 
 if (exists("labels")){
   set ylabel "Delay (ms)" offset -8
 }
-set xlabel "Time (s)" offset 0,-2
+set xlabel "Time (s)" offset 0,-1
 set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
   
-plot owd_file using ($0*0.1):(($1 - path_delay)/1000) with points pointtype 7 title "Queue Delay"
+plot owd_file using ($0*0.1):(($1 - path_delay)/1000000) with point pointtype 7 ps 0.2 lc rgb "blue" title "Queue Delay"
   
 unset multiplot

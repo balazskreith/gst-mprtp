@@ -30,15 +30,19 @@ typedef struct _FBRAFBProcessorStat
   gint32                   sent_bytes_in_1s;
   gint32                   sent_packets_in_1s;
   gint32                   goodput_bytes;
-  GstClockTime             owd_ltt_median;
+  GstClockTime             owd_ltt80/*,owd_ltt40*/;
   GstClockTime             owd_stt_median;
-  gdouble                  owd_corr;
+  gdouble                  owdh_corr;
+//  gdouble                  owdl_corr;
   gboolean                 recent_discarded;
   gdouble                  stability;
   GstClockTime             RTT;
   gdouble                  srtt;
   gint32                   discarded_packets_in_1s;
   gint32                   received_packets_in_1s;
+
+  gdouble                  owd_th1;
+  gdouble                  owd_th2;
 //  gint64                   max_bytes_in_flight;
 }FBRAFBProcessorStat;
 
@@ -53,7 +57,7 @@ struct _FBRAFBProcessor
   guint8                   subflow_id;
 
   struct{
-    GstClockTime median,min,max;
+    GstClockTime ltt80th, /*ltt40th,*/ min,max;
   }owd_stat;
 
   gint32                   measurements_num;

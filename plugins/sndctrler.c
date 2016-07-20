@@ -51,24 +51,6 @@ GST_DEBUG_CATEGORY_STATIC (sndctrler_debug_category);
 
 G_DEFINE_TYPE (SndController, sndctrler, G_TYPE_OBJECT);
 
-#define PROFILING(func) \
-{  \
-  GstClockTime start, elapsed; \
-  start = _now(this); \
-  func; \
-  elapsed = GST_TIME_AS_MSECONDS(_now(this) - start); \
-  if(0 < elapsed) g_print("elapsed time in ms: %lu\n", elapsed); \
-} \
-
-#define PROFILING2(msg, func) \
-{  \
-  GstClockTime start, elapsed; \
-  start = _now(this); \
-  func; \
-  elapsed = GST_TIME_AS_MSECONDS(_now(this) - start); \
-  if(0 < elapsed) {g_print(msg" elapsed time in ms: %lu\n", elapsed); }\
-} \
-
 typedef struct _Subflow Subflow;
 
 //IRP: Incoming Report Processor
@@ -499,7 +481,7 @@ sndctrler_ticker_run (void *data)
     this->target_bitrate_t1 = this->target_bitrate;
     this->target_bitrate = sndrate_distor_refresh(this->sndratedistor);
   }
-  _emit_signal(this);
+  _emit_signal(this);//<-This usually takes 1-10ms
 //  _system_notifier_main(this);
 
   next_scheduler_time = _now(this) + 100 * GST_MSECOND;

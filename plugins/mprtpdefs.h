@@ -18,4 +18,14 @@
 
 #define DISABLE_LINE if(0)
 
+
+#define PROFILING(msg, func) \
+{  \
+  GstClockTime start, elapsed; \
+  start = _now(this); \
+  func; \
+  elapsed = GST_TIME_AS_MSECONDS(_now(this) - start); \
+  if(0 < elapsed) {g_print(msg" elapsed time in ms: %lu\n", elapsed); }\
+} \
+
 #endif /* PLUGINS_MPRTPDEFS_H_ */

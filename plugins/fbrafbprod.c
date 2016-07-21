@@ -98,26 +98,51 @@ static void _owd_percentile_pipe(gpointer data, swpercentilecandidates_t *candid
   this->max_delay = *(GstClockTime*)candidates->max;
 }
 
-static void _stabilitystat_pipe(gpointer data, swint32stat_t *stat)
+static void _tendency_add_pipe(gpointer udata, gpointer itemptr)
 {
-  FBRAFBProducer *this = data;
-//  this->stability = 1.;
-//  if(0. < stat->avg){
-//    this->stability = 1. - stat->avg;
-//  }
-  this->stability = stat->avg;
-  this->sampling_num = MIN(255, stat->counter);
+  FBRAFBProducer* this;
+  gint32* item;
+  item = itemptr;
+  this = udata;
+
+  ++this->tendency.counter;
+  this->tendency.sum += *item;
+
 }
 
-
-static void _payloadstat_pipe(gpointer data, swint32stat_t *stat)
+static void _tendency_rem_pipe(gpointer udata, gpointer itemptr)
 {
-  FBRAFBProducer *this = data;
+  FBRAFBProducer* this;
+  gint32* item;
+  item = itemptr;
+  this = udata;
 
-  this->received_bytes = stat->sum;
+  --this->tendency.counter;
+  this->tendency.sum -= *item;
+
 }
 
+static void _payloads_add_pipe(gpointer udata, gpointer itemptr)
+{
+  FBRAFBProducer* this;
+  gint32* item;
+  item = itemptr;
+  this = udata;
 
+  this->received_bytes += *item;
+
+}
+
+static void _payloads_rem_pipe(gpointer udata, gpointer itemptr)
+{
+  FBRAFBProducer* this;
+  gint32* item;
+  item = itemptr;
+  this = udata;
+
+  this->received_bytes -= *item;
+
+}
 
 
 void
@@ -154,12 +179,12 @@ fbrafbproducer_init (FBRAFBProducer * this)
 
 
   this->owds_sw         = make_slidingwindow_uint64(50, 200 * GST_MSECOND);
-  this->tendency_sw    = make_slidingwindow_int32(100, GST_SECOND);
+  this->tendency_sw     = make_slidingwindow_int32(100, GST_SECOND);
   this->payloadbytes_sw = make_slidingwindow_int32(2000, GST_SECOND);
 
-  slidingwindow_add_plugin(this->owds_sw,         make_swpercentile(50, bintree3cmp_uint64, _owd_percentile_pipe, this));
-  slidingwindow_add_plugin(this->tendency_sw,    make_swint32_stater(_stabilitystat_pipe, this));
-  slidingwindow_add_plugin(this->payloadbytes_sw, make_swint32_stater(_payloadstat_pipe, this));
+  slidingwindow_add_plugin(this->owds_sw,        make_swpercentile(50, bintree3cmp_uint64, _owd_percentile_pipe, this));
+  slidingwindow_add_pipes(this->tendency_sw,     _tendency_rem_pipe, this, _tendency_add_pipe, this);
+  slidingwindow_add_pipes(this->payloadbytes_sw, _payloads_rem_pipe, this, _payloads_add_pipe, this);
 
 }
 
@@ -296,7 +321,13 @@ void _setup_xr_owd(FBRAFBProducer * this, ReportProducer *reportproducer)
 
 void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer)
 {
-  report_producer_add_afb_reps(reportproducer, this->ssrc, this->sampling_num, this->stability);
+  guint8 sampling_num;
+  gfloat tendency = 0.;
+  sampling_num = CONSTRAIN(0, 255, this->tendency.counter);
+  if(0 < sampling_num){
+    tendency = (gfloat) this->tendency.sum / (gfloat) this->tendency.counter;
+  }
+  report_producer_add_afb_reps(reportproducer, this->ssrc, sampling_num, tendency);
 }
 
 #undef THIS_WRITELOCK

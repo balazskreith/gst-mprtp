@@ -45,15 +45,6 @@
 GST_DEBUG_CATEGORY_STATIC (fbrafbprocessor_debug_category);
 #define GST_CAT_DEFAULT fbrafbprocessor_debug_category
 
-typedef struct _FBRAFBProcessorItem{
-  guint        ref;
-  guint16      seq_num;
-  guint32      payload_bytes;
-  GstClockTime sent;
-  gboolean     discarded;
-//  gboolean     seen;
-}FBRAFBProcessorItem;
-
 G_DEFINE_TYPE (FBRAFBProcessor, fbrafbprocessor, G_TYPE_OBJECT);
 
 //----------------------------------------------------------------------
@@ -62,7 +53,6 @@ G_DEFINE_TYPE (FBRAFBProcessor, fbrafbprocessor, G_TYPE_OBJECT);
 
 static void fbrafbprocessor_finalize (GObject * object);
 static void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr);
-static gdouble _get_fbinterval_in_sec(FBRAFBProcessor *this);
 static void _process_afb(FBRAFBProcessor *this, guint32 id, GstRTCPAFB_REPS *remb);
 static void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary);
 static void _unref_item(FBRAFBProcessor * this, FBRAFBProcessorItem* item);
@@ -129,22 +119,22 @@ static void _owd_ltt80_percentile_pipe(gpointer udata, swpercentilecandidates_t 
                                   this->owd_stat.ltt80th * .2 );
 }
 
-//static void _owdstat(gpointer udata, swuint64stat_t* stat)
-//{
-//  FBRAFBProcessor *this = udata;
-//  gdouble dev = 0.;
-//
-//  if(stat->counter < 2){
-//    goto done;
-//  }
-//
-//  dev  = stat->dev;
-//done:
-//  this->stat.owd_th1  = CONSTRAIN(5, 50, dev ) * GST_MSECOND;
-//  this->stat.owd_th2  = CONSTRAIN(5, 50, 2 * dev ) * GST_MSECOND;
-//  return;
-//}
+static gboolean _BiF_obsolation(gpointer udata, SlidingWindowItem *switem)
+{
+  FBRAFBProcessor *this = udata;
+  FBRAFBProcessorItem *item = switem->data;
 
+  if(_cmp_uint16(item->seq_num, this->lowest_acked_seq) < 0){
+    return TRUE;
+  }
+
+  if(0 < _cmp_uint16(item->seq_num, this->highest_acked_seq)){
+    return FALSE;
+  }
+
+  item->received = TRUE;
+  return TRUE;
+}
 
 void
 fbrafbprocessor_class_init (FBRAFBProcessorClass * klass)
@@ -179,12 +169,23 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->measurements_num = 0;
   this->stat.RTT         = GST_SECOND;
   this->stat.srtt        = 0;
+
+  this->items            = g_malloc0(sizeof(FBRAFBProcessorItem) * 65536);
   this->owd_sw           = make_slidingwindow_uint64(600, 60 * GST_SECOND);
+  this->recv_sw          = make_slidingwindow(2000, GST_SECOND);
+  this->sent_sw          = make_slidingwindow(2000, GST_SECOND);
+  this->BiF_sw           = make_slidingwindow(2000, 0);
+
+  slidingwindow_setup_custom_obsolation(this->BiF_sw, _BiF_obsolation, this);
+  slidingwindow_add_pipes(this->BiF_sw, _BiF_rem_pipe, this, _BiF_add_pipe, this);
+  slidingwindow_add_pipes(this->sent_sw, _sent_rem_pipe, this, sent_add_pipe, this);
+  slidingwindow_add_pipes(this->recv_sw, _recv_rem_pipe, this, _recv_add_pipe, this);
+
   slidingwindow_add_plugins(this->owd_sw,
-//                            make_swpercentile(40, bintree3cmp_uint64, _owd_ltt40_percentile_pipe, this),
                             make_swpercentile(80, bintree3cmp_uint64, _owd_ltt80_percentile_pipe, this),
-//                            make_swuint64_stater(_owdstat, this),
                            NULL);
+
+
   //slidingwindow_add_plugin(this->owd_sw, make_swpercentile(50, bintree3cmp_uint64, _owd_percentile_pipe, this));
 
 }
@@ -321,108 +322,35 @@ fbrafbprocessor_get_stats (FBRAFBProcessor * this, FBRAFBProcessorStat* result)
 {
   THIS_READLOCK (this);
   memcpy(result, &this->stat, sizeof(FBRAFBProcessorStat));
-//  g_print("BiF: %d |GP:%d |owd_corr: %3.2f |owd_ltt: %lu |owd_stt: %lu |PiF: %d |RD: %d |SR: %d| SP: %d| REPS: %f\n",
-//          this->stat.bytes_in_flight,
-//          this->stat.goodput_bytes,
-//          this->stat.owd_corr,
-//          GST_TIME_AS_MSECONDS(this->stat.owd_ltt_median),
-//          GST_TIME_AS_MSECONDS(this->stat.owd_stt_median),
-//          this->stat.packets_in_flight,
-//          this->stat.recent_discarded,
-//          this->stat.sent_bytes_in_1s  * 8,
-//          this->stat.sent_packets_in_1s,
-//          this->stat.stability
-//      );
-  if(this->stat.goodput_bytes * 8 < 0) g_print("#%d|%d#\n", this->stat.goodput_bytes, this->stat.goodput_bytes * 8);
   THIS_READUNLOCK (this);
 }
 
-gint32 fbrafbprocessor_get_sent_bytes_in_1s(FBRAFBProcessor *this)
-{
-  gint32 result;
-  THIS_READLOCK (this);
-  _obsolate_sent_packet(this);
-  result = this->stat.sent_bytes_in_1s;
-  THIS_READUNLOCK(this);
-  return result;
-}
 
-GstClockTime fbrafbprocessor_get_fbinterval(FBRAFBProcessor *this)
-{
-  GstClockTime result;
-  THIS_READLOCK (this);
-  result = _get_fbinterval_in_sec(this) * GST_SECOND;
-  THIS_READUNLOCK(this);
-  return result;
-}
-
-void fbrafbprocessor_record_congestion(FBRAFBProcessor *this)
-{
-  THIS_WRITELOCK (this);
-  this->congestion_detected = _now(this);
-  THIS_WRITEUNLOCK (this);
-}
-//
-//static gboolean _off_congestion(FBRAFBProcessor *this)
-//{
-//  GstClockTime now, elapsed;
-//  if(!this->congestion_detected){
-//      return 1.;
-//  }
-//  now = _now(this);
-//  if(now - this->stat.srtt < this->congestion_detected){
-//    return 0.;
-//  }
-//  if(this->congestion_detected < now - 3 * this->stat.srtt){
-//    return 1.;
-//  }
-//  elapsed = now - this->congestion_detected;
-//  return (gdouble)elapsed / this->stat.srtt;
-//}
-//
-//
-//static void _refresh_owd_ltt_ewma(FBRAFBProcessor *this)
-//{
-//  gdouble alpha;
-//  alpha = this->stat.stability * _off_congestion(this);
-//  alpha *= alpha;
-//  alpha *= _get_fbinterval_in_sec(this);
-//  this->stat.owd_ltt80 *= 1.-alpha;
-//  this->stat.owd_ltt80 += alpha * this->stat.owd_stt_median;
-//}
-
-static void _refresh_owd_ltt_median(FBRAFBProcessor *this)
+static void _refresh_owd_ltt(FBRAFBProcessor *this)
 {
   slidingwindow_add_data(this->owd_sw, &this->stat.owd_stt_median);
   this->stat.owd_ltt80 = this->owd_stat.ltt80th;
-//  this->stat.owd_ltt40 = this->owd_stat.ltt40th;
 }
 
-void fbrafbprocessor_refresh_owd_ltt(FBRAFBProcessor *this)
+void fbrafbprocessor_approve_owd_ltt(FBRAFBProcessor *this)
 {
   THIS_WRITELOCK (this);
 
-  _refresh_owd_ltt_median(this);
+  _refresh_owd_ltt(this);
 
   THIS_WRITEUNLOCK (this);
-}
-
-
-gdouble _get_fbinterval_in_sec(FBRAFBProcessor *this)
-{
-  return (1.0/MIN(33,MAX(10,(this->stat.goodput_bytes * 8)/20000)));
 }
 
 void _process_afb(FBRAFBProcessor *this, guint32 id, GstRTCPAFB_REPS *reps)
 {
-  gfloat                stability;
+  gfloat                tendency;
   guint8                sampling_num;
 
   if(id != RTCP_AFB_REPS_ID){
     return;
   }
-  gst_rtcp_afb_reps_getdown(reps, &sampling_num, &stability);
-  this->stat.stability = 0 < sampling_num ? stability : 1.;
+  gst_rtcp_afb_reps_getdown(reps, &sampling_num, &tendency);
+  this->stat.tendency = 0 < sampling_num ? tendency : 1.;
 
 }
 
@@ -447,6 +375,25 @@ void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
 
 done:
   return;
+}
+
+void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr)
+{
+  FBRAFBProcessorItem *item;
+  guint16 act_seq, end_seq;
+  gint i;
+  if(this->rle_initialized && _cmp_uint16(xr->DiscardedRLE.begin_seq, this->highest_acked_seq) < 0){
+    g_warning("The received feedback rle vector begin_seq is lower than the actual highest_acked_seq");
+    return;
+  }
+
+  this->rle_initialized = TRUE;
+  this->lowest_acked_seq  = act_seq = xr->DiscardedRLE.begin_seq;
+  this->highest_acked_seq = end_seq = xr->DiscardedRLE.end_seq;
+  for(i=0; act_seq <= end_seq; ++act_seq, ++i){
+    item = this->items + act_seq;
+    item->discarded = !xr->DiscardedRLE.vector[i];
+  }
 }
 
 

@@ -17,1265 +17,1307 @@ Seconds: 1
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 500000 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 1
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 547308 | weight: 1.000000
+Sending target: 492536 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 2
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 628244 | weight: 1.000000
+Sending target: 447784 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 2
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 654676 | weight: 1.000000
+Sending target: 560940 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 2
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 515114 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 3
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 718668 | weight: 1.000000
+Sending target: 582592 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 4
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 718100 | weight: 1.000000
+Sending target: 596255 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 4
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 553059 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 5
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 779392 | weight: 1.000000
+Sending target: 626020 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 5
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 892043 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 5
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 738025 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 5
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 738025 | weight: 1.000000
+Sending target: 580668 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 6
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 824345 | weight: 1.000000
+Sending target: 673419 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 6
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 816126 | weight: 1.000000
+Sending target: 612234 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 7
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 882204 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 7
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 701133 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 7
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 696806 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 7
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 891692 | weight: 1.000000
+Sending target: 654634 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 8
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 680536 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 8
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 680536 | weight: 1.000000
+Sending target: 674868 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 9
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 904809 | weight: 1.000000
+Sending target: 715692 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 9
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 730808 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 10
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 664804 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 10
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 593659 | weight: 1.000000
+Sending target: 664410 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 11
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 801628 | weight: 1.000000
+Sending target: 567398 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 11
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 548251 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 11
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 548251 | weight: 1.000000
+Sending target: 653858 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 12
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 776998 | weight: 1.000000
+Sending target: 591476 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 12
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 595057 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 12
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 595057 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 13
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 752994 | weight: 1.000000
+Sending target: 660524 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 14
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 845151 | weight: 1.000000
+Sending target: 683256 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 15
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 897965 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 15
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 776515 | weight: 1.000000
+Sending target: 741585 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 16
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 759290 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 16
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 803677 | weight: 1.000000
+Sending target: 644462 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 17
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 918427 | weight: 1.000000
+Sending target: 813050 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 18
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 723575 | weight: 1.000000
+Sending target: 661991 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 18
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 689338 | weight: 1.000000
+Sending target: 859492 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 19
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 895903 | weight: 1.000000
+Sending target: 739477 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 20
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 722793 | weight: 1.000000
+Sending target: 636220 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 20
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 902501 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 21
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 733759 | weight: 1.000000
+Sending target: 792213 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 22
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 781832 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 23
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 775595 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 23
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 876055 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 23
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 827332 | weight: 1.000000
+Sending target: 895984 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 24
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 928704 | weight: 1.000000
+Sending target: 748034 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 24
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 984592 | weight: 1.000000
+Sending target: 666568 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 25
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 1030157 | weight: 1.000000
+Sending target: 862146 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 26
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 1150940 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 26
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 1156916 | weight: 1.000000
+Sending target: 674370 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 27
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 1269324 | weight: 1.000000
+Sending target: 888903 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 27
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 768626 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 28
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 1292114 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 28
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 1367452 | weight: 1.000000
+Sending target: 695300 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 29
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 1487450 | weight: 1.000000
+Sending target: 907508 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 29
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 1579260 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 30
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 1591417 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 30
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 1638796 | weight: 1.000000
+Sending target: 796605 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 31
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 1716648 | weight: 1.000000
+Sending target: 912348 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 32
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 1759621 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 32
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 1800699 | weight: 1.000000
+Sending target: 728094 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 33
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 1951460 | weight: 1.000000
+Sending target: 933334 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 34
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 2047491 | weight: 1.000000
+Sending target: 807047 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 34
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 730054 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 35
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 2116612 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 35
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 1874851 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 35
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 1753902 | weight: 1.000000
+Sending target: 927506 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 36
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 2020590 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 36
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 2005805 | weight: 1.000000
+Sending target: 758977 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 37
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 1971152 | weight: 1.000000
+Sending target: 676321 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 37
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 861020 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 38
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 1992268 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 38
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 2139545 | weight: 1.000000
+Sending target: 740794 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 39
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 2137158 | weight: 1.000000
+Sending target: 901100 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 40
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 2246110 | weight: 1.000000
+Sending target: 790981 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 40
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 1840665 | weight: 1.000000
+Sending target: 691874 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 41
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 1351392 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 41
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 1205244 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 41
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 1076841 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 41
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 861472 | weight: 1.000000
+Sending target: 629014 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 42
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 689177 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 42
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 412127 | weight: 1.000000
+Sending target: 506992 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 43
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 401253 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 43
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 240751 | weight: 1.000000
+Sending target: 436194 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 44
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 232115 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 44
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 426195 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 45
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 391033 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 45
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 379612 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 45
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 351742 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 45
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 439100 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 45
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 439100 | weight: 1.000000
+Sending target: 380969 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 46
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 409207 | weight: 1.000000
+Sending target: 430819 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 46
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 342866 | weight: 1.000000
+Sending target: 369937 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 47
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 388110 | weight: 1.000000
+Sending target: 354377 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 48
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 407809 | weight: 1.000000
+Sending target: 499769 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 48
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 413886 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 48
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 384243 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 48
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 431998 | weight: 1.000000
+Sending target: 307936 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 49
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 447671 | weight: 1.000000
+Sending target: 287060 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 50
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 450897 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 50
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 437220 | weight: 1.000000
+Sending target: 383086 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 51
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 504722 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 51
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 439322 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 51
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 414445 | weight: 1.000000
+Sending target: 353555 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 52
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 434496 | weight: 1.000000
+Sending target: 326300 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 52
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 434496 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 52
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 486876 | weight: 1.000000
+Sending target: 474401 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 53
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 455942 | weight: 1.000000
+Sending target: 338143 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 54
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 437567 | weight: 1.000000
+Sending target: 302825 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 55
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 477826 | weight: 1.000000
+Sending target: 374537 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 56
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 451837 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 56
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 485483 | weight: 1.000000
+Sending target: 342214 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 57
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 485483 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 57
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 527024 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 57
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 485483 | weight: 1.000000
+Sending target: 465178 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 58
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 464205 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 58
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 515928 | weight: 1.000000
+Sending target: 416596 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 59
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 446421 | weight: 1.000000
+Sending target: 576124 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 59
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 378740 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 60
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 411929 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 60
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 489184 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 61
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 576052 | weight: 1.000000
+Sending target: 456916 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 62
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 613888 | weight: 1.000000
+Sending target: 397073 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 63
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 705206 | weight: 1.000000
+Sending target: 373888 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 63
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 758168 | weight: 1.000000
+Sending target: 563716 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 64
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 819956 | weight: 1.000000
+Sending target: 517661 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 65
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 898412 | weight: 1.000000
+Sending target: 449863 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 65
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 953184 | weight: 1.000000
+Sending target: 626691 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 66
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 806860 | weight: 1.000000
+Sending target: 656905 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 67
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 710860 | weight: 1.000000
+Sending target: 603238 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 67
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 710860 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 67
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 820284 | weight: 1.000000
+Sending target: 633788 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 68
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 869806 | weight: 1.000000
+Sending target: 650621 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 69
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 956241 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 69
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 770116 | weight: 1.000000
+Sending target: 690704 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 70
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 698548 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 70
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 838896 | weight: 1.000000
+Sending target: 706324 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 71
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 803121 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 71
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 923908 | weight: 1.000000
+Sending target: 717950 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 72
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 787177 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 72
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 854364 | weight: 1.000000
+Sending target: 741740 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 73
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 924964 | weight: 1.000000
+Sending target: 715401 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 73
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 653669 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 74
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 780665 | weight: 1.000000
+Sending target: 745971 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 75
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 707291 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 75
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 853315 | weight: 1.000000
+Sending target: 740888 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 76
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 872315 | weight: 1.000000
+Sending target: 754704 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 76
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 774788 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 77
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 764978 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 77
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 682490 | weight: 1.000000
+Sending target: 761044 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 78
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 803000 | weight: 1.000000
+Sending target: 766111 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 79
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 861445 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 79
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 858406 | weight: 1.000000
+Sending target: 770341 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 80
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 904729 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 80
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 791413 | weight: 1.000000
+Sending target: 767561 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 81
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 708577 | weight: 1.000000
+Sending target: 786714 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 82
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 836378 | weight: 1.000000
+Sending target: 829913 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 82
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 673477 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 83
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 842301 | weight: 1.000000
+Sending target: 708904 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 84
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 920764 | weight: 1.000000
+Sending target: 594816 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 84
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 786612 | weight: 1.000000
+Sending target: 716602 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 85
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 722656 | weight: 1.000000
+Sending target: 644995 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 85
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 842374 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 86
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 793718 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 86
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 931074 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 86
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 966327 | weight: 1.000000
+Sending target: 737068 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 87
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 781080 | weight: 1.000000
+Sending target: 782562 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 87
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 707905 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 88
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 707659 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 88
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 780656 | weight: 1.000000
+Sending target: 794784 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 89
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 759427 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 89
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 922020 | weight: 1.000000
+Sending target: 673599 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 90
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 946046 | weight: 1.000000
+Sending target: 870358 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 91
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 770827 | weight: 1.000000
+Sending target: 767836 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 91
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 827208 | weight: 1.000000
+Sending target: 642018 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 92
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 847957 | weight: 1.000000
+Sending target: 738485 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 93
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 913837 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 93
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 749037 | weight: 1.000000
+Sending target: 629030 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 94
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 882564 | weight: 1.000000
+Sending target: 743493 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 95
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 924555 | weight: 1.000000
+Sending target: 630128 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 95
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 784920 | weight: 1.000000
+Sending target: 796394 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 96
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 725839 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 96
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 840136 | weight: 1.000000
+Sending target: 699068 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 97
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 758810 | weight: 1.000000
+Sending target: 807416 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
-Seconds: 97
+Seconds: 98
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 920829 | weight: 1.000000
+Sending target: 698167 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
-Seconds: 99
+Seconds: 98
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 946340 | weight: 1.000000
-128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
-###############################################################
-Seconds: 99
-Active subflow num: 1
-----------------------------------------------------------------
-Subflow id: 1
-Sending target: 786374 | weight: 1.000000
+Sending target: 869526 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 100
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 702448 | weight: 1.000000
+Sending target: 711534 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 100
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 702448 | weight: 1.000000
+Sending target: 643653 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 100
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 829956 | weight: 1.000000
+Sending target: 860538 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
 ###############################################################
 Seconds: 101
 Active subflow num: 1
 ----------------------------------------------------------------
 Subflow id: 1
-Sending target: 829956 | weight: 1.000000
+Sending target: 718441 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 102
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 637994 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 103
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 768656 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 104
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 654729 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 104
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 754134 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 105
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 665300 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 105
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 816756 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 106
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 706243 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 107
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 837587 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 107
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 678089 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 108
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 676464 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 109
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 686300 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 110
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 633400 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 110
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 723337 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 111
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 622335 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 111
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 737716 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 112
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 754866 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 114
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 762214 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 115
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 820396 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 116
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 674704 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 116
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 852072 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 117
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 733097 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 118
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 674775 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 119
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 777842 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 120
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 636507 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 121
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 831838 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 122
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 722899 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 123
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 889835 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 124
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 769436 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 125
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 910782 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 126
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 723210 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 127
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 724427 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 128
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 642304 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 128
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 757807 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 129
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 655269 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 129
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 749489 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 130
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 667865 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 130
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 775462 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 131
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 763530 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 132
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 666872 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 132
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 785234 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 133
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 812162 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 134
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 816364 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 135
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 727459 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 136
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 838156 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 136
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 746877 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 137
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 910908 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 138
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 692946 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 139
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 778309 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 140
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 781954 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 142
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 808417 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 143
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 674926 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 143
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 794815 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 143
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 684539 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 144
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 717806 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 146
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 590328 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 146
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 794254 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 147
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 697190 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 148
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 835595 | weight: 1.000000
+128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 
+###############################################################
+Seconds: 149
+Active subflow num: 1
+----------------------------------------------------------------
+Subflow id: 1
+Sending target: 666842 | weight: 1.000000
 128->sent_bytes:0 (L:(nil),R:(nil)) subflows:1 

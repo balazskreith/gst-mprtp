@@ -724,26 +724,26 @@ gst_rtcp_afb_remb_getdown (GstRTCPAFB_REMB * report,
 void
 gst_rtcp_afb_reps_change (GstRTCPAFB_REPS * report,
                           guint8 *sampling_num,
-                          gfloat *stability)
+                          gfloat *tendency)
 {
   if(sampling_num){
       report->sampling_num = *sampling_num;
   }
-  if(stability){
-    report->stability = g_htonfloat(*stability);
+  if(tendency){
+    report->tendency = g_htonfloat(*tendency);
   }
 }
 
 void
 gst_rtcp_afb_reps_getdown (GstRTCPAFB_REPS * report,
                            guint8 *sampling_num,
-                           gfloat *stability)
+                           gfloat *tendency)
 {
     if(sampling_num){
         *sampling_num = report->sampling_num;
     }
-  if(stability){
-    *stability = g_ntohfloat(report->stability);
+  if(tendency){
+    *tendency = g_ntohfloat(report->tendency);
   }
 }
 

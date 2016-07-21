@@ -51,8 +51,10 @@ struct _FBRAFBProducer
   GstClockTime             min_delay;
   GstClockTime             max_delay;
 
-  gfloat                   tendency;
-  guint8                   sampling_num;
+  struct{
+    gint counter;
+    gint sum;
+  }tendency;
   gint32                   received_bytes;
 
 

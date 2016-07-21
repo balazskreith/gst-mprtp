@@ -22,6 +22,13 @@ typedef struct _FBRAFBProcessorClass FBRAFBProcessorClass;
 #define FBRAFBPROCESSOR_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),FBRAFBPROCESSOR_TYPE))
 #define FBRAFBPROCESSOR_CAST(src)        ((FBRAFBProcessor *)(src))
 
+typedef struct _FBRAFBProcessorItem{
+  guint        ref;
+  guint16      seq_num;
+  guint32      payload_bytes;
+  GstClockTime sent,received;
+  gboolean     discarded;
+}FBRAFBProcessorItem;
 
 typedef struct _FBRAFBProcessorStat
 {
@@ -35,7 +42,7 @@ typedef struct _FBRAFBProcessorStat
   gdouble                  owdh_corr;
 //  gdouble                  owdl_corr;
   gboolean                 recent_discarded;
-  gdouble                  stability;
+  gdouble                  tendency;
   GstClockTime             RTT;
   gdouble                  srtt;
   gint32                   discarded_packets_in_1s;
@@ -63,6 +70,11 @@ struct _FBRAFBProcessor
   gint32                   measurements_num;
 
   SlidingWindow           *owd_sw;
+  SlidingWindow           *BiF_sw;
+  SlidingWindow           *recv_sw;
+  SlidingWindow           *sent_sw;
+  FBRAFBProcessorItem     *items;
+
   FBRAFBProcessorStat      stat;
 
   GstClockTime             congestion_detected;
@@ -81,10 +93,7 @@ FBRAFBProcessor *make_fbrafbprocessor(guint8 subflow_id);
 void fbrafbprocessor_reset(FBRAFBProcessor *this);
 void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn);
 void fbrafbprocessor_get_stats (FBRAFBProcessor * this, FBRAFBProcessorStat* result);
-gint32 fbrafbprocessor_get_sent_bytes_in_1s(FBRAFBProcessor *this);
-GstClockTime fbrafbprocessor_get_fbinterval(FBRAFBProcessor *this);
-void fbrafbprocessor_record_congestion(FBRAFBProcessor *this);
-void fbrafbprocessor_refresh_owd_ltt(FBRAFBProcessor *this);
+void fbrafbprocessor_approve_owd_ltt(FBRAFBProcessor *this);
 void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary);
 
 #endif /* FBRAFBPROCESSOR_H_ */

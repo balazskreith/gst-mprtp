@@ -281,9 +281,9 @@ typedef struct PACKED _GstRTCPAFB_REPS{
 //  guint32 stability;
   #if G_BYTE_ORDER == G_LITTLE_ENDIAN
     guint32               sampling_num : 8;
-    guint32               stability : 24;
+    guint32               tendency : 24;
   #elif G_BYTE_ORDER == G_BIG_ENDIAN
-    guint32               stability : 24;
+    guint32               tendency : 24;
     guint32               sampling_num : 8;
   #else
   #error "G_BYTE_ORDER should be big or little endian."

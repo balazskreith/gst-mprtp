@@ -69,12 +69,10 @@ typedef struct _MPRTPSubflowFBRACngCtrlerParams{
   gint32              max_ramp_up_bitrate;
   gint32              min_target_bitrate;
   gint32              max_target_bitrate;
-  gdouble             restrictivity_factor;
   gdouble             approvement_epsilon;
 
   gdouble             discard_cong_treshold;
   gdouble             discard_dist_treshold;
-  gdouble             stability_treshold;
   gdouble             owd_corr_cng_th;
 
   gdouble             owd_corr_dist_th;

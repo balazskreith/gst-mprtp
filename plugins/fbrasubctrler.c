@@ -46,9 +46,6 @@ GST_DEBUG_CATEGORY_STATIC (fbrasubctrler_debug_category);
 
 G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 
-//if target close to the bottleneck, the increasement will be multiplied by this factor
-#define RESTRICTIVITY_FACTOR 0.1
-
 //determine the minimum interval in seconds must be stay in probe stage
 //before the target considered to be accepted
 #define MIN_APPROVE_INTERVAL 1.0
@@ -94,9 +91,6 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 //approvement epsilon
 #define APPROVEMENT_EPSILON 0.25
 
-//Stability treshold
-#define STABILITY_TRESHOLD 0.5
-
 
 
 typedef struct _Private Private;
@@ -117,6 +111,18 @@ typedef enum{
 }Stage;
 
 #define SR_TR_ARRAY_LENGTH 3
+
+typedef struct{
+  gint32  gp;
+  gint32  sr;
+  gint32  fec;
+  gdouble tend;
+}TargetItem;
+
+typedef struct{
+  TargetItem items[256];
+  gint       item_index;
+}TargetController;
 
 struct _Private{
   GstClockTime        time;
@@ -141,23 +147,19 @@ struct _Private{
 
   gboolean            bcongestion;
 
-  gdouble             reduce_trend;
-  GstClockTime        reduce_started;
-
   gint32              corrigate_num;
 
   //Possible parameters
   gint32              min_monitoring_interval;
   gint32              max_monitoring_interval;
-  gdouble             min_approve_interval;
-  gdouble             max_approve_interval;
-  gdouble             restrictivity_factor;
-  gint32              min_ramp_up_bitrate;
-  gint32              max_ramp_up_bitrate;
-  gint32              min_target_bitrate;
-  gint32              max_target_bitrate;
-  gdouble             approvement_epsilon;
-  gdouble             stability_treshold;
+//
+//  gdouble             min_approve_interval;
+//  gdouble             max_approve_interval;
+//  gint32              min_ramp_up_bitrate;
+//  gint32              max_ramp_up_bitrate;
+//  gint32              min_target_bitrate;
+//  gint32              max_target_bitrate;
+//  gdouble             approvement_epsilon;
 
   gdouble             discad_cong_treshold;
   gdouble             discad_dist_treshold;
@@ -170,13 +172,7 @@ struct _Private{
 
 };
 
-//TODO: stay or delete.
-typedef struct _SenderRate{
-  gboolean     approved;
-  gint32       desired;
-  gint32       actual;
-  GstClockTime changed;
-}SenderRate;
+
 
 #define _priv(this) ((Private*)this->priv)
 #define _fbstat(this) this->fbstat
@@ -212,8 +208,6 @@ typedef struct _SenderRate{
 #define _min_br(this) MIN(_SR(this), _TR(this))
 #define _max_br(this) MAX(_SR(this), _TR(this))
 #define _owd_corr(this) _fbstat(this).owdh_corr
-//#define _owdl_corr(this) _fbstat(this).owdl_corr
-#define _owd_stability(this) _fbstat(this).stability
 
 #define _owd_corr_cng_th(this)        _priv(this)->owd_corr_cng_th
 #define _owd_corr_dist_th(this)       _priv(this)->owd_corr_dist_th
@@ -231,7 +225,6 @@ typedef struct _SenderRate{
 #define _max_ramp_up(this)            _priv(this)->max_ramp_up_bitrate
 #define _min_target(this)             _priv(this)->min_target_bitrate
 #define _max_target(this)             _priv(this)->max_target_bitrate
-#define _restrict_fac(this)           _priv(this)->restrictivity_factor
 
 
 //----------------------------------------------------------------------
@@ -331,6 +324,7 @@ fbrasubctrler_finalize (GObject * object)
   g_object_unref(this->fbprocessor);
   g_object_unref(this->sysclock);
   g_object_unref(this->path);
+  g_object_unref(this->targetctrler);
 }
 
 
@@ -348,7 +342,6 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->min_monitoring_interval          = MIN_MONITORING_INTERVAL;
   _priv(this)->max_monitoring_interval          = MAX_MONITORING_INTERVAL;
 
-  _priv(this)->restrictivity_factor             = RESTRICTIVITY_FACTOR;
   _priv(this)->min_approve_interval             = MIN_APPROVE_INTERVAL;
   _priv(this)->max_approve_interval             = MAX_APPROVE_INTERVAL;
   _priv(this)->min_ramp_up_bitrate              = RAMP_UP_MIN_SPEED;
@@ -361,7 +354,6 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->owd_corr_dist_th                 = OWD_CORR_DISTORTION_TRESHOLD;
 
   _priv(this)->approvement_epsilon              = APPROVEMENT_EPSILON;
-  _priv(this)->stability_treshold               = STABILITY_TRESHOLD;
 
   _priv(this)->tr_approved                      = TRUE;
 
@@ -385,6 +377,8 @@ FBRASubController *make_fbrasubctrler(MPRTPSPath *path)
   FBRASubController *result;
   result                      = g_object_new (FBRASUBCTRLER_TYPE, NULL);
   result->path                = g_object_ref(path);
+  result->targetctrler        = g_object_new(FBRATARGETCTRLER_TYPE, NULL);
+
   result->id                  = mprtps_path_get_id(result->path);
   result->monitoring_interval = 3;
   result->made                = _now(result);
@@ -538,12 +532,12 @@ void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRa
   _max_ramp_up(this)                            = cngctrler->max_ramp_up_bitrate;
   _min_target(this)                             = cngctrler->min_target_bitrate;
   _max_target(this)                             = cngctrler->max_target_bitrate;
-  _restrict_fac(this)                           = cngctrler->restrictivity_factor;
   _appr_eps(this)                               = cngctrler->approvement_epsilon;
+
+  fbratargetctrler_signal_update(this->targetctrler, params);
 
   _FD_cong_th(this)                             = cngctrler->discard_cong_treshold;
   _FD_dist_th(this)                             = cngctrler->discard_dist_treshold;
-  _stability_th(this)                           = cngctrler->stability_treshold;
   _owd_corr_cng_th(this)                        = cngctrler->owd_corr_cng_th;
   _owd_corr_dist_th(this)                       = cngctrler->owd_corr_dist_th;
 
@@ -555,19 +549,18 @@ void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedR
   MPRTPSubflowFBRA2CngCtrlerParams *cngctrler;
   cngctrler = &result->cngctrler;
 
-  cngctrler->min_approve_interval           = _min_appr_int(this);
-  cngctrler->max_approve_interval           = _max_appr_int(this);
-  cngctrler->min_ramp_up_bitrate            = _min_ramp_up(this);
-  cngctrler->max_ramp_up_bitrate            = _max_ramp_up(this);
-  cngctrler->min_target_bitrate             = _min_target(this);
-  cngctrler->max_target_bitrate             = _max_target(this);
+//  cngctrler->min_approve_interval           = _min_appr_int(this);
+//  cngctrler->max_approve_interval           = _max_appr_int(this);
+//  cngctrler->min_ramp_up_bitrate            = _min_ramp_up(this);
+//  cngctrler->max_ramp_up_bitrate            = _max_ramp_up(this);
+//  cngctrler->min_target_bitrate             = _min_target(this);
+//  cngctrler->max_target_bitrate             = _max_target(this);
+//  cngctrler->approvement_epsilon            = _appr_eps(this);
 
-  cngctrler->restrictivity_factor           = _restrict_fac(this);
-  cngctrler->approvement_epsilon            = _appr_eps(this);
+  fbratargetctrler_signal_request(this->targetctrler, result);
 
   cngctrler->discard_dist_treshold          = _FD_dist_th(this);
   cngctrler->discard_cong_treshold          = _FD_cong_th(this);
-  cngctrler->stability_treshold             = _stability_th(this);
   cngctrler->owd_corr_cng_th                = _owd_corr_cng_th(this);
   cngctrler->owd_corr_dist_th               = _owd_corr_dist_th(this);
 

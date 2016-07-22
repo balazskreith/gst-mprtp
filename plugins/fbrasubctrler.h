@@ -14,6 +14,7 @@
 #include "reportproc.h"
 #include "signalreport.h"
 #include "fbrafbproc.h"
+#include "fbratargetctrler.h"
 
 
 typedef struct _FBRASubController FBRASubController;
@@ -65,6 +66,7 @@ struct _FBRASubController
 
   FBRAFBProcessor*          fbprocessor;
   FBRAFBProcessorStat       fbstat;
+  FBRATargetCtrler*         targetctrler;
   //Need for monitoring
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;

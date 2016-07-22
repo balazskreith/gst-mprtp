@@ -47,6 +47,9 @@ struct _FBRAFBProducer
   SlidingWindow           *owds_sw;
   SlidingWindow           *tendency_sw;
 
+  GstClockTime             next_fb;
+  gint                     rcved_packets;
+
   GstClockTime             median_delay;
   GstClockTime             min_delay;
   GstClockTime             max_delay;
@@ -70,7 +73,9 @@ FBRAFBProducer *make_fbrafbproducer(guint32 ssrc, guint8 subflow_id);
 void fbrafbproducer_reset(FBRAFBProducer *this);
 void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold);
 void fbrafbproducer_track(gpointer data, GstMpRTPBuffer *mprtp);
-GstClockTime fbrafbproducer_get_interval(gpointer data);
+gboolean fbrafbproducer_do_fb(gpointer data);
+void fbrafbproducer_fb_sent(gpointer data);
+void fbrafbproducer_get_interval(gpointer data, gint *min_packet, GstClockTime *max_interval);
 void fbrafbproducer_setup_feedback(gpointer data, ReportProducer *reportprod);
 
 #endif /* FBRAFBPRODUCER_H_ */

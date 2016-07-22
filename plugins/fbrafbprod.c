@@ -130,6 +130,7 @@ static void _payloads_add_pipe(gpointer udata, gpointer itemptr)
   this = udata;
 
   this->received_bytes += *item;
+  ++this->rcved_packets;
 
 }
 
@@ -269,19 +270,26 @@ void fbrafbproducer_setup_feedback(gpointer data, ReportProducer *reportprod)
   THIS_WRITEUNLOCK (this);
 }
 
-GstClockTime fbrafbproducer_get_interval(gpointer data)
+gboolean fbrafbproducer_do_fb(gpointer data)
 {
-  GstClockTime result;
+  gboolean result = FALSE;
   FBRAFBProducer *this;
   this = data;
-  THIS_READLOCK (this);
-  result = (1.0/MIN(33,MAX(10,(this->received_bytes * 8)/20000))) * GST_SECOND;
-
-  //slidingwindow_set_treshold(this->stability_sw, result);
-  slidingwindow_set_act_limit(this->tendency_sw, (this->received_bytes * 8) / 50000);
-//  g_print("tendency window: %d, actual_count: %d\n", this->tendency_sw->num_act_limit, this->tendency_sw->items->count);
+  THIS_READLOCK(this);
+  result = 4 < this->rcved_packets || (0 < this->next_fb && this->next_fb < _now(this));
   THIS_READUNLOCK(this);
   return result;
+}
+
+void fbrafbproducer_fb_sent(gpointer data)
+{
+  FBRAFBProducer *this;
+  this = data;
+  THIS_WRITELOCK(this);
+  this->next_fb = _now(this) + 100 * GST_MSECOND;
+  this->rcved_packets = 0;
+  slidingwindow_set_act_limit(this->tendency_sw, (this->received_bytes * 8) / 50000);
+  THIS_WRITEUNLOCK(this);
 }
 
 void _setup_xr_rfc7097(FBRAFBProducer * this, ReportProducer *reportproducer)

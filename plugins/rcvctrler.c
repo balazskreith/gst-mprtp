@@ -105,8 +105,11 @@ struct _Subflow
 
   GstClockTime                  next_feedback;
   gpointer                      fbproducer;
-  GstClockTime                (*feedback_interval_calcer)(gpointer data);
-  void                        (*feedback_setup_feedback)(gpointer data, ReportProducer *reportprod);
+//  void                        (*feedback_interval_calcer)(gpointer data, gint *min_packet, GstClockTime *max_interval);
+//  void                        (*feedback_setup_feedback)(gpointer data, ReportProducer *reportprod);
+  gboolean                    (*do_fb)(gpointer data);
+  void                        (*fb_sent)(gpointer data);
+  void                        (*setup_fb)(gpointer data, ReportProducer *reportprod);
 
   RateWindow                    received_bytes;
   guint32                       receiver_rate;
@@ -139,11 +142,14 @@ static void
 _system_notifier_main(RcvController * this);
 
 //----- feedback specific functions
-static GstClockTime
-_default_interval_calcer(gpointer data);
+static gboolean
+_default_do_fb(gpointer udata);
 
 static void
-_default_feedback_appender(gpointer data, ReportProducer *reportprod);
+_default_fb_sent(gpointer udata);
+
+static void
+_default_setup_fb(gpointer data, ReportProducer *reportprod);
 
 
 //------------------------- Utility functions --------------------------------
@@ -261,20 +267,23 @@ static void _change_controlling_mode(RcvController *this, Subflow *subflow, guin
   subflow->controlling_mode = controlling_mode;
   switch(controlling_mode){
     case 0:
-      subflow->feedback_interval_calcer  = _default_interval_calcer;
-      subflow->feedback_setup_feedback = _default_feedback_appender;
+      subflow->do_fb     = _default_do_fb;
+      subflow->fb_sent   = _default_fb_sent;
+      subflow->setup_fb  = _default_setup_fb;
       GST_DEBUG_OBJECT(subflow, "subflow %d set to no controlling mode", subflow->id);
       break;
     case 1:
-      subflow->feedback_interval_calcer = _default_interval_calcer;
-      subflow->feedback_setup_feedback = _default_feedback_appender;
+      subflow->do_fb     = _default_do_fb;
+      subflow->fb_sent   = _default_fb_sent;
+      subflow->setup_fb  = _default_setup_fb;
       subflow->regular_report_enabled = TRUE;
       GST_DEBUG_OBJECT(subflow, "subflow %d set to only report processing mode", subflow->id);
       break;
     case 2:
       subflow->fbproducer = make_fbrafbproducer(this->ssrc, subflow->id);
-      subflow->feedback_interval_calcer = fbrafbproducer_get_interval;
-      subflow->feedback_setup_feedback = fbrafbproducer_setup_feedback;
+      subflow->do_fb     = fbrafbproducer_do_fb;
+      subflow->fb_sent   = fbrafbproducer_fb_sent;
+      subflow->setup_fb  = fbrafbproducer_setup_feedback;
       mprtpr_path_set_packetstracker(subflow->path, fbrafbproducer_track, subflow->fbproducer);
       subflow->regular_report_enabled   = TRUE;
       subflow->fb_report_enabled        = TRUE;
@@ -518,12 +527,14 @@ _orp_main(RcvController * this)
       report_created = TRUE;
     }
 
-    if(subflow->fb_report_enabled && subflow->next_feedback <= now){
+//    if(subflow->fb_report_enabled && subflow->next_feedback <= now){
+    if(subflow->fb_report_enabled && subflow->do_fb(subflow->fbproducer)){
       if(!report_created){
         report_producer_begin(this->report_producer, subflow->id);
       }
-      subflow->feedback_setup_feedback(subflow->fbproducer, this->report_producer);
-      subflow->next_feedback = now + subflow->feedback_interval_calcer(subflow->fbproducer);
+      subflow->fb_sent(subflow->fbproducer);
+      subflow->setup_fb(subflow->fbproducer, this->report_producer);
+      subflow->next_feedback += now;
       report_created = TRUE;
     }
 
@@ -622,17 +633,21 @@ _system_notifier_main(RcvController * this)
 
 
 //-------------------------Controller feedbacks and intervals ---------------
-GstClockTime _default_interval_calcer(gpointer data)
+
+gboolean _default_do_fb(gpointer udata)
 {
-  return 100 * GST_MSECOND;
+  return FALSE;
 }
 
-void _default_feedback_appender(gpointer data, ReportProducer *reportprod)
+void _default_fb_sent(gpointer udata)
 {
-
+  return;
 }
 
-
+void _default_setup_fb(gpointer data, ReportProducer *reportprod)
+{
+  return;
+}
 //------------------------- Utility functions --------------------------------
 
 Subflow *
@@ -645,8 +660,8 @@ _make_subflow (guint8 id, MpRTPRPath * path)
   result->joined_time               = gst_clock_get_time (result->sysclock);
   result->ricalcer                  = make_ricalcer(FALSE);
   result->LRR                       = _now(result);
-  result->feedback_interval_calcer  = _default_interval_calcer;
-  result->feedback_setup_feedback = _default_feedback_appender;
+  result->do_fb                     = _default_do_fb;
+  result->fb_sent                   = _default_fb_sent;
   _reset_subflow (result);
   return result;
 }

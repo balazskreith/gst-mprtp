@@ -20,9 +20,8 @@ set ytics font ",20"
 set ylabel font ",20"
 set xlabel font ",20"
  
- 
 set origin 0,0
-set size ratio 0.25
+set size ratio 0.23
 set datafile separator "," 
 
 set multiplot layout 2,1 font ",18"
@@ -33,15 +32,21 @@ if (!exists("legends")) {
   set key inside vertical top right
 }
    
-set tmargin 3
-set bmargin 5
+   
+#set lmargin at screen 0.0
+#set rmargin at screen 0.85
+#set bmargin at screen 0.05
+#set tmargin at screen 0.85
+
+#set tmargin 3
+#set bmargin 5
 
 if (!exists("labels")){
-  set lmargin 12  
+  set lmargin 2  
 }else{
   set lmargin 23
 }
-set rmargin 7
+set rmargin 3
 set yrange [0:range]
 set ytics 1000
 set xrange [0:duration]
@@ -64,7 +69,7 @@ set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
 # claret:  #a21d21
 # lpurple: #b43894
 
-set style line 1 linecolor rgb '#008c48' linetype 1 linewidth 1
+set style line 1 linecolor rgb '#008c48' linetype 1 linewidth 2
 set style line 2 linecolor rgb '#b43894' linetype 2 linewidth 1
 set style line 3 linecolor rgb '#185aa9' linetype 3 linewidth 1
 set style line 4 linecolor rgb '#a21d21' linetype 4 linewidth 1	

@@ -55,22 +55,24 @@ static void fbrafbprocessor_finalize (GObject * object);
 static void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr);
 static void _process_afb(FBRAFBProcessor *this, guint32 id, GstRTCPAFB_REPS *remb);
 static void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary);
+static void _ref_item(FBRAFBProcessor * this, FBRAFBProcessorItem* item);
 static void _unref_item(FBRAFBProcessor * this, FBRAFBProcessorItem* item);
+static FBRAFBProcessorItem* _retrieve_item(FBRAFBProcessor * this, guint16 seq);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
 
 
-static gint
-_cmp_uint16 (guint16 x, guint16 y)
-{
-  if(x == y) return 0;
-  if(x < y && y - x < 32768) return -1;
-  if(x > y && x - y > 32768) return -1;
-  if(x < y && y - x > 32768) return 1;
-  if(x > y && x - y < 32768) return 1;
-  return 0;
-}
+//static gint
+//_cmp_uint16 (guint16 x, guint16 y)
+//{
+//  if(x == y) return 0;
+//  if(x < y && y - x < 32768) return -1;
+//  if(x > y && x - y > 32768) return -1;
+//  if(x < y && y - x > 32768) return 1;
+//  if(x > y && x - y < 32768) return 1;
+//  return 0;
+//}
 
 static void owd_logger(gpointer data, gchar* string)
 {
@@ -119,22 +121,80 @@ static void _owd_ltt80_percentile_pipe(gpointer udata, swpercentilecandidates_t 
                                   this->owd_stat.ltt80th * .2 );
 }
 
-static gboolean _BiF_obsolation(gpointer udata, SlidingWindowItem *switem)
+static void _sent_add_pipe(gpointer udata, gpointer itemptr)
 {
   FBRAFBProcessor *this = udata;
-  FBRAFBProcessorItem *item = switem->data;
+  FBRAFBProcessorItem *item = itemptr;
 
-  if(_cmp_uint16(item->seq_num, this->lowest_acked_seq) < 0){
-    return TRUE;
-  }
+  _ref_item(this, item);
 
-  if(0 < _cmp_uint16(item->seq_num, this->highest_acked_seq)){
-    return FALSE;
-  }
+  this->stat.bytes_in_flight += item->payload_bytes;
+  ++this->stat.packets_in_flight;
 
-  item->received = TRUE;
-  return TRUE;
+  this->stat.sent_bytes_in_1s += item->payload_bytes;
+  ++this->stat.sent_packets_in_1s;
 }
+
+static void _sent_rem_pipe(gpointer udata, gpointer itemptr)
+{
+  FBRAFBProcessor *this = udata;
+  FBRAFBProcessorItem *item = itemptr;
+
+  this->stat.sent_bytes_in_1s -= item->payload_bytes;
+  --this->stat.sent_packets_in_1s;
+
+  if(!item->acknowledged){
+    g_warning("sequence number %hu not acknowledged in 1s. Hm????", item->seq_num);
+    this->stat.bytes_in_flight -= item->payload_bytes;
+    --this->stat.packets_in_flight;
+  }
+
+  _unref_item(this, item);
+}
+
+
+static void _acked_1s_add_pipe(gpointer udata, gpointer itemptr)
+{
+  FBRAFBProcessor *this = udata;
+  FBRAFBProcessorItem *item = itemptr;
+
+  _ref_item(this, item);
+
+  item->acknowledged = TRUE;
+
+  this->stat.bytes_in_flight -= item->payload_bytes;
+  --this->stat.packets_in_flight;
+
+  ++this->stat.acked_packets_in_1s;
+
+  if(item->discarded){
+    ++this->stat.discarded_packets_in_1s;
+  }else{
+    this->stat.goodput_bytes += item->payload_bytes;
+  }
+
+  return;
+}
+
+static void _acked_1s_rem_pipe(gpointer udata, gpointer itemptr)
+{
+  FBRAFBProcessor *this = udata;
+  FBRAFBProcessorItem *item = itemptr;
+
+  if(item->discarded){
+    --this->stat.discarded_packets_in_1s;
+  }else{
+    this->stat.goodput_bytes -= item->payload_bytes;
+  }
+
+  --this->stat.acked_packets_in_1s;
+
+  _unref_item(this, item);
+
+}
+
+
+
 
 void
 fbrafbprocessor_class_init (FBRAFBProcessorClass * klass)
@@ -158,6 +218,19 @@ fbrafbprocessor_finalize (GObject * object)
   g_object_unref(this->sysclock);
 }
 
+#include <string.h>
+static void _sent_sprint(gpointer data, gchar *result)
+{
+  FBRAFBProcessorItem *item = data;
+  sprintf(result,"Sent window seq: %hu payload: %d", item->seq_num, item->payload_bytes);
+}
+
+static void _acked_sprint(gpointer data, gchar *result)
+{
+  FBRAFBProcessorItem *item = data;
+  sprintf(result,"Acked window seq: %hu payload: %d", item->seq_num, item->payload_bytes);
+}
+
 void
 fbrafbprocessor_init (FBRAFBProcessor * this)
 {
@@ -172,14 +245,14 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
 
   this->items            = g_malloc0(sizeof(FBRAFBProcessorItem) * 65536);
   this->owd_sw           = make_slidingwindow_uint64(600, 60 * GST_SECOND);
-  this->recv_sw          = make_slidingwindow(2000, GST_SECOND);
+  this->acked_1s_sw      = make_slidingwindow(2000, GST_SECOND);
   this->sent_sw          = make_slidingwindow(2000, GST_SECOND);
-  this->BiF_sw           = make_slidingwindow(2000, 0);
 
-  slidingwindow_setup_custom_obsolation(this->BiF_sw, _BiF_obsolation, this);
-  slidingwindow_add_pipes(this->BiF_sw, _BiF_rem_pipe, this, _BiF_add_pipe, this);
-  slidingwindow_add_pipes(this->sent_sw, _sent_rem_pipe, this, sent_add_pipe, this);
-  slidingwindow_add_pipes(this->recv_sw, _recv_rem_pipe, this, _recv_add_pipe, this);
+  slidingwindow_add_pipes(this->sent_sw, _sent_rem_pipe, this, _sent_add_pipe, this);
+  slidingwindow_add_pipes(this->acked_1s_sw, _acked_1s_rem_pipe, this, _acked_1s_add_pipe, this);
+
+  DISABLE_LINE slidingwindow_add_plugin(this->sent_sw, make_swprinter(_sent_sprint));
+  DISABLE_LINE slidingwindow_add_plugin(this->acked_1s_sw, make_swprinter(_acked_sprint));
 
   slidingwindow_add_plugins(this->owd_sw,
                             make_swpercentile(80, bintree3cmp_uint64, _owd_ltt80_percentile_pipe, this),
@@ -214,87 +287,30 @@ void fbrafbprocessor_reset(FBRAFBProcessor *this)
 }
 
 
-static void _obsolate_sent_packet(FBRAFBProcessor *this)
-{
-  FBRAFBProcessorItem* item;
-  GstClockTime treshold;
-  treshold = _now(this) - GST_SECOND;
-
-  while(!g_queue_is_empty(this->sent_in_1s)){
-    item = g_queue_peek_head(this->sent_in_1s);
-    if(treshold <= item->sent){
-      break;
-    }
-    item = g_queue_pop_head(this->sent_in_1s);
-    this->stat.sent_bytes_in_1s -= item->payload_bytes;
-    --this->stat.sent_packets_in_1s;
-    _unref_item(this, item);
-  }
-}
-
-static void _obsolate_acked_packet(FBRAFBProcessor *this)
-{
-  FBRAFBProcessorItem* item;
-  GstClockTime treshold;
-  if(g_queue_is_empty(this->acked)){
-    goto done;
-  }
-
-  item = g_queue_peek_tail(this->acked);
-  treshold = item->sent - GST_SECOND;
-//  g_print("reference seq: %hu, sent: %lu, treshold: %lu\n", item->seq_num, GST_TIME_AS_MSECONDS(item->sent), GST_TIME_AS_MSECONDS(treshold));
-
-  while(!g_queue_is_empty(this->acked)){
-    item = g_queue_peek_head(this->acked);
-    if(treshold < item->sent){
-      break;
-    }
-    item = g_queue_pop_head(this->acked);
-    if(!item->discarded){
-      this->stat.goodput_bytes-=item->payload_bytes;
-//      g_print("-gp:%u(%hu) ",item->payload_bytes, item->seq_num);
-    }else{
-      --this->stat.discarded_packets_in_1s;
-    }
-    --this->stat.received_packets_in_1s;
-    _unref_item(this, item);
-  }
-
-done:
-  return;
-}
-
 void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn)
 {
   FBRAFBProcessor *this;
   FBRAFBProcessorItem* item;
-  GstClockTime now;
   this = data;
   THIS_WRITELOCK (this);
-  now = _now(this);
-  //make item
-  item = g_slice_new0(FBRAFBProcessorItem);
+
+  item = _retrieve_item(this, sn);
+
   item->payload_bytes = payload_len;
-  item->sent          = now;
   item->seq_num       = sn;
-  item->ref           = 2;
 
-  this->stat.bytes_in_flight+= item->payload_bytes;
   ++this->stat.packets_in_flight;
-  g_queue_push_tail(this->sent, item);
+  this->stat.bytes_in_flight += payload_len;
 
-  this->stat.sent_bytes_in_1s += item->payload_bytes;
-  ++this->stat.sent_packets_in_1s;
-  g_queue_push_tail(this->sent_in_1s, item);
-  _obsolate_sent_packet(this);
-
+  slidingwindow_add_data(this->sent_sw, item);
+  slidingwindow_refresh(this->acked_1s_sw);
   THIS_WRITEUNLOCK (this);
 }
 
 void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary)
 {
 
-  //TODO: This is the function where we have Profiling problem!
+  //TODO: This is the function where we have Profiling problem! Still? I have changed the access for items
 
   PROFILING("THIS_WRITELOCK", THIS_WRITELOCK (this));
 
@@ -382,93 +398,53 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
   FBRAFBProcessorItem *item;
   guint16 act_seq, end_seq;
   gint i;
-  if(this->rle_initialized && _cmp_uint16(xr->DiscardedRLE.begin_seq, this->highest_acked_seq) < 0){
-    g_warning("The received feedback rle vector begin_seq is lower than the actual highest_acked_seq");
-    return;
-  }
 
-  this->rle_initialized = TRUE;
-  this->lowest_acked_seq  = act_seq = xr->DiscardedRLE.begin_seq;
-  this->highest_acked_seq = end_seq = xr->DiscardedRLE.end_seq;
-  for(i=0; act_seq <= end_seq; ++act_seq, ++i){
-    item = this->items + act_seq;
-    item->discarded = !xr->DiscardedRLE.vector[i];
-  }
-}
-
-
-#define _done_if_sent_queue_is_empty(this)                            \
-    if(g_queue_is_empty(this->sent)){                                 \
-      g_warning("sent queue is empty. What do you want to track?");   \
-      goto done;                                                      \
-    }                                                                 \
-
-void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr)
-{
-  FBRAFBProcessorItem* item;
-  guint i;
-  GList *it = NULL;
-
-  _done_if_sent_queue_is_empty(this);
-
-  //g_print("RLE processed\n");
-
-  item = g_queue_peek_head(this->sent);
-  while(_cmp_uint16(item->seq_num, xr->DiscardedRLE.end_seq) <= 0){
-    this->stat.bytes_in_flight -= item->payload_bytes;
-    --this->stat.packets_in_flight;
-    this->stat.goodput_bytes += item->payload_bytes;
-    ++this->stat.received_packets_in_1s;
-    g_queue_push_tail(this->acked, g_queue_pop_head(this->sent));
-    if(_cmp_uint16(item->seq_num, xr->DiscardedRLE.begin_seq) == 0){
-      it = g_queue_peek_tail_link(this->acked);
-    }
-    if(g_queue_is_empty(this->sent)){
-      break;
-    }
-    item = g_queue_peek_head(this->sent);
-  }
-
-  //TODO: Bytes in flight tracking comes here
-
-  if(g_queue_is_empty(this->acked) || !it){
+  act_seq = xr->DiscardedRLE.begin_seq;
+  end_seq = xr->DiscardedRLE.end_seq;
+  if(act_seq == end_seq){
     goto done;
   }
-
-  item = it->data;
-  for(i = 0; _cmp_uint16(item->seq_num, xr->DiscardedRLE.end_seq) <= 0; ++i){
-    if(!xr->DiscardedRLE.vector[i]){
-      this->stat.goodput_bytes -= item->payload_bytes;
-      item->discarded = TRUE;
-      this->last_discard = _now(this);
-      ++this->stat.discarded_packets_in_1s;
-    }
-    if(!it->next){
-      break;
-    }
-    it = it->next;
-    item = it->data;
+  for(i=0; act_seq <= end_seq; ++act_seq, ++i){
+    item = this->items + act_seq;
+    if(item->acknowledged){
+        continue;
+      }
+    item->discarded = !xr->DiscardedRLE.vector[i];
+    slidingwindow_add_data(this->acked_1s_sw, item);
   }
-
-  _obsolate_acked_packet(this);
-
 done:
-  return;
+  slidingwindow_refresh(this->sent_sw);
 }
 
-#undef _done_if_sent_queue_is_empty
+
+void _ref_item(FBRAFBProcessor * this, FBRAFBProcessorItem* item)
+{
+  ++item->ref;
+}
 
 void _unref_item(FBRAFBProcessor * this, FBRAFBProcessorItem* item)
 {
-  if(0 < --item->ref){
-    return;
+  if(0 < item->ref){
+    --item->ref;
   }
-//  g_print("Drop an item seq is %hu, %s discarded, gp: %d\n",
-//          item->seq_num,
-//          !item->discarded?"doesn't":" ",
-//          this->stat.goodput_bytes * 8);
-  g_slice_free(FBRAFBProcessorItem, item);
 }
+
+FBRAFBProcessorItem* _retrieve_item(FBRAFBProcessor * this, guint16 seq)
+{
+  FBRAFBProcessorItem* item;
+  item = this->items + seq;
+  if(!item->ref){
+    goto done;
+  }
+
+  --this->stat.packets_in_flight;
+  this->stat.bytes_in_flight-=item->payload_bytes;
+
+done:
+  memset(item, 0, sizeof(FBRAFBProcessorItem));
+  return item;
+}
+
 
 #undef THIS_WRITELOCK
 #undef THIS_WRITEUNLOCK

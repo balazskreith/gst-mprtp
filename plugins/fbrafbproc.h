@@ -26,7 +26,7 @@ typedef struct _FBRAFBProcessorItem{
   guint        ref;
   guint16      seq_num;
   guint32      payload_bytes;
-  GstClockTime sent,received;
+  gboolean     acknowledged;
   gboolean     discarded;
 }FBRAFBProcessorItem;
 
@@ -46,7 +46,7 @@ typedef struct _FBRAFBProcessorStat
   GstClockTime             RTT;
   gdouble                  srtt;
   gint32                   discarded_packets_in_1s;
-  gint32                   received_packets_in_1s;
+  gint32                   acked_packets_in_1s;
 
   gdouble                  owd_th1;
   gdouble                  owd_th2;
@@ -70,8 +70,7 @@ struct _FBRAFBProcessor
   gint32                   measurements_num;
 
   SlidingWindow           *owd_sw;
-  SlidingWindow           *BiF_sw;
-  SlidingWindow           *recv_sw;
+  SlidingWindow           *acked_1s_sw;
   SlidingWindow           *sent_sw;
   FBRAFBProcessorItem     *items;
 

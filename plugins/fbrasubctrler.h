@@ -53,8 +53,8 @@ struct _FBRASubController
 
   gint32                    max_target_point;
   gint32                    min_target_point;
-  gint32                    target_bitrate;
-  gint32                    target_bitrate_t1;
+//  gint32                    target_bitrate;
+//  gint32                    target_bitrate_t1;
   GstClockTime              last_tr_changed;
   GstClockTime              last_settled;
 

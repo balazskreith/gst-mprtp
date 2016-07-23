@@ -32,7 +32,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          slidingwindow.c            \
                          lib_bintree.c              \
                          lib_swplugins.c            \
-                         subratectrler.c            
+                         subratectrler.c            \
+                         fbratargetctrler.c
                     
                     
 noinst_HEADERS = mprtpspath.h           \

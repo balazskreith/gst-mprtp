@@ -63,16 +63,17 @@
 
 typedef struct _MPRTPSubflowFBRACngCtrlerParams{
   //parameters can be changed
-  gdouble             min_approve_interval;
-  gdouble             max_approve_interval;
+  GstClockTime        min_approve_interval;
+  gdouble             approve_min_factor;
+  gdouble             approve_max_factor;
   gint32              min_ramp_up_bitrate;
   gint32              max_ramp_up_bitrate;
   gint32              min_target_bitrate;
   gint32              max_target_bitrate;
   gdouble             approvement_epsilon;
 
-  gdouble             discard_cong_treshold;
   gdouble             discard_dist_treshold;
+  gdouble             discard_cong_treshold;
   gdouble             owd_corr_cng_th;
 
   gdouble             owd_corr_dist_th;

@@ -107,7 +107,7 @@ struct _Private{
 
   GstClockTime        adjust_th;
 
-  gdouble             discarded_rate;
+//  gdouble             discarded_rate;
   gdouble             avg_rtp_payload;
   gdouble             rtt;
 
@@ -144,7 +144,7 @@ struct _Private{
 #define _rdiscards(this) _fbstat(this).recent_discards
 //#define _RTT(this) (_priv(this)->rtt == 0. ? (gdouble)GST_SECOND : _priv(this)->rtt)
 #define _RTT(this) (_priv(this)->rtt == 0. ? (gdouble)GST_SECOND : MAX(100 * GST_MSECOND, _priv(this)->rtt))
-#define _FD(this) _priv(this)->discarded_rate
+#define _FD(this) _fbstat(this).discarded_rate
 
 #define _state(this) mprtps_path_get_state(this->path)
 #define _state_t1(this) this->state_t1
@@ -398,18 +398,6 @@ void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedR
 
 }
 
-static void _update_fraction_discarded(FBRASubController *this)
-{
-  if(_fbstat(this).acked_packets_in_1s == 0 || _fbstat(this).discarded_packets_in_1s == 0){
-    _priv(this)->discarded_rate = 0.;
-    return;
-  }
-
-  _priv(this)->discarded_rate = (gdouble)_fbstat(this).discarded_packets_in_1s;
-  _priv(this)->discarded_rate /= (gdouble)_fbstat(this).acked_packets_in_1s;
-
-}
-
 void fbrasubctrler_report_update(
                          FBRASubController *this,
                          GstMPRTCPReportSummary *summary)
@@ -432,9 +420,7 @@ void fbrasubctrler_report_update(
 
   fbrafbprocessor_update(this->fbprocessor, summary);
   fbrafbprocessor_get_stats(this->fbprocessor, &this->fbstat);
-
-  _update_rate_correlations(this);
-  _update_fraction_discarded(this);
+  fbratargetctrler_update(this->targetctrler, &this->fbstat);
 
   _execute_stage(this);
 
@@ -442,7 +428,10 @@ void fbrasubctrler_report_update(
 //    fbrafbprocessor_approve_owd_ltt(this->fbprocessor);
 //  }
 
-  if(_state(this) == MPRTPS_PATH_STATE_OVERUSED){
+  if(_state(this) != MPRTPS_PATH_STATE_OVERUSED){
+      fbrafbprocessor_approve_owd_ltt(this->fbprocessor);
+      this->last_approved = _now(this);
+  }else if(this->last_approved < _now(this) - 150 * GST_MSECOND){
       fbrafbprocessor_approve_owd_ltt(this->fbprocessor);
   }
 
@@ -478,8 +467,6 @@ void
 _reduce_stage(
     FBRASubController *this)
 {
-  GstClockTime approve_interval = MIN(GST_SECOND, _RTT(this));
-
   if(_owd_corr_cng_th(this) < _owd_corr(this)){
     fbratargetctrler_break(this->targetctrler);
     goto done;
@@ -489,7 +476,6 @@ _reduce_stage(
 
   _set_event(this, EVENT_SETTLED);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
-  _reset_monitoring(this);
 done:
   fbratargetctrler_refresh_target(this->targetctrler);
   return;
@@ -549,10 +535,12 @@ _probe_stage(
   }
 
   if(!fbratargetctrler_get_probe_approvement(this->targetctrler)){
+      g_print("HERE\n");
     goto done;
   }
 
   fbratargetctrler_accelerate(this->targetctrler);
+  fbratargetctrler_probe(this->targetctrler);
   _switch_stage_to(this, STAGE_INCREASE, FALSE);
   _set_event(this, EVENT_READY);
 done:
@@ -582,7 +570,6 @@ _increase_stage(
     goto done;
   }
 
-  fbratargetctrler_probe(this->targetctrler);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
 done:
   fbratargetctrler_refresh_target(this->targetctrler);

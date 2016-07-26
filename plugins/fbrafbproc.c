@@ -114,11 +114,11 @@ static void _owd_ltt80_percentile_pipe(gpointer udata, swpercentilecandidates_t 
 
   this->stat.owd_th1  = CONSTRAIN(5 * GST_MSECOND,
                                   50 * GST_MSECOND,
-                                  this->owd_stat.min * .1);
+                                  this->owd_stat.min * .5);
 
   this->stat.owd_th2  = CONSTRAIN(5 * GST_MSECOND,
                                   50 * GST_MSECOND,
-                                  this->owd_stat.ltt80th * .2 );
+                                  this->owd_stat.ltt80th * .5);
 }
 
 static void _sent_add_pipe(gpointer udata, gpointer itemptr)
@@ -216,6 +216,7 @@ fbrafbprocessor_finalize (GObject * object)
   FBRAFBProcessor *this;
   this = FBRAFBPROCESSOR(object);
   g_object_unref(this->sysclock);
+  g_free(this->items);
 }
 
 #include <string.h>
@@ -307,6 +308,18 @@ void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn)
   THIS_WRITEUNLOCK (this);
 }
 
+static void _update_fraction_discarded(FBRAFBProcessor *this)
+{
+  if(this->stat.acked_packets_in_1s == 0 || this->stat.discarded_packets_in_1s == 0){
+    this->stat.discarded_rate = 0.;
+    return;
+  }
+
+  this->stat.discarded_rate = (gdouble)this->stat.discarded_packets_in_1s;
+  this->stat.discarded_rate /= (gdouble)this->stat.acked_packets_in_1s;
+
+}
+
 void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary)
 {
 
@@ -321,7 +334,7 @@ void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summa
   if(summary->XR.DiscardedRLE.processed){
     PROFILING("_process_rle_discvector", _process_rle_discvector(this, &summary->XR));
     this->stat.recent_discarded = 0 < this->last_discard && _now(this) < this->last_discard + this->stat.RTT;
-
+    _update_fraction_discarded(this);
   }
   if(summary->XR.OWD.processed){
       PROFILING("_process_owd",_process_owd(this, &summary->XR));

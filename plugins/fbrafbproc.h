@@ -43,10 +43,13 @@ typedef struct _FBRAFBProcessorStat
 //  gdouble                  owdl_corr;
   gboolean                 recent_discarded;
   gdouble                  tendency;
+//  gdouble                  tend_median;
   GstClockTime             RTT;
   gdouble                  srtt;
   gint32                   discarded_packets_in_1s;
   gint32                   acked_packets_in_1s;
+
+  gdouble                  discarded_rate;
 
   gdouble                  owd_th1;
   gdouble                  owd_th2;

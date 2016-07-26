@@ -84,6 +84,7 @@ struct _FBRASubController
   GstClockTime              last_reduced;
 
   GstClockTime              adjustment_time;
+  GstClockTime              last_approved;
 
   gpointer                  priv;
 

@@ -274,53 +274,12 @@ fbrasubctrler_init (FBRASubController * this)
 
 }
 
-static gboolean pacing = FALSE;
-static gint32 cwnd_max;
-static GstClockTime last_sent;
 gboolean fbrasubctrler_path_approver(gpointer data, GstRTPBuffer *rtp)
 {
   FBRASubController *this = data;
-
-  if(!pacing && mprtps_path_is_non_congested(this->path)){
-    goto approve;
-  }
-
-  if(mprtps_path_get_state(this->path) != MPRTPS_PATH_STATE_OVERUSED){
-    pacing = FALSE;
-    goto approve;
-  }
-  if(!pacing){
-    cwnd_max = _fbstat(this).bytes_in_flight * 8;
-    pacing = TRUE;
-    goto approve;
-  }
-  if(1) goto approve;
-
-  {
-    gdouble pace_bitrate;
-    gdouble t_pace;
-    gdouble owd_in_sec;
-    gdouble cwnd;
-
-//    owd_in_sec = (gdouble)_fbstat(this).owd_ltt80 * .000000001;
-    cwnd = cwnd_max * CONSTRAIN(.2, .8, 3.0 - _fbstat(this).owdh_corr);
-    owd_in_sec = (gdouble)_fbstat(this).RTT * .000000001;
-//    pace_bitrate = MAX(50000, mprtps_path_get_target_bitrate(this->path) / owd_in_sec);
-    pace_bitrate = MAX(50000, cwnd / owd_in_sec);
-//    pace_bitrate = MAX(50000, cwnd_max * .6 / ((gdouble)_fbstat(this).owd_ltt80 * .000000001));
-    t_pace = (gdouble)(this->last_rtp_size * 8) / pace_bitrate;
-    if(_now(this) < last_sent + t_pace * GST_SECOND){
-      goto disapprove;
-    }
-  }
-  //TODO: breakable. ->NEM. A sndratectrler majd elintézi ezt a faszságot.
-approve:
   this->last_rtp_size = gst_rtp_buffer_get_payload_len(rtp);
   fbratargetctrler_update_rtpavg(this->targetctrler, this->last_rtp_size);
-  last_sent = _now(this);
   return TRUE;
-disapprove:
-  return FALSE;
 }
 
 

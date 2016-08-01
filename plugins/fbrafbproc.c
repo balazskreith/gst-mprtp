@@ -116,12 +116,12 @@ static void _owd_ltt80_percentile_pipe(gpointer udata, swpercentilecandidates_t 
   this->owd_stat.min = *(GstClockTime*)candidates->min;
   this->owd_stat.max = *(GstClockTime*)candidates->max;
 
-  this->stat.owd_th1  = CONSTRAIN(5 * GST_MSECOND,
-                                  50 * GST_MSECOND,
+  this->stat.owd_th1  = CONSTRAIN(10 * GST_MSECOND,
+                                  100 * GST_MSECOND,
                                   this->owd_stat.min * .33);
 
-  this->stat.owd_th2  = CONSTRAIN(5 * GST_MSECOND,
-                                  50 * GST_MSECOND,
+  this->stat.owd_th2  = CONSTRAIN(100 * GST_MSECOND,
+                                  300 * GST_MSECOND,
                                   this->owd_stat.ltt80th * .33);
 }
 
@@ -291,8 +291,8 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->stat.srtt        = 0;
 
   this->items            = g_malloc0(sizeof(FBRAFBProcessorItem) * 65536);
-  this->FD_sw            = make_slidingwindow_double(600, 30 * GST_SECOND);
-  this->owd_sw           = make_slidingwindow_uint64(600, 60 * GST_SECOND);
+  this->FD_sw            = make_slidingwindow_double(600, 20 * GST_SECOND);
+  this->owd_sw           = make_slidingwindow_uint64(600, 5 * GST_SECOND);
   this->acked_1s_sw      = make_slidingwindow(2000, GST_SECOND);
   this->sent_sw          = make_slidingwindow(2000, GST_SECOND);
 

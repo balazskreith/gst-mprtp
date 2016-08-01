@@ -333,7 +333,7 @@ changed_event (GstElement * mprtp_sch, gpointer ptr)
 //    }
 //  }
 //
-//  g_print("get_bitrate: %d new_bitrate: %d\n", get_bitrate, new_bitrate);
+//  g_print("signal->target_media_rate: %d\n", signal->target_media_rate);
   g_object_set (encoder, "target-bitrate", signal->target_media_rate, NULL);
 //done:
   return;
@@ -416,9 +416,15 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
   gst_element_link_pads (mprtpsch, "mprtp_src", mprtpsnd, "mprtp_sink");
   g_free (padName);
 
-  gst_element_link_pads (mprtpsnd, "src_1", rtpSink_1, "sink");
-//  gst_element_link_pads (mprtpsnd, "src_1", mq, "sink_1");
-//  gst_element_link_pads (mq, "src_1", rtpSink_1, "sink");
+  if(extra_delay){
+    gst_element_link_pads (mprtpsnd, "src_1", mq, "sink_1");
+    gst_element_link_pads (mq, "src_1", rtpSink_1, "sink");
+    g_object_set(mq, "min-treshold-time", (GstClockTime) extra_delay * GST_MSECOND, NULL);
+    g_print("HERE");
+  }else{
+    gst_element_link_pads (mprtpsnd, "src_1", rtpSink_1, "sink");
+  }
+
 
   gst_element_link_pads (mprtpsnd, "src_2", mq, "sink_2");
   gst_element_link_pads (mq, "src_2", rtpSink_2, "sink");
@@ -449,6 +455,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
             "setup-sending-target", sending_target,
             "setup-controlling-mode", controlling_mode,
             "mpath-keyframe-filtering", mpath_keyfiltering,
+//            "extra-delay", extra_delay,
             NULL);
 
   if(testseq){

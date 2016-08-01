@@ -1,99 +1,91 @@
-name=system("echo mprtp-subflow-") 
 time=system("date +%Y_%m_%d_%H_%M_%S")
 
-if (!exists("throughput_file")) throughput_file='logs/sub_snd_sum.csv'
-if (!exists("owd_file")) throughput_file='logs/owd.csv'
-if (!exists("owd_file2")) throughput_file='logs/owd2.csv'
-if (!exists("output_file")) output_file='reports/summary-snd-rates.pdf'
-if (!exists("labels")) labels='0'
-if (!exists("legends")) legends='0'
 
-duration=120
-range=3000
+#---------------------------- Variables -----------------------------------
+
+if (!exists("throughput_file")) throughput_file='logs/sub_snd_sum.csv'
+if (!exists("owd_file")) owd_file='logs/owd.csv'
+if (!exists("owd_file2")) owd_file2='logs/owd2.csv'
+if (!exists("output_file")) output_file='reports/summary-snd-rates.pdf'
+if (!exists("path_delay")) path_delay=50000
+if (!exists("fecstat_file")) fecstat_file='logs/fecstat.csv'
+if (!exists("fecstat_file2")) fecstat_file2='logs/fecstat2.csv'
+
+duration=100
+range=2100
 
 font_size=18
 #-------------------------------------------------------------------------
 
 set terminal pdf enhanced rounded size 10,6
 set output output_file
-set key font ",32"
-set xtics font ",32"
-set ytics font ",32"
-set ylabel font ",32"
-set xlabel font ",32"
- 
-set origin 0,0
-set size ratio 0.25
 set datafile separator "," 
 
-set multiplot layout 2,1 font ",18"
+set multiplot layout 3, 1 font ",14"
+set tmargin 4
 
-if (legends < 1) {
-  unset key
-}else{
-  set key inside vertical top right
-}
-   
-#set tmargin 5
-#set bmargin 5
+#Plot_1
+# magenta: #0xee2e2f
+# green:   #0x008c48
+# blue:    #0x185aa9
+# orange:  #0xf47d23
+# purple:  #0x662c91
+# claret:  #0xa21d21
+# lpurple: #0xb43894
 
-if (labels < 1){
-  set lmargin 12  
-}else{
-  set lmargin 23
-}
+set title "Throughput (kbps)"
 
-set rmargin 7
 set yrange [0:range]
 set ytics 1000
 set xrange [0:duration]
-set xtics 20 offset 0,-1
-if (0 < labels){
-  set ylabel "Throughput (KBits)" offset -8
-}
-set xlabel "Time (s)" offset 0,-2
-set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
-set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
-
-# Line width of the axes
-# Line styles
-#colors:
-# magenta: #ee2e2f
-# green:   #008c48
-# blue:    #185aa9
-# orange:  #f47d23
-# purple:  #662c91
-# claret:  #a21d21
-# lpurple: #b43894
-
-set style line 1 linecolor rgb '#008c48' linetype 1 linewidth 1
-set style line 2 linecolor rgb '#b43894' linetype 2 linewidth 1
-set style line 3 linecolor rgb '#185aa9' linetype 3 linewidth 1
-set style line 4 linecolor rgb '#a21d21' linetype 4 linewidth 1	
-set style line 5 linecolor rgb '#662c91' linetype 5 linewidth 1	
-
+set xtics 10 offset 0,-1
+set format x ""
 unset xlabel
-unset xtics  
-plot throughput_file using ($0*0.1):(($1+$2)/125) with lines ls 1 title "SR (Peer 1)", \
-     throughput_file using ($0*0.1):(($6+$7)/125) with lines ls 2 title "SR (Peer 2)", \
-     throughput_file using ($0*0.1):22 with lines ls 4 title "Path Capacity"
-       
-       
-set yrange [0:500]
-set ytics 100
-set xrange [0:duration]
-set xtics 20 offset 0,-1
-set xtics font ", 32"
-set xlabel font ", 32"
 
-if (0 < labels){
-  set ylabel "Delay (ms)" offset -8
-}
-set xlabel "Time (s)" offset 0,-2
+set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
+set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
+
+unset key
+plot throughput_file using ($0*0.1):($1/125) with point pointtype 7 ps 0.2 lc rgb "blue" title "Sending Rate", \
+	 throughput_file using ($0*0.1):($7/125) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Sending Rate", \
+	 throughput_file using ($0*0.1):(($1+$7)/125) with point pointtype 7 ps 0.05 lc rgb "0x000000" title "Sending Rate", \
+     throughput_file using ($0*0.1):22 with lines lc rgb "0xDC143C" title "Path Capacity"
+
+
+#Plot_2
+set yrange [0:1]
+set ytics 0.5
+set xrange [0:duration]
+set xtics 10 offset 0,-1
+
+set title "Network Delay (s)"
+unset xlabel
+
 set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
   
-plot owd_file using ($0*0.1):(($2)/1000) with lines ls 1 title "OWD (Peer1)", \
-     owd_file2 using ($0*0.1):(($2)/1000) with lines ls 2 title "OWD (Peer2)", \
+plot owd_file using ($0*0.1):(($1 - path_delay)/1000000) with point pointtype 7 ps 0.2 lc rgb "blue" title "Queue Delay", \
+	 owd_file2 using ($0*0.1):(($1 - path_delay)/1000000) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Queue Delay", \
   
+  
+
+#Plot_3
+
+set title "FFRE"
+set yrange [0:1.1]
+set ytics 0.25
+set xlabel "Time (s)" offset 0,-1
+set format x "%.0f"
+
+set boxwidth 0.5 relative
+set style fill transparent solid 1.0 noborder
+
+plot fecstat_file using ($0*0.1):(0 < $2+$3 ? $3/($2+$3) : 0) with boxes lc rgb "blue" title "FFRE", \
+	 fecstat_file2 using ($0*0.1):(0 < $2+$3 ? $3/($2+$3) : 0) with boxes lc rgb "0x008c48" title "FFRE"
+
+
+#
 unset multiplot
+#
+#
+#

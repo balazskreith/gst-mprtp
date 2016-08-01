@@ -20,6 +20,9 @@ DURATION=150
 OWD_SND=100
 OWD_RCV=100
 
+  rm $TEMPDIR/peer1/*
+  rm $TEMPDIR/peer2/*
+  rm $TEMPDIR/peer3/*
 
 
 while [[ $# -gt 1 ]]

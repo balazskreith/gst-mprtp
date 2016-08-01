@@ -436,6 +436,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
   _setup_paths(this);
+
+  DISABLE_LINE {enable_mprtp_logger();  swperctest();}
 }
 
 
@@ -1234,15 +1236,15 @@ _mprtpscheduler_process_run (void *data)
 
   this = (GstMprtpscheduler *) data;
 
+  packetssndqueue_wait_until_item(this->sndqueue);
 again:
   item = packetssndqueue_peek(this->sndqueue);
   if(!item){
-    next_scheduler_time = _now(this) + 1 * GST_MSECOND;
-    goto done;
+    goto exit;
   }
 
   if(!_mprtpscheduler_send_buffer(this, item)){
-    next_scheduler_time = _now(this) + 1 * GST_MSECOND;
+    next_scheduler_time = _now(this) + 500 * GST_USECOND;
     goto done;
   }
   item = packetssndqueue_pop(this->sndqueue);
@@ -1254,6 +1256,8 @@ done:
     GST_WARNING_OBJECT (this, "The scheduler clock wait is interrupted");
   }
   gst_clock_id_unref (clock_id);
+exit:
+  return;
 }
 
 #undef THIS_WRITELOCK

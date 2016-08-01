@@ -42,7 +42,9 @@ typedef struct _bintree3 {
 } bintree3_t;
 
 gint32 bintree3cmp_int32(gpointer a,gpointer b);
+gint32 bintree3cmp_uint32(gpointer a,gpointer b);
 gint32 bintree3cmp_uint64(gpointer pa,gpointer pb);
+gint32 bintree3cmp_double(gpointer pa,gpointer pb);
 gint32 bintree3cmp_int64(gpointer pa,gpointer pb);
 
 bintree3_t *make_bintree3(bintree3cmp cmp);
@@ -51,7 +53,7 @@ void bintree3_print(bintree3_t* this);
 void bintree3_test(void);
 void bintree3_dtor(gpointer target);
 void bintree3_reset(bintree3_t *this);
-gpointer bintree3_get_items_sorted_array(bintree3_t *this);
+gpointer bintree3_get_items_sorted_array(bintree3_t *this, guint *length);
 void bintree3_setup_duplicate_notifier(bintree3_t *this, bintree3dupnotifier duplicate_notifier, gpointer duplicate_notifier_data);
 gpointer bintree3_delete_top_data(bintree3_t *this);
 gpointer bintree3_delete_bottom_data(bintree3_t *this);

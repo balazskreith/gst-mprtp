@@ -173,7 +173,7 @@ static gchar default_path_3_tx_ip[255];
 static gchar *testseq      = NULL;
 static gchar default_testseq[255];
 
-static int logging              = 0;
+static int logging              = 1;
 static int owd_th               = 200;
 static int discard_th           = 50;
 static int lost_th              = 500;
@@ -201,6 +201,7 @@ static int playout_low_watermark  = 0;
 static int playout_desired_framenum   = 3;
 static double playout_spread_factor = 1.1;
 static int mpath_keyfiltering = 0;
+static int extra_delay = 0;
 
 
 static GOptionEntry entries[] =
@@ -218,6 +219,7 @@ static GOptionEntry entries[] =
     { "path_3_tx_ip", 0, 0, G_OPTION_ARG_STRING, &path_3_tx_ip, "path_3_tx_ip", NULL },
     { "testseq", 0, 0, G_OPTION_ARG_STRING, &testseq, "testseq", NULL },
     { "retain_time", 0, 0, G_OPTION_ARG_INT, &retain_time, "retain_time", NULL },
+    { "extra_delay", 0, 0, G_OPTION_ARG_INT, &extra_delay, "extra_delay", NULL },
     { "mpath_keyframe_filtering", 0, 0, G_OPTION_ARG_INT, &mpath_keyfiltering, "mpath_keyframe_filtering", NULL },
     { "path1_active", 0, 0, G_OPTION_ARG_INT, &path1_active, "path1_active", NULL },
     { "path2_active", 0, 0, G_OPTION_ARG_INT, &path2_active, "path2_active", NULL },
@@ -443,6 +445,19 @@ static void _setup_test_params(void)
 
 }
 
-
+char *rand_string(char *str, size_t size)
+{
+    const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJK...";
+    size_t n;
+    if (size) {
+        --size;
+        for (n = 0; n < size; n++) {
+            int key = rand() % (int) (sizeof charset - 1);
+            str[n] = charset[key];
+        }
+        str[size] = '\0';
+    }
+    return str;
+}
 
 #endif /* TESTS_TEST_H_ */

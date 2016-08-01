@@ -61,6 +61,7 @@ struct _FECDecoder
 
   guint8                     payload_type;
   guint32                    total_early_repaired_bytes;
+  guint32                    total_rtp_packets;
   guint32                    total_repaired_bytes;
   guint32                    total_lost_bytes;
   GList*                     segments;
@@ -84,9 +85,12 @@ GType fecdecoder_get_type (void);
 FECDecoder *make_fecdecoder(void);
 void fecdecoder_reset(FECDecoder *this);
 void fecdecoder_get_stat(FECDecoder *this,
+                         guint32 *total_rtp_packets,
                          guint32 *early_repaired_bytes,
                          guint32 *total_repaired_bytes,
-                         gdouble *FFRE);
+                         guint32 *total_recovered_packets,
+                         guint32 *total_missed_packets);
+
 gboolean fecdecoder_has_repaired_rtpbuffer(FECDecoder *this, guint16 hpsn, GstBuffer** repairedbuf);
 void fecdecoder_set_payload_type(FECDecoder *this, guint8 fec_payload_type);
 void fecdecoder_set_repair_window(FECDecoder *this, GstClockTime min, GstClockTime max);

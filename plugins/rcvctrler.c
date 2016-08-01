@@ -76,6 +76,13 @@ typedef struct _RateWindow{
   guint32 rate_value;
 }RateWindow;
 
+typedef struct{
+  guint32 total_missing_packets;
+  guint32 total_recovered_bytes;
+  guint32 total_rtp_packets;
+  guint32 total_recovered_packets;
+}FECStatItem;
+
 struct _Subflow
 {
   guint8                        id;
@@ -137,6 +144,9 @@ _orp_add_rr(
     RcvController *this,
     Subflow *subflow);
 
+static void
+_FECStat(RcvController * this);
+
 //----------------------------- System Notifier ------------------------------
 static void
 _system_notifier_main(RcvController * this);
@@ -196,6 +206,12 @@ static guint32
 _update_ratewindow(
     RateWindow *window,
     guint32 value);
+
+static void
+_fecstat_rem_pipe(
+    gpointer udata,
+    gpointer itemptr);
+
 
 void
 rcvctrler_class_init (RcvControllerClass * klass)
@@ -325,9 +341,8 @@ rcvctrler_finalize (GObject * object)
 //  g_object_unref (this->ricalcer);
   g_object_unref (this->sysclock);
   g_object_unref(this->report_producer);
+  g_object_unref(this->fecstat);
 
-  mprtp_free(this->fec_early_repaired_bytes);
-  mprtp_free(this->fec_total_repaired_bytes);
 }
 
 void
@@ -339,10 +354,10 @@ rcvctrler_init (RcvController * this)
   this->report_is_flowable = FALSE;
   this->report_producer    = g_object_new(REPORTPRODUCER_TYPE, NULL);
   this->report_processor   = g_object_new(REPORTPROCESSOR_TYPE, NULL);
-
-  this->fec_early_repaired_bytes         = mprtp_malloc(sizeof(RateWindow));
-  this->fec_total_repaired_bytes         = mprtp_malloc(sizeof(RateWindow));
   this->made               = _now(this);
+
+  this->fecstat            = make_slidingwindow(200, GST_SECOND);
+  slidingwindow_add_pipes(this->fecstat, _fecstat_rem_pipe, this, NULL, NULL);
 
   report_processor_set_logfile(this->report_processor, "rcv_reports.log");
   report_producer_set_logfile(this->report_producer, "rcv_produced_reports.log");
@@ -367,7 +382,9 @@ refctrler_ticker (void *data)
 //  PROFILING(_orp_main(this));
   PROFILING("refctrler_ticker",_orp_main(this));
 
+  _FECStat(this);
   _system_notifier_main(this);
+
 
   next_scheduler_time = _now(this) + 10 * GST_MSECOND;
   THIS_WRITEUNLOCK (this);
@@ -490,9 +507,6 @@ _orp_main(RcvController * this)
   gchar interval_logfile[255];
   GstClockTime elapsed_x, elapsed_y, now;
 
-  if(!this->report_is_flowable) {
-    goto done;
-  }
   now = _now(this);
 
   ++this->orp_tick;
@@ -510,7 +524,7 @@ _orp_main(RcvController * this)
 
     _update_receiver_rate(subflow);
 
-    if(subflow->next_regular_report <= now){
+    if(subflow->next_regular_report <= now && this->report_is_flowable){
       gdouble interval;
       report_producer_begin(this->report_producer, subflow->id);
       _orp_add_rr(this, subflow);
@@ -523,7 +537,9 @@ _orp_main(RcvController * this)
 
       elapsed_y  = GST_TIME_AS_MSECONDS(_now(this) - subflow->LRR);
       subflow->LRR = _now(this);
-      mprtp_logger(interval_logfile, "%lu,%f\n", elapsed_x/100, (gdouble)elapsed_y / 1000.);
+
+      DISABLE_LINE mprtp_logger(interval_logfile, "%lu,%f\n", elapsed_x/100, (gdouble)elapsed_y / 1000.);
+
       report_created = TRUE;
     }
 
@@ -556,7 +572,6 @@ _orp_main(RcvController * this)
   }
 
   DISABLE_LINE _uint16_diff(0,0);
-done:
   return;
 }
 
@@ -620,6 +635,35 @@ void _orp_add_rr(RcvController * this, Subflow *subflow)
 
 }
 
+
+//----------------------------- Logging service ------------------------------
+void
+_FECStat(RcvController * this)
+{
+  FECStatItem *item, *latest, *oldest;
+  guint32 missing_rate, recovered_rate, total_rtp_rate;
+  item = g_slice_new0(FECStatItem);
+
+  fecdecoder_get_stat(this->fecdecoder, &item->total_rtp_packets, NULL, &item->total_recovered_bytes, &item->total_recovered_packets, &item->total_missing_packets);
+  slidingwindow_add_data(this->fecstat, item);
+
+  if(_now(this) - this->last_fecstat < 100 * GST_MSECOND ){
+    return;
+  }
+
+  oldest = slidingwindow_peek_oldest(this->fecstat);
+  latest = slidingwindow_peek_latest(this->fecstat);
+  if(!latest || !oldest){
+    mprtp_logger("fecstat.csv", "%u,%u,%u\n", 0, 0, 0);
+    return;
+  }
+
+  missing_rate   = latest->total_missing_packets - oldest->total_missing_packets;
+  recovered_rate = latest->total_recovered_packets - oldest->total_recovered_packets;
+  total_rtp_rate = latest->total_rtp_packets - oldest->total_rtp_packets;
+  mprtp_logger("fecstat.csv", "%u,%u,%u\n", total_rtp_rate, missing_rate, recovered_rate);
+  this->last_fecstat = _now(this);
+}
 
 
 //----------------------------- System Notifier ------------------------------
@@ -749,6 +793,14 @@ guint32 _update_ratewindow(RateWindow *window, guint32 value)
   window->index = (window->index + 1) % RATEWINDOW_LENGTH;
   window->rate_value = value - window->items[window->index];
   return window->rate_value;
+}
+
+
+
+void _fecstat_rem_pipe(gpointer udata, gpointer itemptr)
+{
+  FECStatItem *item = itemptr;
+  g_slice_free(FECStatItem, item);
 }
 
 

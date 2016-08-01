@@ -5,8 +5,8 @@ import os
 output = sys.argv[1] # prints var1
 #output = "output.dat"
 
-for x in range(0,10) :
-    idle = numpy.random.exponential(10)
+for x in range(0,5) :
+    idle = numpy.random.exponential(20)
     cmd = "sleep " + str(idle)
     os.system(cmd)
     size = str(int(numpy.random.uniform(100, 10240)))

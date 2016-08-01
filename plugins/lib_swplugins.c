@@ -2,13 +2,111 @@
 #include "gstmprtpbuffer.h"
 #include <math.h>
 
+#define now (gst_clock_get_time (sysclock))
+static GstClock* sysclock;
+static int _cmpfunc (const void * pa, const void * pb)
+{
+  return *((guint32*)pa) == *((guint32*)pb) ? 0 : *((guint32*)pa) < *((guint32*)pb) ? -1 : 1;
+}
+
+#include "mprtplogger.h"
+static void _median_test_with_qsort(const gchar *filename, guint32* src, guint32* dst, gint length, guint32 *result, GstClockTime *elapsed)
+{
+  *elapsed = now;
+  memcpy(dst, src, sizeof(guint32) * length);
+  qsort(dst, length, sizeof(guint32), _cmpfunc);
+
+  if(length%2==0) {
+      *result = (dst[length/2]+dst[length/2-1])/2;
+  }else{
+      *result = dst[length/2];
+  }
+
+  *elapsed = now - *elapsed;
+}
+
+static void _median_test_with_perc(const gchar *filename, SlidingWindow* sw, guint32 *item, GstClockTime *elapsed)
+{
+  *elapsed = now;
+  slidingwindow_add_data(sw, item);
+  *elapsed = now - *elapsed;
+
+}
 
 
+static void _percentile_median_pipe(gpointer udata, swpercentilecandidates_t *candidates)
+{
+  guint32 *result = udata;
+  if(!candidates->processed){
+    return;
+  }
+
+  if(!candidates->left){
+      *result = *(guint32*)candidates->right;
+  }else if(!candidates->right){
+      *result = *(guint32*)candidates->left;
+  }else{
+      *result  = *(guint32*)candidates->left;
+      *result += *(guint32*)candidates->right;
+      *result >>= 1;
+  }
+}
+
+void swperctest(void)
+{
+  guint32 repeat = 1000;
+  guint32 *array,*array2;
+  guint32 result1,result2;
+  GstClockTime elapsed1, elapsed2;
+  gchar filename[255];
+  gint i,j,k;
+  guint32 num_limits[8] = {10,100,1000,10000,100000,1000000,10000000,100000000};
+
+  sysclock = gst_system_clock_obtain();
+  array  = g_malloc0(sizeof(guint32) * 200000000);
+  array2 = g_malloc0(sizeof(guint32) * 200000000);
+
+  for(i = 0; i < 8; ++i){
+    SlidingWindow* sw;
+    guint num_limit = num_limits[i];
+    sw = make_slidingwindow(num_limit, 0);
+    slidingwindow_add_plugin(sw, make_swpercentile(50, bintree3cmp_uint32, _percentile_median_pipe, &result2));
+    slidingwindow_add_plugin(sw, make_swprinter(swprinter_uint32));
+    sprintf(filename, "mediantest_%d.csv", num_limit);
+    for(j = 0; j < num_limit; ++j){
+      array[j] = g_random_int();
+      slidingwindow_add_data(sw, &array[j]);
+    }
+
+    for(k = 0; k < repeat; ++k,++j){
+      array[j] = g_random_int();
+
+      //profile 1 - qsort
+      _median_test_with_qsort(filename, array + (j - num_limit + 1), array2, num_limit, &result1, &elapsed1);
+      //profile 2 - perc
+      _median_test_with_perc(filename, sw, &array[j], &elapsed2);
+
+      mprtp_logger(filename, "%u,%lu,%u,%lu\n", result1, elapsed1, result2, elapsed2);
+    }
+
+    slidingwindow_clear(sw);
+    g_object_unref(sw);
+  }
+
+  g_object_unref(sysclock);
+  g_free(array);
+  g_free(array2);
+}
 //----------------- SWPrinter plugin --------------------------------------
 
 void swprinter_int32(gpointer data, gchar* string)
 {
   sprintf(string, "%d", *(gint32*)data);
+}
+
+void swprinter_uint32(gpointer data, gchar* string)
+{
+  sprintf(string, "%u", *(guint32*)data);
 }
 
 void swprinter_int64(gpointer data, gchar* string)
@@ -336,6 +434,28 @@ SlidingWindowPlugin* make_swpercentile_with_sprint(
   bintree3_setsprint(priv->mintree, sprint);
   priv->sprinted = TRUE;
   return result;
+}
+
+void swpercentile_fileprint_data(SlidingWindowPlugin *plugin, const gchar *filename)
+{
+  swpercentile_t* this = plugin->priv;
+//  gpointer *items1,*items2;
+//  guint length1,length2,i;
+//  items1 = bintree3_get_items_sorted_array(this->maxtree, &length1);
+//  items2 = bintree3_get_items_sorted_array(this->mintree, &length2);
+//  mprtp_logger(filename, "perc: ");
+//  for(i = 0; i < length1; ++i){
+//      mprtp_logger(filename, "%u|", *(guint32*)(items1 + i));
+//    }
+//  for(i = 0; i < length2; ++i){
+//      mprtp_logger(filename, "%u|", *(guint32*)(items2 + i));
+//    }
+//  mprtp_logger(filename, "\n");
+  bintree3_setsprint(this->maxtree, swprinter_uint32);
+  bintree3_setsprint(this->mintree, swprinter_uint32);
+  bintree3_print(this->maxtree);
+  bintree3_print(this->mintree);
+  g_print("p: %d,%d\n", this->Mxc, this->Mnc);
 }
 
 SlidingWindowPlugin* make_swpercentile(

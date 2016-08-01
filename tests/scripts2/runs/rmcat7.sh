@@ -20,7 +20,9 @@ DURATION=310
 OWD_SND=100
 OWD_RCV=100
 
-
+  rm $TEMPDIR/peer1/*
+  rm $TEMPDIR/peer2/*
+  rm $TEMPDIR/peer3/*
 
 while [[ $# -gt 1 ]]
 do
@@ -50,17 +52,22 @@ done
   echo "ntrt -c$CONFDIR/ntrt_snd_meas.ini -m$CONFDIR/ntrt_rmcat7.cmds -t$DURATION &" > $PEER1_SND
   echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_1.dat &" >> $PEER1_SND 
   echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_2.dat &" >> $PEER1_SND 
-  echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_3.dat &" >> $PEER1_SND 
-  echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_4.dat &" >> $PEER1_SND 
-  echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_5.dat &" >> $PEER1_SND 
-  echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_6.dat &" >> $PEER1_SND 
-  echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_7.dat &" >> $PEER1_SND 
+#  echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_3.dat &" >> $PEER1_SND 
+#  echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_4.dat &" >> $PEER1_SND 
+#  echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_5.dat &" >> $PEER1_SND 
+#  echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_6.dat &" >> $PEER1_SND 
+#  echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_7.dat &" >> $PEER1_SND 
   echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_8.dat &" >> $PEER1_SND 
   echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_9.dat &" >> $PEER1_SND 
   echo "python3 $RUNDIR/stcp.py $TEMPDIR/stcp_10.dat &" >> $PEER1_SND 
   echo -n "./$SENDER" >> $PEER1_SND
   ./$CONFDIR/peer1params.sh >> $PEER1_SND
   chmod 777 $PEER1_SND
+
+  PEER2_SND="$TEMPDIR/sender_2.sh"
+  echo -n "./$SENDER" > $PEER2_SND
+  ./$CONFDIR/peer2params.sh >> $PEER2_SND
+  chmod 777 $PEER2_SND
 
   PEER1_RCV="$TEMPDIR/receiver_1.sh"
   echo "ntrt -c$CONFDIR/ntrt_rcv_meas.ini -t$DURATION &" > $PEER1_RCV
@@ -70,11 +77,18 @@ done
   echo -n "--save_received_yuvfile=1 " >> $PEER1_RCV 
   chmod 777 $PEER1_RCV
 
+  PEER2_RCV="$TEMPDIR/receiver_2.sh"
+  echo -n "./$RECEIVER" > $PEER2_RCV
+  ./$CONFDIR/peer2params.sh >> $PEER2_RCV
+  chmod 777 $PEER2_RCV
+
 
   #start receiver and sender
   sudo ip netns exec $NSRCV ./$PEER1_RCV 2> $LOGSDIR"/"receiver.log &
+  sudo ip netns exec $NSRCV ./$PEER2_RCV 2> $LOGSDIR"/"receiver_2.log &
   sleep 2
   sudo ip netns exec $NSSND ./$PEER1_SND 2> $LOGSDIR"/"sender.log &
+  sudo ip netns exec $NSSND ./$PEER2_SND 2> $LOGSDIR"/"sender_2.log &
 
 cleanup()
 # example cleanup function

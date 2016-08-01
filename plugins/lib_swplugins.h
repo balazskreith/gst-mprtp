@@ -9,8 +9,9 @@
 #include "slidingwindow.h"
 #include "lib_bintree.h"
 
-
+void swperctest(void);
 void swprinter_int32(gpointer data, gchar* string);
+void swprinter_uint32(gpointer data, gchar* string);
 void swprinter_int64(gpointer data, gchar* string);
 void swprinter_uint64(gpointer data, gchar* string);
 SlidingWindowPlugin* make_swprinter(void (*sprint)(gpointer,gchar*));
@@ -51,6 +52,7 @@ SlidingWindowPlugin* make_swpercentile_with_sprint(
                               void (*sprint)(gpointer,gchar*)
                               );
 
+void swpercentile_fileprint_data(SlidingWindowPlugin *plugin, const gchar *filename);
 SlidingWindowPlugin* make_swpercentile(
                               gint32     percentile,
                               bintree3cmp  cmp,

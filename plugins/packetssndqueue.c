@@ -31,10 +31,15 @@
 #include "rtpfecbuffer.h"
 #include "lib_swplugins.h"
 
-#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
+//#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
+//#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
+//#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
+//#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
+
+#define THIS_READLOCK(this) g_mutex_lock(&this->mutex)
+#define THIS_READUNLOCK(this) g_mutex_unlock(&this->mutex)
+#define THIS_WRITELOCK(this) g_mutex_lock(&this->mutex)
+#define THIS_WRITEUNLOCK(this) g_mutex_unlock(&this->mutex)
 
 #define _now(this) gst_clock_get_time (this->sysclock)
 
@@ -100,9 +105,11 @@ packetssndqueue_finalize (GObject * object)
 void
 packetssndqueue_init (PacketsSndQueue * this)
 {
-  g_rw_lock_init (&this->rwmutex);
+//  g_rw_lock_init (&this->rwmutex);
+  g_mutex_init(&this->mutex);
+  g_cond_init(&this->cond);
   this->sysclock = gst_system_clock_obtain();
-  this->obsolation_treshold = 0;
+  this->obsolation_treshold = GST_SECOND;
   this->items = g_queue_new();
 
 }
@@ -185,6 +192,7 @@ void packetssndqueue_push(PacketsSndQueue *this, GstBuffer *buffer)
 
   this->bytes+=item->size;
   g_queue_push_tail(this->items, item);
+  g_cond_signal(&this->cond);
   THIS_WRITEUNLOCK(this);
 }
 
@@ -201,6 +209,17 @@ GstBuffer * packetssndqueue_pop(PacketsSndQueue *this)
   }
   THIS_WRITEUNLOCK(this);
   return result;
+}
+
+void packetssndqueue_wait_until_item(PacketsSndQueue *this)
+{
+  THIS_READLOCK(this);
+  if(!g_queue_is_empty(this->items)){
+    goto done;
+  }
+  g_cond_wait(&this->cond, &this->mutex);
+done:
+  THIS_READLOCK(this);
 }
 
 GstBuffer * packetssndqueue_peek(PacketsSndQueue *this)

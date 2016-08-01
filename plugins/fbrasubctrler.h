@@ -88,6 +88,8 @@ struct _FBRASubController
 
   gpointer                  priv;
 
+  guint                     last_rtp_size;
+
 };
 
 struct _FBRASubControllerClass{

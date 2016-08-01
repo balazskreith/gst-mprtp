@@ -45,7 +45,6 @@
  *
  */
 
-
 GMainLoop *loop = NULL;
 
 typedef struct _SessionData

@@ -51,10 +51,10 @@ struct _RcvController
   ReportProcessor*  report_processor;
 
   FECDecoder*       fecdecoder;
-  gpointer          fec_early_repaired_bytes;
-  gpointer          fec_total_repaired_bytes;
-  gdouble           FFRE;
   guint             orp_tick;
+
+  SlidingWindow*    fecstat;
+  GstClockTime      last_fecstat;
 
   GstMPRTCPReportSummary reports_summary;
 };

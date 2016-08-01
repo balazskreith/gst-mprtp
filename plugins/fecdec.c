@@ -145,11 +145,18 @@ void fecdecoder_reset(FECDecoder *this)
 }
 
 void fecdecoder_get_stat(FECDecoder *this,
+                         guint32 *total_rtp_packets,
                          guint32 *early_repaired_bytes,
                          guint32 *total_repaired_bytes,
-                         gdouble *FFRE)
+                         guint32 *total_recovered_packets,
+                         guint32 *total_missed_packets)
 {
   THIS_READLOCK(this);
+
+  if(total_rtp_packets){
+    *total_rtp_packets = this->total_rtp_packets;
+  }
+
   if(early_repaired_bytes){
     *early_repaired_bytes = this->total_early_repaired_bytes;
   }
@@ -158,13 +165,12 @@ void fecdecoder_get_stat(FECDecoder *this,
     *total_repaired_bytes = this->total_repaired_bytes;
   }
 
-  //frames recovery efficiency
-  if(FFRE){
-    if(!this->recovered && !this->lost){
-      *FFRE = 0.;
-    }else{
-      *FFRE = (gdouble)this->recovered / (gdouble)(this->recovered + this->lost);
-    }
+  if(total_recovered_packets){
+    *total_recovered_packets = this->recovered;
+  }
+
+  if(total_missed_packets){
+    *total_missed_packets = this->lost;
   }
 
   THIS_READUNLOCK(this);
@@ -382,6 +388,7 @@ done:
 void _add_rtp_packet_to_segment(FECDecoder *this, GstMpRTPBuffer *mprtp, FECDecoderSegment *segment)
 {
   FECDecoderItem *item = NULL;
+  ++this->total_rtp_packets;
   if(_find_item_by_seq(segment->items, mprtp->abs_seq) != NULL){
       g_warning("Duplicated sequece number %hu for RTP packet", mprtp->abs_seq);
     goto done;

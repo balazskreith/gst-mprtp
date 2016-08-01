@@ -80,7 +80,7 @@ static void owd_logger(gpointer data, gchar* string)
   THIS_READLOCK(this);
 
   sprintf(string, "%lu,%lu,%lu,%lu\n",
-               GST_TIME_AS_USECONDS(this->stat.owd_stt_median),
+               GST_TIME_AS_USECONDS(this->stat.owd_stt),
                GST_TIME_AS_USECONDS(this->stat.owd_ltt80),
                GST_TIME_AS_USECONDS(this->stat.RTT),
                (GstClockTime)this->stat.srtt / 1000
@@ -95,10 +95,14 @@ static void _owd_ltt80_percentile_pipe(gpointer udata, swpercentilecandidates_t 
 {
   FBRAFBProcessor *this = udata;
   if(!candidates->processed){
-      this->owd_stat.ltt80th = this->owd_stat.min = this->owd_stat.max = this->stat.owd_stt_median;
+      this->owd_ltt_ewma = this->owd_ltt_ewma == 0. ? this->stat.owd_stt : (this->owd_ltt_ewma * .8 + this->stat.owd_stt * .2);
+      this->stat.owd_th1  = this->owd_ltt_ewma * .2;
+      this->stat.owd_th2  = this->owd_ltt_ewma * .8;
+      this->owd_stat.ltt80th = this->owd_stat.min = this->owd_stat.max = this->owd_ltt_ewma;
       g_warning("Not enough owd_stt to calculate the ltt80th");
     return;
   }
+  this->owd_ltt_ewma = 0.;
 
   if(!candidates->left){
     this->owd_stat.ltt80th = *(GstClockTime*)candidates->right;
@@ -114,12 +118,35 @@ static void _owd_ltt80_percentile_pipe(gpointer udata, swpercentilecandidates_t 
 
   this->stat.owd_th1  = CONSTRAIN(5 * GST_MSECOND,
                                   50 * GST_MSECOND,
-                                  this->owd_stat.min * .5);
+                                  this->owd_stat.min * .33);
 
   this->stat.owd_th2  = CONSTRAIN(5 * GST_MSECOND,
                                   50 * GST_MSECOND,
-                                  this->owd_stat.ltt80th * .5);
+                                  this->owd_stat.ltt80th * .33);
 }
+
+
+static void _FD_ltt20_percentile_pipe(gpointer udata, swpercentilecandidates_t *candidates)
+{
+  FBRAFBProcessor *this = udata;
+  if(!candidates->processed){
+    this->stat.FD_median = 0.;
+    return;
+  }
+
+  if(!candidates->left){
+    this->stat.FD_median = *(gdouble*)candidates->right;
+  }else if(!candidates->right){
+    this->stat.FD_median = *(gdouble*)candidates->left;
+  }else{
+    this->stat.FD_median  = *(gdouble*)candidates->left;
+    this->stat.FD_median += *(gdouble*)candidates->right;
+    this->stat.FD_median /=2.;
+  }
+
+}
+
+
 
 static void _sent_add_pipe(gpointer udata, gpointer itemptr)
 {
@@ -232,6 +259,25 @@ static void _acked_sprint(gpointer data, gchar *result)
   sprintf(result,"Acked window seq: %hu payload: %d", item->seq_num, item->payload_bytes);
 }
 
+
+
+//static void _owd_off_add_pipe(gpointer udata, gpointer itemptr)
+//{
+//  FBRAFBProcessor *this = udata;
+//  gdouble *item = itemptr;
+//
+//  this->stat.owd_stt_tend += *item;
+//
+//}
+//
+//static void _owd_off_rem_pipe(gpointer udata, gpointer itemptr)
+//{
+//  FBRAFBProcessor *this = udata;
+//  gdouble *item = itemptr;
+//
+//  this->stat.owd_stt_tend -= *item;
+//}
+
 void
 fbrafbprocessor_init (FBRAFBProcessor * this)
 {
@@ -245,9 +291,13 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->stat.srtt        = 0;
 
   this->items            = g_malloc0(sizeof(FBRAFBProcessorItem) * 65536);
+  this->FD_sw            = make_slidingwindow_double(600, 30 * GST_SECOND);
   this->owd_sw           = make_slidingwindow_uint64(600, 60 * GST_SECOND);
   this->acked_1s_sw      = make_slidingwindow(2000, GST_SECOND);
   this->sent_sw          = make_slidingwindow(2000, GST_SECOND);
+
+//  this->owd_offs = make_slidingwindow_double(10, GST_SECOND);
+//  slidingwindow_add_pipes(this->owd_offs, _owd_off_rem_pipe, this, _owd_off_add_pipe, this);
 
   slidingwindow_add_pipes(this->sent_sw, _sent_rem_pipe, this, _sent_add_pipe, this);
   slidingwindow_add_pipes(this->acked_1s_sw, _acked_1s_rem_pipe, this, _acked_1s_add_pipe, this);
@@ -257,6 +307,10 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
 
   slidingwindow_add_plugins(this->owd_sw,
                             make_swpercentile(80, bintree3cmp_uint64, _owd_ltt80_percentile_pipe, this),
+                           NULL);
+
+  slidingwindow_add_plugins(this->FD_sw,
+                            make_swpercentile(20, bintree3cmp_double, _FD_ltt20_percentile_pipe, this),
                            NULL);
 
 
@@ -300,6 +354,7 @@ void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn)
   item->payload_bytes = payload_len;
   item->seq_num       = sn;
 
+
   ++this->stat.packets_in_flight;
   this->stat.bytes_in_flight += payload_len;
 
@@ -318,6 +373,8 @@ static void _update_fraction_discarded(FBRAFBProcessor *this)
   this->stat.discarded_rate = (gdouble)this->stat.discarded_packets_in_1s;
   this->stat.discarded_rate /= (gdouble)this->stat.acked_packets_in_1s;
 
+  slidingwindow_add_data(this->FD_sw, &this->stat.discarded_rate);
+
 }
 
 void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary)
@@ -332,7 +389,7 @@ void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summa
     this->stat.srtt = (this->stat.srtt == 0.) ? summary->RR.RTT : (summary->RR.RTT * .1 + this->stat.srtt * .9);
   }
   if(summary->XR.DiscardedRLE.processed){
-    PROFILING("_process_rle_discvector", _process_rle_discvector(this, &summary->XR));
+    _process_rle_discvector(this, &summary->XR);
     this->stat.recent_discarded = 0 < this->last_discard && _now(this) < this->last_discard + this->stat.RTT;
     _update_fraction_discarded(this);
   }
@@ -357,7 +414,7 @@ fbrafbprocessor_get_stats (FBRAFBProcessor * this, FBRAFBProcessorStat* result)
 
 static void _refresh_owd_ltt(FBRAFBProcessor *this)
 {
-  slidingwindow_add_data(this->owd_sw, &this->stat.owd_stt_median);
+  slidingwindow_add_data(this->owd_sw, &this->stat.owd_stt);
   this->stat.owd_ltt80 = this->owd_stat.ltt80th;
 }
 
@@ -389,20 +446,31 @@ void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
     goto done;
   }
 
-  this->stat.owd_stt_median = xrsummary->OWD.median_delay;
+  this->stat.owd_stt = xrsummary->OWD.median_delay;
 
 //  this->last_delay_t2         = this->last_delay_t1;
 //  this->last_delay_t1         = this->last_delay;
 //  this->last_delay            = xrsummary->OWD.median_delay;
 
   if(this->stat.owd_ltt80){
-    this->stat.owdh_corr =  (gdouble) this->stat.owd_stt_median;
+    this->stat.owdh_corr =  (gdouble) this->stat.owd_stt;
     this->stat.owdh_corr /=  (gdouble)this->stat.owd_ltt80;
   }else{
     this->stat.owdh_corr = /*this->stat.owdl_corr = */ 1.;
   }
 
+//  {
+//    gdouble off = 0.;
+//    if(xrsummary->OWD.median_delay && this->stat.owd_ltt80){
+//      off = (gdouble)xrsummary->OWD.median_delay - (gdouble)this->stat.owd_ltt80;
+//      off /= (gdouble)this->stat.owd_ltt80;
+//    }
+//    slidingwindow_add_data(this->owd_offs, &off);
+//  }
+
+
 done:
+//  slidingwindow_refresh(this->owd_offs);
   return;
 }
 

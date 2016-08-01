@@ -79,12 +79,25 @@ gint32 bintree3cmp_int32(gpointer pa,gpointer pb)
   return a == b ? 0 : a < b ? -1 : 1;
 }
 
+gint32 bintree3cmp_uint32(gpointer pa,gpointer pb)
+{
+  return *((guint32*)pa) == *((guint32*)pb) ? 0 : *((guint32*)pa) < *((guint32*)pb) ? -1 : 1;
+}
+
 
 gint32 bintree3cmp_uint64(gpointer pa,gpointer pb)
 {
   guint64 a,b;
   a = *((guint64*)pa);
   b = *((guint64*)pb);
+  return a == b ? 0 : a < b ? -1 : 1;
+}
+
+gint32 bintree3cmp_double(gpointer pa,gpointer pb)
+{
+  gdouble a,b;
+  a = *((gdouble*)pa);
+  b = *((gdouble*)pb);
   return a == b ? 0 : a < b ? -1 : 1;
 }
 
@@ -201,12 +214,15 @@ static void _inorder_fillup(bintree3node_t* node, gpointer* dataptr)
   _inorder_fillup(node->right, dataptr);
 }
 
-gpointer bintree3_get_items_sorted_array(bintree3_t *this)
+gpointer bintree3_get_items_sorted_array(bintree3_t *this, guint *length)
 {
   gpointer* result;
   //TODO: test this
   result = g_malloc0(sizeof(gpointer) * (this->node_counter + this->duplicate_counter));
   _inorder_fillup(this->root, result);
+  if(length){
+      *length = this->node_counter + this->duplicate_counter;
+  }
   return result;
 }
 

@@ -37,7 +37,9 @@ struct _PacketsSndQueue
   GObject                    object;
   GstClock*                  sysclock;
   GstClockTime               made;
-  GRWLock                    rwmutex;
+//  GRWLock                    rwmutex;
+  GMutex                     mutex;
+  GCond                      cond;
 
   GstClockTime               obsolation_treshold;
   gboolean                   expected_lost;
@@ -65,6 +67,7 @@ gint32 packetssndqueue_get_bytes_in_queue(PacketsSndQueue *this);
 void packetssndqueue_push(PacketsSndQueue *this, GstBuffer* buffer);
 void packetssndqueue_set_obsolation_treshold(PacketsSndQueue *this, GstClockTime treshold);
 GstClockTime packetssndqueue_get_obsolation_treshold(PacketsSndQueue *this);
+void packetssndqueue_wait_until_item(PacketsSndQueue *this);
 GstBuffer * packetssndqueue_peek(PacketsSndQueue *this);
 GstBuffer * packetssndqueue_pop(PacketsSndQueue *this);
 

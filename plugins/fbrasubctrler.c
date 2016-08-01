@@ -48,10 +48,10 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 
 
 //determines the treshold for utilization, in which below the path considered to be congested
-#define DISCARD_CONGESTION_TRESHOLD 0.1
+#define DISCARD_CONGESTION_MAX_TRESHOLD 0.1
 
 //determines the treshold for utilization, in which below the path considered to be distorted
-#define DISCARD_DISTORTION_TRESHOLD 0.0
+#define DISCARD_DISTORTION_MAX_TRESHOLD 0.0
 
 //determines a treshold for trend calculations, in which above the KEEP stage not let it to PROBE
 #define OWD_CORR_DISTORTION_TRESHOLD 1.05
@@ -237,7 +237,7 @@ fbrasubctrler_class_init (FBRASubControllerClass * klass)
   gobject_class->finalize = fbrasubctrler_finalize;
 
   GST_DEBUG_CATEGORY_INIT (fbrasubctrler_debug_category, "fbrasubctrler", 0,
-      "FBRA+MARC Subflow Rate Controller");
+      "FBRA+ Subflow Rate Controller");
 
 }
 
@@ -265,8 +265,8 @@ fbrasubctrler_init (FBRASubController * this)
   //Initial values
   _priv(this)->adjust_th = 20 * GST_MSECOND;
 
-  _priv(this)->discad_cong_treshold             = DISCARD_CONGESTION_TRESHOLD;
-  _priv(this)->discad_dist_treshold             = DISCARD_DISTORTION_TRESHOLD;
+  _priv(this)->discad_cong_treshold             = DISCARD_CONGESTION_MAX_TRESHOLD;
+  _priv(this)->discad_dist_treshold             = DISCARD_DISTORTION_MAX_TRESHOLD;
   _priv(this)->owd_corr_cng_th                  = OWD_CORR_CONGESTION_TRESHOLD;
   _priv(this)->owd_corr_dist_th                 = OWD_CORR_DISTORTION_TRESHOLD;
 
@@ -274,16 +274,53 @@ fbrasubctrler_init (FBRASubController * this)
 
 }
 
-
+static gboolean pacing = FALSE;
+static gint32 cwnd_max;
+static GstClockTime last_sent;
 gboolean fbrasubctrler_path_approver(gpointer data, GstRTPBuffer *rtp)
 {
   FBRASubController *this = data;
 
-  fbratargetctrler_update_rtpavg(this->targetctrler, gst_rtp_buffer_get_payload_len(rtp));
+  if(!pacing && mprtps_path_is_non_congested(this->path)){
+    goto approve;
+  }
 
+  if(mprtps_path_get_state(this->path) != MPRTPS_PATH_STATE_OVERUSED){
+    pacing = FALSE;
+    goto approve;
+  }
+  if(!pacing){
+    cwnd_max = _fbstat(this).bytes_in_flight * 8;
+    pacing = TRUE;
+    goto approve;
+  }
+  if(1) goto approve;
+
+  {
+    gdouble pace_bitrate;
+    gdouble t_pace;
+    gdouble owd_in_sec;
+    gdouble cwnd;
+
+//    owd_in_sec = (gdouble)_fbstat(this).owd_ltt80 * .000000001;
+    cwnd = cwnd_max * CONSTRAIN(.2, .8, 3.0 - _fbstat(this).owdh_corr);
+    owd_in_sec = (gdouble)_fbstat(this).RTT * .000000001;
+//    pace_bitrate = MAX(50000, mprtps_path_get_target_bitrate(this->path) / owd_in_sec);
+    pace_bitrate = MAX(50000, cwnd / owd_in_sec);
+//    pace_bitrate = MAX(50000, cwnd_max * .6 / ((gdouble)_fbstat(this).owd_ltt80 * .000000001));
+    t_pace = (gdouble)(this->last_rtp_size * 8) / pace_bitrate;
+    if(_now(this) < last_sent + t_pace * GST_SECOND){
+      goto disapprove;
+    }
+  }
   //TODO: breakable. ->NEM. A sndratectrler majd elintézi ezt a faszságot.
-
+approve:
+  this->last_rtp_size = gst_rtp_buffer_get_payload_len(rtp);
+  fbratargetctrler_update_rtpavg(this->targetctrler, this->last_rtp_size);
+  last_sent = _now(this);
   return TRUE;
+disapprove:
+  return FALSE;
 }
 
 
@@ -298,6 +335,7 @@ FBRASubController *make_fbrasubctrler(MPRTPSPath *path)
   result->monitoring_interval = 3;
   result->made                = _now(result);
   result->fbprocessor         = make_fbrafbprocessor(result->id);
+
   _switch_stage_to(result, STAGE_KEEP, FALSE);
   mprtps_path_set_state(result->path, MPRTPS_PATH_STATE_STABLE);
   mprtps_path_set_packetstracker(result->path, fbrafbprocessor_track, result->fbprocessor);
@@ -308,9 +346,12 @@ FBRASubController *make_fbrasubctrler(MPRTPSPath *path)
 void fbrasubctrler_enable(FBRASubController *this)
 {
   this->enabled             = TRUE;
-  this->disable_end         = _now(this) + 1 * GST_SECOND;
+  this->disable_end         = _now(this) + 0 * GST_SECOND;
   this->last_distorted      = _now(this);
   this->last_tr_changed     = _now(this);
+
+  fbratargetctrler_set_initial(this->targetctrler, mprtps_path_get_target_bitrate(this->path));
+  fbratargetctrler_probe(this->targetctrler);
 }
 
 void fbrasubctrler_disable(FBRASubController *this)
@@ -358,8 +399,8 @@ void fbrasubctrler_time_update(FBRASubController *this)
   fbinterval_th = 150 * GST_MSECOND;
 
   if(!_bcongestion(this) && this->last_fb_arrived < _now(this) - fbinterval_th){
-    fbratargetctrler_halt(this->targetctrler);
-    _switch_stage_to(this, STAGE_REDUCE, FALSE);
+    fbratargetctrler_break(this->targetctrler);
+    _switch_stage_to(this, STAGE_KEEP, FALSE);
     g_print("backward congestion fbinterval: %lu\n", fbinterval_th);
     _bcongestion(this) = TRUE;
     goto done;
@@ -376,8 +417,8 @@ void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRa
 
   fbratargetctrler_signal_update(this->targetctrler, params);
 
-  _FD_cong_th(this)                             = cngctrler->discard_cong_treshold;
-  _FD_dist_th(this)                             = cngctrler->discard_dist_treshold;
+//  _FD_cong_th(this)                             = cngctrler->discard_cong_treshold;
+//  _FD_dist_th(this)                             = cngctrler->discard_dist_treshold;
   _owd_corr_cng_th(this)                        = cngctrler->owd_corr_cng_th;
   _owd_corr_dist_th(this)                       = cngctrler->owd_corr_dist_th;
 
@@ -391,11 +432,17 @@ void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedR
 
   fbratargetctrler_signal_request(this->targetctrler, result);
 
-  cngctrler->discard_dist_treshold          = _FD_dist_th(this);
-  cngctrler->discard_cong_treshold          = _FD_cong_th(this);
+//  cngctrler->discard_dist_treshold          = _FD_dist_th(this);
+//  cngctrler->discard_cong_treshold          = _FD_cong_th(this);
   cngctrler->owd_corr_cng_th                = _owd_corr_cng_th(this);
   cngctrler->owd_corr_dist_th               = _owd_corr_dist_th(this);
 
+}
+
+static void _update_fraction_discarded(FBRASubController *this)
+{
+  _FD_cong_th(this) = MIN(DISCARD_CONGESTION_MAX_TRESHOLD, this->fbstat.FD_median * 2.);
+  _FD_dist_th(this) = MIN(DISCARD_DISTORTION_MAX_TRESHOLD, this->fbstat.FD_median * 2.);
 }
 
 void fbrasubctrler_report_update(
@@ -421,6 +468,7 @@ void fbrasubctrler_report_update(
   fbrafbprocessor_update(this->fbprocessor, summary);
   fbrafbprocessor_get_stats(this->fbprocessor, &this->fbstat);
   fbratargetctrler_update(this->targetctrler, &this->fbstat);
+  _update_fraction_discarded(this);
 
   _execute_stage(this);
 
@@ -431,7 +479,7 @@ void fbrasubctrler_report_update(
   if(_state(this) != MPRTPS_PATH_STATE_OVERUSED){
       fbrafbprocessor_approve_owd_ltt(this->fbprocessor);
       this->last_approved = _now(this);
-  }else if(this->last_approved < _now(this) - 150 * GST_MSECOND){
+  }else if(this->last_approved < _now(this) - _RTT(this)){
       fbrafbprocessor_approve_owd_ltt(this->fbprocessor);
   }
 
@@ -439,10 +487,10 @@ void fbrasubctrler_report_update(
   _priv(this)->owd_corr_dist_th = (gdouble)(_fbstat(this).owd_ltt80 + _fbstat(this).owd_th1) / (gdouble)_fbstat(this).owd_ltt80;
 
   mprtp_logger("fbrasubctrler.log",
-               "TR: %-7d|GP:%-7d|corh: %-3lu/%-3lu=%3.2f (%1.2f - %1.2f)|SR: %-7d|FEC:%-7d|tend: %3.2f|stg: %d|sta: %d|FD: %-4f|rtt: %-3.2f\n",
+               "TR: %-7d|GP:%-7d|corh: %-3lu/%-3lu=%3.2f (%1.2f - %1.2f)|SR: %-7d|FEC:%-7d|tend: %3.2f|stg: %d|sta: %d|FD: %1.2f(%1.2f-%1.2f-%1.2f)|rtt: %-3.2f\n",
             _TR(this),
             _fbstat(this).goodput_bytes * 8,
-            GST_TIME_AS_MSECONDS(_fbstat(this).owd_stt_median),
+            GST_TIME_AS_MSECONDS(_fbstat(this).owd_stt),
             GST_TIME_AS_MSECONDS(_fbstat(this).owd_ltt80),
             _fbstat(this).owdh_corr,
             _priv(this)->owd_corr_cng_th,
@@ -453,6 +501,9 @@ void fbrasubctrler_report_update(
             _priv(this)->stage,
             mprtps_path_get_state(this->path),
             _FD(this),
+            _FD_dist_th(this),
+            _FD_cong_th(this),
+            this->fbstat.FD_median,
             GST_TIME_AS_MSECONDS(_RTT(this))
         );
 
@@ -470,7 +521,7 @@ _reduce_stage(
   if(_owd_corr_cng_th(this) < _owd_corr(this)){
     fbratargetctrler_break(this->targetctrler);
     goto done;
-  }else if(fbratargetctrler_get_target_approvement(this->targetctrler)){
+  }else if(!fbratargetctrler_get_approvement(this->targetctrler)){
     goto done;
   }
 
@@ -504,7 +555,7 @@ _keep_stage(
 
   if(now - _RTT(this) < this->last_distorted){
     goto done;
-  }else if(!fbratargetctrler_get_target_approvement(this->targetctrler)){
+  }else if(!fbratargetctrler_get_approvement(this->targetctrler)){
     goto done;
   }
 
@@ -527,15 +578,14 @@ _probe_stage(
   }
 
   if(_FD_dist_th(this) < _FD(this) || _owd_corr_dist_th(this) < _owd_corr(this)){
-    fbratargetctrler_halt(this->targetctrler);
+    fbratargetctrler_break(this->targetctrler);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_KEEP, FALSE);
     this->last_distorted = _now(this);
     goto done;
   }
 
-  if(!fbratargetctrler_get_probe_approvement(this->targetctrler)){
-      g_print("HERE\n");
+  if(!fbratargetctrler_get_approvement(this->targetctrler)){
     goto done;
   }
 
@@ -560,13 +610,13 @@ _increase_stage(
   }
 
   if(_FD_dist_th(this) < _FD(this) || _owd_corr_dist_th(this) < _owd_corr(this)){
-    fbratargetctrler_halt(this->targetctrler);
+    fbratargetctrler_break(this->targetctrler);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     goto done;
   }
 
-  if(!fbratargetctrler_get_target_approvement(this->targetctrler)){
+  if(!fbratargetctrler_get_approvement(this->targetctrler)){
     goto done;
   }
 

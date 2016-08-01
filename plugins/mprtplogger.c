@@ -198,7 +198,9 @@ void mprtp_logger(const gchar *filename, const gchar * format, ...)
   WriterQueueItem *item;
   va_list args;
   THIS_LOCK(this);
-
+  if(!this->enabled){
+    goto done;
+  }
   item = g_malloc0(sizeof(WriterQueueItem));
   va_start (args, format);
   vsprintf(item->string, format, args);
@@ -210,6 +212,7 @@ void mprtp_logger(const gchar *filename, const gchar * format, ...)
   if(this->writer_wait){
     g_cond_signal(&this->writer_cond);
   }
+done:
   THIS_UNLOCK(this);
 }
 

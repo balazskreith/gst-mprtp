@@ -38,7 +38,7 @@ typedef struct _FBRAFBProcessorStat
   gint32                   sent_packets_in_1s;
   gint32                   goodput_bytes;
   GstClockTime             owd_ltt80/*,owd_ltt40*/;
-  GstClockTime             owd_stt_median;
+  GstClockTime             owd_stt;
   gdouble                  owdh_corr;
 //  gdouble                  owdl_corr;
   gboolean                 recent_discarded;
@@ -53,6 +53,10 @@ typedef struct _FBRAFBProcessorStat
 
   gdouble                  owd_th1;
   gdouble                  owd_th2;
+
+  gdouble                  FD_median;
+
+
 //  gint64                   max_bytes_in_flight;
 }FBRAFBProcessorStat;
 
@@ -68,14 +72,21 @@ struct _FBRAFBProcessor
 
   struct{
     GstClockTime ltt80th, /*ltt40th,*/ min,max;
+//    GstClockTime stt_median;
   }owd_stat;
+
+
+//  SlidingWindow* owd_offs;
 
   gint32                   measurements_num;
 
+  SlidingWindow           *FD_sw;
   SlidingWindow           *owd_sw;
   SlidingWindow           *acked_1s_sw;
   SlidingWindow           *sent_sw;
   FBRAFBProcessorItem     *items;
+
+  gdouble                  owd_ltt_ewma;
 
   FBRAFBProcessorStat      stat;
 

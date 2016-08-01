@@ -22,6 +22,35 @@
 #include <stdlib.h>
 #include "test.h"
 
+#include <signal.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+static volatile gboolean done = FALSE;
+GMainLoop *loop = NULL;
+GstPipeline *_pipe_;
+
+static void term(int signum)
+{
+  if(g_main_loop_is_running(loop)){
+    g_main_loop_quit(loop);
+  }
+
+  if(done){
+    return;
+  }
+
+  done = TRUE;
+
+  g_print ("stoping client pipeline\n");
+  gst_element_set_state (GST_ELEMENT (_pipe_), GST_STATE_NULL);
+
+  gst_object_unref (_pipe_);
+  g_main_loop_unref (loop);
+}
+
+
 /*
  *
  *             .-------.                                            .----------.
@@ -44,9 +73,6 @@
  *
  *
  */
-
-
-GMainLoop *loop = NULL;
 
 typedef struct _SessionData
 {
@@ -97,8 +123,9 @@ make_video_session (guint sessionNum)
 {
   gint framerate = 25;
   SessionData *ret = session_new (sessionNum);
+  gchar binname[20];
 //  GstBin *bin = GST_BIN (gst_bin_new ("video"));
-  GstBin *bin = GST_BIN (gst_bin_new (NULL));
+  GstBin *bin = GST_BIN (gst_bin_new (rand_string(binname, 18)));
   GstElement *queue = gst_element_factory_make ("queue", NULL);
   GstElement *depayloader = gst_element_factory_make ("rtpvp8depay", NULL);
   GstElement *decoder = gst_element_factory_make ("vp8dec", NULL);
@@ -133,7 +160,8 @@ make_video_session_and_save_yuvfile (guint sessionNum)
 {
   gint framerate = 25;
   SessionData *ret = session_new (sessionNum);
-  GstBin *bin = GST_BIN (gst_bin_new ("video"));
+  gchar binname[20];
+  GstBin *bin = GST_BIN (gst_bin_new (rand_string(binname, 18)));
   GstElement *queue = gst_element_factory_make ("queue", "q1");
   GstElement *depayloader = gst_element_factory_make ("rtpvp8depay", "depayloader");
   GstElement *decoder = gst_element_factory_make ("vp8dec", "decoder");
@@ -270,9 +298,10 @@ request_aux_receiver (GstElement * rtpbin, guint sessid, SessionData * session)
   GstPad *pad;
   gchar *name;
   GstStructure *pt_map;
+  gchar binname[20];
 
   GST_INFO ("creating AUX receiver");
-  bin = gst_bin_new (NULL);
+  bin = gst_bin_new (rand_string(binname, 18));
   rtx = gst_element_factory_make ("rtprtxreceive", NULL);
   pt_map = gst_structure_new ("application/x-rtp-pt-map",
       "96", G_TYPE_UINT, 99, NULL);
@@ -369,7 +398,6 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
                 "playout-high-watermark", playout_high_watermark,
                 "playout-low-watermark", playout_low_watermark,
                 "playout-desired-framenum", playout_desired_framenum,
-                "playout-spread-factor", playout_spread_factor,
                 "logging", logging,
                 "logs-path", logsdir,
                 NULL);
@@ -431,7 +459,6 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
 int
 main (int argc, char **argv)
 {
-  GstPipeline *pipe;
   SessionData *videoSession;
   SessionData *audioSession;
   GstElement *rtpBin;
@@ -439,6 +466,11 @@ main (int argc, char **argv)
 
   GError *error = NULL;
   GOptionContext *context;
+
+  struct sigaction action;
+  memset(&action, 0, sizeof(struct sigaction));
+  action.sa_handler = term;
+  sigaction(SIGTERM, &action, NULL);
 
   context = g_option_context_new ("- test tree model performance");
   g_option_context_add_main_entries (context, entries, NULL);
@@ -451,18 +483,18 @@ main (int argc, char **argv)
   gst_init (NULL, NULL);
 
   loop = g_main_loop_new (NULL, FALSE);
-  pipe = GST_PIPELINE (gst_pipeline_new (NULL));
+  _pipe_ = GST_PIPELINE (gst_pipeline_new (NULL));
 
-  bus = gst_element_get_bus (GST_ELEMENT (pipe));
-  g_signal_connect (bus, "message::error", G_CALLBACK (cb_error), pipe);
-  g_signal_connect (bus, "message::warning", G_CALLBACK (cb_warning), pipe);
-  g_signal_connect (bus, "message::state-changed", G_CALLBACK (cb_state), pipe);
+  bus = gst_element_get_bus (GST_ELEMENT (_pipe_));
+  g_signal_connect (bus, "message::error", G_CALLBACK (cb_error), _pipe_);
+  g_signal_connect (bus, "message::warning", G_CALLBACK (cb_warning), _pipe_);
+  g_signal_connect (bus, "message::state-changed", G_CALLBACK (cb_state), _pipe_);
   g_signal_connect (bus, "message::eos", G_CALLBACK (cb_eos), NULL);
   gst_bus_add_signal_watch (bus);
   gst_object_unref (bus);
 
   rtpBin = gst_element_factory_make ("rtpbin", NULL);
-  gst_bin_add (GST_BIN (pipe), rtpBin);
+  gst_bin_add (GST_BIN (_pipe_), rtpBin);
 //  g_object_set (rtpBin, "latency", 200, "do-retransmission", TRUE,
 //      "rtp-profile", GST_RTP_PROFILE_AVPF, NULL);
 
@@ -472,18 +504,13 @@ main (int argc, char **argv)
     videoSession = make_video_session (0);
   }
 
-  join_session (GST_ELEMENT (pipe), rtpBin, videoSession, 90000);
+  join_session (GST_ELEMENT (_pipe_), rtpBin, videoSession, 90000);
 
   g_print ("starting client pipeline\n");
-  gst_element_set_state (GST_ELEMENT (pipe), GST_STATE_PLAYING);
+  gst_element_set_state (GST_ELEMENT (_pipe_), GST_STATE_PLAYING);
 
   g_main_loop_run (loop);
-
-  g_print ("stoping client pipeline\n");
-  gst_element_set_state (GST_ELEMENT (pipe), GST_STATE_NULL);
-
-  gst_object_unref (pipe);
-  g_main_loop_unref (loop);
+  term(1);
 
   return 0;
 }

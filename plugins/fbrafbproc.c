@@ -50,29 +50,29 @@ G_DEFINE_TYPE (FBRAFBProcessor, fbrafbprocessor, G_TYPE_OBJECT);
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
+typedef struct{
+  gint         ref;
+  gdouble      owd_corr;
+  GstClockTime owd;
+  gint64       owd_in_ms;
+  gdouble      FD;
+  gint32       BiF;
+}FBRAFBStatItem;
 
 static void fbrafbprocessor_finalize (GObject * object);
 static void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr);
+static void _process_statitem(FBRAFBProcessor *this);
 static void _process_afb(FBRAFBProcessor *this, guint32 id, GstRTCPAFB_REPS *remb);
 static void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary);
-static void _ref_item(FBRAFBProcessor * this, FBRAFBProcessorItem* item);
-static void _unref_item(FBRAFBProcessor * this, FBRAFBProcessorItem* item);
+static void _ref_rtpitem(FBRAFBProcessor * this, FBRAFBProcessorItem* item);
+static void _unref_rtpitem(FBRAFBProcessor * this, FBRAFBProcessorItem* item);
 static FBRAFBProcessorItem* _retrieve_item(FBRAFBProcessor * this, guint16 seq);
+static void _ref_statitem(FBRAFBProcessor * this, FBRAFBStatItem* item);
+static void _unref_statitem(FBRAFBProcessor * this, FBRAFBStatItem* item);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
 
-
-//static gint
-//_cmp_uint16 (guint16 x, guint16 y)
-//{
-//  if(x == y) return 0;
-//  if(x < y && y - x < 32768) return -1;
-//  if(x > y && x - y > 32768) return -1;
-//  if(x < y && y - x > 32768) return 1;
-//  if(x > y && x - y < 32768) return 1;
-//  return 0;
-//}
 
 static void owd_logger(gpointer data, gchar* string)
 {
@@ -91,59 +91,67 @@ static void owd_logger(gpointer data, gchar* string)
 }
 
 
+#define _statitem_cmpfnc(field) \
+static gint _statitem_##field##_cmp(gpointer pa, gpointer pb) \
+{ \
+  FBRAFBStatItem *a,*b; \
+  a = pa; b = pb; \
+  if(a->field == b->field) return 0; \
+  return a->field < b->field ? -1 : 1; \
+} \
+
+_statitem_cmpfnc(owd);
+//_statitem_cmpfnc(BiF);
+
+
+
 static void _owd_ltt80_percentile_pipe(gpointer udata, swpercentilecandidates_t *candidates)
 {
   FBRAFBProcessor *this = udata;
+  FBRAFBStatItem *left, *right, *min, *max;
+
   if(!candidates->processed){
       this->owd_ltt_ewma = this->owd_ltt_ewma == 0. ? this->stat.owd_stt : (this->owd_ltt_ewma * .8 + this->stat.owd_stt * .2);
-      this->stat.owd_th1  = this->owd_ltt_ewma * .2;
-      this->stat.owd_th2  = this->owd_ltt_ewma * .8;
+      this->stat.owd_th_dist  = this->owd_ltt_ewma * .2;
+      this->stat.owd_th_cng  = this->owd_ltt_ewma * .8;
       this->owd_stat.ltt80th = this->owd_stat.min = this->owd_stat.max = this->owd_ltt_ewma;
       g_warning("Not enough owd_stt to calculate the ltt80th");
     return;
   }
   this->owd_ltt_ewma = 0.;
+  left  = candidates->left;
+  right = candidates->right;
 
-  if(!candidates->left){
-    this->owd_stat.ltt80th = *(GstClockTime*)candidates->right;
-  }else if(!candidates->right){
-    this->owd_stat.ltt80th = *(GstClockTime*)candidates->left;
+  if(!left){
+    this->owd_stat.ltt80th = right->owd;
+  }else if(!right){
+    this->owd_stat.ltt80th = left->owd;
   }else{
-    this->owd_stat.ltt80th = *(GstClockTime*)candidates->left;
-    this->owd_stat.ltt80th += *(GstClockTime*)candidates->right;
+    this->owd_stat.ltt80th = left->owd;
+    this->owd_stat.ltt80th += right->owd;
     this->owd_stat.ltt80th>>=1;
   }
-  this->owd_stat.min = *(GstClockTime*)candidates->min;
-  this->owd_stat.max = *(GstClockTime*)candidates->max;
+  min = candidates->min;
+  max = candidates->max;
+  this->owd_stat.min = min->owd;
+  this->owd_stat.max = max->owd;
 
-  this->stat.owd_th1  = CONSTRAIN(10 * GST_MSECOND,
-                                  100 * GST_MSECOND,
-                                  this->owd_stat.min * .33);
+//  this->stat.owd_th1  = CONSTRAIN(10 * GST_MSECOND,
+//                                  100 * GST_MSECOND,
+//                                  this->owd_stat.min * .33);
+//
+//  this->stat.owd_th2  = CONSTRAIN(100 * GST_MSECOND,
+//                                  300 * GST_MSECOND,
+//                                  this->owd_stat.ltt80th * .33);
 
-  this->stat.owd_th2  = CONSTRAIN(100 * GST_MSECOND,
-                                  300 * GST_MSECOND,
-                                  this->owd_stat.ltt80th * .33);
-}
+  this->stat.owd_th_dist  = this->stat.owd_std * 2.;
+  this->stat.owd_th_cng  = this->stat.owd_std * 4.;
 
 
-static void _FD_ltt20_percentile_pipe(gpointer udata, swpercentilecandidates_t *candidates)
-{
-  FBRAFBProcessor *this = udata;
-  if(!candidates->processed){
-    this->stat.FD_median = 0.;
-    return;
-  }
-
-  if(!candidates->left){
-    this->stat.FD_median = *(gdouble*)candidates->right;
-  }else if(!candidates->right){
-    this->stat.FD_median = *(gdouble*)candidates->left;
-  }else{
-    this->stat.FD_median  = *(gdouble*)candidates->left;
-    this->stat.FD_median += *(gdouble*)candidates->right;
-    this->stat.FD_median /=2.;
-  }
-
+//
+//  this->stat.owd_th2  = CONSTRAIN(100 * GST_MSECOND,
+//                                  300 * GST_MSECOND,
+//                                  this->owd_stat.ltt80th * .33);
 }
 
 
@@ -153,7 +161,7 @@ static void _sent_add_pipe(gpointer udata, gpointer itemptr)
   FBRAFBProcessor *this = udata;
   FBRAFBProcessorItem *item = itemptr;
 
-  _ref_item(this, item);
+  _ref_rtpitem(this, item);
 
   this->stat.bytes_in_flight += item->payload_bytes;
   ++this->stat.packets_in_flight;
@@ -176,7 +184,7 @@ static void _sent_rem_pipe(gpointer udata, gpointer itemptr)
     --this->stat.packets_in_flight;
   }
 
-  _unref_item(this, item);
+  _unref_rtpitem(this, item);
 }
 
 
@@ -185,7 +193,7 @@ static void _acked_1s_add_pipe(gpointer udata, gpointer itemptr)
   FBRAFBProcessor *this = udata;
   FBRAFBProcessorItem *item = itemptr;
 
-  _ref_item(this, item);
+  _ref_rtpitem(this, item);
 
   item->acknowledged = TRUE;
 
@@ -216,7 +224,7 @@ static void _acked_1s_rem_pipe(gpointer udata, gpointer itemptr)
 
   --this->stat.acked_packets_in_1s;
 
-  _unref_item(this, item);
+  _unref_rtpitem(this, item);
 
 }
 
@@ -259,24 +267,69 @@ static void _acked_sprint(gpointer data, gchar *result)
   sprintf(result,"Acked window seq: %hu payload: %d", item->seq_num, item->payload_bytes);
 }
 
+static void _statitem_rem_pipe(gpointer udata, gpointer itemptr)
+{
+  FBRAFBProcessor *this = udata;
+  FBRAFBStatItem *item = itemptr;
 
+  _unref_statitem(this, item);
 
-//static void _owd_off_add_pipe(gpointer udata, gpointer itemptr)
-//{
-//  FBRAFBProcessor *this = udata;
-//  gdouble *item = itemptr;
-//
-//  this->stat.owd_stt_tend += *item;
-//
-//}
-//
-//static void _owd_off_rem_pipe(gpointer udata, gpointer itemptr)
-//{
-//  FBRAFBProcessor *this = udata;
-//  gdouble *item = itemptr;
-//
-//  this->stat.owd_stt_tend -= *item;
-//}
+}
+
+static void _statitem_add_pipe(gpointer udata, gpointer itemptr)
+{
+  FBRAFBProcessor *this = udata;
+  FBRAFBStatItem *item = itemptr;
+
+  _ref_statitem(this, item);
+
+}
+
+static void _sw_refresh(FBRAFBProcessor *this)
+{
+  this->stat.FD_avg  = this->swstat.fdsum / (gdouble)this->swstat.num;
+  //Calculate Moving Variance:
+  //V = (N * SX2 - (SX1 * SX1)) / (N * (N - 1))
+  if(1 < this->swstat.num){
+    this->stat.owd_var = (this->swstat.num * this->swstat.owdsqsum) - (this->swstat.owdsum * this->swstat.owdsum);
+    this->stat.owd_var /= this->swstat.num * (this->swstat.num - 1);
+    this->stat.owd_std = sqrt(this->stat.owd_var);
+  }else{
+    this->stat.owd_var = this->stat.owd_std = 0.;
+  }
+
+//  g_print("FD_avg: %1.2f| owd_var: %1.2f| owd_std: %1.2f\n", this->stat.FD_avg, this->stat.owd_var, this->stat.owd_std);
+}
+
+static void _sw_statitem_rem_pipe(gpointer udata, gpointer itemptr)
+{
+  FBRAFBProcessor *this = udata;
+  FBRAFBStatItem *item = itemptr;
+
+  --this->swstat.num;
+  this->swstat.fdsum    -= item->FD;
+  this->swstat.fdsqsum  -= item->FD * item->FD;
+
+  this->swstat.owdsum   -= item->owd_in_ms;
+  this->swstat.owdsqsum -= item->owd_in_ms * item->owd_in_ms;
+  _sw_refresh(this);
+
+  _unref_statitem(this, item);
+}
+
+static void _sw_statitem_add_pipe(gpointer udata, gpointer itemptr)
+{
+  FBRAFBProcessor *this = udata;
+  FBRAFBStatItem *item = itemptr;
+
+  ++this->swstat.num;
+  this->swstat.fdsum    += item->FD;
+  this->swstat.fdsqsum  += item->FD * item->FD;
+
+  this->swstat.owdsum   += item->owd_in_ms;
+  this->swstat.owdsqsum += item->owd_in_ms * item->owd_in_ms;
+  _sw_refresh(this);
+}
 
 void
 fbrafbprocessor_init (FBRAFBProcessor * this)
@@ -291,10 +344,11 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->stat.srtt        = 0;
 
   this->items            = g_malloc0(sizeof(FBRAFBProcessorItem) * 65536);
-  this->FD_sw            = make_slidingwindow_double(600, 20 * GST_SECOND);
-  this->owd_sw           = make_slidingwindow_uint64(600, 5 * GST_SECOND);
+  this->stt_sw           = make_slidingwindow(100, 10 * GST_SECOND);
+  this->ltt_sw           = make_slidingwindow(600, 30 * GST_SECOND);
   this->acked_1s_sw      = make_slidingwindow(2000, GST_SECOND);
   this->sent_sw          = make_slidingwindow(2000, GST_SECOND);
+
 
 //  this->owd_offs = make_slidingwindow_double(10, GST_SECOND);
 //  slidingwindow_add_pipes(this->owd_offs, _owd_off_rem_pipe, this, _owd_off_add_pipe, this);
@@ -302,21 +356,22 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   slidingwindow_add_pipes(this->sent_sw, _sent_rem_pipe, this, _sent_add_pipe, this);
   slidingwindow_add_pipes(this->acked_1s_sw, _acked_1s_rem_pipe, this, _acked_1s_add_pipe, this);
 
+  slidingwindow_add_pipes(this->ltt_sw, _sw_statitem_rem_pipe, this, _sw_statitem_add_pipe, this);
+
+  slidingwindow_add_pipes(this->stt_sw, _statitem_rem_pipe, this, _statitem_add_pipe, this);
+
   DISABLE_LINE slidingwindow_add_plugin(this->sent_sw, make_swprinter(_sent_sprint));
   DISABLE_LINE slidingwindow_add_plugin(this->acked_1s_sw, make_swprinter(_acked_sprint));
 
-  slidingwindow_add_plugins(this->owd_sw,
-                            make_swpercentile(80, bintree3cmp_uint64, _owd_ltt80_percentile_pipe, this),
-                           NULL);
-
-  slidingwindow_add_plugins(this->FD_sw,
-                            make_swpercentile(20, bintree3cmp_double, _FD_ltt20_percentile_pipe, this),
+  slidingwindow_add_plugins(this->ltt_sw,
+                            make_swpercentile(80, _statitem_owd_cmp, _owd_ltt80_percentile_pipe, this),
+                            //make_swpercentile(60, _statitem_BiF_cmp, _owd_BiF_percentile_pipe, this),
                            NULL);
 
 
   //slidingwindow_add_plugin(this->owd_sw, make_swpercentile(50, bintree3cmp_uint64, _owd_percentile_pipe, this));
-
 }
+
 
 FBRAFBProcessor *make_fbrafbprocessor(guint8 subflow_id)
 {
@@ -341,7 +396,6 @@ void fbrafbprocessor_reset(FBRAFBProcessor *this)
   THIS_WRITEUNLOCK (this);
 }
 
-
 void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn)
 {
   FBRAFBProcessor *this;
@@ -355,8 +409,8 @@ void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn)
   item->seq_num       = sn;
 
 
-  ++this->stat.packets_in_flight;
-  this->stat.bytes_in_flight += payload_len;
+//  ++this->stat.packets_in_flight;
+//  this->stat.bytes_in_flight += payload_len;
 
   slidingwindow_add_data(this->sent_sw, item);
   slidingwindow_refresh(this->acked_1s_sw);
@@ -373,7 +427,7 @@ static void _update_fraction_discarded(FBRAFBProcessor *this)
   this->stat.discarded_rate = (gdouble)this->stat.discarded_packets_in_1s;
   this->stat.discarded_rate /= (gdouble)this->stat.acked_packets_in_1s;
 
-  slidingwindow_add_data(this->FD_sw, &this->stat.discarded_rate);
+//  slidingwindow_add_data(this->stt_sw, &this->stat.discarded_rate);
 
 }
 
@@ -399,6 +453,7 @@ void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summa
   if(summary->AFB.processed){
       PROFILING("_process_afb",_process_afb(this, summary->AFB.fci_id, (GstRTCPAFB_REPS *)summary->AFB.fci_data));
   }
+  _process_statitem(this);
   ++this->measurements_num;
   THIS_WRITEUNLOCK (this);
 }
@@ -414,7 +469,8 @@ fbrafbprocessor_get_stats (FBRAFBProcessor * this, FBRAFBProcessorStat* result)
 
 static void _refresh_owd_ltt(FBRAFBProcessor *this)
 {
-  slidingwindow_add_data(this->owd_sw, &this->stat.owd_stt);
+//  slidingwindow_add_data(this->ltt_sw, &this->stat.owd_stt);
+  slidingwindow_add_data(this->ltt_sw, this->last_statitem);
   this->stat.owd_ltt80 = this->owd_stat.ltt80th;
 }
 
@@ -427,6 +483,21 @@ void fbrafbprocessor_approve_owd_ltt(FBRAFBProcessor *this)
   THIS_WRITEUNLOCK (this);
 }
 
+void _process_statitem(FBRAFBProcessor *this)
+{
+  FBRAFBStatItem *item;
+  item = g_slice_new0(FBRAFBStatItem);
+  item->FD        = this->stat.discarded_rate;
+  item->owd       = this->stat.owd_stt;
+  item->owd_in_ms = GST_TIME_AS_MSECONDS(this->stat.owd_stt);
+  item->owd_corr  = this->stat.owd_corr;
+  item->BiF       = this->stat.bytes_in_flight;
+  item->ref       = 1;
+
+  slidingwindow_add_data(this->stt_sw, item);
+  this->last_statitem = item;
+}
+
 void _process_afb(FBRAFBProcessor *this, guint32 id, GstRTCPAFB_REPS *reps)
 {
   gfloat                tendency;
@@ -435,6 +506,7 @@ void _process_afb(FBRAFBProcessor *this, guint32 id, GstRTCPAFB_REPS *reps)
   if(id != RTCP_AFB_REPS_ID){
     return;
   }
+
   gst_rtcp_afb_reps_getdown(reps, &sampling_num, &tendency);
   this->stat.tendency = 0 < sampling_num ? tendency : 1.;
 
@@ -448,29 +520,15 @@ void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
 
   this->stat.owd_stt = xrsummary->OWD.median_delay;
 
-//  this->last_delay_t2         = this->last_delay_t1;
-//  this->last_delay_t1         = this->last_delay;
-//  this->last_delay            = xrsummary->OWD.median_delay;
-
   if(this->stat.owd_ltt80){
-    this->stat.owdh_corr =  (gdouble) this->stat.owd_stt;
-    this->stat.owdh_corr /=  (gdouble)this->stat.owd_ltt80;
+    this->stat.owd_corr =  (gdouble) this->stat.owd_stt;
+    this->stat.owd_corr /=  (gdouble)this->stat.owd_ltt80;
   }else{
-    this->stat.owdh_corr = /*this->stat.owdl_corr = */ 1.;
+    this->stat.owd_corr = /*this->stat.owdl_corr = */ 1.;
   }
-
-//  {
-//    gdouble off = 0.;
-//    if(xrsummary->OWD.median_delay && this->stat.owd_ltt80){
-//      off = (gdouble)xrsummary->OWD.median_delay - (gdouble)this->stat.owd_ltt80;
-//      off /= (gdouble)this->stat.owd_ltt80;
-//    }
-//    slidingwindow_add_data(this->owd_offs, &off);
-//  }
 
 
 done:
-//  slidingwindow_refresh(this->owd_offs);
   return;
 }
 
@@ -498,12 +556,12 @@ done:
 }
 
 
-void _ref_item(FBRAFBProcessor * this, FBRAFBProcessorItem* item)
+void _ref_rtpitem(FBRAFBProcessor * this, FBRAFBProcessorItem* item)
 {
   ++item->ref;
 }
 
-void _unref_item(FBRAFBProcessor * this, FBRAFBProcessorItem* item)
+void _unref_rtpitem(FBRAFBProcessor * this, FBRAFBProcessorItem* item)
 {
   if(0 < item->ref){
     --item->ref;
@@ -525,6 +583,22 @@ done:
   memset(item, 0, sizeof(FBRAFBProcessorItem));
   return item;
 }
+
+
+void _ref_statitem(FBRAFBProcessor * this, FBRAFBStatItem* item)
+{
+  ++item->ref;
+}
+
+void _unref_statitem(FBRAFBProcessor * this, FBRAFBStatItem* item)
+{
+  if(0 < --item->ref){
+    return;
+  }
+  g_slice_free(FBRAFBStatItem, item);
+}
+
+
 
 
 #undef THIS_WRITELOCK

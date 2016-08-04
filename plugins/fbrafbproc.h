@@ -39,11 +39,11 @@ typedef struct _FBRAFBProcessorStat
   gint32                   goodput_bytes;
   GstClockTime             owd_ltt80/*,owd_ltt40*/;
   GstClockTime             owd_stt;
-  gdouble                  owdh_corr;
-//  gdouble                  owdl_corr;
+  gdouble                  owd_corr;
+
   gboolean                 recent_discarded;
   gdouble                  tendency;
-//  gdouble                  tend_median;
+
   GstClockTime             RTT;
   gdouble                  srtt;
   gint32                   discarded_packets_in_1s;
@@ -51,10 +51,12 @@ typedef struct _FBRAFBProcessorStat
 
   gdouble                  discarded_rate;
 
-  gdouble                  owd_th1;
-  gdouble                  owd_th2;
+  gdouble                  owd_th_dist;
+  gdouble                  owd_th_cng;
 
   gdouble                  FD_median;
+
+  gdouble                  owd_var, owd_std, FD_avg;
 
 
 //  gint64                   max_bytes_in_flight;
@@ -70,21 +72,32 @@ struct _FBRAFBProcessor
   GQueue*                  acked;
   guint8                   subflow_id;
 
+  gpointer                 last_statitem;
+
   struct{
     GstClockTime ltt80th, /*ltt40th,*/ min,max;
 //    GstClockTime stt_median;
   }owd_stat;
 
+  struct{
+    gdouble fdsum;
+    gdouble fdsqsum;
+    gint64  owdsum;
+    gint64  owdsqsum;
+    gint64  num;
+  }swstat;
 
 //  SlidingWindow* owd_offs;
 
   gint32                   measurements_num;
 
-  SlidingWindow           *FD_sw;
-  SlidingWindow           *owd_sw;
+  SlidingWindow           *stt_sw;
+  SlidingWindow           *ltt_sw;
+
   SlidingWindow           *acked_1s_sw;
   SlidingWindow           *sent_sw;
   FBRAFBProcessorItem     *items;
+
 
   gdouble                  owd_ltt_ewma;
 

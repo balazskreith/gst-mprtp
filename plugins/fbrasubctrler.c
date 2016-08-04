@@ -162,7 +162,7 @@ struct _Private{
 #define _GP_t1(this) (_priv(this)->goodput_bitrate_t1)
 #define _min_br(this) MIN(_SR(this), _TR(this))
 #define _max_br(this) MAX(_SR(this), _TR(this))
-#define _owd_corr(this) _fbstat(this).owdh_corr
+#define _owd_corr(this) _fbstat(this).owd_corr
 
 #define _owd_corr_cng_th(this)        _priv(this)->owd_corr_cng_th
 #define _owd_corr_dist_th(this)       _priv(this)->owd_corr_dist_th
@@ -273,12 +273,66 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->tr_approved                      = TRUE;
 
 }
+//
+//static gboolean pacing = FALSE;
+//static gint32 cwnd_max;
+//static GstClockTime last_sent;
+//gboolean fbrasubctrler_path_approver(gpointer data, GstRTPBuffer *rtp)
+//{
+//  FBRASubController *this = data;
+//
+//  if(!pacing && mprtps_path_is_non_congested(this->path)){
+//    goto approve;
+//  }
+//
+//  if(mprtps_path_get_state(this->path) != MPRTPS_PATH_STATE_OVERUSED){
+//    pacing = FALSE;
+//    goto approve;
+//  }
+//  if(!pacing){
+//    cwnd_max = _fbstat(this).bytes_in_flight * 8;
+//    pacing = TRUE;
+//    goto approve;
+//  }
+//
+//  {
+//    gdouble pace_bitrate;
+//    gdouble t_pace;
+//    gdouble rtt_in_sec;
+//    gdouble cwnd;
+//
+////    owd_in_sec = (gdouble)_fbstat(this).owd_ltt80 * .000000001;
+//    cwnd = cwnd_max * CONSTRAIN(.6, .9, 3.0 - _fbstat(this).owd_corr);
+//    rtt_in_sec = (gdouble)_fbstat(this).RTT * .000000001;
+//    pace_bitrate = MAX(50000, cwnd / rtt_in_sec);
+//    t_pace = (gdouble)(this->last_rtp_size * 8) / pace_bitrate;
+//    if(_now(this) < last_sent + t_pace * GST_SECOND){
+//      goto disapprove;
+//    }
+//  }
+//
+//approve:
+//  this->last_rtp_size = gst_rtp_buffer_get_payload_len(rtp);
+//  fbratargetctrler_update_rtpavg(this->targetctrler, this->last_rtp_size);
+//  last_sent = _now(this);
+////  g_print("rtp: %hu approved\n", gst_rtp_buffer_get_seq(rtp));
+//  return TRUE;
+//disapprove:
+////  g_print("rtp: %hu disapproved\n", gst_rtp_buffer_get_seq(rtp));
+//  return FALSE;
+//}
 
 gboolean fbrasubctrler_path_approver(gpointer data, GstRTPBuffer *rtp)
 {
   FBRASubController *this = data;
+
   this->last_rtp_size = gst_rtp_buffer_get_payload_len(rtp);
   fbratargetctrler_update_rtpavg(this->targetctrler, this->last_rtp_size);
+  g_print("BiF: %d->%d (%1.3f - %1.3f)\n",
+          _fbstat(this).sent_bytes_in_1s * 8,
+          _fbstat(this).bytes_in_flight * 8,
+          (gdouble)_fbstat(this).bytes_in_flight / (gdouble)_fbstat(this).sent_bytes_in_1s,
+          (gdouble)_fbstat(this).sent_bytes_in_1s * (gdouble)(_fbstat(this).owd_stt * .000000001) * 8);
   return TRUE;
 }
 
@@ -442,8 +496,8 @@ void fbrasubctrler_report_update(
       fbrafbprocessor_approve_owd_ltt(this->fbprocessor);
   }
 
-  _priv(this)->owd_corr_cng_th  = (gdouble)(_fbstat(this).owd_ltt80 + _fbstat(this).owd_th2) / (gdouble)_fbstat(this).owd_ltt80;
-  _priv(this)->owd_corr_dist_th = (gdouble)(_fbstat(this).owd_ltt80 + _fbstat(this).owd_th1) / (gdouble)_fbstat(this).owd_ltt80;
+  _priv(this)->owd_corr_cng_th  = (gdouble)(_fbstat(this).owd_ltt80 + _fbstat(this).owd_th_cng) / (gdouble)_fbstat(this).owd_ltt80;
+  _priv(this)->owd_corr_dist_th = (gdouble)(_fbstat(this).owd_ltt80 + _fbstat(this).owd_th_dist) / (gdouble)_fbstat(this).owd_ltt80;
 
   mprtp_logger("fbrasubctrler.log",
                "TR: %-7d|GP:%-7d|corh: %-3lu/%-3lu=%3.2f (%1.2f - %1.2f)|SR: %-7d|FEC:%-7d|tend: %3.2f|stg: %d|sta: %d|FD: %1.2f(%1.2f-%1.2f-%1.2f)|rtt: %-3.2f\n",
@@ -451,9 +505,9 @@ void fbrasubctrler_report_update(
             _fbstat(this).goodput_bytes * 8,
             GST_TIME_AS_MSECONDS(_fbstat(this).owd_stt),
             GST_TIME_AS_MSECONDS(_fbstat(this).owd_ltt80),
-            _fbstat(this).owdh_corr,
-            _priv(this)->owd_corr_cng_th,
-            _priv(this)->owd_corr_dist_th,
+            _fbstat(this).owd_corr,
+            _fbstat(this).owd_th_cng,
+            _fbstat(this).owd_th_dist,
             _fbstat(this).sent_bytes_in_1s  * 8,
             this->monitored_bitrate,
             _fbstat(this).tendency,
@@ -472,14 +526,34 @@ done:
   return;
 }
 
+static gboolean _distortion(FBRASubController *this)
+{
+  GstClockTime owd_th;
+
+  owd_th = _fbstat(this).owd_ltt80 + CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, _fbstat(this).owd_th_cng);
+  if(owd_th < _fbstat(this).owd_stt){
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+static gboolean _congestion(FBRASubController *this)
+{
+  gdouble FD_th;
+  FD_th = CONSTRAIN(.02, .1, _fbstat(this).FD_avg * 2);
+  if(FD_th < _FD(this)){
+    return TRUE;
+  }
+  return FALSE;
+}
 
 void
 _reduce_stage(
     FBRASubController *this)
 {
-  if(_owd_corr_cng_th(this) < _owd_corr(this)){
+  if(_congestion(this)){
     fbratargetctrler_break(this->targetctrler);
-    goto done;
   }else if(!fbratargetctrler_get_approvement(this->targetctrler)){
     goto done;
   }
@@ -497,24 +571,26 @@ _keep_stage(
 {
   GstClockTime now = _now(this);
 
-  if(_FD_cong_th(this) < _FD(this) || _owd_corr_cng_th(this)  < _owd_corr(this)){
+  if(_congestion(this)){
     fbratargetctrler_break(this->targetctrler);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     goto done;
   }
 
-  if(_FD_dist_th(this) < _FD(this) || _owd_corr_dist_th(this) < _owd_corr(this)){
+  if(_distortion(this)){
+    fbratargetctrler_halt(this->targetctrler);
     _set_event(this, EVENT_DISTORTION);
     this->last_distorted = now;
+    goto done;
   }else if(_state(this) != MPRTPS_PATH_STATE_STABLE){
     _set_event(this, EVENT_SETTLED);
     goto done;
   }
 
-  if(now - _RTT(this) < this->last_distorted){
+  if(!fbratargetctrler_get_approvement(this->targetctrler)){
     goto done;
-  }else if(!fbratargetctrler_get_approvement(this->targetctrler)){
+  }else if(now - _RTT(this) < this->last_distorted){
     goto done;
   }
 
@@ -529,15 +605,15 @@ void
 _probe_stage(
     FBRASubController *this)
 {
-  if(_FD_cong_th(this) < _FD(this) || _owd_corr_cng_th(this)  < _owd_corr(this)){
+  if(_congestion(this)){
     fbratargetctrler_break(this->targetctrler);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     goto done;
   }
 
-  if(_FD_dist_th(this) < _FD(this) || _owd_corr_dist_th(this) < _owd_corr(this)){
-    fbratargetctrler_break(this->targetctrler);
+  if(_distortion(this)){
+    fbratargetctrler_revert(this->targetctrler);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_KEEP, FALSE);
     this->last_distorted = _now(this);
@@ -561,15 +637,15 @@ void
 _increase_stage(
     FBRASubController *this)
 {
-  if(_FD_cong_th(this) < _FD(this) || _owd_corr_cng_th(this)  < _owd_corr(this)){
+  if(_congestion(this)){
     fbratargetctrler_break(this->targetctrler);
     _set_event(this, EVENT_CONGESTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     goto done;
   }
 
-  if(_FD_dist_th(this) < _FD(this) || _owd_corr_dist_th(this) < _owd_corr(this)){
-    fbratargetctrler_break(this->targetctrler);
+  if(_distortion(this)){
+    fbratargetctrler_revert(this->targetctrler);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     goto done;

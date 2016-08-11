@@ -1,0 +1,7 @@
+------------------------------------------------------------
+Client connecting to 127.0.0.1, TCP port 1234
+TCP window size: 2.50 MByte (default)
+------------------------------------------------------------
+[  4] local 127.0.0.1 port 60117 connected with 127.0.0.1 port 1234
+[ ID] Interval       Transfer     Bandwidth
+[  4]  0.0- 0.0 sec  3.25 MBytes  8.62 Gbits/sec

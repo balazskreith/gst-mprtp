@@ -148,6 +148,6 @@ sudo ip netns exec $NS_RCV ip route add 10.0.2.0/30 dev $R3 via 10.0.2.5
 sudo ip netns exec $NS_MID sysctl -w net.ipv4.ip_forward=1
 #dd of=/proc/sys/net/ipv4/ip_forward <<<1
 
-sudo ip netns exec $NS_MID "./scripts2/setup_ns_mid.sh"
+sudo ip netns exec $NS_MID "./scripts/setup_ns_mid.sh"
 
 

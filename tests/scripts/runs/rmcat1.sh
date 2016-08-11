@@ -7,11 +7,13 @@ SENDER="sender"
 RECEIVER="receiver"
 LOGSDIR="logs"
 REPORTSDIR="reports"
-SCRIPTSDIR="scripts2"
+SCRIPTSDIR="scripts"
 TEMPDIR=$SCRIPTSDIR"/temp"
 EVALDIR=$SCRIPTSDIR"/evals"
 CONFDIR=$SCRIPTSDIR"/configs"
 RUNDIR=$SCRIPTSDIR"/runs"
+
+PRECMD="cerbero-1.6 shell"
 
 rm -R -f $LOGSDIR/*
 
@@ -50,13 +52,15 @@ done
   sudo ip netns exec ns_mid tc qdisc change dev veth1 root handle 1: netem delay "$OWD_RCV"ms
 
   PEER1_SND="$TEMPDIR/sender_1.sh"
-  echo "ntrt -c$CONFDIR/ntrt_snd_meas.ini -m$CONFDIR/ntrt_rmcat1.cmds -t$DURATION &" > $PEER1_SND
+  echo $PRECMD > $PEER1_SND
+  echo "ntrt -c$CONFDIR/ntrt_snd_meas.ini -m$CONFDIR/ntrt_rmcat1.cmds -t$DURATION &" >> $PEER1_SND
   echo -n "./$SENDER" >> $PEER1_SND
   ./$CONFDIR/peer1params.sh >> $PEER1_SND
   chmod 777 $PEER1_SND
 
   PEER1_RCV="$TEMPDIR/receiver_1.sh"
-  echo "ntrt -c$CONFDIR/ntrt_rcv_meas.ini -t$DURATION &" > $PEER1_RCV
+  echo $PRECMD > $PEER1_RCV
+  echo "ntrt -c$CONFDIR/ntrt_rcv_meas.ini -t$DURATION &" >> $PEER1_RCV
   echo -n "./$RECEIVER" >> $PEER1_RCV
   ./$CONFDIR/peer1params.sh >> $PEER1_RCV
   echo -n "--save_received_yuvfile=0 " >> $PEER1_RCV 

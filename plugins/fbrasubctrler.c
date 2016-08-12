@@ -274,7 +274,7 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->owd_corr_dist_th                 = OWD_CORR_DISTORTION_TRESHOLD;
 
   _priv(this)->tr_approved                      = TRUE;
-  _priv(this)->proative                         = FALSE;
+  _priv(this)->proactive                        = FALSE;
 
 }
 //

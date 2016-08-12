@@ -7,7 +7,7 @@ SENDER="sender"
 RECEIVER="receiver"
 LOGSDIR="logs"
 REPORTSDIR="reports"
-SCRIPTSDIR="scripts2"
+SCRIPTSDIR="scripts"
 TEMPDIR=$SCRIPTSDIR"/temp"
 EVALDIR=$SCRIPTSDIR"/evals"
 CONFDIR=$SCRIPTSDIR"/configs"
@@ -49,6 +49,8 @@ done
   sudo ip netns exec ns_mid tc qdisc change dev veth1 root handle 1: netem delay "$OWD_RCV"ms
 
   PEER1_SND="$TEMPDIR/sender_1.sh"
+  PEER1_SND_EMBED="$TEMPDIR/sender_1_cerbero.sh"
+  
   echo "ntrt -c$CONFDIR/ntrt_snd_meas.ini -m$CONFDIR/ntrt_rmcat6.cmds -t$DURATION &" > $PEER1_SND
   echo -n "./$SENDER" >> $PEER1_SND
   ./$CONFDIR/peer1params.sh >> $PEER1_SND
@@ -57,7 +59,12 @@ done
   echo "iperf -c 10.0.0.6 -p 1234 -t $DURATION" >> $PEER1_SND
   chmod 777 $PEER1_SND
 
+  echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_SND" > $PEER1_SND_EMBED 
+  chmod 777 $PEER1_SND_EMBED  
+
   PEER1_RCV="$TEMPDIR/receiver_1.sh"
+  PEER1_RCV_EMBED="$TEMPDIR/receiver_1_cerbero.sh"
+  
   echo "ntrt -c$CONFDIR/ntrt_rcv_meas.ini -t$DURATION &" > $PEER1_RCV
   echo -n "./$RECEIVER" >> $PEER1_RCV
   ./$CONFDIR/peer1params.sh >> $PEER1_RCV
@@ -66,11 +73,14 @@ done
   echo "" >> $PEER1_RCV
   echo "iperf -s -p 1234" >> $PEER1_RCV
   chmod 777 $PEER1_RCV
+  
+  echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_RCV" > $PEER1_RCV_EMBED 
+  chmod 777 $PEER1_RCV_EMBED  
 
   #start receiver and sender
-  sudo ip netns exec $NSRCV ./$PEER1_RCV 2> $LOGSDIR"/"receiver.log &
+  sudo ip netns exec $NSRCV ./$PEER1_RCV_EMBED 2> $LOGSDIR"/"receiver.log &
   sleep 2
-  sudo ip netns exec $NSSND ./$PEER1_SND 2> $LOGSDIR"/"sender.log &
+  sudo ip netns exec $NSSND ./$PEER1_SND_EMBED 2> $LOGSDIR"/"sender.log &
 
 cleanup()
 # example cleanup function

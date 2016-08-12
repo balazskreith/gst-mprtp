@@ -126,6 +126,8 @@ struct _Private{
   GstClockTime        owd_dist_th;
   GstClockTime        owd_cng_th;
 
+  gboolean            proative;
+
 };
 
 
@@ -133,6 +135,7 @@ struct _Private{
 #define _priv(this) ((Private*)this->priv)
 #define _fbstat(this) this->fbstat
 #define _throttler(this) _priv(this)->throttler
+#define _proactive(this) _priv(this)->proactive
 
 #define _bcongestion(this) _priv(this)->bcongestion
 #define _btlp(this) this->bottleneck_point
@@ -271,6 +274,7 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->owd_corr_dist_th                 = OWD_CORR_DISTORTION_TRESHOLD;
 
   _priv(this)->tr_approved                      = TRUE;
+  _priv(this)->proative                         = FALSE;
 
 }
 //
@@ -531,11 +535,17 @@ done:
 static gboolean _distortion(FBRASubController *this)
 {
   GstClockTime owd_th;
+
+  if(!_proactive(this)){
+    return FALSE;
+  }
+
   owd_th = _fbstat(this).owd_ltt80 + CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, _fbstat(this).owd_th_cng);
   if(owd_th < _fbstat(this).owd_stt){
     return TRUE;
   }
 
+//  This approach based on density of the distortion of the path
 //  if(.2 < _fbstat(this).overused_avg){
 //    return TRUE;
 //  }

@@ -127,6 +127,7 @@ struct _Private{
   GstClockTime        owd_cng_th;
 
   gboolean            proactive;
+  GstClockTime        proactive_disabled;
 
 };
 
@@ -492,7 +493,12 @@ void fbrasubctrler_report_update(
   _update_fraction_discarded(this);
 
 //  _priv(this)->proactive = _fbstat(this).overused_avg < .5;
-  _priv(this)->proactive = _fbstat(this).FD_avg < .02;
+  if(.02 < _fbstat(this).discarded_rate){
+    _priv(this)->proactive = FALSE;
+    _priv(this)->proactive_disabled = _now(this);
+  }else if(!_priv(this)->proactive && _priv(this)->proactive_disabled < _now(this) - CONSTRAIN(300 * GST_MSECOND, GST_SECOND, 3 * _RTT(this))){
+    _priv(this)->proactive = TRUE;
+  }
 
   _execute_stage(this);
 
@@ -526,7 +532,7 @@ void fbrasubctrler_report_update(
             _fbstat(this).tendency,
             _priv(this)->stage,
             mprtps_path_get_state(this->path),
-            _FD(this),
+			_fbstat(this).FD_avg,
             GST_TIME_AS_MSECONDS(_RTT(this)),
 			_proactive(this)
         );

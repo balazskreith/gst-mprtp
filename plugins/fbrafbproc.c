@@ -293,7 +293,7 @@ static void _stt_statitem_add_pipe(gpointer udata, gpointer itemptr)
   item->overused = item->owd < this->stat.owd_ltt80 ? -1 : 1;
   this->stat.overused_sum += item->overused;
   ++this->stat.overused_num;
-  this->stat.overused_avg = (gdouble)this->stat.overused_sum / (gdouble)this->stat.overused_num;
+  this->stat.overused_avg = (gdouble) this->stat.overused_sum / (gdouble) this->stat.overused_num;
 
   this->swstat.fdsum    += item->FD;
   this->swstat.fdsqsum  += item->FD * item->FD;

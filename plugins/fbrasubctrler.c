@@ -328,11 +328,13 @@ gboolean fbrasubctrler_path_approver(gpointer data, GstRTPBuffer *rtp)
 
   this->last_rtp_size = gst_rtp_buffer_get_payload_len(rtp);
   fbratargetctrler_update_rtpavg(this->targetctrler, this->last_rtp_size);
-  g_print("BiF: %d->%d (%1.3f - %1.3f)\n",
-          _fbstat(this).sent_bytes_in_1s * 8,
-          _fbstat(this).bytes_in_flight * 8,
-          (gdouble)_fbstat(this).bytes_in_flight / (gdouble)_fbstat(this).sent_bytes_in_1s,
-          (gdouble)_fbstat(this).sent_bytes_in_1s * (gdouble)(_fbstat(this).owd_stt * .000000001) * 8);
+
+//  g_print("BiF: %d->%d (%1.3f - %1.3f)\n",
+//          _fbstat(this).sent_bytes_in_1s * 8,
+//          _fbstat(this).bytes_in_flight * 8,
+//          (gdouble)_fbstat(this).bytes_in_flight / (gdouble)_fbstat(this).sent_bytes_in_1s,
+//          (gdouble)_fbstat(this).sent_bytes_in_1s * (gdouble)(_fbstat(this).owd_stt * .000000001) * 8);
+
   return TRUE;
 }
 

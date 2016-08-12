@@ -267,7 +267,7 @@ static void _acked_sprint(gpointer data, gchar *result)
   sprintf(result,"Acked window seq: %hu payload: %d", item->seq_num, item->payload_bytes);
 }
 
-static void _statitem_rem_pipe(gpointer udata, gpointer itemptr)
+static void _stt_statitem_rem_pipe(gpointer udata, gpointer itemptr)
 {
   FBRAFBProcessor *this = udata;
   FBRAFBStatItem *item = itemptr;
@@ -276,7 +276,7 @@ static void _statitem_rem_pipe(gpointer udata, gpointer itemptr)
 
 }
 
-static void _statitem_add_pipe(gpointer udata, gpointer itemptr)
+static void _stt_statitem_add_pipe(gpointer udata, gpointer itemptr)
 {
   FBRAFBProcessor *this = udata;
   FBRAFBStatItem *item = itemptr;
@@ -301,7 +301,7 @@ static void _sw_refresh(FBRAFBProcessor *this)
 //  g_print("FD_avg: %1.2f| owd_var: %1.2f| owd_std: %1.2f\n", this->stat.FD_avg, this->stat.owd_var, this->stat.owd_std);
 }
 
-static void _sw_statitem_rem_pipe(gpointer udata, gpointer itemptr)
+static void _sw_ltt_statitem_rem_pipe(gpointer udata, gpointer itemptr)
 {
   FBRAFBProcessor *this = udata;
   FBRAFBStatItem *item = itemptr;
@@ -317,7 +317,7 @@ static void _sw_statitem_rem_pipe(gpointer udata, gpointer itemptr)
   _unref_statitem(this, item);
 }
 
-static void _sw_statitem_add_pipe(gpointer udata, gpointer itemptr)
+static void _sw_ltt_statitem_add_pipe(gpointer udata, gpointer itemptr)
 {
   FBRAFBProcessor *this = udata;
   FBRAFBStatItem *item = itemptr;
@@ -344,7 +344,7 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->stat.srtt        = 0;
 
   this->items            = g_malloc0(sizeof(FBRAFBProcessorItem) * 65536);
-  this->stt_sw           = make_slidingwindow(100, 10 * GST_SECOND);
+  this->stt_sw           = make_slidingwindow(10, 0.3 * GST_SECOND);
   this->ltt_sw           = make_slidingwindow(600, 30 * GST_SECOND);
   this->acked_1s_sw      = make_slidingwindow(2000, GST_SECOND);
   this->sent_sw          = make_slidingwindow(2000, GST_SECOND);
@@ -356,9 +356,9 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   slidingwindow_add_pipes(this->sent_sw, _sent_rem_pipe, this, _sent_add_pipe, this);
   slidingwindow_add_pipes(this->acked_1s_sw, _acked_1s_rem_pipe, this, _acked_1s_add_pipe, this);
 
-  slidingwindow_add_pipes(this->ltt_sw, _sw_statitem_rem_pipe, this, _sw_statitem_add_pipe, this);
+  slidingwindow_add_pipes(this->ltt_sw, _sw_ltt_statitem_rem_pipe, this, _sw_ltt_statitem_add_pipe, this);
 
-  slidingwindow_add_pipes(this->stt_sw, _statitem_rem_pipe, this, _statitem_add_pipe, this);
+  slidingwindow_add_pipes(this->stt_sw, _stt_statitem_rem_pipe, this, _stt_statitem_add_pipe, this);
 
   DISABLE_LINE slidingwindow_add_plugin(this->sent_sw, make_swprinter(_sent_sprint));
   DISABLE_LINE slidingwindow_add_plugin(this->acked_1s_sw, make_swprinter(_acked_sprint));

@@ -491,8 +491,8 @@ void fbrasubctrler_report_update(
   fbratargetctrler_update(this->targetctrler, &this->fbstat);
   _update_fraction_discarded(this);
 
-  _priv(this)->proactive = _fbstat(this).overused_avg < .5;
-  _priv(this)->proactive = FALSE;
+//  _priv(this)->proactive = _fbstat(this).overused_avg < .5;
+  _priv(this)->proactive = _fbstat(this).FD_avg < .02;
 
   _execute_stage(this);
 

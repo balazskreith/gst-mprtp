@@ -468,6 +468,8 @@ void fbrasubctrler_report_update(
                          FBRASubController *this,
                          GstMPRTCPReportSummary *summary)
 {
+  GstClockTime max_approve_idle_th;
+
   if(!this->enabled){
     goto done;
   }
@@ -495,10 +497,13 @@ void fbrasubctrler_report_update(
 //    fbrafbprocessor_approve_owd_ltt(this->fbprocessor);
 //  }
 
+
+  max_approve_idle_th = CONSTRAIN(100 * GST_MSECOND, 500 * GST_MSECOND, 3 * _RTT(this));
+
   if(_state(this) != MPRTPS_PATH_STATE_OVERUSED){
       fbrafbprocessor_approve_owd_ltt(this->fbprocessor);
       this->last_approved = _now(this);
-  }else if(this->last_approved < _now(this) - _RTT(this)){
+  }else if(this->last_approved < _now(this) - max_approve_idle_th){
       fbrafbprocessor_approve_owd_ltt(this->fbprocessor);
   }
 

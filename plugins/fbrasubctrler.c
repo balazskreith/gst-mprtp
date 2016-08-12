@@ -126,7 +126,7 @@ struct _Private{
   GstClockTime        owd_dist_th;
   GstClockTime        owd_cng_th;
 
-  gboolean            proative;
+  gboolean            proactive;
 
 };
 

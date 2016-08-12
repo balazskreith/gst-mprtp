@@ -500,7 +500,7 @@ void fbrasubctrler_report_update(
 //  }
 
 
-  max_approve_idle_th = CONSTRAIN(100 * GST_MSECOND, 500 * GST_MSECOND, 3 * _RTT(this));
+  max_approve_idle_th = CONSTRAIN(100 * GST_MSECOND, 500 * GST_MSECOND, 2 * _RTT(this));
 
   if(_state(this) != MPRTPS_PATH_STATE_OVERUSED){
       fbrafbprocessor_approve_owd_ltt(this->fbprocessor);

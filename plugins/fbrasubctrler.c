@@ -530,15 +530,15 @@ done:
 
 static gboolean _distortion(FBRASubController *this)
 {
-//  GstClockTime owd_th;
-//  owd_th = _fbstat(this).owd_ltt80 + CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, _fbstat(this).owd_th_cng);
-//  if(owd_th < _fbstat(this).owd_stt){
-//    return TRUE;
-//  }
-
-  if(.2 < _fbstat(this).overused_avg){
+  GstClockTime owd_th;
+  owd_th = _fbstat(this).owd_ltt80 + CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, _fbstat(this).owd_th_cng);
+  if(owd_th < _fbstat(this).owd_stt){
     return TRUE;
   }
+
+//  if(.2 < _fbstat(this).overused_avg){
+//    return TRUE;
+//  }
 
   return FALSE;
 }

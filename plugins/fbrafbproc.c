@@ -277,6 +277,10 @@ static void _stt_statitem_rem_pipe(gpointer udata, gpointer itemptr)
   --this->stat.overused_num;
   this->stat.overused_avg = (gdouble)this->stat.overused_sum / (gdouble)this->stat.overused_num;
 
+  this->swstat.fdsum    -= item->FD;
+  this->swstat.fdsqsum  -= item->FD * item->FD;
+  this->stat.FD_avg      = this->swstat.fdsum / (gdouble)this->stat.overused_num;
+
   _unref_statitem(this, item);
 
 }
@@ -291,13 +295,16 @@ static void _stt_statitem_add_pipe(gpointer udata, gpointer itemptr)
   ++this->stat.overused_num;
   this->stat.overused_avg = (gdouble)this->stat.overused_sum / (gdouble)this->stat.overused_num;
 
+  this->swstat.fdsum    += item->FD;
+  this->swstat.fdsqsum  += item->FD * item->FD;
+  this->stat.FD_avg      = this->swstat.fdsum / (gdouble)this->stat.overused_num;
+
   _ref_statitem(this, item);
 
 }
 
 static void _sw_refresh(FBRAFBProcessor *this)
 {
-  this->stat.FD_avg  = this->swstat.fdsum / (gdouble)this->swstat.num;
   //Calculate Moving Variance:
   //V = (N * SX2 - (SX1 * SX1)) / (N * (N - 1))
   if(1 < this->swstat.num){
@@ -317,8 +324,6 @@ static void _sw_ltt_statitem_rem_pipe(gpointer udata, gpointer itemptr)
   FBRAFBStatItem *item = itemptr;
 
   --this->swstat.num;
-  this->swstat.fdsum    -= item->FD;
-  this->swstat.fdsqsum  -= item->FD * item->FD;
 
   this->swstat.owdsum   -= item->owd_in_ms;
   this->swstat.owdsqsum -= item->owd_in_ms * item->owd_in_ms;
@@ -354,7 +359,7 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->stat.srtt        = 0;
 
   this->items            = g_malloc0(sizeof(FBRAFBProcessorItem) * 65536);
-  this->stt_sw           = make_slidingwindow(100,  GST_SECOND * 5);
+  this->stt_sw           = make_slidingwindow(100,  GST_SECOND * 2);
   this->ltt_sw           = make_slidingwindow(600,  GST_SECOND * 30);
   this->acked_1s_sw      = make_slidingwindow(2000, GST_SECOND);
   this->sent_sw          = make_slidingwindow(2000, GST_SECOND);

@@ -285,10 +285,8 @@ static void _stt_statitem_add_pipe(gpointer udata, gpointer itemptr)
 {
   FBRAFBProcessor *this = udata;
   FBRAFBStatItem *item = itemptr;
-  GstClockTime owd_th;
-  owd_th = CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, this->stat.owd_th_cng);
 
-  item->overused = item->owd < this->stat.owd_ltt80 +  owd_th ? 0 : 1;
+  item->overused = item->owd < this->stat.owd_ltt80 ? 0 : 1;
   this->stat.overused_sum += item->overused;
   ++this->stat.overused_num;
   this->stat.overused_avg = (gdouble)this->stat.overused_sum / (gdouble)this->stat.overused_num;
@@ -356,8 +354,8 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->stat.srtt        = 0;
 
   this->items            = g_malloc0(sizeof(FBRAFBProcessorItem) * 65536);
-  this->stt_sw           = make_slidingwindow(10, 0.3 * GST_SECOND);
-  this->ltt_sw           = make_slidingwindow(600, 30 * GST_SECOND);
+  this->stt_sw           = make_slidingwindow(100,  GST_SECOND);
+  this->ltt_sw           = make_slidingwindow(600,  GST_SECOND * 30);
   this->acked_1s_sw      = make_slidingwindow(2000, GST_SECOND);
   this->sent_sw          = make_slidingwindow(2000, GST_SECOND);
 
@@ -426,6 +424,8 @@ void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn)
 
   slidingwindow_add_data(this->sent_sw, item);
   slidingwindow_refresh(this->acked_1s_sw);
+
+  slidingwindow_set_treshold(this->stt_sw, CONSTRAIN(100 * GST_MSECOND, GST_SECOND, 3 * this->stat.RTT));
   THIS_WRITEUNLOCK (this);
 }
 

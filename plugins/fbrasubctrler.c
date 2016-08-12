@@ -491,6 +491,8 @@ void fbrasubctrler_report_update(
   fbratargetctrler_update(this->targetctrler, &this->fbstat);
   _update_fraction_discarded(this);
 
+  _priv(this)->proactive = .5 < _fbstat(this).overused_avg;
+
   _execute_stage(this);
 
 //  if(_FD(this) <= _FD_cong_th(this) && _fbstat(this).tendency < .2 && -.2 < _fbstat(this).tendency){
@@ -511,24 +513,21 @@ void fbrasubctrler_report_update(
   _priv(this)->owd_corr_dist_th = (gdouble)(_fbstat(this).owd_ltt80 + _fbstat(this).owd_th_dist) / (gdouble)_fbstat(this).owd_ltt80;
 
   mprtp_logger("fbrasubctrler.log",
-               "TR: %-7d|GP:%-7d|corh: %-3lu/%-3lu=%3.2f (%1.2f - %1.2f)|SR: %-7d|FEC:%-7d|tend: %3.2f|stg: %d|sta: %d|FD: %1.2f(%1.2f-%1.2f-%1.2f)|rtt: %-3.2f\n",
+               "TR: %-7d|GP:%-7d|corh: %-3lu/%-3lu=%3.2f (%1.2f)|SR: %-7d|FEC:%-7d|tend: %3.2f|stg: %d|sta: %d|FD: %1.2f|rtt: %-3.2f|proa: %d\n",
             _TR(this),
             _fbstat(this).goodput_bytes * 8,
             GST_TIME_AS_MSECONDS(_fbstat(this).owd_stt),
             GST_TIME_AS_MSECONDS(_fbstat(this).owd_ltt80),
             _fbstat(this).owd_corr,
             _fbstat(this).owd_th_cng,
-            _fbstat(this).owd_th_dist,
             _fbstat(this).sent_bytes_in_1s  * 8,
             this->monitored_bitrate,
             _fbstat(this).tendency,
             _priv(this)->stage,
             mprtps_path_get_state(this->path),
             _FD(this),
-            _FD_dist_th(this),
-            _FD_cong_th(this),
-            this->fbstat.FD_median,
-            GST_TIME_AS_MSECONDS(_RTT(this))
+            GST_TIME_AS_MSECONDS(_RTT(this)),
+			_proactive(this)
         );
 
   ++this->measurements_num;

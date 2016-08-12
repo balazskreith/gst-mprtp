@@ -56,6 +56,9 @@ typedef struct _FBRAFBProcessorStat
 
   gdouble                  FD_median;
 
+  gdouble                  overused_avg;
+  gint32                   overused_sum, overused_num;
+
   gdouble                  owd_var, owd_std, FD_avg;
 
 

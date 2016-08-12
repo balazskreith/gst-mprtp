@@ -57,6 +57,7 @@ typedef struct{
   gint64       owd_in_ms;
   gdouble      FD;
   gint32       BiF;
+  gint32       overused;
 }FBRAFBStatItem;
 
 static void fbrafbprocessor_finalize (GObject * object);
@@ -272,6 +273,10 @@ static void _stt_statitem_rem_pipe(gpointer udata, gpointer itemptr)
   FBRAFBProcessor *this = udata;
   FBRAFBStatItem *item = itemptr;
 
+  this->stat.overused_sum -= item->overused;
+  --this->stat.overused_num;
+  this->stat.overused_avg = (gdouble)this->stat.overused_sum / (gdouble)this->stat.overused_num;
+
   _unref_statitem(this, item);
 
 }
@@ -280,6 +285,13 @@ static void _stt_statitem_add_pipe(gpointer udata, gpointer itemptr)
 {
   FBRAFBProcessor *this = udata;
   FBRAFBStatItem *item = itemptr;
+  GstClockTime owd_th;
+  owd_th = CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, this->stat.owd_th_cng);
+
+  item->overused = item->owd < this->stat.owd_ltt80 +  owd_th ? 0 : 1;
+  this->stat.overused_sum += item->overused;
+  ++this->stat.overused_num;
+  this->stat.overused_avg = (gdouble)this->stat.overused_sum / (gdouble)this->stat.overused_num;
 
   _ref_statitem(this, item);
 

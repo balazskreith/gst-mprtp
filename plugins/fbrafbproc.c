@@ -425,7 +425,7 @@ void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn)
   slidingwindow_add_data(this->sent_sw, item);
   slidingwindow_refresh(this->acked_1s_sw);
 
-  slidingwindow_set_treshold(this->stt_sw, CONSTRAIN(100 * GST_MSECOND, GST_SECOND, 3 * this->stat.RTT));
+//  slidingwindow_set_treshold(this->stt_sw, CONSTRAIN(100 * GST_MSECOND, GST_SECOND, 3 * this->stat.RTT));
   THIS_WRITEUNLOCK (this);
 }
 

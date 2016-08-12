@@ -354,7 +354,7 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->stat.srtt        = 0;
 
   this->items            = g_malloc0(sizeof(FBRAFBProcessorItem) * 65536);
-  this->stt_sw           = make_slidingwindow(100,  GST_SECOND);
+  this->stt_sw           = make_slidingwindow(100,  GST_SECOND * 5);
   this->ltt_sw           = make_slidingwindow(600,  GST_SECOND * 30);
   this->acked_1s_sw      = make_slidingwindow(2000, GST_SECOND);
   this->sent_sw          = make_slidingwindow(2000, GST_SECOND);

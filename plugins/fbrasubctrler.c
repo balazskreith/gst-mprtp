@@ -537,7 +537,8 @@ static gboolean _distortion(FBRASubController *this)
   GstClockTime owd_th;
 
   if(!_proactive(this)){
-    return FALSE;
+//    return FALSE;
+    return .02 < _fbstat(this).discarded_rate;
   }
 
   owd_th = _fbstat(this).owd_ltt80 + CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, _fbstat(this).owd_th_cng);
@@ -556,6 +557,10 @@ static gboolean _distortion(FBRASubController *this)
 static gboolean _congestion(FBRASubController *this)
 {
   gdouble FD_th;
+  if(!_proactive(this)){
+    return .1 < _fbstat(this).discarded_rate;
+  }
+
   FD_th = CONSTRAIN(.02, .1, _fbstat(this).FD_avg * 2);
   if(FD_th < _FD(this)){
     return TRUE;

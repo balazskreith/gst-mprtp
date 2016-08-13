@@ -496,8 +496,10 @@ void fbrasubctrler_report_update(
   if(.02 < _fbstat(this).discarded_rate){
     _priv(this)->proactive = FALSE;
     _priv(this)->proactive_disabled = _now(this);
-  }else if(!_priv(this)->proactive && _priv(this)->proactive_disabled < _now(this) - CONSTRAIN(300 * GST_MSECOND, GST_SECOND, 3 * _RTT(this))){
-    _priv(this)->proactive = TRUE;
+  }else if(!_priv(this)->proactive){
+	GstClockTime th;
+	th = CONSTRAIN(300 * GST_MSECOND, GST_SECOND, 3 * _RTT(this));
+    _priv(this)->proactive = _priv(this)->proactive_disabled < _now(this) - th;
   }
 
   _execute_stage(this);
@@ -532,7 +534,7 @@ void fbrasubctrler_report_update(
             _fbstat(this).tendency,
             _priv(this)->stage,
             mprtps_path_get_state(this->path),
-			_fbstat(this).FD_avg,
+			_fbstat(this).discarded_rate,
             GST_TIME_AS_MSECONDS(_RTT(this)),
 			_proactive(this)
         );

@@ -31,6 +31,7 @@ typedef struct _MPRTPSubflowFBRACngCtrlerParams{
   gdouble             owd_corr_cng_th;
 
   gdouble             owd_corr_dist_th;
+  gboolean            reactive_cc_allowed;
 
 }MPRTPSubflowFBRA2CngCtrlerParams;
 

@@ -59,6 +59,9 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 //determines a treshold for trend calculations, in which above the path considered to be congested
 #define OWD_CORR_CONGESTION_TRESHOLD 1.2
 
+//determines a treshold for trend calculations, in which above the KEEP stage not let it to PROBE
+#define REACTIVE_CONGESTION_DETECTION_ALLOWED TRUE
+
 typedef struct _Private Private;
 
 typedef enum{
@@ -129,6 +132,8 @@ struct _Private{
   gboolean            proactive;
   GstClockTime        proactive_disabled;
 
+  gboolean            reactive_cc_allowed;
+
 };
 
 
@@ -170,6 +175,7 @@ struct _Private{
 
 #define _owd_corr_cng_th(this)        _priv(this)->owd_corr_cng_th
 #define _owd_corr_dist_th(this)       _priv(this)->owd_corr_dist_th
+#define _reactive_cc_allowed(this)    _priv(this)->reactive_cc_allowed
 
 #define _appr_eps(this)               _priv(this)->approvement_epsilon
 
@@ -276,6 +282,7 @@ fbrasubctrler_init (FBRASubController * this)
 
   _priv(this)->tr_approved                      = TRUE;
   _priv(this)->proactive                        = FALSE;
+  _priv(this)->reactive_cc_allowed              = REACTIVE_CONGESTION_DETECTION_ALLOWED;
 
 }
 //
@@ -441,6 +448,7 @@ void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRa
 //  _FD_dist_th(this)                             = cngctrler->discard_dist_treshold;
   _owd_corr_cng_th(this)                        = cngctrler->owd_corr_cng_th;
   _owd_corr_dist_th(this)                       = cngctrler->owd_corr_dist_th;
+  _reactive_cc_allowed(this)                    = cngctrler->reactive_cc_allowed;
 
 
 }
@@ -452,10 +460,9 @@ void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedR
 
   fbratargetctrler_signal_request(this->targetctrler, result);
 
-//  cngctrler->discard_dist_treshold          = _FD_dist_th(this);
-//  cngctrler->discard_cong_treshold          = _FD_cong_th(this);
   cngctrler->owd_corr_cng_th                = _owd_corr_cng_th(this);
   cngctrler->owd_corr_dist_th               = _owd_corr_dist_th(this);
+  cngctrler->reactive_cc_allowed            = _reactive_cc_allowed(this);
 
 }
 
@@ -493,7 +500,9 @@ void fbrasubctrler_report_update(
   _update_fraction_discarded(this);
 
 //  _priv(this)->proactive = _fbstat(this).overused_avg < .5;
-  if(.02 < _fbstat(this).discarded_rate){
+  if(!_reactive_cc_allowed(this)){
+    _priv(this)->proactive = TRUE;
+  }else if(.02 < _fbstat(this).discarded_rate){
     _priv(this)->proactive = FALSE;
     _priv(this)->proactive_disabled = _now(this);
   }else if(!_priv(this)->proactive){

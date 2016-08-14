@@ -164,9 +164,6 @@ static void _sent_add_pipe(gpointer udata, gpointer itemptr)
 
   _ref_rtpitem(this, item);
 
-  this->stat.bytes_in_flight += item->payload_bytes;
-  ++this->stat.packets_in_flight;
-
   this->stat.sent_bytes_in_1s += item->payload_bytes;
   ++this->stat.sent_packets_in_1s;
 }
@@ -175,12 +172,32 @@ static void _sent_rem_pipe(gpointer udata, gpointer itemptr)
 {
   FBRAFBProcessor *this = udata;
   FBRAFBProcessorItem *item = itemptr;
-
   this->stat.sent_bytes_in_1s -= item->payload_bytes;
   --this->stat.sent_packets_in_1s;
 
+  _unref_rtpitem(this, item);
+}
+
+
+static void _BiF_add_pipe(gpointer udata, gpointer itemptr)
+{
+  FBRAFBProcessor *this = udata;
+  FBRAFBProcessorItem *item = itemptr;
+
+  _ref_rtpitem(this, item);
+
+  this->stat.bytes_in_flight += item->payload_bytes;
+  ++this->stat.packets_in_flight;
+
+}
+
+static void _BiF_rem_pipe(gpointer udata, gpointer itemptr)
+{
+  FBRAFBProcessor *this = udata;
+  FBRAFBProcessorItem *item = itemptr;
+
   if(!item->acknowledged){
-    g_warning("sequence number %hu not acknowledged in 1s. Hm????", item->seq_num);
+    g_warning("sequence number %hu not acknowledged in 3RTT or 3s. Hm????", item->seq_num);
     this->stat.bytes_in_flight -= item->payload_bytes;
     --this->stat.packets_in_flight;
   }
@@ -364,11 +381,14 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->acked_1s_sw      = make_slidingwindow(2000, GST_SECOND);
   this->sent_sw          = make_slidingwindow(2000, GST_SECOND);
 
+  this->BiF_sw          = make_slidingwindow(2000, GST_SECOND);
+
 
 //  this->owd_offs = make_slidingwindow_double(10, GST_SECOND);
 //  slidingwindow_add_pipes(this->owd_offs, _owd_off_rem_pipe, this, _owd_off_add_pipe, this);
 
   slidingwindow_add_pipes(this->sent_sw, _sent_rem_pipe, this, _sent_add_pipe, this);
+  slidingwindow_add_pipes(this->BiF_sw, _BiF_rem_pipe, this, _BiF_add_pipe, this);
   slidingwindow_add_pipes(this->acked_1s_sw, _acked_1s_rem_pipe, this, _acked_1s_add_pipe, this);
 
   slidingwindow_add_pipes(this->ltt_sw, _sw_ltt_statitem_rem_pipe, this, _sw_ltt_statitem_add_pipe, this);
@@ -428,6 +448,7 @@ void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn)
 //  this->stat.bytes_in_flight += payload_len;
 
   slidingwindow_add_data(this->sent_sw, item);
+  slidingwindow_add_data(this->BiF_sw, item);
   slidingwindow_refresh(this->acked_1s_sw);
 
 //  slidingwindow_set_treshold(this->stt_sw, CONSTRAIN(100 * GST_MSECOND, GST_SECOND, 3 * this->stat.RTT));
@@ -458,6 +479,7 @@ void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summa
   if(summary->RR.processed){
     this->stat.RTT  = summary->RR.RTT;
     this->stat.srtt = (this->stat.srtt == 0.) ? summary->RR.RTT : (summary->RR.RTT * .1 + this->stat.srtt * .9);
+    slidingwindow_set_treshold(this->BiF_sw, 3 * MIN(GST_SECOND, this->stat.srtt));
   }
   if(summary->XR.DiscardedRLE.processed){
     _process_rle_discvector(this, &summary->XR);
@@ -570,6 +592,7 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
   }
 done:
   slidingwindow_refresh(this->sent_sw);
+  slidingwindow_refresh(this->BiF_sw);
 }
 
 

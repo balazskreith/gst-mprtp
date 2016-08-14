@@ -99,6 +99,7 @@ struct _FBRAFBProcessor
 
   SlidingWindow           *acked_1s_sw;
   SlidingWindow           *sent_sw;
+  SlidingWindow           *BiF_sw;
   FBRAFBProcessorItem     *items;
 
 

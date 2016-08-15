@@ -89,7 +89,8 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-noinst_PROGRAMS = sender$(EXEEXT) receiver$(EXEEXT)
+noinst_PROGRAMS = sender$(EXEEXT) receiver$(EXEEXT) \
+	v4l2_file_player$(EXEEXT)
 subdir = tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/common/m4/as-ac-expand.m4 \
@@ -128,6 +129,14 @@ sender_DEPENDENCIES = $(am__DEPENDENCIES_1)
 sender_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(sender_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_v4l2_file_player_OBJECTS =  \
+	v4l2_file_player-v4l2_file_player.$(OBJEXT)
+v4l2_file_player_OBJECTS = $(am_v4l2_file_player_OBJECTS)
+v4l2_file_player_DEPENDENCIES = $(am__DEPENDENCIES_1)
+v4l2_file_player_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(v4l2_file_player_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
+	-o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -162,8 +171,10 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(receiver_SOURCES) $(sender_SOURCES)
-DIST_SOURCES = $(receiver_SOURCES) $(sender_SOURCES)
+SOURCES = $(receiver_SOURCES) $(sender_SOURCES) \
+	$(v4l2_file_player_SOURCES)
+DIST_SOURCES = $(receiver_SOURCES) $(sender_SOURCES) \
+	$(v4l2_file_player_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -367,6 +378,9 @@ receiver_LDADD = $(GST_LIBS)
 sender_SOURCES = sender.c
 sender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
 sender_LDADD = $(GST_LIBS)
+v4l2_file_player_SOURCES = v4l2_file_player.c
+v4l2_file_player_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
+v4l2_file_player_LDADD = $(GST_LIBS)
 all: all-am
 
 .SUFFIXES:
@@ -418,6 +432,10 @@ sender$(EXEEXT): $(sender_OBJECTS) $(sender_DEPENDENCIES) $(EXTRA_sender_DEPENDE
 	@rm -f sender$(EXEEXT)
 	$(AM_V_CCLD)$(sender_LINK) $(sender_OBJECTS) $(sender_LDADD) $(LIBS)
 
+v4l2_file_player$(EXEEXT): $(v4l2_file_player_OBJECTS) $(v4l2_file_player_DEPENDENCIES) $(EXTRA_v4l2_file_player_DEPENDENCIES) 
+	@rm -f v4l2_file_player$(EXEEXT)
+	$(AM_V_CCLD)$(v4l2_file_player_LINK) $(v4l2_file_player_OBJECTS) $(v4l2_file_player_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
@@ -426,6 +444,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/receiver-receiver.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sender-sender.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/v4l2_file_player-v4l2_file_player.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -475,6 +494,20 @@ sender-sender.obj: sender.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sender.c' object='sender-sender.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -c -o sender-sender.obj `if test -f 'sender.c'; then $(CYGPATH_W) 'sender.c'; else $(CYGPATH_W) '$(srcdir)/sender.c'; fi`
+
+v4l2_file_player-v4l2_file_player.o: v4l2_file_player.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(v4l2_file_player_CFLAGS) $(CFLAGS) -MT v4l2_file_player-v4l2_file_player.o -MD -MP -MF $(DEPDIR)/v4l2_file_player-v4l2_file_player.Tpo -c -o v4l2_file_player-v4l2_file_player.o `test -f 'v4l2_file_player.c' || echo '$(srcdir)/'`v4l2_file_player.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/v4l2_file_player-v4l2_file_player.Tpo $(DEPDIR)/v4l2_file_player-v4l2_file_player.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='v4l2_file_player.c' object='v4l2_file_player-v4l2_file_player.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(v4l2_file_player_CFLAGS) $(CFLAGS) -c -o v4l2_file_player-v4l2_file_player.o `test -f 'v4l2_file_player.c' || echo '$(srcdir)/'`v4l2_file_player.c
+
+v4l2_file_player-v4l2_file_player.obj: v4l2_file_player.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(v4l2_file_player_CFLAGS) $(CFLAGS) -MT v4l2_file_player-v4l2_file_player.obj -MD -MP -MF $(DEPDIR)/v4l2_file_player-v4l2_file_player.Tpo -c -o v4l2_file_player-v4l2_file_player.obj `if test -f 'v4l2_file_player.c'; then $(CYGPATH_W) 'v4l2_file_player.c'; else $(CYGPATH_W) '$(srcdir)/v4l2_file_player.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/v4l2_file_player-v4l2_file_player.Tpo $(DEPDIR)/v4l2_file_player-v4l2_file_player.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='v4l2_file_player.c' object='v4l2_file_player-v4l2_file_player.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(v4l2_file_player_CFLAGS) $(CFLAGS) -c -o v4l2_file_player-v4l2_file_player.obj `if test -f 'v4l2_file_player.c'; then $(CYGPATH_W) 'v4l2_file_player.c'; else $(CYGPATH_W) '$(srcdir)/v4l2_file_player.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

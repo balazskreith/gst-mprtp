@@ -12,11 +12,6 @@
 ## M4sh Initialization. ##
 ## -------------------- ##
 
-autoreconf --verbose --force --install --make || {
- echo 'autogen.sh failed';
- exit 1;
-}
-
 # Be more Bourne compatible
 DUALCASE=1; export DUALCASE # for MKS sh
 if test -n "${ZSH_VERSION+set}" && (emulate sh) >/dev/null 2>&1; then :

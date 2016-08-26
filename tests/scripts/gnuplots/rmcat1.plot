@@ -19,7 +19,7 @@ set terminal pdf enhanced rounded size 10,6
 set output output_file
 set datafile separator "," 
 
-set multiplot layout 2, 1 font ",14"
+set multiplot layout 3, 1 font ",14"
 set tmargin 4
 
 #Plot_1
@@ -67,13 +67,13 @@ plot owd_file using ($0*0.1):(($1 - path_delay)/1000000) with point pointtype 7 
 
 #Plot_3
 
-#set title "FFRE"
-#set yrange [0:1.1]
-#set ytics 0.25
-#set xlabel "Time (s)" offset 0,-1
-#set format x "%.0f"
+set title "FFRE"
+set yrange [0:1.1]
+set ytics 0.25
+set xlabel "Time (s)" offset 0,-1
+set format x "%.0f"
 
-#plot fecstat_file using ($0*0.1):(0 < $2+$3 ? $3/($2+$3) : 0) with filledcurve x1 lc rgb "blue" title "FFRE"
+plot fecstat_file using ($0*0.1):(0 < $2+$3 ? $3/($2+$3) : 0) with filledcurve x1 lc rgb "blue" title "FFRE"
 
 
 #

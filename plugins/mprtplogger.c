@@ -59,6 +59,7 @@ typedef struct{
 typedef struct{
   gchar    string[1024];
   gchar    path[255];
+  gboolean overwrite;
 }WriterQueueItem;
 
 
@@ -216,6 +217,32 @@ done:
   THIS_UNLOCK(this);
 }
 
+void mprtp_log_one(const gchar *filename, const gchar * format, ...)
+{
+  WriterQueueItem *item;
+  va_list args;
+  THIS_LOCK(this);
+  if(!this->enabled){
+    goto done;
+  }
+  item = g_malloc0(sizeof(WriterQueueItem));
+  va_start (args, format);
+  vsprintf(item->string, format, args);
+  va_end (args);
+
+  strcpy(item->path, this->path);
+  strcat(item->path, filename);
+  item->overwrite = TRUE;
+
+  g_queue_push_tail(this->writer_queue, item);
+  if(this->writer_wait){
+    g_cond_signal(&this->writer_cond);
+  }
+done:
+  THIS_UNLOCK(this);
+}
+
+
 void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer,gchar*),gpointer data, const gchar* filename)
 {
   Subscription *subscription;
@@ -289,7 +316,8 @@ again:
   this->writer_wait = FALSE;
   THIS_UNLOCK(this);
 
-  fp = fopen(item->path, "a+");
+  fp = fopen(item->path, item->overwrite ? "w" : "a+");
+
   fprintf (fp, "%s", item->string);
   fclose(fp);
   g_free(item);

@@ -62,6 +62,7 @@ void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer,gchar*),gpointer d
 void mprtp_logger_set_target_directory(const gchar *path);
 void mprtp_logger_get_target_directory(gchar* result);
 void mprtp_logger(const gchar *filename, const gchar * format, ...);
+void mprtp_log_one(const gchar *filename, const gchar * format, ...);
 
 GType mprtp_logger_get_type (void);
 #endif /* MPRTP_LOGGER_H_ */

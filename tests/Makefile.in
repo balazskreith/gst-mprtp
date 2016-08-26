@@ -90,6 +90,7 @@ build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
 noinst_PROGRAMS = sender$(EXEEXT) receiver$(EXEEXT) \
+	scream_sender$(EXEEXT) scream_receiver$(EXEEXT) \
 	v4l2_file_player$(EXEEXT)
 subdir = tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -122,6 +123,21 @@ am__v_lt_0 = --silent
 am__v_lt_1 = 
 receiver_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(receiver_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_scream_receiver_OBJECTS =  \
+	scream_receiver-scream_receiver.$(OBJEXT)
+scream_receiver_OBJECTS = $(am_scream_receiver_OBJECTS)
+scream_receiver_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+scream_receiver_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(scream_receiver_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
+	-o $@
+am_scream_sender_OBJECTS = scream_sender-scream_sender.$(OBJEXT)
+scream_sender_OBJECTS = $(am_scream_sender_OBJECTS)
+scream_sender_DEPENDENCIES = $(am__DEPENDENCIES_1)
+scream_sender_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(scream_sender_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_sender_OBJECTS = sender-sender.$(OBJEXT)
 sender_OBJECTS = $(am_sender_OBJECTS)
@@ -171,9 +187,11 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(receiver_SOURCES) $(sender_SOURCES) \
+SOURCES = $(receiver_SOURCES) $(scream_receiver_SOURCES) \
+	$(scream_sender_SOURCES) $(sender_SOURCES) \
 	$(v4l2_file_player_SOURCES)
-DIST_SOURCES = $(receiver_SOURCES) $(sender_SOURCES) \
+DIST_SOURCES = $(receiver_SOURCES) $(scream_receiver_SOURCES) \
+	$(scream_sender_SOURCES) $(sender_SOURCES) \
 	$(v4l2_file_player_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
@@ -375,9 +393,15 @@ top_srcdir = @top_srcdir@
 receiver_SOURCES = receiver.c
 receiver_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
 receiver_LDADD = $(GST_LIBS)
+scream_receiver_SOURCES = scream_receiver.c
+scream_receiver_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(AM_CFLAGS)
+scream_receiver_LDADD = $(GST_PLUGINS_BASE_LIBS) -lgstrtp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
 sender_SOURCES = sender.c
 sender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
 sender_LDADD = $(GST_LIBS)
+scream_sender_SOURCES = scream_sender.c
+scream_sender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
+scream_sender_LDADD = $(GST_LIBS)
 v4l2_file_player_SOURCES = v4l2_file_player.c
 v4l2_file_player_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
 v4l2_file_player_LDADD = $(GST_LIBS)
@@ -428,6 +452,14 @@ receiver$(EXEEXT): $(receiver_OBJECTS) $(receiver_DEPENDENCIES) $(EXTRA_receiver
 	@rm -f receiver$(EXEEXT)
 	$(AM_V_CCLD)$(receiver_LINK) $(receiver_OBJECTS) $(receiver_LDADD) $(LIBS)
 
+scream_receiver$(EXEEXT): $(scream_receiver_OBJECTS) $(scream_receiver_DEPENDENCIES) $(EXTRA_scream_receiver_DEPENDENCIES) 
+	@rm -f scream_receiver$(EXEEXT)
+	$(AM_V_CCLD)$(scream_receiver_LINK) $(scream_receiver_OBJECTS) $(scream_receiver_LDADD) $(LIBS)
+
+scream_sender$(EXEEXT): $(scream_sender_OBJECTS) $(scream_sender_DEPENDENCIES) $(EXTRA_scream_sender_DEPENDENCIES) 
+	@rm -f scream_sender$(EXEEXT)
+	$(AM_V_CCLD)$(scream_sender_LINK) $(scream_sender_OBJECTS) $(scream_sender_LDADD) $(LIBS)
+
 sender$(EXEEXT): $(sender_OBJECTS) $(sender_DEPENDENCIES) $(EXTRA_sender_DEPENDENCIES) 
 	@rm -f sender$(EXEEXT)
 	$(AM_V_CCLD)$(sender_LINK) $(sender_OBJECTS) $(sender_LDADD) $(LIBS)
@@ -443,6 +475,8 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/receiver-receiver.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scream_receiver-scream_receiver.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scream_sender-scream_sender.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sender-sender.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/v4l2_file_player-v4l2_file_player.Po@am__quote@
 
@@ -480,6 +514,34 @@ receiver-receiver.obj: receiver.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='receiver.c' object='receiver-receiver.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(receiver_CFLAGS) $(CFLAGS) -c -o receiver-receiver.obj `if test -f 'receiver.c'; then $(CYGPATH_W) 'receiver.c'; else $(CYGPATH_W) '$(srcdir)/receiver.c'; fi`
+
+scream_receiver-scream_receiver.o: scream_receiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_receiver_CFLAGS) $(CFLAGS) -MT scream_receiver-scream_receiver.o -MD -MP -MF $(DEPDIR)/scream_receiver-scream_receiver.Tpo -c -o scream_receiver-scream_receiver.o `test -f 'scream_receiver.c' || echo '$(srcdir)/'`scream_receiver.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/scream_receiver-scream_receiver.Tpo $(DEPDIR)/scream_receiver-scream_receiver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='scream_receiver.c' object='scream_receiver-scream_receiver.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_receiver_CFLAGS) $(CFLAGS) -c -o scream_receiver-scream_receiver.o `test -f 'scream_receiver.c' || echo '$(srcdir)/'`scream_receiver.c
+
+scream_receiver-scream_receiver.obj: scream_receiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_receiver_CFLAGS) $(CFLAGS) -MT scream_receiver-scream_receiver.obj -MD -MP -MF $(DEPDIR)/scream_receiver-scream_receiver.Tpo -c -o scream_receiver-scream_receiver.obj `if test -f 'scream_receiver.c'; then $(CYGPATH_W) 'scream_receiver.c'; else $(CYGPATH_W) '$(srcdir)/scream_receiver.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/scream_receiver-scream_receiver.Tpo $(DEPDIR)/scream_receiver-scream_receiver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='scream_receiver.c' object='scream_receiver-scream_receiver.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_receiver_CFLAGS) $(CFLAGS) -c -o scream_receiver-scream_receiver.obj `if test -f 'scream_receiver.c'; then $(CYGPATH_W) 'scream_receiver.c'; else $(CYGPATH_W) '$(srcdir)/scream_receiver.c'; fi`
+
+scream_sender-scream_sender.o: scream_sender.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_sender_CFLAGS) $(CFLAGS) -MT scream_sender-scream_sender.o -MD -MP -MF $(DEPDIR)/scream_sender-scream_sender.Tpo -c -o scream_sender-scream_sender.o `test -f 'scream_sender.c' || echo '$(srcdir)/'`scream_sender.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/scream_sender-scream_sender.Tpo $(DEPDIR)/scream_sender-scream_sender.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='scream_sender.c' object='scream_sender-scream_sender.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_sender_CFLAGS) $(CFLAGS) -c -o scream_sender-scream_sender.o `test -f 'scream_sender.c' || echo '$(srcdir)/'`scream_sender.c
+
+scream_sender-scream_sender.obj: scream_sender.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_sender_CFLAGS) $(CFLAGS) -MT scream_sender-scream_sender.obj -MD -MP -MF $(DEPDIR)/scream_sender-scream_sender.Tpo -c -o scream_sender-scream_sender.obj `if test -f 'scream_sender.c'; then $(CYGPATH_W) 'scream_sender.c'; else $(CYGPATH_W) '$(srcdir)/scream_sender.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/scream_sender-scream_sender.Tpo $(DEPDIR)/scream_sender-scream_sender.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='scream_sender.c' object='scream_sender-scream_sender.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_sender_CFLAGS) $(CFLAGS) -c -o scream_sender-scream_sender.obj `if test -f 'scream_sender.c'; then $(CYGPATH_W) 'scream_sender.c'; else $(CYGPATH_W) '$(srcdir)/scream_sender.c'; fi`
 
 sender-sender.o: sender.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -MT sender-sender.o -MD -MP -MF $(DEPDIR)/sender-sender.Tpo -c -o sender-sender.o `test -f 'sender.c' || echo '$(srcdir)/'`sender.c

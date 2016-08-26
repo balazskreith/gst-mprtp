@@ -133,6 +133,7 @@ fecdecoder_init (FECDecoder * this)
   this->sysclock = gst_system_clock_obtain();
   this->repair_window_max = 300 * GST_MSECOND;
   this->repair_window_min = 10 * GST_MSECOND;
+  this->repaired = 0;
 
 }
 
@@ -214,6 +215,7 @@ gboolean fecdecoder_has_repaired_rtpbuffer(FECDecoder *this, guint16 hpsn, GstBu
     if(missing_seq == -1){
       continue;
     }
+    mprtp_log_one("recovered_packets.txt", "%d\n", ++this->repaired);
     *repairedbuf = _repair_rtpbuf_by_segment(this, segment, missing_seq);
     segment->repaired = TRUE;
     result = TRUE;

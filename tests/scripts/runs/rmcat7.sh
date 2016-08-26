@@ -23,6 +23,8 @@ OWD_RCV=100
   rm $TEMPDIR/peer1/*
   rm $TEMPDIR/peer2/*
   rm $TEMPDIR/peer3/*
+  rm $TEMPDIR/peer4/*
+  rm $TEMPDIR/peer5/*
 
 while [[ $# -gt 1 ]]
 do
@@ -66,7 +68,8 @@ done
   ./$CONFDIR/peer1params.sh >> $PEER1_SND
   chmod 777 $PEER1_SND
   
-  echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_SND" > $PEER1_SND_EMBED 
+  #echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_SND" > $PEER1_SND_EMBED
+  echo "./$PEER1_SND" > $PEER1_SND_EMBED 
   chmod 777 $PEER1_SND_EMBED  
 
   PEER2_SND="$TEMPDIR/sender_2.sh"
@@ -75,7 +78,8 @@ done
   ./$CONFDIR/peer2params.sh >> $PEER2_SND
   chmod 777 $PEER2_SND
   
-  echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER2_SND" > $PEER2_SND_EMBED 
+  #echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER2_SND" > $PEER2_SND_EMBED 
+  echo "./$PEER2_SND" > $PEER2_SND_EMBED 
   chmod 777 $PEER2_SND_EMBED  
 
   PEER1_RCV="$TEMPDIR/receiver_1.sh"
@@ -84,10 +88,10 @@ done
   echo "iperf -s -p 1234 &" >> $PEER1_RCV
   echo -n "./$RECEIVER" >> $PEER1_RCV
   ./$CONFDIR/peer1params.sh >> $PEER1_RCV
-  echo -n "--save_received_yuvfile=1 " >> $PEER1_RCV 
   chmod 777 $PEER1_RCV
   
-  echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_RCV" > $PEER1_RCV_EMBED 
+  #echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_RCV" > $PEER1_RCV_EMBED 
+  echo "./$PEER1_RCV" > $PEER1_RCV_EMBED 
   chmod 777 $PEER1_RCV_EMBED  
 
   PEER2_RCV="$TEMPDIR/receiver_2.sh"
@@ -96,7 +100,8 @@ done
   ./$CONFDIR/peer2params.sh >> $PEER2_RCV
   chmod 777 $PEER2_RCV
   
-  echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER2_RCV" > $PEER2_RCV_EMBED 
+  #echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER2_RCV" > $PEER2_RCV_EMBED 
+  echo "./$PEER2_RCV" > $PEER2_RCV_EMBED 
   chmod 777 $PEER2_RCV_EMBED  
 
 

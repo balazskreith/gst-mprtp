@@ -472,7 +472,6 @@ void _trash_bintree3node(bintree3_t *this, bintree3node_t *node)
   }
 
   g_slice_free(bintree3node_t, node);
-
 }
 
 void _refresh_top(bintree3_t *this)

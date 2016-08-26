@@ -1,7 +1,7 @@
 #!/bin/bash
 set -x
 VETH1="veth1"
-BW=5000
+BW=1000
 LATENCY=100
 BURST=15400
 
@@ -15,7 +15,7 @@ tc qdisc add dev "$VETH1" parent 1: handle 2: tbf rate "$BW"kbit burst "$BURST" 
 #ipfw pipe 1 config bw 3500Kbit/s queue 1050Kbit/s
 
 VETH2="veth2"
-BW=5000
+BW=1000
 LATENCY=100
 BURST=15400
 

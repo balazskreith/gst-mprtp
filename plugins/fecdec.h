@@ -58,6 +58,7 @@ struct _FECDecoder
   GstClockTime               repair_window_max;
   GstClockTime               made;
   GRWLock                    rwmutex;
+  gint32                     repaired;
 
   guint8                     payload_type;
   guint32                    total_early_repaired_bytes;

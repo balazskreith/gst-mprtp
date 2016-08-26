@@ -81,17 +81,8 @@ typedef enum{
 
 #define SR_TR_ARRAY_LENGTH 3
 
-typedef struct{
-  gint32  gp;
-  gint32  sr;
-  gint32  fec;
-  gdouble tend;
-}TargetItem;
 
-typedef struct{
-  TargetItem items[256];
-  gint       item_index;
-}TargetController;
+
 
 struct _Private{
   GstClockTime        time;

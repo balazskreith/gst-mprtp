@@ -38,8 +38,11 @@ struct _FBRAFBProducer
   guint32                  ssrc;
   guint8                   subflow_id;
 
+//  gboolean                 begin_seq_init;
+//  gboolean                 end_seq_init;
   guint16                  begin_seq;
   guint16                  end_seq;
+//  guint16                  HSSN,LRSN; //Last Reported Sequence Number
   gboolean*                vector;
   guint                    vector_length;
 

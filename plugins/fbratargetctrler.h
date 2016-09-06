@@ -52,6 +52,7 @@ struct _FBRATargetCtrler
   gint32                    rcved_fb;
   gint32                    required_fb;
   gint32                    target_bitrate;
+  gint32                    undershoot_target;
   gint32                    bottleneck_point;
   gint32                    stable_point;
 
@@ -80,6 +81,7 @@ void fbratargetctrler_accelerate(FBRATargetCtrler* this);
 gboolean fbratargetctrler_get_approvement(FBRATargetCtrler* this);
 gboolean fbratargetctrler_get_target_approvement(FBRATargetCtrler* this);
 gboolean fbratargetctrler_get_probe_approvement(FBRATargetCtrler* this);
+gint32 fbratargetctrler_get_target_rate(FBRATargetCtrler* this);
 void fbratargetctrler_refresh_target(FBRATargetCtrler* this);
 
 void fbratargetctrler_set_initial(FBRATargetCtrler *this, gint32 target_bitrate);

@@ -59,7 +59,8 @@ done
   echo "ntrt -c$CONFDIR/ntrt_snd_meas.ini -m$CONFDIR/ntrt_rmcat1.cmds -t$DURATION &" > $PEER1_SND
   echo -n "./$SENDER" >> $PEER1_SND
   ./$CONFDIR/peer1params.sh >> $PEER1_SND
-  echo -n "--save_received_yuvfile=1 " >> $PEER1_SND 
+  echo -n "--save_received_yuvfile=0 " >> $PEER1_SND 
+  echo -n "--use_testsourcevideo=1 " >> $PEER1_SND 
   chmod 777 $PEER1_SND
   
   #echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_SND" > $PEER1_SND_EMBED
@@ -72,7 +73,7 @@ done
   echo "ntrt -c$CONFDIR/ntrt_rcv_meas.ini -t$DURATION &" > $PEER1_RCV
   echo -n "./$RECEIVER" >> $PEER1_RCV
   ./$CONFDIR/peer1params.sh >> $PEER1_RCV
-  echo -n "--save_received_yuvfile=1 " >> $PEER1_RCV 
+  echo -n "--save_received_yuvfile=0 " >> $PEER1_RCV 
   chmod 777 $PEER1_RCV
   
   #echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_RCV" > $PEER1_RCV_EMBED 

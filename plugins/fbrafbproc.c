@@ -582,6 +582,7 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
   if(act_seq == end_seq){
     goto done;
   }
+//  g_print("rle vector received from %d to %d\n", act_seq, end_seq);
   for(i=0; act_seq <= end_seq; ++act_seq, ++i){
     item = this->items + act_seq;
     if(item->acknowledged){

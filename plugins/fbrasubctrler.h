@@ -90,6 +90,8 @@ struct _FBRASubController
 
   guint                     last_rtp_size;
 
+  gboolean hard_reduce_mem;
+
 };
 
 struct _FBRASubControllerClass{

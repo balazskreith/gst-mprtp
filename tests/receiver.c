@@ -121,7 +121,6 @@ setup_ghost_sink (GstElement * sink, GstBin * bin)
 static SessionData *
 make_video_session (guint sessionNum)
 {
-  gint framerate = 25;
   SessionData *ret = session_new (sessionNum);
   gchar binname[20];
 //  GstBin *bin = GST_BIN (gst_bin_new ("video"));
@@ -153,12 +152,9 @@ make_video_session (guint sessionNum)
   return ret;
 }
 
-
-
 static SessionData *
 make_video_session_and_save_yuvfile (guint sessionNum)
 {
-  gint framerate = 25;
   SessionData *ret = session_new (sessionNum);
   gchar binname[20];
   GstBin *bin = GST_BIN (gst_bin_new (rand_string(binname, 18)));
@@ -498,6 +494,7 @@ main (int argc, char **argv)
 //  g_object_set (rtpBin, "latency", 200, "do-retransmission", TRUE,
 //      "rtp-profile", GST_RTP_PROFILE_AVPF, NULL);
 
+  framerate = use_testsourcevideo ? 100 : 25;
   if(save_received_yuvfile){
     videoSession = make_video_session_and_save_yuvfile (0);
   }else{

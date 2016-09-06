@@ -1244,7 +1244,7 @@ again:
   }
 
   if(!_mprtpscheduler_send_buffer(this, item)){
-    next_scheduler_time = _now(this) + 500 * GST_USECOND;
+    next_scheduler_time = _now(this) + 1 * GST_USECOND;
     goto done;
   }
   item = packetssndqueue_pop(this->sndqueue);

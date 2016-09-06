@@ -50,11 +50,11 @@ G_DEFINE_TYPE (FBRATargetCtrler, fbratargetctrler, G_TYPE_OBJECT);
 //before the target considered to be accepted
 #define MIN_APPROVE_INTERVAL 50 * GST_MSECOND
 
-//determine the minimum interval in seconds must be stay in probe stage
+//determine the minimum multiplying factor for aprovements
 //before the target considered to be accepted
 #define APPROVE_MIN_FACTOR 1.0
 
-//determine the maximum interval in seconds must be stay in probe stage
+//determine the maximum multiplying factor for aprovements
 //before the target considered to be accepted
 #define APPROVE_MAX_FACTOR 2.0
 
@@ -76,9 +76,6 @@ G_DEFINE_TYPE (FBRATargetCtrler, fbratargetctrler, G_TYPE_OBJECT);
 
 //interval epsilon
 #define INTERVAL_EPSILON 0.25
-
-//monitoring epsilon
-#define MONITORING_EPSILON 1.0
 
 //determines the minimum monitoring interval
 #define MIN_MONITORING_INTERVAL 2
@@ -116,7 +113,6 @@ struct _Private{
   gint32              min_monitoring_interval;
   gint32              max_monitoring_interval;
 
-  gdouble             monitoring_epsilon;
   gdouble             interval_epsilon;
 
   TargetItem          items[256];
@@ -139,7 +135,6 @@ struct _Private{
 #define _btlp(this) this->bottleneck_point
 
 #define _appr_eps(this)               _priv(this)->approvement_epsilon
-#define _mon_eps(this)                _priv(this)->monitoring_epsilon
 #define _interval_eps(this)           _priv(this)->interval_epsilon
 #define _min_appr_int(this)           _priv(this)->min_approve_interval
 #define _appr_min_fact(this)          _priv(this)->approve_min_factor
@@ -217,7 +212,6 @@ fbratargetctrler_init (FBRATargetCtrler * this)
 
   _priv(this)->approvement_epsilon              = APPROVEMENT_EPSILON;
   _priv(this)->interval_epsilon                 = INTERVAL_EPSILON;
-  _priv(this)->monitoring_epsilon               = MONITORING_EPSILON;
 
   _priv(this)->min_monitoring_interval          = MIN_MONITORING_INTERVAL;
   _priv(this)->max_monitoring_interval          = MAX_MONITORING_INTERVAL;
@@ -380,7 +374,7 @@ static guint _get_monitoring_interval(FBRATargetCtrler *this)
   {
     gdouble refpoint;
     refpoint = MAX(_min_target(this), this->bottleneck_point);
-    epsilon = MIN(1., (gdouble) _max_ramp_up(this) / refpoint);
+    epsilon = MIN(.25, (gdouble) _max_ramp_up(this) / refpoint);
   }
 
 //  off = _off_target(this, 2, _mon_eps(this));
@@ -426,6 +420,8 @@ void fbratargetctrler_update_rtpavg(FBRATargetCtrler* this, gint32 payload_lengt
   _priv(this)->avg_rtp_payload *= .9;
   _priv(this)->avg_rtp_payload += .1 * payload_length;
 }
+
+
 
 static void _corrigate(FBRATargetCtrler *this)
 {
@@ -503,6 +499,7 @@ void fbratargetctrler_break(FBRATargetCtrler* this)
   if(1.1 < OF){
     this->bottleneck_point = _priv(this)->gp_median;
     this->target_bitrate = this->bottleneck_point * .6;
+    this->undershoot_target = this->target_bitrate * .2;
     goto reduced;
   }
 
@@ -514,14 +511,15 @@ void fbratargetctrler_break(FBRATargetCtrler* this)
   }
 
   this->bottleneck_point = MIN(_priv(this)->gp_median, this->target_bitrate) * .9;
-  this->target_bitrate = this->bottleneck_point * .9;
-
+  this->target_bitrate = this->bottleneck_point * .85;
+  this->undershoot_target = this->target_bitrate * .2;
 
 reduced:
   this->changed = this->broke = _now(this);
   this->target_approvement = FALSE;
   this->rcved_fb = 0;
   this->reached  = 0;
+
 done:
   return;
 
@@ -533,6 +531,7 @@ void fbratargetctrler_accelerate(FBRATargetCtrler* this)
   this->rcved_fb = 0;
   this->stable_point = MIN(this->target_bitrate, _priv(this)->gp_median);
   this->target_bitrate = this->stable_point + _priv(this)->fec_median;
+//  this->target_bitrate = CONSTRAIN(this->stable_point, _priv(this)->gp_median * 2, this->target_bitrate + _priv(this)->fec_median);
   this->target_approvement = FALSE;
 }
 
@@ -637,6 +636,10 @@ gboolean fbratargetctrler_get_probe_approvement(FBRATargetCtrler* this)
   return this->probe_approvement;
 }
 
+gint32 fbratargetctrler_get_target_rate(FBRATargetCtrler* this)
+{
+  return this->target_bitrate;
+}
 /*
                              s
 X_Bps = -----------------------------------------------
@@ -668,7 +671,7 @@ void fbratargetctrler_refresh_target(FBRATargetCtrler* this)
 
   _refresh_target_approvement(this);
   if(this->changed < this->reached){
-
+    DISABLE_LINE _corrigate(this);
   }
 
   if(0 < _priv(this)->min_target_bitrate){
@@ -688,7 +691,15 @@ void fbratargetctrler_refresh_target(FBRATargetCtrler* this)
 //          this->target_approvement, this->probe_approvement, this->stable_point,
 //          this->refreshed < this->broke, this->refreshed < this->increased);
 
-  mprtps_path_set_target_bitrate(this->path, this->target_bitrate);
+  if(this->broke <= this->reached){
+    mprtps_path_set_target_bitrate(this->path, this->target_bitrate);
+  }else{
+	this->undershoot_target = MAX(_priv(this)->min_target_bitrate, this->undershoot_target);
+	mprtps_path_set_target_bitrate(this->path, this->undershoot_target);
+	if(this->broke < _now(this) - CONSTRAIN(.05 * GST_SECOND, .3 * GST_SECOND, 2 * _RTT(this))){
+	  this->undershoot_target = (this->undershoot_target * 4 + this->target_bitrate) / 5;
+	}
+  }
 
   this->refreshed = _now(this);
 }

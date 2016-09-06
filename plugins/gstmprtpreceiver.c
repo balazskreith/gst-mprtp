@@ -330,7 +330,7 @@ gst_mprtpreceiver_request_new_pad (GstElement * element, GstPadTemplate * templ,
   GstPad *sinkpad;
   GstMprtpreceiver *this;
   guint8 subflow_id;
-  Subflow *subflow;
+  Subflow *subflow = NULL;
   gboolean async = FALSE;
   GList *it;
 

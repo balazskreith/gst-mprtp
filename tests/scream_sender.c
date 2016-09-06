@@ -119,68 +119,60 @@ setup_ghost (GstElement * src, GstBin * bin)
   gst_element_add_pad (GST_ELEMENT (bin), binPad);
 }
 
+
+
 static SessionData *
-make_video_session (guint sessionNum)
+make_video_session2 (guint sessionNum)
 {
   GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
-//  GstElement *videoSrc = gst_element_factory_make ("autovideosrc", NULL);
-  GstElement *videoSrc = gst_element_factory_make ("multifilesrc", NULL);
-  GstElement *queue    = gst_element_factory_make("queue", NULL);
-  GstElement *identity = gst_element_factory_make ("identity", NULL);
-  GstElement *videoParse = gst_element_factory_make ("videoparse", NULL);
-  GstElement *videoConv = gst_element_factory_make("autovideoconvert", NULL);
+  GstElement *videoSrc = gst_element_factory_make ("videotestsrc", NULL);
   GstElement *payloader = gst_element_factory_make ("rtpvp8pay", NULL);
+
+  GstElement *plyqueue    = gst_element_factory_make("queue", "plyqueue");
+  GstElement *recqueue    = gst_element_factory_make("queue", "recqueue");
+  GstElement *recorder    = gst_element_factory_make("filesink", "recorder");
+  GstElement *splitter    = gst_element_factory_make("tee", "splitter");
+
   GstCaps *videoCaps;
   SessionData *session;
-  g_object_set (videoSrc,
-                "location", yuvsrc_file,
-                "loop", TRUE,
-                NULL);
 
   encoder = gst_element_factory_make ("vp8enc", NULL);
-  //g_object_set (payloader, "config-interval", 2, NULL);
   g_object_set (encoder, "target-bitrate", sending_target, NULL);
-//  g_object_set (encoder, "end-usage", 1, NULL);
-//  g_object_set (encoder, "deadline", 20000, NULL);
-//  g_object_set (encoder, "undershoot", 100, NULL);
-//  g_object_set (encoder, "cpu-used", 0, NULL);
-//  g_object_set (encoder, "keyframe-mode", 0, NULL);
-/* values are inspired by webrtc.org values in vp8_impl.cc */
+
+  g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 3, NULL);
+
+  g_object_set (recorder, "location", "source.yuv", NULL);
+
   g_object_set(encoder,
-      "end-usage", 1, /* VPX_CBR */
-      "deadline", G_GINT64_CONSTANT(1), /* VPX_DL_REALTIME */
-      "cpu-used", -6,
-      "min-quantizer", 2,
-      "buffer-initial-size", 300,
-      "buffer-optimal-size", 300,
-      "buffer-size", 400,
-      "dropframe-threshold", 30,
-      "lag-in-frames", 0,
-      "timebase", 1, 90000,
-      "error-resilient", 1,
-//      "keyframe-mode", 1, /* VPX_KF_DISABLED */
-//      "keyframe-max-dist", 128,
-      NULL);
+        "end-usage", 1, /* VPX_CBR */
+        "deadline", G_GINT64_CONSTANT(1), /* VPX_DL_REALTIME */
+        "cpu-used", -6,
+        "min-quantizer", 2,
+        "buffer-initial-size", 300,
+        "buffer-optimal-size", 300,
+        "buffer-size", 400,
+        "dropframe-threshold", 30,
+        "lag-in-frames", 0,
+        "timebase", 1, 90000,
+        "error-resilient", 1,
+  //      "keyframe-mode", 1, /* VPX_KF_DISABLED */
+  //      "keyframe-max-dist", 128,
+        NULL);
 
+  gst_bin_add_many (videoBin, videoSrc, encoder, plyqueue, recqueue, recorder, splitter, payloader, NULL);
 
-  gst_bin_add_many (videoBin, videoConv, videoSrc, identity, videoParse, encoder, payloader, queue, NULL);
-  g_object_set (videoParse,
-      "width", yuvsrc_width,
-      "height", yuvsrc_height,
-      "framerate", 25, 1,
-      "format", 2,
-      NULL);
-  g_object_set (identity, "sync", TRUE, NULL);
+  videoCaps = gst_caps_new_simple ("video/x-raw",
+      "width", G_TYPE_INT, yuvsrc_width,
+      "height", G_TYPE_INT, yuvsrc_height,
+	  "framerate", GST_TYPE_FRACTION, framerate, 1, NULL);
 
-  gst_element_link (videoSrc, videoParse);
-//    gst_element_link (videoParse, identity);
-//    gst_element_link (identity, encoder);
-//    gst_element_link (videoParse, queue);
-//    gst_element_link (queue, encoder);
-  gst_element_link (videoParse, encoder);
+  gst_element_link_filtered (videoSrc, splitter, videoCaps);
+  gst_element_link_pads (splitter, "src_1", plyqueue, "sink");
+  gst_element_link_pads (splitter, "src_2", recqueue, "sink");
+  gst_element_link (recqueue, recorder);
+
+  gst_element_link (plyqueue, encoder);
   gst_element_link (encoder, payloader);
-
-//  g_object_set(videoSrc, "filter-caps", videoCaps, NULL);
 
   setup_ghost (payloader, videoBin);
 
@@ -190,20 +182,21 @@ make_video_session (guint sessionNum)
   return session;
 }
 
-
 static SessionData *
-make_video_session2 (guint sessionNum)
+make_video_session (guint sessionNum)
 {
   GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
   GstElement *videoSrc = gst_element_factory_make ("videotestsrc", NULL);
   GstElement *payloader = gst_element_factory_make ("rtpvp8pay", NULL);
+
+
   GstCaps *videoCaps;
   SessionData *session;
 
   encoder = gst_element_factory_make ("vp8enc", NULL);
   g_object_set (encoder, "target-bitrate", sending_target, NULL);
 
-  g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 10, NULL);
+  g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 3, NULL);
 
   g_object_set(encoder,
         "end-usage", 1, /* VPX_CBR */
@@ -222,10 +215,12 @@ make_video_session2 (guint sessionNum)
         NULL);
 
   gst_bin_add_many (videoBin, videoSrc, encoder, payloader, NULL);
+
   videoCaps = gst_caps_new_simple ("video/x-raw",
       "width", G_TYPE_INT, yuvsrc_width,
       "height", G_TYPE_INT, yuvsrc_height,
-	  "framerate", GST_TYPE_FRACTION, 25, 1, NULL);
+	  "framerate", GST_TYPE_FRACTION, framerate, 1, NULL);
+
   gst_element_link_filtered (videoSrc, encoder, videoCaps);
   gst_element_link (encoder, payloader);
 
@@ -237,56 +232,6 @@ make_video_session2 (guint sessionNum)
   return session;
 }
 
-
-static SessionData *
-make_video_session3 (guint sessionNum)
-{
-  GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
-  GstElement *v4l2src = gst_element_factory_make ("v4l2src", NULL);
-  GstElement *queue = gst_element_factory_make ("queue", NULL);
-  GstElement *videoconvert = gst_element_factory_make ("videoconvert", NULL);
-  GstElement *capsfilter = gst_element_factory_make ("capsfilter", NULL);
-  GstElement *payloader = gst_element_factory_make ("rtpvp8pay", NULL);
-  GstCaps *videoCaps;
-  SessionData *session;
-
-  encoder = gst_element_factory_make ("vp8enc", NULL);
-  g_object_set (encoder, "target-bitrate", sending_target, NULL);
-
-  g_object_set(encoder,
-        "end-usage", 1, /* VPX_CBR */
-        "deadline", G_GINT64_CONSTANT(1), /* VPX_DL_REALTIME */
-        "cpu-used", -6,
-        "min-quantizer", 2,
-        "buffer-initial-size", 300,
-        "buffer-optimal-size", 300,
-        "buffer-size", 400,
-        "dropframe-threshold", 30,
-        "lag-in-frames", 0,
-        "timebase", 1, 90000,
-        "error-resilient", 1,
-  //      "keyframe-mode", 1, /* VPX_KF_DISABLED */
-  //      "keyframe-max-dist", 128,
-        NULL);
-
-
-
-  gst_bin_add_many (videoBin, v4l2src, videoconvert, queue, encoder, payloader, NULL);
-  videoCaps = gst_caps_new_simple (
-      "video/x-raw",
-      "width", G_TYPE_INT, 352,
-      "height", G_TYPE_INT, 288,
-      "framerate", GST_TYPE_FRACTION, 25, 1, NULL);
-
-  gst_element_link_many (v4l2src, videoconvert, queue, encoder, payloader, NULL);
-
-  setup_ghost (payloader, videoBin);
-
-  session = session_new (sessionNum);
-  session->input = GST_ELEMENT (videoBin);
-
-  return session;
-}
 
 static GstElement *
 request_aux_sender (GstElement * rtpbin, guint sessid, SessionData * session)
@@ -367,6 +312,8 @@ static void on_feedback_rtcp(GObject *session, guint type, guint fbtype, guint s
 static gboolean on_payload_adaptation_request(GstElement *screamqueue, guint pt,
     SessionData *session)
 {
+    guint pt_rtx;
+
     OWR_UNUSED(screamqueue);
     return TRUE;
 }
@@ -390,7 +337,6 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
   GstElement *rtcpSink = gst_element_factory_make ("udpsink", NULL);
   GstElement *rtcpSrc = gst_element_factory_make ("udpsrc", NULL);
   GstElement *scream_queue = gst_element_factory_make("screamqueue", "screamqueue");
-  GstElement *queue = gst_element_factory_make("queue", "queue");
   int basePort;
   gchar *padName;
 
@@ -399,7 +345,6 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
   session->screamqueue = scream_queue;
 
   gst_bin_add_many (GST_BIN (pipe), rtpSink, rtcpSink, rtcpSrc, scream_queue,
-		  queue,
       session->input, NULL);
 
   /* enable retransmission by setting rtprtxsend as the "aux" element of rtpbin */
@@ -407,13 +352,13 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
       (GCallback) request_aux_sender, session);
 
   g_object_set (rtpSink, "port", path1_tx_rtp_port, "host", path_1_tx_ip,
-		  "enable-last-sample", FALSE,
+		  "sync",FALSE,
 		  "async", FALSE,
-		  "sync", FALSE,
-		  NULL);
+	      NULL);
 
   g_object_set (rtcpSink, "port", rtpbin_tx_rtcp_port, "host", path_1_tx_ip,
-       "sync",FALSE, "async", FALSE, NULL);
+       "sync",FALSE,
+	   "async", FALSE, NULL);
 
   g_object_set (rtcpSrc, "port", rtpbin_rx_rtcp_port, NULL);
 
@@ -435,8 +380,6 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
   padName = g_strdup_printf ("send_rtp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, scream_queue, "sink");
   gst_element_link (scream_queue, rtpSink);
-  //gst_element_link (scream_queue, queue);
-  //gst_element_link (queue, rtpSink);
 
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");
@@ -497,7 +440,7 @@ main (int argc, char **argv)
   gst_bin_add (GST_BIN (pipe), rtpBin);
 
 //  videoSession = make_video_session (0);
-  videoSession = make_video_session2 (0);
+  videoSession = save_received_yuvfile ? make_video_session2(0) : make_video_session(0);
   add_stream (pipe, rtpBin, videoSession);
 
   g_print ("starting server pipeline\n");

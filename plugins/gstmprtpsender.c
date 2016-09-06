@@ -547,7 +547,7 @@ gst_mprtpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
   GstPad *srcpad;
   GstMprtpsender *this;
   guint8 subflow_id;
-  Subflow *subflow;
+  Subflow *subflow = NULL;
   gboolean async = FALSE;
   GList *it;
 

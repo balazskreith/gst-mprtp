@@ -73,7 +73,7 @@ set ytics 0.25
 set xlabel "Time (s)" offset 0,-1
 set format x "%.0f"
 
-plot fecstat_file using ($0*0.1):(0 < $2+$3 ? $3/($2+$3) : 0) with filledcurve x1 lc rgb "blue" title "FFRE"
+plot fecstat_file using ($0*0.1):(0 < $2+$3 ? $3/($2+$3) : 0) with filledcurve x1 lc rgb "blue" title "Packet Recovery Efficiency"
 
 
 #

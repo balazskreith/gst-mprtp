@@ -247,6 +247,7 @@ void fbrafbproducer_track(gpointer data, GstMpRTPBuffer *mprtp)
   if(_cmp_seq(this->end_seq + 1, mprtp->subflow_seq) < 0){
     guint16 seq = this->end_seq + 1;
     for(; _cmp_seq(seq, mprtp->subflow_seq) < 0; ++seq){
+//      g_print("marked as discarded: %d\n", seq);
       this->vector[this->vector_length++] = FALSE;
     }
   }
@@ -303,12 +304,19 @@ void _setup_xr_rfc7097(FBRAFBProducer * this, ReportProducer *reportproducer)
                                        this->vector_length
                                        );
 
+//  g_print("FB creating begin seq: %d end seq: %d, vector length: %d\n", this->begin_seq, this->end_seq, this->vector_length);
   memset(this->vector, 0, sizeof(gboolean) * 1000);
-  this->vector_length = 0;
-  if(_cmp_seq(this->begin_seq, this->end_seq) < 0){
+//  if(_cmp_seq(this->begin_seq, this->end_seq) < 0){
+//    this->begin_seq = this->end_seq + 1;
+//  }
+  if(0 < this->vector_length){
     this->begin_seq = this->end_seq + 1;
+    this->vector_length = 0;
   }
+
 }
+
+
 
 void _setup_xr_owd(FBRAFBProducer * this, ReportProducer *reportproducer)
 {

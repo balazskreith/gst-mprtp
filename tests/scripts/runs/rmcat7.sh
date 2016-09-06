@@ -68,7 +68,7 @@ done
   ./$CONFDIR/peer1params.sh >> $PEER1_SND
   chmod 777 $PEER1_SND
   
-  #echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_SND" > $PEER1_SND_EMBED
+   #echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_SND" > $PEER1_SND_EMBED
   echo "./$PEER1_SND" > $PEER1_SND_EMBED 
   chmod 777 $PEER1_SND_EMBED  
 

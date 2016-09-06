@@ -156,6 +156,8 @@ static gchar default_yuvsrc_file[255];
 static int yuvsrc_width          = 352;
 static int yuvsrc_height         = 288;
 static int save_received_yuvfile = 0;
+static int use_testsourcevideo   = 0;
+static int framerate = 100;
 
 static gchar *path_1_rx_ip      = NULL;
 static gchar default_path_1_rx_ip[255];
@@ -183,7 +185,7 @@ static int spike_var_th         = 32;
 static int rtcp_interval_type   = 2;
 static int report_timeout       = 0;
 static int controlling_mode     = 2;
-static int sending_target       = 500000;
+static int sending_target       = 100000;
 static int path1_active         = 1;
 static int path2_active         = 0;
 static int path3_active         = 0;
@@ -208,7 +210,8 @@ static int extra_delay = 0;
 static GOptionEntry entries[] =
 {
     { "logsdir", 0, 0, G_OPTION_ARG_STRING, &logsdir, "Logsdir", NULL },
-    { "save_received_yuvfile", 0, 0, G_OPTION_ARG_INT, &save_received_yuvfile, "Save received YUVfile", NULL },
+	{ "save_received_yuvfile", 0, 0, G_OPTION_ARG_INT, &save_received_yuvfile, "Save received YUVfile", NULL },
+	{ "use_testsourcevideo", 0, 0, G_OPTION_ARG_INT, &use_testsourcevideo, "Use Testvideosource", NULL },
     { "yuvsrc_file", 0, 0, G_OPTION_ARG_STRING, &yuvsrc_file, "Yuvsrc file", NULL },
     { "yuvsrc_width", 0, 0, G_OPTION_ARG_INT, &yuvsrc_width, "Yuvsrc width", NULL },
     { "yuvsrc_height", 0, 0, G_OPTION_ARG_INT, &yuvsrc_height, "Yuvsrc width", NULL },

@@ -337,8 +337,8 @@ gboolean fbrasubctrler_path_approver(gpointer data, GstRTPBuffer *rtp)
 //          _fbstat(this).bytes_in_flight * 8,
 //          (gdouble)_fbstat(this).bytes_in_flight / (gdouble)_fbstat(this).sent_bytes_in_1s,
 //          (gdouble)_fbstat(this).sent_bytes_in_1s * (gdouble)(_fbstat(this).owd_stt * .000000001) * 8);
-
   return TRUE;
+
 }
 
 
@@ -572,6 +572,14 @@ static gboolean _congestion(FBRASubController *this)
   gdouble FD_th;
   if(!_proactive(this)){
     return .1 < _fbstat(this).discarded_rate;
+  }
+
+  {
+    GstClockTime owd_th;
+    owd_th = _fbstat(this).owd_ltt80 + CONSTRAIN(100 * GST_MSECOND, 300 * GST_MSECOND, _fbstat(this).owd_th_cng);
+    if(owd_th < _fbstat(this).owd_stt){
+      return TRUE;
+    }
   }
 
   FD_th = CONSTRAIN(.02, .1, _fbstat(this).FD_avg * 2);

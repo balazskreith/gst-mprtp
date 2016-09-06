@@ -59,7 +59,7 @@ done
   echo "iperf -c 10.0.0.6 -p 1234 -t $DURATION" >> $PEER1_SND
   chmod 777 $PEER1_SND
 
-  echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_SND" > $PEER1_SND_EMBED 
+  echo "./$PEER1_SND" > $PEER1_SND_EMBED 
   chmod 777 $PEER1_SND_EMBED  
 
   PEER1_RCV="$TEMPDIR/receiver_1.sh"
@@ -74,7 +74,7 @@ done
   echo "iperf -s -p 1234" >> $PEER1_RCV
   chmod 777 $PEER1_RCV
   
-  echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_RCV" > $PEER1_RCV_EMBED 
+  echo " ./$PEER1_RCV" > $PEER1_RCV_EMBED 
   chmod 777 $PEER1_RCV_EMBED  
 
   #start receiver and sender

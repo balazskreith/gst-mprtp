@@ -200,6 +200,14 @@ static void _BiF_rem_pipe(gpointer udata, gpointer itemptr)
     g_warning("sequence number %hu not acknowledged in 3RTT or 3s. Hm????", item->seq_num);
     this->stat.bytes_in_flight -= item->payload_bytes;
     --this->stat.packets_in_flight;
+  }else if(this->stat.higest_acked_seq_num == item->seq_num){
+	  GstClockTime now = _now(this);
+	  gdouble rtt = now - item->sent;
+	  this->stat.RTT = (this->stat.RTT == 0) ? rtt : (rtt * .125 + this->stat.RTT * .875);
+	  if(this->stat.RTT < now - this->stat.srtt_updated){
+		  this->stat.srtt = (this->stat.srtt == 0.) ? this->stat.RTT : this->stat.RTT * .125 + this->stat.srtt * .875;
+		  this->stat.srtt_updated = now;
+	  }
   }
 
   _unref_rtpitem(this, item);
@@ -442,7 +450,7 @@ void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn)
 
   item->payload_bytes = payload_len;
   item->seq_num       = sn;
-
+  item->sent          = _now(this);
 
 //  ++this->stat.packets_in_flight;
 //  this->stat.bytes_in_flight += payload_len;
@@ -477,8 +485,8 @@ void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summa
   PROFILING("THIS_WRITELOCK", THIS_WRITELOCK (this));
 
   if(summary->RR.processed){
-    this->stat.RTT  = summary->RR.RTT;
-    this->stat.srtt = (this->stat.srtt == 0.) ? summary->RR.RTT : (summary->RR.RTT * .1 + this->stat.srtt * .9);
+	//this->stat.RTT  = summary->RR.RTT;
+	//this->stat.srtt = (this->stat.srtt == 0.) ? summary->RR.RTT : (summary->RR.RTT * .1 + this->stat.srtt * .9);
     slidingwindow_set_treshold(this->BiF_sw, 3 * MIN(GST_SECOND, this->stat.srtt));
   }
   if(summary->XR.DiscardedRLE.processed){
@@ -591,6 +599,7 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
     item->discarded = !xr->DiscardedRLE.vector[i];
     slidingwindow_add_data(this->acked_1s_sw, item);
   }
+  this->stat.higest_acked_seq_num = end_seq;
 done:
   slidingwindow_refresh(this->sent_sw);
   slidingwindow_refresh(this->BiF_sw);

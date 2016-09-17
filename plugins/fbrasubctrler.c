@@ -120,8 +120,8 @@ struct _Private{
   GstClockTime        owd_dist_th;
   GstClockTime        owd_cng_th;
 
-  gboolean            proactive;
-  GstClockTime        proactive_disabled;
+//  gboolean            proactive;
+//  GstClockTime        proactive_disabled;
 
   gboolean            reactive_cc_allowed;
 
@@ -132,7 +132,6 @@ struct _Private{
 #define _priv(this) ((Private*)this->priv)
 #define _fbstat(this) this->fbstat
 #define _throttler(this) _priv(this)->throttler
-#define _proactive(this) _priv(this)->proactive
 
 #define _bcongestion(this) _priv(this)->bcongestion
 #define _btlp(this) this->bottleneck_point
@@ -272,7 +271,6 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->owd_corr_dist_th                 = OWD_CORR_DISTORTION_TRESHOLD;
 
   _priv(this)->tr_approved                      = TRUE;
-  _priv(this)->proactive                        = FALSE;
   _priv(this)->reactive_cc_allowed              = REACTIVE_CONGESTION_DETECTION_ALLOWED;
 
 }
@@ -463,6 +461,9 @@ static void _update_fraction_discarded(FBRASubController *this)
   _FD_dist_th(this) = MIN(DISCARD_DISTORTION_MAX_TRESHOLD, this->fbstat.FD_median * 2.);
 }
 
+
+GstClockTime start = 0;
+GstClockTime previous = 0;
 void fbrasubctrler_report_update(
                          FBRASubController *this,
                          GstMPRTCPReportSummary *summary)
@@ -490,18 +491,6 @@ void fbrasubctrler_report_update(
   fbratargetctrler_update(this->targetctrler, &this->fbstat);
   _update_fraction_discarded(this);
 
-//  _priv(this)->proactive = _fbstat(this).overused_avg < .5;
-  if(!_reactive_cc_allowed(this)){
-    _priv(this)->proactive = TRUE;
-  }else if(.02 < _fbstat(this).discarded_rate){
-    _priv(this)->proactive = FALSE;
-    _priv(this)->proactive_disabled = _now(this);
-  }else if(!_priv(this)->proactive){
-	GstClockTime th;
-	th = CONSTRAIN(300 * GST_MSECOND, GST_SECOND, 3 * _RTT(this));
-    _priv(this)->proactive = _priv(this)->proactive_disabled < _now(this) - th;
-  }
-
   _execute_stage(this);
 
 //  if(_FD(this) <= _FD_cong_th(this) && _fbstat(this).tendency < .2 && -.2 < _fbstat(this).tendency){
@@ -522,7 +511,7 @@ void fbrasubctrler_report_update(
   _priv(this)->owd_corr_dist_th = (gdouble)(_fbstat(this).owd_ltt80 + _fbstat(this).owd_th_dist) / (gdouble)_fbstat(this).owd_ltt80;
 
   mprtp_logger("fbrasubctrler.log",
-               "TR: %-7d|GP:%-7d|corh: %-3lu/%-3lu=%3.2f (%1.2f)|SR: %-7d|FEC:%-7d|tend: %3.2f|stg: %d|sta: %d|FD: %1.2f|rtt: %-3.2f|pro4: %d\n",
+               "TR: %-7d|GP:%-7d|corh: %-3lu/%-3lu=%3.2f (%1.2f)|SR: %-7d|FEC:%-7d|tend: %3.2f|stg: %d|sta: %d|FD: %1.2f|rtt: %-3.2f|T:%-3.3f (%-3.3f)\n",
             _TR(this),
             _fbstat(this).goodput_bytes * 8,
             GST_TIME_AS_MSECONDS(_fbstat(this).owd_stt),
@@ -536,9 +525,11 @@ void fbrasubctrler_report_update(
             mprtps_path_get_state(this->path),
 			_fbstat(this).discarded_rate,
             GST_TIME_AS_MSECONDS(_RTT(this)),
-			_proactive(this)
+			(gdouble)(_now(this) - start) / (gdouble)GST_SECOND,
+			(gdouble)(_now(this) - previous) / (gdouble)GST_SECOND
         );
-
+previous = _now(this);
+if(!start) start = _now(this);
   ++this->measurements_num;
 
 done:
@@ -548,11 +539,6 @@ done:
 static gboolean _distortion(FBRASubController *this)
 {
   GstClockTime owd_th;
-
-  if(!_proactive(this)){
-    return FALSE;
-//    return .02 < _fbstat(this).discarded_rate;
-  }
 
   owd_th = _fbstat(this).owd_ltt80 + CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, _fbstat(this).owd_th_cng);
   if(owd_th < _fbstat(this).owd_stt){
@@ -570,9 +556,6 @@ static gboolean _distortion(FBRASubController *this)
 static gboolean _congestion(FBRASubController *this)
 {
   gdouble FD_th;
-  if(!_proactive(this)){
-    return .1 < _fbstat(this).discarded_rate;
-  }
 
   {
     GstClockTime owd_th;

@@ -28,6 +28,7 @@ typedef struct _FBRAFBProcessorItem{
   guint32      payload_bytes;
   gboolean     acknowledged;
   gboolean     discarded;
+  GstClockTime sent;
 }FBRAFBProcessorItem;
 
 typedef struct _FBRAFBProcessorStat
@@ -61,6 +62,8 @@ typedef struct _FBRAFBProcessorStat
 
   gdouble                  owd_var, owd_std, FD_avg;
 
+  GstClockTime             srtt_updated;
+  guint16                  higest_acked_seq_num;
 
 //  gint64                   max_bytes_in_flight;
 }FBRAFBProcessorStat;

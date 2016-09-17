@@ -443,6 +443,8 @@ static void _corrigate(FBRATargetCtrler *this)
 //  g_print("[DEBUG] :: tend_median(%f), factor(%f)\n", _priv(this)->tend_median, factor);
 
 }
+
+
 //We know that we are in KEEP stage and we have distortion, so corrigate based on GP and tendency
 void fbratargetctrler_halt(FBRATargetCtrler* this)
 {

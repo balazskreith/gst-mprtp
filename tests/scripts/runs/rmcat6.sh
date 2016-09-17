@@ -3,8 +3,8 @@ programname=$0
 
 NSSND="ns_snd"
 NSRCV="ns_rcv"
-SENDER="sender"
-RECEIVER="receiver"
+SENDER="sender1"
+RECEIVER="receiver1"
 LOGSDIR="logs"
 REPORTSDIR="reports"
 SCRIPTSDIR="scripts"

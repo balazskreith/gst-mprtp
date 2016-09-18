@@ -125,6 +125,8 @@ struct _Private{
 
   gboolean            reactive_cc_allowed;
 
+  GstClockTime        pacing_approve_time;
+
 };
 
 
@@ -326,10 +328,38 @@ fbrasubctrler_init (FBRASubController * this)
 gboolean fbrasubctrler_path_approver(gpointer data, GstRTPBuffer *rtp)
 {
   FBRASubController *this = data;
+  guint payload_size = gst_rtp_buffer_get_payload_len(rtp);
+//  GstClockTime now = _now(this);
 
-  this->last_rtp_size = gst_rtp_buffer_get_payload_len(rtp);
+  if(1) goto approve;
+  else goto disapprove;
+//  if(_stage(this) != STAGE_REDUCE){
+//    goto approve;
+//  }
+//  if(_now(this) - CONSTRAIN(.05 * GST_SECOND, .3 * GST_SECOND, 2 * _RTT(this)) < this->congestion_detected){
+//    goto approve;
+//  }
+//  if(_fbstat(this).owd_corr < 1.2){
+//	goto approve;
+//  }
+//  fbratargetctrler_undershooting(this->targetctrler);
+//  if(now < _priv(this)->pacing_approve_time){
+//    goto disapprove;
+//  }
+//  {
+//    gdouble cwnd = _fbstat(this).BiF.median * .6;
+//    gdouble rtt_in_s = (gdouble)_RTT(this) / (gdouble) GST_SECOND;
+//    gdouble pacing_bitrate = MAX(50000., (cwnd * 8.) / rtt_in_s);
+//    gdouble pacing_time = (gdouble) ((payload_size + 24) * 8) / (gdouble)pacing_bitrate;
+//    _priv(this)->pacing_approve_time = now + (pacing_time * GST_SECOND);
+//  }
+
+approve:
+  this->last_rtp_size = payload_size;
   fbratargetctrler_update_rtpavg(this->targetctrler, this->last_rtp_size);
-
+  return TRUE;
+disapprove:
+  return FALSE;
 //  g_print("BiF: %d->%d (%1.3f - %1.3f)\n",
 //          _fbstat(this).sent_bytes_in_1s * 8,
 //          _fbstat(this).bytes_in_flight * 8,
@@ -473,13 +503,13 @@ void fbrasubctrler_report_update(
   if(!this->enabled){
     goto done;
   }
-  if(summary->RR.processed){
-    if(_priv(this)->rtt == 0.){
-      _priv(this)->rtt = summary->RR.RTT;
-    }else{
-      _priv(this)->rtt = .9 * _priv(this)->rtt + .1 * summary->RR.RTT;
-    }
-  }
+//  if(summary->RR.processed){
+//    if(_priv(this)->rtt == 0.){
+//      _priv(this)->rtt = summary->RR.RTT;
+//    }else{
+//      _priv(this)->rtt = .9 * _priv(this)->rtt + .1 * summary->RR.RTT;
+//    }
+//  }
   if(!summary->XR.processed){
     goto done;
   }
@@ -490,6 +520,8 @@ void fbrasubctrler_report_update(
   fbrafbprocessor_get_stats(this->fbprocessor, &this->fbstat);
   fbratargetctrler_update(this->targetctrler, &this->fbstat);
   _update_fraction_discarded(this);
+
+  _priv(this)->rtt = _fbstat(this).srtt;
 
   _execute_stage(this);
 
@@ -540,7 +572,10 @@ static gboolean _distortion(FBRASubController *this)
 {
   GstClockTime owd_th;
 
-  owd_th = _fbstat(this).owd_ltt80 + CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, _fbstat(this).owd_th_cng);
+//  if(300 * GST_MSECOND < _fbstat(this).owd_ltt80){
+//	  return FALSE;
+//  }
+  owd_th = _fbstat(this).owd_ltt80 + CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, _fbstat(this).owd_th_dist);
   if(owd_th < _fbstat(this).owd_stt){
     return TRUE;
   }
@@ -675,6 +710,13 @@ _increase_stage(
     goto done;
   }
 
+//  if(this->increasement_started < _now(this) - CONSTRAIN(50 * GST_MSECOND, 3 * GST_SECOND, 3 * _RTT(this))){
+  if(this->increasement_started < _now(this) - MAX(300 * GST_MSECOND, 5 * _RTT(this))){
+    fbratargetctrler_revert(this->targetctrler);
+    _switch_stage_to(this, STAGE_PROBE, FALSE);
+    goto done;
+  }
+
   if(!fbratargetctrler_get_approvement(this->targetctrler)){
     goto done;
   }
@@ -763,6 +805,7 @@ void _switch_stage_to(
        this->stage_fnc = _reduce_stage;
      break;
      case STAGE_INCREASE:
+    this->increasement_started = _now(this);
        this->stage_fnc = _increase_stage;
      break;
      case STAGE_PROBE:

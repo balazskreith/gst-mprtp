@@ -49,12 +49,17 @@ struct _FBRATargetCtrler
 
   GstClockTime              monitoring_reached;
 
+  gint32                    dtarget,gp_point;
+
   gint32                    rcved_fb;
   gint32                    required_fb;
   gint32                    target_bitrate;
   gint32                    undershoot_target;
   gint32                    bottleneck_point;
   gint32                    stable_point;
+
+  gboolean undershooting;
+  GstClockTime undershooting_started;
 
   gboolean                  target_approvement;
   gboolean                  probe_approvement;
@@ -70,7 +75,7 @@ struct _FBRATargetCtrlerClass{
 GType fbratargetctrler_get_type (void);
 FBRATargetCtrler *make_fbratargetctrler(MPRTPSPath *path);
 void fbratargetctrler_probe(FBRATargetCtrler *this);
-void _stop_probing(FBRATargetCtrler *this);
+void _stop_probe_and_acceleration(FBRATargetCtrler *this);
 void fbratargetctrler_update_rtpavg(FBRATargetCtrler* this, gint32 payload_length);
 void fbratargetctrler_set_bottleneck_point(FBRATargetCtrler* this);
 void fbratargetctrler_update(FBRATargetCtrler* this, FBRAFBProcessorStat* stat);
@@ -82,7 +87,9 @@ gboolean fbratargetctrler_get_approvement(FBRATargetCtrler* this);
 gboolean fbratargetctrler_get_target_approvement(FBRATargetCtrler* this);
 gboolean fbratargetctrler_get_probe_approvement(FBRATargetCtrler* this);
 gint32 fbratargetctrler_get_target_rate(FBRATargetCtrler* this);
+void fbratargetctrler_undershooting(FBRATargetCtrler* this);
 void fbratargetctrler_refresh_target(FBRATargetCtrler* this);
+
 
 void fbratargetctrler_set_initial(FBRATargetCtrler *this, gint32 target_bitrate);
 

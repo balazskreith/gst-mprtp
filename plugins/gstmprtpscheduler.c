@@ -138,7 +138,6 @@ enum
 };
 
 /* pad templates */
-
 static GstStaticPadTemplate gst_mprtpscheduler_rtp_sink_template =
 GST_STATIC_PAD_TEMPLATE ("rtp_sink",
     GST_PAD_SINK,
@@ -788,7 +787,7 @@ gst_mprtpscheduler_change_state (GstElement * element,
       break;
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
        gst_task_set_lock (this->thread, &this->thread_mutex);
-//       gst_task_start (this->thread);//Fixme elliminate if doesn't want this.
+       gst_task_start (this->thread); //Fixme elliminate if we doesn't want this.
        break;
      default:
        break;
@@ -1236,12 +1235,13 @@ _mprtpscheduler_process_run (void *data)
 
   this = (GstMprtpscheduler *) data;
 
-  packetssndqueue_wait_until_item(this->sndqueue);
+//  packetssndqueue_wait_until_item(this->sndqueue);
 again:
   item = packetssndqueue_peek(this->sndqueue);
   if(!item){
     goto exit;
   }
+//  g_print("---%lu-%p\n",GST_TIME_AS_MSECONDS(_now(this)), item);
 
   if(!_mprtpscheduler_send_buffer(this, item)){
     next_scheduler_time = _now(this) + 1 * GST_USECOND;

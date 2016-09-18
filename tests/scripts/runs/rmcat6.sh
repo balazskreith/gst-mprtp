@@ -3,8 +3,8 @@ programname=$0
 
 NSSND="ns_snd"
 NSRCV="ns_rcv"
-SENDER="sender1"
-RECEIVER="receiver1"
+SENDER="sender"
+RECEIVER="receiver"
 LOGSDIR="logs"
 REPORTSDIR="reports"
 SCRIPTSDIR="scripts"
@@ -68,7 +68,7 @@ done
   echo "ntrt -c$CONFDIR/ntrt_rcv_meas.ini -t$DURATION &" > $PEER1_RCV
   echo -n "./$RECEIVER" >> $PEER1_RCV
   ./$CONFDIR/peer1params.sh >> $PEER1_RCV
-  echo -n "--save_received_yuvfile=1 " >> $PEER1_RCV 
+  echo -n "--save_received_yuvfile=0 " >> $PEER1_RCV 
   echo -n " & " >> $PEER1_RCV
   echo "" >> $PEER1_RCV
   echo "iperf -s -p 1234" >> $PEER1_RCV

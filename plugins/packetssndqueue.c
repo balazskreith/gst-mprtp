@@ -109,7 +109,7 @@ packetssndqueue_init (PacketsSndQueue * this)
   g_mutex_init(&this->mutex);
   g_cond_init(&this->cond);
   this->sysclock = gst_system_clock_obtain();
-  this->obsolation_treshold = GST_SECOND;
+  this->obsolation_treshold = 300 * GST_MSECOND;
   this->items = g_queue_new();
 
 }

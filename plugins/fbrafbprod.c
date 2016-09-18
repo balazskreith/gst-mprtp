@@ -277,7 +277,11 @@ gboolean fbrafbproducer_do_fb(gpointer data)
   FBRAFBProducer *this;
   this = data;
   THIS_READLOCK(this);
+  if(_now(this) < this->last_fb + 19 * GST_MSECOND){
+    goto done;
+  }
   result = 4 < this->rcved_packets || (0 < this->next_fb && this->next_fb < _now(this));
+done:
   THIS_READUNLOCK(this);
   return result;
 }
@@ -287,7 +291,8 @@ void fbrafbproducer_fb_sent(gpointer data)
   FBRAFBProducer *this;
   this = data;
   THIS_WRITELOCK(this);
-  this->next_fb = _now(this) + 100 * GST_MSECOND;
+  this->last_fb = _now(this);
+  this->next_fb = this->last_fb + 100 * GST_MSECOND;
   this->rcved_packets = 0;
   slidingwindow_set_act_limit(this->tendency_sw, (this->received_bytes * 8) / 50000);
   THIS_WRITEUNLOCK(this);

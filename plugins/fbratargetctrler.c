@@ -402,13 +402,15 @@ void fbratargetctrler_probe(FBRATargetCtrler *this)
   mprtps_path_set_monitoring_interval(this->path, this->monitoring_interval);
 }
 
-void _stop_probing(FBRATargetCtrler *this)
+void _stop_probe_and_acceleration(FBRATargetCtrler *this)
 {
   this->monitoring_started  = 0;
   this->monitoring_interval = 0;
   this->probe_approvement   = FALSE;
   this->monitoring_reached  = 0;
   mprtps_path_set_monitoring_interval(this->path, 0);
+
+  this->dtarget = 0;
 }
 
 void fbratargetctrler_update_rtpavg(FBRATargetCtrler* this, gint32 payload_length)
@@ -449,7 +451,7 @@ static void _corrigate(FBRATargetCtrler *this)
 void fbratargetctrler_halt(FBRATargetCtrler* this)
 {
   gdouble OF; //Overusing Factor
-  _stop_probing(this);
+  _stop_probe_and_acceleration(this);
   OF = (gdouble)this->target_bitrate / (gdouble)(_priv(this)->gp_median);
 
   if(1.1 < OF){
@@ -472,7 +474,7 @@ reduced:
 void fbratargetctrler_revert(FBRATargetCtrler* this)
 {
   gdouble OF; //Overusing Factor
-  _stop_probing(this);
+  _stop_probe_and_acceleration(this);
   OF = (gdouble)this->target_bitrate / (gdouble)(_priv(this)->gp_median + _priv(this)->fec_median);
 
   if(1.1 < OF){
@@ -495,7 +497,7 @@ reduced:
 void fbratargetctrler_break(FBRATargetCtrler* this)
 {
   gdouble OF; //Overusing Factor
-  _stop_probing(this);
+  _stop_probe_and_acceleration(this);
   OF = (gdouble)this->target_bitrate / (gdouble)(_priv(this)->gp_median + _priv(this)->fec_median);
 
   if(1.1 < OF){
@@ -529,11 +531,17 @@ done:
 
 void fbratargetctrler_accelerate(FBRATargetCtrler* this)
 {
+  gint32 new_target;
   this->changed = this->increased = _now(this);
   this->rcved_fb = 0;
   this->stable_point = MIN(this->target_bitrate, _priv(this)->gp_median);
-  this->target_bitrate = this->stable_point + _priv(this)->fec_median;
+  new_target = this->stable_point + _priv(this)->fec_median;
+
+  this->gp_point = _priv(this)->gp_median;
+  this->dtarget = this->target_bitrate < new_target ? new_target - this->target_bitrate : 0;
+  this->target_bitrate = new_target;
 //  this->target_bitrate = CONSTRAIN(this->stable_point, _priv(this)->gp_median * 2, this->target_bitrate + _priv(this)->fec_median);
+
   this->target_approvement = FALSE;
 }
 
@@ -550,6 +558,7 @@ static void _refresh_interval(FBRATargetCtrler* this)
 
 void _refresh_target_approvement(FBRATargetCtrler* this)
 {
+  gint32 boundary;
   if(this->changed < this->reached && this->target_approvement){
     goto done;
   }
@@ -558,11 +567,13 @@ void _refresh_target_approvement(FBRATargetCtrler* this)
     goto done;
   }
 
-  if(_priv(this)->gp_median < this->target_bitrate * (1.-_priv(this)->approvement_epsilon)){
+  boundary = CONSTRAIN(10000,50000,this->target_bitrate * (1.-_priv(this)->approvement_epsilon));
+
+  if(_priv(this)->gp_median < this->target_bitrate - boundary){
     goto done;
   }
 
-  if((1.+_priv(this)->approvement_epsilon) * this->target_bitrate < _priv(this)->gp_median){
+  if(boundary + this->target_bitrate < _priv(this)->gp_median){
     goto done;
   }
 
@@ -571,6 +582,11 @@ void _refresh_target_approvement(FBRATargetCtrler* this)
   }
 
   if((1.+_priv(this)->approvement_epsilon) * this->target_bitrate < _priv(this)->sr_median){
+    goto done;
+  }
+
+  boundary = MAX(this->dtarget - 20000, this->dtarget * (1.-_priv(this)->approvement_epsilon));
+  if(0 < this->dtarget && _priv(this)->gp_median < this->gp_point + boundary){
     goto done;
   }
 
@@ -614,7 +630,6 @@ done:
 //  g_print("[DEBUG] :: _refresh_target_approvement :: approvement(%d)\n", this->target_approvement);
   return;
 }
-
 
 gboolean fbratargetctrler_get_approvement(FBRATargetCtrler* this)
 {
@@ -666,7 +681,13 @@ static gint32 _get_tfrc(FBRATargetCtrler *this)
   return result;
 }
 
-
+void fbratargetctrler_undershooting(FBRATargetCtrler* this){
+  if(this->undershooting){
+    return;
+  }
+  this->undershooting_started = _now(this);
+  this->undershooting = TRUE;
+}
 
 void fbratargetctrler_refresh_target(FBRATargetCtrler* this)
 {
@@ -693,15 +714,30 @@ void fbratargetctrler_refresh_target(FBRATargetCtrler* this)
 //          this->target_approvement, this->probe_approvement, this->stable_point,
 //          this->refreshed < this->broke, this->refreshed < this->increased);
 
+//  if(this->undershooting){
+//	this->undershoot_target = MAX(_priv(this)->min_target_bitrate, this->undershoot_target);
+//	mprtps_path_set_target_bitrate(this->path, this->undershoot_target);
+//	if(this->undershooting_started < _now(this) - CONSTRAIN(.05 * GST_SECOND, .3 * GST_SECOND, 2 * _RTT(this))){
+//	  this->undershoot_target = (this->undershoot_target * 4 + this->target_bitrate) / 5;
+//    }
+//	if(this->undershooting_started < _now(this) - CONSTRAIN(.05 * GST_SECOND, .3 * GST_SECOND, 5 * _RTT(this))){
+//		this->undershooting = FALSE;
+//	}
+//  }else{
+//	mprtps_path_set_target_bitrate(this->path, this->target_bitrate);
+//  }
+
   if(this->broke <= this->reached){
     mprtps_path_set_target_bitrate(this->path, this->target_bitrate);
   }else{
 	this->undershoot_target = MAX(_priv(this)->min_target_bitrate, this->undershoot_target);
 	mprtps_path_set_target_bitrate(this->path, this->undershoot_target);
 	if(this->broke < _now(this) - CONSTRAIN(.05 * GST_SECOND, .3 * GST_SECOND, 2 * _RTT(this))){
-	  this->undershoot_target = (this->undershoot_target * 4 + this->target_bitrate) / 5;
+      this->undershoot_target = (this->undershoot_target * 4 + this->target_bitrate) / 5;
 	}
+
   }
+  mprtps_path_set_target_bitrate(this->path, this->target_bitrate);
 
   this->refreshed = _now(this);
 }

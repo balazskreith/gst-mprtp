@@ -156,6 +156,35 @@ static void _owd_ltt80_percentile_pipe(gpointer udata, swpercentilecandidates_t 
 }
 
 
+static void _BiF_stat_median_pipe(gpointer udata, swpercentilecandidates_t *candidates)
+{
+  FBRAFBProcessor *this = udata;
+  gint32 *left, *right, *min, *max;
+
+  if(!candidates->processed){
+     this->stat.BiF.median = 0;
+    return;
+  }
+  left  = candidates->left;
+  right = candidates->right;
+
+  if(!left){
+    this->stat.BiF.median = *(gint32*)right;
+  }else if(!right){
+	this->stat.BiF.median = *(gint32*)left;
+  }else{
+    this->stat.BiF.median = *(gint32*)left;
+    this->stat.BiF.median = *(gint32*)right;
+    this->stat.BiF.median>>=1;
+  }
+  min = candidates->min;
+  max = candidates->max;
+  this->stat.BiF.min = *(gint32*) min;
+  this->stat.BiF.max = *(gint32*) max;
+
+}
+
+
 
 static void _sent_add_pipe(gpointer udata, gpointer itemptr)
 {
@@ -188,6 +217,7 @@ static void _BiF_add_pipe(gpointer udata, gpointer itemptr)
 
   this->stat.bytes_in_flight += item->payload_bytes;
   ++this->stat.packets_in_flight;
+  this->stat.BiF.temp_max = MAX(this->stat.BiF.temp_max, this->stat.bytes_in_flight);
 
 }
 
@@ -200,14 +230,6 @@ static void _BiF_rem_pipe(gpointer udata, gpointer itemptr)
     g_warning("sequence number %hu not acknowledged in 3RTT or 3s. Hm????", item->seq_num);
     this->stat.bytes_in_flight -= item->payload_bytes;
     --this->stat.packets_in_flight;
-  }else if(this->stat.higest_acked_seq_num == item->seq_num){
-	  GstClockTime now = _now(this);
-	  gdouble rtt = now - item->sent;
-	  this->stat.RTT = (this->stat.RTT == 0) ? rtt : (rtt * .125 + this->stat.RTT * .875);
-	  if(this->stat.RTT < now - this->stat.srtt_updated){
-		  this->stat.srtt = (this->stat.srtt == 0.) ? this->stat.RTT : this->stat.RTT * .125 + this->stat.srtt * .875;
-		  this->stat.srtt_updated = now;
-	  }
   }
 
   _unref_rtpitem(this, item);
@@ -389,7 +411,8 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   this->acked_1s_sw      = make_slidingwindow(2000, GST_SECOND);
   this->sent_sw          = make_slidingwindow(2000, GST_SECOND);
 
-  this->BiF_sw          = make_slidingwindow(2000, GST_SECOND);
+  this->BiF_sw           = make_slidingwindow(2000, GST_SECOND);
+  this->BiF_stat_sw      = make_slidingwindow_int32(50, 5 * GST_SECOND);
 
 
 //  this->owd_offs = make_slidingwindow_double(10, GST_SECOND);
@@ -409,6 +432,10 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
   slidingwindow_add_plugins(this->ltt_sw,
                             make_swpercentile(80, _statitem_owd_cmp, _owd_ltt80_percentile_pipe, this),
                             //make_swpercentile(60, _statitem_BiF_cmp, _owd_BiF_percentile_pipe, this),
+                           NULL);
+
+  slidingwindow_add_plugins(this->BiF_stat_sw,
+                            make_swpercentile(50,  bintree3cmp_int32, _BiF_stat_median_pipe, this),
                            NULL);
 
 
@@ -443,14 +470,16 @@ void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn)
 {
   FBRAFBProcessor *this;
   FBRAFBProcessorItem* item;
+  GstClockTime now;
   this = data;
   THIS_WRITELOCK (this);
 
   item = _retrieve_item(this, sn);
+  now  = _now(this);
 
   item->payload_bytes = payload_len;
   item->seq_num       = sn;
-  item->sent          = _now(this);
+  item->sent          = now;
 
 //  ++this->stat.packets_in_flight;
 //  this->stat.bytes_in_flight += payload_len;
@@ -458,6 +487,11 @@ void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn)
   slidingwindow_add_data(this->sent_sw, item);
   slidingwindow_add_data(this->BiF_sw, item);
   slidingwindow_refresh(this->acked_1s_sw);
+  if(this->stat.BiF.updated < now - 100 * GST_MSECOND){
+    slidingwindow_add_data(this->BiF_stat_sw, &this->stat.BiF.temp_max);
+    this->stat.BiF.temp_max = 0;
+    this->stat.BiF.updated = now;
+  }
 
 //  slidingwindow_set_treshold(this->stt_sw, CONSTRAIN(100 * GST_MSECOND, GST_SECOND, 3 * this->stat.RTT));
   THIS_WRITEUNLOCK (this);
@@ -564,8 +598,9 @@ void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
   if(!xrsummary->OWD.median_delay){
     goto done;
   }
-
+  this->stat.owd_stt_t1 = this->stat.owd_stt;
   this->stat.owd_stt = xrsummary->OWD.median_delay;
+  this->stat.owd_off = (gdouble)(this->stat.owd_stt - this->stat.owd_stt_t1) / (gdouble)this->stat.owd_stt;;
 
   if(this->stat.owd_ltt80){
     this->stat.owd_corr =  (gdouble) this->stat.owd_stt;
@@ -597,9 +632,17 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
         continue;
       }
     item->discarded = !xr->DiscardedRLE.vector[i];
+    if(end_seq == item->seq_num){
+	  GstClockTime now = _now(this);
+	  GstClockTime rtt = now - item->sent;
+	  this->stat.RTT = (this->stat.RTT == 0) ? rtt : (rtt * .125 + this->stat.RTT * .875);
+	  if(this->stat.RTT < now - this->stat.srtt_updated){
+		  this->stat.srtt = (this->stat.srtt == 0.) ? this->stat.RTT : this->stat.RTT * .125 + this->stat.srtt * .875;
+		  this->stat.srtt_updated = now;
+	  }
+    }
     slidingwindow_add_data(this->acked_1s_sw, item);
   }
-  this->stat.higest_acked_seq_num = end_seq;
 done:
   slidingwindow_refresh(this->sent_sw);
   slidingwindow_refresh(this->BiF_sw);

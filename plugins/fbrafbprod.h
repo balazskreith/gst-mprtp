@@ -50,6 +50,7 @@ struct _FBRAFBProducer
   SlidingWindow           *owds_sw;
   SlidingWindow           *tendency_sw;
 
+  GstClockTime             last_fb;
   GstClockTime             next_fb;
   gint                     rcved_packets;
 

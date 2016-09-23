@@ -28,4 +28,16 @@
   if(0 < elapsed) {g_print(msg" elapsed time in ms: %lu\n", elapsed); }\
 } \
 
+
+typedef enum{
+  RTCP_INTERVAL_REGULAR_INTERVAL_MODE      = 0,
+  RTCP_INTERVAL_EARLY_RTCP_MODE            = 1,
+  RTCP_INTERVAL_IMMEDIATE_FEEDBACK_MODE    = 2,
+}RTCPIntervalMode;
+
+typedef enum{
+  CONGESTION_CONTROLLING_MODE_NONE         = 0,
+  CONGESTION_CONTROLLING_MODE_FBRAPLUS     = 1,
+}CongestionControllingMode;
+
 #endif /* PLUGINS_MPRTPDEFS_H_ */

@@ -91,7 +91,7 @@ typedef struct{
   gint32  gp;
   gint32  sr;
   gint32  fec;
-  gdouble tend;
+//  gdouble tend;
 }TargetItem;
 
 typedef struct{
@@ -120,7 +120,7 @@ struct _Private{
 
   gint32              gp_median,fec_median,sr_median;
   gdouble             tend_median;
-  gdouble             fraction_discarded;
+//  gdouble             fraction_discarded;
 
   gdouble             avg_rtp_payload;
 
@@ -228,7 +228,6 @@ static gint _item_##field##_cmp(gpointer pa, gpointer pb) \
 _item_cmpfnc(gp);
 _item_cmpfnc(sr);
 _item_cmpfnc(fec);
-_item_cmpfnc(tend);
 
 
 
@@ -261,7 +260,6 @@ static void _item_##field##_pipe(gpointer udata, swpercentilecandidates_t *candi
 _item_median_pipe(gp)
 _item_median_pipe(sr)
 _item_median_pipe(fec)
-_item_median_pipe(tend)
 
 FBRATargetCtrler *make_fbratargetctrler(MPRTPSPath *path)
 {
@@ -275,7 +273,6 @@ FBRATargetCtrler *make_fbratargetctrler(MPRTPSPath *path)
                             make_swpercentile(50, _item_gp_cmp, _item_gp_pipe, result),
                             make_swpercentile(50, _item_sr_cmp, _item_sr_pipe, result),
                             make_swpercentile(50, _item_fec_cmp, _item_fec_pipe, result),
-                            make_swpercentile(50, _item_tend_cmp, _item_tend_pipe, result),
                             NULL);
 
   return result;
@@ -329,7 +326,6 @@ void fbratargetctrler_update(FBRATargetCtrler* this, FBRAFBProcessorStat* stat)
   item->fec  = mprtps_path_get_monitored_bitrate(this->path, &packets_num);
   item->sr   = stat->sent_bytes_in_1s * 8;
   item->gp   = stat->goodput_bytes * 8;
-  item->tend = stat->tendency;
 
   this->owd_corr = stat->owd_corr;
 
@@ -340,7 +336,7 @@ void fbratargetctrler_update(FBRATargetCtrler* this, FBRAFBProcessorStat* stat)
   _priv(this)->RTT = CONSTRAIN( _min_appr_int(this), GST_SECOND, stat->RTT);
   ++this->rcved_fb;
 
-  _priv(this)->fraction_discarded = stat->discarded_rate;
+//  _priv(this)->fraction_discarded = stat->discarded_rate;
 //  stat->tendency = _priv(this)->tend_median;
 }
 
@@ -665,11 +661,11 @@ X_Bps = -----------------------------------------------
 static gint32 _get_tfrc(FBRATargetCtrler *this)
 {
   gdouble result = 0.;
-  gdouble rtt,p;
+  gdouble rtt,p = 0.;
   rtt = _RTT(this);
   rtt /= (gdouble) GST_SECOND;
   //p   =  _FD(this);
-  p = _priv(this)->fraction_discarded;
+//  p = _priv(this)->fraction_discarded;
 //  p = 0.1;
   if(p == 0.) p = 0.05;
   result = _priv(this)->avg_rtp_payload * 8;

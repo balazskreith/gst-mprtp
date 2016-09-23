@@ -196,7 +196,7 @@ typedef struct PACKED _GstRTCPXRDiscardedRLEBlock
   guint16 begin_seq;
   guint16 end_seq;
   GstRTCPXRChunk chunks[2];
-} GstRTCPXRDiscardedRLEBlock;
+} GstRTCPXRRLELostsRLEBlock;
 
 
 typedef struct PACKED _GstRTCPXROWDBlock
@@ -246,7 +246,7 @@ typedef union PACKED _GstRTCPXRBlock
   };
   GstRTCPXROWDBlock          owd;
   GstRTCPXRDiscardedBlock    discarded;
-  GstRTCPXRDiscardedRLEBlock discarded_rle;
+  GstRTCPXRRLELostsRLEBlock discarded_rle;
 }GstRTCPXRBlock;
 
 typedef struct PACKED _GstRTCPXR
@@ -510,28 +510,28 @@ gst_rtcp_xr_chunk_hton_cpy (GstRTCPXRChunk *dst_chunk,
 
 
 void
-gst_rtcp_xr_discarded_rle_setup(GstRTCPXRDiscardedRLEBlock *block,
+gst_rtcp_xr_rle_losts_setup(GstRTCPXRRLELostsRLEBlock *block,
                       gboolean early_bit,
                       guint8 thinning,
                       guint32 ssrc,
                       guint16 begin_seq,
                       guint16 end_seq);
 
-void gst_rtcp_xr_discarded_rle_getdown (GstRTCPXRDiscardedRLEBlock *block,
+void gst_rtcp_xr_rle_losts_getdown (GstRTCPXRRLELostsRLEBlock *block,
                              gboolean *early_bit,
                              guint8 *thinning,
                              guint32 *ssrc,
                              guint16 *begin_seq,
                              guint16 *end_seq);
 
-void gst_rtcp_xr_discarded_rle_change (GstRTCPXRDiscardedRLEBlock *block,
+void gst_rtcp_xr_rle_losts_change (GstRTCPXRRLELostsRLEBlock *block,
                              gboolean *early_bit,
                              guint8 *thinning,
                              guint32 *ssrc,
                              guint16 *begin_seq,
                              guint16 *end_seq);
 
-guint gst_rtcp_xr_discarded_rle_block_get_chunks_num(GstRTCPXRDiscardedRLEBlock *block);
+guint gst_rtcp_xr_rle_losts_block_get_chunks_num(GstRTCPXRRLELostsRLEBlock *block);
 
 
 
@@ -650,7 +650,7 @@ void gst_printfnc_rtcp_xrchunks(GstRTCPXRChunk * chunk1, GstRTCPXRChunk * chunk2
 
 #define gst_print_rtcp_xr_7097(report) \
     gst_printfnc_rtcp_xr_7097(report, g_print)
-void gst_printfnc_rtcp_xr_discarded_rle_block(GstRTCPXRDiscardedRLEBlock * block, printfnc print);
+void gst_printfnc_rtcp_xr_rle_losts_block(GstRTCPXRRLELostsRLEBlock * block, printfnc print);
 
 #define gst_print_rtcp_srb(block_ptr) \
     gst_printfnc_rtcp_srb(block_ptr, g_print)

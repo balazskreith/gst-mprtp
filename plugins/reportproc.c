@@ -92,9 +92,9 @@ _processing_xr_owd_block (
     GstMPRTCPReportSummary* summary);
 
 static void
-_processing_xr_discarded_rle_block (
+_processing_xr_rle_losts_block (
     ReportProcessor *this,
-    GstRTCPXRDiscardedRLEBlock * xrb,
+    GstRTCPXRRLELostsRLEBlock * xrb,
     GstMPRTCPReportSummary* summary);
 
 
@@ -373,10 +373,9 @@ _processing_xr_owd_block (ReportProcessor *this,
 }
 
 
-
 void
-_processing_xr_discarded_rle_block (ReportProcessor *this,
-                        GstRTCPXRDiscardedRLEBlock * xrb,
+_processing_xr_rle_losts_block (ReportProcessor *this,
+                        GstRTCPXRRLELostsRLEBlock * xrb,
                         GstMPRTCPReportSummary* summary)
 {
   guint chunks_num;
@@ -384,23 +383,23 @@ _processing_xr_discarded_rle_block (ReportProcessor *this,
   guint chunk_i, bit_i;
   guint16 seq;
 
-  summary->XR.DiscardedRLE.processed = TRUE;
+  summary->XR.LostRLE.processed = TRUE;
   src = xrb->chunks;
-  summary->XR.DiscardedRLE.vector_length = 0;
-  gst_rtcp_xr_discarded_rle_getdown(xrb,
-                                    &summary->XR.DiscardedRLE.early_bit,
-                                    &summary->XR.DiscardedRLE.thinning,
+  summary->XR.LostRLE.vector_length = 0;
+  gst_rtcp_xr_rle_losts_getdown(xrb,
+                                    &summary->XR.LostRLE.early_bit,
+                                    &summary->XR.LostRLE.thinning,
                                     NULL,
-                                    &summary->XR.DiscardedRLE.begin_seq,
-                                    &summary->XR.DiscardedRLE.end_seq);
+                                    &summary->XR.LostRLE.begin_seq,
+                                    &summary->XR.LostRLE.end_seq);
 
-  seq = summary->XR.DiscardedRLE.begin_seq;
-  chunks_num = gst_rtcp_xr_discarded_rle_block_get_chunks_num(xrb);
+  seq = summary->XR.LostRLE.begin_seq;
+  chunks_num = gst_rtcp_xr_rle_losts_block_get_chunks_num(xrb);
 
   for(chunk_i = 0; chunk_i < chunks_num; ++chunk_i){
     gst_rtcp_xr_chunk_ntoh_cpy(&chunk, src + chunk_i);
-    for(bit_i = 0; bit_i < 15 && _cmp_seq(seq, summary->XR.DiscardedRLE.end_seq) <= 0; ++bit_i){
-      summary->XR.DiscardedRLE.vector[summary->XR.DiscardedRLE.vector_length++] =
+    for(bit_i = 0; bit_i < 15 && _cmp_seq(seq, summary->XR.LostRLE.end_seq) <= 0; ++bit_i){
+      summary->XR.LostRLE.vector[summary->XR.LostRLE.vector_length++] =
           0 < (chunk.Bitvector.bitvector & (guint16)(1<<bit_i)) ? TRUE : FALSE;
     }
   }
@@ -445,8 +444,8 @@ again:
     case GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER:
         _processing_xr_owd_block(this, (GstRTCPXROWDBlock*) block, summary);
         break;
-    case GST_RTCP_XR_DISCARDED_RLE_BLOCK_TYPE_IDENTIFIER:
-        _processing_xr_discarded_rle_block(this, (GstRTCPXRDiscardedRLEBlock*) block, summary);
+    case GST_RTCP_XR_LOSS_RLE_BLOCK_TYPE_IDENTIFIER:
+        _processing_xr_rle_losts_block(this, (GstRTCPXRRLELostsRLEBlock*) block, summary);
         break;
     case GST_RTCP_XR_DISCARDED_BYTES_BLOCK_TYPE_IDENTIFIER:
         _processing_xr_discarded_bytes_block(this, (GstRTCPXRDiscardedBlock*) block, summary);
@@ -551,21 +550,21 @@ void _logging(ReportProcessor *this, GstMPRTCPReportSummary* summary)
   }
 
 
-  if(summary->XR.processed && summary->XR.DiscardedRLE.processed){
+  if(summary->XR.processed && summary->XR.LostRLE.processed){
       gint i;
       mprtp_logger(this->logfile,
                    "-------------------------- XR_RFC7097 ---------------------------\n"
                    "begin_seq: %hu\n"
                    "end_seq:   %hu\n"
                    ,
-                   summary->XR.DiscardedRLE.begin_seq,
-                   summary->XR.DiscardedRLE.end_seq
+                   summary->XR.LostRLE.begin_seq,
+                   summary->XR.LostRLE.end_seq
       );
-      for(i=0; i<summary->XR.DiscardedRLE.vector_length; ++i){
+      for(i=0; i<summary->XR.LostRLE.vector_length; ++i){
           mprtp_logger(this->logfile,
                            "value %d:    %X\n"
                            ,
-                           i, summary->XR.DiscardedRLE.vector[i]
+                           i, summary->XR.LostRLE.vector[i]
               );
       }
     }

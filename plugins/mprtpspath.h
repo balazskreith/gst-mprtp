@@ -16,6 +16,7 @@
 #include "gstmprtcpbuffer.h"
 #include "packetssndqueue.h"
 #include "reportproc.h"
+#include "rtppackets.h"
 
 G_BEGIN_DECLS
 
@@ -29,21 +30,6 @@ typedef struct _MPRTPSPathClass MPRTPSPathClass;
 #define MPRTPS_PATH_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),MPRTPS_PATH_TYPE))
 #define MPRTPS_PATH_CAST(src)        ((MPRTPSPath *)(src))
 
-
-
-typedef enum
-{
-  MPRTPS_PATH_FLAG_NON_LOSSY     = 1,
-  MPRTPS_PATH_FLAG_NON_CONGESTED = 2,
-  MPRTPS_PATH_FLAG_ACTIVE        = 4,
-} MPRTPSPathFlags;
-
-typedef enum
-{
-  MPRTPS_PATH_STATE_OVERUSED     = -1,
-  MPRTPS_PATH_STATE_STABLE       = 0,
-  MPRTPS_PATH_STATE_UNDERUSED     = 1,
-} MPRTPSPathState;
 
 struct _MPRTPSPath
 {
@@ -87,7 +73,7 @@ struct _MPRTPSPath
   gpointer                packetstracker_data;
 
   gpointer                approval_data;
-  gboolean              (*approval)(gpointer, GstRTPBuffer *);
+  gboolean              (*approval)(gpointer, RTPPacket *);
 };
 
 struct _MPRTPSPathClass
@@ -133,8 +119,8 @@ gboolean mprtps_path_has_expected_lost(MPRTPSPath * this);
 void mprtps_path_process_rtp_packet(MPRTPSPath * this, GstBuffer * buffer, gboolean *monitoring_request);
 
 void mprtps_path_set_keep_alive_period(MPRTPSPath *this, GstClockTime period);
-void mprtps_path_set_approval_process(MPRTPSPath *this, gpointer data, gboolean(*approval)(gpointer, GstRTPBuffer *));
-gboolean mprtps_path_approve_request(MPRTPSPath *this, GstRTPBuffer *buf);
+void mprtps_path_set_approval_process(MPRTPSPath *this, gpointer data, gboolean(*approval)(gpointer, RTPPacket *));
+gboolean mprtps_path_approve_request(MPRTPSPath *this, RTPPacket *packet);
 
 void mprtps_path_set_packetstracker(MPRTPSPath *this, void(*packetstracker)(gpointer,  guint, guint16), gpointer data);
 

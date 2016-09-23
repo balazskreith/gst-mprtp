@@ -60,7 +60,7 @@ done
   echo -n "./$SENDER" >> $PEER1_SND
   ./$CONFDIR/peer1params.sh >> $PEER1_SND
   echo -n "--save_received_yuvfile=0 " >> $PEER1_SND 
-  echo -n "--use_testsourcevideo=1 " >> $PEER1_SND 
+  echo -n "--use_testsourcevideo=0 " >> $PEER1_SND 
   chmod 777 $PEER1_SND
   
   #echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_SND" > $PEER1_SND_EMBED

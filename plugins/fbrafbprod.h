@@ -48,7 +48,7 @@ struct _FBRAFBProducer
 
   SlidingWindow           *payloadbytes_sw;
   SlidingWindow           *owds_sw;
-  SlidingWindow           *tendency_sw;
+//  SlidingWindow           *tendency_sw;
 
   GstClockTime             last_fb;
   GstClockTime             next_fb;

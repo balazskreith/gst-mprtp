@@ -353,7 +353,7 @@ mprtps_path_set_keep_alive_period(MPRTPSPath *this, GstClockTime period)
 }
 
 void
-mprtps_path_set_approval_process(MPRTPSPath *this, gpointer data, gboolean(*approval)(gpointer, GstRTPBuffer *))
+mprtps_path_set_approval_process(MPRTPSPath *this, gpointer data, gboolean(*approval)(gpointer, RTPPacket *))
 {
   THIS_WRITELOCK (this);
   this->approval = approval;
@@ -361,11 +361,11 @@ mprtps_path_set_approval_process(MPRTPSPath *this, gpointer data, gboolean(*appr
   THIS_WRITEUNLOCK (this);
 }
 
-gboolean mprtps_path_approve_request(MPRTPSPath *this, GstRTPBuffer *rtp)
+gboolean mprtps_path_approve_request(MPRTPSPath *this, RTPPacket *packet)
 {
   gboolean result;
   THIS_READLOCK(this);
-  result = !this->approval ? TRUE : this->approval(this->approval_data, rtp);
+  result = !this->approval ? TRUE : this->approval(this->approval_data, packet);
   THIS_READUNLOCK(this);
   return result;
 }

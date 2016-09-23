@@ -48,14 +48,13 @@ G_DEFINE_TYPE (ReportIntervalCalculator, ricalcer, G_TYPE_OBJECT);
 
 //static gdouble const RTCP_MIN_TIME = 5.;
 static const gdouble RTCP_MIN_TIME = 1.0;
-static const gdouble RTCP_MAX_TIME = 7.5;
+//static const gdouble RTCP_MAX_TIME = 7.5;
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
 
 static void ricalcer_finalize (GObject * object);
-static gdouble _calc_report_interval(ReportIntervalCalculator * this);
 
 static gdouble
 _get_rtcp_interval (
@@ -92,36 +91,29 @@ ricalcer_finalize (GObject * object)
   g_object_unref(this->sysclock);
 }
 
-void ricalcer_set_mode(ReportIntervalCalculator *this, RTCPIntervalMode mode)
+
+gboolean ricalcer_rtcp_fb_allowed(ReportIntervalCalculator * this, SndSubflow *subflow)
 {
-  THIS_WRITELOCK(this);
-  this->mode = mode;
-  THIS_WRITEUNLOCK(this);
+  return subflow->rtcp_interval_mode == RTCP_INTERVAL_IMMEDIATE_FEEDBACK_MODE;
 }
 
-gboolean ricalcer_rtcp_fb_allowed(ReportIntervalCalculator * this)
+gboolean ricalcer_rtcp_regular_allowed(ReportIntervalCalculator * this, SndSubflow *subflow)
 {
-  gboolean result;
-  THIS_READLOCK(this);
-  result = this->mode == RTCP_INTERVAL_IMMEDIATE_FEEDBACK_MODE;
-  THIS_READUNLOCK(this);
-  return result;
-}
+  gdouble interval_in_sec;
+  if(_now(this) < subflow->next_regular_rtcp){
+    return FALSE;
+  }
+  interval_in_sec =
+      _get_rtcp_interval (
+                          1,                                       //senders
+                          2,                                       //members
+                          subflow->target_bitrate * .05,           //rtcp_bw
+                          this->sender_side?1:0,                   //we_sent
+                          128,                                     //avg_rtcp_size
+                          subflow->next_regular_rtcp == 0?0:1);    //initialized
 
-
-void
-ricalcer_init (ReportIntervalCalculator * this)
-{
-  this->media_rate = 64000.;
-  this->initialized = FALSE;
-  this->avg_rtcp_size = 128.;
-  this->allow_early = TRUE;
-  this->urgent = FALSE;
-  this->max_interval = 1.5;
-  this->base_interval = 1.5;
-  this->min_interval = .5;
-  this->sysclock = gst_system_clock_obtain();
-  g_rw_lock_init (&this->rwmutex);
+  subflow->next_regular_rtcp = _now(this) + interval_in_sec * GST_SECOND;
+  return TRUE;
 }
 
 ReportIntervalCalculator *make_ricalcer(gboolean sender_side)
@@ -129,80 +121,6 @@ ReportIntervalCalculator *make_ricalcer(gboolean sender_side)
   ReportIntervalCalculator *result;
   result = g_object_new (RICALCER_TYPE, NULL);
   result->sender_side = sender_side;
-  return result;
-}
-
-gdouble ricalcer_get_next_regular_interval(ReportIntervalCalculator * this)
-{
-  if (!this->initialized) {
-    this->initialized = TRUE;
-    this->actual_interval = RTCP_MIN_TIME;
-    goto done;
-  }
-  this->actual_interval = _calc_report_interval(this);
-done:
-  return this->actual_interval;
-}
-
-
-void ricalcer_refresh_rate_parameters(ReportIntervalCalculator * this,
-                                 gdouble media_rate,
-                                 gdouble avg_rtcp_size)
-{
-  THIS_WRITELOCK(this);
-  this->media_rate = media_rate;
-  this->avg_rtcp_size = avg_rtcp_size;
-  THIS_WRITEUNLOCK(this);
-}
-
-void ricalcer_refresh_packets_rate(ReportIntervalCalculator * this,
-                                          gint32 received,
-                                          gint32 discarded,
-                                          gint32 lost)
-{
-  THIS_WRITELOCK(this);
-  this->received = received;
-  this->discarded = discarded;
-  this->lost = lost;
-  THIS_WRITEUNLOCK(this);
-}
-
-void ricalcer_urgent_report_request(ReportIntervalCalculator * this)
-{
-  THIS_WRITELOCK(this);
-  this->urgent = TRUE;
-  THIS_WRITEUNLOCK(this);
-}
-
-gdouble _calc_report_interval(ReportIntervalCalculator * this)
-{
-  gdouble result;
-  if(this->received < 1){
-      result = RTCP_MIN_TIME;
-      goto done;
-  }
-  if(this->discarded){
-    gdouble good_packet_rate = (gdouble) (this->received - this->discarded) / (gdouble) (this->received + this->discarded);
-    gdouble bad_packet_rate = 1.-good_packet_rate;
-    const gdouble ro_th = .33;
-    if(ro_th < bad_packet_rate){
-      result = MAX(RTCP_MIN_TIME, this->actual_interval * (1.-ro_th));
-    }else{
-      result = MIN(RTCP_MAX_TIME, MAX(RTCP_MIN_TIME, this->actual_interval  * g_random_double_range(0.5, 1.5)));
-    }
-  }else{
-    result =MIN(RTCP_MAX_TIME * g_random_double_range(0.66, 1.0),
-                MAX( this->actual_interval * 1.5,
-                    _get_rtcp_interval (
-                    1,                        //senders
-                    2,                        //members
-                    this->media_rate * .05,   //rtcp_bw
-                    this->sender_side?1:0,    //we_sent
-                    this->avg_rtcp_size,      //avg_rtcp_size
-                    this->initialized?0:1)    //initial
-        ));
-  }
-done:
   return result;
 }
 

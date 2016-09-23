@@ -228,7 +228,7 @@ void report_producer_add_xr_owd(ReportProducer *this,
 }
 
 
-void report_producer_add_xr_discarded_rle(ReportProducer *this,
+void report_producer_add_xr_lost_rle(ReportProducer *this,
                                  gboolean early_bit,
                                  guint8 thinning,
                                  guint16 begin_seq,
@@ -237,15 +237,15 @@ void report_producer_add_xr_discarded_rle(ReportProducer *this,
                                  guint vector_length)
 {
   gchar databed[1024];
-  GstRTCPXRDiscardedRLEBlock *block;
+  GstRTCPXRRLELostsRLEBlock *block;
   GstRTCPXRChunk chunk;
   gint bit_i, chunks_length, vector_i;
   gboolean last_is_copied = TRUE;
   THIS_WRITELOCK(this);
   memset(databed, 0, 1024);
   memset(&chunk, 0, sizeof(GstRTCPXRChunk));
-  block = (GstRTCPXRDiscardedRLEBlock*) databed;
-  gst_rtcp_xr_discarded_rle_setup(block, early_bit, thinning, this->ssrc, begin_seq, end_seq);
+  block = (GstRTCPXRRLELostsRLEBlock*) databed;
+  gst_rtcp_xr_rle_losts_setup(block, early_bit, thinning, this->ssrc, begin_seq, end_seq);
   for(chunks_length = 0, bit_i = 0, vector_i=0; vector_i<vector_length; ++vector_i){
       if(vector[vector_i]){
         chunk.Bitvector.bitvector |= (guint16)(1<<bit_i);

@@ -167,6 +167,12 @@ void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf)
 }
 
 
+void fecencoder_add_rtpbuffer2(FECEncoder *this, GstBuffer *buf)
+{
+  g_async_queue_push(this->bitstrings, gst_buffer_ref(buf));
+}
+
+
 
 GstBuffer*
 fecencoder_get_fec_packet(FECEncoder *this)

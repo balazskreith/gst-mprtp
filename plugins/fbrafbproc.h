@@ -40,35 +40,42 @@ typedef struct _FBRAFBProcessorStat
   gint32                   goodput_bytes;
   GstClockTime             owd_ltt80/*,owd_ltt40*/;
   GstClockTime             owd_stt;
-  gdouble                  owd_off;
-  GstClockTime             owd_stt_t1;
+
+  GstClockTime             owd_stt_t1,owd_stt_t2;
+  gdouble                  owd_log_longcorr;
+  gdouble                  owd_log_shortcorr;
+//  gdouble                  owd_off;
+//  GstClockTime             owd_stt_t1;
   gdouble                  owd_corr;
 
-  gboolean                 recent_discarded;
-  gdouble                  tendency;
+//  gboolean                 recent_discarded;
+//  gdouble                  tendency;
 
   GstClockTime             RTT;
   gdouble                  srtt;
   gint32                   discarded_packets_in_1s;
   gint32                   acked_packets_in_1s;
 
-  gdouble                  discarded_rate;
+//  gdouble                  discarded_rate;
 
-  gdouble                  owd_th_dist;
-  gdouble                  owd_th_cng;
+  gdouble                  owd_th_dist_in_ms;
+  gdouble                  owd_th_cng_in_ms;
 
-  gdouble                  FD_median;
+//  gdouble                  FD_median;
 
-  gdouble                  overused_avg;
-  gint32                   overused_sum, overused_num;
+//  gdouble                  overused_avg;
+//  gint32                   overused_sum, overused_num;
 
-  gdouble                  owd_var, owd_std, FD_avg;
+  gdouble                  owd_var_in_ms, owd_std_in_ms;
+  gdouble                  dBiF_var, dBiF_std, dBiF_avg;
+//  gdouble                  FD_avg;
 
   GstClockTime             srtt_updated;
 
+
   struct{
-	  gint32 min,max,median, temp_max;
-	  GstClockTime updated;
+	  gint32 min,max,median,temp;
+//	  GstClockTime updated;
   }BiF;
 
 //  gint64                   max_bytes_in_flight;
@@ -85,6 +92,7 @@ struct _FBRAFBProcessor
   guint8                   subflow_id;
 
   gpointer                 last_statitem;
+  gint32 last_BiF;
 
   struct{
     GstClockTime ltt80th, /*ltt40th,*/ min,max;
@@ -92,11 +100,15 @@ struct _FBRAFBProcessor
   }owd_stat;
 
   struct{
-    gdouble fdsum;
-    gdouble fdsqsum;
+//    gdouble fdsum;
+//    gdouble fdsqsum;
     gint64  owdsum;
     gint64  owdsqsum;
     gint64  num;
+    gint32  dBiF_num;
+    gint32  dBiF_sum;
+    gint32  dBiF_sqsum;
+    gint32  last_BiF;
   }swstat;
 
 //  SlidingWindow* owd_offs;
@@ -109,16 +121,16 @@ struct _FBRAFBProcessor
   SlidingWindow           *acked_1s_sw;
   SlidingWindow           *sent_sw;
   SlidingWindow           *BiF_sw;
-  SlidingWindow           *BiF_stat_sw;
+//  SlidingWindow           *BiF_stat_sw;
   FBRAFBProcessorItem     *items;
 
 
   gdouble                  owd_ltt_ewma;
 
   FBRAFBProcessorStat      stat;
+  guint16                  last_seq;
 
-  GstClockTime             congestion_detected;
-  GstClockTime             last_discard;
+//  GstClockTime             last_discard;
 
 };
 
@@ -133,7 +145,7 @@ FBRAFBProcessor *make_fbrafbprocessor(guint8 subflow_id);
 void fbrafbprocessor_reset(FBRAFBProcessor *this);
 void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn);
 void fbrafbprocessor_get_stats (FBRAFBProcessor * this, FBRAFBProcessorStat* result);
-void fbrafbprocessor_approve_owd_ltt(FBRAFBProcessor *this);
+void fbrafbprocessor_approve_measurement(FBRAFBProcessor *this);
 void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary);
 
 #endif /* FBRAFBPROCESSOR_H_ */

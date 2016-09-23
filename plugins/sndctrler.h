@@ -37,33 +37,22 @@ struct _SndController
 {
   GObject                    object;
 
-  GstTask*                   thread;
   GstClockTime               made;
-  GRecMutex                  thread_mutex;
-  GHashTable*                subflows;
-  GRWLock                    rwmutex;
+  SndSubflows*               subflows;
   ReportProcessor*           report_processor;
   ReportProducer*            report_producer;
   GstClock*                  sysclock;
-  GstClockTime               expected_lost_detected;
-  guint64                    ticknum;
-  guint                      subflow_num;
+  SndTracker*                sndtracker;
+  RTPPackets*                rtppackets;
 
   gboolean                   report_is_flowable;
-  GstBufferReceiverFunc      send_mprtcp_packet_func;
-  gpointer                   send_mprtcp_packet_data;
-  GstSchedulerSignaling      utilization_signal_func;
-  gpointer                   utilization_signal_data;
+
   MPRTPPluginSignalData*     mprtp_signal_data;
 
-  FECEncoder*                fecencoder;
-  guint32                    fec_sum_bitrate;
-  guint32                    fec_sum_packetsrate;
-
-  gint32                     target_bitrate_t1;
-  gint32                     target_bitrate;
-
-  SendingRateDistributor*    sndratedistor;
+  GSList*                    controllers;
+  ReportIntervalCalculator*  ricalcer;
+  GAsyncQueue*               mprtcpq;
+  GAsyncQueue*               emitterq;
 
   GstMPRTCPReportSummary     reports_summary;
 };
@@ -80,6 +69,13 @@ void sndctrler_setup(SndController* this,
                      StreamSplitter* splitter,
                      SendingRateDistributor *pacer,
                      FECEncoder* fecencoder);
+
+SndController* make_sndctrler(
+    SndTracker* sndtracker,
+    SndSubflows* subflows,
+    PacketSender *packetsender,
+    GAsyncQueue *emitterq);
+
 
 void
 sndctrler_setup_callbacks(SndController *this,
@@ -106,13 +102,9 @@ void sndctrler_setup_report_timeout(
     guint8 subflow_id,
     GstClockTime report_timeout);
 
+
 void
-sndctrler_rem_path (SndController *controller_ptr, guint8 subflow_id);
-void
-sndctrler_add_path (SndController *controller_ptr, guint8 subflow_id, MPRTPSPath * path);
-void
-sndctrler_report_can_flow (SndController *this);
-void sndctrler_receive_mprtcp (SndController *this,GstBuffer * buf);
+sndctrler_receive_mprtcp (SndController *this,GstBuffer * buf);
 
 void
 sndctrler_setup_siganling(gpointer ptr,

@@ -46,7 +46,7 @@ typedef struct _GstMprtpschedulerPrivate GstMprtpschedulerPrivate;
 struct _GstMprtpscheduler
 {
   GstElement                    base_object;
-  GRWLock                       rwmutex;
+  GMutex                        mutex;
   GstPad*                       rtp_sinkpad;
   GstPad*                       mprtp_srcpad;
   GstPad*                       mprtcp_rr_sinkpad;
@@ -54,22 +54,18 @@ struct _GstMprtpscheduler
 
   guint8                        mprtp_ext_header_id;
   guint8                        abs_time_ext_header_id;
-  guint32                       ssrc_filter;
   gboolean                      enable_fec;
-  PacketsSndQueue*              sndqueue;
-  GHashTable*                   paths;
+
+  SndSubflows*                  subflows;
   StreamSplitter*               splitter;
   SndController*                controller;
   SendingRateDistributor*       sndrates;
-  gboolean                      logging;
   gboolean                      riport_flow_signal_sent;
-  guint                         active_subflows_num;
-  guint                         mpath_keyframe_filtering;
   GstSegment                    segment;
   GstClockTime                  position_out;
 
   guint8                        fec_payload_type;
-
+  GstClockTime                  obsolation_treshold;
   GstClock*                     sysclock;
 
   guint32                       rtcp_sent_octet_sum;
@@ -78,11 +74,14 @@ struct _GstMprtpscheduler
   GRecMutex                     thread_mutex;
   FECEncoder*                   fec_encoder;
   guint32                       fec_interval;
-  guint32                       sent_packets;
+//  guint32                       sent_packets;
 
   GstMprtpschedulerPrivate*     priv;
 
-
+  PacketSender* packetsender;
+  GAsyncQueue*  mprtpq;
+  GAsyncQueue*  mprtcpq;
+  GAsyncQueue*  rtpq;
 
   GstClockTime test_wait;
   guint seen_line;

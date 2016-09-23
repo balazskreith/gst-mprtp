@@ -208,7 +208,8 @@ libgstmprtp_la-streamsplitter.lo: streamsplitter.c \
  /usr/include/string.h /usr/include/assert.h slidingwindow.h \
  lib_bintree.h mprtprpath.h \
  /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h ricalcer.h \
- /usr/include/math.h /usr/include/x86_64-linux-gnu/bits/math-vector.h \
+ rtppackets.h /usr/include/math.h \
+ /usr/include/x86_64-linux-gnu/bits/math-vector.h \
  /usr/include/x86_64-linux-gnu/bits/libm-simd-decl-stubs.h \
  /usr/include/x86_64-linux-gnu/bits/huge_val.h \
  /usr/include/x86_64-linux-gnu/bits/huge_valf.h \
@@ -723,6 +724,8 @@ mprtprpath.h:
 /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h:
 
 ricalcer.h:
+
+rtppackets.h:
 
 /usr/include/math.h:
 

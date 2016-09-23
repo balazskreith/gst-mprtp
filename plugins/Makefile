@@ -165,7 +165,8 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-slidingwindow.lo libgstmprtp_la-lib_bintree.lo \
 	libgstmprtp_la-lib_swplugins.lo \
 	libgstmprtp_la-subratectrler.lo \
-	libgstmprtp_la-fbratargetctrler.lo
+	libgstmprtp_la-fbratargetctrler.lo \
+	libgstmprtp_la-rtppackets.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -442,7 +443,8 @@ libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
                          lib_bintree.c              \
                          lib_swplugins.c            \
                          subratectrler.c            \
-                         fbratargetctrler.c
+                         fbratargetctrler.c         \
+                         rtppackets.c
 
 noinst_HEADERS = mprtpspath.h           \
                  sndctrler.h            \
@@ -584,6 +586,7 @@ include ./$(DEPDIR)/libgstmprtp_la-reportproc.Plo
 include ./$(DEPDIR)/libgstmprtp_la-reportprod.Plo
 include ./$(DEPDIR)/libgstmprtp_la-ricalcer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rtpfecbuffer.Plo
+include ./$(DEPDIR)/libgstmprtp_la-rtppackets.Plo
 include ./$(DEPDIR)/libgstmprtp_la-screamsubctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-signalreport.Plo
 include ./$(DEPDIR)/libgstmprtp_la-slidingwindow.Plo
@@ -844,6 +847,13 @@ libgstmprtp_la-fbratargetctrler.lo: fbratargetctrler.c
 #	$(AM_V_CC)source='fbratargetctrler.c' object='libgstmprtp_la-fbratargetctrler.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-fbratargetctrler.lo `test -f 'fbratargetctrler.c' || echo '$(srcdir)/'`fbratargetctrler.c
+
+libgstmprtp_la-rtppackets.lo: rtppackets.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-rtppackets.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-rtppackets.Tpo -c -o libgstmprtp_la-rtppackets.lo `test -f 'rtppackets.c' || echo '$(srcdir)/'`rtppackets.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-rtppackets.Tpo $(DEPDIR)/libgstmprtp_la-rtppackets.Plo
+#	$(AM_V_CC)source='rtppackets.c' object='libgstmprtp_la-rtppackets.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-rtppackets.lo `test -f 'rtppackets.c' || echo '$(srcdir)/'`rtppackets.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

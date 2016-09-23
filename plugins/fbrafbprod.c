@@ -51,9 +51,9 @@ G_DEFINE_TYPE (FBRAFBProducer, fbrafbproducer, G_TYPE_OBJECT);
 
 static void fbrafbproducer_finalize (GObject * object);
 
-static void _setup_xr_rfc7097(FBRAFBProducer * this, ReportProducer *reportproducer);
+static void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this, ReportProducer *reportproducer);
 static void _setup_xr_owd(FBRAFBProducer * this, ReportProducer *reportproducer);
-static void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer);
+//static void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer);
 
 
 static gint
@@ -98,29 +98,29 @@ static void _owd_percentile_pipe(gpointer data, swpercentilecandidates_t *candid
   this->max_delay = *(GstClockTime*)candidates->max;
 }
 
-static void _tendency_add_pipe(gpointer udata, gpointer itemptr)
-{
-  FBRAFBProducer* this;
-  gint32* item;
-  item = itemptr;
-  this = udata;
-
-  ++this->tendency.counter;
-  this->tendency.sum += *item;
-
-}
-
-static void _tendency_rem_pipe(gpointer udata, gpointer itemptr)
-{
-  FBRAFBProducer* this;
-  gint32* item;
-  item = itemptr;
-  this = udata;
-
-  --this->tendency.counter;
-  this->tendency.sum -= *item;
-
-}
+//static void _tendency_add_pipe(gpointer udata, gpointer itemptr)
+//{
+//  FBRAFBProducer* this;
+//  gint32* item;
+//  item = itemptr;
+//  this = udata;
+//
+//  ++this->tendency.counter;
+//  this->tendency.sum += *item;
+//
+//}
+//
+//static void _tendency_rem_pipe(gpointer udata, gpointer itemptr)
+//{
+//  FBRAFBProducer* this;
+//  gint32* item;
+//  item = itemptr;
+//  this = udata;
+//
+//  --this->tendency.counter;
+//  this->tendency.sum -= *item;
+//
+//}
 
 static void _payloads_add_pipe(gpointer udata, gpointer itemptr)
 {
@@ -180,11 +180,11 @@ fbrafbproducer_init (FBRAFBProducer * this)
 
 
   this->owds_sw         = make_slidingwindow_uint64(50, 200 * GST_MSECOND);
-  this->tendency_sw     = make_slidingwindow_int32(100, GST_SECOND);
+//  this->tendency_sw     = make_slidingwindow_int32(100, GST_SECOND);
   this->payloadbytes_sw = make_slidingwindow_int32(2000, GST_SECOND);
 
   slidingwindow_add_plugin(this->owds_sw,        make_swpercentile(50, bintree3cmp_uint64, _owd_percentile_pipe, this));
-  slidingwindow_add_pipes(this->tendency_sw,     _tendency_rem_pipe, this, _tendency_add_pipe, this);
+//  slidingwindow_add_pipes(this->tendency_sw,     _tendency_rem_pipe, this, _tendency_add_pipe, this);
   slidingwindow_add_pipes(this->payloadbytes_sw, _payloads_rem_pipe, this, _payloads_add_pipe, this);
 
 }
@@ -212,14 +212,14 @@ void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold
   THIS_WRITEUNLOCK (this);
 }
 
-static void _refresh_devar(FBRAFBProducer *this, GstMpRTPBuffer *mprtp)
-{
-  if(mprtp->delay <= this->median_delay){
-    slidingwindow_add_int(this->tendency_sw, -1);
-  }else{
-    slidingwindow_add_int(this->tendency_sw, 1);
-  }
-}
+//static void _refresh_devar(FBRAFBProducer *this, GstMpRTPBuffer *mprtp)
+//{
+//  if(mprtp->delay <= this->median_delay){
+//    slidingwindow_add_int(this->tendency_sw, -1);
+//  }else{
+//    slidingwindow_add_int(this->tendency_sw, 1);
+//  }
+//}
 
 void fbrafbproducer_track(gpointer data, GstMpRTPBuffer *mprtp)
 {
@@ -229,7 +229,7 @@ void fbrafbproducer_track(gpointer data, GstMpRTPBuffer *mprtp)
   this = data;
   THIS_WRITELOCK (this);
 
-  _refresh_devar(this, mprtp);
+//  _refresh_devar(this, mprtp);
   slidingwindow_add_data(this->owds_sw, &mprtp->delay);
 
   if(!this->initialized){
@@ -265,8 +265,8 @@ void fbrafbproducer_setup_feedback(gpointer data, ReportProducer *reportprod)
   THIS_WRITELOCK (this);
 
   _setup_xr_owd(this, reportprod);
-  _setup_xr_rfc7097(this, reportprod);
-  _setup_afb_reps(this, reportprod);
+  _setup_xr_rfc3611_rle_lost(this, reportprod);
+//  _setup_afb_reps(this, reportprod);
 
   THIS_WRITEUNLOCK (this);
 }
@@ -294,13 +294,13 @@ void fbrafbproducer_fb_sent(gpointer data)
   this->last_fb = _now(this);
   this->next_fb = this->last_fb + 100 * GST_MSECOND;
   this->rcved_packets = 0;
-  slidingwindow_set_act_limit(this->tendency_sw, (this->received_bytes * 8) / 50000);
+//  slidingwindow_set_act_limit(this->tendency_sw, (this->received_bytes * 8) / 50000);
   THIS_WRITEUNLOCK(this);
 }
 
-void _setup_xr_rfc7097(FBRAFBProducer * this, ReportProducer *reportproducer)
+void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this, ReportProducer *reportproducer)
 {
-  report_producer_add_xr_discarded_rle(reportproducer,
+  report_producer_add_xr_lost_rle(reportproducer,
                                        FALSE,
                                        0,
                                        this->begin_seq,
@@ -340,16 +340,16 @@ void _setup_xr_owd(FBRAFBProducer * this, ReportProducer *reportproducer)
 
 }
 
-void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer)
-{
-  guint8 sampling_num;
-  gfloat tendency = 0.;
-  sampling_num = CONSTRAIN(0, 255, this->tendency.counter);
-  if(0 < sampling_num){
-    tendency = (gfloat) this->tendency.sum / (gfloat) this->tendency.counter;
-  }
-  report_producer_add_afb_reps(reportproducer, this->ssrc, sampling_num, tendency);
-}
+//void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer)
+//{
+//  guint8 sampling_num;
+//  gfloat tendency = 0.;
+//  sampling_num = CONSTRAIN(0, 255, this->tendency.counter);
+//  if(0 < sampling_num){
+//    tendency = (gfloat) this->tendency.sum / (gfloat) this->tendency.counter;
+//  }
+//  report_producer_add_afb_reps(reportproducer, this->ssrc, sampling_num, tendency);
+//}
 
 #undef THIS_WRITELOCK
 #undef THIS_WRITEUNLOCK

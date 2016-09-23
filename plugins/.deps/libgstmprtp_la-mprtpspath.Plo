@@ -205,7 +205,8 @@ libgstmprtp_la-mprtpspath.lo: mprtpspath.c /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/bits/waitstatus.h /usr/include/alloca.h \
  /usr/include/x86_64-linux-gnu/bits/stdlib-float.h /usr/include/ctype.h \
  /usr/include/assert.h slidingwindow.h lib_bintree.h mprtprpath.h \
- /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h ricalcer.h
+ /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h ricalcer.h \
+ rtppackets.h
 
 /usr/include/stdc-predef.h:
 
@@ -710,3 +711,5 @@ mprtprpath.h:
 /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h:
 
 ricalcer.h:
+
+rtppackets.h:

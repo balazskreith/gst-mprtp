@@ -797,7 +797,7 @@ gst_rtcp_xr_chunk_hton_cpy (GstRTCPXRChunk *dst_chunk,
 
 
 void
-gst_rtcp_xr_discarded_rle_setup(GstRTCPXRDiscardedRLEBlock *block,
+gst_rtcp_xr_rle_losts_setup(GstRTCPXRRLELostsRLEBlock *block,
                       gboolean early_bit,
                       guint8 thinning,
                       guint32 ssrc,
@@ -806,9 +806,9 @@ gst_rtcp_xr_discarded_rle_setup(GstRTCPXRDiscardedRLEBlock *block,
 {
   block->reserved     = 0;
   block->block_length = g_htons (3);
-  block->block_type   = GST_RTCP_XR_DISCARDED_RLE_BLOCK_TYPE_IDENTIFIER;
+  block->block_type   = GST_RTCP_XR_LOSS_RLE_BLOCK_TYPE_IDENTIFIER;
   memset(&block->chunks[0], 0, 4);
-  gst_rtcp_xr_discarded_rle_change(block,
+  gst_rtcp_xr_rle_losts_change(block,
                              &early_bit,
                              &thinning,
                              &ssrc,
@@ -816,7 +816,7 @@ gst_rtcp_xr_discarded_rle_setup(GstRTCPXRDiscardedRLEBlock *block,
                              &end_seq);
 }
 
-void gst_rtcp_xr_discarded_rle_getdown (GstRTCPXRDiscardedRLEBlock *block,
+void gst_rtcp_xr_rle_losts_getdown (GstRTCPXRRLELostsRLEBlock *block,
                              gboolean *early_bit,
                              guint8 *thinning,
                              guint32 *ssrc,
@@ -841,7 +841,7 @@ void gst_rtcp_xr_discarded_rle_getdown (GstRTCPXRDiscardedRLEBlock *block,
 }
 
 
-void gst_rtcp_xr_discarded_rle_change (GstRTCPXRDiscardedRLEBlock *block,
+void gst_rtcp_xr_rle_losts_change (GstRTCPXRRLELostsRLEBlock *block,
                              gboolean *early_bit,
                              guint8 *thinning,
                              guint32 *ssrc,
@@ -865,7 +865,7 @@ void gst_rtcp_xr_discarded_rle_change (GstRTCPXRDiscardedRLEBlock *block,
    }
 }
 
-guint gst_rtcp_xr_discarded_rle_block_get_chunks_num(GstRTCPXRDiscardedRLEBlock *block)
+guint gst_rtcp_xr_rle_losts_block_get_chunks_num(GstRTCPXRRLELostsRLEBlock *block)
 {
   guint chunk_words_num;
   guint16 block_length;
@@ -1321,13 +1321,13 @@ again:
         gst_printfnc_rtcp_xr_owd_block((GstRTCPXROWDBlock*)block, print);
         break;
     case GST_RTCP_XR_LOSS_RLE_BLOCK_TYPE_IDENTIFIER:
-        //todo: implement
+    	gst_printfnc_rtcp_xr_rle_losts_block((GstRTCPXRRLELostsRLEBlock*)block, print);
         break;
     case GST_RTCP_XR_DISCARDED_PACKETS_BLOCK_TYPE_IDENTIFIER:
       gst_printfnc_rtcp_xr_discarded_packets_block((GstRTCPXRDiscardedBlock*) block, print);
         break;
     case GST_RTCP_XR_DISCARDED_RLE_BLOCK_TYPE_IDENTIFIER:
-        gst_printfnc_rtcp_xr_discarded_rle_block((GstRTCPXRDiscardedRLEBlock*)block, print);
+
         break;
     case GST_RTCP_XR_DISCARDED_BYTES_BLOCK_TYPE_IDENTIFIER:
       gst_printfnc_rtcp_xr_discarded_bytes_block((GstRTCPXRDiscardedBlock*) block, print);
@@ -1524,7 +1524,7 @@ gst_printfnc_rtcp_xrchunks(GstRTCPXRChunk * chunk1, GstRTCPXRChunk * chunk2, pri
 }
 
 void
-gst_printfnc_rtcp_xr_discarded_rle_block(GstRTCPXRDiscardedRLEBlock * block, printfnc print)
+gst_printfnc_rtcp_xr_rle_losts_block(GstRTCPXRRLELostsRLEBlock * block, printfnc print)
 {
   gboolean early_bit;
   guint chunk_index;
@@ -1533,7 +1533,7 @@ gst_printfnc_rtcp_xr_discarded_rle_block(GstRTCPXRDiscardedRLEBlock * block, pri
   guint chunks_num;
   guint16 begin_seq, end_seq;
 
-  gst_rtcp_xr_discarded_rle_getdown (block, &early_bit, &thinning, &ssrc, &begin_seq, &end_seq);
+  gst_rtcp_xr_rle_losts_getdown (block, &early_bit, &thinning, &ssrc, &begin_seq, &end_seq);
 
   print (
       "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
@@ -1546,7 +1546,7 @@ gst_printfnc_rtcp_xr_discarded_rle_block(GstRTCPXRDiscardedRLEBlock * block, pri
       block->block_type, block->reserved, early_bit, thinning,
       g_ntohs (block->block_length), ssrc, begin_seq, end_seq);
 
-   chunks_num = gst_rtcp_xr_discarded_rle_block_get_chunks_num(block);
+   chunks_num = gst_rtcp_xr_rle_losts_block_get_chunks_num(block);
 
    for(chunk_index = 0;
        chunk_index < chunks_num;

@@ -44,7 +44,7 @@ typedef struct _GstMPRTCPXRReportSummary{
     guint16           end_seq;
     gboolean          vector[1024];
     guint             vector_length;
-  }DiscardedRLE;
+  }LostRLE;
 
   struct{
     gboolean          processed;

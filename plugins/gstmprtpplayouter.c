@@ -688,15 +688,6 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
       g_value_set_boolean (value, this->logging);
       THIS_READUNLOCK (this);
       break;
-    case PROP_LOG_PATH:
-      THIS_READLOCK (this);
-      {
-        gchar string[255];
-        mprtp_logger_get_target_directory(string);
-        g_value_set_string (value, string);
-      }
-      THIS_READUNLOCK (this);
-      break;
     case PROP_REPAIR_WINDOW_MIN:
       THIS_READLOCK (this);
       g_value_set_uint (value, this->repair_window_min / GST_MSECOND);

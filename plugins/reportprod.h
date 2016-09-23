@@ -65,7 +65,7 @@ void report_producer_add_rr(ReportProducer *this,
                             guint32 LSR,
                             guint32 DLSR);
 
-void report_producer_add_xr_discarded_rle(ReportProducer *this,
+void report_producer_add_xr_lost_rle(ReportProducer *this,
                                           gboolean early_bit,
                                           guint8 thinning,
                                           guint16 begin_seq,

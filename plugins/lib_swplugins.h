@@ -9,6 +9,47 @@
 #include "slidingwindow.h"
 #include "lib_bintree.h"
 
+
+#define StructCmpFnc(Type, field) \
+static gint _statitem_##field##_cmp(gpointer pa, gpointer pb) \
+{ \
+  Type *a,*b; \
+  a = pa; b = pb; \
+  if(a->field == b->field) return 0; \
+  return a->field < b->field ? -1 : 1; \
+} \
+
+
+#define PercentileResult(Type, field, candidates, PercResult, minResult, maxResult, defaultResult) \
+if(!candidates->processed){                        \
+  PercResult = defaultResult;                      \
+}else{                                             \
+  FBRAFBStatItem *left, *right, *min, *max;        \
+  left  = candidates->left;                        \
+  right = candidates->right;                       \
+  min   = candidates->min;                         \
+  max   = candidates->max;                         \
+  if(!left){                                       \
+      PercResult = ((Type*)right)->field;          \
+  }else if(!right){                                \
+	  PercResult = ((Type*)left)->field;           \
+  }else{                                           \
+	  PercResult =  ((Type*)left)->field;          \
+	  PercResult += ((Type*)right)->field;         \
+      PercResult>>=1;                              \
+  }                                                \
+  minResult = ((Type*)min)->field;                 \
+  maxResult = ((Type*)max)->field;                 \
+}                                                  \
+
+
+#define PercentileResultPipeFnc(name, TypeThis, ResultField, MinField, MaxField, Type, field, defaultResult) \
+static void name(gpointer udata, swpercentilecandidates_t* candidates) \
+{ \
+  TypeThis* this = udata;	\
+  PercentileResult(Type, field, candidates, this->ResultField, this->MinField, this->MaxField, defaultResult); \
+} \
+
 void swperctest(void);
 void swprinter_int32(gpointer data, gchar* string);
 void swprinter_uint32(gpointer data, gchar* string);
@@ -28,6 +69,9 @@ typedef struct swpercentilecandidates_struct_t{
   gpointer   min;
   gpointer   max;
 }swpercentilecandidates_t;
+
+
+
 
 typedef struct swint32stat_struct_t{
   gint32  counter;

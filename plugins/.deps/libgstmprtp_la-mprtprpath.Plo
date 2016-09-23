@@ -214,7 +214,8 @@ libgstmprtp_la-mprtprpath.lo: mprtprpath.c /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/bits/waitflags.h \
  /usr/include/x86_64-linux-gnu/bits/waitstatus.h /usr/include/alloca.h \
  /usr/include/x86_64-linux-gnu/bits/stdlib-float.h /usr/include/ctype.h \
- /usr/include/assert.h slidingwindow.h lib_bintree.h ricalcer.h
+ /usr/include/assert.h slidingwindow.h lib_bintree.h ricalcer.h \
+ rtppackets.h
 
 /usr/include/stdc-predef.h:
 
@@ -739,3 +740,5 @@ slidingwindow.h:
 lib_bintree.h:
 
 ricalcer.h:
+
+rtppackets.h:

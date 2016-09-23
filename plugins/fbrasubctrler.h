@@ -15,6 +15,7 @@
 #include "signalreport.h"
 #include "fbrafbproc.h"
 #include "fbratargetctrler.h"
+#include "rtppackets.h"
 
 
 typedef struct _FBRASubController FBRASubController;
@@ -37,37 +38,21 @@ struct _FBRASubController
 {
   GObject                   object;
   guint8                    id;
-  GRWLock                   rwmutex;
   GstClock*                 sysclock;
-  MPRTPSPath*               path;
-
   GstClockTime              made;
-//  gboolean                  disable_controlling;
+
   GstClockTime              last_executed;
-  GstClockTime              disable_end;
   guint                     measurements_num;
 
-  gint32                    monitored_bitrate;
-  guint32                   monitored_packets;
   gint32                    bottleneck_point;
-
-  gint32                    max_target_point;
-  gint32                    min_target_point;
-//  gint32                    target_bitrate;
-//  gint32                    target_bitrate_t1;
-  GstClockTime              last_tr_changed;
   GstClockTime              last_settled;
-
-  gdouble                   rand_factor;
-
   GstClockTime              last_fb_arrived;
 
   gboolean                  enabled;
 
   FBRAFBProcessor*          fbprocessor;
   FBRAFBProcessorStat       fbstat;
-  FBRATargetCtrler*         targetctrler;
-  //Need for monitoring
+
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;
   GstClockTime              increasement_started;
@@ -76,21 +61,19 @@ struct _FBRASubController
   SubRateAction             stage_fnc;
 
   GstClockTime              congestion_detected;
-  gboolean                  owd_approvement;
 
-  guint                     consecutive_ok;
-  guint                     consecutive_nok;
   GstClockTime              last_distorted;
   GstClockTime              last_reduced;
 
-  GstClockTime              adjustment_time;
+  gdouble                   cwnd;
+
   GstClockTime              last_approved;
 
   gpointer                  priv;
 
-  guint                     last_rtp_size;
-
-  gboolean hard_reduce_mem;
+  RTPPackets*              rtppackets;
+  SndSubflow*              subflow;
+  SndTracker*              sndtracker;
 
 };
 
@@ -101,7 +84,7 @@ struct _FBRASubControllerClass{
 GType fbrasubctrler_get_type (void);
 FBRASubController *make_fbrasubctrler(MPRTPSPath *path);
 
-gboolean fbrasubctrler_path_approver(gpointer data, GstRTPBuffer *buffer);
+gboolean fbrasubctrler_path_approver(gpointer data, RTPPacket *packet);
 
 void fbrasubctrler_enable(FBRASubController *this);
 void fbrasubctrler_disable(FBRASubController *this);

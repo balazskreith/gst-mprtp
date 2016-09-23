@@ -5,6 +5,7 @@
 #include "mprtpspath.h"
 #include "sndratedistor.h"
 #include "reportproc.h"
+#include "rtppackets.h"
 #include "signalreport.h"
 
 typedef struct _SubflowRateController SubflowRateController;
@@ -47,5 +48,5 @@ void subratectrler_report_update(SubflowRateController *this, GstMPRTCPReportSum
 void subratectrler_time_update(SubflowRateController *this);
 void subratectrler_signal_update(SubflowRateController *this, MPRTPSubflowRateController *ratectrler_params);
 void subratectrler_signal_request(SubflowRateController *this, MPRTPSubflowRateController *ratectrler_params);
-gboolean subratectrler_packet_approver(gpointer data,GstRTPBuffer *buf);
+gboolean subratectrler_packet_approver(gpointer data,RTPPacket *packet);
 #endif /* SUBRATECTRLER_H_ */

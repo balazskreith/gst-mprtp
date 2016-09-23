@@ -24,13 +24,11 @@ typedef struct _MPRTPLoggerClass MPRTPLoggerClass;
 struct _MPRTPLogger
 {
   GObject           object;
-  GMutex            mutex;
   GstClock*         sysclock;
   GstClockTime      made;
-//  GHashTable*       reserves;
 
-  GstTask*          caller;
-  GRecMutex         caller_mutex;
+  GstTask*          process;
+  GRecMutex         process_mutex;
 
   gchar             path[255];
   gboolean          enabled;
@@ -38,11 +36,7 @@ struct _MPRTPLogger
   GString*          collector_string;
   gchar             collector_filename[255];
 
-  GstTask*          writer;
-  GRecMutex         writer_mutex;
-  GQueue*           writer_queue;
-  GCond             writer_cond;
-  gboolean          writer_wait;
+  GAsyncQueue*      messages;
 };
 
 struct _MPRTPLoggerClass{
@@ -56,11 +50,9 @@ gpointer mprtp_malloc(gsize bytenum);
 void mprtp_free(gpointer ptr);
 
 void init_mprtp_logger(void);
-void enable_mprtp_logger(void);
-void disable_mprtp_logger(void);
 void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer,gchar*),gpointer data, const gchar* filename);
+void mprtp_logger_set_state(gboolean enabled);
 void mprtp_logger_set_target_directory(const gchar *path);
-void mprtp_logger_get_target_directory(gchar* result);
 void mprtp_logger(const gchar *filename, const gchar * format, ...);
 void mprtp_log_one(const gchar *filename, const gchar * format, ...);
 

@@ -306,7 +306,7 @@ static void _slidingwindow_obsolate_time_limit(SlidingWindow* this)
 {
   SlidingWindowItem *item;
 again:
-  if(datapuffer_readcapacity(this->items) < this->min_itemnum){
+  if(datapuffer_readcapacity(this->items) <= this->min_itemnum){
     return;
   }
   item = datapuffer_peek_first(this->items);

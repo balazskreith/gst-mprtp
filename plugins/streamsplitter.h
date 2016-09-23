@@ -28,16 +28,15 @@ typedef struct _SchNode SchNode;
 struct _StreamSplitter
 {
   GObject              object;
-  GRWLock              rwmutex;
   GstClock*            sysclock;
   GstClockTime         made;
-  GHashTable*          subflows;
   SchNode*             tree;
-  PacketsSndQueue*     sndqueue;
 
-  guint                active_subflow_num;
-  guint8               max_flag;
-  guint                keyframe_filtering;
+//  guint                active_subflow_num;
+//  guint8               max_flag;
+//  guint                keyframe_filtering;
+
+  SndSubflows*         subflows;
 };
 
 struct _StreamSplitterClass{
@@ -45,18 +44,7 @@ struct _StreamSplitterClass{
 };
 
 StreamSplitter*
-make_stream_splitter(
-    PacketsSndQueue *sndqueue);
-
-//class functions
-void stream_splitter_add_path(StreamSplitter * this,
-                              guint8 subflow_id,
-                              MPRTPSPath *path,
-                              gint32 sending_rate);
-
-void stream_splitter_rem_path(
-    StreamSplitter * this,
-    guint8 subflow_id);
+make_stream_splitter(SndSubflows* sndsubflows);
 
 void
 stream_splitter_set_mpath_keyframe_filtering(
@@ -66,29 +54,8 @@ stream_splitter_set_mpath_keyframe_filtering(
 gboolean
 stream_splitter_approve_buffer(
     StreamSplitter * this,
-    GstBuffer *buf,
+	RTPPacket *packet,
     MPRTPSPath **path);
-
-GstBuffer *
-stream_splitter_pop(
-    StreamSplitter * this,
-    MPRTPSPath **out_path);
-
-void stream_splitter_setup_sending_target(
-    StreamSplitter* this,
-    guint8 subflow_id,
-    gint32 sending_target);
-
-gdouble stream_splitter_get_sending_target(
-    StreamSplitter* this,
-    guint8 subflow_id);
-
-gdouble stream_splitter_get_sending_weight(
-    StreamSplitter* this,
-    guint8 subflow_id);
-
-void stream_splitter_refresh_targets (
-    StreamSplitter * this);
 
 void stream_splitter_commit_changes (
     StreamSplitter * this);

@@ -24,6 +24,8 @@ typedef struct _RcvTrackerClass RcvTrackerClass;
 typedef struct _RcvTrackerStat{
   gdouble    min_skew;
   gdouble    max_skew;
+  gint32     discarded_packets;
+  gint32     recovered_packets;
 }RcvTrackerStat;
 
 
@@ -32,17 +34,11 @@ typedef struct _RcvTrackerSubflowStat{
   guint32                   total_received_bytes;
   guint32                   total_received_packets;
   guint32                   jitter;
+
+  GstClockTime              skew_median;
+  GstClockTime              skew_min;
+  GstClockTime              skew_max;
 }RcvTrackerSubflowStat;
-
-typedef struct _RcvTrackerStatNotifier{
-  void (*callback)(gpointer udata, RcvTrackerSubflowStat* stat);
-  gpointer udata;
-}RcvTrackerStatNotifier;
-
-typedef struct _RcvTrackerPacketNotifier{
-  void (*callback)(gpointer udata, RcvTrackerSubflowStat* stat);
-  gpointer udata;
-}RcvTrackerPacketNotifier;
 
 struct _RcvTracker
 {
@@ -50,8 +46,10 @@ struct _RcvTracker
   GstClock*                 sysclock;
   RcvTrackerStat            stat;
   GSList*                   joined_subflows;
-  GSList*                   stat_notifiers;
-  GSList*                   packet_notifiers;
+
+  Observer*                 on_stat_changed;
+  Observer*                 on_packet_arrived;
+  Observer*                 on_discarded_packet;
 
   GstClockTime              skew_minmax_updated;
 
@@ -72,23 +70,39 @@ void rcvtracker_deinit_subflow(RcvTracker *this, guint8 subflow_id);
 void rcvtracker_init_subflow(RcvTracker *this, guint8 subflow_id);
 void rcvtracker_refresh(RcvTracker * this);
 
+void rcvtracker_add_discarded_seq(RcvTracker* this, DiscardedPacket discarded_packet);
+
 void rcvtracker_add_packet_notifier(RcvTracker * this,
                                         void (*callback)(gpointer udata, gpointer item),
                                         gpointer udata);
 
-void rcvtracker_add_stat_notifier(RcvTracker * this,
-                                    void (*callback)(gpointer udata, RcvTrackerStat* stat),
+void rcvtracker_add_on_stat_changed_cb(RcvTracker * this,
+                                    NotifierFunc callback,
                                     gpointer udata);
 
-void rcvtracker_add_stat_subflow_notifier(RcvTracker * this,
+void rcvtracker_subflow_add_on_stat_changed_cb(RcvTracker * this,
                                     guint8 subflow_id,
-                                    void (*callback)(gpointer udata, RcvTrackerSubflowStat* stat),
+                                    NotifierFunc callback,
                                     gpointer udata);
 
-void rcvtracker_add_packet_on_subflow_notifier(RcvTracker * this,
+void rcvtracker_add_on_discarded_packet_cb(RcvTracker * this,
                                     guint8 subflow_id,
-                                    void (*callback)(gpointer udata, RcvTrackerSubflowStat* stat),
+                                    NotifierFunc callback,
                                     gpointer udata);
+
+void rcvtracker_subflow_add_on_lost_packet_cb(RcvTracker * this,
+                                    guint8 subflow_id,
+                                    NotifierFunc callback,
+                                    gpointer udata);
+
+void rcvtracker_subflow_add_on_received_packet_cb(RcvTracker * this,
+                                    guint8 subflow_id,
+                                    NotifierFunc callback,
+                                    gpointer udata);
+
+void rcvtracker_subflow_rem_on_received_packet_cb(RcvTracker * this,
+                                        guint8 subflow_id,
+                                        NotifierFunc callback);
 
 void rcvtracker_add_packet(RcvTracker * this, RTPPacket* packet);
 RcvTrackerSubflowStat* rcvtracker_get_subflow_stat(RcvTracker * this, guint8 subflow_id);

@@ -30,7 +30,6 @@
 #include <string.h>
 #include <sys/timex.h>
 #include "ricalcer.h"
-#include "subratectrler.h"
 #include <stdlib.h>
 
 #define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
@@ -83,7 +82,7 @@ _sender_report_updater(
     SndController * this);
 
 static void
-_orp_add_sr (
+_create_sr (
     SndController * this,
     SndSubflow * subflow);
 
@@ -399,7 +398,7 @@ static void _sender_report_updater_helper(SndSubflow *subflow, gpointer udata)
   }
 
   report_producer_begin(this->report_producer, subflow->id);
-  _orp_add_sr(this, subflow);
+  _create_sr(this, subflow);
   buf = report_producer_end(this->report_producer, &report_length);
   g_async_queue_push(this->mprtcpq, buf);
 
@@ -425,7 +424,7 @@ done:
 }
 
 void
-_orp_add_sr (SndController * this, SndSubflow * subflow)
+_create_sr (SndController * this, SndSubflow * subflow)
 {
   guint64 ntptime;
   guint32 rtptime;
@@ -503,7 +502,7 @@ void _dispose_congestion_controller(SndController* this, CongestionController* c
 {
   controller->disable(controller->udata);
   controller->dispose(controller->udata);
-  g_slist_remove(this->controllers, controller);
+  this->controllers = g_slist_remove(this->controllers, controller);
   g_slice_free(CongestionController, controller);
 }
 
@@ -521,4 +520,3 @@ CongestionController* _create_fbraplus(SndController* this, SndSubflow* subflow)
 }
 
 
-#undef REPORTTIMEOUT

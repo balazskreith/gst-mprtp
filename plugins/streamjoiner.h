@@ -42,6 +42,7 @@ struct _StreamJoiner
   GQueue*              playoutq;
   guint16              last_seq;
   gboolean             last_seq_init;
+  guint32              last_ts;
 
   gdouble              betha;
   PacketForwarder*     rtppackets_out;

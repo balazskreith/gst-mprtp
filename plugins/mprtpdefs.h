@@ -56,8 +56,13 @@ struct _RTPAbsTimeExtension
 };
 
 typedef struct{
-  guint16  seq_num;
+  guint16  abs_seq;
   gboolean repaired;
 }DiscardedPacket;
+
+typedef struct{
+  guint16  subflow_seq;
+  gboolean repaired;
+}LostPacket;
 
 #endif /* PLUGINS_MPRTPDEFS_H_ */

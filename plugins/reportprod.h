@@ -29,7 +29,6 @@ typedef struct _ReportProducerClass ReportProducerClass;
 struct _ReportProducer
 {
   GObject                  object;
-  GRWLock                  rwmutex;
   GstClockTime             made;
   GstClock*                sysclock;
   guint32                  ssrc;
@@ -39,6 +38,7 @@ struct _ReportProducer
   GstMPRTCPSubflowBlock*   block;
   gpointer                 actual;
   gsize                    length;
+  gboolean                 in_progress;
 
   struct{
     GstRTCPXRBlock*          head_block;

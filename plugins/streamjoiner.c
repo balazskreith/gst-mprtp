@@ -56,7 +56,9 @@ typedef struct{
 typedef struct{
   Message    base;
   GstBuffer *buffer;
+  guint32    ts;
   guint16    abs_seq;
+
 }RTPBufferMessage;
 
 typedef struct{
@@ -87,16 +89,16 @@ _cmp_seq (guint16 x, guint16 y)
   return 0;
 }
 
-//static gint
-//_cmp_ts (guint32 x, guint32 y)
-//{
-//  if(x == y) return 0;
-//  if(x < y && y - x < 2147483648) return -1;
-//  if(x > y && x - y > 2147483648) return -1;
-//  if(x < y && y - x > 2147483648) return 1;
-//  if(x > y && x - y < 2147483648) return 1;
-//  return 0;
-//}
+static gint
+_cmp_ts (guint32 x, guint32 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 2147483648) return -1;
+  if(x > y && x - y > 2147483648) return -1;
+  if(x < y && y - x > 2147483648) return 1;
+  if(x > y && x - y < 2147483648) return 1;
+  return 0;
+}
 
 static gint _playoutq_sort_helper(gconstpointer a, gconstpointer b, gpointer user_data)
 {
@@ -178,9 +180,10 @@ void stream_joiner_add_packet(StreamJoiner *this, RTPPacket* packet)
   RTPBufferMessage *msg;
   rtppackets_packet_ref(packet);
   msg = g_slice_new(RTPBufferMessage);
-  msg->base.type = STREAMJOINER_MESSAGE_RTPPACKET;
-  msg->buffer  = packet;
-  msg->abs_seq = packet->abs_seq;
+  msg->base.type   = STREAMJOINER_MESSAGE_RTPPACKET;
+  msg->ts          = packet->timestamp;
+  msg->buffer      = packet->buffer;
+  msg->abs_seq     = packet->abs_seq;
   g_async_queue_push(this->messages_in, msg);
 }
 
@@ -224,9 +227,17 @@ static void _forward(StreamJoiner *this, RTPBufferMessage *rtpbuf_msg)
     goto send;
   }
 
-  if(_cmp_seq(++this->last_seq, rtpbuf_msg->abs_seq) != 0){
+  if(_cmp_seq(++this->last_seq, rtpbuf_msg->abs_seq) < 0){
+    DiscardedPacket discarded_packet = g_slice_new0(DiscardedPacket);
+    discarded_packet->abs_seq    = this->last_seq;
     g_queue_push_head(this->playoutq, rtpbuf_msg);
+    g_async_queue_push(this->discarded_packets_out, discarded_packet);
     goto done;
+  }
+
+  if(_cmp_ts(this->last_ts, rtpbuf_msg->ts) < 0){
+    this->last_ts = rtpbuf_msg->ts;
+    this->pacing_time += this->playout_delay;
   }
 
 send:
@@ -252,13 +263,17 @@ void _process(gpointer udata)
     goto done;
   }
 
-  this->pacing_time += (this->pacing_time == 0 ? _now(this) : 0) + this->playout_delay;
+  if(this->pacing_time == 0){
+    this->pacing_time = _now(this);
+  }
 
   if(g_queue_is_empty(this->playoutq)){
+    this->pacing_time += this->playout_delay;
     goto done;
   }
 
   _forward(this, g_queue_pop_head(this->joinq));
+
 
 done:
   return;

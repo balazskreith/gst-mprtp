@@ -23,7 +23,6 @@
 
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
-#include "rcvratedistor.h"
 #include <math.h>
 #include <gst/gst.h>
 #include <stdlib.h>
@@ -42,27 +41,23 @@ GST_DEBUG_CATEGORY_STATIC (rcvtracker_debug_category);
 
 #define _now(this) gst_clock_get_time (this->sysclock)
 #define _priv(this) ((Private*)(this->priv))
-#define _get_subflow(this, subflow_id) ((Subflow*)(_priv(this)->subflows + subflow_id))
-
+//#define _get_subflow(this, subflow_id) ((Subflow*)(_priv(this)->subflows + subflow_id))
 
 G_DEFINE_TYPE (RcvTracker, rcvtracker, G_TYPE_OBJECT);
-
-typedef struct{
-  void     (*callback)(gpointer udata, RcvTrackerSubflowStat* stat);
-  gpointer   udata;
-}SubflowNotifier;
 
 typedef struct _Subflow{
   gboolean              initialized;
   RcvTrackerSubflowStat stat;
-  GSList*               stat_notifiers;
-  GSList*               packet_notifiers;
+
+  Observer*             on_stat_changed;
+  Observer*             on_received_packet;
+  Observer*             on_lost_packet;
+
   GstClockTime          last_mprtp_delay;
   gboolean              seq_initialized;
 
   SlidingWindow*        skews;
 
-  GstClockTime          skew_median, skew_min, skew_max;
   gdouble               path_skew;
   SlidingWindow*        path_skews;
 }Subflow;
@@ -75,6 +70,11 @@ typedef struct{
   GstClockTime timestamp;
 }GstClockTimeCover;
 
+static void _init_subflow(RcvTracker *this, guint8 subflow_id);
+static Subflow* _get_subflow(SndTracker *this, guint8 subflow_id);
+
+static Private* _priv_ctor(void);
+static void _priv_dtor(Private *priv);
 //----------------------------------------------------------------------
 //-------- Private functions belongs to the object ----------
 //----------------------------------------------------------------------
@@ -83,17 +83,6 @@ static void
 rcvtracker_finalize (
     GObject * object);
 
-static void
-_refresh_packet_notifiers(GSList* notifiers, RTPPacket *packet);
-
-static void
-_packet_notify(gpointer item, gpointer udata);
-
-static void
-_refresh_stat_notifiers(GSList* notifiers, RcvTrackerSubflowStat * stat);
-
-static void
-_stat_notify(gpointer item, gpointer udata);
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -102,12 +91,12 @@ _stat_notify(gpointer item, gpointer udata);
 static void _subflow_skews_median_pipe(gpointer udata, swpercentilecandidates_t *candidates)
 {
   Subflow *subflow = udata;
-  PercentileResult(GstClockTimeCover, timestamp, candidates, subflow->skew_median, subflow->skew_min, subflow->skew_max, 0);
+  PercentileResult(GstClockTimeCover, timestamp, candidates, subflow->stat.skew_median, subflow->stat.skew_min, subflow->stat.skew_max, 0);
 
   if(subflow->path_skew == 0.){
-    subflow->path_skew = subflow->skew_median;
+    subflow->path_skew = subflow->stat.skew_median;
   }else{
-    subflow->path_skew = subflow->path_skew * .99 + (gdouble)(subflow->skew_median * .01);
+    subflow->path_skew = subflow->path_skew * .99 + (gdouble)(subflow->stat.skew_median * .01);
   }
 
   slidingwindow_add_data(subflow->path_skews, &subflow->path_skew);
@@ -146,7 +135,11 @@ rcvtracker_finalize (GObject * object)
   RcvTracker * this;
   this = RCVTRACKER(object);
   g_object_unref(this->sysclock);
-  g_free(this->priv);
+  g_object_unref(this->path_skews);
+  g_object_unref(this->on_discarded_packet);
+  g_object_unref(this->on_packet_arrived);
+  g_object_unref(this->on_stat_changed);
+  _priv_dtor(this->priv);
 }
 
 
@@ -154,45 +147,20 @@ void
 rcvtracker_init (RcvTracker * this)
 {
   this->sysclock = gst_system_clock_obtain();
-  this->priv = g_malloc0(sizeof(Private));
-  this->path_skews = make_slidingwindow_double(256, 0);
+  this->priv                = _priv_ctor();
+  this->path_skews          = make_slidingwindow_double(256, 0);
+  this->on_discarded_packet = make_observer();
+  this->on_packet_arrived   = make_observer();
+  this->on_stat_changed     = make_observer();
 
   slidingwindow_add_plugin(this->path_skews, make_swminmax(bintree3cmp_double, _skews_minmax_pipe, this));
 
 }
 
-void rcvtracker_deinit_subflow(RcvTracker *this, guint8 subflow_id)
-{
-  Subflow* subflow = _get_subflow(this, subflow_id);
-  if(subflow->initialized){
-    GST_WARNING_OBJECT(this, "Subflow already deinitialized");
-    return;
-  }
-
-  g_object_unref(subflow->skews);
-  this->joined_subflows = g_slist_prepend(this->joined_subflows, subflow);
-}
-
-
-void rcvtracker_init_subflow(RcvTracker *this, guint8 subflow_id)
-{
-  Subflow* subflow = _get_subflow(this, subflow_id);
-  if(!subflow->initialized){
-    GST_WARNING_OBJECT(this, "Subflow already initialized");
-    return;
-  }
-
-  subflow->skews = make_slidingwindow_uint64(100, 2 * GST_SECOND);
-  slidingwindow_add_plugin(subflow->skews,
-                           make_swpercentile(50, bintree3cmp_uint64, _subflow_skews_median_pipe, this));
-
-  subflow->path_skews = this->path_skews;
-  this->joined_subflows = g_slist_remove(this->joined_subflows, subflow);
-}
 
 static void _rcvtracker_refresh_helper(Subflow* subflow, RcvTracker *this)
 {
-
+  slidingwindow_refresh(subflow->path_skews);
 }
 
 void rcvtracker_refresh(RcvTracker * this)
@@ -200,72 +168,85 @@ void rcvtracker_refresh(RcvTracker * this)
   g_slist_foreach(this->joined_subflows, (GFunc) _rcvtracker_refresh_helper, this);
 }
 
-void rcvtracker_add_packet_notifier(RcvTracker * this,
-                                        void (*callback)(gpointer udata, gpointer item),
+void rcvtracker_add_discarded_seq(RcvTracker* this, DiscardedPacket discarded_packet)
+{
+  Subflow *subflow;
+
+  ++this->stat.discarded_packets;
+  if(discarded_packet->repaired){
+    ++this->stat.recovered_packets;
+  }
+
+  observer_notify(this->on_discarded_packet, discarded_packet);
+}
+
+void rcvtracker_add_packet_notifier(RcvTracker * this, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(this->on_packet_arrived, callback, udata);
+}
+
+
+void rcvtracker_add_on_stat_changed_cb(RcvTracker * this, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(this->on_stat_changed, callback, udata);
+}
+
+void rcvtracker_subflow_add_on_stat_changed_cb(RcvTracker * this,
+                                    guint8 subflow_id,
+                                    NotifierFunc callback,
+                                    gpointer udata)
+{
+  Subflow *subflow = _get_subflow(this, subflow_id);
+  observer_add_listener(this->on_stat_changed, callback, udata);
+}
+
+
+void rcvtracker_add_on_discarded_packet_cb(RcvTracker * this,
+                                    guint8 subflow_id,
+                                    NotifierFunc callback,
+                                    gpointer udata)
+{
+  Subflow *subflow = _get_subflow(this, subflow_id);
+  observer_add_listener(this->on_discarded_packet, callback, udata);
+}
+
+void rcvtracker_subflow_add_on_lost_packet_cb(RcvTracker * this,
+                                    guint8 subflow_id,
+                                    NotifierFunc callback,
+                                    gpointer udata)
+{
+  Subflow *subflow = _get_subflow(this, subflow_id);
+  observer_add_listener(subflow->on_lost_packet, callback, udata);
+}
+
+void rcvtracker_subflow_add_on_received_packet_cb(RcvTracker * this,
+                                        guint8 subflow_id,
+                                        NotifierFunc callback,
                                         gpointer udata)
 {
-  RcvTrackerPacketNotifier* notifier = g_slice_new0(RcvTrackerPacketNotifier);
-  notifier->callback = callback;
-  notifier->udata = udata;
-  this->packet_notifiers = g_slist_prepend(this->packet_notifiers, notifier);
+  Subflow *subflow = _get_subflow(this, subflow_id);
+  observer_add_listener(subflow->on_received_packet, callback, udata);
 }
 
-
-void rcvtracker_add_stat_notifier(RcvTracker * this,
-                                    void (*callback)(gpointer udata, RcvTrackerSubflowStat* stat),
-                                    gpointer udata)
+void rcvtracker_subflow_rem_on_received_packet_cb(RcvTracker * this,
+                                        guint8 subflow_id,
+                                        NotifierFunc callback)
 {
-  RcvTrackerStatNotifier* notifier = g_slice_new0(RcvTrackerStatNotifier);
-  notifier->callback = callback;
-  notifier->udata = udata;
-  this->stat_notifiers = g_slist_prepend(this->stat_notifiers, notifier);
-}
-
-void rcvtracker_add_stat_subflow_notifier(RcvTracker * this,
-                                    guint8 subflow_id,
-                                    void (*callback)(gpointer udata, RcvTrackerSubflowStat* stat),
-                                    gpointer udata)
-{
-  RcvTrackerStatNotifier* notifier = g_slice_new0(RcvTrackerStatNotifier);
-  notifier->callback = callback;
-  notifier->udata = udata;
-  _get_subflow(this, subflow_id)->stat_notifiers = g_slist_prepend(_get_subflow(this, subflow_id)->stat_notifiers, notifier);
-}
-
-
-void rcvtracker_add_packet_on_subflow_notifier(RcvTracker * this,
-                                    guint8 subflow_id,
-                                    void (*callback)(gpointer udata, RcvTrackerSubflowStat* stat),
-                                    gpointer udata)
-{
-  RcvTrackerPacketNotifier* notifier = g_slice_new0(RcvTrackerPacketNotifier);
-  notifier->callback = callback;
-  notifier->udata = udata;
-  _get_subflow(this, subflow_id)->packet_notifiers = g_slist_prepend(_get_subflow(this, subflow_id)->packet_notifiers, notifier);
+  Subflow *subflow = _get_subflow(this, subflow_id);
+  observer_rem_listener(subflow->on_received_packet, callback);
 }
 
 RcvTrackerSubflowStat* rcvtracker_get_subflow_stat(RcvTracker * this, guint8 subflow_id)
 {
-  return _priv(this)->subflows + subflow_id;
+  return &_get_subflow(this, subflow_id)->stat;
 }
 
-void rcvtracker_add_packet(RcvTracker * this, RTPPacket* packet)
+static void _subflow_add_packet(RcvTracker * this, Subflow *subflow, RTPPacket* packet)
 {
-  Subflow* subflow;
-  gint64 skew;
   gint cmp;
+  gint64 skew;
 
-  _refresh_packet_notifiers(this->packet_notifiers, packet);
-  if(packet->subflow_id == 0){
-    return;
-  }
-  subflow = _get_subflow(this, packet->subflow_id);
-  if(!subflow->initialized){
-    GST_WARNING_OBJECT(this, "Uninitialized subflow in rcvtracker got a packet");
-    return;
-  }
-
-  _refresh_packet_notifiers(subflow->packet_notifiers, packet);
+  observer_notify(this->on_packet_arrived, packet);
 
   if (subflow->seq_initialized == FALSE) {
     subflow->stat.highest_seq = packet->subflow_seq;
@@ -283,99 +264,95 @@ void rcvtracker_add_packet(RcvTracker * this, RTPPacket* packet)
   ++subflow->stat.total_received_packets;
   subflow->stat.total_received_bytes += packet->payload_size;
 
-  cmp = _cmp_seq(subflow->stat.highest_seq + 1, packet->subflow_seq);
-  if(cmp == 0){
+  cmp = _cmp_seq(packet->subflow_seq, subflow->stat.highest_seq + 1);
+  if(cmp < 0){
+    goto done;
+  }
+
+  if(!cmp){
     subflow->stat.highest_seq = packet->subflow_seq;
     slidingwindow_add_data(subflow->skews, &skew);
-  }else if(cmp < 0){
+  }else{
+    guint16 act_seq;
+    for(act_seq = subflow->stat.highest_seq; act_seq != packet->subflow_seq; ++act_seq){
+      LostPacket lost_packet;
+      lost_packet.subflow_seq = act_seq;
+      observer_notify(subflow->on_lost_packet, &lost_packet);
+    }
     subflow->stat.highest_seq = packet->subflow_seq;
   }
 
-  _refresh_stat_notifiers(subflow->stat_notifiers, &subflow->stat);
 done:
-  _refresh_stat_notifiers(this->stat_notifiers, &this->stat);
-
+  observer_notify(subflow->on_stat_changed, &subflow->stat);
 }
 
-
-//Only process rtp packets
-void
-mprtpr_path_process_rtp_packet (MpRTPRPath * this, GstMpRTPBuffer *mprtp)
+void rcvtracker_add_packet(RcvTracker * this, RTPPacket* packet)
 {
-  gint64 skew;
+  Subflow* subflow;
 
-  THIS_WRITELOCK (this);
-  if(!mprtp->delay){
-    GST_WARNING_OBJECT(this, "A packet delay should not be 0, the mprtpr path process doesn't work with it");
+  observer_notify(this->on_packet_arrived, packet);
+
+  if(packet->subflow_id == 0){
     goto done;
   }
 
-  if (this->seq_initialized == FALSE) {
-    this->highest_seq = mprtp->subflow_seq;
-    this->total_packets_received = 1;
-    this->total_payload_received = mprtp->payload_bytes;
-    this->last_rtp_timestamp = mprtp->timestamp;
-    this->last_mprtp_delay = mprtp->delay;
-    _add_delay(this, mprtp->delay);
-    this->seq_initialized = TRUE;
-    goto done;
-  }
-
-  //normal jitter calculation for regular rtcp reports
-  skew = (((gint64)this->last_mprtp_delay - (gint64)mprtp->delay));
-  this->jitter += ((skew < 0?-1*skew:skew) - this->jitter) / 16;
-  this->last_mprtp_delay = mprtp->delay;
-  ++this->total_packets_received;
-  this->total_payload_received += mprtp->payload_bytes;
-
-  //collect and evaluate skew in another way
-  if(_cmp_seq32(this->last_rtp_timestamp, mprtp->timestamp) < 0){
-    this->last_rtp_timestamp = mprtp->timestamp;
-  }
-  _add_delay(this, mprtp->delay);
-
-  if(this->packetstracker){
-    this->packetstracker(this->packetstracker_data, mprtp);
-  }
-
-  //consider cycle num increase with allowance of a little gap
-  if(65472 < this->highest_seq && mprtp->subflow_seq < 128){
-    ++this->cycle_num;
-  }
-
-  //set the new packet seq as the highest seq
-  this->highest_seq = mprtp->subflow_seq;
+  subflow = _get_subflow(this, packet->subflow_id);
+  _subflow_add_packet(this, subflow, packet);
 
 done:
-  THIS_WRITEUNLOCK(this);
+  observer_notify(this->on_stat_changed, &this->stat);
+
 }
 
 
-
-void _refresh_packet_notifiers(GSList* notifiers, RTPPacket * packet)
+Subflow* _get_subflow(SndTracker *this, guint8 subflow_id)
 {
-  if(notifiers){
-    g_slist_foreach(notifiers, _stat_notify, packet);
+  Subflow *result;
+  result = _priv(this)->subflows + subflow_id;
+  if(!result->initialized){
+    _init_subflow(this, subflow_id);
   }
+  return result;
 }
 
-void _packet_notify(gpointer item, gpointer udata)
+
+
+
+void _init_subflow(RcvTracker *this, guint8 subflow_id)
 {
-  RcvTrackerPacketNotifier *notifier;
-  RTPPacket* packet = udata;
-  notifier->callback(notifier->udata, packet);
+  Subflow* subflow = _get_subflow(this, subflow_id);
+
+  subflow->skews = make_slidingwindow_int64(100, 2 * GST_SECOND);
+  slidingwindow_add_plugin(subflow->skews,
+                           make_swpercentile(50, bintree3cmp_int64, _subflow_skews_median_pipe, this));
+
+  subflow->path_skews = this->path_skews;
+  this->joined_subflows = g_slist_prepend(this->joined_subflows, subflow);
+
 }
 
-void _refresh_stat_notifiers(GSList* notifiers, RcvTrackerSubflowStat * stat)
+
+static Private* _priv_ctor(void)
 {
-  if(notifiers){
-    g_slist_foreach(notifiers, _stat_notify, stat);
+  Private* result = g_malloc0(sizeof(Private));
+  return result;
+}
+
+static void _priv_dtor(Private *priv)
+{
+  Subflow *subflow;
+  gint i;
+  for(i = 0; i < 256; ++i){
+    subflow = priv->subflows + i;
+    if(subflow->on_stat_changed){
+      g_object_unref(subflow->on_stat_changed);
+    }
+    if(subflow->on_lost_packet){
+      g_object_unref(subflow->on_lost_packet);
+    }
+    if(subflow->on_received_packet){
+      g_object_unref(subflow->on_received_packet);
+    }
+    g_object_unref(subflow->skews);
   }
-}
-
-void _stat_notify(gpointer item, gpointer udata)
-{
-  RcvTrackerStatNotifier *notifier;
-  RcvTrackerSubflowStat* stat = udata;
-  notifier->callback(notifier->udata, stat);
 }

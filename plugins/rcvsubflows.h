@@ -29,12 +29,6 @@ typedef struct _RcvSubflow RcvSubflow;
 struct _RcvSubflow
 {
   guint8                     id;
-  guint8                     mprtp_ext_header_id;
-  guint16                    rtp_seq;
-  guint16                    rtp_seq_cycle_num;
-  guint8                     fec_ext_header_id;
-  guint16                    fec_seq;
-  guint16                    fec_seq_cycle_num;
 
   guint32                    total_received_packets_num;
   guint32                    total_received_payload_bytes;
@@ -42,6 +36,9 @@ struct _RcvSubflow
   GstClockTime               next_regular_rtcp;
   RTCPIntervalMode           rtcp_interval_mode;
   CongestionControllingMode  congestion_controlling_mode;
+
+  guint64                    last_SR_report_sent;
+  guint64                    last_SR_report_rcvd;
 
   guint32                    received_packet_count;
   guint32                    received_octet_count;

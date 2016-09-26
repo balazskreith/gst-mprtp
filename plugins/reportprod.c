@@ -37,11 +37,6 @@
 //#define THIS_WRITELOCK(this)
 //#define THIS_WRITEUNLOCK(this)
 
-#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
-
 #define DATABED_LENGTH 1400
 
 GST_DEBUG_CATEGORY_STATIC (report_producer_debug_category);
@@ -109,32 +104,32 @@ report_producer_finalize (GObject * object)
 void
 report_producer_init (ReportProducer * this)
 {
-  g_rw_lock_init (&this->rwmutex);
-
   this->sysclock        = gst_system_clock_obtain ();
   this->ssrc            = g_random_int();
   this->report          = this->databed = mprtp_malloc(DATABED_LENGTH);
   this->made            = _now(this);
   this->xr.actual_block = this->xr.databed = mprtp_malloc(DATABED_LENGTH);
+  this->in_progress         = FALSE;
 }
 
 void report_producer_set_ssrc(ReportProducer *this, guint32 ssrc)
 {
-  THIS_WRITELOCK(this);
   this->ssrc = ssrc;
-  THIS_WRITEUNLOCK(this);
 }
 
 void report_producer_set_logfile(ReportProducer *this, const gchar *logfile)
 {
-  THIS_WRITELOCK(this);
   strcpy(this->logfile, logfile);
-  THIS_WRITEUNLOCK(this);
 }
 
 void report_producer_begin(ReportProducer *this, guint8 subflow_id)
 {
-  THIS_WRITELOCK(this);
+  if(this->in_progress){
+    return;
+  }
+
+  this->in_progress = TRUE;
+
   memset(this->databed, 0, DATABED_LENGTH);
   gst_mprtcp_report_init(this->report);
   this->block = gst_mprtcp_riport_add_block_begin(this->report, (guint16) subflow_id);
@@ -146,7 +141,6 @@ void report_producer_begin(ReportProducer *this, guint8 subflow_id)
   this->xr.actual_block = this->xr.databed;
   this->xr.length       = 0;
 
-  THIS_WRITEUNLOCK(this);
 }
 
 void report_producer_add_rr(ReportProducer *this,
@@ -160,7 +154,6 @@ void report_producer_add_rr(ReportProducer *this,
   guint16 length;//, main_length;
 //  guint8 block_length;
   GstRTCPRR *rr;
-  THIS_WRITELOCK(this);
   rr = gst_mprtcp_riport_block_add_rr(this->block);
   gst_rtcp_rr_add_rrb (rr,
                            this->ssrc,
@@ -172,7 +165,6 @@ void report_producer_add_rr(ReportProducer *this,
                            DLSR);
   gst_rtcp_header_getdown (&rr->header, NULL, NULL, NULL, NULL, &length, NULL);
   _add_length(this, length);
-  THIS_WRITEUNLOCK(this);
 }
 
 void report_producer_add_xr_discarded_bytes(ReportProducer *this,
@@ -181,7 +173,6 @@ void report_producer_add_xr_discarded_bytes(ReportProducer *this,
                                     guint32 payload_bytes_discarded)
 {
   GstRTCPXRDiscardedBlock block;
-  THIS_WRITELOCK(this);
   gst_rtcp_xr_discarded_bytes_setup(&block,
                                     interval_metric_flag,
                                     early_bit,
@@ -189,7 +180,6 @@ void report_producer_add_xr_discarded_bytes(ReportProducer *this,
                                     payload_bytes_discarded);
 
   _add_xrblock(this, (GstRTCPXRBlock*) &block);
-  THIS_WRITEUNLOCK(this);
 }
 
 void report_producer_add_xr_discarded_packets(ReportProducer *this,
@@ -198,7 +188,6 @@ void report_producer_add_xr_discarded_packets(ReportProducer *this,
                                     guint32 discarded_packets_num)
 {
   GstRTCPXRDiscardedBlock block;
-  THIS_WRITELOCK(this);
   gst_rtcp_xr_discarded_packets_setup(&block,
                                     interval_metric_flag,
                                     early_bit,
@@ -206,7 +195,6 @@ void report_producer_add_xr_discarded_packets(ReportProducer *this,
                                     discarded_packets_num);
 
   _add_xrblock(this, (GstRTCPXRBlock*) &block);
-  THIS_WRITEUNLOCK(this);
 }
 
 void report_producer_add_xr_owd(ReportProducer *this,
@@ -216,7 +204,6 @@ void report_producer_add_xr_owd(ReportProducer *this,
                                  guint32 max_delay)
 {
   GstRTCPXROWDBlock block;
-  THIS_WRITELOCK(this);
   gst_rtcp_xr_owd_block_setup(&block,
                               interval_metric_flag,
                               this->ssrc,
@@ -224,7 +211,6 @@ void report_producer_add_xr_owd(ReportProducer *this,
                               min_delay,
                               max_delay);
   _add_xrblock(this, (GstRTCPXRBlock*) &block);
-  THIS_WRITEUNLOCK(this);
 }
 
 
@@ -241,7 +227,6 @@ void report_producer_add_xr_lost_rle(ReportProducer *this,
   GstRTCPXRChunk chunk;
   gint bit_i, chunks_length, vector_i;
   gboolean last_is_copied = TRUE;
-  THIS_WRITELOCK(this);
   memset(databed, 0, 1024);
   memset(&chunk, 0, sizeof(GstRTCPXRChunk));
   block = (GstRTCPXRRLELostsRLEBlock*) databed;
@@ -277,7 +262,6 @@ void report_producer_add_xr_lost_rle(ReportProducer *this,
     gst_rtcp_xr_block_change((GstRTCPXRBlock*) block, NULL, &block_length, NULL);
   }
   _add_xrblock(this, (GstRTCPXRBlock*) block);
-  THIS_WRITEUNLOCK(this);
 }
 
 
@@ -287,9 +271,7 @@ void report_producer_add_afb(ReportProducer *this,
                                 gpointer fci_dat,
                                 guint fci_dat_len)
 {
-  THIS_WRITELOCK(this);
   _add_afb(this, media_source_ssrc, fci_id, fci_dat, fci_dat_len);
-  THIS_WRITEUNLOCK(this);
 }
 
 void report_producer_add_afb_remb(
@@ -301,10 +283,8 @@ void report_producer_add_afb_remb(
     guint16 hssn)
 {
   GstRTCPAFB_REMB remb;
-  THIS_WRITELOCK(this);
   gst_rtcp_afb_remb_change(&remb, &num_ssrc, &float_num, &ssrc_feedback, &hssn);
   _add_afb(this, media_source_ssrc, RTCP_AFB_REMB_ID, &remb, sizeof(GstRTCPAFB_REMB));
-  THIS_WRITEUNLOCK(this);
 }
 
 void report_producer_add_afb_reps(
@@ -314,10 +294,8 @@ void report_producer_add_afb_reps(
     gfloat float_num)
 {
   GstRTCPAFB_REPS reps;
-  THIS_WRITELOCK(this);
   gst_rtcp_afb_reps_change(&reps, &sampling_num, &float_num);
   _add_afb(this, media_source_ssrc, RTCP_AFB_REPS_ID, &reps, sizeof(GstRTCPAFB_REPS));
-  THIS_WRITEUNLOCK(this);
 }
 
 
@@ -331,12 +309,10 @@ void report_producer_add_sr(ReportProducer *this,
   guint16 length;
 //  guint8 block_length;
   GstRTCPSR *sr;
-  THIS_WRITELOCK(this);
   sr = gst_mprtcp_riport_block_add_sr(this->block);
   gst_rtcp_srb_setup(&sr->sender_block, ntp_timestamp, rtp_timestamp, packet_count, octet_count);
   gst_rtcp_header_getdown (&sr->header, NULL, NULL, NULL, NULL, &length, NULL);
   _add_length(this, length);
-  THIS_WRITEUNLOCK(this);
 }
 
 
@@ -344,7 +320,6 @@ GstBuffer *report_producer_end(ReportProducer *this, guint *length)
 {
   gpointer data;
   GstBuffer* result = NULL;
-  THIS_WRITELOCK(this);
   _add_xr(this);
   if(!this->length){
     goto done;
@@ -363,7 +338,7 @@ GstBuffer *report_producer_end(ReportProducer *this, guint *length)
 //  mprtp_logger_collect("########### Report produced for after: %lu seconds ###########\n", GST_TIME_AS_SECONDS(_now(this) - this->made));
 //  mprtp_logger_close_collector();
 done:
-  THIS_WRITEUNLOCK(this);
+  this->in_progress = FALSE;
   return result;
 }
 

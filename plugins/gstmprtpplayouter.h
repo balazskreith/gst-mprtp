@@ -88,10 +88,7 @@ struct _GstMprtpplayouter
 
   gboolean        logging;
 
-  GstTask*        thread;
-  GRecMutex       thread_mutex;
-
-  GAsyncQueue*     playoutq;
+  GAsyncQueue*     discarded_packets_in;
   GAsyncQueue*     mprtp_out;
   GAsyncQueue*     mprtcp_out;
   PacketForwarder* packetforwarder;

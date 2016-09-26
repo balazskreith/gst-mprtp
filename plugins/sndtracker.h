@@ -31,18 +31,13 @@ typedef struct _SndTrackerStat{
   gint32                    sent_fec_packets_in_1s;
 }SndTrackerStat;
 
-typedef struct _SndTrackerStatNotifier{
-  void (*callback)(gpointer udata, SndTrackerStat* stat);
-  gpointer udata;
-}SndTrackerStatNotifier;
-
 struct _SndTracker
 {
   GObject                   object;
   GstClock*                 sysclock;
   SlidingWindow*            packets_sw;
   SlidingWindow*            fec_sw;
-  GSList*                   notifiers;
+  Observer*                 stat_observer;
 
   gpointer                  priv;
   SndTrackerStat            stat;
@@ -64,15 +59,9 @@ void sndtracker_add_packet_notifier(SndTracker * this,
                                         void (*rem_callback)(gpointer udata, gpointer item),
                                         gpointer rem_udata);
 
-void sndtracker_add_stat_notifier(SndTracker * this,
-                                    void (*callback)(gpointer udata, SndTrackerStat* stat),
-                                    gpointer udata);
+void sndtracker_add_stat_notifier(SndTracker * this, NotifierFunc callback, gpointer udata);
 
-void sndtracker_add_stat_subflow_notifier(SndTracker * this,
-                                    guint8 subflow_id,
-                                    void (*callback)(gpointer udata, SndTrackerStat* stat),
-                                    gpointer udata);
-
+void sndtracker_add_stat_subflow_notifier(SndTracker * this, guint8 subflow_id, NotifierFunc callback, gpointer udata);
 void sndtracker_add_packet(SndTracker * this, RTPPacket* packet);
 void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_response);
 SndTrackerStat* sndtracker_get_accumulated_stat(SndTracker * this);

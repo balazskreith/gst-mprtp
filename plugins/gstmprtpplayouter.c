@@ -104,6 +104,8 @@ static GstFlowReturn _processing_mprtcp_packet (GstMprtpplayouter * this,
 static void _join_path (GstMprtpplayouter * this, guint8 subflow_id);
 static void _detach_path (GstMprtpplayouter * this, guint8 subflow_id);
 
+static void _time_updater_process(gpointer udata);
+static void _rtppacket_transceiver (GstMprtpplayouter *this, GstBuffer *buffer);
 #define _trash_mprtp_buffer(this, mprtp) mprtp_free(mprtp)
 
 #define _now(this) gst_clock_get_time (this->sysclock)
@@ -124,8 +126,6 @@ enum
   PROP_RTP_PASSTHROUGH,
   PROP_LOG_ENABLED,
   PROP_LOG_PATH,
-  PROP_JOIN_MIN_TRESHOLD,
-  PROP_JOIN_MAX_TRESHOLD,
 
 };
 
@@ -255,20 +255,6 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
             "Determines the path for logfiles",
             "NULL", G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_JOIN_MIN_TRESHOLD,
-         g_param_spec_uint ("join-min-treshold",
-                            "set the minimum treshold for streamjoiner in ms.",
-                            "set the minimum treshold for streamjoiner in ms.",
-                            0,
-                            4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-    g_object_class_install_property (gobject_class, PROP_JOIN_MAX_TRESHOLD,
-         g_param_spec_uint ("join-max-treshold",
-                            "set the maximum treshold for streamjoiner in ms.",
-                            "set the maxumum treshold for streamjoiner in ms.",
-                            0,
-                            4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
   g_object_class_install_property (gobject_class, PROP_SETUP_RTCP_INTERVAL_TYPE,
         g_param_spec_uint ("setup-rtcp-interval-type",
                            "RTCP interval types: 0 - regular, 1 - early, 2 - immediate feedback",
@@ -332,7 +318,6 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
 
   g_mutex_init (&this->mutex);
 
-  this->thread                   = gst_task_new(_mprtpplayouter_process_run, this, NULL);
   this->sysclock                 = gst_system_clock_obtain();
   this->pivot_clock_rate         = MPRTP_PLAYOUTER_DEFAULT_CLOCKRATE;
   this->pivot_ssrc               = MPRTP_PLAYOUTER_DEFAULT_SSRC;
@@ -344,7 +329,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->rtppackets               = make_rtppackets();
   this->rcvtracker               = make_rcvtracker();
 
-  this->playoutq                 = g_async_queue_new();
+  this->discarded_packets_in                 = g_async_queue_new();
   this->packetforwarder          = make_packetforwarder(this->mprtp_srcpad, this->mprtcp_rr_srcpad);
 
   rcvctrler_setup(this->controller, this->joiner, this->fec_decoder);
@@ -365,12 +350,10 @@ gst_mprtpplayouter_finalize (GObject * object)
   g_object_unref (this->joiner);
   g_object_unref (this->controller);
   g_object_unref (this->sysclock);
-  g_object_unref (this->playoutq);
+  g_object_unref (this->discarded_packets_in);
   g_object_unref (this->packetforwarder);
 
   /* clean up object here */
-  gst_task_join (this->thread);
-  gst_object_unref (this->thread);
   G_OBJECT_CLASS (gst_mprtpplayouter_parent_class)->finalize (object);
 //  while(!g_queue_is_empty(this->mprtp_buffer_pool)){
 //    mprtp_free(g_queue_pop_head(this->mprtp_buffer_pool));
@@ -425,21 +408,6 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       break;
     case PROP_LOG_PATH:
       mprtp_logger_set_target_directory(g_value_get_string(value));
-      break;
-    case PROP_OWD_WINDOW_TRESHOLD:
-      guint_value = g_value_get_uint (value);
-      _setup_paths_tresholds(this,
-                             subflow_prop->id,
-                             mprtpr_path_set_owd_window_treshold,
-                             (GstClockTime) subflow_prop->value * GST_MSECOND);
-      break;
-    case PROP_JOIN_MIN_TRESHOLD:
-      guint_value = g_value_get_uint (value);
-      stream_joiner_set_min_treshold(this->joiner, (GstClockTime)guint_value * GST_MSECOND);
-      break;
-    case PROP_JOIN_MAX_TRESHOLD:
-      guint_value = g_value_get_uint (value);
-      stream_joiner_set_max_treshold(this->joiner, (GstClockTime)guint_value * GST_MSECOND);
       break;
     case PROP_SETUP_RTCP_INTERVAL_TYPE:
       guint_value = g_value_get_uint (value);
@@ -630,12 +598,10 @@ gst_mprtpplayouter_change_state (GstElement * element,
     case GST_STATE_CHANGE_NULL_TO_READY:
       break;
     case GST_STATE_CHANGE_READY_TO_PAUSED:
-      gst_pad_start_task(this->mprtp_srcpad, (GstTaskFunction)_playout_process,
+      gst_pad_start_task(this->mprtp_srcpad, (GstTaskFunction)_time_updater_process,
          this, NULL);
       break;
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
-        gst_task_set_lock (this->thread, &this->thread_mutex);
-        gst_task_start (this->thread);
         break;
       default:
         break;
@@ -647,7 +613,6 @@ gst_mprtpplayouter_change_state (GstElement * element,
 
     switch (transition) {
       case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
-        gst_task_stop (this->thread);
         break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       break;
@@ -713,7 +678,9 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
       packetforwarder_add_rtppad_buffer(this->packetforwarder, gst_buffer_ref(buf));
     goto done;
   }
-  g_async_queue_push(this->playoutq, gst_buffer_ref(buf));
+
+  _rtppacket_transceiver(this, buf);
+
   result = GST_FLOW_OK;
 done:
 //  g_print("END PROCESSING RTP\n");
@@ -836,36 +803,34 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
 
 
 
-static gint
-_cmp_seq (guint16 x, guint16 y)
-{
-  if(x == y) return 0;
-  if(x < y && y - x < 32768) return -1;
-  if(x > y && x - y > 32768) return -1;
-  if(x < y && y - x > 32768) return 1;
-  if(x > y && x - y < 32768) return 1;
-  return 0;
-}
-
-
-
 void
-_playout_process_run (gpointer udata)
+_time_updater_process(gpointer udata)
 {
-  GstMprtpplayouter *this;
-  GstBuffer* buffer;
-  RTPPacket *packet;
+  GstMprtpplayouter *this = udata;
+  DiscardedPacket *discarded_packet;
 
-  this = (GstMprtpscheduler *) udata;
+  discarded_packet = (DiscardedPacket *)g_async_queue_timeout_pop(this->discarded_packets_in, 1000);
+
   THIS_LOCK(this);
-
-  sndctrler_time_update(this->controller);
-
-  buffer = (GstBuffer *)g_async_queue_timeout_pop(this->playoutq, 100);
-  if(!buffer){
+  if(!discarded_packet){
     rcvtracker_refresh(this->rcvtracker);
     goto done;
   }
+
+  rcvtracker_add_discarded_seq(this->rcvtracker, discarded_packet->abs_seq);
+
+done:
+  rcvctrler_time_update(this->controller);
+  THIS_UNLOCK(this);
+  return;
+}
+
+void
+_rtppacket_transceiver (GstMprtpplayouter *this, GstBuffer *buffer)
+{
+  RTPPacket *packet;
+
+  THIS_LOCK(this);
 
   //check weather the packet is mprtp
   if(!rtppackets_buffer_is_mprtp(this->rtppackets, buffer)){
@@ -885,13 +850,8 @@ _playout_process_run (gpointer udata)
 
   rcvtracker_add_packet(this->rcvtracker, packet);
   stream_joiner_add_packet(this->joiner, packet);
-  //TODO: add packet to stream joiner
-  //TODO: retrieve packet from joiner
-  packet = retrieve from joiner;
-  if(packet){
-    packetforwarder_add_rtppad_buffer(this->packetforwarder, packet->buffer);
-    rtppackets_packet_forwarded(this->rtppackets, packet);
-  }
+  rtppackets_packet_forwarded(this->rtppackets, packet);
+
 done:
   THIS_UNLOCK(this);
   return;

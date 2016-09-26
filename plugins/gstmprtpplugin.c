@@ -71,10 +71,10 @@ plugin_init (GstPlugin * plugin)
    remove these, as they're always defined.  Otherwise, edit as
    appropriate for your external plugin package. */
 #ifndef VERSION
-#define VERSION "0.4.alpha"
+#define VERSION "0.9.0.1"
 #endif
 #ifndef PACKAGE
-#define PACKAGE "Multipath RTP protocol handler and multipath streamer"
+#define PACKAGE "Multipath RTP Protocol Streamer and FBRA+ congestion controller"
 #endif
 #ifndef PACKAGE_NAME
 #define PACKAGE_NAME "mprtp"
@@ -86,5 +86,5 @@ plugin_init (GstPlugin * plugin)
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
     mprtp,
-    "MPRTP plugins are intended to realize streaming amongst multiple subflows by using MPRTP protocol.",
+    "The plugin is designed to use MPRTP amongst several subflows",
     plugin_init, VERSION, "LGPL", PACKAGE_NAME, GST_PACKAGE_ORIGIN)

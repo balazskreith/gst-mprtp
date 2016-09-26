@@ -34,27 +34,19 @@ struct _RcvController
 {
   GObject          object;
 
-  GstTask*          thread;
-  GRecMutex         thread_mutex;
-
-  GHashTable*       subflows;
-  GRWLock           rwmutex;
+  RcvSubflows*      subflows;
   GstClockTime      made;
   GstClock*         sysclock;
-  StreamJoiner*     joiner;
   guint32           ssrc;
-  void            (*send_mprtcp_packet_func)(gpointer,GstBuffer*);
-  gpointer          send_mprtcp_packet_data;
   gboolean          report_is_flowable;
 
   ReportProducer*   report_producer;
   ReportProcessor*  report_processor;
 
-  FECDecoder*       fecdecoder;
-  guint             orp_tick;
-
-  SlidingWindow*    fecstat;
-  GstClockTime      last_fecstat;
+  GSList*           fbproducers;
+  RTPPackets*       rtppackets;
+  RcvTracker*       rcvtracker;
+  GAsyncQueue*      mprtcpq;
 
   GstMPRTCPReportSummary reports_summary;
 };
@@ -63,7 +55,11 @@ struct _RcvControllerClass{
   GObjectClass parent_class;
 };
 
-
+RcvController* make_rcvctrler(
+    RTPPackets* rtppackets,
+    RcvTracker* rcvtracker,
+    RcvSubflows* subflows,
+    GAsyncQueue *mprtcpq);
 
 //Class functions
 void rcvctrler_setup(RcvController *this,

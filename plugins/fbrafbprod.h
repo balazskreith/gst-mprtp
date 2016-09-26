@@ -29,7 +29,6 @@ typedef struct _CorrBlock CorrBlock;
 struct _FBRAFBProducer
 {
   GObject                  object;
-  GRWLock                  rwmutex;
   GstClock*                sysclock;
 
   guint16                  cycle_num;
@@ -38,17 +37,13 @@ struct _FBRAFBProducer
   guint32                  ssrc;
   guint8                   subflow_id;
 
-//  gboolean                 begin_seq_init;
-//  gboolean                 end_seq_init;
   guint16                  begin_seq;
   guint16                  end_seq;
-//  guint16                  HSSN,LRSN; //Last Reported Sequence Number
   gboolean*                vector;
   guint                    vector_length;
 
   SlidingWindow           *payloadbytes_sw;
   SlidingWindow           *owds_sw;
-//  SlidingWindow           *tendency_sw;
 
   GstClockTime             last_fb;
   GstClockTime             next_fb;

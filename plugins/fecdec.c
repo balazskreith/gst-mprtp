@@ -75,7 +75,7 @@ typedef struct{
 
 typedef struct{
   Request            base;
-  guint16            seq_num;
+  guint16            abs_seq;
 }FECRepairRequest;
 
 
@@ -218,7 +218,7 @@ static void _fecdec_process(gpointer udata)
     goto done;
   }
 
-  buffer = _get_repaired_rtpbuffer(this, discarded_packet->seq_num);
+  buffer = _get_repaired_rtpbuffer(this, discarded_packet->abs_seq);
   if(buffer){
     g_async_queue_push(this->rtpbuffers_out, buffer);
     discarded_packet->repaired = TRUE;

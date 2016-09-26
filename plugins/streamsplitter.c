@@ -211,28 +211,22 @@ stream_splitter_set_mpath_keyframe_filtering(StreamSplitter * this, guint keyfra
   GST_LOG_OBJECT(this, "Currently it is not implemented");
 }
 
-gboolean
-stream_splitter_approve_buffer(StreamSplitter * this, RTPPacket *packet, MPRTPSPath **path)
+SndSubflow* stream_splitter_approve_packet(StreamSplitter * this, RTPPacket *packet, GstClockTime now)
 {
-  gboolean result;
   SchNode *selected;
-
-  result = FALSE;
-  *path = NULL;
+  SndSubflow* result = NULL;
 
   if (this->tree == NULL) {
     GST_WARNING_OBJECT (this, "No active subflow");
     goto done;
   }
 
-  selected = _schtree_select_next(this->tree, packet, _now(this));
+  selected = _schtree_select_next(this->tree, packet, now);
   if(!selected){
     goto done;
   }
 
-  result = TRUE;
-  *path = selected->subflows->data;
-
+  result = selected->subflows->data;
   _schtree_approve_next(selected, packet->payload_size);
 done:
   return result;
@@ -260,7 +254,7 @@ void _create_nodes(gpointer item, gpointer udata)
 {
   CreateData *cdata = udata;
   SndSubflow *subflow = item;
-  cdata->actual = subflow->target_bitrate;
+  cdata->actual = subflow->target_bitrate >> 3;
   cdata->root->remained -= _schtree_insert(cdata->root,
                                           &cdata->actual,
                                           subflow,
@@ -272,9 +266,9 @@ SchNode *
 _tree_ctor (StreamSplitter *this)
 {
   CreateData cdata;
-  cdata.remained = cdata.total = sndsubflows_get_total_target(this->subflows);
-  cdata.margin = cdata.total / SCHTREE_MAX_VALUE + 1;
-  cdata.root = _make_schnode(cdata.total);
+  cdata.remained = cdata.total = sndsubflows_get_total_target(this->subflows) >> 3;
+  cdata.margin   = cdata.total / SCHTREE_MAX_VALUE + 1;
+  cdata.root     = _make_schnode(cdata.total);
   sndsubflows_iterate(this->subflows, _create_nodes, &cdata);
   return cdata.root;
 }
@@ -528,7 +522,7 @@ void _logging(gpointer data)
 
   _iterate_subflows(this, _log_subflow, this);
   sndsubflows_iterate(this->subflows, _log_subflow, this);
-  _log_tree(this->tree, sndsubflows_get_total_target(this->subflows), 0);
+  _log_tree(this->tree, sndsubflows_get_total_target(this->subflows) >> 3, 0);
 }
 
 #undef SCHTREE_MAX_VALUE

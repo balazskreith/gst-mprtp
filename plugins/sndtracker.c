@@ -23,14 +23,11 @@
 
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
-#include "sndratedistor.h"
 #include <math.h>
 #include <gst/gst.h>
 #include <stdlib.h>
 #include <string.h>
-#include "streamsplitter.h"
-#include "sndctrler.h"
-
+#include "sndtracker.h"
 
 GST_DEBUG_CATEGORY_STATIC (sndtracker_debug_category);
 #define GST_CAT_DEFAULT sndtracker_debug_category
@@ -73,6 +70,9 @@ static void
 _packets_rem_pipe(gpointer udata, gpointer item);
 
 static void
+_fec_rem_pipe(gpointer udata, gpointer item);
+
+static void
 _notify(gpointer item, gpointer udata);
 
 //----------------------------------------------------------------------
@@ -99,6 +99,7 @@ sndtracker_finalize (GObject * object)
   this = SNDTRACKER(object);
   g_object_unref(this->sysclock);
   g_object_unref(this->packets_sw);
+  g_object_unref(this->fec_sw);
   g_free(this->priv);
 }
 
@@ -107,10 +108,12 @@ void
 sndtracker_init (SndTracker * this)
 {
   this->sysclock = gst_system_clock_obtain();
-  this->packets_sw = make_slidingwindow(2000, GST_SECOND);
+  this->packets_sw = make_slidingwindow(1000, GST_SECOND);
+  this->fec_sw = make_slidingwindow(500, GST_SECOND);
   this->priv = g_malloc0(sizeof(Private));
 
   slidingwindow_add_pipes(this->packets_sw, _packets_rem_pipe, this, NULL, NULL);
+  slidingwindow_add_pipes(this->fec_sw, _fec_rem_pipe, this, NULL, NULL);
 }
 
 void sndtracker_refresh(SndTracker * this)
@@ -167,20 +170,36 @@ void sndtracker_add_packet(SndTracker * this, RTPPacket* packet)
   this->stat.total_sent_bytes += packet->payload_size;
   ++this->stat.total_sent_packets;
 
-  _refresh_notifiers(this->notifiers, &this->stat);
+  _refresh_stat_notifiers(this->notifiers, &this->stat);
 
   if(packet->subflow_id != 0){
     Subflow* subflow = _get_subflow(this, packet->subflow_id);
-    subflow->stat.sent_bytes_in_1s += packet->payload;
+    subflow->stat.sent_bytes_in_1s += packet->payload_size;
     ++subflow->stat.sent_packets_in_1s;
 
     subflow->stat.total_sent_bytes += packet->payload_size;
     ++subflow->stat.total_sent_packets;
 
-    _refresh_notifiers(subflow->notifiers, &subflow->stat);
+    _refresh_stat_notifiers(subflow->notifiers, &subflow->stat);
   }
 
+  slidingwindow_add_data(this->packets_sw, packet);
 }
+
+void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_response)
+{
+  this->stat.sent_fec_bytes_in_1s += fec_response->payload_size;
+  ++this->stat.sent_fec_packets_in_1s;
+
+  if(fec_response->subflow_id != 0){
+    Subflow* subflow = _get_subflow(this, fec_response->subflow_id);
+    subflow->stat.sent_fec_bytes_in_1s += fec_response->payload_size;
+    ++subflow->stat.sent_fec_packets_in_1s;
+  }
+  fecencoder_ref_response(fec_response);
+  slidingwindow_add_data(this->fec_sw, fec_response);
+}
+
 
 void _packets_rem_pipe(gpointer udata, gpointer item)
 {
@@ -190,19 +209,37 @@ void _packets_rem_pipe(gpointer udata, gpointer item)
   this->stat.sent_bytes_in_1s -= packet->payload_size;
   --this->stat.sent_packets_in_1s;
 
-  _refresh_notifiers(this->notifiers, &this->stat);
+  _refresh_stat_notifiers(this->notifiers, &this->stat);
 
   if(packet->subflow_id != 0){
     Subflow* subflow = _get_subflow(this, packet->subflow_id);
     subflow->stat.sent_bytes_in_1s -= packet->payload;
     --subflow->stat.sent_packets_in_1s;
 
-    _refresh_notifiers(subflow->notifiers, &subflow->stat);
+    _refresh_stat_notifiers(subflow->notifiers, &subflow->stat);
   }
 }
 
 
-void _refresh_notifiers(GSList* notifiers, SndTrackerStat * stat)
+void _fec_rem_pipe(gpointer udata, gpointer item)
+{
+  SndTracker* this = udata;
+  FECEncoderResponse* response = item;
+
+  this->stat.sent_fec_bytes_in_1s -= response->payload_size;
+  --this->stat.sent_fec_packets_in_1s;
+
+  if(response->subflow_id != 0){
+    Subflow* subflow = _get_subflow(this, response->subflow_id);
+    subflow->stat.sent_fec_bytes_in_1s -= response->payload_size;
+    --subflow->stat.sent_fec_packets_in_1s;
+  }
+
+  fecencoder_unref_response(response);
+}
+
+
+void _refresh_stat_notifiers(GSList* notifiers, SndTrackerStat * stat)
 {
   if(notifiers){
     g_slist_foreach(notifiers, _notify, stat);
@@ -213,5 +250,5 @@ void _notify(gpointer item, gpointer udata)
 {
   SndTrackerStatNotifier *notifier;
   SndTrackerStat* stat = udata;
-  notifier->callback(notifier->udata, stat)
+  notifier->callback(notifier->udata, stat);
 }

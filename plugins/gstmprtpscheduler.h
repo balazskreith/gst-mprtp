@@ -23,11 +23,11 @@
 #include <gst/gst.h>
 
 #include "gstmprtcpbuffer.h"
-#include "mprtpspath.h"
 #include "sndctrler.h"
 #include "streamsplitter.h"
 #include "mprtplogger.h"
 #include "fecenc.h"
+#include "packetforwarder.h"
 
 G_BEGIN_DECLS
 #define GST_TYPE_MPRTPSCHEDULER   (gst_mprtpscheduler_get_type())
@@ -57,9 +57,10 @@ struct _GstMprtpscheduler
   gboolean                      enable_fec;
 
   SndSubflows*                  subflows;
+  RTPPackets*                   rtppackets;
   StreamSplitter*               splitter;
   SndController*                controller;
-  SendingRateDistributor*       sndrates;
+  SndTracker*                   sndtracker;
   gboolean                      riport_flow_signal_sent;
   GstSegment                    segment;
   GstClockTime                  position_out;
@@ -74,19 +75,18 @@ struct _GstMprtpscheduler
   GRecMutex                     thread_mutex;
   FECEncoder*                   fec_encoder;
   guint32                       fec_interval;
-//  guint32                       sent_packets;
+  guint32                       sent_packets;
+
+  PacketForwarder*              packetforwarder;
+  GAsyncQueue*                  mprtpq;
+  GAsyncQueue*                  mprtcpq;
+  GAsyncQueue*                  rtpq;
+  GAsyncQueue*                  fec_responses;
+  GAsyncQueue*                  emitterq;
 
   GstMprtpschedulerPrivate*     priv;
 
-  PacketSender* packetsender;
-  GAsyncQueue*  mprtpq;
-  GAsyncQueue*  mprtcpq;
-  GAsyncQueue*  rtpq;
 
-  GstClockTime test_wait;
-  guint seen_line;
-  gboolean test_enabled;
-  gchar test_seq[255];
 };
 
 struct _GstMprtpschedulerClass

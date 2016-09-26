@@ -40,4 +40,24 @@ typedef enum{
   CONGESTION_CONTROLLING_MODE_FBRAPLUS     = 1,
 }CongestionControllingMode;
 
+
+typedef struct _MPRTPSubflowHeaderExtension MPRTPSubflowHeaderExtension;
+typedef struct _RTPAbsTimeExtension RTPAbsTimeExtension;
+
+struct _MPRTPSubflowHeaderExtension
+{
+  guint8 id;
+  guint16 seq;
+};
+
+struct _RTPAbsTimeExtension
+{
+  guint8 time[3];
+};
+
+typedef struct{
+  guint16  seq_num;
+  gboolean repaired;
+}DiscardedPacket;
+
 #endif /* PLUGINS_MPRTPDEFS_H_ */

@@ -22,7 +22,9 @@ typedef struct _FECDecoderClass FECDecoderClass;
 #define FECDECODER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),FECDECODER_TYPE))
 #define FECDECODER_CAST(src)        ((FECDecoder *)(src))
 
-
+typedef struct{
+  GstBuffer* rtpbuffer;
+}FECRepairResponse;
 
 typedef struct _FECDecoderSegment
 {
@@ -54,23 +56,17 @@ struct _FECDecoder
 {
   GObject                    object;
   GstClock*                  sysclock;
-  GstClockTime               repair_window_min;
-  GstClockTime               repair_window_max;
+  GstTask*                   thread;
+  GRecMutex                  thread_mutex;
   GstClockTime               made;
-  GRWLock                    rwmutex;
-  gint32                     repaired;
-
-  guint8                     payload_type;
-  guint32                    total_early_repaired_bytes;
-  guint32                    total_rtp_packets;
-  guint32                    total_repaired_bytes;
-  guint32                    total_lost_bytes;
   GList*                     segments;
   GList*                     items;
-//  GList*                     requests;
 
-  guint32                    lost;
-  guint32                    recovered;
+  GAsyncQueue*               rtppackets_in;
+  GAsyncQueue*               fecbuffers_in;
+  GAsyncQueue*               rtpbuffers_out;
+  GAsyncQueue*               discard_packets_in;
+  GAsyncQueue*               discard_packets_out;
 };
 
 
@@ -80,22 +76,12 @@ struct _FECDecoderClass{
 
 };
 
-
-
 GType fecdecoder_get_type (void);
-FECDecoder *make_fecdecoder(void);
+FECDecoder *make_fecdecoder(GAsyncQueue* responses);
 void fecdecoder_reset(FECDecoder *this);
-void fecdecoder_get_stat(FECDecoder *this,
-                         guint32 *total_rtp_packets,
-                         guint32 *early_repaired_bytes,
-                         guint32 *total_repaired_bytes,
-                         guint32 *total_recovered_packets,
-                         guint32 *total_missed_packets);
 
-gboolean fecdecoder_has_repaired_rtpbuffer(FECDecoder *this, guint16 hpsn, GstBuffer** repairedbuf);
-void fecdecoder_set_payload_type(FECDecoder *this, guint8 fec_payload_type);
-void fecdecoder_set_repair_window(FECDecoder *this, GstClockTime min, GstClockTime max);
-void fecdecoder_add_rtp_packet(FECDecoder *this, GstMpRTPBuffer* buffer);
-void fecdecoder_add_fec_packet(FECDecoder *this, GstMpRTPBuffer *mprtp);
-void fecdecoder_clean(FECDecoder *this);
+
+void fecdecoder_add_rtp_packet(FECDecoder *this, RTPPacket *packet);
+void fecdecoder_add_fec_buffer(FECDecoder *this, , GstBuffer *buffer);
+
 #endif /* FECDECODER_H_ */

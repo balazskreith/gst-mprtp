@@ -54,6 +54,9 @@ struct _SndController
   GAsyncQueue*               mprtcpq;
   GAsyncQueue*               emitterq;
 
+  GstClockTime               last_time_update;
+  GstClockTime               last_emit;
+
   GstMPRTCPReportSummary     reports_summary;
 };
 
@@ -64,25 +67,13 @@ struct _SndControllerClass{
 
 
 
-//Class functions
-void sndctrler_setup(SndController* this,
-                     StreamSplitter* splitter,
-                     SendingRateDistributor *pacer,
-                     FECEncoder* fecencoder);
-
 SndController* make_sndctrler(
+    RTPPackets* rtppackets,
     SndTracker* sndtracker,
     SndSubflows* subflows,
-    PacketSender *packetsender,
+    GAsyncQueue *mprtcpq,
     GAsyncQueue *emitterq);
 
-
-void
-sndctrler_setup_callbacks(SndController *this,
-                          gpointer mprtcp_send_data,
-                          GstBufferReceiverFunc mprtcp_send_func,
-                          gpointer utilization_signal_data,
-                          GstSchedulerSignaling utilization_signal_func);
 
 void
 sndctrler_change_interval_type(
@@ -102,6 +93,12 @@ void sndctrler_setup_report_timeout(
     guint8 subflow_id,
     GstClockTime report_timeout);
 
+
+void
+sndctrler_report_can_flow (SndController *this);
+
+void
+sndctrler_time_update (SndController *this);
 
 void
 sndctrler_receive_mprtcp (SndController *this,GstBuffer * buf);

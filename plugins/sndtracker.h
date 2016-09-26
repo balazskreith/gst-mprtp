@@ -26,6 +26,9 @@ typedef struct _SndTrackerStat{
   gint16                    sent_packets_in_1s;
   guint32                   total_sent_bytes;
   guint32                   total_sent_packets;
+
+  gint32                    sent_fec_bytes_in_1s;
+  gint32                    sent_fec_packets_in_1s;
 }SndTrackerStat;
 
 typedef struct _SndTrackerStatNotifier{
@@ -38,6 +41,7 @@ struct _SndTracker
   GObject                   object;
   GstClock*                 sysclock;
   SlidingWindow*            packets_sw;
+  SlidingWindow*            fec_sw;
   GSList*                   notifiers;
 
   gpointer                  priv;
@@ -70,6 +74,7 @@ void sndtracker_add_stat_subflow_notifier(SndTracker * this,
                                     gpointer udata);
 
 void sndtracker_add_packet(SndTracker * this, RTPPacket* packet);
+void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_response);
 SndTrackerStat* sndtracker_get_accumulated_stat(SndTracker * this);
 SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id);
 

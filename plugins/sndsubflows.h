@@ -39,8 +39,9 @@ struct _SndSubflow
   guint8                     mprtp_ext_header_id;
   guint16                    rtp_seq;
   guint16                    rtp_seq_cycle_num;
+  guint8                     fec_ext_header_id;
   guint16                    fec_seq;
-  guint16                    fec_cycle_num;
+  guint16                    fec_seq_cycle_num;
 
   gboolean                   lossy;
   gboolean                   congested;
@@ -48,6 +49,7 @@ struct _SndSubflow
 
   gint32                     target_bitrate;
   guint32                    fec_interval;
+  guint32                    packet_counter_for_fec;
 
   guint32                    total_sent_packets_num;
   guint32                    total_sent_payload_bytes;
@@ -55,7 +57,6 @@ struct _SndSubflow
   MPRTPSPathState            state;
 
   GstClockTime               pacing_time;
-  GstClockTime               keepalive_period;
 
   GstClockTime               next_regular_rtcp;
   GstClockTime               report_timeout;
@@ -105,11 +106,17 @@ void sndsubflows_set_target_rate(SndSubflows* this, SndSubflow* subflow, gint32 
 gint32 sndsubflows_get_total_target(SndSubflows* this);
 gint32 sndsubflows_get_subflows_num(SndSubflows* this);
 
-void sndsubflow_add_report_arrived_notification(SndSubflow* subflow, void (*callback)(gpointer udata, SndSubflow* subflow), gpointer udata);
 void sndsubflow_add_removal_notification(SndSubflow* subflow, void (*callback)(gpointer udata, SndSubflow* subflow), gpointer udata);
 void sndsubflow_add_active_status_changed_notification(SndSubflow* subflow, void (*callback)(gpointer udata, SndSubflow* subflow), gpointer udata);
 
 void sndsubflow_set_active_status(SndSubflow* subflow, gboolean active);
 guint8 sndsubflow_get_flags_abs_value(SndSubflow* subflow);
+GstBuffer*
+sndsubflow_process_rtp_buffer(SndSubflow *subflow,
+                               GstBuffer* buffer,
+                               gboolean *fec_request);
+GstBuffer*
+sndsubflow_process_fec_buffer(SndSubflow *subflow,
+                               GstBuffer* buffer);
 
 #endif /* SNDSUBFLOWSN_H_ */

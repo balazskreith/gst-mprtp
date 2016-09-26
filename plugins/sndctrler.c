@@ -44,14 +44,17 @@ GST_DEBUG_CATEGORY_STATIC (sndctrler_debug_category);
 
 G_DEFINE_TYPE (SndController, sndctrler, G_TYPE_OBJECT);
 
+typedef void (*CallFunc)(gpointer udata);
+typedef gboolean (*TimeUpdaterFunc)(gpointer udata);
+typedef void (*TransitFunc)(gpointer udata, GstMPRTCPReportSummary* summary);
 typedef struct{
-  guint8   subflow_id;
-  gpointer udata;
-  void   (*dispose)(gpointer udata);
-  void   (*disable)(gpointer udata);
-  void   (*enable)(gpointer udata);
-  void   (*time_updater)(gpointer udata);
-  void   (*report_updater)(gpointer udata, );
+  guint8          subflow_id;
+  gpointer        udata;
+  CallFunc        dispose;
+  CallFunc        disable;
+  CallFunc        enable;
+  TimeUpdaterFunc time_updater;
+  TransitFunc     report_updater;
 }CongestionController;
 
 //----------------------------------------------------------------------
@@ -76,7 +79,7 @@ _create_fbraplus(
 
 //------------------------ Outgoing Report Producer -------------------------
 static void
-_orp_producer_main(
+_sender_report_updater(
     SndController * this);
 
 static void
@@ -86,10 +89,16 @@ _orp_add_sr (
 
 //----------------------------------------------------------------------------
 static MPRTPPluginSignalData*
-_create_utilization_message(
+_update_subflow_report_utilization(
     SndController* this,
     SndSubflow *subflow,
     GstMPRTCPReportSummary *summary);
+
+static MPRTPPluginSignalData*
+_update_subflow_target_utilization(
+    SndController* this,
+    SndSubflow *subflow);
+
 
 //----------------------------------------------------------------------------
 
@@ -148,7 +157,11 @@ sndctrler_init (SndController * this)
 }
 
 SndController*
-make_sndctrler(RTPPackets *rtppackets, SndTracker *sndtracker, SndSubflows* subflows, GAsyncQueue *mprtcpq, GAsyncQueue *emitterq)
+make_sndctrler(RTPPackets *rtppackets,
+    SndTracker *sndtracker,
+    SndSubflows* subflows,
+    GAsyncQueue *mprtcpq,
+    GAsyncQueue *emitterq)
 {
   SndController* this = (SndController*)g_object_new(SNDCTRLER_TYPE, NULL);
   this->mprtcpq    = g_async_queue_ref(mprtcpq);
@@ -289,18 +302,6 @@ void sndctrler_setup_report_timeout(SndController * this, guint8 subflow_id, Gst
   sndsubflows_iterate(this->subflows, _subflow_change_report_timeout, &helper);
 }
 
-
-void
-sndctrler_setup (SndController   *this,
-                 StreamSplitter  *splitter,
-                 SendingRateDistributor *sndratedistor,
-                 FECEncoder      *fecencoder)
-{
-
-
-}
-
-
 void
 sndctrler_report_can_flow (SndController *this)
 {
@@ -311,13 +312,34 @@ void
 sndctrler_time_update (SndController *this)
 {
   GSList *it;
+  GstClockTime now = _now(this);
+  gboolean emit_signal = FALSE;
 
-  //TODO: Here report timeout check stuff
+  if(now - 20 * GST_MSECOND < this->last_time_update){
+    goto done;
+  }
+  this->last_time_update = now;
 
   for(it = this->controllers; it; it = it->next){
     CongestionController* controller = it->data;
-    controller->time_updater(controller->udata);
+    emit_signal |= controller->time_updater(controller->udata);
   }
+  emit_signal |= this->last_emit < now - 200 * GST_MSECOND;
+
+  if(emit_signal){
+    MPRTPPluginSignalData *msg;
+    msg = g_slice_new0(MPRTPPluginSignalData);
+
+    _update_subflow_target_utilization(this);
+    memcpy(msg, this->mprtp_signal_data, sizeof(MPRTPPluginSignalData));
+    g_async_queue_push(this->emitterq, msg);
+
+    this->last_emit = now;
+  }
+
+  _sender_report_updater(this);
+done:
+  return;
 }
 
 void
@@ -326,7 +348,7 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
   SndSubflow *subflow;
   GstMPRTCPReportSummary *summary;
   GSList* it;
-  MPRTPPluginSignalData *msg;
+  GstClockTime now = _now(this);
 
   summary = &this->reports_summary;
   memset(summary, 0, sizeof(GstMPRTCPReportSummary));
@@ -348,9 +370,6 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
     break;
   }
 
-  msg = _create_utilization_message(this, subflow, summary);
-  g_async_queue_push(this->emitterq, msg);
-
 done:
   return;
 }
@@ -361,7 +380,7 @@ done:
 
 //------------------------ Outgoing Report Producer -------------------------
 
-static void _orp_producer_helper(SndSubflow *subflow, gpointer udata)
+static void _sender_report_updater_helper(SndSubflow *subflow, gpointer udata)
 {
   SndController*            this;
   ReportIntervalCalculator* ricalcer;
@@ -392,14 +411,14 @@ done:
 }
 
 void
-_orp_producer_main(SndController * this)
+_sender_report_updater(SndController * this)
 {
 
   if(!this->report_is_flowable){
     goto done;
   }
 
-  _subflow_iterator(this, _orp_producer_helper, this);
+  sndsubflows_iterate(this->subflows, (GFunc) _sender_report_updater_helper, this);
 
 done:
   return;
@@ -435,9 +454,9 @@ _orp_add_sr (SndController * this, SndSubflow * subflow)
 
 //---------------------------------------------------------------------------
 
-MPRTPPluginSignalData* _create_utilization_message(SndController* this, SndSubflow *subflow, GstMPRTCPReportSummary *summary)
+void _update_subflow_report_utilization(SndController* this, SndSubflow *subflow, GstMPRTCPReportSummary *summary)
 {
-  MPRTPPluginSignalData* signaldata, *result;
+  MPRTPPluginSignalData* signaldata;
   MPRTPSubflowUtilizationSignalData *subflowdata;
 
   signaldata  = this->mprtp_signal_data;
@@ -456,10 +475,25 @@ MPRTPPluginSignalData* _create_utilization_message(SndController* this, SndSubfl
     subflowdata->owd_min = summary->XR.OWD.min_delay;
     subflowdata->owd_median = summary->XR.OWD.median_delay;
   }
+}
 
-  result = g_slice_new0(MPRTPPluginSignalData);
-  memcpy(result, signaldata, sizeof(MPRTPPluginSignalData));
-  return result;
+static void _update_sndsubflow(gpointer item, gpointer udata)
+{
+  SndSubflow *subflow = item;
+  MPRTPPluginSignalData *signaldata = udata;
+  MPRTPSubflowUtilizationSignalData *subflowdata;
+
+  subflowdata = &signaldata->subflow[subflow->id];
+  subflowdata->target_bitrate = subflow->target_bitrate;
+}
+
+void _update_subflow_target_utilization(SndController* this)
+{
+  MPRTPPluginSignalData* signaldata;
+
+  signaldata  = this->mprtp_signal_data;
+  sndsubflows_iterate(this->subflows, _update_sndsubflow, signaldata);
+  signaldata->target_media_rate = sndsubflows_get_total_target(this->subflows);
 }
 
 //---------------------- Utility functions ----------------------------------
@@ -476,8 +510,13 @@ void _dispose_congestion_controller(SndController* this, CongestionController* c
 CongestionController* _create_fbraplus(SndController* this, SndSubflow* subflow)
 {
   CongestionController *result = g_slice_new0(CongestionController);
-  result->subflow_id = subflow->id;
-  result->udata = make_fbrasubctrler(this->rtppackets, this->sndtracker, subflow);
+  result->subflow_id     = subflow->id;
+  result->udata          = make_fbrasubctrler(this->rtppackets, this->sndtracker, subflow);
+  result->disable        = (CallFunc) fbrasubctrler_disable;
+  result->dispose        = (CallFunc) g_object_unref;
+  result->enable         = (CallFunc) fbrasubctrler_enable;
+  result->time_updater   = (TimeUpdaterFunc) fbrasubctrler_time_update;
+  result->report_updater = (TransitFunc) fbrasubctrler_report_update;
   return result;
 }
 

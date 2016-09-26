@@ -155,7 +155,7 @@ void init_mprtp_logger(void)
   this = g_object_new(MPRTPLOGGER_TYPE, NULL);
 }
 
-void _process(gpointer udata)
+static void _process(gpointer udata)
 {
   MPRTPLogger* this = udata;
   Message* msg;

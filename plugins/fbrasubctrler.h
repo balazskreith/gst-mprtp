@@ -90,7 +90,7 @@ void fbrasubctrler_enable(FBRASubController *this);
 void fbrasubctrler_disable(FBRASubController *this);
 
 void fbrasubctrler_report_update(FBRASubController *this, GstMPRTCPReportSummary *summary);
-void fbrasubctrler_time_update(FBRASubController *this);
+gboolean fbrasubctrler_time_update(FBRASubController *this);
 
 void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *params);
 void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *result);

@@ -63,46 +63,38 @@ typedef struct _GstMprtpplayouterClass GstMprtpplayouterClass;
 struct _GstMprtpplayouter
 {
   GstElement      base_mprtpreceiver;
-  GRWLock         rwmutex;
+  GMutex          mutex;
 
-  guint8          mprtp_ext_header_id;
-  guint8          abs_time_ext_header_id;
   guint32         pivot_ssrc;
   guint32         pivot_clock_rate;
   GSocketAddress *pivot_address;
   guint8          pivot_address_subflow_id;
-  guint8          fec_payload_type;
   guint64         clock_base;
-  gboolean        auto_rate_and_cc;
-  gboolean        rtp_passthrough;
 
-  GstClockTime    playout_point;
+  GstClock*       sysclock;
+  StreamJoiner*   joiner;
+  RcvController*  controller;
+  FECDecoder*     fec_decoder;
+  RTPPackets*     rtppackets;
+  RcvTracker*     rcvtracker;
 
   GstPad*         mprtp_srcpad;
   GstPad*         mprtp_sinkpad;
   GstPad*         mprtcp_sr_sinkpad;
   GstPad*         mprtcp_rr_srcpad;
 
-
   GstClockTime    repair_window_max;
   GstClockTime    repair_window_min;
 
-  GHashTable*     paths;
-  PacketsRcvQueue* rcvqueue;
-  StreamJoiner*   joiner;
-  gboolean          logging;
-  RcvController*    controller;
-  GstClock*       sysclock;
+  gboolean        logging;
 
-  guint           subflows_num;
-  FECDecoder*     fec_decoder;
-  GstClockTime    last_fec_clean;
-  guint16         expected_seq;
-  gboolean        expected_seq_init;
-  guint32         rtcp_sent_octet_sum;
+  GstTask*        thread;
+  GRecMutex       thread_mutex;
 
-  GstTask*                      thread;
-  GRecMutex                     thread_mutex;
+  GAsyncQueue*     playoutq;
+  GAsyncQueue*     mprtp_out;
+  GAsyncQueue*     mprtcp_out;
+  PacketForwarder* packetforwarder;
 
 };
 

@@ -51,11 +51,11 @@ stream_splitter_set_mpath_keyframe_filtering(
     StreamSplitter * this,
     guint keyframe_filtering);
 
-gboolean
-stream_splitter_approve_buffer(
+SndSubflow*
+stream_splitter_approve_packet(
     StreamSplitter * this,
-	RTPPacket *packet,
-    MPRTPSPath **path);
+    RTPPacket *packet,
+    GstClockTime now);
 
 void stream_splitter_commit_changes (
     StreamSplitter * this);

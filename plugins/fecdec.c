@@ -29,11 +29,6 @@
 #include <string.h>
 #include "mprtpspath.h"
 
-#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
-
 #define _now(this) gst_clock_get_time (this->sysclock)
 
 
@@ -64,19 +59,44 @@ G_DEFINE_TYPE (FECDecoder, fecdecoder, G_TYPE_OBJECT);
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
+typedef enum{
+  FECDECODER_REQUEST_TYPE_FEC_BUFFER             = 1,
+  FECDECODER_REQUEST_TYPE_REPAIR_REQUEST         = 2,
+}RequestTypes;
+
+typedef struct{
+  RequestTypes type;
+}Request;
+
+typedef struct{
+  Request    base;
+  GstBuffer* buffer;
+}RTPFECRequest;
+
+typedef struct{
+  Request            base;
+  guint16            seq_num;
+}FECRepairRequest;
+
 
 
 static void fecdecoder_finalize (GObject * object);
-static void _add_rtp_packet_to_segment(FECDecoder *this, GstMpRTPBuffer *mprtp, FECDecoderSegment *segment);
+static void _clean(FECDecoder *this);;
+static void _fecdec_process(gpointer udata);
+static void _add_rtp_packet(FECDecoder *this, RTPPacket *packet);
+static void _add_fec_buffer(FECDecoder *this, GstBuffer *buffer);
+static GstBuffer* _get_repaired_rtpbuffer(FECDecoder *this, guint16 searched_seq);
+static void _add_rtp_packet_to_segment(FECDecoder *this, RTPPacket *packet, FECDecoderSegment *segment);
 static FECDecoderSegment *_find_segment_by_seq(FECDecoder *this, guint16 seq_num);
-static void _add_rtp_packet_to_items(FECDecoder *this, GstMpRTPBuffer *mprtp);
+static void _add_rtp_packet_to_items(FECDecoder *this, GstMpRTPBuffer *packet);
 static GstBuffer *_repair_rtpbuf_by_segment(FECDecoder *this, FECDecoderSegment *segment, guint16 seq);
 static gint _find_item_by_seq_helper(gconstpointer item_ptr, gconstpointer desired_seq);
 static FECDecoderItem * _find_item_by_seq(GList *items, guint16 seq);
 static FECDecoderItem * _take_item_by_seq(GList **items, guint16 seq);
+static void _dispose_item(gpointer item);
 static void _segment_dtor(FECDecoder *this, FECDecoderSegment *segment);
 static FECDecoderSegment* _segment_ctor(void);
-static FECDecoderItem* _make_item(FECDecoder *this, GstMpRTPBuffer *mprtp);
+static FECDecoderItem* _make_item(FECDecoder *this, RTPPacket *packet);
 
 static void
 _print_segment(FECDecoderSegment *segment)
@@ -113,7 +133,7 @@ fecdecoder_class_init (FECDecoderClass * klass)
   gobject_class->finalize = fecdecoder_finalize;
 
   GST_DEBUG_CATEGORY_INIT (fecdecoder_debug_category, "fecdecoder", 0,
-      "AAAAAAAAA");
+      "FEC Decoder Component");
 
 }
 
@@ -122,139 +142,108 @@ fecdecoder_finalize (GObject * object)
 {
   FECDecoder *this;
   this = FECDECODER(object);
+
+  gst_task_stop(this->thread);
+  gst_task_join(this->thread);
+  gst_object_unref(this->thread);
+
   g_object_unref(this->sysclock);
-  g_free(this->segments);
+  g_async_queue_unref(this->discard_packets_in);
+  g_async_queue_unref(this->discard_packets_out);
+  g_async_queue_unref(this->rtppackets_in);
+  g_async_queue_unref(this->fecbuffers_in);
+
 }
 
 void
 fecdecoder_init (FECDecoder * this)
 {
-  g_rw_lock_init (&this->rwmutex);
-  this->sysclock = gst_system_clock_obtain();
-  this->repair_window_max = 300 * GST_MSECOND;
-  this->repair_window_min = 10 * GST_MSECOND;
-  this->repaired = 0;
+  this->thread           = gst_task_new (_fecdec_process, this, NULL);
+  this->sysclock         = gst_system_clock_obtain();
+  this->rtppackets_in    = g_async_queue_new();
+  this->fecbuffers_in    = g_async_queue_new();
+  this->discard_packets_in = g_async_queue_new();
+
+  gst_task_set_lock (this->thread, &this->thread_mutex);
+  gst_task_start (this->thread);
 
 }
 
 
 void fecdecoder_reset(FECDecoder *this)
 {
-  THIS_WRITELOCK(this);
 
-  THIS_WRITEUNLOCK(this);
 }
 
-void fecdecoder_get_stat(FECDecoder *this,
-                         guint32 *total_rtp_packets,
-                         guint32 *early_repaired_bytes,
-                         guint32 *total_repaired_bytes,
-                         guint32 *total_recovered_packets,
-                         guint32 *total_missed_packets)
-{
-  THIS_READLOCK(this);
-
-  if(total_rtp_packets){
-    *total_rtp_packets = this->total_rtp_packets;
-  }
-
-  if(early_repaired_bytes){
-    *early_repaired_bytes = this->total_early_repaired_bytes;
-  }
-
-  if(total_repaired_bytes){
-    *total_repaired_bytes = this->total_repaired_bytes;
-  }
-
-  if(total_recovered_packets){
-    *total_recovered_packets = this->recovered;
-  }
-
-  if(total_missed_packets){
-    *total_missed_packets = this->lost;
-  }
-
-  THIS_READUNLOCK(this);
-}
-
-FECDecoder *make_fecdecoder(void)
+FECDecoder *make_fecdecoder(GAsyncQueue* discard_packets_out, GAsyncQueue* rtpbuffers_out)
 {
   FECDecoder *this;
   this = g_object_new (FECDECODER_TYPE, NULL);
   this->made = _now(this);
+  this->discard_packets_out = g_async_queue_ref(discard_packets_out);
+  this->rtpbuffers_out = g_async_queue_ref(rtpbuffers_out);
   return this;
 }
 
-gboolean fecdecoder_has_repaired_rtpbuffer(FECDecoder *this, guint16 hpsn, GstBuffer** repairedbuf /*highest played sequence number*/)
+
+void fecdecoder_add_rtp_packet(FECDecoder *this, RTPPacket *packet)
 {
-  FECDecoderSegment *segment;
-  GList *segi;
-  gboolean result = FALSE;
-  THIS_WRITELOCK(this);
-  for(segi = this->segments; segi; segi = segi->next){
-    guint16 item_seq;
-    gint32 missing_seq = -1;
-    segment = segi->data;
-    if(segment->missing != 1 || segment->repaired) {
-      continue;
-    }
-    if(_cmp_uint16(hpsn, segment->base_sn) < 0){
-      continue;
-    }
-    if(_now(this) - this->repair_window_min < segment->added){
-      continue;
-    }
-    if(segment->added < _now(this) - this->repair_window_max){
-      continue;
-    }
-    for(item_seq = segment->base_sn; item_seq != (segment->high_sn+1); ++item_seq){
-      if(_find_item_by_seq(segment->items, item_seq) == NULL){
-        missing_seq = item_seq;
-      }
-    }
-    if(missing_seq == -1){
-      continue;
-    }
-    mprtp_log_one("recovered_packets.txt", "%d\n", ++this->repaired);
-    *repairedbuf = _repair_rtpbuf_by_segment(this, segment, missing_seq);
-    segment->repaired = TRUE;
-    result = TRUE;
+  rtppackets_packet_ref(packet);
+  g_async_queue_push(this->rtppackets_in, packet);
+}
+
+void fecdecoder_add_fec_buffer(FECDecoder *this, GstBuffer *buffer)
+{
+  g_async_queue_push(this->fecbuffers_in, gst_buffer_ref(buffer));
+}
+
+static void _fecdec_process(gpointer udata)
+{
+  FECDecoder* this = udata;
+  RTPPacket* packet;
+  GstBuffer* buffer;
+  DiscardedPacket* discarded_packet;
+
+  while((packet = g_async_queue_try_pop(this->rtppackets_in)) != NULL){
+    _add_rtp_packet(this, packet);
+    rtppackets_packet_unref(packet);
   }
-  THIS_WRITEUNLOCK(this);
-  return result;
 
-}
+  while((buffer = g_async_queue_try_pop(this->fecbuffers_in)) != NULL){
+    _add_fec_buffer(this, buffer);
+  }
 
-void fecdecoder_set_payload_type(FECDecoder *this, guint8 payload_type)
-{
-  THIS_WRITELOCK(this);
-  this->payload_type = payload_type;
-  THIS_WRITEUNLOCK(this);
-}
-
-void fecdecoder_set_repair_window(FECDecoder *this, GstClockTime min, GstClockTime max)
-{
-  THIS_WRITELOCK(this);
-  this->repair_window_min = min;
-  this->repair_window_max = max;
-  THIS_WRITEUNLOCK(this);
-}
-
-void fecdecoder_add_rtp_packet(FECDecoder *this, GstMpRTPBuffer *mprtp)
-{
-  FECDecoderSegment *segment;
-  THIS_WRITELOCK(this);
-  segment =_find_segment_by_seq(this, mprtp->abs_seq);
-  if(!segment){
-    _add_rtp_packet_to_items(this, mprtp);
+  discarded_packet = g_async_queue_timeout_pop(this->discard_packets_in, 1000);
+  if(!discarded_packet){
     goto done;
   }
-  _add_rtp_packet_to_segment(this, mprtp, segment);
+
+  buffer = _get_repaired_rtpbuffer(this, discarded_packet->seq_num);
+  if(buffer){
+    g_async_queue_push(this->rtpbuffers_out, buffer);
+    discarded_packet->repaired = TRUE;
+  }
+  g_async_queue_push(this->discard_packets_out, discarded_packet);
+
 done:
-  THIS_WRITEUNLOCK(this);
+  _clean(this);
+  return;
 }
 
-void fecdecoder_add_fec_packet(FECDecoder *this, GstMpRTPBuffer *mprtp)
+void _add_rtp_packet(FECDecoder *this, RTPPacket *packet)
+{
+  FECDecoderSegment *segment;
+  segment =_find_segment_by_seq(this, packet->abs_seq);
+  if(!segment){
+    _add_rtp_packet_to_items(this, packet);
+    goto done;
+  }
+  _add_rtp_packet_to_segment(this, packet, segment);
+done:
+  return;
+}
+
+void _add_fec_buffer(FECDecoder *this, GstBuffer *buffer)
 {
   FECDecoderSegment *segment;
   GstRTPFECHeader   *header;
@@ -263,8 +252,7 @@ void fecdecoder_add_fec_packet(FECDecoder *this, GstMpRTPBuffer *mprtp)
   guint16 seq,c;
   GstRTPBuffer       rtp = GST_RTP_BUFFER_INIT;
 
-  THIS_WRITELOCK(this);
-  gst_rtp_buffer_map(mprtp->buffer, GST_MAP_READ, &rtp);
+  gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
   payload = gst_rtp_buffer_get_payload(&rtp);
   payload_length = gst_rtp_buffer_get_payload_len(&rtp);
   header = (GstRTPFECHeader*) payload;
@@ -300,14 +288,14 @@ void fecdecoder_add_fec_packet(FECDecoder *this, GstMpRTPBuffer *mprtp)
   DISABLE_LINE _print_segment(segment);
 done:
   gst_rtp_buffer_unmap(&rtp);
-  THIS_WRITEUNLOCK(this);
+  gst_buffer_unref(buffer);
 }
 
-void fecdecoder_clean(FECDecoder *this)
+void _clean(FECDecoder *this)
 {
   GList *new_list, *it;
   GstClockTime now;
-  THIS_WRITELOCK(this);
+
   now = _now(this);
 
   //filter out items
@@ -315,8 +303,8 @@ void fecdecoder_clean(FECDecoder *this)
   for(it = this->items; it; it = it->next){
     FECDecoderItem *item;
     item = it->data;
-    if(item->added < now - this->repair_window_max){
-      mprtp_free(item);
+    if(item->added < now - 300 * GST_MSECOND){
+      _dispose_item(item);
       continue;
     }
     new_list = g_list_prepend(new_list, item);
@@ -330,7 +318,7 @@ void fecdecoder_clean(FECDecoder *this)
   for(it = this->segments; it; it = it->next){
     FECDecoderSegment *segment;
     segment = it->data;
-    if(segment->added < now - this->repair_window_max ||
+    if(segment->added < now - 300 * GST_MSECOND ||
        segment->complete){
       _segment_dtor(this, segment);
       continue;
@@ -340,7 +328,6 @@ void fecdecoder_clean(FECDecoder *this)
   g_list_free(this->segments);
   this->segments = new_list;
 
-  THIS_WRITEUNLOCK(this);
 }
 
 static gint _find_segment_by_seq_helper(gconstpointer segment_ptr, gconstpointer seq_ptr)
@@ -370,42 +357,70 @@ done:
 }
 
 
-void _add_rtp_packet_to_items(FECDecoder *this, GstMpRTPBuffer *mprtp)
+GstBuffer* _get_repaired_rtpbuffer(FECDecoder *this, guint16 searched_seq)
+{
+  FECDecoderSegment *segment;
+  GList *segi;
+  GstBuffer* result = NULL;
+  for(segi = this->segments; segi; segi = segi->next){
+    guint16 item_seq;
+    gint32 missing_seq = -1;
+    segment = segi->data;
+    if(segment->missing != 1 || segment->repaired) {
+      continue;
+    }
+    if(_cmp_uint16(searched_seq, segment->base_sn) < 0 ||
+       _cmp_uint16(segment->base_sn + segment->protected, searched_seq) < 0){
+      continue;
+    }
+
+    for(item_seq = segment->base_sn; item_seq != (segment->high_sn+1); ++item_seq){
+      if(_find_item_by_seq(segment->items, item_seq) == NULL){
+        missing_seq = item_seq;
+      }
+    }
+    if(missing_seq != searched_seq){
+      continue;
+    }
+
+    //TODO: move from here
+    //mprtp_log_one("recovered_packets.txt", "%d\n", ++this->repaired);
+    result = _repair_rtpbuf_by_segment(this, segment, missing_seq);
+    segment->repaired = TRUE;
+  }
+  return result;
+}
+
+void _add_rtp_packet_to_items(FECDecoder *this, RTPPacket *packet)
 {
   FECDecoderItem *item;
-  item = _find_item_by_seq(this->items, mprtp->abs_seq);
+  item = _find_item_by_seq(this->items, packet->abs_seq);
   if(item){
       GST_WARNING_OBJECT(this, "Duplicated RTP sequence number found");
       goto done;
   }
-  item = _make_item(this, mprtp);
+  item = _make_item(this, packet);
   this->items = g_list_prepend(this->items, item);
-
-//  gst_print_rtp_buffer(mprtp->buffer);
 
 done:
   return;
 }
 
-void _add_rtp_packet_to_segment(FECDecoder *this, GstMpRTPBuffer *mprtp, FECDecoderSegment *segment)
+void _add_rtp_packet_to_segment(FECDecoder *this, RTPPacket *packet, FECDecoderSegment *segment)
 {
   FECDecoderItem *item = NULL;
-  ++this->total_rtp_packets;
-  if(_find_item_by_seq(segment->items, mprtp->abs_seq) != NULL){
-      g_warning("Duplicated sequece number %hu for RTP packet", mprtp->abs_seq);
+  if(_find_item_by_seq(segment->items, packet->abs_seq) != NULL){
+      g_warning("Duplicated sequece number %hu for RTP packet", packet->abs_seq);
     goto done;
   }
   if(--segment->missing < 0){
     g_warning("Duplicated or corrupted FEC segment.");
     goto done;
   }
-  item = _make_item(this, mprtp);
+  item = _make_item(this, packet);
   segment->complete = segment->missing == 0;
   segment->items = g_list_prepend(segment->items, item);
-  if(segment->repaired){
-    this->total_early_repaired_bytes +=
-        item->bitstring_length + 12 /*fixed rtp header */ - 10 /*the extra 80 bits at the beginning */;
-  }
+
 done:
   return;
 }
@@ -440,7 +455,6 @@ GstBuffer *_repair_rtpbuf_by_segment(FECDecoder *this, FECDecoderSegment *segmen
   rtpheader->ssrc    = g_htonl(segment->ssrc);
   memcpy(databed + 12, segment->fecbitstring + 10, length);
 
-  this->total_repaired_bytes += length + 12;
   segment->repaired           = TRUE;
 
   return gst_buffer_new_wrapped(databed, length + 12);
@@ -476,41 +490,39 @@ FECDecoderItem * _take_item_by_seq(GList **items, guint16 seq)
   return result;
 }
 
+void _dispose_item(gpointer item)
+{
+  g_slice_free(FECDecoderItem, item);
+}
+
 void _segment_dtor(FECDecoder *this, FECDecoderSegment *segment)
 {
-  if(!segment->complete){
-    if(segment->repaired){
-      ++this->recovered;
-    }else{
-      this->lost+=segment->missing;
-    }
-  }
   if(segment->items){
-    g_list_free_full(segment->items, mprtp_free);
+    g_list_free_full(segment->items, _dispose_item);
+//    g_list_free_full(segment->items, mprtp_free);
   }
-  mprtp_free(segment);
+  g_slice_free(FECDecoderSegment, segment);
+  //mprtp_free(segment);
 }
 
 FECDecoderSegment* _segment_ctor(void)
 {
   FECDecoderSegment* result;
-  result = mprtp_malloc(sizeof(FECDecoderSegment));
+//  result = mprtp_malloc(sizeof(FECDecoderSegment));
+  result = g_slice_new0(FECDecoderSegment);
   return result;
 }
 
-FECDecoderItem* _make_item(FECDecoder *this, GstMpRTPBuffer *mprtp)
+FECDecoderItem* _make_item(FECDecoder *this, RTPPacket *packet)
 {
   FECDecoderItem* result;
-  result = g_malloc0(sizeof(FECDecoderItem));
-  rtpfecbuffer_setup_bitstring(mprtp->buffer, result->bitstring, &result->bitstring_length);
-  result->seq_num = mprtp->abs_seq;
-  result->ssrc    = mprtp->ssrc;
+//  result = g_malloc0(sizeof(FECDecoderItem));
+  result = g_slice_new0(FECDecoderItem);
+  rtpfecbuffer_setup_bitstring(packet->buffer, result->bitstring, &result->bitstring_length);
+  result->seq_num = packet->abs_seq;
+  result->ssrc    = packet->ssrc;
   result->added   = _now(this);
   return result;
 }
 
 
-#undef THIS_WRITELOCK
-#undef THIS_WRITEUNLOCK
-#undef THIS_READLOCK
-#undef THIS_READUNLOCK

@@ -348,6 +348,31 @@ gpointer slidingwindow_peek_latest(SlidingWindow* this)
   item = datapuffer_peek_last(this->items);
   return item->data;
 }
+typedef struct{
+  gint (*comparator)(gpointer item, gpointer udata);
+  gpointer udata;
+}PeekCustomHelper;
+
+static gint _slidingwindow_peek_custom_helper(gpointer item, gpointer udata)
+{
+  PeekCustomHelper* helper = udata;
+  SlidingWindowItem* sitem = item;
+  return helper->comparator(sitem->data, helper->udata);
+}
+
+gpointer slidingwindow_peek_custom(SlidingWindow* this, gint (*comparator)(gpointer item, gpointer udata), gpointer udata)
+{
+  SlidingWindowItem *item;
+  PeekCustomHelper helper;
+  gpointer result = NULL;
+  if(datapuffer_isempty(this->items)){
+    return NULL;
+  }
+  helper.comparator = comparator;
+  helper.udata = udata;
+  result = datapuffer_peek_custom(this->items, _slidingwindow_peek_custom_helper, &helper);
+  return result;
+}
 
 void slidingwindow_set_treshold(SlidingWindow* this, GstClockTime obsolation_treshold)
 {
@@ -517,6 +542,24 @@ gpointer datapuffer_peek_last(datapuffer_t* puffer)
   }
   return puffer->items[pos];
 }//# datapuffer_read end
+
+gpointer datapuffer_peek_custom(datapuffer_t* puffer, gint (*comparator)(gpointer item, gpointer udata), gpointer udata)
+{
+  gint32 pos;
+  gint32 npos = puffer->start;
+  gpointer item;
+  do{
+    pos = npos;
+    item = puffer->items[pos];
+    if(comparator(item, udata) == 0){
+      return item;
+    }
+    if(++npos == puffer->length){
+      npos = 0;
+    }
+  }while(pos != puffer->end);
+  return NULL;
+}
 
 gint32 datapuffer_readcapacity(datapuffer_t *datapuffer)
 {

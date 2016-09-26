@@ -29,11 +29,6 @@
 #include <string.h>
 #include "mprtpspath.h"
 
-#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
-
 #define _now(this) gst_clock_get_time (this->sysclock)
 
 //#define THIS_READLOCK(this)
@@ -53,31 +48,42 @@ G_DEFINE_TYPE (FECEncoder, fecencoder, G_TYPE_OBJECT);
 //----------------------------------------------------------------------
 typedef struct _BitString{
   guint8    bytes[GST_RTPFEC_PARITY_BYTES_MAX_LENGTH];
-  gint16   length;
+  gint16    length;
   guint16   seq_num;
   guint32   ssrc;
 }BitString;
 
+typedef enum{
+  FECENCODER_REQUEST_TYPE_RTP_BUFFER             = 1,
+  FECENCODER_REQUEST_TYPE_FEC_REQUEST            = 2,
+  FECENCODER_REQUEST_TYPE_PAYLOAD_CHANGE         = 3,
+}RequestTypes;
+
+typedef struct{
+  RequestTypes type;
+}Request;
+
+typedef struct{
+  Request    base;
+  guint8     payload_type;
+}PayloadChangeRequest;
+
+typedef struct{
+  Request    base;
+  GstBuffer* buffer;
+}RTPBufferRequest;
+
+typedef struct{
+  Request            base;
+}FECRequest;
+
+
 static void fecencoder_finalize (GObject * object);
 static BitString* _make_bitstring(GstBuffer* buf);
-
-
+static void _fecenc_process(gpointer udata);
+static void _fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf);
+static GstBuffer* _fecencoder_get_fec_packet(FECEncoder *this, gint32* packet_length);
 //------------------------- Utility functions --------------------------------
-typedef struct _Subflow{
-  guint8                     id;
-  MPRTPSPath*                path;
-  guint32                    total_payload_len;
-  guint32                    total_packets_sent;
-  guint16                    sequence_num;
-  guint16                    cycle_num;
-}Subflow;
-
-static Subflow *_subflow_ctor (void);
-static void _subflow_dtor (Subflow * this);
-static void _ruin_subflow (gpointer subflow);
-static Subflow *_make_subflow (MPRTPSPath * path);
-static void _reset_subflow (Subflow * this);
-static Subflow *_get_subflow(FECEncoder * this, guint8 subflow_id);
 
 void
 fecencoder_class_init (FECEncoderClass * klass)
@@ -89,7 +95,7 @@ fecencoder_class_init (FECEncoderClass * klass)
   gobject_class->finalize = fecencoder_finalize;
 
   GST_DEBUG_CATEGORY_INIT (fecencoder_debug_category, "fecencoder", 0,
-      "AAAAAAAAA");
+      "FEC Encoder component");
 
 }
 
@@ -99,83 +105,90 @@ fecencoder_finalize (GObject * object)
   FECEncoder *this;
   this = FECENCODER(object);
   g_object_unref(this->sysclock);
+
+  gst_task_stop(this->thread);
+  gst_task_join (this->thread);
+  gst_object_unref (this->thread);
 }
 
 void
 fecencoder_init (FECEncoder * this)
 {
-  g_rw_lock_init (&this->rwmutex);
-  this->subflows = g_hash_table_new_full (NULL, NULL,
-      NULL, (GDestroyNotify) _ruin_subflow);
-
+  this->thread   = gst_task_new (_fecenc_process, this, NULL);
   this->sysclock = gst_system_clock_obtain();
   this->max_protection_num = GST_RTPFEC_MAX_PROTECTION_NUM;
   this->bitstrings = g_queue_new();
+
+  gst_task_set_lock (this->thread, &this->thread_mutex);
+  gst_task_start (this->thread);
 
 }
 
 
 void fecencoder_reset(FECEncoder *this)
 {
-  THIS_WRITELOCK(this);
 
-  THIS_WRITEUNLOCK(this);
 }
 
-FECEncoder *make_fecencoder(void)
+FECEncoder *make_fecencoder(GAsyncQueue *responses)
 {
   FECEncoder *this;
   this = g_object_new (FECENCODER_TYPE, NULL);
   this->made = _now(this);
+  this->responses = g_async_queue_ref(responses);
   return this;
 }
 
-
-void fecencoder_set_payload_type(FECEncoder *this, guint8 payload_type)
+void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer* buffer)
 {
-  THIS_WRITELOCK(this);
-  this->payload_type = payload_type;
-  THIS_WRITEUNLOCK(this);
+  RTPBufferRequest* request = g_slice_new0(RTPBufferRequest);
+  request->base.type = FECENCODER_REQUEST_TYPE_RTP_BUFFER;
+  request->buffer = gst_buffer_ref(buffer);
+  g_async_queue_push(this->requests, request);
 }
 
-void fecencoder_get_stats(FECEncoder *this, guint8 subflow_id, guint32 *packets, guint32 *payloads)
+void fecencoder_request_fec(FECEncoder *this)
 {
-  Subflow *subflow;
-  THIS_READLOCK(this);
-  subflow = _get_subflow(this, subflow_id);
-  if(!subflow){
-    goto done;
+  FECRequest* request = g_slice_new0(FECRequest);
+  request->base.type = FECENCODER_REQUEST_TYPE_FEC_REQUEST;
+  g_async_queue_push(this->requests, request);
+}
+
+
+void fecencoder_set_payload_type(FECEncoder* this, guint8 fec_payload_type)
+{
+  PayloadChangeRequest* request = g_slice_new0(PayloadChangeRequest);
+  request->base.type = FECENCODER_REQUEST_TYPE_PAYLOAD_CHANGE;
+  request->payload_type = fec_payload_type;
+  g_async_queue_push(this->requests, request);
+}
+
+void fecencoder_ref_response(FECEncoderResponse* response)
+{
+  ++response->ref;
+}
+
+void fecencoder_unref_response(FECEncoderResponse* response)
+{
+  if(0 < response->ref){
+    return;
   }
-  if(packets){
-      *packets = subflow->total_packets_sent;
-    }
-  if(payloads){
-      *payloads = subflow->total_payload_len;
-    }
-done:
-  THIS_READUNLOCK(this);
+  g_slice_free(FECEncoderResponse, response);
 }
 
-void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf)
+
+void _fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf)
 {
-  THIS_WRITELOCK(this);
   g_queue_push_tail(this->bitstrings, _make_bitstring(buf));
   while(this->max_protection_num <= g_queue_get_length(this->bitstrings)){
     mprtp_free(g_queue_pop_head(this->bitstrings));
   }
-  THIS_WRITEUNLOCK(this);
-}
-
-
-void fecencoder_add_rtpbuffer2(FECEncoder *this, GstBuffer *buf)
-{
-  g_async_queue_push(this->bitstrings, gst_buffer_ref(buf));
 }
 
 
 
 GstBuffer*
-fecencoder_get_fec_packet(FECEncoder *this)
+_fecencoder_get_fec_packet(FECEncoder *this, gint32* packet_length)
 {
   GstBuffer* result = NULL;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
@@ -186,8 +199,8 @@ fecencoder_get_fec_packet(FECEncoder *this)
   GstRTPFECHeader *fecheader;
   gboolean init = FALSE;
   gint n_mask = 0;
-  THIS_WRITELOCK(this);
-  fecbitstring = mprtp_malloc(sizeof(BitString));
+//  fecbitstring = mprtp_malloc(sizeof(BitString));
+  fecbitstring = g_slice_new0(BitString);
 again:
   if(g_queue_get_length(this->bitstrings) < 1){
     goto create;
@@ -203,7 +216,7 @@ again:
     fecbitstring->seq_num = actual->seq_num;
     fecbitstring->ssrc    = actual->ssrc;
   }
-  mprtp_free(actual);
+  g_slice_free(BitString, actual);
   goto again;
 create:
   result = gst_rtp_buffer_new_allocate (
@@ -230,53 +243,22 @@ create:
   fecheader->reserved   = 0;
   memcpy(payload + sizeof(GstRTPFECHeader), fecbitstring->bytes + 10, fecbitstring->length - 10);
   gst_rtp_buffer_unmap(&rtp);
-  mprtp_free(fecbitstring);
+//  mprtp_free(fecbitstring);
+  if(packet_length){
+    *packet_length = fecbitstring->length + 10;
+  }
+  g_slice_free(BitString, fecbitstring);
 
-  THIS_WRITEUNLOCK(this);
   return result;
 }
 
-
-void
-fecencoder_add_path (FECEncoder * this, MPRTPSPath *path)
-{
-  Subflow *subflow;
-  subflow = _make_subflow(path);
-  g_hash_table_insert (this->subflows, GINT_TO_POINTER (subflow->id), subflow);
-}
-
-void
-fecencoder_rem_path (FECEncoder * this, guint8 subflow_id)
-{
-  g_hash_table_remove (this->subflows, GINT_TO_POINTER (subflow_id));
-}
-
-void
-fecencoder_assign_to_subflow (FECEncoder * this,
-                  GstBuffer *buf,
-                  guint8 mprtp_ext_header_id,
-                  guint8 subflow_id)
-{
-  MPRTPSubflowHeaderExtension data;
-  GstRTPBuffer                rtp = GST_RTP_BUFFER_INIT;
-  Subflow *subflow;
-  THIS_WRITELOCK(this);
-  subflow = _get_subflow(this, subflow_id);
-  gst_rtp_buffer_map(buf, GST_MAP_READWRITE, &rtp);
-  data.id = subflow_id;
-  data.seq = ++subflow->sequence_num;
-  gst_rtp_buffer_add_extension_onebyte_header (&rtp, mprtp_ext_header_id, (gpointer) &data, sizeof (data));
-  subflow->total_payload_len += gst_rtp_buffer_get_payload_len(&rtp);
-  ++subflow->total_packets_sent;
-  gst_rtp_buffer_unmap(&rtp);
-  THIS_WRITEUNLOCK(this);
-}
 
 BitString* _make_bitstring(GstBuffer* buf)
 {
   BitString *result;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-  result = mprtp_malloc(sizeof(BitString));
+//  result = mprtp_malloc(sizeof(BitString));
+  result = g_slice_new0(BitString);
   rtpfecbuffer_setup_bitstring(buf, result->bytes, &result->length);
   gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
   result->seq_num = gst_rtp_buffer_get_seq(&rtp);
@@ -286,76 +268,53 @@ BitString* _make_bitstring(GstBuffer* buf)
 }
 
 
-
-//---------------------- Utility functions ----------------------------------
-Subflow *
-_subflow_ctor (void)
+static void _fecenc_process(gpointer udata)
 {
-  Subflow *result;
-  result = mprtp_malloc (sizeof (Subflow));
+  FECEncoder* this = udata;
+  Request* request;
+again:
+  request = (Request*) g_async_queue_timeout_pop(this->requests, 1000);
+  if(!request){
+    goto done;
+  }
+  switch(request->type){
+    case FECENCODER_REQUEST_TYPE_PAYLOAD_CHANGE:
+    {
+      PayloadChangeRequest* fec_payload_request = (PayloadChangeRequest*)request;
+      this->payload_type = fec_payload_request->payload_type;
+      g_slice_free(PayloadChangeRequest, fec_payload_request);
+    }
+    break;
+    case FECENCODER_REQUEST_TYPE_FEC_REQUEST:
+    {
+      FECRequest* fec_request = (FECRequest*)request;
+      FECEncoderResponse* fec_response = _fec_response_ctor();
+      fec_response->fecbuffer = _fecencoder_get_fec_packet(this, &fec_response->payload_size);
+      g_slice_free(FECRequest, fec_request);
+      g_async_queue_push(this->responses, fec_response);
+    }
+    break;
+    case FECENCODER_REQUEST_TYPE_RTP_BUFFER:
+    {
+      RTPBufferRequest* rtp_buffer_request = (RTPBufferRequest*)request;
+      _fecencoder_add_rtpbuffer(this, rtp_buffer_request->buffer);
+      g_slice_free(RTPBufferRequest, rtp_buffer_request);
+    }
+    break;
+    default:
+      g_warning("Unhandled message with type %d", request->type);
+    break;
+  }
+  goto again;
+done:
+  return;
+}
+
+FECEncoderResponse* _fec_response_ctor(void)
+{
+  FECEncoderResponse* result;
+  result = g_slice_new0(FECEncoderResponse);
+  result->ref = 1;
   return result;
 }
 
-void
-_subflow_dtor (Subflow * this)
-{
-  g_return_if_fail (this);
-  mprtp_free (this);
-}
-
-void
-_ruin_subflow (gpointer subflow)
-{
-  Subflow *this;
-  g_return_if_fail (subflow);
-  this = (Subflow *) subflow;
-  g_object_unref (this->path);
-  _subflow_dtor (this);
-}
-
-Subflow *
-_make_subflow (MPRTPSPath * path)
-{
-  Subflow *result;
-
-  result                  = _subflow_ctor ();
-  result->path            = g_object_ref (path);
-  result->id              = mprtps_path_get_id(path);
-
-  _reset_subflow (result);
-  return result;
-}
-
-void
-_reset_subflow (Subflow * this)
-{
-
-}
-
-//static void _subflow_iterator(
-//    FECEncoder * this,
-//    void(*process)(Subflow*,gpointer),
-//    gpointer data)
-//{
-//  GHashTableIter iter;
-//  gpointer       key, val;
-//  Subflow*       subflow;
-//
-//  g_hash_table_iter_init (&iter, this->subflows);
-//  while (g_hash_table_iter_next (&iter, (gpointer) & key, (gpointer) & val))
-//  {
-//    subflow = (Subflow *) val;
-//    process(subflow, data);
-//  }
-//}
-
-Subflow *_get_subflow(FECEncoder * this, guint8 subflow_id)
-{
-  return g_hash_table_lookup (this->subflows, GINT_TO_POINTER (subflow_id));
-}
-
-#undef DEBUG_PRINT_TOOLS
-#undef THIS_WRITELOCK
-#undef THIS_WRITEUNLOCK
-#undef THIS_READLOCK
-#undef THIS_READUNLOCK

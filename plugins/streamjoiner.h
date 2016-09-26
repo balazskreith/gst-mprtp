@@ -36,25 +36,21 @@ struct _StreamJoiner
   GObject              object;
   GstClock*            sysclock;
   GstClockTime         made;
-  GHashTable*          subflows;
-  gint                 subflow_num;
-  GRWLock              rwmutex;
   GstClockTime         join_delay;
-  GstClockTime         join_min_treshold;
-  GstClockTime         join_max_treshold;
-  GstClockTime         last_join_refresh;
-  SlidingWindow*       delays;
+
+  SlidingWindow*       joinq;
+  GQueue*              playoutq;
+  guint16              last_seq;
+  gboolean             last_seq_init;
 
   gdouble              betha;
+  PacketForwarder*     rtppackets_out;
+  GAsyncQueue*         discarded_packets_out;
+  GAsyncQueue*         messages_in;
 
-  GQueue*              packets_by_seq;
-  GQueue*              packets_by_arrival;
+  GstClockTime         pacing_time;
 
-  PacketsRcvQueue*     rcvqueue;
-
-  gboolean             flush;
-  gboolean             HFSN_initialized;
-  guint16              HFSN;
+  gdouble              playout_delay;
 
 };
 struct _StreamJoinerClass{
@@ -62,58 +58,22 @@ struct _StreamJoinerClass{
 };
 
 StreamJoiner*
-make_stream_joiner(PacketsRcvQueue *rcvqueue);
+make_stream_joiner();
 
 void
-stream_joiner_set_min_treshold (
-    StreamJoiner * this,
-    GstClockTime treshold);
-
-void
-stream_joiner_set_max_treshold (
-    StreamJoiner * this,
-    GstClockTime treshold);
-
-void
-stream_joiner_set_window_treshold (
-    StreamJoiner * this,
-    GstClockTime treshold);
-
-void
-stream_joiner_set_betha_factor (
-    StreamJoiner * this,
-    gdouble betha);
-
-void
-stream_joiner_add_path(
-    StreamJoiner * this,
-    guint8 subflow_id,
-    MpRTPRPath *path);
-
-void
-stream_joiner_rem_path(
-    StreamJoiner * this,
-    guint8 subflow_id);
-
-void
-stream_joiner_push(
-    StreamJoiner * this,
-    GstMpRTPBuffer *mprtp);
-
-void
-stream_joiner_transfer(
-    StreamJoiner *this);
-
-
-void
-stream_joiner_set_playout_halt_time(
+stream_joiner_add_stat(
     StreamJoiner *this,
-    GstClockTime halt_time);
+    RcvTrackerStat* stat);
 
 void
-stream_joiner_set_playout_allowed(
+stream_joiner_add_packet(
     StreamJoiner *this,
-    gboolean playout_permission);
+    RTPPacket* packet);
+
+void
+stream_joiner_set_join_delay (
+    StreamJoiner * this,
+    GstClockTime join_delay);
 
 
 GType

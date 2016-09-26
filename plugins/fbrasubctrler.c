@@ -101,27 +101,10 @@ struct _Private{
 
   GstClockTime        adjust_th;
 
-//  gdouble             discarded_rate;
   gdouble             avg_rtp_payload;
   gdouble             rtt;
 
   gboolean            bcongestion;
-
-//  gint32              corrigate_num;
-
-  //Possible parameters
-
-//  gdouble             discad_cong_treshold;
-//  gdouble             discad_dist_treshold;
-
-//  gdouble             owd_corr_dist_th;
-//  gdouble             owd_corr_cng_th;
-
-//  GstClockTime        owd_dist_th;
-//  GstClockTime        owd_cng_th;
-
-//  gboolean            proactive;
-//  GstClockTime        proactive_disabled;
 
   gboolean            reactive_cc_allowed;
 
@@ -326,18 +309,19 @@ disapprove:
 
 FBRASubController *make_fbrasubctrler(RTPPackets* rtppackets, SndTracker *sndtracker, SndSubflow *subflow)
 {
-  FBRASubController *result;
-  result                      = g_object_new (FBRASUBCTRLER_TYPE, NULL);
-  result->rtppackets          = g_object_ref(rtppackets);
-  result->sndtracker          = g_object_unref(sndtracker);
-  result->subflow             = subflow;
-  result->made                = _now(result);
+  FBRASubController *this;
+  this                      = g_object_new (FBRASUBCTRLER_TYPE, NULL);
+  this->rtppackets          = g_object_ref(rtppackets);
+  this->sndtracker          = g_object_unref(sndtracker);
+  this->subflow             = subflow;
+  this->made                = _now(this);
 
 
   subflow->state = MPRTPS_PATH_STATE_STABLE;
-  _switch_stage_to(result, STAGE_KEEP, FALSE);
+  _switch_stage_to(this, STAGE_KEEP, FALSE);
 
-  sndtracker_add_packet_notifier(llllll);
+  sndtracker_add_packet_notifier(this->sndtracker, _stat_tracker, this, NULL, NULL);
+  sndtracker_add_packet_notifier(this->sndtracker, _pacing_tracker, this, NULL, NULL);
   sndtracker_add_stat_subflow_notifier()
 
   return result;
@@ -385,9 +369,12 @@ done:
   return;
 }
 
-void fbrasubctrler_time_update(FBRASubController *this)
+gboolean fbrasubctrler_time_update(FBRASubController *this)
 {
   GstClockTime fbinterval_th;
+
+  //TODO: update sender_rate
+
   if(!this->enabled || _now(this) < this->disable_end || this->measurements_num < 5){
     goto done;
   }
@@ -404,44 +391,8 @@ void fbrasubctrler_time_update(FBRASubController *this)
   }
 
 done:
-  return;
+  return FALSE;
 }
-
-void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *params)
-{
-//  MPRTPSubflowFBRA2CngCtrlerParams *cngctrler;
-//  cngctrler = &params->cngctrler;
-
-  fbratargetctrler_signal_update(this->targetctrler, params);
-
-//  _FD_cong_th(this)                             = cngctrler->discard_cong_treshold;
-//  _FD_dist_th(this)                             = cngctrler->discard_dist_treshold;
-//  _owd_corr_cng_th(this)                        = cngctrler->owd_corr_cng_th;
-//  _owd_corr_dist_th(this)                       = cngctrler->owd_corr_dist_th;
-//  _reactive_cc_allowed(this)                    = cngctrler->reactive_cc_allowed;
-
-
-}
-
-void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *result)
-{
-//  MPRTPSubflowFBRA2CngCtrlerParams *cngctrler;
-//  cngctrler = &result->cngctrler;
-
-  fbratargetctrler_signal_request(this->targetctrler, result);
-
-//  cngctrler->owd_corr_cng_th                = _owd_corr_cng_th(this);
-//  cngctrler->owd_corr_dist_th               = _owd_corr_dist_th(this);
-//  cngctrler->reactive_cc_allowed            = _reactive_cc_allowed(this);
-
-}
-
-//static void _update_fraction_discarded(FBRASubController *this)
-//{
-//  _FD_cong_th(this) = MIN(DISCARD_CONGESTION_MAX_TRESHOLD, this->fbstat.FD_median * 2.);
-//  _FD_dist_th(this) = MIN(DISCARD_DISTORTION_MAX_TRESHOLD, this->fbstat.FD_median * 2.);
-//}
-
 
 GstClockTime start = 0;
 GstClockTime previous = 0;
@@ -450,6 +401,9 @@ void fbrasubctrler_report_update(
                          GstMPRTCPReportSummary *summary)
 {
   GstClockTime max_approve_idle_th;
+
+
+  //TODO: update cwnd
 
   if(!this->enabled){
     goto done;
@@ -693,7 +647,6 @@ _fire(
         case EVENT_CONGESTION:
         break;
         case EVENT_SETTLED:
-          this->last_settled = _now(this);
           mprtps_path_set_non_congested(this->path);
           mprtps_path_set_state(this->path, MPRTPS_PATH_STATE_STABLE);
         break;

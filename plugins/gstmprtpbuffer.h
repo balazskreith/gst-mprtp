@@ -55,19 +55,6 @@ struct _GstMpRTPBuffer{
 
 
 
-typedef struct _MPRTPSubflowHeaderExtension MPRTPSubflowHeaderExtension;
-typedef struct _RTPAbsTimeExtension RTPAbsTimeExtension;
-
-struct _MPRTPSubflowHeaderExtension
-{
-  guint8 id;
-  guint16 seq;
-};
-
-struct _RTPAbsTimeExtension
-{
-  guint8 time[3];
-};
 
 typedef struct{
   guint32 timestamp;

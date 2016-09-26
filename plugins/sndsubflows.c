@@ -66,6 +66,13 @@ _call_notifiers(
     GSList *notifiers,
     SndSubflow *subflow);
 
+static void
+_setup_rtp2mprtp (SndSubflow *subflow,
+                  GstRTPBuffer *rtp);
+
+static void
+_setup_mprtpfec (SndSubflow *subflow,
+                  GstRTPBuffer *rtp);
 
 //----------------------------------------------------------------------
 //---- Private function implementations to Stream Dealer object --------
@@ -106,7 +113,7 @@ void
 sndsubflows_init (SndSubflows * this)
 {
   this->sysclock = gst_system_clock_obtain ();
-  this->subflows               = g_hash_table_new_full (NULL, NULL, NULL, mprtp_free);
+  this->subflows               = g_malloc0(sizeof(SndSubflow) * 256);
   this->made                   = _now(this);
 }
 
@@ -179,7 +186,6 @@ SndSubflow* sndsubflows_get_subflow(SndSubflows* this, guint8 subflow_id)
   return this->subflows + subflow_id;
 }
 
-
 void sndsubflow_add_removal_notification(SndSubflow* subflow, void (*callback)(gpointer udata, SndSubflow* subflow), gpointer udata)
 {
   _add_notifier(&subflow->notifiers.on_removing, callback, udata);
@@ -200,6 +206,42 @@ void sndsubflow_set_active_status(SndSubflow* subflow, gboolean active)
   subflow->active = active;
   _call_notifiers(subflow->notifiers.on_active_status_changed, subflow);
 }
+
+
+
+GstBuffer*
+sndsubflow_process_rtp_buffer(SndSubflow *subflow,
+                              GstBuffer* buffer,
+                              gboolean *fec_request)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  buffer = gst_buffer_make_writable(buffer);
+  gst_rtp_buffer_map(buffer, GST_MAP_READWRITE, &rtp);
+  _setup_rtp2mprtp(subflow, &rtp);
+  gst_rtp_buffer_unmap(&rtp);
+
+  if(!fec_request || !subflow->fec_interval){
+    goto done;
+  }
+  if(subflow->fec_interval <= ++subflow->packet_counter_for_fec){
+    *fec_request = TRUE;
+  }
+done:
+  return buffer;
+}
+
+GstBuffer*
+sndsubflow_process_fec_buffer(SndSubflow *subflow,
+                              GstBuffer* buffer)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  buffer = gst_buffer_make_writable(buffer);
+  gst_rtp_buffer_map(buffer, GST_MAP_READWRITE, &rtp);
+  _setup_mprtpfec(subflow, &rtp);
+  gst_rtp_buffer_unmap(&rtp);
+  return buffer;
+}
+
 
 
 
@@ -242,3 +284,41 @@ static void _call_notifiers(GSList *notifiers, SndSubflow *subflow)
     notifier->callback(notifier->udata, subflow);
   }
 }
+
+
+
+void
+_setup_rtp2mprtp (SndSubflow *subflow,
+                  GstRTPBuffer *rtp)
+{
+  MPRTPSubflowHeaderExtension data;
+  data.id = subflow->id;
+  if (++(subflow->rtp_seq) == 0) {
+    ++(subflow->rtp_seq_cycle_num);
+  }
+  data.seq = subflow->rtp_seq;
+
+  gst_rtp_buffer_add_extension_onebyte_header (rtp, subflow->mprtp_ext_header_id,
+      (gpointer) & data, sizeof (data));
+
+  return;
+}
+
+
+void
+_setup_mprtpfec (SndSubflow *subflow,
+                  GstRTPBuffer *rtp)
+{
+  MPRTPSubflowHeaderExtension data;
+  data.id = subflow->id;
+  if (++(subflow->fec_seq) == 0) {
+    ++(subflow->fec_seq_cycle_num);
+  }
+  data.seq = subflow->fec_seq;
+
+  gst_rtp_buffer_add_extension_onebyte_header (rtp, subflow->fec_ext_header_id,
+      (gpointer) & data, sizeof (data));
+
+  return;
+}
+

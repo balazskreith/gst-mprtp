@@ -23,37 +23,35 @@
 
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
-#include "streamsplitter.h"
-#include "mprtpspath.h"
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include "packetforwarder.h"
 
-
-GST_DEBUG_CATEGORY_STATIC (packetsender_debug_category);
-#define GST_CAT_DEFAULT packetsender_debug_category
+GST_DEBUG_CATEGORY_STATIC (packetforwarder_debug_category);
+#define GST_CAT_DEFAULT packetforwarder_debug_category
 
 /* class initialization */
-G_DEFINE_TYPE (PacketSender, packetsender, G_TYPE_OBJECT);
+G_DEFINE_TYPE (PacketForwarder, packetforwarder, G_TYPE_OBJECT);
 
 typedef struct{
   GstPad *rtppad;
   GstPad *rtcppad;
-}PacketSenderPrivate;
+}PacketForwarderPrivate;
 
 #define _now(this) gst_clock_get_time (this->sysclock)
-#define _priv(this) ((PacketSenderPrivate*)(this->priv))
+#define _priv(this) ((PacketForwarderPrivate*)(this->priv))
 
 static void _process(gpointer udata);
-static void _start(PacketSender* this);
-static void _stop(PacketSender* this);
+static void _start(PacketForwarder* this);
+static void _stop(PacketForwarder* this);
 //----------------------------------------------------------------------
 //---- Private function implementations to Stream Dealer object --------
 //----------------------------------------------------------------------
 
 
 void
-packetsender_class_init (PacketSenderClass * klass)
+packetsender_class_init (PacketForwarderClass * klass)
 {
   GObjectClass *gobject_class;
 
@@ -61,15 +59,15 @@ packetsender_class_init (PacketSenderClass * klass)
 
   gobject_class->finalize = packetsender_finalize;
 
-  GST_DEBUG_CATEGORY_INIT (packetsender_debug_category, "packetsender", 0,
-      "MPRTP Packet Sender Component");
+  GST_DEBUG_CATEGORY_INIT (packetforwarder_debug_category, "packetforwarder", 0,
+      "MPRTP Packet Forwarder Component");
 
 }
 
 void
 packetsender_finalize (GObject * object)
 {
-  PacketSender *this;
+  PacketForwarder *this;
   GstBuffer* buffer;
   this = PACKETSRCVQUEUE(object);
 
@@ -91,7 +89,7 @@ packetsender_finalize (GObject * object)
 
 
 void
-packetsender_init (PacketSender * this)
+packetsender_init (PacketForwarder * this)
 {
   this->sysclock = gst_system_clock_obtain();
   this->mprtpq   = g_async_queue_new();
@@ -99,44 +97,44 @@ packetsender_init (PacketSender * this)
 
 }
 
-PacketSender* make_packetsender(GstPad* rtppad, GstPad* rtcppad)
+PacketForwarder* make_packetforwarder(GstPad* rtppad, GstPad* rtcppad)
 {
-  PacketSender *this;
-  this = g_object_new (PACKETSRCVQUEUE_TYPE, NULL);
-  this->priv = g_malloc0(sizeof(PacketSenderPrivate));
+  PacketForwarder *this;
+  this = g_object_new (PACKETFORWARDER_TYPE, NULL);
+  this->priv = g_malloc0(sizeof(PacketForwarderPrivate));
   _priv(this)->rtcppad = rtcppad;
   _priv(this)->rtppad  = rtppad;
   _start(this);
   return this;
 }
 
-void packetsender_add_rtppad_buffer(PacketSender* this, GstBuffer *buffer)
+void packetforwarder_add_rtppad_buffer(PacketForwarder* this, GstBuffer *buffer)
 {
   g_async_queue_push(this->mprtpq, buffer);
 }
 
-void packetsender_add_rtcppad_buffer(PacketSender* this, GstBuffer *buffer)
+void packetforwarder_add_rtcppad_buffer(PacketForwarder* this, GstBuffer *buffer)
 {
   g_async_queue_push(this->mprtcpq, buffer);
 }
 
-void _start(PacketSender* this)
+void _start(PacketForwarder* this)
 {
   this->thread = gst_task_new (_process, this, NULL);
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
 }
 
-void _stop(PacketSender* this)
+void _stop(PacketForwarder* this)
 {
   gst_task_stop (this->thread);
   gst_task_join (this->thread);
   this->thread = NULL;
 }
 
-void _process(gpointer udata)
+static void _process(gpointer udata)
 {
-  PacketSender* this = udata;
+  PacketForwarder* this = udata;
   GstBuffer* buffer;
   gboolean repeat = FALSE;
 again:

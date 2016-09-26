@@ -24,7 +24,7 @@ static gint _statitem_##field##_cmp(gpointer pa, gpointer pb) \
 if(!candidates->processed){                        \
   PercResult = defaultResult;                      \
 }else{                                             \
-  FBRAFBStatItem *left, *right, *min, *max;        \
+  Type *left, *right, *min, *max;                  \
   left  = candidates->left;                        \
   right = candidates->right;                       \
   min   = candidates->min;                         \

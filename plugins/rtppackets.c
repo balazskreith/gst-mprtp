@@ -71,7 +71,7 @@ G_DEFINE_TYPE (RTPPackets, rtppackets, G_TYPE_OBJECT);
 //----------------------------------------------------------------------
 
 static void rtppackets_finalize (GObject * object);
-
+static void _extract_mprtp_info(RTPPackets* this, RTPPacket* packet, GstRTPBuffer *rtp);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -137,7 +137,7 @@ void rtppackets_add_subflow(RTPPackets* this, guint8 subflow_id)
   this->subflows[subflow_id] = g_malloc0(sizeof(RTPPacket*) * 65536);
 }
 
-void _stalled_notify_caller(gpointer item, gpointer udata)
+static void _stalled_notify_caller(gpointer item, gpointer udata)
 {
   RTPPacket* packet = udata;
   StalledNotifier *notifier = item;
@@ -145,48 +145,110 @@ void _stalled_notify_caller(gpointer item, gpointer udata)
 }
 
 
-RTPPacket* rtppackets_get_packet(RTPPackets* this, GstBuffer *buffer)
+static void _setup_rtppacket(RTPPackets* this, RTPPacket* packet, GstRTPBuffer* rtp)
 {
-  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-  RTPPacket* result;
-  guint16 abs_seq;
-  gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
-  abs_seq = gst_rtp_buffer_get_seq(&rtp);
-  result            = this->packets + abs_seq;
+  packet->position     = RTP_PACKET_POSITION_ONSENDING;
+  packet->created      = _now(this);
+  packet->abs_seq      = gst_rtp_buffer_get_seq(&rtp);
+  packet->timestamp    = gst_rtp_buffer_get_timestamp(&rtp);
+  packet->ssrc         = gst_rtp_buffer_get_ssrc(&rtp);
+  packet->payload_size = gst_rtp_buffer_get_payload_len(&rtp);
+  packet->payload_type = gst_rtp_buffer_get_payload_type(&rtp);
+  packet->header_size  = gst_rtp_buffer_get_header_len(&rtp);
+  packet->ref          = 1;
+}
 
-  if(0 < result->ref){
-    if(!result->sent){//we have never sent this.
-      goto done;
-    }
-    //we sent the packet, but it remained and a new one wants to replace it.
-    if(this->stalled_notifiers){
-      g_slist_foreach(this->stalled_notifiers, _stalled_notify_caller, result);
-    }
+gboolean _do_reset_packet(RTPPackets* this, RTPPacket* packet)
+{
+  if(packet->ref < 1){
+    return TRUE; //The packet is never used or appropriately unrefed
+  }
+  if(!packet->forwarded){
+    return FALSE; //The packet is not forwarded but created before, so now its used.
+  }
+
+  //At this point we know sg is wrong!
+  //The packet is marked as forwarded, so it went through all of the process
+  //and still a reference is greater then 0. So notify debug functions
+  //or any other kind of marvelous function needs to be notified.
+  if(this->stalled_notifiers){
+    g_slist_foreach(this->stalled_notifiers, _stalled_notify_caller, packet);
+  }
+  //and reset the packet
+  return TRUE;
+}
+
+static RTPPacket* _retrieve_packet(RTPPackets* this, GstRTPBuffer* rtp)
+{
+
+  RTPPacket* result;
+  result  = this->packets +  gst_rtp_buffer_get_seq(&rtp);
+
+  if(!_do_reset_packet(this, result)){
+    goto done;
   }
 
   memset(result, 0, sizeof(RTPPacket));
-  result->added        = _now(this);
-  result->buffer       = gst_buffer_ref(buffer);
-  result->timestamp    = gst_rtp_buffer_get_timestamp(&rtp);
-  result->abs_seq      = abs_seq;
-  result->ssrc         = gst_rtp_buffer_get_ssrc(&rtp);
-  result->payload_size = gst_rtp_buffer_get_payload_len(&rtp);
-  result->subflow_id   = 0;
-  result->header_size  = gst_rtp_buffer_get_header_len(&rtp);
-  result->subflow_seq  = 0;
-  result->sent         = 0;
+  _setup_rtppacket(this, result, &rtp);
   result->ref          = 1;
-  result->acknowledged = FALSE;
-  result->lost    = FALSE;
-  result->payload      = gst_rtp_buffer_get_payload(&rtp);
-  gst_rtp_buffer_unmap(&rtp);
+
+  result->buffer       = gst_buffer_ref(rtp->buffer);
 done:
   return result;
 }
 
-void rtppackets_reset_packet(RTPPacket* packet)
+RTPPacket* rtppackets_retrieve_packet_for_sending(RTPPackets* this, GstBuffer *buffer)
 {
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  RTPPacket* result;
+  gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
+  result = _retrieve_packet(this, &rtp);
+  gst_rtp_buffer_unmap(&rtp);
 
+  result->position     = RTP_PACKET_POSITION_ONSENDING;
+  return result;
+}
+
+gboolean rtppackets_buffer_is_mprtp(RTPPackets* this, GstBuffer *buffer)
+{
+  gpointer pointer = NULL;
+  guint size;
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  gboolean result;
+  g_return_val_if_fail(GST_IS_BUFFER(buffer), FALSE);
+  g_return_val_if_fail(gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp), FALSE);
+  result = gst_rtp_buffer_get_extension_onebyte_header(&rtp, this->mprtp_ext_header_id, 0, &pointer, &size);
+  gst_rtp_buffer_unmap(&rtp);
+  return result;
+}
+
+gboolean rtppackets_buffer_is_fec(RTPPackets* this, GstBuffer *buffer)
+{
+  gpointer pointer = NULL;
+  guint size;
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  gboolean result;
+  g_return_val_if_fail(GST_IS_BUFFER(buffer), FALSE);
+  g_return_val_if_fail(gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp), FALSE);
+  result = gst_rtp_buffer_get_payload_type(&rtp) == this->fec_payload_type;
+  gst_rtp_buffer_unmap(&rtp);
+  return result;
+}
+
+
+RTPPacket* rtppackets_retrieve_packet_at_receiving(RTPPackets* this, GstBuffer *buffer)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  RTPPacket* result;
+
+  gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
+  result = _retrieve_packet(this, &rtp);
+  _extract_mprtp_info(this, result, &rtp);
+
+  gst_rtp_buffer_unmap(&rtp);
+
+  result->position                       = RTP_PACKET_POSITION_RECEIVED;
+  return result;
 }
 
 void rtppackets_map_to_subflow(RTPPackets* this, RTPPacket *packet, guint8 subflow_id, guint16 subflow_seq)
@@ -195,17 +257,15 @@ void rtppackets_map_to_subflow(RTPPackets* this, RTPPacket *packet, guint8 subfl
 }
 
 
-void rtppackets_packet_sent(RTPPackets* this, RTPPacket *packet)
+void rtppackets_packet_forwarded(RTPPackets* this, RTPPacket *packet)
 {
   packet->buffer = NULL;
-  packet->sent   = _now(this);
+  packet->forwarded   = _now(this);
 
   if(0 < packet->ref) {
     --packet->ref;
   }
-
 }
-
 
 RTPPacket* rtppackets_get_by_abs_seq(RTPPackets* this, guint16 abs_seq)
 {
@@ -219,11 +279,85 @@ RTPPacket* rtppackets_get_by_subflow_seq(RTPPackets* this, guint8 subflow_id, gu
   return items[sub_seq];
 }
 
+void rtppackets_set_mprtp_ext_header_id(RTPPackets* this, guint8 mprtp_ext_header_id)
+{
+  this->mprtp_ext_header_id = mprtp_ext_header_id;
+}
+
+void rtppackets_set_abs_time_ext_header_id(RTPPackets* this, guint8 abs_time_ext_header_id)
+{
+  this->abs_time_ext_header_id = abs_time_ext_header_id;
+}
+
+void rtppackets_set_fec_payload_type(RTPPackets* this, guint8 fec_payload_type)
+{
+  this->fec_payload_type = fec_payload_type;
+}
+
+guint8 rtppackets_get_mprtp_ext_header_id(RTPPackets* this)
+{
+  return this->mprtp_ext_header_id;
+}
+
+guint8 rtppackets_get_abs_time_ext_header_id(RTPPackets* this)
+{
+  return this->abs_time_ext_header_id;
+}
+
+guint8 rtppackets_get_fec_payload_type(RTPPackets* this)
+{
+  return this->abs_time_ext_header_id;
+}
+
+void rtppackets_packet_unref(RTPPacket *packet)
+{
+  --packet->ref;
+}
+
+void rtppackets_packet_ref(RTPPacket *packet)
+{
+  ++packet->ref;
+}
 
 
 
-#undef DEBUG_PRINT_TOOLS
-#undef THIS_WRITELOCK
-#undef THIS_WRITEUNLOCK
-#undef THIS_READLOCK
-#undef THIS_READUNLOCK
+static void _extract_mprtp_info(RTPPackets* this, RTPPacket* packet, GstRTPBuffer *rtp)
+{
+  gpointer pointer = NULL;
+  guint size;
+  MPRTPSubflowHeaderExtension *subflow_infos;
+
+  gst_rtp_buffer_get_extension_onebyte_header(rtp, this->mprtp_ext_header_id,
+                                              0, &pointer, &size);
+  subflow_infos = (MPRTPSubflowHeaderExtension *) pointer;
+
+  packet->subflow_id       = subflow_infos->id;
+  packet->subflow_seq      = subflow_infos->seq;
+
+  packet->received_info.abs_rcv_ntp_time = NTP_NOW;
+  size=0;
+  pointer = NULL;
+  if(0 < this->abs_time_ext_header_id &&
+     gst_rtp_buffer_get_extension_onebyte_header(rtp, this->abs_time_ext_header_id, 0, &pointer, &size))
+  {
+    guint32 rcv_chunk = (NTP_NOW >> 14) & 0x00ffffff;
+    guint64 ntp_base = NTP_NOW;
+    guint64 snd_time = 0;
+    memcpy (&snd_time, pointer, 3);
+//    g_print("rcv_chunk: %X:%u\nsnd_chunk: %X:%u\n",
+//            rcv_chunk, rcv_chunk,
+//            (guint32)snd_time, (guint32)snd_time);
+    if(rcv_chunk < snd_time){
+      ntp_base-=0x0000004000000000UL;
+    }
+    snd_time <<= 14;
+    snd_time |=  (ntp_base & 0xFFFFFFC000000000UL);
+    packet->received_info.abs_snd_ntp_time = snd_time;
+    packet->received_info.delay = get_epoch_time_from_ntp_in_ns(NTP_NOW - snd_time);
+
+  }else{
+    packet->received_info.abs_snd_ntp_time = 0;
+    packet->received_info.delay = 0;
+  }
+}
+

@@ -30,16 +30,6 @@
 #include <string.h>
 #include <stdlib.h>     /* qsort */
 
-#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
-
-//#define THIS_READLOCK(this)
-//#define THIS_READUNLOCK(this)
-//#define THIS_WRITELOCK(this)
-//#define THIS_WRITEUNLOCK(this)
-
 #define _now(this) gst_clock_get_time (this->sysclock)
 
 GST_DEBUG_CATEGORY_STATIC (fbrafbproducer_debug_category);
@@ -50,7 +40,7 @@ G_DEFINE_TYPE (FBRAFBProducer, fbrafbproducer, G_TYPE_OBJECT);
 
 
 static void fbrafbproducer_finalize (GObject * object);
-
+static void _on_received_packet(FBRAFBProducer *this, RTPPacket *packet);
 static void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this, ReportProducer *reportproducer);
 static void _setup_xr_owd(FBRAFBProducer * this, ReportProducer *reportproducer);
 //static void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer);
@@ -66,17 +56,7 @@ _cmp_seq (guint16 x, guint16 y)
   if(x > y && x - y < 32768) return 1;
   return 0;
 }
-//
-//static gint
-//_cmp_timestamp (guint32 x, guint32 y)
-//{
-//  if(x == y) return 0;
-//  if(x < y && y - x < 2147483648) return -1;
-//  if(x > y && x - y > 2147483648) return -1;
-//  if(x < y && y - x > 2147483648) return 1;
-//  if(x > y && x - y < 2147483648) return 1;
-//  return 0;
-//}
+PercentileResultPipeFnc(_owd_percentile_pipe, FBRAFBProducer, median_delay, min_delay, max_delay, RTPPacket, received.delay, 0);
 
 static void _owd_percentile_pipe(gpointer data, swpercentilecandidates_t *candidates)
 {
@@ -98,52 +78,6 @@ static void _owd_percentile_pipe(gpointer data, swpercentilecandidates_t *candid
   this->max_delay = *(GstClockTime*)candidates->max;
 }
 
-//static void _tendency_add_pipe(gpointer udata, gpointer itemptr)
-//{
-//  FBRAFBProducer* this;
-//  gint32* item;
-//  item = itemptr;
-//  this = udata;
-//
-//  ++this->tendency.counter;
-//  this->tendency.sum += *item;
-//
-//}
-//
-//static void _tendency_rem_pipe(gpointer udata, gpointer itemptr)
-//{
-//  FBRAFBProducer* this;
-//  gint32* item;
-//  item = itemptr;
-//  this = udata;
-//
-//  --this->tendency.counter;
-//  this->tendency.sum -= *item;
-//
-//}
-
-static void _payloads_add_pipe(gpointer udata, gpointer itemptr)
-{
-  FBRAFBProducer* this;
-  gint32* item;
-  item = itemptr;
-  this = udata;
-
-  this->received_bytes += *item;
-  ++this->rcved_packets;
-
-}
-
-static void _payloads_rem_pipe(gpointer udata, gpointer itemptr)
-{
-  FBRAFBProducer* this;
-  gint32* item;
-  item = itemptr;
-  this = udata;
-
-  this->received_bytes -= *item;
-
-}
 
 
 void
@@ -172,73 +106,60 @@ fbrafbproducer_finalize (GObject * object)
 void
 fbrafbproducer_init (FBRAFBProducer * this)
 {
-  g_rw_lock_init (&this->rwmutex);
   this->sysclock = gst_system_clock_obtain();
 
   this->vector   = mprtp_malloc(sizeof(gboolean)  * 1000);
   this->vector_length = 0;
 
-
-  this->owds_sw         = make_slidingwindow_uint64(50, 200 * GST_MSECOND);
-//  this->tendency_sw     = make_slidingwindow_int32(100, GST_SECOND);
-  this->payloadbytes_sw = make_slidingwindow_int32(2000, GST_SECOND);
-
-  slidingwindow_add_plugin(this->owds_sw,        make_swpercentile(50, bintree3cmp_uint64, _owd_percentile_pipe, this));
-//  slidingwindow_add_pipes(this->tendency_sw,     _tendency_rem_pipe, this, _tendency_add_pipe, this);
-  slidingwindow_add_pipes(this->payloadbytes_sw, _payloads_rem_pipe, this, _payloads_add_pipe, this);
-
 }
 
-FBRAFBProducer *make_fbrafbproducer(guint32 ssrc, guint8 subflow_id)
+FBRAFBProducer *make_fbrafbproducer(guint32 ssrc,
+    guint8 subflow_id,
+    RcvTracker *tracker)
 {
-    FBRAFBProducer *this;
-    this = g_object_new (FBRAFBPRODUCER_TYPE, NULL);
-    this->ssrc = ssrc;
-    this->subflow_id = subflow_id;
-    return this;
+  FBRAFBProducer *this;
+  this = g_object_new (FBRAFBPRODUCER_TYPE, NULL);
+  this->ssrc = ssrc;
+  this->subflow_id      = subflow_id;
+  this->tracker         = g_object_ref(tracker);
+  this->owds_sw         = make_slidingwindow_uint64(20, 200 * GST_MSECOND);
+
+  slidingwindow_add_plugin(this->owds_sw,
+      make_swpercentile(50, bintree3cmp_uint64, _owd_percentile_pipe, this));
+
+  rcvtracker_subflow_add_on_received_packet_cb(this->tracker, subflow_id,
+        (NotifierFunc) _on_received_packet, this);
+
+  rcvtracker_subflow_add_on_received_packet_cb(this->tracker, subflow_id,
+        (NotifierFunc) slidingwindow_add_data, this->owds_sw);
+
+  slidingwindow_add_pipes()
+
+  rcvtracker_subflow_add_on_lost_packet_cb(this->tracker, subflow_id,
+      _on_packet_lost, this);
+  return this;
 }
 
 void fbrafbproducer_reset(FBRAFBProducer *this)
 {
-  THIS_WRITELOCK (this);
   this->initialized = FALSE;
-  THIS_WRITEUNLOCK (this);
 }
 
 void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold)
 {
-  THIS_WRITELOCK (this);
   slidingwindow_set_treshold(this->owds_sw, treshold);
-  THIS_WRITEUNLOCK (this);
 }
 
-//static void _refresh_devar(FBRAFBProducer *this, GstMpRTPBuffer *mprtp)
-//{
-//  if(mprtp->delay <= this->median_delay){
-//    slidingwindow_add_int(this->tendency_sw, -1);
-//  }else{
-//    slidingwindow_add_int(this->tendency_sw, 1);
-//  }
-//}
-
-void fbrafbproducer_track(gpointer data, GstMpRTPBuffer *mprtp)
+void _on_received_packet(FBRAFBProducer *this, RTPPacket *packet)
 {
-  FBRAFBProducer *this;
 
-
-  this = data;
-  THIS_WRITELOCK (this);
-
-//  _refresh_devar(this, mprtp);
-  slidingwindow_add_data(this->owds_sw, &mprtp->delay);
+  slidingwindow_add_data(this->owds_sw, &pa->delay);
 
   if(!this->initialized){
     this->initialized = TRUE;
-    this->begin_seq = this->end_seq = mprtp->subflow_seq;
+    this->begin_seq = this->end_seq = packet->subflow_seq;
     goto done;
   }
-
-  slidingwindow_add_int(this->payloadbytes_sw, mprtp->payload_bytes);
 
   if(_cmp_seq(mprtp->subflow_seq, this->end_seq) <= 0){
     goto done;
@@ -255,20 +176,16 @@ void fbrafbproducer_track(gpointer data, GstMpRTPBuffer *mprtp)
   this->end_seq = mprtp->subflow_seq;
 
 done:
-  THIS_WRITEUNLOCK (this);
+  return;
 }
 
 void fbrafbproducer_setup_feedback(gpointer data, ReportProducer *reportprod)
 {
   FBRAFBProducer *this;
   this = data;
-  THIS_WRITELOCK (this);
 
   _setup_xr_owd(this, reportprod);
   _setup_xr_rfc3611_rle_lost(this, reportprod);
-//  _setup_afb_reps(this, reportprod);
-
-  THIS_WRITEUNLOCK (this);
 }
 
 gboolean fbrafbproducer_do_fb(gpointer data)
@@ -276,13 +193,11 @@ gboolean fbrafbproducer_do_fb(gpointer data)
   gboolean result = FALSE;
   FBRAFBProducer *this;
   this = data;
-  THIS_READLOCK(this);
   if(_now(this) < this->last_fb + 19 * GST_MSECOND){
     goto done;
   }
   result = 4 < this->rcved_packets || (0 < this->next_fb && this->next_fb < _now(this));
 done:
-  THIS_READUNLOCK(this);
   return result;
 }
 
@@ -290,12 +205,8 @@ void fbrafbproducer_fb_sent(gpointer data)
 {
   FBRAFBProducer *this;
   this = data;
-  THIS_WRITELOCK(this);
   this->last_fb = _now(this);
-  this->next_fb = this->last_fb + 100 * GST_MSECOND;
   this->rcved_packets = 0;
-//  slidingwindow_set_act_limit(this->tendency_sw, (this->received_bytes * 8) / 50000);
-  THIS_WRITEUNLOCK(this);
 }
 
 void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this, ReportProducer *reportproducer)
@@ -339,19 +250,3 @@ void _setup_xr_owd(FBRAFBProducer * this, ReportProducer *reportproducer)
 
 
 }
-
-//void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer)
-//{
-//  guint8 sampling_num;
-//  gfloat tendency = 0.;
-//  sampling_num = CONSTRAIN(0, 255, this->tendency.counter);
-//  if(0 < sampling_num){
-//    tendency = (gfloat) this->tendency.sum / (gfloat) this->tendency.counter;
-//  }
-//  report_producer_add_afb_reps(reportproducer, this->ssrc, sampling_num, tendency);
-//}
-
-#undef THIS_WRITELOCK
-#undef THIS_WRITEUNLOCK
-#undef THIS_READLOCK
-#undef THIS_READUNLOCK

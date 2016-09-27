@@ -17,6 +17,31 @@ static void _trash_bintree3node(bintree3_t *this, bintree3node_t *node);
 static void _ruin_full(bintree3_t *this, bintree3node_t *node);
 
 
+static void
+_sprint_list_of_pointers(GSList* it, gchar *result, guint result_length)
+{
+  gchar helper[255];
+  if(!it){
+    return;
+  }
+  memset(result, result_length);
+  for(; it; it = it->next){
+    memset(helper, 0, 255);
+    sprintf(helper, "(%p)%c ", it->data, it->next ? ',' : '');
+    strcat(result, "%s", helper);
+  }
+}
+
+static void
+_setup_indent_level(gchar *result, guint result_length, guint level)
+{
+  gint i;
+  memset(result, result_length);
+  for(i = 0; i < level; ++i){
+    strcat(result, "--");
+  }
+}
+
 void static
 _print_tree (bintree3_t * tree, bintree3node_t* node, gint32 level)
 {
@@ -26,41 +51,26 @@ _print_tree (bintree3_t * tree, bintree3node_t* node, gint32 level)
   if (!node) {
     return;
   }
+  if(tree->top)  {
+    _sprint_list_of_pointers(tree->top->ptrs, string, 255);
+    //observer_notify(tree->on_print, string);
+  }
+
+  if (!level){
+    gchar str[255];
+    memset(str, 0, 255);
+    sprintf(str, "Tree %p TOP is: %s Node Counter: %u Duplicate counter: %d\n", tree, string, tree->node_counter, tree->duplicate_counter);
+    observer_notify(tree->on_print, str);
+  }
+  _setup_indent_level(string, 255, level);
+  _sprint_list_of_pointers(node->ptrs, string, 255);
+  //observer_notify(tree->on_print, string);
+
   memset(string, 0, 255);
-  if(tree->top)
-  {
-    GSList *it;
-    gchar str1[255], str2[255];
-    for(it = tree->top->ptrs; it; it = it->next){
-        memset(str1, 0, 255);
-        memset(str2, 0, 255);
-        tree->sprint(it->data, str1);
-        sprintf(str2, "(%p), ", it->data);
-        strcat(string, str1);
-        strcat(string, str2);
-    }
-  }
-
-  if (!level)
-    g_print("Tree %p TOP is: %s Node Counter: %u Duplicate counter: %d\n", tree, string, tree->node_counter, tree->duplicate_counter);
-  for (i = 0; i < level && i < 10; ++i)
-    g_print("--");
-
-  memset(string,0,255);
-  {
-    GSList *it;
-    gchar str1[255], str2[255];
-    for(it = node->ptrs; it; it = it->next){
-        memset(str1, 0, 255);
-        memset(str2, 0, 255);
-        tree->sprint(it->data, str1);
-        sprintf(str2, "(%p), ", it->data);
-        strcat(string, str1);
-        strcat(string, str2);
-    }
-  }
-  g_print("%d->%p->data:%s  ref: %u ->left:%p ->right:%p\n",
+  sprintf(string, "%d->%p->data:%s  ref: %u ->left:%p ->right:%p\n",
       level, node, string, node->ref, node->left, node->right);
+  observer_notify(tree->on_print, string);
+
   _print_tree (tree, node->left, level + 1);
   _print_tree (tree, node->right, level + 1);
 }
@@ -111,26 +121,17 @@ gint32 bintree3cmp_int64(gpointer pa,gpointer pb)
 }
 
 
-
-static void _default_sprint(gpointer node, gchar* string)
-{
-  strcpy(string, "Unknown");
-}
-
 bintree3_t *make_bintree3(bintree3cmp cmp)
 {
   bintree3_t *result;
   result = malloc (sizeof(bintree3_t));
   memset(result, 0, sizeof(bintree3_t));
   result->cmp = cmp;
-  result->sprint = _default_sprint;
+  result->on_print     = make_observer();
+  result->on_duplicate = make_observer();
   return result;
 }
 
-void bintree3_setsprint(bintree3_t* this, bintree3sprint sprint)
-{
-  this->sprint = sprint;
-}
 
 void bintree3_print(bintree3_t* this)
 {
@@ -191,6 +192,8 @@ void bintree3_dtor(gpointer target)
   }
   this = target;
   bintree3_reset(this);
+  g_object_unref(this->on_print);
+  g_object_unref(this->on_duplicate);
   free(this);
 }
 
@@ -226,10 +229,14 @@ gpointer bintree3_get_items_sorted_array(bintree3_t *this, guint *length)
   return result;
 }
 
-void bintree3_setup_duplicate_notifier(bintree3_t *this, bintree3dupnotifier duplicate_notifier, gpointer duplicate_notifier_data)
+void bintree3_add_on_duplicate_cb(bintree3_t *this, NotifierFunc callback, gpointer udata)
 {
-  this->duplicate_notifier = duplicate_notifier;
-  this->duplicate_notifier_data = duplicate_notifier_data;
+  observer_add_listener(this->on_duplicate, callback, udata);
+}
+
+void bintree3_add_on_print_cb(bintree3_t *this, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(this->on_print, callback, udata);
 }
 
 void _ruin_full(bintree3_t *this, bintree3node_t *node)
@@ -338,9 +345,9 @@ bintree3node_t * _insert_into_tree(bintree3_t *this, bintree3node_t *actual, bin
   cmp_result = this->cmp (actual->ptrs->data, (*insert)->ptrs->data);
   if (!cmp_result) {
     actual->ref+=(*insert)->ref;
-    if(this->duplicate_notifier){
-      this->duplicate_notifier(this->duplicate_notifier_data, (*insert)->ptrs->data);
-    }
+
+    observer_notify(this->on_duplicate, (*insert)->ptrs->data);
+
     actual->ptrs = g_slist_append(actual->ptrs, (*insert)->ptrs->data);
     this->duplicate_counter += (*insert)->ref;
     _trash_bintree3node(this, *insert);

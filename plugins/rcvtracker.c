@@ -137,7 +137,7 @@ rcvtracker_finalize (GObject * object)
   g_object_unref(this->sysclock);
   g_object_unref(this->path_skews);
   g_object_unref(this->on_discarded_packet);
-  g_object_unref(this->on_packet_arrived);
+  g_object_unref(this->on_received_packet);
   g_object_unref(this->on_stat_changed);
   _priv_dtor(this->priv);
 }
@@ -150,7 +150,7 @@ rcvtracker_init (RcvTracker * this)
   this->priv                = _priv_ctor();
   this->path_skews          = make_slidingwindow_double(256, 0);
   this->on_discarded_packet = make_observer();
-  this->on_packet_arrived   = make_observer();
+  this->on_received_packet   = make_observer();
   this->on_stat_changed     = make_observer();
 
   slidingwindow_add_plugin(this->path_skews, make_swminmax(bintree3cmp_double, _skews_minmax_pipe, this));
@@ -180,9 +180,9 @@ void rcvtracker_add_discarded_seq(RcvTracker* this, DiscardedPacket discarded_pa
   observer_notify(this->on_discarded_packet, discarded_packet);
 }
 
-void rcvtracker_add_packet_notifier(RcvTracker * this, NotifierFunc callback, gpointer udata)
+void rcvtracker_add_on_received_packet_callback(RcvTracker * this, NotifierFunc callback, gpointer udata)
 {
-  observer_add_listener(this->on_packet_arrived, callback, udata);
+  observer_add_listener(this->on_received_packet, callback, udata);
 }
 
 
@@ -246,7 +246,7 @@ static void _subflow_add_packet(RcvTracker * this, Subflow *subflow, RTPPacket* 
   gint cmp;
   gint64 skew;
 
-  observer_notify(this->on_packet_arrived, packet);
+  observer_notify(subflow->on_received_packet, packet);
 
   if (subflow->seq_initialized == FALSE) {
     subflow->stat.highest_seq = packet->subflow_seq;
@@ -290,7 +290,7 @@ void rcvtracker_add_packet(RcvTracker * this, RTPPacket* packet)
 {
   Subflow* subflow;
 
-  observer_notify(this->on_packet_arrived, packet);
+  observer_notify(this->on_received_packet, packet);
 
   if(packet->subflow_id == 0){
     goto done;

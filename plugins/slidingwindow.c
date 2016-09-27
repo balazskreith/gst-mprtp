@@ -46,46 +46,6 @@ static gboolean _slidingwindow_default_obsolation(gpointer udata, SlidingWindowI
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
 
-void
-slidingwindow_class_init (SlidingWindowClass * klass)
-{
-  GObjectClass *gobject_class;
-
-  gobject_class = (GObjectClass *) klass;
-
-  gobject_class->finalize = slidingwindow_finalize;
-
-  GST_DEBUG_CATEGORY_INIT (slidingwindow_debug_category, "slidingwindow", 0,
-      "SlidingWindow");
-
-}
-
-static void _item_dtor(gpointer itemptr)
-{
-  g_slice_free(SlidingWindowItem, itemptr);
-}
-
-void
-slidingwindow_finalize (GObject * object)
-{
-  SlidingWindow* this;
-
-  if(!object){
-    return;
-  }
-  this = (SlidingWindow*)object;
-  datapuffer_clear(this->items, _item_dtor);
-  datapuffer_dtor(this->items);
-
-  g_list_free_full(this->plugins, swplugin_dtor);
-}
-
-void
-slidingwindow_init (SlidingWindow * this)
-{
-
-}
-
 static void _copyfnc_int32(gpointer udata, gpointer dst, gpointer src)
 {
   memcpy(dst, src, sizeof(gint32));
@@ -223,6 +183,49 @@ SlidingWindow* make_slidingwindow_with_allocators(guint32 num_limit,
   return result;
 }
 
+
+void
+slidingwindow_class_init (SlidingWindowClass * klass)
+{
+  GObjectClass *gobject_class;
+
+  gobject_class = (GObjectClass *) klass;
+
+  gobject_class->finalize = slidingwindow_finalize;
+
+  GST_DEBUG_CATEGORY_INIT (slidingwindow_debug_category, "slidingwindow", 0,
+      "SlidingWindow");
+
+}
+
+static void _item_dtor(gpointer itemptr)
+{
+  g_slice_free(SlidingWindowItem, itemptr);
+}
+
+void
+slidingwindow_finalize (GObject * object)
+{
+  SlidingWindow* this;
+
+  if(!object){
+    return;
+  }
+  this = (SlidingWindow*)object;
+  datapuffer_clear(this->items, _item_dtor);
+  datapuffer_dtor(this->items);
+
+  g_list_free_full(this->plugins, swplugin_dtor);
+  g_object_unref(this->on_add_item);
+  g_object_unref(this->on_rem_item);
+}
+
+void
+slidingwindow_init (SlidingWindow * this)
+{
+
+}
+
 SlidingWindow* make_slidingwindow(guint32 num_limit, GstClockTime obsolation_treshold)
 {
   SlidingWindow* result;
@@ -240,6 +243,9 @@ SlidingWindow* make_slidingwindow(guint32 num_limit, GstClockTime obsolation_tre
   result->min_itemnum      = 1;
   result->obsolate         = _slidingwindow_default_obsolation;
   result->obsolate_udata   = result;
+  result->on_add_item      = make_observer();
+  result->on_rem_item      = make_observer();
+
   return result;
 }
 
@@ -253,13 +259,7 @@ static void _slidingwindow_rem(SlidingWindow* this)
 
   item = datapuffer_read(this->items);
 
-  for(it = this->plugins; it; it = it->next){
-      SlidingWindowPlugin *swplugin;
-      swplugin = it->data;
-      if(swplugin->rem_pipe){
-        swplugin->rem_pipe(swplugin->rem_data, item->data);
-      }
-  }
+  observer_notify(this->on_rem_item, item->data);
 
   if(this->allocator.active){
     this->allocator.dealloc(this->allocator.dealloc_udata, item->data);
@@ -404,13 +404,7 @@ void slidingwindow_add_data(SlidingWindow* this, gpointer data)
     item->data = data;
   }
 
-  for(it = this->plugins; it; it = it->next){
-      SlidingWindowPlugin *swplugin;
-      swplugin = it->data;
-      if(swplugin->add_pipe){
-        swplugin->add_pipe(swplugin->add_data, item->data);
-      }
-  }
+  observer_notify(this->on_add_item, item->data);
 
   datapuffer_write(this->items, item);
 }
@@ -418,6 +412,14 @@ void slidingwindow_add_data(SlidingWindow* this, gpointer data)
 void slidingwindow_add_plugin(SlidingWindow* this, SlidingWindowPlugin *swplugin)
 {
   this->plugins = g_list_append(this->plugins, swplugin);
+  if(swplugin->add_pipe){
+    observer_add_listener(this->on_add_item, (NotifierFunc) swplugin->add_pipe, swplugin->add_data);
+  }
+
+  if(swplugin->rem_pipe){
+    observer_add_listener(this->on_rem_item, (NotifierFunc) swplugin->rem_pipe, swplugin->rem_data);
+  }
+
 }
 
 
@@ -447,17 +449,46 @@ void slidingwindow_add_pipes(SlidingWindow* this, void (*rem_pipe)(gpointer,gpoi
   slidingwindow_add_plugin(this, swplugin);
 }
 
+void slidingwindow_on_change(SlidingWindow* this, NotifierFunc add_callback, NotifierFunc rem_callback, gpointer udata)
+{
+  observer_add_listener(this->on_add_item, add_callback, udata);
+  observer_add_listener(this->on_rem_item, rem_callback, udata);
+}
+
+void slidingwindow_on_add_item_cb(SlidingWindow* this, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(this->on_add_item, callback, udata);
+}
+
+void slidingwindow_on_rem_item_cb(SlidingWindow* this, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(this->on_rem_item, callback, udata);
+}
+
 gboolean slidingwindow_is_empty(SlidingWindow* this)
 {
   return datapuffer_isempty(this->items);
 }
 
+void swplugin_notify(SlidingWindowPlugin* this, gpointer subject)
+{
+  observer_notify(this->on_calculated, subject);
+}
+
+SlidingWindowPlugin* make_swplugin(NotifierFunc on_calculated_cb, gpointer udata)
+{
+  SlidingWindowPlugin* this = swplugin_ctor();
+  observer_add_listener(this->on_calculated, on_calculated_cb, udata);
+  return this;
+}
 
 SlidingWindowPlugin* swplugin_ctor(void)
 {
   SlidingWindowPlugin* this;
   this = malloc(sizeof(SlidingWindowPlugin));
   memset(this, 0, sizeof(SlidingWindowPlugin));
+  this->on_calculated = make_observer();
+  this->disposer = swplugin_dtor;
   return this;
 }
 

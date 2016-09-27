@@ -36,17 +36,17 @@ struct _FBRAFBProducer
 
   guint32                  ssrc;
   guint8                   subflow_id;
+  RcvTracker*              tracker;
+  RTPPackets*              rtpdb;
 
   guint16                  begin_seq;
   guint16                  end_seq;
   gboolean*                vector;
   guint                    vector_length;
 
-  SlidingWindow           *payloadbytes_sw;
   SlidingWindow           *owds_sw;
 
   GstClockTime             last_fb;
-  GstClockTime             next_fb;
   gint                     rcved_packets;
 
   GstClockTime             median_delay;
@@ -71,10 +71,8 @@ GType fbrafbproducer_get_type (void);
 FBRAFBProducer *make_fbrafbproducer(guint32 ssrc, guint8 subflow_id);
 void fbrafbproducer_reset(FBRAFBProducer *this);
 void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold);
-void fbrafbproducer_track(gpointer data, GstMpRTPBuffer *mprtp);
+
 gboolean fbrafbproducer_do_fb(gpointer data);
-void fbrafbproducer_fb_sent(gpointer data);
-void fbrafbproducer_get_interval(gpointer data, gint *min_packet, GstClockTime *max_interval);
 void fbrafbproducer_setup_feedback(gpointer data, ReportProducer *reportprod);
 
 #endif /* FBRAFBPRODUCER_H_ */

@@ -28,17 +28,17 @@ typedef struct _bintree3node{
 }bintree3node_t;
 
 typedef gint32 (*bintree3cmp)(gpointer,gpointer);
-typedef void    (*bintree3sprint)(gpointer,gchar*);
-typedef void    (*bintree3dupnotifier)(gpointer,gpointer);
+//typedef void    (*bintree3sprint)(gpointer,gchar*);
 
 typedef struct _bintree3 {
   bintree3node_t       *root,*bottom,*top;
   bintree3cmp           cmp;
-  bintree3sprint        sprint;
+//  bintree3sprint        sprint;
   gint32                node_counter;
   gint32                duplicate_counter;
-  bintree3dupnotifier   duplicate_notifier;
-  gpointer              duplicate_notifier_data;
+
+  Observer*             on_duplicate;
+  Observer*             on_print;
 } bintree3_t;
 
 gint32 bintree3cmp_int32(gpointer a,gpointer b);
@@ -48,13 +48,14 @@ gint32 bintree3cmp_double(gpointer pa,gpointer pb);
 gint32 bintree3cmp_int64(gpointer pa,gpointer pb);
 
 bintree3_t *make_bintree3(bintree3cmp cmp);
-void bintree3_setsprint(bintree3_t* this, bintree3sprint sprint);
 void bintree3_print(bintree3_t* this);
 void bintree3_test(void);
 void bintree3_dtor(gpointer target);
 void bintree3_reset(bintree3_t *this);
 gpointer bintree3_get_items_sorted_array(bintree3_t *this, guint *length);
-void bintree3_setup_duplicate_notifier(bintree3_t *this, bintree3dupnotifier duplicate_notifier, gpointer duplicate_notifier_data);
+void bintree3_add_on_duplicate_cb(bintree3_t *this, NotifierFunc callback, gpointer udata);
+void bintree3_add_on_print_cb(bintree3_t *this, NotifierFunc callback, gpointer udata);
+
 gpointer bintree3_delete_top_data(bintree3_t *this);
 gpointer bintree3_delete_bottom_data(bintree3_t *this);
 gpointer bintree3_get_top_data(bintree3_t *this);

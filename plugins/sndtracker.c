@@ -61,10 +61,10 @@ sndtracker_finalize (
     GObject * object);
 
 static void
-_packets_rem_pipe(gpointer udata, gpointer item);
+_packets_rem_pipe(SndTracker* this, RTPPacket* packet);
 
 static void
-_fec_rem_pipe(gpointer udata, gpointer item);
+_fec_rem_pipe(SndTracker* this, FECEncoderResponse* response);
 
 static Private*
 _priv_ctor(void);
@@ -114,8 +114,8 @@ sndtracker_init (SndTracker * this)
   this->fec_sw = make_slidingwindow(500, GST_SECOND);
   this->priv = _priv_ctor();
 
-  slidingwindow_add_pipes(this->packets_sw, _packets_rem_pipe, this, NULL, NULL);
-  slidingwindow_add_pipes(this->fec_sw, _fec_rem_pipe, this, NULL, NULL);
+  slidingwindow_on_rem_item_cb(this->packets_sw, (NotifierFunc) _packets_rem_pipe, this);
+  slidingwindow_on_rem_item_cb(this->fec_sw, (NotifierFunc) _fec_rem_pipe, this);
 }
 
 void sndtracker_refresh(SndTracker * this)
@@ -135,10 +135,10 @@ void sndtracker_add_packet_notifier(SndTracker * this,
 
 void sndtracker_add_stat_notifier(SndTracker * this, NotifierFunc callback, gpointer udata)
 {
-  if(!this->stat_observer){
-    this->stat_observer = make_observer();
+  if(!this->on_stat_changed){
+    this->on_stat_changed = make_observer();
   }
-  observer_add_listener(this->stat_observer, callback, udata);
+  observer_add_listener(this->on_stat_changed, callback, udata);
 }
 
 void sndtracker_add_stat_subflow_notifier(SndTracker * this,
@@ -197,15 +197,13 @@ void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_resp
 }
 
 
-void _packets_rem_pipe(gpointer udata, gpointer item)
+void _packets_rem_pipe(SndTracker* this, RTPPacket* packet)
 {
-  SndTracker* this = udata;
-  RTPPacket* packet = item;
 
   this->stat.sent_bytes_in_1s -= packet->payload_size;
   --this->stat.sent_packets_in_1s;
 
-  observer_notify(this->stat_observer, &this->stat);
+  observer_notify(this->on_stat_changed, &this->stat);
 
   if(packet->subflow_id != 0){
     Subflow* subflow = _get_subflow(this, packet->subflow_id);
@@ -217,11 +215,8 @@ void _packets_rem_pipe(gpointer udata, gpointer item)
 }
 
 
-void _fec_rem_pipe(gpointer udata, gpointer item)
+void _fec_rem_pipe(SndTracker* this, FECEncoderResponse* response)
 {
-  SndTracker* this = udata;
-  FECEncoderResponse* response = item;
-
   this->stat.sent_fec_bytes_in_1s -= response->payload_size;
   --this->stat.sent_fec_packets_in_1s;
 

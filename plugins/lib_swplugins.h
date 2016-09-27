@@ -63,7 +63,7 @@ typedef struct swminmaxdat_struct_t{
 }swminmaxstat_t;
 
 typedef struct swpercentilecandidates_struct_t{
-  gboolean  processed;
+  gboolean   processed;
   gpointer   left;
   gpointer   right;
   gpointer   min;
@@ -83,25 +83,16 @@ typedef struct swint32stat_struct_t{
 }swint32stat_t;
 
 SlidingWindowPlugin* make_swminmax(bintree3cmp cmp,
-                          void (*minmax_pipe)(gpointer,swminmaxstat_t*),
-                          gpointer minmax_data
+                                  NotifierFunc on_calculated_cb,
+                                  gpointer       udata
                           );
 
 
-SlidingWindowPlugin* make_swpercentile_with_sprint(
-                              gint32     percentile,
-                              bintree3cmp  cmp,
-                              void      (*percentile_pipe)(gpointer,swpercentilecandidates_t*),
-                              gpointer       percentile_data,
-                              void (*sprint)(gpointer,gchar*)
-                              );
-
-void swpercentile_fileprint_data(SlidingWindowPlugin *plugin, const gchar *filename);
 SlidingWindowPlugin* make_swpercentile(
                               gint32     percentile,
                               bintree3cmp  cmp,
-                              void      (*percentile_pipe)(gpointer,swpercentilecandidates_t*),
-                              gpointer       percentile_data
+                              NotifierFunc on_calculated_cb,
+                              gpointer       udata
                               );
 
 SlidingWindowPlugin* make_swint32_stater(void (*pipe)(gpointer,swint32stat_t*),gpointer pipe_data);

@@ -37,7 +37,8 @@ struct _SndTracker
   GstClock*                 sysclock;
   SlidingWindow*            packets_sw;
   SlidingWindow*            fec_sw;
-  Observer*                 stat_observer;
+
+  Observer*                 on_stat_changed;
 
   gpointer                  priv;
   SndTrackerStat            stat;

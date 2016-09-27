@@ -48,7 +48,7 @@ struct _RcvTracker
   GSList*                   joined_subflows;
 
   Observer*                 on_stat_changed;
-  Observer*                 on_packet_arrived;
+  Observer*                 on_received_packet;
   Observer*                 on_discarded_packet;
 
   GstClockTime              skew_minmax_updated;
@@ -72,7 +72,7 @@ void rcvtracker_refresh(RcvTracker * this);
 
 void rcvtracker_add_discarded_seq(RcvTracker* this, DiscardedPacket discarded_packet);
 
-void rcvtracker_add_packet_notifier(RcvTracker * this,
+void rcvtracker_add_on_received_packet_callback(RcvTracker * this,
                                         void (*callback)(gpointer udata, gpointer item),
                                         gpointer udata);
 

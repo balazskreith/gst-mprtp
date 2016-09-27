@@ -52,6 +52,8 @@ struct _SlidingWindow
   gboolean               (*obsolate)(gpointer, SlidingWindowItem*);
   gpointer                 obsolate_udata;
   GList*                   plugins;
+  Observer*                on_add_item;
+  Observer*                on_rem_item;
 
   sallocator_t            allocator;
 
@@ -69,6 +71,7 @@ typedef struct _SlidingWindowPlugin{
   gpointer    add_data;
   void      (*disposer)(gpointer);
   void      (*clear)(gpointer);
+  Observer*   on_calculated;
   gpointer    priv;
 }SlidingWindowPlugin;
 
@@ -104,9 +107,14 @@ void slidingwindow_setup_custom_obsolation(SlidingWindow* this, gboolean (*custo
 void slidingwindow_add_plugin(SlidingWindow* this, SlidingWindowPlugin *plugin);
 void slidingwindow_add_plugins (SlidingWindow* this, ... );
 void slidingwindow_add_pipes(SlidingWindow* this, void (*rem_pipe)(gpointer,gpointer),gpointer rem_data, void (*add_pipe)(gpointer,gpointer),gpointer add_data);
+
+void slidingwindow_on_change(SlidingWindow* this, NotifierFunc add_callback, NotifierFunc rem_callback, gpointer udata);
+void slidingwindow_on_add_item_cb(SlidingWindow* this, NotifierFunc callback, gpointer udata);
+void slidingwindow_on_rem_item_cb(SlidingWindow* this, NotifierFunc callback, gpointer udata);
 gboolean slidingwindow_is_empty(SlidingWindow* this);
 
-
+void swplugin_notify(SlidingWindowPlugin* this, gpointer subject);
+SlidingWindowPlugin* make_swplugin(NotifierFunc on_calculated_cb, gpointer udata);
 SlidingWindowPlugin* swplugin_ctor(void);
 void swplugin_dtor(gpointer target);
 

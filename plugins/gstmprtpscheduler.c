@@ -84,22 +84,15 @@ static gboolean gst_mprtpscheduler_src_query (GstPad * srckpad, GstObject * pare
 static void gst_mprtpscheduler_mprtcp_sender (gpointer ptr, GstBuffer * buf);
 static void _join_subflow (GstMprtpscheduler * this, guint subflow_id);
 static void _detach_subflow (GstMprtpscheduler * this, guint subflow_id);
-static gboolean
-_try_get_path (GstMprtpscheduler * this, guint16 subflow_id,
-    MPRTPSPath ** result);
-static void _change_path_state (GstMprtpscheduler * this, guint8 subflow_id,
-    gboolean set_congested, gboolean set_lossy);
 static void _change_sending_rate(GstMprtpscheduler * this,
     guint8 subflow_id, gint32 target_bitrate);
 static gboolean gst_mprtpscheduler_mprtp_src_event (GstPad * pad,
     GstObject * parent, GstEvent * event);
 static gboolean gst_mprtpscheduler_sink_eventfunc (GstPad * srckpad, GstObject * parent,
                                                    GstEvent * event);
-static void _setup_subflows (GstMprtpscheduler * this);
 static gboolean _mprtpscheduler_send_packet (GstMprtpscheduler * this, RTPPacket *packet);
 static void mprtpscheduler_approval_process(gpointer udata);
 static void mprtpscheduler_emitter_process(gpointer udata);
-static void _setup_timestamp(GstMprtpscheduler *this, GstBuffer *buffer);
 
 
 static guint _subflows_utilization;
@@ -478,35 +471,34 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
   THIS_LOCK(this);
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
-      this->mprtp_ext_header_id = (guint8) g_value_get_uint (value);
-      _setup_subflows(this);
+      sndsubflows_set_mprtp_ext_header_id(this->subflows, (guint8) g_value_get_uint (value));
       break;
     case PROP_ABS_TIME_EXT_HEADER_ID:
-      this->abs_time_ext_header_id = (guint8) g_value_get_uint (value);
+      rtppackets_set_abs_time_ext_header_id(this->rtppackets, (guint8) g_value_get_uint (value));
       break;
     case PROP_FEC_PAYLOAD_TYPE:
       this->fec_payload_type = (guint8) g_value_get_uint (value);
       fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
       break;
     case PROP_JOIN_SUBFLOW:
-      _join_subflow (this, g_value_get_uint (value));
+      sndsubflows_join(this->subflows, g_value_get_uint (value));
       break;
     case PROP_MPATH_KEYFRAME_FILTERING:
       g_warning("path keyframe filtering is not implemented yet");
       break;
     case PROP_PACKET_OBSOLATION_TRESHOLD:
-        this->obsolation_treshold = g_value_get_uint(value) * GST_MSECOND;
-        break;
+      this->obsolation_treshold = g_value_get_uint(value) * GST_MSECOND;
+      break;
     case PROP_DETACH_SUBFLOW:
-      _detach_subflow (this, g_value_get_uint (value));
+      sndsubflows_detach(this->subflows, g_value_get_uint (value));
       break;
     case PROP_SET_SUBFLOW_CONGESTED:
       guint_value = g_value_get_uint (value);
-      _change_path_state (this, (guint8) guint_value, TRUE, FALSE);
+      sndsubflows_set_path_congested(this->subflows, guint_value, TRUE);
       break;
     case PROP_SET_SUBFLOW_NON_CONGESTED:
       guint_value = g_value_get_uint (value);
-      _change_path_state (this, (guint8) guint_value, FALSE, FALSE);
+      sndsubflows_set_path_congested(this->subflows, guint_value, FALSE);
       break;
     case PROP_FEC_INTERVAL:
       this->fec_interval = g_value_get_uint (value);
@@ -517,15 +509,10 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       stream_splitter_refresh_targets(this->splitter);
       break;
     case PROP_SETUP_RTCP_INTERVAL_TYPE:
-      guint_value = g_value_get_uint (value);
-      sndctrler_change_interval_type(this->controller, subflow_prop->id, subflow_prop->value);
+      sndsubflows_set_rtcp_interval_type(this->subflows, subflow_prop->id, subflow_prop->value);
       break;
     case PROP_SETUP_CONTROLLING_MODE:
-      guint_value = g_value_get_uint (value);
-      sndctrler_change_controlling_mode(this->controller,
-                                        subflow_prop->id,
-                                        subflow_prop->value,
-                                        &this->enable_fec);
+      sndsubflows_set_congestion_controlling_type(this->subflows, subflow_prop->id, subflow_prop->value);
       break;
     case PROP_SETUP_REPORT_TIMEOUT:
       guint_value = g_value_get_uint (value);
@@ -556,10 +543,10 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
   THIS_LOCK(this);
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
-      g_value_set_uint (value, (guint) this->mprtp_ext_header_id);
+      g_value_set_uint (value, (guint) sndsubflow_get_mprtp_ext_header_id(this->subflows));
       break;
     case PROP_ABS_TIME_EXT_HEADER_ID:
-      g_value_set_uint (value, (guint) this->abs_time_ext_header_id);
+      g_value_set_uint (value, (guint) rtppackets_get_abs_time_ext_header_id(this->rtppackets));
       break;
     case PROP_MPATH_KEYFRAME_FILTERING:
       g_warning("path keyframe filtering is not implemented yet");
@@ -579,19 +566,6 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
   }
   THIS_UNLOCK(this);
 
-}
-
-static void _change_mprtp_ext_header_id(gpointer item, gpointer udata)
-{
-  SndSubflow              *subflow = item;
-  guint8* mprtp_ext_header_id = udata;
-  subflow->mprtp_ext_header_id = *mprtp_ext_header_id;
-}
-
-void
-_setup_subflows (GstMprtpscheduler * this)
-{
-  sndsubflows_iterate(this->subflows,_change_mprtp_ext_header_id, &this->mprtp_ext_header_id);
 }
 
 
@@ -616,13 +590,13 @@ gst_mprtpscheduler_mprtp_src_event (GstPad * pad, GstObject * parent,
 void
 _join_subflow (GstMprtpscheduler * this, guint subflow_id)
 {
-  sndsubflows_add(this->subflows, subflow_id);
+  sndsubflows_join(this->subflows, subflow_id);
 }
 
 void
 _detach_subflow (GstMprtpscheduler * this, guint subflow_id)
 {
-  sndsubflows_rem(this->subflows, subflow_id);
+  sndsubflows_detach(this->subflows, subflow_id);
 }
 
 
@@ -709,28 +683,6 @@ gst_mprtpscheduler_query (GstElement * element, GstQuery * query)
 
   return ret;
 }
-
-void _setup_timestamp(GstMprtpscheduler *this, GstBuffer *buffer)
-{
-  RTPAbsTimeExtension data;
-  guint32 time;
-  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-
-  if (G_UNLIKELY (!gst_rtp_buffer_map (buffer, GST_MAP_READWRITE, &rtp))) {
-    GST_WARNING_OBJECT (this, "The RTP packet is not writeable");
-    return;
-  }
-
-  //Absolute sending time +0x83AA7E80
-  //https://tools.ietf.org/html/draft-alvestrand-rmcat-remb-03
-  time = (NTP_NOW >> 14) & 0x00ffffff;
-  memcpy (&data, &time, 3);
-  gst_rtp_buffer_add_extension_onebyte_header (&rtp,
-      this->abs_time_ext_header_id, (gpointer) &data, sizeof (data));
-  gst_rtp_buffer_unmap(&rtp);
-}
-
-
 
 
 void
@@ -913,50 +865,6 @@ gst_mprtpscheduler_src_query (GstPad * srckpad, GstObject * parent,
 }
 
 
-
-gboolean
-_try_get_path (GstMprtpscheduler * this, guint16 subflow_id,
-    MPRTPSPath ** result)
-{
-  MPRTPSPath *path;
-  path = _get_path(this, subflow_id);
-  if (path == NULL) {
-    return FALSE;
-  }
-  if (result) {
-    *result = path;
-  }
-  return TRUE;
-}
-
-
-
-void
-_change_path_state (GstMprtpscheduler * this, guint8 subflow_id,
-    gboolean set_congested, gboolean set_lossy)
-{
-  MPRTPSPath *path;
-  if (!_try_get_path (this, subflow_id, &path)) {
-    GST_WARNING_OBJECT (this,
-        "Change state can not be done due to unknown subflow id (%d)",
-        subflow_id);
-    return;
-  }
-
-  if (!set_congested) {
-    mprtps_path_set_non_congested (path);
-  } else {
-    mprtps_path_set_congested (path);
-  }
-
-  if (!set_lossy) {
-    mprtps_path_set_non_lossy (path);
-  } else {
-    mprtps_path_set_lossy (path);
-  }
-
-}
-
 typedef struct{
   guint8 subflow_id;
   gint32 target_bitrate;
@@ -998,7 +906,6 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, RTPPacket *packet)
   gboolean result = FALSE;
   SndSubflow *subflow;
   gboolean fec_request = FALSE;
-//  GstBuffer *buffer = packet->buffer;
   GstClockTime now = _now(this);
 
   subflow = stream_splitter_approve_packet(this->splitter, packet, now);
@@ -1006,20 +913,18 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, RTPPacket *packet)
     goto done;
   }
 
-  if(this->enable_fec || 0 < this->fec_interval){
-    fec_request |= (0 < this->fec_interval) && (++this->sent_packets % this->fec_interval == 0);
-    fecencoder_add_rtpbuffer(this->fec_encoder, packet->buffer);
-  }
+  fec_request |= (0 < this->fec_interval) && (++this->sent_packets % this->fec_interval == 0);
+  fecencoder_add_rtpbuffer(this->fec_encoder, packet->buffer);
 
   result = TRUE;
-  packet->buffer = sndsubflow_process_rtp_buffer(subflow, packet->buffer, &fec_request);
-  if(fec_request){
-    fecencoder_request_fec(this->fec_encoder);
+  rtppacket_setup_mprtp(packet, subflow);
+  if(fec_request || sndsubflow_fec_requested(subflow)){
+    fecencoder_request_fec(this->fec_encoder, subflow);
   }
 
-  _setup_timestamp(this, packet->buffer);
+  rtppacket_setup_abs_time_extension(this->rtppackets, packet);
   sndtracker_add_packet(this->sndtracker, packet);
-  packetforwarder_add_rtppad_buffer(this->packetforwarder, packet->buffer);
+  packetforwarder_add_rtppad_buffer(this->packetforwarder, gst_buffer_ref(packet->buffer));
   rtppackets_packet_forwarded(packet);
 
   if(fec_request){
@@ -1027,7 +932,7 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, RTPPacket *packet)
     response = g_async_queue_pop(this->fec_responses);
     response->subflow_id = subflow->id;
     response->fecbuffer = sndsubflow_process_fec_buffer(subflow, response->fecbuffer);
-    sndtracker_add_fec_response(this->sndtracker, response);
+    sndtracker_add_on_fec_response(this->sndtracker, response);
     packetforwarder_add_rtppad_buffer(this->packetforwarder, response->fecbuffer);
     fecencoder_unref_response(response);
   }
@@ -1067,7 +972,6 @@ again:
     rtppackets_packet_forwarded(this->rtppackets, packet);
     goto again;
   }
-
 
   if(!_mprtpscheduler_send_packet(this, packet)){
     g_async_queue_push_front(this->rtpq, buffer);

@@ -94,7 +94,7 @@ ricalcer_finalize (GObject * object)
 
 gboolean ricalcer_rtcp_fb_allowed(ReportIntervalCalculator * this, SndSubflow *subflow)
 {
-  return subflow->rtcp_interval_mode == RTCP_INTERVAL_IMMEDIATE_FEEDBACK_MODE;
+  return subflow->rtcp_interval_type == RTCP_INTERVAL_IMMEDIATE_FEEDBACK_MODE;
 }
 
 gboolean ricalcer_rtcp_regular_allowed(ReportIntervalCalculator * this, SndSubflow *subflow)

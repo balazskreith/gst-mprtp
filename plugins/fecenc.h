@@ -45,7 +45,9 @@ struct _FECEncoder
   GstTask*                   thread;
   GRecMutex                  thread_mutex;
   GAsyncQueue*               requests;
-  GAsyncQueue*               responses;
+  GAsyncQueue*               messages_out;
+
+  SubflowSeqTrack*           seqtracks;
 };
 
 
@@ -61,7 +63,7 @@ FECEncoder *make_fecencoder(GAsyncQueue *responses);
 void fecencoder_reset(FECEncoder *this);
 void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer* buffer);
 void fecencoder_set_payload_type(FECEncoder* this, guint8 fec_payload_type);
-void fecencoder_request_fec(FECEncoder* this);
+void fecencoder_request_fec(FECEncoder* this, guint8 subflow_id);
 
 void fecencoder_ref_response(FECEncoderResponse* response);
 void fecencoder_unref_response(FECEncoderResponse* response);

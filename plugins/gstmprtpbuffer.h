@@ -28,13 +28,6 @@
 
 typedef struct _GstMpRTPBuffer GstMpRTPBuffer;
 
-#define MPRTP_PLUGIN_MAX_RLE_LENGTH 20
-
-#define MPRTP_PLUGIN_MAX_SUBFLOW_NUM 32
-
-#define GST_MPRTP_BUFFER_INIT {FALSE, NULL, 0, 0, 0, 0, 0, 0}
-
-#define CONSTRAIN(min,max,value) MAX(min, MIN(max, value))
 
 struct _GstMpRTPBuffer{
 //  GstRTPBuffer   rtp;
@@ -53,13 +46,6 @@ struct _GstMpRTPBuffer{
   gboolean       marker;
 };
 
-
-
-
-typedef struct{
-  guint32 timestamp;
-  GList* packets;
-}RTPFrame;
 
 gboolean gst_buffer_is_mprtp(GstBuffer *buffer, guint8 mprtp_ext_header_id);
 gboolean gst_buffer_is_monitoring_rtp(GstBuffer *buffer, guint8 monitoring_payload_type);

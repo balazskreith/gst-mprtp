@@ -185,7 +185,7 @@ make_rcvctrler(RTPPackets *rtppackets,
 
 typedef struct{
   guint8                    subflow_id;
-  RTCPIntervalMode          new_mode;
+  RTCPIntervalType          new_mode;
 }ChangeIntervalHelper;
 
 static void _subflow_change_interval_type(gpointer item, gpointer udata)
@@ -223,7 +223,7 @@ static gint _fbproducer_by_subflow_id(gpointer item, gpointer udata)
 
 typedef struct{
   guint8                    subflow_id;
-  CongestionControllingMode new_mode;
+  CongestionControllingType new_mode;
   RcvController            *rcv_fbproducer;
 }ChangeControllingHelper;
 
@@ -266,7 +266,7 @@ done:
 
 void rcvctrler_change_controlling_mode(RcvController * this,
                                        guint8 subflow_id,
-                                       CongestionControllingMode controlling_mode,
+                                       CongestionControllingType controlling_mode,
                                        gboolean *enable_fec)
 {
   ChangeControllingHelper helper;

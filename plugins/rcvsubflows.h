@@ -34,8 +34,8 @@ struct _RcvSubflow
   guint32                    total_received_payload_bytes;
 
   GstClockTime               next_regular_rtcp;
-  RTCPIntervalMode           rtcp_interval_mode;
-  CongestionControllingMode  congestion_controlling_mode;
+  RTCPIntervalType           rtcp_interval_mode;
+  CongestionControllingType  congestion_controlling_mode;
 
   guint64                    last_SR_report_sent;
   guint64                    last_SR_report_rcvd;

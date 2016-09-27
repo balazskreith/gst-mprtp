@@ -833,14 +833,14 @@ _rtppacket_transceiver (GstMprtpplayouter *this, GstBuffer *buffer)
   THIS_LOCK(this);
 
   //check weather the packet is mprtp
-  if(!rtppackets_buffer_is_mprtp(this->rtppackets, buffer)){
+  if(!gst_rtp_buffer_is_mprtp(this->rtppackets, buffer)){
     if(GST_IS_BUFFER(buffer))
       packetforwarder_add_rtppad_buffer(this->packetforwarder, buffer);
     goto done;
   }
 
   //check weather packet is fec type
-  if(rtppackets_buffer_is_fec(this->rtppackets, buffer)){
+  if(rtppackets_buffer_is_fecmprtp(this->rtppackets, buffer)){
     fecdecoder_add_fec_buffer(this->rtppackets, packet);
     goto done;
   }

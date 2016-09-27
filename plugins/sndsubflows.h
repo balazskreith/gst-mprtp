@@ -9,7 +9,7 @@
 #define SNDSUBFLOWSN_H_
 
 #include <gst/gst.h>
-#include "mprtpspath.h"
+#include "mprtpdefs.h"
 
 typedef struct _SndSubflows SndSubflows;
 typedef struct _SndSubflowsClass SndSubflowsClass;
@@ -28,20 +28,16 @@ typedef struct _SndSubflow SndSubflow;
 
 typedef enum
 {
-  MPRTPS_PATH_STATE_OVERUSED     = -1,
-  MPRTPS_PATH_STATE_STABLE       = 0,
-  MPRTPS_PATH_STATE_UNDERUSED     = 1,
-} MPRTPSPathState;
+  SNDSUBFLOW_STATE_OVERUSED     = -1,
+  SNDSUBFLOW_STATE_STABLE       = 0,
+  SNDSUBFLOW_STATE_UNDERUSED     = 1,
+} SndSubflowState;
 
 struct _SndSubflow
 {
+  SndSubflows*               base_db;
   guint8                     id;
-  guint8                     mprtp_ext_header_id;
-  guint16                    rtp_seq;
-  guint16                    rtp_seq_cycle_num;
-  guint8                     fec_ext_header_id;
-  guint16                    fec_seq;
-  guint16                    fec_seq_cycle_num;
+  SubflowSeqTrack            seqtracker;
 
   gboolean                   lossy;
   gboolean                   congested;
@@ -54,23 +50,20 @@ struct _SndSubflow
   guint32                    total_sent_packets_num;
   guint32                    total_sent_payload_bytes;
 
-  MPRTPSPathState            state;
+  SndSubflowState            state;
 
   GstClockTime               pacing_time;
 
   GstClockTime               next_regular_rtcp;
   GstClockTime               report_timeout;
-  RTCPIntervalMode           rtcp_interval_mode;
-  CongestionControllingMode  congestion_controlling_mode;
+  RTCPIntervalType           rtcp_interval_type;
+  CongestionControllingType  congestion_controlling_type;
 
   guint32                    sent_packet_count;
   guint32                    sent_octet_count;
 
-  struct{
-    GSList*                 on_removing;
-    GSList*                 on_active_status_changed;
-  }notifiers;
-
+  Observer*                  on_stat_changed;
+  Observer*                  on_packet_sent;
 };
 
 
@@ -81,10 +74,18 @@ struct _SndSubflows
   GObject              object;
   GstClock*            sysclock;
   GstClockTime         made;
+  guint8               mprtp_ext_header_id;
 
   SndSubflow*          subflows[256];
-  GSList*              added;
-  GSList*              added_notifications;
+
+  GQueue*              changed_subflows;
+  GSList*              joined;
+
+  Observer*            on_subflow_detached;
+  Observer*            on_subflow_joined;
+  Observer*            on_congestion_controlling_type_changed;
+  Observer*            on_path_active_changed;
+
   gint32               target_rate;
   guint                subflows_num;
 };
@@ -98,25 +99,46 @@ make_sndsubflows(void);
 
 GType sndsubflows_get_type (void);
 
-void sndsubflows_add_notifications(SndSubflows* this,void (*callback)(gpointer udata, SndSubflow* subflow), gpointer udata);
-SndSubflow* sndsubflows_add(SndSubflows* this, guint8 id);
-void sndsubflows_rem(SndSubflows* this, guint8 id);
+void sndsubflows_join(SndSubflows* this, guint8 id);
+void sndsubflows_detach(SndSubflows* this, guint8 id);
 void sndsubflows_iterate(SndSubflows* this, GFunc process, gpointer udata);
+
 void sndsubflows_set_target_rate(SndSubflows* this, SndSubflow* subflow, gint32 target_rate);
 gint32 sndsubflows_get_total_target(SndSubflows* this);
 gint32 sndsubflows_get_subflows_num(SndSubflows* this);
+SndSubflow* sndsubflows_get_subflow(SndSubflows* this, guint8 subflow_id);
 
-void sndsubflow_add_removal_notification(SndSubflow* subflow, void (*callback)(gpointer udata, SndSubflow* subflow), gpointer udata);
-void sndsubflow_add_active_status_changed_notification(SndSubflow* subflow, void (*callback)(gpointer udata, SndSubflow* subflow), gpointer udata);
+void sndsubflows_set_mprtp_ext_header_id(SndSubflows* this, guint8 mprtp_ext_header_id);
+guint8 sndsubflows_get_mprtp_ext_header_id(SndSubflows* this);
 
-void sndsubflow_set_active_status(SndSubflow* subflow, gboolean active);
+
+void sndsubflows_set_congestion_controlling_type(SndSubflows* this, guint8 subflow_id, CongestionControllingType new_type);
+void sndsubflows_set_path_active(SndSubflows* this, guint8 subflow_id, gboolean value);
+void sndsubflows_set_rtcp_interval_type(SndSubflows* this, guint8 subflow_id, RTCPIntervalType new_type);
+void sndsubflows_set_path_lossy(SndSubflows* this, guint8 subflow_id, gboolean value);
+void sndsubflows_set_path_congested(SndSubflows* this, guint8 subflow_id, gboolean value);
+
+void sndsubflows_on_subflow_joined_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
+void sndsubflows_add_on_subflow_detached_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
+void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
+void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
+
+
+
+//------------------------------------------------------------------------------------------------
+void sndsubflow_on_stat_changed_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata);
+void sndsubflow_on_packet_sent_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata);
+void sndsubflow_set_state(SndSubflow* this, SndSubflowState state);
+guint8 sndsubflow_get_mprtp_ext_header_id(SndSubflow* subflow);
+guint16 sndsubflow_get_next_subflow_seq(SndSubflow* subflow);
+
 guint8 sndsubflow_get_flags_abs_value(SndSubflow* subflow);
+
+gboolean sndsubflow_fec_requested(SndSubflow* subflow);
+
 GstBuffer*
 sndsubflow_process_rtp_buffer(SndSubflow *subflow,
                                GstBuffer* buffer,
                                gboolean *fec_request);
-GstBuffer*
-sndsubflow_process_fec_buffer(SndSubflow *subflow,
-                               GstBuffer* buffer);
 
 #endif /* SNDSUBFLOWSN_H_ */

@@ -9,6 +9,7 @@
 #define RTPPACKETS_H_
 
 #include <gst/gst.h>
+#include "sndsubflows.h"
 
 typedef struct _RTPPackets RTPPackets;
 typedef struct _RTPPacketsClass RTPPacketsClass;
@@ -66,14 +67,13 @@ struct _RTPPackets
   GObject                    object;
   GstClock*                  sysclock;
   GstClockTime               made;
-  GRWLock                    rwmutex;
   RTPPacket*                 packets;
-  RTPPacket**                subflows[256];
-  GSList*                    stalled_notifiers;
 
-  guint8                     mprtp_ext_header_id;
+  Observer*                  on_stalled_packets;
+
   guint8                     abs_time_ext_header_id;
-  guint8                     fec_payload_type;
+
+  SndSubflows*               subflows;
 };
 
 
@@ -85,24 +85,25 @@ struct _RTPPacketsClass{
 
 
 GType rtppackets_get_type (void);
+RTPPackets* make_rtppackets(SndSubflows *subflows);
+void rtppackets_reset(RTPPackets* this);
 
-void rtppackets_add_stalled_notifier(RTPPackets* this, void (*callback)(gpointer udata, RTPPacket* packet), gpointer udata);
+void rtppackets_add_stalled_packet_cb(RTPPackets* this, void (*callback)(gpointer udata, RTPPacket* packet), gpointer udata);
 void rtppackets_add_subflow(RTPPackets* this, guint8 subflow_id);
 void _stalled_notify_caller(RTPPackets* this, gpointer item, gpointer udata);
 RTPPacket* rtppackets_retrieve_packet_for_sending(RTPPackets* this, GstBuffer *buffer);
-gboolean rtppackets_buffer_is_mprtp(RTPPackets* this, GstBuffer *buffer);
-gboolean rtppackets_buffer_is_fec(RTPPackets* this, GstBuffer *buffer);
-RTPPacket* rtppackets_retrieve_packet_at_receiving(RTPPackets* this, GstBuffer *buffer);
-void rtppackets_map_to_subflow(RTPPackets* this, RTPPacket *packet, guint8 subflow_id, guint16 subflow_seq);
+RTPPacket* rtppackets_retrieve_packet_at_receiving(RTPPackets* this, RcvSubflow* subflow, GstBuffer *buffer);
+
+void rtppacket_setup_mprtp(RTPPacket *packet, SndSubflow* subflow);
+void rtppacket_setup_abs_time_extension(RTPPackets *this, RTPPacket* packet);
+
 void rtppackets_packet_forwarded(RTPPackets* this, RTPPacket *packet);
 RTPPacket* rtppackets_get_by_abs_seq(RTPPackets* this, guint16 abs_seq);
 RTPPacket* rtppackets_get_by_subflow_seq(RTPPackets* this, guint8 subflow_id, guint16 sub_seq);
 
-void rtppackets_setup_packet_timestamp(RTPPackets *this, RTPPacket *packet);
 
-void rtppackets_set_mprtp_ext_header_id(RTPPackets* this, guint8 mprtp_ext_header_id);
+
 void rtppackets_set_abs_time_ext_header_id(RTPPackets* this, guint8 abs_time_ext_header_id);
-guint8 rtppackets_get_mprtp_ext_header_id(RTPPackets* this);
 guint8 rtppackets_get_abs_time_ext_header_id(RTPPackets* this);
 
 void rtppackets_packet_unref(RTPPacket *packet);

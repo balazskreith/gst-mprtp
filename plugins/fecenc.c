@@ -75,6 +75,7 @@ typedef struct{
 
 typedef struct{
   Request            base;
+  SndSubflow*        subflow;
 }FECRequest;
 
 
@@ -82,7 +83,7 @@ static void fecencoder_finalize (GObject * object);
 static BitString* _make_bitstring(GstBuffer* buf);
 static void _fecenc_process(gpointer udata);
 static void _fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf);
-static GstBuffer* _fecencoder_get_fec_packet(FECEncoder *this, gint32* packet_length);
+static GstBuffer* _fecencoder_get_fec_packet(FECEncoder *this, SndSubflow *subflow, gint32* packet_length);
 //------------------------- Utility functions --------------------------------
 
 void
@@ -104,11 +105,29 @@ fecencoder_finalize (GObject * object)
 {
   FECEncoder *this;
   this = FECENCODER(object);
-  g_object_unref(this->sysclock);
-
   gst_task_stop(this->thread);
   gst_task_join (this->thread);
+
+  g_async_queue_unref(this->messages_out);
+
+  g_free(this->seqtracks);
+  g_queue_clear(this->bitstrings);
+  g_object_unref(this->bitstrings);
+  g_object_unref(this->sysclock);
+
   gst_object_unref (this->thread);
+}
+
+FECEncoder *make_fecencoder(GAsyncQueue *responses)
+{
+  FECEncoder *this;
+  this = g_object_new (FECENCODER_TYPE, NULL);
+  this->made = _now(this);
+  this->messages_out = g_async_queue_ref(responses);
+
+  gst_task_set_lock (this->thread, &this->thread_mutex);
+  gst_task_start (this->thread);
+  return this;
 }
 
 void
@@ -118,10 +137,7 @@ fecencoder_init (FECEncoder * this)
   this->sysclock = gst_system_clock_obtain();
   this->max_protection_num = GST_RTPFEC_MAX_PROTECTION_NUM;
   this->bitstrings = g_queue_new();
-
-  gst_task_set_lock (this->thread, &this->thread_mutex);
-  gst_task_start (this->thread);
-
+  this->seqtracks  = g_malloc0(sizeof(SubflowSeqTrack) * 256);
 }
 
 
@@ -130,14 +146,6 @@ void fecencoder_reset(FECEncoder *this)
 
 }
 
-FECEncoder *make_fecencoder(GAsyncQueue *responses)
-{
-  FECEncoder *this;
-  this = g_object_new (FECENCODER_TYPE, NULL);
-  this->made = _now(this);
-  this->responses = g_async_queue_ref(responses);
-  return this;
-}
 
 void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer* buffer)
 {
@@ -147,10 +155,11 @@ void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer* buffer)
   g_async_queue_push(this->requests, request);
 }
 
-void fecencoder_request_fec(FECEncoder *this)
+void fecencoder_request_fec(FECEncoder *this, SndSubflow* subflow)
 {
   FECRequest* request = g_slice_new0(FECRequest);
   request->base.type = FECENCODER_REQUEST_TYPE_FEC_REQUEST;
+  request->subflow = subflow;
   g_async_queue_push(this->requests, request);
 }
 
@@ -188,7 +197,7 @@ void _fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf)
 
 
 GstBuffer*
-_fecencoder_get_fec_packet(FECEncoder *this, gint32* packet_length)
+_fecencoder_get_fec_packet(FECEncoder *this, SndSubflow *subflow, gint32* packet_length)
 {
   GstBuffer* result = NULL;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
@@ -229,6 +238,17 @@ create:
   gst_rtp_buffer_set_payload_type(&rtp, this->payload_type);
   gst_rtp_buffer_set_seq(&rtp, ++this->seq_num);
   gst_rtp_buffer_set_ssrc(&rtp, fecbitstring->ssrc);
+
+  //MPRTP setup begin
+  if(subflow)
+  {
+    guint8  mprtp_ext_header_id = sndsubflow_get_mprtp_ext_header_id(subflow);
+    guint8  subflow_id  = subflow->id;
+    guint16 subflow_seq = subflowseqtracker_increase(this->seqtracks + subflow_id);
+    gst_rtp_buffer_set_mprtp_extension(&rtp, mprtp_ext_header_id, subflow_id, subflow_seq);
+  }
+  //mprtp setup end;
+
   payload = gst_rtp_buffer_get_payload(&rtp);
   fecheader = (GstRTPFECHeader*) payload;
   memcpy(fecheader, fecbitstring->bytes, 8);
@@ -289,15 +309,16 @@ again:
     {
       FECRequest* fec_request = (FECRequest*)request;
       FECEncoderResponse* fec_response = _fec_response_ctor();
-      fec_response->fecbuffer = _fecencoder_get_fec_packet(this, &fec_response->payload_size);
+      fec_response->fecbuffer = _fecencoder_get_fec_packet(this, fec_request->subflow, &fec_response->payload_size);
       g_slice_free(FECRequest, fec_request);
-      g_async_queue_push(this->responses, fec_response);
+      g_async_queue_push(this->messages_out, fec_response);
     }
     break;
     case FECENCODER_REQUEST_TYPE_RTP_BUFFER:
     {
       RTPBufferRequest* rtp_buffer_request = (RTPBufferRequest*)request;
       _fecencoder_add_rtpbuffer(this, rtp_buffer_request->buffer);
+      gst_buffer_unref(rtp_buffer_request->buffer);
       g_slice_free(RTPBufferRequest, rtp_buffer_request);
     }
     break;

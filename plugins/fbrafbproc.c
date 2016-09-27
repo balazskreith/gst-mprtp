@@ -30,16 +30,6 @@
 #include <stdio.h>
 #include "mprtplogger.h"
 
-#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
-
-//#define THIS_READLOCK(this)
-//#define THIS_READUNLOCK(this)
-//#define THIS_WRITELOCK(this)
-//#define THIS_WRITEUNLOCK(this)
-
 #define _now(this) gst_clock_get_time (this->sysclock)
 
 GST_DEBUG_CATEGORY_STATIC (fbrafbprocessor_debug_category);
@@ -50,27 +40,11 @@ G_DEFINE_TYPE (FBRAFBProcessor, fbrafbprocessor, G_TYPE_OBJECT);
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
-typedef struct{
-  gint         ref;
-  gdouble      owd_corr;
-  GstClockTime owd;
-  gint64       owd_in_ms;
-//  gdouble      FD;
-  gint32       BiF;
-  gint32       dBiF;
-//  gint32       overused;
-}FBRAFBStatItem;
 
 static void fbrafbprocessor_finalize (GObject * object);
 static void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr);
 static void _process_statitem(FBRAFBProcessor *this);
-//static void _process_afb(FBRAFBProcessor *this, guint32 id, GstRTCPAFB_REPS *remb);
 static void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary);
-static void _ref_rtpitem(FBRAFBProcessor * this, FBRAFBProcessorItem* item);
-static void _unref_rtpitem(FBRAFBProcessor * this, FBRAFBProcessorItem* item);
-static FBRAFBProcessorItem* _retrieve_item(FBRAFBProcessor * this, guint16 seq);
-static void _ref_statitem(FBRAFBProcessor * this, FBRAFBStatItem* item);
-static void _unref_statitem(FBRAFBProcessor * this, FBRAFBStatItem* item);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -404,122 +378,37 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
 }
 
 
-FBRAFBProcessor *make_fbrafbprocessor(guint8 subflow_id)
+FBRAFBProcessor *make_fbrafbprocessor(void)
 {
     FBRAFBProcessor *this;
     this = g_object_new (FBRAFBPROCESSOR_TYPE, NULL);
-    this->subflow_id = subflow_id;
-
+    this->on_report_processed = make_observer();
     return this;
 }
 
 
 void fbrafbprocessor_reset(FBRAFBProcessor *this)
 {
-  THIS_WRITELOCK (this);
-  this->measurements_num = 0;
-  THIS_WRITEUNLOCK (this);
+
 }
-
-void fbrafbprocessor_track(gpointer data, guint payload_len, guint16 sn)
-{
-  FBRAFBProcessor *this;
-  FBRAFBProcessorItem* item;
-//  GstClockTime now;
-  this = data;
-  THIS_WRITELOCK (this);
-
-  item = _retrieve_item(this, sn);
-//  now  = _now(this);
-
-  item->payload_bytes = payload_len;
-  item->seq_num       = sn;
-  item->sent          = _now(this);
-
-//  ++this->stat.packets_in_flight;
-//  this->stat.bytes_in_flight += payload_len;
-
-  slidingwindow_add_data(this->sent_sw, item);
-//  slidingwindow_add_data(this->BiF_sw, item);
-  slidingwindow_refresh(this->acked_1s_sw);
-//  if(this->stat.BiF.updated < now - 100 * GST_MSECOND){
-//    slidingwindow_add_data(this->BiF_stat_sw, &this->stat.BiF.temp_max);
-//    this->stat.BiF.temp_max = 0;
-//    this->stat.BiF.updated = now;
-//  }
-
-//  slidingwindow_set_treshold(this->stt_sw, CONSTRAIN(100 * GST_MSECOND, GST_SECOND, 3 * this->stat.RTT));
-  THIS_WRITEUNLOCK (this);
-}
-
-//static void _update_fraction_discarded(FBRAFBProcessor *this)
-//{
-//  if(this->stat.acked_packets_in_1s == 0 || this->stat.discarded_packets_in_1s == 0){
-//    this->stat.discarded_rate = 0.;
-//    return;
-//  }
-//
-//  this->stat.discarded_rate = (gdouble)this->stat.discarded_packets_in_1s;
-//  this->stat.discarded_rate /= (gdouble)this->stat.acked_packets_in_1s;
-//
-////  slidingwindow_add_data(this->stt_sw, &this->stat.discarded_rate);
-//
-//}
 
 void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary)
 {
 
-  //TODO: This is the function where we have Profiling problem! Still? I have changed the access for items
-
-  PROFILING("THIS_WRITELOCK", THIS_WRITELOCK (this));
-
-  if(summary->RR.processed){
-	//this->stat.RTT  = summary->RR.RTT;
-	//this->stat.srtt = (this->stat.srtt == 0.) ? summary->RR.RTT : (summary->RR.RTT * .1 + this->stat.srtt * .9);
-//    slidingwindow_set_treshold(this->BiF_sw, 3 * MIN(GST_SECOND, this->stat.srtt));
-  }
   if(summary->XR.LostRLE.processed){
     _process_rle_discvector(this, &summary->XR);
-//    this->stat.recent_discarded = 0 < this->last_discard && _now(this) < this->last_discard + this->stat.RTT;
-//    _update_fraction_discarded(this);
   }
   if(summary->XR.OWD.processed){
       PROFILING("_process_owd",_process_owd(this, &summary->XR));
   }
-  //Short tendency is not considered to be ok
-//  if(summary->AFB.processed){
-//      PROFILING("_process_afb",_process_afb(this, summary->AFB.fci_id, (GstRTCPAFB_REPS *)summary->AFB.fci_data));
-//  }
   _process_statitem(this);
-  ++this->measurements_num;
   _owd_logger(this);
-  THIS_WRITEUNLOCK (this);
-
-}
-
-void
-fbrafbprocessor_get_stats (FBRAFBProcessor * this, FBRAFBProcessorStat* result)
-{
-  THIS_READLOCK (this);
-  memcpy(result, &this->stat, sizeof(FBRAFBProcessorStat));
-  THIS_READUNLOCK (this);
-}
-
-
-static void _refresh_owd_ltt(FBRAFBProcessor *this)
-{
-//  slidingwindow_add_data(this->ltt_sw, &this->stat.owd_stt);
-  slidingwindow_add_data(this->ltt_sw, this->last_statitem);
-  this->stat.owd_ltt80 = this->owd_stat.ltt80th;
+  observer_notify(this->on_report_processed, &this->stat);
 }
 
 void fbrafbprocessor_approve_measurement(FBRAFBProcessor *this)
 {
-  THIS_WRITELOCK (this);
-
-  _refresh_owd_ltt(this);
-
-  THIS_WRITEUNLOCK (this);
+  ++this->measurements_num;
 }
 
 void _process_statitem(FBRAFBProcessor *this)
@@ -544,19 +433,6 @@ void _process_statitem(FBRAFBProcessor *this)
   slidingwindow_add_data(this->BiF_sw, this->last_statitem);
 }
 
-//void _process_afb(FBRAFBProcessor *this, guint32 id, GstRTCPAFB_REPS *reps)
-//{
-//  gfloat                tendency;
-//  guint8                sampling_num;
-//
-//  if(id != RTCP_AFB_REPS_ID){
-//    return;
-//  }
-//
-//  gst_rtcp_afb_reps_getdown(reps, &sampling_num, &tendency);
-//  this->stat.tendency = 0 < sampling_num ? tendency : 1.;
-//
-//}
 
 void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
 {
@@ -633,22 +509,9 @@ done:
 //  slidingwindow_refresh(this->BiF_sw);
 }
 
-
-void _ref_rtpitem(FBRAFBProcessor * this, FBRAFBProcessorItem* item)
+FBRAPlusMeasurement* _retrieve_item(FBRAFBProcessor * this, guint16 seq)
 {
-  ++item->ref;
-}
-
-void _unref_rtpitem(FBRAFBProcessor * this, FBRAFBProcessorItem* item)
-{
-  if(0 < item->ref){
-    --item->ref;
-  }
-}
-
-FBRAFBProcessorItem* _retrieve_item(FBRAFBProcessor * this, guint16 seq)
-{
-  FBRAFBProcessorItem* item;
+  FBRAPlusMeasurement* item;
   item = this->items + seq;
   if(item->ref){
 	//This should not be happened, since ack_sw removes this
@@ -661,23 +524,5 @@ FBRAFBProcessorItem* _retrieve_item(FBRAFBProcessor * this, guint16 seq)
 }
 
 
-void _ref_statitem(FBRAFBProcessor * this, FBRAFBStatItem* item)
-{
-  ++item->ref;
-}
-
-void _unref_statitem(FBRAFBProcessor * this, FBRAFBStatItem* item)
-{
-  if(0 < --item->ref){
-    return;
-  }
-  g_slice_free(FBRAFBStatItem, item);
-}
 
 
-
-
-#undef THIS_WRITELOCK
-#undef THIS_WRITEUNLOCK
-#undef THIS_READLOCK
-#undef THIS_READUNLOCK

@@ -130,13 +130,6 @@ FBRAFBProducer *make_fbrafbproducer(guint32 ssrc,
   rcvtracker_subflow_add_on_received_packet_cb(this->tracker, subflow_id,
         (NotifierFunc) _on_received_packet, this);
 
-  rcvtracker_subflow_add_on_received_packet_cb(this->tracker, subflow_id,
-        (NotifierFunc) slidingwindow_add_data, this->owds_sw);
-
-  slidingwindow_add_pipes()
-
-  rcvtracker_subflow_add_on_lost_packet_cb(this->tracker, subflow_id,
-      _on_packet_lost, this);
   return this;
 }
 
@@ -153,7 +146,7 @@ void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold
 void _on_received_packet(FBRAFBProducer *this, RTPPacket *packet)
 {
 
-  slidingwindow_add_data(this->owds_sw, &pa->delay);
+  slidingwindow_add_data(this->owds_sw, &packet->received_info.delay);
 
   if(!this->initialized){
     this->initialized = TRUE;
@@ -161,19 +154,18 @@ void _on_received_packet(FBRAFBProducer *this, RTPPacket *packet)
     goto done;
   }
 
-  if(_cmp_seq(mprtp->subflow_seq, this->end_seq) <= 0){
+  if(_cmp_seq(packet->subflow_seq, this->end_seq) <= 0){
     goto done;
   }
 
-  if(_cmp_seq(this->end_seq + 1, mprtp->subflow_seq) < 0){
+  if(_cmp_seq(this->end_seq + 1, packet->subflow_seq) < 0){
     guint16 seq = this->end_seq + 1;
-    for(; _cmp_seq(seq, mprtp->subflow_seq) < 0; ++seq){
-//      g_print("marked as discarded: %d\n", seq);
+    for(; _cmp_seq(seq, packet->subflow_seq) < 0; ++seq){
       this->vector[this->vector_length++] = FALSE;
     }
   }
   this->vector[this->vector_length++] = TRUE;
-  this->end_seq = mprtp->subflow_seq;
+  this->end_seq = packet->subflow_seq;
 
 done:
   return;

@@ -34,6 +34,39 @@ GST_DEBUG_CATEGORY_STATIC (sndsubflows_debug_category);
 
 G_DEFINE_TYPE (SndSubflows, sndsubflows, G_TYPE_OBJECT);
 
+#define CHANGE_SUBFLOW_PROPERTY_VALUE(subflows_list, subflow_id, property, property_value, changed_subflows) \
+{                                                     \
+  if(changed_subflows){                               \
+    g_queue_clear(changed_subflows);                  \
+  }                                                   \
+  GSList* it;                                         \
+  for(it = subflows_list; it; it = it->next)          \
+  {                                                   \
+    SndSubflow* subflow = it->data;                   \
+    if(subflow_id == 0 || subflow_id == 255){         \
+      subflow->property = property_value;             \
+      if(changed_subflows){                           \
+        g_queue_push_head(changed_subflows, subflow); \
+      }                                               \
+      continue;                                       \
+    }                                                 \
+    if(subflow->id == subflow_id){                    \
+      subflow->property = property_value;             \
+      if(changed_subflows){                           \
+        g_queue_push_head(changed_subflows, subflow); \
+      }                                               \
+      break;                                          \
+    }                                                 \
+  }                                                   \
+}                                                     \
+
+#define NOTIFY_CHANGED_SUBFLOWS(changed_subflows, observer)        \
+{                                                                  \
+  while(!g_queue_is_empty(changed_subflows)){                      \
+    observer_notify(observer, g_queue_pop_head(changed_subflows)); \
+  }                                                                \
+}                                                                  \
+
 #define _now(this) gst_clock_get_time (this->sysclock)
 typedef struct{
   void    (*callback)(gpointer udata, SndSubflow* subflow);
@@ -47,32 +80,13 @@ static void
 sndsubflows_finalize (
     GObject * object);
 
-void _add_notifier(
-    GSList **list,
-    void (*callback)(gpointer udata, SndSubflow* subflow),
-    gpointer udata);
 
-static Notifier*
-_make_notifier(
-    void (*callback)(gpointer udata, SndSubflow* subflow),
-    gpointer udata);
+static SndSubflow*
+_make_subflow(SndSubflows* base_db, guint8 subflow_id);
 
 static void
-_dispose_notifier(
-    gpointer data);
+_dispose_subflow(SndSubflow *subflow);
 
-static void
-_call_notifiers(
-    GSList *notifiers,
-    SndSubflow *subflow);
-
-static void
-_setup_rtp2mprtp (SndSubflow *subflow,
-                  GstRTPBuffer *rtp);
-
-static void
-_setup_mprtpfec (SndSubflow *subflow,
-                  GstRTPBuffer *rtp);
 
 //----------------------------------------------------------------------
 //---- Private function implementations to Stream Dealer object --------
@@ -104,7 +118,16 @@ sndsubflows_finalize (GObject * object)
 {
   SndSubflows *this = SNDSUBFLOWS (object);
   g_hash_table_destroy (this->subflows);
+  g_queue_clear(this->changed_subflows);
   g_object_unref (this->sysclock);
+
+  g_object_unref(this->on_subflow_detached);
+  g_object_unref(this->on_subflow_joined);
+  g_object_unref(this->on_congestion_controlling_type_changed);
+  g_object_unref(this->on_path_active_changed);
+
+  g_object_unref(this->changed_subflows);
+
   g_free(this->subflows);
 }
 
@@ -112,56 +135,75 @@ sndsubflows_finalize (GObject * object)
 void
 sndsubflows_init (SndSubflows * this)
 {
-  this->sysclock = gst_system_clock_obtain ();
-  this->subflows               = g_malloc0(sizeof(SndSubflow) * 256);
-  this->made                   = _now(this);
+  this->sysclock            = gst_system_clock_obtain ();
+  this->subflows            = g_malloc0(sizeof(SndSubflow*) * 256);
+  this->made                = _now(this);
+
+  this->on_subflow_detached                     = make_observer();
+  this->on_subflow_joined                       = make_observer();
+  this->on_congestion_controlling_type_changed  = make_observer();
+  this->on_path_active_changed                  = make_observer();
+
+  this->changed_subflows                        = g_queue_new();
+
 }
 
-void sndsubflows_add_notifications(SndSubflows* this,void (*callback)(gpointer udata, SndSubflow* subflow), gpointer udata)
+void sndsubflows_join(SndSubflows* this, guint8 id)
 {
-  _add_notifier(&this->added_notifications, callback, udata);
-}
+  SndSubflow *subflow;
+  subflow = _make_subflow(this, id);
 
-SndSubflow* sndsubflows_add(SndSubflows* this, guint8 id)
-{
-  SndSubflow *result;
-  if(this->subflows[id] != NULL){
-    GST_LOG_OBJECT(this, "The subflow is already exists");
-    return this->subflows[id];
-  }
+  this->subflows[id] = subflow;
   ++this->subflows_num;
-  this->added = g_slist_prepend(this->added, this->subflows[id]);
 
-  this->subflows[id] = result = g_malloc0(sizeof(SndSubflow));
+  this->joined = g_slist_prepend(this->joined, subflow);
 
-  _call_notifiers(this->added_notifications, result);
-
-  return result;
+  observer_notify(this->on_subflow_joined, subflow);
 
 }
 
-void sndsubflows_rem(SndSubflows* this, guint8 id)
+void sndsubflows_detach(SndSubflows* this, guint8 id)
 {
   SndSubflow* subflow;
-  if(this->subflows[id] == NULL){
-    GST_LOG_OBJECT(this, "The subflow is not exists");
-  }
   subflow = this->subflows[id];
-  this->added = g_slist_remove(this->added, subflow);
 
-  _call_notifiers(subflow->notifiers.on_removing);
+  observer_notify(this->on_subflow_detached, subflow);
 
-  g_free(this->subflows[id]);
-  this->subflows[id] = NULL;
+  this->joined = g_slist_remove(this->joined, subflow);
+
   --this->subflows_num;
+  this->subflows[id] = NULL;
+
+  _dispose_subflow(subflow);
+
 }
 
 void sndsubflows_iterate(SndSubflows* this, GFunc process, gpointer udata)
 {
-  if(!this->added){
+  if(!this->joined){
     return;
   }
-  g_slist_foreach(this->added, process, udata);
+  g_slist_foreach(this->joined, process, udata);
+}
+
+void sndsubflows_on_subflow_joined_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(this->on_subflow_joined, callback, udata);
+}
+
+void sndsubflows_add_on_subflow_detached_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(this->on_subflow_detached, callback, udata);
+}
+
+void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(this->on_congestion_controlling_type_changed, callback, udata);
+}
+
+void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(this->on_path_active_changed, callback, udata);
 }
 
 void sndsubflows_set_target_rate(SndSubflows* this, SndSubflow* subflow, gint32 target_rate)
@@ -180,20 +222,73 @@ gint32 sndsubflows_get_subflows_num(SndSubflows* this)
   return this->subflows_num;
 }
 
-
 SndSubflow* sndsubflows_get_subflow(SndSubflows* this, guint8 subflow_id)
 {
   return this->subflows + subflow_id;
 }
 
-void sndsubflow_add_removal_notification(SndSubflow* subflow, void (*callback)(gpointer udata, SndSubflow* subflow), gpointer udata)
+void sndsubflows_set_mprtp_ext_header_id(SndSubflows* this, guint8 mprtp_ext_header_id)
 {
-  _add_notifier(&subflow->notifiers.on_removing, callback, udata);
+  this->mprtp_ext_header_id = mprtp_ext_header_id;
 }
 
-void sndsubflow_add_active_status_changed_notification(SndSubflow* subflow, void (*callback)(gpointer udata, SndSubflow* subflow), gpointer udata)
+guint8 sndsubflows_get_mprtp_ext_header_id(SndSubflows* this)
 {
-  _add_notifier(&subflow->notifiers.on_active_status_changed, callback, udata);
+  return this->mprtp_ext_header_id;
+}
+
+void sndsubflows_set_congestion_controlling_type(SndSubflows* this, guint8 subflow_id, CongestionControllingType new_type)
+{
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->subflows, subflow_id, congestion_controlling_type, new_type, this->changed_subflows);
+  NOTIFY_CHANGED_SUBFLOWS(this->changed_subflows, this->on_congestion_controlling_type_changed);
+}
+
+void sndsubflows_set_path_active(SndSubflows* this, guint8 subflow_id, gboolean value)
+{
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->subflows, subflow_id, active, value, this->changed_subflows);
+  NOTIFY_CHANGED_SUBFLOWS(this->changed_subflows, this->on_path_active_changed);
+}
+
+void sndsubflows_set_rtcp_interval_type(SndSubflows* this, guint8 subflow_id, RTCPIntervalType new_type)
+{
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->subflows, subflow_id, rtcp_interval_type, new_type, NULL);
+}
+
+void sndsubflows_set_path_lossy(SndSubflows* this, guint8 subflow_id, gboolean value)
+{
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->subflows, subflow_id, lossy, value, NULL);
+}
+
+void sndsubflows_set_path_congested(SndSubflows* this, guint8 subflow_id, gboolean value)
+{
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->subflows, subflow_id, congested, value, NULL);
+}
+
+//-----------------------------------------------------------------------------------------------------------
+
+void sndsubflow_on_stat_changed_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(subflow->on_stat_changed, callback, udata);
+}
+
+void sndsubflow_set_state(SndSubflow* subflow, SndSubflowState state)
+{
+  subflow->state = state;
+}
+
+void sndsubflow_on_packet_sent_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(subflow->on_packet_sent, callback, udata);
+}
+
+guint8 sndsubflow_get_mprtp_ext_header_id(SndSubflow* subflow)
+{
+  return subflow->base_db->mprtp_ext_header_id;
+}
+
+guint16 sndsubflow_get_next_subflow_seq(SndSubflow* subflow)
+{
+  return subflowseqtracker_increase(&subflow->seqtracker);
 }
 
 guint8 sndsubflow_get_flags_abs_value(SndSubflow* subflow)
@@ -201,11 +296,14 @@ guint8 sndsubflow_get_flags_abs_value(SndSubflow* subflow)
   return (subflow->active ? 4 : 0) + (subflow->lossy ? 0 : 2) + (subflow->congested ? 0 : 1);
 }
 
-void sndsubflow_set_active_status(SndSubflow* subflow, gboolean active)
+gboolean sndsubflow_fec_requested(SndSubflow* subflow)
 {
-  subflow->active = active;
-  _call_notifiers(subflow->notifiers.on_active_status_changed, subflow);
+  if(!subflow->fec_interval){
+    return FALSE;
+  }
+  return subflow->seqtracker.seqence_num % subflow->fec_interval == 0;
 }
+
 
 
 
@@ -230,95 +328,24 @@ done:
   return buffer;
 }
 
-GstBuffer*
-sndsubflow_process_fec_buffer(SndSubflow *subflow,
-                              GstBuffer* buffer)
+
+
+SndSubflow* _make_subflow(SndSubflows* base_db, guint8 subflow_id)
 {
-  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-  buffer = gst_buffer_make_writable(buffer);
-  gst_rtp_buffer_map(buffer, GST_MAP_READWRITE, &rtp);
-  _setup_mprtpfec(subflow, &rtp);
-  gst_rtp_buffer_unmap(&rtp);
-  return buffer;
-}
-
-
-
-
-
-
-
-
-
-void _add_notifier(GSList **list, void (*callback)(gpointer udata, SndSubflow* subflow), gpointer udata)
-{
-  *list = g_slist_prepend(*list, _make_notifier(callback, udata));
-}
-
-Notifier* _make_notifier(void (*callback)(gpointer udata, SndSubflow* subflow), gpointer udata)
-{
-  Notifier* result =  g_slice_new0(Notifier);
-  result->udata = udata;
-  result->callback = callback;
+  SndSubflow* result = g_malloc0(sizeof(SndSubflow));
+  result->base_db         = base_db;
+  result->on_packet_sent  = make_observer();
+  result->on_stat_changed = make_observer();
   return result;
 }
 
-void _dispose_notifier(gpointer data)
+void _dispose_subflow(SndSubflow *subflow)
 {
-  if(!data){
-    return;
-  }
-  Notifier* notifier = data;
-  g_slice_free(Notifier, notifier);
-}
-
-static void _call_notifiers(GSList *notifiers, SndSubflow *subflow)
-{
-  GSList *it;
-  if(!notifiers){
-    return;
-  }
-
-  for(it = notifiers; it; it = it->next){
-    Notifier* notifier = it->data;
-    notifier->callback(notifier->udata, subflow);
-  }
+  g_object_unref(subflow->on_packet_sent);
+  g_object_unref(subflow->on_stat_changed);
+  g_free(subflow);
 }
 
 
 
-void
-_setup_rtp2mprtp (SndSubflow *subflow,
-                  GstRTPBuffer *rtp)
-{
-  MPRTPSubflowHeaderExtension data;
-  data.id = subflow->id;
-  if (++(subflow->rtp_seq) == 0) {
-    ++(subflow->rtp_seq_cycle_num);
-  }
-  data.seq = subflow->rtp_seq;
-
-  gst_rtp_buffer_add_extension_onebyte_header (rtp, subflow->mprtp_ext_header_id,
-      (gpointer) & data, sizeof (data));
-
-  return;
-}
-
-
-void
-_setup_mprtpfec (SndSubflow *subflow,
-                  GstRTPBuffer *rtp)
-{
-  MPRTPSubflowHeaderExtension data;
-  data.id = subflow->id;
-  if (++(subflow->fec_seq) == 0) {
-    ++(subflow->fec_seq_cycle_num);
-  }
-  data.seq = subflow->fec_seq;
-
-  gst_rtp_buffer_add_extension_onebyte_header (rtp, subflow->fec_ext_header_id,
-      (gpointer) & data, sizeof (data));
-
-  return;
-}
-
+#undef CHANGE_SUBFLOW_PROPERTY_VALUE

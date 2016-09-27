@@ -34,24 +34,30 @@ typedef void (*SubRateAction)(FBRASubController*);
 typedef void (*SubTargetRateCtrler)(FBRASubController*, gint32);
 
 
+typedef struct _FBRAPlusStat
+{
+  gint32                   bytes_in_flight;
+  gint32                   sender_bitrate;
+  gdouble                  owd_corr;
+  gdouble                  owd_std;
+  GstClockTime             RTT;
+  gdouble                  srtt;
+}FBRAPlusStat;
+
 struct _FBRASubController
 {
   GObject                   object;
-  guint8                    id;
   GstClock*                 sysclock;
   GstClockTime              made;
+  gboolean                  enabled;
+  SndSubflow*               subflow;
 
   GstClockTime              last_executed;
-  guint                     measurements_num;
 
   gint32                    bottleneck_point;
-  GstClockTime              last_settled;
-  GstClockTime              last_fb_arrived;
-
-  gboolean                  enabled;
 
   FBRAFBProcessor*          fbprocessor;
-  FBRAFBProcessorStat       fbstat;
+  FBRAPlusStat              fbstat;
 
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;
@@ -71,9 +77,7 @@ struct _FBRASubController
 
   gpointer                  priv;
 
-  RTPPackets*              rtppackets;
-  SndSubflow*              subflow;
-  SndTracker*              sndtracker;
+  SndTracker*               sndtracker;
 
 };
 
@@ -92,7 +96,5 @@ void fbrasubctrler_disable(FBRASubController *this);
 void fbrasubctrler_report_update(FBRASubController *this, GstMPRTCPReportSummary *summary);
 gboolean fbrasubctrler_time_update(FBRASubController *this);
 
-void fbrasubctrler_signal_update(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *params);
-void fbrasubctrler_signal_request(FBRASubController *this, MPRTPSubflowFECBasedRateAdaption *result);
 
 #endif /* FBRASUBCTRLER_H_ */

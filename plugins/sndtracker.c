@@ -118,6 +118,14 @@ sndtracker_init (SndTracker * this)
   slidingwindow_on_rem_item_cb(this->fec_sw, (NotifierFunc) _fec_rem_pipe, this);
 }
 
+SndTracker *make_sndtracker(SndSubflows* subflows)
+{
+  SndTracker* this;
+  this = g_object_new(SNDTRACKER_TYPE, NULL);
+
+  return this;
+}
+
 void sndtracker_refresh(SndTracker * this)
 {
   slidingwindow_refresh(this->packets_sw);
@@ -133,7 +141,7 @@ void sndtracker_add_packet_notifier(SndTracker * this,
 }
 
 
-void sndtracker_add_stat_notifier(SndTracker * this, NotifierFunc callback, gpointer udata)
+void sndtracker_add_stat_changed_cb(SndTracker * this, NotifierFunc callback, gpointer udata)
 {
   if(!this->on_stat_changed){
     this->on_stat_changed = make_observer();
@@ -141,7 +149,7 @@ void sndtracker_add_stat_notifier(SndTracker * this, NotifierFunc callback, gpoi
   observer_add_listener(this->on_stat_changed, callback, udata);
 }
 
-void sndtracker_add_stat_subflow_notifier(SndTracker * this,
+void sndtracker_subflow_add_on_stat_changed_cb(SndTracker * this,
                                     guint8 subflow_id,
                                     NotifierFunc callback, gpointer udata)
 {
@@ -182,7 +190,7 @@ void sndtracker_add_packet(SndTracker * this, RTPPacket* packet)
   slidingwindow_add_data(this->packets_sw, packet);
 }
 
-void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_response)
+void sndtracker_add_on_fec_response(SndTracker * this, FECEncoderResponse *fec_response)
 {
   this->stat.sent_fec_bytes_in_1s += fec_response->payload_size;
   ++this->stat.sent_fec_packets_in_1s;

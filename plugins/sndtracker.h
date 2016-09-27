@@ -51,7 +51,7 @@ struct _SndTrackerClass{
 
 
 GType sndtracker_get_type (void);
-SndTracker *make_sndtracker(void);
+SndTracker *make_sndtracker(SndSubflows* subflows);
 void sndtracker_refresh(SndTracker * this);
 
 void sndtracker_add_packet_notifier(SndTracker * this,
@@ -60,11 +60,11 @@ void sndtracker_add_packet_notifier(SndTracker * this,
                                         void (*rem_callback)(gpointer udata, gpointer item),
                                         gpointer rem_udata);
 
-void sndtracker_add_stat_notifier(SndTracker * this, NotifierFunc callback, gpointer udata);
+void sndtracker_add_stat_changed_cb(SndTracker * this, NotifierFunc callback, gpointer udata);
 
-void sndtracker_add_stat_subflow_notifier(SndTracker * this, guint8 subflow_id, NotifierFunc callback, gpointer udata);
+void sndtracker_subflow_add_on_stat_changed_cb(SndTracker * this, guint8 subflow_id, NotifierFunc callback, gpointer udata);
 void sndtracker_add_packet(SndTracker * this, RTPPacket* packet);
-void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_response);
+void sndtracker_add_on_fec_response(SndTracker * this, FECEncoderResponse *fec_response);
 SndTrackerStat* sndtracker_get_accumulated_stat(SndTracker * this);
 SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id);
 

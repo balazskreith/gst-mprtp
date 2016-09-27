@@ -52,10 +52,6 @@ struct _GstMprtpscheduler
   GstPad*                       mprtcp_rr_sinkpad;
   GstPad*                       mprtcp_sr_srcpad;
 
-  guint8                        mprtp_ext_header_id;
-  guint8                        abs_time_ext_header_id;
-  gboolean                      enable_fec;
-
   SndSubflows*                  subflows;
   RTPPackets*                   rtppackets;
   StreamSplitter*               splitter;

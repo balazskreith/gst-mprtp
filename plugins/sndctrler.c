@@ -47,13 +47,14 @@ typedef void (*CallFunc)(gpointer udata);
 typedef gboolean (*TimeUpdaterFunc)(gpointer udata);
 typedef void (*TransitFunc)(gpointer udata, GstMPRTCPReportSummary* summary);
 typedef struct{
-  guint8          subflow_id;
-  gpointer        udata;
-  CallFunc        dispose;
-  CallFunc        disable;
-  CallFunc        enable;
-  TimeUpdaterFunc time_updater;
-  TransitFunc     report_updater;
+  CongestionControllingType type;
+  guint8                    subflow_id;
+  gpointer                  udata;
+  CallFunc                  dispose;
+  CallFunc                  disable;
+  CallFunc                  enable;
+  TimeUpdaterFunc           time_updater;
+  TransitFunc               report_updater;
 }CongestionController;
 
 //----------------------------------------------------------------------
@@ -63,6 +64,20 @@ typedef struct{
 static void
 sndctrler_finalize (GObject * object);
 
+static void
+_on_subflow_active_changed(
+    SndController* this,
+    SndSubflow *subflow);
+
+static void
+_on_subflow_detached(
+    SndController* this,
+    SndSubflow *subflow);
+
+static void
+_on_congestion_controlling_changed(
+    SndController* this,
+    SndSubflow *subflow);
 
 static void
 _dispose_congestion_controller(
@@ -163,142 +178,22 @@ make_sndctrler(RTPPackets *rtppackets,
     GAsyncQueue *emitterq)
 {
   SndController* this = (SndController*)g_object_new(SNDCTRLER_TYPE, NULL);
+
   this->mprtcpq    = g_async_queue_ref(mprtcpq);
   this->emitterq   = g_async_queue_ref(emitterq);
   this->subflows   = g_object_ref(subflows);
   this->sndtracker = g_object_ref(sndtracker);
   this->rtppackets = g_object_ref(rtppackets);
 
+  sndsubflows_add_on_subflow_detached_cb(
+      this->subflows, (NotifierFunc)_on_subflow_detached, this);
+
+  sndsubflows_add_on_congestion_controlling_type_changed_cb(
+      this->subflows, (NotifierFunc)_on_congestion_controlling_changed, this);
+
+  sndsubflows_add_on_path_active_changed_cb(
+      this->subflows, (NotifierFunc)_on_subflow_active_changed, this);
   return this;
-}
-
-
-typedef struct{
-  guint8                    subflow_id;
-  RTCPIntervalMode          new_mode;
-}ChangeIntervalHelper;
-
-static void _subflow_change_interval_type(gpointer item, gpointer udata)
-{
-  SndSubflow* subflow = item;
-  ChangeIntervalHelper* helper = udata;
-  if(helper->subflow_id == 0 || helper->subflow_id == 255){
-    goto change;
-  }
-  if(helper->subflow_id != subflow->id){
-    goto remain;
-  }
-change:
-  subflow->rtcp_interval_mode = helper->new_mode;
-remain:
-  return;
-}
-
-void sndctrler_change_interval_type(SndController * this, guint8 subflow_id, guint type)
-{
-  ChangeIntervalHelper helper;
-  helper.new_mode = type;
-  helper.subflow_id = subflow_id;
-  sndsubflows_iterate(this->subflows, _subflow_change_interval_type, &helper);
-}
-
-
-
-static gint _controller_by_subflow_id(gpointer item, gpointer udata)
-{
-  CongestionController *controller = item;
-  SndSubflow *subflow = udata;
-  return subflow->id == controller->subflow_id ? 0 : -1;
-}
-
-typedef struct{
-  guint8                    subflow_id;
-  CongestionControllingMode new_mode;
-  SndController            *snd_controller;
-  gboolean                 *enable_fec;
-}ChangeControllingHelper;
-
-static void _subflow_change_controlling_mode(gpointer item, gpointer udata)
-{
-  SndSubflow              *subflow = item;
-  ChangeControllingHelper *helper = udata;
-  GSList                  *controller_item;
-  SndController           *this = helper->snd_controller;
-
-  if(helper->subflow_id == 0 || helper->subflow_id == 255){
-    goto change;
-  }
-  if(helper->subflow_id != subflow->id){
-    goto done;
-  }
-change:
-  controller_item = g_slist_find_custom(this->controllers, _controller_by_subflow_id, subflow);
-  if(controller_item){
-    CongestionController *controller = controller_item->data;
-    if(subflow->congestion_controlling_mode == helper->new_mode){
-      goto done;
-    }
-    _dispose_congestion_controller(this, controller);
-  }
-
-  subflow->congestion_controlling_mode = helper->new_mode;
-  switch(helper->new_mode){
-    case CONGESTION_CONTROLLING_MODE_FBRAPLUS:
-      this->controllers = g_slist_prepend(this->controllers, _create_fbraplus(this, subflow));
-      if(helper->enable_fec){
-        *helper->enable_fec = TRUE;
-      }
-      break;
-    case CONGESTION_CONTROLLING_MODE_NONE:
-    default:
-      break;
-  };
-
-done:
-  return;
-}
-
-void sndctrler_change_controlling_mode(SndController * this,
-                                       guint8 subflow_id,
-                                       CongestionControllingMode controlling_mode,
-                                       gboolean *enable_fec)
-{
-  ChangeControllingHelper helper;
-  helper.new_mode = controlling_mode;
-  helper.subflow_id = subflow_id;
-  helper.snd_controller = this;
-  helper.enable_fec = enable_fec;
-  sndsubflows_iterate(this->subflows, _subflow_change_controlling_mode, &helper);
-}
-
-
-typedef struct{
-  guint8                    subflow_id;
-  GstClockTime              report_timeout;
-}ChangeReportTimeoutHelper;
-
-static void _subflow_change_report_timeout(gpointer item, gpointer udata)
-{
-  SndSubflow* subflow = item;
-  ChangeReportTimeoutHelper* helper = udata;
-  if(helper->subflow_id == 0 || helper->subflow_id == 255){
-    goto change;
-  }
-  if(helper->subflow_id != subflow->id){
-    goto remain;
-  }
-change:
-  subflow->report_timeout = helper->report_timeout;
-remain:
-  return;
-}
-
-void sndctrler_setup_report_timeout(SndController * this, guint8 subflow_id, GstClockTime report_timeout)
-{
-  ChangeReportTimeoutHelper helper;
-  helper.report_timeout = report_timeout;
-  helper.subflow_id = subflow_id;
-  sndsubflows_iterate(this->subflows, _subflow_change_report_timeout, &helper);
 }
 
 void
@@ -389,7 +284,7 @@ static void _sender_report_updater_helper(SndSubflow *subflow, gpointer udata)
   this     = udata;
   ricalcer = this->ricalcer;
 
-  if(subflow->congestion_controlling_mode == CONGESTION_CONTROLLING_MODE_NONE){
+  if(subflow->congestion_controlling_type == CONGESTION_CONTROLLING_MODE_NONE){
     goto done;
   }
 
@@ -495,6 +390,69 @@ void _update_subflow_target_utilization(SndController* this)
   signaldata->target_media_rate = sndsubflows_get_total_target(this->subflows);
 }
 
+
+//---------------------- Event handlers ----------------------------------
+
+static gint _controller_by_subflow_id(gpointer item, gpointer udata)
+{
+  CongestionController *controller = item;
+  SndSubflow *subflow = udata;
+  return subflow->id == controller->subflow_id ? 0 : -1;
+}
+
+void _on_subflow_active_changed(SndController* this, SndSubflow *subflow)
+{
+  GSList* controller_item;
+  CongestionController *controller;
+  controller_item = g_slist_find_custom(this->controllers, _controller_by_subflow_id, subflow);
+  if(!controller_item){
+    return;
+  }
+  controller = controller_item->data;
+  if(subflow->active){
+    controller->enable(controller->udata);
+  }else{
+    controller->disable(controller->udata);
+  }
+}
+
+void _on_subflow_detached(SndController* this, SndSubflow *subflow)
+{
+  GSList* controller_item;
+  CongestionController *controller;
+  controller_item = g_slist_find_custom(this->controllers, _controller_by_subflow_id, subflow);
+  if(!controller_item){
+    return;
+  }
+  controller = controller_item->data;
+  _dispose_congestion_controller(this, controller);
+}
+
+void _on_congestion_controlling_changed(SndController* this, SndSubflow *subflow)
+{
+  GSList* controller_item;
+
+  controller_item = g_slist_find_custom(this->controllers, _controller_by_subflow_id, subflow);
+  if(controller_item){
+    CongestionController *controller = controller_item->data;
+    if(subflow->congestion_controlling_type == controller->type){
+      goto done;
+    }
+    _dispose_congestion_controller(this, controller);
+  }
+
+  switch(subflow->congestion_controlling_type){
+    case CONGESTION_CONTROLLING_MODE_FBRAPLUS:
+      this->controllers = g_slist_prepend(this->controllers, _create_fbraplus(this, subflow));
+      break;
+    case CONGESTION_CONTROLLING_MODE_NONE:
+    default:
+      break;
+  };
+done:
+  return;
+}
+
 //---------------------- Utility functions ----------------------------------
 
 
@@ -509,6 +467,7 @@ void _dispose_congestion_controller(SndController* this, CongestionController* c
 CongestionController* _create_fbraplus(SndController* this, SndSubflow* subflow)
 {
   CongestionController *result = g_slice_new0(CongestionController);
+  result->type           = CONGESTION_CONTROLLING_MODE_FBRAPLUS;
   result->subflow_id     = subflow->id;
   result->udata          = make_fbrasubctrler(this->rtppackets, this->sndtracker, subflow);
   result->disable        = (CallFunc) fbrasubctrler_disable;

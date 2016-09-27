@@ -10,7 +10,6 @@
 
 
 #include <gst/gst.h>
-#include "mprtpspath.h"
 
 typedef struct _SndTracker SndTracker;
 typedef struct _SndTrackerClass SndTrackerClass;
@@ -21,27 +20,45 @@ typedef struct _SndTrackerClass SndTrackerClass;
 #define SNDTRACKER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),SNDTRACKER_TYPE))
 #define SNDTRACKER_CAST(src)        ((SndTracker *)(src))
 
-typedef struct _SndTrackerStat{
+
+typedef struct _SndTrackerSndStat{
+
   gint32                    sent_bytes_in_1s;
   gint16                    sent_packets_in_1s;
+
   guint32                   total_sent_bytes;
   guint32                   total_sent_packets;
 
   gint32                    sent_fec_bytes_in_1s;
   gint32                    sent_fec_packets_in_1s;
+
+  gint32                    bytes_in_flight;
+  gint32                    packets_in_flight;
+
+  gint32                    received_bytes_in_1s;
+  gint32                    received_packets_in_1s;
+
+  gint32                    acked_bytes_in_1s;
+  gint32                    acked_packets_in_1s;
+
+  guint32                   total_acked_bytes;
+  guint32                   total_acked_packets;
+
+  guint32                   total_received_bytes;
+  guint32                   total_received_packets;
 }SndTrackerStat;
 
 struct _SndTracker
 {
   GObject                   object;
   GstClock*                 sysclock;
-  SlidingWindow*            packets_sw;
+  SndSubflows*              subflows_db;
+  SlidingWindow*            sent_sw;
+  SlidingWindow*            acked_sw;
   SlidingWindow*            fec_sw;
 
-  Observer*                 on_stat_changed;
-
   gpointer                  priv;
-  SndTrackerStat            stat;
+  SndTrackerStat         stat;
 };
 
 
@@ -51,21 +68,15 @@ struct _SndTrackerClass{
 
 
 GType sndtracker_get_type (void);
-SndTracker *make_sndtracker(SndSubflows* subflows);
+SndTracker *make_sndtracker(SndSubflows* subflows_db);
 void sndtracker_refresh(SndTracker * this);
 
-void sndtracker_add_packet_notifier(SndTracker * this,
-                                        void (*add_callback)(gpointer udata, gpointer item),
-                                        gpointer add_udata,
-                                        void (*rem_callback)(gpointer udata, gpointer item),
-                                        gpointer rem_udata);
 
-void sndtracker_add_stat_changed_cb(SndTracker * this, NotifierFunc callback, gpointer udata);
-
-void sndtracker_subflow_add_on_stat_changed_cb(SndTracker * this, guint8 subflow_id, NotifierFunc callback, gpointer udata);
-void sndtracker_add_packet(SndTracker * this, RTPPacket* packet);
-void sndtracker_add_on_fec_response(SndTracker * this, FECEncoderResponse *fec_response);
-SndTrackerStat* sndtracker_get_accumulated_stat(SndTracker * this);
+void sndtracker_packet_sent(SndTracker * this, RTPPacket* packet);
+RTPPacket* sndtracker_retrieve_sent_packet(SndTracker * this, guint8 subflow_id, guint16 subflow_seq);
+void sndtracker_packet_acked(SndTracker * this, RTPPacket* packet);
+void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_response);
+SndTrackerStat* sndtracker_get_stat(SndTracker * this);
 SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id);
 
 #endif /* SNDTRACKER_H_ */

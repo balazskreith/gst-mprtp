@@ -30,6 +30,7 @@ typedef enum{
 
 struct _RTPPacket
 {
+  RTPPackets*          base_db;
   GstBuffer*           buffer;
   gint                 ref;
   GstClockTime         created;
@@ -73,7 +74,6 @@ struct _RTPPackets
 
   guint8                     abs_time_ext_header_id;
 
-  SndSubflows*               subflows;
 };
 
 
@@ -89,18 +89,16 @@ RTPPackets* make_rtppackets(SndSubflows *subflows);
 void rtppackets_reset(RTPPackets* this);
 
 void rtppackets_add_stalled_packet_cb(RTPPackets* this, void (*callback)(gpointer udata, RTPPacket* packet), gpointer udata);
-void rtppackets_add_subflow(RTPPackets* this, guint8 subflow_id);
+
 void _stalled_notify_caller(RTPPackets* this, gpointer item, gpointer udata);
 RTPPacket* rtppackets_retrieve_packet_for_sending(RTPPackets* this, GstBuffer *buffer);
 RTPPacket* rtppackets_retrieve_packet_at_receiving(RTPPackets* this, RcvSubflow* subflow, GstBuffer *buffer);
 
 void rtppacket_setup_mprtp(RTPPacket *packet, SndSubflow* subflow);
-void rtppacket_setup_abs_time_extension(RTPPackets *this, RTPPacket* packet);
+void rtppacket_setup_abs_time_extension(RTPPacket* packet);
 
 void rtppackets_packet_forwarded(RTPPackets* this, RTPPacket *packet);
 RTPPacket* rtppackets_get_by_abs_seq(RTPPackets* this, guint16 abs_seq);
-RTPPacket* rtppackets_get_by_subflow_seq(RTPPackets* this, guint8 subflow_id, guint16 sub_seq);
-
 
 
 void rtppackets_set_abs_time_ext_header_id(RTPPackets* this, guint8 abs_time_ext_header_id);

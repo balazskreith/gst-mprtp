@@ -284,7 +284,7 @@ static void _sender_report_updater_helper(SndSubflow *subflow, gpointer udata)
   this     = udata;
   ricalcer = this->ricalcer;
 
-  if(subflow->congestion_controlling_type == CONGESTION_CONTROLLING_MODE_NONE){
+  if(subflow->congestion_controlling_type == CONGESTION_CONTROLLING_TYPE_NONE){
     goto done;
   }
 
@@ -442,10 +442,10 @@ void _on_congestion_controlling_changed(SndController* this, SndSubflow *subflow
   }
 
   switch(subflow->congestion_controlling_type){
-    case CONGESTION_CONTROLLING_MODE_FBRAPLUS:
+    case CONGESTION_CONTROLLING_TYPE_FBRAPLUS:
       this->controllers = g_slist_prepend(this->controllers, _create_fbraplus(this, subflow));
       break;
-    case CONGESTION_CONTROLLING_MODE_NONE:
+    case CONGESTION_CONTROLLING_TYPE_NONE:
     default:
       break;
   };
@@ -467,7 +467,7 @@ void _dispose_congestion_controller(SndController* this, CongestionController* c
 CongestionController* _create_fbraplus(SndController* this, SndSubflow* subflow)
 {
   CongestionController *result = g_slice_new0(CongestionController);
-  result->type           = CONGESTION_CONTROLLING_MODE_FBRAPLUS;
+  result->type           = CONGESTION_CONTROLLING_TYPE_FBRAPLUS;
   result->subflow_id     = subflow->id;
   result->udata          = make_fbrasubctrler(this->rtppackets, this->sndtracker, subflow);
   result->disable        = (CallFunc) fbrasubctrler_disable;

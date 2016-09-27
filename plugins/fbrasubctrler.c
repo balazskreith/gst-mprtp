@@ -91,30 +91,16 @@ struct _Private{
 
 
 #define _priv(this) ((Private*)this->priv)
-#define _fbstat(this) this->fbstat
+#define _fbstat(this) this->stat
 #define _throttler(this) _priv(this)->throttler
 
-#define _btlp(this) this->bottleneck_point
-#define _mon_int(this) this->monitoring_interval
-#define _mon_br(this) this->monitored_bitrate
-#define _qdelay_processed(this) _fbstat(this).owd_processed
-#define _rdiscards(this) _fbstat(this).recent_discards
-
-#define _state_t1(this) this->state_t1
 #define _stage(this) _priv(this)->stage
-#define _stage_t1(this) _priv(this)->stage_t1
 #define _event(this) _priv(this)->event
 #define _set_event(this, e) _event(this) = e
 #define _set_pending_event(this, e) this->pending_event = e
 
-#define _stability_th(this) _priv(this)->stability_treshold
-
 #define _SR(this) (_fbstat(this).sent_bytes_in_1s * 8)
 #define _GP(this) (_fbstat(this).goodput_bytes * 8)
-#define _GP_t1(this) (_priv(this)->goodput_bitrate_t1)
-#define _min_br(this) MIN(_SR(this), _TR(this))
-#define _max_br(this) MAX(_SR(this), _TR(this))
-#define _owd_corr(this) _fbstat(this).owd_corr
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
@@ -242,32 +228,29 @@ disapprove:
 }
 
 
-FBRASubController *make_fbrasubctrler(SndSubflow *subflow, SndTracker *sndtracker)
+FBRASubController *make_fbrasubctrler(SndTracker *sndtracker, SndSubflow *subflow)
 {
   FBRASubController *this;
   this                      = g_object_new (FBRASUBCTRLER_TYPE, NULL);
   this->sndtracker          = g_object_unref(sndtracker);
   this->subflow             = subflow;
   this->made                = _now(this);
+  this->fbprocessor         = make_fbrafbprocessor(sndtracker, subflow, &this->stat);
 
-
-  subflow->state = SNDSUBFLOW_STATE_STABLE;
+  sndsubflow_set_state(subflow, SNDSUBFLOW_STATE_STABLE);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
 
-  return result;
+  return this;
 }
 
 void fbrasubctrler_enable(FBRASubController *this)
 {
-  GstClockTime now = _now(this);
-  this->enabled             = TRUE;
-
+  this->enabled    = TRUE;
 }
 
 void fbrasubctrler_disable(FBRASubController *this)
 {
   _switch_stage_to(this, STAGE_KEEP, FALSE);
-  this->measurements_num = 0;
   this->enabled = FALSE;
 }
 
@@ -297,6 +280,11 @@ done:
   return;
 }
 
+static void _stat_update(FBRASubController *this)
+{
+
+}
+
 gboolean fbrasubctrler_time_update(FBRASubController *this)
 {
   GstClockTime fbinterval_th;
@@ -322,8 +310,6 @@ done:
   return FALSE;
 }
 
-GstClockTime start = 0;
-GstClockTime previous = 0;
 void fbrasubctrler_report_update(
                          FBRASubController *this,
                          GstMPRTCPReportSummary *summary)
@@ -334,6 +320,9 @@ void fbrasubctrler_report_update(
     goto done;
   }
 
+  fbrafbprocessor_update(this->fbprocessor, summary);
+
+  _stat_update(this);
   _execute_stage(this);
 
   max_approve_idle_th = CONSTRAIN(100 * GST_MSECOND, 500 * GST_MSECOND, 2 * _RTT(this));

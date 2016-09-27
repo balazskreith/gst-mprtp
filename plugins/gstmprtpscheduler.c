@@ -384,7 +384,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   this->subflows      = make_sndsubflows();
   this->rtppackets    = make_rtppackets();
-  this->rtpq          = g_async_queue_new();
+  this->rtp_in          = g_async_queue_new();
   this->fec_responses = g_async_queue_new();
   this->emitterq      = g_async_queue_new();
 
@@ -436,7 +436,7 @@ gst_mprtpscheduler_finalize (GObject * object)
 
   g_async_queue_unref(this->mprtpq);
   g_async_queue_unref(this->mprtcpq);
-  g_async_queue_unref(this->rtpq);
+  g_async_queue_unref(this->rtp_in);
   g_async_queue_unref(this->fec_responses);
   g_async_queue_unref(this->emitterq);
 
@@ -728,7 +728,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     return GST_FLOW_OK;
   }
 
-  g_async_queue_push(this->rtpq, gst_buffer_ref(buffer));
+  g_async_queue_push(this->rtp_in, gst_buffer_ref(buffer));
 done:
   result = GST_FLOW_OK;
   return result;
@@ -922,8 +922,8 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, RTPPacket *packet)
     fecencoder_request_fec(this->fec_encoder, subflow);
   }
 
-  rtppacket_setup_abs_time_extension(this->rtppackets, packet);
-  sndtracker_add_packet(this->sndtracker, packet);
+  rtppacket_setup_abs_time_extension(packet);
+  sndtracker_packet_sent(this->sndtracker, packet);
   packetforwarder_add_rtppad_buffer(this->packetforwarder, gst_buffer_ref(packet->buffer));
   rtppackets_packet_forwarded(packet);
 
@@ -932,7 +932,7 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, RTPPacket *packet)
     response = g_async_queue_pop(this->fec_responses);
     response->subflow_id = subflow->id;
     response->fecbuffer = sndsubflow_process_fec_buffer(subflow, response->fecbuffer);
-    sndtracker_add_on_fec_response(this->sndtracker, response);
+    sndtracker_add_fec_response(this->sndtracker, response);
     packetforwarder_add_rtppad_buffer(this->packetforwarder, response->fecbuffer);
     fecencoder_unref_response(response);
   }
@@ -959,22 +959,22 @@ mprtpscheduler_approval_process (gpointer udata)
   sndctrler_time_update(this->controller);
 
 again:
-  buffer = (GstBuffer *)g_async_queue_timeout_pop(this->rtpq, 100);
+  buffer = (GstBuffer *)g_async_queue_timeout_pop(this->rtp_in, 100);
   if(!buffer){
     sndtracker_refresh(this->sndtracker);
     goto done;
   }
   packet = rtppackets_retrieve_packet_for_sending(this->rtppackets, buffer);
+  gst_buffer_unref(buffer);
 
   //Obsolete packets stayed in the q for a while
   if(0 < this->obsolation_treshold && packet->created < _now(this) - this->obsolation_treshold){
-    gst_buffer_unref(packet->buffer);
     rtppackets_packet_forwarded(this->rtppackets, packet);
     goto again;
   }
 
   if(!_mprtpscheduler_send_packet(this, packet)){
-    g_async_queue_push_front(this->rtpq, buffer);
+    g_async_queue_push_front(this->rtp_in, gst_buffer_ref(buffer));
     goto done;
   }
 done:

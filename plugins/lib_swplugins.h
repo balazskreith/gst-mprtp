@@ -10,8 +10,8 @@
 #include "lib_bintree.h"
 
 
-#define StructCmpFnc(Type, field) \
-static gint _statitem_##field##_cmp(gpointer pa, gpointer pb) \
+#define StructCmpFnc(funcName, Type, field) \
+static gint funcName(gpointer pa, gpointer pb) \
 { \
   Type *a,*b; \
   a = pa; b = pb; \

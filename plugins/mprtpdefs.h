@@ -49,8 +49,8 @@ typedef enum{
 }RTCPIntervalType;
 
 typedef enum{
-  CONGESTION_CONTROLLING_MODE_NONE         = 0,
-  CONGESTION_CONTROLLING_MODE_FBRAPLUS     = 1,
+  CONGESTION_CONTROLLING_TYPE_NONE         = 0,
+  CONGESTION_CONTROLLING_TYPE_FBRAPLUS     = 1,
 }CongestionControllingType;
 
 

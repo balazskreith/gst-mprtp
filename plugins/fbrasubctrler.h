@@ -9,8 +9,6 @@
 #define FBRASUBCTRLER_H_
 
 #include <gst/gst.h>
-#include "mprtpspath.h"
-#include "sndratedistor.h"
 #include "reportproc.h"
 #include "signalreport.h"
 #include "fbrafbproc.h"
@@ -34,16 +32,6 @@ typedef void (*SubRateAction)(FBRASubController*);
 typedef void (*SubTargetRateCtrler)(FBRASubController*, gint32);
 
 
-typedef struct _FBRAPlusStat
-{
-  gint32                   bytes_in_flight;
-  gint32                   sender_bitrate;
-  gdouble                  owd_corr;
-  gdouble                  owd_std;
-  GstClockTime             RTT;
-  gdouble                  srtt;
-}FBRAPlusStat;
-
 struct _FBRASubController
 {
   GObject                   object;
@@ -57,7 +45,7 @@ struct _FBRASubController
   gint32                    bottleneck_point;
 
   FBRAFBProcessor*          fbprocessor;
-  FBRAPlusStat              fbstat;
+  FBRAPlusStat              stat;
 
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;
@@ -86,7 +74,7 @@ struct _FBRASubControllerClass{
 
 };
 GType fbrasubctrler_get_type (void);
-FBRASubController *make_fbrasubctrler(MPRTPSPath *path);
+FBRASubController *make_fbrasubctrler(SndTracker *sndtracker, SndSubflow *subflow);
 
 gboolean fbrasubctrler_path_approver(gpointer data, RTPPacket *packet);
 

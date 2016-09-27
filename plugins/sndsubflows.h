@@ -118,7 +118,7 @@ void sndsubflows_set_rtcp_interval_type(SndSubflows* this, guint8 subflow_id, RT
 void sndsubflows_set_path_lossy(SndSubflows* this, guint8 subflow_id, gboolean value);
 void sndsubflows_set_path_congested(SndSubflows* this, guint8 subflow_id, gboolean value);
 
-void sndsubflows_on_subflow_joined_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
+void sndsubflows_add_on_subflow_joined_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
 void sndsubflows_add_on_subflow_detached_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
 void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
 void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);

@@ -26,7 +26,6 @@
 #include "rcvctrler.h"
 #include "streamsplitter.h"
 #include "gstmprtcpbuffer.h"
-#include "mprtprpath.h"
 #include "streamjoiner.h"
 #include "ricalcer.h"
 #include "mprtplogger.h"
@@ -183,87 +182,6 @@ make_rcvctrler(RTPPackets *rtppackets,
   return this;
 }
 
-typedef struct{
-  guint8                    subflow_id;
-  RTCPIntervalType          new_mode;
-}ChangeIntervalHelper;
-
-static void _subflow_change_interval_type(gpointer item, gpointer udata)
-{
-  RcvSubflow* subflow = item;
-  ChangeIntervalHelper* helper = udata;
-  if(helper->subflow_id == 0 || helper->subflow_id == 255){
-    goto change;
-  }
-  if(helper->subflow_id != subflow->id){
-    goto remain;
-  }
-change:
-  subflow->rtcp_interval_mode = helper->new_mode;
-remain:
-  return;
-}
-
-void rcvctrler_change_interval_type(RcvController * this, guint8 subflow_id, guint type)
-{
-  ChangeIntervalHelper helper;
-  helper.new_mode = type;
-  helper.subflow_id = subflow_id;
-  rcvsubflows_iterate(this->subflows, _subflow_change_interval_type, &helper);
-}
-
-
-
-static gint _fbproducer_by_subflow_id(gpointer item, gpointer udata)
-{
-  FeedbackProducer *fbproducer = item;
-  RcvSubflow *subflow = udata;
-  return subflow->id == fbproducer->subflow_id ? 0 : -1;
-}
-
-typedef struct{
-  guint8                    subflow_id;
-  CongestionControllingType new_mode;
-  RcvController            *rcv_fbproducer;
-}ChangeControllingHelper;
-
-static void _subflow_change_controlling_mode(gpointer item, gpointer udata)
-{
-  RcvSubflow              *subflow = item;
-  ChangeControllingHelper *helper = udata;
-  GSList                  *fbproducer_item;
-  RcvController           *this = helper->rcv_fbproducer;
-
-  if(helper->subflow_id == 0 || helper->subflow_id == 255){
-    goto change;
-  }
-  if(helper->subflow_id != subflow->id){
-    goto done;
-  }
-change:
-  fbproducer_item = g_slist_find_custom(this->fbproducers, _fbproducer_by_subflow_id, subflow);
-  if(fbproducer_item){
-    FeedbackProducer *fbproducer = fbproducer_item->data;
-    if(subflow->congestion_controlling_mode == helper->new_mode){
-      goto done;
-    }
-    _dispose_congestion_fbproducer(this, fbproducer);
-  }
-
-  subflow->congestion_controlling_mode = helper->new_mode;
-  switch(helper->new_mode){
-    case CONGESTION_CONTROLLING_MODE_FBRAPLUS:
-      this->fbproducers = g_slist_prepend(this->fbproducers, _create_fbraplus(this, subflow));
-      break;
-    case CONGESTION_CONTROLLING_MODE_NONE:
-    default:
-      break;
-  };
-
-done:
-  return;
-}
-
 void rcvctrler_change_controlling_mode(RcvController * this,
                                        guint8 subflow_id,
                                        CongestionControllingType controlling_mode,
@@ -404,7 +322,7 @@ FeedbackProducer* _create_fbraplus(SndController* this, SndSubflow* subflow)
 {
   CongestionController *result = g_slice_new0(CongestionController);
   result->subflow_id     = subflow->id;
-  result->udata          = make_fbrasubctrler(this->rtppackets, this->rcvtracker, subflow);
+  result->udata          = make_fbrasubctrler(this->rcvtracker, subflow);
   result->disable        = (CallFunc) ;
   result->dispose        = (CallFunc) g_object_unref;
   result->enable         = (CallFunc) ;

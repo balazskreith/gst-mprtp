@@ -27,7 +27,6 @@
 #include "gstmprtcpbuffer.h"
 #include <math.h>
 #include <string.h>
-#include "mprtpspath.h"
 #include "rtpfecbuffer.h"
 #include "lib_swplugins.h"
 
@@ -44,6 +43,8 @@ G_DEFINE_TYPE (RTPPackets, rtppackets, G_TYPE_OBJECT);
 
 static void rtppackets_finalize (GObject * object);
 static void _extract_mprtp_info(RTPPackets* this, RTPPacket* packet, RcvSubflow* subflow, GstRTPBuffer *rtp);
+static void _on_subflow_joined(RTPPackets* this, SndSubflow* subflow);
+static void _on_subflow_detached(RTPPackets* this, SndSubflow* subflow);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -67,18 +68,22 @@ rtppackets_finalize (GObject * object)
 {
   RTPPackets *this;
   this = RTPPACKETS(object);
-  g_object_unref(this->sysclock);
-  g_object_unref(this->packets);
-  g_object_unref(this->subflows);
   g_object_unref(this->on_stalled_packets);
+
+  g_object_unref(this->sysclock);
+  g_free(this->packets);
+
 }
 
 RTPPackets* make_rtppackets(SndSubflows *subflows)
 {
   RTPPackets* this;
   this = g_object_new (RTPPACKETS_TYPE, NULL);
-  this->subflows = g_object_ref(subflows);
   this->on_stalled_packets = make_observer();
+
+  sndsubflows_add_on_subflow_joined_cb(subflows, (NotifierFunc) _on_subflow_joined, this);
+  sndsubflows_add_on_subflow_detached_cb(subflows, (NotifierFunc) _on_subflow_detached, this);
+
   return this;
 }
 
@@ -103,17 +108,20 @@ void rtppackets_add_stalled_packet_cb(RTPPackets* this, NotifierFunc callback, g
   observer_add_listener(this->on_stalled_packets, callback, udata);
 }
 
-void rtppackets_add_subflow(RTPPackets* this, guint8 subflow_id)
+void _on_subflow_joined(RTPPackets* this, SndSubflow* subflow)
 {
-  if(this->subflows[subflow_id]){
-    return;
-  }
-  this->subflows[subflow_id] = g_malloc0(sizeof(RTPPacket*) * 65536);
+
+}
+
+void _on_subflow_detached(RTPPackets* this, SndSubflow* subflow)
+{
+
 }
 
 static void _init_rtppacket(RTPPackets* this, RTPPacket* packet, GstRTPBuffer* rtp)
 {
-  packet->buffer       = rtp->buffer;
+  packet->base_db      = this;
+  packet->buffer       = gst_buffer_ref(rtp->buffer);
   packet->created      = _now(this);
   packet->abs_seq      = gst_rtp_buffer_get_seq(&rtp);
   packet->timestamp    = gst_rtp_buffer_get_timestamp(&rtp);
@@ -187,8 +195,8 @@ RTPPacket* rtppackets_retrieve_packet_at_receiving(RTPPackets* this, RcvSubflow*
 
 void rtppackets_packet_forwarded(RTPPackets* this, RTPPacket *packet)
 {
-  packet->buffer = NULL;
-  packet->forwarded   = _now(this);
+  packet->buffer    = NULL;
+  packet->forwarded = _now(this);
 
   if(0 < packet->ref) {
     --packet->ref;
@@ -200,24 +208,12 @@ RTPPacket* rtppackets_get_by_abs_seq(RTPPackets* this, guint16 abs_seq)
   return this->packets + abs_seq;
 }
 
-
-RTPPacket* rtppackets_get_by_subflow_seq(RTPPackets* this, guint8 subflow_id, guint16 sub_seq)
-{
-  RTPPacket** items = this->subflows[subflow_id];
-  return items[sub_seq];
-}
-
 void rtppackets_set_abs_time_ext_header_id(RTPPackets* this, guint8 abs_time_ext_header_id)
 {
   this->abs_time_ext_header_id = abs_time_ext_header_id;
 }
 
 guint8 rtppackets_get_abs_time_ext_header_id(RTPPackets* this)
-{
-  return this->abs_time_ext_header_id;
-}
-
-guint8 rtppackets_get_fec_payload_type(RTPPackets* this)
 {
   return this->abs_time_ext_header_id;
 }
@@ -242,16 +238,21 @@ void rtppacket_setup_mprtp(RTPPacket *packet, SndSubflow* subflow)
   gst_rtp_buffer_map(packet->buffer, GST_MAP_READWRITE, &rtp);
   gst_rtp_buffer_set_mprtp_extension(&rtp, mprtp_ext_header_id, subflow->id, subflow_seq);
   gst_rtp_buffer_unmap(&rtp);
+
+  packet->subflow_id = subflow->id;
+  packet->subflow_seq = subflow_seq;
+
 }
 
 
-void rtppacket_setup_abs_time_extension(RTPPackets *this, RTPPacket* packet)
+void rtppacket_setup_abs_time_extension(RTPPacket* packet)
 {
+  guint8 abs_time_header_ext = rtppackets_get_by_abs_seq(packet->base_db);
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   packet->buffer = gst_buffer_make_writable(packet->buffer);
 
   gst_rtp_buffer_map(packet->buffer, GST_MAP_READWRITE, &rtp);
-  gst_rtp_buffer_set_abs_time_extension(&rtp, this->abs_time_ext_header_id);
+  gst_rtp_buffer_set_abs_time_extension(&rtp, abs_time_header_ext);
   gst_rtp_buffer_unmap(&rtp);
 }
 

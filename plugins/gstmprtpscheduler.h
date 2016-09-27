@@ -76,7 +76,7 @@ struct _GstMprtpscheduler
   PacketForwarder*              packetforwarder;
   GAsyncQueue*                  mprtpq;
   GAsyncQueue*                  mprtcpq;
-  GAsyncQueue*                  rtpq;
+  GAsyncQueue*                  rtp_in;
   GAsyncQueue*                  fec_responses;
   GAsyncQueue*                  emitterq;
 

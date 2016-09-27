@@ -186,7 +186,7 @@ void sndsubflows_iterate(SndSubflows* this, GFunc process, gpointer udata)
   g_slist_foreach(this->joined, process, udata);
 }
 
-void sndsubflows_on_subflow_joined_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
+void sndsubflows_add_on_subflow_joined_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
 {
   observer_add_listener(this->on_subflow_joined, callback, udata);
 }

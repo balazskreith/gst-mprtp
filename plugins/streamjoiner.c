@@ -162,7 +162,7 @@ make_stream_joiner(GAsyncQueue* rtppackets_out, GAsyncQueue *discarded_packets_o
   result->joinq                   = make_slidingwindow(100, result->join_delay);
   result->playoutq                = g_queue_new();
 
-  slidingwindow_add_pipes(result->joinq, _joinq_rem_pipe, result, NULL, NULL);
+  slidingwindow_add_on_rem_item_cb(result->joinq, _joinq_rem_pipe, result);
   return result;
 }
 

@@ -35,8 +35,8 @@ typedef enum
 
 struct _SndSubflow
 {
-  SndSubflows*               base_db;
   guint8                     id;
+  SndSubflows*               base_db;
   SubflowSeqTrack            seqtracker;
 
   gboolean                   lossy;
@@ -74,7 +74,6 @@ struct _SndSubflows
   GObject              object;
   GstClock*            sysclock;
   GstClockTime         made;
-  guint8               mprtp_ext_header_id;
 
   SndSubflow*          subflows[256];
 
@@ -127,19 +126,14 @@ void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, NotifierFunc c
 
 //------------------------------------------------------------------------------------------------
 void sndsubflow_on_stat_changed_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata);
-void sndsubflow_on_packet_sent_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata);
+void sndsubflow_add_on_packet_sent_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata);
 void sndsubflow_set_state(SndSubflow* this, SndSubflowState state);
 SndSubflowState sndsubflow_get_state(SndSubflow* subflow);
-guint8 sndsubflow_get_mprtp_ext_header_id(SndSubflow* subflow);
 guint16 sndsubflow_get_next_subflow_seq(SndSubflow* subflow);
 
 guint8 sndsubflow_get_flags_abs_value(SndSubflow* subflow);
 
 gboolean sndsubflow_fec_requested(SndSubflow* subflow);
 
-GstBuffer*
-sndsubflow_process_rtp_buffer(SndSubflow *subflow,
-                               GstBuffer* buffer,
-                               gboolean *fec_request);
 
 #endif /* SNDSUBFLOWSN_H_ */

@@ -73,9 +73,9 @@ struct _RTPPackets
   Observer*                  on_stalled_packets;
 
   guint8                     abs_time_ext_header_id;
+  guint8                     mprtp_ext_header_id;
 
 };
-
 
 
 struct _RTPPacketsClass{
@@ -85,7 +85,7 @@ struct _RTPPacketsClass{
 
 
 GType rtppackets_get_type (void);
-RTPPackets* make_rtppackets(SndSubflows *subflows);
+RTPPackets* make_rtppackets(void);
 void rtppackets_reset(RTPPackets* this);
 
 void rtppackets_add_stalled_packet_cb(RTPPackets* this, void (*callback)(gpointer udata, RTPPacket* packet), gpointer udata);
@@ -103,6 +103,9 @@ RTPPacket* rtppackets_get_by_abs_seq(RTPPackets* this, guint16 abs_seq);
 
 void rtppackets_set_abs_time_ext_header_id(RTPPackets* this, guint8 abs_time_ext_header_id);
 guint8 rtppackets_get_abs_time_ext_header_id(RTPPackets* this);
+
+void rtppackets_set_mprtp_ext_header_id(RTPPackets* this, guint8 mprtp_ext_header_id);
+guint8 rtppackets_get_mprtp_ext_header_id(RTPPackets* this);
 
 void rtppackets_packet_unref(RTPPacket *packet);
 void rtppackets_packet_ref(RTPPacket *packet);

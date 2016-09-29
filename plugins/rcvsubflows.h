@@ -29,6 +29,7 @@ typedef struct _RcvSubflow RcvSubflow;
 struct _RcvSubflow
 {
   guint8                     id;
+  SndSubflows*               base_db;
 
   guint32                    total_received_packets_num;
   guint32                    total_received_payload_bytes;
@@ -43,13 +44,13 @@ struct _RcvSubflow
   guint32                    received_packet_count;
   guint32                    received_octet_count;
 
-  struct{
-    GSList*                 on_removing;
-  }notifiers;
+  GstClockTime               next_regular_rtcp;
+  GstClockTime               report_timeout;
+  RTCPIntervalType           rtcp_interval_type;
+  CongestionControllingType  congestion_controlling_type;
 
+  Observer*                  on_rtp_packet_sent;
 };
-
-
 
 
 struct _RcvSubflows
@@ -59,9 +60,17 @@ struct _RcvSubflows
   GstClockTime         made;
 
   RcvSubflow*          subflows[256];
-  GSList*              added;
-  GSList*              on_add_notifications;
+  GSList*              joined;
+
+  GQueue*              changed_subflows;
+  GSList*              joined;
+
+  Observer*            on_subflow_detached;
+  Observer*            on_subflow_joined;
+  Observer*            on_congestion_controlling_type_changed;
+
   guint                subflows_num;
+
 };
 
 struct _RcvSubflowsClass{
@@ -73,12 +82,18 @@ make_rcvsubflows(void);
 
 GType rcvsubflows_get_type (void);
 
-void rcvsubflows_on_add_notifications(RcvSubflows* this,void (*callback)(gpointer udata, RcvSubflow* subflow), gpointer udata);
-RcvSubflow* rcvsubflows_add(RcvSubflows* this, guint8 id);
-void rcvsubflows_rem(RcvSubflows* this, guint8 id);
 void rcvsubflows_iterate(RcvSubflows* this, GFunc process, gpointer udata);
 
-void rcvsubflow_add_removal_notification(RcvSubflow* subflow, void (*callback)(gpointer udata, RcvSubflow* subflow), gpointer udata);
+void rcvsubflows_set_congestion_controlling_type(RcvSubflows* this, guint8 subflow_id, CongestionControllingType new_type);
+void rcvsubflows_set_path_active(RcvSubflows* this, guint8 subflow_id, gboolean value);
+void rcvsubflows_set_rtcp_interval_type(RcvSubflows* this, guint8 subflow_id, RTCPIntervalType new_type);
+void rcvsubflows_set_path_lossy(RcvSubflows* this, guint8 subflow_id, gboolean value);
+void rcvsubflows_set_path_congested(RcvSubflows* this, guint8 subflow_id, gboolean value);
+
+void rcvsubflows_add_on_subflow_joined_cb(RcvSubflows* this, NotifierFunc callback, gpointer udata);
+void rcvsubflows_add_on_subflow_detached_cb(RcvSubflows* this, NotifierFunc callback, gpointer udata);
+void rcvsubflows_add_on_congestion_controlling_type_changed_cb(RcvSubflows* this, NotifierFunc callback, gpointer udata);
+void rcvsubflows_add_on_path_active_changed_cb(RcvSubflows* this, NotifierFunc callback, gpointer udata);
 
 
 #endif /* RCVSUBFLOWSN_H_ */

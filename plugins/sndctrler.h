@@ -42,7 +42,6 @@ struct _SndController
   ReportProducer*            report_producer;
   GstClock*                  sysclock;
   SndTracker*                sndtracker;
-  RTPPackets*                rtppackets;
 
   gboolean                   report_is_flowable;
 

@@ -290,11 +290,12 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->controller               = g_object_new(RCVCTRLER_TYPE, NULL);
   this->pivot_address_subflow_id = 0;
   this->pivot_address            = NULL;
+  this->subflows                 = make_rcvsubflows();
   this->fec_decoder              = make_fecdecoder();
   this->rtppackets               = make_rtppackets();
   this->rcvtracker               = make_rcvtracker();
 
-  this->discarded_packets_in                 = g_async_queue_new();
+  this->discarded_packets_in     = g_async_queue_new();
   this->packetforwarder          = make_packetforwarder(this->mprtp_srcpad, this->mprtcp_rr_srcpad);
 
   rcvctrler_setup(this->controller, this->joiner, this->fec_decoder);
@@ -303,6 +304,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   rtppackets_set_abs_time_ext_header_id(this->rtppackets, ABS_TIME_DEFAULT_EXTENSION_HEADER_ID);
   rtppackets_set_mprtp_ext_header_id(this->rtppackets, MPRTP_DEFAULT_EXTENSION_HEADER_ID);
   rtppackets_set_fec_payload_type(this->rtppackets, FEC_PAYLOAD_DEFAULT_ID);
+
 }
 
 
@@ -718,7 +720,6 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
   if (this->pivot_ssrc != MPRTP_PLAYOUTER_DEFAULT_SSRC &&
       mprtp->ssrc != this->pivot_ssrc) {
 
-    _trash_mprtp_buffer(this, mprtp);
     GST_DEBUG_OBJECT (this, "RTP packet ssrc is %u, the pivot ssrc is %u",
         this->pivot_ssrc, mprtp->ssrc);
     if(GST_IS_BUFFER(buf))
@@ -741,26 +742,7 @@ _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
       }
     }
   }
-  if (_try_get_path (this, mprtp->subflow_id, &path) == FALSE) {
-    _join_path (this, mprtp->subflow_id);
-    if (_try_get_path (this, mprtp->subflow_id, &path) == FALSE) {
-      GST_WARNING_OBJECT (this, "Subflow not found");
-      _trash_mprtp_buffer(this, mprtp);
-      return;
-    }
-  }
 
-  if(mprtp->fec_packet){
-    if(0 < this->repair_window_max){
-      fecdecoder_add_fec_buffer(this->fec_decoder, mprtp);
-    }
-    _trash_mprtp_buffer(this, mprtp);
-  }else{
-    if(0 < this->repair_window_max){
-      fecdecoder_add_rtp_packet(this->fec_decoder, mprtp);
-    }
-    stream_joiner_push(this->joiner, mprtp);
-  }
   return;
 }
 

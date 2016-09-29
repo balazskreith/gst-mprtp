@@ -148,7 +148,6 @@ sndctrler_finalize (GObject * object)
   g_async_queue_unref(this->emitterq);
   g_object_unref(this->subflows);
   g_object_unref(this->sndtracker);
-  g_object_unref(this->rtppackets);
 
   g_slice_free(MPRTPPluginSignalData, this->mprtp_signal_data);
 }
@@ -167,15 +166,14 @@ sndctrler_init (SndController * this)
 
   report_processor_set_logfile(this->report_processor, "snd_reports.log");
   report_producer_set_logfile(this->report_producer, "snd_produced_reports.log");
-
 }
 
 SndController*
-make_sndctrler(RTPPackets *rtppackets,
-    SndTracker *sndtracker,
+make_sndctrler(
+    SndTracker*  sndtracker,
     SndSubflows* subflows,
-    GAsyncQueue *mprtcpq,
-    GAsyncQueue *emitterq)
+    GAsyncQueue* mprtcpq,
+    GAsyncQueue* emitterq)
 {
   SndController* this = (SndController*)g_object_new(SNDCTRLER_TYPE, NULL);
 
@@ -183,7 +181,6 @@ make_sndctrler(RTPPackets *rtppackets,
   this->emitterq   = g_async_queue_ref(emitterq);
   this->subflows   = g_object_ref(subflows);
   this->sndtracker = g_object_ref(sndtracker);
-  this->rtppackets = g_object_ref(rtppackets);
 
   sndsubflows_add_on_subflow_detached_cb(
       this->subflows, (NotifierFunc)_on_subflow_detached, this);
@@ -469,7 +466,7 @@ CongestionController* _create_fbraplus(SndController* this, SndSubflow* subflow)
   CongestionController *result = g_slice_new0(CongestionController);
   result->type           = CONGESTION_CONTROLLING_TYPE_FBRAPLUS;
   result->subflow_id     = subflow->id;
-  result->udata          = make_fbrasubctrler(this->rtppackets, this->sndtracker, subflow);
+  result->udata          = make_fbrasubctrler(this->sndtracker, subflow);
   result->disable        = (CallFunc) fbrasubctrler_disable;
   result->dispose        = (CallFunc) g_object_unref;
   result->enable         = (CallFunc) fbrasubctrler_enable;

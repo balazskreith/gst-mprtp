@@ -172,6 +172,7 @@ void fbrafbprocessor_report_update(FBRAFBProcessor *this, GstMPRTCPReportSummary
   }
 
   ++this->measurements_num;
+  ++this->rcved_fb_since_changed;
   this->last_report_updated = now;
   _process_stat(this);
 

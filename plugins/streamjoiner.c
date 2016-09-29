@@ -24,7 +24,6 @@
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include "streamjoiner.h"
-#include "gstmprtpbuffer.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>

@@ -47,7 +47,7 @@ typedef struct _Subflow{
   gboolean            init;
   SndTrackerStat      stat;
   RTPPacket*          sent_packets[65536];
-//  Observer*           on_stat_changed;
+  Observer*           on_packet_sent;
 }Subflow;
 
 typedef struct _Priv{
@@ -187,6 +187,8 @@ void sndtracker_packet_sent(SndTracker * this, RTPPacket* packet)
     ++subflow->stat.total_sent_packets;
 
     subflow->sent_packets[packet->subflow_seq] = packet;
+
+    observer_notify(subflow->on_packet_sent, packet);
   }
 
   rtppackets_packet_ref(packet);
@@ -262,6 +264,10 @@ void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_resp
   slidingwindow_add_data(this->fec_sw, fec_response);
 }
 
+void sndtracker_add_on_packet_sent(SndTracker * this, guint8 subflow_id, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(_get_subflow(this, subflow_id)->on_packet_sent, callback, udata);
+}
 
 void _sent_packets_rem_pipe(SndTracker* this, RTPPacket* packet)
 {
@@ -331,7 +337,14 @@ static Private* _priv_ctor(void)
 
 static void _priv_dtor(Private *priv)
 {
-
+  gint i;
+  Subflow* subflow;
+  for(i = 0; i < 256; ++i){
+    subflow = priv->subflows + i;
+    if(subflow->init){
+      g_object_unref(subflow->on_packet_sent);
+    }
+  }
 }
 
 void
@@ -342,6 +355,7 @@ _on_subflow_joined(SndTracker* this, SndSubflow* sndsubflow)
     return;
   }
   subflow->init = TRUE;
+  subflow->on_packet_sent = make_observer();
 }
 
 void

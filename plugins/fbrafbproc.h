@@ -68,6 +68,7 @@ struct _FBRAFBProcessor
   SndSubflow*              subflow;
 
   guint                    measurements_num;
+  guint                    rcved_fb_since_changed;
   gint32                   last_bytes_in_flight;
   GstClockTime             RTT;
   GstClockTime             srtt_updated;

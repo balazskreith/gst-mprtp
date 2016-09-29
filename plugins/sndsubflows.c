@@ -68,10 +68,6 @@ G_DEFINE_TYPE (SndSubflows, sndsubflows, G_TYPE_OBJECT);
 }                                                                  \
 
 #define _now(this) gst_clock_get_time (this->sysclock)
-typedef struct{
-  void    (*callback)(gpointer udata, SndSubflow* subflow);
-  gpointer  udata;
-}Notifier;
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
@@ -117,7 +113,6 @@ void
 sndsubflows_finalize (GObject * object)
 {
   SndSubflows *this = SNDSUBFLOWS (object);
-  g_hash_table_destroy (this->subflows);
   g_queue_clear(this->changed_subflows);
   g_object_unref (this->sysclock);
 
@@ -136,7 +131,6 @@ void
 sndsubflows_init (SndSubflows * this)
 {
   this->sysclock            = gst_system_clock_obtain ();
-  this->subflows            = g_malloc0(sizeof(SndSubflow*) * 256);
   this->made                = _now(this);
 
   this->on_subflow_detached                     = make_observer();
@@ -227,15 +221,6 @@ SndSubflow* sndsubflows_get_subflow(SndSubflows* this, guint8 subflow_id)
   return this->subflows + subflow_id;
 }
 
-void sndsubflows_set_mprtp_ext_header_id(SndSubflows* this, guint8 mprtp_ext_header_id)
-{
-  this->mprtp_ext_header_id = mprtp_ext_header_id;
-}
-
-guint8 sndsubflows_get_mprtp_ext_header_id(SndSubflows* this)
-{
-  return this->mprtp_ext_header_id;
-}
 
 void sndsubflows_set_congestion_controlling_type(SndSubflows* this, guint8 subflow_id, CongestionControllingType new_type)
 {
@@ -281,14 +266,9 @@ SndSubflowState sndsubflow_get_state(SndSubflow* subflow)
   return subflow->state;
 }
 
-void sndsubflow_on_packet_sent_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata)
+void sndsubflow_add_on_packet_sent_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata)
 {
   observer_add_listener(subflow->on_packet_sent, callback, udata);
-}
-
-guint8 sndsubflow_get_mprtp_ext_header_id(SndSubflow* subflow)
-{
-  return subflow->base_db->mprtp_ext_header_id;
 }
 
 guint16 sndsubflow_get_next_subflow_seq(SndSubflow* subflow)
@@ -309,29 +289,6 @@ gboolean sndsubflow_fec_requested(SndSubflow* subflow)
   return subflow->seqtracker.seqence_num % subflow->fec_interval == 0;
 }
 
-
-
-
-GstBuffer*
-sndsubflow_process_rtp_buffer(SndSubflow *subflow,
-                              GstBuffer* buffer,
-                              gboolean *fec_request)
-{
-  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-  buffer = gst_buffer_make_writable(buffer);
-  gst_rtp_buffer_map(buffer, GST_MAP_READWRITE, &rtp);
-  _setup_rtp2mprtp(subflow, &rtp);
-  gst_rtp_buffer_unmap(&rtp);
-
-  if(!fec_request || !subflow->fec_interval){
-    goto done;
-  }
-  if(subflow->fec_interval <= ++subflow->packet_counter_for_fec){
-    *fec_request = TRUE;
-  }
-done:
-  return buffer;
-}
 
 
 

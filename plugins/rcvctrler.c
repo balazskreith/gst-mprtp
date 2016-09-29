@@ -54,31 +54,16 @@ G_DEFINE_TYPE (RcvController, rcvctrler, G_TYPE_OBJECT);
 #define REGULAR_REPORT_PERIOD_TIME (5*GST_SECOND)
 
 
-//                        ^
-//                        | Event
-// .---.    .--------.-----------.
-// |   |    | T | SystemNotifier |
-// |   |    | i |----------------|
-// | I |    | c |      ORP       |->Reports
-// | R |-E->| k |----------------|
-// | P |    | e |   PlayCtrler   |
-// |   |    | r |                |
-// '---'    '---'----------------'
-//                        | Delays
-//                        V
-
 typedef void (*CallFunc)(gpointer udata);
 typedef gboolean (*TimeUpdaterFunc)(gpointer udata);
 typedef void (*ReportTransitFunc)(gpointer udata, GstMPRTCPReportSummary* summary);
 typedef struct{
-  guint8                subflow_id;
+  RcvSubflow*           subflow;
   gpointer              udata;
   CallFunc              dispose;
-  CallFunc              disable;
-  CallFunc              enable;
   TimeUpdaterFunc       time_updater;
   ReportTransitFunc     report_updater;
-  void (*report_callback)(gpointer udata, )
+  void                (*report_callback)(gpointer udata, );
 }FeedbackProducer;
 
 
@@ -90,6 +75,9 @@ static void
 rcvctrler_finalize (GObject * object);
 
 //------------------------ Outgoing Report Producer -------------------------
+static void
+_receiver_report_updater(
+    SndController * this);
 
 static void
 _create_rr(
@@ -161,42 +149,47 @@ rcvctrler_finalize (GObject * object)
 
   g_object_unref(this->subflows);
   g_object_unref(this->rcvtracker);
-  g_object_unref(this->rtppackets);
   g_async_queue_unref(this->mprtcpq);
 
 }
 
 RcvController*
-make_rcvctrler(RTPPackets *rtppackets,
+make_rcvctrler(
     RcvTracker *rcvtracker,
     RcvSubflows* subflows,
-    GAsyncQueue *mprtcpq,
-    GAsyncQueue *emitterq)
+    GAsyncQueue *mprtcpq)
 {
   RcvController* this = (RcvController*)g_object_new(SNDCTRLER_TYPE, NULL);
   this->mprtcpq    = g_async_queue_ref(mprtcpq);
   this->subflows   = g_object_ref(subflows);
   this->rcvtracker = g_object_ref(rcvtracker);
-  this->rtppackets = g_object_ref(rtppackets);
 
   return this;
 }
 
-void rcvctrler_change_controlling_mode(RcvController * this,
-                                       guint8 subflow_id,
-                                       CongestionControllingType controlling_mode,
-                                       gboolean *enable_fec)
-{
-  ChangeControllingHelper helper;
-  helper.new_mode = controlling_mode;
-  helper.subflow_id = subflow_id;
-  helper.rcv_fbproducer = this;
-  rcvsubflows_iterate(this->subflows, _subflow_change_controlling_mode, &helper);
-}
-
-
 
 //------------------------- Incoming Report Processor -------------------
+
+
+void
+rcvctrler_time_update (RcvController *this)
+{
+  GSList *it;
+  GstClockTime now = _now(this);
+
+  if(now - 20 * GST_MSECOND < this->last_time_update){
+    goto done;
+  }
+  this->last_time_update = now;
+
+  for(it = this->fbproducers; it; it = it->next){
+    FeedbackProducer* fbproducer = it->data;
+    fbproducer->time_updater(fbproducer->udata);
+  }
+
+done:
+  return;
+}
 
 
 void
@@ -227,6 +220,49 @@ done:
 //------------------------ Outgoing Report Producer -------------------------
 
 
+static void _receiver_report_updater_helper(RcvSubflow *subflow, gpointer udata)
+{
+  RcvController*            this;
+  ReportIntervalCalculator* ricalcer;
+  GstBuffer*                buf;
+  guint                     report_length = 0;
+
+  this     = udata;
+  ricalcer = this->ricalcer;
+
+  if(subflow->congestion_controlling_type == CONGESTION_CONTROLLING_TYPE_NONE){
+    goto done;
+  }
+
+  if(!ricalcer_rtcp_regular_allowed(ricalcer, subflow)){
+    goto done;
+  }
+
+  report_producer_begin(this->report_producer, subflow->id);
+  _create_rr(this, subflow);
+  buf = report_producer_end(this->report_producer, &report_length);
+  g_async_queue_push(this->mprtcpq, buf);
+
+  //report_length += 12 /* RTCP HEADER*/ + (28<<3) /*UDP+IP HEADER*/;
+  //ricalcer_update_avg_report_size(ricaler, report_length);
+
+done:
+  return;
+}
+
+void
+_receiver_report_updater(RcvController * this)
+{
+
+  if(!this->report_is_flowable){
+    goto done;
+  }
+
+  rcvsubflows_iterate(this->subflows, (GFunc) _receiver_report_updater_helper, this);
+
+done:
+  return;
+}
 
 void _create_rr(RcvController * this, RcvSubflow *subflow)
 {
@@ -312,22 +348,19 @@ _uint16_diff (guint16 start, guint16 end)
 
 void _dispose_fbproducer(RcvController* this, FeedbackProducer* producer)
 {
-  producer->disable(producer->udata);
   producer->dispose(producer->udata);
   this->fbproducers = g_slist_remove(this->fbproducers, producer);
   g_slice_free(FeedbackProducer, producer);
 }
 
-FeedbackProducer* _create_fbraplus(SndController* this, SndSubflow* subflow)
+FeedbackProducer* _create_fbraplus(SndController* this, RcvSubflow* subflow)
 {
-  CongestionController *result = g_slice_new0(CongestionController);
-  result->subflow_id     = subflow->id;
-  result->udata          = make_fbrasubctrler(this->rcvtracker, subflow);
-  result->disable        = (CallFunc) ;
+  FeedbackProducer *result = g_slice_new0(FeedbackProducer);
+  result->subflow        = subflow;
+  result->udata          = make_fbrafbproducer()
   result->dispose        = (CallFunc) g_object_unref;
-  result->enable         = (CallFunc) ;
   result->time_updater   = (TimeUpdaterFunc) ;
-  result->report_updater = (ReportTransitFunc) ;
+  result->report_updater = (ReportTransitFunc);
   return result;
 }
 

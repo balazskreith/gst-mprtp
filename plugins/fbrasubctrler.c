@@ -183,17 +183,17 @@ _target_rate_time_update(
 
 static gdouble
 _off_target(
-    FBRATargetCtrler *this,
+    FBRASubController *this,
     gint pow,
     gdouble eps);
 
 static guint
 _get_monitoring_interval(
-    FBRATargetCtrler *this);
+    FBRASubController *this);
 
 static guint
 _get_approvement_interval(
-    FBRATargetCtrler* this);
+    FBRASubController* this);
 
 static void
 _execute_stage(
@@ -400,8 +400,7 @@ _keep_stage(
     goto done;
   }
 
-  //fbratargetctrler_probe(this->targetctrler);
-  //_switch_stage_to(this, STAGE_PROBE, FALSE);
+  _switch_stage_to(this, STAGE_PROBE, FALSE);
 done:
   return;
 }
@@ -488,6 +487,7 @@ _fire(
         case EVENT_SETTLED:
           this->last_settled = _now(this);
           sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_STABLE);
+
           //bounce back target
         break;
         case EVENT_FI:
@@ -504,6 +504,7 @@ _fire(
         break;
         case EVENT_DISTORTION:
           //corrigate target
+
           this->last_distorted = _now(this);
           sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_OVERUSED);
           break;
@@ -549,21 +550,17 @@ void _switch_stage_to(
   switch(target){
      case STAGE_KEEP:
        this->stage_fnc = _keep_stage;
-       //keep cwnd
      break;
      case STAGE_REDUCE:
        this->congestion_detected = _now(this);
        this->stage_fnc = _reduce_stage;
-       //reduce cwnd
      break;
      case STAGE_INCREASE:
        this->increasement_started = _now(this);
        this->stage_fnc = _increase_stage;
-       //open cwnd
      break;
      case STAGE_PROBE:
        this->stage_fnc = _probe_stage;
-       //open cwnd
      break;
    }
   _priv(this)->stage         = target;
@@ -593,11 +590,11 @@ void _target_rate_time_update(FBRASubController *this)
     goto done;
   }
 
-  if(this->rcved_fb_since_changed < this->required_fb_for_approve){
+  if(this->rcved_fb_since_changed < 1){
     goto done;
   }
 
-  boundary = CONSTRAIN(10000, 50000,this->desired_bitrate * (1.-this->approvement_epsilon));
+  boundary = CONSTRAIN(10000, 50000, this->desired_bitrate * _priv(this)->approvement_epsilon___);
 
   if(_stat(this)->receiver_bitrate < this->desired_bitrate - boundary){
     goto done;
@@ -636,17 +633,17 @@ done:
 }
 
 
-gdouble _off_target(FBRATargetCtrler *this, gint pow, gdouble eps)
+gdouble _off_target(FBRASubController *this, gint pow, gdouble eps)
 {
   gint32 refpoint;
   gdouble result;
   gint i;
   refpoint = MAX(_min_target(this), this->bottleneck_point);
-  if(this->target_bitrate <= refpoint){
+  if(this->desired_bitrate <= refpoint){
     return 0.;
   }
-  result = this->target_bitrate - refpoint;
-  result /= this->target_bitrate * eps;
+  result = this->desired_bitrate - refpoint;
+  result /= this->desired_bitrate * eps;
 
   for(i=1; i<pow; ++i) result*=result;
 
@@ -656,7 +653,7 @@ gdouble _off_target(FBRATargetCtrler *this, gint pow, gdouble eps)
 }
 
 
-guint _get_monitoring_interval(FBRATargetCtrler *this)
+guint _get_monitoring_interval(FBRASubController *this)
 {
   guint interval;
   gdouble off;
@@ -674,17 +671,17 @@ guint _get_monitoring_interval(FBRATargetCtrler *this)
 
   interval = off * _mon_min_int(this) + (1.-off) * _mon_max_int(this);
 
-  while(this->target_bitrate / interval < _min_ramp_up(this) && _mon_min_int(this) < interval){
+  while(this->desired_bitrate / interval < _min_ramp_up(this) && _mon_min_int(this) < interval){
     --interval;
   }
-  while(_max_ramp_up(this) < this->target_bitrate / interval && interval < _mon_max_int(this)){
+  while(_max_ramp_up(this) < this->desired_bitrate / interval && interval < _mon_max_int(this)){
     ++interval;
   }
 
   return interval;
 }
 
-guint _get_approvement_interval(FBRATargetCtrler* this)
+guint _get_approvement_interval(FBRASubController* this)
 {
   gdouble off;
   gdouble interval;

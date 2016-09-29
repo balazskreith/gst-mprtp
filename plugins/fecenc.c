@@ -27,7 +27,6 @@
 #include "gstmprtcpbuffer.h"
 #include <math.h>
 #include <string.h>
-#include "mprtpspath.h"
 
 #define _now(this) gst_clock_get_time (this->sysclock)
 
@@ -57,6 +56,7 @@ typedef enum{
   FECENCODER_REQUEST_TYPE_RTP_BUFFER             = 1,
   FECENCODER_REQUEST_TYPE_FEC_REQUEST            = 2,
   FECENCODER_REQUEST_TYPE_PAYLOAD_CHANGE         = 3,
+  FECENCODER_REQUEST_MPRTP_EXT_HEADER_ID_CHANGE  = 4,
 }RequestTypes;
 
 typedef struct{
@@ -70,12 +70,17 @@ typedef struct{
 
 typedef struct{
   Request    base;
+  guint8     mprtp_ext_header_id;
+}MPRTPExtHeaderIDChange;
+
+typedef struct{
+  Request    base;
   GstBuffer* buffer;
 }RTPBufferRequest;
 
 typedef struct{
   Request            base;
-  SndSubflow*        subflow;
+  guint8             subflow_id;
 }FECRequest;
 
 
@@ -138,6 +143,7 @@ fecencoder_init (FECEncoder * this)
   this->max_protection_num = GST_RTPFEC_MAX_PROTECTION_NUM;
   this->bitstrings = g_queue_new();
   this->seqtracks  = g_malloc0(sizeof(SubflowSeqTrack) * 256);
+  this->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
 }
 
 
@@ -155,11 +161,11 @@ void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer* buffer)
   g_async_queue_push(this->requests, request);
 }
 
-void fecencoder_request_fec(FECEncoder *this, SndSubflow* subflow)
+void fecencoder_request_fec(FECEncoder *this, guint8 subflow_id)
 {
   FECRequest* request = g_slice_new0(FECRequest);
   request->base.type = FECENCODER_REQUEST_TYPE_FEC_REQUEST;
-  request->subflow = subflow;
+  request->subflow_id = subflow_id;
   g_async_queue_push(this->requests, request);
 }
 
@@ -242,10 +248,9 @@ create:
   //MPRTP setup begin
   if(subflow)
   {
-    guint8  mprtp_ext_header_id = sndsubflow_get_mprtp_ext_header_id(subflow);
     guint8  subflow_id  = subflow->id;
     guint16 subflow_seq = subflowseqtracker_increase(this->seqtracks + subflow_id);
-    gst_rtp_buffer_set_mprtp_extension(&rtp, mprtp_ext_header_id, subflow_id, subflow_seq);
+    gst_rtp_buffer_set_mprtp_extension(&rtp, this->mprtp_ext_header_id, subflow_id, subflow_seq);
   }
   //mprtp setup end;
 
@@ -298,18 +303,25 @@ again:
     goto done;
   }
   switch(request->type){
-    case FECENCODER_REQUEST_TYPE_PAYLOAD_CHANGE:
+  case FECENCODER_REQUEST_TYPE_PAYLOAD_CHANGE:
+  {
+    PayloadChangeRequest* fec_payload_request = (PayloadChangeRequest*)request;
+    this->payload_type = fec_payload_request->payload_type;
+    g_slice_free(PayloadChangeRequest, fec_payload_request);
+  }
+  break;
+  case FECENCODER_REQUEST_MPRTP_EXT_HEADER_ID_CHANGE:
     {
-      PayloadChangeRequest* fec_payload_request = (PayloadChangeRequest*)request;
-      this->payload_type = fec_payload_request->payload_type;
-      g_slice_free(PayloadChangeRequest, fec_payload_request);
+      MPRTPExtHeaderIDChange* fec_payload_request = (MPRTPExtHeaderIDChange*)request;
+      this->mprtp_ext_header_id = fec_payload_request->mprtp_ext_header_id;
+      g_slice_free(MPRTPExtHeaderIDChange, fec_payload_request);
     }
     break;
     case FECENCODER_REQUEST_TYPE_FEC_REQUEST:
     {
       FECRequest* fec_request = (FECRequest*)request;
       FECEncoderResponse* fec_response = _fec_response_ctor();
-      fec_response->fecbuffer = _fecencoder_get_fec_packet(this, fec_request->subflow, &fec_response->payload_size);
+      fec_response->fecbuffer = _fecencoder_get_fec_packet(this, fec_request->subflow_id, &fec_response->payload_size);
       g_slice_free(FECRequest, fec_request);
       g_async_queue_push(this->messages_out, fec_response);
     }

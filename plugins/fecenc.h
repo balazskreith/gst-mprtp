@@ -39,6 +39,7 @@ struct _FECEncoder
   gint32                     max_protection_num;
   guint16                    seq_num;
   guint8                     payload_type;
+  guint8                     mprtp_ext_header_id;
 
   GQueue*                    bitstrings;
 

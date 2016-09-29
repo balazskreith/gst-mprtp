@@ -34,7 +34,6 @@ struct _FBRAFBProducer
   guint16                  cycle_num;
   gboolean                 initialized;
 
-  guint32                  ssrc;
   guint8                   subflow_id;
   RcvTracker*              tracker;
   RTPPackets*              rtpdb;

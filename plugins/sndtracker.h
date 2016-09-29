@@ -76,6 +76,7 @@ void sndtracker_packet_sent(SndTracker * this, RTPPacket* packet);
 RTPPacket* sndtracker_retrieve_sent_packet(SndTracker * this, guint8 subflow_id, guint16 subflow_seq);
 void sndtracker_packet_acked(SndTracker * this, RTPPacket* packet);
 void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_response);
+void sndtracker_add_on_packet_sent(SndTracker * this, guint8 subflow_id, NotifierFunc callback, gpointer udata);
 SndTrackerStat* sndtracker_get_stat(SndTracker * this);
 SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id);
 

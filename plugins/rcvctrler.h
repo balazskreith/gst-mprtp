@@ -32,79 +32,46 @@ typedef struct _RcvControllerClass RcvControllerClass;
 
 struct _RcvController
 {
-  GObject          object;
+  GObject                object;
 
-  RcvSubflows*      subflows;
-  GstClockTime      made;
-  GstClock*         sysclock;
-  guint32           ssrc;
-  gboolean          report_is_flowable;
+  RcvSubflows*           subflows;
+  GstClockTime           made;
+  GstClock*              sysclock;
+  guint32                ssrc;
+  gboolean               report_is_flowable;
 
-  ReportProducer*   report_producer;
-  ReportProcessor*  report_processor;
+  ReportProducer*        report_producer;
+  ReportProcessor*       report_processor;
 
-  GSList*           fbproducers;
-  RTPPackets*       rtppackets;
-  RcvTracker*       rcvtracker;
-  GAsyncQueue*      mprtcpq;
+  GSList*                fbproducers;
+  RcvTracker*            rcvtracker;
+  GAsyncQueue*           mprtcpq;
 
   GstMPRTCPReportSummary reports_summary;
+  GstClockTime           last_time_update;
 };
+
 
 struct _RcvControllerClass{
   GObjectClass parent_class;
 };
 
+
 RcvController* make_rcvctrler(
-    RTPPackets* rtppackets,
     RcvTracker* rcvtracker,
     RcvSubflows* subflows,
     GAsyncQueue *mprtcpq);
 
-//Class functions
-void rcvctrler_setup(RcvController *this,
-                     StreamJoiner* splitter,
-                     FECDecoder*   fecdecoder);
 
 void
-rcvctrler_change_interval_type(
-    RcvController * this,
-    guint8 subflow_id,
-    guint type);
+rcvctrler_time_update (
+    RcvController *this);
 
-
-void
-rcvctrler_change_controlling_mode(
-    RcvController * this,
-    guint8 subflow_id,
-    guint controlling_mode);
-
-void
-rcvctrler_add_path (
-    RcvController *this,
-    guint8 subflow_id,
-    MpRTPRPath * path);
-
-
-void
-rcvctrler_rem_path (
-    RcvController *this,
-    guint8 subflow_id);
 
 void
 rcvctrler_receive_mprtcp (
     RcvController *this,
     GstBuffer * buf);
-
-void rcvctrler_enable_auto_rate_and_cc(RcvController *this);
-void rcvctrler_disable_auto_rate_and_congestion_control(RcvController *this);
-
-
-void
-rcvctrler_setup_callbacks(RcvController * this,
-                          gpointer mprtcp_send_data,
-                          GstBufferReceiverFunc mprtcp_send_func);
-
 
 
 GType rcvctrler_get_type (void);

@@ -74,6 +74,7 @@ struct _GstMprtpplayouter
   GstClock*       sysclock;
   StreamJoiner*   joiner;
   RcvController*  controller;
+  RcvSubflows*    subflows;
   FECDecoder*     fec_decoder;
   RTPPackets*     rtppackets;
   RcvTracker*     rcvtracker;

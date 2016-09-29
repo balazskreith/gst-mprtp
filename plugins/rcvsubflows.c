@@ -35,10 +35,42 @@ GST_DEBUG_CATEGORY_STATIC (rcvsubflows_debug_category);
 G_DEFINE_TYPE (RcvSubflows, rcvsubflows, G_TYPE_OBJECT);
 
 #define _now(this) gst_clock_get_time (this->sysclock)
-typedef struct{
-  void    (*callback)(gpointer udata, RcvSubflow* subflow);
-  gpointer  udata;
-}Notifier;
+
+
+#define CHANGE_SUBFLOW_PROPERTY_VALUE(subflows_list, subflow_id, property, property_value, changed_subflows) \
+{                                                     \
+  if(changed_subflows){                               \
+    g_queue_clear(changed_subflows);                  \
+  }                                                   \
+  GSList* it;                                         \
+  for(it = subflows_list; it; it = it->next)          \
+  {                                                   \
+    RcvSubflow* subflow = it->data;                   \
+    if(subflow_id == 0 || subflow_id == 255){         \
+      subflow->property = property_value;             \
+      if(changed_subflows){                           \
+        g_queue_push_head(changed_subflows, subflow); \
+      }                                               \
+      continue;                                       \
+    }                                                 \
+    if(subflow->id == subflow_id){                    \
+      subflow->property = property_value;             \
+      if(changed_subflows){                           \
+        g_queue_push_head(changed_subflows, subflow); \
+      }                                               \
+      break;                                          \
+    }                                                 \
+  }                                                   \
+}                                                     \
+
+#define NOTIFY_CHANGED_SUBFLOWS(changed_subflows, observer)        \
+{                                                                  \
+  while(!g_queue_is_empty(changed_subflows)){                      \
+    observer_notify(observer, g_queue_pop_head(changed_subflows)); \
+  }                                                                \
+}                                                                  \
+
+
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
@@ -47,29 +79,6 @@ static void
 rcvsubflows_finalize (
     GObject * object);
 
-void _add_notifier(
-    GSList **list,
-    void (*callback)(gpointer udata, RcvSubflow* subflow),
-    gpointer udata);
-
-static Notifier*
-_make_notifier(
-    void (*callback)(gpointer udata, RcvSubflow* subflow),
-    gpointer udata);
-
-static void
-_dispose_notifier(
-    gpointer data);
-
-static void
-_call_notifiers(
-    GSList *notifiers,
-    RcvSubflow *subflow);
-
-static RcvSubflow*
-rcvsubflows_get_subflow(
-    RcvSubflows* this,
-    guint8 subflow_id);
 
 //----------------------------------------------------------------------
 //---- Private function implementations to Stream Dealer object --------
@@ -100,8 +109,15 @@ void
 rcvsubflows_finalize (GObject * object)
 {
   RcvSubflows *this = RCVSUBFLOWS (object);
-  g_hash_table_destroy (this->subflows);
+  g_queue_clear(this->changed_subflows);
   g_object_unref (this->sysclock);
+
+  g_object_unref(this->on_subflow_detached);
+  g_object_unref(this->on_subflow_joined);
+  g_object_unref(this->on_congestion_controlling_type_changed);
+
+  g_object_unref(this->changed_subflows);
+
   g_free(this->subflows);
 }
 
@@ -110,103 +126,104 @@ void
 rcvsubflows_init (RcvSubflows * this)
 {
   this->sysclock = gst_system_clock_obtain ();
-  this->subflows               = g_malloc0(sizeof(RcvSubflow) * 256);
   this->made                   = _now(this);
+
+  this->on_subflow_detached                     = make_observer();
+  this->on_subflow_joined                       = make_observer();
+  this->on_congestion_controlling_type_changed  = make_observer();
+
+  this->changed_subflows                        = g_queue_new();
 }
 
-void rcvsubflows_on_add_notifications(RcvSubflows* this,void (*callback)(gpointer udata, RcvSubflow* subflow), gpointer udata)
+void rcvsubflows_join(RcvSubflows* this, guint8 id)
 {
-  _add_notifier(&this->on_add_notifications, callback, udata);
-}
+  RcvSubflow *subflow;
+  subflow = _make_subflow(this, id);
 
-RcvSubflow* rcvsubflows_add(RcvSubflows* this, guint8 id)
-{
-  RcvSubflow *result;
-  if(this->subflows[id] != NULL){
-    GST_LOG_OBJECT(this, "The subflow is already exists");
-    return this->subflows[id];
-  }
+  this->subflows[id] = subflow;
   ++this->subflows_num;
-  this->added = g_slist_prepend(this->added, this->subflows[id]);
 
-  this->subflows[id] = result = g_malloc0(sizeof(RcvSubflow));
+  this->joined = g_slist_prepend(this->joined, subflow);
 
-  _call_notifiers(this->on_add_notifications, result);
-
-  return result;
+  observer_notify(this->on_subflow_joined, subflow);
 
 }
 
-void rcvsubflows_rem(RcvSubflows* this, guint8 id)
+void rcvsubflows_detach(RcvSubflows* this, guint8 id)
 {
   RcvSubflow* subflow;
-  if(this->subflows[id] == NULL){
-    GST_LOG_OBJECT(this, "The subflow is not exists");
-  }
   subflow = this->subflows[id];
-  this->added = g_slist_remove(this->added, subflow);
 
-  _call_notifiers(subflow->notifiers.on_removing);
+  observer_notify(this->on_subflow_detached, subflow);
 
-  g_free(this->subflows[id]);
-  this->subflows[id] = NULL;
+  this->joined = g_slist_remove(this->joined, subflow);
+
   --this->subflows_num;
+  this->subflows[id] = NULL;
+
+  _dispose_subflow(subflow);
+
 }
 
 void rcvsubflows_iterate(RcvSubflows* this, GFunc process, gpointer udata)
 {
-  if(!this->added){
+  if(!this->joined){
     return;
   }
-  g_slist_foreach(this->added, process, udata);
+  g_slist_foreach(this->joined, process, udata);
 }
 
+void rcvsubflows_add_on_subflow_joined_cb(RcvSubflows* this, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(this->on_subflow_joined, callback, udata);
+}
+
+void rcvsubflows_add_on_subflow_detached_cb(RcvSubflows* this, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(this->on_subflow_detached, callback, udata);
+}
+
+void rcvsubflows_add_on_congestion_controlling_type_changed_cb(RcvSubflows* this, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(this->on_congestion_controlling_type_changed, callback, udata);
+}
 
 RcvSubflow* rcvsubflows_get_subflow(RcvSubflows* this, guint8 subflow_id)
 {
   return this->subflows + subflow_id;
 }
 
-void rcvsubflow_add_removal_notification(RcvSubflow* subflow, void (*callback)(gpointer udata, RcvSubflow* subflow), gpointer udata)
+gint32 rcvsubflows_get_subflows_num(RcvSubflows* this)
 {
-  _add_notifier(&subflow->notifiers.on_removing, callback, udata);
+  return this->subflows_num;
+}
+
+void rcvsubflows_set_congestion_controlling_type(RcvSubflows* this, guint8 subflow_id, CongestionControllingType new_type)
+{
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->subflows, subflow_id, congestion_controlling_type, new_type, this->changed_subflows);
+  NOTIFY_CHANGED_SUBFLOWS(this->changed_subflows, this->on_congestion_controlling_type_changed);
+}
+
+void rcvsubflows_set_rtcp_interval_type(RcvSubflows* this, guint8 subflow_id, RTCPIntervalType new_type)
+{
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->subflows, subflow_id, rtcp_interval_type, new_type, NULL);
 }
 
 
-
-void _add_notifier(GSList **list, void (*callback)(gpointer udata, RcvSubflow* subflow), gpointer udata)
+RcvSubflow* _make_subflow(RcvSubflows* base_db, guint8 subflow_id)
 {
-  *list = g_slist_prepend(*list, _make_notifier(callback, udata));
-}
-
-Notifier* _make_notifier(void (*callback)(gpointer udata, RcvSubflow* subflow), gpointer udata)
-{
-  Notifier* result =  g_slice_new0(Notifier);
-  result->udata = udata;
-  result->callback = callback;
+  RcvSubflow* result = g_malloc0(sizeof(RcvSubflow));
+  result->base_db             = base_db;
+  result->on_rtp_packet_sent  = make_observer();
   return result;
 }
 
-void _dispose_notifier(gpointer data)
+void _dispose_subflow(RcvSubflow *subflow)
 {
-  if(!data){
-    return;
-  }
-  Notifier* notifier = data;
-  g_slice_free(Notifier, notifier);
-}
-
-static void _call_notifiers(GSList *notifiers, RcvSubflow *subflow)
-{
-  GSList *it;
-  if(!notifiers){
-    return;
-  }
-
-  for(it = notifiers; it; it = it->next){
-    Notifier* notifier = it->data;
-    notifier->callback(notifier->udata, subflow);
-  }
+  g_object_unref(subflow->on_rtp_packet_sent);
+  g_free(subflow);
 }
 
 
+
+#undef CHANGE_SUBFLOW_PROPERTY_VALUE

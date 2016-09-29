@@ -375,8 +375,6 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->thread = gst_task_new (mprtpscheduler_emitter_process, this, NULL);
   g_mutex_init (&this->mutex);
 
-  this->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
-  this->abs_time_ext_header_id = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
   this->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
   this->splitter = make_stream_splitter(this->subflows);
 
@@ -402,6 +400,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   _setup_subflows(this);
   fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
+
 }
 
 
@@ -471,7 +470,7 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
   THIS_LOCK(this);
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
-      sndsubflows_set_mprtp_ext_header_id(this->subflows, (guint8) g_value_get_uint (value));
+      rtppackets_set_mprtp_ext_header_id(this->subflows, (guint8) g_value_get_uint (value));
       break;
     case PROP_ABS_TIME_EXT_HEADER_ID:
       rtppackets_set_abs_time_ext_header_id(this->rtppackets, (guint8) g_value_get_uint (value));
@@ -543,7 +542,7 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
   THIS_LOCK(this);
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
-      g_value_set_uint (value, (guint) sndsubflow_get_mprtp_ext_header_id(this->subflows));
+      g_value_set_uint (value, (guint) rtppackets_get_mprtp_ext_header_id(this->subflows));
       break;
     case PROP_ABS_TIME_EXT_HEADER_ID:
       g_value_set_uint (value, (guint) rtppackets_get_abs_time_ext_header_id(this->rtppackets));
@@ -919,7 +918,7 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, RTPPacket *packet)
   result = TRUE;
   rtppacket_setup_mprtp(packet, subflow);
   if(fec_request || sndsubflow_fec_requested(subflow)){
-    fecencoder_request_fec(this->fec_encoder, subflow);
+    fecencoder_request_fec(this->fec_encoder, subflow->id);
   }
 
   rtppacket_setup_abs_time_extension(packet);

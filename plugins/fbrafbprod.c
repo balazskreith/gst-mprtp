@@ -56,7 +56,7 @@ _cmp_seq (guint16 x, guint16 y)
   if(x > y && x - y < 32768) return 1;
   return 0;
 }
-PercentileResultPipeFnc(_owd_percentile_pipe, FBRAFBProducer, median_delay, min_delay, max_delay, RTPPacket, received.delay, 0);
+PercentileResultPipeFnc(_owd_percentile_pipe, FBRAFBProducer, median_delay, min_delay, max_delay, RTPPacket, received_info.delay, 0);
 
 static void _owd_percentile_pipe(gpointer data, swpercentilecandidates_t *candidates)
 {
@@ -113,13 +113,10 @@ fbrafbproducer_init (FBRAFBProducer * this)
 
 }
 
-FBRAFBProducer *make_fbrafbproducer(guint32 ssrc,
-    guint8 subflow_id,
-    RcvTracker *tracker)
+FBRAFBProducer *make_fbrafbproducer(guint8 subflow_id, RcvTracker *tracker)
 {
   FBRAFBProducer *this;
   this = g_object_new (FBRAFBPRODUCER_TYPE, NULL);
-  this->ssrc = ssrc;
   this->subflow_id      = subflow_id;
   this->tracker         = g_object_ref(tracker);
   this->owds_sw         = make_slidingwindow_uint64(20, 200 * GST_MSECOND);

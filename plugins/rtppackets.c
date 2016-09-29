@@ -75,15 +75,14 @@ rtppackets_finalize (GObject * object)
 
 }
 
-RTPPackets* make_rtppackets(SndSubflows *subflows)
+RTPPackets* make_rtppackets()
 {
   RTPPackets* this;
   this = g_object_new (RTPPACKETS_TYPE, NULL);
   this->on_stalled_packets = make_observer();
 
-  sndsubflows_add_on_subflow_joined_cb(subflows, (NotifierFunc) _on_subflow_joined, this);
-  sndsubflows_add_on_subflow_detached_cb(subflows, (NotifierFunc) _on_subflow_detached, this);
-
+  this->mprtp_ext_header_id    = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
+  this->abs_time_ext_header_id = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
   return this;
 }
 
@@ -108,15 +107,6 @@ void rtppackets_add_stalled_packet_cb(RTPPackets* this, NotifierFunc callback, g
   observer_add_listener(this->on_stalled_packets, callback, udata);
 }
 
-void _on_subflow_joined(RTPPackets* this, SndSubflow* subflow)
-{
-
-}
-
-void _on_subflow_detached(RTPPackets* this, SndSubflow* subflow)
-{
-
-}
 
 static void _init_rtppacket(RTPPackets* this, RTPPacket* packet, GstRTPBuffer* rtp)
 {
@@ -218,6 +208,16 @@ guint8 rtppackets_get_abs_time_ext_header_id(RTPPackets* this)
   return this->abs_time_ext_header_id;
 }
 
+void rtppackets_set_mprtp_ext_header_id(RTPPackets* this, guint8 mprtp_ext_header_id)
+{
+  this->mprtp_ext_header_id = mprtp_ext_header_id;
+}
+
+guint8 rtppackets_get_mprtp_ext_header_id(RTPPackets* this)
+{
+  return this->mprtp_ext_header_id;
+}
+
 void rtppackets_packet_unref(RTPPacket *packet)
 {
   --packet->ref;
@@ -230,7 +230,7 @@ void rtppackets_packet_ref(RTPPacket *packet)
 
 void rtppacket_setup_mprtp(RTPPacket *packet, SndSubflow* subflow)
 {
-  guint8  mprtp_ext_header_id = sndsubflow_get_mprtp_ext_header_id(subflow);
+  guint8  mprtp_ext_header_id = rtppackets_get_mprtp_ext_header_id(packet->base_db);
   guint16 subflow_seq = sndsubflow_get_next_subflow_seq(subflow);
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   packet->buffer = gst_buffer_make_writable(packet->buffer);
@@ -258,10 +258,10 @@ void rtppacket_setup_abs_time_extension(RTPPacket* packet)
 
 
 
-static void _extract_mprtp_info(RTPPackets* this, RTPPacket* packet, RcvSubflow* subflow, GstRTPBuffer *rtp)
+void _extract_mprtp_info(RTPPackets* this, RTPPacket* packet, RcvSubflow* subflow, GstRTPBuffer *rtp)
 {
 
-  guint8 mprtp_ext_header_id = rcvsubflows_get_mprtp_header_ext <- subflow;
+  guint8 mprtp_ext_header_id = rtppackets_get_mprtp_ext_header_id(this);
 
   packet->received_info.abs_snd_ntp_time =
       gst_rtp_buffer_get_abs_time_extension(rtp, this->abs_time_ext_header_id);
@@ -269,15 +269,7 @@ static void _extract_mprtp_info(RTPPackets* this, RTPPacket* packet, RcvSubflow*
   packet->received_info.delay =
       get_epoch_time_from_ntp_in_ns(NTP_NOW - packet->received_info.abs_snd_ntp_time);
 
-  gst_rtp_buffer_get_mprtp_extension(rtp, mprtp_ext_header_id, )
-
-  gst_rtp_buffer_get_extension_onebyte_header(rtp, this->mprtp_ext_header_id,
-                                              0, &pointer, &size);
-  subflow_infos = (MPRTPSubflowHeaderExtension *) pointer;
-
-  packet->subflow_id       = subflow_infos->id;
-  packet->subflow_seq      = subflow_infos->seq;
-
+  gst_rtp_buffer_get_mprtp_extension(rtp, mprtp_ext_header_id, &packet->subflow_id, &packet->subflow_seq);
 
 }
 

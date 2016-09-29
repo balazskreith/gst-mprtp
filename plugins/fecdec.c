@@ -88,7 +88,7 @@ static void _add_fec_buffer(FECDecoder *this, GstBuffer *buffer);
 static GstBuffer* _get_repaired_rtpbuffer(FECDecoder *this, guint16 searched_seq);
 static void _add_rtp_packet_to_segment(FECDecoder *this, RTPPacket *packet, FECDecoderSegment *segment);
 static FECDecoderSegment *_find_segment_by_seq(FECDecoder *this, guint16 seq_num);
-static void _add_rtp_packet_to_items(FECDecoder *this, GstMpRTPBuffer *packet);
+static void _add_rtp_packet_to_items(FECDecoder *this, RTPPacket *packet);
 static GstBuffer *_repair_rtpbuf_by_segment(FECDecoder *this, FECDecoderSegment *segment, guint16 seq);
 static gint _find_item_by_seq_helper(gconstpointer item_ptr, gconstpointer desired_seq);
 static FECDecoderItem * _find_item_by_seq(GList *items, guint16 seq);

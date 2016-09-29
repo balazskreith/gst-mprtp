@@ -47,21 +47,42 @@ GST_DEBUG_CATEGORY_STATIC (fbrasubctrler_debug_category);
 G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 
 
-////determines the treshold for utilization, in which below the path considered to be congested
-//#define DISCARD_CONGESTION_MAX_TRESHOLD 0.1
-//
-////determines the treshold for utilization, in which below the path considered to be distorted
-//#define DISCARD_DISTORTION_MAX_TRESHOLD 0.0
-//
-////determines a treshold for trend calculations, in which above the KEEP stage not let it to PROBE
-//#define OWD_CORR_DISTORTION_TRESHOLD 1.05
-//
-////determines a treshold for trend calculations, in which above the path considered to be congested
-//#define OWD_CORR_CONGESTION_TRESHOLD 1.2
+//determine the minimum interval in seconds must be stay in probe stage
+//before the target considered to be accepted
+#define MIN_APPROVE_INTERVAL 50 * GST_MSECOND
 
-////determines a treshold for trend calculations, in which above the KEEP stage not let it to PROBE
-//#define REACTIVE_CONGESTION_DETECTION_ALLOWED TRUE
+//determine the minimum multiplying factor for aprovements
+//before the target considered to be accepted
+#define APPROVE_MIN_FACTOR 1.0
 
+//determine the maximum multiplying factor for aprovements
+//before the target considered to be accepted
+#define APPROVE_MAX_FACTOR 2.0
+
+//determines the minimum ramp up bitrate
+#define RAMP_UP_MIN_SPEED 50000
+
+//determines the maximum ramp up bitrate
+#define RAMP_UP_MAX_SPEED 250000
+
+//Min target_bitrate [bps]
+//#define TARGET_BITRATE_MIN 500000
+#define TARGET_BITRATE_MIN 100000
+
+//Max target_bitrate [bps] - 0 means infinity
+#define TARGET_BITRATE_MAX 0
+
+//approvement epsilon
+#define APPROVEMENT_EPSILON 0.25
+
+//interval epsilon
+#define INTERVAL_EPSILON 0.25
+
+//determines the minimum monitoring interval
+#define MIN_MONITORING_INTERVAL 2
+
+//determines the maximum monitoring interval
+#define MAX_MONITORING_INTERVAL 14
 typedef struct _Private Private;
 
 typedef enum{
@@ -86,22 +107,40 @@ struct _Private{
   Stage               stage;
   gdouble             avg_rtp_payload;
 
+  GstClockTime        min_approve_interval;
+  gdouble             approve_min_factor;
+  gdouble             approve_max_factor;
+  gint32              min_ramp_up_bitrate;
+  gint32              max_ramp_up_bitrate;
+  gint32              min_target_bitrate;
+  gint32              max_target_bitrate;
+  gdouble             approvement_epsilon;
+  gint32              min_monitoring_interval;
+  gint32              max_monitoring_interval;
+  gdouble             interval_epsilon;
 };
 
 
 
 #define _priv(this) ((Private*)this->priv)
-#define _fbstat(this) this->stat
-#define _throttler(this) _priv(this)->throttler
+#define _stat(this) this->stat
 
 #define _stage(this) _priv(this)->stage
 #define _event(this) _priv(this)->event
 #define _set_event(this, e) _event(this) = e
 #define _set_pending_event(this, e) this->pending_event = e
 
-#define _SR(this) (_fbstat(this).sent_bytes_in_1s * 8)
-#define _GP(this) (_fbstat(this).goodput_bytes * 8)
-
+#define _appr_eps(this)               _priv(this)->approvement_epsilon
+#define _interval_eps(this)           _priv(this)->interval_epsilon
+#define _min_appr_int(this)           _priv(this)->min_approve_interval
+#define _appr_min_fact(this)          _priv(this)->approve_min_factor
+#define _appr_max_fact(this)          _priv(this)->approve_max_factor
+#define _min_ramp_up(this)            _priv(this)->min_ramp_up_bitrate
+#define _max_ramp_up(this)            _priv(this)->max_ramp_up_bitrate
+#define _min_target(this)             _priv(this)->min_target_bitrate
+#define _max_target(this)             _priv(this)->max_target_bitrate
+#define _mon_min_int(this)            _priv(this)->min_monitoring_interval
+#define _mon_max_int(this)            _priv(this)->max_monitoring_interval
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
@@ -138,10 +177,27 @@ _switch_stage_to(
     Stage target,
     gboolean execute);
 
-#define _transit_state_to(this, target) \
-   this->state_t1 = this->state;        \
-   this->state = target;                \
+static void
+_target_rate_time_update(
+    FBRASubController *this);
 
+static gdouble
+_off_target(
+    FBRATargetCtrler *this,
+    gint pow,
+    gdouble eps);
+
+static guint
+_get_monitoring_interval(
+    FBRATargetCtrler *this);
+
+static guint
+_get_approvement_interval(
+    FBRATargetCtrler* this);
+
+static void
+_execute_stage(
+    FBRASubController *this);
 
 static void
 _fire(
@@ -186,47 +242,21 @@ fbrasubctrler_init (FBRASubController * this)
 {
   this->priv = mprtp_malloc(sizeof(Private));
   this->sysclock = gst_system_clock_obtain();
+
+  _priv(this)->approve_min_factor               = APPROVE_MIN_FACTOR;
+  _priv(this)->approve_max_factor               = APPROVE_MAX_FACTOR;
+  _priv(this)->min_approve_interval             = MIN_APPROVE_INTERVAL;
+  _priv(this)->min_ramp_up_bitrate              = RAMP_UP_MIN_SPEED;
+  _priv(this)->max_ramp_up_bitrate              = RAMP_UP_MAX_SPEED;
+  _priv(this)->min_target_bitrate               = TARGET_BITRATE_MIN;
+  _priv(this)->max_target_bitrate               = TARGET_BITRATE_MAX;
+
+  _priv(this)->approvement_epsilon              = APPROVEMENT_EPSILON;
+  _priv(this)->interval_epsilon                 = INTERVAL_EPSILON;
+
+  _priv(this)->min_monitoring_interval          = MIN_MONITORING_INTERVAL;
+  _priv(this)->max_monitoring_interval          = MAX_MONITORING_INTERVAL;
 }
-
-GstClockTime last_pacing;
-gboolean fbrasubctrler_path_approver(gpointer data, RTPPacket *packet)
-{
-  FBRASubController *this = data;
-  guint payload_size = packet->payload_size;
-  GstClockTime now = _now(this);
-
-  {
-//    gdouble cwnd = _fbstat(this).BiF.median * .6;
-    gdouble rtt_in_s = (gdouble)_RTT(this) / (gdouble) GST_SECOND;
-    gdouble pacing_bitrate = MAX(200000., (this->cwnd * 8.) / rtt_in_s);
-    gdouble pacing_time = (gdouble) ((payload_size + 24) * 8) / (gdouble)pacing_bitrate;
-    g_print("rtp_packet: %d (%hu) | rtt_in_s: %f, pacing_bitrate: %f, pacing_time: %f | dt: %-1.4f\n",
-    		(payload_size + 24) * 8,
-			packet->abs_seq,
-			rtt_in_s,
-			pacing_bitrate,
-			pacing_time,
-			(gdouble) GST_TIME_AS_USECONDS(now - last_pacing));
-    last_pacing = now;
-    _priv(this)->pacing_approve_time = now + (pacing_time * (gdouble)GST_SECOND);
-    goto approve;
-  }
-
-approve:
-  this->last_rtp_size = payload_size;
-  fbratargetctrler_update_rtpavg(this->targetctrler, this->last_rtp_size);
-  return TRUE;
-disapprove:
-  return FALSE;
-//  g_print("BiF: %d->%d (%1.3f - %1.3f)\n",
-//          _fbstat(this).sent_bytes_in_1s * 8,
-//          _fbstat(this).bytes_in_flight * 8,
-//          (gdouble)_fbstat(this).bytes_in_flight / (gdouble)_fbstat(this).sent_bytes_in_1s,
-//          (gdouble)_fbstat(this).sent_bytes_in_1s * (gdouble)(_fbstat(this).owd_stt * .000000001) * 8);
-  return TRUE;
-
-}
-
 
 FBRASubController *make_fbrasubctrler(SndTracker *sndtracker, SndSubflow *subflow)
 {
@@ -254,57 +284,22 @@ void fbrasubctrler_disable(FBRASubController *this)
   this->enabled = FALSE;
 }
 
-
-static void _execute_stage(FBRASubController *this)
+void fbrasubctrler_on_rtp_sending(FBRASubController* this, RTPPacket *packet)
 {
-  if(this->measurements_num < 5){
-    goto done;
-  }
+  //TODO update pacing time
 
-  if(_now(this) - _priv(this)->adjust_th < this->last_executed){
-    goto done;
-  }
-
-  if(this->pending_event != EVENT_FI){
-    _fire(this, this->pending_event);
-    this->pending_event = EVENT_FI;
-  }
-  //Execute stage
-  this->stage_fnc(this);
-  _fire(this, _event(this));
-  _priv(this)->event = EVENT_FI;
-  _priv(this)->controlled = TRUE;
-  this->last_executed = _now(this);
-
-done:
-  return;
 }
 
-static void _stat_update(FBRASubController *this)
-{
-
-}
 
 gboolean fbrasubctrler_time_update(FBRASubController *this)
 {
   GstClockTime fbinterval_th;
-
-  //TODO: update sender_rate
-
-  if(!this->enabled || _now(this) < this->disable_end || this->measurements_num < 5){
+  if(!this->enabled){
     goto done;
   }
 
-  this->monitored_bitrate = mprtps_path_get_monitored_bitrate(this->path, &this->monitored_packets);
-  fbinterval_th = 150 * GST_MSECOND;
-
-  if(!_bcongestion(this) && this->last_fb_arrived < _now(this) - fbinterval_th){
-    fbratargetctrler_break(this->targetctrler);
-    _switch_stage_to(this, STAGE_KEEP, FALSE);
-    g_print("backward congestion fbinterval: %lu\n", fbinterval_th);
-    _bcongestion(this) = TRUE;
-    goto done;
-  }
+  fbrafbprocessor_time_update(this->fbprocessor);
+  _target_rate_time_update(this);
 
 done:
   return FALSE;
@@ -320,8 +315,7 @@ void fbrasubctrler_report_update(
     goto done;
   }
 
-  fbrafbprocessor_update(this->fbprocessor, summary);
-
+  fbrafbprocessor_report_update(this->fbprocessor, summary);
   _stat_update(this);
   _execute_stage(this);
 
@@ -340,60 +334,42 @@ done:
 
 static gboolean _distortion(FBRASubController *this)
 {
-  GstClockTime owd_th;
+  //consider fix tresholds
+  GstClockTime owd_th = _stat(this)->owd_80th +
+      CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, _stat(this)->owd_in_ms_std * 4);
 
-//  if(300 * GST_MSECOND < _fbstat(this).owd_ltt80){
-//	  return FALSE;
-//  }
-  owd_th = _fbstat(this).owd_ltt80 + CONSTRAIN(30 * GST_MSECOND,
-		  	  	  	  	  	  	  	  	  	   150 * GST_MSECOND,
-											   _fbstat(this).owd_th_dist_in_ms * GST_MSECOND);
-  if(owd_th < _fbstat(this).owd_stt){
-    return TRUE;
-  }
-//  This approach based on density of the distortion of the path
-//  if(.2 < _fbstat(this).overused_avg){
-//    return TRUE;
-//  }
+  gint32 BiF_th = _stat(this)->BiF_80th + MAX(5000, _stat(this)->BiF_80th * .2);
 
-  return FALSE;
+  return owd_th < _stat(this).last_owd || BiF_th < _stat(this).bytes_in_flight;
 }
 
 static gboolean _congestion(FBRASubController *this)
 {
-//  gdouble FD_th;
-
-  {
-    GstClockTime owd_th;
-    owd_th = _fbstat(this).owd_ltt80 + CONSTRAIN(100 * GST_MSECOND,
-    											 300 * GST_MSECOND,
-												 _fbstat(this).owd_th_cng_in_ms * GST_MSECOND);
-    if(owd_th < _fbstat(this).owd_stt){
-      return TRUE;
-    }
+  if(this->last_distorted < this->last_settled + CONSTRAIN(100 * GST_MSECOND, GST_SECOND, 1.5 * _stat(this).srtt)){
+    return FALSE;
   }
-
-//  FD_th = CONSTRAIN(.02, .1, _fbstat(this).FD_avg * 2);
-//  if(FD_th < _FD(this)){
-//    return TRUE;
-//  }
-  return FALSE;
+  return TRUE;
 }
 
 void
 _reduce_stage(
     FBRASubController *this)
 {
-  if(_congestion(this)){
-    fbratargetctrler_break(this->targetctrler);
-  }else if(!fbratargetctrler_get_approvement(this->targetctrler)){
+
+  this->cwnd = MAX(10000, _stat(this)->BiF_80th * _stat(this)->owd_log_corr) * 8;
+
+  if(_distorted(this)){
+    //keep undershooting?
+    goto done;
+  }
+
+  if(!this->target_approvement){
     goto done;
   }
 
   _set_event(this, EVENT_SETTLED);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
 done:
-  fbratargetctrler_refresh_target(this->targetctrler);
   return;
 }
 
@@ -401,28 +377,26 @@ void
 _keep_stage(
     FBRASubController *this)
 {
-  GstClockTime now = _now(this);
+
+  this->cwnd = MAX(10000, _stat(this)->BiF_max * _stat(this)->owd_log_corr) * 8;
 
   if(_congestion(this)){
-    //fbratargetctrler_break(this->targetctrler);
     _set_event(this, EVENT_CONGESTION);
-    //_switch_stage_to(this, STAGE_REDUCE, FALSE);
+    _switch_stage_to(this, STAGE_REDUCE, FALSE);
     goto done;
   }
 
   if(_distortion(this)){
-    //fbratargetctrler_halt(this->targetctrler);
     _set_event(this, EVENT_DISTORTION);
-    this->last_distorted = now;
     goto done;
   }else if(_state(this) != SNDSUBFLOW_STATE_STABLE){
     _set_event(this, EVENT_SETTLED);
     goto done;
   }
 
-  if(!fbratargetctrler_get_approvement(this->targetctrler)){
+  if(!this->target_approvement){
     goto done;
-  }else if(now - _RTT(this) < this->last_distorted){
+  }else if(_now(this) - _stat(this)->srtt < this->last_distorted){
     goto done;
   }
 
@@ -436,31 +410,22 @@ void
 _probe_stage(
     FBRASubController *this)
 {
-  if(_congestion(this)){
-    fbratargetctrler_break(this->targetctrler);
-    _set_event(this, EVENT_CONGESTION);
-    _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    goto done;
-  }
+
+  this->cwnd = MAX(10000, _stat(this)->BiF_max * _stat(this)->owd_log_corr) * 8;
 
   if(_distortion(this)){
-    fbratargetctrler_revert(this->targetctrler);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_KEEP, FALSE);
-    this->last_distorted = _now(this);
     goto done;
   }
 
-  if(!fbratargetctrler_get_approvement(this->targetctrler)){
+  if(!this->target_approvement){
     goto done;
   }
 
-  fbratargetctrler_accelerate(this->targetctrler);
-  fbratargetctrler_probe(this->targetctrler);
   _switch_stage_to(this, STAGE_INCREASE, FALSE);
   _set_event(this, EVENT_READY);
 done:
-  fbratargetctrler_refresh_target(this->targetctrler);
   return;
 }
 
@@ -468,49 +433,62 @@ void
 _increase_stage(
     FBRASubController *this)
 {
-  if(_congestion(this)){
-    fbratargetctrler_break(this->targetctrler);
-    _set_event(this, EVENT_CONGESTION);
-    _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    goto done;
-  }
+
+  this->cwnd = MAX(10000, _stat(this)->BiF_max * _stat(this)->owd_log_corr) * 8  + this->delta_target;
 
   if(_distortion(this)){
-    fbratargetctrler_revert(this->targetctrler);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     goto done;
   }
 
-//  if(this->increasement_started < _now(this) - CONSTRAIN(50 * GST_MSECOND, 3 * GST_SECOND, 3 * _RTT(this))){
   if(this->increasement_started < _now(this) - MAX(300 * GST_MSECOND, 5 * _RTT(this))){
-    fbratargetctrler_revert(this->targetctrler);
     _switch_stage_to(this, STAGE_PROBE, FALSE);
     goto done;
   }
 
-  if(!fbratargetctrler_get_approvement(this->targetctrler)){
+  if(!this->target_approvement){
     goto done;
   }
 
   _switch_stage_to(this, STAGE_PROBE, FALSE);
 done:
-  fbratargetctrler_refresh_target(this->targetctrler);
   return;
 }
+
+void _execute_stage(FBRASubController *this)
+{
+  if(this->pending_event != EVENT_FI){
+    _fire(this, this->pending_event);
+    this->pending_event = EVENT_FI;
+  }
+
+  //Execute stage
+  this->stage_fnc(this);
+  _fire(this, _event(this));
+  _priv(this)->event = EVENT_FI;
+  this->last_executed = _now(this);
+
+done:
+  return;
+}
+
 
 void
 _fire(
     FBRASubController *this,
     Event event)
 {
+
   switch(_state(this)){
     case SNDSUBFLOW_STATE_OVERUSED:
       switch(event){
         case EVENT_CONGESTION:
         break;
         case EVENT_SETTLED:
+          this->last_settled = _now(this);
           sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_STABLE);
+          //bounce back target
         break;
         case EVENT_FI:
         default:
@@ -520,15 +498,21 @@ _fire(
     case SNDSUBFLOW_STATE_STABLE:
       switch(event){
         case EVENT_CONGESTION:
+          //undershoot target
+          this->last_distorted = _now(this);
           sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_OVERUSED);
         break;
         case EVENT_DISTORTION:
+          //corrigate target
+          this->last_distorted = _now(this);
           sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_OVERUSED);
           break;
         case EVENT_READY:
           sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_UNDERUSED);
           break;
         case EVENT_SETTLED:
+          this->last_settled = _now(this);
+          break;
         case EVENT_FI:
         default:
         break;
@@ -537,14 +521,14 @@ _fire(
     case SNDSUBFLOW_STATE_UNDERUSED:
       switch(event){
         case EVENT_CONGESTION:
-          sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_OVERUSED);
-        break;
         case EVENT_DISTORTION:
+          //revert and corrigate
+          this->last_distorted = _now(this);
           sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_OVERUSED);
         break;
         case EVENT_SETTLED:
-          sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_STABLE);
-        break;
+          this->last_settled = _now(this);
+          break;
         case EVENT_FI:
         default:
         break;
@@ -565,17 +549,21 @@ void _switch_stage_to(
   switch(target){
      case STAGE_KEEP:
        this->stage_fnc = _keep_stage;
+       //keep cwnd
      break;
      case STAGE_REDUCE:
        this->congestion_detected = _now(this);
        this->stage_fnc = _reduce_stage;
+       //reduce cwnd
      break;
      case STAGE_INCREASE:
-    this->increasement_started = _now(this);
+       this->increasement_started = _now(this);
        this->stage_fnc = _increase_stage;
+       //open cwnd
      break;
      case STAGE_PROBE:
        this->stage_fnc = _probe_stage;
+       //open cwnd
      break;
    }
   _priv(this)->stage         = target;
@@ -585,4 +573,123 @@ void _switch_stage_to(
 }
 
 
+void _target_rate_time_update(FBRASubController *this)
+{
+  //stalled bytes!
+  gint32 min_desired_margin = MIN(this->desired_bitrate * 0.9, this->desired_bitrate - 100000);
+  gint32 max_desired_margin = MAX(this->desired_bitrate * 1.1, this->desired_bitrate + 100000);
+  gint32 boundary;
+  gint32 approving_interval;
 
+  SndSubflowState state = sndsubflow_get_state(this->subflow);
+
+  if(state == SNDSUBFLOW_STATE_OVERUSED && _stat(this)->receiver_bitrate < min_desired_margin){
+    this->bottleneck_point = _stat(this)->receiver_bitrate;
+    this->desired_bitrate = this->bottleneck_point * .6;
+    goto done;
+  }
+
+  if(this->target_changed < this->target_reached){
+    goto done;
+  }
+
+  if(this->rcved_fb_since_changed < this->required_fb_for_approve){
+    goto done;
+  }
+
+  boundary = CONSTRAIN(10000, 50000,this->desired_bitrate * (1.-this->approvement_epsilon));
+
+  if(_stat(this)->receiver_bitrate < this->desired_bitrate - boundary){
+    goto done;
+  }
+
+  if(boundary + this->desired_bitrate < _stat(this)->receiver_bitrate){
+    goto done;
+  }
+
+  if(_stat(this)->sender_bitrate < this->desired_bitrate - boundary){
+    goto done;
+  }
+
+  if(boundary + this->desired_bitrate < _stat(this)->sender_bitrate){
+    goto done;
+  }
+
+  boundary = MAX(this->delta_target - 20000, this->delta_target * (1.-_priv(this)->approvement_epsilon));
+  if(0 < this->delta_target && _stat(this)->receiver_bitrate < this->stable_bitrate + boundary){
+    goto done;
+  }
+
+  if(this->target_reached < this->target_changed){
+    this->target_reached = _now(this);
+    goto done;
+  }
+
+  approving_interval = _refresh_interval(this);
+  if(_now(this) < this->target_reached + approving_interval){
+    goto done;
+  }
+  this->target_approvement = TRUE;
+
+done:
+  return;
+}
+
+
+gdouble _off_target(FBRATargetCtrler *this, gint pow, gdouble eps)
+{
+  gint32 refpoint;
+  gdouble result;
+  gint i;
+  refpoint = MAX(_min_target(this), this->bottleneck_point);
+  if(this->target_bitrate <= refpoint){
+    return 0.;
+  }
+  result = this->target_bitrate - refpoint;
+  result /= this->target_bitrate * eps;
+
+  for(i=1; i<pow; ++i) result*=result;
+
+  result = CONSTRAIN(0.,1., result);
+
+  return result;
+}
+
+
+guint _get_monitoring_interval(FBRATargetCtrler *this)
+{
+  guint interval;
+  gdouble off;
+  gdouble epsilon;
+  //  off = _off_target(this, 1, _mon_eps(this));
+
+  {
+    gdouble refpoint;
+    refpoint = MAX(_min_target(this), this->bottleneck_point);
+    epsilon = MIN(.25, (gdouble) _max_ramp_up(this) / refpoint);
+  }
+
+//  off = _off_target(this, 2, _mon_eps(this));
+  off = _off_target(this, 2, epsilon);
+
+  interval = off * _mon_min_int(this) + (1.-off) * _mon_max_int(this);
+
+  while(this->target_bitrate / interval < _min_ramp_up(this) && _mon_min_int(this) < interval){
+    --interval;
+  }
+  while(_max_ramp_up(this) < this->target_bitrate / interval && interval < _mon_max_int(this)){
+    ++interval;
+  }
+
+  return interval;
+}
+
+guint _get_approvement_interval(FBRATargetCtrler* this)
+{
+  gdouble off;
+  gdouble interval;
+
+  off = _off_target(this, 2, _interval_eps(this));
+  interval = off * _appr_min_fact(this) + (1.-off) * _appr_max_fact(this);
+  return CONSTRAIN(.1 * GST_SECOND,  .6 * GST_SECOND, interval * _RTT(this));
+}

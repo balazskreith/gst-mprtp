@@ -46,6 +46,11 @@ static void fbrafbprocessor_finalize (GObject * object);
 static void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr);
 static void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary);
 static void _process_stat(FBRAFBProcessor *this);
+
+static void _on_long_sw_rem(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement);
+static void _on_short_sw_rem(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement);
+static void _on_long_sw_add(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement);
+static void _on_short_sw_add(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -57,48 +62,22 @@ static void _owd_logger(FBRAFBProcessor *this)
   }
   {
     gchar filename[255];
-    sprintf(filename, "owd_%d.csv", this->subflow_id);
+    sprintf(filename, "owd_%d.csv", this->subflow->id);
     mprtp_logger(filename, "%lu,%lu,%lu,%lu\n",
-                   GST_TIME_AS_USECONDS(this->stat.owd_stt),
-                   GST_TIME_AS_USECONDS(this->stat.owd_ltt80),
-                   GST_TIME_AS_USECONDS(this->stat.RTT),
+                   GST_TIME_AS_USECONDS(_stat(this)->last_owd),
+                   GST_TIME_AS_USECONDS(_stat(this)->owd_80th),
+                   GST_TIME_AS_USECONDS(this->RTT),
                    (GstClockTime)this->stat.srtt / 1000
                    );
   }
 
-
+  this->last_owd_log = _now(this);
 
 }
 
 
 StructCmpFnc(_measurement_owd_cmp, FBRAPlusMeasurement, owd);
 StructCmpFnc(_measurement_BiF_cmp, FBRAPlusMeasurement, bytes_in_flight);
-
-void _on_BiF_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates)
-{
-  PercentileResult(FBRAPlusMeasurement,   \
-                   bytes_in_flight,       \
-                   candidates,            \
-                   _stat(this)->BiF_80th, \
-                   _stat(this)->BiF_min,  \
-                   _stat(this)->BiF_max,  \
-                   0                      \
-                   );
-}
-
-
-void _on_owd_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates)
-{
-  PercentileResult(FBRAPlusMeasurement,   \
-                   bytes_in_flight,       \
-                   candidates,            \
-                   _stat(this)->owd_80th, \
-                   _stat(this)->owd_min,  \
-                   _stat(this)->owd_max,  \
-                   0                      \
-                   );
-}
-
 
 void
 fbrafbprocessor_class_init (FBRAFBProcessorClass * klass)
@@ -151,6 +130,13 @@ FBRAFBProcessor *make_fbrafbprocessor(SndTracker* sndtracker, SndSubflow* subflo
   slidingwindow_add_plugin(this->long_sw,
         make_swpercentile(80, _measurement_owd_cmp, (NotifierFunc) _on_owd_80th_calculated, this));
 
+  slidingwindow_add_on_change(this->short_sw,
+        (NotifierFunc) _on_short_sw_rem, (NotifierFunc) _on_short_sw_add, this);
+
+  slidingwindow_add_on_change(this->long_sw,
+        (NotifierFunc) _on_long_sw_rem, (NotifierFunc) _on_long_sw_add, this);
+
+
   return this;
 }
 
@@ -160,9 +146,19 @@ void fbrafbprocessor_reset(FBRAFBProcessor *this)
 
 }
 
-void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary)
+void fbrafbprocessor_time_update(FBRAFBProcessor *this){
+  _process_stat(this);
+}
+
+void fbrafbprocessor_report_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary)
 {
   gboolean process = FALSE;
+  GstClockTime now = _now(this);
+  if(now - 20 * GST_MSECOND < this->last_report_updated){
+    g_warning("batched report arrived");
+    goto done;
+  }
+
   if(summary->XR.LostRLE.processed){
     _process_rle_discvector(this, &summary->XR);
     process = TRUE;
@@ -171,11 +167,16 @@ void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summa
       PROFILING("_process_owd",_process_owd(this, &summary->XR));
       process = TRUE;
   }
-  if(process){
-    ++this->measurements_num;
-    _process_stat(this);
-    _owd_logger(this);
+  if(!process){
+    goto done;
   }
+
+  ++this->measurements_num;
+  this->last_report_updated = now;
+  _process_stat(this);
+
+done:
+  return;
 }
 
 void fbrafbprocessor_approve_measurement(FBRAFBProcessor *this)
@@ -183,7 +184,7 @@ void fbrafbprocessor_approve_measurement(FBRAFBProcessor *this)
   FBRAPlusMeasurement *measurement;
   measurement = g_slice_new0(FBRAPlusMeasurement);
   measurement->bytes_in_flight = this->last_bytes_in_flight;
-  measurement->owd             = this->last_owd;
+  measurement->owd             = _stat(this)->last_owd;
 
   slidingwindow_add_data(this->long_sw, measurement);
   slidingwindow_add_data(this->short_sw, measurement);
@@ -195,10 +196,10 @@ void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
   if(!xrsummary->OWD.median_delay){
     goto done;
   }
-  this->last_owd = xrsummary->OWD.median_delay;
+  _stat(this)->last_owd = xrsummary->OWD.median_delay;
 
   if(_stat(this)->owd_80th){
-    this->stat.owd_log_corr = log(_stat(this)->owd_80th) / log(this->last_owd);
+    this->stat.owd_log_corr = log(GST_TIME_AS_MSECONDS(_stat(this)->owd_80th)) / log(GST_TIME_AS_MSECONDS(_stat(this)->last_owd));
   }else{
     this->stat.owd_log_corr = 1.;
   }
@@ -247,16 +248,75 @@ void _process_stat(FBRAFBProcessor *this)
   SndTrackerStat* sndstat = sndtracker_get_subflow_stat(this->sndtracker, this->subflow->id);
   this->last_bytes_in_flight = sndstat->bytes_in_flight;
 
-  if(sndstat->bytes_in_flight < _stat(this)->BiF_80th * 1.2){
+  if(sndstat->bytes_in_flight < _stat(this)->BiF_80th){
     _stat(this)->stalled_bytes = 0;
   }else{
     _stat(this)->stalled_bytes = sndstat->bytes_in_flight - _stat(this)->BiF_80th;
   }
 
-  _stat(this)->received_bitrate = sndstat->received_bytes_in_1s * 8;
-  _stat(this)->sender_bitrate   = sndstat->sent_bytes_in_1s * 8;
-  _stat(this)->owd_srtt_ratio   = (gdouble) this->last_owd / (gdouble) _stat(this)->srtt;
+  _stat(this)->bytes_in_flight       = sndstat->bytes_in_flight;
+  _stat(this)->sender_bitrate        = sndstat->sent_bytes_in_1s * 8;
+  _stat(this)->receiver_bitrate      = sndstat->received_bytes_in_1s * 8;
+  _stat(this)->fec_bitrate           = sndstat->sent_fec_bytes_in_1s * 8;
 
-  _stat(this)->last_updated     = _now(this);
+  _owd_logger(this);
 }
 
+
+
+void _on_BiF_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates)
+{
+  PercentileResult(FBRAPlusMeasurement,   \
+                   bytes_in_flight,       \
+                   candidates,            \
+                   _stat(this)->BiF_80th, \
+                   this->BiF_min,         \
+                   _stat(this)->BiF_max,  \
+                   0                      \
+                   );
+}
+
+
+void _on_owd_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates)
+{
+  PercentileResult(FBRAPlusMeasurement,   \
+                   bytes_in_flight,       \
+                   candidates,            \
+                   _stat(this)->owd_80th, \
+                   this->owd_min,         \
+                   this->owd_max,         \
+                   0                      \
+                   );
+}
+
+
+static gdouble _calculate_std(FBRAPlusStdHelper* helper, gdouble new_item)
+{
+  gdouble prev_mean = helper->mean;
+  helper->mean += (new_item - helper->mean) / (gdouble) helper->counter;
+  helper->abs_var  += (new_item - helper->mean) * (new_item - prev_mean);
+  return sqrt(helper->abs_var / (gdouble) helper->counter);
+}
+
+void _on_short_sw_rem(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement)
+{
+  --this->BiF_std_helper.counter;
+}
+
+void _on_long_sw_rem(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement)
+{
+  --this->owd_std_helper.counter;
+  g_slice_free(FBRAPlusMeasurement, measurement);
+}
+
+void _on_short_sw_add(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement)
+{
+  ++this->BiF_std_helper.counter;
+  _stat(this)->BiF_std = _calculate_std(&this->BiF_std_helper, measurement->bytes_in_flight);
+}
+
+void _on_long_sw_add(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement)
+{
+  ++this->owd_std_helper.counter;
+  _stat(this)->owd_in_ms_std = _calculate_std(&this->owd_std_helper, GST_TIME_AS_MSECONDS(measurement->owd));
+}

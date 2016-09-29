@@ -40,6 +40,13 @@ struct _FBRASubController
   gboolean                  enabled;
   SndSubflow*               subflow;
 
+  gboolean                  target_approvement;
+  gint32                    desired_bitrate;
+  gint32                    delta_target;
+  gint32                    stable_bitrate;
+  GstClockTime              target_changed;
+  GstClockTime              target_reached;
+
   GstClockTime              last_executed;
 
   gint32                    bottleneck_point;
@@ -56,12 +63,11 @@ struct _FBRASubController
 
   GstClockTime              congestion_detected;
 
+  GstClockTime              last_approved;
+  GstClockTime              last_settled;
   GstClockTime              last_distorted;
-  GstClockTime              last_reduced;
 
   gdouble                   cwnd;
-
-  GstClockTime              last_approved;
 
   gpointer                  priv;
 

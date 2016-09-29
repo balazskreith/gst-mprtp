@@ -340,24 +340,6 @@ void fbratargetctrler_update(FBRATargetCtrler* this, FBRAFBProcessorStat* stat)
 //  stat->tendency = _priv(this)->tend_median;
 }
 
-static gdouble _off_target(FBRATargetCtrler *this, gint pow, gdouble eps)
-{
-  gint32 refpoint;
-  gdouble result;
-  gint i;
-  refpoint = MAX(_min_target(this), this->bottleneck_point);
-  if(this->target_bitrate <= refpoint){
-    return 0.;
-  }
-  result = this->target_bitrate - refpoint;
-  result /= this->target_bitrate * eps;
-
-  for(i=1; i<pow; ++i) result*=result;
-
-  result = CONSTRAIN(0.,1., result);
-
-  return result;
-}
 
 
 static guint _get_monitoring_interval(FBRATargetCtrler *this)

@@ -129,6 +129,7 @@ void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, NotifierFunc c
 void sndsubflow_on_stat_changed_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata);
 void sndsubflow_on_packet_sent_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata);
 void sndsubflow_set_state(SndSubflow* this, SndSubflowState state);
+SndSubflowState sndsubflow_get_state(SndSubflow* subflow);
 guint8 sndsubflow_get_mprtp_ext_header_id(SndSubflow* subflow);
 guint16 sndsubflow_get_next_subflow_seq(SndSubflow* subflow);
 

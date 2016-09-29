@@ -276,6 +276,11 @@ void sndsubflow_set_state(SndSubflow* subflow, SndSubflowState state)
   subflow->state = state;
 }
 
+SndSubflowState sndsubflow_get_state(SndSubflow* subflow)
+{
+  return subflow->state;
+}
+
 void sndsubflow_on_packet_sent_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata)
 {
   observer_add_listener(subflow->on_packet_sent, callback, udata);

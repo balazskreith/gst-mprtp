@@ -24,22 +24,29 @@ typedef struct _FBRAFBProcessorClass FBRAFBProcessorClass;
 
 typedef struct _FBRAPlusStat
 {
+  GstClockTime             owd_80th;
+  GstClockTime             last_owd;
+
   gint32                   measurement_num;
   gint32                   BiF_80th;
   gint32                   BiF_max;
-  gint32                   BiF_min;
   gint32                   BiF_std;
   gint32                   stalled_bytes;
+  gint32                   bytes_in_flight;
   gint32                   sender_bitrate;
-  gint32                   received_bitrate;
-  GstClockTime             owd_80th;
-  GstClockTime             owd_min;
-  GstClockTime             owd_max;
+  gint32                   receiver_bitrate;
+  gint32                   fec_bitrate;
   gdouble                  owd_log_corr;
-  gdouble                  owd_log_std;
-  gdouble                  owd_srtt_ratio;
+  gdouble                  owd_in_ms_std;
   gdouble                  srtt;
+
 }FBRAPlusStat;
+
+typedef struct{
+  guint   counter;
+  gdouble mean; //the mean
+  gdouble abs_var;
+}FBRAPlusStdHelper;
 
 typedef struct{
   GstClockTime owd;
@@ -62,9 +69,17 @@ struct _FBRAFBProcessor
 
   guint                    measurements_num;
   gint32                   last_bytes_in_flight;
-  GstClockTime             last_owd;
   GstClockTime             RTT;
   GstClockTime             srtt_updated;
+
+  gint32                   BiF_min;
+  GstClockTime             owd_min;
+  GstClockTime             owd_max;
+
+  FBRAPlusStdHelper        owd_std_helper;
+  FBRAPlusStdHelper        BiF_std_helper;
+  GstClockTime             last_report_updated;
+  GstClockTime             last_owd_log;
 
 };
 
@@ -78,6 +93,6 @@ FBRAFBProcessor *make_fbrafbprocessor(SndTracker* sndtracker, SndSubflow* subflo
 
 void fbrafbprocessor_reset(FBRAFBProcessor *this);
 void fbrafbprocessor_approve_measurement(FBRAFBProcessor *this);
-void fbrafbprocessor_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary);
+void fbrafbprocessor_report_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary);
 
 #endif /* FBRAFBPROCESSOR_H_ */

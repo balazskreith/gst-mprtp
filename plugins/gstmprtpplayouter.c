@@ -1,35 +1,3 @@
-/* GStreamer
- * Copyright (C) 2015 FIXME <fixme@example.com>
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Library General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Library General Public License for more details.
- *
- * You should have received a copy of the GNU Library General Public
- * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 51 Franklin Street, Suite 500,
- * Boston, MA 02110-1335, USA.
- */
-/**
- * SECTION:element-gstmprtpplayouter
- *
- * The mprtpplayouter element does FIXME stuff.
- *
- * <refsect2>
- * <title>Example launch line</title>
- * |[
- * gst-launch -v fakesrc ! mprtpplayouter ! FIXME ! fakesink
- * ]|
- * FIXME Describe what the pipeline does.
- * </refsect2>
- */
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -41,10 +9,7 @@
 #include <string.h>
 #include "gstmprtpplayouter.h"
 #include "gstmprtcpbuffer.h"
-#include "mprtprpath.h"
-#include "mprtpspath.h"
 #include "streamjoiner.h"
-#include "gstmprtpbuffer.h"
 #include "mprtplogger.h"
 
 
@@ -60,7 +25,7 @@ typedef struct _SubflowSpecProp{
   #else
   #error "G_BYTE_ORDER should be big or little endian."
   #endif
-  }SubflowSpecProp;
+}SubflowSpecProp;
 
 GST_DEBUG_CATEGORY_STATIC (gst_mprtpplayouter_debug_category);
 #define GST_CAT_DEFAULT gst_mprtpplayouter_debug_category
@@ -747,9 +712,7 @@ _processing_mprtcp_packet (GstMprtpplayouter * this, GstBuffer * buf)
 void
 _processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
 {
-  MpRTPRPath *path = NULL;
   GstNetAddressMeta *meta;
-  GstMpRTPBuffer *mprtp = NULL;
 
   mprtp = _make_mprtp_buffer(this, buf);
   if (this->pivot_ssrc != MPRTP_PLAYOUTER_DEFAULT_SSRC &&

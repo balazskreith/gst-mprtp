@@ -188,6 +188,21 @@ void rcvsubflows_add_on_congestion_controlling_type_changed_cb(RcvSubflows* this
   observer_add_listener(this->on_congestion_controlling_type_changed, callback, udata);
 }
 
+void rcvsubflow_notify_rtcp_fb_cbs(RcvSubflow* subflow, gpointer udata)
+{
+  observer_notify(subflow->on_rtcp_time_update, udata);
+}
+
+void rcvsubflow_add_on_rtcp_fb_cb(RcvSubflow* subflow, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(subflow->on_rtcp_time_update, callback, udata);
+}
+
+void rcvsubflow_rem_on_rtcp_fb_cb(RcvSubflow* subflow, NotifierFunc callback)
+{
+  observer_rem_listener(subflow->on_rtcp_time_update, callback);
+}
+
 RcvSubflow* rcvsubflows_get_subflow(RcvSubflows* this, guint8 subflow_id)
 {
   return this->subflows + subflow_id;
@@ -213,14 +228,14 @@ void rcvsubflows_set_rtcp_interval_type(RcvSubflows* this, guint8 subflow_id, RT
 RcvSubflow* _make_subflow(RcvSubflows* base_db, guint8 subflow_id)
 {
   RcvSubflow* result = g_malloc0(sizeof(RcvSubflow));
-  result->base_db             = base_db;
-  result->on_rtp_packet_sent  = make_observer();
+  result->base_db                  = base_db;
+  result->on_rtcp_time_update  = make_observer();
   return result;
 }
 
 void _dispose_subflow(RcvSubflow *subflow)
 {
-  g_object_unref(subflow->on_rtp_packet_sent);
+  g_object_unref(subflow->on_rtcp_time_update);
   g_free(subflow);
 }
 

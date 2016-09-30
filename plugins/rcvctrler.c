@@ -133,6 +133,8 @@ rcvctrler_init (RcvController * this)
   this->report_processor   = g_object_new(REPORTPROCESSOR_TYPE, NULL);
   this->made               = _now(this);
 
+  this->ricalcer           = make_ricalcer(FALSE);
+
   report_processor_set_logfile(this->report_processor, "rcv_reports.log");
   report_producer_set_logfile(this->report_producer, "rcv_produced_reports.log");
 
@@ -223,25 +225,26 @@ done:
 static void _receiver_report_updater_helper(RcvSubflow *subflow, gpointer udata)
 {
   RcvController*            this;
-  ReportIntervalCalculator* ricalcer;
   GstBuffer*                buf;
   guint                     report_length = 0;
 
-  this     = udata;
-  ricalcer = this->ricalcer;
+  this = udata;
 
   if(subflow->congestion_controlling_type == CONGESTION_CONTROLLING_TYPE_NONE){
     goto done;
   }
 
-  if(!ricalcer_rtcp_regular_allowed(ricalcer, subflow)){
-    goto done;
+  if(ricalcer_rtcp_regular_allowed(this->ricalcer, subflow)){
+    report_producer_begin(this->report_producer, subflow->id);
+    _create_rr(this, subflow);
   }
 
-  report_producer_begin(this->report_producer, subflow->id);
-  _create_rr(this, subflow);
+  rcvsubflow_notify_rtcp_fb_cbs(subflow, this->report_producer);
+
   buf = report_producer_end(this->report_producer, &report_length);
-  g_async_queue_push(this->mprtcpq, buf);
+  if(!buf){
+    g_async_queue_push(this->mprtcpq, buf);
+  }
 
   //report_length += 12 /* RTCP HEADER*/ + (28<<3) /*UDP+IP HEADER*/;
   //ricalcer_update_avg_report_size(ricaler, report_length);
@@ -266,37 +269,31 @@ done:
 
 void _create_rr(RcvController * this, RcvSubflow *subflow)
 {
-  guint8 fraction_lost;
+  guint8  fraction_lost;
   guint32 ext_hsn;
   guint32 received;
   guint32 lost;
   guint32 expected;
-  guint32 total_received;
-  guint32 jitter;
   guint16 cycle_num;
-  guint16 HSSN;
   guint32 LSR;
   guint32 DLSR;
+  RcvTrackerSubflowStat* stat;
 
-  mprtpr_path_get_regular_stats(subflow->path,
-                             &HSSN,
-                             &cycle_num,
-                             &jitter,
-                             &total_received);
+  stat = rcvtracker_get_subflow_stat(this->rcvtracker, subflow->id);
 
-  expected      = _uint32_diff(subflow->HSSN, HSSN);
-  received      = total_received - subflow->total_received;
+  expected      = _uint32_diff(subflow->highest_seq, stat->highest_seq);
+  received      = stat->total_received_packets - subflow->total_received_packets;
   lost          = received < expected ? expected - received : 0;
 
   fraction_lost = (expected == 0 || lost <= 0) ? 0 : (lost << 8) / expected;
-  ext_hsn       = (((guint32) cycle_num) << 16) | ((guint32) HSSN);
+  ext_hsn       = (((guint32) cycle_num) << 16) | ((guint32) stat->highest_seq);
 
 //  g_print("expected: %u received: %u lost: %u fraction_lost: %d cycle num: %d\n",
 //          expected, received, lost, fraction_lost, cycle_num);
 
-  subflow->HSSN           = HSSN;
-  subflow->total_lost    += lost;
-  subflow->total_received = total_received;
+  subflow->highest_seq             = stat->highest_seq;
+  subflow->total_lost_packets     += lost;
+  subflow->total_received_packets  = stat->total_received_packets;
 
   LSR = (guint32) (subflow->last_SR_report_sent >> 16);
 
@@ -311,14 +308,12 @@ void _create_rr(RcvController * this, RcvSubflow *subflow)
 
   report_producer_add_rr(this->report_producer,
                          fraction_lost,
-                         subflow->total_lost,
+                         subflow->total_lost_packets,
                          ext_hsn,
-                         jitter,
+                         stat->jitter,
                          LSR,
                          DLSR
                          );
-
-  ricalcer_refresh_packets_rate(subflow->ricalcer, received, lost, lost);
 
 }
 
@@ -353,11 +348,11 @@ void _dispose_fbproducer(RcvController* this, FeedbackProducer* producer)
   g_slice_free(FeedbackProducer, producer);
 }
 
-FeedbackProducer* _create_fbraplus(SndController* this, RcvSubflow* subflow)
+FeedbackProducer* _create_fbraplus(RcvController* this, RcvSubflow* subflow)
 {
   FeedbackProducer *result = g_slice_new0(FeedbackProducer);
   result->subflow        = subflow;
-  result->udata          = make_fbrafbproducer()
+  result->udata          = make_fbrafbproducer(subflow, this->rcvtracker);
   result->dispose        = (CallFunc) g_object_unref;
   result->time_updater   = (TimeUpdaterFunc) ;
   result->report_updater = (ReportTransitFunc);

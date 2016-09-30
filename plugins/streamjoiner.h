@@ -9,13 +9,12 @@
 #define STREAM_JOINER_H_
 
 #include <gst/gst.h>
-#include "packetsrcvqueue.h"
 #include "lib_swplugins.h"
+#include "rcvtracker.h"
 
 typedef struct _StreamJoiner StreamJoiner;
 typedef struct _StreamJoinerClass StreamJoinerClass;
 
-#include "mprtprpath.h"
 
 #define STREAM_JOINER_TYPE             (stream_joiner_get_type())
 #define STREAM_JOINER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),STREAM_JOINER_TYPE,StreamJoiner))
@@ -38,6 +37,9 @@ struct _StreamJoiner
   GstClockTime         made;
   GstClockTime         join_delay;
 
+  GstTask*             thread;
+  GRecMutex            thread_mutex;
+
   SlidingWindow*       joinq;
   GQueue*              playoutq;
   guint16              last_seq;
@@ -45,7 +47,7 @@ struct _StreamJoiner
   guint32              last_ts;
 
   gdouble              betha;
-  PacketForwarder*     rtppackets_out;
+  GAsyncQueue*         rtppackets_out;
   GAsyncQueue*         discarded_packets_out;
   GAsyncQueue*         messages_in;
 
@@ -59,7 +61,9 @@ struct _StreamJoinerClass{
 };
 
 StreamJoiner*
-make_stream_joiner();
+make_stream_joiner(
+    GAsyncQueue* rtppackets_out,
+    GAsyncQueue* discarded_packets_out);
 
 void
 stream_joiner_add_stat(

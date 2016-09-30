@@ -10,7 +10,7 @@
 
 
 #include <gst/gst.h>
-#include "mprtpspath.h"
+#include "mprtpdefs.h"
 
 typedef struct _RcvTracker RcvTracker;
 typedef struct _RcvTrackerClass RcvTrackerClass;
@@ -70,7 +70,7 @@ void rcvtracker_deinit_subflow(RcvTracker *this, guint8 subflow_id);
 void rcvtracker_init_subflow(RcvTracker *this, guint8 subflow_id);
 void rcvtracker_refresh(RcvTracker * this);
 
-void rcvtracker_add_discarded_seq(RcvTracker* this, DiscardedPacket discarded_packet);
+void rcvtracker_add_discarded_seq(RcvTracker* this, DiscardedPacket* discarded_packet);
 
 void rcvtracker_add_on_received_packet_callback(RcvTracker * this,
                                         void (*callback)(gpointer udata, gpointer item),

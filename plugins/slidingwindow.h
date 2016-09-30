@@ -10,6 +10,7 @@
 
 #include <gst/gst.h>
 #include "lib_bintree.h"
+#include "observer.h"
 
 typedef struct _SlidingWindow SlidingWindow;
 typedef struct _SlidingWindowClass SlidingWindowClass;

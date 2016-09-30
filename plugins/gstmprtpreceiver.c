@@ -38,9 +38,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "gstmprtpreceiver.h"
-#include "mprtpspath.h"
-#include "mprtprpath.h"
 #include "gstmprtcpbuffer.h"
+
 
 GST_DEBUG_CATEGORY_STATIC (gst_mprtpreceiver_debug_category);
 #define GST_CAT_DEFAULT gst_mprtpreceiver_debug_category
@@ -244,26 +243,22 @@ gst_mprtpreceiver_set_property (GObject * object, guint property_id,
   GstMprtpreceiver *this = GST_MPRTPRECEIVER (object);
   GST_DEBUG_OBJECT (this, "set_property");
 
+  THIS_WRITELOCK (this);
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
-      THIS_WRITELOCK (this);
       this->mprtp_ext_header_id = (guint8) g_value_get_uint (value);
-      THIS_WRITEUNLOCK (this);
       break;
     case PROP_FEC_PAYLOAD_TYPE:
-      THIS_WRITELOCK (this);
       this->fec_payload_type = (guint8) g_value_get_uint (value);
-      THIS_WRITEUNLOCK (this);
       break;
     case PROP_REPORT_ONLY:
-      THIS_WRITELOCK (this);
       this->only_report_receiving = g_value_get_boolean (value);
-      THIS_WRITEUNLOCK (this);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
   }
+  THIS_WRITEUNLOCK (this);
 }
 
 void
@@ -274,26 +269,22 @@ gst_mprtpreceiver_get_property (GObject * object, guint property_id,
 
   GST_DEBUG_OBJECT (this, "get_property");
 
+  THIS_READLOCK (this);
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
-      THIS_READLOCK (this);
       g_value_set_uint (value, (guint) this->mprtp_ext_header_id);
-      THIS_READUNLOCK (this);
       break;
     case PROP_FEC_PAYLOAD_TYPE:
-       THIS_READLOCK (this);
        g_value_set_uint (value, (guint) this->fec_payload_type);
-       THIS_READUNLOCK (this);
        break;
     case PROP_REPORT_ONLY:
-      THIS_READLOCK (this);
       g_value_set_boolean (value, this->only_report_receiving);
-      THIS_READUNLOCK (this);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
   }
+  THIS_READUNLOCK (this);
 }
 
 void
@@ -374,6 +365,7 @@ gst_mprtpreceiver_request_new_pad (GstElement * element, GstPadTemplate * templ,
   }else{
     subflow->inpad = sinkpad;
   }
+
   THIS_WRITEUNLOCK (this);
 
   gst_pad_set_active (sinkpad, TRUE);

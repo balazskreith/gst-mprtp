@@ -9,12 +9,10 @@
 #define FBRASUBCTRLER_H_
 
 #include <gst/gst.h>
-#include "reportproc.h"
-#include "signalreport.h"
 #include "fbrafbproc.h"
-#include "fbratargetctrler.h"
+#include "sndtracker.h"
+#include "sndsubflows.h"
 #include "rtppackets.h"
-
 
 typedef struct _FBRASubController FBRASubController;
 typedef struct _FBRASubControllerClass FBRASubControllerClass;

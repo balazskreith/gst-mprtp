@@ -5,19 +5,11 @@
  *      Author: balazs
  */
 
-#ifndef REFCTRLER_H_
-#define REFCTRLER_H_
+#ifndef OBSERVER_H_
+#define OBSERVER_H_
 
 #include <gst/gst.h>
-
-#include "mprtprpath.h"
-#include "streamjoiner.h"
-#include "ricalcer.h"
-#include "sndctrler.h"
-#include "streamsplitter.h"
-#include "reportprod.h"
-#include "reportproc.h"
-#include "fecdec.h"
+#include "mprtpdefs.h"
 
 typedef struct _Observer Observer;
 typedef struct _ObserverClass ObserverClass;
@@ -53,4 +45,4 @@ void observer_rem_listener(Observer *this, NotifierFunc callback);
 void observer_notify(Observer *this, gpointer subject);
 
 
-#endif /* REFCTRLER_H_ */
+#endif /* OBSERVER_H_ */

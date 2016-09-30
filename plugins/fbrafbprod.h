@@ -10,7 +10,6 @@
 
 #include <gst/gst.h>
 #include "gstmprtcpbuffer.h"
-#include "gstmprtpbuffer.h"
 #include "reportprod.h"
 #include "lib_swplugins.h"
 
@@ -34,16 +33,15 @@ struct _FBRAFBProducer
   guint16                  cycle_num;
   gboolean                 initialized;
 
-  guint8                   subflow_id;
+  RcvSubflow*              subflow;
   RcvTracker*              tracker;
-  RTPPackets*              rtpdb;
 
   guint16                  begin_seq;
   guint16                  end_seq;
   gboolean*                vector;
   guint                    vector_length;
 
-  SlidingWindow           *owds_sw;
+  SlidingWindow*           owds_sw;
 
   GstClockTime             last_fb;
   gint                     rcved_packets;
@@ -67,11 +65,9 @@ struct _FBRAFBProducerClass{
 };
 
 GType fbrafbproducer_get_type (void);
-FBRAFBProducer *make_fbrafbproducer(guint32 ssrc, guint8 subflow_id);
+FBRAFBProducer *make_fbrafbproducer(RcvSubflow* subflow, RcvTracker *tracker, ReportProducer *reportprod);
 void fbrafbproducer_reset(FBRAFBProducer *this);
 void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold);
 
-gboolean fbrafbproducer_do_fb(gpointer data);
-void fbrafbproducer_setup_feedback(gpointer data, ReportProducer *reportprod);
 
 #endif /* FBRAFBPRODUCER_H_ */

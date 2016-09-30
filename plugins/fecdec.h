@@ -9,7 +9,7 @@
 #define FECDECODER_H_
 
 #include <gst/gst.h>
-#include "gstmprtpbuffer.h"
+#include "rtppackets.h"
 #include "rtpfecbuffer.h"
 
 typedef struct _FECDecoder FECDecoder;

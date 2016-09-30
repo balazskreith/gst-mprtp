@@ -12,11 +12,8 @@
 #include <gio/gio.h>
 #include <stdio.h>
 
-#include "mprtpspath.h"
-#include "streamsplitter.h"
 #include "reportprod.h"
 #include "reportproc.h"
-#include "fecenc.h"
 #include "signalreport.h"
 
 typedef struct _SndController SndController;

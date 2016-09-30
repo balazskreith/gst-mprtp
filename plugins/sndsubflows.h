@@ -9,7 +9,8 @@
 #define SNDSUBFLOWSN_H_
 
 #include <gst/gst.h>
-#include "mprtpdefs.h"
+#include "observer.h"
+
 
 typedef struct _SndSubflows SndSubflows;
 typedef struct _SndSubflowsClass SndSubflowsClass;

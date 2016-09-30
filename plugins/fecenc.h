@@ -9,9 +9,7 @@
 #define FECENCODER_H_
 
 #include <gst/gst.h>
-#include "gstmprtpbuffer.h"
 #include "rtpfecbuffer.h"
-#include "mprtpspath.h"
 
 typedef struct _FECEncoder FECEncoder;
 typedef struct _FECEncoderClass FECEncoderClass;

@@ -32,23 +32,24 @@ typedef struct _RcvControllerClass RcvControllerClass;
 
 struct _RcvController
 {
-  GObject                object;
+  GObject                   object;
 
-  RcvSubflows*           subflows;
-  GstClockTime           made;
-  GstClock*              sysclock;
-  guint32                ssrc;
-  gboolean               report_is_flowable;
+  RcvSubflows*              subflows;
+  GstClockTime              made;
+  GstClock*                 sysclock;
+  guint32                   ssrc;
+  gboolean                  report_is_flowable;
 
-  ReportProducer*        report_producer;
-  ReportProcessor*       report_processor;
+  ReportProducer*           report_producer;
+  ReportProcessor*          report_processor;
 
-  GSList*                fbproducers;
-  RcvTracker*            rcvtracker;
-  GAsyncQueue*           mprtcpq;
+  GSList*                   fbproducers;
+  RcvTracker*               rcvtracker;
+  GAsyncQueue*              mprtcpq;
 
-  GstMPRTCPReportSummary reports_summary;
-  GstClockTime           last_time_update;
+  GstMPRTCPReportSummary    reports_summary;
+  GstClockTime              last_time_update;
+  ReportIntervalCalculator* ricalcer;
 };
 
 

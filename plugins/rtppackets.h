@@ -10,6 +10,7 @@
 
 #include <gst/gst.h>
 #include "sndsubflows.h"
+#include "rcvsubflows.h"
 
 typedef struct _RTPPackets RTPPackets;
 typedef struct _RTPPacketsClass RTPPacketsClass;

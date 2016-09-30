@@ -37,7 +37,6 @@
 #include <stdio.h>
 #include <gst/gst.h>
 #include "gstmprtpsender.h"
-#include "mprtpspath.h"
 #include "gstmprtcpbuffer.h"
 #include <string.h>
 
@@ -310,9 +309,11 @@ gst_mprtpsender_class_init (GstMprtpsenderClass * klass)
   gobject_class->get_property = gst_mprtpsender_get_property;
   gobject_class->dispose = gst_mprtpsender_dispose;
   gobject_class->finalize = gst_mprtpsender_finalize;
+
   element_class->request_new_pad =
       GST_DEBUG_FUNCPTR (gst_mprtpsender_request_new_pad);
-  element_class->release_pad = GST_DEBUG_FUNCPTR (gst_mprtpsender_release_pad);
+
+  element_class->release_pad  = GST_DEBUG_FUNCPTR (gst_mprtpsender_release_pad);
   element_class->change_state =
       GST_DEBUG_FUNCPTR (gst_mprtpsender_change_state);
   element_class->query = GST_DEBUG_FUNCPTR (gst_mprtpsender_query);

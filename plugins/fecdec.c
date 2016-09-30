@@ -23,21 +23,13 @@
 
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
-#include "fecdec.h"
-#include "gstmprtcpbuffer.h"
 #include <math.h>
 #include <string.h>
-#include "mprtpspath.h"
+#include "fecdec.h"
+
 
 #define _now(this) gst_clock_get_time (this->sysclock)
 
-
-
-//#define THIS_READLOCK(this)
-//#define THIS_READUNLOCK(this)
-//#define THIS_WRITELOCK(this)
-//#define THIS_WRITEUNLOCK(this)
-//#define _cmp_uint16(x,y) ((x==y)?0:((gint16) (x - y)) < 0 ? -1 : 1)
 
 static gint
 _cmp_uint16 (guint16 x, guint16 y)
@@ -158,10 +150,10 @@ fecdecoder_finalize (GObject * object)
 void
 fecdecoder_init (FECDecoder * this)
 {
-  this->thread           = gst_task_new (_fecdec_process, this, NULL);
-  this->sysclock         = gst_system_clock_obtain();
-  this->rtppackets_in    = g_async_queue_new();
-  this->fecbuffers_in    = g_async_queue_new();
+  this->thread             = gst_task_new (_fecdec_process, this, NULL);
+  this->sysclock           = gst_system_clock_obtain();
+  this->rtppackets_in      = g_async_queue_new();
+  this->fecbuffers_in      = g_async_queue_new();
   this->discard_packets_in = g_async_queue_new();
 
   gst_task_set_lock (this->thread, &this->thread_mutex);

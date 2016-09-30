@@ -77,6 +77,11 @@ stream_joiner_finalize (
 static void
 _process(gpointer udata);
 
+static void
+_process_message(
+    StreamJoiner *this,
+    Message *msg);
+
 static gint
 _cmp_seq (guint16 x, guint16 y)
 {
@@ -136,6 +141,10 @@ void
 stream_joiner_finalize (GObject * object)
 {
   StreamJoiner *this = STREAM_JOINER (object);
+  gst_task_stop(this->thread);
+  gst_task_join(this->thread);
+  gst_object_unref(this->thread);
+
   g_object_unref (this->sysclock);
 }
 
@@ -147,7 +156,10 @@ stream_joiner_init (StreamJoiner * this)
   this->made               = _now(this);
   this->join_delay         = 10 * GST_MSECOND;
 
+  this->thread             = gst_task_new(_process, this, NULL);
 
+  gst_task_set_lock(this->thread, &this->thread_mutex);
+  gst_task_start(this->thread);
 }
 
 StreamJoiner*
@@ -186,7 +198,7 @@ void stream_joiner_add_packet(StreamJoiner *this, RTPPacket* packet)
   g_async_queue_push(this->messages_in, msg);
 }
 
-static void _process_message(StreamJoiner *this, Message *msg)
+void _process_message(StreamJoiner *this, Message *msg)
 {
   if(msg->type == STREAMJOINER_MESSAGE_STAT){
     StatMessage* stat_msg = (StatMessage*)msg;

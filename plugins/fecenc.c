@@ -23,19 +23,12 @@
 
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
-#include "fecenc.h"
-#include "gstmprtcpbuffer.h"
 #include <math.h>
 #include <string.h>
+#include "fecenc.h"
+#include "gstmprtcpbuffer.h"
 
 #define _now(this) gst_clock_get_time (this->sysclock)
-
-//#define THIS_READLOCK(this)
-//#define THIS_READUNLOCK(this)
-//#define THIS_WRITELOCK(this)
-//#define THIS_WRITEUNLOCK(this)
-//#define _cmp_uint16(x,y) ((x==y)?0:((gint16) (x - y)) < 0 ? -1 : 1)
-
 
 GST_DEBUG_CATEGORY_STATIC (fecencoder_debug_category);
 #define GST_CAT_DEFAULT fecencoder_debug_category

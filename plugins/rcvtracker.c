@@ -27,8 +27,8 @@
 #include <gst/gst.h>
 #include <stdlib.h>
 #include <string.h>
-#include "streamsplitter.h"
 #include "rcvctrler.h"
+#include "rtppackets.h"
 
 
 GST_DEBUG_CATEGORY_STATIC (rcvtracker_debug_category);
@@ -168,7 +168,7 @@ void rcvtracker_refresh(RcvTracker * this)
   g_slist_foreach(this->joined_subflows, (GFunc) _rcvtracker_refresh_helper, this);
 }
 
-void rcvtracker_add_discarded_seq(RcvTracker* this, DiscardedPacket discarded_packet)
+void rcvtracker_add_discarded_seq(RcvTracker* this, DiscardedPacket* discarded_packet)
 {
   Subflow *subflow;
 
@@ -235,6 +235,8 @@ void rcvtracker_subflow_rem_on_received_packet_cb(RcvTracker * this,
   Subflow *subflow = _get_subflow(this, subflow_id);
   observer_rem_listener(subflow->on_received_packet, callback);
 }
+
+
 
 RcvTrackerSubflowStat* rcvtracker_get_subflow_stat(RcvTracker * this, guint8 subflow_id)
 {

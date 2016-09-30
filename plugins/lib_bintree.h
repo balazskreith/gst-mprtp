@@ -8,6 +8,7 @@
 #include <assert.h>
 
 #include <gst/gst.h>
+#include "observer.h"
 
 typedef struct{
   gboolean                 active;

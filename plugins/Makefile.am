@@ -1,51 +1,45 @@
 plugin_LTLIBRARIES = libgstmprtp.la
 
 # sources used to compile this plug-in
-libgstmprtp_la_SOURCES = gstmprtpplugin.c           \
-                         gstmprtcpbuffer.c          \
-                         gstmprtpbuffer.c           \
-                         gstmprtpscheduler.c        \
-                         gstmprtpplayouter.c        \
-                         gstmprtpreceiver.c         \
-                         gstmprtpsender.c           \
-                         mprtprpath.c               \
-                         mprtpspath.c               \
-                         streamjoiner.c             \
-                         streamsplitter.c           \
-                         sndctrler.c                \
-                         rcvctrler.c                \
-                         mprtplogger.c              \
-                         packetssndqueue.c          \
-                         packetsrcvqueue.c          \
-                         ricalcer.c                 \
-                         reportproc.c               \
-                         reportprod.c               \
-                         sndratedistor.c            \
-                         fbrasubctrler.c            \
-                         fbrafbproc.c               \
-                         fbrafbprod.c               \
-                         screamsubctrler.c          \
-                         fecdec.c                   \
-                         fecenc.c                   \
-                         rtpfecbuffer.c             \
-                         signalreport.c             \
-                         slidingwindow.c            \
-                         lib_bintree.c              \
-                         lib_swplugins.c            \
-                         subratectrler.c            \
-                         fbratargetctrler.c         \
-                         rtppackets.c
+libgstmprtp_la_SOURCES = fbrafbproc.c          \
+                         fbrafbprod.c          \
+                         fbrasubctrler.c       \
+                         fecdec.c              \
+                         fecenc.c              \
+                         gstmprtcpbuffer.c     \
+                         gstmprtpplayouter.c   \
+                         gstmprtpreceiver.c    \
+                         gstmprtpscheduler.c   \
+                         gstmprtpsender.c      \
+                         lib_bintree.c         \
+                         lib_swplugins.c       \
+                         mprtpdefs.c           \
+                         mprtplogger.c         \
+                         observer.c            \
+                         packetforwarder.c     \
+                         rcvctrler.c           \
+                         rcvsubflows.c         \
+                         rcvtracker.c          \
+                         reportproc.c          \
+                         reportprod.c          \
+                         ricalcer.c            \
+                         rtpfecbuffer.c        \
+                         rtppackets.c          \
+                         signalreport.c        \
+                         slidingwindow.c       \
+                         sndctrler.c           \
+                         sndsubflows.c         \
+                         sndtracker.c          \
+                         streamjoiner.c        \
+                         streamsplitter.c          
                     
                     
 noinst_HEADERS = mprtpspath.h           \
                  sndctrler.h            \
                  rcvctrler.c            \
-                 mprtprpath.h           \
                  streamsplitter.h       \
                  streamjoiner.h         \
                  mprtplogger.h          \
-                 packetssndqueue.h      \
-                 packetsrcvqueue.h      \
                  ricalcer.h             \
                  reportproc.h           \
                  reportprod.h           \

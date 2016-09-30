@@ -23,12 +23,12 @@
 
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
-#include "fbrafbprod.h"
-#include "mprtplogger.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>     /* qsort */
+#include "fbrafbprod.h"
+#include "reportprod.h"
 
 #define _now(this) gst_clock_get_time (this->sysclock)
 
@@ -40,11 +40,12 @@ G_DEFINE_TYPE (FBRAFBProducer, fbrafbproducer, G_TYPE_OBJECT);
 
 
 static void fbrafbproducer_finalize (GObject * object);
+static gboolean _do_fb(FBRAFBProducer* data);;
 static void _on_received_packet(FBRAFBProducer *this, RTPPacket *packet);
-static void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this, ReportProducer *reportproducer);
-static void _setup_xr_owd(FBRAFBProducer * this, ReportProducer *reportproducer);
+static void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this,  ReportProducer* reportproducer);
+static void _setup_xr_owd(FBRAFBProducer * this,  ReportProducer* reportproducer);
 //static void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer);
-
+static void _on_fb_update(FBRAFBProducer *this,  ReportProducer* reportproducer);
 
 static gint
 _cmp_seq (guint16 x, guint16 y)
@@ -99,8 +100,15 @@ fbrafbproducer_finalize (GObject * object)
 {
   FBRAFBProducer *this;
   this = FBRAFBPRODUCER(object);
+
+  rcvtracker_subflow_rem_on_received_packet_cb(this->tracker, this->subflow->id, _on_received_packet);
+  rcvsubflow_rem_on_rtcp_fb_cb(this->subflow, _on_fb_update);
+
   g_object_unref(this->sysclock);
+  g_object_unref(this->tracker);
   mprtp_free(this->vector);
+
+
 }
 
 void
@@ -113,19 +121,21 @@ fbrafbproducer_init (FBRAFBProducer * this)
 
 }
 
-FBRAFBProducer *make_fbrafbproducer(guint8 subflow_id, RcvTracker *tracker)
+FBRAFBProducer *make_fbrafbproducer(RcvSubflow* subflow, RcvTracker *tracker)
 {
   FBRAFBProducer *this;
   this = g_object_new (FBRAFBPRODUCER_TYPE, NULL);
-  this->subflow_id      = subflow_id;
+  this->subflow         = subflow;
   this->tracker         = g_object_ref(tracker);
   this->owds_sw         = make_slidingwindow_uint64(20, 200 * GST_MSECOND);
 
   slidingwindow_add_plugin(this->owds_sw,
       make_swpercentile(50, bintree3cmp_uint64, _owd_percentile_pipe, this));
 
-  rcvtracker_subflow_add_on_received_packet_cb(this->tracker, subflow_id,
+  rcvtracker_subflow_add_on_received_packet_cb(this->tracker, subflow->id,
         (NotifierFunc) _on_received_packet, this);
+
+  rcvsubflow_add_on_rtcp_fb_cb(subflow, _on_fb_update);
 
   return this;
 }
@@ -144,6 +154,8 @@ void _on_received_packet(FBRAFBProducer *this, RTPPacket *packet)
 {
 
   slidingwindow_add_data(this->owds_sw, &packet->received_info.delay);
+
+  ++this->rcved_packets;
 
   if(!this->initialized){
     this->initialized = TRUE;
@@ -168,27 +180,32 @@ done:
   return;
 }
 
-void fbrafbproducer_setup_feedback(gpointer data, ReportProducer *reportprod)
-{
-  FBRAFBProducer *this;
-  this = data;
 
-  _setup_xr_owd(this, reportprod);
-  _setup_xr_rfc3611_rle_lost(this, reportprod);
+static gboolean _do_fb(FBRAFBProducer *this)
+{
+  return 4 < this->rcved_packets || this->last_fb < _now(this) - 100 * GST_MSECOND;
 }
 
-gboolean fbrafbproducer_do_fb(gpointer data)
+
+void _on_fb_update(FBRAFBProducer *this, ReportProducer* reportproducer)
 {
-  gboolean result = FALSE;
-  FBRAFBProducer *this;
-  this = data;
-  if(_now(this) < this->last_fb + 19 * GST_MSECOND){
+  GstBuffer*                buf;
+  guint                     report_length = 0;
+
+  if(!_do_fb(this)){
     goto done;
   }
-  result = 4 < this->rcved_packets || (0 < this->next_fb && this->next_fb < _now(this));
+
+  report_producer_begin(reportproducer, this->subflow->id);
+  _setup_xr_owd(this);
+  _setup_xr_rfc3611_rle_lost(this);
+
+  this->last_fb = _now(this);
+  this->rcved_packets = 0;
 done:
-  return result;
+  return;
 }
+
 
 void fbrafbproducer_fb_sent(gpointer data)
 {
@@ -198,7 +215,7 @@ void fbrafbproducer_fb_sent(gpointer data)
   this->rcved_packets = 0;
 }
 
-void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this, ReportProducer *reportproducer)
+void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this,ReportProducer* reportproducer)
 {
   report_producer_add_xr_lost_rle(reportproducer,
                                        FALSE,
@@ -223,7 +240,7 @@ void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this, ReportProducer *reportpro
 
 
 
-void _setup_xr_owd(FBRAFBProducer * this, ReportProducer *reportproducer)
+void _setup_xr_owd(FBRAFBProducer * this, ReportProducer* reportproducer)
 {
   guint32      u32_median_delay, u32_min_delay, u32_max_delay;
 

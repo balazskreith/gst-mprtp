@@ -21,11 +21,9 @@
 #define _GST_MPRTPPLAYOUTER_H_
 
 #include <gst/gst.h>
-#include "gstmprtcpbuffer.h"
-#include "mprtprpath.h"
-#include "streamjoiner.h"
 #include <gst/net/gstnetaddressmeta.h>
-#include "gstmprtpbuffer.h"
+#include "gstmprtcpbuffer.h"
+#include "streamjoiner.h"
 #include "rcvctrler.h"
 #include "fecdec.h"
 

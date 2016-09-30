@@ -23,23 +23,13 @@
 
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
-#include "fbrasubctrler.h"
-#include "gstmprtcpbuffer.h"
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-
-//#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-//#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-//#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-//#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
-
-#define THIS_READLOCK(this)
-#define THIS_READUNLOCK(this)
-#define THIS_WRITELOCK(this)
-#define THIS_WRITEUNLOCK(this)
+#include "fbrasubctrler.h"
+#include "reportproc.h"
 
 GST_DEBUG_CATEGORY_STATIC (fbrasubctrler_debug_category);
 #define GST_CAT_DEFAULT fbrasubctrler_debug_category

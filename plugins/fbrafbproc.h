@@ -9,8 +9,11 @@
 #define FBRAFBPROCESSOR_H_
 
 #include <gst/gst.h>
-#include "reportproc.h"
 #include "lib_swplugins.h"
+#include "sndtracker.h"
+#include "observer.h"
+#include "sndsubflows.h"
+
 
 typedef struct _FBRAFBProcessor FBRAFBProcessor;
 typedef struct _FBRAFBProcessorClass FBRAFBProcessorClass;

@@ -28,6 +28,7 @@ G_BEGIN_DECLS
 #define GST_MPRTPSENDER_CLASS(klass)   (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_MPRTPSENDER,GstMprtpsenderClass))
 #define GST_IS_MPRTPSENDER(obj)   (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_MPRTPSENDER))
 #define GST_IS_MPRTPSENDER_CLASS(obj)   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_MPRTPSENDER))
+
 typedef struct _GstMprtpsender GstMprtpsender;
 typedef struct _GstMprtpsenderClass GstMprtpsenderClass;
 typedef struct _GstMprtpsenderPrivate GstMprtpsenderPrivate;

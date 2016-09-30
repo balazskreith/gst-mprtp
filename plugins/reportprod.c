@@ -25,7 +25,6 @@
 #include <gst/rtp/gstrtcpbuffer.h>
 #include "reportprod.h"
 #include "gstmprtcpbuffer.h"
-#include "mprtprpath.h"
 #include "streamjoiner.h"
 #include <math.h>
 #include <string.h>
@@ -320,6 +319,11 @@ GstBuffer *report_producer_end(ReportProducer *this, guint *length)
 {
   gpointer data;
   GstBuffer* result = NULL;
+
+  if(this->in_progress == FALSE){
+    return result;
+  }
+
   _add_xr(this);
   if(!this->length){
     goto done;

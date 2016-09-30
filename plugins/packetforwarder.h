@@ -9,7 +9,6 @@
 #define PACKETFORWARDERN_H_
 
 #include <gst/gst.h>
-#include "mprtpspath.h"
 
 typedef struct _PacketForwarder PacketForwarder;
 typedef struct _PacketForwarderClass PacketForwarderClass;

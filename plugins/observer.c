@@ -26,7 +26,6 @@
 #include "observer.h"
 #include "streamsplitter.h"
 #include "gstmprtcpbuffer.h"
-#include "mprtprpath.h"
 #include "streamjoiner.h"
 #include "ricalcer.h"
 #include "mprtplogger.h"

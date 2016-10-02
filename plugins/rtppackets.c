@@ -42,9 +42,8 @@ G_DEFINE_TYPE (RTPPackets, rtppackets, G_TYPE_OBJECT);
 //----------------------------------------------------------------------
 
 static void rtppackets_finalize (GObject * object);
-static void _extract_mprtp_info(RTPPackets* this, RTPPacket* packet, RcvSubflow* subflow, GstRTPBuffer *rtp);
-static void _on_subflow_joined(RTPPackets* this, SndSubflow* subflow);
-static void _on_subflow_detached(RTPPackets* this, SndSubflow* subflow);
+static void _check_buffer_meta_data(RTPPackets * this, RTPPacket *packet);
+static void _extract_mprtp_info(RTPPackets* this, RTPPacket* packet, GstRTPBuffer *rtp);
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -81,8 +80,8 @@ RTPPackets* make_rtppackets()
   this = g_object_new (RTPPACKETS_TYPE, NULL);
   this->on_stalled_packets = make_observer();
 
-  this->mprtp_ext_header_id    = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
-  this->abs_time_ext_header_id = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
+  this->mprtp_ext_header_id      = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
+  this->abs_time_ext_header_id   = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
   return this;
 }
 
@@ -120,6 +119,9 @@ static void _init_rtppacket(RTPPackets* this, RTPPacket* packet, GstRTPBuffer* r
   packet->payload_type = gst_rtp_buffer_get_payload_type(&rtp);
   packet->header_size  = gst_rtp_buffer_get_header_len(&rtp);
   packet->ref          = 1;
+
+  this->pivot_address_subflow_id = 0;
+  this->pivot_address            = NULL;
 }
 
 gboolean _do_reset_packet(RTPPackets* this, RTPPacket* packet)
@@ -152,7 +154,6 @@ static RTPPacket* _retrieve_packet(RTPPackets* this, GstRTPBuffer* rtp)
 
   memset(result, 0, sizeof(RTPPacket));
   _init_rtppacket(this, result, &rtp);
-
 done:
   return result;
 }
@@ -169,14 +170,15 @@ RTPPacket* rtppackets_retrieve_packet_for_sending(RTPPackets* this, GstBuffer *b
 }
 
 
-RTPPacket* rtppackets_retrieve_packet_at_receiving(RTPPackets* this, RcvSubflow* subflow, GstBuffer *buffer)
+RTPPacket* rtppackets_retrieve_packet_at_receiving(RTPPackets* this, GstBuffer *buffer)
 {
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   RTPPacket* result;
 
   gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
   result = _retrieve_packet(this, &rtp);
-  _extract_mprtp_info(this, result, subflow, &rtp);
+  _extract_mprtp_info(this, result, &rtp);
+  _check_buffer_meta_data(this, result);
   gst_rtp_buffer_unmap(&rtp);
   result->position = RTP_PACKET_POSITION_RECEIVED;
   return result;
@@ -256,9 +258,27 @@ void rtppacket_setup_abs_time_extension(RTPPacket* packet)
   gst_rtp_buffer_unmap(&rtp);
 }
 
+void _check_buffer_meta_data(RTPPackets * this, RTPPacket *packet)
+{
+  GstNetAddressMeta *meta;
+  //to avoid the check_collision problem in rtpsession.
+  meta = gst_buffer_get_net_address_meta (packet->buffer);
+  if (meta) {
+    if (!this->pivot_address) {
+      this->pivot_address_subflow_id = packet->subflow_id;
+      this->pivot_address = G_SOCKET_ADDRESS (g_object_ref (meta->addr));
+    } else if (packet->subflow_seq != this->pivot_address_subflow_id) {
+      if(gst_buffer_is_writable(packet->buffer))
+        gst_buffer_add_net_address_meta (packet->buffer, this->pivot_address);
+      else{
+        packet->buffer = gst_buffer_make_writable(packet->buffer);
+        gst_buffer_add_net_address_meta (packet->buffer, this->pivot_address);
+      }
+    }
+  }
+}
 
-
-void _extract_mprtp_info(RTPPackets* this, RTPPacket* packet, RcvSubflow* subflow, GstRTPBuffer *rtp)
+void _extract_mprtp_info(RTPPackets* this, RTPPacket* packet, GstRTPBuffer *rtp)
 {
 
   guint8 mprtp_ext_header_id = rtppackets_get_mprtp_ext_header_id(this);

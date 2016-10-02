@@ -22,10 +22,6 @@ typedef struct _FECDecoderClass FECDecoderClass;
 #define FECDECODER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),FECDECODER_TYPE))
 #define FECDECODER_CAST(src)        ((FECDecoder *)(src))
 
-typedef struct{
-  GstBuffer* rtpbuffer;
-}FECRepairResponse;
-
 typedef struct _FECDecoderSegment
 {
   GstClockTime         added;
@@ -64,9 +60,8 @@ struct _FECDecoder
 
   GAsyncQueue*               rtppackets_in;
   GAsyncQueue*               fecbuffers_in;
-  GAsyncQueue*               rtpbuffers_out;
-  GAsyncQueue*               discard_packets_in;
-  GAsyncQueue*               discard_packets_out;
+  GAsyncQueue*               repair_request_in;
+  GAsyncQueue*               repair_response_out;
 };
 
 
@@ -77,11 +72,11 @@ struct _FECDecoderClass{
 };
 
 GType fecdecoder_get_type (void);
-FECDecoder *make_fecdecoder(GAsyncQueue* responses);
+FECDecoder *make_fecdecoder(void);
 void fecdecoder_reset(FECDecoder *this);
 
-
+void fecdecoder_setup_and_start(FECDecoder *this, GAsyncQueue* repair_response_out);
 void fecdecoder_add_rtp_packet(FECDecoder *this, RTPPacket *packet);
-void fecdecoder_add_fec_buffer(FECDecoder *this, , GstBuffer *buffer);
+void fecdecoder_add_fec_buffer(FECDecoder *this, GstBuffer *buffer);
 
 #endif /* FECDECODER_H_ */

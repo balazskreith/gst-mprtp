@@ -66,6 +66,15 @@ guint64 gst_rtp_buffer_get_abs_time_extension(GstRTPBuffer* rtp, guint8 abs_time
   return snd_time;
 }
 
+gboolean gst_buffer_is_mprtp(GstBuffer* buffer, guint8 mprtp_ext_header_id)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  gboolean result;
+  gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
+  result = gst_rtp_buffer_is_mprtp(&rtp, mprtp_ext_header_id);
+  gst_rtp_buffer_unmap(&rtp);
+  return result;
+}
 
 gboolean gst_rtp_buffer_is_mprtp(GstRTPBuffer* rtp, guint8 mprtp_ext_header_id)
 {

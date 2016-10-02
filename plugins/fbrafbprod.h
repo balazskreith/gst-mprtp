@@ -65,7 +65,7 @@ struct _FBRAFBProducerClass{
 };
 
 GType fbrafbproducer_get_type (void);
-FBRAFBProducer *make_fbrafbproducer(RcvSubflow* subflow, RcvTracker *tracker, ReportProducer *reportprod);
+FBRAFBProducer *make_fbrafbproducer(RcvSubflow* subflow, RcvTracker *tracker);
 void fbrafbproducer_reset(FBRAFBProducer *this);
 void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold);
 

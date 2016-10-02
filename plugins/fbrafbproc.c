@@ -47,6 +47,9 @@ static void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSumm
 static void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary);
 static void _process_stat(FBRAFBProcessor *this);
 
+static void _on_BiF_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates);
+static void _on_owd_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates);
+
 static void _on_long_sw_rem(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement);
 static void _on_short_sw_rem(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement);
 static void _on_long_sw_add(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement);
@@ -67,7 +70,7 @@ static void _owd_logger(FBRAFBProcessor *this)
                    GST_TIME_AS_USECONDS(_stat(this)->last_owd),
                    GST_TIME_AS_USECONDS(_stat(this)->owd_80th),
                    GST_TIME_AS_USECONDS(this->RTT),
-                   (GstClockTime)this->stat.srtt / 1000
+                   (GstClockTime)_stat(this)->srtt / 1000
                    );
   }
 
@@ -107,7 +110,7 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
 {
   this->sysclock         = gst_system_clock_obtain();
   this-> RTT             = 0;
-  this->stat.srtt        = 0;
+  _stat(this)->srtt      = 0;
 
 }
 
@@ -200,9 +203,9 @@ void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
   _stat(this)->last_owd = xrsummary->OWD.median_delay;
 
   if(_stat(this)->owd_80th){
-    this->stat.owd_log_corr = log(GST_TIME_AS_MSECONDS(_stat(this)->owd_80th)) / log(GST_TIME_AS_MSECONDS(_stat(this)->last_owd));
+    _stat(this)->owd_log_corr = log(GST_TIME_AS_MSECONDS(_stat(this)->owd_80th)) / log(GST_TIME_AS_MSECONDS(_stat(this)->last_owd));
   }else{
-    this->stat.owd_log_corr = 1.;
+    _stat(this)->owd_log_corr = 1.;
   }
 
 done:
@@ -226,7 +229,7 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
     packet = sndtracker_retrieve_sent_packet(this->sndtracker, this->subflow->id, act_seq);
     packet->onsending_info.acknowledged = TRUE;
     packet->onsending_info.lost = !xr->LostRLE.vector[i];
-    sndtracker_packet_acked(this, packet);
+    sndtracker_packet_acked(this->sndtracker, packet);
   }
 
   {

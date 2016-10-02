@@ -10,6 +10,7 @@
 
 #include <gst/gst.h>
 #include "rtpfecbuffer.h"
+#include "sndsubflows.h"
 
 typedef struct _FECEncoder FECEncoder;
 typedef struct _FECEncoderClass FECEncoderClass;
@@ -60,6 +61,7 @@ struct _FECEncoderClass{
 GType fecencoder_get_type (void);
 FECEncoder *make_fecencoder(GAsyncQueue *responses);
 void fecencoder_reset(FECEncoder *this);
+
 void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer* buffer);
 void fecencoder_set_payload_type(FECEncoder* this, guint8 fec_payload_type);
 void fecencoder_request_fec(FECEncoder* this, guint8 subflow_id);

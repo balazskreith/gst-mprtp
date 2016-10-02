@@ -59,27 +59,6 @@ _cmp_seq (guint16 x, guint16 y)
 }
 PercentileResultPipeFnc(_owd_percentile_pipe, FBRAFBProducer, median_delay, min_delay, max_delay, RTPPacket, received_info.delay, 0);
 
-static void _owd_percentile_pipe(gpointer data, swpercentilecandidates_t *candidates)
-{
-  FBRAFBProducer *this = data;
-  if(!candidates->processed){
-    return;
-  }
-  if(!candidates->left){
-    this->median_delay = *(GstClockTime*)candidates->right;
-  }else if(!candidates->right){
-    this->median_delay = *(GstClockTime*)candidates->left;
-  }else{
-    this->median_delay = *(GstClockTime*)candidates->left;
-    this->median_delay += *(GstClockTime*)candidates->right;
-    this->median_delay>>=1;
-  }
-
-  this->min_delay = *(GstClockTime*)candidates->min;
-  this->max_delay = *(GstClockTime*)candidates->max;
-}
-
-
 
 void
 fbrafbproducer_class_init (FBRAFBProducerClass * klass)
@@ -101,8 +80,8 @@ fbrafbproducer_finalize (GObject * object)
   FBRAFBProducer *this;
   this = FBRAFBPRODUCER(object);
 
-  rcvtracker_subflow_rem_on_received_packet_cb(this->tracker, this->subflow->id, _on_received_packet);
-  rcvsubflow_rem_on_rtcp_fb_cb(this->subflow, _on_fb_update);
+  rcvtracker_subflow_rem_on_received_packet_cb(this->tracker, this->subflow->id, (NotifierFunc)_on_received_packet);
+  rcvsubflow_rem_on_rtcp_fb_cb(this->subflow, (NotifierFunc) _on_fb_update);
 
   g_object_unref(this->sysclock);
   g_object_unref(this->tracker);
@@ -130,12 +109,12 @@ FBRAFBProducer *make_fbrafbproducer(RcvSubflow* subflow, RcvTracker *tracker)
   this->owds_sw         = make_slidingwindow_uint64(20, 200 * GST_MSECOND);
 
   slidingwindow_add_plugin(this->owds_sw,
-      make_swpercentile(50, bintree3cmp_uint64, _owd_percentile_pipe, this));
+      make_swpercentile(50, bintree3cmp_uint64, (NotifierFunc)_owd_percentile_pipe, this));
 
   rcvtracker_subflow_add_on_received_packet_cb(this->tracker, subflow->id,
         (NotifierFunc) _on_received_packet, this);
 
-  rcvsubflow_add_on_rtcp_fb_cb(subflow, _on_fb_update);
+  rcvsubflow_add_on_rtcp_fb_cb(subflow, (NotifierFunc) _on_fb_update, this);
 
   return this;
 }
@@ -189,16 +168,13 @@ static gboolean _do_fb(FBRAFBProducer *this)
 
 void _on_fb_update(FBRAFBProducer *this, ReportProducer* reportproducer)
 {
-  GstBuffer*                buf;
-  guint                     report_length = 0;
-
   if(!_do_fb(this)){
     goto done;
   }
 
   report_producer_begin(reportproducer, this->subflow->id);
-  _setup_xr_owd(this);
-  _setup_xr_rfc3611_rle_lost(this);
+  _setup_xr_owd(this, reportproducer);
+  _setup_xr_rfc3611_rle_lost(this, reportproducer);
 
   this->last_fb = _now(this);
   this->rcved_packets = 0;
@@ -206,14 +182,6 @@ done:
   return;
 }
 
-
-void fbrafbproducer_fb_sent(gpointer data)
-{
-  FBRAFBProducer *this;
-  this = data;
-  this->last_fb = _now(this);
-  this->rcved_packets = 0;
-}
 
 void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this,ReportProducer* reportproducer)
 {

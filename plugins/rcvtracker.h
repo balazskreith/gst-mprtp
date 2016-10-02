@@ -10,6 +10,7 @@
 
 
 #include <gst/gst.h>
+#include "rtppackets.h"
 #include "mprtpdefs.h"
 
 typedef struct _RcvTracker RcvTracker;

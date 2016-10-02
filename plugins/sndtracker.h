@@ -12,6 +12,7 @@
 #include <gst/gst.h>
 #include "sndsubflows.h"
 #include "rtppackets.h"
+#include "fecenc.h"
 
 typedef struct _SndTracker SndTracker;
 typedef struct _SndTrackerClass SndTrackerClass;

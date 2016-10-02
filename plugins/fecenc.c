@@ -72,16 +72,17 @@ typedef struct{
 }RTPBufferRequest;
 
 typedef struct{
-  Request            base;
-  guint8             subflow_id;
+  Request    base;
+  guint8     subflow_id;
 }FECRequest;
 
 
 static void fecencoder_finalize (GObject * object);
 static BitString* _make_bitstring(GstBuffer* buf);
 static void _fecenc_process(gpointer udata);
+static FECEncoderResponse* _fec_response_ctor(void);
 static void _fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf);
-static GstBuffer* _fecencoder_get_fec_packet(FECEncoder *this, SndSubflow *subflow, gint32* packet_length);
+static GstBuffer* _fecencoder_get_fec_packet(FECEncoder *this, guint8 subflow_id, gint32* packet_length);
 //------------------------- Utility functions --------------------------------
 
 void
@@ -196,7 +197,7 @@ void _fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf)
 
 
 GstBuffer*
-_fecencoder_get_fec_packet(FECEncoder *this, SndSubflow *subflow, gint32* packet_length)
+_fecencoder_get_fec_packet(FECEncoder *this, guint8 subflow_id, gint32* packet_length)
 {
   GstBuffer* result = NULL;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
@@ -239,9 +240,8 @@ create:
   gst_rtp_buffer_set_ssrc(&rtp, fecbitstring->ssrc);
 
   //MPRTP setup begin
-  if(subflow)
+  if(0 < subflow_id)
   {
-    guint8  subflow_id  = subflow->id;
     guint16 subflow_seq = subflowseqtracker_increase(this->seqtracks + subflow_id);
     gst_rtp_buffer_set_mprtp_extension(&rtp, this->mprtp_ext_header_id, subflow_id, subflow_seq);
   }

@@ -144,10 +144,10 @@ am__DEPENDENCIES_1 =
 libgstmprtp_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-am_libgstmprtp_la_OBJECTS = libgstmprtp_la-fbrafbproc.lo \
-	libgstmprtp_la-fbrafbprod.lo libgstmprtp_la-fbrasubctrler.lo \
-	libgstmprtp_la-fecdec.lo libgstmprtp_la-fecenc.lo \
-	libgstmprtp_la-gstmprtcpbuffer.lo \
+am_libgstmprtp_la_OBJECTS = libgstmprtp_la-broker.lo \
+	libgstmprtp_la-fbrafbproc.lo libgstmprtp_la-fbrafbprod.lo \
+	libgstmprtp_la-fbrasubctrler.lo libgstmprtp_la-fecdec.lo \
+	libgstmprtp_la-fecenc.lo libgstmprtp_la-gstmprtcpbuffer.lo \
 	libgstmprtp_la-gstmprtpplayouter.lo \
 	libgstmprtp_la-gstmprtpreceiver.lo \
 	libgstmprtp_la-gstmprtpscheduler.lo \
@@ -407,7 +407,8 @@ top_srcdir = ..
 plugin_LTLIBRARIES = libgstmprtp.la
 
 # sources used to compile this plug-in
-libgstmprtp_la_SOURCES = fbrafbproc.c          \
+libgstmprtp_la_SOURCES = broker.c              \
+                         fbrafbproc.c          \
                          fbrafbprod.c          \
                          fbrasubctrler.c       \
                          fecdec.c              \
@@ -437,7 +438,7 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          sndsubflows.c         \
                          sndtracker.c          \
                          streamjoiner.c        \
-                         streamsplitter.c          
+                         streamsplitter.c      
 
 noinst_HEADERS = mprtpspath.h           \
                  sndctrler.h            \
@@ -551,6 +552,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+include ./$(DEPDIR)/libgstmprtp_la-broker.Plo
 include ./$(DEPDIR)/libgstmprtp_la-fbrafbproc.Plo
 include ./$(DEPDIR)/libgstmprtp_la-fbrafbprod.Plo
 include ./$(DEPDIR)/libgstmprtp_la-fbrasubctrler.Plo
@@ -603,6 +605,13 @@ include ./$(DEPDIR)/libgstmprtp_la-streamsplitter.Plo
 #	$(AM_V_CC)source='$<' object='$@' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LTCOMPILE) -c -o $@ $<
+
+libgstmprtp_la-broker.lo: broker.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-broker.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-broker.Tpo -c -o libgstmprtp_la-broker.lo `test -f 'broker.c' || echo '$(srcdir)/'`broker.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-broker.Tpo $(DEPDIR)/libgstmprtp_la-broker.Plo
+#	$(AM_V_CC)source='broker.c' object='libgstmprtp_la-broker.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-broker.lo `test -f 'broker.c' || echo '$(srcdir)/'`broker.c
 
 libgstmprtp_la-fbrafbproc.lo: fbrafbproc.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-fbrafbproc.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-fbrafbproc.Tpo -c -o libgstmprtp_la-fbrafbproc.lo `test -f 'fbrafbproc.c' || echo '$(srcdir)/'`fbrafbproc.c

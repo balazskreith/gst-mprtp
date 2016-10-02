@@ -30,7 +30,7 @@ typedef struct _SubflowSpecProp{
 GST_DEBUG_CATEGORY_STATIC (gst_mprtpplayouter_debug_category);
 #define GST_CAT_DEFAULT gst_mprtpplayouter_debug_category
 
-#define THIS_LOCK(this) g_mutex_lock_lock(&this->mutex)
+#define THIS_LOCK(this) g_mutex_lock(&this->mutex)
 #define THIS_UNLOCK(this) g_mutex_unlock(&this->mutex)
 
 #define MPRTP_PLAYOUTER_DEFAULT_SSRC 0
@@ -59,18 +59,14 @@ static gboolean gst_mprtpplayouter_src_query (GstPad * sinkpad,
     GstObject * parent, GstQuery * query);
 static gboolean gst_mprtpplayouter_sink_event (GstPad * pad, GstObject * parent,
     GstEvent * event);
-static void
-gst_mprtpplayouter_mprtcp_sender (gpointer ptr, GstBuffer * buf);
 
-static void _processing_mprtp_packet (GstMprtpplayouter * mprtpr,
-    GstBuffer * buf);
 static GstFlowReturn _processing_mprtcp_packet (GstMprtpplayouter * this,
     GstBuffer * buf);
 static void _join_path (GstMprtpplayouter * this, guint8 subflow_id);
 static void _detach_path (GstMprtpplayouter * this, guint8 subflow_id);
 
 static void _time_updater_process(gpointer udata);
-static void _rtppacket_transceiver (GstMprtpplayouter *this, GstBuffer *buffer);
+static void _mprtppacket_transceiver (GstMprtpplayouter *this, GstBuffer *buffer);
 #define _trash_mprtp_buffer(this, mprtp) mprtp_free(mprtp)
 
 #define _now(this) gst_clock_get_time (this->sysclock)
@@ -286,24 +282,30 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->sysclock                 = gst_system_clock_obtain();
   this->pivot_clock_rate         = MPRTP_PLAYOUTER_DEFAULT_CLOCKRATE;
   this->pivot_ssrc               = MPRTP_PLAYOUTER_DEFAULT_SSRC;
-  this->joiner                   = make_stream_joiner();
+  this->fec_payload_type         = FEC_PAYLOAD_DEFAULT_ID;
+
   this->controller               = g_object_new(RCVCTRLER_TYPE, NULL);
-  this->pivot_address_subflow_id = 0;
-  this->pivot_address            = NULL;
   this->subflows                 = make_rcvsubflows();
+  this->packetforwarder          = make_packetforwarder(this->mprtp_srcpad,
+                                                        this->mprtcp_rr_srcpad);
   this->fec_decoder              = make_fecdecoder();
+  this->joiner                   = make_stream_joiner();
+
   this->rtppackets               = make_rtppackets();
   this->rcvtracker               = make_rcvtracker();
 
   this->discarded_packets_in     = g_async_queue_new();
-  this->packetforwarder          = make_packetforwarder(this->mprtp_srcpad, this->mprtcp_rr_srcpad);
 
-  rcvctrler_setup(this->controller, this->joiner, this->fec_decoder);
-  rcvctrler_setup_callbacks(this->controller, this, gst_mprtpplayouter_mprtcp_sender);
+  stream_joiner_setup_and_start(this->joiner,
+      this->packetforwarder->mprtpq,
+      this->fec_decoder->repair_request_in,
+      this->discarded_packets_in);
+
+  fecdecoder_setup_and_start(this->fec_decoder,
+      this->joiner->repair_response_in);
 
   rtppackets_set_abs_time_ext_header_id(this->rtppackets, ABS_TIME_DEFAULT_EXTENSION_HEADER_ID);
   rtppackets_set_mprtp_ext_header_id(this->rtppackets, MPRTP_DEFAULT_EXTENSION_HEADER_ID);
-  rtppackets_set_fec_payload_type(this->rtppackets, FEC_PAYLOAD_DEFAULT_ID);
 
 }
 
@@ -336,7 +338,7 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (object);
   gboolean gboolean_value;
   guint guint_value;
-  gdouble gdouble_value;
+//  gdouble gdouble_value;
   SubflowSpecProp *subflow_prop;
   GST_DEBUG_OBJECT (this, "set_property");
 
@@ -351,7 +353,7 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       rtppackets_set_abs_time_ext_header_id(this->rtppackets, (guint8) g_value_get_uint (value));
       break;
     case PROP_FEC_PAYLOAD_TYPE:
-      rtppackets_set_fec_payload_type(this->rtppackets, (guint8) g_value_get_uint (value));
+      this->fec_payload_type = g_value_get_uint (value);
       break;
     case PROP_PIVOT_SSRC:
       this->pivot_ssrc = g_value_get_uint (value);
@@ -368,21 +370,18 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
     case PROP_LOG_ENABLED:
       gboolean_value = g_value_get_boolean (value);
       this->logging = gboolean_value;
-      if(this->logging)
-        enable_mprtp_logger();
-      else
-        disable_mprtp_logger();
+      mprtp_logger_set_state(this->logging);
       break;
     case PROP_LOG_PATH:
       mprtp_logger_set_target_directory(g_value_get_string(value));
       break;
     case PROP_SETUP_RTCP_INTERVAL_TYPE:
       guint_value = g_value_get_uint (value);
-      rcvctrler_change_interval_type(this->controller, subflow_prop->id, subflow_prop->value);
+      rcvsubflows_set_rtcp_interval_type(this->subflows, subflow_prop->id, subflow_prop->value);
       break;
     case PROP_SETUP_CONTROLLING_MODE:
       guint_value = g_value_get_uint (value);
-      rcvctrler_change_controlling_mode(this->controller, subflow_prop->id, subflow_prop->value);
+      rcvsubflows_set_congestion_controlling_type(this->subflows, subflow_prop->id, subflow_prop->value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -408,7 +407,7 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
       g_value_set_uint (value, (guint) rtppackets_get_abs_time_ext_header_id(this->rtppackets));
       break;
     case PROP_FEC_PAYLOAD_TYPE:
-      g_value_set_uint (value, (guint) rtppackets_get_fec_payload_type(this->rtppackets));
+      g_value_set_uint (value, (guint) this->fec_payload_type);
       break;
     case PROP_PIVOT_CLOCK_RATE:
       g_value_set_uint (value, this->pivot_clock_rate);
@@ -597,7 +596,6 @@ gst_mprtpplayouter_query (GstElement * element, GstQuery * query)
 {
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (element);
   gboolean ret = TRUE;
-  GstStructure *s;
   GST_DEBUG_OBJECT (this, "query");
   switch (GST_QUERY_TYPE (query)) {
     default:
@@ -617,7 +615,7 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 {
   GstMprtpplayouter *this;
   GstMapInfo info;
-  guint8 *data;
+  guint8  *buf_2nd_byte;
   GstFlowReturn result = GST_FLOW_OK;
 
   this = GST_MPRTPPLAYOUTER (parent);
@@ -632,23 +630,37 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     result = GST_FLOW_ERROR;
     goto done;
   }
-  data = info.data + 1;
+  buf_2nd_byte = info.data + 1;
   gst_buffer_unmap (buf, &info);
+
   //demultiplexing based on RFC5761
-  if (*data == MPRTCP_PACKET_TYPE_IDENTIFIER) {
+  if (*buf_2nd_byte == MPRTCP_PACKET_TYPE_IDENTIFIER) {
     result = _processing_mprtcp_packet (this, buf);
     goto done;
   }
+
   //check weather the packet is rtcp or mprtp
-  if (*data > 192 && *data < 223) {
+  if (*buf_2nd_byte > 192 && *buf_2nd_byte < 223) {
     if(GST_IS_BUFFER(buf))
       packetforwarder_add_rtppad_buffer(this->packetforwarder, gst_buffer_ref(buf));
     goto done;
   }
 
-  _rtppacket_transceiver(this, buf);
+  //if(!gst_rtp_buffer_is_mprtp(this->rtppackets, buf)){
+  if(!gst_buffer_is_mprtp(buf, rtppackets_get_mprtp_ext_header_id(this->rtppackets))){
+    if(GST_IS_BUFFER(buf))
+      packetforwarder_add_rtppad_buffer(this->packetforwarder, buf);
+    goto done;
+  }
 
+  if (*buf_2nd_byte == this->fec_payload_type) {
+    fecdecoder_add_fec_buffer(this->fec_decoder, buf);
+    goto done;
+  }
+
+  _mprtppacket_transceiver(this, buf);
   result = GST_FLOW_OK;
+
 done:
 //  g_print("END PROCESSING RTP\n");
   return result;
@@ -663,41 +675,29 @@ gst_mprtpplayouter_mprtcp_sr_sink_chain (GstPad * pad, GstObject * parent,
   GstMprtpplayouter *this;
   GstMapInfo info;
   GstFlowReturn result;
-  guint8 *data;
+  guint8 *buf_2nd_byte;
 
   this = GST_MPRTPPLAYOUTER (parent);
   GST_DEBUG_OBJECT (this, "RTCP/MPRTCP sink");
-  THIS_LOCK (this);
   if (!gst_buffer_map (buf, &info, GST_MAP_READ)) {
     GST_WARNING ("Buffer is not readable");
     result = GST_FLOW_ERROR;
     goto done;
   }
 
-  data = info.data + 1;
+  buf_2nd_byte = info.data + 1;
   gst_buffer_unmap (buf, &info);
-  //demultiplexing based on RFC5761
-  if (*data != this->rtppackets->fec_payload_type) {
-    result = _processing_mprtcp_packet (this, buf);
-  }else{
-    _processing_mprtp_packet(this, buf);
-    result = GST_FLOW_OK;
+
+  if (*buf_2nd_byte == this->fec_payload_type) {
+    fecdecoder_add_fec_buffer(this->fec_decoder, buf);
+    goto done;
   }
 
+  result = _processing_mprtcp_packet (this, buf);
+
 done:
-  THIS_UNLOCK (this);
   return result;
 
-}
-
-void
-gst_mprtpplayouter_mprtcp_sender (gpointer ptr, GstBuffer * buf)
-{
-  GstMprtpplayouter *this;
-  this = GST_MPRTPPLAYOUTER (ptr);
-  THIS_LOCK (this);
-  gst_pad_push (this->mprtcp_rr_srcpad, buf);
-  THIS_UNLOCK (this);
 }
 
 
@@ -705,47 +705,12 @@ GstFlowReturn
 _processing_mprtcp_packet (GstMprtpplayouter * this, GstBuffer * buf)
 {
   GstFlowReturn result;
+  THIS_LOCK (this);
   rcvctrler_receive_mprtcp(this->controller, buf);
   result = GST_FLOW_OK;
+  THIS_UNLOCK (this);
   return result;
 }
-
-//static GstClockTime in_prev;
-void
-_processing_mprtp_packet (GstMprtpplayouter * this, GstBuffer * buf)
-{
-  GstNetAddressMeta *meta;
-
-  mprtp = _make_mprtp_buffer(this, buf);
-  if (this->pivot_ssrc != MPRTP_PLAYOUTER_DEFAULT_SSRC &&
-      mprtp->ssrc != this->pivot_ssrc) {
-
-    GST_DEBUG_OBJECT (this, "RTP packet ssrc is %u, the pivot ssrc is %u",
-        this->pivot_ssrc, mprtp->ssrc);
-    if(GST_IS_BUFFER(buf))
-      gst_pad_push (this->mprtp_srcpad, buf);
-    return;
-  }
-
-  //to avoid the check_collision problem in rtpsession.
-  meta = gst_buffer_get_net_address_meta (buf);
-  if (meta) {
-    if (!this->pivot_address) {
-      this->pivot_address_subflow_id = mprtp->subflow_id;
-      this->pivot_address = G_SOCKET_ADDRESS (g_object_ref (meta->addr));
-    } else if (mprtp->subflow_seq != this->pivot_address_subflow_id) {
-      if(gst_buffer_is_writable(buf))
-        gst_buffer_add_net_address_meta (buf, this->pivot_address);
-      else{
-        buf = gst_buffer_make_writable(buf);
-        gst_buffer_add_net_address_meta (buf, this->pivot_address);
-      }
-    }
-  }
-
-  return;
-}
-
 
 
 void
@@ -762,7 +727,7 @@ _time_updater_process(gpointer udata)
     goto done;
   }
 
-  rcvtracker_add_discarded_seq(this->rcvtracker, discarded_packet->abs_seq);
+  rcvtracker_add_discarded_seq(this->rcvtracker, discarded_packet);
 
 done:
   rcvctrler_time_update(this->controller);
@@ -771,26 +736,22 @@ done:
 }
 
 void
-_rtppacket_transceiver (GstMprtpplayouter *this, GstBuffer *buffer)
+_mprtppacket_transceiver (GstMprtpplayouter *this, GstBuffer *buffer)
 {
   RTPPacket *packet;
 
   THIS_LOCK(this);
-
-  //check weather the packet is mprtp
-  if(!gst_rtp_buffer_is_mprtp(this->rtppackets, buffer)){
-    if(GST_IS_BUFFER(buffer))
-      packetforwarder_add_rtppad_buffer(this->packetforwarder, buffer);
-    goto done;
-  }
-
-  //check weather packet is fec type
-  if(rtppackets_buffer_is_fecmprtp(this->rtppackets, buffer)){
-    fecdecoder_add_fec_buffer(this->rtppackets, packet);
-    goto done;
-  }
-
+  //TOOD: change
   packet = rtppackets_retrieve_packet_at_receiving(this->rtppackets, buffer);
+
+  if (this->pivot_ssrc != MPRTP_PLAYOUTER_DEFAULT_SSRC && packet->ssrc != this->pivot_ssrc) {
+    rtppackets_packet_forwarded(this->rtppackets, packet);
+    GST_DEBUG_OBJECT (this, "RTP packet ssrc is %u, the pivot ssrc is %u", this->pivot_ssrc, packet->ssrc);
+    if(GST_IS_BUFFER(packet->buffer))
+      packetforwarder_add_rtcppad_buffer(this->packetforwarder, packet->buffer);
+    goto done;
+  }
+
   fecdecoder_add_rtp_packet(this->fec_decoder, packet);
 
   rcvtracker_add_packet(this->rcvtracker, packet);

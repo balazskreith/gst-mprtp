@@ -36,37 +36,12 @@
 #include <stdio.h>
 
 
-
-#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
-
-#define MIN_MEDIA_RATE 50000
-
 #define _now(this) (gst_clock_get_time (this->sysclock))
 
 GST_DEBUG_CATEGORY_STATIC (observer_debug_category);
 #define GST_CAT_DEFAULT observer_debug_category
 
 G_DEFINE_TYPE (Observer, observer, G_TYPE_OBJECT);
-
-#define REGULAR_REPORT_PERIOD_TIME (5*GST_SECOND)
-
-typedef struct _Subflow Subflow;
-
-//                        ^
-//                        | Event
-// .---.    .--------.-----------.
-// |   |    | T | SystemObserver |
-// |   |    | i |----------------|
-// | I |    | c |      ORP       |->Reports
-// | R |-E->| k |----------------|
-// | P |    | e |   PlayCtrler   |
-// |   |    | r |                |
-// '---'    '---'----------------'
-//                        | Delays
-//                        V
 
 typedef struct{
   void     (*callback)(gpointer udata, gpointer notifyData);

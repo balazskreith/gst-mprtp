@@ -13,6 +13,7 @@
 #include "sndtracker.h"
 #include "observer.h"
 #include "sndsubflows.h"
+#include "reportproc.h"
 
 
 typedef struct _FBRAFBProcessor FBRAFBProcessor;
@@ -97,6 +98,7 @@ FBRAFBProcessor *make_fbrafbprocessor(SndTracker* sndtracker, SndSubflow* subflo
 
 void fbrafbprocessor_reset(FBRAFBProcessor *this);
 void fbrafbprocessor_approve_measurement(FBRAFBProcessor *this);
+void fbrafbprocessor_time_update(FBRAFBProcessor *this);
 void fbrafbprocessor_report_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary);
 
 #endif /* FBRAFBPROCESSOR_H_ */

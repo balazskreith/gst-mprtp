@@ -15,6 +15,8 @@
 #include "reportprod.h"
 #include "reportproc.h"
 #include "signalreport.h"
+#include "fecenc.h"
+#include "sndtracker.h"
 
 typedef struct _SndController SndController;
 typedef struct _SndControllerClass SndControllerClass;

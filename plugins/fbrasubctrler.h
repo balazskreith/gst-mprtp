@@ -45,12 +45,14 @@ struct _FBRASubController
   GstClockTime              target_changed;
   GstClockTime              target_reached;
 
+  guint                     rcved_fb_since_changed;
+
   GstClockTime              last_executed;
 
   gint32                    bottleneck_point;
 
   FBRAFBProcessor*          fbprocessor;
-  FBRAPlusStat              stat;
+  FBRAPlusStat*             stat;
 
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;
@@ -85,6 +87,7 @@ gboolean fbrasubctrler_path_approver(gpointer data, RTPPacket *packet);
 void fbrasubctrler_enable(FBRASubController *this);
 void fbrasubctrler_disable(FBRASubController *this);
 
+void fbrasubctrler_on_rtp_sending(FBRASubController* this, RTPPacket *packet);
 void fbrasubctrler_report_update(FBRASubController *this, GstMPRTCPReportSummary *summary);
 gboolean fbrasubctrler_time_update(FBRASubController *this);
 

@@ -9,6 +9,7 @@
 #define RTPPACKETS_H_
 
 #include <gst/gst.h>
+#include <gst/net/gstnetaddressmeta.h>
 #include "sndsubflows.h"
 #include "rcvsubflows.h"
 
@@ -76,6 +77,10 @@ struct _RTPPackets
   guint8                     abs_time_ext_header_id;
   guint8                     mprtp_ext_header_id;
 
+  guint32         pivot_clock_rate;
+  GSocketAddress* pivot_address;
+  guint8          pivot_address_subflow_id;
+
 };
 
 
@@ -93,7 +98,7 @@ void rtppackets_add_stalled_packet_cb(RTPPackets* this, void (*callback)(gpointe
 
 void _stalled_notify_caller(RTPPackets* this, gpointer item, gpointer udata);
 RTPPacket* rtppackets_retrieve_packet_for_sending(RTPPackets* this, GstBuffer *buffer);
-RTPPacket* rtppackets_retrieve_packet_at_receiving(RTPPackets* this, RcvSubflow* subflow, GstBuffer *buffer);
+RTPPacket* rtppackets_retrieve_packet_at_receiving(RTPPackets* this, GstBuffer *buffer);
 
 void rtppacket_setup_mprtp(RTPPacket *packet, SndSubflow* subflow);
 void rtppacket_setup_abs_time_extension(RTPPacket* packet);

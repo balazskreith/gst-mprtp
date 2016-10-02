@@ -31,11 +31,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-//#define THIS_READLOCK(this)
-//#define THIS_READUNLOCK(this)
-//#define THIS_WRITELOCK(this)
-//#define THIS_WRITEUNLOCK(this)
-
 #define DATABED_LENGTH 1400
 
 GST_DEBUG_CATEGORY_STATIC (report_producer_debug_category);

@@ -2,8 +2,7 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
  /usr/include/stdc-predef.h ../config.h \
  /usr/local/include/gstreamer-1.0/gst/gst.h /usr/include/glib-2.0/glib.h \
  /usr/include/glib-2.0/glib/galloca.h /usr/include/glib-2.0/glib/gtypes.h \
- /usr/lib/x86_64-linux-gnu/glib-2.0/include/glibconfig.h \
- /usr/include/glib-2.0/glib/gmacros.h \
+ /usr/include/glib-2.0/glibconfig.h /usr/include/glib-2.0/glib/gmacros.h \
  /usr/lib/gcc/x86_64-linux-gnu/5/include/stddef.h \
  /usr/lib/gcc/x86_64-linux-gnu/5/include-fixed/limits.h \
  /usr/lib/gcc/x86_64-linux-gnu/5/include-fixed/syslimits.h \
@@ -196,18 +195,10 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
  /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h \
  /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
  /usr/include/x86_64-linux-gnu/bits/sys_errlist.h /usr/include/string.h \
- gstmprtpreceiver.h mprtpspath.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
+ gstmprtpreceiver.h gstmprtcpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h mprtpdefs.h \
- mprtplogger.h gstmprtcpbuffer.h gstmprtpbuffer.h packetssndqueue.h \
- reportproc.h streamjoiner.h packetsrcvqueue.h lib_swplugins.h \
- /usr/include/stdlib.h /usr/include/x86_64-linux-gnu/bits/waitflags.h \
- /usr/include/x86_64-linux-gnu/bits/waitstatus.h /usr/include/alloca.h \
- /usr/include/x86_64-linux-gnu/bits/stdlib-float.h /usr/include/ctype.h \
- /usr/include/assert.h slidingwindow.h lib_bintree.h mprtprpath.h \
- /usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h ricalcer.h \
- rtppackets.h
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtplogger.h
 
 /usr/include/stdc-predef.h:
 
@@ -221,7 +212,7 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
 
 /usr/include/glib-2.0/glib/gtypes.h:
 
-/usr/lib/x86_64-linux-gnu/glib-2.0/include/glibconfig.h:
+/usr/include/glib-2.0/glibconfig.h:
 
 /usr/include/glib-2.0/glib/gmacros.h:
 
@@ -665,54 +656,14 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
 
 gstmprtpreceiver.h:
 
-mprtpspath.h:
-
-/usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h:
-
-/usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
+gstmprtcpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h:
 
 mprtpdefs.h:
 
+/usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h:
+
+/usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
+
 mprtplogger.h:
-
-gstmprtcpbuffer.h:
-
-gstmprtpbuffer.h:
-
-packetssndqueue.h:
-
-reportproc.h:
-
-streamjoiner.h:
-
-packetsrcvqueue.h:
-
-lib_swplugins.h:
-
-/usr/include/stdlib.h:
-
-/usr/include/x86_64-linux-gnu/bits/waitflags.h:
-
-/usr/include/x86_64-linux-gnu/bits/waitstatus.h:
-
-/usr/include/alloca.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdlib-float.h:
-
-/usr/include/ctype.h:
-
-/usr/include/assert.h:
-
-slidingwindow.h:
-
-lib_bintree.h:
-
-mprtprpath.h:
-
-/usr/local/include/gstreamer-1.0/gst/base/gstqueuearray.h:
-
-ricalcer.h:
-
-rtppackets.h:

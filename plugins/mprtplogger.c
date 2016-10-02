@@ -38,10 +38,6 @@
 #define THIS_LOCK(this) g_mutex_lock(&this->mutex)
 #define THIS_UNLOCK(this) g_mutex_unlock(&this->mutex)
 
-#define LIST_READLOCK g_rw_lock_reader_lock(&list_mutex)
-#define LIST_READUNLOCK g_rw_lock_reader_unlock(&list_mutex)
-#define LIST_WRITELOCK g_rw_lock_writer_lock(&list_mutex)
-#define LIST_WRITEUNLOCK g_rw_lock_writer_unlock(&list_mutex)
 
 #define DATABED_LENGTH 1400
 

@@ -21,7 +21,7 @@
 #define _GST_MPRTPPLAYOUTER_H_
 
 #include <gst/gst.h>
-#include <gst/net/gstnetaddressmeta.h>
+#include "packetforwarder.h"
 #include "gstmprtcpbuffer.h"
 #include "streamjoiner.h"
 #include "rcvctrler.h"
@@ -65,8 +65,8 @@ struct _GstMprtpplayouter
 
   guint32         pivot_ssrc;
   guint32         pivot_clock_rate;
-  GSocketAddress *pivot_address;
-  guint8          pivot_address_subflow_id;
+//  GSocketAddress *pivot_address;
+//  guint8          pivot_address_subflow_id;
   guint64         clock_base;
 
   GstClock*       sysclock;
@@ -76,6 +76,8 @@ struct _GstMprtpplayouter
   FECDecoder*     fec_decoder;
   RTPPackets*     rtppackets;
   RcvTracker*     rcvtracker;
+
+  guint8          fec_payload_type;
 
   GstPad*         mprtp_srcpad;
   GstPad*         mprtp_sinkpad;

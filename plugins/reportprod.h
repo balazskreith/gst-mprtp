@@ -9,7 +9,7 @@
 #define REPPRODER_H_
 
 #include <gst/gst.h>
-
+#include "gstmprtcpbuffer.h"
 #include "streamjoiner.h"
 #include "ricalcer.h"
 #include "streamsplitter.h"

@@ -23,11 +23,11 @@
 
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
-#include "streamjoiner.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "streamjoiner.h"
 #include "mprtplogger.h"
 
 
@@ -158,23 +158,36 @@ stream_joiner_init (StreamJoiner * this)
 
   this->thread             = gst_task_new(_process, this, NULL);
 
-  gst_task_set_lock(this->thread, &this->thread_mutex);
-  gst_task_start(this->thread);
 }
 
 StreamJoiner*
-make_stream_joiner(GAsyncQueue* rtppackets_out, GAsyncQueue *discarded_packets_out)
+make_stream_joiner(void)
 {
   StreamJoiner *result;
   result = (StreamJoiner *) g_object_new (STREAM_JOINER_TYPE, NULL);
-  result->rtppackets_out         = g_async_queue_ref(rtppackets_out);
-  result->messages_in            = g_async_queue_new();
-  result->discarded_packets_out  = g_async_queue_ref(discarded_packets_out);
+
+
+  result->messages_in             = g_async_queue_new();
+  result->repair_response_in      = g_async_queue_new();
+
   result->joinq                   = make_slidingwindow(100, result->join_delay);
   result->playoutq                = g_queue_new();
 
   slidingwindow_add_on_rem_item_cb(result->joinq, _joinq_rem_pipe, result);
   return result;
+}
+
+void stream_joiner_setup_and_start(StreamJoiner *this,
+    GAsyncQueue* rtppackets_out,
+    GAsyncQueue *repair_request_out,
+    GAsyncQueue *discarded_packets_out)
+{
+  this->rtppackets_out          = g_async_queue_ref(rtppackets_out);
+  this->repair_request_out      = g_async_queue_ref(repair_request_out);
+  this->discarded_packets_out   = g_async_queue_ref(discarded_packets_out);
+
+  gst_task_set_lock (this->thread, &this->thread_mutex);
+  gst_task_start (this->thread);
 }
 
 void stream_joiner_add_stat(StreamJoiner *this, RcvTrackerStat* stat)
@@ -219,9 +232,8 @@ void _process_message(StreamJoiner *this, Message *msg)
     return;
   }
 
-  {
+  if(msg->type == STREAMJOINER_MESSAGE_RTPPACKET){
     RTPBufferMessage *rtp_message = (RTPBufferMessage*) msg;
-    //Message is RTPBuffer
     if(0 < this->join_delay){
       slidingwindow_add_data(this->joinq, rtp_message);
     }else{
@@ -240,15 +252,30 @@ static void _forward(StreamJoiner *this, RTPBufferMessage *rtpbuf_msg)
 
   if(_cmp_seq(++this->last_seq, rtpbuf_msg->abs_seq) < 0){
     DiscardedPacket discarded_packet = g_slice_new0(DiscardedPacket);
-    discarded_packet->abs_seq    = this->last_seq;
+    discarded_packet->abs_seq = this->last_seq;
     g_queue_push_head(this->playoutq, rtpbuf_msg);
+    g_async_queue_push(this->repair_request_out, discarded_packet);
+    while((discarded_packet = g_async_queue_try_pop(this->repair_response_in)) != NULL){
+      if(discarded_packet->abs_seq == this->last_seq){
+        break;
+      }
+      g_slice_free(DiscardedPacket, discarded_packet);
+      discarded_packet = NULL;
+    }
+    if(!discarded_packet){
+      discarded_packet = g_async_queue_timeout_pop(this->repair_response_in, 500);
+    }
+    if(discarded_packet){
+      g_async_queue_push(this->rtppackets_out, discarded_packet->rtpbuf);
+    }
     g_async_queue_push(this->discarded_packets_out, discarded_packet);
+    this->playout_time = _now(this);
     goto done;
   }
 
   if(_cmp_ts(this->last_ts, rtpbuf_msg->ts) < 0){
     this->last_ts = rtpbuf_msg->ts;
-    this->pacing_time += this->playout_delay;
+    this->playout_time += this->playout_delay;
   }
 
 send:
@@ -270,16 +297,16 @@ void _process(gpointer udata)
     _process_message(this, msg);
   }
 
-  if(_now(this) < this->pacing_time){
+  if(_now(this) < this->playout_time){
     goto done;
   }
 
-  if(this->pacing_time == 0){
-    this->pacing_time = _now(this);
+  if(this->playout_time == 0){
+    this->playout_time = _now(this);
   }
 
   if(g_queue_is_empty(this->playoutq)){
-    this->pacing_time += this->playout_delay;
+    this->playout_time += this->playout_delay;
     goto done;
   }
 

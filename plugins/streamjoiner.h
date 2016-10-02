@@ -50,8 +50,10 @@ struct _StreamJoiner
   GAsyncQueue*         rtppackets_out;
   GAsyncQueue*         discarded_packets_out;
   GAsyncQueue*         messages_in;
+  GAsyncQueue*         repair_request_out;
+  GAsyncQueue*         repair_response_in;
 
-  GstClockTime         pacing_time;
+  GstClockTime         playout_time;
 
   gdouble              playout_delay;
 
@@ -61,9 +63,12 @@ struct _StreamJoinerClass{
 };
 
 StreamJoiner*
-make_stream_joiner(
+make_stream_joiner(void);
+
+void stream_joiner_setup_and_start(StreamJoiner *this,
     GAsyncQueue* rtppackets_out,
-    GAsyncQueue* discarded_packets_out);
+    GAsyncQueue *repair_request_out,
+    GAsyncQueue *discarded_packets_out);
 
 void
 stream_joiner_add_stat(

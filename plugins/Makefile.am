@@ -1,7 +1,8 @@
 plugin_LTLIBRARIES = libgstmprtp.la
 
 # sources used to compile this plug-in
-libgstmprtp_la_SOURCES = fbrafbproc.c          \
+libgstmprtp_la_SOURCES = broker.c              \
+                         fbrafbproc.c          \
                          fbrafbprod.c          \
                          fbrasubctrler.c       \
                          fecdec.c              \
@@ -31,7 +32,7 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          sndsubflows.c         \
                          sndtracker.c          \
                          streamjoiner.c        \
-                         streamsplitter.c          
+                         streamsplitter.c      
                     
                     
 noinst_HEADERS = mprtpspath.h           \

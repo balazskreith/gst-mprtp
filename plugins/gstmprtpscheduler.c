@@ -387,7 +387,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->emitterq      = g_async_queue_new();
 
   this->fec_encoder   = make_fecencoder(this->fec_responses);
-  this->sndtracker    = make_sndtracker();
+  this->sndtracker    = make_sndtracker(this->subflows);
 
   this->controller = make_sndctrler(this->rtppackets,
       this->sndtracker,
@@ -398,7 +398,6 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->mprtpq        = g_async_queue_ref(this->packetforwarder->mprtpq);
   this->mprtcpq       = g_async_queue_ref(this->packetforwarder->mprtcpq);
 
-  _setup_subflows(this);
   fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
 
 }
@@ -470,7 +469,7 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
   THIS_LOCK(this);
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
-      rtppackets_set_mprtp_ext_header_id(this->subflows, (guint8) g_value_get_uint (value));
+      rtppackets_set_mprtp_ext_header_id(this->rtppackets, (guint8) g_value_get_uint (value));
       break;
     case PROP_ABS_TIME_EXT_HEADER_ID:
       rtppackets_set_abs_time_ext_header_id(this->rtppackets, (guint8) g_value_get_uint (value));
@@ -505,7 +504,6 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
     case PROP_SET_SENDING_TARGET:
       guint_value = g_value_get_uint (value);
       _change_sending_rate(this, subflow_prop->id, subflow_prop->value);
-      stream_splitter_refresh_targets(this->splitter);
       break;
     case PROP_SETUP_RTCP_INTERVAL_TYPE:
       sndsubflows_set_rtcp_interval_type(this->subflows, subflow_prop->id, subflow_prop->value);

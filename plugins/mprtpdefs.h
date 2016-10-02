@@ -11,6 +11,7 @@
 #include <gst/gst.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include <gst/rtp/gstrtpbuffer.h>
+#include "mprtplogger.h"
 
 #define MPRTP_DEFAULT_EXTENSION_HEADER_ID 3
 #define ABS_TIME_DEFAULT_EXTENSION_HEADER_ID 8
@@ -69,8 +70,9 @@ struct _RTPAbsTimeExtension
 };
 
 typedef struct{
-  guint16  abs_seq;
-  gboolean repaired;
+  guint16    abs_seq;
+  gboolean   repaired;
+  GstBuffer* rtpbuf;
 }DiscardedPacket;
 
 typedef struct{
@@ -89,6 +91,7 @@ void gst_rtp_buffer_get_mprtp_extension(GstRTPBuffer* rtp, guint8 ext_header_id,
 void gst_rtp_buffer_set_abs_time_extension(GstRTPBuffer* rtp, guint8 abs_time_ext_header_id);
 guint64 gst_rtp_buffer_get_abs_time_extension(GstRTPBuffer* rtp, guint8 abs_time_ext_header_id);
 
+gboolean gst_buffer_is_mprtp(GstBuffer* buffer, guint8 mprtp_ext_header_id);
 gboolean gst_rtp_buffer_is_mprtp(GstRTPBuffer* rtp, guint8 mprtp_ext_header_id);
 gboolean gst_rtp_buffer_is_fectype(GstRTPBuffer* rtp, guint8 fec_payload_type);
 

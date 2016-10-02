@@ -22,8 +22,7 @@ libgstmprtp_la-gstmprtcpbuffer.lo: gstmprtcpbuffer.c \
  /usr/include/x86_64-linux-gnu/bits/stdlib-float.h /usr/include/string.h \
  /usr/include/xlocale.h /usr/local/include/gstreamer-1.0/gst/gst.h \
  /usr/include/glib-2.0/glib.h /usr/include/glib-2.0/glib/galloca.h \
- /usr/include/glib-2.0/glib/gtypes.h \
- /usr/lib/x86_64-linux-gnu/glib-2.0/include/glibconfig.h \
+ /usr/include/glib-2.0/glib/gtypes.h /usr/include/glib-2.0/glibconfig.h \
  /usr/include/glib-2.0/glib/gmacros.h \
  /usr/lib/gcc/x86_64-linux-gnu/5/include-fixed/limits.h \
  /usr/lib/gcc/x86_64-linux-gnu/5/include-fixed/syslimits.h \
@@ -197,9 +196,9 @@ libgstmprtp_la-gstmprtcpbuffer.lo: gstmprtcpbuffer.c \
  /usr/local/include/gstreamer-1.0/gst/gstparse.h \
  /usr/local/include/gstreamer-1.0/gst/gstcompat.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
- gstmprtcpbuffer.h gstmprtpbuffer.h \
+ gstmprtcpbuffer.h mprtpdefs.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtpdefs.h \
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtplogger.h \
  /usr/include/x86_64-linux-gnu/sys/time.h \
  /usr/lib/gcc/x86_64-linux-gnu/5/include/stdint.h /usr/include/stdint.h \
  /usr/include/x86_64-linux-gnu/bits/wchar.h
@@ -270,7 +269,7 @@ libgstmprtp_la-gstmprtcpbuffer.lo: gstmprtcpbuffer.c \
 
 /usr/include/glib-2.0/glib/gtypes.h:
 
-/usr/lib/x86_64-linux-gnu/glib-2.0/include/glibconfig.h:
+/usr/include/glib-2.0/glibconfig.h:
 
 /usr/include/glib-2.0/glib/gmacros.h:
 
@@ -660,13 +659,13 @@ libgstmprtp_la-gstmprtcpbuffer.lo: gstmprtcpbuffer.c \
 
 gstmprtcpbuffer.h:
 
-gstmprtpbuffer.h:
+mprtpdefs.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
 
-mprtpdefs.h:
+mprtplogger.h:
 
 /usr/include/x86_64-linux-gnu/sys/time.h:
 

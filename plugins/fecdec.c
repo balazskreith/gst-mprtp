@@ -140,8 +140,8 @@ fecdecoder_finalize (GObject * object)
   gst_object_unref(this->thread);
 
   g_object_unref(this->sysclock);
-  g_async_queue_unref(this->discard_packets_in);
-  g_async_queue_unref(this->discard_packets_out);
+  g_async_queue_unref(this->repair_request_in);
+  g_async_queue_unref(this->repair_response_out);
   g_async_queue_unref(this->rtppackets_in);
   g_async_queue_unref(this->fecbuffers_in);
 
@@ -154,10 +154,7 @@ fecdecoder_init (FECDecoder * this)
   this->sysclock           = gst_system_clock_obtain();
   this->rtppackets_in      = g_async_queue_new();
   this->fecbuffers_in      = g_async_queue_new();
-  this->discard_packets_in = g_async_queue_new();
-
-  gst_task_set_lock (this->thread, &this->thread_mutex);
-  gst_task_start (this->thread);
+  this->repair_request_in  = g_async_queue_new();
 
 }
 
@@ -167,16 +164,21 @@ void fecdecoder_reset(FECDecoder *this)
 
 }
 
-FECDecoder *make_fecdecoder(GAsyncQueue* discard_packets_out, GAsyncQueue* rtpbuffers_out)
+FECDecoder *make_fecdecoder(void)
 {
   FECDecoder *this;
   this = g_object_new (FECDECODER_TYPE, NULL);
   this->made = _now(this);
-  this->discard_packets_out = g_async_queue_ref(discard_packets_out);
-  this->rtpbuffers_out = g_async_queue_ref(rtpbuffers_out);
+
   return this;
 }
 
+void fecdecoder_setup_and_start(FECDecoder *this, GAsyncQueue* repair_response_out)
+{
+  this->repair_response_out = g_async_queue_ref(repair_response_out);
+  gst_task_set_lock (this->thread, &this->thread_mutex);
+  gst_task_start (this->thread);
+}
 
 void fecdecoder_add_rtp_packet(FECDecoder *this, RTPPacket *packet)
 {
@@ -205,17 +207,13 @@ static void _fecdec_process(gpointer udata)
     _add_fec_buffer(this, buffer);
   }
 
-  discarded_packet = g_async_queue_timeout_pop(this->discard_packets_in, 1000);
+  discarded_packet = g_async_queue_timeout_pop(this->repair_request_in, 1000);
   if(!discarded_packet){
     goto done;
   }
-
-  buffer = _get_repaired_rtpbuffer(this, discarded_packet->abs_seq);
-  if(buffer){
-    g_async_queue_push(this->rtpbuffers_out, buffer);
-    discarded_packet->repaired = TRUE;
-  }
-  g_async_queue_push(this->discard_packets_out, discarded_packet);
+  discarded_packet->repaired = TRUE;
+  discarded_packet->rtpbuf   = _get_repaired_rtpbuffer(this, discarded_packet->abs_seq);
+  g_async_queue_push(this->repair_response_out, discarded_packet);
 
 done:
   _clean(this);

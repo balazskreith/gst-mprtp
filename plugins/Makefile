@@ -440,26 +440,38 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          streamjoiner.c        \
                          streamsplitter.c      
 
-noinst_HEADERS = mprtpspath.h           \
-                 sndctrler.h            \
-                 rcvctrler.c            \
-                 streamsplitter.h       \
-                 streamjoiner.h         \
-                 mprtplogger.h          \
-                 ricalcer.h             \
-                 reportproc.h           \
-                 reportprod.h           \
-                 sndratedistor.h        \
-                 fbrasubctrler.h        \
-	             fbrafbproc.h           \
-	             fbrafbprod.h           \
-	             screamsubctrler.h      \
-                 fecdec.h               \
-                 fecenc.h               \
-                 rtpfecbuffer.h         \
-                 signalreport.h         \
-                 slidingwindow.h        \
-                 subratectrler.h
+noinst_HEADERS = fbrafbproc.h          \
+                 fbrafbprod.h          \
+                 fbrasubctrler.h       \
+                 fecdec.h              \
+                 fecenc.h              \
+                 gstmprtcpbuffer.h     \
+                 gstmprtpplayouter.h   \
+                 gstmprtpreceiver.h    \
+                 gstmprtpscheduler.h   \
+                 gstmprtpsender.h      \
+                 lib_bintree.h         \
+                 lib_swplugins.h       \
+                 mediator.h            \
+                 mprtpdefs.h           \
+                 mprtplogger.h         \
+                 observer.h            \
+                 packetforwarder.h     \
+                 rcvctrler.h           \
+                 rcvsubflows.h         \
+                 rcvtracker.h          \
+                 reportproc.h          \
+                 reportprod.h          \
+                 ricalcer.h            \
+                 rtpfecbuffer.h        \
+                 rtppackets.h          \
+                 signalreport.h        \
+                 slidingwindow.h       \
+                 sndctrler.h           \
+                 sndsubflows.h         \
+                 sndtracker.h          \
+                 streamjoiner.h        \
+                 streamsplitter.h      
 
 
 # compiler and linker flags used to compile this plugin, set in configure.ac

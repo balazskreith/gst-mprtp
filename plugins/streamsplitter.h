@@ -24,7 +24,7 @@ typedef struct _SchNode SchNode;
 #define STREAM_SPLITTER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),STREAM_SPLITTER_TYPE))
 #define STREAM_SPLITTER_CAST(src)        ((StreamSplitter *)(src))
 
-#define SCHTREE_MAX_VALUE 128
+#define SCHTREE_MAX_LEVEL 7
 
 struct _StreamSplitter
 {

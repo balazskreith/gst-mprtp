@@ -255,7 +255,7 @@ _tree_ctor (StreamSplitter *this)
 {
   CreateData cdata;
   cdata.remained = cdata.total = sndsubflows_get_total_target(this->subflows) >> 3;
-  cdata.margin   = cdata.total / SCHTREE_MAX_VALUE + 1;
+  cdata.margin   = (cdata.total >> SCHTREE_MAX_LEVEL) + 1;
   cdata.root     = _make_schnode(cdata.total);
   sndsubflows_iterate(this->subflows, _create_nodes, &cdata);
   return cdata.root;
@@ -285,7 +285,7 @@ _schtree_insert (SchNode * node, gint *value, SndSubflow * subflow, gint level_v
     goto done;
   }
 
-  if((node->remained <= *value || *value < margin) &&
+  if((node->remained <= *value || *value <= margin) &&
     !node->left &&
     !node->right)
   {
@@ -508,9 +508,7 @@ void _logging(gpointer data)
                sndsubflows_get_subflows_num(this->subflows)
                );
 
-  _iterate_subflows(this, _log_subflow, this);
   sndsubflows_iterate(this->subflows, _log_subflow, this);
   _log_tree(this->tree, sndsubflows_get_total_target(this->subflows) >> 3, 0);
 }
 
-#undef SCHTREE_MAX_VALUE

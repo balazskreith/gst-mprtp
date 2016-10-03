@@ -11,6 +11,7 @@
 #include <gst/gst.h>
 #include "lib_swplugins.h"
 #include "rcvtracker.h"
+#include "mediator.h"
 
 typedef struct _StreamJoiner StreamJoiner;
 typedef struct _StreamJoinerClass StreamJoinerClass;
@@ -36,9 +37,7 @@ struct _StreamJoiner
   GstClock*            sysclock;
   GstClockTime         made;
   GstClockTime         join_delay;
-
-  GstTask*             thread;
-  GRecMutex            thread_mutex;
+  GstClockTime         last_playout_time_refreshed;
 
   SlidingWindow*       joinq;
   GQueue*              playoutq;
@@ -46,16 +45,11 @@ struct _StreamJoiner
   gboolean             last_seq_init;
   guint32              last_ts;
 
-  gdouble              betha;
-  GAsyncQueue*         rtppackets_out;
-  GAsyncQueue*         discarded_packets_out;
-  GAsyncQueue*         messages_in;
-  GAsyncQueue*         repair_request_out;
-  GAsyncQueue*         repair_response_in;
-
   GstClockTime         playout_time;
 
   gdouble              playout_delay;
+
+  Mediator*            repair_channel;
 
 };
 struct _StreamJoinerClass{
@@ -63,28 +57,26 @@ struct _StreamJoinerClass{
 };
 
 StreamJoiner*
-make_stream_joiner(void);
-
-void stream_joiner_setup_and_start(StreamJoiner *this,
-    GAsyncQueue* rtppackets_out,
-    GAsyncQueue *repair_request_out,
-    GAsyncQueue *discarded_packets_out);
-
-void
-stream_joiner_add_stat(
-    StreamJoiner *this,
-    RcvTrackerStat* stat);
-
-void
-stream_joiner_add_packet(
-    StreamJoiner *this,
-    RTPPacket* packet);
+make_stream_joiner(Mediator* repair_channel);
 
 void
 stream_joiner_set_join_delay (
     StreamJoiner * this,
     GstClockTime join_delay);
 
+void
+stream_joiner_push_packet(
+    StreamJoiner *this,
+    RTPPacket* packet);
+
+void
+stream_joiner_on_rcvtracker_stat_change(
+    StreamJoiner *this,
+    RcvTrackerStat* stat);
+
+RTPPacket*
+stream_joiner_pop_packet(
+    StreamJoiner *this);
 
 GType
 stream_joiner_get_type (void);

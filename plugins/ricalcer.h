@@ -9,7 +9,8 @@
 #define RICALCER_H_
 
 #include <gst/gst.h>
-//#include "mprtpspath.h"
+#include "sndsubflows.h"
+#include "rcvsubflows.h"
 
 typedef struct _ReportIntervalCalculator ReportIntervalCalculator;
 typedef struct _ReportIntervalCalculatorClass ReportIntervalCalculatorClass;
@@ -35,6 +36,7 @@ struct _ReportIntervalCalculatorClass{
 GType ricalcer_get_type (void);
 ReportIntervalCalculator *make_ricalcer(gboolean sender_side);
 gboolean ricalcer_rtcp_fb_allowed(ReportIntervalCalculator * this, SndSubflow *subflow);
-gboolean ricalcer_rtcp_regular_allowed(ReportIntervalCalculator * this, SndSubflow *subflow);
+gboolean ricalcer_rtcp_regular_allowed_sndsubflow(ReportIntervalCalculator * this, SndSubflow *subflow);
+gboolean ricalcer_rtcp_regular_allowed_rcvsubflow(ReportIntervalCalculator * this, RcvSubflow *subflow);
 
 #endif /* RICALCER_H_ */

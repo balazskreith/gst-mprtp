@@ -68,8 +68,6 @@ gst_mprtpscheduler_change_state (GstElement * element,
     GstStateChange transition);
 static gboolean gst_mprtpscheduler_query (GstElement * element,
     GstQuery * query);
-static void
-gst_mprtpscheduler_emit_signal(gpointer ptr, gpointer data);
 static GstFlowReturn gst_mprtpscheduler_rtp_sink_chain (GstPad * pad,
     GstObject * parent, GstBuffer * buffer);
 static GstFlowReturn gst_mprtpscheduler_rtp_sink_chainlist (GstPad * pad,
@@ -81,9 +79,6 @@ static GstFlowReturn gst_mprtpscheduler_mprtcp_rr_sink_chain (GstPad * pad,
 static gboolean gst_mprtpscheduler_src_query (GstPad * srckpad, GstObject * parent,
     GstQuery * query);
 
-static void gst_mprtpscheduler_mprtcp_sender (gpointer ptr, GstBuffer * buf);
-static void _join_subflow (GstMprtpscheduler * this, guint subflow_id);
-static void _detach_subflow (GstMprtpscheduler * this, guint subflow_id);
 static void _change_sending_rate(GstMprtpscheduler * this,
     guint8 subflow_id, gint32 target_bitrate);
 static gboolean gst_mprtpscheduler_mprtp_src_event (GstPad * pad,
@@ -389,7 +384,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->fec_encoder   = make_fecencoder(this->fec_responses);
   this->sndtracker    = make_sndtracker(this->subflows);
 
-  this->controller = make_sndctrler(this->rtppackets,
+  this->controller = make_sndctrler(
       this->sndtracker,
       this->subflows,
       this->mprtcpq,
@@ -540,7 +535,7 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
   THIS_LOCK(this);
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
-      g_value_set_uint (value, (guint) rtppackets_get_mprtp_ext_header_id(this->subflows));
+      g_value_set_uint (value, (guint) rtppackets_get_mprtp_ext_header_id(this->rtppackets));
       break;
     case PROP_ABS_TIME_EXT_HEADER_ID:
       g_value_set_uint (value, (guint) rtppackets_get_abs_time_ext_header_id(this->rtppackets));
@@ -583,19 +578,6 @@ gst_mprtpscheduler_mprtp_src_event (GstPad * pad, GstObject * parent,
   THIS_UNLOCK(this);
   return result;
 }
-
-void
-_join_subflow (GstMprtpscheduler * this, guint subflow_id)
-{
-  sndsubflows_join(this->subflows, subflow_id);
-}
-
-void
-_detach_subflow (GstMprtpscheduler * this, guint subflow_id)
-{
-  sndsubflows_detach(this->subflows, subflow_id);
-}
-
 
 
 static GstStateChangeReturn
@@ -682,14 +664,6 @@ gst_mprtpscheduler_query (GstElement * element, GstQuery * query)
 }
 
 
-void
-gst_mprtpscheduler_emit_signal(gpointer ptr, gpointer data)
-{
-  GstMprtpscheduler *this = ptr;
-//  g_signal_emit (this,_subflows_utilization, 0 /* details */, 1);
-  g_signal_emit (this,_subflows_utilization, 0 /* details */, data);
-}
-
 
 static GstFlowReturn
 gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
@@ -711,18 +685,18 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
       gst_buffer_extract (buffer, 1, &second_byte, 1) != 1) {
     GST_WARNING_OBJECT (this, "could not extract first byte from buffer");
     gst_buffer_unref (buffer);
-    return GST_FLOW_OK;
+    goto done;
   }
 
   if (!PACKET_IS_RTP_OR_RTCP (first_byte)) {
     GST_DEBUG_OBJECT (this, "Not RTP Packet arrived at rtp_sink");
     g_async_queue_push(this->mprtpq, buffer);
-    return GST_FLOW_OK;
+    goto done;
   }
   if(PACKET_IS_RTCP(second_byte)){
     GST_DEBUG_OBJECT (this, "RTCP Packet arrived on rtp sink");
     g_async_queue_push(this->mprtpq, buffer);
-    return GST_FLOW_OK;
+    goto done;
   }
 
   g_async_queue_push(this->rtp_in, gst_buffer_ref(buffer));
@@ -778,14 +752,6 @@ gst_mprtpscheduler_mprtcp_rr_sink_chain (GstPad * pad, GstObject * parent,
   THIS_UNLOCK(this);
   return result;
 
-}
-
-void
-gst_mprtpscheduler_mprtcp_sender (gpointer ptr, GstBuffer * buf)
-{
-  GstMprtpscheduler *this;
-  this = GST_MPRTPSCHEDULER (ptr);
-  g_async_queue_push(this->mprtcpq, buf);
 }
 
 
@@ -890,7 +856,7 @@ void _change_sending_rate(GstMprtpscheduler * this, guint8 subflow_id, gint32 ta
   ChangeSendingRateHelper helper;
   helper.subflow_id = subflow_id;
   helper.target_bitrate = target_bitrate;
-  helper->subflows = this->subflows;
+  helper.subflows = this->subflows;
 
   sndsubflows_iterate(this->subflows, _change_sending_rate_helper, &helper);
 }
@@ -922,13 +888,12 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, RTPPacket *packet)
   rtppacket_setup_abs_time_extension(packet);
   sndtracker_packet_sent(this->sndtracker, packet);
   packetforwarder_add_rtppad_buffer(this->packetforwarder, gst_buffer_ref(packet->buffer));
-  rtppackets_packet_forwarded(packet);
+  rtppackets_packet_forwarded(this->rtppackets, packet);
 
   if(fec_request){
     FECEncoderResponse* response;
     response = g_async_queue_pop(this->fec_responses);
     response->subflow_id = subflow->id;
-    response->fecbuffer = sndsubflow_process_fec_buffer(subflow, response->fecbuffer);
     sndtracker_add_fec_response(this->sndtracker, response);
     packetforwarder_add_rtppad_buffer(this->packetforwarder, response->fecbuffer);
     fecencoder_unref_response(response);
@@ -984,10 +949,10 @@ void
 mprtpscheduler_emitter_process (gpointer udata)
 {
   GstMprtpscheduler *this;
-  this = (GstMprtpscheduler *) udata;
   MPRTPPluginSignalData *msg;
 
-  msg = (MPRTPPluginSignalData *)g_async_queue_timeout_pop(this->emitterq, 1000);
+  this = (GstMprtpscheduler *) udata;
+  msg  = (MPRTPPluginSignalData *)g_async_queue_timeout_pop(this->emitterq, 1000);
   if(!msg){
     goto done;
   }

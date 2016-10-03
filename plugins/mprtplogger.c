@@ -86,6 +86,9 @@ static void
 mprtp_logger_finalize (GObject * object);
 
 static void
+_process(gpointer udata);
+
+static void
 _writing(
     MPRTPLogger* this,
     WritingMessage *item);
@@ -171,7 +174,7 @@ again:
     case MPRTP_LOGGER_MESSAGE_TYPE_WRITING:
     {
       _writing(this, (WritingMessage*) msg);
-      g_slice_free(WritingMessage, msg);
+      g_slice_free(WritingMessage, (WritingMessage*) msg);
     }
     break;
     case MPRTP_LOGGER_MESSAGE_TYPE_CHANGE_TARGET_DIRECTORY:

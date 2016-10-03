@@ -29,7 +29,7 @@ typedef struct _RcvSubflow RcvSubflow;
 struct _RcvSubflow
 {
   guint8                     id;
-  SndSubflows*               base_db;
+  RcvSubflows*               base_db;
 
   guint32                    total_lost_packets;
   guint32                    total_received_packets;
@@ -81,7 +81,8 @@ RcvSubflows*
 make_rcvsubflows(void);
 
 GType rcvsubflows_get_type(void);
-
+void rcvsubflows_join(RcvSubflows* this, guint8 id);
+void rcvsubflows_detach(RcvSubflows* this, guint8 id);
 void rcvsubflows_iterate(RcvSubflows* this, GFunc process, gpointer udata);
 
 void rcvsubflows_set_congestion_controlling_type(RcvSubflows* this, guint8 subflow_id, CongestionControllingType new_type);
@@ -98,5 +99,7 @@ void rcvsubflows_add_on_congestion_controlling_type_changed_cb(RcvSubflows* this
 void rcvsubflow_notify_rtcp_fb_cbs(RcvSubflow* subflow, gpointer udata);
 void rcvsubflow_add_on_rtcp_fb_cb(RcvSubflow* subflow, NotifierFunc callback, gpointer udata);
 void rcvsubflow_rem_on_rtcp_fb_cb(RcvSubflow* subflow, NotifierFunc callback);
+gint32 rcvsubflows_get_subflows_num(RcvSubflows* this);
+RcvSubflow* rcvsubflows_get_subflow(RcvSubflows* this, guint8 subflow_id);
 
 #endif /* RCVSUBFLOWSN_H_ */

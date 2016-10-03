@@ -32,17 +32,6 @@
 GST_DEBUG_CATEGORY_STATIC (stream_splitter_debug_category);
 #define GST_CAT_DEFAULT stream_splitter_debug_category
 
-
-//#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-//#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-//#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-//#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
-
-#define THIS_READLOCK(this)
-#define THIS_READUNLOCK(this)
-#define THIS_WRITELOCK(this)
-#define THIS_WRITEUNLOCK(this)
-
 /* Evaluates to a mask with n bits set */
 #define BITS_MASK(n) ((1<<(n))-1)
 

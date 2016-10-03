@@ -23,8 +23,6 @@ typedef struct _SndSubflowsPrivate SndSubflowsPrivate;
 #define SNDSUBFLOWS_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),SNDSUBFLOWS_TYPE))
 #define SNDSUBFLOWS_CAST(src)        ((SndSubflows *)(src))
 
-#define SCHTREE_MAX_VALUE 128
-
 typedef struct _SndSubflow SndSubflow;
 
 typedef enum

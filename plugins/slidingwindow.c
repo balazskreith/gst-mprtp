@@ -252,7 +252,6 @@ SlidingWindow* make_slidingwindow(guint32 num_limit, GstClockTime obsolation_tre
 static void _slidingwindow_rem(SlidingWindow* this)
 {
   SlidingWindowItem *item;
-  GList* it;
   if(datapuffer_isempty(this->items)){
     return;
   }
@@ -362,7 +361,6 @@ static gint _slidingwindow_peek_custom_helper(gpointer item, gpointer udata)
 
 gpointer slidingwindow_peek_custom(SlidingWindow* this, gint (*comparator)(gpointer item, gpointer udata), gpointer udata)
 {
-  SlidingWindowItem *item;
   PeekCustomHelper helper;
   gpointer result = NULL;
   if(datapuffer_isempty(this->items)){
@@ -391,7 +389,6 @@ void slidingwindow_add_int(SlidingWindow* this, gint data)
 
 void slidingwindow_add_data(SlidingWindow* this, gpointer data)
 {
-  GList* it;
   SlidingWindowItem *item;
 
   slidingwindow_refresh(this);

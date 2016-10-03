@@ -36,10 +36,10 @@ G_DEFINE_TYPE (SndSubflows, sndsubflows, G_TYPE_OBJECT);
 
 #define CHANGE_SUBFLOW_PROPERTY_VALUE(subflows_list, subflow_id, property, property_value, changed_subflows) \
 {                                                     \
+  GSList* it;                                         \
   if(changed_subflows){                               \
     g_queue_clear(changed_subflows);                  \
   }                                                   \
-  GSList* it;                                         \
   for(it = subflows_list; it; it = it->next)          \
   {                                                   \
     SndSubflow* subflow = it->data;                   \
@@ -218,35 +218,35 @@ gint32 sndsubflows_get_subflows_num(SndSubflows* this)
 
 SndSubflow* sndsubflows_get_subflow(SndSubflows* this, guint8 subflow_id)
 {
-  return this->subflows + subflow_id;
+  return this->subflows[subflow_id];
 }
 
 
 void sndsubflows_set_congestion_controlling_type(SndSubflows* this, guint8 subflow_id, CongestionControllingType new_type)
 {
-  CHANGE_SUBFLOW_PROPERTY_VALUE(this->subflows, subflow_id, congestion_controlling_type, new_type, this->changed_subflows);
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, congestion_controlling_type, new_type, this->changed_subflows);
   NOTIFY_CHANGED_SUBFLOWS(this->changed_subflows, this->on_congestion_controlling_type_changed);
 }
 
 void sndsubflows_set_path_active(SndSubflows* this, guint8 subflow_id, gboolean value)
 {
-  CHANGE_SUBFLOW_PROPERTY_VALUE(this->subflows, subflow_id, active, value, this->changed_subflows);
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, active, value, this->changed_subflows);
   NOTIFY_CHANGED_SUBFLOWS(this->changed_subflows, this->on_path_active_changed);
 }
 
 void sndsubflows_set_rtcp_interval_type(SndSubflows* this, guint8 subflow_id, RTCPIntervalType new_type)
 {
-  CHANGE_SUBFLOW_PROPERTY_VALUE(this->subflows, subflow_id, rtcp_interval_type, new_type, NULL);
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, rtcp_interval_type, new_type, NULL);
 }
 
 void sndsubflows_set_path_lossy(SndSubflows* this, guint8 subflow_id, gboolean value)
 {
-  CHANGE_SUBFLOW_PROPERTY_VALUE(this->subflows, subflow_id, lossy, value, NULL);
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, lossy, value, NULL);
 }
 
 void sndsubflows_set_path_congested(SndSubflows* this, guint8 subflow_id, gboolean value)
 {
-  CHANGE_SUBFLOW_PROPERTY_VALUE(this->subflows, subflow_id, congested, value, NULL);
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, congested, value, NULL);
 }
 
 //-----------------------------------------------------------------------------------------------------------

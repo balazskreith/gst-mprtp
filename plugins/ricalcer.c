@@ -84,6 +84,12 @@ ricalcer_class_init (ReportIntervalCalculatorClass * klass)
 }
 
 void
+ricalcer_init (ReportIntervalCalculator * this)
+{
+
+}
+
+void
 ricalcer_finalize (GObject * object)
 {
   ReportIntervalCalculator * this;
@@ -97,7 +103,7 @@ gboolean ricalcer_rtcp_fb_allowed(ReportIntervalCalculator * this, SndSubflow *s
   return subflow->rtcp_interval_type == RTCP_INTERVAL_IMMEDIATE_FEEDBACK_MODE;
 }
 
-gboolean ricalcer_rtcp_regular_allowed(ReportIntervalCalculator * this, SndSubflow *subflow)
+gboolean ricalcer_rtcp_regular_allowed_sndsubflow(ReportIntervalCalculator * this, SndSubflow *subflow)
 {
   gdouble interval_in_sec;
   if(_now(this) < subflow->next_regular_rtcp){
@@ -108,6 +114,25 @@ gboolean ricalcer_rtcp_regular_allowed(ReportIntervalCalculator * this, SndSubfl
                           1,                                       //senders
                           2,                                       //members
                           subflow->target_bitrate * .05,           //rtcp_bw
+                          this->sender_side?1:0,                   //we_sent
+                          128,                                     //avg_rtcp_size
+                          subflow->next_regular_rtcp == 0?0:1);    //initialized
+
+  subflow->next_regular_rtcp = _now(this) + interval_in_sec * GST_SECOND;
+  return TRUE;
+}
+
+gboolean ricalcer_rtcp_regular_allowed_rcvsubflow(ReportIntervalCalculator * this, RcvSubflow *subflow)
+{
+  gdouble interval_in_sec;
+  if(_now(this) < subflow->next_regular_rtcp){
+    return FALSE;
+  }
+  interval_in_sec =
+      _get_rtcp_interval (
+                          1,                                       //senders
+                          2,                                       //members
+                          500000 * .05,                            //rtcp_bw
                           this->sender_side?1:0,                   //we_sent
                           128,                                     //avg_rtcp_size
                           subflow->next_regular_rtcp == 0?0:1);    //initialized

@@ -44,5 +44,8 @@ void observer_add_listener(Observer *this, NotifierFunc callback, gpointer udata
 void observer_rem_listener(Observer *this, NotifierFunc callback);
 void observer_notify(Observer *this, gpointer subject);
 
+void observer_add_collector(Observer *this, CollectorFunc callback, gpointer udata);
+void observer_rem_collector(Observer *this, CollectorFunc callback);
+void observer_collect(Observer *this, ...);
 
 #endif /* OBSERVER_H_ */

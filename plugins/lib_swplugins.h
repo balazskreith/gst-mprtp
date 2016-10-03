@@ -95,6 +95,6 @@ SlidingWindowPlugin* make_swpercentile(
                               gpointer       udata
                               );
 
-SlidingWindowPlugin* make_swint32_stater(void (*pipe)(gpointer,swint32stat_t*),gpointer pipe_data);
+SlidingWindowPlugin* make_swint32_stater(NotifierFunc on_calculated_cb, gpointer on_calculated_udata);
 
 #endif /* INCGUARD_NTRT_LIBRARY_SWPLUGINS_H_ */

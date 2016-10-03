@@ -1,8 +1,7 @@
 plugin_LTLIBRARIES = libgstmprtp.la
 
 # sources used to compile this plug-in
-libgstmprtp_la_SOURCES = broker.c              \
-                         fbrafbproc.c          \
+libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          fbrafbprod.c          \
                          fbrasubctrler.c       \
                          fecdec.c              \
@@ -14,6 +13,7 @@ libgstmprtp_la_SOURCES = broker.c              \
                          gstmprtpsender.c      \
                          lib_bintree.c         \
                          lib_swplugins.c       \
+                         mediator.c            \
                          mprtpdefs.c           \
                          mprtplogger.c         \
                          observer.c            \

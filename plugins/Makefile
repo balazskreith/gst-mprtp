@@ -144,24 +144,24 @@ am__DEPENDENCIES_1 =
 libgstmprtp_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-am_libgstmprtp_la_OBJECTS = libgstmprtp_la-broker.lo \
-	libgstmprtp_la-fbrafbproc.lo libgstmprtp_la-fbrafbprod.lo \
-	libgstmprtp_la-fbrasubctrler.lo libgstmprtp_la-fecdec.lo \
-	libgstmprtp_la-fecenc.lo libgstmprtp_la-gstmprtcpbuffer.lo \
+am_libgstmprtp_la_OBJECTS = libgstmprtp_la-fbrafbproc.lo \
+	libgstmprtp_la-fbrafbprod.lo libgstmprtp_la-fbrasubctrler.lo \
+	libgstmprtp_la-fecdec.lo libgstmprtp_la-fecenc.lo \
+	libgstmprtp_la-gstmprtcpbuffer.lo \
 	libgstmprtp_la-gstmprtpplayouter.lo \
 	libgstmprtp_la-gstmprtpreceiver.lo \
 	libgstmprtp_la-gstmprtpscheduler.lo \
 	libgstmprtp_la-gstmprtpsender.lo libgstmprtp_la-lib_bintree.lo \
-	libgstmprtp_la-lib_swplugins.lo libgstmprtp_la-mprtpdefs.lo \
-	libgstmprtp_la-mprtplogger.lo libgstmprtp_la-observer.lo \
-	libgstmprtp_la-packetforwarder.lo libgstmprtp_la-rcvctrler.lo \
-	libgstmprtp_la-rcvsubflows.lo libgstmprtp_la-rcvtracker.lo \
-	libgstmprtp_la-reportproc.lo libgstmprtp_la-reportprod.lo \
-	libgstmprtp_la-ricalcer.lo libgstmprtp_la-rtpfecbuffer.lo \
-	libgstmprtp_la-rtppackets.lo libgstmprtp_la-signalreport.lo \
-	libgstmprtp_la-slidingwindow.lo libgstmprtp_la-sndctrler.lo \
-	libgstmprtp_la-sndsubflows.lo libgstmprtp_la-sndtracker.lo \
-	libgstmprtp_la-streamjoiner.lo \
+	libgstmprtp_la-lib_swplugins.lo libgstmprtp_la-mediator.lo \
+	libgstmprtp_la-mprtpdefs.lo libgstmprtp_la-mprtplogger.lo \
+	libgstmprtp_la-observer.lo libgstmprtp_la-packetforwarder.lo \
+	libgstmprtp_la-rcvctrler.lo libgstmprtp_la-rcvsubflows.lo \
+	libgstmprtp_la-rcvtracker.lo libgstmprtp_la-reportproc.lo \
+	libgstmprtp_la-reportprod.lo libgstmprtp_la-ricalcer.lo \
+	libgstmprtp_la-rtpfecbuffer.lo libgstmprtp_la-rtppackets.lo \
+	libgstmprtp_la-signalreport.lo libgstmprtp_la-slidingwindow.lo \
+	libgstmprtp_la-sndctrler.lo libgstmprtp_la-sndsubflows.lo \
+	libgstmprtp_la-sndtracker.lo libgstmprtp_la-streamjoiner.lo \
 	libgstmprtp_la-streamsplitter.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
@@ -407,8 +407,7 @@ top_srcdir = ..
 plugin_LTLIBRARIES = libgstmprtp.la
 
 # sources used to compile this plug-in
-libgstmprtp_la_SOURCES = broker.c              \
-                         fbrafbproc.c          \
+libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          fbrafbprod.c          \
                          fbrasubctrler.c       \
                          fecdec.c              \
@@ -420,6 +419,7 @@ libgstmprtp_la_SOURCES = broker.c              \
                          gstmprtpsender.c      \
                          lib_bintree.c         \
                          lib_swplugins.c       \
+                         mediator.c            \
                          mprtpdefs.c           \
                          mprtplogger.c         \
                          observer.c            \
@@ -552,7 +552,6 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-include ./$(DEPDIR)/libgstmprtp_la-broker.Plo
 include ./$(DEPDIR)/libgstmprtp_la-fbrafbproc.Plo
 include ./$(DEPDIR)/libgstmprtp_la-fbrafbprod.Plo
 include ./$(DEPDIR)/libgstmprtp_la-fbrasubctrler.Plo
@@ -565,6 +564,7 @@ include ./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
 include ./$(DEPDIR)/libgstmprtp_la-lib_bintree.Plo
 include ./$(DEPDIR)/libgstmprtp_la-lib_swplugins.Plo
+include ./$(DEPDIR)/libgstmprtp_la-mediator.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpdefs.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtplogger.Plo
 include ./$(DEPDIR)/libgstmprtp_la-observer.Plo
@@ -605,13 +605,6 @@ include ./$(DEPDIR)/libgstmprtp_la-streamsplitter.Plo
 #	$(AM_V_CC)source='$<' object='$@' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LTCOMPILE) -c -o $@ $<
-
-libgstmprtp_la-broker.lo: broker.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-broker.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-broker.Tpo -c -o libgstmprtp_la-broker.lo `test -f 'broker.c' || echo '$(srcdir)/'`broker.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-broker.Tpo $(DEPDIR)/libgstmprtp_la-broker.Plo
-#	$(AM_V_CC)source='broker.c' object='libgstmprtp_la-broker.lo' libtool=yes \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-broker.lo `test -f 'broker.c' || echo '$(srcdir)/'`broker.c
 
 libgstmprtp_la-fbrafbproc.lo: fbrafbproc.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-fbrafbproc.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-fbrafbproc.Tpo -c -o libgstmprtp_la-fbrafbproc.lo `test -f 'fbrafbproc.c' || echo '$(srcdir)/'`fbrafbproc.c
@@ -696,6 +689,13 @@ libgstmprtp_la-lib_swplugins.lo: lib_swplugins.c
 #	$(AM_V_CC)source='lib_swplugins.c' object='libgstmprtp_la-lib_swplugins.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-lib_swplugins.lo `test -f 'lib_swplugins.c' || echo '$(srcdir)/'`lib_swplugins.c
+
+libgstmprtp_la-mediator.lo: mediator.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-mediator.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-mediator.Tpo -c -o libgstmprtp_la-mediator.lo `test -f 'mediator.c' || echo '$(srcdir)/'`mediator.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-mediator.Tpo $(DEPDIR)/libgstmprtp_la-mediator.Plo
+#	$(AM_V_CC)source='mediator.c' object='libgstmprtp_la-mediator.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-mediator.lo `test -f 'mediator.c' || echo '$(srcdir)/'`mediator.c
 
 libgstmprtp_la-mprtpdefs.lo: mprtpdefs.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-mprtpdefs.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-mprtpdefs.Tpo -c -o libgstmprtp_la-mprtpdefs.lo `test -f 'mprtpdefs.c' || echo '$(srcdir)/'`mprtpdefs.c

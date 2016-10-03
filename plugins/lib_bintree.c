@@ -24,11 +24,11 @@ _sprint_list_of_pointers(GSList* it, gchar *result, guint result_length)
   if(!it){
     return;
   }
-  memset(result, result_length);
+  memset(result, 0, result_length);
   for(; it; it = it->next){
     memset(helper, 0, 255);
-    sprintf(helper, "(%p)%c ", it->data, it->next ? ',' : '');
-    strcat(result, "%s", helper);
+    sprintf(helper, "(%p)%c ", it->data, it->next ? ',' : ' ');
+    strcat(result, helper);
   }
 }
 
@@ -36,7 +36,7 @@ static void
 _setup_indent_level(gchar *result, guint result_length, guint level)
 {
   gint i;
-  memset(result, result_length);
+  memset(result, 0, result_length);
   for(i = 0; i < level; ++i){
     strcat(result, "--");
   }
@@ -45,7 +45,6 @@ _setup_indent_level(gchar *result, guint result_length, guint level)
 void static
 _print_tree (bintree3_t * tree, bintree3node_t* node, gint32 level)
 {
-  gint32 i;
   gchar string[255];
 
   if (!node) {
@@ -141,11 +140,6 @@ void bintree3_print(bintree3_t* this)
   _print_tree(this, this->root, 0);
 }
 
-static void test_sprint(gpointer data, gchar *string)
-{
-  sprintf(string, "%d", *((gint32*)data));
-}
-
 void bintree3_test(void)
 {
   bintree3_t *tree1;
@@ -155,9 +149,6 @@ void bintree3_test(void)
   gint32   tree2_values[] = {5,7,7,2,3,1};
   tree1 = make_bintree3(bintree3cmp_int32);
   tree2 = make_bintree3(bintree3cmp_int32);
-
-  bintree3_setsprint(tree1, test_sprint);
-  bintree3_setsprint(tree2, test_sprint);
 
   printf("POP CASE. Insert 5,7,7,6,8,8,2,2,3,1 into tree1\n");
   for(i = 0; i < 10; ++i){

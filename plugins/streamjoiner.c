@@ -74,13 +74,14 @@ static void
 stream_joiner_finalize (
     GObject * object);
 
-static void
-_process(gpointer udata);
-
-static void
-_process_message(
+static gboolean
+_has_packet_to_playout(
     StreamJoiner *this,
-    Message *msg);
+    GstClockTime elapsed_time);
+
+static RTPPacket*
+_pop_packet(
+    StreamJoiner *this);
 
 static gint
 _cmp_seq (guint16 x, guint16 y)
@@ -106,8 +107,8 @@ _cmp_ts (guint32 x, guint32 y)
 
 static gint _playoutq_sort_helper(gconstpointer a, gconstpointer b, gpointer user_data)
 {
-  const RTPBufferMessage *ai = a;
-  const RTPBufferMessage *bi = b;
+  const RTPPacket *ai = a;
+  const RTPPacket *bi = b;
   return _cmp_seq(ai->abs_seq, bi->abs_seq);
 }
 
@@ -141,11 +142,8 @@ void
 stream_joiner_finalize (GObject * object)
 {
   StreamJoiner *this = STREAM_JOINER (object);
-  gst_task_stop(this->thread);
-  gst_task_join(this->thread);
-  gst_object_unref(this->thread);
-
-  g_object_unref (this->sysclock);
+  g_object_unref(this->repair_channel);
+  g_object_unref(this->sysclock);
 }
 
 
@@ -154,21 +152,18 @@ stream_joiner_init (StreamJoiner * this)
 {
   this->sysclock           = gst_system_clock_obtain ();
   this->made               = _now(this);
-  this->join_delay         = 10 * GST_MSECOND;
-
-  this->thread             = gst_task_new(_process, this, NULL);
+  this->join_delay         = 0;
 
 }
 
 StreamJoiner*
-make_stream_joiner(void)
+make_stream_joiner(Mediator* repair_channel)
 {
   StreamJoiner *result;
   result = (StreamJoiner *) g_object_new (STREAM_JOINER_TYPE, NULL);
 
 
-  result->messages_in             = g_async_queue_new();
-  result->repair_response_in      = g_async_queue_new();
+  result->repair_channel          = g_object_ref(repair_channel);
 
   result->joinq                   = make_slidingwindow(100, result->join_delay);
   result->playoutq                = g_queue_new();
@@ -177,157 +172,106 @@ make_stream_joiner(void)
   return result;
 }
 
-void stream_joiner_setup_and_start(StreamJoiner *this,
-    GAsyncQueue* rtppackets_out,
-    GAsyncQueue *repair_request_out,
-    GAsyncQueue *discarded_packets_out)
+void stream_joiner_push_packet(StreamJoiner *this, RTPPacket* packet)
 {
-  this->rtppackets_out          = g_async_queue_ref(rtppackets_out);
-  this->repair_request_out      = g_async_queue_ref(repair_request_out);
-  this->discarded_packets_out   = g_async_queue_ref(discarded_packets_out);
-
-  gst_task_set_lock (this->thread, &this->thread_mutex);
-  gst_task_start (this->thread);
+  g_queue_insert_sorted(this->playoutq, packet, _playoutq_sort_helper, NULL);
 }
 
-void stream_joiner_add_stat(StreamJoiner *this, RcvTrackerStat* stat)
+void stream_joiner_on_rcvtracker_stat_change(StreamJoiner *this, RcvTrackerStat* stat)
 {
-  StatMessage *msg;
-  msg = g_slice_new(StatMessage);
-  msg->base.type = STREAMJOINER_MESSAGE_STAT;
-  memcpy(&msg->stat, stat, sizeof(RcvTrackerStat));
-  g_async_queue_push(this->messages_in, msg);
-}
-
-void stream_joiner_add_packet(StreamJoiner *this, RTPPacket* packet)
-{
-  RTPBufferMessage *msg;
-  rtppackets_packet_ref(packet);
-  msg = g_slice_new(RTPBufferMessage);
-  msg->base.type   = STREAMJOINER_MESSAGE_RTPPACKET;
-  msg->ts          = packet->timestamp;
-  msg->buffer      = packet->buffer;
-  msg->abs_seq     = packet->abs_seq;
-  g_async_queue_push(this->messages_in, msg);
-}
-
-void _process_message(StreamJoiner *this, Message *msg)
-{
-  if(msg->type == STREAMJOINER_MESSAGE_STAT){
-    StatMessage* stat_msg = (StatMessage*)msg;
-    if(this->playout_delay == 0.){
-      this->playout_delay = stat_msg->stat.max_skew;
-    }else{
-      this->playout_delay = (stat_msg->stat.max_skew + 255. * this->playout_delay) / 256.;
-    }
-    g_slice_free(StatMessage, msg);
+  GstClockTime now = _now(this);
+  if(this->last_playout_time_refreshed + 20 * GST_MSECOND < now){
     return;
   }
 
-  if(msg->type == STREAMJOINER_MESSAGE_JOINDELAY){
-    JoinDelayMessage join_msg = (JoinDelayMessage*)msg;
-    this->join_delay = join_msg->join_delay;
-    slidingwindow_set_treshold(this->joinq, this->join_delay);
-    g_slice_free(JoinDelayMessage, msg);
-    return;
+  if(this->playout_delay == 0.){
+    this->playout_delay = stat->max_skew;
+  }else{
+    this->playout_delay = (stat->max_skew + 255. * this->playout_delay) / 256.;
   }
 
-  if(msg->type == STREAMJOINER_MESSAGE_RTPPACKET){
-    RTPBufferMessage *rtp_message = (RTPBufferMessage*) msg;
-    if(0 < this->join_delay){
-      slidingwindow_add_data(this->joinq, rtp_message);
-    }else{
-      g_queue_insert_sorted(this->playoutq, rtp_message, _playoutq_sort_helper, NULL);
-    }
-  }
+  this->last_playout_time_refreshed = now;
 }
 
-static void _forward(StreamJoiner *this, RTPBufferMessage *rtpbuf_msg)
+void stream_joiner_set_join_delay(StreamJoiner *this, GstClockTime join_delay)
 {
-  if(this->last_seq_init == FALSE){
-    this->last_seq_init = TRUE;
-    this->last_seq = rtpbuf_msg->abs_seq;
-    goto send;
-  }
-
-  if(_cmp_seq(++this->last_seq, rtpbuf_msg->abs_seq) < 0){
-    DiscardedPacket discarded_packet = g_slice_new0(DiscardedPacket);
-    discarded_packet->abs_seq = this->last_seq;
-    g_queue_push_head(this->playoutq, rtpbuf_msg);
-    g_async_queue_push(this->repair_request_out, discarded_packet);
-    while((discarded_packet = g_async_queue_try_pop(this->repair_response_in)) != NULL){
-      if(discarded_packet->abs_seq == this->last_seq){
-        break;
-      }
-      g_slice_free(DiscardedPacket, discarded_packet);
-      discarded_packet = NULL;
-    }
-    if(!discarded_packet){
-      discarded_packet = g_async_queue_timeout_pop(this->repair_response_in, 500);
-    }
-    if(discarded_packet){
-      g_async_queue_push(this->rtppackets_out, discarded_packet->rtpbuf);
-    }
-    g_async_queue_push(this->discarded_packets_out, discarded_packet);
-    this->playout_time = _now(this);
-    goto done;
-  }
-
-  if(_cmp_ts(this->last_ts, rtpbuf_msg->ts) < 0){
-    this->last_ts = rtpbuf_msg->ts;
-    this->playout_time += this->playout_delay;
-  }
-
-send:
-  g_async_queue_push(this->rtppackets_out, rtpbuf_msg->buffer);
-  g_slice_free(RTPBufferMessage, rtpbuf_msg);
-done:
-  return;
+  this->join_delay = join_delay;
 }
 
-void _process(gpointer udata)
+RTPPacket* stream_joiner_pop_packet(StreamJoiner *this)
 {
-  StreamJoiner *this;
-  RTPBufferMessage* rtpbuf_msg;
-  Message *msg;
+  GstClockTime now = _now(this);
+  RTPPacket* packet = NULL;
 
-  slidingwindow_refresh(this->joinq);
-
-  while((msg = g_async_queue_try_pop(this->messages_in))){
-    _process_message(this, msg);
-  }
-
-  if(_now(this) < this->playout_time){
-    goto done;
+  if(now < this->playout_time){
+    return NULL;
   }
 
   if(this->playout_time == 0){
-    this->playout_time = _now(this);
+    this->playout_time = now;
   }
 
-  if(g_queue_is_empty(this->playoutq)){
+  if(!_has_packet_to_playout(this, now)){
     this->playout_time += this->playout_delay;
-    goto done;
+    return NULL;
   }
 
-  _forward(this, g_queue_pop_head(this->joinq));
+  if((packet = _pop_packet(this)) == NULL){
+    return NULL;
+  }
 
+  if(_cmp_ts(this->last_ts, packet->timestamp) < 0){
+    this->last_ts = packet->timestamp;
+    this->playout_time += this->playout_delay;
+  }
 
-done:
-  return;
-
+  return packet;
 }
 
-void
-stream_joiner_set_join_delay (StreamJoiner * this, GstClockTime join_delay)
+
+RTPPacket* _pop_packet(StreamJoiner *this)
 {
-  JoinDelayMessage *msg;
-  msg = g_slice_new(JoinDelayMessage);
-  msg->join_delay  = join_delay;
-  msg->base.type = STREAMJOINER_MESSAGE_JOINDELAY;
-  g_async_queue_push(this->messages_in, msg);
+  RTPPacket* result = g_queue_pop_head(this->playoutq);
+
+  if(this->last_seq_init == FALSE){
+    this->last_seq_init = TRUE;
+    this->last_seq = result->abs_seq;
+    this->last_ts  = result->timestamp;
+    return result;
+  }
+
+  if(_cmp_seq(++this->last_seq, result->abs_seq) < 0){
+    DiscardedPacket *discarded_packet = g_slice_new0(DiscardedPacket);
+    g_queue_push_head(this->playoutq, result);
+    discarded_packet->abs_seq = this->last_seq;
+    mediator_set_request(this->repair_channel, discarded_packet);
+    return NULL;
+  }
+
+  return result;
 }
 
+gboolean _has_packet_to_playout(StreamJoiner *this, GstClockTime elapsed_time)
+{
+  if(g_queue_is_empty(this->playoutq)){
+    return FALSE;
+  }
+
+  if(!this->join_delay){
+    return TRUE;
+  }
+
+  if(g_queue_get_length(this->playoutq) < 2){
+    elapsed_time -= ((RTPPacket*)g_queue_peek_head(this->playoutq))->created;
+  }else{
+    RTPPacket *first,*last;
+    first = g_queue_peek_head(this->playoutq);
+    last  = g_queue_peek_tail(this->playoutq);
+    elapsed_time = first->created < last->created ? last->created - first->created : first->created - last->created;
+  }
+
+  return this->join_delay <= elapsed_time;
+}
 
 
 

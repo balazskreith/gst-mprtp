@@ -39,10 +39,10 @@ G_DEFINE_TYPE (RcvSubflows, rcvsubflows, G_TYPE_OBJECT);
 
 #define CHANGE_SUBFLOW_PROPERTY_VALUE(subflows_list, subflow_id, property, property_value, changed_subflows) \
 {                                                     \
+  GSList* it;                                         \
   if(changed_subflows){                               \
     g_queue_clear(changed_subflows);                  \
   }                                                   \
-  GSList* it;                                         \
   for(it = subflows_list; it; it = it->next)          \
   {                                                   \
     RcvSubflow* subflow = it->data;                   \
@@ -79,6 +79,15 @@ static void
 rcvsubflows_finalize (
     GObject * object);
 
+
+static RcvSubflow*
+_make_subflow(
+    RcvSubflows* base_db,
+    guint8 subflow_id);
+
+static void
+_dispose_subflow(
+    RcvSubflow *subflow);
 
 //----------------------------------------------------------------------
 //---- Private function implementations to Stream Dealer object --------
@@ -205,7 +214,7 @@ void rcvsubflow_rem_on_rtcp_fb_cb(RcvSubflow* subflow, NotifierFunc callback)
 
 RcvSubflow* rcvsubflows_get_subflow(RcvSubflows* this, guint8 subflow_id)
 {
-  return this->subflows + subflow_id;
+  return this->subflows[subflow_id];
 }
 
 gint32 rcvsubflows_get_subflows_num(RcvSubflows* this)
@@ -215,13 +224,13 @@ gint32 rcvsubflows_get_subflows_num(RcvSubflows* this)
 
 void rcvsubflows_set_congestion_controlling_type(RcvSubflows* this, guint8 subflow_id, CongestionControllingType new_type)
 {
-  CHANGE_SUBFLOW_PROPERTY_VALUE(this->subflows, subflow_id, congestion_controlling_type, new_type, this->changed_subflows);
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, congestion_controlling_type, new_type, this->changed_subflows);
   NOTIFY_CHANGED_SUBFLOWS(this->changed_subflows, this->on_congestion_controlling_type_changed);
 }
 
 void rcvsubflows_set_rtcp_interval_type(RcvSubflows* this, guint8 subflow_id, RTCPIntervalType new_type)
 {
-  CHANGE_SUBFLOW_PROPERTY_VALUE(this->subflows, subflow_id, rtcp_interval_type, new_type, NULL);
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, rtcp_interval_type, new_type, NULL);
 }
 
 

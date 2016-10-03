@@ -74,7 +74,7 @@ rtppackets_finalize (GObject * object)
 
 }
 
-RTPPackets* make_rtppackets()
+RTPPackets* make_rtppackets(void)
 {
   RTPPackets* this;
   this = g_object_new (RTPPACKETS_TYPE, NULL);
@@ -112,19 +112,19 @@ static void _init_rtppacket(RTPPackets* this, RTPPacket* packet, GstRTPBuffer* r
   packet->base_db      = this;
   packet->buffer       = gst_buffer_ref(rtp->buffer);
   packet->created      = _now(this);
-  packet->abs_seq      = gst_rtp_buffer_get_seq(&rtp);
-  packet->timestamp    = gst_rtp_buffer_get_timestamp(&rtp);
-  packet->ssrc         = gst_rtp_buffer_get_ssrc(&rtp);
-  packet->payload_size = gst_rtp_buffer_get_payload_len(&rtp);
-  packet->payload_type = gst_rtp_buffer_get_payload_type(&rtp);
-  packet->header_size  = gst_rtp_buffer_get_header_len(&rtp);
+  packet->abs_seq      = gst_rtp_buffer_get_seq(rtp);
+  packet->timestamp    = gst_rtp_buffer_get_timestamp(rtp);
+  packet->ssrc         = gst_rtp_buffer_get_ssrc(rtp);
+  packet->payload_size = gst_rtp_buffer_get_payload_len(rtp);
+  packet->payload_type = gst_rtp_buffer_get_payload_type(rtp);
+  packet->header_size  = gst_rtp_buffer_get_header_len(rtp);
   packet->ref          = 1;
 
   this->pivot_address_subflow_id = 0;
   this->pivot_address            = NULL;
 }
 
-gboolean _do_reset_packet(RTPPackets* this, RTPPacket* packet)
+static gboolean _do_reset_packet(RTPPackets* this, RTPPacket* packet)
 {
   if(packet->ref < 1){
     return TRUE; //The packet is never used or appropriately unrefed
@@ -146,14 +146,14 @@ static RTPPacket* _retrieve_packet(RTPPackets* this, GstRTPBuffer* rtp)
 {
 
   RTPPacket* result;
-  result  = this->packets +  gst_rtp_buffer_get_seq(&rtp);
+  result  = this->packets +  gst_rtp_buffer_get_seq(rtp);
 
   if(!_do_reset_packet(this, result)){
     goto done;
   }
 
   memset(result, 0, sizeof(RTPPacket));
-  _init_rtppacket(this, result, &rtp);
+  _init_rtppacket(this, result, rtp);
 done:
   return result;
 }
@@ -249,7 +249,7 @@ void rtppacket_setup_mprtp(RTPPacket *packet, SndSubflow* subflow)
 
 void rtppacket_setup_abs_time_extension(RTPPacket* packet)
 {
-  guint8 abs_time_header_ext = rtppackets_get_by_abs_seq(packet->base_db);
+  guint8 abs_time_header_ext = rtppackets_get_abs_time_ext_header_id(packet->base_db);
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   packet->buffer = gst_buffer_make_writable(packet->buffer);
 

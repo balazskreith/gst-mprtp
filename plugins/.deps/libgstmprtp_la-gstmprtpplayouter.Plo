@@ -352,10 +352,10 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  /usr/include/glib-2.0/gio/glistmodel.h \
  /usr/include/glib-2.0/gio/gliststore.h \
  /usr/include/glib-2.0/gio/gio-autocleanups.h sndsubflows.h rcvsubflows.h \
- rcvctrler.h ricalcer.h sndctrler.h reportprod.h streamsplitter.h \
- reportproc.h signalreport.h fecenc.h rtpfecbuffer.h sndtracker.h \
- fecdec.h /usr/include/glib-2.0/gio/gnetworking.h /usr/include/netdb.h \
- /usr/include/netinet/in.h \
+ mediator.h rcvctrler.h ricalcer.h sndctrler.h reportprod.h \
+ streamsplitter.h reportproc.h signalreport.h fecenc.h rtpfecbuffer.h \
+ sndtracker.h fecdec.h /usr/include/glib-2.0/gio/gnetworking.h \
+ /usr/include/netdb.h /usr/include/netinet/in.h \
  /usr/lib/gcc/x86_64-linux-gnu/5/include/stdint.h /usr/include/stdint.h \
  /usr/include/x86_64-linux-gnu/bits/wchar.h \
  /usr/include/x86_64-linux-gnu/sys/socket.h \
@@ -1192,6 +1192,8 @@ rtppackets.h:
 sndsubflows.h:
 
 rcvsubflows.h:
+
+mediator.h:
 
 rcvctrler.h:
 

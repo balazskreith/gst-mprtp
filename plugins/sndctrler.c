@@ -24,13 +24,11 @@
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include "sndctrler.h"
-#include "streamsplitter.h"
-#include "gstmprtcpbuffer.h"
 #include <math.h>
 #include <string.h>
 #include <sys/timex.h>
-#include "ricalcer.h"
 #include <stdlib.h>
+#include "fbrasubctrler.h"
 
 #define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
 #define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
@@ -102,16 +100,15 @@ _create_sr (
     SndSubflow * subflow);
 
 //----------------------------------------------------------------------------
-static MPRTPPluginSignalData*
+static void
 _update_subflow_report_utilization(
     SndController* this,
     SndSubflow *subflow,
     GstMPRTCPReportSummary *summary);
 
-static MPRTPPluginSignalData*
+static void
 _update_subflow_target_utilization(
-    SndController* this,
-    SndSubflow *subflow);
+    SndController* this);
 
 
 //----------------------------------------------------------------------------
@@ -239,7 +236,6 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
   SndSubflow *subflow;
   GstMPRTCPReportSummary *summary;
   GSList* it;
-  GstClockTime now = _now(this);
 
   summary = &this->reports_summary;
   memset(summary, 0, sizeof(GstMPRTCPReportSummary));
@@ -251,6 +247,8 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
     g_warning("Report arrived referring to subflow not exists");
     goto done;
   }
+
+  _update_subflow_report_utilization(this, subflow, summary);
 
   for(it = this->controllers; it; it = it->next){
     CongestionController* controller = it->data;
@@ -285,7 +283,7 @@ static void _sender_report_updater_helper(SndSubflow *subflow, gpointer udata)
     goto done;
   }
 
-  if(!ricalcer_rtcp_regular_allowed(ricalcer, subflow)){
+  if(!ricalcer_rtcp_regular_allowed_sndsubflow(ricalcer, subflow)){
     goto done;
   }
 
@@ -390,10 +388,10 @@ void _update_subflow_target_utilization(SndController* this)
 
 //---------------------- Event handlers ----------------------------------
 
-static gint _controller_by_subflow_id(gpointer item, gpointer udata)
+static gint _controller_by_subflow_id(gconstpointer item, gconstpointer udata)
 {
-  CongestionController *controller = item;
-  SndSubflow *subflow = udata;
+  const CongestionController *controller = item;
+  const SndSubflow *subflow = udata;
   return subflow->id == controller->subflow_id ? 0 : -1;
 }
 
@@ -401,7 +399,7 @@ void _on_subflow_active_changed(SndController* this, SndSubflow *subflow)
 {
   GSList* controller_item;
   CongestionController *controller;
-  controller_item = g_slist_find_custom(this->controllers, _controller_by_subflow_id, subflow);
+  controller_item = g_slist_find_custom(this->controllers, _controller_by_subflow_id, (gconstpointer) subflow);
   if(!controller_item){
     return;
   }
@@ -417,7 +415,7 @@ void _on_subflow_detached(SndController* this, SndSubflow *subflow)
 {
   GSList* controller_item;
   CongestionController *controller;
-  controller_item = g_slist_find_custom(this->controllers, _controller_by_subflow_id, subflow);
+  controller_item = g_slist_find_custom(this->controllers, _controller_by_subflow_id, (gconstpointer) subflow);
   if(!controller_item){
     return;
   }
@@ -429,7 +427,7 @@ void _on_congestion_controlling_changed(SndController* this, SndSubflow *subflow
 {
   GSList* controller_item;
 
-  controller_item = g_slist_find_custom(this->controllers, _controller_by_subflow_id, subflow);
+  controller_item = g_slist_find_custom(this->controllers, _controller_by_subflow_id, (gconstpointer) subflow);
   if(controller_item){
     CongestionController *controller = controller_item->data;
     if(subflow->congestion_controlling_type == controller->type){

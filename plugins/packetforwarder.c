@@ -42,6 +42,8 @@ typedef struct{
 #define _now(this) gst_clock_get_time (this->sysclock)
 #define _priv(this) ((PacketForwarderPrivate*)(this->priv))
 
+static void packetforwarder_finalize (GObject * object);
+
 static void _process(gpointer udata);
 static void _start(PacketForwarder* this);
 static void _stop(PacketForwarder* this);
@@ -51,13 +53,13 @@ static void _stop(PacketForwarder* this);
 
 
 void
-packetsender_class_init (PacketForwarderClass * klass)
+packetforwarder_class_init (PacketForwarderClass * klass)
 {
   GObjectClass *gobject_class;
 
   gobject_class = (GObjectClass *) klass;
 
-  gobject_class->finalize = packetsender_finalize;
+  gobject_class->finalize = packetforwarder_finalize;
 
   GST_DEBUG_CATEGORY_INIT (packetforwarder_debug_category, "packetforwarder", 0,
       "MPRTP Packet Forwarder Component");
@@ -65,11 +67,11 @@ packetsender_class_init (PacketForwarderClass * klass)
 }
 
 void
-packetsender_finalize (GObject * object)
+packetforwarder_finalize (GObject * object)
 {
   PacketForwarder *this;
   GstBuffer* buffer;
-  this = PACKETSRCVQUEUE(object);
+  this = PACKETFORWARDER(object);
 
   _stop(this);
 
@@ -89,7 +91,7 @@ packetsender_finalize (GObject * object)
 
 
 void
-packetsender_init (PacketForwarder * this)
+packetforwarder_init (PacketForwarder * this)
 {
   this->sysclock = gst_system_clock_obtain();
   this->mprtpq   = g_async_queue_new();
@@ -152,6 +154,6 @@ again:
   if(repeat){
     goto again;
   }
-done:
+
   return;
 }

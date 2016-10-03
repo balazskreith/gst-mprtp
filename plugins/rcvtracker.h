@@ -35,6 +35,7 @@ typedef struct _RcvTrackerSubflowStat{
   guint32                   total_received_bytes;
   guint32                   total_received_packets;
   guint32                   jitter;
+  guint16                   cycle_num;
 
   GstClockTime              skew_median;
   GstClockTime              skew_min;
@@ -71,7 +72,7 @@ void rcvtracker_deinit_subflow(RcvTracker *this, guint8 subflow_id);
 void rcvtracker_init_subflow(RcvTracker *this, guint8 subflow_id);
 void rcvtracker_refresh(RcvTracker * this);
 
-void rcvtracker_add_discarded_seq(RcvTracker* this, DiscardedPacket* discarded_packet);
+void rcvtracker_add_discarded_packet(RcvTracker* this, DiscardedPacket* discarded_packet);
 
 void rcvtracker_add_on_received_packet_callback(RcvTracker * this,
                                         void (*callback)(gpointer udata, gpointer item),

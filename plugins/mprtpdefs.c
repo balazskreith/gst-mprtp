@@ -1,12 +1,12 @@
 #include "mprtpdefs.h"
-
+#include <string.h>
 
 void gst_rtp_buffer_set_mprtp_extension(GstRTPBuffer* rtp, guint8 ext_header_id, guint8 subflow_id, guint16 subflow_seq)
 {
   MPRTPSubflowHeaderExtension mprtp_ext;
   mprtp_ext.id = subflow_id;
   mprtp_ext.seq = subflow_seq;
-  gst_rtp_buffer_add_extension_onebyte_header (&rtp, ext_header_id, (gpointer) &mprtp_ext, sizeof (mprtp_ext));
+  gst_rtp_buffer_add_extension_onebyte_header (rtp, ext_header_id, (gpointer) &mprtp_ext, sizeof (mprtp_ext));
 }
 
 void gst_rtp_buffer_get_mprtp_extension(GstRTPBuffer* rtp, guint8 ext_header_id, guint8 *subflow_id, guint16 *subflow_seq)
@@ -43,8 +43,7 @@ void gst_rtp_buffer_set_abs_time_extension(GstRTPBuffer* rtp, guint8 abs_time_ex
     //https://tools.ietf.org/html/draft-alvestrand-rmcat-remb-03
     time = (NTP_NOW >> 14) & 0x00ffffff;
     memcpy (&data, &time, 3);
-    gst_rtp_buffer_add_extension_onebyte_header (&rtp, abs_time_ext_header_id, (gpointer) &data, sizeof (data));
-    gst_rtp_buffer_unmap(&rtp);
+    gst_rtp_buffer_add_extension_onebyte_header (rtp, abs_time_ext_header_id, (gpointer) &data, sizeof (data));
 }
 
 guint64 gst_rtp_buffer_get_abs_time_extension(GstRTPBuffer* rtp, guint8 abs_time_ext_header_id)
@@ -80,14 +79,10 @@ gboolean gst_rtp_buffer_is_mprtp(GstRTPBuffer* rtp, guint8 mprtp_ext_header_id)
 {
   gpointer pointer = NULL;
   guint size;
-  gboolean result;
   return gst_rtp_buffer_get_extension_onebyte_header(rtp, mprtp_ext_header_id, 0, &pointer, &size);
 }
 
 gboolean gst_rtp_buffer_is_fectype(GstRTPBuffer* rtp, guint8 fec_payload_type)
 {
-  gpointer pointer = NULL;
-  guint size;
-  gboolean result;
   return gst_rtp_buffer_get_payload_type(rtp) == fec_payload_type;
 }

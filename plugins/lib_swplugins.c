@@ -69,7 +69,8 @@ void swperctest(void)
     SlidingWindow* sw;
     guint num_limit = num_limits[i];
     sw = make_slidingwindow(num_limit, 0);
-    slidingwindow_add_plugin(sw, make_swpercentile(50, bintree3cmp_uint32, _percentile_median_pipe, &result2));
+    slidingwindow_add_plugin(sw,
+        make_swpercentile(50, bintree3cmp_uint32, (NotifierFunc)_percentile_median_pipe, &result2));
     slidingwindow_add_plugin(sw, make_swprinter(swprinter_uint32));
     sprintf(filename, "mediantest_%d.csv", num_limit);
     for(j = 0; j < num_limit; ++j){
@@ -202,7 +203,7 @@ static void _swminmax_add_pipe(gpointer dataptr, gpointer itemptr)
   bintree3_insert_data(this->tree, itemptr);
   this->stat.min = bintree3_get_bottom_data(this->tree);
   this->stat.max = bintree3_get_top_data(this->tree);
-  swplugin_notify(this->base, this->stat);
+  swplugin_notify(this->base, &this->stat);
 }
 
 static void _swminmax_rem_pipe(gpointer dataptr, gpointer itemptr)
@@ -212,7 +213,7 @@ static void _swminmax_rem_pipe(gpointer dataptr, gpointer itemptr)
   bintree3_delete_value(this->tree, itemptr);
   this->stat.min = bintree3_get_bottom_data(this->tree);
   this->stat.max = bintree3_get_top_data(this->tree);
-  swplugin_notify(this->base, this->stat);
+  swplugin_notify(this->base, &this->stat);
 }
 
 SlidingWindowPlugin* make_swminmax(bintree3cmp cmp, NotifierFunc on_calculated_cb, gpointer udata)

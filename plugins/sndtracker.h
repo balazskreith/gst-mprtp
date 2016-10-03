@@ -13,6 +13,7 @@
 #include "sndsubflows.h"
 #include "rtppackets.h"
 #include "fecenc.h"
+#include "slidingwindow.h"
 
 typedef struct _SndTracker SndTracker;
 typedef struct _SndTrackerClass SndTrackerClass;

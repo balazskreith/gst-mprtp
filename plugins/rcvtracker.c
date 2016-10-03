@@ -48,6 +48,7 @@ G_DEFINE_TYPE (RcvTracker, rcvtracker, G_TYPE_OBJECT);
 typedef struct _Subflow{
   gboolean              initialized;
   RcvTrackerSubflowStat stat;
+  guint32               received_packets_since_cycle_begin;
 
   Observer*             on_stat_changed;
   Observer*             on_received_packet;
@@ -59,7 +60,7 @@ typedef struct _Subflow{
   SlidingWindow*        skews;
 
   gdouble               path_skew;
-  SlidingWindow*        path_skews;
+  SlidingWindow*        pathes_skews;
 }Subflow;
 
 typedef struct _Priv{
@@ -71,7 +72,7 @@ typedef struct{
 }GstClockTimeCover;
 
 static void _init_subflow(RcvTracker *this, guint8 subflow_id);
-static Subflow* _get_subflow(SndTracker *this, guint8 subflow_id);
+static Subflow* _get_subflow(RcvTracker *this, guint8 subflow_id);
 
 static Private* _priv_ctor(void);
 static void _priv_dtor(Private *priv);
@@ -83,6 +84,17 @@ static void
 rcvtracker_finalize (
     GObject * object);
 
+
+static gint
+_cmp_seq (guint16 x, guint16 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 32768) return -1;
+  if(x > y && x - y > 32768) return -1;
+  if(x < y && y - x > 32768) return 1;
+  if(x > y && x - y < 32768) return 1;
+  return 0;
+}
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -99,7 +111,7 @@ static void _subflow_skews_median_pipe(gpointer udata, swpercentilecandidates_t 
     subflow->path_skew = subflow->path_skew * .99 + (gdouble)(subflow->stat.skew_median * .01);
   }
 
-  slidingwindow_add_data(subflow->path_skews, &subflow->path_skew);
+  slidingwindow_add_data(subflow->pathes_skews, &subflow->path_skew);
 }
 
 static void _skews_minmax_pipe(gpointer udata, swminmaxstat_t* stat)
@@ -111,8 +123,8 @@ static void _skews_minmax_pipe(gpointer udata, swminmaxstat_t* stat)
 
   this->skew_minmax_updated = _now(this);
 
-  this->stat.min_skew = (gdouble)stat->min;
-  this->stat.max_skew = (gdouble)stat->max;
+  this->stat.min_skew = *((gdouble*)stat->min);
+  this->stat.max_skew = *((gdouble*)stat->max);
 }
 
 
@@ -153,14 +165,15 @@ rcvtracker_init (RcvTracker * this)
   this->on_received_packet   = make_observer();
   this->on_stat_changed     = make_observer();
 
-  slidingwindow_add_plugin(this->path_skews, make_swminmax(bintree3cmp_double, _skews_minmax_pipe, this));
+  slidingwindow_add_plugin(this->path_skews,
+      make_swminmax(bintree3cmp_double, (NotifierFunc) _skews_minmax_pipe, this));
 
 }
 
 
 static void _rcvtracker_refresh_helper(Subflow* subflow, RcvTracker *this)
 {
-  slidingwindow_refresh(subflow->path_skews);
+  slidingwindow_refresh(subflow->pathes_skews);
 }
 
 void rcvtracker_refresh(RcvTracker * this)
@@ -168,12 +181,10 @@ void rcvtracker_refresh(RcvTracker * this)
   g_slist_foreach(this->joined_subflows, (GFunc) _rcvtracker_refresh_helper, this);
 }
 
-void rcvtracker_add_discarded_seq(RcvTracker* this, DiscardedPacket* discarded_packet)
+void rcvtracker_add_discarded_packet(RcvTracker* this, DiscardedPacket* discarded_packet)
 {
-  Subflow *subflow;
-
   ++this->stat.discarded_packets;
-  if(discarded_packet->repaired){
+  if(discarded_packet->repairedbuf != NULL){
     ++this->stat.recovered_packets;
   }
 
@@ -196,7 +207,6 @@ void rcvtracker_subflow_add_on_stat_changed_cb(RcvTracker * this,
                                     NotifierFunc callback,
                                     gpointer udata)
 {
-  Subflow *subflow = _get_subflow(this, subflow_id);
   observer_add_listener(this->on_stat_changed, callback, udata);
 }
 
@@ -206,7 +216,6 @@ void rcvtracker_add_on_discarded_packet_cb(RcvTracker * this,
                                     NotifierFunc callback,
                                     gpointer udata)
 {
-  Subflow *subflow = _get_subflow(this, subflow_id);
   observer_add_listener(this->on_discarded_packet, callback, udata);
 }
 
@@ -264,11 +273,19 @@ static void _subflow_add_packet(RcvTracker * this, Subflow *subflow, RTPPacket* 
   subflow->stat.jitter += ((skew < 0?-1*skew:skew) - subflow->stat.jitter) / 16;
   subflow->last_mprtp_delay = packet->received_info.delay;
   ++subflow->stat.total_received_packets;
+  ++subflow->received_packets_since_cycle_begin;
   subflow->stat.total_received_bytes += packet->payload_size;
 
   cmp = _cmp_seq(packet->subflow_seq, subflow->stat.highest_seq + 1);
   if(cmp < 0){
     goto done;
+  }
+
+  if(65500 < subflow->stat.highest_seq && packet->subflow_seq < 128 &&
+     33000 < subflow->received_packets_since_cycle_begin)
+  {
+    ++subflow->stat.cycle_num;
+    subflow->received_packets_since_cycle_begin = 0;
   }
 
   if(!cmp){
@@ -307,7 +324,7 @@ done:
 }
 
 
-Subflow* _get_subflow(SndTracker *this, guint8 subflow_id)
+Subflow* _get_subflow(RcvTracker *this, guint8 subflow_id)
 {
   Subflow *result;
   result = _priv(this)->subflows + subflow_id;
@@ -326,9 +343,10 @@ void _init_subflow(RcvTracker *this, guint8 subflow_id)
 
   subflow->skews = make_slidingwindow_int64(100, 2 * GST_SECOND);
   slidingwindow_add_plugin(subflow->skews,
-                           make_swpercentile(50, bintree3cmp_int64, _subflow_skews_median_pipe, this));
+                           make_swpercentile(50, bintree3cmp_int64,
+                               (NotifierFunc) _subflow_skews_median_pipe, this));
 
-  subflow->path_skews = this->path_skews;
+  subflow->pathes_skews = this->path_skews;
   this->joined_subflows = g_slist_prepend(this->joined_subflows, subflow);
 
 }

@@ -10,6 +10,7 @@
 
 #include <gst/gst.h>
 #include "sndsubflows.h"
+#include "rtppackets.h"
 
 typedef struct _StreamSplitter StreamSplitter;
 typedef struct _StreamSplitterClass StreamSplitterClass;

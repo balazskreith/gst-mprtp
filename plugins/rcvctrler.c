@@ -23,24 +23,19 @@
 
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
-#include "rcvctrler.h"
-#include "streamsplitter.h"
 #include "gstmprtcpbuffer.h"
+#include "streamsplitter.h"
 #include "streamjoiner.h"
-#include "ricalcer.h"
 #include "mprtplogger.h"
 #include "fbrafbprod.h"
+#include "rcvctrler.h"
+#include "ricalcer.h"
+
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
-
-
-#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
 
 #define MIN_MEDIA_RATE 50000
 
@@ -51,19 +46,18 @@ GST_DEBUG_CATEGORY_STATIC (rcvctrler_debug_category);
 
 G_DEFINE_TYPE (RcvController, rcvctrler, G_TYPE_OBJECT);
 
-#define REGULAR_REPORT_PERIOD_TIME (5*GST_SECOND)
+#define REGULAR_REPORT_PERIOD_TIME (5 * GST_SECOND)
 
 
 typedef void (*CallFunc)(gpointer udata);
 typedef gboolean (*TimeUpdaterFunc)(gpointer udata);
 typedef void (*ReportTransitFunc)(gpointer udata, GstMPRTCPReportSummary* summary);
 typedef struct{
-  RcvSubflow*           subflow;
-  gpointer              udata;
-  CallFunc              dispose;
-  TimeUpdaterFunc       time_updater;
-  ReportTransitFunc     report_updater;
-  void                (*report_callback)(gpointer udata, );
+  CongestionControllingType type;
+  RcvSubflow*               subflow;
+  gpointer                  udata;
+  TimeUpdaterFunc           time_updater;
+  ReportTransitFunc         report_updater;
 }FeedbackProducer;
 
 
@@ -77,7 +71,7 @@ rcvctrler_finalize (GObject * object);
 //------------------------ Outgoing Report Producer -------------------------
 static void
 _receiver_report_updater(
-    SndController * this);
+    RcvController * this);
 
 static void
 _create_rr(
@@ -97,15 +91,20 @@ _uint16_diff (
     guint16 a,
     guint16 b);
 
-static void
-_dispose_fbproducer(
-    RcvController* this,
-    FeedbackProducer* producer);
-
 static FeedbackProducer*
 _create_fbraplus(
     RcvController* this,
     RcvSubflow* subflow);
+
+static void
+_on_subflow_detached(
+    RcvController* this,
+    RcvSubflow *subflow);
+
+static void
+_on_congestion_controlling_changed(
+    RcvController* this,
+    RcvSubflow *subflow);
 
 
 void
@@ -144,7 +143,6 @@ void
 rcvctrler_finalize (GObject * object)
 {
   RcvController *this = RCVCTRLER (object);
-  g_hash_table_destroy (this->subflows);
   g_object_unref (this->sysclock);
   g_object_unref(this->report_producer);
   g_object_unref(this->report_processor);
@@ -166,6 +164,12 @@ make_rcvctrler(
   this->subflows   = g_object_ref(subflows);
   this->rcvtracker = g_object_ref(rcvtracker);
 
+  rcvsubflows_add_on_subflow_detached_cb(
+      this->subflows, (NotifierFunc)_on_subflow_detached, this);
+
+  rcvsubflows_add_on_congestion_controlling_type_changed_cb(
+      this->subflows, (NotifierFunc)_on_congestion_controlling_changed, this);
+
   return this;
 }
 
@@ -176,18 +180,15 @@ make_rcvctrler(
 void
 rcvctrler_time_update (RcvController *this)
 {
-  GSList *it;
   GstClockTime now = _now(this);
 
   if(now - 20 * GST_MSECOND < this->last_time_update){
     goto done;
   }
-  this->last_time_update = now;
 
-  for(it = this->fbproducers; it; it = it->next){
-    FeedbackProducer* fbproducer = it->data;
-    fbproducer->time_updater(fbproducer->udata);
-  }
+  _receiver_report_updater(this);
+
+  this->last_time_update = now;
 
 done:
   return;
@@ -205,7 +206,7 @@ rcvctrler_receive_mprtcp (RcvController *this, GstBuffer * buf)
 
   report_processor_process_mprtcp(this->report_processor, buf, summary);
 
-  subflow = sndsubflows_get_subflow(this->subflows, summary->subflow_id);
+  subflow = rcvsubflows_get_subflow(this->subflows, summary->subflow_id);
 
   if(summary->SR.processed){
     this->report_is_flowable = TRUE;
@@ -214,8 +215,6 @@ rcvctrler_receive_mprtcp (RcvController *this, GstBuffer * buf)
     subflow->last_SR_report_rcvd = NTP_NOW;
   }
 
-done:
-  return;
 }
 
 
@@ -234,7 +233,7 @@ static void _receiver_report_updater_helper(RcvSubflow *subflow, gpointer udata)
     goto done;
   }
 
-  if(ricalcer_rtcp_regular_allowed(this->ricalcer, subflow)){
+  if(ricalcer_rtcp_regular_allowed_rcvsubflow(this->ricalcer, subflow)){
     report_producer_begin(this->report_producer, subflow->id);
     _create_rr(this, subflow);
   }
@@ -284,6 +283,7 @@ void _create_rr(RcvController * this, RcvSubflow *subflow)
   expected      = _uint32_diff(subflow->highest_seq, stat->highest_seq);
   received      = stat->total_received_packets - subflow->total_received_packets;
   lost          = received < expected ? expected - received : 0;
+  cycle_num     = stat->cycle_num;
 
   fraction_lost = (expected == 0 || lost <= 0) ? 0 : (lost << 8) / expected;
   ext_hsn       = (((guint32) cycle_num) << 16) | ((guint32) stat->highest_seq);
@@ -323,6 +323,9 @@ void _create_rr(RcvController * this, RcvSubflow *subflow)
 guint32
 _uint32_diff (guint32 start, guint32 end)
 {
+
+  DISABLE_LINE _uint16_diff(start, end);
+
   if (start <= end) {
     return end - start;
   }
@@ -340,25 +343,65 @@ _uint16_diff (guint16 start, guint16 end)
 
 
 
-
-void _dispose_fbproducer(RcvController* this, FeedbackProducer* producer)
+FeedbackProducer* _create_fbraplus(RcvController* this, RcvSubflow* subflow)
 {
-  producer->dispose(producer->udata);
+  FeedbackProducer *result = g_slice_new0(FeedbackProducer);
+  result->type           = CONGESTION_CONTROLLING_TYPE_FBRAPLUS;
+  result->subflow        = subflow;
+  result->udata          = make_fbrafbproducer(subflow, this->rcvtracker);
+  return result;
+}
+
+
+static gint _producer_by_subflow_id(gconstpointer item, gconstpointer udata)
+{
+  const FeedbackProducer *producer = item;
+  const RcvSubflow *subflow = udata;
+  return subflow->id == producer->subflow->id ? 0 : -1;
+}
+
+static void _dispose_feedback_producer(RcvController* this, FeedbackProducer* producer)
+{
   this->fbproducers = g_slist_remove(this->fbproducers, producer);
   g_slice_free(FeedbackProducer, producer);
 }
 
-FeedbackProducer* _create_fbraplus(RcvController* this, RcvSubflow* subflow)
+void _on_subflow_detached(RcvController* this, RcvSubflow *subflow)
 {
-  FeedbackProducer *result = g_slice_new0(FeedbackProducer);
-  result->subflow        = subflow;
-  result->udata          = make_fbrafbproducer(subflow, this->rcvtracker);
-  result->dispose        = (CallFunc) g_object_unref;
-  result->time_updater   = (TimeUpdaterFunc) ;
-  result->report_updater = (ReportTransitFunc);
-  return result;
+  GSList* producer_item;
+  FeedbackProducer *producer;
+  producer_item = g_slist_find_custom(this->fbproducers, subflow, _producer_by_subflow_id);
+  if(!producer_item){
+    return;
+  }
+  producer = producer_item->data;
+  _dispose_feedback_producer(this, producer);
 }
 
+void _on_congestion_controlling_changed(RcvController* this, RcvSubflow *subflow)
+{
+  GSList* controller_item;
+
+  controller_item = g_slist_find_custom(this->fbproducers, subflow, _producer_by_subflow_id);
+  if(controller_item){
+    FeedbackProducer *producer = controller_item->data;
+    if(subflow->congestion_controlling_type == producer->type){
+      goto done;
+    }
+    _dispose_feedback_producer(this, producer);
+  }
+
+  switch(subflow->congestion_controlling_type){
+    case CONGESTION_CONTROLLING_TYPE_FBRAPLUS:
+      this->fbproducers = g_slist_prepend(this->fbproducers, _create_fbraplus(this, subflow));
+      break;
+    case CONGESTION_CONTROLLING_TYPE_NONE:
+    default:
+      break;
+  };
+done:
+  return;
+}
 
 #undef MAX_RIPORT_INTERVAL
 #undef THIS_READLOCK

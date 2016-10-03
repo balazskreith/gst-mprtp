@@ -371,4 +371,3 @@ Subflow* _get_subflow(SndTracker *this, guint8 subflow_id)
   return result;
 }
 
-#undef _get_subflow;

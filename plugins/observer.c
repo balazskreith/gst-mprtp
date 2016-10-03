@@ -23,17 +23,11 @@
 
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
-#include "observer.h"
-#include "streamsplitter.h"
-#include "gstmprtcpbuffer.h"
-#include "streamjoiner.h"
-#include "ricalcer.h"
-#include "mprtplogger.h"
-#include "fbrafbprod.h"
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "observer.h"
 
 
 #define _now(this) (gst_clock_get_time (this->sysclock))
@@ -44,19 +38,19 @@ GST_DEBUG_CATEGORY_STATIC (observer_debug_category);
 G_DEFINE_TYPE (Observer, observer, G_TYPE_OBJECT);
 
 typedef struct{
-  void     (*callback)(gpointer udata, gpointer notifyData);
-  gpointer   udata;
+  NotifierFunc callback;
+  gpointer     udata;
 }Notifier;
 
 typedef struct{
-  gpointer (*callback)(gpointer udata);
-  gpointer   udata;
+  CollectorFunc callback;
+  gpointer      udata;
 }Collector;
 
 static Notifier* _make_notifier(NotifierFunc callback, gpointer udata);
 static void _dispose_notifier(gpointer item);
 
-static Notifier* _make_collector(NotifierFunc callback, gpointer udata);
+static Collector* _make_collector(CollectorFunc callback, gpointer udata);
 static void _dispose_collector(gpointer item);
 
 
@@ -113,10 +107,10 @@ void observer_add_listener(Observer *this, NotifierFunc callback, gpointer udata
   this->notifiers = g_slist_prepend(this->notifiers, notifier);
 }
 
-static gint _find_notifier_by_func(gpointer itemp, gpointer searchedp)
+static gint _find_notifier_by_func(gconstpointer itemp, gconstpointer searchedp)
 {
-  NotifierFunc *searched_callback = searchedp;
-  Notifier* notifier = itemp;
+  const NotifierFunc searched_callback = searchedp;
+  const Notifier* notifier = itemp;
   return notifier->callback == searched_callback ? 0 : -1;
 }
 
@@ -155,10 +149,10 @@ void observer_add_collector(Observer *this, CollectorFunc callback, gpointer uda
   this->collectors = g_slist_append(this->collectors, collector);
 }
 
-static gint _find_collector_by_func(gpointer itemp, gpointer searchedp)
+static gint _find_collector_by_func(gconstpointer itemp, gconstpointer searchedp)
 {
-  CollectorFunc *searched_callback = searchedp;
-  Collector* collector = itemp;
+  const CollectorFunc searched_callback = searchedp;
+  const Collector* collector = itemp;
   return collector->callback == searched_callback ? 0 : -1;
 }
 

@@ -94,7 +94,7 @@ GType rtppackets_get_type (void);
 RTPPackets* make_rtppackets(void);
 void rtppackets_reset(RTPPackets* this);
 
-void rtppackets_add_stalled_packet_cb(RTPPackets* this, void (*callback)(gpointer udata, RTPPacket* packet), gpointer udata);
+void rtppackets_add_stalled_packet_cb(RTPPackets* this, NotifierFunc callback, gpointer udata);
 
 void _stalled_notify_caller(RTPPackets* this, gpointer item, gpointer udata);
 RTPPacket* rtppackets_retrieve_packet_for_sending(RTPPackets* this, GstBuffer *buffer);

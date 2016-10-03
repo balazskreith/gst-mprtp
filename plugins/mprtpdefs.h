@@ -71,8 +71,7 @@ struct _RTPAbsTimeExtension
 
 typedef struct{
   guint16    abs_seq;
-  gboolean   repaired;
-  GstBuffer* rtpbuf;
+  GstBuffer* repairedbuf;
 }DiscardedPacket;
 
 typedef struct{

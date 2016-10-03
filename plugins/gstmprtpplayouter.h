@@ -89,10 +89,14 @@ struct _GstMprtpplayouter
 
   gboolean        logging;
 
-  GAsyncQueue*     discarded_packets_in;
+  Mediator*        repair_channel;
+  GAsyncQueue*     discarded_packets;
+  GAsyncQueue*     packetsq;
   GAsyncQueue*     mprtp_out;
   GAsyncQueue*     mprtcp_out;
-  PacketForwarder* packetforwarder;
+
+  gboolean         fec_requested;
+//  PacketForwarder* packetforwarder;
 
 };
 

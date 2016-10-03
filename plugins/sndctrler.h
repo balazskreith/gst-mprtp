@@ -65,11 +65,10 @@ struct _SndControllerClass{
 
 
 SndController* make_sndctrler(
-    RTPPackets* rtppackets,
-    SndTracker* sndtracker,
-    SndSubflows* subflows,
-    GAsyncQueue *mprtcpq,
-    GAsyncQueue *emitterq);
+    SndTracker*  sndtracker,
+        SndSubflows* subflows,
+        GAsyncQueue* mprtcpq,
+        GAsyncQueue* emitterq);
 
 
 void

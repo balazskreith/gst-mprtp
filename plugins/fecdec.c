@@ -140,8 +140,8 @@ fecdecoder_finalize (GObject * object)
   gst_object_unref(this->thread);
 
   g_object_unref(this->sysclock);
-  g_async_queue_unref(this->repair_request_in);
-  g_async_queue_unref(this->repair_response_out);
+  g_object_unref(this->repair_channel);
+  g_async_queue_unref(this->discarded_packets_in);
   g_async_queue_unref(this->rtppackets_in);
   g_async_queue_unref(this->fecbuffers_in);
 
@@ -150,11 +150,11 @@ fecdecoder_finalize (GObject * object)
 void
 fecdecoder_init (FECDecoder * this)
 {
-  this->thread             = gst_task_new (_fecdec_process, this, NULL);
-  this->sysclock           = gst_system_clock_obtain();
-  this->rtppackets_in      = g_async_queue_new();
-  this->fecbuffers_in      = g_async_queue_new();
-  this->repair_request_in  = g_async_queue_new();
+  this->thread                = gst_task_new (_fecdec_process, this, NULL);
+  this->sysclock              = gst_system_clock_obtain();
+  this->rtppackets_in         = g_async_queue_new();
+  this->fecbuffers_in         = g_async_queue_new();
+  this->discarded_packets_in  = g_async_queue_new();
 
 }
 
@@ -164,20 +164,21 @@ void fecdecoder_reset(FECDecoder *this)
 
 }
 
-FECDecoder *make_fecdecoder(void)
+FECDecoder *make_fecdecoder(Mediator* repair_channel)
 {
   FECDecoder *this;
   this = g_object_new (FECDECODER_TYPE, NULL);
   this->made = _now(this);
+  this->repair_channel = g_object_ref(repair_channel);
 
+  gst_task_set_lock (this->thread, &this->thread_mutex);
+  gst_task_start (this->thread);
   return this;
 }
 
-void fecdecoder_setup_and_start(FECDecoder *this, GAsyncQueue* repair_response_out)
+void fecdecoder_on_discarded_packet(FECDecoder *this, DiscardedPacket *discarded_packet)
 {
-  this->repair_response_out = g_async_queue_ref(repair_response_out);
-  gst_task_set_lock (this->thread, &this->thread_mutex);
-  gst_task_start (this->thread);
+  g_async_queue_push(this->discarded_packets_in, discarded_packet);
 }
 
 void fecdecoder_add_rtp_packet(FECDecoder *this, RTPPacket *packet)
@@ -207,13 +208,12 @@ static void _fecdec_process(gpointer udata)
     _add_fec_buffer(this, buffer);
   }
 
-  discarded_packet = g_async_queue_timeout_pop(this->repair_request_in, 1000);
+  discarded_packet = g_async_queue_timeout_pop(this->discarded_packets_in, 1000);
   if(!discarded_packet){
     goto done;
   }
-  discarded_packet->repaired = TRUE;
-  discarded_packet->rtpbuf   = _get_repaired_rtpbuffer(this, discarded_packet->abs_seq);
-  g_async_queue_push(this->repair_response_out, discarded_packet);
+  discarded_packet->repairedbuf   = _get_repaired_rtpbuffer(this, discarded_packet->abs_seq);
+  mediator_set_response(this->repair_channel, discarded_packet);
 
 done:
   _clean(this);

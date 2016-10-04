@@ -42,7 +42,6 @@ GST_DEBUG_CATEGORY_STATIC (sndctrler_debug_category);
 G_DEFINE_TYPE (SndController, sndctrler, G_TYPE_OBJECT);
 
 typedef void (*CallFunc)(gpointer udata);
-typedef gboolean (*TimeUpdaterFunc)(gpointer udata);
 typedef void (*TransitFunc)(gpointer udata, GstMPRTCPReportSummary* summary);
 typedef struct{
   CongestionControllingType type;
@@ -51,7 +50,7 @@ typedef struct{
   CallFunc                  dispose;
   CallFunc                  disable;
   CallFunc                  enable;
-  TimeUpdaterFunc           time_updater;
+  CallFunc                  time_update;
   TransitFunc               report_updater;
 }CongestionController;
 
@@ -61,6 +60,11 @@ typedef struct{
 
 static void
 sndctrler_finalize (GObject * object);
+
+static void
+_on_subflow_state_changed(
+    SndController *this,
+    SndSubflow* subflow);
 
 static void
 _on_subflow_active_changed(
@@ -90,6 +94,10 @@ _create_fbraplus(
 //----------------------------------------------------------------------------
 
 //------------------------ Outgoing Report Producer -------------------------
+static void
+_emit_signal (
+    SndController *this);
+
 static void
 _sender_report_updater(
     SndController * this);
@@ -161,8 +169,10 @@ sndctrler_init (SndController * this)
   this->ricalcer           = make_ricalcer(TRUE);
   this->mprtp_signal_data  = g_slice_new0(MPRTPPluginSignalData);
 
+
   report_processor_set_logfile(this->report_processor, "snd_reports.log");
   report_producer_set_logfile(this->report_producer, "snd_produced_reports.log");
+
 }
 
 SndController*
@@ -187,6 +197,9 @@ make_sndctrler(
 
   sndsubflows_add_on_path_active_changed_cb(
       this->subflows, (NotifierFunc)_on_subflow_active_changed, this);
+
+  sndsubflows_add_on_subflow_state_changed_cb(
+      this->subflows, (NotifierFunc)_on_subflow_state_changed, this);
   return this;
 }
 
@@ -201,31 +214,20 @@ sndctrler_time_update (SndController *this)
 {
   GSList *it;
   GstClockTime now = _now(this);
-  gboolean emit_signal = FALSE;
 
-  if(now - 20 * GST_MSECOND < this->last_time_update){
+  if(now - 100 * GST_MSECOND < this->last_regular_emit){
     goto done;
   }
-  this->last_time_update = now;
 
   for(it = this->controllers; it; it = it->next){
     CongestionController* controller = it->data;
-    emit_signal |= controller->time_updater(controller->udata);
-  }
-  emit_signal |= this->last_emit < now - 200 * GST_MSECOND;
-
-  if(emit_signal){
-    MPRTPPluginSignalData *msg;
-    msg = g_slice_new0(MPRTPPluginSignalData);
-
-    _update_subflow_target_utilization(this);
-    memcpy(msg, this->mprtp_signal_data, sizeof(MPRTPPluginSignalData));
-    g_async_queue_push(this->emitterq, msg);
-
-    this->last_emit = now;
+    controller->time_update(controller->udata);
   }
 
+  _emit_signal(this);
   _sender_report_updater(this);
+
+  this->last_regular_emit = now;
 done:
   return;
 }
@@ -267,7 +269,18 @@ done:
 //---------------------------------------------------------------------------
 
 
-//------------------------ Outgoing Report Producer -------------------------
+void
+_emit_signal (SndController *this)
+{
+  MPRTPPluginSignalData *msg;
+  msg = g_slice_new0(MPRTPPluginSignalData);
+
+  _update_subflow_target_utilization(this);
+  memcpy(msg, this->mprtp_signal_data, sizeof(MPRTPPluginSignalData));
+  g_async_queue_push(this->emitterq, msg);
+}
+
+
 
 static void _sender_report_updater_helper(SndSubflow *subflow, gpointer udata)
 {
@@ -388,6 +401,14 @@ void _update_subflow_target_utilization(SndController* this)
 
 //---------------------- Event handlers ----------------------------------
 
+void _on_subflow_state_changed(SndController *this, SndSubflow* subflow)
+{
+  if(subflow->state != SNDSUBFLOW_STATE_OVERUSED){
+    return;
+  }
+  _emit_signal(this);
+}
+
 static gint _controller_by_subflow_id(gconstpointer item, gconstpointer udata)
 {
   const CongestionController *controller = item;
@@ -468,7 +489,7 @@ CongestionController* _create_fbraplus(SndController* this, SndSubflow* subflow)
   result->disable        = (CallFunc) fbrasubctrler_disable;
   result->dispose        = (CallFunc) g_object_unref;
   result->enable         = (CallFunc) fbrasubctrler_enable;
-  result->time_updater   = (TimeUpdaterFunc) fbrasubctrler_time_update;
+  result->time_update   =  (CallFunc) fbrasubctrler_time_update;
   result->report_updater = (TransitFunc) fbrasubctrler_report_update;
   return result;
 }

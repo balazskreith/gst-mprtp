@@ -62,7 +62,7 @@ struct _SndTracker
   SlidingWindow*            fec_sw;
 
   gpointer                  priv;
-  SndTrackerStat         stat;
+  SndTrackerStat            stat;
 };
 
 

@@ -89,7 +89,7 @@ void fbrasubctrler_disable(FBRASubController *this);
 
 void fbrasubctrler_on_rtp_sending(FBRASubController* this, RTPPacket *packet);
 void fbrasubctrler_report_update(FBRASubController *this, GstMPRTCPReportSummary *summary);
-gboolean fbrasubctrler_time_update(FBRASubController *this);
+void fbrasubctrler_time_update(FBRASubController *this);
 
 
 #endif /* FBRASUBCTRLER_H_ */

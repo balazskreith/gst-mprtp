@@ -102,10 +102,13 @@ sndsubflows_class_init (SndSubflowsClass * klass)
 
 }
 
-SndSubflows* make_sndsubflows(void)
+SndSubflows* make_sndsubflows(Mediator* monitoring_handler)
 {
   SndSubflows *this;
   this = g_object_new (SNDSUBFLOWS_TYPE, NULL);
+
+  this->monitoring_handler = g_object_ref(monitoring_handler);
+
   return this;
 }
 
@@ -113,6 +116,9 @@ void
 sndsubflows_finalize (GObject * object)
 {
   SndSubflows *this = SNDSUBFLOWS (object);
+
+  g_object_unref(this->monitoring_handler);
+
   g_queue_clear(this->changed_subflows);
   g_object_unref (this->sysclock);
 
@@ -120,6 +126,8 @@ sndsubflows_finalize (GObject * object)
   g_object_unref(this->on_subflow_joined);
   g_object_unref(this->on_congestion_controlling_type_changed);
   g_object_unref(this->on_path_active_changed);
+  g_object_unref(this->on_target_bitrate_changed);
+  g_object_unref(this->on_subflow_state_changed);
 
   g_object_unref(this->changed_subflows);
 
@@ -137,6 +145,8 @@ sndsubflows_init (SndSubflows * this)
   this->on_subflow_joined                       = make_observer();
   this->on_congestion_controlling_type_changed  = make_observer();
   this->on_path_active_changed                  = make_observer();
+  this->on_target_bitrate_changed               = make_observer();
+  this->on_subflow_state_changed                = make_observer();
 
   this->changed_subflows                        = g_queue_new();
 
@@ -190,6 +200,11 @@ void sndsubflows_add_on_subflow_detached_cb(SndSubflows* this, NotifierFunc call
   observer_add_listener(this->on_subflow_detached, callback, udata);
 }
 
+void sndsubflows_add_on_subflow_state_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
+{
+  observer_add_listener(this->on_subflow_state_changed, callback, udata);
+}
+
 void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
 {
   observer_add_listener(this->on_congestion_controlling_type_changed, callback, udata);
@@ -200,10 +215,23 @@ void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, NotifierFunc c
   observer_add_listener(this->on_path_active_changed, callback, udata);
 }
 
-void sndsubflows_set_target_rate(SndSubflows* this, SndSubflow* subflow, gint32 target_rate)
+void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
 {
-  this->target_rate -= subflow->target_bitrate;
-  this->target_rate += subflow->target_bitrate = target_rate;
+  observer_add_listener(this->on_target_bitrate_changed, callback, udata);
+}
+
+void sndsubflow_request_monitoring(SndSubflow* subflow)
+{
+  SndSubflows *subflows = subflow->base_db;
+  mediator_set_request(subflows->monitoring_handler, subflow);
+}
+
+void sndsubflows_set_target_rate(SndSubflow* subflow, gint32 target_rate)
+{
+  SndSubflows *subflows = subflow->base_db;
+  subflows->target_rate -= subflow->target_bitrate;
+  subflows->target_rate += subflow->target_bitrate = target_rate;
+  observer_notify(subflows->on_target_bitrate_changed, subflow);
 }
 
 gint32 sndsubflows_get_total_target(SndSubflows* this)
@@ -249,26 +277,24 @@ void sndsubflows_set_path_congested(SndSubflows* this, guint8 subflow_id, gboole
   CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, congested, value, NULL);
 }
 
+void sndsubflows_set_target_bitrate(SndSubflows* this, guint8 subflow_id, gint32 target_bitrate)
+{
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, target_bitrate, target_bitrate, NULL);
+}
+
+
 //-----------------------------------------------------------------------------------------------------------
 
-void sndsubflow_on_stat_changed_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata)
-{
-  observer_add_listener(subflow->on_stat_changed, callback, udata);
-}
 
 void sndsubflow_set_state(SndSubflow* subflow, SndSubflowState state)
 {
   subflow->state = state;
+  observer_notify(subflow->base_db->on_subflow_state_changed, subflow);
 }
 
 SndSubflowState sndsubflow_get_state(SndSubflow* subflow)
 {
   return subflow->state;
-}
-
-void sndsubflow_add_on_packet_sent_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata)
-{
-  observer_add_listener(subflow->on_packet_sent, callback, udata);
 }
 
 guint16 sndsubflow_get_next_subflow_seq(SndSubflow* subflow)
@@ -281,30 +307,18 @@ guint8 sndsubflow_get_flags_abs_value(SndSubflow* subflow)
   return (subflow->active ? 4 : 0) + (subflow->lossy ? 0 : 2) + (subflow->congested ? 0 : 1);
 }
 
-gboolean sndsubflow_fec_requested(SndSubflow* subflow)
-{
-  if(!subflow->fec_interval){
-    return FALSE;
-  }
-  return subflow->seqtracker.seqence_num % subflow->fec_interval == 0;
-}
-
-
-
 
 SndSubflow* _make_subflow(SndSubflows* base_db, guint8 subflow_id)
 {
   SndSubflow* result = g_malloc0(sizeof(SndSubflow));
   result->base_db         = base_db;
-  result->on_packet_sent  = make_observer();
-  result->on_stat_changed = make_observer();
+
+
   return result;
 }
 
 void _dispose_subflow(SndSubflow *subflow)
 {
-  g_object_unref(subflow->on_packet_sent);
-  g_object_unref(subflow->on_stat_changed);
   g_free(subflow);
 }
 

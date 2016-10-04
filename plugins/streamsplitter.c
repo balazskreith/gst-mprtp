@@ -187,16 +187,24 @@ stream_splitter_init (StreamSplitter * this)
   this->made                   = _now(this);
 }
 
-void
-stream_splitter_commit_changes (StreamSplitter * this)
-{
-  _refresh_splitter(this);
-}
 
 void
 stream_splitter_set_mpath_keyframe_filtering(StreamSplitter * this, guint keyframe_filtering)
 {
   GST_LOG_OBJECT(this, "Currently it is not implemented");
+}
+
+void
+stream_splitter_on_target_bitrate_changed(StreamSplitter* this, SndSubflow* subflow)
+{
+  gint32 scheduled_target = this->actual_targets[subflow->id];
+  gint32 abs_delta_target = subflow->target_bitrate - scheduled_target;
+  abs_delta_target *= abs_delta_target < 0 ? -1 : 1;
+  if(abs_delta_target < scheduled_target * .05 && abs_delta_target < 50000){
+    return;
+  }
+  _refresh_splitter(this);
+  this->actual_targets[subflow->id] = subflow->target_bitrate;
 }
 
 SndSubflow* stream_splitter_approve_packet(StreamSplitter * this, RTPPacket *packet, GstClockTime now)

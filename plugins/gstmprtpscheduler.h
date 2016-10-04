@@ -28,6 +28,7 @@
 #include "mprtplogger.h"
 #include "fecenc.h"
 #include "packetforwarder.h"
+#include "mediator.h"
 
 G_BEGIN_DECLS
 #define GST_TYPE_MPRTPSCHEDULER   (gst_mprtpscheduler_get_type())
@@ -73,6 +74,8 @@ struct _GstMprtpscheduler
   guint32                       fec_interval;
   guint32                       sent_packets;
 
+  gboolean                      monitoring_request;
+  Mediator*                     monitoring;
   PacketForwarder*              packetforwarder;
   GAsyncQueue*                  mprtpq;
   GAsyncQueue*                  mprtcpq;

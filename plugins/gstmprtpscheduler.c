@@ -79,12 +79,13 @@ static GstFlowReturn gst_mprtpscheduler_mprtcp_rr_sink_chain (GstPad * pad,
 static gboolean gst_mprtpscheduler_src_query (GstPad * srckpad, GstObject * parent,
     GstQuery * query);
 
-static void _change_sending_rate(GstMprtpscheduler * this,
-    guint8 subflow_id, gint32 target_bitrate);
 static gboolean gst_mprtpscheduler_mprtp_src_event (GstPad * pad,
     GstObject * parent, GstEvent * event);
 static gboolean gst_mprtpscheduler_sink_eventfunc (GstPad * srckpad, GstObject * parent,
                                                    GstEvent * event);
+
+static void _on_monitoring_request(GstMprtpscheduler * this, SndSubflow* subflow);
+static void _on_monitoring_response(GstMprtpscheduler * this, FECEncoderResponse *response);
 static gboolean _mprtpscheduler_send_packet (GstMprtpscheduler * this, RTPPacket *packet);
 static void mprtpscheduler_approval_process(gpointer udata);
 static void mprtpscheduler_emitter_process(gpointer udata);
@@ -375,13 +376,16 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   this->packetforwarder  = make_packetforwarder(this->mprtp_srcpad, this->mprtcp_sr_srcpad);
 
-  this->subflows      = make_sndsubflows();
+  this->monitoring    = make_mediator();
+
+  this->subflows      = make_sndsubflows(this->monitoring);
   this->rtppackets    = make_rtppackets();
-  this->rtp_in          = g_async_queue_new();
+  this->rtp_in        = g_async_queue_new();
   this->fec_responses = g_async_queue_new();
   this->emitterq      = g_async_queue_new();
 
-  this->fec_encoder   = make_fecencoder(this->fec_responses);
+
+  this->fec_encoder   = make_fecencoder(this->monitoring);
   this->sndtracker    = make_sndtracker(this->subflows);
 
   this->controller = make_sndctrler(
@@ -394,7 +398,14 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->mprtcpq       = g_async_queue_ref(this->packetforwarder->mprtcpq);
 
   fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
+  sndsubflows_add_on_target_bitrate_changed_cb(this->subflows,
+      (NotifierFunc) stream_splitter_on_target_bitrate_changed, this->splitter);
 
+  mediator_set_request_handler(this->monitoring,
+        (NotifierFunc) _on_monitoring_request, this);
+
+  mediator_set_response_handler(this->monitoring,
+        (NotifierFunc) _on_monitoring_response, this);
 }
 
 
@@ -498,7 +509,7 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       break;
     case PROP_SET_SENDING_TARGET:
       guint_value = g_value_get_uint (value);
-      _change_sending_rate(this, subflow_prop->id, subflow_prop->value);
+      sndsubflows_set_target_bitrate(this->subflows, subflow_prop->id, subflow_prop->value);
       break;
     case PROP_SETUP_RTCP_INTERVAL_TYPE:
       sndsubflows_set_rtcp_interval_type(this->subflows, subflow_prop->id, subflow_prop->value);
@@ -601,8 +612,6 @@ gst_mprtpscheduler_change_state (GstElement * element,
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
        gst_task_set_lock (this->thread, &this->thread_mutex);
        gst_task_start (this->thread); //Fixme elliminate if we doesn't want this.
-
-
        break;
      default:
        break;
@@ -827,48 +836,22 @@ gst_mprtpscheduler_src_query (GstPad * srckpad, GstObject * parent,
   return result;
 }
 
-
-typedef struct{
-  guint8 subflow_id;
-  gint32 target_bitrate;
-  SndSubflows *subflows;
-}ChangeSendingRateHelper;
-
-static void _change_sending_rate_helper(gpointer item, gpointer udata)
+void _on_monitoring_request(GstMprtpscheduler * this, SndSubflow* subflow)
 {
-  SndSubflow              *subflow = item;
-  ChangeSendingRateHelper *helper = udata;
-
-  if(helper->subflow_id == 0 || helper->subflow_id == 255){
-    goto change;
-  }
-  if(helper->subflow_id != subflow->id){
-    goto done;
-  }
-change:
-  sndsubflows_set_target_rate(helper->subflows, subflow, helper->target_bitrate);
-done:
-  return;
+  fecencoder_request_fec(this->fec_encoder, subflow->id);
+  this->monitoring_request = TRUE;
 }
 
-void _change_sending_rate(GstMprtpscheduler * this, guint8 subflow_id, gint32 target_bitrate)
+void _on_monitoring_response(GstMprtpscheduler * this, FECEncoderResponse *response)
 {
-  ChangeSendingRateHelper helper;
-  helper.subflow_id = subflow_id;
-  helper.target_bitrate = target_bitrate;
-  helper.subflows = this->subflows;
-
-  sndsubflows_iterate(this->subflows, _change_sending_rate_helper, &helper);
+  g_async_queue_push(this->fec_responses, response);
 }
-
-
 
 gboolean
 _mprtpscheduler_send_packet (GstMprtpscheduler * this, RTPPacket *packet)
 {
   gboolean result = FALSE;
   SndSubflow *subflow;
-  gboolean fec_request = FALSE;
   GstClockTime now = _now(this);
 
   subflow = stream_splitter_approve_packet(this->splitter, packet, now);
@@ -876,28 +859,20 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, RTPPacket *packet)
     goto done;
   }
 
-  fec_request |= (0 < this->fec_interval) && (++this->sent_packets % this->fec_interval == 0);
+  if(0 < this->fec_interval && (++this->sent_packets % this->fec_interval) == 0){
+    sndsubflow_request_monitoring(subflow);
+  }
+  //TODO: add this line before entering the buffer to the thread
   fecencoder_add_rtpbuffer(this->fec_encoder, packet->buffer);
 
   result = TRUE;
   rtppacket_setup_mprtp(packet, subflow);
-  if(fec_request || sndsubflow_fec_requested(subflow)){
-    fecencoder_request_fec(this->fec_encoder, subflow->id);
-  }
 
   rtppacket_setup_abs_time_extension(packet);
   sndtracker_packet_sent(this->sndtracker, packet);
   packetforwarder_add_rtppad_buffer(this->packetforwarder, gst_buffer_ref(packet->buffer));
   rtppackets_packet_forwarded(this->rtppackets, packet);
 
-  if(fec_request){
-    FECEncoderResponse* response;
-    response = g_async_queue_pop(this->fec_responses);
-    response->subflow_id = subflow->id;
-    sndtracker_add_fec_response(this->sndtracker, response);
-    packetforwarder_add_rtppad_buffer(this->packetforwarder, response->fecbuffer);
-    fecencoder_unref_response(response);
-  }
 
   if (!this->riport_flow_signal_sent) {
     this->riport_flow_signal_sent = TRUE;
@@ -920,7 +895,17 @@ mprtpscheduler_approval_process (gpointer udata)
 
   sndctrler_time_update(this->controller);
 
-again:
+  if(this->monitoring_request){
+    FECEncoderResponse *response;
+    response = g_async_queue_pop(this->fec_responses);
+    sndtracker_add_fec_response(this->sndtracker, response);
+    packetforwarder_add_rtppad_buffer(this->packetforwarder, response->fecbuffer);
+    fecencoder_unref_response(response);
+    this->monitoring_request = FALSE;
+  }else{
+    //TODO: refresh sndtracker fec indow
+  }
+
   buffer = (GstBuffer *)g_async_queue_timeout_pop(this->rtp_in, 100);
   if(!buffer){
     sndtracker_refresh(this->sndtracker);
@@ -932,7 +917,7 @@ again:
   //Obsolete packets stayed in the q for a while
   if(0 < this->obsolation_treshold && packet->created < _now(this) - this->obsolation_treshold){
     rtppackets_packet_forwarded(this->rtppackets, packet);
-    goto again;
+    goto done;
   }
 
   if(!_mprtpscheduler_send_packet(this, packet)){

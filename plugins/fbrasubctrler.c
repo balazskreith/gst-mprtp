@@ -169,7 +169,7 @@ _switch_stage_to(
     gboolean execute);
 
 static void
-_target_rate_time_update(
+_update_approvement(
     FBRASubController *this);
 
 static gdouble
@@ -223,8 +223,9 @@ fbrasubctrler_finalize (GObject * object)
   FBRASubController *this;
   this = FBRASUBCTRLER(object);
   mprtp_free(this->priv);
-  g_free(this->stat);
   g_object_unref(this->fbprocessor);
+  g_free(this->stat);
+  g_object_unref(this->sndtracker);
   g_object_unref(this->sysclock);
 }
 
@@ -252,8 +253,8 @@ fbrasubctrler_init (FBRASubController * this)
 
 FBRASubController *make_fbrasubctrler(SndTracker *sndtracker, SndSubflow *subflow)
 {
-  FBRASubController *this;
-  this                      = g_object_new (FBRASUBCTRLER_TYPE, NULL);
+  FBRASubController *this   = g_object_new (FBRASUBCTRLER_TYPE, NULL);
+
   this->sndtracker          = g_object_ref(sndtracker);
   this->subflow             = subflow;
   this->made                = _now(this);
@@ -285,17 +286,17 @@ void fbrasubctrler_on_rtp_sending(FBRASubController* this, RTPPacket *packet)
 }
 
 
-gboolean fbrasubctrler_time_update(FBRASubController *this)
+void fbrasubctrler_time_update(FBRASubController *this)
 {
   if(!this->enabled){
     goto done;
   }
 
   fbrafbprocessor_time_update(this->fbprocessor);
-  _target_rate_time_update(this);
+  _update_approvement(this);
 
 done:
-  return FALSE;
+  return;
 }
 
 void fbrasubctrler_report_update(
@@ -563,7 +564,7 @@ void _switch_stage_to(
 }
 
 
-void _target_rate_time_update(FBRASubController *this)
+void _update_approvement(FBRASubController *this)
 {
   //stalled bytes!
   gint32 min_desired_margin = MIN(this->desired_bitrate * 0.9, this->desired_bitrate - 100000);

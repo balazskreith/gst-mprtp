@@ -51,8 +51,7 @@ struct _SndController
   GAsyncQueue*               mprtcpq;
   GAsyncQueue*               emitterq;
 
-  GstClockTime               last_time_update;
-  GstClockTime               last_emit;
+  GstClockTime               last_regular_emit;
 
   GstMPRTCPReportSummary     reports_summary;
 };

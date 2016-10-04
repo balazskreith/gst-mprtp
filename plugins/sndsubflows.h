@@ -10,6 +10,7 @@
 
 #include <gst/gst.h>
 #include "observer.h"
+#include "mediator.h"
 
 
 typedef struct _SndSubflows SndSubflows;
@@ -43,7 +44,6 @@ struct _SndSubflow
   gboolean                   active;
 
   gint32                     target_bitrate;
-  guint32                    fec_interval;
   guint32                    packet_counter_for_fec;
 
   guint32                    total_sent_packets_num;
@@ -61,8 +61,6 @@ struct _SndSubflow
   guint32                    sent_packet_count;
   guint32                    sent_octet_count;
 
-  Observer*                  on_stat_changed;
-  Observer*                  on_packet_sent;
 };
 
 
@@ -83,6 +81,10 @@ struct _SndSubflows
   Observer*            on_subflow_joined;
   Observer*            on_congestion_controlling_type_changed;
   Observer*            on_path_active_changed;
+  Observer*            on_target_bitrate_changed;
+  Observer*            on_subflow_state_changed;
+
+  Mediator*            monitoring_handler;
 
   gint32               target_rate;
   guint                subflows_num;
@@ -93,7 +95,7 @@ struct _SndSubflowsClass{
 };
 
 SndSubflows*
-make_sndsubflows(void);
+make_sndsubflows(Mediator* monitoring_handler);
 
 GType sndsubflows_get_type (void);
 
@@ -101,7 +103,8 @@ void sndsubflows_join(SndSubflows* this, guint8 id);
 void sndsubflows_detach(SndSubflows* this, guint8 id);
 void sndsubflows_iterate(SndSubflows* this, GFunc process, gpointer udata);
 
-void sndsubflows_set_target_rate(SndSubflows* this, SndSubflow* subflow, gint32 target_rate);
+void sndsubflow_request_monitoring(SndSubflow* subflow);
+void sndsubflows_set_target_rate(SndSubflow* subflow, gint32 target_rate);
 gint32 sndsubflows_get_total_target(SndSubflows* this);
 gint32 sndsubflows_get_subflows_num(SndSubflows* this);
 SndSubflow* sndsubflows_get_subflow(SndSubflows* this, guint8 subflow_id);
@@ -115,24 +118,23 @@ void sndsubflows_set_path_active(SndSubflows* this, guint8 subflow_id, gboolean 
 void sndsubflows_set_rtcp_interval_type(SndSubflows* this, guint8 subflow_id, RTCPIntervalType new_type);
 void sndsubflows_set_path_lossy(SndSubflows* this, guint8 subflow_id, gboolean value);
 void sndsubflows_set_path_congested(SndSubflows* this, guint8 subflow_id, gboolean value);
+void sndsubflows_set_target_bitrate(SndSubflows* this, guint8 subflow_id, gint32 target_bitrate);
 
 void sndsubflows_add_on_subflow_joined_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
 void sndsubflows_add_on_subflow_detached_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
+void sndsubflows_add_on_subflow_state_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
 void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
 void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
-
+void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
 
 
 //------------------------------------------------------------------------------------------------
-void sndsubflow_on_stat_changed_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata);
-void sndsubflow_add_on_packet_sent_cb(SndSubflow* subflow, NotifierFunc callback, gpointer udata);
 void sndsubflow_set_state(SndSubflow* this, SndSubflowState state);
 SndSubflowState sndsubflow_get_state(SndSubflow* subflow);
 guint16 sndsubflow_get_next_subflow_seq(SndSubflow* subflow);
 
 guint8 sndsubflow_get_flags_abs_value(SndSubflow* subflow);
 
-gboolean sndsubflow_fec_requested(SndSubflow* subflow);
 
 
 #endif /* SNDSUBFLOWSN_H_ */

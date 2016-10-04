@@ -352,7 +352,7 @@ libgstmprtp_la-gstmprtpscheduler.lo: gstmprtpscheduler.c \
  lib_swplugins.h /usr/include/ctype.h /usr/include/assert.h \
  slidingwindow.h lib_bintree.h observer.h rcvtracker.h rtppackets.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h \
- sndsubflows.h rcvsubflows.h mediator.h ricalcer.h streamsplitter.h \
+ sndsubflows.h mediator.h rcvsubflows.h ricalcer.h streamsplitter.h \
  reportproc.h signalreport.h fecenc.h rtpfecbuffer.h sndtracker.h \
  packetforwarder.h /usr/include/x86_64-linux-gnu/sys/timex.h \
  /usr/include/x86_64-linux-gnu/sys/time.h \
@@ -1172,9 +1172,9 @@ rtppackets.h:
 
 sndsubflows.h:
 
-rcvsubflows.h:
-
 mediator.h:
+
+rcvsubflows.h:
 
 ricalcer.h:
 

@@ -38,6 +38,7 @@ struct _StreamSplitter
 //  guint                keyframe_filtering;
 
   SndSubflows*         subflows;
+  gint32               actual_targets[256];
 };
 
 struct _StreamSplitterClass{
@@ -52,14 +53,16 @@ stream_splitter_set_mpath_keyframe_filtering(
     StreamSplitter * this,
     guint keyframe_filtering);
 
+void
+stream_splitter_on_target_bitrate_changed(
+    StreamSplitter* this,
+    SndSubflow* subflows);
+
 SndSubflow*
 stream_splitter_approve_packet(
     StreamSplitter * this,
     RTPPacket *packet,
     GstClockTime now);
-
-void stream_splitter_commit_changes (
-    StreamSplitter * this);
 
 GType stream_splitter_get_type (void);
 

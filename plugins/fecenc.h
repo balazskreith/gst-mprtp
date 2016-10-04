@@ -11,6 +11,7 @@
 #include <gst/gst.h>
 #include "rtpfecbuffer.h"
 #include "sndsubflows.h"
+#include "mediator.h"
 
 typedef struct _FECEncoder FECEncoder;
 typedef struct _FECEncoderClass FECEncoderClass;
@@ -44,8 +45,10 @@ struct _FECEncoder
 
   GstTask*                   thread;
   GRecMutex                  thread_mutex;
-  GAsyncQueue*               requests;
-  GAsyncQueue*               messages_out;
+  GAsyncQueue*               messages;
+  GAsyncQueue*               buffers;
+
+  Mediator*                  response_handler;
 
   SubflowSeqTrack*           seqtracks;
 };
@@ -59,7 +62,7 @@ struct _FECEncoderClass{
 
 
 GType fecencoder_get_type (void);
-FECEncoder *make_fecencoder(GAsyncQueue *responses);
+FECEncoder *make_fecencoder(Mediator* response_handler);
 void fecencoder_reset(FECEncoder *this);
 
 void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer* buffer);

@@ -9,7 +9,8 @@
 #define RCVSUBFLOWSN_H_
 
 #include <gst/gst.h>
-#include "observer.h"
+
+#include "notifier.h"
 
 typedef struct _RcvSubflows RcvSubflows;
 typedef struct _RcvSubflowsClass RcvSubflowsClass;
@@ -50,7 +51,7 @@ struct _RcvSubflow
   RTCPIntervalType           rtcp_interval_type;
   CongestionControllingType  congestion_controlling_type;
 
-  Observer*                  on_rtcp_time_update;
+  Notifier*                  on_rtcp_time_update;
 };
 
 
@@ -65,9 +66,9 @@ struct _RcvSubflows
 
   GQueue*              changed_subflows;
 
-  Observer*            on_subflow_detached;
-  Observer*            on_subflow_joined;
-  Observer*            on_congestion_controlling_type_changed;
+  Notifier*            on_subflow_detached;
+  Notifier*            on_subflow_joined;
+  Notifier*            on_congestion_controlling_type_changed;
 
   guint                subflows_num;
 
@@ -92,13 +93,13 @@ void rcvsubflows_set_path_lossy(RcvSubflows* this, guint8 subflow_id, gboolean v
 void rcvsubflows_set_path_congested(RcvSubflows* this, guint8 subflow_id, gboolean value);
 
 
-void rcvsubflows_add_on_subflow_joined_cb(RcvSubflows* this, NotifierFunc callback, gpointer udata);
-void rcvsubflows_add_on_subflow_detached_cb(RcvSubflows* this, NotifierFunc callback, gpointer udata);
-void rcvsubflows_add_on_congestion_controlling_type_changed_cb(RcvSubflows* this, NotifierFunc callback, gpointer udata);
+void rcvsubflows_add_on_subflow_joined_cb(RcvSubflows* this, ListenerFunc callback, gpointer udata);
+void rcvsubflows_add_on_subflow_detached_cb(RcvSubflows* this, ListenerFunc callback, gpointer udata);
+void rcvsubflows_add_on_congestion_controlling_type_changed_cb(RcvSubflows* this, ListenerFunc callback, gpointer udata);
 
 void rcvsubflow_notify_rtcp_fb_cbs(RcvSubflow* subflow, gpointer udata);
-void rcvsubflow_add_on_rtcp_fb_cb(RcvSubflow* subflow, NotifierFunc callback, gpointer udata);
-void rcvsubflow_rem_on_rtcp_fb_cb(RcvSubflow* subflow, NotifierFunc callback);
+void rcvsubflow_add_on_rtcp_fb_cb(RcvSubflow* subflow, ListenerFunc callback, gpointer udata);
+void rcvsubflow_rem_on_rtcp_fb_cb(RcvSubflow* subflow, ListenerFunc callback);
 gint32 rcvsubflows_get_subflows_num(RcvSubflows* this);
 RcvSubflow* rcvsubflows_get_subflow(RcvSubflows* this, guint8 subflow_id);
 

@@ -70,7 +70,7 @@ void swperctest(void)
     guint num_limit = num_limits[i];
     sw = make_slidingwindow(num_limit, 0);
     slidingwindow_add_plugin(sw,
-        make_swpercentile(50, bintree3cmp_uint32, (NotifierFunc)_percentile_median_pipe, &result2));
+        make_swpercentile(50, bintree3cmp_uint32, (ListenerFunc)_percentile_median_pipe, &result2));
     slidingwindow_add_plugin(sw, make_swprinter(swprinter_uint32));
     sprintf(filename, "mediantest_%d.csv", num_limit);
     for(j = 0; j < num_limit; ++j){
@@ -216,7 +216,7 @@ static void _swminmax_rem_pipe(gpointer dataptr, gpointer itemptr)
   swplugin_notify(this->base, &this->stat);
 }
 
-SlidingWindowPlugin* make_swminmax(bintree3cmp cmp, NotifierFunc on_calculated_cb, gpointer udata)
+SlidingWindowPlugin* make_swminmax(bintree3cmp cmp, ListenerFunc on_calculated_cb, gpointer udata)
 {
   SlidingWindowPlugin* this;
   this = swplugin_ctor();
@@ -411,7 +411,7 @@ static void _swpercentile_on_rem(gpointer dataptr, gpointer itemptr)
 SlidingWindowPlugin* make_swpercentile(
                               gint32     percentile,
                               bintree3cmp  cmp,
-                              NotifierFunc on_calculated_cb,
+                              ListenerFunc on_calculated_cb,
                               gpointer     udata
                               )
 {
@@ -499,7 +499,7 @@ static void _swint32stat_rem_pipe(gpointer dataptr, gpointer itemptr)
   _swint32stat_calc(this);
 }
 
-SlidingWindowPlugin* make_swint32_stater(NotifierFunc on_calculated_cb, gpointer on_calculated_udata)
+SlidingWindowPlugin* make_swint32_stater(ListenerFunc on_calculated_cb, gpointer on_calculated_udata)
 {
   SlidingWindowPlugin* this;
   this = make_swplugin(on_calculated_cb, on_calculated_udata);

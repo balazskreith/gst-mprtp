@@ -46,8 +46,8 @@ typedef struct{
 typedef struct _Subflow{
   gboolean            init;
   SndTrackerStat      stat;
-  RTPPacket*          sent_packets[65536];
-  Observer*           on_packet_sent;
+  SndPacket*          sent_packets[65536];
+  Notifier*           on_packet_sent;
 }Subflow;
 
 typedef struct _Priv{
@@ -63,10 +63,10 @@ sndtracker_finalize (
     GObject * object);
 
 static void
-_sent_packets_rem_pipe(SndTracker* this, RTPPacket* packet);
+_sent_packets_rem_pipe(SndTracker* this, SndPacket* packet);
 
 static void
-_acked_packets_rem_pipe(SndTracker* this, RTPPacket* packet);
+_acked_packets_rem_pipe(SndTracker* this, SndPacket* packet);
 
 static void
 _fec_rem_pipe(SndTracker* this, FECEncoderResponse* response);
@@ -129,9 +129,9 @@ sndtracker_init (SndTracker * this)
   this->fec_sw   = make_slidingwindow(500, GST_SECOND);
   this->priv = _priv_ctor();
 
-  slidingwindow_add_on_rem_item_cb(this->sent_sw, (NotifierFunc) _sent_packets_rem_pipe, this);
-  slidingwindow_add_on_rem_item_cb(this->fec_sw, (NotifierFunc) _fec_rem_pipe, this);
-  slidingwindow_add_on_rem_item_cb(this->acked_sw, (NotifierFunc) _acked_packets_rem_pipe, this);
+  slidingwindow_add_on_rem_item_cb(this->sent_sw, (ListenerFunc) _sent_packets_rem_pipe, this);
+  slidingwindow_add_on_rem_item_cb(this->fec_sw, (ListenerFunc) _fec_rem_pipe, this);
+  slidingwindow_add_on_rem_item_cb(this->acked_sw, (ListenerFunc) _acked_packets_rem_pipe, this);
 }
 
 SndTracker *make_sndtracker(SndSubflows* subflows_db)
@@ -140,8 +140,8 @@ SndTracker *make_sndtracker(SndSubflows* subflows_db)
   this = g_object_new(SNDTRACKER_TYPE, NULL);
   this->subflows_db = g_object_ref(subflows_db);
 
-  sndsubflows_add_on_subflow_joined_cb(this->subflows_db, (NotifierFunc) _on_subflow_joined, this);
-  sndsubflows_add_on_subflow_detached_cb(this->subflows_db, (NotifierFunc) _on_subflow_detached, this);
+  sndsubflows_add_on_subflow_joined_cb(this->subflows_db, (ListenerFunc) _on_subflow_joined, this);
+  sndsubflows_add_on_subflow_detached_cb(this->subflows_db, (ListenerFunc) _on_subflow_detached, this);
 
   return this;
 }
@@ -163,7 +163,7 @@ SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id
   return &subflow->stat;
 }
 
-void sndtracker_packet_sent(SndTracker * this, RTPPacket* packet)
+void sndtracker_packet_sent(SndTracker * this, SndPacket* packet)
 {
   this->stat.bytes_in_flight += packet->payload_size;
   ++this->stat.packets_in_flight;
@@ -188,23 +188,28 @@ void sndtracker_packet_sent(SndTracker * this, RTPPacket* packet)
 
     subflow->sent_packets[packet->subflow_seq] = packet;
 
-    observer_notify(subflow->on_packet_sent, packet);
+    notifier_do(subflow->on_packet_sent, packet);
   }
 
-  rtppackets_packet_ref(packet);
+  sndpacket_ref(packet);
   slidingwindow_add_data(this->sent_sw, packet);
 }
 
-RTPPacket* sndtracker_retrieve_sent_packet(SndTracker * this, guint8 subflow_id, guint16 subflow_seq)
+SndPacket* sndtracker_retrieve_sent_packet(SndTracker * this, guint8 subflow_id, guint16 subflow_seq)
 {
   Subflow* subflow = _get_subflow(this, subflow_id);
-  RTPPacket* result = subflow->sent_packets[subflow_seq];
+  SndPacket* result = subflow->sent_packets[subflow_seq];
   return result;
 }
 
 
-void sndtracker_packet_acked(SndTracker * this, RTPPacket* packet)
+void sndtracker_packet_acked(SndTracker * this, SndPacket* packet)
 {
+  if(packet->acknowledged){
+    goto exit;
+  }
+  packet->acknowledged = TRUE;
+
   this->stat.bytes_in_flight -= packet->payload_size;
   --this->stat.packets_in_flight;
 
@@ -214,7 +219,7 @@ void sndtracker_packet_acked(SndTracker * this, RTPPacket* packet)
   this->stat.total_acked_bytes += packet->payload_size;
   ++this->stat.total_acked_packets;
 
-  if(!packet->onsending_info.lost){
+  if(!packet->lost){
     this->stat.received_bytes_in_1s += packet->payload_size;
     ++this->stat.received_packets_in_1s;
 
@@ -234,7 +239,7 @@ void sndtracker_packet_acked(SndTracker * this, RTPPacket* packet)
     subflow->stat.total_acked_bytes += packet->payload_size;
     ++subflow->stat.total_acked_packets;
 
-    if(!packet->onsending_info.lost){
+    if(!packet->lost){
       this->stat.received_bytes_in_1s += packet->payload_size;
       ++this->stat.received_packets_in_1s;
 
@@ -245,8 +250,11 @@ void sndtracker_packet_acked(SndTracker * this, RTPPacket* packet)
     subflow->sent_packets[packet->subflow_seq] = NULL;
   }
 
-  rtppackets_packet_ref(packet);
+  sndpacket_ref(packet);
   slidingwindow_add_data(this->acked_sw, packet);
+
+exit:
+  return;
 }
 
 void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_response)
@@ -264,12 +272,17 @@ void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_resp
   slidingwindow_add_data(this->fec_sw, fec_response);
 }
 
-void sndtracker_add_on_packet_sent(SndTracker * this, guint8 subflow_id, NotifierFunc callback, gpointer udata)
+void sndtracker_add_on_packet_sent(SndTracker * this, guint8 subflow_id, ListenerFunc callback, gpointer udata)
 {
-  observer_add_listener(_get_subflow(this, subflow_id)->on_packet_sent, callback, udata);
+  notifier_add_listener(_get_subflow(this, subflow_id)->on_packet_sent, callback, udata);
 }
 
-void _sent_packets_rem_pipe(SndTracker* this, RTPPacket* packet)
+void sndtracker_rem_on_packet_sent(SndTracker * this, guint8 subflow_id, ListenerFunc callback)
+{
+  notifier_rem_listener(_get_subflow(this, subflow_id)->on_packet_sent, callback);
+}
+
+void _sent_packets_rem_pipe(SndTracker* this, SndPacket* packet)
 {
   this->stat.sent_bytes_in_1s -= packet->payload_size;
   --this->stat.sent_packets_in_1s;
@@ -280,10 +293,19 @@ void _sent_packets_rem_pipe(SndTracker* this, RTPPacket* packet)
     --subflow->stat.sent_packets_in_1s;
   }
 
-  rtppackets_packet_unref(packet);
+  if(!packet->acknowledged){
+    this->stat.bytes_in_flight -= packet->payload_size;
+    --this->stat.packets_in_flight;
+    if(packet->subflow_id != 0){
+      Subflow* subflow = _get_subflow(this, packet->subflow_id);
+      subflow->stat.bytes_in_flight -= packet->payload_size;
+      --subflow->stat.packets_in_flight;
+    }
+  }
+  sndpacket_unref(packet);
 }
 
-void _acked_packets_rem_pipe(SndTracker* this, RTPPacket* packet)
+void _acked_packets_rem_pipe(SndTracker* this, SndPacket* packet)
 {
   this->stat.acked_bytes_in_1s -= packet->payload_size;
   --this->stat.acked_packets_in_1s;
@@ -291,7 +313,7 @@ void _acked_packets_rem_pipe(SndTracker* this, RTPPacket* packet)
   this->stat.total_acked_bytes -= packet->payload_size;
   --this->stat.total_acked_packets;
 
-  if(!packet->onsending_info.lost){
+  if(!packet->lost){
     this->stat.received_bytes_in_1s -= packet->payload_size;
     --this->stat.received_packets_in_1s;
   }
@@ -304,13 +326,13 @@ void _acked_packets_rem_pipe(SndTracker* this, RTPPacket* packet)
     subflow->stat.total_acked_bytes -= packet->payload_size;
     --subflow->stat.total_acked_packets;
 
-    if(!packet->onsending_info.lost){
+    if(!packet->lost){
       subflow->stat.received_bytes_in_1s -= packet->payload_size;
       --subflow->stat.total_received_packets;
     }
   }
 
-  rtppackets_packet_unref(packet);
+  sndpacket_unref(packet);
 }
 
 
@@ -355,7 +377,7 @@ _on_subflow_joined(SndTracker* this, SndSubflow* sndsubflow)
     return;
   }
   subflow->init = TRUE;
-  subflow->on_packet_sent = make_observer();
+  subflow->on_packet_sent = make_notifier();
 }
 
 void

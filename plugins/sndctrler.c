@@ -190,16 +190,16 @@ make_sndctrler(
   this->sndtracker = g_object_ref(sndtracker);
 
   sndsubflows_add_on_subflow_detached_cb(
-      this->subflows, (NotifierFunc)_on_subflow_detached, this);
+      this->subflows, (ListenerFunc)_on_subflow_detached, this);
 
   sndsubflows_add_on_congestion_controlling_type_changed_cb(
-      this->subflows, (NotifierFunc)_on_congestion_controlling_changed, this);
+      this->subflows, (ListenerFunc)_on_congestion_controlling_changed, this);
 
   sndsubflows_add_on_path_active_changed_cb(
-      this->subflows, (NotifierFunc)_on_subflow_active_changed, this);
+      this->subflows, (ListenerFunc)_on_subflow_active_changed, this);
 
   sndsubflows_add_on_subflow_state_changed_cb(
-      this->subflows, (NotifierFunc)_on_subflow_state_changed, this);
+      this->subflows, (ListenerFunc)_on_subflow_state_changed, this);
   return this;
 }
 

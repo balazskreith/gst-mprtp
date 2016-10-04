@@ -11,7 +11,7 @@
 
 #include <gst/gst.h>
 #include "sndsubflows.h"
-#include "rtppackets.h"
+#include "sndpackets.h"
 #include "fecenc.h"
 #include "slidingwindow.h"
 
@@ -76,11 +76,12 @@ SndTracker *make_sndtracker(SndSubflows* subflows_db);
 void sndtracker_refresh(SndTracker * this);
 
 
-void sndtracker_packet_sent(SndTracker * this, RTPPacket* packet);
-RTPPacket* sndtracker_retrieve_sent_packet(SndTracker * this, guint8 subflow_id, guint16 subflow_seq);
-void sndtracker_packet_acked(SndTracker * this, RTPPacket* packet);
+void sndtracker_packet_sent(SndTracker * this, SndPacket* packet);
+SndPacket* sndtracker_retrieve_sent_packet(SndTracker * this, guint8 subflow_id, guint16 subflow_seq);
+void sndtracker_packet_acked(SndTracker * this, SndPacket* packet);
 void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_response);
-void sndtracker_add_on_packet_sent(SndTracker * this, guint8 subflow_id, NotifierFunc callback, gpointer udata);
+void sndtracker_add_on_packet_sent(SndTracker * this, guint8 subflow_id, ListenerFunc callback, gpointer udata);
+void sndtracker_rem_on_packet_sent(SndTracker * this, guint8 subflow_id, ListenerFunc callback);
 SndTrackerStat* sndtracker_get_stat(SndTracker * this);
 SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id);
 

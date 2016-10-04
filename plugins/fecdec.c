@@ -70,6 +70,11 @@ typedef struct{
   guint16            abs_seq;
 }FECRepairRequest;
 
+typedef struct{
+  GstBuffer *buffer;
+  guint16    abs_seq;
+  guint32    ssrc;
+}RTPPacket;
 
 
 static void fecdecoder_finalize (GObject * object);
@@ -142,7 +147,7 @@ fecdecoder_finalize (GObject * object)
   g_object_unref(this->sysclock);
   g_object_unref(this->repair_channel);
   g_async_queue_unref(this->discarded_packets_in);
-  g_async_queue_unref(this->rtppackets_in);
+  g_async_queue_unref(this->rtpbuffers_in);
   g_async_queue_unref(this->fecbuffers_in);
 
 }
@@ -152,7 +157,7 @@ fecdecoder_init (FECDecoder * this)
 {
   this->thread                = gst_task_new (_fecdec_process, this, NULL);
   this->sysclock              = gst_system_clock_obtain();
-  this->rtppackets_in         = g_async_queue_new();
+  this->rtpbuffers_in         = g_async_queue_new();
   this->fecbuffers_in         = g_async_queue_new();
   this->discarded_packets_in  = g_async_queue_new();
 
@@ -181,10 +186,18 @@ void fecdecoder_on_discarded_packet(FECDecoder *this, DiscardedPacket *discarded
   g_async_queue_push(this->discarded_packets_in, discarded_packet);
 }
 
-void fecdecoder_add_rtp_packet(FECDecoder *this, RTPPacket *packet)
+void fecdecoder_add_rtp_buffer(FECDecoder *this, GstBuffer *buffer)
 {
-  rtppackets_packet_ref(packet);
-  g_async_queue_push(this->rtppackets_in, packet);
+  RTPPacket* packet = g_slice_new0(RTPPacket);
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+
+  gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
+  packet->abs_seq = gst_rtp_buffer_get_seq(&rtp);
+  packet->ssrc    = gst_rtp_buffer_get_ssrc(&rtp);
+  gst_rtp_buffer_unmap(&rtp);
+  packet->buffer = gst_buffer_ref(buffer);
+
+  g_async_queue_push(this->rtpbuffers_in, packet);
 }
 
 void fecdecoder_add_fec_buffer(FECDecoder *this, GstBuffer *buffer)
@@ -199,9 +212,10 @@ static void _fecdec_process(gpointer udata)
   GstBuffer* buffer;
   DiscardedPacket* discarded_packet;
 
-  while((packet = g_async_queue_try_pop(this->rtppackets_in)) != NULL){
+  while((packet = g_async_queue_try_pop(this->rtpbuffers_in)) != NULL){
     _add_rtp_packet(this, packet);
-    rtppackets_packet_unref(packet);
+    gst_buffer_unref(packet->buffer);
+    g_slice_free(RTPPacket, packet);
   }
 
   while((buffer = g_async_queue_try_pop(this->fecbuffers_in)) != NULL){

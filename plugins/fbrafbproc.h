@@ -9,9 +9,10 @@
 #define FBRAFBPROCESSOR_H_
 
 #include <gst/gst.h>
+
 #include "lib_swplugins.h"
+#include "notifier.h"
 #include "sndtracker.h"
-#include "observer.h"
 #include "sndsubflows.h"
 #include "reportproc.h"
 
@@ -67,7 +68,7 @@ struct _FBRAFBProcessor
 
   FBRAPlusMeasurement      actual_measurement;
   FBRAPlusStat*            stat;
-  Observer*                on_report_processed;
+  Notifier*                on_report_processed;
   SndTracker*              sndtracker;
   SndSubflow*              subflow;
 

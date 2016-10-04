@@ -165,10 +165,10 @@ make_rcvctrler(
   this->rcvtracker = g_object_ref(rcvtracker);
 
   rcvsubflows_add_on_subflow_detached_cb(
-      this->subflows, (NotifierFunc)_on_subflow_detached, this);
+      this->subflows, (ListenerFunc)_on_subflow_detached, this);
 
   rcvsubflows_add_on_congestion_controlling_type_changed_cb(
-      this->subflows, (NotifierFunc)_on_congestion_controlling_changed, this);
+      this->subflows, (ListenerFunc)_on_congestion_controlling_changed, this);
 
   return this;
 }

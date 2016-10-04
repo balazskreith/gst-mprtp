@@ -83,7 +83,7 @@ typedef struct swint32stat_struct_t{
 }swint32stat_t;
 
 SlidingWindowPlugin* make_swminmax(bintree3cmp cmp,
-                                  NotifierFunc on_calculated_cb,
+                                  ListenerFunc on_calculated_cb,
                                   gpointer       udata
                           );
 
@@ -91,10 +91,10 @@ SlidingWindowPlugin* make_swminmax(bintree3cmp cmp,
 SlidingWindowPlugin* make_swpercentile(
                               gint32     percentile,
                               bintree3cmp  cmp,
-                              NotifierFunc on_calculated_cb,
+                              ListenerFunc on_calculated_cb,
                               gpointer       udata
                               );
 
-SlidingWindowPlugin* make_swint32_stater(NotifierFunc on_calculated_cb, gpointer on_calculated_udata);
+SlidingWindowPlugin* make_swint32_stater(ListenerFunc on_calculated_cb, gpointer on_calculated_udata);
 
 #endif /* INCGUARD_NTRT_LIBRARY_SWPLUGINS_H_ */

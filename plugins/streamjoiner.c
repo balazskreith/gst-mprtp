@@ -79,7 +79,7 @@ _has_packet_to_playout(
     StreamJoiner *this,
     GstClockTime elapsed_time);
 
-static RTPPacket*
+static RcvPacket*
 _pop_packet(
     StreamJoiner *this);
 
@@ -107,8 +107,8 @@ _cmp_ts (guint32 x, guint32 y)
 
 static gint _playoutq_sort_helper(gconstpointer a, gconstpointer b, gpointer user_data)
 {
-  const RTPPacket *ai = a;
-  const RTPPacket *bi = b;
+  const RcvPacket *ai = a;
+  const RcvPacket *bi = b;
   return _cmp_seq(ai->abs_seq, bi->abs_seq);
 }
 
@@ -172,7 +172,7 @@ make_stream_joiner(Mediator* repair_channel)
   return result;
 }
 
-void stream_joiner_push_packet(StreamJoiner *this, RTPPacket* packet)
+void stream_joiner_push_packet(StreamJoiner *this, RcvPacket* packet)
 {
   g_queue_insert_sorted(this->playoutq, packet, _playoutq_sort_helper, NULL);
 }
@@ -198,10 +198,10 @@ void stream_joiner_set_join_delay(StreamJoiner *this, GstClockTime join_delay)
   this->join_delay = join_delay;
 }
 
-RTPPacket* stream_joiner_pop_packet(StreamJoiner *this)
+RcvPacket* stream_joiner_pop_packet(StreamJoiner *this)
 {
   GstClockTime now = _now(this);
-  RTPPacket* packet = NULL;
+  RcvPacket* packet = NULL;
 
   if(now < this->playout_time){
     return NULL;
@@ -229,9 +229,9 @@ RTPPacket* stream_joiner_pop_packet(StreamJoiner *this)
 }
 
 
-RTPPacket* _pop_packet(StreamJoiner *this)
+RcvPacket* _pop_packet(StreamJoiner *this)
 {
-  RTPPacket* result = g_queue_pop_head(this->playoutq);
+  RcvPacket* result = g_queue_pop_head(this->playoutq);
 
   if(this->last_seq_init == FALSE){
     this->last_seq_init = TRUE;
@@ -262,12 +262,12 @@ gboolean _has_packet_to_playout(StreamJoiner *this, GstClockTime elapsed_time)
   }
 
   if(g_queue_get_length(this->playoutq) < 2){
-    elapsed_time -= ((RTPPacket*)g_queue_peek_head(this->playoutq))->created;
+    elapsed_time -= ((RcvPacket*)g_queue_peek_head(this->playoutq))->made;
   }else{
-    RTPPacket *first,*last;
+    RcvPacket *first,*last;
     first = g_queue_peek_head(this->playoutq);
     last  = g_queue_peek_tail(this->playoutq);
-    elapsed_time = first->created < last->created ? last->created - first->created : first->created - last->created;
+    elapsed_time = first->made < last->made ? last->made - first->made : first->made - last->made;
   }
 
   return this->join_delay <= elapsed_time;

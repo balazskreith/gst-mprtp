@@ -8,7 +8,8 @@
 #include <assert.h>
 
 #include <gst/gst.h>
-#include "observer.h"
+
+#include "notifier.h"
 
 typedef struct{
   gboolean                 active;
@@ -38,8 +39,8 @@ typedef struct _bintree3 {
   gint32                node_counter;
   gint32                duplicate_counter;
 
-  Observer*             on_duplicate;
-  Observer*             on_print;
+  Notifier*             on_duplicate;
+  Notifier*             on_print;
 } bintree3_t;
 
 gint32 bintree3cmp_int32(gpointer a,gpointer b);
@@ -54,8 +55,8 @@ void bintree3_test(void);
 void bintree3_dtor(gpointer target);
 void bintree3_reset(bintree3_t *this);
 gpointer bintree3_get_items_sorted_array(bintree3_t *this, guint *length);
-void bintree3_add_on_duplicate_cb(bintree3_t *this, NotifierFunc callback, gpointer udata);
-void bintree3_add_on_print_cb(bintree3_t *this, NotifierFunc callback, gpointer udata);
+void bintree3_add_on_duplicate_cb(bintree3_t *this, ListenerFunc callback, gpointer udata);
+void bintree3_add_on_print_cb(bintree3_t *this, ListenerFunc callback, gpointer udata);
 
 gpointer bintree3_delete_top_data(bintree3_t *this);
 gpointer bintree3_delete_bottom_data(bintree3_t *this);

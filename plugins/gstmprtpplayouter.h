@@ -63,10 +63,6 @@ struct _GstMprtpplayouter
   GstElement      base_mprtpreceiver;
   GMutex          mutex;
 
-  guint32         pivot_ssrc;
-  guint32         pivot_clock_rate;
-//  GSocketAddress *pivot_address;
-//  guint8          pivot_address_subflow_id;
   guint64         clock_base;
 
   GstClock*       sysclock;
@@ -74,7 +70,7 @@ struct _GstMprtpplayouter
   RcvController*  controller;
   RcvSubflows*    subflows;
   FECDecoder*     fec_decoder;
-  RTPPackets*     rtppackets;
+  RcvPackets*     rcvpackets;
   RcvTracker*     rcvtracker;
 
   guint8          fec_payload_type;

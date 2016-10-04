@@ -12,7 +12,7 @@
 #include "fbrafbproc.h"
 #include "sndtracker.h"
 #include "sndsubflows.h"
-#include "rtppackets.h"
+#include "sndpackets.h"
 
 typedef struct _FBRASubController FBRASubController;
 typedef struct _FBRASubControllerClass FBRASubControllerClass;
@@ -82,12 +82,11 @@ struct _FBRASubControllerClass{
 GType fbrasubctrler_get_type (void);
 FBRASubController *make_fbrasubctrler(SndTracker *sndtracker, SndSubflow *subflow);
 
-gboolean fbrasubctrler_path_approver(gpointer data, RTPPacket *packet);
+gboolean fbrasubctrler_path_approver(gpointer data, SndPacket *packet);
 
 void fbrasubctrler_enable(FBRASubController *this);
 void fbrasubctrler_disable(FBRASubController *this);
 
-void fbrasubctrler_on_rtp_sending(FBRASubController* this, RTPPacket *packet);
 void fbrasubctrler_report_update(FBRASubController *this, GstMPRTCPReportSummary *summary);
 void fbrasubctrler_time_update(FBRASubController *this);
 

@@ -195,8 +195,8 @@ libgstmprtp_la-streamsplitter.lo: streamsplitter.c \
  /usr/local/include/gstreamer-1.0/gst/gstcompat.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
- streamsplitter.h sndsubflows.h observer.h mprtpdefs.h mprtplogger.h \
- mediator.h rtppackets.h \
+ streamsplitter.h sndsubflows.h mediator.h mprtpdefs.h mprtplogger.h \
+ notifier.h sndpackets.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h \
  /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
@@ -808,15 +808,15 @@ streamsplitter.h:
 
 sndsubflows.h:
 
-observer.h:
+mediator.h:
 
 mprtpdefs.h:
 
 mprtplogger.h:
 
-mediator.h:
+notifier.h:
 
-rtppackets.h:
+sndpackets.h:
 
 /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h:
 

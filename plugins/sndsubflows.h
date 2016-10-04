@@ -9,8 +9,9 @@
 #define SNDSUBFLOWSN_H_
 
 #include <gst/gst.h>
-#include "observer.h"
+
 #include "mediator.h"
+#include "notifier.h"
 
 
 typedef struct _SndSubflows SndSubflows;
@@ -77,12 +78,12 @@ struct _SndSubflows
   GQueue*              changed_subflows;
   GSList*              joined;
 
-  Observer*            on_subflow_detached;
-  Observer*            on_subflow_joined;
-  Observer*            on_congestion_controlling_type_changed;
-  Observer*            on_path_active_changed;
-  Observer*            on_target_bitrate_changed;
-  Observer*            on_subflow_state_changed;
+  Notifier*            on_subflow_detached;
+  Notifier*            on_subflow_joined;
+  Notifier*            on_congestion_controlling_type_changed;
+  Notifier*            on_path_active_changed;
+  Notifier*            on_target_bitrate_changed;
+  Notifier*            on_subflow_state_changed;
 
   Mediator*            monitoring_handler;
 
@@ -120,12 +121,12 @@ void sndsubflows_set_path_lossy(SndSubflows* this, guint8 subflow_id, gboolean v
 void sndsubflows_set_path_congested(SndSubflows* this, guint8 subflow_id, gboolean value);
 void sndsubflows_set_target_bitrate(SndSubflows* this, guint8 subflow_id, gint32 target_bitrate);
 
-void sndsubflows_add_on_subflow_joined_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
-void sndsubflows_add_on_subflow_detached_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
-void sndsubflows_add_on_subflow_state_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
-void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
-void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
-void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata);
+void sndsubflows_add_on_subflow_joined_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
+void sndsubflows_add_on_subflow_detached_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
+void sndsubflows_add_on_subflow_state_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
+void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
+void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
+void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 
 
 //------------------------------------------------------------------------------------------------

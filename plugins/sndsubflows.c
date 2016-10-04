@@ -60,10 +60,10 @@ G_DEFINE_TYPE (SndSubflows, sndsubflows, G_TYPE_OBJECT);
   }                                                   \
 }                                                     \
 
-#define NOTIFY_CHANGED_SUBFLOWS(changed_subflows, observer)        \
+#define NOTIFY_CHANGED_SUBFLOWS(changed_subflows, notifier)        \
 {                                                                  \
   while(!g_queue_is_empty(changed_subflows)){                      \
-    observer_notify(observer, g_queue_pop_head(changed_subflows)); \
+    notifier_do(notifier, g_queue_pop_head(changed_subflows)); \
   }                                                                \
 }                                                                  \
 
@@ -141,12 +141,12 @@ sndsubflows_init (SndSubflows * this)
   this->sysclock            = gst_system_clock_obtain ();
   this->made                = _now(this);
 
-  this->on_subflow_detached                     = make_observer();
-  this->on_subflow_joined                       = make_observer();
-  this->on_congestion_controlling_type_changed  = make_observer();
-  this->on_path_active_changed                  = make_observer();
-  this->on_target_bitrate_changed               = make_observer();
-  this->on_subflow_state_changed                = make_observer();
+  this->on_subflow_detached                     = make_notifier();
+  this->on_subflow_joined                       = make_notifier();
+  this->on_congestion_controlling_type_changed  = make_notifier();
+  this->on_path_active_changed                  = make_notifier();
+  this->on_target_bitrate_changed               = make_notifier();
+  this->on_subflow_state_changed                = make_notifier();
 
   this->changed_subflows                        = g_queue_new();
 
@@ -162,7 +162,7 @@ void sndsubflows_join(SndSubflows* this, guint8 id)
 
   this->joined = g_slist_prepend(this->joined, subflow);
 
-  observer_notify(this->on_subflow_joined, subflow);
+  notifier_do(this->on_subflow_joined, subflow);
 
 }
 
@@ -171,7 +171,7 @@ void sndsubflows_detach(SndSubflows* this, guint8 id)
   SndSubflow* subflow;
   subflow = this->subflows[id];
 
-  observer_notify(this->on_subflow_detached, subflow);
+  notifier_do(this->on_subflow_detached, subflow);
 
   this->joined = g_slist_remove(this->joined, subflow);
 
@@ -190,34 +190,34 @@ void sndsubflows_iterate(SndSubflows* this, GFunc process, gpointer udata)
   g_slist_foreach(this->joined, process, udata);
 }
 
-void sndsubflows_add_on_subflow_joined_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
+void sndsubflows_add_on_subflow_joined_cb(SndSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  observer_add_listener(this->on_subflow_joined, callback, udata);
+  notifier_add_listener(this->on_subflow_joined, callback, udata);
 }
 
-void sndsubflows_add_on_subflow_detached_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
+void sndsubflows_add_on_subflow_detached_cb(SndSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  observer_add_listener(this->on_subflow_detached, callback, udata);
+  notifier_add_listener(this->on_subflow_detached, callback, udata);
 }
 
-void sndsubflows_add_on_subflow_state_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
+void sndsubflows_add_on_subflow_state_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  observer_add_listener(this->on_subflow_state_changed, callback, udata);
+  notifier_add_listener(this->on_subflow_state_changed, callback, udata);
 }
 
-void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
+void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  observer_add_listener(this->on_congestion_controlling_type_changed, callback, udata);
+  notifier_add_listener(this->on_congestion_controlling_type_changed, callback, udata);
 }
 
-void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
+void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  observer_add_listener(this->on_path_active_changed, callback, udata);
+  notifier_add_listener(this->on_path_active_changed, callback, udata);
 }
 
-void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, NotifierFunc callback, gpointer udata)
+void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  observer_add_listener(this->on_target_bitrate_changed, callback, udata);
+  notifier_add_listener(this->on_target_bitrate_changed, callback, udata);
 }
 
 void sndsubflow_request_monitoring(SndSubflow* subflow)
@@ -231,7 +231,7 @@ void sndsubflows_set_target_rate(SndSubflow* subflow, gint32 target_rate)
   SndSubflows *subflows = subflow->base_db;
   subflows->target_rate -= subflow->target_bitrate;
   subflows->target_rate += subflow->target_bitrate = target_rate;
-  observer_notify(subflows->on_target_bitrate_changed, subflow);
+  notifier_do(subflows->on_target_bitrate_changed, subflow);
 }
 
 gint32 sndsubflows_get_total_target(SndSubflows* this)
@@ -289,7 +289,7 @@ void sndsubflows_set_target_bitrate(SndSubflows* this, guint8 subflow_id, gint32
 void sndsubflow_set_state(SndSubflow* subflow, SndSubflowState state)
 {
   subflow->state = state;
-  observer_notify(subflow->base_db->on_subflow_state_changed, subflow);
+  notifier_do(subflow->base_db->on_subflow_state_changed, subflow);
 }
 
 SndSubflowState sndsubflow_get_state(SndSubflow* subflow)

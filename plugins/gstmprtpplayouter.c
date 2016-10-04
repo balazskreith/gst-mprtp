@@ -33,8 +33,6 @@ GST_DEBUG_CATEGORY_STATIC (gst_mprtpplayouter_debug_category);
 #define THIS_LOCK(this) g_mutex_lock(&this->mutex)
 #define THIS_UNLOCK(this) g_mutex_unlock(&this->mutex)
 
-#define MPRTP_PLAYOUTER_DEFAULT_SSRC 0
-#define MPRTP_PLAYOUTER_DEFAULT_CLOCKRATE 90000
 
 
 static void gst_mprtpplayouter_set_property (GObject * object,
@@ -87,10 +85,8 @@ enum
   PROP_MPRTP_EXT_HEADER_ID,
   PROP_ABS_TIME_EXT_HEADER_ID,
   PROP_FEC_PAYLOAD_TYPE,
-  PROP_PIVOT_SSRC,
   PROP_JOIN_SUBFLOW,
   PROP_DETACH_SUBFLOW,
-  PROP_PIVOT_CLOCK_RATE,
   PROP_SETUP_CONTROLLING_MODE,
   PROP_SETUP_RTCP_INTERVAL_TYPE,
   PROP_RTP_PASSTHROUGH,
@@ -164,18 +160,6 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
   gobject_class->get_property = gst_mprtpplayouter_get_property;
   gobject_class->dispose = gst_mprtpplayouter_dispose;
   gobject_class->finalize = gst_mprtpplayouter_finalize;
-
-  g_object_class_install_property (gobject_class, PROP_PIVOT_CLOCK_RATE,
-      g_param_spec_uint ("pivot-clock-rate", "Clock rate of the pivot stream",
-          "Sets the clock rate of the pivot stream used for calculating "
-          "skew and playout delay at the receiver", 0,
-          G_MAXUINT, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_PIVOT_SSRC,
-      g_param_spec_uint ("pivot-ssrc", "SSRC of the pivot stream",
-          "Sets the ssrc of the pivot stream used selecting MPRTP packets "
-          "for playout delay at the receiver", 0,
-          G_MAXUINT, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_MPRTP_EXT_HEADER_ID,
       g_param_spec_uint ("mprtp-ext-header-id",
@@ -289,8 +273,6 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   g_mutex_init (&this->mutex);
 
   this->sysclock                 = gst_system_clock_obtain();
-  this->pivot_clock_rate         = MPRTP_PLAYOUTER_DEFAULT_CLOCKRATE;
-  this->pivot_ssrc               = MPRTP_PLAYOUTER_DEFAULT_SSRC;
   this->fec_payload_type         = FEC_PAYLOAD_DEFAULT_ID;
 
   this->controller               = g_object_new(RCVCTRLER_TYPE, NULL);
@@ -300,7 +282,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->fec_decoder              = make_fecdecoder(this->repair_channel);
   this->joiner                   = make_stream_joiner(this->repair_channel);
 
-  this->rtppackets               = make_rtppackets();
+  this->rcvpackets               = make_rcvpackets();
   this->rcvtracker               = make_rcvtracker();
 
   this->discarded_packets        = g_async_queue_new();
@@ -308,19 +290,19 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->fec_requested              = FALSE;
 
   mediator_set_request_handler(this->repair_channel,
-      (NotifierFunc) fecdecoder_on_discarded_packet, this->fec_decoder);
+      (ListenerFunc) fecdecoder_on_discarded_packet, this->fec_decoder);
 
   mediator_set_request_handler(this->repair_channel,
-      (NotifierFunc) _playouter_on_repair_request, this);
+      (ListenerFunc) _playouter_on_repair_request, this);
 
   mediator_set_response_handler(this->repair_channel,
-      (NotifierFunc) _playouter_on_response_request, this);
+      (ListenerFunc) _playouter_on_response_request, this);
 
-  rtppackets_set_abs_time_ext_header_id(this->rtppackets, ABS_TIME_DEFAULT_EXTENSION_HEADER_ID);
-  rtppackets_set_mprtp_ext_header_id(this->rtppackets, MPRTP_DEFAULT_EXTENSION_HEADER_ID);
+  rcvpackets_set_abs_time_ext_header_id(this->rcvpackets, ABS_TIME_DEFAULT_EXTENSION_HEADER_ID);
+  rcvpackets_set_mprtp_ext_header_id(this->rcvpackets, MPRTP_DEFAULT_EXTENSION_HEADER_ID);
 
   rcvtracker_add_on_stat_changed_cb(this->rcvtracker,
-      (NotifierFunc) stream_joiner_on_rcvtracker_stat_change, this->joiner);
+      (ListenerFunc) stream_joiner_on_rcvtracker_stat_change, this->joiner);
 }
 
 
@@ -362,19 +344,13 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
   THIS_LOCK (this);
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
-      rtppackets_set_mprtp_ext_header_id(this->rtppackets, (guint8) g_value_get_uint (value));
+      rcvpackets_set_mprtp_ext_header_id(this->rcvpackets, (guint8) g_value_get_uint (value));
       break;
     case PROP_ABS_TIME_EXT_HEADER_ID:
-      rtppackets_set_abs_time_ext_header_id(this->rtppackets, (guint8) g_value_get_uint (value));
+      rcvpackets_set_abs_time_ext_header_id(this->rcvpackets, (guint8) g_value_get_uint (value));
       break;
     case PROP_FEC_PAYLOAD_TYPE:
       this->fec_payload_type = g_value_get_uint (value);
-      break;
-    case PROP_PIVOT_SSRC:
-      this->pivot_ssrc = g_value_get_uint (value);
-      break;
-    case PROP_PIVOT_CLOCK_RATE:
-      this->pivot_clock_rate = g_value_get_uint (value);
       break;
     case PROP_JOIN_SUBFLOW:
       rcvsubflows_join(this->subflows, g_value_get_uint (value));
@@ -416,19 +392,13 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
   THIS_LOCK (this);
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
-      g_value_set_uint (value, (guint) rtppackets_get_mprtp_ext_header_id(this->rtppackets));
+      g_value_set_uint (value, (guint) rcvpackets_get_mprtp_ext_header_id(this->rcvpackets));
       break;
     case PROP_ABS_TIME_EXT_HEADER_ID:
-      g_value_set_uint (value, (guint) rtppackets_get_abs_time_ext_header_id(this->rtppackets));
+      g_value_set_uint (value, (guint) rcvpackets_get_abs_time_ext_header_id(this->rcvpackets));
       break;
     case PROP_FEC_PAYLOAD_TYPE:
       g_value_set_uint (value, (guint) this->fec_payload_type);
-      break;
-    case PROP_PIVOT_CLOCK_RATE:
-      g_value_set_uint (value, this->pivot_clock_rate);
-      break;
-    case PROP_PIVOT_SSRC:
-      g_value_set_uint (value, this->pivot_ssrc);
       break;
     case PROP_LOG_ENABLED:
       g_value_set_boolean (value, this->logging);
@@ -515,7 +485,6 @@ gst_mprtpplayouter_sink_event (GstPad * pad, GstObject * parent,
       THIS_LOCK (this);
       if (gst_structure_has_field (s, "clock-rate")) {
         gst_structure_get_int (s, "clock-rate", &gint_value);
-        this->pivot_clock_rate = (guint32) gint_value;
       }
       if (gst_structure_has_field (s, "clock-base")) {
         gst_structure_get_uint (s, "clock-base", &guint_value);
@@ -648,8 +617,8 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     goto done;
   }
 
-  //if(!gst_rtp_buffer_is_mprtp(this->rtppackets, buf)){
-  if(!gst_buffer_is_mprtp(buf, rtppackets_get_mprtp_ext_header_id(this->rtppackets))){
+  //if(!gst_rtp_buffer_is_mprtp(this->rcvpackets, buf)){
+  if(!gst_buffer_is_mprtp(buf, rcvpackets_get_mprtp_ext_header_id(this->rcvpackets))){
     if(GST_IS_BUFFER(buf)){
       gst_pad_push(this->mprtp_srcpad, buf);
     }
@@ -659,6 +628,8 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   if (*buf_2nd_byte == this->fec_payload_type) {
     fecdecoder_add_fec_buffer(this->fec_decoder, buf);
     goto done;
+  }else{
+    fecdecoder_add_rtp_buffer(this->fec_decoder, buf);
   }
 
   g_async_queue_push(this->packetsq, gst_buffer_ref(buf));
@@ -734,28 +705,22 @@ void _playouter_on_response_request(GstMprtpplayouter *this, DiscardedPacket *di
 void
 _playout_process (GstMprtpplayouter *this)
 {
-  RTPPacket *packet;
+  GstBuffer* buffer;
+  RcvPacket *packet;
 
   THIS_LOCK(this);
-  if((packet = g_async_queue_timeout_pop(this->packetsq, 100)) == NULL){
+  if((buffer = g_async_queue_timeout_pop(this->packetsq, 100)) == NULL){
     goto done;
   }
 
-  if (this->pivot_ssrc != MPRTP_PLAYOUTER_DEFAULT_SSRC && packet->ssrc != this->pivot_ssrc) {
-    GST_DEBUG_OBJECT (this, "RTP packet ssrc is %u, the pivot ssrc is %u", this->pivot_ssrc, packet->ssrc);
-    gst_pad_push(this->mprtp_srcpad, packet->buffer);
-    rtppackets_packet_forwarded(this->rtppackets, packet);
-    goto done;
-  }
+  packet = rcvpackets_make_packet(this->rcvpackets, buffer);
 
-  fecdecoder_add_rtp_packet(this->fec_decoder, packet);
   rcvtracker_add_packet(this->rcvtracker, packet);
   stream_joiner_push_packet(this->joiner, packet);
 
   packet = stream_joiner_pop_packet(this->joiner);
   if(packet){
-    gst_pad_push(this->mprtp_srcpad, packet->buffer);
-    rtppackets_packet_forwarded(this->rtppackets, packet);
+    gst_pad_push(this->mprtp_srcpad, rcvpacket_play_and_retrieve(packet));
     goto done;
   }
 

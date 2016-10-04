@@ -67,14 +67,14 @@ stream_joiner_set_join_delay (
 void
 stream_joiner_push_packet(
     StreamJoiner *this,
-    RTPPacket* packet);
+    RcvPacket* packet);
 
 void
 stream_joiner_on_rcvtracker_stat_change(
     StreamJoiner *this,
     RcvTrackerStat* stat);
 
-RTPPacket*
+RcvPacket*
 stream_joiner_pop_packet(
     StreamJoiner *this);
 

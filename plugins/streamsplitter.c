@@ -98,7 +98,7 @@ _schtree_insert (
 static gboolean
 _allowed(
     SchNode *node,
-	  RTPPacket *packet,
+	  SndPacket *packet,
     GstClockTime now);
 
 static SchNode *
@@ -115,7 +115,7 @@ _schnode_rdtor (
 static SchNode *
 _schtree_select_next (
     SchNode * root,
-	  RTPPacket *packet,
+	  SndPacket *packet,
     GstClockTime now);
 
 
@@ -132,11 +132,11 @@ _refresh_splitter (
 //static guint8
 //_get_key_restriction(
 //    StreamSplitter *this,
-//	RTPPacket *packet);
+//	SndPacket *packet);
 //
 //static gboolean
 //_vp8_keyframe_filter(
-//		RTPPacket *rtp);
+//		SndPacket *rtp);
 
 
 static void
@@ -207,7 +207,7 @@ stream_splitter_on_target_bitrate_changed(StreamSplitter* this, SndSubflow* subf
   this->actual_targets[subflow->id] = subflow->target_bitrate;
 }
 
-SndSubflow* stream_splitter_approve_packet(StreamSplitter * this, RTPPacket *packet, GstClockTime now)
+SndSubflow* stream_splitter_approve_packet(StreamSplitter * this, SndPacket *packet, GstClockTime now)
 {
   SchNode *selected;
   SndSubflow* result = NULL;
@@ -332,7 +332,7 @@ done:
   return dvalue;
 }
 
-gboolean _allowed(SchNode *node, RTPPacket *packet, GstClockTime now)
+gboolean _allowed(SchNode *node, SndPacket *packet, GstClockTime now)
 {
   GList *it;
   SndSubflow *subflow;
@@ -371,7 +371,7 @@ _schnode_ctor (void)
 
 
 SchNode *
-_schtree_select_next (SchNode * root, RTPPacket *packet, GstClockTime now)
+_schtree_select_next (SchNode * root, SndPacket *packet, GstClockTime now)
 {
   SchNode *selected, *left, *right;
   gboolean left_allowed,right_allowed;
@@ -415,7 +415,7 @@ _schtree_approve_next (SchNode * selected, guint bytes_to_send)
 }
 
 //TODO: implement it in multipath case for more sophistacated distribution
-//guint8 _get_key_restriction(StreamSplitter *this, RTPPacket *packet)
+//guint8 _get_key_restriction(StreamSplitter *this, SndPacket *packet)
 //{
 //  switch(this->keyframe_filtering){
 //    case 1:
@@ -428,7 +428,7 @@ _schtree_approve_next (SchNode * selected, guint bytes_to_send)
 //}
 //
 //gboolean
-//_vp8_keyframe_filter(RTPPacket *packet)
+//_vp8_keyframe_filter(SndPacket *packet)
 //{
 //  gboolean is_keyframe;
 //  guint8 *p;

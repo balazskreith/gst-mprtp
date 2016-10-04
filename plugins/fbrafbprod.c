@@ -41,7 +41,7 @@ G_DEFINE_TYPE (FBRAFBProducer, fbrafbproducer, G_TYPE_OBJECT);
 
 static void fbrafbproducer_finalize (GObject * object);
 static gboolean _do_fb(FBRAFBProducer* data);;
-static void _on_received_packet(FBRAFBProducer *this, RTPPacket *packet);
+static void _on_received_packet(FBRAFBProducer *this, RcvPacket *packet);
 static void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this,  ReportProducer* reportproducer);
 static void _setup_xr_owd(FBRAFBProducer * this,  ReportProducer* reportproducer);
 //static void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer);
@@ -57,7 +57,7 @@ _cmp_seq (guint16 x, guint16 y)
   if(x > y && x - y < 32768) return 1;
   return 0;
 }
-PercentileResultPipeFnc(_owd_percentile_pipe, FBRAFBProducer, median_delay, min_delay, max_delay, RTPPacket, received_info.delay, 0);
+PercentileResultPipeFnc(_owd_percentile_pipe, FBRAFBProducer, median_delay, min_delay, max_delay, RcvPacket, delay, 0);
 
 
 void
@@ -80,8 +80,8 @@ fbrafbproducer_finalize (GObject * object)
   FBRAFBProducer *this;
   this = FBRAFBPRODUCER(object);
 
-  rcvtracker_subflow_rem_on_received_packet_cb(this->tracker, this->subflow->id, (NotifierFunc)_on_received_packet);
-  rcvsubflow_rem_on_rtcp_fb_cb(this->subflow, (NotifierFunc) _on_fb_update);
+  rcvtracker_subflow_rem_on_received_packet_cb(this->tracker, this->subflow->id, (ListenerFunc)_on_received_packet);
+  rcvsubflow_rem_on_rtcp_fb_cb(this->subflow, (ListenerFunc) _on_fb_update);
 
   g_object_unref(this->sysclock);
   g_object_unref(this->tracker);
@@ -109,12 +109,12 @@ FBRAFBProducer *make_fbrafbproducer(RcvSubflow* subflow, RcvTracker *tracker)
   this->owds_sw         = make_slidingwindow_uint64(20, 200 * GST_MSECOND);
 
   slidingwindow_add_plugin(this->owds_sw,
-      make_swpercentile(50, bintree3cmp_uint64, (NotifierFunc)_owd_percentile_pipe, this));
+      make_swpercentile(50, bintree3cmp_uint64, (ListenerFunc)_owd_percentile_pipe, this));
 
   rcvtracker_subflow_add_on_received_packet_cb(this->tracker, subflow->id,
-        (NotifierFunc) _on_received_packet, this);
+        (ListenerFunc) _on_received_packet, this);
 
-  rcvsubflow_add_on_rtcp_fb_cb(subflow, (NotifierFunc) _on_fb_update, this);
+  rcvsubflow_add_on_rtcp_fb_cb(subflow, (ListenerFunc) _on_fb_update, this);
 
   return this;
 }
@@ -129,10 +129,10 @@ void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold
   slidingwindow_set_treshold(this->owds_sw, treshold);
 }
 
-void _on_received_packet(FBRAFBProducer *this, RTPPacket *packet)
+void _on_received_packet(FBRAFBProducer *this, RcvPacket *packet)
 {
 
-  slidingwindow_add_data(this->owds_sw, &packet->received_info.delay);
+  slidingwindow_add_data(this->owds_sw, &packet->delay);
 
   ++this->rcved_packets;
 

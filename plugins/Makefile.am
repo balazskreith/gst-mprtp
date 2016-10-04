@@ -16,21 +16,22 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          mediator.c            \
                          mprtpdefs.c           \
                          mprtplogger.c         \
-                         observer.c            \
+                         notifier.c            \
                          packetforwarder.c     \
                          rcvctrler.c           \
+                         rcvpackets.c          \
                          rcvsubflows.c         \
                          rcvtracker.c          \
                          reportproc.c          \
                          reportprod.c          \
                          ricalcer.c            \
                          rtpfecbuffer.c        \
-                         rtppackets.c          \
                          signalreport.c        \
                          slidingwindow.c       \
                          sndctrler.c           \
                          sndsubflows.c         \
                          sndtracker.c          \
+                         sndpackets.c          \
                          streamjoiner.c        \
                          streamsplitter.c      
                     
@@ -50,20 +51,21 @@ noinst_HEADERS = fbrafbproc.h          \
                  mediator.h            \
                  mprtpdefs.h           \
                  mprtplogger.h         \
-                 observer.h            \
+                 notifier.h            \
                  packetforwarder.h     \
                  rcvctrler.h           \
                  rcvsubflows.h         \
+                 rcvpackets.h          \
                  rcvtracker.h          \
                  reportproc.h          \
                  reportprod.h          \
                  ricalcer.h            \
                  rtpfecbuffer.h        \
-                 rtppackets.h          \
                  signalreport.h        \
                  slidingwindow.h       \
                  sndctrler.h           \
                  sndsubflows.h         \
+                 sndpackets.h          \
                  sndtracker.h          \
                  streamjoiner.h        \
                  streamsplitter.h      

@@ -63,10 +63,10 @@ G_DEFINE_TYPE (RcvSubflows, rcvsubflows, G_TYPE_OBJECT);
   }                                                   \
 }                                                     \
 
-#define NOTIFY_CHANGED_SUBFLOWS(changed_subflows, observer)        \
+#define NOTIFY_CHANGED_SUBFLOWS(changed_subflows, notifier)        \
 {                                                                  \
   while(!g_queue_is_empty(changed_subflows)){                      \
-    observer_notify(observer, g_queue_pop_head(changed_subflows)); \
+    notifier_do(notifier, g_queue_pop_head(changed_subflows)); \
   }                                                                \
 }                                                                  \
 
@@ -137,9 +137,9 @@ rcvsubflows_init (RcvSubflows * this)
   this->sysclock = gst_system_clock_obtain ();
   this->made                   = _now(this);
 
-  this->on_subflow_detached                     = make_observer();
-  this->on_subflow_joined                       = make_observer();
-  this->on_congestion_controlling_type_changed  = make_observer();
+  this->on_subflow_detached                     = make_notifier();
+  this->on_subflow_joined                       = make_notifier();
+  this->on_congestion_controlling_type_changed  = make_notifier();
 
   this->changed_subflows                        = g_queue_new();
 }
@@ -154,7 +154,7 @@ void rcvsubflows_join(RcvSubflows* this, guint8 id)
 
   this->joined = g_slist_prepend(this->joined, subflow);
 
-  observer_notify(this->on_subflow_joined, subflow);
+  notifier_do(this->on_subflow_joined, subflow);
 
 }
 
@@ -163,7 +163,7 @@ void rcvsubflows_detach(RcvSubflows* this, guint8 id)
   RcvSubflow* subflow;
   subflow = this->subflows[id];
 
-  observer_notify(this->on_subflow_detached, subflow);
+  notifier_do(this->on_subflow_detached, subflow);
 
   this->joined = g_slist_remove(this->joined, subflow);
 
@@ -182,34 +182,34 @@ void rcvsubflows_iterate(RcvSubflows* this, GFunc process, gpointer udata)
   g_slist_foreach(this->joined, process, udata);
 }
 
-void rcvsubflows_add_on_subflow_joined_cb(RcvSubflows* this, NotifierFunc callback, gpointer udata)
+void rcvsubflows_add_on_subflow_joined_cb(RcvSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  observer_add_listener(this->on_subflow_joined, callback, udata);
+  notifier_add_listener(this->on_subflow_joined, callback, udata);
 }
 
-void rcvsubflows_add_on_subflow_detached_cb(RcvSubflows* this, NotifierFunc callback, gpointer udata)
+void rcvsubflows_add_on_subflow_detached_cb(RcvSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  observer_add_listener(this->on_subflow_detached, callback, udata);
+  notifier_add_listener(this->on_subflow_detached, callback, udata);
 }
 
-void rcvsubflows_add_on_congestion_controlling_type_changed_cb(RcvSubflows* this, NotifierFunc callback, gpointer udata)
+void rcvsubflows_add_on_congestion_controlling_type_changed_cb(RcvSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  observer_add_listener(this->on_congestion_controlling_type_changed, callback, udata);
+  notifier_add_listener(this->on_congestion_controlling_type_changed, callback, udata);
 }
 
 void rcvsubflow_notify_rtcp_fb_cbs(RcvSubflow* subflow, gpointer udata)
 {
-  observer_notify(subflow->on_rtcp_time_update, udata);
+  notifier_do(subflow->on_rtcp_time_update, udata);
 }
 
-void rcvsubflow_add_on_rtcp_fb_cb(RcvSubflow* subflow, NotifierFunc callback, gpointer udata)
+void rcvsubflow_add_on_rtcp_fb_cb(RcvSubflow* subflow, ListenerFunc callback, gpointer udata)
 {
-  observer_add_listener(subflow->on_rtcp_time_update, callback, udata);
+  notifier_add_listener(subflow->on_rtcp_time_update, callback, udata);
 }
 
-void rcvsubflow_rem_on_rtcp_fb_cb(RcvSubflow* subflow, NotifierFunc callback)
+void rcvsubflow_rem_on_rtcp_fb_cb(RcvSubflow* subflow, ListenerFunc callback)
 {
-  observer_rem_listener(subflow->on_rtcp_time_update, callback);
+  notifier_rem_listener(subflow->on_rtcp_time_update, callback);
 }
 
 RcvSubflow* rcvsubflows_get_subflow(RcvSubflows* this, guint8 subflow_id)
@@ -238,7 +238,7 @@ RcvSubflow* _make_subflow(RcvSubflows* base_db, guint8 subflow_id)
 {
   RcvSubflow* result = g_malloc0(sizeof(RcvSubflow));
   result->base_db                  = base_db;
-  result->on_rtcp_time_update  = make_observer();
+  result->on_rtcp_time_update  = make_notifier();
   return result;
 }
 

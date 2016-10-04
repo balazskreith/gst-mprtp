@@ -9,8 +9,9 @@
 #define MEDIATOR_H_
 
 #include <gst/gst.h>
+
 #include "mprtpdefs.h"
-#include "observer.h"
+#include "notifier.h"
 
 typedef struct _Mediator Mediator;
 typedef struct _MediatorClass MediatorClass;
@@ -26,8 +27,8 @@ typedef struct _MediatorClass MediatorClass;
 struct _Mediator
 {
   GObject          object;
-  Observer*        on_request;
-  Observer*        on_response;
+  Notifier*        on_request;
+  Notifier*        on_response;
 };
 
 struct _MediatorClass{
@@ -38,8 +39,8 @@ struct _MediatorClass{
 GType mediator_get_type (void);
 
 Mediator *make_mediator(void);
-void mediator_set_request_handler(Mediator *this, NotifierFunc response_cb, gpointer udata);
-void mediator_set_response_handler(Mediator *this, NotifierFunc request_cb, gpointer udata);
+void mediator_set_request_handler(Mediator *this, ListenerFunc response_cb, gpointer udata);
+void mediator_set_response_handler(Mediator *this, ListenerFunc request_cb, gpointer udata);
 void mediator_set_request(Mediator* this, gpointer request);
 void mediator_set_response(Mediator* this, gpointer response);
 

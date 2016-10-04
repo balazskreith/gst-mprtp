@@ -54,7 +54,7 @@ struct _GstMprtpscheduler
   GstPad*                       mprtcp_sr_srcpad;
 
   SndSubflows*                  subflows;
-  RTPPackets*                   rtppackets;
+  SndPackets*                   sndpackets;
   StreamSplitter*               splitter;
   SndController*                controller;
   SndTracker*                   sndtracker;
@@ -79,7 +79,7 @@ struct _GstMprtpscheduler
   PacketForwarder*              packetforwarder;
   GAsyncQueue*                  mprtpq;
   GAsyncQueue*                  mprtcpq;
-  GAsyncQueue*                  rtp_in;
+  GAsyncQueue*                  rtpbuffers_in;
   GAsyncQueue*                  fec_responses;
   GAsyncQueue*                  emitterq;
 

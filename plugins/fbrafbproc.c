@@ -119,7 +119,7 @@ FBRAFBProcessor *make_fbrafbprocessor(SndTracker* sndtracker, SndSubflow* subflo
 {
   FBRAFBProcessor *this;
   this = g_object_new (FBRAFBPROCESSOR_TYPE, NULL);
-  this->on_report_processed = make_observer();
+  this->on_report_processed = make_notifier();
   this->sndtracker = g_object_ref(sndtracker);
   this->subflow    = subflow;
   this->stat       = stat;
@@ -128,16 +128,16 @@ FBRAFBProcessor *make_fbrafbprocessor(SndTracker* sndtracker, SndSubflow* subflo
   this->long_sw = make_slidingwindow(600, 30 * GST_SECOND);
 
   slidingwindow_add_plugin(this->short_sw,
-        make_swpercentile(80, _measurement_BiF_cmp, (NotifierFunc) _on_BiF_80th_calculated, this));
+        make_swpercentile(80, _measurement_BiF_cmp, (ListenerFunc) _on_BiF_80th_calculated, this));
 
   slidingwindow_add_plugin(this->long_sw,
-        make_swpercentile(80, _measurement_owd_cmp, (NotifierFunc) _on_owd_80th_calculated, this));
+        make_swpercentile(80, _measurement_owd_cmp, (ListenerFunc) _on_owd_80th_calculated, this));
 
   slidingwindow_add_on_change(this->short_sw,
-        (NotifierFunc) _on_short_sw_rem, (NotifierFunc) _on_short_sw_add, this);
+        (ListenerFunc) _on_short_sw_rem, (ListenerFunc) _on_short_sw_add, this);
 
   slidingwindow_add_on_change(this->long_sw,
-        (NotifierFunc) _on_long_sw_rem, (NotifierFunc) _on_long_sw_add, this);
+        (ListenerFunc) _on_long_sw_rem, (ListenerFunc) _on_long_sw_add, this);
 
 
   return this;
@@ -215,7 +215,7 @@ done:
 
 void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr)
 {
-  RTPPacket* packet;
+  SndPacket* packet;
   guint16 act_seq, end_seq;
   gint i;
 
@@ -227,14 +227,14 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
 
   for(i=0; act_seq <= end_seq; ++act_seq, ++i){
     packet = sndtracker_retrieve_sent_packet(this->sndtracker, this->subflow->id, act_seq);
-    packet->onsending_info.acknowledged = TRUE;
-    packet->onsending_info.lost = !xr->LostRLE.vector[i];
+    packet->acknowledged = TRUE;
+    packet->lost = !xr->LostRLE.vector[i];
     sndtracker_packet_acked(this->sndtracker, packet);
   }
 
   {
     GstClockTime now = _now(this);
-    GstClockTime rtt = now - packet->forwarded;
+    GstClockTime rtt = now - packet->sent;
     this->RTT = (this->RTT == 0) ? rtt : (rtt * .125 + this->RTT * .875);
     if(this->RTT < now - this->srtt_updated){
       _stat(this)->srtt = (_stat(this)->srtt == 0.) ? this->RTT : this->RTT * .125 + _stat(this)->srtt * .875;

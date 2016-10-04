@@ -10,7 +10,7 @@
 
 
 #include <gst/gst.h>
-#include "rtppackets.h"
+#include "rcvpackets.h"
 #include "mprtpdefs.h"
 
 typedef struct _RcvTracker RcvTracker;
@@ -49,9 +49,9 @@ struct _RcvTracker
   RcvTrackerStat            stat;
   GSList*                   joined_subflows;
 
-  Observer*                 on_stat_changed;
-  Observer*                 on_received_packet;
-  Observer*                 on_discarded_packet;
+  Notifier*                 on_stat_changed;
+  Notifier*                 on_received_packet;
+  Notifier*                 on_discarded_packet;
 
   GstClockTime              skew_minmax_updated;
 
@@ -79,34 +79,34 @@ void rcvtracker_add_on_received_packet_callback(RcvTracker * this,
                                         gpointer udata);
 
 void rcvtracker_add_on_stat_changed_cb(RcvTracker * this,
-                                    NotifierFunc callback,
+                                    ListenerFunc callback,
                                     gpointer udata);
 
 void rcvtracker_subflow_add_on_stat_changed_cb(RcvTracker * this,
                                     guint8 subflow_id,
-                                    NotifierFunc callback,
+                                    ListenerFunc callback,
                                     gpointer udata);
 
 void rcvtracker_add_on_discarded_packet_cb(RcvTracker * this,
                                     guint8 subflow_id,
-                                    NotifierFunc callback,
+                                    ListenerFunc callback,
                                     gpointer udata);
 
 void rcvtracker_subflow_add_on_lost_packet_cb(RcvTracker * this,
                                     guint8 subflow_id,
-                                    NotifierFunc callback,
+                                    ListenerFunc callback,
                                     gpointer udata);
 
 void rcvtracker_subflow_add_on_received_packet_cb(RcvTracker * this,
                                     guint8 subflow_id,
-                                    NotifierFunc callback,
+                                    ListenerFunc callback,
                                     gpointer udata);
 
 void rcvtracker_subflow_rem_on_received_packet_cb(RcvTracker * this,
                                         guint8 subflow_id,
-                                        NotifierFunc callback);
+                                        ListenerFunc callback);
 
-void rcvtracker_add_packet(RcvTracker * this, RTPPacket* packet);
+void rcvtracker_add_packet(RcvTracker * this, RcvPacket* packet);
 RcvTrackerSubflowStat* rcvtracker_get_subflow_stat(RcvTracker * this, guint8 subflow_id);
 
 #endif /* RCVTRACKER_H_ */

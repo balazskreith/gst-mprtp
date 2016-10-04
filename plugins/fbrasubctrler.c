@@ -146,6 +146,11 @@ struct _Private{
 
 #define _now(this) (gst_clock_get_time(this->sysclock))
 
+ static void
+ _on_rtp_sending(
+     FBRASubController* this,
+     SndPacket *packet);
+
 static void
 _reduce_stage(
     FBRASubController *this);
@@ -222,6 +227,10 @@ fbrasubctrler_finalize (GObject * object)
 {
   FBRASubController *this;
   this = FBRASUBCTRLER(object);
+
+  sndtracker_rem_on_packet_sent(this->sndtracker, this->subflow->id,
+      (ListenerFunc) _on_rtp_sending);
+
   mprtp_free(this->priv);
   g_object_unref(this->fbprocessor);
   g_free(this->stat);
@@ -265,22 +274,31 @@ FBRASubController *make_fbrasubctrler(SndTracker *sndtracker, SndSubflow *subflo
   sndsubflow_set_state(subflow, SNDSUBFLOW_STATE_STABLE);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
 
+  sndtracker_add_on_packet_sent(this->sndtracker, this->subflow->id,
+      (ListenerFunc) _on_rtp_sending, this);
+
   return this;
 }
 
 void fbrasubctrler_enable(FBRASubController *this)
 {
   this->enabled    = TRUE;
+
+
 }
 
 void fbrasubctrler_disable(FBRASubController *this)
 {
   _switch_stage_to(this, STAGE_KEEP, FALSE);
   this->enabled = FALSE;
+
 }
 
-void fbrasubctrler_on_rtp_sending(FBRASubController* this, RTPPacket *packet)
+void _on_rtp_sending(FBRASubController* this, SndPacket *packet)
 {
+  if(!this->enabled){
+    return;
+  }
   //TODO update pacing time
 
 }

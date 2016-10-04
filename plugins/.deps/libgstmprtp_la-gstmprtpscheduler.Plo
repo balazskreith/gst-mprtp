@@ -350,11 +350,11 @@ libgstmprtp_la-gstmprtpscheduler.lo: gstmprtpscheduler.c \
  /usr/include/glib-2.0/gio/gliststore.h \
  /usr/include/glib-2.0/gio/gio-autocleanups.h reportprod.h streamjoiner.h \
  lib_swplugins.h /usr/include/ctype.h /usr/include/assert.h \
- slidingwindow.h lib_bintree.h observer.h rcvtracker.h rtppackets.h \
+ slidingwindow.h lib_bintree.h notifier.h rcvtracker.h rcvpackets.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h \
- sndsubflows.h mediator.h rcvsubflows.h ricalcer.h streamsplitter.h \
- reportproc.h signalreport.h fecenc.h rtpfecbuffer.h sndtracker.h \
- packetforwarder.h /usr/include/x86_64-linux-gnu/sys/timex.h \
+ rcvsubflows.h mediator.h ricalcer.h sndsubflows.h streamsplitter.h \
+ sndpackets.h reportproc.h signalreport.h fecenc.h rtpfecbuffer.h \
+ sndtracker.h packetforwarder.h /usr/include/x86_64-linux-gnu/sys/timex.h \
  /usr/include/x86_64-linux-gnu/sys/time.h \
  /usr/include/x86_64-linux-gnu/bits/timex.h
 
@@ -1162,23 +1162,25 @@ slidingwindow.h:
 
 lib_bintree.h:
 
-observer.h:
+notifier.h:
 
 rcvtracker.h:
 
-rtppackets.h:
+rcvpackets.h:
 
 /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h:
 
-sndsubflows.h:
+rcvsubflows.h:
 
 mediator.h:
 
-rcvsubflows.h:
-
 ricalcer.h:
 
+sndsubflows.h:
+
 streamsplitter.h:
+
+sndpackets.h:
 
 reportproc.h:
 

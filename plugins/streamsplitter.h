@@ -10,7 +10,7 @@
 
 #include <gst/gst.h>
 #include "sndsubflows.h"
-#include "rtppackets.h"
+#include "sndpackets.h"
 
 typedef struct _StreamSplitter StreamSplitter;
 typedef struct _StreamSplitterClass StreamSplitterClass;
@@ -61,7 +61,7 @@ stream_splitter_on_target_bitrate_changed(
 SndSubflow*
 stream_splitter_approve_packet(
     StreamSplitter * this,
-    RTPPacket *packet,
+    SndPacket *packet,
     GstClockTime now);
 
 GType stream_splitter_get_type (void);

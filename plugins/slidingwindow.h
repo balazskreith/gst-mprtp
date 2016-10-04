@@ -9,8 +9,9 @@
 #define SLIDINGWINDOW_H_
 
 #include <gst/gst.h>
+
 #include "lib_bintree.h"
-#include "observer.h"
+#include "notifier.h"
 
 typedef struct _SlidingWindow SlidingWindow;
 typedef struct _SlidingWindowClass SlidingWindowClass;
@@ -53,8 +54,8 @@ struct _SlidingWindow
   gboolean               (*obsolate)(gpointer, SlidingWindowItem*);
   gpointer                 obsolate_udata;
   GList*                   plugins;
-  Observer*                on_add_item;
-  Observer*                on_rem_item;
+  Notifier*                on_add_item;
+  Notifier*                on_rem_item;
 
   sallocator_t            allocator;
 
@@ -72,7 +73,7 @@ typedef struct _SlidingWindowPlugin{
   gpointer    add_data;
   void      (*disposer)(gpointer);
   void      (*clear)(gpointer);
-  Observer*   on_calculated;
+  Notifier*   on_calculated;
   gpointer    priv;
 }SlidingWindowPlugin;
 
@@ -108,13 +109,13 @@ void slidingwindow_setup_custom_obsolation(SlidingWindow* this, gboolean (*custo
 void slidingwindow_add_plugin(SlidingWindow* this, SlidingWindowPlugin *plugin);
 void slidingwindow_add_plugins (SlidingWindow* this, ... );
 
-void slidingwindow_add_on_change(SlidingWindow* this, NotifierFunc add_callback, NotifierFunc rem_callback, gpointer udata);
-void slidingwindow_add_on_add_item_cb(SlidingWindow* this, NotifierFunc callback, gpointer udata);
-void slidingwindow_add_on_rem_item_cb(SlidingWindow* this, NotifierFunc callback, gpointer udata);
+void slidingwindow_add_on_change(SlidingWindow* this, ListenerFunc add_callback, ListenerFunc rem_callback, gpointer udata);
+void slidingwindow_add_on_add_item_cb(SlidingWindow* this, ListenerFunc callback, gpointer udata);
+void slidingwindow_add_on_rem_item_cb(SlidingWindow* this, ListenerFunc callback, gpointer udata);
 gboolean slidingwindow_is_empty(SlidingWindow* this);
 
 void swplugin_notify(SlidingWindowPlugin* this, gpointer subject);
-SlidingWindowPlugin* make_swplugin(NotifierFunc on_calculated_cb, gpointer udata);
+SlidingWindowPlugin* make_swplugin(ListenerFunc on_calculated_cb, gpointer udata);
 SlidingWindowPlugin* swplugin_ctor(void);
 void swplugin_dtor(gpointer target);
 

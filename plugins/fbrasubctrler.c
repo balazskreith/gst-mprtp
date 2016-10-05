@@ -296,11 +296,16 @@ void fbrasubctrler_disable(FBRASubController *this)
 
 void _on_rtp_sending(FBRASubController* this, SndPacket *packet)
 {
+  gdouble pacing_time;
+  gdouble pacing_bitrate;
+  gdouble srtt_in_s;
   if(!this->enabled){
     return;
   }
-  //TODO update pacing time
-
+  srtt_in_s = _stat(this)->srtt * .000000001;
+  pacing_bitrate = this->cwnd / srtt_in_s;
+  pacing_time = (gdouble)packet->payload_size / pacing_bitrate;
+  this->subflow->pacing_time = pacing_time * GST_SECOND;
 }
 
 
@@ -367,7 +372,7 @@ _reduce_stage(
     FBRASubController *this)
 {
 
-  this->cwnd = MAX(10000, _stat(this)->BiF_80th * _stat(this)->owd_log_corr) * 8;
+  this->cwnd = MAX(10000, _stat(this)->BiF_80th) * 8;
 
   if(_distortion(this)){
     //keep undershooting?
@@ -389,7 +394,7 @@ _keep_stage(
     FBRASubController *this)
 {
 
-  this->cwnd = MAX(10000, _stat(this)->BiF_max * _stat(this)->owd_log_corr) * 8;
+  this->cwnd = MAX(10000, _stat(this)->BiF_max * 1.5) * 8;
 
   if(_congestion(this)){
     _set_event(this, EVENT_CONGESTION);
@@ -421,7 +426,7 @@ _probe_stage(
     FBRASubController *this)
 {
 
-  this->cwnd = MAX(10000, _stat(this)->BiF_max * _stat(this)->owd_log_corr) * 8;
+  this->cwnd = MAX(10000, _stat(this)->BiF_max * 1.5) * 8;
 
   if(_distortion(this)){
     _set_event(this, EVENT_DISTORTION);
@@ -444,7 +449,7 @@ _increase_stage(
     FBRASubController *this)
 {
 
-  this->cwnd = MAX(10000, _stat(this)->BiF_max * _stat(this)->owd_log_corr) * 8  + this->delta_target;
+  this->cwnd = MAX(10000, _stat(this)->BiF_max * 2) * 8  + this->delta_target;
 
   if(_distortion(this)){
     _set_event(this, EVENT_DISTORTION);

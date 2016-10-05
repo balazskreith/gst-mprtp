@@ -282,6 +282,11 @@ void sndsubflows_set_target_bitrate(SndSubflows* this, guint8 subflow_id, gint32
   CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, target_bitrate, target_bitrate, NULL);
 }
 
+void sndsubflows_set_report_timeout(SndSubflows* this, guint8 subflow_id, GstClockTime report_timeout)
+{
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, report_timeout, report_timeout, NULL);
+}
+
 
 //-----------------------------------------------------------------------------------------------------------
 

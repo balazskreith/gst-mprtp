@@ -205,10 +205,6 @@ SndPacket* sndtracker_retrieve_sent_packet(SndTracker * this, guint8 subflow_id,
 
 void sndtracker_packet_acked(SndTracker * this, SndPacket* packet)
 {
-  if(packet->acknowledged){
-    goto exit;
-  }
-  packet->acknowledged = TRUE;
 
   this->stat.bytes_in_flight -= packet->payload_size;
   --this->stat.packets_in_flight;
@@ -253,7 +249,6 @@ void sndtracker_packet_acked(SndTracker * this, SndPacket* packet)
   sndpacket_ref(packet);
   slidingwindow_add_data(this->acked_sw, packet);
 
-exit:
   return;
 }
 

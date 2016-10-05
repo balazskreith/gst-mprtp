@@ -71,25 +71,6 @@ SndController* make_sndctrler(
 
 
 void
-sndctrler_change_interval_type(
-    SndController * this,
-    guint8 subflow_id,
-    guint type);
-
-void
-sndctrler_change_controlling_mode(
-    SndController * this,
-    guint8 subflow_id,
-    guint mode,
-    gboolean *fec_enable);
-
-void sndctrler_setup_report_timeout(
-    SndController * this,
-    guint8 subflow_id,
-    GstClockTime report_timeout);
-
-
-void
 sndctrler_report_can_flow (SndController *this);
 
 void

@@ -246,15 +246,15 @@ AUTOCONF = ${SHELL} /home/balazs/gst/gst-mprtp/missing autoconf
 AUTOHEADER = ${SHELL} /home/balazs/gst/gst-mprtp/missing autoheader
 AUTOMAKE = ${SHELL} /home/balazs/gst/gst-mprtp/missing automake-1.15
 AWK = gawk
-CC = /usr/bin/gcc
+CC = gcc
 CCDEPMODE = depmode=gcc3
-CFLAGS = -g3 -gdwarf-2 -Wall
-CPP = /usr/bin/gcc -E
+CFLAGS = -g -O2 -Wall
+CPP = gcc -E
 CPPFLAGS = 
-CXX = /usr/bin/g++
-CXXCPP = /usr/bin/g++ -E
+CXX = g++
+CXXCPP = g++ -E
 CXXDEPMODE = depmode=gcc3
-CXXFLAGS = -g3 -gdwarf-2
+CXXFLAGS = -g -O2
 CYGPATH_W = echo
 DEFS = -DHAVE_CONFIG_H
 DEPDIR = .deps
@@ -350,8 +350,8 @@ abs_srcdir = /home/balazs/gst/gst-mprtp/plugins
 abs_top_builddir = /home/balazs/gst/gst-mprtp
 abs_top_srcdir = /home/balazs/gst/gst-mprtp
 ac_ct_AR = ar
-ac_ct_CC = /usr/bin/gcc
-ac_ct_CXX = 
+ac_ct_CC = gcc
+ac_ct_CXX = g++
 ac_ct_DUMPBIN = 
 ac_ct_OBJC = gcc
 am__include = include
@@ -448,10 +448,6 @@ noinst_HEADERS = fbrafbproc.h          \
                  fecdec.h              \
                  fecenc.h              \
                  gstmprtcpbuffer.h     \
-                 gstmprtpplayouter.h   \
-                 gstmprtpreceiver.h    \
-                 gstmprtpscheduler.h   \
-                 gstmprtpsender.h      \
                  lib_bintree.h         \
                  lib_swplugins.h       \
                  mediator.h            \

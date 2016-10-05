@@ -512,14 +512,16 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       sndsubflows_set_target_bitrate(this->subflows, subflow_prop->id, subflow_prop->value);
       break;
     case PROP_SETUP_RTCP_INTERVAL_TYPE:
+      guint_value = g_value_get_uint (value);
       sndsubflows_set_rtcp_interval_type(this->subflows, subflow_prop->id, subflow_prop->value);
       break;
     case PROP_SETUP_CONTROLLING_MODE:
+      guint_value = g_value_get_uint (value);
       sndsubflows_set_congestion_controlling_type(this->subflows, subflow_prop->id, subflow_prop->value);
       break;
     case PROP_SETUP_REPORT_TIMEOUT:
       guint_value = g_value_get_uint (value);
-      sndctrler_setup_report_timeout(this->controller,  subflow_prop->id, subflow_prop->value * GST_MSECOND);
+      sndsubflows_set_report_timeout(this->subflows, subflow_prop->id, subflow_prop->value * GST_MSECOND);
       break;
     case PROP_LOG_ENABLED:
       gboolean_value = g_value_get_boolean (value);

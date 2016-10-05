@@ -128,6 +128,7 @@ static void _skews_minmax_pipe(gpointer udata, swminmaxstat_t* stat)
 }
 
 
+
 void
 rcvtracker_class_init (RcvTrackerClass * klass)
 {
@@ -140,6 +141,15 @@ rcvtracker_class_init (RcvTrackerClass * klass)
   GST_DEBUG_CATEGORY_INIT (rcvtracker_debug_category, "rcvtracker", 0,
       "MpRTP Sending Rate Distributor");
 }
+
+RcvTracker *make_rcvtracker(void)
+{
+  RcvTracker* this;
+  this = g_object_new(SNDTRACKER_TYPE, NULL);
+
+  return this;
+}
+
 
 void
 rcvtracker_finalize (GObject * object)

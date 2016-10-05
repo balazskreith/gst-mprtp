@@ -448,10 +448,6 @@ noinst_HEADERS = fbrafbproc.h          \
                  fecdec.h              \
                  fecenc.h              \
                  gstmprtcpbuffer.h     \
-                 gstmprtpplayouter.h   \
-                 gstmprtpreceiver.h    \
-                 gstmprtpscheduler.h   \
-                 gstmprtpsender.h      \
                  lib_bintree.h         \
                  lib_swplugins.h       \
                  mediator.h            \

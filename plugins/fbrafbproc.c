@@ -134,10 +134,12 @@ FBRAFBProcessor *make_fbrafbprocessor(SndTracker* sndtracker, SndSubflow* subflo
         make_swpercentile(80, _measurement_owd_cmp, (ListenerFunc) _on_owd_80th_calculated, this));
 
   slidingwindow_add_on_change(this->short_sw,
-        (ListenerFunc) _on_short_sw_rem, (ListenerFunc) _on_short_sw_add, this);
+        (ListenerFunc) _on_short_sw_rem,
+        (ListenerFunc) _on_short_sw_add, this);
 
   slidingwindow_add_on_change(this->long_sw,
-        (ListenerFunc) _on_long_sw_rem, (ListenerFunc) _on_long_sw_add, this);
+        (ListenerFunc) _on_long_sw_rem,
+        (ListenerFunc) _on_long_sw_add, this);
 
 
   return this;
@@ -203,7 +205,9 @@ void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
   _stat(this)->last_owd = xrsummary->OWD.median_delay;
 
   if(_stat(this)->owd_80th){
-    _stat(this)->owd_log_corr = log(GST_TIME_AS_MSECONDS(_stat(this)->owd_80th)) / log(GST_TIME_AS_MSECONDS(_stat(this)->last_owd));
+    gdouble corr = log(GST_TIME_AS_MSECONDS(_stat(this)->owd_80th));
+    corr /= _stat(this)->owd_log_corr * log(GST_TIME_AS_MSECONDS(_stat(this)->last_owd));
+    _stat(this)->owd_log_corr = corr;
   }else{
     _stat(this)->owd_log_corr = 1.;
   }
@@ -215,7 +219,7 @@ done:
 
 void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr)
 {
-  SndPacket* packet;
+  SndPacket* packet = NULL;
   guint16 act_seq, end_seq;
   gint i;
 
@@ -227,6 +231,9 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
 
   for(i=0; act_seq <= end_seq; ++act_seq, ++i){
     packet = sndtracker_retrieve_sent_packet(this->sndtracker, this->subflow->id, act_seq);
+    if(packet->acknowledged){
+      continue;
+    }
     packet->acknowledged = TRUE;
     packet->lost = !xr->LostRLE.vector[i];
     sndtracker_packet_acked(this->sndtracker, packet);

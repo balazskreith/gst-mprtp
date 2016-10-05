@@ -120,6 +120,7 @@ void sndsubflows_set_rtcp_interval_type(SndSubflows* this, guint8 subflow_id, RT
 void sndsubflows_set_path_lossy(SndSubflows* this, guint8 subflow_id, gboolean value);
 void sndsubflows_set_path_congested(SndSubflows* this, guint8 subflow_id, gboolean value);
 void sndsubflows_set_target_bitrate(SndSubflows* this, guint8 subflow_id, gint32 target_bitrate);
+void sndsubflows_set_report_timeout(SndSubflows* this, guint8 subflow_id, GstClockTime report_timeout);
 
 void sndsubflows_add_on_subflow_joined_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_subflow_detached_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);

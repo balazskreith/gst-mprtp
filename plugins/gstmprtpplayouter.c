@@ -647,7 +647,7 @@ gst_mprtpplayouter_mprtcp_sr_sink_chain (GstPad * pad, GstObject * parent,
 {
   GstMprtpplayouter *this;
   GstMapInfo info;
-  GstFlowReturn result;
+  GstFlowReturn result = GST_FLOW_OK;
   guint8 *buf_2nd_byte;
 
   this = GST_MPRTPPLAYOUTER (parent);

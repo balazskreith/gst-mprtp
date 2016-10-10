@@ -30,7 +30,6 @@ struct _PacketForwarder
 
   GstTask*             thread;
   GRecMutex            thread_mutex;
-
   gpointer             priv;
 
 };
@@ -39,7 +38,7 @@ struct _PacketForwarderClass{
   GObjectClass parent_class;
 };
 
-PacketForwarder* make_packetforwarder(GstPad* rtppad, GstPad* rtcppad);
+PacketForwarder* make_packetforwarder(GstPad* rtppad, GstPad* rtcppad, gboolean async);
 void packetforwarder_add_rtppad_buffer(PacketForwarder* this, GstBuffer *buffer);
 void packetforwarder_add_rtcppad_buffer(PacketForwarder* this, GstBuffer *buffer);
 GType packetforwarder_get_type (void);

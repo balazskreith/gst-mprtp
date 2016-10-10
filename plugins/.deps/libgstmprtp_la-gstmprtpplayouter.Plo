@@ -211,8 +211,8 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  /usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h \
  /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
  /usr/include/x86_64-linux-gnu/bits/stdlib.h /usr/include/ctype.h \
- /usr/include/assert.h slidingwindow.h lib_bintree.h notifier.h \
- rcvtracker.h rcvpackets.h \
+ /usr/include/assert.h slidingwindow.h lib_datapuffer.h lib_bintree.h \
+ notifier.h recycle.h rcvtracker.h rcvpackets.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h \
  /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
@@ -363,7 +363,7 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  /usr/include/glib-2.0/gio/gio-autocleanups.h rcvsubflows.h mediator.h \
  rcvctrler.h ricalcer.h sndsubflows.h sndctrler.h reportprod.h \
  streamsplitter.h sndpackets.h reportproc.h signalreport.h fecenc.h \
- rtpfecbuffer.h sndtracker.h fecdec.h \
+ rtpfecbuffer.h sndtracker.h fecdec.h jitterbuffer.h \
  /usr/include/glib-2.0/gio/gnetworking.h /usr/include/netdb.h \
  /usr/include/netinet/in.h \
  /usr/lib/gcc/x86_64-linux-gnu/5/include/stdint.h /usr/include/stdint.h \
@@ -896,9 +896,13 @@ lib_swplugins.h:
 
 slidingwindow.h:
 
+lib_datapuffer.h:
+
 lib_bintree.h:
 
 notifier.h:
+
+recycle.h:
 
 rcvtracker.h:
 
@@ -1247,6 +1251,8 @@ rtpfecbuffer.h:
 sndtracker.h:
 
 fecdec.h:
+
+jitterbuffer.h:
 
 /usr/include/glib-2.0/gio/gnetworking.h:
 

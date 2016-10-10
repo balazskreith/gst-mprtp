@@ -9,9 +9,10 @@
 #define SLIDINGWINDOW_H_
 
 #include <gst/gst.h>
-
+#include "lib_datapuffer.h"
 #include "lib_bintree.h"
 #include "notifier.h"
+#include "recycle.h"
 
 typedef struct _SlidingWindow SlidingWindow;
 typedef struct _SlidingWindowClass SlidingWindowClass;
@@ -23,16 +24,6 @@ typedef struct _SlidingWindowClass SlidingWindowClass;
 #define SLIDINGWINDOW_IS_SOURCE(src)          (G_TYPE_CHECK_INSTANCE_TYPE((src),SLIDINGWINDOW_TYPE))
 #define SLIDINGWINDOW_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),SLIDINGWINDOW_TYPE))
 #define SLIDINGWINDOW_CAST(src)        ((SlidingWindow *)(src))
-
-typedef struct datapuffer_struct_t
-{
-        gpointer                *items;                ///< A pointer array of data the puffer will uses for storing
-        gint32                   length;               ///< The maximal amount of data the puffer can store
-        gint32                   start;        ///< index for read operations. It points to the next element going to be read
-        gint32                   end;      ///< index for write operations. It points to the last element, which was written by the puffer
-        gint32                   count;
-        gpointer                 read;
-} datapuffer_t;
 
 struct _SlidingWindowItem
 {
@@ -57,7 +48,8 @@ struct _SlidingWindow
   Notifier*                on_add_item;
   Notifier*                on_rem_item;
 
-  sallocator_t            allocator;
+  Recycle*                 data_recycle;
+  Recycle*                 items_recycle;
 
 };
 
@@ -78,20 +70,15 @@ typedef struct _SlidingWindowPlugin{
 }SlidingWindowPlugin;
 
 
-
 GType slidingwindow_get_type (void);
 SlidingWindow* make_slidingwindow_int32(guint32 num_limit, GstClockTime obsolation_treshold);
 SlidingWindow* make_slidingwindow_int64(guint32 num_limit, GstClockTime obsolation_treshold);
+SlidingWindow* make_slidingwindow_uint32(guint32 num_limit, GstClockTime obsolation_treshold);
 SlidingWindow* make_slidingwindow_uint64(guint32 num_limit, GstClockTime obsolation_treshold);
 SlidingWindow* make_slidingwindow_double(guint32 num_limit, GstClockTime obsolation_treshold);
-SlidingWindow* make_slidingwindow_with_allocators(guint32 num_limit,
+SlidingWindow* make_slidingwindow_with_data_recycle(guint32 num_limit,
                                                   GstClockTime obsolation_treshold,
-                                                  gpointer               (*alloc)(gpointer,gpointer),
-                                                  gpointer                 alloc_udata,
-                                                  void                   (*dealloc)(gpointer,gpointer),
-                                                  gpointer                 dealloc_udata,
-                                                  void                   (*copy)(gpointer,gpointer,gpointer),
-                                                  gpointer                 copy_udata
+                                                  Recycle* data_recycle
                                                   );
 SlidingWindow* make_slidingwindow(guint32 num_limit, GstClockTime obsolation_treshold);
 void slidingwindow_clear(SlidingWindow* this);
@@ -118,19 +105,5 @@ void swplugin_notify(SlidingWindowPlugin* this, gpointer subject);
 SlidingWindowPlugin* make_swplugin(ListenerFunc on_calculated_cb, gpointer udata);
 SlidingWindowPlugin* swplugin_ctor(void);
 void swplugin_dtor(gpointer target);
-
-datapuffer_t* datapuffer_ctor(gint32 items_num);
-void datapuffer_dtor(datapuffer_t *datapuffer);
-gpointer datapuffer_read(datapuffer_t *datapuffer);
-gpointer datapuffer_peek_first(datapuffer_t* puffer);
-gpointer datapuffer_peek_last(datapuffer_t* puffer);
-gpointer datapuffer_peek_custom(datapuffer_t* puffer, gint (*comparator)(gpointer item, gpointer udata), gpointer udata);
-void datapuffer_write(datapuffer_t *datapuffer, void *item);
-gint32 datapuffer_capacity(datapuffer_t *datapuffer);
-gint32 datapuffer_readcapacity(datapuffer_t *datapuffer);
-gint32 datapuffer_writecapacity(datapuffer_t *datapuffer);
-gboolean datapuffer_isfull(datapuffer_t *datapuffer);
-gboolean datapuffer_isempty(datapuffer_t *datapuffer);
-void datapuffer_clear(datapuffer_t *datapuffer, void (*dtor)(gpointer));
 
 #endif /* SLIDINGWINDOW_H_ */

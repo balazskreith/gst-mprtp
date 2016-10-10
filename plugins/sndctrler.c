@@ -149,11 +149,10 @@ sndctrler_finalize (GObject * object)
   SndController *this = SNDCTRLER (object);
 
   g_object_unref (this->sysclock);
-  g_async_queue_unref(this->mprtcpq);
   g_async_queue_unref(this->emitterq);
   g_object_unref(this->subflows);
   g_object_unref(this->sndtracker);
-
+  g_object_unref(this->on_rtcp_ready);
   g_slice_free(MPRTPPluginSignalData, this->mprtp_signal_data);
 }
 
@@ -168,7 +167,7 @@ sndctrler_init (SndController * this)
   this->controllers        = NULL;
   this->ricalcer           = make_ricalcer(TRUE);
   this->mprtp_signal_data  = g_slice_new0(MPRTPPluginSignalData);
-
+  this->time_update_period = 200 * GST_MSECOND;
 
   report_processor_set_logfile(this->report_processor, "snd_reports.log");
   report_producer_set_logfile(this->report_producer, "snd_produced_reports.log");
@@ -179,15 +178,16 @@ SndController*
 make_sndctrler(
     SndTracker*  sndtracker,
     SndSubflows* subflows,
-    GAsyncQueue* mprtcpq,
+    Notifier*    on_rtcp_ready,
     GAsyncQueue* emitterq)
 {
   SndController* this = (SndController*)g_object_new(SNDCTRLER_TYPE, NULL);
 
-  this->mprtcpq    = g_async_queue_ref(mprtcpq);
   this->emitterq   = g_async_queue_ref(emitterq);
   this->subflows   = g_object_ref(subflows);
   this->sndtracker = g_object_ref(sndtracker);
+
+  this->on_rtcp_ready = g_object_ref(on_rtcp_ready);
 
   sndsubflows_add_on_subflow_detached_cb(
       this->subflows, (ListenerFunc)_on_subflow_detached, this);
@@ -214,8 +214,7 @@ sndctrler_time_update (SndController *this)
 {
   GSList *it;
   GstClockTime now = _now(this);
-
-  if(now - 100 * GST_MSECOND < this->last_regular_emit){
+  if(0 < this->last_regular_emit && this->last_regular_emit + this->time_update_period < now){
     goto done;
   }
 
@@ -302,8 +301,9 @@ static void _sender_report_updater_helper(SndSubflow *subflow, gpointer udata)
 
   report_producer_begin(this->report_producer, subflow->id);
   _create_sr(this, subflow);
-  buf = report_producer_end(this->report_producer, &report_length);
-  g_async_queue_push(this->mprtcpq, buf);
+  if((buf = report_producer_end(this->report_producer, &report_length)) != NULL){
+    notifier_do(this->on_rtcp_ready, buf);
+  }
 
   //report_length += 12 /* RTCP HEADER*/ + (28<<3) /*UDP+IP HEADER*/;
   //ricalcer_update_avg_report_size(ricaler, report_length);
@@ -403,10 +403,22 @@ void _update_subflow_target_utilization(SndController* this)
 
 void _on_subflow_state_changed(SndController *this, SndSubflow* subflow)
 {
-  if(subflow->state != SNDSUBFLOW_STATE_OVERUSED){
-    return;
+  if(subflow->state_t1 != SNDSUBFLOW_STATE_OVERUSED && subflow->state == SNDSUBFLOW_STATE_OVERUSED){
+    ++this->overused_subflows;
+    this->time_update_period = 50 * GST_MSECOND;
+    _emit_signal(this);
+    goto done;
   }
-  _emit_signal(this);
+
+  if(subflow->state_t1 == SNDSUBFLOW_STATE_OVERUSED && subflow->state != SNDSUBFLOW_STATE_OVERUSED){
+    if(--this->overused_subflows < 1){
+      this->time_update_period = 200 * GST_MSECOND;
+    }
+    goto done;
+  }
+
+done:
+  return;
 }
 
 static gint _controller_by_subflow_id(gconstpointer item, gconstpointer udata)
@@ -459,7 +471,11 @@ void _on_congestion_controlling_changed(SndController* this, SndSubflow *subflow
 
   switch(subflow->congestion_controlling_type){
     case CONGESTION_CONTROLLING_TYPE_FBRAPLUS:
-      this->controllers = g_slist_prepend(this->controllers, _create_fbraplus(this, subflow));
+      {
+        CongestionController *controller = _create_fbraplus(this, subflow);
+        this->controllers = g_slist_prepend(this->controllers, controller);
+        controller->enable(controller->udata);
+      }
       break;
     case CONGESTION_CONTROLLING_TYPE_NONE:
     default:

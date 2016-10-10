@@ -27,16 +27,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "streamjoiner.h"
+#include "jitterbuffer.h"
 #include "mprtplogger.h"
 
 
-GST_DEBUG_CATEGORY_STATIC (stream_joiner_debug_category);
-#define GST_CAT_DEFAULT stream_joiner_debug_category
+GST_DEBUG_CATEGORY_STATIC (jitterbuffer_debug_category);
+#define GST_CAT_DEFAULT jitterbuffer_debug_category
 
 #define _now(this) gst_clock_get_time (this->sysclock)
 
-G_DEFINE_TYPE (StreamJoiner, stream_joiner, G_TYPE_OBJECT);
+G_DEFINE_TYPE (JitterBuffer, jitterbuffer, G_TYPE_OBJECT);
 
 
 //----------------------------------------------------------------------
@@ -44,20 +44,26 @@ G_DEFINE_TYPE (StreamJoiner, stream_joiner, G_TYPE_OBJECT);
 //----------------------------------------------------------------------
 
 static void
-stream_joiner_finalize (
+jitterbuffer_finalize (
     GObject * object);
 
 //
-//static gint
-//_cmp_seq (guint16 x, guint16 y)
-//{
-//  if(x == y) return 0;
-//  if(x < y && y - x < 32768) return -1;
-//  if(x > y && x - y > 32768) return -1;
-//  if(x < y && y - x > 32768) return 1;
-//  if(x > y && x - y < 32768) return 1;
-//  return 0;
-//}
+static gint
+_cmp_seq (guint16 x, guint16 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 32768) return -1;
+  if(x > y && x - y > 32768) return -1;
+  if(x < y && y - x > 32768) return 1;
+  if(x > y && x - y < 32768) return 1;
+  return 0;
+}
+
+static gint _cmp_rcvpacket_abs_seq(RcvPacket *a, RcvPacket* b, gpointer udata)
+{
+  return _cmp_seq(a->abs_seq, b->abs_seq);
+}
+
 //
 //static gint
 //_cmp_ts (guint32 x, guint32 y)
@@ -76,68 +82,89 @@ stream_joiner_finalize (
 //----------------------------------------------------------------------
 
 void
-stream_joiner_class_init (StreamJoinerClass * klass)
+jitterbuffer_class_init (JitterBufferClass * klass)
 {
   GObjectClass *gobject_class;
 
   gobject_class = (GObjectClass *) klass;
 
-  gobject_class->finalize = stream_joiner_finalize;
+  gobject_class->finalize = jitterbuffer_finalize;
 
-  GST_DEBUG_CATEGORY_INIT (stream_joiner_debug_category, "stream_joiner", 0,
+  GST_DEBUG_CATEGORY_INIT (jitterbuffer_debug_category, "jitterbuffer", 0,
       "MpRTP Manual Sending Controller");
 }
 
 void
-stream_joiner_finalize (GObject * object)
+jitterbuffer_finalize (GObject * object)
 {
-  StreamJoiner *this = STREAM_JOINER (object);
+  JitterBuffer *this = JITTERBUFFER (object);
   RcvPacket* packet;
-  while((packet = g_queue_pop_head(this->joinq)) != NULL){
+  while((packet = g_queue_pop_head(this->playoutq)) != NULL){
     rcvpacket_unref(packet);
   }
-  g_object_unref(this->joinq);
+  g_object_unref(this->playoutq);
   g_object_unref(this->sysclock);
 }
 
 
 void
-stream_joiner_init (StreamJoiner * this)
+jitterbuffer_init (JitterBuffer * this)
 {
-  this->sysclock           = gst_system_clock_obtain ();
-  this->made               = _now(this);
+  this->sysclock = gst_system_clock_obtain ();
+  this->made     = _now(this);
+  this->playoutq    = g_queue_new();
 
 }
 
-StreamJoiner*
-make_stream_joiner(void)
+JitterBuffer*
+make_jitterbuffer(Mediator* repair_channel)
 {
-  StreamJoiner *result;
-  result = (StreamJoiner *) g_object_new (STREAM_JOINER_TYPE, NULL);
+  JitterBuffer *result;
+  result = (JitterBuffer *) g_object_new (JITTERBUFFER_TYPE, NULL);
 
-  result->joinq = g_queue_new();
-
+  result->repair_channel = g_object_ref(repair_channel);
 
   return result;
 }
 
-void stream_joiner_push_packet(StreamJoiner *this, RcvPacket* packet)
+void jitterbuffer_push_packet(JitterBuffer *this, RcvPacket* packet)
 {
-  g_queue_push_tail(this->joinq, packet);
+  g_queue_insert_sorted(this->playoutq, packet, (GCompareDataFunc) _cmp_rcvpacket_abs_seq, NULL);
 }
 
-RcvPacket* stream_joiner_pop_packet(StreamJoiner *this)
+RcvPacket* jitterbuffer_pop_packet(JitterBuffer *this, gboolean *repair_request)
 {
   RcvPacket* packet = NULL;
+  gint cmp;
 
-  if(g_queue_is_empty(this->joinq)){
+  if(g_queue_is_empty(this->playoutq)){
     goto done;
   }
 
-  packet = g_queue_pop_head(this->joinq);
-
+  packet = g_queue_pop_head(this->playoutq);
+  if(!this->last_seq_init){
+    this->last_seq = packet->abs_seq;
+    this->last_seq_init = TRUE;
+    goto done;
+  }
+  cmp = _cmp_seq(this->last_seq + 1, packet->abs_seq);
+  if(0 < cmp){
+    goto done;
+  }
+  while(cmp < 0){
+    DiscardedPacket* discarded_packet;
+    discarded_packet = g_slice_new0(DiscardedPacket);
+    discarded_packet->abs_seq = ++this->last_seq;
+    mediator_set_request(this->repair_channel, discarded_packet);
+    if(repair_request){
+      *repair_request = TRUE;
+    }
+    cmp = _cmp_seq(this->last_seq, packet->abs_seq);
+  }
+  this->last_seq = packet->abs_seq;
 done:
   return packet;
 
 }
+
 

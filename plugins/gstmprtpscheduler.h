@@ -53,6 +53,8 @@ struct _GstMprtpscheduler
   GstPad*                       mprtcp_rr_sinkpad;
   GstPad*                       mprtcp_sr_srcpad;
 
+  gboolean                      preroll;
+
   SndSubflows*                  subflows;
   SndPackets*                   sndpackets;
   StreamSplitter*               splitter;
@@ -66,6 +68,8 @@ struct _GstMprtpscheduler
   GstClockTime                  obsolation_treshold;
   GstClock*                     sysclock;
 
+  GstClockTime                  last_pts;
+
   guint32                       rtcp_sent_octet_sum;
 
   GstTask*                      thread;
@@ -76,12 +80,10 @@ struct _GstMprtpscheduler
 
   gboolean                      monitoring_request;
   Mediator*                     monitoring;
-  PacketForwarder*              packetforwarder;
-  GAsyncQueue*                  mprtpq;
-  GAsyncQueue*                  mprtcpq;
   GAsyncQueue*                  rtpbuffers_in;
   GAsyncQueue*                  fec_responses;
   GAsyncQueue*                  emitterq;
+  Notifier*                     on_rtcp_ready;
 
   GstMprtpschedulerPrivate*     priv;
 

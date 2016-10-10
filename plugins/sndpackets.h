@@ -1,0 +1,91 @@
+/*
+ * sndpackets.h
+ *
+ *  Created on: Jun 30, 2015
+ *      Author: balazs
+ */
+
+#ifndef SNDPACKETS_H_
+#define SNDPACKETS_H_
+
+#include <gst/gst.h>
+#include <gst/net/gstnetaddressmeta.h>
+#include "sndsubflows.h"
+#include "rcvsubflows.h"
+
+typedef struct _SndPackets SndPackets;
+typedef struct _SndPacketsClass SndPacketsClass;
+
+#define SNDPACKETS_TYPE             (sndpackets_get_type())
+#define SNDPACKETS(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),SNDPACKETS_TYPE,SndPackets))
+#define SNDPACKETS_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass),SNDPACKETS_TYPE,SndPacketsClass))
+#define SNDPACKETS_IS_SOURCE(src)          (G_TYPE_CHECK_INSTANCE_TYPE((src),SNDPACKETS_TYPE))
+#define SNDPACKETS_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),SNDPACKETS_TYPE))
+#define SNDPACKETS_CAST(src)        ((SndPackets *)(src))
+
+typedef struct _SndPacket
+{
+  SndPackets*          base_db;
+  GstBuffer*           buffer;
+  gint                 ref;
+  GstClockTime         made;
+  GstClockTime         sent;
+
+  gboolean             marker;
+  guint8               payload_type;
+  guint16              abs_seq;
+  guint32              timestamp;
+  guint32              ssrc;
+
+  guint                header_size;
+  guint                payload_size;
+
+  guint16              subflow_seq;
+  guint8               subflow_id;
+
+  gboolean             lost;
+  gboolean             acknowledged;
+}SndPacket;
+
+
+struct _SndPackets
+{
+  GObject                    object;
+  GstClock*                  sysclock;
+  GstClockTime               made;
+  SndPacket*                 packets;
+
+  guint8                     abs_time_ext_header_id;
+  guint8                     mprtp_ext_header_id;
+
+};
+
+
+struct _SndPacketsClass{
+  GObjectClass parent_class;
+
+};
+
+
+GType sndpackets_get_type (void);
+SndPackets* make_sndpackets(void);
+void sndpackets_reset(SndPackets* this);
+
+gboolean sndpacket_is_already_in_use(SndPackets* this, GstBuffer* buffer);
+SndPacket* sndpackets_make_packet(SndPackets* this, GstBuffer* buffer);
+SndPacket* sndpackets_get_by_abs_seq(SndPackets* this, guint16 abs_seq);
+
+void sndpacket_setup_mprtp(SndPacket *packet, SndSubflow* subflow);
+
+void sndpackets_set_abs_time_ext_header_id(SndPackets* this, guint8 abs_time_ext_header_id);
+guint8 sndpackets_get_abs_time_ext_header_id(SndPackets* this);
+
+void sndpackets_set_mprtp_ext_header_id(SndPackets* this, guint8 mprtp_ext_header_id);
+guint8 sndpackets_get_mprtp_ext_header_id(SndPackets* this);
+
+GstBuffer* sndpacket_retrieve_and_send(SndPacket* packet);
+GstBuffer* sndpacket_retrieve(SndPacket* packet);
+void sndpacket_unref(SndPacket *packet);
+void sndpacket_ref(SndPacket *packet);
+
+#endif /* SNDPACKETS_H_ */

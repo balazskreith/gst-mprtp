@@ -161,7 +161,8 @@ void sndsubflows_join(SndSubflows* this, guint8 id)
   ++this->subflows_num;
 
   this->joined = g_slist_prepend(this->joined, subflow);
-
+g_print("---->%d", SUBFLOW_DEFAULT_SENDING_RATE);
+  sndsubflows_set_target_bitrate(this, id, SUBFLOW_DEFAULT_SENDING_RATE);
   notifier_do(this->on_subflow_joined, subflow);
 
 }
@@ -226,11 +227,12 @@ void sndsubflow_request_monitoring(SndSubflow* subflow)
   mediator_set_request(subflows->monitoring_handler, subflow);
 }
 
-void sndsubflows_set_target_rate(SndSubflow* subflow, gint32 target_rate)
+void sndsubflow_set_target_rate(SndSubflow* subflow, gint32 target_rate)
 {
   SndSubflows *subflows = subflow->base_db;
   subflows->target_rate -= subflow->target_bitrate;
   subflows->target_rate += subflow->target_bitrate = target_rate;
+
   notifier_do(subflows->on_target_bitrate_changed, subflow);
 }
 
@@ -277,9 +279,17 @@ void sndsubflows_set_path_congested(SndSubflows* this, guint8 subflow_id, gboole
   CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, congested, value, NULL);
 }
 
+static void _sum_subflow_target(SndSubflow* subflow, SndSubflows* subflows)
+{
+  subflows->target_rate += subflow->target_bitrate;
+  notifier_do(subflows->on_target_bitrate_changed, subflow);
+}
+
 void sndsubflows_set_target_bitrate(SndSubflows* this, guint8 subflow_id, gint32 target_bitrate)
 {
   CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, target_bitrate, target_bitrate, NULL);
+  this->target_rate = 0;
+  g_slist_foreach(this->joined, (GFunc) _sum_subflow_target, this);
 }
 
 void sndsubflows_set_report_timeout(SndSubflows* this, guint8 subflow_id, GstClockTime report_timeout)
@@ -293,6 +303,7 @@ void sndsubflows_set_report_timeout(SndSubflows* this, guint8 subflow_id, GstClo
 
 void sndsubflow_set_state(SndSubflow* subflow, SndSubflowState state)
 {
+  subflow->state_t1 = subflow->state;
   subflow->state = state;
   notifier_do(subflow->base_db->on_subflow_state_changed, subflow);
 }
@@ -317,8 +328,7 @@ SndSubflow* _make_subflow(SndSubflows* base_db, guint8 subflow_id)
 {
   SndSubflow* result = g_malloc0(sizeof(SndSubflow));
   result->base_db         = base_db;
-
-
+  result->id              = subflow_id;
   return result;
 }
 

@@ -177,10 +177,6 @@ void report_processor_process_mprtcp(ReportProcessor * this, GstBuffer* buffer, 
   gst_buffer_map(buffer, &map, GST_MAP_READ);
   report = (GstMPRTCPSubflowReport *)map.data;
   gst_mprtcp_report_getdown(report, &ssrc);
-  //Todo: SSRC filter here
-  if(0 && ssrc != this->ssrc){
-      g_warning("Wrong SSRC to process");
-  }
   result->created = _now(this);
   result->ssrc = ssrc;
   result->updated = _now(this);

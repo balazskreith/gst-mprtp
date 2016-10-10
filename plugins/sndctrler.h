@@ -41,14 +41,16 @@ struct _SndController
   ReportProducer*            report_producer;
   GstClock*                  sysclock;
   SndTracker*                sndtracker;
+  Notifier*                  on_rtcp_ready;
 
   gboolean                   report_is_flowable;
 
   MPRTPPluginSignalData*     mprtp_signal_data;
+  GstClockTime               time_update_period;
+  gint32                     overused_subflows;
 
   GSList*                    controllers;
   ReportIntervalCalculator*  ricalcer;
-  GAsyncQueue*               mprtcpq;
   GAsyncQueue*               emitterq;
 
   GstClockTime               last_regular_emit;
@@ -66,7 +68,7 @@ struct _SndControllerClass{
 SndController* make_sndctrler(
     SndTracker*  sndtracker,
         SndSubflows* subflows,
-        GAsyncQueue* mprtcpq,
+        Notifier*    on_rtcp_ready,
         GAsyncQueue* emitterq);
 
 

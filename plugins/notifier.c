@@ -38,12 +38,13 @@ GST_DEBUG_CATEGORY_STATIC (notifier_debug_category);
 G_DEFINE_TYPE (Notifier, notifier, G_TYPE_OBJECT);
 
 typedef struct{
-  ListenerFunc callback;
-  gpointer     udata;
+  ListenerFunc   callback;
+  ListenerFilterFunc filter;
+  gpointer       udata;
 }Listener;
 
 
-static Listener* _make_listener(ListenerFunc callback, gpointer udata);
+static Listener* _make_listener(ListenerFunc callback, ListenerFilterFunc filter, gpointer udata);
 static void _dispose_listener(gpointer item);
 
 
@@ -93,7 +94,13 @@ Notifier *make_notifier(void)
 
 void notifier_add_listener(Notifier *this, ListenerFunc callback, gpointer udata)
 {
-  Listener *listener = _make_listener(callback, udata);
+  Listener *listener = _make_listener(callback, NULL, udata);
+  this->listeners = g_slist_prepend(this->listeners, listener);
+}
+
+void notifier_add_listener_with_filter(Notifier *this, ListenerFunc callback, ListenerFilterFunc filter, gpointer udata)
+{
+  Listener *listener = _make_listener(callback, filter, udata);
   this->listeners = g_slist_prepend(this->listeners, listener);
 }
 
@@ -119,7 +126,12 @@ void notifier_rem_listener(Notifier *this, ListenerFunc callback)
 static void _listener_helper(gpointer item, gpointer udata)
 {
   Listener* listener = item;
+  if(listener->filter && !listener->filter(listener->udata, udata)){
+    goto done;
+  }
   listener->callback(listener->udata, udata);
+done:
+  return;
 }
 
 void notifier_do(Notifier *this, gpointer subject)
@@ -131,10 +143,11 @@ void notifier_do(Notifier *this, gpointer subject)
 }
 
 
-Listener* _make_listener(ListenerFunc callback, gpointer udata)
+Listener* _make_listener(ListenerFunc callback, ListenerFilterFunc filter, gpointer udata)
 {
   Listener* result = g_slice_new0(Listener);
   result->callback = callback;
+  result->filter = filter;
   result->udata = udata;
   return result;
 }

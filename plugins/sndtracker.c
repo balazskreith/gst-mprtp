@@ -150,6 +150,7 @@ void sndtracker_refresh(SndTracker * this)
 {
   slidingwindow_refresh(this->sent_sw);
   slidingwindow_refresh(this->acked_sw);
+  slidingwindow_refresh(this->fec_sw);
 }
 
 SndTrackerStat* sndtracker_get_stat(SndTracker * this)

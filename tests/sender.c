@@ -160,10 +160,12 @@ make_video_yuvfile_session (guint sessionNum)
 
 
   gst_bin_add_many (videoBin, videoConv, videoSrc, identity, videoParse, encoder, payloader, queue, NULL);
+
+
   g_object_set (videoParse,
       "width", yuvsrc_width,
       "height", yuvsrc_height,
-      "framerate", 25, 1,
+      "framerate", framerate, 1,
       "format", 2,
       NULL);
   g_object_set (identity, "sync", TRUE, NULL);
@@ -253,7 +255,7 @@ make_video_yuvfile_session_and_save (guint sessionNum)
   g_object_set (videoParse,
       "width", yuvsrc_width,
       "height", yuvsrc_height,
-      "framerate", 25, 1,
+      "framerate", framerate, 1,
       "format", 2,
       NULL);
 
@@ -371,7 +373,7 @@ make_video_session (guint sessionNum)
         NULL);
 
   gst_bin_add_many (videoBin, videoSrc, encoder, payloader, NULL);
-
+  g_print("framerate: %d", framerate);
   videoCaps = gst_caps_new_simple ("video/x-raw",
       "width", G_TYPE_INT, yuvsrc_width,
       "height", G_TYPE_INT, yuvsrc_height,
@@ -500,7 +502,8 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
                   NULL);
 
 
-    g_object_set (rtpSink_1, "port", path1_tx_rtp_port, "host", path_1_tx_ip, NULL);
+//    g_object_set (rtpSink_1, "port", path1_tx_rtp_port, "host", path_1_tx_ip, NULL);
+    g_object_set (rtpSink_1, "port", path1_tx_rtp_port, "host", path_1_tx_ip, "sync", FALSE, "async", FALSE, NULL);
     g_object_set (rtpSink_2, "port", path2_tx_rtp_port, "host", path_2_tx_ip, NULL);
     g_object_set (rtpSink_3, "port", path3_tx_rtp_port, "host", path_3_tx_ip, NULL);
 
@@ -561,7 +564,6 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
             "fec-interval", fec_interval,
             "obsolation-treshold", obsolation_th,
             "setup-report-timeout", report_timeout,
-            "setup-keep-alive-period", keep_alive_period,
             "setup-sending-target", sending_target,
             "setup-controlling-mode", controlling_mode,
             "mpath-keyframe-filtering", mpath_keyfiltering,
@@ -635,7 +637,7 @@ main (int argc, char **argv)
 
   if(argc > 1) testfile = argv[1];
 
-  framerate = use_testsourcevideo ? 100 : 25;
+//  framerate = use_testsourcevideo ? 100 : 25;
   if(use_testsourcevideo){
     videoSession = save_received_yuvfile ? make_video_session2(0) : make_video_session(0);
   }else{

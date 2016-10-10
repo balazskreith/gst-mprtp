@@ -9,9 +9,12 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          gstmprtcpbuffer.c     \
                          gstmprtpplayouter.c   \
                          gstmprtpreceiver.c    \
+                         gstmprtpplugin.c      \
                          gstmprtpscheduler.c   \
                          gstmprtpsender.c      \
+                         jitterbuffer.c        \
                          lib_bintree.c         \
+                         lib_datapuffer.c      \
                          lib_swplugins.c       \
                          mediator.c            \
                          mprtpdefs.c           \
@@ -22,6 +25,7 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          rcvpackets.c          \
                          rcvsubflows.c         \
                          rcvtracker.c          \
+                         recycle.c             \
                          reportproc.c          \
                          reportprod.c          \
                          ricalcer.c            \
@@ -42,7 +46,9 @@ noinst_HEADERS = fbrafbproc.h          \
                  fecdec.h              \
                  fecenc.h              \
                  gstmprtcpbuffer.h     \
+                 jitterbuffer.h        \
                  lib_bintree.h         \
+                 lib_datapuffer.h      \
                  lib_swplugins.h       \
                  mediator.h            \
                  mprtpdefs.h           \
@@ -53,6 +59,7 @@ noinst_HEADERS = fbrafbproc.h          \
                  rcvsubflows.h         \
                  rcvpackets.h          \
                  rcvtracker.h          \
+                 recycle.h             \
                  reportproc.h          \
                  reportprod.h          \
                  ricalcer.h            \

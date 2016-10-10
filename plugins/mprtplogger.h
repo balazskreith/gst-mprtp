@@ -30,6 +30,8 @@ struct _MPRTPLogger
   GstTask*          process;
   GRecMutex         process_mutex;
 
+  GHashTable*       memory_consumptions;
+
   gchar             path[255];
   gboolean          enabled;
 
@@ -37,11 +39,25 @@ struct _MPRTPLogger
   gchar             collector_filename[255];
 
   GAsyncQueue*      messages;
+  GAsyncQueue*      recycle;
 };
 
 struct _MPRTPLoggerClass{
   GObjectClass parent_class;
 };
+
+
+
+#define mprtp_slice_new0(type) \
+  mprtp_logger_add_memory_consumption(#type, sizeof(type)), g_slice_new0(type)
+
+//#define mprtp_log_slice_new0(type)  g_slice_new0(type)
+
+#define mprtp_slice_free(type, mem) \
+  mrptp_logger_rem_memoty_consumption(#type, sizeof(type)), g_slice_free(type, mem)
+
+//#define mprtp_log_slice_free(type, mem)  g_slice_free(type, mem)
+
 
 //#define mprtp_malloc(bytenum) g_malloc0(bytenum)
 gpointer mprtp_malloc(gsize bytenum);
@@ -51,6 +67,9 @@ void mprtp_free(gpointer ptr);
 
 void init_mprtp_logger(void);
 void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer,gchar*),gpointer data, const gchar* filename);
+void mprtp_logger_add_memory_consumption(gchar *type_name, gsize size);
+void mprtp_logger_rem_memory_consumption(gchar *type_name, gsize size);
+void mprtp_logger_print_memory_consumption(void);
 void mprtp_logger_set_state(gboolean enabled);
 void mprtp_logger_set_target_directory(const gchar *path);
 void mprtp_logger(const gchar *filename, const gchar * format, ...);

@@ -33,10 +33,6 @@ struct _StreamSplitter
   GstClockTime         made;
   SchNode*             tree;
 
-//  guint                active_subflow_num;
-//  guint8               max_flag;
-//  guint                keyframe_filtering;
-
   SndSubflows*         subflows;
   gint32               actual_targets[256];
 };

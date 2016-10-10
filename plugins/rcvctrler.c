@@ -149,7 +149,7 @@ rcvctrler_finalize (GObject * object)
 
   g_object_unref(this->subflows);
   g_object_unref(this->rcvtracker);
-  g_async_queue_unref(this->mprtcpq);
+  g_object_unref(this->on_rtcp_ready);
 
 }
 
@@ -157,12 +157,14 @@ RcvController*
 make_rcvctrler(
     RcvTracker *rcvtracker,
     RcvSubflows* subflows,
-    GAsyncQueue *mprtcpq)
+    Notifier* on_rtcp_ready)
 {
-  RcvController* this = (RcvController*)g_object_new(SNDCTRLER_TYPE, NULL);
-  this->mprtcpq    = g_async_queue_ref(mprtcpq);
-  this->subflows   = g_object_ref(subflows);
-  this->rcvtracker = g_object_ref(rcvtracker);
+  RcvController* this = (RcvController*)g_object_new(RCVCTRLER_TYPE, NULL);
+
+  this->sysclock      = gst_system_clock_obtain();
+  this->on_rtcp_ready = g_object_ref(on_rtcp_ready);
+  this->subflows      = g_object_ref(subflows);
+  this->rcvtracker    = g_object_ref(rcvtracker);
 
   rcvsubflows_add_on_subflow_detached_cb(
       this->subflows, (ListenerFunc)_on_subflow_detached, this);
@@ -242,7 +244,7 @@ static void _receiver_report_updater_helper(RcvSubflow *subflow, gpointer udata)
 
   buf = report_producer_end(this->report_producer, &report_length);
   if(!buf){
-    g_async_queue_push(this->mprtcpq, buf);
+    notifier_do(this->on_rtcp_ready, buf);
   }
 
   //report_length += 12 /* RTCP HEADER*/ + (28<<3) /*UDP+IP HEADER*/;

@@ -251,6 +251,7 @@ void _create_nodes(gpointer item, gpointer udata)
   CreateData *cdata = udata;
   SndSubflow *subflow = item;
   cdata->actual = subflow->target_bitrate >> 3;
+
   cdata->root->remained -= _schtree_insert(cdata->root,
                                           &cdata->actual,
                                           subflow,
@@ -277,7 +278,6 @@ _schnode_rdtor (StreamSplitter *this,SchNode * node)
   }
   _schnode_rdtor (this, node->left);
   _schnode_rdtor (this, node->right);
-//  pointerpool_add(this->pointerpool, node);
   g_slice_free(SchNode, node);
 
 //  mprtp_free(node);
@@ -289,6 +289,7 @@ _schtree_insert (SchNode * node, gint *value, SndSubflow * subflow, gint level_v
 {
   gint dvalue = 0;
   gint left_level_value,right_level_value;
+
   if(!node->remained || *value < 1){
     goto done;
   }
@@ -361,6 +362,7 @@ gpointer
 _schnode_ctor (void)
 {
   SchNode *result = g_slice_new0(SchNode);
+//  g_print("%d schnode created", ++created_);
   result->left       = NULL;
   result->right      = NULL;
   result->subflows   = NULL;

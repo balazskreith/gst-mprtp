@@ -86,7 +86,7 @@ ricalcer_class_init (ReportIntervalCalculatorClass * klass)
 void
 ricalcer_init (ReportIntervalCalculator * this)
 {
-
+  this->sysclock = gst_system_clock_obtain();
 }
 
 void

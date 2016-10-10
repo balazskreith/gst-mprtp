@@ -50,7 +50,7 @@ struct _SndSubflow
   guint32                    total_sent_packets_num;
   guint32                    total_sent_payload_bytes;
 
-  SndSubflowState            state;
+  SndSubflowState            state, state_t1;
 
   GstClockTime               pacing_time;
 
@@ -105,7 +105,7 @@ void sndsubflows_detach(SndSubflows* this, guint8 id);
 void sndsubflows_iterate(SndSubflows* this, GFunc process, gpointer udata);
 
 void sndsubflow_request_monitoring(SndSubflow* subflow);
-void sndsubflows_set_target_rate(SndSubflow* subflow, gint32 target_rate);
+void sndsubflow_set_target_rate(SndSubflow* subflow, gint32 target_rate);
 gint32 sndsubflows_get_total_target(SndSubflows* this);
 gint32 sndsubflows_get_subflows_num(SndSubflows* this);
 SndSubflow* sndsubflows_get_subflow(SndSubflows* this, guint8 subflow_id);

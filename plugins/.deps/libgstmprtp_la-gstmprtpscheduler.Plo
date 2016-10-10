@@ -358,7 +358,8 @@ libgstmprtp_la-gstmprtpscheduler.lo: gstmprtpscheduler.c \
  /usr/include/glib-2.0/gio/gliststore.h \
  /usr/include/glib-2.0/gio/gio-autocleanups.h reportprod.h streamjoiner.h \
  lib_swplugins.h /usr/include/ctype.h /usr/include/assert.h \
- slidingwindow.h lib_bintree.h notifier.h rcvtracker.h rcvpackets.h \
+ slidingwindow.h lib_datapuffer.h lib_bintree.h notifier.h recycle.h \
+ rcvtracker.h rcvpackets.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h \
  rcvsubflows.h mediator.h ricalcer.h sndsubflows.h streamsplitter.h \
  sndpackets.h reportproc.h signalreport.h fecenc.h rtpfecbuffer.h \
@@ -1186,9 +1187,13 @@ lib_swplugins.h:
 
 slidingwindow.h:
 
+lib_datapuffer.h:
+
 lib_bintree.h:
 
 notifier.h:
+
+recycle.h:
 
 rcvtracker.h:
 

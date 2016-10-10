@@ -110,7 +110,6 @@ fbrafbprocessor_init (FBRAFBProcessor * this)
 {
   this->sysclock         = gst_system_clock_obtain();
   this-> RTT             = 0;
-  _stat(this)->srtt      = 0;
 
 }
 
@@ -215,7 +214,6 @@ void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
 done:
   return;
 }
-
 
 void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr)
 {

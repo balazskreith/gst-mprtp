@@ -41,6 +41,7 @@ G_DEFINE_TYPE (FBRAFBProducer, fbrafbproducer, G_TYPE_OBJECT);
 
 static void fbrafbproducer_finalize (GObject * object);
 static gboolean _do_fb(FBRAFBProducer* data);;
+static gboolean _receive_packet_filter(FBRAFBProducer *this, RcvPacket *packet);
 static void _on_received_packet(FBRAFBProducer *this, RcvPacket *packet);
 static void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this,  ReportProducer* reportproducer);
 static void _setup_xr_owd(FBRAFBProducer * this,  ReportProducer* reportproducer);
@@ -80,7 +81,7 @@ fbrafbproducer_finalize (GObject * object)
   FBRAFBProducer *this;
   this = FBRAFBPRODUCER(object);
 
-  rcvtracker_subflow_rem_on_received_packet_cb(this->tracker, this->subflow->id, (ListenerFunc)_on_received_packet);
+  rcvtracker_rem_on_received_packet_listener(this->tracker,  (ListenerFunc)_on_received_packet);
   rcvsubflow_rem_on_rtcp_fb_cb(this->subflow, (ListenerFunc) _on_fb_update);
 
   g_object_unref(this->sysclock);
@@ -111,8 +112,10 @@ FBRAFBProducer *make_fbrafbproducer(RcvSubflow* subflow, RcvTracker *tracker)
   slidingwindow_add_plugin(this->owds_sw,
       make_swpercentile(50, bintree3cmp_uint64, (ListenerFunc)_owd_percentile_pipe, this));
 
-  rcvtracker_subflow_add_on_received_packet_cb(this->tracker, subflow->id,
-        (ListenerFunc) _on_received_packet, this);
+  rcvtracker_add_on_received_packet_listener_with_filter(this->tracker,
+      (ListenerFunc) _on_received_packet,
+      (ListenerFilterFunc) _receive_packet_filter,
+      this);
 
   rcvsubflow_add_on_rtcp_fb_cb(subflow, (ListenerFunc) _on_fb_update, this);
 
@@ -127,6 +130,11 @@ void fbrafbproducer_reset(FBRAFBProducer *this)
 void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold)
 {
   slidingwindow_set_treshold(this->owds_sw, treshold);
+}
+
+gboolean _receive_packet_filter(FBRAFBProducer *this, RcvPacket *packet)
+{
+  return packet->subflow_id == this->subflow->id;
 }
 
 void _on_received_packet(FBRAFBProducer *this, RcvPacket *packet)

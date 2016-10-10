@@ -270,7 +270,6 @@ FBRASubController *make_fbrasubctrler(SndTracker *sndtracker, SndSubflow *subflo
   this->stat                = g_malloc0(sizeof(FBRAPlusStat));
   this->fbprocessor         = make_fbrafbprocessor(sndtracker, subflow, this->stat);
 
-
   sndsubflow_set_state(subflow, SNDSUBFLOW_STATE_STABLE);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
 
@@ -296,16 +295,17 @@ void fbrasubctrler_disable(FBRASubController *this)
 
 void _on_rtp_sending(FBRASubController* this, SndPacket *packet)
 {
-  gdouble pacing_time;
+  gdouble pacing_time = 0.;
   gdouble pacing_bitrate;
   gdouble srtt_in_s;
   if(!this->enabled){
     return;
   }
   srtt_in_s = _stat(this)->srtt * .000000001;
-  pacing_bitrate = this->cwnd / srtt_in_s;
+  pacing_bitrate = 0. < srtt_in_s ? this->cwnd / srtt_in_s : 50000.;
   pacing_time = (gdouble)packet->payload_size / pacing_bitrate;
   this->subflow->pacing_time = pacing_time * GST_SECOND;
+//  g_print("pacing_time: %f/%f=%f\n", (gdouble)packet->payload_size, pacing_bitrate, pacing_time);
 }
 
 
@@ -317,6 +317,17 @@ void fbrasubctrler_time_update(FBRASubController *this)
 
   fbrafbprocessor_time_update(this->fbprocessor);
   _update_approvement(this);
+
+  switch(this->subflow->state){
+    case SNDSUBFLOW_STATE_OVERUSED:
+      break;
+    case SNDSUBFLOW_STATE_STABLE:
+      break;
+    case SNDSUBFLOW_STATE_UNDERUSED:
+      break;
+    default:
+      break;
+  }
 
 done:
   return;
@@ -352,7 +363,7 @@ static gboolean _distortion(FBRASubController *this)
 {
   //consider fix tresholds
   GstClockTime owd_th = _stat(this)->owd_80th +
-      CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, _stat(this)->owd_in_ms_std * 4);
+      CONSTRAIN(50 * GST_MSECOND, 150 * GST_MSECOND, _stat(this)->owd_in_ms_std * GST_MSECOND * 4);
 
   gint32 BiF_th = _stat(this)->BiF_80th + MAX(5000, _stat(this)->BiF_80th * .2);
 
@@ -397,16 +408,16 @@ _keep_stage(
   this->cwnd = MAX(10000, _stat(this)->BiF_max * 1.5) * 8;
 
   if(_congestion(this)){
-    _set_event(this, EVENT_CONGESTION);
-    _switch_stage_to(this, STAGE_REDUCE, FALSE);
+    //_set_event(this, EVENT_CONGESTION);
+    //_switch_stage_to(this, STAGE_REDUCE, FALSE);
     goto done;
   }
 
   if(_distortion(this)){
-    _set_event(this, EVENT_DISTORTION);
+    //_set_event(this, EVENT_DISTORTION);
     goto done;
   }else if(_subflow(this)->state != SNDSUBFLOW_STATE_STABLE){
-    _set_event(this, EVENT_SETTLED);
+    //_set_event(this, EVENT_SETTLED);
     goto done;
   }
 
@@ -416,7 +427,7 @@ _keep_stage(
     goto done;
   }
 
-  _switch_stage_to(this, STAGE_PROBE, FALSE);
+  //_switch_stage_to(this, STAGE_PROBE, FALSE);
 done:
   return;
 }
@@ -449,7 +460,7 @@ _increase_stage(
     FBRASubController *this)
 {
 
-  this->cwnd = MAX(10000, _stat(this)->BiF_max * 2) * 8  + this->delta_target;
+  this->cwnd = MAX(10000, _stat(this)->BiF_max * 2) * 8;
 
   if(_distortion(this)){
     _set_event(this, EVENT_DISTORTION);

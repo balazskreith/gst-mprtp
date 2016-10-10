@@ -491,10 +491,12 @@ main (int argc, char **argv)
 
   rtpBin = gst_element_factory_make ("rtpbin", NULL);
   gst_bin_add (GST_BIN (_pipe_), rtpBin);
-//  g_object_set (rtpBin, "latency", 200, "do-retransmission", TRUE,
-//      "rtp-profile", GST_RTP_PROFILE_AVPF, NULL);
+  //  g_object_set (rtpBin, "latency", 200, "do-retransmission", TRUE,
+  //      "rtp-profile", GST_RTP_PROFILE_AVPF, NULL);
 
-  framerate = use_testsourcevideo ? 100 : 25;
+    g_object_set (rtpBin, "buffer-mode", 2, NULL);
+
+//  framerate = use_testsourcevideo ? 100 : 25;
   if(save_received_yuvfile){
     videoSession = make_video_session_and_save_yuvfile (0);
   }else{

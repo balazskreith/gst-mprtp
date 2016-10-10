@@ -407,36 +407,30 @@ gst_mprtpsender_set_property (GObject * object, guint property_id,
   Subflow *subflow;
   GST_DEBUG_OBJECT (this, "set_property");
 
+  THIS_WRITELOCK (this);
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
-      THIS_WRITELOCK (this);
       this->mprtp_ext_header_id = (guint8) g_value_get_uint (value);
-      THIS_WRITEUNLOCK (this);
       break;
     case PROP_PIVOT_OUTPAD:
-      THIS_WRITELOCK (this);
       subflow_id = (guint8) g_value_get_uint (value);
       if (_select_subflow (this, subflow_id, &subflow)) {
         this->pivot_outpad = subflow->outpad;
       } else {
         this->pivot_outpad = NULL;
       }
-      THIS_WRITEUNLOCK (this);
       break;
     case PROP_FEC_PAYLOAD_TYPE:
-      THIS_WRITELOCK (this);
       this->fec_payload_type = (guint8) g_value_get_uint (value);
-      THIS_WRITEUNLOCK (this);
       break;
     case PROP_ASYNC_FEC:
-      THIS_WRITELOCK (this);
       this->async_fec = g_value_get_boolean (value);
-      THIS_WRITEUNLOCK (this);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
   }
+  THIS_WRITEUNLOCK (this);
 }
 
 void
@@ -447,26 +441,22 @@ gst_mprtpsender_get_property (GObject * object, guint property_id,
 
   GST_DEBUG_OBJECT (this, "get_property");
 
+  THIS_READLOCK (this);
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
-      THIS_READLOCK (this);
       g_value_set_uint (value, (guint) this->mprtp_ext_header_id);
-      THIS_READUNLOCK (this);
       break;
     case PROP_FEC_PAYLOAD_TYPE:
-     THIS_READLOCK (this);
      g_value_set_uint (value, (guint) this->fec_payload_type);
-     THIS_READUNLOCK (this);
      break;
     case PROP_ASYNC_FEC:
-      THIS_READLOCK (this);
       g_value_set_boolean (value, this->async_fec);
-      THIS_READUNLOCK (this);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
   }
+  THIS_READUNLOCK (this);
 }
 
 void
@@ -928,7 +918,6 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     this->dirty = FALSE;
   }
 
-
   n = g_list_length (this->subflows);
   if (n < 1) {
     GST_ERROR_OBJECT (this, "No appropiate subflow");
@@ -937,6 +926,7 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     goto done;
   }
   packet_type = _get_packet_mptype (this, buf, &map, &subflow_id);
+
   if (packet_type != PACKET_IS_NOT_MP && _select_subflow (this, subflow_id, &subflow) != FALSE) {
     if(packet_type == PACKET_IS_MPRTCP){
       outpad = subflow->async_outpad ? subflow->async_outpad : subflow->outpad;

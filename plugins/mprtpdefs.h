@@ -16,7 +16,7 @@
 #define MPRTP_DEFAULT_EXTENSION_HEADER_ID 3
 #define ABS_TIME_DEFAULT_EXTENSION_HEADER_ID 8
 #define FEC_PAYLOAD_DEFAULT_ID 126
-#define SUBFLOW_DEFAULT_SENDING_RATE 100000
+#define SUBFLOW_DEFAULT_SENDING_RATE 800000
 
 #define MPRTP_PLUGIN_MAX_SUBFLOW_NUM 32
 
@@ -42,7 +42,6 @@
   if(0 < elapsed) {g_print(msg" elapsed time in ms: %lu\n", elapsed); }\
 } \
 
-
 typedef enum{
   RTCP_INTERVAL_REGULAR_INTERVAL_MODE      = 0,
   RTCP_INTERVAL_EARLY_RTCP_MODE            = 1,
@@ -51,7 +50,7 @@ typedef enum{
 
 typedef enum{
   CONGESTION_CONTROLLING_TYPE_NONE         = 0,
-  CONGESTION_CONTROLLING_TYPE_FBRAPLUS     = 1,
+  CONGESTION_CONTROLLING_TYPE_FBRAPLUS     = 2,
 }CongestionControllingType;
 
 
@@ -75,6 +74,7 @@ typedef struct{
 }DiscardedPacket;
 
 typedef struct{
+  guint8   subflow_id;
   guint16  subflow_seq;
   gboolean repaired;
 }LostPacket;

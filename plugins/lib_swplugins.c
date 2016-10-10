@@ -351,14 +351,16 @@ static void _swpercentile_balancer(swpercentile_t *this)
 reduce_mintree:
   ratio = (double) (this->Mxc + 1) / (double) (this->Mnc - 1);
   if(this->ratio < ratio || this->Mnc < 1) goto done;
-  bintree3_insert_data(this->maxtree, bintree3_delete_bottom_data(this->mintree));
+  //bintree3_insert_data(this->maxtree, bintree3_delete_bottom_data(this->mintree));
+  bintree3_insert_top_data(this->maxtree, bintree3_delete_bottom_data(this->mintree));
   --this->Mnc; ++this->Mxc;
   goto reduce_mintree;
 
 reduce_maxtree:
   ratio = (double) (this->Mxc - 1) / (double) (this->Mnc + 1);
   if(ratio < this->ratio || this->Mxc < 1) goto done;
-  bintree3_insert_data(this->mintree, bintree3_delete_top_data(this->maxtree));
+  //bintree3_insert_data(this->mintree, bintree3_delete_top_data(this->maxtree));
+  bintree3_insert_bottom_data(this->mintree, bintree3_delete_top_data(this->maxtree));
   --this->Mxc; ++this->Mnc;
   goto reduce_maxtree;
 

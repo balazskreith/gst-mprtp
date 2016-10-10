@@ -47,10 +47,19 @@ GST_DEBUG_CATEGORY_STATIC (mprtp_logger_debug_category);
 #define _now(this) (gst_clock_get_time (this->sysclock))
 
 typedef enum{
-  MPRTP_LOGGER_MESSAGE_TYPE_STATE_CHANGING          = 1,
-  MPRTP_LOGGER_MESSAGE_TYPE_WRITING                 = 2,
-  MPRTP_LOGGER_MESSAGE_TYPE_CHANGE_TARGET_DIRECTORY = 3,
+  MPRTP_LOGGER_MESSAGE_TYPE_STATE_CHANGING           = 1,
+  MPRTP_LOGGER_MESSAGE_TYPE_WRITING                  = 2,
+  MPRTP_LOGGER_MESSAGE_TYPE_CHANGE_TARGET_DIRECTORY  = 3,
+  MPRTP_LOGGER_MESSAGE_TYPE_ADD_MEMORY_ALLOCATION    = 4,
+  MPRTP_LOGGER_MESSAGE_TYPE_REM_MEMORY_ALLOCATION    = 5,
+  MPRTP_LOGGER_MESSAGE_TYPE_PRINT_MEMORY_ALLOCATIONS = 6,
 }MessageTypes;
+
+//NOTE: This must be big enough to holds any kind of Message,
+//since this type is going to be created and recycled
+typedef struct {
+  gchar    bytes[2048];
+}MessageBlock;
 
 typedef struct{
   MessageTypes type;
@@ -63,17 +72,24 @@ typedef struct{
 
 typedef struct{
   Message  base;
+  gchar    type_name[255];
+  gsize    size;
+}MemoryConsumptionMessage;
+
+typedef struct{
+  Message  base;
   gchar    string[1024];
-  gchar    path[255];
+  gchar    filename[255];
   gboolean overwrite;
 }WritingMessage;
 
 typedef struct{
   Message            base;
-  gchar              path[255];
+  gchar              filename[255];
 }TargetDirectoryMessage;
 
-
+#define alloc_message(type) (type*) _messageblock_ctor()
+#define throw_message(msg) _throw_messageblock((MessageBlock*) msg)
 
 G_DEFINE_TYPE (MPRTPLogger, mprtp_logger, G_TYPE_OBJECT);
 
@@ -88,10 +104,27 @@ mprtp_logger_finalize (GObject * object);
 static void
 _process(gpointer udata);
 
+static MessageBlock*
+_messageblock_ctor(void);
+
+static void
+_throw_messageblock(
+    MessageBlock* messageblock);
+
+static void
+_messageblock_dtor(
+    gpointer mem);
+
 static void
 _writing(
     MPRTPLogger* this,
     WritingMessage *item);
+
+static void
+_print_memory_allocation(
+    gpointer key,
+    gpointer value,
+    gpointer udata);
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -126,9 +159,19 @@ void
 mprtp_logger_finalize (GObject * object)
 {
   MPRTPLogger *this = MPRTPLOGGER (object);
+  MessageBlock* msg_block;
+  while((msg_block = g_async_queue_try_pop(this->messages)) != NULL){
+    _messageblock_dtor(msg_block);
+  }
+  while((msg_block = g_async_queue_try_pop(this->recycle)) != NULL){
+    _messageblock_dtor(msg_block);
+  }
   g_object_unref (this->sysclock);
   gst_task_stop (this->process);
   g_async_queue_unref(this->messages);
+  g_async_queue_unref(this->recycle);
+
+  g_hash_table_unref(this->memory_consumptions);
 }
 
 void
@@ -139,6 +182,9 @@ mprtp_logger_init (MPRTPLogger * this)
   this->made       = _now(this);
   strcpy(this->path, "logs/");
   this->messages   = g_async_queue_new();
+  this->recycle   = g_async_queue_new();
+
+  this->memory_consumptions = g_hash_table_new(g_str_hash, g_str_equal);
 
   this->process = gst_task_new (_process, this, NULL);
   g_rec_mutex_init (&this->process_mutex);
@@ -168,22 +214,56 @@ again:
     {
       StatusMessage* status_msg = (StatusMessage*)msg;
       this->enabled = status_msg->enabled;
-      g_slice_free(StatusMessage, status_msg);
+//      g_slice_free(StatusMessage, status_msg);
+      throw_message(msg);
     }
     break;
     case MPRTP_LOGGER_MESSAGE_TYPE_WRITING:
     {
       _writing(this, (WritingMessage*) msg);
-      g_slice_free(WritingMessage, (WritingMessage*) msg);
+//      g_slice_free(WritingMessage, (WritingMessage*) msg);
+      throw_message(msg);
     }
     break;
     case MPRTP_LOGGER_MESSAGE_TYPE_CHANGE_TARGET_DIRECTORY:
     {
       TargetDirectoryMessage* target_msg = (TargetDirectoryMessage*)msg;
-      strcpy(this->path, target_msg->path);
-      g_slice_free(TargetDirectoryMessage, target_msg);
+      strcpy(this->path, target_msg->filename);
+//      g_slice_free(TargetDirectoryMessage, target_msg);
+      throw_message(msg);
     }
     break;
+    case MPRTP_LOGGER_MESSAGE_TYPE_ADD_MEMORY_ALLOCATION:
+    {
+      MemoryConsumptionMessage* consumption_msg = (MemoryConsumptionMessage*)msg;
+      MemoryConsumptionMessage* actual;
+      if(!g_hash_table_contains(this->memory_consumptions, consumption_msg->type_name)){
+        g_hash_table_insert(this->memory_consumptions, consumption_msg->type_name, consumption_msg);
+        break;
+      }
+      actual = g_hash_table_lookup(this->memory_consumptions, consumption_msg->type_name);
+      actual->size += consumption_msg->size;
+//      g_slice_free(MemoryConsumptionMessage, consumption_msg);
+      throw_message(msg);
+    }
+    break;
+    case MPRTP_LOGGER_MESSAGE_TYPE_REM_MEMORY_ALLOCATION:
+    {
+      MemoryConsumptionMessage* consumption_msg = (MemoryConsumptionMessage*)msg;
+      MemoryConsumptionMessage* actual;
+      if(!g_hash_table_contains(this->memory_consumptions, consumption_msg->type_name)){
+        break;
+      }
+      actual = g_hash_table_lookup(this->memory_consumptions, consumption_msg->type_name);
+      actual->size -= consumption_msg->size;
+//      g_slice_free(MemoryConsumptionMessage, consumption_msg);
+      throw_message(msg);
+    }
+    break;
+    case MPRTP_LOGGER_MESSAGE_TYPE_PRINT_MEMORY_ALLOCATIONS:
+      g_hash_table_foreach(this->memory_consumptions, _print_memory_allocation, NULL);
+      throw_message(msg);
+      break;
     default:
       g_warning("Unhandled message with type %d", msg->type);
     break;
@@ -193,10 +273,42 @@ done:
   return;
 }
 
+void mprtp_logger_add_memory_consumption(gchar *type_name, gsize size)
+{
+  MemoryConsumptionMessage *msg;
+//  msg = g_slice_new0(MemoryConsumptionMessage);
+  msg = alloc_message(MemoryConsumptionMessage);
+  msg->base.type = MPRTP_LOGGER_MESSAGE_TYPE_ADD_MEMORY_ALLOCATION;
+  msg->size = size;
+  strcpy(msg->type_name, type_name);
+  g_async_queue_push(this->messages, msg);
+}
+
+void mprtp_logger_rem_memory_consumption(gchar *type_name, gsize size)
+{
+  MemoryConsumptionMessage *msg;
+//  msg = g_slice_new0(MemoryConsumptionMessage);
+  msg = alloc_message(MemoryConsumptionMessage);
+  msg->base.type = MPRTP_LOGGER_MESSAGE_TYPE_REM_MEMORY_ALLOCATION;
+  msg->size = size;
+  strcpy(msg->type_name, type_name);
+  g_async_queue_push(this->messages, msg);
+}
+
+void mprtp_logger_print_memory_consumption(void)
+{
+  Message *msg;
+//  msg = g_slice_new0(Message);
+  msg = alloc_message(Message);
+  msg->type = MPRTP_LOGGER_MESSAGE_TYPE_PRINT_MEMORY_ALLOCATIONS;
+  g_async_queue_push(this->messages, msg);
+}
+
 void mprtp_logger_set_state(gboolean enabled)
 {
   StatusMessage *msg;
-  msg = g_slice_new0(StatusMessage);
+//  msg = g_slice_new0(StatusMessage);
+  msg = alloc_message(StatusMessage);
   msg->base.type = MPRTP_LOGGER_MESSAGE_TYPE_STATE_CHANGING;
   msg->enabled = enabled;
 
@@ -206,10 +318,11 @@ void mprtp_logger_set_state(gboolean enabled)
 void mprtp_logger_set_target_directory(const gchar *path)
 {
   TargetDirectoryMessage *msg;
-  msg = g_slice_new0(TargetDirectoryMessage);
-  msg->base.type = MPRTP_LOGGER_MESSAGE_TYPE_WRITING;
+//  msg = g_slice_new0(TargetDirectoryMessage);
+  msg = alloc_message(TargetDirectoryMessage);
+  msg->base.type = MPRTP_LOGGER_MESSAGE_TYPE_CHANGE_TARGET_DIRECTORY;
 
-  strcpy(msg->path, path);
+  strcpy(msg->filename, path);
   g_async_queue_push(this->messages, msg);
 }
 
@@ -217,14 +330,14 @@ void mprtp_logger(const gchar *filename, const gchar * format, ...)
 {
   WritingMessage *msg;
   va_list args;
-  msg = g_slice_new0(WritingMessage);
+//  msg = g_slice_new0(WritingMessage);
+  msg = alloc_message(WritingMessage);
   msg->base.type = MPRTP_LOGGER_MESSAGE_TYPE_WRITING;
   va_start (args, format);
   vsprintf(msg->string, format, args);
   va_end (args);
 
-  strcpy(msg->path, this->path);
-  strcat(msg->path, filename);
+  strcpy(msg->filename, filename);
   g_async_queue_push(this->messages, msg);
 }
 
@@ -232,7 +345,8 @@ void mprtp_log_one(const gchar *filename, const gchar * format, ...)
 {
   WritingMessage *item;
   va_list args;
-  item = g_slice_new0(WritingMessage);
+//  item = g_slice_new0(WritingMessage);
+  item = alloc_message(WritingMessage);
   item->base.type = MPRTP_LOGGER_MESSAGE_TYPE_WRITING;
 
   va_start (args, format);
@@ -241,23 +355,55 @@ void mprtp_log_one(const gchar *filename, const gchar * format, ...)
 
   item->overwrite = TRUE;
 
-  strcpy(item->path, this->path);
-  strcat(item->path, filename);
+  strcpy(item->filename, filename);
   g_async_queue_push(this->messages, item);
 }
 
 
+MessageBlock* _messageblock_ctor(void)
+{
+  MessageBlock *result;
+  result = g_async_queue_try_pop(this->recycle);
+  if(!result){
+    result = g_slice_new0(MessageBlock);
+  }else{
+    memset(result, 0, sizeof(MessageBlock));
+  }
+  return result;
+}
+
+void _throw_messageblock(MessageBlock* messageblock)
+{
+  g_async_queue_push(this->recycle, messageblock);
+}
+
+void _messageblock_dtor(gpointer mem)
+{
+  g_slice_free(MessageBlock, (MessageBlock*)mem);
+}
+
 void _writing(MPRTPLogger* this, WritingMessage *item)
 {
   FILE *fp;
+  gchar path[255];
+
   if(!this->enabled){
     return;
   }
-  fp = fopen(item->path, item->overwrite ? "w" : "a+");
+  memset(path, 0, 255);
+  strcpy(path, this->path);
+  strcpy(path, item->filename);
+  fp = fopen(path, item->overwrite ? "w" : "a+");
   fprintf (fp, "%s", item->string);
   fclose(fp);
-  g_free(item);
 }
+
+void _print_memory_allocation(gpointer key, gpointer value, gpointer udata)
+{
+  MemoryConsumptionMessage* msg = value;
+  g_print("%30s: %lu\n", msg->type_name, msg->size);
+}
+
 
 #undef MAX_RIPORT_INTERVAL
 #undef THIS_LOCK

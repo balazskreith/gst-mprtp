@@ -39,12 +39,12 @@ struct _RcvController
   guint32                   ssrc;
   gboolean                  report_is_flowable;
 
+  Notifier*                 on_rtcp_ready;
   ReportProducer*           report_producer;
   ReportProcessor*          report_processor;
 
   GSList*                   fbproducers;
   RcvTracker*               rcvtracker;
-  GAsyncQueue*              mprtcpq;
 
   GstMPRTCPReportSummary    reports_summary;
   GstClockTime              last_time_update;
@@ -60,7 +60,7 @@ struct _RcvControllerClass{
 RcvController* make_rcvctrler(
     RcvTracker* rcvtracker,
     RcvSubflows* subflows,
-    GAsyncQueue *mprtcpq);
+    Notifier* on_rtcp_ready);
 
 
 void

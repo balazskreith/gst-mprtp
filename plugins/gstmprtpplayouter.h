@@ -26,6 +26,7 @@
 #include "streamjoiner.h"
 #include "rcvctrler.h"
 #include "fecdec.h"
+#include "jitterbuffer.h"
 
 #if GLIB_CHECK_VERSION (2, 35, 7)
 #include <gio/gnetworking.h>
@@ -67,11 +68,13 @@ struct _GstMprtpplayouter
 
   GstClock*       sysclock;
   StreamJoiner*   joiner;
+  JitterBuffer*   jitterbuffer;
   RcvController*  controller;
   RcvSubflows*    subflows;
   FECDecoder*     fec_decoder;
   RcvPackets*     rcvpackets;
   RcvTracker*     rcvtracker;
+  Notifier*       on_rtcp_ready;
 
   guint8          fec_payload_type;
 
@@ -91,7 +94,6 @@ struct _GstMprtpplayouter
   GAsyncQueue*     mprtp_out;
   GAsyncQueue*     mprtcp_out;
 
-  gboolean         fec_requested;
 //  PacketForwarder* packetforwarder;
 
 };

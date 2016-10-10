@@ -32,15 +32,38 @@ if(!candidates->processed){                        \
   if(!left){                                       \
       PercResult = ((Type*)right)->field;          \
   }else if(!right){                                \
-	  PercResult = ((Type*)left)->field;           \
+    PercResult = ((Type*)left)->field;             \
   }else{                                           \
-	  PercResult =  ((Type*)left)->field;          \
-	  PercResult += ((Type*)right)->field;         \
+    PercResult =  ((Type*)left)->field;            \
+    PercResult += ((Type*)right)->field;           \
       PercResult>>=1;                              \
   }                                                \
   minResult = ((Type*)min)->field;                 \
   maxResult = ((Type*)max)->field;                 \
-}                                                  \
+}
+
+
+#define PercentileRawResult(Type, candidates, PercResult, minResult, maxResult, defaultResult) \
+if(!candidates->processed){                        \
+  PercResult = defaultResult;                      \
+}else{                                             \
+  Type *left, *right, *min, *max;                  \
+  left  = candidates->left;                        \
+  right = candidates->right;                       \
+  min   = candidates->min;                         \
+  max   = candidates->max;                         \
+  if(!left){                                       \
+      PercResult = *right;                         \
+  }else if(!right){                                \
+    PercResult = *left;                            \
+  }else{                                           \
+    PercResult =  *left;                           \
+    PercResult += *right;                          \
+    PercResult>>=1;                                \
+  }                                                \
+  minResult = *min;                                \
+  maxResult = *max;                                \
+}
 
 
 #define PercentileResultPipeFnc(name, TypeThis, ResultField, MinField, MaxField, Type, field, defaultResult) \

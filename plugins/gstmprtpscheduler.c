@@ -83,7 +83,7 @@ static gboolean gst_mprtpscheduler_mprtp_src_event (GstPad * pad,
     GstObject * parent, GstEvent * event);
 static gboolean gst_mprtpscheduler_sink_eventfunc (GstPad * srckpad, GstObject * parent,
                                                    GstEvent * event);
-
+static void _on_rtcp_ready(GstMprtpscheduler * this, GstBuffer *buffer);
 static void _on_monitoring_request(GstMprtpscheduler * this, SndSubflow* subflow);
 static void _on_monitoring_response(GstMprtpscheduler * this, FECEncoderResponse *response);
 static gboolean _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndPacket *packet);
@@ -372,11 +372,9 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   g_mutex_init (&this->mutex);
 
   this->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
-  this->splitter = make_stream_splitter(this->subflows);
-
-  this->packetforwarder  = make_packetforwarder(this->mprtp_srcpad, this->mprtcp_sr_srcpad);
 
   this->monitoring    = make_mediator();
+  this->on_rtcp_ready = make_notifier();
 
   this->subflows      = make_sndsubflows(this->monitoring);
   this->sndpackets    = make_sndpackets();
@@ -384,28 +382,28 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->fec_responses = g_async_queue_new();
   this->emitterq      = g_async_queue_new();
 
-
+  this->splitter      = make_stream_splitter(this->subflows);
   this->fec_encoder   = make_fecencoder(this->monitoring);
   this->sndtracker    = make_sndtracker(this->subflows);
 
   this->controller = make_sndctrler(
       this->sndtracker,
       this->subflows,
-      this->mprtcpq,
+      this->on_rtcp_ready,
       this->emitterq);
-
-  this->mprtpq        = g_async_queue_ref(this->packetforwarder->mprtpq);
-  this->mprtcpq       = g_async_queue_ref(this->packetforwarder->mprtcpq);
 
   fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
   sndsubflows_add_on_target_bitrate_changed_cb(this->subflows,
       (ListenerFunc) stream_splitter_on_target_bitrate_changed, this->splitter);
 
   mediator_set_request_handler(this->monitoring,
-        (ListenerFunc) _on_monitoring_request, this);
+      (ListenerFunc) _on_monitoring_request, this);
 
   mediator_set_response_handler(this->monitoring,
-        (ListenerFunc) _on_monitoring_response, this);
+      (ListenerFunc) _on_monitoring_response, this);
+
+  notifier_add_listener(this->on_rtcp_ready,
+      (ListenerFunc) _on_rtcp_ready, this);
 }
 
 
@@ -438,8 +436,6 @@ gst_mprtpscheduler_finalize (GObject * object)
   g_object_unref (this->splitter);
   g_object_unref (this->fec_encoder);
 
-  g_async_queue_unref(this->mprtpq);
-  g_async_queue_unref(this->mprtcpq);
   g_async_queue_unref(this->rtpbuffers_in);
   g_async_queue_unref(this->fec_responses);
   g_async_queue_unref(this->emitterq);
@@ -471,7 +467,6 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
 
   subflow_prop = (SubflowSpecProp*) &guint_value;
   GST_DEBUG_OBJECT (this, "set_property");
-
   THIS_LOCK(this);
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
@@ -608,10 +603,10 @@ gst_mprtpscheduler_change_state (GstElement * element,
     case GST_STATE_CHANGE_NULL_TO_READY:
       break;
     case GST_STATE_CHANGE_READY_TO_PAUSED:
-      gst_pad_start_task(this->mprtp_srcpad, (GstTaskFunction)mprtpscheduler_approval_process,
-         this, NULL);
       break;
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
+       gst_pad_start_task(this->mprtp_srcpad, (GstTaskFunction)mprtpscheduler_approval_process,
+         this, NULL);
        gst_task_set_lock (this->thread, &this->thread_mutex);
        gst_task_start (this->thread); //Fixme elliminate if we doesn't want this.
        break;
@@ -684,6 +679,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   GstFlowReturn result;
   guint8 first_byte;
   guint8 second_byte;
+
 //  gboolean suggest_to_skip = FALSE;
 //  GstBuffer *outbuf;
   result = GST_FLOW_OK;
@@ -701,14 +697,35 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
 
   if (!PACKET_IS_RTP_OR_RTCP (first_byte)) {
     GST_DEBUG_OBJECT (this, "Not RTP Packet arrived at rtp_sink");
-    g_async_queue_push(this->mprtpq, buffer);
+    gst_pad_push(this->mprtp_srcpad, buffer);
     goto done;
   }
   if(PACKET_IS_RTCP(second_byte)){
     GST_DEBUG_OBJECT (this, "RTCP Packet arrived on rtp sink");
-    g_async_queue_push(this->mprtpq, buffer);
+    gst_pad_push(this->mprtp_srcpad, buffer);
     goto done;
   }
+  if(!this->preroll){
+    this->last_pts = GST_BUFFER_PTS(buffer);
+    gst_pad_push(this->mprtp_srcpad, buffer);
+    this->preroll = TRUE;
+
+    goto done;
+  }
+
+  if(GST_BUFFER_PTS_IS_VALID(buffer)){
+    GstClockTime scheduled_time;
+    GstClockID clock_id;
+    scheduled_time = _now(this) + (GST_BUFFER_PTS(buffer) - this->last_pts);
+    this->last_pts = GST_BUFFER_PTS(buffer);
+    clock_id = gst_clock_new_single_shot_id (this->sysclock, scheduled_time);
+
+    if (gst_clock_id_wait (clock_id, NULL) == GST_CLOCK_UNSCHEDULED) {
+      GST_WARNING_OBJECT (this, "The scheduler clock wait is interrupted");
+    }
+    gst_clock_id_unref (clock_id);
+  }
+
   fecencoder_add_rtpbuffer(this->fec_encoder, buffer);
   g_async_queue_push(this->rtpbuffers_in, gst_buffer_ref(buffer));
 done:
@@ -838,6 +855,11 @@ gst_mprtpscheduler_src_query (GstPad * srckpad, GstObject * parent,
   return result;
 }
 
+void _on_rtcp_ready(GstMprtpscheduler * this, GstBuffer *buffer)
+{
+  gst_pad_push(this->mprtcp_sr_srcpad, buffer);
+}
+
 void _on_monitoring_request(GstMprtpscheduler * this, SndSubflow* subflow)
 {
   fecencoder_request_fec(this->fec_encoder, subflow->id);
@@ -868,8 +890,14 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndPacket *packet)
   result = TRUE;
   sndpacket_setup_mprtp(packet, subflow);
   sndtracker_packet_sent(this->sndtracker, packet);
-  packetforwarder_add_rtppad_buffer(this->packetforwarder, sndpacket_retrieve_and_send(packet));
 
+  g_print("%lu\n",
+  //    gst_segment_to_running_time(&this->segment, GST_FORMAT_TIME, 0)
+      GST_BUFFER_PTS (packet->buffer)
+  );
+  PROFILING("gst_pad_push",
+      gst_pad_push(this->mprtp_srcpad, sndpacket_retrieve_and_send(packet));
+  );
 
   if (!this->riport_flow_signal_sent) {
     this->riport_flow_signal_sent = TRUE;
@@ -890,22 +918,20 @@ mprtpscheduler_approval_process (gpointer udata)
   this = (GstMprtpscheduler *) udata;
   THIS_LOCK(this);
 
+  sndtracker_refresh(this->sndtracker);
   sndctrler_time_update(this->controller);
 
   if(this->monitoring_request){
     FECEncoderResponse *response;
     response = g_async_queue_pop(this->fec_responses);
     sndtracker_add_fec_response(this->sndtracker, response);
-    packetforwarder_add_rtppad_buffer(this->packetforwarder, response->fecbuffer);
+    gst_pad_push(this->mprtp_srcpad, response->fecbuffer);
     fecencoder_unref_response(response);
     this->monitoring_request = FALSE;
-  }else{
-    //TODO: refresh sndtracker fec indow
   }
 
   buffer = (GstBuffer *)g_async_queue_timeout_pop(this->rtpbuffers_in, 100);
   if(!buffer){
-    sndtracker_refresh(this->sndtracker);
     goto done;
   }
   packet = sndpackets_make_packet(this->sndpackets, buffer);
@@ -931,13 +957,11 @@ mprtpscheduler_emitter_process (gpointer udata)
 {
   GstMprtpscheduler *this;
   MPRTPPluginSignalData *msg;
-
   this = (GstMprtpscheduler *) udata;
   msg  = (MPRTPPluginSignalData *)g_async_queue_timeout_pop(this->emitterq, 1000);
   if(!msg){
     goto done;
   }
-  //at least 10 packet or 100ms must be elapsed between two signal
   g_signal_emit (this, _subflows_utilization, 0 /* details */, msg);
   g_slice_free(MPRTPPluginSignalData, msg);
 

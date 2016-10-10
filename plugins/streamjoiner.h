@@ -36,20 +36,7 @@ struct _StreamJoiner
   GObject              object;
   GstClock*            sysclock;
   GstClockTime         made;
-  GstClockTime         join_delay;
-  GstClockTime         last_playout_time_refreshed;
-
-  SlidingWindow*       joinq;
-  GQueue*              playoutq;
-  guint16              last_seq;
-  gboolean             last_seq_init;
-  guint32              last_ts;
-
-  GstClockTime         playout_time;
-
-  gdouble              playout_delay;
-
-  Mediator*            repair_channel;
+  GQueue*              joinq;
 
 };
 struct _StreamJoinerClass{
@@ -57,22 +44,13 @@ struct _StreamJoinerClass{
 };
 
 StreamJoiner*
-make_stream_joiner(Mediator* repair_channel);
+make_stream_joiner(void);
 
-void
-stream_joiner_set_join_delay (
-    StreamJoiner * this,
-    GstClockTime join_delay);
 
 void
 stream_joiner_push_packet(
     StreamJoiner *this,
     RcvPacket* packet);
-
-void
-stream_joiner_on_rcvtracker_stat_change(
-    StreamJoiner *this,
-    RcvTrackerStat* stat);
 
 RcvPacket*
 stream_joiner_pop_packet(

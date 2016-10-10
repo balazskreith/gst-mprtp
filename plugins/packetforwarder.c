@@ -99,7 +99,7 @@ packetforwarder_init (PacketForwarder * this)
 
 }
 
-PacketForwarder* make_packetforwarder(GstPad* rtppad, GstPad* rtcppad)
+PacketForwarder* make_packetforwarder(GstPad* rtppad, GstPad* rtcppad, gboolean async)
 {
   PacketForwarder *this;
   this = g_object_new (PACKETFORWARDER_TYPE, NULL);

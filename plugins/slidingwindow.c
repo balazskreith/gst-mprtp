@@ -34,6 +34,13 @@ GST_DEBUG_CATEGORY_STATIC (slidingwindow_debug_category);
 
 G_DEFINE_TYPE (SlidingWindow, slidingwindow, G_TYPE_OBJECT);
 
+#define RECYCLE_SHAPER_COPY(name, type) \
+static void name(gpointer result, gpointer udata) \
+{                                                 \
+  memcpy(result, udata, sizeof(type));            \
+}                                                 \
+
+
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
@@ -41,145 +48,68 @@ G_DEFINE_TYPE (SlidingWindow, slidingwindow, G_TYPE_OBJECT);
 static void slidingwindow_finalize (GObject * object);
 static gboolean _slidingwindow_default_obsolation(gpointer udata, SlidingWindowItem *item);
 
-
-//----------------------------------------------------------------------
-//--------- Private functions implementations to SchTree object --------
-//----------------------------------------------------------------------
-
-static void _copyfnc_int32(gpointer udata, gpointer dst, gpointer src)
-{
-  memcpy(dst, src, sizeof(gint32));
-}
-
-static void _deallocfnc_int32(gpointer udata, gpointer data)
-{
-  g_slice_free(gint32, data);
-}
-
-static gpointer _allocfnc_int32(gpointer udata, gpointer data)
-{
-  gpointer result;
-  result = g_slice_new0(gint32);
-  memcpy(result, data, sizeof(gint32));
-  return result;
-}
+RECYCLE_SHAPER_COPY(_int32_shaper, gint32);
+RECYCLE_SHAPER_COPY(_int64_shaper, gint64);
+RECYCLE_SHAPER_COPY(_uint32_shaper, guint32);
+RECYCLE_SHAPER_COPY(_uint64_shaper, guint64);
+RECYCLE_SHAPER_COPY(_double_shaper, gdouble);
 
 SlidingWindow* make_slidingwindow_int32(guint32 num_limit, GstClockTime obsolation_treshold)
 {
   SlidingWindow* result;
-  result = make_slidingwindow_with_allocators(num_limit, obsolation_treshold,
-                                              _allocfnc_int32, NULL,
-                                              _deallocfnc_int32, NULL,
-                                              _copyfnc_int32, NULL);
-  return result;
-}
-
-static void _copyfnc_int64(gpointer udata, gpointer dst, gpointer src)
-{
-  memcpy(dst, src, sizeof(gint64));
-}
-
-static void _deallocfnc_int64(gpointer udata, gpointer data)
-{
-  g_slice_free(gint64, data);
-}
-
-static gpointer _allocfnc_int64(gpointer udata, gpointer data)
-{
-  gpointer result;
-  result = g_slice_new0(gint64);
-  memcpy(result, data, sizeof(gint64));
+  result = make_slidingwindow_with_data_recycle(num_limit, obsolation_treshold,
+                                              make_recycle_int32(num_limit, _int32_shaper)
+                                              );
   return result;
 }
 
 SlidingWindow* make_slidingwindow_int64(guint32 num_limit, GstClockTime obsolation_treshold)
 {
   SlidingWindow* result;
-  result = make_slidingwindow_with_allocators(num_limit, obsolation_treshold,
-                                              _allocfnc_int64, NULL,
-                                              _deallocfnc_int64, NULL,
-                                              _copyfnc_int64, NULL);
+  result = make_slidingwindow_with_data_recycle(num_limit, obsolation_treshold,
+                                                make_recycle_int64(num_limit, _int64_shaper)
+                                              );
   return result;
 }
 
-static void _copyfnc_uint64(gpointer udata, gpointer dst, gpointer src)
+SlidingWindow* make_slidingwindow_uint32(guint32 num_limit, GstClockTime obsolation_treshold)
 {
-  memcpy(dst, src, sizeof(guint64));
-}
-
-static void _deallocfnc_uint64(gpointer udata, gpointer data)
-{
-  g_slice_free(guint64, data);
-}
-
-static gpointer _allocfnc_uint64(gpointer udata, gpointer data)
-{
-  gpointer result;
-  result = g_slice_new0(guint64);
-  memcpy(result, data, sizeof(guint64));
+  SlidingWindow* result;
+  result = make_slidingwindow_with_data_recycle(num_limit, obsolation_treshold,
+                                                    make_recycle_uint32(num_limit, _uint32_shaper)
+                                                    );
   return result;
 }
 
 SlidingWindow* make_slidingwindow_uint64(guint32 num_limit, GstClockTime obsolation_treshold)
 {
   SlidingWindow* result;
-  result = make_slidingwindow_with_allocators(num_limit, obsolation_treshold,
-                                              _allocfnc_uint64, NULL,
-                                              _deallocfnc_uint64, NULL,
-                                              _copyfnc_uint64, NULL);
-  return result;
-}
-
-
-static void _copyfnc_double(gpointer udata, gpointer dst, gpointer src)
-{
-  memcpy(dst, src, sizeof(gdouble));
-}
-
-static void _deallocfnc_double(gpointer udata, gpointer data)
-{
-  g_slice_free(gdouble, data);
-}
-
-static gpointer _allocfnc_double(gpointer udata, gpointer data)
-{
-  gpointer result;
-  result = g_slice_new0(gdouble);
-  memcpy(result, data, sizeof(gdouble));
+  result = make_slidingwindow_with_data_recycle(num_limit, obsolation_treshold,
+                                                    make_recycle_uint64(num_limit, _uint64_shaper)
+                                                    );
   return result;
 }
 
 SlidingWindow* make_slidingwindow_double(guint32 num_limit, GstClockTime obsolation_treshold)
 {
   SlidingWindow* result;
-  result = make_slidingwindow_with_allocators(num_limit, obsolation_treshold,
-                                              _allocfnc_double, NULL,
-                                              _deallocfnc_double, NULL,
-                                              _copyfnc_double, NULL);
+  result = make_slidingwindow_with_data_recycle(num_limit, obsolation_treshold,
+                                                make_recycle_double(num_limit, _double_shaper)
+                                              );
   return result;
 }
 
+DEFINE_RECYCLE_TYPE(static, switem, SlidingWindowItem);
+RECYCLE_SHAPER_COPY(_switem_shaper, SlidingWindowItem);
 
-
-SlidingWindow* make_slidingwindow_with_allocators(guint32 num_limit,
+SlidingWindow* make_slidingwindow_with_data_recycle(guint32 num_limit,
                                                   GstClockTime obsolation_treshold,
-                                                  gpointer               (*alloc)(gpointer,gpointer),
-                                                  gpointer                 alloc_udata,
-                                                  void                   (*dealloc)(gpointer,gpointer),
-                                                  gpointer                 dealloc_udata,
-                                                  void                   (*copy)(gpointer,gpointer,gpointer),
-                                                  gpointer                 copy_udata
+                                                  Recycle* data_recycle
                                                   )
 {
   SlidingWindow* result;
   result = make_slidingwindow(num_limit, obsolation_treshold);
-  result->allocator.alloc         = alloc;
-  result->allocator.alloc_udata   = alloc_udata;
-  result->allocator.dealloc       = dealloc;
-  result->allocator.dealloc_udata = dealloc_udata;
-  result->allocator.copy          = copy;
-  result->allocator.copy_udata    = copy_udata;
-  result->allocator.active        = TRUE;
+  result->data_recycle = data_recycle;
   return result;
 }
 
@@ -198,11 +128,6 @@ slidingwindow_class_init (SlidingWindowClass * klass)
 
 }
 
-static void _item_dtor(gpointer itemptr)
-{
-  g_slice_free(SlidingWindowItem, itemptr);
-}
-
 void
 slidingwindow_finalize (GObject * object)
 {
@@ -212,8 +137,13 @@ slidingwindow_finalize (GObject * object)
     return;
   }
   this = (SlidingWindow*)object;
-  datapuffer_clear(this->items, _item_dtor);
+  datapuffer_clear(this->items, _switem_dtor);
   datapuffer_dtor(this->items);
+
+  if(this->data_recycle){
+    g_object_unref(this->data_recycle);
+  }
+  g_object_unref(this->items_recycle);
 
   g_list_free_full(this->plugins, swplugin_dtor);
   g_object_unref(this->on_add_item);
@@ -239,12 +169,13 @@ SlidingWindow* make_slidingwindow(guint32 num_limit, GstClockTime obsolation_tre
   result->sysclock         = gst_system_clock_obtain();
   result->treshold         = obsolation_treshold;
   result->num_limit        = result->num_act_limit = num_limit;
-  result->allocator.active = FALSE;
   result->min_itemnum      = 1;
   result->obsolate         = _slidingwindow_default_obsolation;
   result->obsolate_udata   = result;
   result->on_add_item      = make_notifier();
   result->on_rem_item      = make_notifier();
+  result->data_recycle     = NULL;
+  result->items_recycle    = make_recycle_switem(num_limit, _switem_shaper);
 
   return result;
 }
@@ -260,11 +191,12 @@ static void _slidingwindow_rem(SlidingWindow* this)
 
   notifier_do(this->on_rem_item, item->data);
 
-  if(this->allocator.active){
-    this->allocator.dealloc(this->allocator.dealloc_udata, item->data);
+  if(this->data_recycle){
+    recycle_add(this->data_recycle, item->data);
   }
 
-  g_slice_free(SlidingWindowItem, item);
+  recycle_add(this->items_recycle, item);
+//  g_slice_free(SlidingWindowItem, item);
 }
 
 void slidingwindow_clear(SlidingWindow* this)
@@ -393,10 +325,12 @@ void slidingwindow_add_data(SlidingWindow* this, gpointer data)
 
   slidingwindow_refresh(this);
 
-  item = g_slice_new0(SlidingWindowItem);
+//  item = g_slice_new0(SlidingWindowItem);
+  item = recycle_retrieve(this->items_recycle);
+
   item->added = _now(this);
-  if(this->allocator.active){
-    item->data = this->allocator.alloc(this->allocator.alloc_udata, data);
+  if(this->data_recycle){
+    item->data = recycle_retrieve_and_shape(this->data_recycle, data);
   }else{
     item->data = data;
   }
@@ -484,128 +418,4 @@ void swplugin_dtor(gpointer target)
   swplugin = target;
   swplugin->disposer(swplugin);
 }
-
-//------------------------------------------------------------------------------
-
-datapuffer_t* datapuffer_ctor(gint32 size)
-{
-        datapuffer_t* result;
-        result = (datapuffer_t*) g_malloc0(sizeof(datapuffer_t));
-        result->items = (gpointer*) g_malloc0(sizeof(gpointer) * size);
-        result->length = size;
-        result->start = 0;
-        result->end = 0;
-        result->count = 0;
-        return result;
-}//# datapuffer_ctor end
-
-
-void datapuffer_dtor(datapuffer_t* puffer)
-{
-        gint32 index;
-        gpointer item;
-        index = 0;
-        if(puffer == NULL){
-                return;
-        }
-        for(index = 0; index <  puffer->length; index++)
-        {
-                item = puffer->items[index];
-                if(item == NULL)
-                {
-                  continue;
-                }
-                g_free(item);
-        }
-        g_free(puffer->items);
-        g_free(puffer);
-}//# datapuffer_dtor end
-
-void datapuffer_write(datapuffer_t* puffer, gpointer item)
-{
-        puffer->items[puffer->end++] = item;
-        ++puffer->count;
-        if(puffer->length <= puffer->end){
-                puffer->end = 0;
-        }
-}//# datapuffer_write end
-
-gpointer datapuffer_read(datapuffer_t* puffer)
-{
-        puffer->read = puffer->items[puffer->start];
-        puffer->items[puffer->start] = NULL;
-        if(puffer->length <= ++puffer->start){
-                puffer->start = 0;
-        }
-        --puffer->count;
-        return puffer->read;
-}//# datapuffer_read end
-
-gpointer datapuffer_peek_first(datapuffer_t* puffer)
-{
-        return puffer->items[puffer->start];
-}//# datapuffer_read end
-
-gpointer datapuffer_peek_last(datapuffer_t* puffer)
-{
-  gint32 pos;
-  if(puffer->end == 0){
-    pos = puffer->length - 1;
-  }else{
-    pos = puffer->end - 1;
-  }
-  return puffer->items[pos];
-}//# datapuffer_read end
-
-gpointer datapuffer_peek_custom(datapuffer_t* puffer, gint (*comparator)(gpointer item, gpointer udata), gpointer udata)
-{
-  gint32 pos;
-  gint32 npos = puffer->start;
-  gpointer item;
-  do{
-    pos = npos;
-    item = puffer->items[pos];
-    if(comparator(item, udata) == 0){
-      return item;
-    }
-    if(++npos == puffer->length){
-      npos = 0;
-    }
-  }while(pos != puffer->end);
-  return NULL;
-}
-
-gint32 datapuffer_readcapacity(datapuffer_t *datapuffer)
-{
-        return datapuffer->count;
-}
-
-gint32 datapuffer_writecapacity(datapuffer_t *datapuffer)
-{
-        return datapuffer->length - datapuffer->count;
-}
-
-gboolean datapuffer_isfull(datapuffer_t *datapuffer)
-{
-        return datapuffer->count == datapuffer->length;
-}
-
-gboolean datapuffer_isempty(datapuffer_t *datapuffer)
-{
-        return datapuffer->count == 0;
-}
-
-void datapuffer_clear(datapuffer_t *puffer, void (*dtor)(gpointer))
-{
-        gint32 i,c;
-        void *item;
-        for(i = 0, c = datapuffer_readcapacity(puffer); i < c; ++i){
-                item = datapuffer_read(puffer);
-                if(dtor == NULL){
-                        continue;
-                }
-                dtor(item);
-        }
-}
-
 

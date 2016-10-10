@@ -57,6 +57,8 @@
 #ifndef TESTS_TEST_H_
 #define TESTS_TEST_H_
 
+#define MPRTP_PLUGIN_MAX_SUBFLOW_NUM 32
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,9 +81,10 @@ typedef struct _MPRTPSubflowUtilizationSignalData{
 }MPRTPSubflowUtilizationSignalData;
 
 typedef struct _MPRTPPluginSignalData{
-  MPRTPSubflowUtilizationSignalData subflow[32];
+  MPRTPSubflowUtilizationSignalData subflow[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   gint32                            target_media_rate;
 }MPRTPPluginSignalData;
+
 
 
 #include <string.h>
@@ -113,7 +116,7 @@ static int yuvsrc_width          = 352;
 static int yuvsrc_height         = 288;
 static int save_received_yuvfile = 0;
 static int use_testsourcevideo   = 0;
-static int framerate = 100;
+static int framerate = 25;
 
 static gchar *path_1_rx_ip      = NULL;
 static gchar default_path_1_rx_ip[255];
@@ -141,7 +144,7 @@ static int spike_var_th         = 32;
 static int rtcp_interval_type   = 2;
 static int report_timeout       = 0;
 static int controlling_mode     = 2;
-static int sending_target       = 100000;
+static int sending_target       = 500000;
 static int path1_active         = 1;
 static int path2_active         = 0;
 static int path3_active         = 0;

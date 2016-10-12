@@ -207,7 +207,13 @@ stream_splitter_on_target_bitrate_changed(StreamSplitter* this, SndSubflow* subf
   this->actual_targets[subflow->id] = subflow->target_bitrate;
 }
 
-SndSubflow* stream_splitter_approve_packet(StreamSplitter * this, SndPacket *packet, GstClockTime now)
+static void _sndsubflow_min_pacing_helper(SndSubflow *subflow, GstClockTime *min_pacing)
+{
+  *min_pacing = MIN(*min_pacing, subflow->pacing_time);
+}
+
+SndSubflow* stream_splitter_approve_packet(StreamSplitter * this,
+    SndPacket *packet, GstClockTime now, GstClockTime *next_time)
 {
   SchNode *selected;
   SndSubflow* result = NULL;
@@ -219,6 +225,9 @@ SndSubflow* stream_splitter_approve_packet(StreamSplitter * this, SndPacket *pac
 
   selected = _schtree_select_next(this->tree, packet, now);
   if(!selected){
+    if(next_time){
+      sndsubflows_iterate(this->subflows, (GFunc) _sndsubflow_min_pacing_helper, next_time);
+    }
     goto done;
   }
 

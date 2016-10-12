@@ -48,11 +48,21 @@ static void name(gpointer result, gpointer udata) \
 static void slidingwindow_finalize (GObject * object);
 static gboolean _slidingwindow_default_obsolation(gpointer udata, SlidingWindowItem *item);
 
+RECYCLE_SHAPER_COPY(_uint16_shaper, guint16);
 RECYCLE_SHAPER_COPY(_int32_shaper, gint32);
 RECYCLE_SHAPER_COPY(_int64_shaper, gint64);
 RECYCLE_SHAPER_COPY(_uint32_shaper, guint32);
 RECYCLE_SHAPER_COPY(_uint64_shaper, guint64);
 RECYCLE_SHAPER_COPY(_double_shaper, gdouble);
+
+SlidingWindow* make_slidingwindow_uint16(guint32 num_limit, GstClockTime obsolation_treshold)
+{
+  SlidingWindow* result;
+  result = make_slidingwindow_with_data_recycle(num_limit, obsolation_treshold,
+                                                    make_recycle_uint16(num_limit, _uint16_shaper)
+                                                    );
+  return result;
+}
 
 SlidingWindow* make_slidingwindow_int32(guint32 num_limit, GstClockTime obsolation_treshold)
 {
@@ -175,7 +185,7 @@ SlidingWindow* make_slidingwindow(guint32 num_limit, GstClockTime obsolation_tre
   result->on_add_item      = make_notifier();
   result->on_rem_item      = make_notifier();
   result->data_recycle     = NULL;
-  result->items_recycle    = make_recycle_switem(num_limit, _switem_shaper);
+  result->items_recycle    = make_recycle_switem( MAX(4, num_limit>>2), _switem_shaper);
 
   return result;
 }

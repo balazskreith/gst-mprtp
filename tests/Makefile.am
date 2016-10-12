@@ -1,5 +1,7 @@
 noinst_PROGRAMS = sender             \
                   receiver           \
+                  fbrapsender        \
+                  fbrapreceiver      \
                   scream_sender      \
                   scream_receiver    \
                   v4l2_file_player   
@@ -12,6 +14,10 @@ receiver_SOURCES = receiver.c
 receiver_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
 receiver_LDADD = $(GST_LIBS)
 
+fbrapreceiver_SOURCES = fbrapreceiver.c
+fbrapreceiver_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
+fbrapreceiver_LDADD = $(GST_LIBS)
+
 scream_receiver_SOURCES = scream_receiver.c
 scream_receiver_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(AM_CFLAGS)
 scream_receiver_LDADD = $(GST_PLUGINS_BASE_LIBS) -lgstrtp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
@@ -19,6 +25,10 @@ scream_receiver_LDADD = $(GST_PLUGINS_BASE_LIBS) -lgstrtp-$(GST_API_VERSION) $(G
 sender_SOURCES = sender.c
 sender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
 sender_LDADD = $(GST_LIBS)
+
+fbrapsender_SOURCES = fbrapsender.c
+fbrapsender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
+fbrapsender_LDADD = $(GST_LIBS)
 
 scream_sender_SOURCES = scream_sender.c
 scream_sender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)

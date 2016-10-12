@@ -214,15 +214,13 @@ sndctrler_time_update (SndController *this)
 {
   GSList *it;
   GstClockTime now = _now(this);
-  if(0 < this->last_regular_emit && this->last_regular_emit + this->time_update_period < now){
+  if(0 < this->last_regular_emit && now < this->last_regular_emit + this->time_update_period){
     goto done;
   }
-
   for(it = this->controllers; it; it = it->next){
     CongestionController* controller = it->data;
     controller->time_update(controller->udata);
   }
-
   _emit_signal(this);
   _sender_report_updater(this);
 
@@ -267,7 +265,6 @@ done:
 
 //---------------------------------------------------------------------------
 
-
 void
 _emit_signal (SndController *this)
 {
@@ -276,6 +273,7 @@ _emit_signal (SndController *this)
 
   _update_subflow_target_utilization(this);
   memcpy(msg, this->mprtp_signal_data, sizeof(MPRTPPluginSignalData));
+
   g_async_queue_push(this->emitterq, msg);
 }
 

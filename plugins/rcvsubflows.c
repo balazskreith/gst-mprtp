@@ -237,6 +237,7 @@ void rcvsubflows_set_rtcp_interval_type(RcvSubflows* this, guint8 subflow_id, RT
 RcvSubflow* _make_subflow(RcvSubflows* base_db, guint8 subflow_id)
 {
   RcvSubflow* result = g_malloc0(sizeof(RcvSubflow));
+  result->id                       = subflow_id;
   result->base_db                  = base_db;
   result->on_rtcp_time_update  = make_notifier();
   return result;

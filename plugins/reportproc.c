@@ -31,16 +31,6 @@
 #include <stdio.h>
 #include "mprtplogger.h"
 
-#define THIS_READLOCK(this)
-#define THIS_READUNLOCK(this)
-#define THIS_WRITELOCK(this)
-#define THIS_WRITEUNLOCK(this)
-
-//#define THIS_READLOCK(this) g_rw_lock_reader_lock(&this->rwmutex)
-//#define THIS_READUNLOCK(this) g_rw_lock_reader_unlock(&this->rwmutex)
-//#define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
-//#define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
-
 GST_DEBUG_CATEGORY_STATIC (report_processor_debug_category);
 #define GST_CAT_DEFAULT report_processor_debug_category
 
@@ -162,9 +152,7 @@ report_processor_init (ReportProcessor * this)
 
 void report_processor_set_ssrc(ReportProcessor *this, guint32 ssrc)
 {
-  THIS_WRITELOCK(this);
   this->ssrc = ssrc;
-  THIS_WRITEUNLOCK(this);
 }
 
 void report_processor_process_mprtcp(ReportProcessor * this, GstBuffer* buffer, GstMPRTCPReportSummary* result)
@@ -190,9 +178,7 @@ void report_processor_process_mprtcp(ReportProcessor * this, GstBuffer* buffer, 
 
 void report_processor_set_logfile(ReportProcessor *this, const gchar *logfile)
 {
-  THIS_WRITELOCK(this);
   strcpy(this->logfile, logfile);
-  THIS_WRITEUNLOCK(this);
 }
 
 void _processing_mprtcp_subflow_block (
@@ -220,6 +206,7 @@ again:
     case GST_RTCP_TYPE_SR:
       {
         GstRTCPSR* sr = (GstRTCPSR*)header;
+        gst_rtcp_header_getdown(header, NULL, NULL, NULL, NULL, NULL, &summary->ssrc);
         _processing_srblock (this, &sr->sender_block, summary);
       }
     break;
@@ -407,7 +394,6 @@ _processing_srblock(ReportProcessor *this,
                 GstMPRTCPReportSummary* summary)
 {
   summary->SR.processed = TRUE;
-
   gst_rtcp_srb_getdown(srb,
                        &summary->SR.ntptime,
                        &summary->SR.rtptime,
@@ -566,7 +552,3 @@ void _logging(ReportProcessor *this, GstMPRTCPReportSummary* summary)
 
 }
 
-#undef THIS_READLOCK
-#undef THIS_READUNLOCK
-#undef THIS_WRITELOCK
-#undef THIS_WRITEUNLOCK

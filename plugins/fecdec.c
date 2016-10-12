@@ -160,6 +160,7 @@ fecdecoder_init (FECDecoder * this)
   this->rtpbuffers_in         = g_async_queue_new();
   this->fecbuffers_in         = g_async_queue_new();
   this->discarded_packets_in  = g_async_queue_new();
+//  this->rtpmessages           = make_messenger(sizeof(RTPPacket));
 
 }
 
@@ -195,7 +196,7 @@ void fecdecoder_add_rtp_buffer(FECDecoder *this, GstBuffer *buffer)
   packet->abs_seq = gst_rtp_buffer_get_seq(&rtp);
   packet->ssrc    = gst_rtp_buffer_get_ssrc(&rtp);
   gst_rtp_buffer_unmap(&rtp);
-  packet->buffer = gst_buffer_ref(buffer);
+  packet->buffer = buffer;
 
   g_async_queue_push(this->rtpbuffers_in, packet);
 }

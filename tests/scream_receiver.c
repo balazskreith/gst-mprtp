@@ -25,44 +25,6 @@
 #include <stdlib.h>
 #include "test.h"
 #include "owr_arrival_time_meta.h"
-/*
- * RTP receiver with RFC4588 retransmission handling enabled
- *
- *  In this example we have two RTP sessions, one for video and one for audio.
- *  Video is received on port 5000, with its RTCP stream received on port 5001
- *  and sent on port 5005. Audio is received on port 5005, with its RTCP stream
- *  received on port 5006 and sent on port 5011.
- *
- *  In both sessions, we set "rtprtxreceive" as the session's "aux" element
- *  in rtpbin, which enables RFC4588 retransmission handling for that session.
- *
- *             .-------.      .----------.        .-----------.   .---------.   .-------------.
- *  RTP        |udpsrc |      | rtpbin   |        |theoradepay|   |theoradec|   |autovideosink|
- *  port=5000  |      src->recv_rtp_0 recv_rtp_0->sink       src->sink     src->sink          |
- *             '-------'      |          |        '-----------'   '---------'   '-------------'
- *                            |          |
- *                            |          |     .-------.
- *                            |          |     |udpsink|  RTCP
- *                            |  send_rtcp_0->sink     | port=5005
- *             .-------.      |          |     '-------' sync=false
- *  RTCP       |udpsrc |      |          |               async=false
- *  port=5001  |     src->recv_rtcp_0    |
- *             '-------'      |          |
- *                            |          |
- *             .-------.      |          |        .---------.   .-------.   .-------------.
- *  RTP        |udpsrc |      |          |        |pcmadepay|   |alawdec|   |autoaudiosink|
- *  port=5006  |      src->recv_rtp_1 recv_rtp_1->sink     src->sink   src->sink          |
- *             '-------'      |          |        '---------'   '-------'   '-------------'
- *                            |          |
- *                            |          |     .-------.
- *                            |          |     |udpsink|  RTCP
- *                            |  send_rtcp_1->sink     | port=5011
- *             .-------.      |          |     '-------' sync=false
- *  RTCP       |udpsrc |      |          |               async=false
- *  port=5007  |     src->recv_rtcp_1    |
- *             '-------'      '----------'
- *
- */
 
 GMainLoop *loop = NULL;
 

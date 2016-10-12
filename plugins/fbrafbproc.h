@@ -65,6 +65,7 @@ struct _FBRAFBProcessor
 
   SlidingWindow*           short_sw;
   SlidingWindow*           long_sw;
+  Recycle*                 measurements_recycle;
 
   FBRAPlusMeasurement      actual_measurement;
   FBRAPlusStat*            stat;

@@ -380,26 +380,11 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
     }
 
   g_object_set (mprtpply,
-                "pivot-clock-rate", clockrate,
                 "setup-rtcp-interval-type", rtcp_interval_type,
                 "setup-controlling-mode", controlling_mode,
-                "fec-repair-window-max", fec_max_window,
-                "fec-repair-window-min", fec_min_window,
-                "spike-delay-treshold", spike_delay_th,
-                "spike-var-treshold", spike_var_th,
-                "join-min-treshold", join_min_th,
-                "join-max-treshold", join_max_th,
-                "join-window-treshold", join_window_th,
-                "join-betha-factor", join_betha_factor,
-                "playout-high-watermark", playout_high_watermark,
-                "playout-low-watermark", playout_low_watermark,
-                "playout-desired-framenum", playout_desired_framenum,
                 "logging", logging,
                 "logs-path", logsdir,
                 NULL);
-
-  g_object_set(mprtpply, "logging", TRUE, NULL);
-  g_object_set(mprtpply, "logs-path", logsdir, NULL);
 
   g_print ("Connecting to %i/%i/%i/%i/%i/%i\n",
       basePort, basePort + 1, basePort + 5,

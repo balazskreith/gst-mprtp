@@ -146,6 +146,11 @@ struct _Private{
 
 #define _now(this) (gst_clock_get_time(this->sysclock))
 
+ static gboolean
+ _rtp_sending_filter(
+     FBRASubController* this,
+     SndPacket *packet);
+
  static void
  _on_rtp_sending(
      FBRASubController* this,
@@ -228,8 +233,7 @@ fbrasubctrler_finalize (GObject * object)
   FBRASubController *this;
   this = FBRASUBCTRLER(object);
 
-  sndtracker_rem_on_packet_sent(this->sndtracker, this->subflow->id,
-      (ListenerFunc) _on_rtp_sending);
+  sndtracker_rem_on_packet_sent(this->sndtracker, (ListenerFunc) _on_rtp_sending);
 
   mprtp_free(this->priv);
   g_object_unref(this->fbprocessor);
@@ -273,8 +277,10 @@ FBRASubController *make_fbrasubctrler(SndTracker *sndtracker, SndSubflow *subflo
   sndsubflow_set_state(subflow, SNDSUBFLOW_STATE_STABLE);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
 
-  sndtracker_add_on_packet_sent(this->sndtracker, this->subflow->id,
-      (ListenerFunc) _on_rtp_sending, this);
+  sndtracker_add_on_packet_sent_with_filter(this->sndtracker,
+      (ListenerFunc) _on_rtp_sending,
+      (ListenerFilterFunc) _rtp_sending_filter,
+      this);
 
   return this;
 }
@@ -291,6 +297,11 @@ void fbrasubctrler_disable(FBRASubController *this)
   _switch_stage_to(this, STAGE_KEEP, FALSE);
   this->enabled = FALSE;
 
+}
+
+gboolean _rtp_sending_filter(FBRASubController* this, SndPacket *packet)
+{
+  return this->subflow->id == packet->subflow_id;
 }
 
 void _on_rtp_sending(FBRASubController* this, SndPacket *packet)

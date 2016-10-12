@@ -252,14 +252,17 @@ typedef struct _swpercentile{
 static swpercentile_t* _swpercentilepriv_ctor(SlidingWindowPlugin* base, gint32 percentile, bintree3cmp cmp)
 {
   swpercentile_t* this;
+  Recycle* bintreenode_recycle = NULL;
+  bintreenode_recycle = make_recycle_for_bintreenode(16);
+
   this = malloc(sizeof(swpercentile_t));
   memset(this, 0, sizeof(swpercentile_t));
   this->base            = base;
   this->percentile      = CONSTRAIN(10,90,percentile);
   this->ratio           = (double)this->percentile / (double)(100-this->percentile);
   this->cmp             = cmp;
-  this->mintree = make_bintree3(cmp);
-  this->maxtree = make_bintree3(cmp);
+  this->mintree = make_bintree3_with_recycle(cmp, bintreenode_recycle);
+  this->maxtree = make_bintree3_with_recycle(cmp, bintreenode_recycle);
   this->Mxc = this->Mnc = 0;
 
   if(this->ratio < 1.){
@@ -269,6 +272,8 @@ static swpercentile_t* _swpercentilepriv_ctor(SlidingWindowPlugin* base, gint32 
   }else{
     this->required = 2;
   }
+
+  g_object_unref(bintreenode_recycle);
 
   return this;
 }

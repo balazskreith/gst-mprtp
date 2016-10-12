@@ -170,59 +170,6 @@ struct _GstMprtpsenderPrivate
 };
 
 
-//
-//gboolean
-//gst_mprtpsender_mprtp_sink_event_handler (GstPad * pad, GstObject * parent,
-//    GstEvent * event)
-//{
-//  GstMprtpsender *this;
-//  gboolean result = TRUE;
-//  GList *it;
-//  Subflow *subflow;
-//  const gchar *stream_id;
-//  const GstSegment *segment;
-//  GstCaps *caps;
-//
-////  g_print ("SND EVENT to the sink: %s", GST_EVENT_TYPE_NAME (event));
-//
-//  this = GST_MPRTPSENDER (parent);
-//  THIS_WRITELOCK (this);
-//  switch (GST_EVENT_TYPE (event)) {
-//    case GST_EVENT_STREAM_START:
-//      if (this->event_stream_start != NULL) {
-//        gst_event_unref (this->event_stream_start);
-//      }
-//      gst_event_parse_stream_start (event, &stream_id);
-//      this->event_stream_start = gst_event_new_stream_start (stream_id);
-//      goto sending;
-//    case GST_EVENT_SEGMENT:
-//      if (this->event_segment != NULL) {
-//        gst_event_unref (this->event_segment);
-//      }
-//      gst_event_parse_segment (event, &segment);
-//      this->event_segment = gst_event_new_segment (segment);
-//      goto sending;
-//    case GST_EVENT_CAPS:
-//      if (this->event_caps != NULL) {
-//        gst_event_unref (this->event_caps);
-//      }
-//      gst_event_parse_caps (event, &caps);
-//      this->event_caps = gst_event_new_caps (caps);
-//      goto sending;
-//    default:
-//      sending:
-//      for (subflow = NULL, it = this->subflows; it != NULL; it = it->next) {
-//        subflow = it->data;
-//        result &= gst_pad_push_event (subflow->outpad, gst_event_copy (event));
-//      }
-//      result &= gst_pad_event_default (pad, parent, event);
-//      //result = gst_pad_event_default (pad, parent, event);
-//  }
-//
-//  THIS_WRITEUNLOCK (this);
-//  return result;
-//}
-
 static void _iterate_subflows(GstMprtpsender *this, void (*process)(Subflow*,gpointer),gpointer data)
 {
   GList *it;
@@ -914,7 +861,7 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   }
   THIS_READLOCK (this);
   if(this->dirty) {
-    _init_all_subflows(this, buf);
+    if(0) _init_all_subflows(this, buf);
     this->dirty = FALSE;
   }
 
@@ -1049,60 +996,6 @@ _get_subflow_from_report (GstMprtpsender * this, GstBuffer * blocks)
 done:
   return result;
 }
-
-//
-//GstBuffer *
-//_assemble_report (Subflow * this, GstBuffer * blocks)
-//{
-//  GstBuffer *result;
-//  gpointer dataptr;
-//  GstMPRTCPSubflowReport report;
-//  GstMPRTCPSubflowBlock *block;
-//  guint16 length;
-//  guint16 offset = 0;
-//  guint8 block_length = 0;
-//  guint16 subflow_id, prev_subflow_id = 0;
-//  guint8 src = 0;
-//  GstMapInfo map = GST_MAP_INFO_INIT;
-//
-//  gst_mprtcp_report_init (&report);
-//  gst_rtcp_header_getdown (&report.header, NULL, NULL, NULL, NULL, &length,
-//      NULL);
-//  length = (length + 1) << 2;
-//  dataptr = g_malloc0 (length);
-//  memcpy (dataptr, &report, length);
-//  result = gst_buffer_new_wrapped (dataptr, length);
-//
-//  if (!gst_buffer_map (blocks, &map, GST_MAP_READ)) {
-//    GST_ERROR_OBJECT (this, "Buffer is not readable");
-//    goto exit;
-//  }
-//  for (offset = 0, src = 0,
-//      block = (GstMPRTCPSubflowBlock *) (map.data + offset);
-//      offset < map.size;
-//      offset += (block_length + 1) << 2,
-//          ++src,
-//          block = (GstMPRTCPSubflowBlock *) (map.data + offset)) {
-//    length += (block_length + 1) << 2;
-//    gst_mprtcp_block_getdown (&block->info, NULL, &block_length, &subflow_id);
-//    if (prev_subflow_id > 0 && subflow_id != prev_subflow_id) {
-//      GST_WARNING ("MPRTCP block comes from multiple subflow");
-//    }
-//    //gst_print_mprtcp_block(block, NULL);
-//  }
-//
-//  gst_buffer_unmap (blocks, &map);
-//  result = gst_buffer_append (result, blocks);
-//  gst_buffer_map (result, &map, GST_MAP_WRITE);
-//  length>>=2;
-//  gst_rtcp_header_change ((GstRTCPHeader *) map.data, NULL, NULL, &src,
-//      NULL, &length, NULL);
-//  g_print("map-size:%lu\n", map.size);
-//  gst_print_rtcp((GstRTCPHeader *) map.data);
-//  gst_buffer_unmap (result, &map);
-//exit:
-//  return result;
-//}
 
 gboolean
 _select_subflow (GstMprtpsender * this, guint8 id, Subflow ** result)

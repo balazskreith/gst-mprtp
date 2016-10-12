@@ -12,6 +12,7 @@
 #include <gst/net/gstnetaddressmeta.h>
 #include "sndsubflows.h"
 #include "rcvsubflows.h"
+#include "recycle.h"
 
 typedef struct _SndPackets SndPackets;
 typedef struct _SndPacketsClass SndPacketsClass;
@@ -25,7 +26,7 @@ typedef struct _SndPacketsClass SndPacketsClass;
 
 typedef struct _SndPacket
 {
-  SndPackets*          base_db;
+//  SndPackets*          base_db;
   GstBuffer*           buffer;
   gint                 ref;
   GstClockTime         made;
@@ -45,6 +46,11 @@ typedef struct _SndPacket
 
   gboolean             lost;
   gboolean             acknowledged;
+
+  guint8               abs_time_ext_header_id;
+  guint8               mprtp_ext_header_id;
+  Recycle*             destiny;
+
 }SndPacket;
 
 
@@ -54,6 +60,8 @@ struct _SndPackets
   GstClock*                  sysclock;
   GstClockTime               made;
   SndPacket*                 packets;
+
+  Recycle*                   recycle;
 
   guint8                     abs_time_ext_header_id;
   guint8                     mprtp_ext_header_id;
@@ -71,11 +79,10 @@ GType sndpackets_get_type (void);
 SndPackets* make_sndpackets(void);
 void sndpackets_reset(SndPackets* this);
 
-gboolean sndpacket_is_already_in_use(SndPackets* this, GstBuffer* buffer);
 SndPacket* sndpackets_make_packet(SndPackets* this, GstBuffer* buffer);
 SndPacket* sndpackets_get_by_abs_seq(SndPackets* this, guint16 abs_seq);
 
-void sndpacket_setup_mprtp(SndPacket *packet, SndSubflow* subflow);
+void sndpacket_setup_mprtp(SndPacket *packet, guint8 subflow_id, guint16 subflow_seq);
 
 void sndpackets_set_abs_time_ext_header_id(SndPackets* this, guint8 abs_time_ext_header_id);
 guint8 sndpackets_get_abs_time_ext_header_id(SndPackets* this);
@@ -83,9 +90,8 @@ guint8 sndpackets_get_abs_time_ext_header_id(SndPackets* this);
 void sndpackets_set_mprtp_ext_header_id(SndPackets* this, guint8 mprtp_ext_header_id);
 guint8 sndpackets_get_mprtp_ext_header_id(SndPackets* this);
 
-GstBuffer* sndpacket_retrieve_and_send(SndPacket* packet);
 GstBuffer* sndpacket_retrieve(SndPacket* packet);
 void sndpacket_unref(SndPacket *packet);
-void sndpacket_ref(SndPacket *packet);
+SndPacket* sndpacket_ref(SndPacket *packet);
 
 #endif /* SNDPACKETS_H_ */

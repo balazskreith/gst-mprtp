@@ -184,7 +184,7 @@ rcvctrler_time_update (RcvController *this)
 {
   GstClockTime now = _now(this);
 
-  if(now - 20 * GST_MSECOND < this->last_time_update){
+  if(now - 10 * GST_MSECOND < this->last_time_update){
     goto done;
   }
 
@@ -212,7 +212,7 @@ rcvctrler_receive_mprtcp (RcvController *this, GstBuffer * buf)
 
   if(summary->SR.processed){
     this->report_is_flowable = TRUE;
-    report_producer_set_ssrc(this->report_producer, summary->ssrc);
+    report_producer_set_sender_ssrc(this->report_producer, summary->ssrc);
     subflow->last_SR_report_sent = summary->SR.ntptime;
     subflow->last_SR_report_rcvd = NTP_NOW;
   }
@@ -243,7 +243,7 @@ static void _receiver_report_updater_helper(RcvSubflow *subflow, gpointer udata)
   rcvsubflow_notify_rtcp_fb_cbs(subflow, this->report_producer);
 
   buf = report_producer_end(this->report_producer, &report_length);
-  if(!buf){
+  if(buf){
     notifier_do(this->on_rtcp_ready, buf);
   }
 
@@ -382,11 +382,11 @@ void _on_subflow_detached(RcvController* this, RcvSubflow *subflow)
 
 void _on_congestion_controlling_changed(RcvController* this, RcvSubflow *subflow)
 {
-  GSList* controller_item;
+  GSList* producer_item;
 
-  controller_item = g_slist_find_custom(this->fbproducers, subflow, _producer_by_subflow_id);
-  if(controller_item){
-    FeedbackProducer *producer = controller_item->data;
+  producer_item = g_slist_find_custom(this->fbproducers, subflow, _producer_by_subflow_id);
+  if(producer_item){
+    FeedbackProducer *producer = producer_item->data;
     if(subflow->congestion_controlling_type == producer->type){
       goto done;
     }

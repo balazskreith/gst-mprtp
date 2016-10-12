@@ -27,56 +27,58 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "recycle.h"
+#include "asyncrecycle.h"
 
 
 #define _now(this) (gst_clock_get_time (this->sysclock))
 
-GST_DEBUG_CATEGORY_STATIC (recycle_debug_category);
-#define GST_CAT_DEFAULT recycle_debug_category
+GST_DEBUG_CATEGORY_STATIC (async_recycle_debug_category);
+#define GST_CAT_DEFAULT async_recycle_debug_category
 
-G_DEFINE_TYPE (Recycle, recycle, G_TYPE_OBJECT);
+G_DEFINE_TYPE (AsyncRecycle, async_recycle, G_TYPE_OBJECT);
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
 
 static void
-recycle_finalize (GObject * object);
+async_recycle_finalize (GObject * object);
 
 void
-recycle_class_init (RecycleClass * klass)
+async_recycle_class_init (AsyncRecycleClass * klass)
 {
   GObjectClass *gobject_class;
 
   gobject_class = (GObjectClass *) klass;
 
-  gobject_class->finalize = recycle_finalize;
+  gobject_class->finalize = async_recycle_finalize;
 
-  GST_DEBUG_CATEGORY_INIT (recycle_debug_category, "rndctrler", 0,
+  GST_DEBUG_CATEGORY_INIT (async_recycle_debug_category, "rndctrler", 0,
       "MpRTP Receiving Controller");
 
 }
 
 
 void
-recycle_finalize (GObject * object)
+async_recycle_finalize (GObject * object)
 {
-  Recycle *this = RECYCLE (object);
-  datapuffer_clear(this->items, this->dtor);
-  datapuffer_dtor(this->items);
+  AsyncRecycle *this = ASYNCRECYCLE (object);
+  gpointer item;
+  while((item = g_async_queue_try_pop(this->items)) != NULL){
+    this->dtor(item);
+  }
+  g_async_queue_unref(this->items);
 }
 
 void
-recycle_init (Recycle * this)
+async_recycle_init (AsyncRecycle * this)
 {
-
+  this->items  = g_async_queue_new();
 }
 
-Recycle *make_recycle(gint32 size, RecycleItemCtor ctor, RecycleItemDtor dtor, RecycleItemShaper shaper)
+AsyncRecycle *make_async_recycle(AsyncRecycleItemCtor ctor, AsyncRecycleItemDtor dtor, AsyncRecycleItemShaper shaper)
 {
-  Recycle *result = g_object_new(RECYCLE_TYPE, NULL);
-  result->items  = datapuffer_ctor(size);
+  AsyncRecycle *result = g_object_new(ASYNCRECYCLE_TYPE, NULL);
   result->ctor   = ctor;
   result->dtor   = dtor;
   result->shaper = shaper;
@@ -84,42 +86,29 @@ Recycle *make_recycle(gint32 size, RecycleItemCtor ctor, RecycleItemDtor dtor, R
 }
 
 
-gpointer recycle_retrieve(Recycle* this)
+gpointer async_recycle_retrieve(AsyncRecycle* this)
 {
-  if(datapuffer_isempty(this->items)){
-    return this->ctor();
-  }
-  return datapuffer_read(this->items);
+  gpointer item = g_async_queue_try_pop(this->items);
+  return item != NULL ? item : this->ctor();
 }
 
-gpointer recycle_retrieve_and_shape(Recycle *this, gpointer udata)
+gpointer async_recycle_retrieve_and_shape(AsyncRecycle *this, gpointer udata)
 {
-  gpointer result = recycle_retrieve(this);
+  gpointer result = async_recycle_retrieve(this);
   if(this->shaper){
     this->shaper(result, udata);
   }
   return result;
 }
 
-void recycle_add(Recycle* this, gpointer item)
+void async_recycle_add(AsyncRecycle* this, gpointer item)
 {
-  if(datapuffer_isfull(this->items)){
-    this->dtor(item);
-    return;
-  }
-  datapuffer_write(this->items, item);
+  g_async_queue_push(this->items, item);
 }
 
 
 
 //------------------------------------------------------------
-
-DEFINE_RECYCLE_TYPE(/*global scope*/, uint16, guint16)
-DEFINE_RECYCLE_TYPE(/*global scope*/, int32, gint32)
-DEFINE_RECYCLE_TYPE(/*global scope*/, int64, gint64)
-DEFINE_RECYCLE_TYPE(/*global scope*/, uint32, guint32)
-DEFINE_RECYCLE_TYPE(/*global scope*/, uint64, guint64)
-DEFINE_RECYCLE_TYPE(/*global scope*/, double, gdouble)
 
 
 

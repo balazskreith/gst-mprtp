@@ -58,7 +58,8 @@ SndSubflow*
 stream_splitter_approve_packet(
     StreamSplitter * this,
     SndPacket *packet,
-    GstClockTime now);
+    GstClockTime now,
+    GstClockTime *next_time);
 
 GType stream_splitter_get_type (void);
 

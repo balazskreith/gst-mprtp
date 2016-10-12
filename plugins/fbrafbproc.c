@@ -54,6 +54,7 @@ static void _on_long_sw_rem(FBRAFBProcessor *this, FBRAPlusMeasurement* measurem
 static void _on_short_sw_rem(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement);
 static void _on_long_sw_add(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement);
 static void _on_short_sw_add(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement);
+
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
@@ -78,7 +79,7 @@ static void _owd_logger(FBRAFBProcessor *this)
 
 }
 
-
+DEFINE_RECYCLE_TYPE(static, measurement, FBRAPlusMeasurement);
 StructCmpFnc(_measurement_owd_cmp, FBRAPlusMeasurement, owd);
 StructCmpFnc(_measurement_BiF_cmp, FBRAPlusMeasurement, bytes_in_flight);
 
@@ -101,6 +102,10 @@ fbrafbprocessor_finalize (GObject * object)
 {
   FBRAFBProcessor *this;
   this = FBRAFBPROCESSOR(object);
+
+  g_object_unref(this->long_sw);
+  g_object_unref(this->short_sw);
+  g_object_unref(this->measurements_recycle);
   g_object_unref(this->sysclock);
   g_object_unref(this->sndtracker);
 }
@@ -123,6 +128,7 @@ FBRAFBProcessor *make_fbrafbprocessor(SndTracker* sndtracker, SndSubflow* subflo
   this->subflow    = subflow;
   this->stat       = stat;
 
+  this->measurements_recycle = make_recycle_measurement(100, NULL);
   this->short_sw = make_slidingwindow(100, 5 * GST_SECOND);
   this->long_sw = make_slidingwindow(600, 30 * GST_SECOND);
 
@@ -187,7 +193,7 @@ done:
 void fbrafbprocessor_approve_measurement(FBRAFBProcessor *this)
 {
   FBRAPlusMeasurement *measurement;
-  measurement = g_slice_new0(FBRAPlusMeasurement);
+  measurement = recycle_retrieve(this->measurements_recycle);
   measurement->bytes_in_flight = this->last_bytes_in_flight;
   measurement->owd             = _stat(this)->last_owd;
 
@@ -219,6 +225,7 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
 {
   SndPacket* packet = NULL;
   guint16 act_seq, end_seq;
+  GstClockTime last_packet_sent_time = 0;
   gint i;
 
   act_seq = xr->LostRLE.begin_seq;
@@ -229,17 +236,20 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
 
   for(i=0; act_seq <= end_seq; ++act_seq, ++i){
     packet = sndtracker_retrieve_sent_packet(this->sndtracker, this->subflow->id, act_seq);
-    if(packet->acknowledged){
+
+    if(!packet || packet->acknowledged){
       continue;
     }
     packet->acknowledged = TRUE;
     packet->lost = !xr->LostRLE.vector[i];
     sndtracker_packet_acked(this->sndtracker, packet);
+    last_packet_sent_time = packet->sent;
   }
 
+  if(0 < last_packet_sent_time)
   {
     GstClockTime now = _now(this);
-    GstClockTime rtt = now - packet->sent;
+    GstClockTime rtt = now - last_packet_sent_time;
     this->RTT = (this->RTT == 0) ? rtt : (rtt * .125 + this->RTT * .875);
     if(this->RTT < now - this->srtt_updated){
       _stat(this)->srtt = (_stat(this)->srtt == 0.) ? this->RTT : this->RTT * .125 + _stat(this)->srtt * .875;
@@ -315,7 +325,7 @@ void _on_short_sw_rem(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement)
 void _on_long_sw_rem(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement)
 {
   --this->owd_std_helper.counter;
-  g_slice_free(FBRAPlusMeasurement, measurement);
+  recycle_add(this->measurements_recycle, measurement);
 }
 
 void _on_short_sw_add(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement)

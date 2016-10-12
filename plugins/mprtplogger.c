@@ -273,7 +273,20 @@ done:
   return;
 }
 
-void mprtp_logger_add_memory_consumption(gchar *type_name, gsize size)
+gpointer mprtp_slice_alloc(const gchar* type_name, gsize size)
+{
+  mprtp_logger_add_memory_consumption(type_name, size);
+  return g_slice_alloc(size);
+}
+
+
+void mprtp_slice_dealloc(const gchar* type_name, gsize size, gpointer memptr)
+{
+  mprtp_logger_rem_memory_consumption(type_name, size);
+  g_slice_free1(size, memptr);
+}
+
+void mprtp_logger_add_memory_consumption(const gchar *type_name, gsize size)
 {
   MemoryConsumptionMessage *msg;
 //  msg = g_slice_new0(MemoryConsumptionMessage);
@@ -284,7 +297,7 @@ void mprtp_logger_add_memory_consumption(gchar *type_name, gsize size)
   g_async_queue_push(this->messages, msg);
 }
 
-void mprtp_logger_rem_memory_consumption(gchar *type_name, gsize size)
+void mprtp_logger_rem_memory_consumption(const gchar *type_name, gsize size)
 {
   MemoryConsumptionMessage *msg;
 //  msg = g_slice_new0(MemoryConsumptionMessage);
@@ -401,7 +414,7 @@ void _writing(MPRTPLogger* this, WritingMessage *item)
 void _print_memory_allocation(gpointer key, gpointer value, gpointer udata)
 {
   MemoryConsumptionMessage* msg = value;
-  g_print("%30s: %lu\n", msg->type_name, msg->size);
+  g_print("%-20s %-10lu\n", msg->type_name, msg->size);
 }
 
 

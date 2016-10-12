@@ -104,6 +104,11 @@ int main(int argc, char *argv[]) {
   g_object_set(G_OBJECT (parse), "height", atoi(argv[3]), NULL);
   g_object_set(G_OBJECT (v4l2_sink), "device", argv[4], NULL);
 
+//  g_object_set(G_OBJECT (parse),
+//      "framerate", 25, 1,
+//      "format", 2,
+//      NULL);
+
   /* Add a callback to we can react to end-of-stream and errors. */
   main_loop_and_pipeline_t main_loop_and_pipeline;
   main_loop_and_pipeline.main_loop = main_loop;
@@ -114,6 +119,8 @@ int main(int argc, char *argv[]) {
   gst_object_unref(bus);
 
   /* Assemble the pipeline. */
+
+
   gst_bin_add_many(GST_BIN (pipeline), source, parse, v4l2_sink, NULL);
   gst_element_link(source, parse);
   gst_element_link(parse, v4l2_sink);
@@ -125,3 +132,7 @@ int main(int argc, char *argv[]) {
   /* Never reached. */
   return 0;
 }
+
+
+
+

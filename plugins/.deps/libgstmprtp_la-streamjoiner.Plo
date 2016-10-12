@@ -368,7 +368,8 @@ libgstmprtp_la-streamjoiner.lo: streamjoiner.c /usr/include/stdc-predef.h \
  /usr/include/glib-2.0/gio/gnotification.h \
  /usr/include/glib-2.0/gio/glistmodel.h \
  /usr/include/glib-2.0/gio/gliststore.h \
- /usr/include/glib-2.0/gio/gio-autocleanups.h rcvsubflows.h mediator.h
+ /usr/include/glib-2.0/gio/gio-autocleanups.h rcvsubflows.h \
+ asyncrecycle.h mediator.h
 
 /usr/include/stdc-predef.h:
 
@@ -1219,5 +1220,7 @@ rcvpackets.h:
 /usr/include/glib-2.0/gio/gio-autocleanups.h:
 
 rcvsubflows.h:
+
+asyncrecycle.h:
 
 mediator.h:

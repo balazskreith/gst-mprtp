@@ -63,6 +63,8 @@ struct _SndTracker
 
   gpointer                  priv;
   SndTrackerStat            stat;
+
+  Notifier*                 on_packet_sent;
 };
 
 
@@ -80,8 +82,9 @@ void sndtracker_packet_sent(SndTracker * this, SndPacket* packet);
 SndPacket* sndtracker_retrieve_sent_packet(SndTracker * this, guint8 subflow_id, guint16 subflow_seq);
 void sndtracker_packet_acked(SndTracker * this, SndPacket* packet);
 void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_response);
-void sndtracker_add_on_packet_sent(SndTracker * this, guint8 subflow_id, ListenerFunc callback, gpointer udata);
-void sndtracker_rem_on_packet_sent(SndTracker * this, guint8 subflow_id, ListenerFunc callback);
+void sndtracker_add_on_packet_sent(SndTracker * this, ListenerFunc callback, gpointer udata);
+void sndtracker_add_on_packet_sent_with_filter(SndTracker * this, ListenerFunc callback, ListenerFilterFunc filter, gpointer udata);
+void sndtracker_rem_on_packet_sent(SndTracker * this, ListenerFunc callback);
 SndTrackerStat* sndtracker_get_stat(SndTracker * this);
 SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id);
 

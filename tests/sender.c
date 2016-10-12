@@ -189,6 +189,61 @@ make_video_yuvfile_session (guint sessionNum)
   return session;
 }
 
+static SessionData *
+make_video_v4l2_session (guint sessionNum)
+{
+  GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
+  GstElement *videoSrc = gst_element_factory_make ("v4l2src", NULL);
+  GstElement *videoParse = gst_element_factory_make ("videoparse", NULL);
+  GstElement *videoConv = gst_element_factory_make("autovideoconvert", NULL);
+  GstElement *payloader = gst_element_factory_make ("rtpvp8pay", NULL);
+  GstCaps *videoCaps;
+  SessionData *session;
+
+  g_object_set (videoSrc,
+                "device", "/dev/video1",
+                NULL);
+
+  encoder = gst_element_factory_make ("vp8enc", NULL);
+  g_object_set (encoder, "target-bitrate", sending_target, NULL);
+  g_object_set(encoder,
+      "end-usage", 1, /* VPX_CBR */
+      "deadline", G_GINT64_CONSTANT(1), /* VPX_DL_REALTIME */
+      "cpu-used", -6,
+      "min-quantizer", 2,
+      "buffer-initial-size", 300,
+      "buffer-optimal-size", 300,
+      "buffer-size", 400,
+      "dropframe-threshold", 30,
+      "lag-in-frames", 0,
+      "timebase", 1, 90000,
+      "error-resilient", 1,
+//      "keyframe-mode", 1, /* VPX_KF_DISABLED */
+//      "keyframe-max-dist", 128,
+      NULL);
+
+
+  gst_bin_add_many (videoBin, videoConv, videoSrc, videoParse, encoder, payloader, NULL);
+
+  g_object_set (videoParse,
+      "width", yuvsrc_width,
+      "height", yuvsrc_height,
+      "framerate", framerate, 1,
+      "format", 2,
+      NULL);
+
+  gst_element_link (videoSrc, videoParse);
+  gst_element_link (videoParse, encoder);
+  gst_element_link (encoder, payloader);
+
+  setup_ghost (payloader, videoBin);
+
+  session = session_new (sessionNum);
+  session->input = GST_ELEMENT (videoBin);
+
+  return session;
+}
+
 //-------------------------- ALTERNATE make_video_yuvfile_session BEGIN -------------------
 
 
@@ -502,8 +557,8 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
                   NULL);
 
 
-//    g_object_set (rtpSink_1, "port", path1_tx_rtp_port, "host", path_1_tx_ip, NULL);
-    g_object_set (rtpSink_1, "port", path1_tx_rtp_port, "host", path_1_tx_ip, "sync", FALSE, "async", FALSE, NULL);
+    g_object_set (rtpSink_1, "port", path1_tx_rtp_port, "host", path_1_tx_ip, NULL);
+//    g_object_set (rtpSink_1, "port", path1_tx_rtp_port, "host", path_1_tx_ip, "sync", FALSE, "async", FALSE, NULL);
     g_object_set (rtpSink_2, "port", path2_tx_rtp_port, "host", path_2_tx_ip, NULL);
     g_object_set (rtpSink_3, "port", path3_tx_rtp_port, "host", path_3_tx_ip, NULL);
 
@@ -526,6 +581,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
 
   //MPRTP Sender
   padName = g_strdup_printf ("send_rtp_src_%u", session->sessionNum);
+//  gst_element_link_pads (rtpBin, padName, mprtpsnd, "mprtp_sink");
   gst_element_link_pads (rtpBin, padName, mprtpsch, "rtp_sink");
   gst_element_link_pads (mprtpsch, "mprtp_src", mprtpsnd, "mprtp_sink");
   g_free (padName);
@@ -638,11 +694,12 @@ main (int argc, char **argv)
   if(argc > 1) testfile = argv[1];
 
 //  framerate = use_testsourcevideo ? 100 : 25;
-  if(use_testsourcevideo){
+  if(0 && use_testsourcevideo){
     videoSession = save_received_yuvfile ? make_video_session2(0) : make_video_session(0);
-  }else{
-	videoSession = save_received_yuvfile ? make_video_yuvfile_session_and_save (0) : make_video_yuvfile_session(0);
+  }else if(0){
+	  videoSession = save_received_yuvfile ? make_video_yuvfile_session_and_save (0) : make_video_yuvfile_session(0);
   }
+  videoSession = make_video_v4l2_session (0);
 
   //videoSession = make_video_session2 (0);
   add_stream (pipe, rtpBin, videoSession, testfile);

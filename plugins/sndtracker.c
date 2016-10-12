@@ -47,7 +47,6 @@ typedef struct _Subflow{
   gboolean            init;
   SndTrackerStat      stat;
   SndPacket*          sent_packets[65536];
-  Notifier*           on_packet_sent;
 }Subflow;
 
 typedef struct _Priv{
@@ -110,12 +109,13 @@ sndtracker_finalize (GObject * object)
 {
   SndTracker * this;
   this = SNDTRACKER(object);
-  g_object_unref(this->sysclock);
   g_object_unref(this->sent_sw);
   g_object_unref(this->acked_sw);
   g_object_unref(this->fec_sw);
+  g_object_unref(this->on_packet_sent);
 
   g_object_unref(this->subflows_db);
+  g_object_unref(this->sysclock);
   _priv_dtor(this->priv);
 }
 
@@ -127,7 +127,10 @@ sndtracker_init (SndTracker * this)
   this->sent_sw  = make_slidingwindow(1000, GST_SECOND);
   this->acked_sw = make_slidingwindow(1000, GST_SECOND);
   this->fec_sw   = make_slidingwindow(500, GST_SECOND);
+
   this->priv = _priv_ctor();
+
+  this->on_packet_sent = make_notifier();
 
   slidingwindow_add_on_rem_item_cb(this->sent_sw, (ListenerFunc) _sent_packets_rem_pipe, this);
   slidingwindow_add_on_rem_item_cb(this->fec_sw, (ListenerFunc) _fec_rem_pipe, this);
@@ -166,6 +169,9 @@ SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id
 
 void sndtracker_packet_sent(SndTracker * this, SndPacket* packet)
 {
+
+  packet->sent = _now(this);
+
   this->stat.bytes_in_flight += packet->payload_size;
   ++this->stat.packets_in_flight;
 
@@ -189,11 +195,10 @@ void sndtracker_packet_sent(SndTracker * this, SndPacket* packet)
 
     subflow->sent_packets[packet->subflow_seq] = packet;
 
-    notifier_do(subflow->on_packet_sent, packet);
+    notifier_do(this->on_packet_sent, packet);
   }
 
-  sndpacket_ref(packet);
-  slidingwindow_add_data(this->sent_sw, packet);
+  slidingwindow_add_data(this->sent_sw, sndpacket_ref(packet));
 }
 
 SndPacket* sndtracker_retrieve_sent_packet(SndTracker * this, guint8 subflow_id, guint16 subflow_seq)
@@ -247,8 +252,7 @@ void sndtracker_packet_acked(SndTracker * this, SndPacket* packet)
     subflow->sent_packets[packet->subflow_seq] = NULL;
   }
 
-  sndpacket_ref(packet);
-  slidingwindow_add_data(this->acked_sw, packet);
+  slidingwindow_add_data(this->acked_sw,  sndpacket_ref(packet));
 
   return;
 }
@@ -268,14 +272,19 @@ void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_resp
   slidingwindow_add_data(this->fec_sw, fec_response);
 }
 
-void sndtracker_add_on_packet_sent(SndTracker * this, guint8 subflow_id, ListenerFunc callback, gpointer udata)
+void sndtracker_add_on_packet_sent(SndTracker * this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener(_get_subflow(this, subflow_id)->on_packet_sent, callback, udata);
+  notifier_add_listener(this->on_packet_sent, callback, udata);
 }
 
-void sndtracker_rem_on_packet_sent(SndTracker * this, guint8 subflow_id, ListenerFunc callback)
+void sndtracker_add_on_packet_sent_with_filter(SndTracker * this, ListenerFunc callback, ListenerFilterFunc filter, gpointer udata)
 {
-  notifier_rem_listener(_get_subflow(this, subflow_id)->on_packet_sent, callback);
+  notifier_add_listener_with_filter(this->on_packet_sent, callback, filter, udata);
+}
+
+void sndtracker_rem_on_packet_sent(SndTracker * this, ListenerFunc callback)
+{
+  notifier_rem_listener(this->on_packet_sent, callback);
 }
 
 void _sent_packets_rem_pipe(SndTracker* this, SndPacket* packet)
@@ -355,14 +364,7 @@ static Private* _priv_ctor(void)
 
 static void _priv_dtor(Private *priv)
 {
-  gint i;
-  Subflow* subflow;
-  for(i = 0; i < 256; ++i){
-    subflow = priv->subflows + i;
-    if(subflow->init){
-      g_object_unref(subflow->on_packet_sent);
-    }
-  }
+  g_free(priv);
 }
 
 void
@@ -373,7 +375,6 @@ _on_subflow_joined(SndTracker* this, SndSubflow* sndsubflow)
     return;
   }
   subflow->init = TRUE;
-  subflow->on_packet_sent = make_notifier();
 }
 
 void

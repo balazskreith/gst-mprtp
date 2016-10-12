@@ -71,11 +71,14 @@ typedef struct{
 }FECRequestMessage;
 
 static void fecencoder_finalize (GObject * object);
-static BitString* _make_bitstring(GstBuffer* buf);
+static BitString* _make_bitstring(FECEncoder* this, GstBuffer* buf);
 static void _fecenc_process(gpointer udata);
 static FECEncoderResponse* _fec_response_ctor(void);
 static void _fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf);
 static GstBuffer* _fecencoder_get_fec_packet(FECEncoder *this, guint8 subflow_id, gint32* packet_length);
+
+DEFINE_RECYCLE_TYPE(static, bitstring, BitString);
+
 //------------------------- Utility functions --------------------------------
 
 void
@@ -106,7 +109,7 @@ fecencoder_finalize (GObject * object)
   g_queue_clear(this->bitstrings);
   g_object_unref(this->bitstrings);
   g_object_unref(this->sysclock);
-
+  g_object_unref(this->bitstring_recycle);
 }
 
 FECEncoder *make_fecencoder(Mediator* response_handler)
@@ -117,6 +120,7 @@ FECEncoder *make_fecencoder(Mediator* response_handler)
 
   this->messages     = g_async_queue_new();
   this->buffers      = g_async_queue_new();
+  this->bitstring_recycle = make_recycle_bitstring(32, NULL);
 
   this->response_handler = g_object_ref(response_handler);
 
@@ -145,7 +149,7 @@ void fecencoder_reset(FECEncoder *this)
 
 void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer* buffer)
 {
-  g_async_queue_push(this->buffers, gst_buffer_ref(buffer));
+  g_async_queue_push(this->buffers, buffer);
 }
 
 void fecencoder_request_fec(FECEncoder *this, guint8 subflow_id)
@@ -181,12 +185,13 @@ void fecencoder_unref_response(FECEncoderResponse* response)
 
 void _fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf)
 {
-  g_queue_push_tail(this->bitstrings, _make_bitstring(buf));
+  g_queue_push_tail(this->bitstrings, _make_bitstring(this, buf));
   gst_buffer_unref(buf);
 
   //Too many bitstring
   while(this->max_protection_num <= g_queue_get_length(this->bitstrings)){
-    g_slice_free(BitString, (BitString*) g_queue_pop_head(this->bitstrings));
+    recycle_add(this->bitstring_recycle, g_queue_pop_head(this->bitstrings));
+
   }
 
 }
@@ -205,8 +210,7 @@ _fecencoder_get_fec_packet(FECEncoder *this, guint8 subflow_id, gint32* packet_l
   GstRTPFECHeader *fecheader;
   gboolean init = FALSE;
   gint n_mask = 0;
-//  fecbitstring = mprtp_malloc(sizeof(BitString));
-  fecbitstring = g_slice_new0(BitString);
+  fecbitstring = recycle_retrieve(this->bitstring_recycle);
 again:
   if(g_queue_get_length(this->bitstrings) < 1){
     goto create;
@@ -222,7 +226,7 @@ again:
     fecbitstring->seq_num = actual->seq_num;
     fecbitstring->ssrc    = actual->ssrc;
   }
-  g_slice_free(BitString, actual);
+  recycle_add(this->bitstring_recycle, actual);
   goto again;
 create:
   result = gst_rtp_buffer_new_allocate (
@@ -262,18 +266,17 @@ create:
   if(packet_length){
     *packet_length = fecbitstring->length + 10;
   }
-  g_slice_free(BitString, fecbitstring);
+  recycle_add(this->bitstring_recycle, fecbitstring);
 
   return result;
 }
 
 
-BitString* _make_bitstring(GstBuffer* buf)
+BitString* _make_bitstring(FECEncoder* this, GstBuffer* buf)
 {
   BitString *result;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-//  result = mprtp_malloc(sizeof(BitString));
-  result = g_slice_new0(BitString);
+  result = recycle_retrieve(this->bitstring_recycle);
   rtpfecbuffer_setup_bitstring(buf, result->bytes, &result->length);
   gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
   result->seq_num = gst_rtp_buffer_get_seq(&rtp);

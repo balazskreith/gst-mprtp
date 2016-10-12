@@ -10,6 +10,7 @@
 #include <gst/gst.h>
 
 #include "notifier.h"
+#include "recycle.h"
 
 typedef struct{
   gboolean                 active;
@@ -41,6 +42,7 @@ typedef struct _bintree3 {
 
   Notifier*             on_duplicate;
   Notifier*             on_print;
+  Recycle*              node_recycle;
 } bintree3_t;
 
 gint32 bintree3cmp_int32(gpointer a,gpointer b);
@@ -49,6 +51,9 @@ gint32 bintree3cmp_uint64(gpointer pa,gpointer pb);
 gint32 bintree3cmp_double(gpointer pa,gpointer pb);
 gint32 bintree3cmp_int64(gpointer pa,gpointer pb);
 
+Recycle* make_recycle_for_bintreenode(gint size);
+
+bintree3_t *make_bintree3_with_recycle(bintree3cmp cmp, Recycle* recycle);
 bintree3_t *make_bintree3(bintree3cmp cmp);
 void bintree3_print(bintree3_t* this);
 void bintree3_test(void);

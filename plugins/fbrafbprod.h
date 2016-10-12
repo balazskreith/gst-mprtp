@@ -25,6 +25,7 @@ typedef struct _FBRAFBProducerClass FBRAFBProducerClass;
 
 typedef struct _CorrBlock CorrBlock;
 
+
 struct _FBRAFBProducer
 {
   GObject                  object;
@@ -42,6 +43,7 @@ struct _FBRAFBProducer
   guint                    vector_length;
 
   SlidingWindow*           owds_sw;
+  SlidingWindow*           rle_sw;
 
   GstClockTime             last_fb;
   gint                     rcved_packets;

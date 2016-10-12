@@ -106,9 +106,9 @@ report_producer_init (ReportProducer * this)
   this->in_progress         = FALSE;
 }
 
-void report_producer_set_ssrc(ReportProducer *this, guint32 ssrc)
+void report_producer_set_sender_ssrc(ReportProducer *this, guint32 sender_ssrc)
 {
-  this->ssrc = ssrc;
+  this->sender_ssrc = sender_ssrc;
 }
 
 void report_producer_set_logfile(ReportProducer *this, const gchar *logfile)
@@ -150,7 +150,7 @@ void report_producer_add_rr(ReportProducer *this,
   GstRTCPRR *rr;
   rr = gst_mprtcp_riport_block_add_rr(this->block);
   gst_rtcp_rr_add_rrb (rr,
-                           this->ssrc,
+                           this->sender_ssrc ,
                            fraction_lost,
                            total_lost,
                            ext_hsn,
@@ -158,6 +158,7 @@ void report_producer_add_rr(ReportProducer *this,
                            LSR,
                            DLSR);
   gst_rtcp_header_getdown (&rr->header, NULL, NULL, NULL, NULL, &length, NULL);
+  gst_rtcp_header_change(&rr->header, NULL, NULL, NULL, NULL, NULL, &this->ssrc);
   _add_length(this, length);
 }
 
@@ -306,6 +307,7 @@ void report_producer_add_sr(ReportProducer *this,
   sr = gst_mprtcp_riport_block_add_sr(this->block);
   gst_rtcp_srb_setup(&sr->sender_block, ntp_timestamp, rtp_timestamp, packet_count, octet_count);
   gst_rtcp_header_getdown (&sr->header, NULL, NULL, NULL, NULL, &length, NULL);
+  gst_rtcp_header_change(&sr->header, NULL, NULL, NULL, NULL, NULL, &this->ssrc);
   _add_length(this, length);
 }
 

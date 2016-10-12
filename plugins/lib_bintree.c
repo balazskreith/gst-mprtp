@@ -16,6 +16,18 @@ static bintree3node_t *_make_bintree3node(bintree3_t *this, gpointer value);
 static void _trash_bintree3node(bintree3_t *this, bintree3node_t *node);
 static void _ruin_full(bintree3_t *this, bintree3node_t *node);
 
+DEFINE_RECYCLE_TYPE(static, bintree3node, bintree3node_t);
+
+static void _bintree3node_shaper(gpointer result, gpointer udata)
+{
+  memset(result, 0, sizeof(bintree3node_t));
+}
+
+Recycle* make_recycle_for_bintreenode(gint size)
+{
+  return make_recycle_bintree3node(size, _bintree3node_shaper);
+}
+
 
 static void
 _sprint_list_of_pointers(GSList* it, gchar *result, guint result_length)
@@ -119,6 +131,13 @@ gint32 bintree3cmp_int64(gpointer pa,gpointer pb)
   return a == b ? 0 : a < b ? -1 : 1;
 }
 
+bintree3_t *make_bintree3_with_recycle(bintree3cmp cmp, Recycle* recycle)
+{
+  bintree3_t *result;
+  result = make_bintree3(cmp);
+  result->node_recycle = g_object_ref(recycle);
+  return result;
+}
 
 bintree3_t *make_bintree3(bintree3cmp cmp)
 {
@@ -185,6 +204,9 @@ void bintree3_dtor(gpointer target)
   bintree3_reset(this);
   g_object_unref(this->on_print);
   g_object_unref(this->on_duplicate);
+  if(this->node_recycle){
+    g_object_unref(this->node_recycle);
+  }
   free(this);
 }
 
@@ -471,7 +493,11 @@ bintree3node_t *_search_value(bintree3_t *this, gpointer data, bintree3node_t **
 bintree3node_t *_make_bintree3node(bintree3_t *this, gpointer data)
 {
   bintree3node_t *result;
-  result = g_slice_new0(bintree3node_t);
+  if(this->node_recycle){
+    result = recycle_retrieve_and_shape(this->node_recycle, data);
+  }else{
+    result = g_slice_new0(bintree3node_t);
+  }
   result->ref = 1;
   result->ptrs = g_slist_append(result->ptrs, data);
   return result;
@@ -491,7 +517,12 @@ void _trash_bintree3node(bintree3_t *this, bintree3node_t *node)
     _refresh_bottom(this);
   }
 
-  g_slice_free(bintree3node_t, node);
+  if(this->node_recycle){
+    recycle_add(this->node_recycle, node);
+  }else{
+    g_slice_free(bintree3node_t, node);
+  }
+
 }
 
 void _refresh_top(bintree3_t *this)

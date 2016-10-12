@@ -58,6 +58,23 @@ _cmp_seq (guint16 x, guint16 y)
   if(x > y && x - y < 32768) return 1;
   return 0;
 }
+
+
+static guint16 _diff_seq(guint16 a, guint16 b)
+{
+  if(a < b) return b-a;
+  if(b < a) return (65536 - a) + b;
+  return 0;
+}
+
+static void _on_rle_sw_rem(FBRAFBProducer* this, guint16* seq_num)
+{
+  this->vector[*seq_num] = FALSE;
+  if(_cmp_seq(this->begin_seq, *seq_num) <= 0){
+    this->begin_seq = *seq_num + 1;
+  }
+}
+
 PercentileResultPipeFnc(_owd_percentile_pipe, FBRAFBProducer, median_delay, min_delay, max_delay, RcvPacket, delay, 0);
 
 
@@ -96,7 +113,7 @@ fbrafbproducer_init (FBRAFBProducer * this)
 {
   this->sysclock = gst_system_clock_obtain();
 
-  this->vector   = mprtp_malloc(sizeof(gboolean)  * 1000);
+  this->vector   = g_malloc0(sizeof(gboolean)  * 65536);
   this->vector_length = 0;
 
 }
@@ -108,6 +125,10 @@ FBRAFBProducer *make_fbrafbproducer(RcvSubflow* subflow, RcvTracker *tracker)
   this->subflow         = subflow;
   this->tracker         = g_object_ref(tracker);
   this->owds_sw         = make_slidingwindow_uint64(20, 200 * GST_MSECOND);
+
+  this->rle_sw          = make_slidingwindow_uint16(100, GST_SECOND);
+
+  slidingwindow_add_on_rem_item_cb(this->rle_sw, (ListenerFunc) _on_rle_sw_rem, this);
 
   slidingwindow_add_plugin(this->owds_sw,
       make_swpercentile(50, bintree3cmp_uint64, (ListenerFunc)_owd_percentile_pipe, this));
@@ -141,8 +162,10 @@ void _on_received_packet(FBRAFBProducer *this, RcvPacket *packet)
 {
 
   slidingwindow_add_data(this->owds_sw, &packet->delay);
+  slidingwindow_add_data(this->rle_sw, &packet->subflow_seq);
 
   ++this->rcved_packets;
+  this->vector[packet->subflow_seq] = TRUE;
 
   if(!this->initialized){
     this->initialized = TRUE;
@@ -150,18 +173,9 @@ void _on_received_packet(FBRAFBProducer *this, RcvPacket *packet)
     goto done;
   }
 
-  if(_cmp_seq(packet->subflow_seq, this->end_seq) <= 0){
-    goto done;
+  if(_cmp_seq(this->end_seq, packet->subflow_seq) < 0){
+    this->end_seq = packet->subflow_seq;
   }
-
-  if(_cmp_seq(this->end_seq + 1, packet->subflow_seq) < 0){
-    guint16 seq = this->end_seq + 1;
-    for(; _cmp_seq(seq, packet->subflow_seq) < 0; ++seq){
-      this->vector[this->vector_length++] = FALSE;
-    }
-  }
-  this->vector[this->vector_length++] = TRUE;
-  this->end_seq = packet->subflow_seq;
 
 done:
   return;
@@ -170,7 +184,14 @@ done:
 
 static gboolean _do_fb(FBRAFBProducer *this)
 {
-  return 4 < this->rcved_packets || this->last_fb < _now(this) - 100 * GST_MSECOND;
+  GstClockTime now = _now(this);
+  if(now - 20 * GST_MSECOND < this->last_fb){
+    return FALSE;
+  }
+  if(this->last_fb < _now(this) - 100 * GST_MSECOND){
+    return TRUE;
+  }
+  return 1 < this->rcved_packets;
 }
 
 
@@ -179,6 +200,9 @@ void _on_fb_update(FBRAFBProducer *this, ReportProducer* reportproducer)
   if(!_do_fb(this)){
     goto done;
   }
+
+
+
 
   report_producer_begin(reportproducer, this->subflow->id);
   _setup_xr_owd(this, reportproducer);
@@ -193,25 +217,29 @@ done:
 
 void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this,ReportProducer* reportproducer)
 {
+
+  if(_cmp_seq(this->end_seq, this->begin_seq) <= 0){
+    goto done;
+  }
+
+  this->vector_length = _diff_seq(this->begin_seq, this->end_seq) + 1;
   report_producer_add_xr_lost_rle(reportproducer,
                                        FALSE,
                                        0,
                                        this->begin_seq,
                                        this->end_seq,
-                                       this->vector,
+                                       this->vector + this->begin_seq,
                                        this->vector_length
                                        );
 
 //  g_print("FB creating begin seq: %d end seq: %d, vector length: %d\n", this->begin_seq, this->end_seq, this->vector_length);
-  memset(this->vector, 0, sizeof(gboolean) * 1000);
+  //BAD!
+//  memset(this->vector, 0, sizeof(gboolean) * 65536);
 //  if(_cmp_seq(this->begin_seq, this->end_seq) < 0){
 //    this->begin_seq = this->end_seq + 1;
 //  }
-  if(0 < this->vector_length){
-    this->begin_seq = this->end_seq + 1;
-    this->vector_length = 0;
-  }
-
+done:
+  return;
 }
 
 

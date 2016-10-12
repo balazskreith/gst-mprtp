@@ -50,6 +50,12 @@ static void _extract_mprtp_info(RcvPackets* this, RcvPacket* packet, GstRTPBuffe
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
 
+DEFINE_ASYNCRECYCLE_TYPE(static, rcvpacket, RcvPacket);
+
+static void _rcvpacket_shaper(RcvPacket* result, gpointer udata)
+{
+  memset(result, 0, sizeof(RcvPacket));
+}
 
 void
 rcvpackets_class_init (RcvPacketsClass * klass)
@@ -69,16 +75,11 @@ void
 rcvpackets_finalize (GObject * object)
 {
   RcvPackets *this;
-  RcvPacket* packet;
 
   this = RCVPACKETS(object);
 
-  while((packet = g_async_queue_try_pop(this->packets_recycle)) != NULL){
-    g_slice_free(RcvPacket, packet);
-  }
-
+  g_object_unref(this->recycle);
   g_object_unref(this->sysclock);
-  g_async_queue_unref(this->packets_recycle);
 
 }
 
@@ -86,7 +87,7 @@ RcvPackets* make_rcvpackets(void)
 {
   RcvPackets* this;
   this = g_object_new (RCVPACKETS_TYPE, NULL);
-  this->packets_recycle = g_async_queue_new();
+  this->recycle = make_async_recycle_rcvpacket((AsyncRecycleItemShaper) _rcvpacket_shaper);
   return this;
 }
 
@@ -113,21 +114,17 @@ RcvPacket* rcvpackets_get_packet(RcvPackets* this, GstBuffer* buffer)
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   RcvPacket* packet;
 
-  if((packet = g_async_queue_try_pop(this->packets_recycle)) != NULL){
-    memset(packet, 0, sizeof(RcvPacket));
-  }else{
-    packet = g_slice_new0(RcvPacket);
-  }
+  packet = async_recycle_retrieve_and_shape(this->recycle, NULL);
 
   gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
   _setup_rcvpacket(packet, &rtp);
   _extract_mprtp_info(this, packet, &rtp);
   gst_rtp_buffer_unmap(&rtp);
 
-  packet->buffer   = gst_buffer_make_writable(buffer);
+  packet->buffer   = buffer;
   packet->ref      = 1;
   packet->received = _now(this);
-  packet->destiny  = this->packets_recycle;
+  packet->destiny  = this->recycle;
 
   _check_buffer_meta_data(this, packet);
 
@@ -170,7 +167,7 @@ void rcvpacket_unref(RcvPacket *packet)
     return;
   }
 
-  g_async_queue_push(packet->destiny, packet);
+  async_recycle_add(packet->destiny, packet);
 }
 
 RcvPacket* rcvpacket_ref(RcvPacket *packet)

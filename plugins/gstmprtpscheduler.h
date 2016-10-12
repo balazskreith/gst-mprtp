@@ -48,6 +48,7 @@ struct _GstMprtpscheduler
 {
   GstElement                    base_object;
   GMutex                        mutex;
+  GCond                         cond;
   GstPad*                       rtp_sinkpad;
   GstPad*                       mprtp_srcpad;
   GstPad*                       mprtcp_rr_sinkpad;
@@ -78,10 +79,8 @@ struct _GstMprtpscheduler
   guint32                       fec_interval;
   guint32                       sent_packets;
 
-  gboolean                      monitoring_request;
   Mediator*                     monitoring;
-  GAsyncQueue*                  rtpbuffers_in;
-  GAsyncQueue*                  fec_responses;
+  GAsyncQueue*                  packetsq;
   GAsyncQueue*                  emitterq;
   Notifier*                     on_rtcp_ready;
 

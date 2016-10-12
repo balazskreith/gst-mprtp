@@ -48,13 +48,11 @@ struct _MPRTPLoggerClass{
 
 
 
-#define mprtp_slice_new0(type) \
-  mprtp_logger_add_memory_consumption(#type, sizeof(type)), g_slice_new0(type)
+#define mprtp_slice_new0(type) mprtp_slice_alloc(#type, sizeof(type))
 
 //#define mprtp_log_slice_new0(type)  g_slice_new0(type)
 
-#define mprtp_slice_free(type, mem) \
-  mrptp_logger_rem_memoty_consumption(#type, sizeof(type)), g_slice_free(type, mem)
+#define mprtp_slice_free(type, mem) mprtp_slice_dealloc(#type, sizeof(type), mem)
 
 //#define mprtp_log_slice_free(type, mem)  g_slice_free(type, mem)
 
@@ -66,9 +64,11 @@ gpointer mprtp_malloc(gsize bytenum);
 void mprtp_free(gpointer ptr);
 
 void init_mprtp_logger(void);
+gpointer mprtp_slice_alloc(const gchar* type_name, gsize size);
+void mprtp_slice_dealloc(const gchar* type_name, gsize size, gpointer memptr);
 void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer,gchar*),gpointer data, const gchar* filename);
-void mprtp_logger_add_memory_consumption(gchar *type_name, gsize size);
-void mprtp_logger_rem_memory_consumption(gchar *type_name, gsize size);
+void mprtp_logger_add_memory_consumption(const gchar *type_name, gsize size);
+void mprtp_logger_rem_memory_consumption(const gchar *type_name, gsize size);
 void mprtp_logger_print_memory_consumption(void);
 void mprtp_logger_set_state(gboolean enabled);
 void mprtp_logger_set_target_directory(const gchar *path);

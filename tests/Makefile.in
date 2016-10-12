@@ -90,6 +90,7 @@ build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
 noinst_PROGRAMS = sender$(EXEEXT) receiver$(EXEEXT) \
+	fbrapsender$(EXEEXT) fbrapreceiver$(EXEEXT) \
 	scream_sender$(EXEEXT) scream_receiver$(EXEEXT) \
 	v4l2_file_player$(EXEEXT)
 subdir = tests
@@ -113,14 +114,26 @@ CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 PROGRAMS = $(noinst_PROGRAMS)
-am_receiver_OBJECTS = receiver-receiver.$(OBJEXT)
-receiver_OBJECTS = $(am_receiver_OBJECTS)
+am_fbrapreceiver_OBJECTS = fbrapreceiver-fbrapreceiver.$(OBJEXT)
+fbrapreceiver_OBJECTS = $(am_fbrapreceiver_OBJECTS)
 am__DEPENDENCIES_1 =
-receiver_DEPENDENCIES = $(am__DEPENDENCIES_1)
+fbrapreceiver_DEPENDENCIES = $(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+fbrapreceiver_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(fbrapreceiver_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_fbrapsender_OBJECTS = fbrapsender-fbrapsender.$(OBJEXT)
+fbrapsender_OBJECTS = $(am_fbrapsender_OBJECTS)
+fbrapsender_DEPENDENCIES = $(am__DEPENDENCIES_1)
+fbrapsender_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(fbrapsender_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_receiver_OBJECTS = receiver-receiver.$(OBJEXT)
+receiver_OBJECTS = $(am_receiver_OBJECTS)
+receiver_DEPENDENCIES = $(am__DEPENDENCIES_1)
 receiver_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(receiver_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
@@ -187,10 +200,12 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(receiver_SOURCES) $(scream_receiver_SOURCES) \
+SOURCES = $(fbrapreceiver_SOURCES) $(fbrapsender_SOURCES) \
+	$(receiver_SOURCES) $(scream_receiver_SOURCES) \
 	$(scream_sender_SOURCES) $(sender_SOURCES) \
 	$(v4l2_file_player_SOURCES)
-DIST_SOURCES = $(receiver_SOURCES) $(scream_receiver_SOURCES) \
+DIST_SOURCES = $(fbrapreceiver_SOURCES) $(fbrapsender_SOURCES) \
+	$(receiver_SOURCES) $(scream_receiver_SOURCES) \
 	$(scream_sender_SOURCES) $(sender_SOURCES) \
 	$(v4l2_file_player_SOURCES)
 am__can_run_installinfo = \
@@ -393,12 +408,18 @@ top_srcdir = @top_srcdir@
 receiver_SOURCES = receiver.c
 receiver_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
 receiver_LDADD = $(GST_LIBS)
+fbrapreceiver_SOURCES = fbrapreceiver.c
+fbrapreceiver_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
+fbrapreceiver_LDADD = $(GST_LIBS)
 scream_receiver_SOURCES = scream_receiver.c
 scream_receiver_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(AM_CFLAGS)
 scream_receiver_LDADD = $(GST_PLUGINS_BASE_LIBS) -lgstrtp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
 sender_SOURCES = sender.c
 sender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
 sender_LDADD = $(GST_LIBS)
+fbrapsender_SOURCES = fbrapsender.c
+fbrapsender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
+fbrapsender_LDADD = $(GST_LIBS)
 scream_sender_SOURCES = scream_sender.c
 scream_sender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
 scream_sender_LDADD = $(GST_LIBS)
@@ -448,6 +469,14 @@ clean-noinstPROGRAMS:
 	echo " rm -f" $$list; \
 	rm -f $$list
 
+fbrapreceiver$(EXEEXT): $(fbrapreceiver_OBJECTS) $(fbrapreceiver_DEPENDENCIES) $(EXTRA_fbrapreceiver_DEPENDENCIES) 
+	@rm -f fbrapreceiver$(EXEEXT)
+	$(AM_V_CCLD)$(fbrapreceiver_LINK) $(fbrapreceiver_OBJECTS) $(fbrapreceiver_LDADD) $(LIBS)
+
+fbrapsender$(EXEEXT): $(fbrapsender_OBJECTS) $(fbrapsender_DEPENDENCIES) $(EXTRA_fbrapsender_DEPENDENCIES) 
+	@rm -f fbrapsender$(EXEEXT)
+	$(AM_V_CCLD)$(fbrapsender_LINK) $(fbrapsender_OBJECTS) $(fbrapsender_LDADD) $(LIBS)
+
 receiver$(EXEEXT): $(receiver_OBJECTS) $(receiver_DEPENDENCIES) $(EXTRA_receiver_DEPENDENCIES) 
 	@rm -f receiver$(EXEEXT)
 	$(AM_V_CCLD)$(receiver_LINK) $(receiver_OBJECTS) $(receiver_LDADD) $(LIBS)
@@ -474,6 +503,8 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbrapreceiver-fbrapreceiver.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbrapsender-fbrapsender.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/receiver-receiver.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scream_receiver-scream_receiver.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scream_sender-scream_sender.Po@am__quote@
@@ -500,6 +531,34 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
+
+fbrapreceiver-fbrapreceiver.o: fbrapreceiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapreceiver_CFLAGS) $(CFLAGS) -MT fbrapreceiver-fbrapreceiver.o -MD -MP -MF $(DEPDIR)/fbrapreceiver-fbrapreceiver.Tpo -c -o fbrapreceiver-fbrapreceiver.o `test -f 'fbrapreceiver.c' || echo '$(srcdir)/'`fbrapreceiver.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/fbrapreceiver-fbrapreceiver.Tpo $(DEPDIR)/fbrapreceiver-fbrapreceiver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fbrapreceiver.c' object='fbrapreceiver-fbrapreceiver.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapreceiver_CFLAGS) $(CFLAGS) -c -o fbrapreceiver-fbrapreceiver.o `test -f 'fbrapreceiver.c' || echo '$(srcdir)/'`fbrapreceiver.c
+
+fbrapreceiver-fbrapreceiver.obj: fbrapreceiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapreceiver_CFLAGS) $(CFLAGS) -MT fbrapreceiver-fbrapreceiver.obj -MD -MP -MF $(DEPDIR)/fbrapreceiver-fbrapreceiver.Tpo -c -o fbrapreceiver-fbrapreceiver.obj `if test -f 'fbrapreceiver.c'; then $(CYGPATH_W) 'fbrapreceiver.c'; else $(CYGPATH_W) '$(srcdir)/fbrapreceiver.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/fbrapreceiver-fbrapreceiver.Tpo $(DEPDIR)/fbrapreceiver-fbrapreceiver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fbrapreceiver.c' object='fbrapreceiver-fbrapreceiver.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapreceiver_CFLAGS) $(CFLAGS) -c -o fbrapreceiver-fbrapreceiver.obj `if test -f 'fbrapreceiver.c'; then $(CYGPATH_W) 'fbrapreceiver.c'; else $(CYGPATH_W) '$(srcdir)/fbrapreceiver.c'; fi`
+
+fbrapsender-fbrapsender.o: fbrapsender.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapsender_CFLAGS) $(CFLAGS) -MT fbrapsender-fbrapsender.o -MD -MP -MF $(DEPDIR)/fbrapsender-fbrapsender.Tpo -c -o fbrapsender-fbrapsender.o `test -f 'fbrapsender.c' || echo '$(srcdir)/'`fbrapsender.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/fbrapsender-fbrapsender.Tpo $(DEPDIR)/fbrapsender-fbrapsender.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fbrapsender.c' object='fbrapsender-fbrapsender.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapsender_CFLAGS) $(CFLAGS) -c -o fbrapsender-fbrapsender.o `test -f 'fbrapsender.c' || echo '$(srcdir)/'`fbrapsender.c
+
+fbrapsender-fbrapsender.obj: fbrapsender.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapsender_CFLAGS) $(CFLAGS) -MT fbrapsender-fbrapsender.obj -MD -MP -MF $(DEPDIR)/fbrapsender-fbrapsender.Tpo -c -o fbrapsender-fbrapsender.obj `if test -f 'fbrapsender.c'; then $(CYGPATH_W) 'fbrapsender.c'; else $(CYGPATH_W) '$(srcdir)/fbrapsender.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/fbrapsender-fbrapsender.Tpo $(DEPDIR)/fbrapsender-fbrapsender.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fbrapsender.c' object='fbrapsender-fbrapsender.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapsender_CFLAGS) $(CFLAGS) -c -o fbrapsender-fbrapsender.obj `if test -f 'fbrapsender.c'; then $(CYGPATH_W) 'fbrapsender.c'; else $(CYGPATH_W) '$(srcdir)/fbrapsender.c'; fi`
 
 receiver-receiver.o: receiver.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(receiver_CFLAGS) $(CFLAGS) -MT receiver-receiver.o -MD -MP -MF $(DEPDIR)/receiver-receiver.Tpo -c -o receiver-receiver.o `test -f 'receiver.c' || echo '$(srcdir)/'`receiver.c

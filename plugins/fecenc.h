@@ -12,6 +12,7 @@
 #include "rtpfecbuffer.h"
 #include "sndsubflows.h"
 #include "mediator.h"
+#include "recycle.h"
 
 typedef struct _FECEncoder FECEncoder;
 typedef struct _FECEncoderClass FECEncoderClass;
@@ -49,6 +50,7 @@ struct _FECEncoder
   GAsyncQueue*               buffers;
 
   Mediator*                  response_handler;
+  Recycle*                   bitstring_recycle;
 
   SubflowSeqTrack*           seqtracks;
 };

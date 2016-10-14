@@ -539,7 +539,7 @@ gst_mprtpplayouter_change_state (GstElement * element,
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       break;
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
-        if(0) gst_pad_start_task(this->mprtp_srcpad, (GstTaskFunction)_playout_process, this, NULL);
+        gst_pad_start_task(this->mprtp_srcpad, (GstTaskFunction)_playout_process, this, NULL);
         break;
       default:
         break;
@@ -593,7 +593,7 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 
   this = GST_MPRTPPLAYOUTER (parent);
   GST_DEBUG_OBJECT (this, "RTP/RTCP/MPRTP/MPRTCP sink");
-//  g_print("START PROCESSING RTP\n");
+
   if(!GST_IS_BUFFER(buf)){
     GST_WARNING("The arrived buffer is not a buffer.");
     goto done;
@@ -636,11 +636,10 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   }
 
   packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
-  g_print("%hu received\n", packet->abs_seq);
-  return gst_pad_push(this->mprtp_srcpad, rcvpacket_retrieve_buffer_and_unref(packet));
+//  return gst_pad_push(this->mprtp_srcpad, rcvpacket_retrieve_buffer_and_unref(packet));
 
 
-if(0){
+//if(0){
   THIS_LOCK(this);
 
   packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
@@ -650,7 +649,7 @@ if(0){
   rcvctrler_time_update(this->controller);
 
   THIS_UNLOCK(this);
-}
+//}
 
 done:
   return result;
@@ -701,19 +700,23 @@ _processing_mprtcp_packet (GstMprtpplayouter * this, GstBuffer * buf)
     result = GST_FLOW_OK;
     THIS_UNLOCK (this);
   );
+
+//  {
+//      GstRTCPBuffer rtcp = GST_RTCP_BUFFER_INIT;
+//      gst_rtcp_buffer_map(buf, GST_MAP_READ, &rtcp);
+//      gst_print_rtcp_buffer(&rtcp);
+//      gst_rtcp_buffer_unmap(&rtcp);
+//  }
   return result;
 }
 
-static GstClockTime last_report;
 void _playouter_on_rtcp_ready(GstMprtpplayouter *this, GstBuffer* buffer)
 {
 //  GstRTCPBuffer rtcp = GST_RTCP_BUFFER_INIT;
 //  gst_rtcp_buffer_map(buffer, GST_MAP_READ, &rtcp);
 //  gst_print_rtcp_buffer(&rtcp);
 //  gst_rtcp_buffer_unmap(&rtcp);
-  if(GST_TIME_AS_MSECONDS(_now(this) - last_report) < 30){
-    g_print("%lu\n", GST_TIME_AS_MSECONDS(_now(this) - last_report));  last_report = _now(this);
-  }
+
   gst_pad_push(this->mprtcp_rr_srcpad, buffer);
 }
 
@@ -735,17 +738,22 @@ void _playouter_on_response_request(GstMprtpplayouter *this, DiscardedPacket *di
 
 
 static void
-_playout_process_ (GstMprtpplayouter *this)
+_playout_process (GstMprtpplayouter *this)
 {
   RcvPacket *packet;
   gboolean repair_request;
-  while((packet = g_async_queue_try_pop(this->packetsq)) != NULL){
-    stream_joiner_push_packet(this->joiner, packet);
-  }
 
-  while((packet = stream_joiner_pop_packet(this->joiner)) != NULL){
-    jitterbuffer_push_packet(this->jitterbuffer, packet);
-  }
+//  PROFILING("stream_joiner_push_packet",
+    while((packet = g_async_queue_try_pop(this->packetsq)) != NULL){
+      stream_joiner_push_packet(this->joiner, packet);
+    }
+//  );
+
+//  PROFILING("jitterbuffer_push_packet",
+    while((packet = stream_joiner_pop_packet(this->joiner)) != NULL){
+      jitterbuffer_push_packet(this->jitterbuffer, packet);
+    }
+//  );
 
 again:
   repair_request = FALSE;
@@ -765,7 +773,9 @@ again:
     }
   }
 
-  gst_pad_push(this->mprtp_srcpad, rcvpacket_retrieve_buffer_and_unref(packet));
+//  PROFILING("gst_pad_push",
+    gst_pad_push(this->mprtp_srcpad, rcvpacket_retrieve_buffer_and_unref(packet));
+//  );
   goto again;
 
 done:
@@ -773,10 +783,12 @@ done:
   return;
 }
 
-void _playout_process(GstMprtpplayouter *this)
-{
-  if(0) _playout_process_(this);
-}
+//void _playout_process(GstMprtpplayouter *this)
+//{
+//   PROFILING("_playout_process",
+//       _playout_process_(this);
+//   );
+//}
 
 #undef THIS_LOCK
 #undef THIS_UNLOCK

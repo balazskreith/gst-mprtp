@@ -36,17 +36,18 @@ static gint32 video_height      = 288;
 static gint32 video_width       = 352;
 static gint32 target_bitrate    = 500000;
 
-static int rtpbin_tx_rtcp_port  = 5013;
-static int rtpbin_rx_rtcp_port  = 5015;
+static int snd_rtcp_port   = 5013;
+static int rcv_rtcp_port   = 5015;
 
-static int path_tx_rtp_port     = 5000;
-static gchar *path_tx_ip        = NULL;
-static gchar default_path_tx_ip[255];
+static int rcv_rtp_port    = 5000;
+static int rcv_mprtcp_port = 5001;
+static int snd_mprtcp_port = 5003;
+static gchar *snd_ip       = NULL;
+static gchar *rcv_ip       = NULL;
+static gchar default_snd_ip[255];
+static gchar default_rcv_ip[255];
 
-static gchar *path_rx_ip        = NULL;
-static gchar default_path_rx_ip[255];
-
-static gchar *logsdir           = NULL;
+static gchar *logs_path         = NULL;
 static gchar default_logsdir[255];
 
 static int logging              = 1;
@@ -58,20 +59,22 @@ static int fec_interval         = 0;
 
 static GOptionEntry entries[] =
 {
-    { "logsdir", 0, 0, G_OPTION_ARG_STRING, &logsdir, "Logsdir", NULL },
+    { "logs_path", 0, 0, G_OPTION_ARG_STRING, &logs_path, "Logsdir", NULL },
     { "video_width", 0, 0, G_OPTION_ARG_INT, &video_width, "video width", NULL },
     { "video_height", 0, 0, G_OPTION_ARG_INT, &video_height, "video width", NULL },
-    { "path_rx_ip", 0, 0, G_OPTION_ARG_STRING, &path_rx_ip, "path_rx_ip", NULL },
-    { "path_tx_ip", 0, 0, G_OPTION_ARG_STRING, &path_tx_ip, "path_tx_ip", NULL },
+    { "snd_ip", 0, 0, G_OPTION_ARG_STRING, &snd_ip, "snd_ip", NULL },
+    { "rcv_ip", 0, 0, G_OPTION_ARG_STRING, &rcv_ip, "rcv_ip", NULL },
+    { "snd_rtcp_port", 0, 0, G_OPTION_ARG_INT, &snd_rtcp_port, "snd_rtcp_port", NULL },
+    { "rcv_rtcp_port", 0, 0, G_OPTION_ARG_INT, &rcv_rtcp_port, "rcv_rtcp_port", NULL },
+    { "rcv_mprtcp_port", 0, 0, G_OPTION_ARG_INT, &rcv_mprtcp_port, "rcv_mprtcp_port", NULL },
+    { "snd_mprtcp_port", 0, 0, G_OPTION_ARG_INT, &snd_mprtcp_port, "snd_mprtcp_port", NULL },
     { "fec_interval", 0, 0, G_OPTION_ARG_INT, &fec_interval, "fec_interval", NULL },
     { "obsolation_th", 0, 0, G_OPTION_ARG_INT, &obsolation_th, "obsolation_th", NULL },
     { "logging", 0, 0, G_OPTION_ARG_INT, &logging, "logging", NULL },
     { "rtcp_interval_type", 0, 0, G_OPTION_ARG_INT, &rtcp_interval_type, "rtcp_interval_type", NULL },
     { "controlling_mode", 0, 0, G_OPTION_ARG_INT, &controlling_mode, "controlling_mode", NULL },
     { "target_bitrate", 0, 0, G_OPTION_ARG_INT, &target_bitrate, "target_bitrate", NULL },
-    { "path_tx_rtp_port", 0, 0, G_OPTION_ARG_INT, &path_tx_rtp_port, "path_tx_rtp_port", NULL },
-    { "rtpbin_tx_rtcp_port", 0, 0, G_OPTION_ARG_INT, &rtpbin_tx_rtcp_port, "rtpbin_tx_rtcp_port", NULL },
-    { "rtpbin_rx_rtcp_port", 0, 0, G_OPTION_ARG_INT, &rtpbin_rx_rtcp_port, "rtpbin_rx_rtcp_port", NULL },
+    { "path_tx_rtp_port", 0, 0, G_OPTION_ARG_INT, &rcv_rtp_port, "path_tx_rtp_port", NULL },
 
     { "info", 0, 0, G_OPTION_ARG_NONE, &info, "Info", NULL },
   { NULL }
@@ -88,26 +91,37 @@ static void _print_info(void)
 static void _setup_test_params(void)
 {
 
-  if(path_tx_rtp_port == 0){
-    path_tx_rtp_port  = 5000;
+  if(rcv_rtp_port == 0){
+    rcv_rtp_port  = 5000;
   }
 
 
-  if(rtpbin_tx_rtcp_port == 0){
-      rtpbin_tx_rtcp_port  = 5013;
+  if(snd_rtcp_port == 0){
+      snd_rtcp_port  = 5013;
   }
-  if(rtpbin_rx_rtcp_port == 0){
-      rtpbin_rx_rtcp_port = 5015;
+  if(rcv_rtcp_port == 0){
+      rcv_rtcp_port = 5015;
+  }
+  if(snd_mprtcp_port == 0){
+    snd_mprtcp_port = 5003;
+  }
+  if(rcv_mprtcp_port == 0){
+    rcv_mprtcp_port = 5001;
   }
 
-  if(logsdir == NULL){
+  if(logs_path == NULL){
       sprintf(default_logsdir, "logs/");
-      logsdir = default_logsdir;
+      logs_path = default_logsdir;
     }
 
-  if(path_tx_ip == NULL){
-      sprintf(default_path_tx_ip, "10.0.0.6");
-      path_tx_ip = default_path_tx_ip;
+  if(rcv_ip == NULL){
+      sprintf(default_rcv_ip, "10.0.0.6");
+      rcv_ip = default_rcv_ip;
+    }
+
+  if(snd_ip == NULL){
+      sprintf(default_snd_ip, "10.0.0.1");
+      snd_ip = default_snd_ip;
     }
 
 //  _print_transfer_info();

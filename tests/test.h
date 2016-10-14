@@ -107,7 +107,7 @@ static int path3_rx_rtcp_port   = 5011;
 
 static int rtpbin_tx_rtcp_port  = 5013;
 static int rtpbin_rx_rtcp_port  = 5015;
-static gchar *logsdir           = NULL;
+static gchar *logs_path           = NULL;
 static gchar default_logsdir[255];
 
 static gchar *yuvsrc_file        = NULL;
@@ -170,7 +170,7 @@ static int extra_delay = 0;
 
 static GOptionEntry entries[] =
 {
-    { "logsdir", 0, 0, G_OPTION_ARG_STRING, &logsdir, "Logsdir", NULL },
+    { "logsdir", 0, 0, G_OPTION_ARG_STRING, &logs_path, "Logsdir", NULL },
 	{ "save_received_yuvfile", 0, 0, G_OPTION_ARG_INT, &save_received_yuvfile, "Save received YUVfile", NULL },
 	{ "use_testsourcevideo", 0, 0, G_OPTION_ARG_INT, &use_testsourcevideo, "Use Testvideosource", NULL },
     { "yuvsrc_file", 0, 0, G_OPTION_ARG_STRING, &yuvsrc_file, "Yuvsrc file", NULL },
@@ -367,12 +367,12 @@ static void _setup_test_params(void)
       rtpbin_tx_rtcp_port  = 5013;
   }
   if(rtpbin_rx_rtcp_port == 0){
-      rtpbin_rx_rtcp_port = 5015;
+    rtpbin_rx_rtcp_port = 5015;
   }
 
-  if(logsdir == NULL){
+  if(logs_path == NULL){
       sprintf(default_logsdir, "logs/");
-      logsdir = default_logsdir;
+      logs_path = default_logsdir;
     }
 
   if(yuvsrc_file == NULL){

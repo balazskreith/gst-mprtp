@@ -87,13 +87,15 @@ static gboolean
 gst_mprtpsender_mprtp_sink_query_handler (GstPad * pad, GstObject * parent,
                                           GstQuery * query);
 
+
+
 typedef struct
 {
   GstPad    *outpad;
-  GstPad    *async_outpad;
+  GstPad    *mprtcp_outpad;
   guint8     id;
   gboolean   initialized;
-  GstClock  *sysclock;
+//  GstClock  *sysclock;
 } Subflow;
 
 
@@ -121,8 +123,8 @@ GST_STATIC_PAD_TEMPLATE ("src_%u",
     GST_PAD_REQUEST,
     GST_STATIC_CAPS_ANY);
 
-static GstStaticPadTemplate gst_mprtpsender_async_src_template =
-GST_STATIC_PAD_TEMPLATE ("async_src_%u",
+static GstStaticPadTemplate gst_mprtpsender_mprtcp_src_template =
+GST_STATIC_PAD_TEMPLATE ("mprtcp_src_%u",
     GST_PAD_SRC,
     GST_PAD_REQUEST,
     GST_STATIC_CAPS_ANY);
@@ -240,7 +242,7 @@ gst_mprtpsender_class_init (GstMprtpsenderClass * klass)
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&gst_mprtpsender_src_template));
   gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&gst_mprtpsender_async_src_template));
+      gst_static_pad_template_get (&gst_mprtpsender_mprtcp_src_template));
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&gst_mprtpsender_mprtcp_sr_sink_template));
   gst_element_class_add_pad_template (element_class,
@@ -341,6 +343,7 @@ gst_mprtpsender_init (GstMprtpsender * mprtpsender)
   mprtpsender->event_stream_start  = NULL;
   mprtpsender->fec_payload_type    = FEC_PAYLOAD_DEFAULT_ID;
   mprtpsender->async_fec           = FALSE;
+
   //mprtpsender->events = g_queue_new();
   g_rw_lock_init (&mprtpsender->rwmutex);
 }
@@ -495,7 +498,7 @@ gst_mprtpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
 //  sscanf (name, "src_%hhu", &subflow_id);
   if(sscanf (name, "src_%hhu", &subflow_id)){
       async = FALSE;
-  }else if(sscanf (name, "async_src_%hhu", &subflow_id)){
+  }else if(sscanf (name, "mprtcp_src_%hhu", &subflow_id)){
       async = TRUE;
   }
   THIS_WRITELOCK (this);
@@ -509,9 +512,9 @@ gst_mprtpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
   if(!subflow) {
       subflow = (Subflow *) g_malloc0 (sizeof (Subflow));
       subflow->id           = subflow_id;
-      subflow->sysclock     = gst_system_clock_obtain ();
-      subflow->async_outpad = subflow->outpad = NULL;
+      subflow->mprtcp_outpad = subflow->outpad = NULL;
       this->subflows        = g_list_prepend (this->subflows, subflow);
+      this->subflows_lookup[subflow_id] = subflow;
   }
 
   srcpad = gst_pad_new_from_template (templ, name);
@@ -531,7 +534,7 @@ gst_mprtpsender_request_new_pad (GstElement * element, GstPadTemplate * templ,
     subflow->outpad   = srcpad;
     this->dirty       = TRUE;
   }else{
-    subflow->async_outpad = srcpad;
+    subflow->mprtcp_outpad = srcpad;
   }
   THIS_WRITEUNLOCK (this);
   GST_OBJECT_FLAG_SET (srcpad, GST_PAD_FLAG_PROXY_CAPS);
@@ -699,11 +702,14 @@ gst_mprtpsender_src_unlink (GstPad * pad, GstObject * parent)
     subflow = NULL;
   }
   if (subflow == NULL) {
-    goto gst_mprtpsender_src_unlink_done;
+    goto done;
   }
-  gst_object_unref (subflow->sysclock);
+
+  mprtpsender->subflows_lookup[subflow->id] = NULL;
   mprtpsender->subflows = g_list_remove (mprtpsender->subflows, subflow);
-gst_mprtpsender_src_unlink_done:
+  g_free(subflow);
+
+done:
   THIS_WRITEUNLOCK (mprtpsender);
 }
 
@@ -876,9 +882,9 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 
   if (packet_type != PACKET_IS_NOT_MP && _select_subflow (this, subflow_id, &subflow) != FALSE) {
     if(packet_type == PACKET_IS_MPRTCP){
-      outpad = subflow->async_outpad ? subflow->async_outpad : subflow->outpad;
+      outpad = subflow->mprtcp_outpad ? subflow->mprtcp_outpad : subflow->outpad;
     }else if(packet_type == PACKET_IS_MPRTP_FEC){
-      outpad = this->async_fec && subflow->async_outpad ? subflow->async_outpad : subflow->outpad;
+      outpad = this->async_fec && subflow->mprtcp_outpad ? subflow->mprtcp_outpad : subflow->outpad;
     }else{
       outpad = subflow->outpad;
     }
@@ -939,9 +945,9 @@ gst_mprtpsender_mprtcp_sink_chain (GstPad * pad, GstObject * parent,
 //    gst_print_rtcp((GstRTCPHeader*)map.data);
 //    gst_buffer_unmap(buf, &map);
 //  }
-//  g_print("############################ SENT (%lu)################################\n", GST_TIME_AS_MSECONDS(gst_clock_get_time(subflow->sysclock)));
-  if(subflow->async_outpad){
-    result = gst_pad_push (subflow->async_outpad, buf);
+//  g_print("############################ SENT %d################################\n", subflow->id);
+  if(subflow->mprtcp_outpad){
+    result = gst_pad_push (subflow->mprtcp_outpad, buf);
   }else{
     result = gst_pad_push (subflow->outpad, buf);
   }
@@ -1000,18 +1006,23 @@ done:
 gboolean
 _select_subflow (GstMprtpsender * this, guint8 id, Subflow ** result)
 {
-  GList *it;
-  Subflow *subflow;
-
-  for (it = this->subflows; it != NULL; it = it->next) {
-    subflow = it->data;
-    if (subflow->id == id) {
-      *result = subflow;
-      return TRUE;
-    }
+//  GList *it;
+//  Subflow *subflow;
+  if(this->subflows_lookup[id] == NULL){
+    return FALSE;
   }
-  *result = NULL;
-  return FALSE;
+  *result = this->subflows_lookup[id];
+  return TRUE;
+
+//  for (it = this->subflows; it != NULL; it = it->next) {
+//    subflow = it->data;
+//    if (subflow->id == id) {
+//      *result = subflow;
+//      return TRUE;
+//    }
+//  }
+//  *result = NULL;
+//  return FALSE;
 }
 
 

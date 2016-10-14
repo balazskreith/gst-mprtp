@@ -89,15 +89,20 @@ Messenger *make_messenger(gsize block_size)
   return result;
 }
 
-gpointer messenger_pop(Messenger *this)
+
+gpointer messenger_pop (Messenger *this)
 {
-  gpointer result;
-  g_mutex_lock(&this->mutex);
-  if(g_queue_is_empty(this->messages)){
-    g_cond_wait(&this->cond, &this->mutex);
+  gpointer result = NULL;
+
+  g_mutex_lock (&this->mutex);
+  while (!result){
+    g_cond_wait (&this->cond, &this->mutex);
+    if(g_queue_is_empty(this->messages)){
+      continue;
+    }
+    result = g_queue_pop_head(this->messages);
   }
-  result = g_queue_pop_head(this->messages);
-  g_mutex_unlock(&this->mutex);
+  g_mutex_unlock (&this->mutex);
   return result;
 }
 

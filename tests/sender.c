@@ -615,7 +615,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session,
 
   g_object_set (mprtpsch,
             "logging", logging,
-            "logs-path", logsdir,
+            "logs-path", logs_path,
             "setup-rtcp-interval-type", rtcp_interval_type,
             "fec-interval", fec_interval,
             "obsolation-treshold", obsolation_th,

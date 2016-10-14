@@ -383,7 +383,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session,
                 "setup-rtcp-interval-type", rtcp_interval_type,
                 "setup-controlling-mode", controlling_mode,
                 "logging", logging,
-                "logs-path", logsdir,
+                "logs-path", logs_path,
                 NULL);
 
   g_print ("Connecting to %i/%i/%i/%i/%i/%i\n",

@@ -241,7 +241,7 @@ gint32 sndsubflows_get_total_target(SndSubflows* this)
   return this->target_rate;
 }
 
-gint32 sndsubflows_get_subflows_num(SndSubflows* this)
+guint sndsubflows_get_subflows_num(SndSubflows* this)
 {
   return this->subflows_num;
 }

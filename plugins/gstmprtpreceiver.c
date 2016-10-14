@@ -109,8 +109,8 @@ GST_STATIC_PAD_TEMPLATE ("sink_%u",
     GST_STATIC_CAPS ("ANY")
     );
 
-static GstStaticPadTemplate gst_mprtpreceiver_async_sink_template =
-GST_STATIC_PAD_TEMPLATE ("async_sink_%u",
+static GstStaticPadTemplate gst_mprtpreceiver_mprtcp_sink_template =
+GST_STATIC_PAD_TEMPLATE ("mprtcp_sink_%u",
     GST_PAD_SINK,
     GST_PAD_REQUEST,
     GST_STATIC_CAPS ("ANY")
@@ -157,7 +157,7 @@ gst_mprtpreceiver_class_init (GstMprtpreceiverClass * klass)
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&gst_mprtpreceiver_sink_template));
   gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&gst_mprtpreceiver_async_sink_template));
+      gst_static_pad_template_get (&gst_mprtpreceiver_mprtcp_sink_template));
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&gst_mprtpreceiver_mprtcp_rr_src_template));
   gst_element_class_add_pad_template (element_class,
@@ -330,7 +330,7 @@ gst_mprtpreceiver_request_new_pad (GstElement * element, GstPadTemplate * templ,
 
   if(sscanf (name, "sink_%hhu", &subflow_id)){
     async = FALSE;
-  }else if(sscanf (name, "async_sink_%hhu", &subflow_id)){
+  }else if(sscanf (name, "mprtcp_sink_%hhu", &subflow_id)){
     async = TRUE;
   }
 

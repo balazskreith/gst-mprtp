@@ -35,24 +35,26 @@ typedef struct _GstMprtpsenderPrivate GstMprtpsenderPrivate;
 
 struct _GstMprtpsender
 {
-  GstElement base_mprtpsender;
-  GRWLock rwmutex;
-  guint8 mprtp_ext_header_id;
-  guint8 fec_payload_type;
-  gboolean async_fec;
-  GList *subflows;
-  gboolean dirty;
-  GstSegment segment;
-  GstPad *mprtcp_rr_sinkpad;
-  GstPad *mprtp_sinkpad;
-  GstPad *mprtcp_sr_sinkpad;
-  GstPad *pivot_outpad;
+  GstElement    base_mprtpsender;
+  GstClock*     sysclock;
+  GRWLock       rwmutex;
+  guint8        mprtp_ext_header_id;
+  guint8        fec_payload_type;
+  gboolean      async_fec;
+  GList*        subflows;
+  gpointer      subflows_lookup[256];
+  gboolean      dirty;
+  GstSegment    segment;
+  GstPad*       mprtcp_rr_sinkpad;
+  GstPad*       mprtp_sinkpad;
+  GstPad*       mprtcp_sr_sinkpad;
+  GstPad*       pivot_outpad;
 
-  GstEvent *event_stream_start;
-  GstEvent *event_segment;
-  GstEvent *event_caps;
+  GstEvent*     event_stream_start;
+  GstEvent*     event_segment;
+  GstEvent*     event_caps;
 
-  GstClock *sysclock;
+
   GstMprtpsenderPrivate *priv;
 };
 

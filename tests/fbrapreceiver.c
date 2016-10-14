@@ -53,13 +53,13 @@ make_video_session (guint sessionNum)
 {
   SessionData *ret = session_new (sessionNum);
 
-  GstBin *bin = GST_BIN (gst_bin_new ("video"));
-  GstElement *queue = gst_element_factory_make ("queue", NULL);
-  GstElement *depayloader = gst_element_factory_make ("rtpvp8depay", NULL);
-  GstElement *decoder = gst_element_factory_make ("vp8dec", NULL);
+  GstBin     *bin         = GST_BIN (gst_bin_new ("video"));
 
-  GstElement *converter = gst_element_factory_make ("videoconvert", NULL);
-  GstElement *sink = gst_element_factory_make ("autovideosink", NULL);
+  GstElement *queue       = gst_element_factory_make ("queue", NULL);
+  GstElement *depayloader = gst_element_factory_make ("rtpvp8depay", NULL);
+  GstElement *decoder     = gst_element_factory_make ("vp8dec", NULL);
+  GstElement *converter   = gst_element_factory_make ("videoconvert", NULL);
+  GstElement *sink        = gst_element_factory_make ("autovideosink", NULL);
 
   gst_bin_add_many (bin, depayloader, decoder, converter, queue, sink, NULL);
   gst_element_link_many (queue, depayloader, decoder, converter, sink, NULL);
@@ -205,29 +205,49 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session)
   GstElement *rtpSrc;
   GstElement *rtcpSrc;
   GstElement *rtcpSink;
+  GstElement *mprtcpSrc;
+  GstElement *mprtpPly;
+  GstElement *mprtpRcv;
+  GstElement *mprtpSnd;
   gchar *padName;
 
   g_print ("Joining session %p\n", session);
 
   session->rtpbin = g_object_ref (rtpBin);
 
-  rtpSrc = gst_element_factory_make ("udpsrc", NULL);
-  rtcpSrc = gst_element_factory_make ("udpsrc", NULL);
-  rtcpSink = gst_element_factory_make ("udpsink", NULL);
+  rtpSrc     = gst_element_factory_make ("udpsrc", NULL);
+  rtcpSrc    = gst_element_factory_make ("udpsrc", NULL);
+  rtcpSink   = gst_element_factory_make ("udpsink", NULL);
+  mprtcpSrc  = gst_element_factory_make ("udpsrc", NULL);
+  mprtpPly   = gst_element_factory_make ("mprtpplayouter", NULL);
+  mprtpRcv   = gst_element_factory_make ("mprtpreceiver", NULL);
+  mprtpSnd   = gst_element_factory_make ("mprtpsender", NULL);
 
-  g_object_set (rtpSrc, "port", path_tx_rtp_port, "caps", session->caps, NULL);
-  g_object_set (rtcpSink, "port", rtpbin_rx_rtcp_port, "host", path_rx_ip,
+  g_object_set (rtpSrc, "port", rcv_rtp_port, "caps", session->caps, NULL);
+  g_object_set (rtcpSink, "port", snd_rtcp_port, "host", snd_ip,
       "sync", FALSE, "async", FALSE, NULL);
-  g_object_set (rtcpSrc, "port", rtpbin_tx_rtcp_port, NULL);
+  g_object_set (rtcpSrc, "port", rcv_rtcp_port, NULL);
+  g_object_set (mprtcpSrc, "port", snd_mprtcp_port, "host", snd_ip,
+        "sync", FALSE, "async", FALSE, NULL);
 
-  g_print ("Connecting to %i/%i/%i\n", path_tx_rtp_port, rtpbin_tx_rtcp_port, rtpbin_rx_rtcp_port);
+  g_print ("Connected: Host - %s:%d, RTCP: %d\n", rcv_ip, rcv_rtp_port, rcv_rtcp_port);
+  g_print("Peer: %s:%d MPRTCP: %d\n", snd_ip, snd_rtcp_port, snd_mprtcp_port);
 
   /* enable RFC4588 retransmission handling by setting rtprtxreceive
    * as the "aux" element of rtpbin */
   g_signal_connect (rtpBin, "request-aux-receiver",
       (GCallback) request_aux_receiver, session);
 
-  gst_bin_add_many (GST_BIN (pipeline), rtpSrc, rtcpSrc, rtcpSink, NULL);
+  gst_bin_add_many (GST_BIN (pipeline),
+      rtpSrc,
+      rtcpSrc,
+      rtcpSink,
+      mprtcpSrc,
+
+      mprtpPly,
+      mprtpRcv,
+      mprtpSnd,
+      NULL);
 
   g_signal_connect_data (rtpBin, "pad-added", G_CALLBACK (handle_new_stream),
       session_ref (session), (GClosureNotify) session_unref, 0);
@@ -236,16 +256,30 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session)
       session_ref (session), (GClosureNotify) session_unref, 0);
 
   padName = g_strdup_printf ("recv_rtp_sink_%u", session->sessionNum);
-  gst_element_link_pads (rtpSrc, "src", rtpBin, padName);
+  gst_element_link_pads(rtpSrc, "src", mprtpRcv, "sink_1");
+  gst_element_link_pads(mprtpRcv, "mprtp_src", mprtpPly, "mprtp_sink");
+  gst_element_link_pads(mprtpPly, "mprtp_src", rtpBin, padName);
   g_free (padName);
 
   padName = g_strdup_printf ("recv_rtcp_sink_%u", session->sessionNum);
   gst_element_link_pads (rtcpSrc, "src", rtpBin, padName);
   g_free (padName);
 
+  gst_element_link_pads (mprtpRcv, "mprtcp_sr_src", mprtpPly, "mprtcp_sr_sink");
+  gst_element_link_pads (mprtpPly, "mprtcp_rr_src", mprtpSnd, "mprtcp_rr_sink");
+  gst_element_link_pads (mprtpSnd, "src_1", mprtcpSrc, "src");
+
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");
   g_free (padName);
+
+  g_object_set(mprtpPly,
+      "join-subflow", 1,
+      "setup-controlling-mode", controlling_mode,
+      "setup-rtcp-interval-type", rtcp_interval_type,
+      "logging", logging,
+      "logs-path", logs_path,
+      NULL);
 
   session_unref (session);
 }
@@ -255,8 +289,7 @@ main (int argc, char **argv)
 {
   GstPipeline *pipe;
   SessionData *videoSession;
-  SessionData *audioSession;
-  GstElement *rtpBin;
+  GstElement  *rtpBin;
   GstBus *bus;
 
   GError *error = NULL;

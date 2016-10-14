@@ -352,8 +352,8 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
       (GCallback) request_aux_sender, session);
 
   g_object_set (rtpSink, "port", path1_tx_rtp_port, "host", path_1_tx_ip,
-		  "sync",FALSE,
-		  "async", FALSE,
+		  //"sync",FALSE,
+		  //"async", FALSE,
 	      NULL);
 
   g_object_set (rtcpSink, "port", rtpbin_tx_rtcp_port, "host", path_1_tx_ip,

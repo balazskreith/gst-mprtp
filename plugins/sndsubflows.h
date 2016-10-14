@@ -107,7 +107,7 @@ void sndsubflows_iterate(SndSubflows* this, GFunc process, gpointer udata);
 void sndsubflow_request_monitoring(SndSubflow* subflow);
 void sndsubflow_set_target_rate(SndSubflow* subflow, gint32 target_rate);
 gint32 sndsubflows_get_total_target(SndSubflows* this);
-gint32 sndsubflows_get_subflows_num(SndSubflows* this);
+guint sndsubflows_get_subflows_num(SndSubflows* this);
 SndSubflow* sndsubflows_get_subflow(SndSubflows* this, guint8 subflow_id);
 
 void sndsubflows_set_mprtp_ext_header_id(SndSubflows* this, guint8 mprtp_ext_header_id);

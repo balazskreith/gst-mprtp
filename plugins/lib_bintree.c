@@ -269,8 +269,6 @@ gpointer bintree3_delete_top_data(bintree3_t *this)
   result = this->top->ptrs->data;
   _deref_from_tree(this, this->top->ptrs->data);
   return result;
-
-  return result;
 }
 
 gpointer bintree3_delete_bottom_data(bintree3_t *this)

@@ -75,8 +75,8 @@ static void _on_rle_sw_rem(FBRAFBProducer* this, guint16* seq_num)
   }
 }
 
-PercentileResultPipeFnc(_owd_percentile_pipe, FBRAFBProducer, median_delay, min_delay, max_delay, RcvPacket, delay, 0);
-
+//PercentileResultPipeFnc(_owd_percentile_pipe, FBRAFBProducer, median_delay, min_delay, max_delay, RcvPacket, delay, 0);
+PercentileRawResultPipeFnc(_owd_percentile_pipe, FBRAFBProducer, GstClockTime, median_delay, min_delay, max_delay, 0);
 
 void
 fbrafbproducer_class_init (FBRAFBProducerClass * klass)
@@ -118,6 +118,11 @@ fbrafbproducer_init (FBRAFBProducer * this)
 
 }
 
+//static void _owd_sprint(gpointer item, gchar *result)
+//{
+//  sprintf(result, "%lu", GST_TIME_AS_MSECONDS(*(guint64*)item));
+//}
+
 FBRAFBProducer *make_fbrafbproducer(RcvSubflow* subflow, RcvTracker *tracker)
 {
   FBRAFBProducer *this;
@@ -130,6 +135,7 @@ FBRAFBProducer *make_fbrafbproducer(RcvSubflow* subflow, RcvTracker *tracker)
 
   slidingwindow_add_on_rem_item_cb(this->rle_sw, (ListenerFunc) _on_rle_sw_rem, this);
 
+//  slidingwindow_add_plugin(this->owds_sw, make_swprinter(_owd_sprint));
   slidingwindow_add_plugin(this->owds_sw,
       make_swpercentile(50, bintree3cmp_uint64, (ListenerFunc)_owd_percentile_pipe, this));
 
@@ -200,8 +206,6 @@ void _on_fb_update(FBRAFBProducer *this, ReportProducer* reportproducer)
   if(!_do_fb(this)){
     goto done;
   }
-
-
 
 
   report_producer_begin(reportproducer, this->subflow->id);

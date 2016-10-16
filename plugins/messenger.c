@@ -78,8 +78,9 @@ messenger_init (Messenger * this)
 {
   g_mutex_init(&this->mutex);
   g_cond_init(&this->cond);
-  this->messages = g_queue_new();
-  this->recycle  = g_queue_new();
+  this->messages      = g_queue_new();
+  this->recycle       = g_queue_new();
+  this->recycle_limit = 100;
 }
 
 Messenger *make_messenger(gsize block_size)
@@ -89,8 +90,14 @@ Messenger *make_messenger(gsize block_size)
   return result;
 }
 
+void messenger_set_recycle_limit(Messenger *this, guint recycle_limit)
+{
+  g_mutex_lock (&this->mutex);
+  this->recycle_limit = recycle_limit;
+  g_mutex_unlock (&this->mutex);
+}
 
-gpointer messenger_pop (Messenger *this)
+gpointer messenger_pop_block (Messenger *this)
 {
   gpointer result = NULL;
 
@@ -107,7 +114,7 @@ gpointer messenger_pop (Messenger *this)
 }
 
 
-gpointer messenger_try_pop(Messenger *this)
+gpointer messenger_try_pop_block(Messenger *this)
 {
   gpointer result = NULL;
   g_mutex_lock(&this->mutex);
@@ -119,7 +126,7 @@ gpointer messenger_try_pop(Messenger *this)
 }
 
 
-gpointer messenger_pop_with_timeout (Messenger *this, gint64 microseconds)
+gpointer messenger_pop_block_with_timeout (Messenger *this, gint64 microseconds)
 {
   gint64 end_time;
   gpointer result = NULL;
@@ -139,7 +146,7 @@ done:
 }
 
 
-void messenger_push(Messenger* this, gpointer message)
+void messenger_push_block(Messenger* this, gpointer message)
 {
   gboolean was_empty;
   g_mutex_lock(&this->mutex);
@@ -155,8 +162,13 @@ void messenger_push(Messenger* this, gpointer message)
 void messenger_throw_block(Messenger* this, gpointer message)
 {
   g_mutex_lock(&this->mutex);
+  if(0 < this->recycle_limit && this->recycle_limit < g_queue_get_length(this->recycle)){
+    g_slice_free1(this->block_size, message);
+    goto done;
+  }
   memset(message, 0, this->block_size);
   g_queue_push_tail(this->recycle, message);
+done:
   g_mutex_unlock(&this->mutex);
 }
 
@@ -175,6 +187,96 @@ gpointer messenger_retrieve_block(Messenger *this)
   return result;
 }
 
+
+void messenger_lock(Messenger* this)
+{
+  g_mutex_lock(&this->mutex);
+}
+
+void messenger_unlock(Messenger* this)
+{
+  g_mutex_unlock(&this->mutex);
+}
+
+
+
+gpointer messenger_pop_block_unlocked (Messenger *this)
+{
+  gpointer result = NULL;
+  while (!result){
+    g_cond_wait (&this->cond, &this->mutex);
+    if(g_queue_is_empty(this->messages)){
+      continue;
+    }
+    result = g_queue_pop_head(this->messages);
+  }
+  return result;
+}
+
+
+gpointer messenger_try_pop_block_unlocked (Messenger *this)
+{
+  gpointer result = NULL;
+  if(!g_queue_is_empty(this->messages)){
+    result = g_queue_pop_head(this->messages);
+  }
+  return result;
+}
+
+
+gpointer messenger_pop_block_with_timeout_unlocked (Messenger *this, gint64 microseconds)
+{
+  gint64 end_time;
+  gpointer result = NULL;
+
+  end_time = g_get_monotonic_time () + microseconds;
+  while (g_queue_is_empty(this->messages)){
+    if (!g_cond_wait_until (&this->cond, &this->mutex, end_time)){
+      // timeout has passed.
+      goto done;
+    }
+  }
+  result = g_queue_pop_head(this->messages);
+done:
+  return result;
+}
+
+
+void messenger_push_block_unlocked(Messenger* this, gpointer message)
+{
+  gboolean was_empty;
+  was_empty = g_queue_is_empty(this->messages);
+  g_queue_push_tail(this->messages, message);
+  if(was_empty){
+    g_cond_signal(&this->cond);
+  }
+}
+
+
+void messenger_throw_block_unlocked(Messenger* this, gpointer message)
+{
+  if(0 < this->recycle_limit && this->recycle_limit < g_queue_get_length(this->recycle)){
+    g_slice_free1(this->block_size, message);
+    goto done;
+  }
+  memset(message, 0, this->block_size);
+  g_queue_push_tail(this->recycle, message);
+done:
+  return;
+}
+
+
+gpointer messenger_retrieve_block_unlocked(Messenger *this)
+{
+  gpointer result;
+  if(g_queue_is_empty(this->recycle)){
+    result = g_slice_alloc0(this->block_size);
+  }else{
+    result = g_queue_pop_head(this->recycle);
+  }
+  //shape
+  return result;
+}
 
 //------------------------------------------------------------
 

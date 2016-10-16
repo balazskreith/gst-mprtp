@@ -53,6 +53,7 @@ struct _FBRASubController
 
   FBRAFBProcessor*          fbprocessor;
   FBRAPlusStat*             stat;
+  guint                     sent_packets;
 
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;

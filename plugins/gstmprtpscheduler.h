@@ -27,7 +27,6 @@
 #include "streamsplitter.h"
 #include "mprtplogger.h"
 #include "fecenc.h"
-#include "packetforwarder.h"
 #include "mediator.h"
 
 G_BEGIN_DECLS
@@ -80,8 +79,9 @@ struct _GstMprtpscheduler
   guint32                       sent_packets;
 
   Mediator*                     monitoring;
-  GAsyncQueue*                  packetsq;
-  GAsyncQueue*                  emitterq;
+  GQueue*                       packetsq;
+  Messenger*                    emit_msger;
+//  GAsyncQueue*                  emitterq;
   Notifier*                     on_rtcp_ready;
 
   GstMprtpschedulerPrivate*     priv;

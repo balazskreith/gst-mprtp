@@ -52,40 +52,50 @@ G_DEFINE_TYPE (FECDecoder, fecdecoder, G_TYPE_OBJECT);
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
 typedef enum{
-  FECDECODER_REQUEST_TYPE_FEC_BUFFER             = 1,
-  FECDECODER_REQUEST_TYPE_REPAIR_REQUEST         = 2,
-}RequestTypes;
+  FECDECODER_MESSAGE_TYPE_FEC_BUFFER        = 1,
+  FECDECODER_MESSAGE_TYPE_REPAIR_REQUEST    = 2,
+  FECDECODER_MESSAGE_TYPE_RTP_BUFFER        = 3,
+  FECDECODER_MESSAGE_TYPE_RESPONSE_LISTENER = 4,
+}MessageTypes;
 
 typedef struct{
-  RequestTypes type;
-}Request;
+  MessageTypes type;
+  gchar        content[1024];//TODO increase it if any of the message type exceeds this limit!!!!
+}Message;
 
 typedef struct{
-  Request    base;
-  GstBuffer* buffer;
-}RTPFECRequest;
+  MessageTypes type;
+  GstBuffer*   buffer;
+}FecBufferMessage;
 
 typedef struct{
-  Request            base;
-  guint16            abs_seq;
-}FECRepairRequest;
+  MessageTypes type;
+  GstBuffer*   buffer;
+  guint16      abs_seq;
+  guint32      ssrc;
+}RTPBufferMessage;
 
 typedef struct{
-  GstBuffer *buffer;
-  guint16    abs_seq;
-  guint32    ssrc;
-}RTPPacket;
+  MessageTypes     type;
+//  DiscardedPacket *discarded_packet;
+  guint16          missing_seq;
+}RepairRequestMessage;
 
+typedef struct{
+  MessageTypes     type;
+  ListenerFunc     listener;
+  gpointer         udata;
+}ReponseListenerMessage;
 
 static void fecdecoder_finalize (GObject * object);
 static void _clean(FECDecoder *this);;
 static void _fecdec_process(gpointer udata);
-static void _add_rtp_packet(FECDecoder *this, RTPPacket *packet);
+static void _add_rtp_packet(FECDecoder *this, RTPBufferMessage *packet);
 static void _add_fec_buffer(FECDecoder *this, GstBuffer *buffer);
 static GstBuffer* _get_repaired_rtpbuffer(FECDecoder *this, guint16 searched_seq);
-static void _add_rtp_packet_to_segment(FECDecoder *this, RTPPacket *packet, FECDecoderSegment *segment);
+static void _add_rtp_packet_to_segment(FECDecoder *this, RTPBufferMessage *packet, FECDecoderSegment *segment);
 static FECDecoderSegment *_find_segment_by_seq(FECDecoder *this, guint16 seq_num);
-static void _add_rtp_packet_to_items(FECDecoder *this, RTPPacket *packet);
+static void _add_rtp_packet_to_items(FECDecoder *this, RTPBufferMessage *packet);
 static GstBuffer *_repair_rtpbuf_by_segment(FECDecoder *this, FECDecoderSegment *segment, guint16 seq);
 static gint _find_item_by_seq_helper(gconstpointer item_ptr, gconstpointer desired_seq);
 static FECDecoderItem * _find_item_by_seq(GList *items, guint16 seq);
@@ -93,7 +103,7 @@ static FECDecoderItem * _take_item_by_seq(GList **items, guint16 seq);
 static void _dispose_item(gpointer item);
 static void _segment_dtor(FECDecoder *this, FECDecoderSegment *segment);
 static FECDecoderSegment* _segment_ctor(void);
-static FECDecoderItem* _make_item(FECDecoder *this, RTPPacket *packet);
+static FECDecoderItem* _make_item(FECDecoder *this, RTPBufferMessage *packet);
 
 static void
 _print_segment(FECDecoderSegment *segment)
@@ -145,22 +155,18 @@ fecdecoder_finalize (GObject * object)
   gst_object_unref(this->thread);
 
   g_object_unref(this->sysclock);
-  g_object_unref(this->repair_channel);
-  g_async_queue_unref(this->discarded_packets_in);
-  g_async_queue_unref(this->rtpbuffers_in);
-  g_async_queue_unref(this->fecbuffers_in);
+  g_object_unref(this->messenger);
+  g_object_unref(this->on_response);
 
 }
 
 void
 fecdecoder_init (FECDecoder * this)
 {
-  this->thread                = gst_task_new (_fecdec_process, this, NULL);
-  this->sysclock              = gst_system_clock_obtain();
-  this->rtpbuffers_in         = g_async_queue_new();
-  this->fecbuffers_in         = g_async_queue_new();
-  this->discarded_packets_in  = g_async_queue_new();
-//  this->rtpmessages           = make_messenger(sizeof(RTPPacket));
+  this->on_response = make_notifier();
+  this->thread      = gst_task_new (_fecdec_process, this, NULL);
+  this->sysclock    = gst_system_clock_obtain();
+  this->messenger   = make_messenger(sizeof(Message));
 
 }
 
@@ -170,72 +176,131 @@ void fecdecoder_reset(FECDecoder *this)
 
 }
 
-FECDecoder *make_fecdecoder(Mediator* repair_channel)
+FECDecoder *make_fecdecoder(void)
 {
   FECDecoder *this;
   this = g_object_new (FECDECODER_TYPE, NULL);
   this->made = _now(this);
-  this->repair_channel = g_object_ref(repair_channel);
 
   gst_task_set_lock (this->thread, &this->thread_mutex);
   gst_task_start (this->thread);
   return this;
 }
 
-void fecdecoder_on_discarded_packet(FECDecoder *this, DiscardedPacket *discarded_packet)
+void fecdecoder_add_response_listener(FECDecoder *this, ListenerFunc listener, gpointer udata)
 {
-  g_async_queue_push(this->discarded_packets_in, discarded_packet);
+  ReponseListenerMessage *msg;
+  messenger_lock(this->messenger);
+
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+  msg->type = FECDECODER_MESSAGE_TYPE_RESPONSE_LISTENER;
+
+  msg->listener = listener;
+  msg->udata    = udata;
+
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
+}
+
+void fecdecoder_request_repair(FECDecoder *this, guint16 missing_seq)
+{
+  RepairRequestMessage *msg;
+  messenger_lock(this->messenger);
+
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+  msg->type = FECDECODER_MESSAGE_TYPE_REPAIR_REQUEST;
+
+  msg->missing_seq = missing_seq;
+
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
 }
 
 void fecdecoder_add_rtp_buffer(FECDecoder *this, GstBuffer *buffer)
 {
-  RTPPacket* packet = g_slice_new0(RTPPacket);
+  RTPBufferMessage* msg;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
 
-  gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
-  packet->abs_seq = gst_rtp_buffer_get_seq(&rtp);
-  packet->ssrc    = gst_rtp_buffer_get_ssrc(&rtp);
-  gst_rtp_buffer_unmap(&rtp);
-  packet->buffer = buffer;
+  messenger_lock(this->messenger);
 
-  g_async_queue_push(this->rtpbuffers_in, packet);
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+  msg->type = FECDECODER_MESSAGE_TYPE_RTP_BUFFER;
+
+  gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
+  msg->abs_seq = gst_rtp_buffer_get_seq(&rtp);
+  msg->ssrc    = gst_rtp_buffer_get_ssrc(&rtp);
+  gst_rtp_buffer_unmap(&rtp);
+  msg->buffer = buffer;
+
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
 }
 
 void fecdecoder_add_fec_buffer(FECDecoder *this, GstBuffer *buffer)
 {
-  g_async_queue_push(this->fecbuffers_in, gst_buffer_ref(buffer));
+  FecBufferMessage *msg;
+  messenger_lock(this->messenger);
+
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+  msg->type = FECDECODER_MESSAGE_TYPE_FEC_BUFFER;
+
+  msg->buffer = buffer;
+
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
 }
 
 static void _fecdec_process(gpointer udata)
 {
   FECDecoder* this = udata;
-  RTPPacket* packet;
-  GstBuffer* buffer;
-  DiscardedPacket* discarded_packet;
+  Message *msg;
 
-  while((packet = g_async_queue_try_pop(this->rtpbuffers_in)) != NULL){
-    _add_rtp_packet(this, packet);
-    gst_buffer_unref(packet->buffer);
-    g_slice_free(RTPPacket, packet);
-  }
-
-  while((buffer = g_async_queue_try_pop(this->fecbuffers_in)) != NULL){
-    _add_fec_buffer(this, buffer);
-  }
-
-  discarded_packet = g_async_queue_timeout_pop(this->discarded_packets_in, 1000);
-  if(!discarded_packet){
+  msg = messenger_pop_block_with_timeout(this->messenger, 1000);
+  if(!msg){
     goto done;
   }
-  discarded_packet->repairedbuf   = _get_repaired_rtpbuffer(this, discarded_packet->abs_seq);
-  mediator_set_response(this->repair_channel, discarded_packet);
+
+  switch(msg->type){
+    case FECDECODER_MESSAGE_TYPE_RTP_BUFFER:
+    {
+      RTPBufferMessage* casted_msg = (RTPBufferMessage*)msg;
+      _add_rtp_packet(this, casted_msg);
+      gst_buffer_unref(casted_msg->buffer);
+    }
+    break;
+    case FECDECODER_MESSAGE_TYPE_FEC_BUFFER:
+    {
+      FecBufferMessage* casted_msg = (FecBufferMessage*)msg;
+      _add_fec_buffer(this, casted_msg->buffer);
+      gst_buffer_unref(casted_msg->buffer);
+    }
+    break;
+    case FECDECODER_MESSAGE_TYPE_REPAIR_REQUEST:
+    {
+      RepairRequestMessage* casted_msg = (RepairRequestMessage*)msg;
+      GstBuffer* rtpbuf = _get_repaired_rtpbuffer(this, casted_msg->missing_seq);
+      notifier_do(this->on_response, rtpbuf);
+
+    }
+    break;
+    case FECDECODER_MESSAGE_TYPE_RESPONSE_LISTENER:
+    {
+      ReponseListenerMessage* casted_msg = (ReponseListenerMessage*)msg;
+      notifier_add_listener(this->on_response, casted_msg->listener, casted_msg->udata);
+    }
+    break;
+    default:
+      g_warning("Unhandled message at FECDecoder with type %d", msg->type);
+    break;
+  }
+  messenger_throw_block(this->messenger, msg);
 
 done:
   _clean(this);
   return;
 }
 
-void _add_rtp_packet(FECDecoder *this, RTPPacket *packet)
+void _add_rtp_packet(FECDecoder *this, RTPBufferMessage *packet)
 {
   FECDecoderSegment *segment;
   segment =_find_segment_by_seq(this, packet->abs_seq);
@@ -293,7 +358,6 @@ void _add_fec_buffer(FECDecoder *this, GstBuffer *buffer)
   DISABLE_LINE _print_segment(segment);
 done:
   gst_rtp_buffer_unmap(&rtp);
-  gst_buffer_unref(buffer);
 }
 
 void _clean(FECDecoder *this)
@@ -396,7 +460,7 @@ GstBuffer* _get_repaired_rtpbuffer(FECDecoder *this, guint16 searched_seq)
   return result;
 }
 
-void _add_rtp_packet_to_items(FECDecoder *this, RTPPacket *packet)
+void _add_rtp_packet_to_items(FECDecoder *this, RTPBufferMessage *packet)
 {
   FECDecoderItem *item;
   item = _find_item_by_seq(this->items, packet->abs_seq);
@@ -411,7 +475,7 @@ done:
   return;
 }
 
-void _add_rtp_packet_to_segment(FECDecoder *this, RTPPacket *packet, FECDecoderSegment *segment)
+void _add_rtp_packet_to_segment(FECDecoder *this, RTPBufferMessage *packet, FECDecoderSegment *segment)
 {
   FECDecoderItem *item = NULL;
   if(_find_item_by_seq(segment->items, packet->abs_seq) != NULL){
@@ -507,7 +571,6 @@ void _segment_dtor(FECDecoder *this, FECDecoderSegment *segment)
 //    g_list_free_full(segment->items, mprtp_free);
   }
   g_slice_free(FECDecoderSegment, segment);
-  //mprtp_free(segment);
 }
 
 FECDecoderSegment* _segment_ctor(void)
@@ -518,7 +581,7 @@ FECDecoderSegment* _segment_ctor(void)
   return result;
 }
 
-FECDecoderItem* _make_item(FECDecoder *this, RTPPacket *packet)
+FECDecoderItem* _make_item(FECDecoder *this, RTPBufferMessage *packet)
 {
   FECDecoderItem* result;
 //  result = g_malloc0(sizeof(FECDecoderItem));

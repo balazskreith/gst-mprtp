@@ -97,10 +97,10 @@ void mediator_set_response(Mediator* this, gpointer response)
 
 void mediator_set_request_handler(Mediator *this, ListenerFunc response_cb, gpointer udata)
 {
-  notifier_add_listener(this->on_response, response_cb, udata);
+  notifier_add_listener(this->on_request, response_cb, udata);
 }
 
 void mediator_set_response_handler(Mediator *this, ListenerFunc request_cb, gpointer udata)
 {
-  notifier_add_listener(this->on_request, request_cb, udata);
+  notifier_add_listener(this->on_response, request_cb, udata);
 }

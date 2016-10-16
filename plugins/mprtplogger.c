@@ -30,14 +30,6 @@
 #include <stdio.h>
 #include <unistd.h>
 
-//#define THIS_LOCK(this)
-//#define THIS_UNLOCK(this)
-//#define THIS_LOCK(this)
-//#define THIS_UNLOCK(this)
-
-#define THIS_LOCK(this) g_mutex_lock(&this->mutex)
-#define THIS_UNLOCK(this) g_mutex_unlock(&this->mutex)
-
 
 #define DATABED_LENGTH 1400
 
@@ -57,34 +49,32 @@ typedef enum{
 
 //NOTE: This must be big enough to holds any kind of Message,
 //since this type is going to be created and recycled
-typedef struct {
-  gchar    bytes[2048];
-}MessageBlock;
 
 typedef struct{
   MessageTypes type;
+  gchar        content[2048];
 }Message;
 
 typedef struct{
-  Message  base;
-  gboolean enabled;
+  MessageTypes type;
+  gboolean     enabled;
 }StatusMessage;
 
 typedef struct{
-  Message  base;
-  gchar    type_name[255];
-  gsize    size;
+  MessageTypes type;
+  gchar        type_name[255];
+  gsize        size;
 }MemoryConsumptionMessage;
 
 typedef struct{
-  Message  base;
-  gchar    string[1024];
-  gchar    filename[255];
-  gboolean overwrite;
+  MessageTypes type;
+  gchar        string[1024];
+  gchar        filename[255];
+  gboolean     overwrite;
 }WritingMessage;
 
 typedef struct{
-  Message            base;
+  MessageTypes       type;
   gchar              filename[255];
 }TargetDirectoryMessage;
 
@@ -103,17 +93,6 @@ mprtp_logger_finalize (GObject * object);
 
 static void
 _process(gpointer udata);
-
-static MessageBlock*
-_messageblock_ctor(void);
-
-static void
-_throw_messageblock(
-    MessageBlock* messageblock);
-
-static void
-_messageblock_dtor(
-    gpointer mem);
 
 static void
 _writing(
@@ -159,18 +138,11 @@ void
 mprtp_logger_finalize (GObject * object)
 {
   MPRTPLogger *this = MPRTPLOGGER (object);
-  MessageBlock* msg_block;
-  while((msg_block = g_async_queue_try_pop(this->messages)) != NULL){
-    _messageblock_dtor(msg_block);
-  }
-  while((msg_block = g_async_queue_try_pop(this->recycle)) != NULL){
-    _messageblock_dtor(msg_block);
-  }
+
   g_object_unref (this->sysclock);
   gst_task_stop (this->process);
-  g_async_queue_unref(this->messages);
-  g_async_queue_unref(this->recycle);
 
+  g_object_unref (this->messenger);
   g_hash_table_unref(this->memory_consumptions);
 }
 
@@ -180,9 +152,8 @@ mprtp_logger_init (MPRTPLogger * this)
   this->enabled    = FALSE;
   this->sysclock   = gst_system_clock_obtain ();
   this->made       = _now(this);
+  this->messenger  = make_messenger(sizeof(Message));
   strcpy(this->path, "logs/");
-  this->messages   = g_async_queue_new();
-  this->recycle   = g_async_queue_new();
 
   this->memory_consumptions = g_hash_table_new(g_str_hash, g_str_equal);
 
@@ -205,32 +176,29 @@ static void _process(gpointer udata)
   MPRTPLogger* this = udata;
   Message* msg;
 again:
-  msg = (Message*) g_async_queue_timeout_pop(this->messages, 1000);
+  msg = (Message*) messenger_pop_block(this->messenger);
   if(!msg){
     goto done;
+  }
+  if(!this->enabled){
+    goto throw_block;
   }
   switch(msg->type){
     case MPRTP_LOGGER_MESSAGE_TYPE_STATE_CHANGING:
     {
       StatusMessage* status_msg = (StatusMessage*)msg;
       this->enabled = status_msg->enabled;
-//      g_slice_free(StatusMessage, status_msg);
-      throw_message(msg);
     }
     break;
     case MPRTP_LOGGER_MESSAGE_TYPE_WRITING:
     {
       _writing(this, (WritingMessage*) msg);
-//      g_slice_free(WritingMessage, (WritingMessage*) msg);
-      throw_message(msg);
     }
     break;
     case MPRTP_LOGGER_MESSAGE_TYPE_CHANGE_TARGET_DIRECTORY:
     {
       TargetDirectoryMessage* target_msg = (TargetDirectoryMessage*)msg;
       strcpy(this->path, target_msg->filename);
-//      g_slice_free(TargetDirectoryMessage, target_msg);
-      throw_message(msg);
     }
     break;
     case MPRTP_LOGGER_MESSAGE_TYPE_ADD_MEMORY_ALLOCATION:
@@ -243,8 +211,6 @@ again:
       }
       actual = g_hash_table_lookup(this->memory_consumptions, consumption_msg->type_name);
       actual->size += consumption_msg->size;
-//      g_slice_free(MemoryConsumptionMessage, consumption_msg);
-      throw_message(msg);
     }
     break;
     case MPRTP_LOGGER_MESSAGE_TYPE_REM_MEMORY_ALLOCATION:
@@ -256,18 +222,17 @@ again:
       }
       actual = g_hash_table_lookup(this->memory_consumptions, consumption_msg->type_name);
       actual->size -= consumption_msg->size;
-//      g_slice_free(MemoryConsumptionMessage, consumption_msg);
-      throw_message(msg);
     }
     break;
     case MPRTP_LOGGER_MESSAGE_TYPE_PRINT_MEMORY_ALLOCATIONS:
       g_hash_table_foreach(this->memory_consumptions, _print_memory_allocation, NULL);
-      throw_message(msg);
       break;
     default:
       g_warning("Unhandled message with type %d", msg->type);
     break;
   }
+throw_block:
+  messenger_throw_block(this->messenger, msg);
   goto again;
 done:
   return;
@@ -289,111 +254,115 @@ void mprtp_slice_dealloc(const gchar* type_name, gsize size, gpointer memptr)
 void mprtp_logger_add_memory_consumption(const gchar *type_name, gsize size)
 {
   MemoryConsumptionMessage *msg;
-//  msg = g_slice_new0(MemoryConsumptionMessage);
-  msg = alloc_message(MemoryConsumptionMessage);
-  msg->base.type = MPRTP_LOGGER_MESSAGE_TYPE_ADD_MEMORY_ALLOCATION;
+return;
+  messenger_lock(this->messenger);
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+
+  msg->type = MPRTP_LOGGER_MESSAGE_TYPE_ADD_MEMORY_ALLOCATION;
   msg->size = size;
   strcpy(msg->type_name, type_name);
-  g_async_queue_push(this->messages, msg);
+
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
 }
 
 void mprtp_logger_rem_memory_consumption(const gchar *type_name, gsize size)
 {
   MemoryConsumptionMessage *msg;
-//  msg = g_slice_new0(MemoryConsumptionMessage);
-  msg = alloc_message(MemoryConsumptionMessage);
-  msg->base.type = MPRTP_LOGGER_MESSAGE_TYPE_REM_MEMORY_ALLOCATION;
+return;
+  messenger_lock(this->messenger);
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+
+  msg->type = MPRTP_LOGGER_MESSAGE_TYPE_REM_MEMORY_ALLOCATION;
   msg->size = size;
   strcpy(msg->type_name, type_name);
-  g_async_queue_push(this->messages, msg);
+
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
 }
 
 void mprtp_logger_print_memory_consumption(void)
 {
   Message *msg;
-//  msg = g_slice_new0(Message);
-  msg = alloc_message(Message);
+return;
+  messenger_lock(this->messenger);
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+
   msg->type = MPRTP_LOGGER_MESSAGE_TYPE_PRINT_MEMORY_ALLOCATIONS;
-  g_async_queue_push(this->messages, msg);
+
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
 }
 
 void mprtp_logger_set_state(gboolean enabled)
 {
   StatusMessage *msg;
-//  msg = g_slice_new0(StatusMessage);
-  msg = alloc_message(StatusMessage);
-  msg->base.type = MPRTP_LOGGER_MESSAGE_TYPE_STATE_CHANGING;
+return;
+  messenger_lock(this->messenger);
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+
+  msg->type = MPRTP_LOGGER_MESSAGE_TYPE_STATE_CHANGING;
   msg->enabled = enabled;
 
-  g_async_queue_push(this->messages, msg);
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
 }
 
 void mprtp_logger_set_target_directory(const gchar *path)
 {
   TargetDirectoryMessage *msg;
-//  msg = g_slice_new0(TargetDirectoryMessage);
-  msg = alloc_message(TargetDirectoryMessage);
-  msg->base.type = MPRTP_LOGGER_MESSAGE_TYPE_CHANGE_TARGET_DIRECTORY;
+return;
+  messenger_lock(this->messenger);
+  msg = messenger_retrieve_block_unlocked(this->messenger);
 
+  msg->type = MPRTP_LOGGER_MESSAGE_TYPE_CHANGE_TARGET_DIRECTORY;
   strcpy(msg->filename, path);
-  g_async_queue_push(this->messages, msg);
+
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
 }
 
 void mprtp_logger(const gchar *filename, const gchar * format, ...)
 {
   WritingMessage *msg;
   va_list args;
-//  msg = g_slice_new0(WritingMessage);
-  msg = alloc_message(WritingMessage);
-  msg->base.type = MPRTP_LOGGER_MESSAGE_TYPE_WRITING;
+return;
+  messenger_lock(this->messenger);
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+
+  msg->type = MPRTP_LOGGER_MESSAGE_TYPE_WRITING;
   va_start (args, format);
   vsprintf(msg->string, format, args);
   va_end (args);
 
   strcpy(msg->filename, filename);
-  g_async_queue_push(this->messages, msg);
+
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
 }
 
 void mprtp_log_one(const gchar *filename, const gchar * format, ...)
 {
-  WritingMessage *item;
+  WritingMessage *msg;
   va_list args;
-//  item = g_slice_new0(WritingMessage);
-  item = alloc_message(WritingMessage);
-  item->base.type = MPRTP_LOGGER_MESSAGE_TYPE_WRITING;
+return;
+  messenger_lock(this->messenger);
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+
+  msg->type = MPRTP_LOGGER_MESSAGE_TYPE_WRITING;
 
   va_start (args, format);
-  vsprintf(item->string, format, args);
+  vsprintf(msg->string, format, args);
   va_end (args);
 
-  item->overwrite = TRUE;
+  msg->overwrite = TRUE;
 
-  strcpy(item->filename, filename);
-  g_async_queue_push(this->messages, item);
+  strcpy(msg->filename, filename);
+
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
 }
 
-
-MessageBlock* _messageblock_ctor(void)
-{
-  MessageBlock *result;
-  result = g_async_queue_try_pop(this->recycle);
-  if(!result){
-    result = g_slice_new0(MessageBlock);
-  }else{
-    memset(result, 0, sizeof(MessageBlock));
-  }
-  return result;
-}
-
-void _throw_messageblock(MessageBlock* messageblock)
-{
-  g_async_queue_push(this->recycle, messageblock);
-}
-
-void _messageblock_dtor(gpointer mem)
-{
-  g_slice_free(MessageBlock, (MessageBlock*)mem);
-}
 
 void _writing(MPRTPLogger* this, WritingMessage *item)
 {
@@ -418,6 +387,3 @@ void _print_memory_allocation(gpointer key, gpointer value, gpointer udata)
 }
 
 
-#undef MAX_RIPORT_INTERVAL
-#undef THIS_LOCK
-#undef THIS_UNLOCK

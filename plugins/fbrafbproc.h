@@ -32,7 +32,7 @@ typedef struct _FBRAPlusStat
   GstClockTime             owd_80th;
   GstClockTime             last_owd;
 
-  gint32                   measurement_num;
+  gint32                   measurements_num;
   gint32                   BiF_80th;
   gint32                   BiF_max;
   gint32                   BiF_std;
@@ -42,7 +42,7 @@ typedef struct _FBRAPlusStat
   gint32                   receiver_bitrate;
   gint32                   fec_bitrate;
   gdouble                  owd_log_corr;
-  gdouble                  owd_in_ms_std;
+  GstClockTime             owd_std;
   gdouble                  srtt;
 
 }FBRAPlusStat;
@@ -50,7 +50,8 @@ typedef struct _FBRAPlusStat
 typedef struct{
   guint   counter;
   gdouble mean; //the mean
-  gdouble abs_var;
+  gdouble var;
+  gdouble emp;
 }FBRAPlusStdHelper;
 
 typedef struct{
@@ -73,7 +74,6 @@ struct _FBRAFBProcessor
   SndTracker*              sndtracker;
   SndSubflow*              subflow;
 
-  guint                    measurements_num;
   guint                    rcved_fb_since_changed;
   gint32                   last_bytes_in_flight;
   GstClockTime             RTT;

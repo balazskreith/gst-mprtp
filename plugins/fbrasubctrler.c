@@ -281,6 +281,7 @@ FBRASubController *make_fbrasubctrler(SndTracker *sndtracker, SndSubflow *subflo
       (ListenerFunc) _on_rtp_sending,
       (ListenerFilterFunc) _rtp_sending_filter,
       this);
+  this->monitoring_interval = 5;
 
   return this;
 }
@@ -309,14 +310,22 @@ void _on_rtp_sending(FBRASubController* this, SndPacket *packet)
   gdouble pacing_time = 0.;
   gdouble pacing_bitrate;
   gdouble srtt_in_s;
-  if(!this->enabled){
+
+  ++this->sent_packets;
+  if(!this->enabled || this->stat->measurements_num < 10){
     return;
   }
+
   srtt_in_s = _stat(this)->srtt * .000000001;
   pacing_bitrate = 0. < srtt_in_s ? this->cwnd / srtt_in_s : 50000.;
   pacing_time = (gdouble)packet->payload_size / pacing_bitrate;
-  this->subflow->pacing_time = pacing_time * GST_SECOND;
+  this->subflow->pacing_time = _now(this) + pacing_time * GST_SECOND;
 //  g_print("pacing_time: %f/%f=%f\n", (gdouble)packet->payload_size, pacing_bitrate, pacing_time);
+
+  if(0 < this->monitoring_interval && this->sent_packets % this->monitoring_interval == 0){
+
+    sndsubflow_request_monitoring(this->subflow);
+  }
 }
 
 
@@ -344,6 +353,24 @@ done:
   return;
 }
 
+static void _stat_print(FBRAPlusStat *stat)
+{
+  g_print("BiF: %-5d| 80: %-5d| Mx: %-5d| std:%-3d| FEC: %-5d SR: %-5d| OWD: %-4lu| 80: %-4lu| std: %-5lu| cor: %3.2f|\n",
+      stat->bytes_in_flight,
+      stat->BiF_80th,
+      stat->BiF_max,
+      stat->BiF_std,
+
+      stat->fec_bitrate,
+      stat->sender_bitrate,
+
+      GST_TIME_AS_MSECONDS(stat->last_owd),
+      GST_TIME_AS_MSECONDS(stat->owd_80th),
+      stat->owd_std,
+      stat->owd_log_corr
+      );
+}
+
 void fbrasubctrler_report_update(
                          FBRASubController *this,
                          GstMPRTCPReportSummary *summary)
@@ -353,6 +380,8 @@ void fbrasubctrler_report_update(
   if(!this->enabled){
     goto done;
   }
+
+  _stat_print(this->stat);
 
   fbrafbprocessor_report_update(this->fbprocessor, summary);
   _execute_stage(this);
@@ -374,7 +403,7 @@ static gboolean _distortion(FBRASubController *this)
 {
   //consider fix tresholds
   GstClockTime owd_th = _stat(this)->owd_80th +
-      CONSTRAIN(50 * GST_MSECOND, 150 * GST_MSECOND, _stat(this)->owd_in_ms_std * GST_MSECOND * 4);
+      CONSTRAIN(50 * GST_MSECOND, 150 * GST_MSECOND, _stat(this)->owd_std * GST_MSECOND * 4);
 
   gint32 BiF_th = _stat(this)->BiF_80th + MAX(5000, _stat(this)->BiF_80th * .2);
 

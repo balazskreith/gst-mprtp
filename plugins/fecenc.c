@@ -27,6 +27,7 @@
 #include <string.h>
 #include "fecenc.h"
 #include "gstmprtcpbuffer.h"
+#include "mprtpdefs.h"
 
 #define _now(this) gst_clock_get_time (this->sysclock)
 
@@ -49,30 +50,37 @@ typedef enum{
   FECENCODER_MESSAGE_TYPE_FEC_REQUEST            = 1,
   FECENCODER_MESSAGE_TYPE_PAYLOAD_CHANGE         = 2,
   FECENCODER_REQUEST_MPRTP_EXT_HEADER_ID_CHANGE  = 3,
+  FECENCODER_MESSAGE_TYPE_RTP_BUFFER             = 4,
 }MessageTypes;
 
 typedef struct{
   MessageTypes type;
+  gchar        content[1024];//TODO increase it if any of the message type exceeds this limit!!!!
 }Message;
 
 typedef struct{
-  Message    base;
-  guint8     payload_type;
+  MessageTypes type;
+  guint8        payload_type;
 }PayloadChangeMessage;
 
 typedef struct{
-  Message    base;
-  guint8     mprtp_ext_header_id;
+  MessageTypes type;
+  guint8       mprtp_ext_header_id;
 }MPRTPExtHeaderIDChangeMessage;
 
 typedef struct{
-  Message    base;
-  guint8     subflow_id;
+  MessageTypes type;
+  guint8       subflow_id;
 }FECRequestMessage;
+
+typedef struct{
+  MessageTypes type;
+  GstBuffer*   buffer;
+}RTPBufferMessage;
 
 static void fecencoder_finalize (GObject * object);
 static BitString* _make_bitstring(FECEncoder* this, GstBuffer* buf);
-static void _fecenc_process(gpointer udata);
+static void _fecenc_process(FECEncoder * this);
 static FECEncoderResponse* _fec_response_ctor(void);
 static void _fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf);
 static GstBuffer* _fecencoder_get_fec_packet(FECEncoder *this, guint8 subflow_id, gint32* packet_length);
@@ -110,6 +118,7 @@ fecencoder_finalize (GObject * object)
   g_object_unref(this->bitstrings);
   g_object_unref(this->sysclock);
   g_object_unref(this->bitstring_recycle);
+  g_object_unref(this->messenger);
 }
 
 FECEncoder *make_fecencoder(Mediator* response_handler)
@@ -118,8 +127,7 @@ FECEncoder *make_fecencoder(Mediator* response_handler)
   this = g_object_new (FECENCODER_TYPE, NULL);
   this->made = _now(this);
 
-  this->messages     = g_async_queue_new();
-  this->buffers      = g_async_queue_new();
+  this->messenger    = make_messenger(sizeof(Message));
   this->bitstring_recycle = make_recycle_bitstring(32, NULL);
 
   this->response_handler = g_object_ref(response_handler);
@@ -132,7 +140,7 @@ FECEncoder *make_fecencoder(Mediator* response_handler)
 void
 fecencoder_init (FECEncoder * this)
 {
-  this->thread   = gst_task_new (_fecenc_process, this, NULL);
+  this->thread   = gst_task_new ((GstTaskFunction)_fecenc_process, this, NULL);
   this->sysclock = gst_system_clock_obtain();
   this->max_protection_num = GST_RTPFEC_MAX_PROTECTION_NUM;
   this->bitstrings = g_queue_new();
@@ -147,26 +155,43 @@ void fecencoder_reset(FECEncoder *this)
 }
 
 
-void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer* buffer)
+void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buffer)
 {
-  g_async_queue_push(this->buffers, buffer);
+  RTPBufferMessage* msg;
+
+  messenger_lock(this->messenger);
+
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+  msg->type = FECENCODER_MESSAGE_TYPE_RTP_BUFFER;
+  msg->buffer = buffer;
+
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
 }
 
 void fecencoder_request_fec(FECEncoder *this, guint8 subflow_id)
 {
-  FECRequestMessage* message = g_slice_new0(FECRequestMessage);
-  message->base.type = FECENCODER_MESSAGE_TYPE_FEC_REQUEST;
-  message->subflow_id = subflow_id;
-  g_async_queue_push(this->messages, message);
+  FECRequestMessage* msg;
+  messenger_lock(this->messenger);
+
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+  msg->type = FECENCODER_MESSAGE_TYPE_FEC_REQUEST;
+  msg->subflow_id = subflow_id;
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
 }
 
 
 void fecencoder_set_payload_type(FECEncoder* this, guint8 fec_payload_type)
 {
-  PayloadChangeMessage* request = g_slice_new0(PayloadChangeMessage);
-  request->base.type = FECENCODER_MESSAGE_TYPE_PAYLOAD_CHANGE;
-  request->payload_type = fec_payload_type;
-  g_async_queue_push(this->messages, request);
+  PayloadChangeMessage* msg;
+  messenger_lock(this->messenger);
+
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+  msg->type = FECENCODER_MESSAGE_TYPE_PAYLOAD_CHANGE;
+  msg->payload_type = fec_payload_type;
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
 }
 
 void fecencoder_ref_response(FECEncoderResponse* response)
@@ -186,7 +211,6 @@ void fecencoder_unref_response(FECEncoderResponse* response)
 void _fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf)
 {
   g_queue_push_tail(this->bitstrings, _make_bitstring(this, buf));
-  gst_buffer_unref(buf);
 
   //Too many bitstring
   while(this->max_protection_num <= g_queue_get_length(this->bitstrings)){
@@ -289,52 +313,65 @@ BitString* _make_bitstring(FECEncoder* this, GstBuffer* buf)
 static void _process_message(FECEncoder* this, Message* message)
 {
   switch(message->type){
+    case FECENCODER_MESSAGE_TYPE_RTP_BUFFER:
+    {
+      RTPBufferMessage *rtp_buffer_msg = (RTPBufferMessage*) message;
+      _fecencoder_add_rtpbuffer(this, rtp_buffer_msg->buffer);
+      gst_buffer_unref(rtp_buffer_msg->buffer);
+    }
+    break;
     case FECENCODER_MESSAGE_TYPE_PAYLOAD_CHANGE:
     {
       PayloadChangeMessage* fec_payload_message = (PayloadChangeMessage*)message;
       this->payload_type = fec_payload_message->payload_type;
-      g_slice_free(PayloadChangeMessage, fec_payload_message);
     }
     break;
     case FECENCODER_REQUEST_MPRTP_EXT_HEADER_ID_CHANGE:
     {
       MPRTPExtHeaderIDChangeMessage* fec_payload_message = (MPRTPExtHeaderIDChangeMessage*)message;
       this->mprtp_ext_header_id = fec_payload_message->mprtp_ext_header_id;
-      g_slice_free(MPRTPExtHeaderIDChangeMessage, fec_payload_message);
     }
     break;
     case FECENCODER_MESSAGE_TYPE_FEC_REQUEST:
     {
       FECRequestMessage* fec_request = (FECRequestMessage*)message;
       FECEncoderResponse* fec_response = _fec_response_ctor();
-      fec_response->fecbuffer = _fecencoder_get_fec_packet(this, fec_request->subflow_id, &fec_response->payload_size);
-      mediator_set_response(this->response_handler, fec_response);
+      fec_response->subflow_id = fec_request->subflow_id;
+      fec_response->fecbuffer  = _fecencoder_get_fec_packet(this, fec_request->subflow_id, &fec_response->payload_size);
 
-      g_slice_free(FECRequestMessage, fec_request);
+      mediator_set_response(this->response_handler, fec_response);
     }
     break;
     default:
-      g_warning("Unhandled message with type %d", message->type);
+      g_warning("Unhandled message at FecEncoder with type %d", message->type);
     break;
   }
 }
 
-void _fecenc_process(gpointer udata)
+static void _fecenc_process(FECEncoder* this)
 {
-  FECEncoder* this = udata;
   Message* message;
-  GstBuffer* buffer;
-  buffer = g_async_queue_try_pop(this->buffers);
-  if(buffer){
-    _fecencoder_add_rtpbuffer(this, buffer);
+
+  message = (Message*) messenger_pop_block_with_timeout(this->messenger, 10000);
+
+  if(!message){
+    goto done;
   }
 
-  message = (Message*) g_async_queue_timeout_pop(this->messages, 1000);
-  if(message){
-    _process_message(this, message);
-  }
+  _process_message(this, message);
+  messenger_throw_block(this->messenger, message);
+done:
   return;
 }
+
+//void _fecenc_process(FECEncoder* this)
+//{
+//
+//  PROFILING(
+//      "fecenc_process",
+//      _fecenc_process_(this)
+//  );
+//}
 
 FECEncoderResponse* _fec_response_ctor(void)
 {

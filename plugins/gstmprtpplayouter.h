@@ -21,7 +21,6 @@
 #define _GST_MPRTPPLAYOUTER_H_
 
 #include <gst/gst.h>
-#include "packetforwarder.h"
 #include "gstmprtcpbuffer.h"
 #include "streamjoiner.h"
 #include "rcvctrler.h"
@@ -63,6 +62,8 @@ struct _GstMprtpplayouter
 {
   GstElement      base_mprtpreceiver;
   GMutex          mutex;
+  GCond           receive_signal;
+  GCond           waiting_signal;
 
   guint64         clock_base;
 
@@ -86,15 +87,11 @@ struct _GstMprtpplayouter
   GstClockTime    repair_window_max;
   GstClockTime    repair_window_min;
 
+  DiscardedPacket  discarded_packet;
+  gboolean         discards;
+
   gboolean        logging;
 
-  Mediator*        repair_channel;
-  GAsyncQueue*     discarded_packets;
-  GAsyncQueue*     packetsq;
-  GAsyncQueue*     mprtp_out;
-  GAsyncQueue*     mprtcp_out;
-
-//  PacketForwarder* packetforwarder;
 
 };
 

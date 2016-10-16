@@ -144,10 +144,10 @@ am__DEPENDENCIES_1 =
 libgstmprtp_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-am_libgstmprtp_la_OBJECTS = libgstmprtp_la-asyncrecycle.lo \
-	libgstmprtp_la-fbrafbproc.lo libgstmprtp_la-fbrafbprod.lo \
-	libgstmprtp_la-fbrasubctrler.lo libgstmprtp_la-fecdec.lo \
-	libgstmprtp_la-fecenc.lo libgstmprtp_la-gstmprtcpbuffer.lo \
+am_libgstmprtp_la_OBJECTS = libgstmprtp_la-fbrafbproc.lo \
+	libgstmprtp_la-fbrafbprod.lo libgstmprtp_la-fbrasubctrler.lo \
+	libgstmprtp_la-fecdec.lo libgstmprtp_la-fecenc.lo \
+	libgstmprtp_la-gstmprtcpbuffer.lo \
 	libgstmprtp_la-gstmprtpplayouter.lo \
 	libgstmprtp_la-gstmprtpreceiver.lo \
 	libgstmprtp_la-gstmprtpplugin.lo \
@@ -158,15 +158,14 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-asyncrecycle.lo \
 	libgstmprtp_la-lib_swplugins.lo libgstmprtp_la-mediator.lo \
 	libgstmprtp_la-messenger.lo libgstmprtp_la-mprtpdefs.lo \
 	libgstmprtp_la-mprtplogger.lo libgstmprtp_la-notifier.lo \
-	libgstmprtp_la-packetforwarder.lo libgstmprtp_la-rcvctrler.lo \
-	libgstmprtp_la-rcvpackets.lo libgstmprtp_la-rcvsubflows.lo \
-	libgstmprtp_la-rcvtracker.lo libgstmprtp_la-recycle.lo \
-	libgstmprtp_la-reportproc.lo libgstmprtp_la-reportprod.lo \
-	libgstmprtp_la-ricalcer.lo libgstmprtp_la-rtpfecbuffer.lo \
-	libgstmprtp_la-signalreport.lo libgstmprtp_la-slidingwindow.lo \
-	libgstmprtp_la-sndctrler.lo libgstmprtp_la-sndsubflows.lo \
-	libgstmprtp_la-sndtracker.lo libgstmprtp_la-sndpackets.lo \
-	libgstmprtp_la-streamjoiner.lo \
+	libgstmprtp_la-rcvctrler.lo libgstmprtp_la-rcvpackets.lo \
+	libgstmprtp_la-rcvsubflows.lo libgstmprtp_la-rcvtracker.lo \
+	libgstmprtp_la-recycle.lo libgstmprtp_la-reportproc.lo \
+	libgstmprtp_la-reportprod.lo libgstmprtp_la-ricalcer.lo \
+	libgstmprtp_la-rtpfecbuffer.lo libgstmprtp_la-signalreport.lo \
+	libgstmprtp_la-slidingwindow.lo libgstmprtp_la-sndctrler.lo \
+	libgstmprtp_la-sndsubflows.lo libgstmprtp_la-sndtracker.lo \
+	libgstmprtp_la-sndpackets.lo libgstmprtp_la-streamjoiner.lo \
 	libgstmprtp_la-streamsplitter.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -412,8 +411,7 @@ top_srcdir = @top_srcdir@
 plugin_LTLIBRARIES = libgstmprtp.la
 
 # sources used to compile this plug-in
-libgstmprtp_la_SOURCES = asyncrecycle.c        \
-                         fbrafbproc.c          \
+libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          fbrafbprod.c          \
                          fbrasubctrler.c       \
                          fecdec.c              \
@@ -433,7 +431,6 @@ libgstmprtp_la_SOURCES = asyncrecycle.c        \
                          mprtpdefs.c           \
                          mprtplogger.c         \
                          notifier.c            \
-                         packetforwarder.c     \
                          rcvctrler.c           \
                          rcvpackets.c          \
                          rcvsubflows.c         \
@@ -452,8 +449,7 @@ libgstmprtp_la_SOURCES = asyncrecycle.c        \
                          streamjoiner.c        \
                          streamsplitter.c      
 
-noinst_HEADERS = asyncrecycle.h        \
-                 fbrafbproc.h          \
+noinst_HEADERS = fbrafbproc.h          \
                  fbrafbprod.h          \
                  fbrasubctrler.h       \
                  fecdec.h              \
@@ -468,7 +464,6 @@ noinst_HEADERS = asyncrecycle.h        \
                  mprtpdefs.h           \
                  mprtplogger.h         \
                  notifier.h            \
-                 packetforwarder.h     \
                  rcvctrler.h           \
                  rcvsubflows.h         \
                  rcvpackets.h          \
@@ -578,7 +573,6 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-asyncrecycle.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fbrafbproc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fbrafbprod.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fbrasubctrler.Plo@am__quote@
@@ -599,7 +593,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-mprtpdefs.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-mprtplogger.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-notifier.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-packetforwarder.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-rcvctrler.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-rcvpackets.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-rcvsubflows.Plo@am__quote@
@@ -638,13 +631,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
-
-libgstmprtp_la-asyncrecycle.lo: asyncrecycle.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-asyncrecycle.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-asyncrecycle.Tpo -c -o libgstmprtp_la-asyncrecycle.lo `test -f 'asyncrecycle.c' || echo '$(srcdir)/'`asyncrecycle.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-asyncrecycle.Tpo $(DEPDIR)/libgstmprtp_la-asyncrecycle.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='asyncrecycle.c' object='libgstmprtp_la-asyncrecycle.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-asyncrecycle.lo `test -f 'asyncrecycle.c' || echo '$(srcdir)/'`asyncrecycle.c
 
 libgstmprtp_la-fbrafbproc.lo: fbrafbproc.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-fbrafbproc.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-fbrafbproc.Tpo -c -o libgstmprtp_la-fbrafbproc.lo `test -f 'fbrafbproc.c' || echo '$(srcdir)/'`fbrafbproc.c
@@ -785,13 +771,6 @@ libgstmprtp_la-notifier.lo: notifier.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='notifier.c' object='libgstmprtp_la-notifier.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-notifier.lo `test -f 'notifier.c' || echo '$(srcdir)/'`notifier.c
-
-libgstmprtp_la-packetforwarder.lo: packetforwarder.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-packetforwarder.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-packetforwarder.Tpo -c -o libgstmprtp_la-packetforwarder.lo `test -f 'packetforwarder.c' || echo '$(srcdir)/'`packetforwarder.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-packetforwarder.Tpo $(DEPDIR)/libgstmprtp_la-packetforwarder.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='packetforwarder.c' object='libgstmprtp_la-packetforwarder.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-packetforwarder.lo `test -f 'packetforwarder.c' || echo '$(srcdir)/'`packetforwarder.c
 
 libgstmprtp_la-rcvctrler.lo: rcvctrler.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-rcvctrler.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-rcvctrler.Tpo -c -o libgstmprtp_la-rcvctrler.lo `test -f 'rcvctrler.c' || echo '$(srcdir)/'`rcvctrler.c

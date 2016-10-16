@@ -12,6 +12,7 @@
 #include <gio/gio.h>
 #include <stdio.h>
 
+#include "messenger.h"
 #include "reportprod.h"
 #include "reportproc.h"
 #include "signalreport.h"
@@ -51,7 +52,7 @@ struct _SndController
 
   GSList*                    controllers;
   ReportIntervalCalculator*  ricalcer;
-  GAsyncQueue*               emitterq;
+  Messenger*                 emit_msger;
 
   GstClockTime               last_regular_emit;
 
@@ -69,7 +70,7 @@ SndController* make_sndctrler(
     SndTracker*  sndtracker,
         SndSubflows* subflows,
         Notifier*    on_rtcp_ready,
-        GAsyncQueue* emitterq);
+        Messenger*   emit_msger);
 
 
 void

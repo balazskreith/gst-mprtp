@@ -85,7 +85,7 @@ void swperctest(void)
       _median_test_with_qsort(filename, array + (j - num_limit + 1), array2, num_limit, &result1, &elapsed1);
       //profile 2 - perc
       _median_test_with_perc(filename, sw, &array[j], &elapsed2);
-
+      g_print("%u,%lu,%u,%lu\n", result1, elapsed1, result2, elapsed2);
       mprtp_logger(filename, "%u,%lu,%u,%lu\n", result1, elapsed1, result2, elapsed2);
     }
 
@@ -261,8 +261,11 @@ static swpercentile_t* _swpercentilepriv_ctor(SlidingWindowPlugin* base, gint32 
   this->percentile      = CONSTRAIN(10,90,percentile);
   this->ratio           = (double)this->percentile / (double)(100-this->percentile);
   this->cmp             = cmp;
-  this->mintree = make_bintree3_with_recycle(cmp, bintreenode_recycle);
-  this->maxtree = make_bintree3_with_recycle(cmp, bintreenode_recycle);
+
+  this->mintree         = make_bintree3_with_recycle(cmp, bintreenode_recycle);
+  this->maxtree         = make_bintree3_with_recycle(cmp, bintreenode_recycle);
+//  this->maxtree         = make_bintree3(cmp);
+//  this->mintree         = make_bintree3(cmp);
   this->Mxc = this->Mnc = 0;
 
   if(this->ratio < 1.){
@@ -356,16 +359,14 @@ static void _swpercentile_balancer(swpercentile_t *this)
 reduce_mintree:
   ratio = (double) (this->Mxc + 1) / (double) (this->Mnc - 1);
   if(this->ratio < ratio || this->Mnc < 1) goto done;
-  //bintree3_insert_data(this->maxtree, bintree3_delete_bottom_data(this->mintree));
-  bintree3_insert_top_data(this->maxtree, bintree3_delete_bottom_data(this->mintree));
+  bintree3_insert_data(this->maxtree, bintree3_delete_bottom_data(this->mintree));
   --this->Mnc; ++this->Mxc;
   goto reduce_mintree;
 
 reduce_maxtree:
   ratio = (double) (this->Mxc - 1) / (double) (this->Mnc + 1);
   if(ratio < this->ratio || this->Mxc < 1) goto done;
-  //bintree3_insert_data(this->mintree, bintree3_delete_top_data(this->maxtree));
-  bintree3_insert_bottom_data(this->mintree, bintree3_delete_top_data(this->maxtree));
+  bintree3_insert_data(this->mintree, bintree3_delete_top_data(this->maxtree));
   --this->Mxc; ++this->Mnc;
   goto reduce_maxtree;
 

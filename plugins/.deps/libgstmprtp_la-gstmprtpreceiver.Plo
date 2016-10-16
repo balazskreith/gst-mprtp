@@ -204,7 +204,14 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
  gstmprtcpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h mprtpdefs.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtplogger.h
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtplogger.h \
+ messenger.h lib_datapuffer.h \
+ /usr/include/x86_64-linux-gnu/bits/waitflags.h \
+ /usr/include/x86_64-linux-gnu/bits/waitstatus.h /usr/include/alloca.h \
+ /usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h \
+ /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
+ /usr/include/x86_64-linux-gnu/bits/stdlib.h /usr/include/ctype.h \
+ /usr/include/assert.h
 
 /usr/include/stdc-predef.h:
 
@@ -687,3 +694,23 @@ mprtpdefs.h:
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h:
 
 mprtplogger.h:
+
+messenger.h:
+
+lib_datapuffer.h:
+
+/usr/include/x86_64-linux-gnu/bits/waitflags.h:
+
+/usr/include/x86_64-linux-gnu/bits/waitstatus.h:
+
+/usr/include/alloca.h:
+
+/usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h:
+
+/usr/include/x86_64-linux-gnu/bits/stdlib-float.h:
+
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:
+
+/usr/include/ctype.h:
+
+/usr/include/assert.h:

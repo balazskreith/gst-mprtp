@@ -289,6 +289,7 @@ gpointer slidingwindow_peek_latest(SlidingWindow* this)
   item = datapuffer_peek_last(this->items);
   return item->data;
 }
+
 typedef struct{
   gint (*comparator)(gpointer item, gpointer udata);
   gpointer udata;
@@ -360,19 +361,18 @@ void slidingwindow_add_plugin(SlidingWindow* this, SlidingWindowPlugin *swplugin
   if(swplugin->rem_pipe){
     notifier_add_listener(this->on_rem_item, (ListenerFunc) swplugin->rem_pipe, swplugin->rem_data);
   }
-
 }
 
 
 void slidingwindow_add_plugins (SlidingWindow* this, ... )
 {
-    va_list arguments;
-    SlidingWindowPlugin* swplugin = NULL;
-    va_start ( arguments, this );
-    for(swplugin = va_arg( arguments, SlidingWindowPlugin*); swplugin; swplugin = va_arg(arguments, SlidingWindowPlugin*)){
-        slidingwindow_add_plugin(this, swplugin);
-    }
-    va_end ( arguments );
+  va_list arguments;
+  SlidingWindowPlugin* swplugin = NULL;
+  va_start ( arguments, this );
+  for(swplugin = va_arg( arguments, SlidingWindowPlugin*); swplugin; swplugin = va_arg(arguments, SlidingWindowPlugin*)){
+      slidingwindow_add_plugin(this, swplugin);
+  }
+  va_end ( arguments );
 }
 
 

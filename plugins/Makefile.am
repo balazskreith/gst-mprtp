@@ -1,8 +1,7 @@
 plugin_LTLIBRARIES = libgstmprtp.la
 
 # sources used to compile this plug-in
-libgstmprtp_la_SOURCES = asyncrecycle.c        \
-                         fbrafbproc.c          \
+libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          fbrafbprod.c          \
                          fbrasubctrler.c       \
                          fecdec.c              \
@@ -22,7 +21,6 @@ libgstmprtp_la_SOURCES = asyncrecycle.c        \
                          mprtpdefs.c           \
                          mprtplogger.c         \
                          notifier.c            \
-                         packetforwarder.c     \
                          rcvctrler.c           \
                          rcvpackets.c          \
                          rcvsubflows.c         \
@@ -42,8 +40,7 @@ libgstmprtp_la_SOURCES = asyncrecycle.c        \
                          streamsplitter.c      
                     
                     
-noinst_HEADERS = asyncrecycle.h        \
-                 fbrafbproc.h          \
+noinst_HEADERS = fbrafbproc.h          \
                  fbrafbprod.h          \
                  fbrasubctrler.h       \
                  fecdec.h              \
@@ -58,7 +55,6 @@ noinst_HEADERS = asyncrecycle.h        \
                  mprtpdefs.h           \
                  mprtplogger.h         \
                  notifier.h            \
-                 packetforwarder.h     \
                  rcvctrler.h           \
                  rcvsubflows.h         \
                  rcvpackets.h          \

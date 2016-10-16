@@ -11,7 +11,7 @@
 #include <gst/gst.h>
 #include <gst/net/gstnetaddressmeta.h>
 #include "rcvsubflows.h"
-#include "asyncrecycle.h"
+#include "recycle.h"
 
 
 typedef struct _RcvPackets RcvPackets;
@@ -49,8 +49,7 @@ struct _RcvPacket
   guint16              subflow_seq;
   guint8               subflow_id;
 
-//  GAsyncQueue*         destiny;
-  AsyncRecycle*        destiny;
+  Recycle*             destiny;
 
 };
 
@@ -60,8 +59,8 @@ struct _RcvPackets
   GObject              object;
   GstClock*            sysclock;
   GstClockTime         made;
-//  GAsyncQueue*         packets_recycle;
-  AsyncRecycle*        recycle;
+
+  Recycle*             recycle;
 
   guint8               abs_time_ext_header_id;
   guint8               mprtp_ext_header_id;

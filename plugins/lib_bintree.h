@@ -69,8 +69,6 @@ gpointer bintree3_get_top_data(bintree3_t *this);
 gpointer bintree3_get_bottom_data(bintree3_t *this);
 gboolean bintree3_has_value(bintree3_t *this, gpointer data);
 void bintree3_insert_data(bintree3_t* this, gpointer data);
-void bintree3_insert_top_data(bintree3_t* this, gpointer data);
-void bintree3_insert_bottom_data(bintree3_t* this, gpointer data);
 
 gboolean bintree3_delete_value(bintree3_t* this, gpointer data);
 gint32 bintree3_get_nodenum(bintree3_t *this);

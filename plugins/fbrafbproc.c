@@ -130,7 +130,7 @@ FBRAFBProcessor *make_fbrafbprocessor(SndTracker* sndtracker, SndSubflow* subflo
 
   this->measurements_recycle = make_recycle_measurement(100, NULL);
   this->short_sw = make_slidingwindow(100, 5 * GST_SECOND);
-  this->long_sw = make_slidingwindow(600, 30 * GST_SECOND);
+  this->long_sw  = make_slidingwindow(600, 30 * GST_SECOND);
 
   slidingwindow_add_plugin(this->short_sw,
         make_swpercentile(80, _measurement_BiF_cmp, (ListenerFunc) _on_BiF_80th_calculated, this));
@@ -138,18 +138,20 @@ FBRAFBProcessor *make_fbrafbprocessor(SndTracker* sndtracker, SndSubflow* subflo
   slidingwindow_add_plugin(this->long_sw,
         make_swpercentile(80, _measurement_owd_cmp, (ListenerFunc) _on_owd_80th_calculated, this));
 
+//  if(0){
   slidingwindow_add_on_change(this->short_sw,
-        (ListenerFunc) _on_short_sw_rem,
-        (ListenerFunc) _on_short_sw_add, this);
+      (ListenerFunc) _on_short_sw_add,
+      (ListenerFunc) _on_short_sw_rem,
+      this);
 
   slidingwindow_add_on_change(this->long_sw,
-        (ListenerFunc) _on_long_sw_rem,
-        (ListenerFunc) _on_long_sw_add, this);
-
+      (ListenerFunc) _on_long_sw_add,
+      (ListenerFunc) _on_long_sw_rem,
+      this);
+//  }
 
   return this;
 }
-
 
 void fbrafbprocessor_reset(FBRAFBProcessor *this)
 {
@@ -181,7 +183,7 @@ void fbrafbprocessor_report_update(FBRAFBProcessor *this, GstMPRTCPReportSummary
     goto done;
   }
 
-  ++this->measurements_num;
+  ++this->stat->measurements_num;
   ++this->rcved_fb_since_changed;
   this->last_report_updated = now;
   _process_stat(this);
@@ -211,7 +213,7 @@ void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
 
   if(_stat(this)->owd_80th){
     gdouble corr = log(GST_TIME_AS_MSECONDS(_stat(this)->owd_80th));
-    corr /= _stat(this)->owd_log_corr * log(GST_TIME_AS_MSECONDS(_stat(this)->last_owd));
+    corr /= log(GST_TIME_AS_MSECONDS(_stat(this)->last_owd));
     _stat(this)->owd_log_corr = corr;
   }else{
     _stat(this)->owd_log_corr = 1.;
@@ -299,7 +301,7 @@ void _on_BiF_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *ca
 void _on_owd_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates)
 {
   PercentileResult(FBRAPlusMeasurement,   \
-                   bytes_in_flight,       \
+                   owd,                   \
                    candidates,            \
                    _stat(this)->owd_80th, \
                    this->owd_min,         \
@@ -309,12 +311,30 @@ void _on_owd_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *ca
 }
 
 
+//static gdouble _calculate_std(FBRAPlusStdHelper* helper, gdouble new_item)
+//{
+//  gdouble prev_mean = helper->mean;
+//  helper->mean += (new_item - helper->mean) / (gdouble) helper->counter;
+//  helper->abs_var  += (new_item - helper->mean) * (new_item - prev_mean);
+//  return sqrt(helper->abs_var / (gdouble) helper->counter);
+//}
+
 static gdouble _calculate_std(FBRAPlusStdHelper* helper, gdouble new_item)
 {
   gdouble prev_mean = helper->mean;
-  helper->mean += (new_item - helper->mean) / (gdouble) helper->counter;
-  helper->abs_var  += (new_item - helper->mean) * (new_item - prev_mean);
-  return sqrt(helper->abs_var / (gdouble) helper->counter);
+  gdouble dprev = new_item - prev_mean;
+  gdouble dact;
+  gdouble n = helper->counter;
+  helper->mean += dprev / n;
+  dact = new_item - helper->mean;
+  if(helper->counter < 2){
+    return 0.;
+  }
+  helper->emp *= (n - 2.) / (n - 1.);
+  helper->emp += pow(dprev, 2) / n;
+  helper->var = ( (n-1.) * helper->var + dprev * dact ) / n;
+
+  return sqrt(helper->var);
 }
 
 void _on_short_sw_rem(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement)
@@ -337,5 +357,6 @@ void _on_short_sw_add(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement)
 void _on_long_sw_add(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement)
 {
   ++this->owd_std_helper.counter;
-  _stat(this)->owd_in_ms_std = _calculate_std(&this->owd_std_helper, GST_TIME_AS_MSECONDS(measurement->owd));
+//  _stat(this)->owd_in_ms_std = GST_TIME_AS_MSECONDS(_calculate_std(&this->owd_std_helper, measurement->owd));
+  _stat(this)->owd_std = _calculate_std(&this->owd_std_helper, measurement->owd);
 }

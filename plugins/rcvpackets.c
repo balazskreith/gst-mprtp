@@ -50,7 +50,7 @@ static void _extract_mprtp_info(RcvPackets* this, RcvPacket* packet, GstRTPBuffe
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
 
-DEFINE_ASYNCRECYCLE_TYPE(static, rcvpacket, RcvPacket);
+DEFINE_RECYCLE_TYPE(static, rcvpacket, RcvPacket);
 
 static void _rcvpacket_shaper(RcvPacket* result, gpointer udata)
 {
@@ -87,7 +87,7 @@ RcvPackets* make_rcvpackets(void)
 {
   RcvPackets* this;
   this = g_object_new (RCVPACKETS_TYPE, NULL);
-  this->recycle = make_async_recycle_rcvpacket((AsyncRecycleItemShaper) _rcvpacket_shaper);
+  this->recycle = make_recycle_rcvpacket(256, (RecycleItemShaper)_rcvpacket_shaper);
   return this;
 }
 
@@ -114,7 +114,7 @@ RcvPacket* rcvpackets_get_packet(RcvPackets* this, GstBuffer* buffer)
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   RcvPacket* packet;
 
-  packet = async_recycle_retrieve_and_shape(this->recycle, NULL);
+  packet = recycle_retrieve_and_shape(this->recycle, NULL);
 
   gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
   _setup_rcvpacket(packet, &rtp);
@@ -167,7 +167,7 @@ void rcvpacket_unref(RcvPacket *packet)
     return;
   }
 
-  async_recycle_add(packet->destiny, packet);
+  recycle_add(packet->destiny, packet);
 }
 
 RcvPacket* rcvpacket_ref(RcvPacket *packet)

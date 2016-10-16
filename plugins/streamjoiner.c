@@ -70,6 +70,11 @@ stream_joiner_finalize (
 //  return 0;
 //}
 //
+//
+//static gint _cmp_rcvpacket_abs_seq(RcvPacket *a, RcvPacket* b)
+//{
+//  return _cmp_seq(a->abs_seq, b->abs_seq);
+//}
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -100,12 +105,13 @@ stream_joiner_finalize (GObject * object)
   g_object_unref(this->sysclock);
 }
 
-
 void
 stream_joiner_init (StreamJoiner * this)
 {
   this->sysclock           = gst_system_clock_obtain ();
   this->made               = _now(this);
+
+  this->enforced_delay     = 0;
 
 }
 
@@ -117,13 +123,39 @@ make_stream_joiner(void)
 
   result->joinq = g_queue_new();
 
+//  result->joinq2 = make_bintree3((bintree3cmp) _cmp_rcvpacket_abs_seq);
 
   return result;
 }
 
+
+void stream_joiner_set_enforced_delay(StreamJoiner *this, GstClockTime enforced_delay)
+{
+  this->enforced_delay = enforced_delay;
+}
+
+static gint _rcvpacket_abs_time(RcvPacket* first, RcvPacket* second, gpointer udata)
+{
+  //It should return 0 if the elements are equal,
+  //a negative value if the first element comes
+  //before the second, and a positive value
+  //if the second element comes before the first.
+
+  if(first->abs_snd_ntp_time == second->abs_snd_ntp_time){
+    return 0;
+  }
+  return first->abs_snd_ntp_time < second->abs_snd_ntp_time ? -1 : 1;
+}
+
 void stream_joiner_push_packet(StreamJoiner *this, RcvPacket* packet)
 {
-  g_queue_push_tail(this->joinq, packet);
+  if(!this->enforced_delay){
+    g_queue_push_tail(this->joinq, packet);
+    goto done;
+  }
+  g_queue_insert_sorted(this->joinq, packet, (GCompareDataFunc) _rcvpacket_abs_time, NULL);
+done:
+  return;
 }
 
 RcvPacket* stream_joiner_pop_packet(StreamJoiner *this)
@@ -134,10 +166,18 @@ RcvPacket* stream_joiner_pop_packet(StreamJoiner *this)
     goto done;
   }
 
-  packet = g_queue_pop_head(this->joinq);
+  if(!this->enforced_delay){
+    packet = g_queue_pop_head(this->joinq);
+    goto done;
+  }
+
+  packet = g_queue_peek_head(this->joinq);
+  {
+    GstClockTime actual_delay = get_epoch_time_from_ntp_in_ns(NTP_NOW - packet->abs_snd_ntp_time);
+    packet = (actual_delay < this->enforced_delay) ? NULL : g_queue_pop_head(this->joinq);
+  }
 
 done:
   return packet;
 
 }
-

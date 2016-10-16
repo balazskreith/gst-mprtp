@@ -294,7 +294,6 @@ gst_mprtpsender_class_init (GstMprtpsenderClass * klass)
 }
 
 
-
 static void
 gst_mprtpsender_init (GstMprtpsender * mprtpsender)
 {
@@ -346,6 +345,7 @@ gst_mprtpsender_init (GstMprtpsender * mprtpsender)
 
   //mprtpsender->events = g_queue_new();
   g_rw_lock_init (&mprtpsender->rwmutex);
+
 }
 
 void

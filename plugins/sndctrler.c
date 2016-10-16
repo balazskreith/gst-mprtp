@@ -149,10 +149,10 @@ sndctrler_finalize (GObject * object)
   SndController *this = SNDCTRLER (object);
 
   g_object_unref (this->sysclock);
-  g_async_queue_unref(this->emitterq);
-  g_object_unref(this->subflows);
-  g_object_unref(this->sndtracker);
-  g_object_unref(this->on_rtcp_ready);
+  g_object_unref (this->emit_msger);
+  g_object_unref (this->subflows);
+  g_object_unref (this->sndtracker);
+  g_object_unref (this->on_rtcp_ready);
   g_slice_free(MPRTPPluginSignalData, this->mprtp_signal_data);
 }
 
@@ -179,11 +179,11 @@ make_sndctrler(
     SndTracker*  sndtracker,
     SndSubflows* subflows,
     Notifier*    on_rtcp_ready,
-    GAsyncQueue* emitterq)
+    Messenger*   emitter_messenger)
 {
   SndController* this = (SndController*)g_object_new(SNDCTRLER_TYPE, NULL);
 
-  this->emitterq   = g_async_queue_ref(emitterq);
+  this->emit_msger   = g_object_ref(emitter_messenger);
   this->subflows   = g_object_ref(subflows);
   this->sndtracker = g_object_ref(sndtracker);
 
@@ -269,12 +269,14 @@ void
 _emit_signal (SndController *this)
 {
   MPRTPPluginSignalData *msg;
-  msg = g_slice_new0(MPRTPPluginSignalData);
+  messenger_lock(this->emit_msger);
+  msg = messenger_retrieve_block_unlocked(this->emit_msger);
 
   _update_subflow_target_utilization(this);
   memcpy(msg, this->mprtp_signal_data, sizeof(MPRTPPluginSignalData));
 
-  g_async_queue_push(this->emitterq, msg);
+  messenger_push_block_unlocked(this->emit_msger, msg);
+  messenger_unlock(this->emit_msger);
 }
 
 

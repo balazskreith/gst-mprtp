@@ -311,28 +311,6 @@ void bintree3_insert_data(bintree3_t* this, gpointer data)
   this->root = _insert(this, this->root, node);
 }
 
-void bintree3_insert_top_data(bintree3_t* this, gpointer data)
-{
-  bintree3node_t* node;
-  node = _make_bintree3node(this, data);
-  if(!this->root){
-    this->root = _insert(this, this->root, node);
-  }else{
-    this->top = _insert(this, this->top, node);
-  }
-}
-
-void bintree3_insert_bottom_data(bintree3_t* this, gpointer data)
-{
-  bintree3node_t* node;
-  node = _make_bintree3node(this, data);
-  if(!this->root){
-    this->root = _insert(this, this->root, node);
-  }else{
-    this->bottom = _insert(this, this->bottom, node);
-  }
-}
-
 gboolean bintree3_delete_value(bintree3_t* this, gpointer data)
 {
   return _deref_from_tree(this, data);

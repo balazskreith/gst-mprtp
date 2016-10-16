@@ -683,6 +683,7 @@ _send_mprtcp_buffer (GstMprtpreceiver * this, GstBuffer * buf)
     GST_WARNING_OBJECT (this, "The RTCP packet is not readable");
     return result;
   }
+
   report = (GstMPRTCPSubflowReport *) gst_rtcp_get_first_header (&rtcp);
   block = gst_mprtcp_get_first_block (report);
   outpad = this->mprtcp_rr_srcpad;

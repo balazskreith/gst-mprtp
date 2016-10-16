@@ -9,6 +9,7 @@
 #define MPRTP_LOGGER_H_
 
 #include <gst/gst.h>
+#include "messenger.h"
 
 typedef struct _MPRTPLogger MPRTPLogger;
 typedef struct _MPRTPLoggerClass MPRTPLoggerClass;
@@ -38,8 +39,7 @@ struct _MPRTPLogger
   GString*          collector_string;
   gchar             collector_filename[255];
 
-  GAsyncQueue*      messages;
-  GAsyncQueue*      recycle;
+  Messenger*        messenger;
 };
 
 struct _MPRTPLoggerClass{

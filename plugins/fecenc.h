@@ -13,6 +13,7 @@
 #include "sndsubflows.h"
 #include "mediator.h"
 #include "recycle.h"
+#include "messenger.h"
 
 typedef struct _FECEncoder FECEncoder;
 typedef struct _FECEncoderClass FECEncoderClass;
@@ -46,8 +47,7 @@ struct _FECEncoder
 
   GstTask*                   thread;
   GRecMutex                  thread_mutex;
-  GAsyncQueue*               messages;
-  GAsyncQueue*               buffers;
+  Messenger*                 messenger;
 
   Mediator*                  response_handler;
   Recycle*                   bitstring_recycle;

@@ -43,6 +43,14 @@ if(!candidates->processed){                        \
 }
 
 
+#define PercentileResultPipeFnc(name, TypeThis, ResultField, MinField, MaxField, Type, field, defaultResult) \
+static void name(gpointer udata, swpercentilecandidates_t* candidates) \
+{ \
+  TypeThis* this = udata; \
+  PercentileResult(Type, field, candidates, this->ResultField, this->MinField, this->MaxField, defaultResult); \
+} \
+
+
 #define PercentileRawResult(Type, candidates, PercResult, minResult, maxResult, defaultResult) \
 if(!candidates->processed){                        \
   PercResult = defaultResult;                      \
@@ -65,13 +73,13 @@ if(!candidates->processed){                        \
   maxResult = *max;                                \
 }
 
-
-#define PercentileResultPipeFnc(name, TypeThis, ResultField, MinField, MaxField, Type, field, defaultResult) \
+#define PercentileRawResultPipeFnc(name, TypeThis, ResultType, ResultField, MinField, MaxField, defaultResult) \
 static void name(gpointer udata, swpercentilecandidates_t* candidates) \
 { \
-  TypeThis* this = udata;	\
-  PercentileResult(Type, field, candidates, this->ResultField, this->MinField, this->MaxField, defaultResult); \
+  TypeThis* this = udata; \
+  PercentileRawResult(ResultType, candidates, this->ResultField, this->MinField, this->MaxField, defaultResult); \
 } \
+
 
 void swperctest(void);
 void swprinter_int32(gpointer data, gchar* string);

@@ -205,7 +205,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session)
   GstElement *rtpSrc;
   GstElement *rtcpSrc;
   GstElement *rtcpSink;
-  GstElement *mprtcpSrc;
+  GstElement *mprtcpSink;
   GstElement *mprtpPly;
   GstElement *mprtpRcv;
   GstElement *mprtpSnd;
@@ -218,7 +218,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session)
   rtpSrc     = gst_element_factory_make ("udpsrc", NULL);
   rtcpSrc    = gst_element_factory_make ("udpsrc", NULL);
   rtcpSink   = gst_element_factory_make ("udpsink", NULL);
-  mprtcpSrc  = gst_element_factory_make ("udpsrc", NULL);
+  mprtcpSink = gst_element_factory_make ("udpsink", NULL);
   mprtpPly   = gst_element_factory_make ("mprtpplayouter", NULL);
   mprtpRcv   = gst_element_factory_make ("mprtpreceiver", NULL);
   mprtpSnd   = gst_element_factory_make ("mprtpsender", NULL);
@@ -227,7 +227,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session)
   g_object_set (rtcpSink, "port", snd_rtcp_port, "host", snd_ip,
       "sync", FALSE, "async", FALSE, NULL);
   g_object_set (rtcpSrc, "port", rcv_rtcp_port, NULL);
-  g_object_set (mprtcpSrc, "port", snd_mprtcp_port, "host", snd_ip,
+  g_object_set (mprtcpSink, "port", snd_mprtcp_port, "host", snd_ip,
         "sync", FALSE, "async", FALSE, NULL);
 
   g_print ("Connected: Host - %s:%d, RTCP: %d\n", rcv_ip, rcv_rtp_port, rcv_rtcp_port);
@@ -242,7 +242,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session)
       rtpSrc,
       rtcpSrc,
       rtcpSink,
-      mprtcpSrc,
+      mprtcpSink,
 
       mprtpPly,
       mprtpRcv,
@@ -267,7 +267,7 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session)
 
   gst_element_link_pads (mprtpRcv, "mprtcp_sr_src", mprtpPly, "mprtcp_sr_sink");
   gst_element_link_pads (mprtpPly, "mprtcp_rr_src", mprtpSnd, "mprtcp_rr_sink");
-  gst_element_link_pads (mprtpSnd, "src_1", mprtcpSrc, "src");
+  gst_element_link_pads (mprtpSnd, "src_1", mprtcpSink, "sink");
 
   padName = g_strdup_printf ("send_rtcp_src_%u", session->sessionNum);
   gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");

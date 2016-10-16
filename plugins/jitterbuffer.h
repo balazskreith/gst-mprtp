@@ -38,8 +38,16 @@ struct _JitterBuffer
   GstClockTime         made;
   guint16              last_seq;
   gboolean             last_seq_init;
+
+  guint32              last_ts;
+
+  gint32               clock_rate;
   GQueue*              playoutq;
-  Mediator*            repair_channel;
+
+  GstClockTime         playout_delay;
+  GstClockTime         playout_time;
+  SlidingWindow*       path_skews;
+  gpointer             subflows;
 
 };
 struct _JitterBufferClass{
@@ -47,18 +55,28 @@ struct _JitterBufferClass{
 };
 
 JitterBuffer*
-make_jitterbuffer(Mediator *repair_channel);
+make_jitterbuffer(void);
 
+void jitterbuffer_set_clock_rate(
+    JitterBuffer *this,
+    gint32 clock_rate
+    );
 
 void
 jitterbuffer_push_packet(
     JitterBuffer *this,
     RcvPacket* packet);
 
+gboolean
+jitterbuffer_has_repair_request(
+    JitterBuffer *this,
+    GstClockTime *playout_time,
+    guint16 *gap_seq);
+
 RcvPacket*
 jitterbuffer_pop_packet(
     JitterBuffer *this,
-    gboolean *repair_request);
+    GstClockTime *playout_time);
 
 GType
 jitterbuffer_get_type (void);

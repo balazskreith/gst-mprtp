@@ -12,6 +12,7 @@
 #include "rcvpackets.h"
 #include "rtpfecbuffer.h"
 #include "mediator.h"
+#include "messenger.h"
 
 typedef struct _FECDecoder FECDecoder;
 typedef struct _FECDecoderClass FECDecoderClass;
@@ -59,11 +60,9 @@ struct _FECDecoder
   GList*                     segments;
   GList*                     items;
 
-  Mediator*                  repair_channel;
+  Messenger*                 messenger;
+  Notifier*                  on_response;
 
-  GAsyncQueue*               rtpbuffers_in;
-  GAsyncQueue*               fecbuffers_in;
-  GAsyncQueue*               discarded_packets_in;
 };
 
 
@@ -74,10 +73,11 @@ struct _FECDecoderClass{
 };
 
 GType fecdecoder_get_type (void);
-FECDecoder *make_fecdecoder(Mediator* repair_channel);
+FECDecoder *make_fecdecoder(void);
 void fecdecoder_reset(FECDecoder *this);
 
-void fecdecoder_on_discarded_packet(FECDecoder *this, DiscardedPacket *discarded_packet);
+void fecdecoder_request_repair(FECDecoder *this, guint16 missing_seq);
+void fecdecoder_add_response_listener(FECDecoder *this, ListenerFunc listener, gpointer udata);
 void fecdecoder_add_rtp_buffer(FECDecoder *this, GstBuffer *packet);
 void fecdecoder_add_fec_buffer(FECDecoder *this, GstBuffer *buffer);
 

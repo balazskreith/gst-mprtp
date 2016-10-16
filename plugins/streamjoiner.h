@@ -24,12 +24,6 @@ typedef struct _StreamJoinerClass StreamJoinerClass;
 #define STREAM_JOINER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),STREAM_JOINER_TYPE))
 #define STREAM_JOINER_CAST(src)        ((StreamJoiner *)(src))
 
-#define MPRTP_SENDER_SCHTREE_MAX_PATH_NUM 32
-#define MAX_SKEWS_ARRAY_LENGTH 256
-
-//typedef struct _FrameNode FrameNode;
-//typedef struct _Frame Frame;
-
 
 struct _StreamJoiner
 {
@@ -37,6 +31,8 @@ struct _StreamJoiner
   GstClock*            sysclock;
   GstClockTime         made;
   GQueue*              joinq;
+
+  GstClockTime         enforced_delay;
 
 };
 struct _StreamJoinerClass{
@@ -46,6 +42,12 @@ struct _StreamJoinerClass{
 StreamJoiner*
 make_stream_joiner(void);
 
+
+void
+stream_joiner_set_enforced_delay(
+    StreamJoiner *this,
+    GstClockTime join_delay
+);
 
 void
 stream_joiner_push_packet(

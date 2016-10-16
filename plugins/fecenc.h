@@ -44,6 +44,7 @@ struct _FECEncoder
   guint8                     mprtp_ext_header_id;
 
   GQueue*                    bitstrings;
+  GQueue*                    pending_responses;
 
   GstTask*                   thread;
   GRecMutex                  thread_mutex;

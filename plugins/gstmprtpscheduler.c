@@ -376,7 +376,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->sysclock = gst_system_clock_obtain ();
   this->thread = gst_task_new (mprtpscheduler_emitter_process, this, NULL);
   g_mutex_init (&this->mutex);
-  g_cond_init(&this->cond);
+  g_cond_init(&this->waiting_signal);
 
   this->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
 
@@ -678,15 +678,11 @@ gst_mprtpscheduler_query (GstElement * element, GstQuery * query)
 static void _wait(GstMprtpscheduler *this, GstClockTime waiting_time, gint64 step_in_microseconds)
 {
   GstClockTime start = _now(this);
+  gint64 end_time;
   while(_now(this) - start < waiting_time){
-    g_cond_wait_until(&this->cond, &this->mutex, step_in_microseconds);
+    end_time = g_get_monotonic_time() + step_in_microseconds;
+    g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);
   }
-
-//  while(!g_cond_wait_until(&this->cond, &this->mutex, step_in_microseconds)){
-//    if(waiting_time <= _now(this) - start){
-//      return;
-//    }
-//  }
 }
 
 static GstFlowReturn
@@ -731,14 +727,17 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     goto done;
   }
 
-  fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(buffer));
+  //The problem if we add the fec here: We add an extesnion thereafter and
+  //meanwhile the receiver side the bitstting considering the extension
+  //here we don't at the creation.
+  //fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(buffer));
 
   THIS_LOCK(this);
 
   if(0 < sndsubflows_get_subflows_num(this->subflows)){
     packet = sndpackets_make_packet(this->sndpackets, gst_buffer_ref(buffer));
     g_queue_push_tail(this->packetsq, packet);
-    g_cond_signal(&this->cond);
+    g_cond_signal(&this->waiting_signal);
   }else{
     result = gst_pad_push(this->mprtp_srcpad, buffer);
   }
@@ -943,13 +942,14 @@ void _on_monitoring_response(GstMprtpscheduler * this, FECEncoderResponse *respo
 void
 _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndSubflow* subflow, SndPacket *packet)
 {
-
+  GstBuffer *buffer;
   sndpacket_setup_mprtp(packet, subflow->id, sndsubflow_get_next_subflow_seq(subflow));
   sndtracker_packet_sent(this->sndtracker, packet);
 
 //  g_print("packet %hu sent %d - %hu\n", packet->abs_seq, packet->subflow_id, packet->subflow_seq);
-
-  gst_pad_push(this->mprtp_srcpad, sndpacket_retrieve(packet));
+  buffer = sndpacket_retrieve(packet);
+  fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(buffer));
+  gst_pad_push(this->mprtp_srcpad, buffer);
 
   if (!this->riport_flow_signal_sent) {
     this->riport_flow_signal_sent = TRUE;
@@ -973,7 +973,7 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
 
   packet = (SndPacket*) g_queue_pop_head(this->packetsq);
   if(!packet){
-    g_cond_wait(&this->cond, &this->mutex);
+    g_cond_wait(&this->waiting_signal, &this->mutex);
 //    _wait(this, GST_MSECOND, 100);s
     goto done;
   }

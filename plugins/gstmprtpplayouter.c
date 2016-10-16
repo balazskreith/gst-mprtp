@@ -88,6 +88,8 @@ enum
   PROP_JOIN_SUBFLOW,
   PROP_DETACH_SUBFLOW,
   PROP_SETUP_CONTROLLING_MODE,
+  PROP_MAX_REAPIR_DELAY,
+  PROP_ENFORCED_DELAY,
   PROP_SETUP_RTCP_INTERVAL_TYPE,
   PROP_RTP_PASSTHROUGH,
   PROP_LOG_ENABLED,
@@ -224,6 +226,20 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           "0 - no sending rate controller, 1 - no controlling, but sending SRs, 2 - FBRA with MARC",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_MAX_REAPIR_DELAY,
+      g_param_spec_uint ("max-repair-delay",
+          "the maximal amount of time in ms the playouter waits for FEC response",
+          "the maximal amount of time in ms the playouter waits for FEC response", 0,
+          100, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_ENFORCED_DELAY,
+      g_param_spec_uint ("enforced-delay",
+          "An enforced delay applied to all packet arrives.",
+          "An enforced delay applied to all packet arrives. MPRTP packets are containing an abs_time_extension and it contains the abs ntp time. Enforced delay retrieve packets in a queue until their delay reaches the enforced delay.",
+          0,
+          1000, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+
   element_class->change_state =
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_change_state);
   element_class->query = GST_DEBUG_FUNCPTR (gst_mprtpplayouter_query);
@@ -273,6 +289,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   g_mutex_init (&this->mutex);
   g_cond_init(&this->receive_signal);
   g_cond_init(&this->waiting_signal);
+  g_cond_init(&this->repair_signal);
 
   this->sysclock                 = gst_system_clock_obtain();
   this->fec_payload_type         = FEC_PAYLOAD_DEFAULT_ID;
@@ -288,6 +305,8 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->rcvtracker               = make_rcvtracker();
 
   this->controller               = make_rcvctrler(this->rcvtracker, this->subflows, this->on_rtcp_ready);
+
+  this->max_repair_delay_in_ms   = 10;
 
   fecdecoder_add_response_listener(this->fec_decoder,
       (ListenerFunc) _playouter_on_repair_response, this);
@@ -365,6 +384,15 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       guint_value = g_value_get_uint (value);
       rcvsubflows_set_congestion_controlling_type(this->subflows, subflow_prop->id, subflow_prop->value);
       break;
+    case PROP_MAX_REAPIR_DELAY:
+      guint_value = g_value_get_uint (value);
+      this->max_repair_delay_in_ms = guint_value;
+      break;
+    case PROP_ENFORCED_DELAY:
+      guint_value = g_value_get_uint (value);
+      stream_joiner_set_enforced_delay(this->joiner, guint_value * GST_MSECOND);
+      //gst_pad_push_event(this->mprtp_srcpad, gst_event_new_latency(stream_joiner_get_latency(this->joiner)));
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -418,7 +446,8 @@ gst_mprtpplayouter_src_query (GstPad * sinkpad, GstObject * parent,
       if ((result = gst_pad_query (peer, query))) {
           gst_query_parse_latency (query, &live, &min, &max);
 //          min= GST_MSECOND;
-          min = 0;
+//          min = 0;
+          min = stream_joiner_get_latency(this->joiner);
           max = -1;
           gst_query_set_latency (query, live, min, max);
       }
@@ -570,6 +599,8 @@ gst_mprtpplayouter_query (GstElement * element, GstQuery * query)
   return ret;
 }
 
+//static guint received = 0;
+
 static GstFlowReturn
 gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buf)
@@ -587,6 +618,13 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     GST_WARNING("The arrived buffer is not a buffer.");
     goto done;
   }
+
+  //Artificial lost
+//  if(++received % 11 == 0){
+//    gst_buffer_unref(buf);
+//    goto done;
+//  }
+
   if (!gst_buffer_map (buf, &info, GST_MAP_READ)) {
     GST_WARNING ("Buffer is not readable");
     result = GST_FLOW_ERROR;
@@ -681,12 +719,18 @@ GstFlowReturn
 _processing_mprtcp_packet (GstMprtpplayouter * this, GstBuffer * buf)
 {
   GstFlowReturn result;
-  PROFILING("_processing_mprtcp_packet",
+//  PROFILING("_processing_mprtcp_packet LOCK",
     THIS_LOCK (this);
+//  );
+
+//  PROFILING("_processing_mprtcp_packet",
     rcvctrler_receive_mprtcp(this->controller, buf);
     result = GST_FLOW_OK;
+//  );
+
+//  PROFILING("_processing_mprtcp_packet UNLOCK",
     THIS_UNLOCK (this);
-  );
+//  );
 
 //  {
 //      GstRTCPBuffer rtcp = GST_RTCP_BUFFER_INIT;
@@ -709,25 +753,31 @@ void _playouter_on_rtcp_ready(GstMprtpplayouter *this, GstBuffer* buffer)
 
 void _playouter_on_repair_response(GstMprtpplayouter *this, GstBuffer *rtpbuf)
 {
-  THIS_LOCK(this);
+  PROFILING("_playouter_on_repair_response LOCK",
+    THIS_LOCK(this);
+  );
+
   this->discarded_packet.repairedbuf = rtpbuf;
-  g_cond_signal(&this->waiting_signal);
+  g_cond_signal(&this->repair_signal);
   THIS_UNLOCK(this);
 }
 
 
-static void _wait(GstMprtpplayouter *this, GstClockTime waiting_time, gint64 step_in_microseconds)
+static void _playout_wait(GstMprtpplayouter *this, GstClockTime waiting_time, gint64 step_in_microseconds)
 {
   GstClockTime start = _now(this);
+  gint64 end_time;
   while(_now(this) - start < waiting_time){
-    g_cond_wait_until(&this->waiting_signal, &this->mutex, step_in_microseconds);
+    end_time = g_get_monotonic_time() + step_in_microseconds;
+    g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);
   }
+}
 
-//  while(!g_cond_wait_until(&this->cond, &this->mutex, step_in_microseconds)){
-//    if(waiting_time <= _now(this) - start){
-//      return;
-//    }
-//  }
+static gboolean _repair_responsed(GstMprtpplayouter *this)
+{
+  gint64 end_time;
+  end_time = g_get_monotonic_time() + this->max_repair_delay_in_ms * G_TIME_SPAN_MILLISECOND;
+  return g_cond_wait_until(&this->repair_signal, &this->mutex, end_time);
 }
 
 static void
@@ -743,42 +793,38 @@ _playout_process (GstMprtpplayouter *this)
     jitterbuffer_push_packet(this->jitterbuffer, packet);
   }
 
-  if(jitterbuffer_has_repair_request(this->jitterbuffer, &playout_time, &gap_seq)){
-    this->discards = TRUE;
-    this->discarded_packet.abs_seq = gap_seq;
-    if(this->discarded_packet.repairedbuf){
-      gst_buffer_unref(this->discarded_packet.repairedbuf);
-      this->discarded_packet.repairedbuf = NULL;
-    }
-    fecdecoder_request_repair(this->fec_decoder, gap_seq);
-
-    _wait(this, playout_time - _now(this), 100);
-
-    if(this->discarded_packet.repairedbuf){
-      gst_pad_push(this->mprtp_srcpad, this->discarded_packet.repairedbuf);
-      this->discarded_packet.repairedbuf = NULL;
-      this->discards = FALSE;
-    }
-    goto done;
-  }
-
   packet = jitterbuffer_pop_packet(this->jitterbuffer, &playout_time);
   if(!packet){
     if(!playout_time){
       g_cond_wait(&this->receive_signal, &this->mutex);
     }else if(_now(this) < playout_time){
 //      g_print("before playout_time, the diff is  %lu\n", playout_time - _now(this));
-      _wait(this, playout_time - _now(this), 100);
+      _playout_wait(this, playout_time - _now(this), 100);
 //      g_print("after waiting until playout_time, the diff is  %lu\n", _now(this) - playout_time);
     }
     goto done;
   }
 
-  if(this->discards){
-    if(packet->abs_seq != this->discarded_packet.abs_seq){
-      rcvtracker_add_discarded_packet(this->rcvtracker, &this->discarded_packet);
+  if(jitterbuffer_has_repair_request(this->jitterbuffer, &gap_seq)){
+    this->discarded_packet.abs_seq = gap_seq;
+    if(this->discarded_packet.repairedbuf){
+      GST_WARNING_OBJECT(this, "A repair packet arrived perhaps later than it was necessary");
+      gst_buffer_unref(this->discarded_packet.repairedbuf);
+      this->discarded_packet.repairedbuf = NULL;
     }
-    this->discards = FALSE;
+
+    fecdecoder_request_repair(this->fec_decoder, gap_seq);
+
+    if(!_repair_responsed(this)){
+      GST_WARNING_OBJECT(this, "max_repair_delay reached without response. Maybe need to increase it");
+    }
+
+    rcvtracker_add_discarded_packet(this->rcvtracker, &this->discarded_packet);
+
+    if(this->discarded_packet.repairedbuf){
+      gst_pad_push(this->mprtp_srcpad, this->discarded_packet.repairedbuf);
+      this->discarded_packet.repairedbuf = NULL;
+    }
   }
 
   gst_pad_push(this->mprtp_srcpad, packet->buffer);

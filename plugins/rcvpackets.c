@@ -117,8 +117,13 @@ RcvPacket* rcvpackets_get_packet(RcvPackets* this, GstBuffer* buffer)
   packet = recycle_retrieve_and_shape(this->recycle, NULL);
 
   gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
+
   _setup_rcvpacket(packet, &rtp);
-  _extract_mprtp_info(this, packet, &rtp);
+
+  if(gst_buffer_is_mprtp(buffer, this->mprtp_ext_header_id)){
+    _extract_mprtp_info(this, packet, &rtp);
+  }
+
   gst_rtp_buffer_unmap(&rtp);
 
   packet->buffer   = buffer;
@@ -174,6 +179,26 @@ RcvPacket* rcvpacket_ref(RcvPacket *packet)
 {
   ++packet->ref;
   return packet;
+}
+
+void rcvpacket_print(RcvPacket *packet, printfnc print)
+{
+  print("------- Packet %hu --------\n"
+        "Timestamp:    %-10u\n"
+        "Marker:       %-10d\n"
+        "Payload type: %-10d\n"
+        "Payload size: %-10d\n"
+        "SSRC:         %-10u\n"
+        "ref:          %-10d\n"
+        ,
+        packet->abs_seq,
+        packet->timestamp,
+        packet->marker,
+        packet->payload_type,
+        packet->payload_size,
+        packet->ssrc,
+        packet->ref
+        );
 }
 
 

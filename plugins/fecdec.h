@@ -13,6 +13,7 @@
 #include "rtpfecbuffer.h"
 #include "mediator.h"
 #include "messenger.h"
+#include "gstmprtcpbuffer.h"
 
 typedef struct _FECDecoder FECDecoder;
 typedef struct _FECDecoderClass FECDecoderClass;

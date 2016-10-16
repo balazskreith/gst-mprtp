@@ -112,6 +112,7 @@ stream_joiner_init (StreamJoiner * this)
   this->made               = _now(this);
 
   this->enforced_delay     = 0;
+  this->min_delay          = GST_SECOND;
 
 }
 
@@ -128,6 +129,18 @@ make_stream_joiner(void)
   return result;
 }
 
+GstClockTime stream_joiner_get_latency(StreamJoiner *this)
+{
+  if(!this->enforced_delay){
+    return 0;
+  }
+
+  if(this->enforced_delay < this->min_delay){
+    return 0;
+  }
+
+  return this->enforced_delay - this->min_delay;
+}
 
 void stream_joiner_set_enforced_delay(StreamJoiner *this, GstClockTime enforced_delay)
 {
@@ -149,6 +162,10 @@ static gint _rcvpacket_abs_time(RcvPacket* first, RcvPacket* second, gpointer ud
 
 void stream_joiner_push_packet(StreamJoiner *this, RcvPacket* packet)
 {
+
+  //TODO: considering sliding window minmax?
+  this->min_delay = MIN(this->min_delay, packet->delay);
+
   if(!this->enforced_delay){
     g_queue_push_tail(this->joinq, packet);
     goto done;

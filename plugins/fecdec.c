@@ -278,9 +278,9 @@ static void _fecdec_process(gpointer udata)
     case FECDECODER_MESSAGE_TYPE_REPAIR_REQUEST:
     {
       RepairRequestMessage* casted_msg = (RepairRequestMessage*)msg;
-      GstBuffer* rtpbuf = _get_repaired_rtpbuffer(this, casted_msg->missing_seq);
+      GstBuffer* rtpbuf;
+      rtpbuf = _get_repaired_rtpbuffer(this, casted_msg->missing_seq);
       notifier_do(this->on_response, rtpbuf);
-
     }
     break;
     case FECDECODER_MESSAGE_TYPE_RESPONSE_LISTENER:
@@ -330,6 +330,8 @@ void _add_fec_buffer(FECDecoder *this, GstBuffer *buffer)
     goto done;
   }
 
+//  gst_print_rtpfec_buffer(buffer);
+
   segment               = _segment_ctor();
   segment->added        = _now(this);
   segment->base_sn      = g_ntohs(header->sn_base);
@@ -343,7 +345,7 @@ void _add_fec_buffer(FECDecoder *this, GstBuffer *buffer)
   memcpy(segment->fecbitstring + 8, &header->length_recovery, 2);
   memcpy(segment->fecbitstring + 10, payload + sizeof(GstRTPFECHeader), payload_length - sizeof(GstRTPFECHeader));
 
-  //collects the segment already arrived
+  //collects the items already arrived
   for(c = 0, seq = segment->base_sn; seq != (segment->high_sn+1) && c < GST_RTPFEC_MAX_PROTECTION_NUM; ++seq, ++c){
     FECDecoderItem* item;
     item = _take_item_by_seq(&this->items, seq);
@@ -435,9 +437,11 @@ GstBuffer* _get_repaired_rtpbuffer(FECDecoder *this, guint16 searched_seq)
     guint16 item_seq;
     gint32 missing_seq = -1;
     segment = segi->data;
+
     if(segment->missing != 1 || segment->repaired) {
       continue;
     }
+
     if(_cmp_uint16(searched_seq, segment->base_sn) < 0 ||
        _cmp_uint16(segment->base_sn + segment->protected, searched_seq) < 0){
       continue;
@@ -448,15 +452,17 @@ GstBuffer* _get_repaired_rtpbuffer(FECDecoder *this, guint16 searched_seq)
         missing_seq = item_seq;
       }
     }
+
     if(missing_seq != searched_seq){
-      continue;
+      break;
     }
 
-    //TODO: move from here
-    //mprtp_log_one("recovered_packets.txt", "%d\n", ++this->repaired);
     result = _repair_rtpbuf_by_segment(this, segment, missing_seq);
+//    gst_print_rtp_buffer(result);
     segment->repaired = TRUE;
+    break;
   }
+
   return result;
 }
 
@@ -502,6 +508,10 @@ GstBuffer *_repair_rtpbuf_by_segment(FECDecoder *this, FECDecoderSegment *segmen
   guint16            length;
   guint8*            databed;
   GstBasicRTPHeader* rtpheader;
+  GstBuffer*         result = NULL;
+//  GstRTPBuffer       rtp = GST_RTP_BUFFER_INIT;
+
+//  _print_segment(segment);
 
   //check weather we have unprocessed items
   for(it = segment->items; it; it = it->next){
@@ -513,6 +523,7 @@ GstBuffer *_repair_rtpbuf_by_segment(FECDecoder *this, FECDecoderSegment *segmen
   }
   memcpy(&length, segment->fecbitstring + 8, 2);
   length = g_ntohs(length);
+
   databed = mprtp_malloc(length + 12);
 
   memcpy(databed,     segment->fecbitstring,     2);
@@ -522,11 +533,12 @@ GstBuffer *_repair_rtpbuf_by_segment(FECDecoder *this, FECDecoderSegment *segmen
   rtpheader->version = 2;
   rtpheader->seq_num = g_htons(seq);
   rtpheader->ssrc    = g_htonl(segment->ssrc);
+
   memcpy(databed + 12, segment->fecbitstring + 10, length);
 
   segment->repaired           = TRUE;
-
-  return gst_buffer_new_wrapped(databed, length + 12);
+  result = gst_buffer_new_wrapped(databed, length + 12);
+  return result;
 }
 
 gint _find_item_by_seq_helper(gconstpointer item_ptr, gconstpointer desired_seq)

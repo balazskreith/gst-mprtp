@@ -64,6 +64,7 @@ struct _GstMprtpplayouter
   GMutex          mutex;
   GCond           receive_signal;
   GCond           waiting_signal;
+  GCond           repair_signal;
 
   guint64         clock_base;
 
@@ -84,11 +85,9 @@ struct _GstMprtpplayouter
   GstPad*         mprtcp_sr_sinkpad;
   GstPad*         mprtcp_rr_srcpad;
 
-  GstClockTime    repair_window_max;
-  GstClockTime    repair_window_min;
+  GstClockTime    max_repair_delay_in_ms;
 
   DiscardedPacket  discarded_packet;
-  gboolean         discards;
 
   gboolean        logging;
 

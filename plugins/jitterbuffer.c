@@ -220,21 +220,14 @@ done:
   return;
 }
 
-gboolean jitterbuffer_has_repair_request(JitterBuffer* this, GstClockTime *playout_time, guint16 *gap_seq)
+gboolean jitterbuffer_has_repair_request(JitterBuffer* this, guint16 *gap_seq)
 {
-  RcvPacket* packet;
-  if(!this->last_seq_init || g_queue_is_empty(this->playoutq)){
+  if(this->gap_seq == -1){
     return FALSE;
   }
-
-  packet = g_queue_peek_head(this->playoutq);
-  if((guint16)(this->last_seq + 2) == packet->abs_seq){
-    *gap_seq = this->last_seq + 1;
-    *playout_time += 500 * GST_USECOND;//TODO: change it
-    return TRUE;
-  }
-
-  return FALSE;
+  *gap_seq = this->gap_seq;
+  this->gap_seq = -1;
+  return TRUE;
 }
 
 RcvPacket* jitterbuffer_pop_packet(JitterBuffer *this, GstClockTime *playout_time)
@@ -266,6 +259,9 @@ RcvPacket* jitterbuffer_pop_packet(JitterBuffer *this, GstClockTime *playout_tim
   }
 
   packet = g_queue_pop_head(this->playoutq);
+  if((guint16)(this->last_seq + 2) == packet->abs_seq){
+    this->gap_seq = this->last_seq + 1;
+  }
   this->last_seq = packet->abs_seq;
 done:
   return packet;

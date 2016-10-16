@@ -32,6 +32,7 @@ struct _StreamJoiner
   GstClockTime         made;
   GQueue*              joinq;
 
+  GstClockTime         min_delay;
   GstClockTime         enforced_delay;
 
 };
@@ -42,6 +43,9 @@ struct _StreamJoinerClass{
 StreamJoiner*
 make_stream_joiner(void);
 
+GstClockTime
+stream_joiner_get_latency(
+    StreamJoiner *this);
 
 void
 stream_joiner_set_enforced_delay(

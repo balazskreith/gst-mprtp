@@ -44,6 +44,8 @@ struct _JitterBuffer
   gint32               clock_rate;
   GQueue*              playoutq;
 
+  gint32               gap_seq;
+
   GstClockTime         playout_delay;
   GstClockTime         playout_time;
   SlidingWindow*       path_skews;
@@ -70,7 +72,6 @@ jitterbuffer_push_packet(
 gboolean
 jitterbuffer_has_repair_request(
     JitterBuffer *this,
-    GstClockTime *playout_time,
     guint16 *gap_seq);
 
 RcvPacket*

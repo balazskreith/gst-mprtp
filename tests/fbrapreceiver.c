@@ -322,7 +322,9 @@ main (int argc, char **argv)
   g_object_set (rtpBin,
       "latency", 200,
       //"do-retransmission", TRUE,
-      "rtp-profile", GST_RTP_PROFILE_AVPF, NULL);
+      "rtp-profile", GST_RTP_PROFILE_AVPF,
+      "buffer-mode", 0,
+      NULL);
 
   videoSession = make_video_session (0);
 

@@ -94,4 +94,7 @@ GstBuffer* rcvpacket_retrieve_buffer_and_unref(RcvPacket* packet);
 void rcvpacket_unref(RcvPacket *packet);
 RcvPacket* rcvpacket_ref(RcvPacket *packet);
 
+typedef void (*printfnc)(const gchar* format, ...);
+void rcvpacket_print(RcvPacket *packet, printfnc print);
+
 #endif /* RCVPACKETS_H_ */

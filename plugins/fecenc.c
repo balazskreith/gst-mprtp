@@ -116,9 +116,15 @@ fecencoder_finalize (GObject * object)
   g_free(this->seqtracks);
   g_queue_clear(this->bitstrings);
   g_object_unref(this->bitstrings);
+  g_queue_clear(this->pending_responses);
+  g_object_unref(this->pending_responses);
   g_object_unref(this->sysclock);
   g_object_unref(this->bitstring_recycle);
   g_object_unref(this->messenger);
+}
+
+static void _bitstring_shaper(BitString* result, gpointer udata){
+  memset(result, 0, sizeof(BitString));
 }
 
 FECEncoder *make_fecencoder(Mediator* response_handler)
@@ -128,7 +134,7 @@ FECEncoder *make_fecencoder(Mediator* response_handler)
   this->made = _now(this);
 
   this->messenger    = make_messenger(sizeof(Message));
-  this->bitstring_recycle = make_recycle_bitstring(32, NULL);
+  this->bitstring_recycle = make_recycle_bitstring(32, (RecycleItemShaper)_bitstring_shaper);
 
   this->response_handler = g_object_ref(response_handler);
 
@@ -144,6 +150,7 @@ fecencoder_init (FECEncoder * this)
   this->sysclock = gst_system_clock_obtain();
   this->max_protection_num = GST_RTPFEC_MAX_PROTECTION_NUM;
   this->bitstrings = g_queue_new();
+  this->pending_responses = g_queue_new();
   this->seqtracks  = g_malloc0(sizeof(SubflowSeqTrack) * 256);
   this->mprtp_ext_header_id = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
 }
@@ -234,14 +241,20 @@ _fecencoder_get_fec_packet(FECEncoder *this, guint8 subflow_id, gint32* packet_l
   GstRTPFECHeader *fecheader;
   gboolean init = FALSE;
   gint n_mask = 0;
-  fecbitstring = recycle_retrieve(this->bitstring_recycle);
+  if(g_queue_is_empty(this->bitstrings)){
+    goto done;
+  }
+
+  fecbitstring = recycle_retrieve_and_shape(this->bitstring_recycle, NULL);
 again:
   if(g_queue_get_length(this->bitstrings) < 1){
     goto create;
   }
   ++n_mask;
+
   actual = g_queue_pop_head(this->bitstrings);
   fecbitstring->length = MAX(fecbitstring->length, actual->length);
+
   for(i=0; i < fecbitstring->length; ++i){
     fecbitstring->bytes[i] ^= actual->bytes[i];
   }
@@ -284,14 +297,17 @@ create:
   fecheader->N_MASK     = n_mask;
   fecheader->M_MASK     = 0;
   fecheader->reserved   = 0;
+
   memcpy(payload + sizeof(GstRTPFECHeader), fecbitstring->bytes + 10, fecbitstring->length - 10);
   gst_rtp_buffer_unmap(&rtp);
+
+//  gst_print_rtpfec_buffer(result);
 //  mprtp_free(fecbitstring);
   if(packet_length){
     *packet_length = fecbitstring->length + 10;
   }
   recycle_add(this->bitstring_recycle, fecbitstring);
-
+done:
   return result;
 }
 
@@ -300,7 +316,7 @@ BitString* _make_bitstring(FECEncoder* this, GstBuffer* buf)
 {
   BitString *result;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-  result = recycle_retrieve(this->bitstring_recycle);
+  result = recycle_retrieve_and_shape(this->bitstring_recycle, NULL);
   rtpfecbuffer_setup_bitstring(buf, result->bytes, &result->length);
   gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
   result->seq_num = gst_rtp_buffer_get_seq(&rtp);
@@ -309,6 +325,15 @@ BitString* _make_bitstring(FECEncoder* this, GstBuffer* buf)
   return result;
 }
 
+static void _send_fec_response(FECEncoder* this, FECEncoderResponse *response)
+{
+  response->fecbuffer  = _fecencoder_get_fec_packet(this, response->subflow_id, &response->payload_size);
+  if(!response->fecbuffer){
+    g_queue_push_tail(this->pending_responses, response);
+  }else{
+    mediator_set_response(this->response_handler, response);
+  }
+}
 
 static void _process_message(FECEncoder* this, Message* message)
 {
@@ -318,6 +343,9 @@ static void _process_message(FECEncoder* this, Message* message)
       RTPBufferMessage *rtp_buffer_msg = (RTPBufferMessage*) message;
       _fecencoder_add_rtpbuffer(this, rtp_buffer_msg->buffer);
       gst_buffer_unref(rtp_buffer_msg->buffer);
+      if(!g_queue_is_empty(this->pending_responses)){
+        _send_fec_response(this, g_queue_pop_head(this->pending_responses));
+      }
     }
     break;
     case FECENCODER_MESSAGE_TYPE_PAYLOAD_CHANGE:
@@ -337,9 +365,7 @@ static void _process_message(FECEncoder* this, Message* message)
       FECRequestMessage* fec_request = (FECRequestMessage*)message;
       FECEncoderResponse* fec_response = _fec_response_ctor();
       fec_response->subflow_id = fec_request->subflow_id;
-      fec_response->fecbuffer  = _fecencoder_get_fec_packet(this, fec_request->subflow_id, &fec_response->payload_size);
-
-      mediator_set_response(this->response_handler, fec_response);
+      _send_fec_response(this, fec_response);
     }
     break;
     default:

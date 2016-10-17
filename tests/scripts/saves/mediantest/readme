@@ -1,0 +1,7 @@
+the file named after the length of the slidingwindow.
+all files contains 10000 tests.
+first column:  median by quicksort
+second column: time needed to sort and select.
+third column:  median by percentiletracker
+fourth column: time needed to get the result by percentiletracker.
+

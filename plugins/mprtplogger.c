@@ -175,14 +175,12 @@ static void _process(gpointer udata)
 {
   MPRTPLogger* this = udata;
   Message* msg;
-again:
+
   msg = (Message*) messenger_pop_block(this->messenger);
   if(!msg){
     goto done;
   }
-  if(!this->enabled){
-    goto throw_block;
-  }
+
   switch(msg->type){
     case MPRTP_LOGGER_MESSAGE_TYPE_STATE_CHANGING:
     {
@@ -231,9 +229,7 @@ again:
       g_warning("Unhandled message with type %d", msg->type);
     break;
   }
-throw_block:
   messenger_throw_block(this->messenger, msg);
-  goto again;
 done:
   return;
 }
@@ -254,7 +250,6 @@ void mprtp_slice_dealloc(const gchar* type_name, gsize size, gpointer memptr)
 void mprtp_logger_add_memory_consumption(const gchar *type_name, gsize size)
 {
   MemoryConsumptionMessage *msg;
-return;
   messenger_lock(this->messenger);
   msg = messenger_retrieve_block_unlocked(this->messenger);
 
@@ -269,7 +264,6 @@ return;
 void mprtp_logger_rem_memory_consumption(const gchar *type_name, gsize size)
 {
   MemoryConsumptionMessage *msg;
-return;
   messenger_lock(this->messenger);
   msg = messenger_retrieve_block_unlocked(this->messenger);
 
@@ -284,7 +278,6 @@ return;
 void mprtp_logger_print_memory_consumption(void)
 {
   Message *msg;
-return;
   messenger_lock(this->messenger);
   msg = messenger_retrieve_block_unlocked(this->messenger);
 
@@ -297,7 +290,6 @@ return;
 void mprtp_logger_set_state(gboolean enabled)
 {
   StatusMessage *msg;
-return;
   messenger_lock(this->messenger);
   msg = messenger_retrieve_block_unlocked(this->messenger);
 
@@ -311,7 +303,6 @@ return;
 void mprtp_logger_set_target_directory(const gchar *path)
 {
   TargetDirectoryMessage *msg;
-return;
   messenger_lock(this->messenger);
   msg = messenger_retrieve_block_unlocked(this->messenger);
 
@@ -326,7 +317,6 @@ void mprtp_logger(const gchar *filename, const gchar * format, ...)
 {
   WritingMessage *msg;
   va_list args;
-return;
   messenger_lock(this->messenger);
   msg = messenger_retrieve_block_unlocked(this->messenger);
 
@@ -345,7 +335,6 @@ void mprtp_log_one(const gchar *filename, const gchar * format, ...)
 {
   WritingMessage *msg;
   va_list args;
-return;
   messenger_lock(this->messenger);
   msg = messenger_retrieve_block_unlocked(this->messenger);
 
@@ -376,6 +365,7 @@ void _writing(MPRTPLogger* this, WritingMessage *item)
   strcpy(path, this->path);
   strcpy(path, item->filename);
   fp = fopen(path, item->overwrite ? "w" : "a+");
+  g_print("writing %s to %s\n", item->string, path);
   fprintf (fp, "%s", item->string);
   fclose(fp);
 }

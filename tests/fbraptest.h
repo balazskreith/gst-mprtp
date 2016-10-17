@@ -59,11 +59,11 @@ static int fec_interval         = 0;
 
 static GOptionEntry entries[] =
 {
-    { "logs_path", 0, 0, G_OPTION_ARG_STRING, &logs_path, "Logsdir", NULL },
+    { "logs_path", 0, 0, G_OPTION_ARG_STRING, &logs_path, "logs_path", NULL },
     { "video_width", 0, 0, G_OPTION_ARG_INT, &video_width, "video width", NULL },
     { "video_height", 0, 0, G_OPTION_ARG_INT, &video_height, "video width", NULL },
-    { "snd_ip", 0, 0, G_OPTION_ARG_STRING, &snd_ip, "snd_ip", NULL },
-    { "rcv_ip", 0, 0, G_OPTION_ARG_STRING, &rcv_ip, "rcv_ip", NULL },
+    { "snd_ip", 0, 0, G_OPTION_ARG_STRING, &snd_ip, "Sender IP Address", NULL },
+    { "rcv_ip", 0, 0, G_OPTION_ARG_STRING, &rcv_ip, "Receiver IP Address", NULL },
     { "snd_rtcp_port", 0, 0, G_OPTION_ARG_INT, &snd_rtcp_port, "snd_rtcp_port", NULL },
     { "rcv_rtcp_port", 0, 0, G_OPTION_ARG_INT, &rcv_rtcp_port, "rcv_rtcp_port", NULL },
     { "rcv_mprtcp_port", 0, 0, G_OPTION_ARG_INT, &rcv_mprtcp_port, "rcv_mprtcp_port", NULL },

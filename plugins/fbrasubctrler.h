@@ -39,7 +39,7 @@ struct _FBRASubController
   SndSubflow*               subflow;
 
   gboolean                  target_approvement;
-  gint32                    desired_bitrate;
+  gint32                    target_bitrate;
   gint32                    delta_target;
   gint32                    stable_bitrate;
   GstClockTime              target_changed;

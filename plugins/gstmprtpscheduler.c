@@ -525,7 +525,7 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       break;
     case PROP_LOG_ENABLED:
       gboolean_value = g_value_get_boolean (value);
-      if(0) mprtp_logger_set_state(gboolean_value);
+      mprtp_logger_set_state(gboolean_value);
       break;
     case PROP_LOG_PATH:
       mprtp_logger_set_target_directory(g_value_get_string(value));

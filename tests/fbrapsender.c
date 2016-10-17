@@ -152,6 +152,30 @@ request_aux_sender (GstElement * rtpbin, guint sessid, SessionData * session)
   return bin;
 }
 
+
+static void
+_changed_event (GstElement * mprtp_sch, gpointer ptr)
+{
+  MPRTPPluginSignalData *signal = ptr;
+
+//  gint delta;
+//  gint new_bitrate;
+//  gint get_bitrate;
+//  g_object_get (encoder, "target-bitrate", &get_bitrate, NULL);
+//  {
+//    gint i;
+//    new_bitrate = signal->subflow[0].
+//    for(i=0; i<32; ++i){
+//
+//    }
+//  }
+//
+//  g_print("signal->target_media_rate: %d\n", signal->target_media_rate);
+  g_object_set (encoder, "target-bitrate", signal->target_media_rate, NULL);
+//done:
+  return;
+}
+
 /*
  * This function sets up the UDP sinks and sources for RTP/RTCP, adds the
  * given session's bin into the pipeline, and links it to the properly numbered
@@ -187,6 +211,9 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
   /* enable retransmission by setting rtprtxsend as the "aux" element of rtpbin */
   g_signal_connect (rtpBin, "request-aux-sender",
       (GCallback) request_aux_sender, session);
+
+  g_signal_connect (mprtpSch, "mprtp-subflows-utilization",
+      (GCallback) _changed_event, NULL);
 
   g_object_set (rtpSink, "port", rcv_rtp_port, "host", rcv_ip, NULL);
   g_object_set (rtcpSink, "port", rcv_rtcp_port, "host", rcv_ip,

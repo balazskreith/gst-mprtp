@@ -38,18 +38,15 @@ struct _FBRASubController
   gboolean                  enabled;
   SndSubflow*               subflow;
 
-  gboolean                  target_approvement;
   gint32                    target_bitrate;
-  gint32                    delta_target;
   gint32                    stable_bitrate;
-  GstClockTime              target_changed;
-  GstClockTime              target_reached;
 
   guint                     rcved_fb_since_changed;
 
   GstClockTime              last_executed;
 
   gint32                    bottleneck_point;
+  gint32                    keeping_point;
 
   FBRAFBProcessor*          fbprocessor;
   FBRAPlusStat*             stat;
@@ -57,7 +54,12 @@ struct _FBRASubController
 
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;
-  GstClockTime              increasement_started;
+  gboolean                  monitoring_approved;
+
+  gboolean                  increasing_approved;
+  GstClockTime              increasing_rr_reached;
+  GstClockTime              increasing_sr_reached;
+  gint32                    increasement;
 
   guint                     pending_event;
   SubRateAction             stage_fnc;
@@ -67,6 +69,8 @@ struct _FBRASubController
   GstClockTime              last_approved;
   GstClockTime              last_settled;
   GstClockTime              last_distorted;
+
+  gint32                    distorted_BiF;
 
   gdouble                   cwnd;
 

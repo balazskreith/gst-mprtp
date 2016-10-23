@@ -161,7 +161,6 @@ void sndsubflows_join(SndSubflows* this, guint8 id)
   ++this->subflows_num;
 
   this->joined = g_slist_prepend(this->joined, subflow);
-g_print("---->%d", SUBFLOW_DEFAULT_SENDING_RATE);
   sndsubflows_set_target_bitrate(this, id, SUBFLOW_DEFAULT_SENDING_RATE);
   notifier_do(this->on_subflow_joined, subflow);
 
@@ -221,7 +220,7 @@ void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, ListenerFun
   notifier_add_listener(this->on_target_bitrate_changed, callback, udata);
 }
 
-void sndsubflow_request_monitoring(SndSubflow* subflow)
+void sndsubflow_monitoring_request(SndSubflow* subflow)
 {
   SndSubflows *subflows = subflow->base_db;
   mediator_set_request(subflows->monitoring_handler, subflow);

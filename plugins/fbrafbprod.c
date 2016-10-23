@@ -168,11 +168,10 @@ void _on_received_packet(FBRAFBProducer *this, RcvPacket *packet)
 {
 
   slidingwindow_add_data(this->owds_sw, &packet->delay);
-  slidingwindow_add_data(this->rle_sw, &packet->subflow_seq);
+  slidingwindow_add_data(this->rle_sw,  &packet->subflow_seq);
 
   ++this->rcved_packets;
   this->vector[packet->subflow_seq] = TRUE;
-
   if(!this->initialized){
     this->initialized = TRUE;
     this->begin_seq = this->end_seq = packet->subflow_seq;
@@ -227,6 +226,7 @@ void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this,ReportProducer* reportprod
   }
 
   this->vector_length = _diff_seq(this->begin_seq, this->end_seq) + 1;
+
   report_producer_add_xr_lost_rle(reportproducer,
                                        FALSE,
                                        0,

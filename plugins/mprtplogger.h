@@ -21,6 +21,9 @@ typedef struct _MPRTPLoggerClass MPRTPLoggerClass;
 #define MPRTPLOGGER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),MPRTPLOGGER_TYPE))
 #define MPRTPLOGGER_CAST(src)        ((MPRTPLogger *)(src))
 
+typedef void (*loggerfnc)(const gchar* format, ...);
+typedef void (*loggerfnc_obj)(gpointer obj, const gchar* format, ...);
+
 
 struct _MPRTPLogger
 {
@@ -69,7 +72,8 @@ void mprtp_slice_dealloc(const gchar* type_name, gsize size, gpointer memptr);
 void mprtp_logger_add_logging_fnc(void(*logging_fnc)(gpointer,gchar*),gpointer data, const gchar* filename);
 void mprtp_logger_add_memory_consumption(const gchar *type_name, gsize size);
 void mprtp_logger_rem_memory_consumption(const gchar *type_name, gsize size);
-void mprtp_logger_print_memory_consumption(void);
+void mprtp_logger_print_memory_consumption(loggerfnc fnc);
+void mprtp_logger_print_obj_memory_consumption(loggerfnc_obj fnc, gpointer udata);
 void mprtp_logger_set_state(gboolean enabled);
 void mprtp_logger_set_target_directory(const gchar *path);
 void mprtp_logger(const gchar *filename, const gchar * format, ...);

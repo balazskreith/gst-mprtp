@@ -248,6 +248,18 @@ typedef struct _swpercentile{
   gboolean                  sprinted;
 }swpercentile_t;
 
+static void _swpercentile_set_percentile(swpercentile_t* this, gint32 percentile)
+{
+  this->percentile      = CONSTRAIN(10,90,percentile);
+  this->ratio = (double)this->percentile / (double)(100-this->percentile);
+  if(this->ratio < 1.){
+    this->required = (1./this->ratio) + 1;
+  }else if(1. < this->ratio){
+    this->required = this->ratio + 1;
+  }else{
+    this->required = 2;
+  }
+}
 
 static swpercentile_t* _swpercentilepriv_ctor(SlidingWindowPlugin* base, gint32 percentile, bintree3cmp cmp)
 {
@@ -258,8 +270,6 @@ static swpercentile_t* _swpercentilepriv_ctor(SlidingWindowPlugin* base, gint32 
   this = malloc(sizeof(swpercentile_t));
   memset(this, 0, sizeof(swpercentile_t));
   this->base            = base;
-  this->percentile      = CONSTRAIN(10,90,percentile);
-  this->ratio           = (double)this->percentile / (double)(100-this->percentile);
   this->cmp             = cmp;
 
   this->mintree         = make_bintree3_with_recycle(cmp, bintreenode_recycle);
@@ -268,13 +278,7 @@ static swpercentile_t* _swpercentilepriv_ctor(SlidingWindowPlugin* base, gint32 
 //  this->mintree         = make_bintree3(cmp);
   this->Mxc = this->Mnc = 0;
 
-  if(this->ratio < 1.){
-    this->required = (1./this->ratio) + 1;
-  }else if(1. < this->ratio){
-    this->required = this->ratio + 1;
-  }else{
-    this->required = 2;
-  }
+  _swpercentile_set_percentile(this, percentile);
 
   g_object_unref(bintreenode_recycle);
 
@@ -415,6 +419,10 @@ static void _swpercentile_on_rem(gpointer dataptr, gpointer itemptr)
 
 }
 
+void swpercentile_set_percentile(SlidingWindowPlugin* plugin, gint32 percentile)
+{
+  _swpercentile_set_percentile(plugin->priv, percentile);
+}
 
 SlidingWindowPlugin* make_swpercentile(
                               gint32     percentile,

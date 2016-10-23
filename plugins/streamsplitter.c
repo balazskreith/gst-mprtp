@@ -207,10 +207,12 @@ stream_splitter_on_target_bitrate_changed(StreamSplitter* this, SndSubflow* subf
   this->actual_targets[subflow->id] = subflow->target_bitrate;
 }
 
-static void _sndsubflow_min_pacing_helper(SndSubflow *subflow, GstClockTime *min_pacing)
+
+static void _sndsubflow_min_pacing_helper(SndSubflow *subflow, GstClockTime *next_time)
 {
-  *min_pacing = MIN(*min_pacing, subflow->pacing_time);
+  *next_time = MIN(*next_time, subflow->pacing_time);
 }
+
 
 SndSubflow* stream_splitter_approve_packet(StreamSplitter * this,
     SndPacket *packet, GstClockTime now, GstClockTime *next_time)
@@ -222,6 +224,11 @@ SndSubflow* stream_splitter_approve_packet(StreamSplitter * this,
     GST_WARNING_OBJECT (this, "No active subflow");
     goto done;
   }
+
+//  sndsubflows_iterate(this->subflows, (GFunc) _sndsubflow_min_pacing_helper, next_time);
+//  if(now < *next_time){
+//    goto done;
+//  }
 
   selected = _schtree_select_next(this->tree, packet, now);
   if(!selected){
@@ -350,6 +357,7 @@ gboolean _allowed(SchNode *node, SndPacket *packet, GstClockTime now)
   for(it = node->subflows; it; it = it->next){
     subflow = it->data;
     if(now < subflow->pacing_time){
+//      g_print("pacing: %lu\n", subflow->pacing_time - now);
       continue;
     }
     //TODO: flag restriction here if we implement it in multipath case

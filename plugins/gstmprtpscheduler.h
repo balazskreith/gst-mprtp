@@ -48,6 +48,7 @@ struct _GstMprtpscheduler
   GstElement                    base_object;
   GMutex                        mutex;
   GCond                         waiting_signal;
+  GCond                         receiving_signal;
   GstPad*                       rtp_sinkpad;
   GstPad*                       mprtp_srcpad;
   GstPad*                       mprtcp_rr_sinkpad;

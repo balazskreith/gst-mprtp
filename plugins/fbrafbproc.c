@@ -49,6 +49,7 @@ static void _process_stat(FBRAFBProcessor *this);
 
 static void _on_BiF_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates);
 static void _on_owd_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates);
+static void _on_FL_50th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates);
 
 static void _on_long_sw_rem(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement);
 static void _on_short_sw_rem(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement);
@@ -82,6 +83,7 @@ static void _owd_logger(FBRAFBProcessor *this)
 DEFINE_RECYCLE_TYPE(static, measurement, FBRAPlusMeasurement);
 StructCmpFnc(_measurement_owd_cmp, FBRAPlusMeasurement, owd);
 StructCmpFnc(_measurement_BiF_cmp, FBRAPlusMeasurement, bytes_in_flight);
+StructCmpFnc(_measurement_FL_cmp, FBRAPlusMeasurement, fraction_lost);
 
 void
 fbrafbprocessor_class_init (FBRAFBProcessorClass * klass)
@@ -133,7 +135,10 @@ FBRAFBProcessor *make_fbrafbprocessor(SndTracker* sndtracker, SndSubflow* subflo
   this->long_sw  = make_slidingwindow(600, 30 * GST_SECOND);
 
   slidingwindow_add_plugin(this->short_sw,
-        make_swpercentile(80, _measurement_BiF_cmp, (ListenerFunc) _on_BiF_80th_calculated, this));
+          make_swpercentile(80, _measurement_BiF_cmp, (ListenerFunc) _on_BiF_80th_calculated, this));
+
+  slidingwindow_add_plugin(this->short_sw,
+          make_swpercentile(50, _measurement_FL_cmp, (ListenerFunc) _on_FL_50th_calculated, this));
 
   slidingwindow_add_plugin(this->long_sw,
         make_swpercentile(80, _measurement_owd_cmp, (ListenerFunc) _on_owd_80th_calculated, this));
@@ -175,10 +180,12 @@ void fbrafbprocessor_report_update(FBRAFBProcessor *this, GstMPRTCPReportSummary
     _process_rle_discvector(this, &summary->XR);
     process = TRUE;
   }
+
   if(summary->XR.OWD.processed){
       PROFILING("_process_owd",_process_owd(this, &summary->XR));
       process = TRUE;
   }
+
   if(!process){
     goto done;
   }
@@ -186,6 +193,7 @@ void fbrafbprocessor_report_update(FBRAFBProcessor *this, GstMPRTCPReportSummary
   ++this->stat->measurements_num;
   ++this->rcved_fb_since_changed;
   this->last_report_updated = now;
+
   _process_stat(this);
 
 done:
@@ -198,6 +206,7 @@ void fbrafbprocessor_approve_measurement(FBRAFBProcessor *this)
   measurement = recycle_retrieve(this->measurements_recycle);
   measurement->bytes_in_flight = this->last_bytes_in_flight;
   measurement->owd             = _stat(this)->last_owd;
+  measurement->fraction_lost   = _stat(this)->FL_in_1s;
 
   slidingwindow_add_data(this->long_sw, measurement);
   slidingwindow_add_data(this->short_sw, measurement);
@@ -235,7 +244,6 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
   if(act_seq == end_seq){
     goto done;
   }
-
   for(i=0; act_seq <= end_seq; ++act_seq, ++i){
     packet = sndtracker_retrieve_sent_packet(this->sndtracker, this->subflow->id, act_seq);
 
@@ -244,6 +252,7 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
     }
     packet->acknowledged = TRUE;
     packet->lost = !xr->LostRLE.vector[i];
+
     sndtracker_packet_acked(this->sndtracker, packet);
     last_packet_sent_time = packet->sent;
   }
@@ -266,6 +275,7 @@ done:
 
 void _process_stat(FBRAFBProcessor *this)
 {
+  gdouble lost_fraction_in_1s = 0.;
   SndTrackerStat* sndstat = sndtracker_get_subflow_stat(this->sndtracker, this->subflow->id);
   this->last_bytes_in_flight = sndstat->bytes_in_flight;
 
@@ -275,10 +285,16 @@ void _process_stat(FBRAFBProcessor *this)
     _stat(this)->stalled_bytes = sndstat->bytes_in_flight - _stat(this)->BiF_80th;
   }
 
+  if(sndstat->received_packets_in_1s < sndstat->acked_packets_in_1s){
+    lost_fraction_in_1s  = sndstat->acked_packets_in_1s - sndstat->received_packets_in_1s;
+    lost_fraction_in_1s /= (gdouble) sndstat->acked_packets_in_1s;
+  }
+
   _stat(this)->bytes_in_flight       = sndstat->bytes_in_flight;
   _stat(this)->sender_bitrate        = sndstat->sent_bytes_in_1s * 8;
   _stat(this)->receiver_bitrate      = sndstat->received_bytes_in_1s * 8;
   _stat(this)->fec_bitrate           = sndstat->sent_fec_bytes_in_1s * 8;
+  _stat(this)->FL_in_1s              = lost_fraction_in_1s;
 
   _owd_logger(this);
 }
@@ -306,6 +322,18 @@ void _on_owd_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *ca
                    _stat(this)->owd_80th, \
                    this->owd_min,         \
                    this->owd_max,         \
+                   0                      \
+                   );
+}
+
+void _on_FL_50th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates)
+{
+  PercentileResult(FBRAPlusMeasurement,   \
+                   fraction_lost,         \
+                   candidates,            \
+                   _stat(this)->FL_50th, \
+                   this->FL_min,         \
+                   this->FL_max,         \
                    0                      \
                    );
 }

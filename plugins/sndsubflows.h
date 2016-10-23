@@ -104,7 +104,7 @@ void sndsubflows_join(SndSubflows* this, guint8 id);
 void sndsubflows_detach(SndSubflows* this, guint8 id);
 void sndsubflows_iterate(SndSubflows* this, GFunc process, gpointer udata);
 
-void sndsubflow_request_monitoring(SndSubflow* subflow);
+void sndsubflow_monitoring_request(SndSubflow* subflow);
 void sndsubflow_set_target_rate(SndSubflow* subflow, gint32 target_rate);
 gint32 sndsubflows_get_total_target(SndSubflows* this);
 guint sndsubflows_get_subflows_num(SndSubflows* this);

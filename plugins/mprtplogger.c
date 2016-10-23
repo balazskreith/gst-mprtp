@@ -50,6 +50,7 @@ typedef enum{
 //NOTE: This must be big enough to holds any kind of Message,
 //since this type is going to be created and recycled
 
+
 typedef struct{
   MessageTypes type;
   gchar        content[2048];
@@ -65,6 +66,13 @@ typedef struct{
   gchar        type_name[255];
   gsize        size;
 }MemoryConsumptionMessage;
+
+typedef struct{
+  MessageTypes  type;
+  loggerfnc     logger;
+  loggerfnc_obj logger_obj;
+  gpointer      udata;
+}PrintMemoryConsumptionMessage;
 
 typedef struct{
   MessageTypes type;
@@ -134,6 +142,13 @@ mprtp_logger_class_init (MPRTPLoggerClass * klass)
 
 }
 
+
+static gboolean _memory_consumption_item_dtor(gpointer key, Message* msg, Messenger* messenger)
+{
+  messenger_throw_block(messenger, msg);
+  return TRUE;
+}
+
 void
 mprtp_logger_finalize (GObject * object)
 {
@@ -142,8 +157,10 @@ mprtp_logger_finalize (GObject * object)
   g_object_unref (this->sysclock);
   gst_task_stop (this->process);
 
-  g_object_unref (this->messenger);
+  g_hash_table_foreach_remove(this->memory_consumptions, (GHRFunc) _memory_consumption_item_dtor, this->messenger);
   g_hash_table_unref(this->memory_consumptions);
+  g_object_unref (this->messenger);
+
 }
 
 void
@@ -204,7 +221,9 @@ static void _process(gpointer udata)
       MemoryConsumptionMessage* consumption_msg = (MemoryConsumptionMessage*)msg;
       MemoryConsumptionMessage* actual;
       if(!g_hash_table_contains(this->memory_consumptions, consumption_msg->type_name)){
-        g_hash_table_insert(this->memory_consumptions, consumption_msg->type_name, consumption_msg);
+        actual = messenger_retrieve_block(this->messenger);
+        memcpy(actual, consumption_msg, sizeof(MemoryConsumptionMessage));
+        g_hash_table_insert(this->memory_consumptions, actual->type_name, actual);
         break;
       }
       actual = g_hash_table_lookup(this->memory_consumptions, consumption_msg->type_name);
@@ -223,8 +242,11 @@ static void _process(gpointer udata)
     }
     break;
     case MPRTP_LOGGER_MESSAGE_TYPE_PRINT_MEMORY_ALLOCATIONS:
-      g_hash_table_foreach(this->memory_consumptions, _print_memory_allocation, NULL);
-      break;
+    {
+      PrintMemoryConsumptionMessage* casted_msg = (PrintMemoryConsumptionMessage*)msg;
+      g_hash_table_foreach(this->memory_consumptions, _print_memory_allocation, casted_msg);
+    }
+    break;
     default:
       g_warning("Unhandled message with type %d", msg->type);
     break;
@@ -275,13 +297,28 @@ void mprtp_logger_rem_memory_consumption(const gchar *type_name, gsize size)
   messenger_unlock(this->messenger);
 }
 
-void mprtp_logger_print_memory_consumption(void)
+void mprtp_logger_print_memory_consumption(loggerfnc fnc)
 {
-  Message *msg;
+  PrintMemoryConsumptionMessage *msg;
   messenger_lock(this->messenger);
   msg = messenger_retrieve_block_unlocked(this->messenger);
 
-  msg->type = MPRTP_LOGGER_MESSAGE_TYPE_PRINT_MEMORY_ALLOCATIONS;
+  msg->type   = MPRTP_LOGGER_MESSAGE_TYPE_PRINT_MEMORY_ALLOCATIONS;
+  msg->logger = fnc;
+
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
+}
+
+void mprtp_logger_print_obj_memory_consumption(loggerfnc_obj fnc, gpointer udata)
+{
+  PrintMemoryConsumptionMessage *msg;
+  messenger_lock(this->messenger);
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+
+  msg->type       = MPRTP_LOGGER_MESSAGE_TYPE_PRINT_MEMORY_ALLOCATIONS;
+  msg->logger_obj = fnc;
+  msg->udata      = udata;
 
   messenger_push_block_unlocked(this->messenger, msg);
   messenger_unlock(this->messenger);
@@ -372,8 +409,15 @@ void _writing(MPRTPLogger* this, WritingMessage *item)
 
 void _print_memory_allocation(gpointer key, gpointer value, gpointer udata)
 {
+  PrintMemoryConsumptionMessage* casted_msg = udata;
   MemoryConsumptionMessage* msg = value;
-  g_print("%-20s %-10lu\n", msg->type_name, msg->size);
+  if(casted_msg->logger_obj){
+    casted_msg->logger_obj(casted_msg->udata, "%-20s %-10lu\n", msg->type_name, msg->size);
+  }else if(casted_msg->logger){
+    casted_msg->logger("%-20s %-10lu\n", msg->type_name, msg->size);
+  }else{
+    g_print("%-20s %-10lu\n", msg->type_name, msg->size);
+  }
 }
 
 

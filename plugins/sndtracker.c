@@ -242,8 +242,8 @@ void sndtracker_packet_acked(SndTracker * this, SndPacket* packet)
     ++subflow->stat.total_acked_packets;
 
     if(!packet->lost){
-      this->stat.received_bytes_in_1s += packet->payload_size;
-      ++this->stat.received_packets_in_1s;
+      subflow->stat.received_bytes_in_1s += packet->payload_size;
+      ++subflow->stat.received_packets_in_1s;
 
       subflow->stat.total_received_bytes += packet->payload_size;
       ++subflow->stat.total_received_packets;

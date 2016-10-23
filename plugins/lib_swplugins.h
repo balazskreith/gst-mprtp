@@ -36,7 +36,7 @@ if(!candidates->processed){                        \
   }else{                                           \
     PercResult =  ((Type*)left)->field;            \
     PercResult += ((Type*)right)->field;           \
-      PercResult>>=1;                              \
+    PercResult/=2;                                 \
   }                                                \
   minResult = ((Type*)min)->field;                 \
   maxResult = ((Type*)max)->field;                 \
@@ -67,7 +67,7 @@ if(!candidates->processed){                        \
   }else{                                           \
     PercResult =  *left;                           \
     PercResult += *right;                          \
-    PercResult>>=1;                                \
+    PercResult /=2;                                \
   }                                                \
   minResult = *min;                                \
   maxResult = *max;                                \
@@ -118,6 +118,11 @@ SlidingWindowPlugin* make_swminmax(bintree3cmp cmp,
                                   gpointer       udata
                           );
 
+
+void swpercentile_set_percentile(
+    SlidingWindowPlugin* plugin,
+    gint32 percentile
+    );
 
 SlidingWindowPlugin* make_swpercentile(
                               gint32     percentile,

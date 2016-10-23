@@ -45,6 +45,9 @@ typedef struct _FBRAPlusStat
   GstClockTime             owd_std;
   gdouble                  srtt;
 
+  gdouble                  FL_in_1s;
+  gdouble                  FL_50th;
+
 }FBRAPlusStat;
 
 typedef struct{
@@ -57,6 +60,7 @@ typedef struct{
 typedef struct{
   GstClockTime owd;
   gint32       bytes_in_flight;
+  gdouble      fraction_lost;
 }FBRAPlusMeasurement;
 
 struct _FBRAFBProcessor
@@ -82,6 +86,9 @@ struct _FBRAFBProcessor
   gint32                   BiF_min;
   GstClockTime             owd_min;
   GstClockTime             owd_max;
+
+  gdouble                  FL_min;
+  gdouble                  FL_max;
 
   FBRAPlusStdHelper        owd_std_helper;
   FBRAPlusStdHelper        BiF_std_helper;

@@ -47,6 +47,9 @@ static gchar *rcv_ip       = NULL;
 static gchar default_snd_ip[255];
 static gchar default_rcv_ip[255];
 
+static gchar *src_filepath = NULL;
+static gchar default_src_filepath[255];
+
 static gchar *logs_path         = NULL;
 static gchar default_logsdir[255];
 
@@ -64,6 +67,7 @@ static GOptionEntry entries[] =
     { "video_height", 0, 0, G_OPTION_ARG_INT, &video_height, "video width", NULL },
     { "snd_ip", 0, 0, G_OPTION_ARG_STRING, &snd_ip, "Sender IP Address", NULL },
     { "rcv_ip", 0, 0, G_OPTION_ARG_STRING, &rcv_ip, "Receiver IP Address", NULL },
+    { "src_filepath", 0, 0, G_OPTION_ARG_STRING, &src_filepath, "Source filepath", NULL },
     { "snd_rtcp_port", 0, 0, G_OPTION_ARG_INT, &snd_rtcp_port, "snd_rtcp_port", NULL },
     { "rcv_rtcp_port", 0, 0, G_OPTION_ARG_INT, &rcv_rtcp_port, "rcv_rtcp_port", NULL },
     { "rcv_mprtcp_port", 0, 0, G_OPTION_ARG_INT, &rcv_mprtcp_port, "rcv_mprtcp_port", NULL },
@@ -122,6 +126,11 @@ static void _setup_test_params(void)
   if(snd_ip == NULL){
       sprintf(default_snd_ip, "10.0.0.1");
       snd_ip = default_snd_ip;
+    }
+
+  if(src_filepath == NULL){
+      sprintf(default_src_filepath, "foreman_cif.yuv");
+      src_filepath = default_src_filepath;
     }
 
 //  _print_transfer_info();

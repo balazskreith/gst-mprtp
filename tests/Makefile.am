@@ -27,8 +27,8 @@ sender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
 sender_LDADD = $(GST_LIBS)
 
 fbrapsender_SOURCES = fbrapsender.c
-fbrapsender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
-fbrapsender_LDADD = $(GST_LIBS)
+fbrapsender_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
+fbrapsender_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
 
 scream_sender_SOURCES = scream_sender.c
 scream_sender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)

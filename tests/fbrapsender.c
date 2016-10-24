@@ -255,11 +255,19 @@ make_video_v4l2_session (guint sessionNum)
   SessionData *session;
 
 //  videoSrc = gst_element_factory_make ("appsrc", "filereceiver");
-  videoSrc = gst_element_factory_make ("v4l2src", NULL);
+//  videoSrc = gst_element_factory_make ("v4l2src", NULL);
+//
+  //  g_object_set (videoSrc,
+  //                "device", "/dev/video1",
+  //                NULL);
 
-  g_object_set (videoSrc,
-                "device", "/dev/video1",
-                NULL);
+
+  videoSrc = gst_element_factory_make ("videotestsrc", "filereceiver");
+
+    g_object_set (videoSrc,
+                  "horizontal-speed", 15,
+                  NULL);
+
 
   encoder = gst_element_factory_make ("vp8enc", NULL);
   g_object_set (encoder, "target-bitrate", target_bitrate, NULL);

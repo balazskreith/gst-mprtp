@@ -437,11 +437,11 @@ Copyright (C) 2012 Free Software Foundation, Inc.
 This config.status script is free software; the Free Software Foundation
 gives unlimited permission to copy, distribute and modify it."
 
-ac_pwd='/home/balazs/gst/gst-mprtp'
+ac_pwd='/home/balazs/gst-dev/gst-mprtp-priv'
 srcdir='.'
 INSTALL='/usr/bin/install -c'
 MKDIR_P='/bin/mkdir -p'
-AWK='gawk'
+AWK='mawk'
 test -n "$AWK" || AWK=awk
 # The default lists apply if the user does not specify any file.
 ac_need_defaults=:
@@ -575,7 +575,7 @@ EGREP='/bin/grep -E'
 FGREP='/bin/grep -F'
 LD='/usr/bin/ld -m elf_x86_64'
 NM='/usr/bin/nm -B'
-LN_S='ln -s'
+LN_S='cp -pR'
 max_cmd_len='1572864'
 ac_objext='o'
 exeext=''
@@ -680,7 +680,7 @@ finish_cmds='PATH="\$PATH:/sbin" ldconfig -n $libdir'
 finish_eval=''
 hardcode_into_libs='yes'
 sys_lib_search_path_spec='/usr/lib/gcc/x86_64-linux-gnu/5 /usr/lib/x86_64-linux-gnu /usr/lib /lib/x86_64-linux-gnu /lib '
-configure_time_dlsearch_path='/lib /usr/lib /usr/lib/x86_64-linux-gnu/libfakeroot /lib/i386-linux-gnu /usr/lib/i386-linux-gnu /lib/i686-linux-gnu /usr/lib/i686-linux-gnu /usr/lib/i386-linux-gnu/mesa /usr/local/lib /usr/local/lib /lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu/mesa-egl /usr/lib/x86_64-linux-gnu/mesa '
+configure_time_dlsearch_path='/lib /usr/lib /usr/lib/x86_64-linux-gnu/libfakeroot /usr/local/lib /lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu/mesa-egl /usr/lib/x86_64-linux-gnu/mesa '
 configure_time_lt_sys_library_path=''
 hardcode_action='immediate'
 enable_dlopen='yes'
@@ -915,25 +915,19 @@ S["HAVE_GST_CHECK_TRUE"]=""
 S["GSTPB_PLUGINS_DIR"]="/usr/local/lib/gstreamer-1.0"
 S["GST_PLUGINS_BASE_DIR"]="/usr/local/lib/gstreamer-1.0/gst:/usr/local/lib/gstreamer-1.0/sys:/usr/local/lib/gstreamer-1.0/ext"
 S["GST_PLUGINS_BASE_LIBS"]="-L/usr/local/lib -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0"
-S["GST_PLUGINS_BASE_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/incl"\
-"ude"
+S["GST_PLUGINS_BASE_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include"
 S["GST_CHECK_LIBS"]="-L/usr/local/lib -lgstcheck-1.0 -lm -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0"
-S["GST_CHECK_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/incl"\
-"ude"
+S["GST_CHECK_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include"
 S["GST_NET_LIBS"]="-L/usr/local/lib -lgstnet-1.0 -lgstreamer-1.0 -lgio-2.0 -lgobject-2.0 -lglib-2.0"
-S["GST_NET_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/incl"\
-"ude"
+S["GST_NET_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include"
 S["GST_CONTROLLER_LIBS"]="-L/usr/local/lib -lgstcontroller-1.0 -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0"
-S["GST_CONTROLLER_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/incl"\
-"ude"
+S["GST_CONTROLLER_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include"
 S["GST_BASE_LIBS"]="-L/usr/local/lib -lgstbase-1.0 -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0"
-S["GST_BASE_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/incl"\
-"ude"
+S["GST_BASE_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include"
 S["GST_PLUGINS_DIR"]="/usr/local/lib/gstreamer-1.0"
 S["GST_TOOLS_DIR"]="/usr/local/bin"
 S["GST_LIBS"]="-L/usr/local/lib -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0"
-S["GST_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/incl"\
-"ude -Wall"
+S["GST_CFLAGS"]="-pthread -I/usr/local/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -Wall"
 S["PKG_CONFIG"]="/usr/bin/pkg-config"
 S["CPP"]="gcc -E"
 S["LT_SYS_LIBRARY_PATH"]=""
@@ -946,7 +940,7 @@ S["MANIFEST_TOOL"]=":"
 S["RANLIB"]="ranlib"
 S["ac_ct_AR"]="ar"
 S["AR"]="ar"
-S["LN_S"]="ln -s"
+S["LN_S"]="cp -pR"
 S["NM"]="/usr/bin/nm -B"
 S["ac_ct_DUMPBIN"]=""
 S["DUMPBIN"]=""
@@ -991,17 +985,17 @@ S["am__tar"]="$${TAR-tar} chof - \"$$tardir\""
 S["AMTAR"]="$${TAR-tar}"
 S["am__leading_dot"]="."
 S["SET_MAKE"]=""
-S["AWK"]="gawk"
+S["AWK"]="mawk"
 S["mkdir_p"]="$(MKDIR_P)"
 S["MKDIR_P"]="/bin/mkdir -p"
 S["INSTALL_STRIP_PROGRAM"]="$(install_sh) -c -s"
 S["STRIP"]="strip"
-S["install_sh"]="${SHELL} /home/balazs/gst/gst-mprtp/install-sh"
-S["MAKEINFO"]="${SHELL} /home/balazs/gst/gst-mprtp/missing makeinfo"
-S["AUTOHEADER"]="${SHELL} /home/balazs/gst/gst-mprtp/missing autoheader"
-S["AUTOMAKE"]="${SHELL} /home/balazs/gst/gst-mprtp/missing automake-1.15"
-S["AUTOCONF"]="${SHELL} /home/balazs/gst/gst-mprtp/missing autoconf"
-S["ACLOCAL"]="${SHELL} /home/balazs/gst/gst-mprtp/missing aclocal-1.15"
+S["install_sh"]="${SHELL} /home/balazs/gst-dev/gst-mprtp-priv/install-sh"
+S["MAKEINFO"]="${SHELL} /home/balazs/gst-dev/gst-mprtp-priv/missing makeinfo"
+S["AUTOHEADER"]="${SHELL} /home/balazs/gst-dev/gst-mprtp-priv/missing autoheader"
+S["AUTOMAKE"]="${SHELL} /home/balazs/gst-dev/gst-mprtp-priv/missing automake-1.15"
+S["AUTOCONF"]="${SHELL} /home/balazs/gst-dev/gst-mprtp-priv/missing autoconf"
+S["ACLOCAL"]="${SHELL} /home/balazs/gst-dev/gst-mprtp-priv/missing aclocal-1.15"
 S["VERSION"]="1.0.0"
 S["PACKAGE"]="gst-mprtp"
 S["CYGPATH_W"]="echo"

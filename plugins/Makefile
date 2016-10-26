@@ -153,6 +153,7 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-fbrafbproc.lo \
 	libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-gstmprtpscheduler.lo \
 	libgstmprtp_la-gstmprtpsender.lo \
+	libgstmprtp_la-gsttransceiver.lo \
 	libgstmprtp_la-jitterbuffer.lo libgstmprtp_la-lib_bintree.lo \
 	libgstmprtp_la-lib_datapuffer.lo \
 	libgstmprtp_la-lib_swplugins.lo libgstmprtp_la-mediator.lo \
@@ -239,16 +240,16 @@ ETAGS = etags
 CTAGS = ctags
 am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /home/balazs/gst/gst-mprtp/missing aclocal-1.15
+ACLOCAL = ${SHELL} /home/balazs/gst-dev/gst-mprtp-priv/missing aclocal-1.15
 ACLOCAL_AMFLAGS = -I m4 -I common/m4
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 1
 AR = ar
 AS = as
-AUTOCONF = ${SHELL} /home/balazs/gst/gst-mprtp/missing autoconf
-AUTOHEADER = ${SHELL} /home/balazs/gst/gst-mprtp/missing autoheader
-AUTOMAKE = ${SHELL} /home/balazs/gst/gst-mprtp/missing automake-1.15
-AWK = gawk
+AUTOCONF = ${SHELL} /home/balazs/gst-dev/gst-mprtp-priv/missing autoconf
+AUTOHEADER = ${SHELL} /home/balazs/gst-dev/gst-mprtp-priv/missing autoheader
+AUTOMAKE = ${SHELL} /home/balazs/gst-dev/gst-mprtp-priv/missing automake-1.15
+AWK = mawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2 -Wall
@@ -279,21 +280,21 @@ GSTPB_PLUGINS_DIR = /usr/local/lib/gstreamer-1.0
 GSTPB_PREFIX = /usr/local
 GST_AGE = 502
 GST_API_VERSION = 1.0
-GST_BASE_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include
+GST_BASE_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include
 GST_BASE_LIBS = -L/usr/local/lib -lgstbase-1.0 -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0
-GST_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -Wall
-GST_CHECK_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include
+GST_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -Wall
+GST_CHECK_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include
 GST_CHECK_LIBS = -L/usr/local/lib -lgstcheck-1.0 -lm -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0
-GST_CONTROLLER_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include
+GST_CONTROLLER_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include
 GST_CONTROLLER_LIBS = -L/usr/local/lib -lgstcontroller-1.0 -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0
 GST_CURRENT = 502
 GST_LIBS = -L/usr/local/lib -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0
 GST_LIBVERSION = 502:0:502
 GST_LICENSE = LGPL
 GST_LT_LDFLAGS =  -version-info 502:0:502
-GST_NET_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include
+GST_NET_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include
 GST_NET_LIBS = -L/usr/local/lib -lgstnet-1.0 -lgstreamer-1.0 -lgio-2.0 -lgobject-2.0 -lglib-2.0
-GST_PLUGINS_BASE_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/local/lib/gstreamer-1.0/include -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include
+GST_PLUGINS_BASE_CFLAGS = -pthread -I/usr/local/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include
 GST_PLUGINS_BASE_DIR = /usr/local/lib/gstreamer-1.0/gst:/usr/local/lib/gstreamer-1.0/sys:/usr/local/lib/gstreamer-1.0/ext
 GST_PLUGINS_BASE_LIBS = -L/usr/local/lib -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0
 GST_PLUGINS_DIR = /usr/local/lib/gstreamer-1.0
@@ -313,11 +314,11 @@ LIBOBJS =
 LIBS = 
 LIBTOOL = $(SHELL) $(top_builddir)/libtool
 LIPO = 
-LN_S = ln -s
+LN_S = cp -pR
 LTLIBOBJS = 
 LT_SYS_LIBRARY_PATH = 
 MAINT = 
-MAKEINFO = ${SHELL} /home/balazs/gst/gst-mprtp/missing makeinfo
+MAKEINFO = ${SHELL} /home/balazs/gst-dev/gst-mprtp-priv/missing makeinfo
 MANIFEST_TOOL = :
 MKDIR_P = /bin/mkdir -p
 NM = /usr/bin/nm -B
@@ -348,10 +349,10 @@ VERSION = 1.0.0
 WARNING_CFLAGS =  -Wall -Wdeclaration-after-statement -Wvla -Wpointer-arith -Wmissing-declarations -Wmissing-prototypes -Wredundant-decls -Wwrite-strings -Wold-style-definition -Waggregate-return -Winit-self -Wmissing-include-dirs -Waddress -Wno-multichar -Wnested-externs
 WARNING_CXXFLAGS =  -Wall -Wmissing-declarations -Wredundant-decls -Wwrite-strings -Winit-self -Wmissing-include-dirs -Waddress -Wno-multichar
 WARNING_OBJCFLAGS = 
-abs_builddir = /home/balazs/gst/gst-mprtp/plugins
-abs_srcdir = /home/balazs/gst/gst-mprtp/plugins
-abs_top_builddir = /home/balazs/gst/gst-mprtp
-abs_top_srcdir = /home/balazs/gst/gst-mprtp
+abs_builddir = /home/balazs/gst-dev/gst-mprtp-priv/plugins
+abs_srcdir = /home/balazs/gst-dev/gst-mprtp-priv/plugins
+abs_top_builddir = /home/balazs/gst-dev/gst-mprtp-priv
+abs_top_srcdir = /home/balazs/gst-dev/gst-mprtp-priv
 ac_ct_AR = ar
 ac_ct_CC = gcc
 ac_ct_CXX = g++
@@ -382,7 +383,7 @@ host_vendor = pc
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /home/balazs/gst/gst-mprtp/install-sh
+install_sh = ${SHELL} /home/balazs/gst-dev/gst-mprtp-priv/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -422,6 +423,7 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          gstmprtpplugin.c      \
                          gstmprtpscheduler.c   \
                          gstmprtpsender.c      \
+                         gsttransceiver.c      \
                          jitterbuffer.c        \
                          lib_bintree.c         \
                          lib_datapuffer.c      \
@@ -584,6 +586,7 @@ include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplugin.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
+include ./$(DEPDIR)/libgstmprtp_la-gsttransceiver.Plo
 include ./$(DEPDIR)/libgstmprtp_la-jitterbuffer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-lib_bintree.Plo
 include ./$(DEPDIR)/libgstmprtp_la-lib_datapuffer.Plo
@@ -708,6 +711,13 @@ libgstmprtp_la-gstmprtpsender.lo: gstmprtpsender.c
 #	$(AM_V_CC)source='gstmprtpsender.c' object='libgstmprtp_la-gstmprtpsender.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtpsender.lo `test -f 'gstmprtpsender.c' || echo '$(srcdir)/'`gstmprtpsender.c
+
+libgstmprtp_la-gsttransceiver.lo: gsttransceiver.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gsttransceiver.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gsttransceiver.Tpo -c -o libgstmprtp_la-gsttransceiver.lo `test -f 'gsttransceiver.c' || echo '$(srcdir)/'`gsttransceiver.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gsttransceiver.Tpo $(DEPDIR)/libgstmprtp_la-gsttransceiver.Plo
+#	$(AM_V_CC)source='gsttransceiver.c' object='libgstmprtp_la-gsttransceiver.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gsttransceiver.lo `test -f 'gsttransceiver.c' || echo '$(srcdir)/'`gsttransceiver.c
 
 libgstmprtp_la-jitterbuffer.lo: jitterbuffer.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-jitterbuffer.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-jitterbuffer.Tpo -c -o libgstmprtp_la-jitterbuffer.lo `test -f 'jitterbuffer.c' || echo '$(srcdir)/'`jitterbuffer.c

@@ -12,6 +12,7 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          gstmprtpplugin.c      \
                          gstmprtpscheduler.c   \
                          gstmprtpsender.c      \
+                         gsttransceiver.c      \
                          jitterbuffer.c        \
                          lib_bintree.c         \
                          lib_datapuffer.c      \

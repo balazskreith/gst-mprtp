@@ -2,7 +2,8 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
  /usr/include/stdc-predef.h ../config.h \
  /usr/local/include/gstreamer-1.0/gst/gst.h /usr/include/glib-2.0/glib.h \
  /usr/include/glib-2.0/glib/galloca.h /usr/include/glib-2.0/glib/gtypes.h \
- /usr/include/glib-2.0/glibconfig.h /usr/include/glib-2.0/glib/gmacros.h \
+ /usr/lib/x86_64-linux-gnu/glib-2.0/include/glibconfig.h \
+ /usr/include/glib-2.0/glib/gmacros.h \
  /usr/lib/gcc/x86_64-linux-gnu/5/include/stddef.h \
  /usr/lib/gcc/x86_64-linux-gnu/5/include-fixed/limits.h \
  /usr/lib/gcc/x86_64-linux-gnu/5/include-fixed/syslimits.h \
@@ -125,7 +126,7 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
  /usr/local/include/gstreamer-1.0/gst/gstatomicqueue.h \
  /usr/local/include/gstreamer-1.0/gst/gstbin.h \
  /usr/local/include/gstreamer-1.0/gst/gstelement.h \
- /usr/local/lib/gstreamer-1.0/include/gst/gstconfig.h \
+ /usr/local/include/gstreamer-1.0/gst/gstconfig.h \
  /usr/local/include/gstreamer-1.0/gst/gstobject.h \
  /usr/local/include/gstreamer-1.0/gst/gstcontrolbinding.h \
  /usr/local/include/gstreamer-1.0/gst/gstcontrolsource.h \
@@ -153,6 +154,8 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
  /usr/local/include/gstreamer-1.0/gst/gsttoc.h \
  /usr/local/include/gstreamer-1.0/gst/gstcontext.h \
  /usr/local/include/gstreamer-1.0/gst/gstdevice.h \
+ /usr/local/include/gstreamer-1.0/gst/gststreamcollection.h \
+ /usr/local/include/gstreamer-1.0/gst/gststreams.h \
  /usr/local/include/gstreamer-1.0/gst/gsttask.h \
  /usr/local/include/gstreamer-1.0/gst/gsttaskpool.h \
  /usr/local/include/gstreamer-1.0/gst/gstbus.h \
@@ -225,7 +228,7 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
 
 /usr/include/glib-2.0/glib/gtypes.h:
 
-/usr/include/glib-2.0/glibconfig.h:
+/usr/lib/x86_64-linux-gnu/glib-2.0/include/glibconfig.h:
 
 /usr/include/glib-2.0/glib/gmacros.h:
 
@@ -513,7 +516,7 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
 
 /usr/local/include/gstreamer-1.0/gst/gstelement.h:
 
-/usr/local/lib/gstreamer-1.0/include/gst/gstconfig.h:
+/usr/local/include/gstreamer-1.0/gst/gstconfig.h:
 
 /usr/local/include/gstreamer-1.0/gst/gstobject.h:
 
@@ -568,6 +571,10 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
 /usr/local/include/gstreamer-1.0/gst/gstcontext.h:
 
 /usr/local/include/gstreamer-1.0/gst/gstdevice.h:
+
+/usr/local/include/gstreamer-1.0/gst/gststreamcollection.h:
+
+/usr/local/include/gstreamer-1.0/gst/gststreams.h:
 
 /usr/local/include/gstreamer-1.0/gst/gsttask.h:
 

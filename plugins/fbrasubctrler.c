@@ -179,11 +179,11 @@ _switch_stage_to(
     gboolean execute);
 
 static void
-_refresh_bottleneck_point(
+_refresh_last_keeping_point(
     FBRASubController *this);
 
 static void
-_corrigate_target(
+_refresh_bottleneck_point(
     FBRASubController *this);
 
 static void
@@ -463,13 +463,6 @@ static gboolean _distortion(FBRASubController *this)
   return owd_th < _stat(this)->last_owd || BiF_th < _stat(this)->bytes_in_flight || FL_th < _stat(this)->FL_in_1s;
 }
 
-//static gboolean _congestion(FBRASubController *this)
-//{
-//  if(this->last_distorted < this->last_settled + CONSTRAIN(100 * GST_MSECOND, GST_SECOND, 1.5 * _stat(this)->srtt)){
-//    return FALSE;
-//  }
-//  return TRUE;
-//}
 
 void
 _reduce_stage(
@@ -490,10 +483,10 @@ _reduce_stage(
 
 
   if(_distortion(this)){
+    this->last_distorted = _now(this);
     goto done;
   }
 
-  this->last_distorted = _now(this);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
 done:
   return;
@@ -523,7 +516,7 @@ _keep_stage(
     goto done;
   }
 
-  this->keeping_point = this->target_bitrate;
+  _refresh_last_keeping_point(this);
   _start_monitoring(this);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
 done:
@@ -570,8 +563,6 @@ _increase_stage(
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     goto done;
   }
-
-  DISABLE_LINE _corrigate_target(this);
 
   _refresh_increasing_approvement(this);
   if(!this->increasing_approved){
@@ -697,17 +688,14 @@ void _switch_stage_to(
 }
 
 
+void _refresh_last_keeping_point(FBRASubController *this)
+{
+  this->keeping_point = this->target_bitrate;
+}
+
 void _refresh_bottleneck_point(FBRASubController *this)
 {
   this->bottleneck_point = _stat(this)->receiver_bitrate;
-}
-
-void _corrigate_target(FBRASubController *this)
-{
-  _stop_monitoring(this);
-  if(_stat(this)->receiver_bitrate + _stat(this)->fec_bitrate < this->bottleneck_point * .9){
-    this->bottleneck_point = _stat(this)->receiver_bitrate * .9;
-  }
 }
 
 void _refresh_monitoring_approvement(FBRASubController *this)

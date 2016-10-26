@@ -81,6 +81,7 @@ make_video_v4l2_session (guint sessionNum)
   GstCaps *videoCaps;
   SessionData *session;
 
+<<<<<<< HEAD
   videoSrc = gst_element_factory_make ("videotestsrc", NULL);
 
   g_object_set(videoSrc,
@@ -93,6 +94,22 @@ make_video_v4l2_session (guint sessionNum)
 //  g_object_set (videoSrc,
 //                "device", "/dev/video1",
 //                NULL);
+=======
+//  videoSrc = gst_element_factory_make ("appsrc", "filereceiver");
+//  videoSrc = gst_element_factory_make ("v4l2src", NULL);
+//
+  //  g_object_set (videoSrc,
+  //                "device", "/dev/video1",
+  //                NULL);
+
+
+  videoSrc = gst_element_factory_make ("videotestsrc", "filereceiver");
+
+    g_object_set (videoSrc,
+                  "horizontal-speed", 15,
+                  NULL);
+
+>>>>>>> e38ab06625f1d12608d9eab7b8477a1070f7caae
 
   encoder = gst_element_factory_make ("vp8enc", NULL);
   g_object_set (encoder, "target-bitrate", target_bitrate, NULL);

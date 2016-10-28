@@ -78,15 +78,15 @@ make_video_v4l2_session (guint sessionNum)
   GstElement *videoParse = gst_element_factory_make ("videoparse", NULL);
   GstElement *videoConv = gst_element_factory_make("autovideoconvert", NULL);
   GstElement *payloader = gst_element_factory_make ("rtpvp8pay", NULL);
+  GstElement *bufferpacer = gst_element_factory_make("bufferpacer", NULL);
   GstCaps *videoCaps;
   SessionData *session;
 
-<<<<<<< HEAD
   videoSrc = gst_element_factory_make ("videotestsrc", NULL);
 
   g_object_set(videoSrc,
 		  "horizontal-speed", 15,
-		  "is-live", 1,
+//		  "is-live", 1,
 		  NULL);
 
 //  videoSrc = gst_element_factory_make ("v4l2src", NULL);
@@ -94,22 +94,6 @@ make_video_v4l2_session (guint sessionNum)
 //  g_object_set (videoSrc,
 //                "device", "/dev/video1",
 //                NULL);
-=======
-//  videoSrc = gst_element_factory_make ("appsrc", "filereceiver");
-//  videoSrc = gst_element_factory_make ("v4l2src", NULL);
-//
-  //  g_object_set (videoSrc,
-  //                "device", "/dev/video1",
-  //                NULL);
-
-
-  videoSrc = gst_element_factory_make ("videotestsrc", "filereceiver");
-
-    g_object_set (videoSrc,
-                  "horizontal-speed", 15,
-                  NULL);
-
->>>>>>> e38ab06625f1d12608d9eab7b8477a1070f7caae
 
   encoder = gst_element_factory_make ("vp8enc", NULL);
   g_object_set (encoder, "target-bitrate", target_bitrate, NULL);
@@ -130,7 +114,7 @@ make_video_v4l2_session (guint sessionNum)
       NULL);
 
 
-  gst_bin_add_many (videoBin, videoConv, videoSrc, videoParse, encoder, payloader, NULL);
+  gst_bin_add_many (videoBin, videoConv, videoSrc, bufferpacer, videoParse, encoder, payloader, NULL);
 
   g_object_set (videoParse,
       "width", video_width,
@@ -139,8 +123,12 @@ make_video_v4l2_session (guint sessionNum)
       "format", 2,
       NULL);
 
-  gst_element_link (videoSrc, videoParse);
+//  gst_element_link (videoSrc, videoParse);
+  gst_element_link(videoSrc, bufferpacer);
+  gst_element_link(bufferpacer, videoParse);
   gst_element_link (videoParse, encoder);
+//  gst_element_link (videoParse, transceiver);
+//  gst_element_link (transceiver, encoder);
   gst_element_link (encoder, payloader);
 
   setup_ghost (payloader, videoBin);

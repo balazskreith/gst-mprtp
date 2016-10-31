@@ -9,13 +9,13 @@
 
 static GstPipeline *pipe;
 static GstElement* encoder;
-static GstElement *videoSrc;
 
 typedef struct _SessionData
 {
   int ref;
   guint sessionNum;
-  GstElement *input;
+  GstElement *source;
+  GstElement *encoder;
 } SessionData;
 
 static SessionData *
@@ -70,30 +70,79 @@ setup_ghost (GstElement * src, GstBin * bin)
   gst_element_add_pad (GST_ELEMENT (bin), binPad);
 }
 
+static SessionData *make_raw_receiver(guint sessionNum)
+{
+  SessionData *result;
+  GstBin *sourceBin   = GST_BIN(gst_bin_new(NULL));
+  GstElement* receiver = gst_element_factory_make("udpsrc", NULL);
+  GstElement* rawDepay = gst_element_factory_make("rtpvrawdepay", NULL);
 
-static SessionData *
-make_video_v4l2_session (guint sessionNum)
+  GstCaps* caps        = gst_caps_new_simple ("application/x-rtp",
+      "media", G_TYPE_STRING, "video",
+      "clock-rate", G_TYPE_INT, 90000,
+      "width", G_TYPE_INT, video_width,
+      "height", G_TYPE_INT, video_height,
+      "framerate", GST_TYPE_FRACTION, framerate, 1,
+      "encoding-name", G_TYPE_STRING, "RAW", NULL
+      );
+
+  g_object_set(receiver,
+      "port", 5111,
+      "caps", caps,
+      NULL);
+
+  gst_bin_add_many (sourceBin, receiver, rawDepay, NULL);
+
+  gst_element_link(receiver, rawDepay);
+  setup_ghost (rawDepay, sourceBin);
+
+
+  result = session_new (sessionNum);
+  result->source = GST_ELEMENT(sourceBin);
+
+  return result;
+}
+
+static SessionData *make_videotestsrc(guint sessionNum)
+{
+  SessionData *result;
+  GstBin *sourceBin  = GST_BIN(gst_bin_new(NULL));
+  GstElement* testsrc = gst_element_factory_make("videotestsrc", NULL);
+  GstElement* parser  = gst_element_factory_make("videoparse", NULL);
+
+
+  gst_bin_add_many (sourceBin, testsrc, parser, NULL);
+
+  g_object_set(testsrc,
+      "horizontal-speed", 15,
+      "is-live", 1,
+      NULL);
+
+  g_object_set (parser,
+      "width", video_width,
+      "height", video_height,
+      "framerate", framerate, 1,
+      "format", 2,
+      NULL);
+
+  gst_element_link(testsrc, parser);
+  setup_ghost (parser, sourceBin);
+
+
+  result = session_new (sessionNum);
+  result->source = GST_ELEMENT(sourceBin);
+
+  return result;
+}
+
+
+static void
+make_video_session (SessionData *session)
 {
   GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
   GstElement *videoParse = gst_element_factory_make ("videoparse", NULL);
-  GstElement *videoConv = gst_element_factory_make("autovideoconvert", NULL);
   GstElement *payloader = gst_element_factory_make ("rtpvp8pay", NULL);
-  GstElement *bufferpacer = gst_element_factory_make("bufferpacer", NULL);
   GstCaps *videoCaps;
-  SessionData *session;
-
-  videoSrc = gst_element_factory_make ("videotestsrc", NULL);
-
-  g_object_set(videoSrc,
-		  "horizontal-speed", 15,
-//		  "is-live", 1,
-		  NULL);
-
-//  videoSrc = gst_element_factory_make ("v4l2src", NULL);
-
-//  g_object_set (videoSrc,
-//                "device", "/dev/video1",
-//                NULL);
 
   encoder = gst_element_factory_make ("vp8enc", NULL);
   g_object_set (encoder, "target-bitrate", target_bitrate, NULL);
@@ -114,7 +163,15 @@ make_video_v4l2_session (guint sessionNum)
       NULL);
 
 
-  gst_bin_add_many (videoBin, videoConv, videoSrc, bufferpacer, videoParse, encoder, payloader, NULL);
+  gst_bin_add_many (videoBin,
+
+      session->source,
+
+      videoParse,
+      encoder,
+      payloader,
+
+      NULL);
 
   g_object_set (videoParse,
       "width", video_width,
@@ -123,20 +180,11 @@ make_video_v4l2_session (guint sessionNum)
       "format", 2,
       NULL);
 
-//  gst_element_link (videoSrc, videoParse);
-  gst_element_link(videoSrc, bufferpacer);
-  gst_element_link(bufferpacer, videoParse);
-  gst_element_link (videoParse, encoder);
-//  gst_element_link (videoParse, transceiver);
-//  gst_element_link (transceiver, encoder);
+  gst_element_link_pads(session->source, "src", encoder, "sink");
   gst_element_link (encoder, payloader);
 
   setup_ghost (payloader, videoBin);
-
-  session = session_new (sessionNum);
-  session->input = GST_ELEMENT (videoBin);
-
-  return session;
+  session->encoder = GST_ELEMENT(videoBin);
 }
 
 
@@ -216,6 +264,9 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
 
 
   gst_bin_add_many (GST_BIN (pipe),
+
+      session->encoder,
+
       rtpSink,
       rtcpSink,
       rtcpSrc,
@@ -225,7 +276,6 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
       mprtpSch,
       mprtpSnd,
 
-      session->input,
       NULL);
 
   /* enable retransmission by setting rtprtxsend as the "aux" element of rtpbin */
@@ -246,7 +296,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
   g_print ("Peer: %s:%d MPRTCP: %d\n", rcv_ip, rcv_rtcp_port, rcv_mprtcp_port);
 
   padName = g_strdup_printf ("send_rtp_sink_%u", session->sessionNum);
-  gst_element_link_pads (session->input, "src", rtpBin, padName);
+  gst_element_link_pads (session->encoder, "src", rtpBin, padName);
   g_free (padName);
 
   padName = g_strdup_printf ("send_rtp_src_%u", session->sessionNum);
@@ -314,9 +364,9 @@ main (int argc, char **argv)
 
   gst_bin_add (GST_BIN (pipe), rtpBin);
 
-//  videoSession = make_video_live_session (0);
-//  videoSession = make_video_file_session (0);
-  videoSession = make_video_v4l2_session (0);
+  videoSession = make_videotestsrc(0);
+//  videoSession = make_raw_receiver(0);
+  make_video_session (videoSession);
   add_stream (pipe, rtpBin, videoSession);
 
   g_print ("starting server pipeline\n");

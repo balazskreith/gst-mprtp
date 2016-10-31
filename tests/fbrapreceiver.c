@@ -59,10 +59,11 @@ make_video_session (guint sessionNum)
   GstElement *depayloader = gst_element_factory_make ("rtpvp8depay", NULL);
   GstElement *decoder     = gst_element_factory_make ("vp8dec", NULL);
   GstElement *converter   = gst_element_factory_make ("videoconvert", NULL);
+  GstElement *scaler      = gst_element_factory_make ("videoscale", NULL);
   GstElement *sink        = gst_element_factory_make ("autovideosink", NULL);
 
-  gst_bin_add_many (bin, depayloader, decoder, converter, queue, sink, NULL);
-  gst_element_link_many (queue, depayloader, decoder, converter, sink, NULL);
+  gst_bin_add_many (bin, depayloader, decoder, converter, queue, scaler, sink, NULL);
+  gst_element_link_many (queue, depayloader, decoder, converter, scaler, sink, NULL);
 
   setup_ghost_sink (queue, bin);
 
@@ -256,9 +257,10 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session)
       session_ref (session), (GClosureNotify) session_unref, 0);
 
   padName = g_strdup_printf ("recv_rtp_sink_%u", session->sessionNum);
-  gst_element_link_pads(rtpSrc, "src", mprtpRcv, "sink_1");
-  gst_element_link_pads(mprtpRcv, "mprtp_src", mprtpPly, "mprtp_sink");
-  gst_element_link_pads(mprtpPly, "mprtp_src", rtpBin, padName);
+  gst_element_link_pads(rtpSrc, "src", rtpBin, padName);
+//  gst_element_link_pads(rtpSrc, "src", mprtpRcv, "sink_1");
+//  gst_element_link_pads(mprtpRcv, "mprtp_src", mprtpPly, "mprtp_sink");
+//  gst_element_link_pads(mprtpPly, "mprtp_src", rtpBin, padName);
   g_free (padName);
 
   padName = g_strdup_printf ("recv_rtcp_sink_%u", session->sessionNum);

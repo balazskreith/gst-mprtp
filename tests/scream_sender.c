@@ -22,40 +22,6 @@
 #include "test.h"
 #include "owr_arrival_time_meta.h"
 
-/*
- * An RTP server
- *  creates two sessions and streams audio on one, video on the other, with RTCP
- *  on both sessions. The destination is 127.0.0.1.
- *
- *  In both sessions, we set "rtprtxsend" as the session's "aux" element
- *  in rtpbin, which enables RFC4588 retransmission for that session.
- *
- *  .-------.    .-------.    .-------.      .------------.       .-------.
- *  |audiots|    |alawenc|    |pcmapay|      | rtpbin     |       |udpsink|
- *  |      src->sink    src->sink    src->send_rtp_0 send_rtp_0->sink     |
- *  '-------'    '-------'    '-------'      |            |       '-------'
- *                                           |            |
- *  .-------.    .---------.    .---------.  |            |       .-------.
- *  |audiots|    |theoraenc|    |theorapay|  |            |       |udpsink|
- *  |      src->sink      src->sink  src->send_rtp_1 send_rtp_1->sink     |
- *  '-------'    '---------'    '---------'  |            |       '-------'
- *                                           |            |
- *                               .------.    |            |
- *                               |udpsrc|    |            |       .-------.
- *                               |     src->recv_rtcp_0   |       |udpsink|
- *                               '------'    |       send_rtcp_0->sink    |
- *                                           |            |       '-------'
- *                               .------.    |            |
- *                               |udpsrc|    |            |       .-------.
- *                               |     src->recv_rtcp_1   |       |udpsink|
- *                               '------'    |       send_rtcp_1->sink    |
- *                                           '------------'       '-------'
- *
- * To keep the set of ports consistent across both this server and the
- * corresponding client, a SessionData struct maps a rtpbin session number to
- * a GstBin and is used to create the corresponding udp sinks with correct
- * ports.
- */
 
 static GstElement *encoder;
 
@@ -92,22 +58,6 @@ session_new (guint sessionNum)
 }
 
 /*
- * Used to generate informative messages during pipeline startup
- */
-static void
-cb_state (GstBus * bus, GstMessage * message, gpointer data)
-{
-  GstObject *pipe = GST_OBJECT (data);
-  GstState old, new, pending;
-  gst_message_parse_state_changed (message, &old, &new, &pending);
-  if (message->src == pipe) {
-    g_print ("Pipeline %s changed state from %s to %s\n",
-        GST_OBJECT_NAME (message->src),
-        gst_element_state_get_name (old), gst_element_state_get_name (new));
-  }
-}
-
-/*
  * Creates a GstGhostPad named "src" on the given bin, pointed at the "src" pad
  * of the given element
  */
@@ -117,69 +67,6 @@ setup_ghost (GstElement * src, GstBin * bin)
   GstPad *srcPad = gst_element_get_static_pad (src, "src");
   GstPad *binPad = gst_ghost_pad_new ("src", srcPad);
   gst_element_add_pad (GST_ELEMENT (bin), binPad);
-}
-
-
-
-static SessionData *
-make_video_session2 (guint sessionNum)
-{
-  GstBin *videoBin = GST_BIN (gst_bin_new (NULL));
-  GstElement *videoSrc = gst_element_factory_make ("videotestsrc", NULL);
-  GstElement *payloader = gst_element_factory_make ("rtpvp8pay", NULL);
-
-  GstElement *plyqueue    = gst_element_factory_make("queue", "plyqueue");
-  GstElement *recqueue    = gst_element_factory_make("queue", "recqueue");
-  GstElement *recorder    = gst_element_factory_make("filesink", "recorder");
-  GstElement *splitter    = gst_element_factory_make("tee", "splitter");
-
-  GstCaps *videoCaps;
-  SessionData *session;
-
-  encoder = gst_element_factory_make ("vp8enc", NULL);
-  g_object_set (encoder, "target-bitrate", sending_target, NULL);
-
-  g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 3, NULL);
-
-  g_object_set (recorder, "location", "source.yuv", NULL);
-
-  g_object_set(encoder,
-        "end-usage", 1, /* VPX_CBR */
-        "deadline", G_GINT64_CONSTANT(1), /* VPX_DL_REALTIME */
-        "cpu-used", -6,
-        "min-quantizer", 2,
-        "buffer-initial-size", 300,
-        "buffer-optimal-size", 300,
-        "buffer-size", 400,
-        "dropframe-threshold", 30,
-        "lag-in-frames", 0,
-        "timebase", 1, 90000,
-        "error-resilient", 1,
-  //      "keyframe-mode", 1, /* VPX_KF_DISABLED */
-  //      "keyframe-max-dist", 128,
-        NULL);
-
-  gst_bin_add_many (videoBin, videoSrc, encoder, plyqueue, recqueue, recorder, splitter, payloader, NULL);
-
-  videoCaps = gst_caps_new_simple ("video/x-raw",
-      "width", G_TYPE_INT, yuvsrc_width,
-      "height", G_TYPE_INT, yuvsrc_height,
-	  "framerate", GST_TYPE_FRACTION, framerate, 1, NULL);
-
-  gst_element_link_filtered (videoSrc, splitter, videoCaps);
-  gst_element_link_pads (splitter, "src_1", plyqueue, "sink");
-  gst_element_link_pads (splitter, "src_2", recqueue, "sink");
-  gst_element_link (recqueue, recorder);
-
-  gst_element_link (plyqueue, encoder);
-  gst_element_link (encoder, payloader);
-
-  setup_ghost (payloader, videoBin);
-
-  session = session_new (sessionNum);
-  session->input = GST_ELEMENT (videoBin);
-
-  return session;
 }
 
 static SessionData *
@@ -194,7 +81,7 @@ make_video_session (guint sessionNum)
   SessionData *session;
 
   encoder = gst_element_factory_make ("vp8enc", NULL);
-  g_object_set (encoder, "target-bitrate", sending_target, NULL);
+  g_object_set (encoder, "target-bitrate", target_bitrate, NULL);
 
   g_object_set (videoSrc, "is-live", TRUE, "horizontal-speed", 3, NULL);
 
@@ -217,8 +104,8 @@ make_video_session (guint sessionNum)
   gst_bin_add_many (videoBin, videoSrc, encoder, payloader, NULL);
 
   videoCaps = gst_caps_new_simple ("video/x-raw",
-      "width", G_TYPE_INT, yuvsrc_width,
-      "height", G_TYPE_INT, yuvsrc_height,
+      "width", G_TYPE_INT, video_width,
+      "height", G_TYPE_INT, video_height,
 	  "framerate", GST_TYPE_FRACTION, framerate, 1, NULL);
 
   gst_element_link_filtered (videoSrc, encoder, videoCaps);
@@ -351,16 +238,16 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
   g_signal_connect (rtpBin, "request-aux-sender",
       (GCallback) request_aux_sender, session);
 
-  g_object_set (rtpSink, "port", path1_tx_rtp_port, "host", path_1_tx_ip,
+  g_object_set (rtpSink, "port", rcv_rtp_port, "host", rcv_ip,
 		  //"sync",FALSE,
 		  //"async", FALSE,
 	      NULL);
 
-  g_object_set (rtcpSink, "port", rtpbin_tx_rtcp_port, "host", path_1_tx_ip,
+  g_object_set (rtcpSink, "port", rcv_rtcp_port, "host", rcv_ip,
        "sync",FALSE,
 	   "async", FALSE, NULL);
 
-  g_object_set (rtcpSrc, "port", rtpbin_rx_rtcp_port, NULL);
+  g_object_set (rtcpSrc, "port", snd_rtcp_port, NULL);
 
 //
 //  g_object_set (rtpSink, "port", basePort, "host", "10.0.0.6", NULL);
@@ -439,8 +326,7 @@ main (int argc, char **argv)
 
   gst_bin_add (GST_BIN (pipe), rtpBin);
 
-//  videoSession = make_video_session (0);
-  videoSession = save_received_yuvfile ? make_video_session2(0) : make_video_session(0);
+  videoSession = make_video_session (0);
   add_stream (pipe, rtpBin, videoSession);
 
   g_print ("starting server pipeline\n");

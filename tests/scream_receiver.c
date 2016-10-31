@@ -86,14 +86,6 @@ session_new (guint sessionNum)
   return session_ref (ret);
 }
 
-static void
-setup_ghost_sink (GstElement * sink, GstBin * bin)
-{
-  GstPad *sinkPad = gst_element_get_static_pad (sink, "sink");
-  GstPad *binPad = gst_ghost_pad_new ("sink", sinkPad);
-  gst_element_add_pad (GST_ELEMENT (bin), binPad);
-}
-
 
 static SessionData *
 make_video_session (guint sessionNum)
@@ -102,7 +94,7 @@ make_video_session (guint sessionNum)
   SessionData *ret = session_new (sessionNum);
   gchar binname[20];
 //  GstBin *bin = GST_BIN (gst_bin_new ("video"));
-  GstBin *bin = GST_BIN (gst_bin_new (rand_string(binname, 18)));
+  GstBin *bin = GST_BIN (gst_bin_new (NULL));
   GstElement *queue = gst_element_factory_make ("queue", NULL);
   GstElement *depayloader = gst_element_factory_make ("rtpvp8depay", NULL);
   GstElement *decoder = gst_element_factory_make ("vp8dec", NULL);
@@ -120,8 +112,8 @@ make_video_session (guint sessionNum)
   ret->caps = gst_caps_new_simple ("application/x-rtp",
       "media", G_TYPE_STRING, "video",
       "clock-rate", G_TYPE_INT, 90000,
-      "width", G_TYPE_INT, yuvsrc_width,
-      "height", G_TYPE_INT, yuvsrc_height,
+      "width", G_TYPE_INT, video_width,
+      "height", G_TYPE_INT, video_height,
       "framerate", GST_TYPE_FRACTION, framerate, 1,
       "encoding-name", G_TYPE_STRING, "VP8", NULL
       );
@@ -130,56 +122,6 @@ make_video_session (guint sessionNum)
   return ret;
 }
 
-
-
-static SessionData *
-make_video_session_and_save_yuvfile (guint sessionNum)
-{
-  SessionData *ret = session_new (sessionNum);
-  gchar binname[20];
-  GstBin *bin = GST_BIN (gst_bin_new (rand_string(binname, 18)));
-  GstElement *queue = gst_element_factory_make ("queue", "q1");
-  GstElement *depayloader = gst_element_factory_make ("rtpvp8depay", "depayloader");
-  GstElement *decoder = gst_element_factory_make ("vp8dec", "decoder");
-
-  GstElement *converter = gst_element_factory_make ("videoconvert", "converter");
-  GstElement *autovideosink = gst_element_factory_make ("autovideosink", "autovideoplayer");
-
-  GstElement *tee       = gst_element_factory_make("tee", "splitter");
-  GstElement *ply_queue = gst_element_factory_make("queue", "playqueue");
-  GstElement *rec_queue = gst_element_factory_make("queue", "recorderqueue");
-  GstElement *filesink  = gst_element_factory_make("filesink", "recorder");
-
-  g_object_set (filesink, "location", "destination.yuv", NULL);
-//  gst_bin_add_many (bin, depayloader, decoder, converter, queue, autovideosink, NULL);
-//  gst_element_link_many (queue, depayloader, decoder, converter, autovideosink, NULL);
-
-  gst_bin_add_many (bin, queue, depayloader, decoder, converter, tee, ply_queue,
-                    autovideosink, rec_queue, filesink, NULL);
-  gst_element_link_many (queue, depayloader, decoder, converter, tee, NULL);
-
-  gst_element_link_pads (tee, "src_1", ply_queue, "sink");
-  gst_element_link_many (ply_queue, autovideosink, NULL);
-
-  gst_element_link_pads (tee, "src_2", rec_queue, "sink");
-  gst_element_link_many (rec_queue, filesink, NULL);
-
-  setup_ghost_sink (queue, bin);
-
-  ret->output = GST_ELEMENT (bin);
-
-  ret->caps = gst_caps_new_simple ("application/x-rtp",
-      "media", G_TYPE_STRING, "video",
-      "clock-rate", G_TYPE_INT, 90000,
-      "width", G_TYPE_INT, yuvsrc_width,
-      "height", G_TYPE_INT, yuvsrc_height,
-      "framerate", GST_TYPE_FRACTION, framerate, 1,
-      "encoding-name", G_TYPE_STRING, "VP8", NULL
-      );
-
-  g_object_set (autovideosink, "sync", FALSE, NULL);
-  return ret;
-}
 
 
 
@@ -197,46 +139,6 @@ request_pt_map (GstElement * rtpbin, guint session, guint pt,
   return NULL;
 }
 
-static void
-cb_eos (GstBus * bus, GstMessage * message, gpointer data)
-{
-  g_print ("Got EOS\n");
-  g_main_loop_quit (loop);
-}
-
-static void
-cb_state (GstBus * bus, GstMessage * message, gpointer data)
-{
-  GstObject *pipe = GST_OBJECT (data);
-  GstState old, new, pending;
-  gst_message_parse_state_changed (message, &old, &new, &pending);
-  if (message->src == pipe) {
-    g_print ("Pipeline %s changed state from %s to %s\n",
-        GST_OBJECT_NAME (message->src),
-        gst_element_state_get_name (old), gst_element_state_get_name (new));
-  }
-}
-
-static void
-cb_warning (GstBus * bus, GstMessage * message, gpointer data)
-{
-  GError *error = NULL;
-  gst_message_parse_warning (message, &error, NULL);
-  g_printerr ("Got warning from %s: %s\n", GST_OBJECT_NAME (message->src),
-      error->message);
-  g_error_free (error);
-}
-
-static void
-cb_error (GstBus * bus, GstMessage * message, gpointer data)
-{
-  GError *error = NULL;
-  gst_message_parse_error (message, &error, NULL);
-  g_printerr ("Got error from %s: %s\n", GST_OBJECT_NAME (message->src),
-      error->message);
-  g_error_free (error);
-  g_main_loop_quit (loop);
-}
 
 static void
 handle_new_stream (GstElement * element, GstPad * newPad, gpointer data)
@@ -527,9 +429,9 @@ join_session (GstElement * pipeline, GstElement * rtpBin, SessionData * session)
 //      FALSE, "async", FALSE, NULL);
 //  g_object_set (rtcpSrc, "port", basePort + 1, NULL);
 
-  g_object_set (rtpSrc, "port", path1_tx_rtp_port, "caps", session->caps, NULL);
-  g_object_set (rtcpSrc, "port", rtpbin_tx_rtcp_port, NULL);
-  g_object_set (rtcpSink, "port", rtpbin_rx_rtcp_port, "host", path_1_rx_ip,
+  g_object_set (rtpSrc, "port", rcv_rtp_port, "caps", session->caps, NULL);
+  g_object_set (rtcpSrc, "port", rcv_rtcp_port, NULL);
+  g_object_set (rtcpSink, "port", snd_rtcp_port, "host", snd_ip,
 		  "async", FALSE, NULL);
 
   g_print ("Connecting to %i/%i/%i\n", basePort, basePort + 1, basePort + 5);
@@ -606,10 +508,10 @@ main (int argc, char **argv)
   pipe = GST_PIPELINE (gst_pipeline_new (NULL));
 
   bus = gst_element_get_bus (GST_ELEMENT (pipe));
-  g_signal_connect (bus, "message::error", G_CALLBACK (cb_error), pipe);
+  g_signal_connect (bus, "message::error", G_CALLBACK (cb_error), loop);
   g_signal_connect (bus, "message::warning", G_CALLBACK (cb_warning), pipe);
   g_signal_connect (bus, "message::state-changed", G_CALLBACK (cb_state), pipe);
-  g_signal_connect (bus, "message::eos", G_CALLBACK (cb_eos), NULL);
+  g_signal_connect (bus, "message::eos", G_CALLBACK (cb_eos), loop);
   gst_bus_add_signal_watch (bus);
   gst_object_unref (bus);
 
@@ -621,12 +523,7 @@ main (int argc, char **argv)
           "rtp-profile", GST_RTP_PROFILE_AVPF,
 		  NULL);
 
-  framerate = use_testsourcevideo ? 100 : 25;
-  if(save_received_yuvfile){
-    videoSession = make_video_session_and_save_yuvfile (0);
-  }else{
-    videoSession = make_video_session (0);
-  }
+  videoSession = make_video_session (0);
   join_session (GST_ELEMENT (pipe), rtpBin, videoSession);
 
   g_print ("starting client pipeline\n");

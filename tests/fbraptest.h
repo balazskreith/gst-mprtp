@@ -133,8 +133,11 @@ static void _setup_test_params(void)
       src_filepath = default_src_filepath;
     }
 
-//  _print_transfer_info();
-
 }
+
+
+
+
+
 
 #endif /* FBRAPTESTS_TEST_H_ */

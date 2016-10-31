@@ -154,6 +154,7 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-fbrafbproc.lo \
 	libgstmprtp_la-gstmprtpscheduler.lo \
 	libgstmprtp_la-gstmprtpsender.lo \
 	libgstmprtp_la-gstbufferpacer.lo \
+	libgstmprtp_la-gsttransceiver.lo \
 	libgstmprtp_la-jitterbuffer.lo libgstmprtp_la-lib_bintree.lo \
 	libgstmprtp_la-lib_datapuffer.lo \
 	libgstmprtp_la-lib_swplugins.lo libgstmprtp_la-mediator.lo \
@@ -424,6 +425,7 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          gstmprtpscheduler.c   \
                          gstmprtpsender.c      \
                          gstbufferpacer.c      \
+                         gsttransceiver.c      \
                          jitterbuffer.c        \
                          lib_bintree.c         \
                          lib_datapuffer.c      \
@@ -587,6 +589,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-gsttransceiver.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-jitterbuffer.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-lib_bintree.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-lib_datapuffer.Plo@am__quote@
@@ -718,6 +721,13 @@ libgstmprtp_la-gstbufferpacer.lo: gstbufferpacer.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='gstbufferpacer.c' object='libgstmprtp_la-gstbufferpacer.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstbufferpacer.lo `test -f 'gstbufferpacer.c' || echo '$(srcdir)/'`gstbufferpacer.c
+
+libgstmprtp_la-gsttransceiver.lo: gsttransceiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gsttransceiver.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gsttransceiver.Tpo -c -o libgstmprtp_la-gsttransceiver.lo `test -f 'gsttransceiver.c' || echo '$(srcdir)/'`gsttransceiver.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gsttransceiver.Tpo $(DEPDIR)/libgstmprtp_la-gsttransceiver.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='gsttransceiver.c' object='libgstmprtp_la-gsttransceiver.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gsttransceiver.lo `test -f 'gsttransceiver.c' || echo '$(srcdir)/'`gsttransceiver.c
 
 libgstmprtp_la-jitterbuffer.lo: jitterbuffer.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-jitterbuffer.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-jitterbuffer.Tpo -c -o libgstmprtp_la-jitterbuffer.lo `test -f 'jitterbuffer.c' || echo '$(srcdir)/'`jitterbuffer.c

@@ -153,9 +153,11 @@ scream_sender_DEPENDENCIES = $(am__DEPENDENCIES_1)
 scream_sender_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(scream_sender_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-am_sender_OBJECTS = sender-sender.$(OBJEXT)
+am_sender_OBJECTS = sender-sender.$(OBJEXT) \
+	sender-transceiver.$(OBJEXT)
 sender_OBJECTS = $(am_sender_OBJECTS)
-sender_DEPENDENCIES = $(am__DEPENDENCIES_1)
+sender_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 sender_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(sender_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
@@ -415,9 +417,11 @@ fbrapreceiver_LDADD = $(GST_LIBS)
 scream_receiver_SOURCES = scream_receiver.c
 scream_receiver_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(AM_CFLAGS)
 scream_receiver_LDADD = $(GST_PLUGINS_BASE_LIBS) -lgstrtp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
-sender_SOURCES = sender.c
-sender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
-sender_LDADD = $(GST_LIBS)
+sender_SOURCES = sender.c transceiver.c
+# sender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
+# sender_LDADD = $(GST_LIBS)
+sender_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
+sender_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
 fbrapsender_SOURCES = fbrapsender.c
 fbrapsender_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
 fbrapsender_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
@@ -510,6 +514,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scream_receiver-scream_receiver.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scream_sender-scream_sender.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sender-sender.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sender-transceiver.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/v4l2_file_player-v4l2_file_player.Po@am__quote@
 
 .c.o:
@@ -616,6 +621,20 @@ sender-sender.obj: sender.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sender.c' object='sender-sender.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -c -o sender-sender.obj `if test -f 'sender.c'; then $(CYGPATH_W) 'sender.c'; else $(CYGPATH_W) '$(srcdir)/sender.c'; fi`
+
+sender-transceiver.o: transceiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -MT sender-transceiver.o -MD -MP -MF $(DEPDIR)/sender-transceiver.Tpo -c -o sender-transceiver.o `test -f 'transceiver.c' || echo '$(srcdir)/'`transceiver.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/sender-transceiver.Tpo $(DEPDIR)/sender-transceiver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='transceiver.c' object='sender-transceiver.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -c -o sender-transceiver.o `test -f 'transceiver.c' || echo '$(srcdir)/'`transceiver.c
+
+sender-transceiver.obj: transceiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -MT sender-transceiver.obj -MD -MP -MF $(DEPDIR)/sender-transceiver.Tpo -c -o sender-transceiver.obj `if test -f 'transceiver.c'; then $(CYGPATH_W) 'transceiver.c'; else $(CYGPATH_W) '$(srcdir)/transceiver.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/sender-transceiver.Tpo $(DEPDIR)/sender-transceiver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='transceiver.c' object='sender-transceiver.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -c -o sender-transceiver.obj `if test -f 'transceiver.c'; then $(CYGPATH_W) 'transceiver.c'; else $(CYGPATH_W) '$(srcdir)/transceiver.c'; fi`
 
 v4l2_file_player-v4l2_file_player.o: v4l2_file_player.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(v4l2_file_player_CFLAGS) $(CFLAGS) -MT v4l2_file_player-v4l2_file_player.o -MD -MP -MF $(DEPDIR)/v4l2_file_player-v4l2_file_player.Tpo -c -o v4l2_file_player-v4l2_file_player.o `test -f 'v4l2_file_player.c' || echo '$(srcdir)/'`v4l2_file_player.c

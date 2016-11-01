@@ -12,14 +12,14 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          gstmprtpplugin.c      \
                          gstmprtpscheduler.c   \
                          gstmprtpsender.c      \
-                         gstbufferpacer.c      \
-                         gsttransceiver.c      \
+                         gstrtpstatmaker.c     \
                          jitterbuffer.c        \
                          lib_bintree.c         \
                          lib_datapuffer.c      \
                          lib_swplugins.c       \
                          mediator.c            \
                          messenger.c           \
+                         monitor.c             \
                          mprtpdefs.c           \
                          mprtplogger.c         \
                          notifier.c            \
@@ -54,6 +54,7 @@ noinst_HEADERS = fbrafbproc.h          \
                  lib_swplugins.h       \
                  mediator.h            \
                  messenger.h           \
+                 monitor.h             \
                  mprtpdefs.h           \
                  mprtplogger.h         \
                  notifier.h            \

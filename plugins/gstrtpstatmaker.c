@@ -40,32 +40,31 @@ static GstFlowReturn gst_rtpstatmaker_rtp_sink_chain (GstPad * pad,
 static GstFlowReturn gst_rtpstatmaker_rtp_sink_chainlist (GstPad * pad,
     GstObject * parent, GstBufferList * list);
 
-static GstFlowReturn gst_rtpstatmaker_mprtcp_rr_sink_chain (GstPad * pad,
+static GstFlowReturn gst_rtpstatmaker_packet_sink_chain (GstPad * pad,
     GstObject * parent, GstBuffer * outbuf);
 
 static gboolean gst_rtpstatmaker_src_query (GstPad * srckpad, GstObject * parent,
     GstQuery * query);
 
-//static gboolean gst_rtpstatmaker_mprtp_src_event (GstPad * pad, GstObject * parent, GstEvent * event);
-//static gboolean gst_rtpstatmaker_sink_eventfunc (GstPad * srckpad, GstObject * parent, GstEvent * event);
 static gboolean gst_rtpstatmaker_mprtp_src_event (GstPad * srckpad, GstObject * parent, GstEvent * event);
 static gboolean gst_rtpstatmaker_sink_event (GstPad * srckpad, GstObject * parent, GstEvent * event);
 
+static GstPadLinkReturn _on_packet_srcpad_linked (GstPad * pad, GstObject * parent, GstPad * peer);
+static void _on_packet_srcpad_unlinked (GstPad * pad, GstObject * parent);
+static GstPadLinkReturn _on_packetlogs_srcpad_linked (GstPad * pad, GstObject * parent, GstPad * peer);
+static void _on_packetlogs_srcpad_unlinked (GstPad * pad, GstObject * parent);
+static GstPadLinkReturn _on_statlogs_srcpad_linked (GstPad * pad, GstObject * parent, GstPad * peer);
+static void _on_statlogs_srcpad_unlinked (GstPad * pad, GstObject * parent);
 
-static void _on_rtcp_ready(GstRTPStatMaker * this, GstBuffer *buffer);
-static void _on_monitoring_request(GstRTPStatMaker * this, SndSubflow* subflow);
-static void _on_monitoring_response(GstRTPStatMaker * this, FECEncoderResponse *response);
-static void _rtpstatmaker_send_packet (GstRTPStatMaker * this, SndSubflow* subflow, SndPacket *packet);
-static void rtpstatmaker_approval_process(GstRTPStatMaker *this);
-static void rtpstatmaker_emitter_process(gpointer udata);
-
-
-static guint _subflows_utilization;
 
 enum
 {
   PROP_0,
   PROP_FEC_PAYLOAD_TYPE,
+  PROP_SAMPLING_TIME,
+  PROP_ACCUMULATION_LENGTH,
+  PROP_MPRTP_EXT_HEADER_ID,
+  PROP_CSV_LOGGING,
 };
 
 /* signals and args */
@@ -87,26 +86,36 @@ GST_STATIC_PAD_TEMPLATE ("rtp_sink",
 
 
 static GstStaticPadTemplate gst_rtpstatmaker_mprtp_src_template =
-GST_STATIC_PAD_TEMPLATE ("mprtp_src",
+GST_STATIC_PAD_TEMPLATE ("rtp_src",
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS ("application/x-rtp")
     );
 
 
-static GstStaticPadTemplate gst_rtpstatmaker_mprtcp_rr_sink_template =
-GST_STATIC_PAD_TEMPLATE ("mprtcp_rr_sink",
+static GstStaticPadTemplate gst_rtpstatmaker_packet_src_template =
+GST_STATIC_PAD_TEMPLATE ("packet_src",
     GST_PAD_SINK,
     GST_PAD_ALWAYS,
-//    GST_STATIC_CAPS ("application/x-rtcp")
+    GST_STATIC_CAPS_ANY);
+
+static GstStaticPadTemplate gst_rtpstatmaker_packet_sink_template =
+GST_STATIC_PAD_TEMPLATE ("packet_sink",
+    GST_PAD_SINK,
+    GST_PAD_ALWAYS,
     GST_STATIC_CAPS_ANY);
 
 
-static GstStaticPadTemplate gst_rtpstatmaker_mprtcp_sr_src_template =
-GST_STATIC_PAD_TEMPLATE ("mprtcp_sr_src",
+static GstStaticPadTemplate gst_rtpstatmaker_statlogs_src_template =
+GST_STATIC_PAD_TEMPLATE ("statlogs_src",
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
-//    GST_STATIC_CAPS ("application/x-rtcp")
+    GST_STATIC_CAPS_ANY);
+
+static GstStaticPadTemplate gst_rtpstatmaker_packetlogs_src_template =
+GST_STATIC_PAD_TEMPLATE ("packetlogs_src",
+    GST_PAD_SRC,
+    GST_PAD_ALWAYS,
     GST_STATIC_CAPS_ANY);
 
 
@@ -139,15 +148,14 @@ gst_rtpstatmaker_class_init (GstRTPStatMakerClass * klass)
       gst_static_pad_template_get (&gst_rtpstatmaker_mprtp_src_template));
 
   gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&gst_rtpstatmaker_mprtcp_sr_src_template));
+      gst_static_pad_template_get (&gst_rtpstatmaker_packet_src_template));
 
   gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get
-      (&gst_rtpstatmaker_mprtcp_rr_sink_template));
+      gst_static_pad_template_get (&gst_rtpstatmaker_packet_sink_template));
 
 
   gst_element_class_set_static_metadata (GST_ELEMENT_CLASS (klass),
-      "MPRTP Scheduler", "Generic", "MPRTP scheduler FIXME LONG DESC",
+      "RTPStat Maker Element", "Generic", "Make an accumulative statistical and a sequence based log going through the element",
       "Balázs Kreith <balazs.kreith@gmail.com>");
 
   gobject_class->set_property = gst_rtpstatmaker_set_property;
@@ -159,112 +167,39 @@ gst_rtpstatmaker_class_init (GstRTPStatMakerClass * klass)
   element_class->query = GST_DEBUG_FUNCPTR (gst_rtpstatmaker_query);
 
 
-  g_object_class_install_property (gobject_class, PROP_MPRTP_EXT_HEADER_ID,
-      g_param_spec_uint ("mprtp-ext-header-id",
-          "Set or get the id for the Multipath RTP extension",
-          "Sets or gets the id for the extension header the MpRTP based on. The default is 3",
-          0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_ABS_TIME_EXT_HEADER_ID,
-      g_param_spec_uint ("abs-time-ext-header-id",
-          "Set or get the id for the absolute time RTP extension",
-          "Sets or gets the id for the extension header the absolute time based on. The default is 8",
-          0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
   g_object_class_install_property (gobject_class, PROP_FEC_PAYLOAD_TYPE,
       g_param_spec_uint ("fec-payload-type",
           "Set or get the payload type of FEC packets",
           "Set or get the payload type of FEC packets. The default is 126",
-          0, 127, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          0, 127, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_MPATH_KEYFRAME_FILTERING,
-      g_param_spec_uint ("mpath-keyframe-filtering",
-          "Set or get the keyframe filtering for multiple path",
-          "Set or get the keyframe filtering for multiple path. 0 - no keyframe filtering, 1 - vp8 enc/dec filtering",
-          0, 255, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (gobject_class, PROP_SAMPLING_TIME,
+      g_param_spec_uint ("sampling-time",
+          "Set the sampling time in ms. Default is 100ms",
+          "The sampling time is the period an accumulative statistic is sampled",
+          0, 100000000, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_PACKET_OBSOLATION_TRESHOLD,
-      g_param_spec_uint ("obsolation-treshold",
-          "Set the obsolation treshold at the packet sender queue.",
-          "Set the obsolation treshold at the packet sender queue.",
-          0, 10000, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (gobject_class, PROP_ACCUMULATION_LENGTH,
+      g_param_spec_uint ("accumulation-length",
+          "Set the length of the accumulative window in ms",
+          "The accumulation window is a time based window for packet and it is the base of the accumulative statistics.",
+          0, 1000000000, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_JOIN_SUBFLOW,
-      g_param_spec_uint ("join-subflow", "the subflow id requested to join",
-          "Join a subflow with a given id.", 0,
-          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_DETACH_SUBFLOW,
-      g_param_spec_uint ("detach-subflow", "the subflow id requested to detach",
-          "Detach a subflow with a given id.", 0,
-          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_SET_SUBFLOW_CONGESTED,
-      g_param_spec_uint ("congested-subflow", "set the subflow congested",
-          "Set the subflow congested", 0,
-          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class,
-      PROP_SET_SUBFLOW_NON_CONGESTED,
-      g_param_spec_uint ("non-congested-subflow",
-          "set the subflow non-congested", "Set the subflow non-congested", 0,
-          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_SET_SENDING_TARGET,
-      g_param_spec_uint ("setup-sending-target",
-          "set the sending target of the subflow",
-          "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the target",
-          0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_SETUP_RTCP_INTERVAL_TYPE,
-     g_param_spec_uint ("setup-rtcp-interval-type",
-                        "RTCP interval types: 0 - regular, 1 - early, 2 - immediate feedback",
-                        "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the mode. "
-                        "RTCP interval types: 0 - regular, 1 - early, 2 - immediate feedback",
-                        0,
-                        4294967295, 2, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_SETUP_REPORT_TIMEOUT,
-      g_param_spec_uint ("setup-report-timeout",
-          "setup a timeout value for incoming reports on subflows",
-          "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the timeout in ms",
-          0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_SETUP_CONTROLLING_MODE,
-      g_param_spec_uint ("setup-controlling-mode",
-          "set the controlling mode to the subflow",
-          "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the mode. "
-          "0 - no sending rate controller, 1 - no controlling, but sending SRs, 2 - FBRA with MARC",
-          0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_FEC_INTERVAL,
-      g_param_spec_uint ("fec-interval",
-          "Set a stable FEC interval applied on the media stream",
-          "The property value other than 0 request a FEC protection after a specified packet was sent. "
-          "The newly created FEC packet is going to be sent on the path actually selected if the plugin uses multipath.",
+  g_object_class_install_property (gobject_class, PROP_MPRTP_EXT_HEADER_ID,
+      g_param_spec_uint ("mprtp-ext-header-id",
+          "Set or get the id for the RTP extension",
+          "Sets or gets the id for the extension header the MpRTP based on. The default is 3",
           0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_LOG_ENABLED,
-      g_param_spec_boolean ("logging",
-          "Indicate weather a log for subflow is enabled or not",
-          "Indicate weather a log for subflow is enabled or not",
+  g_object_class_install_property (gobject_class, PROP_CSV_LOGGING,
+      g_param_spec_boolean ("csv-logging",
+          "Indicate weatherthe log is transmitted in a csv format or a structure",
+          "Indicate weatherthe log is transmitted in a csv format or a structure",
           FALSE, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-
-  g_object_class_install_property (gobject_class, PROP_LOG_PATH,
-        g_param_spec_string ("logs-path",
-            "Determines the path for logfiles",
-            "Determines the path for logfiles",
-            "NULL", G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  _subflows_utilization =
-      g_signal_new ("mprtp-subflows-utilization", G_TYPE_FROM_CLASS (klass),
-      G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (GstRTPStatMakerClass, mprtp_media_rate_utilization),
-      NULL, NULL, g_cclosure_marshal_generic, G_TYPE_NONE, 1,
-      G_TYPE_POINTER);
-
-
 }
+
 
 static void
 gst_rtpstatmaker_init (GstRTPStatMaker * this)
@@ -289,80 +224,81 @@ gst_rtpstatmaker_init (GstRTPStatMaker * this)
 
   gst_element_add_pad (GST_ELEMENT (this), this->rtp_sinkpad);
 
-  this->mprtcp_rr_sinkpad =
+  this->packet_sinkpad =
       gst_pad_new_from_static_template
-      (&gst_rtpstatmaker_mprtcp_rr_sink_template, "mprtcp_rr_sink");
+      (&gst_rtpstatmaker_packet_sink_template, "packet_sink");
 
-  gst_pad_set_chain_function (this->mprtcp_rr_sinkpad,
-      GST_DEBUG_FUNCPTR (gst_rtpstatmaker_mprtcp_rr_sink_chain));
+  gst_pad_set_chain_function (this->packet_sinkpad,
+      GST_DEBUG_FUNCPTR (gst_rtpstatmaker_packet_sink_chain));
 
   //  gst_pad_set_event_function (this->rtp_sinkpad,
   //      GST_DEBUG_FUNCPTR (gst_rtpstatmaker_sink_eventfunc));
   gst_pad_set_event_function (this->rtp_sinkpad,
         GST_DEBUG_FUNCPTR (gst_rtpstatmaker_sink_event));
 
-  gst_element_add_pad (GST_ELEMENT (this), this->mprtcp_rr_sinkpad);
+  gst_element_add_pad (GST_ELEMENT (this), this->packet_sinkpad);
 
-  this->mprtcp_sr_srcpad =
+  this->packet_srcpad =
       gst_pad_new_from_static_template
-      (&gst_rtpstatmaker_mprtcp_sr_src_template, "mprtcp_sr_src");
+      (&gst_rtpstatmaker_packet_src_template, "packet_src");
 
-  gst_element_add_pad (GST_ELEMENT (this), this->mprtcp_sr_srcpad);
+  gst_pad_set_link_function (this->packet_srcpad,
+      GST_DEBUG_FUNCPTR (_on_packet_srcpad_linked));
+  gst_pad_set_unlink_function (this->packet_srcpad,
+      GST_DEBUG_FUNCPTR (_on_packet_srcpad_unlinked));
 
-  this->mprtp_srcpad =
+  gst_element_add_pad (GST_ELEMENT (this), this->packet_srcpad);
+
+  this->packetlogs_srcpad =
+      gst_pad_new_from_static_template
+      (&gst_rtpstatmaker_packetlogs_src_template, "packetlogs_src");
+
+  gst_pad_set_link_function (this->packetlogs_srcpad,
+      GST_DEBUG_FUNCPTR (_on_packetlogs_srcpad_linked));
+  gst_pad_set_unlink_function (this->packetlogs_srcpad,
+      GST_DEBUG_FUNCPTR (_on_packetlogs_srcpad_unlinked));
+
+
+  gst_element_add_pad (GST_ELEMENT (this), this->packetlogs_srcpad);
+
+  this->statlogs_srcpad =
+      gst_pad_new_from_static_template
+      (&gst_rtpstatmaker_statlogs_src_template, "statlogs_src");
+
+  gst_pad_set_link_function (this->statlogs_srcpad,
+      GST_DEBUG_FUNCPTR (_on_statlogs_srcpad_linked));
+  gst_pad_set_unlink_function (this->statlogs_srcpad,
+      GST_DEBUG_FUNCPTR (_on_statlogs_srcpad_unlinked));
+
+
+  gst_element_add_pad (GST_ELEMENT (this), this->statlogs_srcpad);
+
+
+  this->rtp_srcpad =
       gst_pad_new_from_static_template (&gst_rtpstatmaker_mprtp_src_template,
-      "mprtp_src");
+      "rtp_src");
 
-  gst_pad_set_event_function (this->mprtp_srcpad,
+  gst_pad_set_event_function (this->rtp_srcpad,
       GST_DEBUG_FUNCPTR (gst_rtpstatmaker_mprtp_src_event));
-  gst_pad_use_fixed_caps (this->mprtp_srcpad);
-  GST_PAD_SET_PROXY_CAPS (this->mprtp_srcpad);
-  GST_PAD_SET_PROXY_ALLOCATION (this->mprtp_srcpad);
+  gst_pad_use_fixed_caps (this->rtp_srcpad);
+  GST_PAD_SET_PROXY_CAPS (this->rtp_srcpad);
+  GST_PAD_SET_PROXY_ALLOCATION (this->rtp_srcpad);
 
-  gst_pad_set_query_function(this->mprtp_srcpad,
+  gst_pad_set_query_function(this->rtp_srcpad,
     GST_DEBUG_FUNCPTR(gst_rtpstatmaker_src_query));
 
-  gst_element_add_pad (GST_ELEMENT (this), this->mprtp_srcpad);
+  gst_element_add_pad (GST_ELEMENT (this), this->rtp_srcpad);
+
 
 
   this->sysclock = gst_system_clock_obtain ();
-  this->thread = gst_task_new (rtpstatmaker_emitter_process, this, NULL);
-  g_mutex_init (&this->mutex);
   g_cond_init(&this->waiting_signal);
-  g_cond_init(&this->receiving_signal);
 
   this->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
 
-  this->monitoring    = make_mediator();
-  this->on_rtcp_ready = make_notifier();
+  //TODO: Monitor can be ssrc based in a hash table for more sophisticated stats, but it is ... THE FUTURE - HAHAHAHA!
+  this->monitor       = make_monitor();
 
-  this->subflows      = make_sndsubflows(this->monitoring);
-  this->sndpackets    = make_sndpackets();
-  this->packetsq      = g_queue_new();
-  this->emit_msger    = make_messenger(sizeof(MPRTPPluginSignalData));
-
-  this->splitter      = make_stream_splitter(this->subflows);
-  this->fec_encoder   = make_fecencoder(this->monitoring);
-  this->sndtracker    = make_sndtracker(this->subflows);
-
-  this->controller = make_sndctrler(
-      this->sndtracker,
-      this->subflows,
-      this->on_rtcp_ready,
-      this->emit_msger);
-
-  fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
-  sndsubflows_add_on_target_bitrate_changed_cb(this->subflows,
-      (ListenerFunc) stream_splitter_on_target_bitrate_changed, this->splitter);
-
-  mediator_set_request_handler(this->monitoring,
-      (ListenerFunc) _on_monitoring_request, this);
-
-  mediator_set_response_handler(this->monitoring,
-      (ListenerFunc) _on_monitoring_response, this);
-
-  notifier_add_listener(this->on_rtcp_ready,
-      (ListenerFunc) _on_rtcp_ready, this);
 }
 
 
@@ -386,107 +322,45 @@ gst_rtpstatmaker_finalize (GObject * object)
   GST_DEBUG_OBJECT (this, "finalize");
 
   /* clean up object here */
-  gst_task_join (this->thread);
-  gst_object_unref (this->thread);
 
   g_object_unref (this->sysclock);
-  g_object_unref (this->subflows);
-  g_object_unref (this->sndpackets);
-  g_object_unref (this->splitter);
-  g_object_unref (this->fec_encoder);
-  g_object_unref(this->packetsq);
-
-  g_object_unref(this->emit_msger);
+  g_object_unref (this->monitor);
 
   G_OBJECT_CLASS (gst_rtpstatmaker_parent_class)->finalize (object);
 }
 
 
-typedef struct _SubflowSpecProp{
-#if G_BYTE_ORDER == G_LITTLE_ENDIAN
-  guint32  value : 24;
-  guint32  id     : 8;
-#elif G_BYTE_ORDER == G_BIG_ENDIAN
-  guint32  id     : 8;
-  guint32  value : 24;
-#else
-#error "G_BYTE_ORDER should be big or little endian."
-#endif
-}SubflowSpecProp;
 
 void
 gst_rtpstatmaker_set_property (GObject * object, guint property_id,
     const GValue * value, GParamSpec * pspec)
 {
   GstRTPStatMaker *this = GST_RTPSTATMAKER (object);
-  guint guint_value;
-  gboolean gboolean_value;
-  SubflowSpecProp *subflow_prop;
 
-  subflow_prop = (SubflowSpecProp*) &guint_value;
   GST_DEBUG_OBJECT (this, "set_property");
   THIS_LOCK(this);
   switch (property_id) {
-    case PROP_MPRTP_EXT_HEADER_ID:
-      sndpackets_set_mprtp_ext_header_id(this->sndpackets, (guint8) g_value_get_uint (value));
-      break;
-    case PROP_ABS_TIME_EXT_HEADER_ID:
-      sndpackets_set_abs_time_ext_header_id(this->sndpackets, (guint8) g_value_get_uint (value));
-      break;
-    case PROP_FEC_PAYLOAD_TYPE:
-      this->fec_payload_type = (guint8) g_value_get_uint (value);
-      fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
-      break;
-    case PROP_JOIN_SUBFLOW:
-      sndsubflows_join(this->subflows, g_value_get_uint (value));
-      break;
-    case PROP_MPATH_KEYFRAME_FILTERING:
-      g_warning("path keyframe filtering is not implemented yet");
-      break;
-    case PROP_PACKET_OBSOLATION_TRESHOLD:
-      this->obsolation_treshold = g_value_get_uint(value) * GST_MSECOND;
-      break;
-    case PROP_DETACH_SUBFLOW:
-      sndsubflows_detach(this->subflows, g_value_get_uint (value));
-      break;
-    case PROP_SET_SUBFLOW_CONGESTED:
-      guint_value = g_value_get_uint (value);
-      sndsubflows_set_path_congested(this->subflows, guint_value, TRUE);
-      break;
-    case PROP_SET_SUBFLOW_NON_CONGESTED:
-      guint_value = g_value_get_uint (value);
-      sndsubflows_set_path_congested(this->subflows, guint_value, FALSE);
-      break;
-    case PROP_FEC_INTERVAL:
-      this->fec_interval = g_value_get_uint (value);
-      break;
-    case PROP_SET_SENDING_TARGET:
-      guint_value = g_value_get_uint (value);
-
-      sndsubflows_set_target_bitrate(this->subflows, subflow_prop->id, subflow_prop->value);
-      break;
-    case PROP_SETUP_RTCP_INTERVAL_TYPE:
-      guint_value = g_value_get_uint (value);
-      sndsubflows_set_rtcp_interval_type(this->subflows, subflow_prop->id, subflow_prop->value);
-      break;
-    case PROP_SETUP_CONTROLLING_MODE:
-      guint_value = g_value_get_uint (value);
-      sndsubflows_set_congestion_controlling_type(this->subflows, subflow_prop->id, subflow_prop->value);
-      break;
-    case PROP_SETUP_REPORT_TIMEOUT:
-      guint_value = g_value_get_uint (value);
-      sndsubflows_set_report_timeout(this->subflows, subflow_prop->id, subflow_prop->value * GST_MSECOND);
-      break;
-    case PROP_LOG_ENABLED:
-      gboolean_value = g_value_get_boolean (value);
-      mprtp_logger_set_state(gboolean_value);
-      break;
-    case PROP_LOG_PATH:
-      mprtp_logger_set_target_directory(g_value_get_string(value));
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
-      break;
+  case PROP_MPRTP_EXT_HEADER_ID:
+    this->mprtp_ext_header_id = (guint8) g_value_get_uint (value);
+    monitor_set_mprtp_ext_header_id(this->monitor, this->mprtp_ext_header_id);
+    break;
+  case PROP_FEC_PAYLOAD_TYPE:
+    this->fec_payload_type = (guint8) g_value_get_uint (value);
+    monitor_set_fec_payload_type(this->monitor, this->fec_payload_type);
+    break;
+  case PROP_ACCUMULATION_LENGTH:
+    this->accumulation_length = (GstClockTime) g_value_get_uint (value) * GST_MSECOND;
+    monitor_set_accumulation_length(this->monitor, this->accumulation_length);
+    break;
+  case PROP_SAMPLING_TIME:
+    this->sampling_time = (GstClockTime) g_value_get_uint (value) * GST_MSECOND;
+    break;
+  case PROP_CSV_LOGGING:
+    this->csv_logging = g_value_get_boolean (value);
+    break;
+  default:
+    G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+    break;
   }
   THIS_UNLOCK(this);
 }
@@ -502,23 +376,8 @@ gst_rtpstatmaker_get_property (GObject * object, guint property_id,
   THIS_LOCK(this);
   switch (property_id) {
     case PROP_MPRTP_EXT_HEADER_ID:
-      g_value_set_uint (value, (guint) sndpackets_get_mprtp_ext_header_id(this->sndpackets));
-      break;
-    case PROP_ABS_TIME_EXT_HEADER_ID:
-      g_value_set_uint (value, (guint) sndpackets_get_abs_time_ext_header_id(this->sndpackets));
-      break;
-    case PROP_MPATH_KEYFRAME_FILTERING:
-      g_warning("path keyframe filtering is not implemented yet");
-      break;
-    case PROP_FEC_PAYLOAD_TYPE:
-      g_value_set_uint (value, (guint) this->fec_payload_type);
-      break;
-    case PROP_PACKET_OBSOLATION_TRESHOLD:
-      g_value_set_uint(value, this->obsolation_treshold / GST_MSECOND);
-      break;
-    case PROP_FEC_INTERVAL:
-      g_value_set_uint (value, (guint) this->fec_interval);
-      break;
+      g_value_set_uint (value, (guint) this->mprtp_ext_header_id);
+    break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -526,26 +385,6 @@ gst_rtpstatmaker_get_property (GObject * object, guint property_id,
   THIS_UNLOCK(this);
 
 }
-
-//
-//gboolean
-//gst_rtpstatmaker_mprtp_src_event (GstPad * pad, GstObject * parent,
-//    GstEvent * event)
-//{
-//  GstRTPStatMaker *this;
-//  gboolean result;
-//
-//  this = GST_RTPSTATMAKER (parent);
-//  THIS_LOCK(this);
-//  switch (GST_EVENT_TYPE (event)) {
-//    default:
-//      result = gst_pad_push_event (this->rtp_sinkpad, event);
-////      result = gst_pad_event_default (pad, parent, event);
-//  }
-//  THIS_UNLOCK(this);
-//  return result;
-//}
-
 
 static GstStateChangeReturn
 gst_rtpstatmaker_change_state (GstElement * element,
@@ -564,8 +403,6 @@ gst_rtpstatmaker_change_state (GstElement * element,
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       break;
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
-       gst_pad_start_task(this->mprtp_srcpad, (GstTaskFunction)rtpstatmaker_approval_process,
-         this, NULL);
        gst_task_set_lock (this->thread, &this->thread_mutex);
        gst_task_start (this->thread);
        break;
@@ -598,26 +435,9 @@ gst_rtpstatmaker_query (GstElement * element, GstQuery * query)
 {
   GstRTPStatMaker *this = GST_RTPSTATMAKER (element);
   gboolean ret = TRUE;
-  GstStructure *s = NULL;
 
   GST_DEBUG_OBJECT (this, "query");
   switch (GST_QUERY_TYPE (query)) {
-    case GST_QUERY_CUSTOM:
-      THIS_LOCK(this);
-      s = gst_query_writable_structure (query);
-      if (!gst_structure_has_name (s,
-              GST_MPRTCP_SCHEDULER_SENT_BYTES_STRUCTURE_NAME)) {
-        ret =
-            GST_ELEMENT_CLASS (gst_rtpstatmaker_parent_class)->query (element,
-            query);
-        break;
-      }
-      gst_structure_set (s,
-          GST_MPRTCP_SCHEDULER_SENT_OCTET_SUM_FIELD,
-          G_TYPE_UINT, this->rtcp_sent_octet_sum, NULL);
-      THIS_UNLOCK(this);
-      ret = TRUE;
-      break;
     default:
       ret =
           GST_ELEMENT_CLASS (gst_rtpstatmaker_parent_class)->query (element,
@@ -629,75 +449,95 @@ gst_rtpstatmaker_query (GstElement * element, GstQuery * query)
 }
 
 
-static void _wait(GstRTPStatMaker *this, GstClockTime end, gint64 step_in_microseconds)
-{
-  gint64 end_time;
-  while(_now(this) < end){
-    end_time = g_get_monotonic_time() + step_in_microseconds;
-    g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);
-  }
-}
 
 static GstFlowReturn
 gst_rtpstatmaker_rtp_sink_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buffer)
 {
   GstRTPStatMaker *this;
-  GstFlowReturn result;
   guint8 first_byte;
   guint8 second_byte;
-  SndPacket* packet = NULL;
+  MonitorPacket* packet = NULL;
+  GstBuffer* packetbuffer = NULL;
 
   this = GST_RTPSTATMAKER (parent);
 
   if (GST_PAD_IS_FLUSHING(pad)) {
-    result = GST_FLOW_FLUSHING;
-    goto done;
+    goto exit;
   }
 
-//  g_print("Sent: %lu\n", GST_TIME_AS_MSECONDS(gst_clock_get_time(this->sysclock)-prev));
-//  prev = gst_clock_get_time(this->sysclock);
   if (gst_buffer_extract (buffer, 0, &first_byte, 1) != 1 ||
       gst_buffer_extract (buffer, 1, &second_byte, 1) != 1) {
     GST_WARNING_OBJECT (this, "could not extract first byte from buffer");
-    gst_buffer_unref (buffer);
-    result = GST_FLOW_ERROR;
-    goto done;
+    goto exit;
   }
 
   if (!PACKET_IS_RTP_OR_RTCP (first_byte)) {
     GST_DEBUG_OBJECT (this, "Not RTP Packet arrived at rtp_sink");
-    gst_pad_push(this->mprtp_srcpad, buffer);
-    result = GST_FLOW_ERROR;
-    goto done;
+    goto exit;
   }
 
-  result = GST_FLOW_OK;
 
   if(PACKET_IS_RTCP(second_byte)){
     GST_DEBUG_OBJECT (this, "RTCP Packet arrived on rtp sink");
-    gst_pad_push(this->mprtp_srcpad, buffer);
-    goto done;
+    goto exit;
   }
-
-  //The problem if we add the fec here: We add an extesnion thereafter and
-  //meanwhile the receiver side the bitstting considering the extension
-  //here we don't at the creation.
-  //fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(buffer));
 
   THIS_LOCK(this);
 
-  if(0 < sndsubflows_get_subflows_num(this->subflows)){
-    packet = sndpackets_make_packet(this->sndpackets, gst_buffer_ref(buffer));
-    g_queue_push_tail(this->packetsq, packet);
-    g_cond_signal(&this->receiving_signal);
-  }else{
-    result = gst_pad_push(this->mprtp_srcpad, buffer);
+  packet = monitor_track_rtpbuffer(this->monitor, buffer);
+  if(!packet){
+    goto done;
   }
-  THIS_UNLOCK(this);
+
+  if(!this->packetsrc_linked && !this->packetlogs_linked){
+    goto done;
+  }
+
+
+  if(this->packetsrc_linked){
+    packetbuffer    = gst_buffer_new_wrapped(g_malloc0(1024), 1024);
+    monitor_setup_packetbufffer(packet, packetbuffer);
+    gst_pad_push(this->packet_srcpad, packetbuffer);
+    packetbuffer = NULL;
+  }
+
+  if(this->packetlogs_linked){
+    GstMapInfo map = GST_MAP_INFO_INIT;
+
+    packetbuffer = gst_buffer_new_wrapped(g_malloc0(1024), 1024);
+    if(this->csv_logging){
+      gchar csv[1024];
+
+
+      sprintf(csv,
+          "%hu,%d,%lu,%d,%u,%u,%u,%d",
+          packet->tracked_seq,
+          packet->state,
+          packet->tracked_ntp,
+          packet->marker,
+          packet->header_size,
+          packet->payload_size,
+          packet->timestamp,
+          packet->payload_type
+
+      );
+
+
+      gst_buffer_map(buffer, &map, GST_MAP_READWRITE);
+      memcpy(map.data, csv, 1024);
+      gst_buffer_unmap(buffer, &map);
+    }else{
+      monitor_setup_packetbufffer(packet, packetbuffer);
+    }
+    gst_pad_push(this->packetlogs_srcpad, packetbuffer);
+  }
 
 done:
-  return result;
+  THIS_UNLOCK(this);
+
+exit:
+  return gst_pad_push(this->rtp_srcpad, buffer);
 }
 
 
@@ -731,30 +571,19 @@ done:
 
 
 static GstFlowReturn
-gst_rtpstatmaker_mprtcp_rr_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *buf)
+gst_rtpstatmaker_packet_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *buf)
 {
   GstRTPStatMaker *this;
   GstFlowReturn result;
 
-//      GstRTCPBuffer rtcp = GST_RTCP_BUFFER_INIT;
-//      gst_rtcp_buffer_map(buf, GST_MAP_READ, &rtcp);
-//      gst_print_rtcp_buffer(&rtcp);
-//      gst_rtcp_buffer_unmap(&rtcp);
-
-
   this = GST_RTPSTATMAKER (parent);
 
-  PROFILING("THIS_LOCK",
-    THIS_LOCK(this);
-  );
+  THIS_LOCK(this);
 
-  PROFILING("sndctrler_receive_mprtcp",
-    sndctrler_receive_mprtcp(this->controller, buf);
-    result = GST_FLOW_OK;
-  );
-  PROFILING("THIS_UNLOCK",
-    THIS_UNLOCK(this);
-  );
+  monitor_track_packetbuffer(this->monitor, buf);
+
+  result = GST_FLOW_OK;
+  THIS_UNLOCK(this);
 
   return result;
 
@@ -794,46 +623,6 @@ static gboolean gst_rtpstatmaker_mprtp_src_event(GstPad *pad, GstObject *parent,
 
     return ret;
 }
-//
-//static gboolean
-//gst_rtpstatmaker_sink_eventfunc (GstPad * srckpad, GstObject * parent,
-//                                   GstEvent * event)
-//{
-//  GstRTPStatMaker * this;
-//  gboolean result = TRUE, forward = TRUE;
-//  g_print("EVENT income: %d - %s\n", GST_EVENT_TYPE (event), GST_EVENT_TYPE_NAME(event));
-//  this = GST_RTPSTATMAKER(parent);
-//  switch (GST_EVENT_TYPE (event)) {
-//    case GST_EVENT_FLUSH_START:
-//      break;
-//    case GST_EVENT_FLUSH_STOP:
-//      /* we need new segment info after the flush. */
-//      gst_segment_init (&this->segment, GST_FORMAT_UNDEFINED);
-//      this->position_out = GST_CLOCK_TIME_NONE;
-//      break;
-//    case GST_EVENT_EOS:
-//      break;
-//    case GST_EVENT_TAG:
-//      break;
-//    case GST_EVENT_SEGMENT:
-//    {
-//      gst_event_copy_segment (event, &this->segment);
-//      GST_DEBUG_OBJECT (this, "received SEGMENT %" GST_SEGMENT_FORMAT,
-//          &this->segment);
-//      break;
-//    }
-//    default:
-//      break;
-//  }
-//
-//  if (result && forward)
-//    result = gst_pad_push_event (this->mprtp_srcpad, event);
-//  else
-//    gst_event_unref (event);
-//
-//  return result;
-//}
-
 
 static gboolean
 gst_rtpstatmaker_src_query (GstPad * srckpad, GstObject * parent,
@@ -867,98 +656,79 @@ gst_rtpstatmaker_src_query (GstPad * srckpad, GstObject * parent,
   return result;
 }
 
-void _on_rtcp_ready(GstRTPStatMaker * this, GstBuffer *buffer)
-{
-//    GstRTCPBuffer rtcp = GST_RTCP_BUFFER_INIT;
-//    gst_rtcp_buffer_map(buffer, GST_MAP_READ, &rtcp);
-//    gst_print_rtcp_buffer(&rtcp);
-//    gst_rtcp_buffer_unmap(&rtcp);
-
-  gst_pad_push(this->mprtcp_sr_srcpad, buffer);
-}
-
-void _on_monitoring_request(GstRTPStatMaker * this, SndSubflow* subflow)
-{
-  fecencoder_request_fec(this->fec_encoder, subflow->id);
-}
-
-void _on_monitoring_response(GstRTPStatMaker * this, FECEncoderResponse *response)
-{
-  THIS_LOCK(this);
-  sndtracker_add_fec_response(this->sndtracker, response);
-  gst_pad_push(this->mprtp_srcpad, response->fecbuffer);
-  fecencoder_unref_response(response);
-  THIS_UNLOCK(this);
-}
-
-void
-_rtpstatmaker_send_packet (GstRTPStatMaker * this, SndSubflow* subflow, SndPacket *packet)
-{
-  GstBuffer *buffer;
-  sndpacket_setup_mprtp(packet, subflow->id, sndsubflow_get_next_subflow_seq(subflow));
-  sndtracker_packet_sent(this->sndtracker, packet);
-
-//  g_print("packet %hu sent %d - %hu\n", packet->abs_seq, packet->subflow_id, packet->subflow_seq);
-  buffer = sndpacket_retrieve(packet);
-  fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(buffer));
-  gst_pad_push(this->mprtp_srcpad, buffer);
-
-  if (!this->riport_flow_signal_sent) {
-    this->riport_flow_signal_sent = TRUE;
-    sndctrler_report_can_flow(this->controller);
-  }
-
-  return;
-}
 
 
 static void
-rtpstatmaker_approval_process (GstRTPStatMaker *this)
+_monitorstat_emitter (GstRTPStatMaker *this)
 {
-  SndPacket *packet;
-  SndSubflow *subflow;
-  GstClockTime now, next_time;
+  Monitor* monitor;
+  MonitorStat* stat;
+  GstBuffer* buffer = NULL;
+  gint64 end_time;
+  const guint length = 1024;
+  gchar csv[1024];
 
-//PROFILING("LOCK",
   THIS_LOCK(this);
-//);
-
-
-  if(g_queue_is_empty(this->packetsq)){
-//    g_cond_wait_until(&this->receiving_signal, &this->mutex, g_get_monotonic_time() + 1000);
-    g_cond_wait(&this->receiving_signal, &this->mutex);
-    goto done;
-  }
-  packet = (SndPacket*) g_queue_pop_head(this->packetsq);
-
-  now = _now(this);
-  next_time = now + 10 * GST_MSECOND;
-
-  sndtracker_refresh(this->sndtracker);
-  sndctrler_time_update(this->controller);
-
-  //Obsolete packets stayed in the q for a while
-  if(0 < this->obsolation_treshold && packet->made < now - this->obsolation_treshold){
-    gst_buffer_unref(sndpacket_retrieve(packet));
+  end_time = g_get_monotonic_time() + this->sampling_time * 1000; //because sampling_time is in ms.
+  g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);
+  if(!this->statlogs_linked){
     goto done;
   }
 
-  subflow = stream_splitter_approve_packet(this->splitter, packet, now, &next_time);
-  if(!subflow){
-    g_queue_push_head(this->packetsq, packet);
-    if(now < next_time - 500 * GST_USECOND){
-//      g_print("1: now: %lu -> next_time: %lu diff: %lu\n", now, next_time, next_time - now);
-      _wait(this, next_time, 500);
-//      g_print("2: now: %lu -> next_time: %lu diff: %lu\n", _now(this), next_time, _now(this) - next_time);
-    }
-    goto done;
+  buffer = gst_buffer_new_wrapped(g_malloc0(length), length);
+  monitor = this->monitor;
+  stat = &monitor->stat;
+
+  if(this->csv_logging){
+    GstMapInfo map = GST_MAP_INFO_INIT;
+    sprintf(csv,
+        "%d,%d,%d,%d," //received
+        "%d,%d,%d,%d," //lost
+        "%d,%d,%d,%d," //discarded
+        "%d,%d,%d,%d," //corrupted
+        "%d,%d,%d,%d," //repaired
+        "%d,%d,%d,%d"  //fec
+        ,
+        stat->received.total_packets,
+        stat->received.total_bytes,
+        stat->received.accumulative_bytes,
+        stat->received.accumulative_packets,
+
+        stat->lost.total_packets,
+        stat->lost.total_bytes,
+        stat->lost.accumulative_bytes,
+        stat->lost.accumulative_packets,
+
+        stat->discarded.total_packets,
+        stat->discarded.total_bytes,
+        stat->discarded.accumulative_bytes,
+        stat->discarded.accumulative_packets,
+
+        stat->corrupted.total_packets,
+        stat->corrupted.total_bytes,
+        stat->corrupted.accumulative_bytes,
+        stat->corrupted.accumulative_packets,
+
+        stat->repaired.total_packets,
+        stat->repaired.total_bytes,
+        stat->repaired.accumulative_bytes,
+        stat->repaired.accumulative_packets,
+
+        stat->fec.total_packets,
+        stat->fec.total_bytes,
+        stat->fec.accumulative_bytes,
+        stat->fec.accumulative_packets
+      );
+
+    gst_buffer_map(buffer, &map, GST_MAP_READWRITE);
+    memcpy(map.data, csv, length);
+    gst_buffer_unmap(buffer, &map);
+
+  }else{
+    monitor_setup_monitorstatbufffer(this->monitor, buffer);
   }
 
-  if(0 < this->fec_interval && (++this->sent_packets % this->fec_interval) == 0){
-    fecencoder_request_fec(this->fec_encoder, subflow->id);
-  }
-
-  _rtpstatmaker_send_packet(this, subflow, packet);
+  gst_pad_push(this->statlogs_srcpad, buffer);
 
 done:
   THIS_UNLOCK(this);
@@ -967,24 +737,87 @@ done:
 
 
 
-void
-rtpstatmaker_emitter_process (gpointer udata)
+
+GstPadLinkReturn _on_packet_srcpad_linked (GstPad * pad, GstObject * parent, GstPad * peer)
 {
   GstRTPStatMaker *this;
-  MPRTPPluginSignalData *msg;
+  GstPadLinkReturn result = GST_PAD_LINK_OK;
+  this = GST_RTPSTATMAKER (parent);
+  THIS_LOCK(this);
+  this->packetsrc_linked = TRUE;
+  THIS_UNLOCK(this);
+  return result;
+}
 
-  this = (GstRTPStatMaker *) udata;
+void _on_packet_srcpad_unlinked (GstPad * pad, GstObject * parent)
+{
+  GstRTPStatMaker *this;
+  this = GST_RTPSTATMAKER (parent);
 
-  messenger_lock(this->emit_msger);
-
-  msg = messenger_pop_block_with_timeout_unlocked(this->emit_msger, 10000);
-  if(!msg){
-    goto done;
-  }
-  g_signal_emit (this, _subflows_utilization, 0 /* details */, msg);
-  messenger_throw_block_unlocked(this->emit_msger, msg);
-done:
-  messenger_unlock(this->emit_msger);
+  THIS_LOCK(this);
+  this->packetsrc_linked = FALSE;
+  THIS_UNLOCK(this);
   return;
 }
+
+
+GstPadLinkReturn _on_packetlogs_srcpad_linked (GstPad * pad, GstObject * parent, GstPad * peer)
+{
+  GstRTPStatMaker *this;
+  GstPadLinkReturn result = GST_PAD_LINK_OK;
+  this = GST_RTPSTATMAKER (parent);
+
+  THIS_LOCK(this);
+  this->packetlogs_linked = TRUE;
+  THIS_UNLOCK(this);
+
+  return result;
+}
+
+void _on_packetlogs_srcpad_unlinked (GstPad * pad, GstObject * parent)
+{
+  GstRTPStatMaker *this;
+  this = GST_RTPSTATMAKER (parent);
+
+  THIS_LOCK(this);
+  this->packetlogs_linked = FALSE;
+  THIS_UNLOCK(this);
+
+  return;
+}
+
+GstPadLinkReturn _on_statlogs_srcpad_linked (GstPad * pad, GstObject * parent, GstPad * peer)
+{
+  GstRTPStatMaker *this;
+  GstPadLinkReturn result = GST_PAD_LINK_OK;
+  this = GST_RTPSTATMAKER (parent);
+
+  THIS_LOCK(this);
+  this->statlogs_linked = TRUE;
+  this->thread = gst_task_new ((GstTaskFunction) _monitorstat_emitter, this, NULL);
+  g_mutex_init (&this->mutex);
+  THIS_UNLOCK(this);
+
+  return result;
+}
+
+void _on_statlogs_srcpad_unlinked (GstPad * pad, GstObject * parent)
+{
+  GstTask* task;
+  GstRTPStatMaker *this;
+  this = GST_RTPSTATMAKER (parent);
+
+  THIS_LOCK(this);
+  this->statlogs_linked = FALSE;
+  task = this->thread;
+  this->thread = NULL;
+  THIS_UNLOCK(this);
+
+  gst_task_join (task);
+  gst_object_unref (task);
+
+  return;
+}
+
+
 

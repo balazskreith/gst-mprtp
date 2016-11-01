@@ -23,11 +23,7 @@
 #include <gst/gst.h>
 
 #include "gstmprtcpbuffer.h"
-#include "sndctrler.h"
-#include "streamsplitter.h"
-#include "mprtplogger.h"
-#include "fecenc.h"
-#include "mediator.h"
+#include "monitor.h"
 
 G_BEGIN_DECLS
 #define GST_TYPE_RTPSTATMAKER   (gst_rtpstatmaker_get_type())
@@ -44,44 +40,31 @@ typedef struct _GstRTPStatMakerPrivate GstRTPStatMakerPrivate;
 struct _GstRTPStatMaker
 {
   GstElement                    base_object;
+  GstClock*                     sysclock;
   GMutex                        mutex;
   GCond                         waiting_signal;
-  GCond                         receiving_signal;
   GstPad*                       rtp_sinkpad;
-  GstPad*                       mprtp_srcpad;
-  GstPad*                       mprtcp_rr_sinkpad;
-  GstPad*                       mprtcp_sr_srcpad;
+  GstPad*                       rtp_srcpad;
+  GstPad*                       packet_sinkpad;
+  GstPad*                       packet_srcpad;
+  GstPad*                       statlogs_srcpad;
+  GstPad*                       packetlogs_srcpad;
 
-  gboolean                      preroll;
-
-  SndSubflows*                  subflows;
-  SndPackets*                   sndpackets;
-  StreamSplitter*               splitter;
-  SndController*                controller;
-  SndTracker*                   sndtracker;
-  gboolean                      riport_flow_signal_sent;
-  GstSegment                    segment;
-  GstClockTime                  position_out;
-
+  guint8                        mprtp_ext_header_id;
   guint8                        fec_payload_type;
-  GstClockTime                  obsolation_treshold;
-  GstClock*                     sysclock;
+  GstClockTime                  accumulation_length;
+  GstClockTime                  sampling_time;
 
-  GstClockTime                  last_pts;
 
-  guint32                       rtcp_sent_octet_sum;
-
+  Monitor*                      monitor;
   GstTask*                      thread;
   GRecMutex                     thread_mutex;
-  FECEncoder*                   fec_encoder;
-  guint32                       fec_interval;
-  guint32                       sent_packets;
 
-  Mediator*                     monitoring;
-  GQueue*                       packetsq;
-  Messenger*                    emit_msger;
-//  GAsyncQueue*                  emitterq;
-  Notifier*                     on_rtcp_ready;
+  gboolean                      csv_logging;
+  gboolean                      packetsrc_linked;
+  gboolean                      packetlogs_linked;
+  gboolean                      statlogs_linked;
+
 
   GstRTPStatMakerPrivate*     priv;
 

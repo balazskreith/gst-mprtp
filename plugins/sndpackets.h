@@ -59,7 +59,7 @@ struct _SndPackets
   GObject                    object;
   GstClock*                  sysclock;
   GstClockTime               made;
-  SndPacket*                 packets;
+//  SndPacket*                 packets;
 
   Recycle*                   recycle;
 

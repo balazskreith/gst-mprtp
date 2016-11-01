@@ -282,8 +282,8 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
   {
 	GObject *rtp_session = NULL;
     g_signal_emit_by_name(rtpBin, "get-internal-session", 0, &rtp_session);
-	g_signal_connect(rtp_session, "on-feedback-rtcp", G_CALLBACK(on_feedback_rtcp), session);
-	g_signal_connect(scream_queue, "on-bitrate-change", G_CALLBACK(on_bitrate_change), session);
+	  g_signal_connect(rtp_session, "on-feedback-rtcp", G_CALLBACK(on_feedback_rtcp), session);
+	  g_signal_connect(scream_queue, "on-bitrate-change", G_CALLBACK(on_bitrate_change), session);
     g_signal_connect(scream_queue, "on-payload-adaptation-request", (GCallback)on_payload_adaptation_request, session);
     g_object_unref(rtp_session);
   }

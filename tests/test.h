@@ -76,7 +76,6 @@ typedef struct{
   gint32      width;
   gint32      height;
   Fraction    framerate;
-
 }VideoParams;
 
 static VideoParams *video_params;

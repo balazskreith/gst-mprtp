@@ -72,7 +72,6 @@ sndpackets_finalize (GObject * object)
   this = SNDPACKETS(object);
 
   g_object_unref(this->sysclock);
-  g_free(this->packets);
 
 }
 
@@ -80,7 +79,6 @@ SndPackets* make_sndpackets(void)
 {
   SndPackets* this;
   this = g_object_new (SNDPACKETS_TYPE, NULL);
-  this->packets = g_malloc0(sizeof(SndPacket) * 65536);
   return this;
 }
 
@@ -98,7 +96,7 @@ sndpackets_init (SndPackets * this)
 
 void sndpackets_reset(SndPackets* this)
 {
-  memset((gpointer)this->packets, 0, sizeof(SndPackets) * 65536);
+
 }
 
 SndPacket* sndpackets_make_packet(SndPackets* this, GstBuffer* buffer)
@@ -113,11 +111,6 @@ SndPacket* sndpackets_make_packet(SndPackets* this, GstBuffer* buffer)
   result->abs_time_ext_header_id = this->abs_time_ext_header_id;
 
   return result;
-}
-
-SndPacket* sndpackets_get_by_abs_seq(SndPackets* this, guint16 abs_seq)
-{
-  return this->packets + abs_seq;
 }
 
 void sndpackets_set_abs_time_ext_header_id(SndPackets* this, guint8 abs_time_ext_header_id)

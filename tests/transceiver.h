@@ -19,12 +19,11 @@
  * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
  * Boston, MA 02110-1301, USA.
  */
+#ifndef TESTS_TRANSCEIVER_H_
+#define TESTS_TRANSCEIVER_H_
 
 #include <gst/gst.h>
 
-#include <string.h>
+GstElement* make_transceiver(void);
 
-#include <gst/app/gstappsrc.h>
-#include <gst/app/gstappsink.h>
-
-GstElement* make_transceiver();
+#endif /* TESTS_TRANSCEIVER_H_ */

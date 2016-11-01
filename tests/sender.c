@@ -55,30 +55,59 @@ session_new (void)
 static GstElement* make_rawproxy_source(void)
 {
   RawProxySourceParams* proxy_params = (RawProxySourceParams*) source_params;
-  GstBin*     sourceBin = GST_BIN(gst_bin_new(NULL));
-  GstElement* receiver  = gst_element_factory_make("udpsrc", NULL);
-  GstElement* rawDepay  = gst_element_factory_make("rtpvrawdepay", NULL);
+  GstBin*     sourceBin   = GST_BIN(gst_bin_new(NULL));
+  GstElement* receiver    = gst_element_factory_make("udpsrc", NULL);
+  GstElement* rawDepay    = gst_element_factory_make("rtpvrawdepay", NULL);
   GstElement* transceiver = make_transceiver();
+  GstElement* videoParse  = gst_element_factory_make("videoparse", NULL);
+
+  GstElement* tee         = gst_element_factory_make("tee", NULL);
+  GstElement* queue       = gst_element_factory_make("queue", NULL);
+  GstElement* sink        = gst_element_factory_make("autovideosink", NULL);
 
   const GstCaps* caps        = gst_caps_new_simple ("application/x-rtp",
       "media", G_TYPE_STRING, "video",
       "clock-rate", G_TYPE_INT, proxy_params->clock_rate,
       "width", G_TYPE_STRING, "352",//TODO: replace it by pram width
       "height", G_TYPE_STRING, "288",
+      "sampling", G_TYPE_STRING, "YCbCr-4:2:0",
       "framerate", GST_TYPE_FRACTION, proxy_params->framerate.numerator, proxy_params->framerate.divider,
       "encoding-name", G_TYPE_STRING, "RAW", NULL
       );
 
   g_print("Caps: %s\n", gst_caps_to_string(caps));
 
-  g_object_set(receiver,
+  g_object_set(G_OBJECT(receiver),
       "port", proxy_params->port,
       "caps", caps,
       NULL);
 
-  gst_bin_add_many (sourceBin, receiver, rawDepay, transceiver, NULL);
+  g_object_set(G_OBJECT(videoParse),
+      "format", 2,
+      "width", 352,
+      "height", 288,
+      "framerate", 25, 1,
+      NULL
+  );
 
-  gst_element_link_many(receiver, rawDepay, transceiver, NULL);
+  gst_bin_add_many (sourceBin, receiver, rawDepay, transceiver, videoParse,
+      tee, queue, sink,
+      NULL);
+
+
+  gst_element_link_pads(receiver, "src", rawDepay, "sink");
+  gst_element_link_pads(rawDepay, "src", tee, "sink");
+  gst_element_link_pads(tee, "src_1", transceiver, "sink");
+
+  gst_element_link_pads(tee, "src_2", queue, "sink");
+  gst_element_link_pads(queue, "src", videoParse, "sink");
+  gst_element_link_pads(videoParse, "src", sink, "sink");
+
+//  gst_element_link_many(receiver, rawDepay, transceiver, videoParse, NULL);
+
+  g_print("CAPS!!!: %s\n",
+      gst_caps_to_string(gst_pad_get_current_caps(gst_element_get_static_pad(videoParse, "src"))));
+
   setup_ghost_src (transceiver, sourceBin);
 
   return GST_ELEMENT(sourceBin);
@@ -123,7 +152,6 @@ static GstElement* make_vp8_encoder(void)
   GstBin *encoderBin = GST_BIN (gst_bin_new (NULL));
   GstElement* encoder = gst_element_factory_make ("vp8enc", NULL);
   GstElement *payloader = gst_element_factory_make ("rtpvp8pay", NULL);
-  GstCaps *videoCaps;
 
 
   g_object_set (encoder, "target-bitrate", target_bitrate, NULL);
@@ -219,6 +247,7 @@ main (int argc, char **argv)
           "width", G_TYPE_INT, video_params->width,
           "height", G_TYPE_INT, video_params->height,
           "framerate", GST_TYPE_FRACTION, video_params->framerate.numerator, video_params->framerate.divider,
+          "format", G_TYPE_STRING, "I420",
           NULL);
 
   session = session_new();

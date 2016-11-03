@@ -21,18 +21,26 @@ gchar* _string_test(gchar *subject_str, gchar* failed_str)
   return subject_str == NULL ? failed_str : subject_str;
 }
 
+
+void setup_framerate(gchar *string, Framerate* framerate)
+{
+  gchar       **tokens = g_strsplit(string, "/", -1);
+  framerate->numerator = atoi(tokens[0]);
+  framerate->divider   = atoi(tokens[1]);
+}
+
+
 SourceParams*   make_source_params(gchar* params_rawstring)
 {
   SourceParams* result = g_malloc0(sizeof(SourceParams));
   gchar       **tokens = g_strsplit(params_rawstring, ":", -1);
 
-  result->type = _compare_types(tokens[0], "TESTVIDEO", "RAWPROXY", NULL);
+  result->type = _compare_types(tokens[0], "TESTVIDEO", "RAWPROXY", "LIVEFILE", "FILE", NULL);
 
   switch(result->type){
     case SOURCE_TYPE_TESTVIDEO:
-      result->testvideo.horizontal_speed = atoi(tokens[1]);
 
-      sprintf(result->to_string, "TestVideoSource, horizontal-speed: %d", result->testvideo.horizontal_speed);
+      sprintf(result->to_string, "TestVideoSource");
       break;
     case SOURCE_TYPE_RAWPROXY:
       strcpy(result->rawproxy.width,      tokens[1]);
@@ -49,6 +57,31 @@ SourceParams*   make_source_params(gchar* params_rawstring)
       );
 
       break;
+
+    case SOURCE_TYPE_FILE:
+    case SOURCE_TYPE_LIVEFILE:
+      strcpy(result->file.location,   tokens[1]);
+
+      result->file.loop = atoi(tokens[2]);
+
+      strcpy(result->file.width,      tokens[3]);
+      strcpy(result->file.height,     tokens[4]);
+
+      result->file.format = atoi(tokens[5]);
+      setup_framerate(tokens[6], &result->file.framerate);
+
+      sprintf(result->to_string, "%s: %s, loop: %d, W:%s, H:%s, Framerate: %d/%d, Format: %d",
+          result->type == SOURCE_TYPE_FILE ? "File" : "LiveFile",
+          result->file.location,
+          result->file.loop,
+          result->file.width,
+          result->file.height,
+          result->file.framerate.numerator,
+          result->file.framerate.divider,
+          result->file.format
+      );
+
+      break;
     default:
       g_print("Unrecognized type (%d) at make_source_params \n", result->type);
       break;
@@ -62,35 +95,47 @@ CodecParams*    make_codec_params (gchar* params_rawstring)
   CodecParams* result = g_malloc0(sizeof(CodecParams));
   gchar       **tokens = g_strsplit(params_rawstring, ":", -1);
 
-  result->type = _compare_types(tokens[0], "VP8", "THEORA", NULL);
-  strcpy(result->width,      tokens[1]);
-  strcpy(result->height,     tokens[2]);
-
-  result->clock_rate = atoi(tokens[3]);
+  result->type = _compare_types(tokens[0], "THEORA",  "VP8", NULL);
 
   switch(result->type){
-    case CODEC_TYPE_VP8:
-
-      sprintf(result->to_string, "VP8 Codec, W:%s, H:%s, ClockRate: %d",
-        result->width,
-        result->height,
-        result->clock_rate
-      );
-    break;
-
     case CODEC_TYPE_THEORA:
-
-      sprintf(result->to_string, "THEORA Codec, W:%s, H:%s, ClockRate: %d",
-              result->width,
-              result->height,
-              result->clock_rate
-            );
+      sprintf(result->type_str,  "THEORA");
+      sprintf(result->to_string, "THEORA");
       break;
+
+    case CODEC_TYPE_VP8:
+      sprintf(result->type_str,  "VP8");
+      sprintf(result->to_string, "VP8");
+    break;
 
     default:
       g_print("Unrecognized type (%d) at make_codec_params \n", result->type);
       break;
   };
+
+  return result;
+}
+
+VideoParams*    make_video_params (gchar* params_rawstring)
+{
+  VideoParams* result = g_malloc0(sizeof(VideoParams));
+  gchar       **tokens = g_strsplit(params_rawstring, ":", -1);
+
+  strcpy(result->width,      tokens[0]);
+  strcpy(result->height,     tokens[1]);
+
+  result->clock_rate = atoi(tokens[2]);
+
+  setup_framerate(tokens[3], &result->framerate);
+
+  sprintf(result->to_string,
+      "Width: %s, Height: %s, Clock-Rate: %d, FrameRate: %d/%d",
+      result->width,
+      result->height,
+      result->clock_rate,
+      result->framerate.numerator,
+      result->framerate.divider
+  );
 
   return result;
 }
@@ -104,6 +149,11 @@ SenderParams*   make_sender_params(gchar* params_rawstring)
 
   switch(result->type){
     case TRANSFER_TYPE_RTPSIMPLE:
+
+      result->dest_port = atoi(tokens[1]);
+      strcpy(result->dest_ip, tokens[2]);
+
+      sprintf(result->to_string, "Dest IP: %s:%d", result->dest_ip, result->dest_port);
 
       break;
     case TRANSFER_TYPE_RTPSCREAM:
@@ -127,9 +177,11 @@ ReceiverParams* make_receiver_params(gchar* params_rawstring)
 
   result->type = _compare_types(tokens[0], "RTPSIMPLE", "RTPSCREAM", "RTPFBRAP", NULL);
 
+  result->bound_port = atoi(tokens[1]);
+
   switch(result->type){
     case TRANSFER_TYPE_RTPSIMPLE:
-
+      sprintf(result->to_string, "RTPSIMPLE, Port: %d", result->bound_port);
       break;
     case TRANSFER_TYPE_RTPSCREAM:
 
@@ -154,7 +206,7 @@ SinkParams*     make_sink_params(gchar* params_rawstring)
 
   switch(result->type){
     case SINK_TYPE_AUTOVIDEO:
-
+      sprintf(result->to_string, "AUTOVIDEO");
       break;
     case SINK_TYPE_RAWPROXY:
 
@@ -277,4 +329,21 @@ setup_ghost_src (GstElement * src, GstBin * bin)
   setup_ghost_src_by_padnames(src, "src", bin, "src");
 }
 
+static SenderNotifiers* sender_notifiers = NULL;
+SenderNotifiers* get_sender_eventers(void)
+{
+  if(sender_notifiers){
+    return sender_notifiers;
+  }
+  sender_notifiers = g_malloc0(sizeof(SenderNotifiers));
+  sender_notifiers->on_playing     = make_notifier("on--playing");
+  sender_notifiers->on_destroy     = make_notifier("on-destroy");
+  sender_notifiers->on_target_bitrate_change = make_notifier("on-target-bitrate-change");
 
+  return sender_notifiers;
+}
+
+void sender_eventers_dtor(void)
+{
+  g_free(sender_notifiers);
+}

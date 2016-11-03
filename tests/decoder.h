@@ -1,5 +1,5 @@
-#ifndef TESTS_ENCODER_H_
-#define TESTS_ENCODER_H_
+#ifndef TESTS_DECODER_H_
+#define TESTS_DECODER_H_
 
 #include <gst/gst.h>
 #include <string.h>
@@ -15,4 +15,4 @@ void decoder_dtor(Decoder* this);
 Decoder* make_decoder(CodecParams *params);
 
 
-#endif /* TESTS_SINK_H_ */
+#endif /* TESTS_DECODER_H_ */

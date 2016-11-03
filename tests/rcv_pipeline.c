@@ -14,6 +14,7 @@ typedef struct{
   ReceiverParams* receiver_params;
   CodecParams*    codec_params;
   SinkParams*     sink_params;
+  VideoParams*    video_params;
 
 }ReceiverSide;
 
@@ -24,12 +25,12 @@ static void _print_params(ReceiverSide* this)
   g_print("Receiver Params: %s\n", this->receiver_params->to_string);
   g_print("Codec    Params: %s\n", this->codec_params->to_string);
   g_print("Sink     Params: %s\n", this->sink_params->to_string);
-
+  g_print("Video    Params: %s\n", this->video_params->to_string);
 }
 
 static void _setup_bin(ReceiverSide *this)
 {
-  gst_bin_add_many(GST_BIN (pipe),
+  gst_bin_add_many(this->bin,
 
         this->receiver->element,
         this->decoder->element,
@@ -43,8 +44,13 @@ static void _connect_receiver_to_decoder(ReceiverSide *this)
   Receiver*  receiver = this->receiver;
   Decoder*   decoder = this->decoder;
 
-  gst_element_link_filtered(receiver->element, decoder->element, videoCaps);
+  GstCaps* caps = gst_caps_new_simple ("application/x-rtp",
+          "media", G_TYPE_STRING, "video",
+          "clock-rate", G_TYPE_INT, this->video_params->clock_rate,
+          "encoding-name", G_TYPE_STRING, this->codec_params->type_str,
+          NULL);
 
+  gst_element_link_filtered(receiver->element, decoder->element, caps);
 }
 
 static void _connect_decoder_to_sink(ReceiverSide *this)
@@ -53,9 +59,15 @@ static void _connect_decoder_to_sink(ReceiverSide *this)
   Sink*    sink    = this->sink;
 
   gst_element_link(decoder->element, sink->element);
-
 }
 
+
+static void _print_info(void){
+  g_print(
+      "Help for using Receiver Pipeline\n"
+      "\t--receiver=RTPSIMPLE|RTPSCREAM|MPRTP|MPRTPFBRAP\n"
+  );
+}
 
 int main (int argc, char **argv)
 {
@@ -75,7 +87,6 @@ int main (int argc, char **argv)
     _print_info();
     return 0;
   }
-  _setup_test_params();
 
   gst_init (&argc, &argv);
 
@@ -91,11 +102,15 @@ int main (int argc, char **argv)
       _string_test(sink_params_rawstring, sink_params_rawstring_default)
   );
 
+  session->video_params = make_video_params(
+      _string_test(video_params_rawstring, video_params_rawstring_default)
+  );
+
   _print_params(session);
 
-  session->receiver  = make_receiver(session.receiver_params);
-  session->decoder   = make_decoder(session.codec_params);
-  session->sink      = make_sink(session.sink_params);
+  session->receiver  = make_receiver(session->receiver_params);
+  session->decoder   = make_decoder(session->codec_params);
+  session->sink      = make_sink(session->sink_params);
 
   loop = g_main_loop_new (NULL, FALSE);
 

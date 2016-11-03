@@ -27,7 +27,6 @@
 #include <gst/app/gstappsrc.h>
 #include <gst/app/gstappsink.h>
 #include "transceiver.h"
-#include "test.h"
 
 static GstFlowReturn
 _on_new_sample_from_receiver (GstElement * elt, GstElement* transmitter)

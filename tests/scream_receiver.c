@@ -23,7 +23,6 @@
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtpdefs.h>
 #include <stdlib.h>
-#include "test.h"
 #include "owr_arrival_time_meta.h"
 
 GMainLoop *loop = NULL;

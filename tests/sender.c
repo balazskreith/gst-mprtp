@@ -1,7 +1,8 @@
 #include <gst/gst.h>
 #include <gst/rtp/rtp.h>
+#include "sender.h"
 
-static void _setup_rtpsimple_sender(GstBin* senderBin, SenderParams *params);
+static GstElement* _make_rtpsimple_sender(SenderParams *params);
 
 
 Sender* sender_ctor(void)
@@ -21,22 +22,47 @@ void sender_dtor(Sender* this)
 
 Sender* make_sender(SenderParams *params)
 {
-  Sender* this = g_malloc0(sizeof(Source));
-  GstBin* sourceBin     = GST_BIN(gst_bin_new(NULL));
+  Sender* this = sender_ctor();
+  GstBin* senderBin     = GST_BIN(gst_bin_new(NULL));
+  GstElement* sender;
 
   switch(params->type){
     case TRANSFER_TYPE_RTPSIMPLE:
-      _setup_rtpsimple_sender(sourceBin, params);
+      sender = _make_rtpsimple_sender(params);
       break;
   };
 
-  this->element = GST_ELEMENT(sourceBin);
+  gst_bin_add_many(senderBin,
+
+      sender,
+
+      NULL
+  );
+
+  this->element = GST_ELEMENT(senderBin);
+
+  setup_ghost_sink(sender, senderBin);
+
   return this;
 }
 
-void _setup_rtpsimple_sender(GstBin* senderBin, SenderParams *params)
+GstElement* _make_rtpsimple_sender(SenderParams *params)
 {
+  GstBin *senderBin    = GST_BIN (gst_bin_new (NULL));
+  GstElement *rtpSink  = gst_element_factory_make ("udpsink", NULL);
+  gchar *padName;
 
+  gst_bin_add_many (senderBin, rtpSink, NULL);
+
+  g_object_set (rtpSink,
+      "port", params->dest_port,
+      "host", params->dest_ip,
+//      "sync", FALSE,
+//      "async", FALSE,
+      NULL);
+
+  setup_ghost_sink(rtpSink, senderBin);
+  return GST_ELEMENT(senderBin);
 }
 
 

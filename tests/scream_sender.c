@@ -19,7 +19,6 @@
  */
 #include <gst/gst.h>
 #include <gst/rtp/rtp.h>
-#include "test.h"
 #include "owr_arrival_time_meta.h"
 
 
@@ -249,15 +248,6 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
 
   g_object_set (rtcpSrc, "port", snd_rtcp_port, NULL);
 
-//
-//  g_object_set (rtpSink, "port", basePort, "host", "10.0.0.6", NULL);
-//  g_object_set (rtcpSink, "port", basePort + 1, "host", "127.0.0.1", "sync",
-//      FALSE, "async", FALSE, NULL);
-//  g_object_set (rtcpSrc, "port", basePort + 5, NULL);
-
-  /* this is just to drop some rtp packets at random, to demonstrate
-   * that rtprtxsend actually works */
-
   padName = g_strdup_printf ("send_rtp_sink_%u", session->sessionNum);
   gst_element_link_pads (session->input, "src", rtpBin, padName);
   g_free (padName);
@@ -280,7 +270,7 @@ add_stream (GstPipeline * pipe, GstElement * rtpBin, SessionData * session)
       basePort + 5);
 
   {
-	GObject *rtp_session = NULL;
+	  GObject *rtp_session = NULL;
     g_signal_emit_by_name(rtpBin, "get-internal-session", 0, &rtp_session);
 	  g_signal_connect(rtp_session, "on-feedback-rtcp", G_CALLBACK(on_feedback_rtcp), session);
 	  g_signal_connect(scream_queue, "on-bitrate-change", G_CALLBACK(on_bitrate_change), session);

@@ -89,10 +89,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-noinst_PROGRAMS = sender$(EXEEXT) receiver$(EXEEXT) \
-	fbrapsender$(EXEEXT) fbrapreceiver$(EXEEXT) \
-	scream_sender$(EXEEXT) scream_receiver$(EXEEXT) \
-	v4l2_file_player$(EXEEXT)
+noinst_PROGRAMS = snd_pipeline$(EXEEXT) rcv_pipeline$(EXEEXT)
 subdir = tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/common/m4/as-ac-expand.m4 \
@@ -114,61 +111,35 @@ CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 PROGRAMS = $(noinst_PROGRAMS)
-am_fbrapreceiver_OBJECTS = fbrapreceiver-fbrapreceiver.$(OBJEXT)
-fbrapreceiver_OBJECTS = $(am_fbrapreceiver_OBJECTS)
+am_rcv_pipeline_OBJECTS = rcv_pipeline-rcv_pipeline.$(OBJEXT) \
+	rcv_pipeline-decoder.$(OBJEXT) rcv_pipeline-encoder.$(OBJEXT) \
+	rcv_pipeline-pipeline.$(OBJEXT) \
+	rcv_pipeline-receiver.$(OBJEXT) rcv_pipeline-sender.$(OBJEXT) \
+	rcv_pipeline-sink.$(OBJEXT) rcv_pipeline-source.$(OBJEXT) \
+	rcv_pipeline-transceiver.$(OBJEXT)
+rcv_pipeline_OBJECTS = $(am_rcv_pipeline_OBJECTS)
 am__DEPENDENCIES_1 =
-fbrapreceiver_DEPENDENCIES = $(am__DEPENDENCIES_1)
+rcv_pipeline_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
-fbrapreceiver_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(fbrapreceiver_CFLAGS) \
+rcv_pipeline_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(rcv_pipeline_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-am_fbrapsender_OBJECTS = fbrapsender-fbrapsender.$(OBJEXT)
-fbrapsender_OBJECTS = $(am_fbrapsender_OBJECTS)
-fbrapsender_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
-fbrapsender_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(fbrapsender_CFLAGS) \
+am_snd_pipeline_OBJECTS = snd_pipeline-snd_pipeline.$(OBJEXT) \
+	snd_pipeline-decoder.$(OBJEXT) snd_pipeline-encoder.$(OBJEXT) \
+	snd_pipeline-pipeline.$(OBJEXT) \
+	snd_pipeline-receiver.$(OBJEXT) snd_pipeline-sender.$(OBJEXT) \
+	snd_pipeline-sink.$(OBJEXT) snd_pipeline-source.$(OBJEXT) \
+	snd_pipeline-transceiver.$(OBJEXT)
+snd_pipeline_OBJECTS = $(am_snd_pipeline_OBJECTS)
+snd_pipeline_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+snd_pipeline_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(snd_pipeline_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-am_receiver_OBJECTS = receiver-receiver.$(OBJEXT)
-receiver_OBJECTS = $(am_receiver_OBJECTS)
-receiver_DEPENDENCIES = $(am__DEPENDENCIES_1)
-receiver_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(receiver_CFLAGS) \
-	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-am_scream_receiver_OBJECTS =  \
-	scream_receiver-scream_receiver.$(OBJEXT)
-scream_receiver_OBJECTS = $(am_scream_receiver_OBJECTS)
-scream_receiver_DEPENDENCIES = $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
-scream_receiver_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
-	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
-	$(scream_receiver_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
-	-o $@
-am_scream_sender_OBJECTS = scream_sender-scream_sender.$(OBJEXT)
-scream_sender_OBJECTS = $(am_scream_sender_OBJECTS)
-scream_sender_DEPENDENCIES = $(am__DEPENDENCIES_1)
-scream_sender_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(scream_sender_CFLAGS) \
-	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-am_sender_OBJECTS = sender-sender.$(OBJEXT) \
-	sender-transceiver.$(OBJEXT)
-sender_OBJECTS = $(am_sender_OBJECTS)
-sender_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
-sender_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(sender_CFLAGS) $(CFLAGS) \
-	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-am_v4l2_file_player_OBJECTS =  \
-	v4l2_file_player-v4l2_file_player.$(OBJEXT)
-v4l2_file_player_OBJECTS = $(am_v4l2_file_player_OBJECTS)
-v4l2_file_player_DEPENDENCIES = $(am__DEPENDENCIES_1)
-v4l2_file_player_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
-	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
-	$(v4l2_file_player_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
-	-o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -203,14 +174,8 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(fbrapreceiver_SOURCES) $(fbrapsender_SOURCES) \
-	$(receiver_SOURCES) $(scream_receiver_SOURCES) \
-	$(scream_sender_SOURCES) $(sender_SOURCES) \
-	$(v4l2_file_player_SOURCES)
-DIST_SOURCES = $(fbrapreceiver_SOURCES) $(fbrapsender_SOURCES) \
-	$(receiver_SOURCES) $(scream_receiver_SOURCES) \
-	$(scream_sender_SOURCES) $(sender_SOURCES) \
-	$(v4l2_file_player_SOURCES)
+SOURCES = $(rcv_pipeline_SOURCES) $(snd_pipeline_SOURCES)
+DIST_SOURCES = $(rcv_pipeline_SOURCES) $(snd_pipeline_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -408,29 +373,30 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-receiver_SOURCES = receiver.c
-receiver_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
-receiver_LDADD = $(GST_LIBS)
-fbrapreceiver_SOURCES = fbrapreceiver.c
-fbrapreceiver_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
-fbrapreceiver_LDADD = $(GST_LIBS)
-scream_receiver_SOURCES = scream_receiver.c
-scream_receiver_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(AM_CFLAGS)
-scream_receiver_LDADD = $(GST_PLUGINS_BASE_LIBS) -lgstrtp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
-sender_SOURCES = sender.c transceiver.c
-# sender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
-# sender_LDADD = $(GST_LIBS)
-sender_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
-sender_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
-fbrapsender_SOURCES = fbrapsender.c
-fbrapsender_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
-fbrapsender_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
-scream_sender_SOURCES = scream_sender.c
-scream_sender_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
-scream_sender_LDADD = $(GST_LIBS)
-v4l2_file_player_SOURCES = v4l2_file_player.c
-v4l2_file_player_CFLAGS = $(GST_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS)
-v4l2_file_player_LDADD = $(GST_LIBS)
+rcv_pipeline_SOURCES = rcv_pipeline.c \
+					   decoder.c \
+					   encoder.c \
+					   pipeline.c \
+					   receiver.c \
+					   sender.c \
+					   sink.c \
+					   source.c \
+					   transceiver.c 
+
+rcv_pipeline_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
+rcv_pipeline_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
+snd_pipeline_SOURCES = snd_pipeline.c \
+					   decoder.c \
+					   encoder.c \
+					   pipeline.c \
+					   receiver.c \
+					   sender.c \
+					   sink.c \
+					   source.c \
+					   transceiver.c
+
+snd_pipeline_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
+snd_pipeline_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
 all: all-am
 
 .SUFFIXES:
@@ -474,33 +440,13 @@ clean-noinstPROGRAMS:
 	echo " rm -f" $$list; \
 	rm -f $$list
 
-fbrapreceiver$(EXEEXT): $(fbrapreceiver_OBJECTS) $(fbrapreceiver_DEPENDENCIES) $(EXTRA_fbrapreceiver_DEPENDENCIES) 
-	@rm -f fbrapreceiver$(EXEEXT)
-	$(AM_V_CCLD)$(fbrapreceiver_LINK) $(fbrapreceiver_OBJECTS) $(fbrapreceiver_LDADD) $(LIBS)
+rcv_pipeline$(EXEEXT): $(rcv_pipeline_OBJECTS) $(rcv_pipeline_DEPENDENCIES) $(EXTRA_rcv_pipeline_DEPENDENCIES) 
+	@rm -f rcv_pipeline$(EXEEXT)
+	$(AM_V_CCLD)$(rcv_pipeline_LINK) $(rcv_pipeline_OBJECTS) $(rcv_pipeline_LDADD) $(LIBS)
 
-fbrapsender$(EXEEXT): $(fbrapsender_OBJECTS) $(fbrapsender_DEPENDENCIES) $(EXTRA_fbrapsender_DEPENDENCIES) 
-	@rm -f fbrapsender$(EXEEXT)
-	$(AM_V_CCLD)$(fbrapsender_LINK) $(fbrapsender_OBJECTS) $(fbrapsender_LDADD) $(LIBS)
-
-receiver$(EXEEXT): $(receiver_OBJECTS) $(receiver_DEPENDENCIES) $(EXTRA_receiver_DEPENDENCIES) 
-	@rm -f receiver$(EXEEXT)
-	$(AM_V_CCLD)$(receiver_LINK) $(receiver_OBJECTS) $(receiver_LDADD) $(LIBS)
-
-scream_receiver$(EXEEXT): $(scream_receiver_OBJECTS) $(scream_receiver_DEPENDENCIES) $(EXTRA_scream_receiver_DEPENDENCIES) 
-	@rm -f scream_receiver$(EXEEXT)
-	$(AM_V_CCLD)$(scream_receiver_LINK) $(scream_receiver_OBJECTS) $(scream_receiver_LDADD) $(LIBS)
-
-scream_sender$(EXEEXT): $(scream_sender_OBJECTS) $(scream_sender_DEPENDENCIES) $(EXTRA_scream_sender_DEPENDENCIES) 
-	@rm -f scream_sender$(EXEEXT)
-	$(AM_V_CCLD)$(scream_sender_LINK) $(scream_sender_OBJECTS) $(scream_sender_LDADD) $(LIBS)
-
-sender$(EXEEXT): $(sender_OBJECTS) $(sender_DEPENDENCIES) $(EXTRA_sender_DEPENDENCIES) 
-	@rm -f sender$(EXEEXT)
-	$(AM_V_CCLD)$(sender_LINK) $(sender_OBJECTS) $(sender_LDADD) $(LIBS)
-
-v4l2_file_player$(EXEEXT): $(v4l2_file_player_OBJECTS) $(v4l2_file_player_DEPENDENCIES) $(EXTRA_v4l2_file_player_DEPENDENCIES) 
-	@rm -f v4l2_file_player$(EXEEXT)
-	$(AM_V_CCLD)$(v4l2_file_player_LINK) $(v4l2_file_player_OBJECTS) $(v4l2_file_player_LDADD) $(LIBS)
+snd_pipeline$(EXEEXT): $(snd_pipeline_OBJECTS) $(snd_pipeline_DEPENDENCIES) $(EXTRA_snd_pipeline_DEPENDENCIES) 
+	@rm -f snd_pipeline$(EXEEXT)
+	$(AM_V_CCLD)$(snd_pipeline_LINK) $(snd_pipeline_OBJECTS) $(snd_pipeline_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -508,14 +454,24 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbrapreceiver-fbrapreceiver.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fbrapsender-fbrapsender.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/receiver-receiver.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scream_receiver-scream_receiver.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scream_sender-scream_sender.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sender-sender.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sender-transceiver.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/v4l2_file_player-v4l2_file_player.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-decoder.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-encoder.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-pipeline.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-rcv_pipeline.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-receiver.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-sender.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-sink.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-source.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-transceiver.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-decoder.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-encoder.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-pipeline.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-receiver.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-sender.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-sink.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-snd_pipeline.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-source.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-transceiver.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -538,117 +494,257 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
 
-fbrapreceiver-fbrapreceiver.o: fbrapreceiver.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapreceiver_CFLAGS) $(CFLAGS) -MT fbrapreceiver-fbrapreceiver.o -MD -MP -MF $(DEPDIR)/fbrapreceiver-fbrapreceiver.Tpo -c -o fbrapreceiver-fbrapreceiver.o `test -f 'fbrapreceiver.c' || echo '$(srcdir)/'`fbrapreceiver.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/fbrapreceiver-fbrapreceiver.Tpo $(DEPDIR)/fbrapreceiver-fbrapreceiver.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fbrapreceiver.c' object='fbrapreceiver-fbrapreceiver.o' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-rcv_pipeline.o: rcv_pipeline.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-rcv_pipeline.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-rcv_pipeline.Tpo -c -o rcv_pipeline-rcv_pipeline.o `test -f 'rcv_pipeline.c' || echo '$(srcdir)/'`rcv_pipeline.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-rcv_pipeline.Tpo $(DEPDIR)/rcv_pipeline-rcv_pipeline.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rcv_pipeline.c' object='rcv_pipeline-rcv_pipeline.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapreceiver_CFLAGS) $(CFLAGS) -c -o fbrapreceiver-fbrapreceiver.o `test -f 'fbrapreceiver.c' || echo '$(srcdir)/'`fbrapreceiver.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-rcv_pipeline.o `test -f 'rcv_pipeline.c' || echo '$(srcdir)/'`rcv_pipeline.c
 
-fbrapreceiver-fbrapreceiver.obj: fbrapreceiver.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapreceiver_CFLAGS) $(CFLAGS) -MT fbrapreceiver-fbrapreceiver.obj -MD -MP -MF $(DEPDIR)/fbrapreceiver-fbrapreceiver.Tpo -c -o fbrapreceiver-fbrapreceiver.obj `if test -f 'fbrapreceiver.c'; then $(CYGPATH_W) 'fbrapreceiver.c'; else $(CYGPATH_W) '$(srcdir)/fbrapreceiver.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/fbrapreceiver-fbrapreceiver.Tpo $(DEPDIR)/fbrapreceiver-fbrapreceiver.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fbrapreceiver.c' object='fbrapreceiver-fbrapreceiver.obj' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-rcv_pipeline.obj: rcv_pipeline.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-rcv_pipeline.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-rcv_pipeline.Tpo -c -o rcv_pipeline-rcv_pipeline.obj `if test -f 'rcv_pipeline.c'; then $(CYGPATH_W) 'rcv_pipeline.c'; else $(CYGPATH_W) '$(srcdir)/rcv_pipeline.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-rcv_pipeline.Tpo $(DEPDIR)/rcv_pipeline-rcv_pipeline.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rcv_pipeline.c' object='rcv_pipeline-rcv_pipeline.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapreceiver_CFLAGS) $(CFLAGS) -c -o fbrapreceiver-fbrapreceiver.obj `if test -f 'fbrapreceiver.c'; then $(CYGPATH_W) 'fbrapreceiver.c'; else $(CYGPATH_W) '$(srcdir)/fbrapreceiver.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-rcv_pipeline.obj `if test -f 'rcv_pipeline.c'; then $(CYGPATH_W) 'rcv_pipeline.c'; else $(CYGPATH_W) '$(srcdir)/rcv_pipeline.c'; fi`
 
-fbrapsender-fbrapsender.o: fbrapsender.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapsender_CFLAGS) $(CFLAGS) -MT fbrapsender-fbrapsender.o -MD -MP -MF $(DEPDIR)/fbrapsender-fbrapsender.Tpo -c -o fbrapsender-fbrapsender.o `test -f 'fbrapsender.c' || echo '$(srcdir)/'`fbrapsender.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/fbrapsender-fbrapsender.Tpo $(DEPDIR)/fbrapsender-fbrapsender.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fbrapsender.c' object='fbrapsender-fbrapsender.o' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-decoder.o: decoder.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-decoder.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-decoder.Tpo -c -o rcv_pipeline-decoder.o `test -f 'decoder.c' || echo '$(srcdir)/'`decoder.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-decoder.Tpo $(DEPDIR)/rcv_pipeline-decoder.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='decoder.c' object='rcv_pipeline-decoder.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapsender_CFLAGS) $(CFLAGS) -c -o fbrapsender-fbrapsender.o `test -f 'fbrapsender.c' || echo '$(srcdir)/'`fbrapsender.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-decoder.o `test -f 'decoder.c' || echo '$(srcdir)/'`decoder.c
 
-fbrapsender-fbrapsender.obj: fbrapsender.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapsender_CFLAGS) $(CFLAGS) -MT fbrapsender-fbrapsender.obj -MD -MP -MF $(DEPDIR)/fbrapsender-fbrapsender.Tpo -c -o fbrapsender-fbrapsender.obj `if test -f 'fbrapsender.c'; then $(CYGPATH_W) 'fbrapsender.c'; else $(CYGPATH_W) '$(srcdir)/fbrapsender.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/fbrapsender-fbrapsender.Tpo $(DEPDIR)/fbrapsender-fbrapsender.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fbrapsender.c' object='fbrapsender-fbrapsender.obj' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-decoder.obj: decoder.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-decoder.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-decoder.Tpo -c -o rcv_pipeline-decoder.obj `if test -f 'decoder.c'; then $(CYGPATH_W) 'decoder.c'; else $(CYGPATH_W) '$(srcdir)/decoder.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-decoder.Tpo $(DEPDIR)/rcv_pipeline-decoder.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='decoder.c' object='rcv_pipeline-decoder.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(fbrapsender_CFLAGS) $(CFLAGS) -c -o fbrapsender-fbrapsender.obj `if test -f 'fbrapsender.c'; then $(CYGPATH_W) 'fbrapsender.c'; else $(CYGPATH_W) '$(srcdir)/fbrapsender.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-decoder.obj `if test -f 'decoder.c'; then $(CYGPATH_W) 'decoder.c'; else $(CYGPATH_W) '$(srcdir)/decoder.c'; fi`
 
-receiver-receiver.o: receiver.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(receiver_CFLAGS) $(CFLAGS) -MT receiver-receiver.o -MD -MP -MF $(DEPDIR)/receiver-receiver.Tpo -c -o receiver-receiver.o `test -f 'receiver.c' || echo '$(srcdir)/'`receiver.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/receiver-receiver.Tpo $(DEPDIR)/receiver-receiver.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='receiver.c' object='receiver-receiver.o' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-encoder.o: encoder.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-encoder.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-encoder.Tpo -c -o rcv_pipeline-encoder.o `test -f 'encoder.c' || echo '$(srcdir)/'`encoder.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-encoder.Tpo $(DEPDIR)/rcv_pipeline-encoder.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='encoder.c' object='rcv_pipeline-encoder.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(receiver_CFLAGS) $(CFLAGS) -c -o receiver-receiver.o `test -f 'receiver.c' || echo '$(srcdir)/'`receiver.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-encoder.o `test -f 'encoder.c' || echo '$(srcdir)/'`encoder.c
 
-receiver-receiver.obj: receiver.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(receiver_CFLAGS) $(CFLAGS) -MT receiver-receiver.obj -MD -MP -MF $(DEPDIR)/receiver-receiver.Tpo -c -o receiver-receiver.obj `if test -f 'receiver.c'; then $(CYGPATH_W) 'receiver.c'; else $(CYGPATH_W) '$(srcdir)/receiver.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/receiver-receiver.Tpo $(DEPDIR)/receiver-receiver.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='receiver.c' object='receiver-receiver.obj' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-encoder.obj: encoder.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-encoder.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-encoder.Tpo -c -o rcv_pipeline-encoder.obj `if test -f 'encoder.c'; then $(CYGPATH_W) 'encoder.c'; else $(CYGPATH_W) '$(srcdir)/encoder.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-encoder.Tpo $(DEPDIR)/rcv_pipeline-encoder.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='encoder.c' object='rcv_pipeline-encoder.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(receiver_CFLAGS) $(CFLAGS) -c -o receiver-receiver.obj `if test -f 'receiver.c'; then $(CYGPATH_W) 'receiver.c'; else $(CYGPATH_W) '$(srcdir)/receiver.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-encoder.obj `if test -f 'encoder.c'; then $(CYGPATH_W) 'encoder.c'; else $(CYGPATH_W) '$(srcdir)/encoder.c'; fi`
 
-scream_receiver-scream_receiver.o: scream_receiver.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_receiver_CFLAGS) $(CFLAGS) -MT scream_receiver-scream_receiver.o -MD -MP -MF $(DEPDIR)/scream_receiver-scream_receiver.Tpo -c -o scream_receiver-scream_receiver.o `test -f 'scream_receiver.c' || echo '$(srcdir)/'`scream_receiver.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/scream_receiver-scream_receiver.Tpo $(DEPDIR)/scream_receiver-scream_receiver.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='scream_receiver.c' object='scream_receiver-scream_receiver.o' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-pipeline.o: pipeline.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-pipeline.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-pipeline.Tpo -c -o rcv_pipeline-pipeline.o `test -f 'pipeline.c' || echo '$(srcdir)/'`pipeline.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-pipeline.Tpo $(DEPDIR)/rcv_pipeline-pipeline.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='pipeline.c' object='rcv_pipeline-pipeline.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_receiver_CFLAGS) $(CFLAGS) -c -o scream_receiver-scream_receiver.o `test -f 'scream_receiver.c' || echo '$(srcdir)/'`scream_receiver.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-pipeline.o `test -f 'pipeline.c' || echo '$(srcdir)/'`pipeline.c
 
-scream_receiver-scream_receiver.obj: scream_receiver.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_receiver_CFLAGS) $(CFLAGS) -MT scream_receiver-scream_receiver.obj -MD -MP -MF $(DEPDIR)/scream_receiver-scream_receiver.Tpo -c -o scream_receiver-scream_receiver.obj `if test -f 'scream_receiver.c'; then $(CYGPATH_W) 'scream_receiver.c'; else $(CYGPATH_W) '$(srcdir)/scream_receiver.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/scream_receiver-scream_receiver.Tpo $(DEPDIR)/scream_receiver-scream_receiver.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='scream_receiver.c' object='scream_receiver-scream_receiver.obj' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-pipeline.obj: pipeline.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-pipeline.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-pipeline.Tpo -c -o rcv_pipeline-pipeline.obj `if test -f 'pipeline.c'; then $(CYGPATH_W) 'pipeline.c'; else $(CYGPATH_W) '$(srcdir)/pipeline.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-pipeline.Tpo $(DEPDIR)/rcv_pipeline-pipeline.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='pipeline.c' object='rcv_pipeline-pipeline.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_receiver_CFLAGS) $(CFLAGS) -c -o scream_receiver-scream_receiver.obj `if test -f 'scream_receiver.c'; then $(CYGPATH_W) 'scream_receiver.c'; else $(CYGPATH_W) '$(srcdir)/scream_receiver.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-pipeline.obj `if test -f 'pipeline.c'; then $(CYGPATH_W) 'pipeline.c'; else $(CYGPATH_W) '$(srcdir)/pipeline.c'; fi`
 
-scream_sender-scream_sender.o: scream_sender.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_sender_CFLAGS) $(CFLAGS) -MT scream_sender-scream_sender.o -MD -MP -MF $(DEPDIR)/scream_sender-scream_sender.Tpo -c -o scream_sender-scream_sender.o `test -f 'scream_sender.c' || echo '$(srcdir)/'`scream_sender.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/scream_sender-scream_sender.Tpo $(DEPDIR)/scream_sender-scream_sender.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='scream_sender.c' object='scream_sender-scream_sender.o' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-receiver.o: receiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-receiver.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-receiver.Tpo -c -o rcv_pipeline-receiver.o `test -f 'receiver.c' || echo '$(srcdir)/'`receiver.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-receiver.Tpo $(DEPDIR)/rcv_pipeline-receiver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='receiver.c' object='rcv_pipeline-receiver.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_sender_CFLAGS) $(CFLAGS) -c -o scream_sender-scream_sender.o `test -f 'scream_sender.c' || echo '$(srcdir)/'`scream_sender.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-receiver.o `test -f 'receiver.c' || echo '$(srcdir)/'`receiver.c
 
-scream_sender-scream_sender.obj: scream_sender.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_sender_CFLAGS) $(CFLAGS) -MT scream_sender-scream_sender.obj -MD -MP -MF $(DEPDIR)/scream_sender-scream_sender.Tpo -c -o scream_sender-scream_sender.obj `if test -f 'scream_sender.c'; then $(CYGPATH_W) 'scream_sender.c'; else $(CYGPATH_W) '$(srcdir)/scream_sender.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/scream_sender-scream_sender.Tpo $(DEPDIR)/scream_sender-scream_sender.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='scream_sender.c' object='scream_sender-scream_sender.obj' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-receiver.obj: receiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-receiver.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-receiver.Tpo -c -o rcv_pipeline-receiver.obj `if test -f 'receiver.c'; then $(CYGPATH_W) 'receiver.c'; else $(CYGPATH_W) '$(srcdir)/receiver.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-receiver.Tpo $(DEPDIR)/rcv_pipeline-receiver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='receiver.c' object='rcv_pipeline-receiver.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(scream_sender_CFLAGS) $(CFLAGS) -c -o scream_sender-scream_sender.obj `if test -f 'scream_sender.c'; then $(CYGPATH_W) 'scream_sender.c'; else $(CYGPATH_W) '$(srcdir)/scream_sender.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-receiver.obj `if test -f 'receiver.c'; then $(CYGPATH_W) 'receiver.c'; else $(CYGPATH_W) '$(srcdir)/receiver.c'; fi`
 
-sender-sender.o: sender.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -MT sender-sender.o -MD -MP -MF $(DEPDIR)/sender-sender.Tpo -c -o sender-sender.o `test -f 'sender.c' || echo '$(srcdir)/'`sender.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/sender-sender.Tpo $(DEPDIR)/sender-sender.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sender.c' object='sender-sender.o' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-sender.o: sender.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-sender.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-sender.Tpo -c -o rcv_pipeline-sender.o `test -f 'sender.c' || echo '$(srcdir)/'`sender.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-sender.Tpo $(DEPDIR)/rcv_pipeline-sender.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sender.c' object='rcv_pipeline-sender.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -c -o sender-sender.o `test -f 'sender.c' || echo '$(srcdir)/'`sender.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-sender.o `test -f 'sender.c' || echo '$(srcdir)/'`sender.c
 
-sender-sender.obj: sender.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -MT sender-sender.obj -MD -MP -MF $(DEPDIR)/sender-sender.Tpo -c -o sender-sender.obj `if test -f 'sender.c'; then $(CYGPATH_W) 'sender.c'; else $(CYGPATH_W) '$(srcdir)/sender.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/sender-sender.Tpo $(DEPDIR)/sender-sender.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sender.c' object='sender-sender.obj' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-sender.obj: sender.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-sender.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-sender.Tpo -c -o rcv_pipeline-sender.obj `if test -f 'sender.c'; then $(CYGPATH_W) 'sender.c'; else $(CYGPATH_W) '$(srcdir)/sender.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-sender.Tpo $(DEPDIR)/rcv_pipeline-sender.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sender.c' object='rcv_pipeline-sender.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -c -o sender-sender.obj `if test -f 'sender.c'; then $(CYGPATH_W) 'sender.c'; else $(CYGPATH_W) '$(srcdir)/sender.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-sender.obj `if test -f 'sender.c'; then $(CYGPATH_W) 'sender.c'; else $(CYGPATH_W) '$(srcdir)/sender.c'; fi`
 
-sender-transceiver.o: transceiver.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -MT sender-transceiver.o -MD -MP -MF $(DEPDIR)/sender-transceiver.Tpo -c -o sender-transceiver.o `test -f 'transceiver.c' || echo '$(srcdir)/'`transceiver.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/sender-transceiver.Tpo $(DEPDIR)/sender-transceiver.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='transceiver.c' object='sender-transceiver.o' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-sink.o: sink.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-sink.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-sink.Tpo -c -o rcv_pipeline-sink.o `test -f 'sink.c' || echo '$(srcdir)/'`sink.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-sink.Tpo $(DEPDIR)/rcv_pipeline-sink.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sink.c' object='rcv_pipeline-sink.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -c -o sender-transceiver.o `test -f 'transceiver.c' || echo '$(srcdir)/'`transceiver.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-sink.o `test -f 'sink.c' || echo '$(srcdir)/'`sink.c
 
-sender-transceiver.obj: transceiver.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -MT sender-transceiver.obj -MD -MP -MF $(DEPDIR)/sender-transceiver.Tpo -c -o sender-transceiver.obj `if test -f 'transceiver.c'; then $(CYGPATH_W) 'transceiver.c'; else $(CYGPATH_W) '$(srcdir)/transceiver.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/sender-transceiver.Tpo $(DEPDIR)/sender-transceiver.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='transceiver.c' object='sender-transceiver.obj' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-sink.obj: sink.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-sink.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-sink.Tpo -c -o rcv_pipeline-sink.obj `if test -f 'sink.c'; then $(CYGPATH_W) 'sink.c'; else $(CYGPATH_W) '$(srcdir)/sink.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-sink.Tpo $(DEPDIR)/rcv_pipeline-sink.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sink.c' object='rcv_pipeline-sink.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sender_CFLAGS) $(CFLAGS) -c -o sender-transceiver.obj `if test -f 'transceiver.c'; then $(CYGPATH_W) 'transceiver.c'; else $(CYGPATH_W) '$(srcdir)/transceiver.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-sink.obj `if test -f 'sink.c'; then $(CYGPATH_W) 'sink.c'; else $(CYGPATH_W) '$(srcdir)/sink.c'; fi`
 
-v4l2_file_player-v4l2_file_player.o: v4l2_file_player.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(v4l2_file_player_CFLAGS) $(CFLAGS) -MT v4l2_file_player-v4l2_file_player.o -MD -MP -MF $(DEPDIR)/v4l2_file_player-v4l2_file_player.Tpo -c -o v4l2_file_player-v4l2_file_player.o `test -f 'v4l2_file_player.c' || echo '$(srcdir)/'`v4l2_file_player.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/v4l2_file_player-v4l2_file_player.Tpo $(DEPDIR)/v4l2_file_player-v4l2_file_player.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='v4l2_file_player.c' object='v4l2_file_player-v4l2_file_player.o' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-source.o: source.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-source.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-source.Tpo -c -o rcv_pipeline-source.o `test -f 'source.c' || echo '$(srcdir)/'`source.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-source.Tpo $(DEPDIR)/rcv_pipeline-source.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='source.c' object='rcv_pipeline-source.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(v4l2_file_player_CFLAGS) $(CFLAGS) -c -o v4l2_file_player-v4l2_file_player.o `test -f 'v4l2_file_player.c' || echo '$(srcdir)/'`v4l2_file_player.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-source.o `test -f 'source.c' || echo '$(srcdir)/'`source.c
 
-v4l2_file_player-v4l2_file_player.obj: v4l2_file_player.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(v4l2_file_player_CFLAGS) $(CFLAGS) -MT v4l2_file_player-v4l2_file_player.obj -MD -MP -MF $(DEPDIR)/v4l2_file_player-v4l2_file_player.Tpo -c -o v4l2_file_player-v4l2_file_player.obj `if test -f 'v4l2_file_player.c'; then $(CYGPATH_W) 'v4l2_file_player.c'; else $(CYGPATH_W) '$(srcdir)/v4l2_file_player.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/v4l2_file_player-v4l2_file_player.Tpo $(DEPDIR)/v4l2_file_player-v4l2_file_player.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='v4l2_file_player.c' object='v4l2_file_player-v4l2_file_player.obj' libtool=no @AMDEPBACKSLASH@
+rcv_pipeline-source.obj: source.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-source.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-source.Tpo -c -o rcv_pipeline-source.obj `if test -f 'source.c'; then $(CYGPATH_W) 'source.c'; else $(CYGPATH_W) '$(srcdir)/source.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-source.Tpo $(DEPDIR)/rcv_pipeline-source.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='source.c' object='rcv_pipeline-source.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(v4l2_file_player_CFLAGS) $(CFLAGS) -c -o v4l2_file_player-v4l2_file_player.obj `if test -f 'v4l2_file_player.c'; then $(CYGPATH_W) 'v4l2_file_player.c'; else $(CYGPATH_W) '$(srcdir)/v4l2_file_player.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-source.obj `if test -f 'source.c'; then $(CYGPATH_W) 'source.c'; else $(CYGPATH_W) '$(srcdir)/source.c'; fi`
+
+rcv_pipeline-transceiver.o: transceiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-transceiver.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-transceiver.Tpo -c -o rcv_pipeline-transceiver.o `test -f 'transceiver.c' || echo '$(srcdir)/'`transceiver.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-transceiver.Tpo $(DEPDIR)/rcv_pipeline-transceiver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='transceiver.c' object='rcv_pipeline-transceiver.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-transceiver.o `test -f 'transceiver.c' || echo '$(srcdir)/'`transceiver.c
+
+rcv_pipeline-transceiver.obj: transceiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-transceiver.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-transceiver.Tpo -c -o rcv_pipeline-transceiver.obj `if test -f 'transceiver.c'; then $(CYGPATH_W) 'transceiver.c'; else $(CYGPATH_W) '$(srcdir)/transceiver.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-transceiver.Tpo $(DEPDIR)/rcv_pipeline-transceiver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='transceiver.c' object='rcv_pipeline-transceiver.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-transceiver.obj `if test -f 'transceiver.c'; then $(CYGPATH_W) 'transceiver.c'; else $(CYGPATH_W) '$(srcdir)/transceiver.c'; fi`
+
+snd_pipeline-snd_pipeline.o: snd_pipeline.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-snd_pipeline.o -MD -MP -MF $(DEPDIR)/snd_pipeline-snd_pipeline.Tpo -c -o snd_pipeline-snd_pipeline.o `test -f 'snd_pipeline.c' || echo '$(srcdir)/'`snd_pipeline.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-snd_pipeline.Tpo $(DEPDIR)/snd_pipeline-snd_pipeline.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='snd_pipeline.c' object='snd_pipeline-snd_pipeline.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-snd_pipeline.o `test -f 'snd_pipeline.c' || echo '$(srcdir)/'`snd_pipeline.c
+
+snd_pipeline-snd_pipeline.obj: snd_pipeline.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-snd_pipeline.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-snd_pipeline.Tpo -c -o snd_pipeline-snd_pipeline.obj `if test -f 'snd_pipeline.c'; then $(CYGPATH_W) 'snd_pipeline.c'; else $(CYGPATH_W) '$(srcdir)/snd_pipeline.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-snd_pipeline.Tpo $(DEPDIR)/snd_pipeline-snd_pipeline.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='snd_pipeline.c' object='snd_pipeline-snd_pipeline.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-snd_pipeline.obj `if test -f 'snd_pipeline.c'; then $(CYGPATH_W) 'snd_pipeline.c'; else $(CYGPATH_W) '$(srcdir)/snd_pipeline.c'; fi`
+
+snd_pipeline-decoder.o: decoder.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-decoder.o -MD -MP -MF $(DEPDIR)/snd_pipeline-decoder.Tpo -c -o snd_pipeline-decoder.o `test -f 'decoder.c' || echo '$(srcdir)/'`decoder.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-decoder.Tpo $(DEPDIR)/snd_pipeline-decoder.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='decoder.c' object='snd_pipeline-decoder.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-decoder.o `test -f 'decoder.c' || echo '$(srcdir)/'`decoder.c
+
+snd_pipeline-decoder.obj: decoder.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-decoder.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-decoder.Tpo -c -o snd_pipeline-decoder.obj `if test -f 'decoder.c'; then $(CYGPATH_W) 'decoder.c'; else $(CYGPATH_W) '$(srcdir)/decoder.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-decoder.Tpo $(DEPDIR)/snd_pipeline-decoder.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='decoder.c' object='snd_pipeline-decoder.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-decoder.obj `if test -f 'decoder.c'; then $(CYGPATH_W) 'decoder.c'; else $(CYGPATH_W) '$(srcdir)/decoder.c'; fi`
+
+snd_pipeline-encoder.o: encoder.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-encoder.o -MD -MP -MF $(DEPDIR)/snd_pipeline-encoder.Tpo -c -o snd_pipeline-encoder.o `test -f 'encoder.c' || echo '$(srcdir)/'`encoder.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-encoder.Tpo $(DEPDIR)/snd_pipeline-encoder.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='encoder.c' object='snd_pipeline-encoder.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-encoder.o `test -f 'encoder.c' || echo '$(srcdir)/'`encoder.c
+
+snd_pipeline-encoder.obj: encoder.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-encoder.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-encoder.Tpo -c -o snd_pipeline-encoder.obj `if test -f 'encoder.c'; then $(CYGPATH_W) 'encoder.c'; else $(CYGPATH_W) '$(srcdir)/encoder.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-encoder.Tpo $(DEPDIR)/snd_pipeline-encoder.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='encoder.c' object='snd_pipeline-encoder.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-encoder.obj `if test -f 'encoder.c'; then $(CYGPATH_W) 'encoder.c'; else $(CYGPATH_W) '$(srcdir)/encoder.c'; fi`
+
+snd_pipeline-pipeline.o: pipeline.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-pipeline.o -MD -MP -MF $(DEPDIR)/snd_pipeline-pipeline.Tpo -c -o snd_pipeline-pipeline.o `test -f 'pipeline.c' || echo '$(srcdir)/'`pipeline.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-pipeline.Tpo $(DEPDIR)/snd_pipeline-pipeline.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='pipeline.c' object='snd_pipeline-pipeline.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-pipeline.o `test -f 'pipeline.c' || echo '$(srcdir)/'`pipeline.c
+
+snd_pipeline-pipeline.obj: pipeline.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-pipeline.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-pipeline.Tpo -c -o snd_pipeline-pipeline.obj `if test -f 'pipeline.c'; then $(CYGPATH_W) 'pipeline.c'; else $(CYGPATH_W) '$(srcdir)/pipeline.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-pipeline.Tpo $(DEPDIR)/snd_pipeline-pipeline.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='pipeline.c' object='snd_pipeline-pipeline.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-pipeline.obj `if test -f 'pipeline.c'; then $(CYGPATH_W) 'pipeline.c'; else $(CYGPATH_W) '$(srcdir)/pipeline.c'; fi`
+
+snd_pipeline-receiver.o: receiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-receiver.o -MD -MP -MF $(DEPDIR)/snd_pipeline-receiver.Tpo -c -o snd_pipeline-receiver.o `test -f 'receiver.c' || echo '$(srcdir)/'`receiver.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-receiver.Tpo $(DEPDIR)/snd_pipeline-receiver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='receiver.c' object='snd_pipeline-receiver.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-receiver.o `test -f 'receiver.c' || echo '$(srcdir)/'`receiver.c
+
+snd_pipeline-receiver.obj: receiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-receiver.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-receiver.Tpo -c -o snd_pipeline-receiver.obj `if test -f 'receiver.c'; then $(CYGPATH_W) 'receiver.c'; else $(CYGPATH_W) '$(srcdir)/receiver.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-receiver.Tpo $(DEPDIR)/snd_pipeline-receiver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='receiver.c' object='snd_pipeline-receiver.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-receiver.obj `if test -f 'receiver.c'; then $(CYGPATH_W) 'receiver.c'; else $(CYGPATH_W) '$(srcdir)/receiver.c'; fi`
+
+snd_pipeline-sender.o: sender.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-sender.o -MD -MP -MF $(DEPDIR)/snd_pipeline-sender.Tpo -c -o snd_pipeline-sender.o `test -f 'sender.c' || echo '$(srcdir)/'`sender.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-sender.Tpo $(DEPDIR)/snd_pipeline-sender.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sender.c' object='snd_pipeline-sender.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-sender.o `test -f 'sender.c' || echo '$(srcdir)/'`sender.c
+
+snd_pipeline-sender.obj: sender.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-sender.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-sender.Tpo -c -o snd_pipeline-sender.obj `if test -f 'sender.c'; then $(CYGPATH_W) 'sender.c'; else $(CYGPATH_W) '$(srcdir)/sender.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-sender.Tpo $(DEPDIR)/snd_pipeline-sender.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sender.c' object='snd_pipeline-sender.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-sender.obj `if test -f 'sender.c'; then $(CYGPATH_W) 'sender.c'; else $(CYGPATH_W) '$(srcdir)/sender.c'; fi`
+
+snd_pipeline-sink.o: sink.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-sink.o -MD -MP -MF $(DEPDIR)/snd_pipeline-sink.Tpo -c -o snd_pipeline-sink.o `test -f 'sink.c' || echo '$(srcdir)/'`sink.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-sink.Tpo $(DEPDIR)/snd_pipeline-sink.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sink.c' object='snd_pipeline-sink.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-sink.o `test -f 'sink.c' || echo '$(srcdir)/'`sink.c
+
+snd_pipeline-sink.obj: sink.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-sink.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-sink.Tpo -c -o snd_pipeline-sink.obj `if test -f 'sink.c'; then $(CYGPATH_W) 'sink.c'; else $(CYGPATH_W) '$(srcdir)/sink.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-sink.Tpo $(DEPDIR)/snd_pipeline-sink.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sink.c' object='snd_pipeline-sink.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-sink.obj `if test -f 'sink.c'; then $(CYGPATH_W) 'sink.c'; else $(CYGPATH_W) '$(srcdir)/sink.c'; fi`
+
+snd_pipeline-source.o: source.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-source.o -MD -MP -MF $(DEPDIR)/snd_pipeline-source.Tpo -c -o snd_pipeline-source.o `test -f 'source.c' || echo '$(srcdir)/'`source.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-source.Tpo $(DEPDIR)/snd_pipeline-source.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='source.c' object='snd_pipeline-source.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-source.o `test -f 'source.c' || echo '$(srcdir)/'`source.c
+
+snd_pipeline-source.obj: source.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-source.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-source.Tpo -c -o snd_pipeline-source.obj `if test -f 'source.c'; then $(CYGPATH_W) 'source.c'; else $(CYGPATH_W) '$(srcdir)/source.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-source.Tpo $(DEPDIR)/snd_pipeline-source.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='source.c' object='snd_pipeline-source.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-source.obj `if test -f 'source.c'; then $(CYGPATH_W) 'source.c'; else $(CYGPATH_W) '$(srcdir)/source.c'; fi`
+
+snd_pipeline-transceiver.o: transceiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-transceiver.o -MD -MP -MF $(DEPDIR)/snd_pipeline-transceiver.Tpo -c -o snd_pipeline-transceiver.o `test -f 'transceiver.c' || echo '$(srcdir)/'`transceiver.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-transceiver.Tpo $(DEPDIR)/snd_pipeline-transceiver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='transceiver.c' object='snd_pipeline-transceiver.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-transceiver.o `test -f 'transceiver.c' || echo '$(srcdir)/'`transceiver.c
+
+snd_pipeline-transceiver.obj: transceiver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-transceiver.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-transceiver.Tpo -c -o snd_pipeline-transceiver.obj `if test -f 'transceiver.c'; then $(CYGPATH_W) 'transceiver.c'; else $(CYGPATH_W) '$(srcdir)/transceiver.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-transceiver.Tpo $(DEPDIR)/snd_pipeline-transceiver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='transceiver.c' object='snd_pipeline-transceiver.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-transceiver.obj `if test -f 'transceiver.c'; then $(CYGPATH_W) 'transceiver.c'; else $(CYGPATH_W) '$(srcdir)/transceiver.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

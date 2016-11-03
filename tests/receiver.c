@@ -1,7 +1,8 @@
 #include <gst/gst.h>
 #include <gst/rtp/rtp.h>
+#include "receiver.h"
 
-static void _setup_rtpsimple_receiver(GstBin* receiverBin, ReceiverParams *params);
+static GstElement* _make_rtpsimple_receiver(ReceiverParams *params);
 
 
 Receiver* receiver_ctor(void)
@@ -22,21 +23,30 @@ void receiver_dtor(Receiver* this)
 Receiver* make_receiver(ReceiverParams *params)
 {
   Receiver* this = receiver_ctor();
-  GstBin* sourceBin     = GST_BIN(gst_bin_new(NULL));
+  GstBin* receiverBin     = GST_BIN(gst_bin_new(NULL));
+  GstElement* receiver;
+  GstElement* src;
 
   switch(params->type){
     case TRANSFER_TYPE_RTPSIMPLE:
-      _setup_rtpsimple_receiver(sourceBin, params);
+      src = receiver = _make_rtpsimple_receiver(params);
+      gst_bin_add(receiverBin, receiver);
       break;
   };
 
-  this->element = GST_ELEMENT(sourceBin);
+  setup_ghost_src(src, receiverBin);
+
+  this->element = GST_ELEMENT(receiverBin);
+
   return this;
 }
 
-void _setup_rtpsimple_receiver(GstBin* receiverBin, ReceiverParams *params)
+GstElement* _make_rtpsimple_receiver(ReceiverParams *params)
 {
+  GstElement *rtpSrc   = gst_element_factory_make ("udpsrc", NULL);
+  g_object_set (rtpSrc, "port", params->bound_port, NULL);
 
+  return rtpSrc;
 }
 
 

@@ -92,7 +92,7 @@ Notifier *make_notifier(void)
   return result;
 }
 
-void notifier_add_listener(Notifier *this, ListenerFunc callback, gpointer udata)
+void notifier_add_listener_full(Notifier *this, ListenerFunc callback, gpointer udata)
 {
   Listener *listener = _make_listener(callback, NULL, udata);
   this->listeners = g_slist_prepend(this->listeners, listener);

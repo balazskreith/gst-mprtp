@@ -1,20 +1,22 @@
 #include "source.h"
 #include "transceiver.h"
+#include "receiver.h"
 
 #include <gst/app/gstappsrc.h>
 #include <gst/app/gstappsink.h>
 
-static GstElement* _make_file_source(SourceParams *params);
-static GstElement* _make_testvideo_source(SourceParams *params);
-//static void _setup_rawproxy_source(GstBin* encoderBin, SourceParams *params);
-GstElement* _make_livefile_source(SourceParams *params);
+static GstElement* _make_testvideo_source(Source* this,SourceParams *params);
+static GstElement* _make_raw_source(Source* this,      SourceParams *params);
+static GstElement* _make_file_source(Source* this,     SourceParams *params);
+static GstElement* _make_v4l2_source(Source* this,     SourceParams *params);
 
 Source* source_ctor(void)
 {
   Source* this;
 
   this = g_malloc0(sizeof(Source));
-
+  this->on_destroy.listener_func = on_fi_called;
+  this->on_playing.listener_func = on_fi_called;
   return this;
 }
 
@@ -33,16 +35,16 @@ Source* make_source(SourceParams *params)
 
   switch(params->type){
     case SOURCE_TYPE_TESTVIDEO:
-      source = _make_testvideo_source(params);
+      source = _make_testvideo_source(this, params);
       break;
     case SOURCE_TYPE_RAWPROXY:
-//      _setup_rawproxy_source(sourceBin, params);
+      source = _make_raw_source(this, params);
       break;
     case SOURCE_TYPE_FILE:
-      source = _make_file_source(params);
+      source = _make_file_source(this, params);
       break;
-    case SOURCE_TYPE_LIVEFILE:
-      source = _make_livefile_source(params);
+    case SOURCE_TYPE_V4L2:
+      source = _make_v4l2_source(this, params);
       break;
   };
 
@@ -58,7 +60,7 @@ Source* make_source(SourceParams *params)
   return this;
 }
 
-GstElement* _make_testvideo_source(SourceParams *params)
+GstElement* _make_testvideo_source(Source* this, SourceParams *params)
 {
   GstElement *source = gst_element_factory_make ("videotestsrc", NULL);
 
@@ -70,43 +72,6 @@ GstElement* _make_testvideo_source(SourceParams *params)
   return source;
 }
 
-
-GstElement* _make_file_source(SourceParams *params)
-{
-  GstBin* fileSrc              = gst_bin_new(NULL);
-  GstElement* multifilesrc     = gst_element_factory_make ("multifilesrc", NULL);
-  GstElement* videoparse       = gst_element_factory_make ("videoparse", NULL);
-  GstElement* autovideoconvert = gst_element_factory_make ("autovideoconvert", NULL);
-
-  gst_bin_add_many(GST_BIN(fileSrc),
-
-      multifilesrc,
-      videoparse,
-      autovideoconvert,
-      NULL
-
-  );
-
-  g_object_set(multifilesrc,
-      "location", params->file.location,
-      "loop",     params->file.loop,
-      NULL
-  );
-
-  g_object_set(videoparse,
-      "width", atoi(params->file.width),
-      "height", atoi(params->file.height),
-      "framerate", params->file.framerate.numerator, params->file.framerate.divider,
-      "format", params->file.format,
-      NULL
-  );
-
-  gst_element_link_many(multifilesrc, videoparse, autovideoconvert, NULL);
-
-  setup_ghost_src(autovideoconvert, fileSrc);
-
-  return GST_ELEMENT(fileSrc);
-}
 
 static void _on_playing(GstPipeline *readerPipe, gpointer user_data)
 {
@@ -130,49 +95,13 @@ static GstFlowReturn _on_new_sample_from_sink (GstElement * sink, GstElement* so
 
   sample = gst_app_sink_pull_sample (GST_APP_SINK (sink));
   buffer = gst_sample_get_buffer(sample);
-//  result = gst_app_src_push_sample(GST_APP_SRC (source), gst_buffer_ref(buffer));
   result = gst_app_src_push_buffer (GST_APP_SRC (source), gst_buffer_ref(buffer));
   gst_sample_unref (sample);
 
   return result;
 }
 
-//
-//GstElement* _make_livefile_source(SourceParams *params)
-//{
-//  GstPipeline* readerPipe = gst_pipeline_new("readerPipe");
-//  GstElement*  fileSrc    = _make_file_source(params);
-//  GstElement*  appsink    = gst_element_factory_make ("appsink", NULL);
-//  GstElement*  appsrc     = gst_element_factory_make ("appsrc", NULL);
-//
-//  gst_bin_add_many(GST_BIN(readerPipe),
-//
-//      fileSrc,
-//      appsink,
-//      NULL
-//
-//  );
-//
-//  g_object_set (G_OBJECT (appsink), "emit-signals", TRUE,
-////      "sync", FALSE, "async", FALSE,
-//      NULL);
-//
-//  g_signal_connect (appsink, "new-sample", G_CALLBACK (_on_new_sample_from_sink), appsrc);
-//
-//  gst_element_link_many(fileSrc, appsink, NULL);
-//
-//  notifier_add_listener(get_sender_eventers()->on_playing, (listener) _on_playing, readerPipe);
-//  notifier_add_listener(get_sender_eventers()->on_destroy, (listener) _on_destroy, readerPipe);
-//
-//  g_object_set (appsrc,
-//      "is-live", TRUE,
-//      "format", GST_FORMAT_TIME,
-//      NULL);
-//
-//  return appsrc;
-//}
-
-GstElement* _make_livefile_source(SourceParams *params)
+GstElement* _make_file_source(Source* this, SourceParams *params)
 {
   GstPipeline* readerPipe      = gst_pipeline_new("readerPipe");
   GstBin* sourceBin            = gst_bin_new(NULL);
@@ -224,8 +153,11 @@ GstElement* _make_livefile_source(SourceParams *params)
 
   gst_element_link_many(multifilesrc, sink_videoparse, autovideoconvert, appsink, NULL);
 
-  notifier_add_listener(get_sender_eventers()->on_playing, (listener) _on_playing, readerPipe);
-  notifier_add_listener(get_sender_eventers()->on_destroy, (listener) _on_destroy, readerPipe);
+  this->on_playing.listener_obj  = readerPipe;
+  this->on_playing.listener_func = (listener) _on_playing;
+
+  this->on_destroy.listener_obj  = readerPipe;
+  this->on_destroy.listener_func = (listener) _on_destroy;
 
   gst_bin_add_many(sourceBin,
       appsrc,
@@ -240,68 +172,49 @@ GstElement* _make_livefile_source(SourceParams *params)
   gst_element_link(appsrc, src_videoparse);
   setup_ghost_src(src_videoparse, sourceBin);
   return GST_ELEMENT(sourceBin);
-//  return appsrc;
 }
 
 
-//
-//void _setup_rawproxy_source(GstBin* sourceBin, SourceParams *params)
-//{
-//  GstElement* receiver    = gst_element_factory_make("udpsrc", NULL);
-//  GstElement* rawDepay    = gst_element_factory_make("rtpvrawdepay", NULL);
-//  GstElement* transceiver = make_transceiver();
-//  GstElement* videoParse  = gst_element_factory_make("videoparse", NULL);
-//
-//  GstElement* tee         = gst_element_factory_make("tee", NULL);
-//  GstElement* queue       = gst_element_factory_make("queue", NULL);
-//  GstElement* source        = gst_element_factory_make("autovideosource", NULL);
-//
-//  const GstCaps* caps        = gst_caps_new_simple ("application/x-rtp",
-//      "media", G_TYPE_STRING, "video",
-//      "clock-rate", G_TYPE_INT, params->clock_rate,
-//      "width", G_TYPE_STRING, "352",
-//      "height", G_TYPE_STRING, "288",
-//      "sampling", G_TYPE_STRING, "YCbCr-4:2:0",
-//      "framerate", GST_TYPE_FRACTION, params->framerate.numerator, proxy_params->framerate.divider,
-//      "encoding-name", G_TYPE_STRING, "RAW", NULL
-//      );
-//
-//  g_print("Caps: %s\n", gst_caps_to_string(caps));
-//
-//  g_object_set(G_OBJECT(receiver),
-//      "port", params->port,
-//      "caps", caps,
-//      NULL);
-//
-//  g_object_set(G_OBJECT(videoParse),
-//      "format", 2,
-//      "width", 352,
-//      "height", 288,
-//      "framerate", 25, 1,
-//      NULL
-//  );
-//
-//  gst_bin_add_many (sourceBin, receiver, rawDepay, transceiver, videoParse,
-//      tee, queue, source,
-//      NULL);
-//
-//
-//  gst_element_link_pads(receiver, "src", rawDepay, "source");
-//  gst_element_link_pads(rawDepay, "src", tee, "source");
-//  gst_element_link_pads(tee, "src_1", transceiver, "source");
-//
-//  gst_element_link_pads(tee, "src_2", queue, "source");
-//  gst_element_link_pads(queue, "src", videoParse, "source");
-//  gst_element_link_pads(videoParse, "src", source, "source");
-//
-//  //  gst_element_link_many(receiver, rawDepay, transceiver, videoParse, NULL);
-//
-//  g_print("CAPS!!!: %s\n",
-//      gst_caps_to_string(gst_pad_get_current_caps(gst_element_get_static_pad(videoParse, "src"))));
-//
-//  setup_ghost_src (transceiver, sourceBin);
-//}
+GstElement* _make_v4l2_source(Source* this, SourceParams *params)
+{
+  GstElement* v4l2src      = gst_element_factory_make ("v4l2src", NULL);
+  return v4l2src;
+}
 
+GstElement* _make_raw_source(Source* this, SourceParams *params)
+{
+  GstBin*     rawBin      = gst_bin_new(NULL);
+  Receiver*   receiver    = make_receiver(NULL, NULL, params->rawproxy.rcv_transfer_params);
+  GstElement* rawDepay    = gst_element_factory_make("rtpvrawdepay", NULL);
+
+  const GstCaps* caps        = gst_caps_new_simple ("application/x-rtp",
+        "media", G_TYPE_STRING, "video",
+        "clock-rate", G_TYPE_INT, params->rawproxy.clock_rate,
+        "width", G_TYPE_STRING, params->rawproxy.width,
+        "height", G_TYPE_STRING, params->rawproxy.width,
+        "payload",G_TYPE_INT, 96,
+        "sampling", G_TYPE_STRING, "YCbCr-4:2:0",
+        "framerate", GST_TYPE_FRACTION, params->rawproxy.framerate.numerator, params->rawproxy.framerate.divider,
+        "encoding-name", G_TYPE_STRING, "RAW", NULL
+        );
+
+
+  gst_bin_add_many(rawBin,
+
+      receiver->element,
+      rawDepay,
+
+      NULL
+  );
+
+  receiver_on_caps_change(receiver, caps);
+
+
+  gst_element_link_many(receiver->element, rawDepay, NULL);
+
+  setup_ghost_src(rawDepay, rawBin);
+  return GST_ELEMENT(rawBin);
+}
 
 
 

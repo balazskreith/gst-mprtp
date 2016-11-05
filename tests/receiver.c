@@ -3,19 +3,22 @@
 #include "receiver.h"
 #include "rtpstatmaker.h"
 
-GstElement* _make_rtp_receiver(RcvTransferParams *params);
-GstElement* _make_mprtp_receiver(RcvTransferParams *params);
+GstElement* _make_rtp_receiver(Receiver* this,   RcvTransferParams *params);
+GstElement* _make_mprtp_receiver(Receiver* this, RcvTransferParams *params);
+
 Receiver* receiver_ctor(void)
 {
   Receiver* this;
 
   this = g_malloc0(sizeof(Receiver));
+  this->on_caps_change = make_notifier("on-caps-change");
 
   return this;
 }
 
 void receiver_dtor(Receiver* this)
 {
+  notifier_unref(this->on_caps_change);
   g_free(this);
 }
 
@@ -32,10 +35,10 @@ Receiver* make_receiver(CCReceiverSideParams *cc_receiver_side_params,
 
   switch(rcv_transfer_params->type){
     case TRANSFER_TYPE_RTP:
-      src = element = _make_rtp_receiver(rcv_transfer_params);
+      src = element = _make_rtp_receiver(this, rcv_transfer_params);
     break;
     case TRANSFER_TYPE_MPRTP:
-      src = element = _make_mprtp_receiver(rcv_transfer_params);
+      src = element = _make_mprtp_receiver(this, rcv_transfer_params);
     break;
   };
   gst_bin_add(receiverBin, element);
@@ -56,10 +59,10 @@ Receiver* make_receiver(CCReceiverSideParams *cc_receiver_side_params,
 
   if(cc_receiver_side_params){
     switch(cc_receiver_side_params->type){
-      case CONGESTION_CONTROLLER_TYPE_SCREAM:
+      case SENDING_PACKET_SCHEDULING_TYPE_SCREAM:
         //TODO: add scream
         break;
-      case CONGESTION_CONTROLLER_TYPE_FBRAPLUS:
+      case SENDING_PACKET_SCHEDULER_TYPE_MPRTPFBRAPLUS:
         //TODO: add fbra+
         break;
     };
@@ -83,21 +86,36 @@ Receiver* make_receiver(CCReceiverSideParams *cc_receiver_side_params,
   return this;
 }
 
-
-static GstElement* _make_rtpsrc(guint16 bound_port){
-  GstElement *rtpSrc   = gst_element_factory_make ("udpsrc", NULL);
-
-  g_object_set (rtpSrc, "port", bound_port, NULL);
-//  return rtpSrc;
-  return debug_by_src(rtpSrc);
-}
-
-GstElement* _make_rtp_receiver(RcvTransferParams *params)
+void receiver_on_caps_change(Receiver* this, const GstCaps* caps)
 {
-  return _make_rtpsrc(params->rtp.bound_port);
+  notifier_do(this->on_caps_change, caps);
 }
 
-GstElement* _make_mprtp_receiver(RcvTransferParams *params)
+static void _on_rtpSrc_caps_change(GstElement* rtpSrc, const GstCaps* caps)
+{
+  g_print("On rtpSrc caps canged called\n");
+  g_object_set(G_OBJECT(rtpSrc), "caps", caps, NULL);
+
+}
+
+static GstElement* _make_rtpsrc(Receiver* this, guint16 bound_port){
+
+  GstElement *rtpSrc   = gst_element_factory_make ("udpsrc", NULL);
+  g_object_set (rtpSrc, "port", bound_port, NULL);
+
+  g_print("UdpSrc is bound to %hu\n", bound_port);
+  notifier_add_listener_full(this->on_caps_change, (listener) _on_rtpSrc_caps_change, rtpSrc);
+
+//  return debug_by_src(rtpSrc);
+  return rtpSrc;
+}
+
+GstElement* _make_rtp_receiver(Receiver* this, RcvTransferParams *params)
+{
+  return _make_rtpsrc(this, params->rtp.bound_port);
+}
+
+GstElement* _make_mprtp_receiver(Receiver* this,RcvTransferParams *params)
 {
   GstBin *receiverBin    = GST_BIN (gst_bin_new (NULL));
   GstElement* mprtpRcv = gst_element_factory_make ("mprtpreceiver", NULL);
@@ -111,7 +129,7 @@ GstElement* _make_mprtp_receiver(RcvTransferParams *params)
     GstElement *rtpSrc;
 
     memset(padName, 0, 255);
-    rtpSrc = _make_rtpsrc(subflow->bound_port);
+    rtpSrc = _make_rtpsrc(this, subflow->bound_port);
     sprintf(padName, "sink_%d", subflow->id);
     gst_element_link_pads(rtpSrc, "src", mprtpRcv, padName);
     gst_bin_add(receiverBin, rtpSrc);

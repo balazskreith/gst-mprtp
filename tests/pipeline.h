@@ -14,6 +14,17 @@
 #include <gst/gst.h>
 #include <gst/rtp/rtp.h>
 
+typedef struct _SourceParams SourceParams;
+typedef struct _SinkParams SinkParams;
+typedef struct _CodecParams CodecParams;
+typedef struct _VideoParams VideoParams;
+typedef struct _StatParams StatParams;
+typedef struct _StatParamsTuple StatParamsTuple;
+typedef struct _SndTransferParams SndTransferParams;
+typedef struct _RcvTransferParams RcvTransferParams;
+typedef struct _CCReceiverSideParams CCReceiverSideParams;
+typedef struct _CCSenderSideParams SndPacketScheduler;
+
 
 typedef struct{
   gint32 numerator;
@@ -30,25 +41,31 @@ typedef struct{
 typedef struct{
   GSList* listeners;
   gchar   name[256];
+  guint   ref;
 }Notifier;
 
 
 typedef enum{
   SOURCE_TYPE_TESTVIDEO = 1,
   SOURCE_TYPE_RAWPROXY  = 2,
-  SOURCE_TYPE_LIVEFILE  = 3,
-  SOURCE_TYPE_FILE      = 4,
+  SOURCE_TYPE_FILE      = 3,
+  SOURCE_TYPE_V4L2      = 4,
 }SourceTypes;
 
-typedef struct{
+typedef struct _SourceParams{
   SourceTypes type;
   union{
    struct{
-     guint16 port;
-     guint32 clock_rate;
-     gchar   width[16];
-     gchar   height[16];
 
+   }testvideo;
+
+   struct{
+     guint16            port;
+     guint32            clock_rate;
+     gchar              width[16];
+     gchar              height[16];
+     Framerate          framerate;
+     RcvTransferParams* rcv_transfer_params;
    }rawproxy;
 
    struct{
@@ -62,26 +79,45 @@ typedef struct{
    }file;
 
    struct{
+     gchar     width[16];
+     gchar     height[16];
 
-   }testvideo;
+     gchar     location[256];
+     gint      loop;
+     Framerate framerate;
+     gint32    format;
+   }v4l2;
 
   };
 
   gchar to_string[256];
-}SourceParams;
-
+};
 
 
 typedef enum{
   SINK_TYPE_AUTOVIDEO = 1,
   SINK_TYPE_RAWPROXY  = 2,
+  SINK_TYPE_FILE      = 3,
 }SinkTypes;
 
-typedef struct{
+struct _SinkParams{
   SinkTypes type;
+  union{
+    struct{
 
+    }autovideo;
+
+    struct{
+
+    }rawproxy;
+
+    struct{
+      gchar location[256];
+    }file;
+
+  };
   gchar      to_string[256];
-}SinkParams;
+};
 
 
 typedef enum{
@@ -89,39 +125,39 @@ typedef enum{
   CODEC_TYPE_VP8    = 2,
 }CodecTypes;
 
-typedef struct{
+struct _CodecParams{
   CodecTypes type;
   gchar      type_str[32];
   gchar      to_string[256];
 
-}CodecParams;
+};
 
-typedef struct{
+struct _VideoParams{
   gchar      width[16];
   gchar      height[16];
   gint32     clock_rate;
   Framerate  framerate;
   gchar      to_string[256];
 
-}VideoParams;
+};
 
 
-typedef struct{
+struct _StatParams{
   gint       csv;
   gchar      touched_sync[256];
 
   gchar      to_string[1024];
 
-}StatParams;
+};
 
-typedef struct{
+
+struct _StatParamsTuple{
   StatParams* stat_params;
   SinkParams* packetlogs_sink_params;
   SinkParams* statlogs_sink_params;
 
   gchar       to_string[2048];
-}StatParamsTuple;
-
+};
 
 typedef enum{
   TRANSFER_TYPE_RTP    = 1,
@@ -134,7 +170,7 @@ typedef struct{
   gchar   dest_ip[256];
 }SenderSubflow;
 
-typedef struct{
+struct _SndTransferParams{
   TransferTypes type;
   union{
     struct{
@@ -148,7 +184,7 @@ typedef struct{
     }mprtp;
   };
   gchar to_string[1024];
-}SndTransferParams;
+};
 
 
 typedef struct{
@@ -156,7 +192,7 @@ typedef struct{
   guint16 bound_port;
 }ReceiverSubflow;
 
-typedef struct{
+struct _RcvTransferParams{
   TransferTypes type;
   union{
     struct{
@@ -169,15 +205,16 @@ typedef struct{
     }mprtp;
   };
   gchar to_string[1024];
-}RcvTransferParams;
-
+};
 
 typedef enum{
-  CONGESTION_CONTROLLER_TYPE_SCREAM    = 1,
-  CONGESTION_CONTROLLER_TYPE_FBRAPLUS  = 2,
+  SENDING_PACKET_SCHEDULING_TYPE_SCREAM        = 1,
+  SENDING_PACKET_SCHEDULER_TYPE_MPRTP          = 2,
+  SENDING_PACKET_SCHEDULER_TYPE_MPRTPFBRAPLUS  = 3,
 }CongestionControllerTypes;
 
-typedef struct{
+
+struct _CCSenderSideParams{
   CongestionControllerTypes type;
   RcvTransferParams* rcv_transfer_params;
   union{
@@ -190,9 +227,9 @@ typedef struct{
   };
 
   gchar to_string[256];
-}CCSenderSideParams;
+};
 
-typedef struct{
+struct _CCReceiverSideParams{
   CongestionControllerTypes type;
   SndTransferParams* snd_transfer_params;
   union{
@@ -205,7 +242,7 @@ typedef struct{
   };
 
   gchar to_string[256];
-}CCReceiverSideParams;//TODO: write this
+};//TODO: write this
 
 static gchar codec_params_rawstring_default[]           = "VP8";
 static gchar* codec_params_rawstring                    = NULL;
@@ -214,8 +251,9 @@ static gchar video_params_rawstring_default[]           = "352:288:90000:25/1";
 static gchar* video_params_rawstring                    = NULL;
 
 //static gchar source_params_rawstring_default[]        = "TESTVIDEO";
-static gchar source_params_rawstring_default[]          = "LIVEFILE:foreman_cif.yuv:1:352:288:2:25/1";
-//static gchar source_params_rawstring_default[]        = "FILE:foreman_cif.yuv:1:352:288:2:25/1";
+static gchar source_params_rawstring_default[]          = "FILE:foreman_cif.yuv:1:352:288:2:25/1";
+//static gchar source_params_rawstring_default[]          = "V4L2";
+//static gchar source_params_rawstring_default[]          = "RAWPROXY:352:288:90000:25/1:RTP:5111";
 static gchar* source_params_rawstring                   = NULL;
 
 static gchar  sink_params_rawstring_default[]           = "AUTOVIDEO";
@@ -246,8 +284,8 @@ static GOptionEntry entries[] =
     { "receiver",  0, 0, G_OPTION_ARG_STRING, &rcvtransfer_params_rawstring,     "receiver",      NULL },
 
     //TODO: MUHAHA
-//    { "cc",  0, 0, G_OPTION_ARG_STRING, &congestion_controller_rawstring,    "cc",      NULL },
-//    { "fb",  0, 0, G_OPTION_ARG_STRING, &feedbacker_rawstring,    "fb",      NULL },
+//    { "scheduler",  0, 0, G_OPTION_ARG_STRING, &scheduler,    "scheduler",      NULL },
+//    { "playouter",  0, 0, G_OPTION_ARG_STRING, &playouter,    "plazouter",      NULL },
 
     { "stat",           0, 0, G_OPTION_ARG_STRING, &stat_params_rawstring,            "stat",            NULL },
     { "encodersink",    0, 0, G_OPTION_ARG_STRING, &encodersink_params_rawstring,     "encodersink",     NULL },
@@ -272,8 +310,8 @@ StatParams*     make_stat_params (gchar* params_rawstring);
 SndTransferParams*  make_snd_transfer_params(gchar* params_rawstring);
 void free_snd_transfer_params(SndTransferParams *snd_transfer_params);
 
-CCSenderSideParams* make_cc_sender_side_params(gchar* params_rawstring);
-void free_cc_sender_side_params(CCSenderSideParams *cc_sender_side_params);
+SndPacketScheduler* make_snd_packet_scheduler_params(gchar* params_rawstring);
+void free_snd_packet_scheduler_params(SndPacketScheduler *snd_packet_scheduler_params);
 
 RcvTransferParams*  make_rcv_transfer_params(gchar* params_rawstring);
 void free_rcv_transfer_params(RcvTransferParams *rcv_transfer_params);
@@ -295,11 +333,15 @@ StatParamsTuple* make_statparams_tuple(StatParams* stat_params,
 
 void free_statparams_tuple(StatParamsTuple* statparams_tuple);
 
+void on_fi_called(gpointer object, gpointer user_data);
+
 Notifier* notifier_ctor(void);
-void notifier_dtor(Notifier* this);
+void notifier_unref(Notifier* this);
 Notifier* make_notifier(const gchar* event_name);
-void notifier_add_listener(Notifier* this, listener listener_func, gpointer user_data);
+void notifier_add_listener_full(Notifier* this, listener listener_func, gpointer user_data);
+void notifier_add_listener(Notifier* this, Listener* listener);
 void notifier_do(Notifier* this, gpointer user_data);
+Notifier* notifier_ref(Notifier* this);
 
 void cb_eos (GstBus * bus, GstMessage * message, gpointer data);
 void cb_state (GstBus * bus, GstMessage * message, gpointer data);
@@ -316,15 +358,39 @@ void setup_ghost_src (GstElement * src, GstBin * bin);
 
 
 typedef struct{
+  gpointer       object;
+  GDestroyNotify dtor;
+}ObjectsHolderItem;
+
+typedef struct{
+  GSList* holders;
+}ObjectsHolder;
+
+ObjectsHolder* objects_holder_ctor(void);
+void object_holder_dtor(ObjectsHolder* holder);
+void objects_holder_add(ObjectsHolder* this, gpointer object, GDestroyNotify dtor);
+
+typedef struct{
   Notifier* on_target_bitrate_change;
   Notifier* on_assembled;
   Notifier* on_playing;
   Notifier* on_destroy;
-}SenderEventers;
 
-SenderEventers* get_sender_eventers(void);
-void sender_eventers_dtor(void);
+  GSList*        objects;
+  ObjectsHolder* objects_holder;
+  GHashTable*    events_to_notifiers;
 
+}Pipeline;
+
+Pipeline* get_pipeline(void);
+void pipeline_dtor(void);
+
+void pipeline_add_event_notifier(const gchar* event_name, Notifier* notifier);
+void pipeline_add_event_listener_full(const gchar* event_name, listener listener_func, gpointer user_data);
+void pipeline_add_event_listener(const gchar* event_name, Listener* listener);
+void pipeline_firing_event(const gchar* event_name, gpointer data);
+
+void pipeline_add_object(gpointer object, GDestroyNotify dtor);
 
 
 #endif /* TESTS_PIPELINE_H_ */

@@ -409,7 +409,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   mediator_set_response_handler(this->monitoring,
       (ListenerFunc) _on_monitoring_response, this);
 
-  notifier_add_listener(this->on_rtcp_ready,
+  notifier_add_listener_full(this->on_rtcp_ready,
       (ListenerFunc) _on_rtcp_ready, this);
 }
 

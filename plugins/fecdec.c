@@ -286,7 +286,7 @@ static void _fecdec_process(gpointer udata)
     case FECDECODER_MESSAGE_TYPE_RESPONSE_LISTENER:
     {
       ReponseListenerMessage* casted_msg = (ReponseListenerMessage*)msg;
-      notifier_add_listener(this->on_response, casted_msg->listener, casted_msg->udata);
+      notifier_add_listener_full(this->on_response, casted_msg->listener, casted_msg->udata);
     }
     break;
     default:

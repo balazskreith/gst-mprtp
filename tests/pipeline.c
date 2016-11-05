@@ -34,8 +34,9 @@ SourceParams*   make_source_params(gchar* params_rawstring)
 {
   SourceParams* result = g_malloc0(sizeof(SourceParams));
   gchar       **tokens = g_strsplit(params_rawstring, ":", -1);
+  gchar       *rcv_transfer_params = NULL;
 
-  result->type = _compare_types(tokens[0], "TESTVIDEO", "RAWPROXY", "LIVEFILE", "FILE", NULL);
+  result->type = _compare_types(tokens[0], "TESTVIDEO", "RAWPROXY", "FILE", "V4L2", NULL);
 
   switch(result->type){
     case SOURCE_TYPE_TESTVIDEO:
@@ -47,19 +48,24 @@ SourceParams*   make_source_params(gchar* params_rawstring)
       strcpy(result->rawproxy.height,     tokens[2]);
 
       result->rawproxy.clock_rate = atoi(tokens[3]);
-      result->rawproxy.port       = atoi(tokens[4]);
+      setup_framerate(tokens[4], &result->rawproxy.framerate);
+      rcv_transfer_params = g_strjoinv(":", tokens + 5);
 
-      sprintf(result->to_string, "RawProxy, W:%s, H:%s, ClockRate: %d, Port: %hu",
+      result->rawproxy.rcv_transfer_params = make_rcv_transfer_params(rcv_transfer_params);
+      g_free(rcv_transfer_params);
+
+      sprintf(result->to_string, "RawProxy, W:%s, H:%s, CR: %d, Fr: %d/%d Rcv: %s",
           result->rawproxy.width,
           result->rawproxy.height,
           result->rawproxy.clock_rate,
-          result->rawproxy.port
+          result->rawproxy.framerate.numerator,
+          result->rawproxy.framerate.divider,
+          result->rawproxy.rcv_transfer_params->to_string
       );
 
       break;
 
     case SOURCE_TYPE_FILE:
-    case SOURCE_TYPE_LIVEFILE:
       strcpy(result->file.location,   tokens[1]);
 
       result->file.loop = atoi(tokens[2]);
@@ -70,8 +76,7 @@ SourceParams*   make_source_params(gchar* params_rawstring)
       result->file.format = atoi(tokens[5]);
       setup_framerate(tokens[6], &result->file.framerate);
 
-      sprintf(result->to_string, "%s: %s, loop: %d, W:%s, H:%s, Framerate: %d/%d, Format: %d",
-          result->type == SOURCE_TYPE_FILE ? "File" : "LiveFile",
+      sprintf(result->to_string, "File Source: %s, loop: %d, W:%s, H:%s, Framerate: %d/%d, Format: %d",
           result->file.location,
           result->file.loop,
           result->file.width,
@@ -79,6 +84,12 @@ SourceParams*   make_source_params(gchar* params_rawstring)
           result->file.framerate.numerator,
           result->file.framerate.divider,
           result->file.format
+      );
+
+      break;
+    case SOURCE_TYPE_V4L2:
+
+      sprintf(result->to_string, "V4L2 Source"
       );
 
       break;
@@ -215,28 +226,35 @@ void free_snd_transfer_params(SndTransferParams *snd_transfer_params)
 }
 
 
-CCSenderSideParams*   make_cc_sender_side_params(gchar* params_rawstring)
+SndPacketScheduler*   make_snd_packet_scheduler_params(gchar* params_rawstring)
 {
-  CCSenderSideParams *result = g_malloc0(sizeof(CCSenderSideParams));
+  SndPacketScheduler *result = g_malloc0(sizeof(SndPacketScheduler));
   gchar                     **tokens = g_strsplit(params_rawstring, ":", -1);
 
-  result->type = _compare_types(tokens[0], "NONE", "SCREAM", "FBRAPLUS", NULL);
+  result->type = _compare_types(tokens[0], "SCREAM", "MPRTP", "MPRTPFBRAPLUS", NULL);
 
   switch(result->type){
-    case CONGESTION_CONTROLLER_TYPE_SCREAM:
+    case SENDING_PACKET_SCHEDULING_TYPE_SCREAM:
 //      _replace_char(",",":",tokens[1]);
       result->rcv_transfer_params = make_rcv_transfer_params(tokens[1]);
 
-      sprintf(result->to_string, "SCReAM congestion controller, Rcv Params: %s",
+      sprintf(result->to_string, "SCReAM congestion controller for packet scheduling, Rcv Params: %s",
           result->rcv_transfer_params->to_string);
       break;
-    case CONGESTION_CONTROLLER_TYPE_FBRAPLUS:
-//      _replace_char(",",":",tokens[1]);
-      result->rcv_transfer_params = make_rcv_transfer_params(tokens[1]);
+    case SENDING_PACKET_SCHEDULER_TYPE_MPRTPFBRAPLUS:
+    //      _replace_char(",",":",tokens[1]);
+          result->rcv_transfer_params = make_rcv_transfer_params(tokens[1]);
 
-      sprintf(result->to_string, "FBRA+ congestion controller, Rcv Params: %s",
-          result->rcv_transfer_params->to_string);
-      break;
+          sprintf(result->to_string, "MPRTP-FBRA+ congestion controller, Rcv Params: %s",
+              result->rcv_transfer_params->to_string);
+          break;
+    case SENDING_PACKET_SCHEDULER_TYPE_MPRTP:
+    //      _replace_char(",",":",tokens[1]);
+          result->rcv_transfer_params = make_rcv_transfer_params(tokens[1]);
+
+          sprintf(result->to_string, "MPRTP congestion controller, Rcv Params: %s",
+              result->rcv_transfer_params->to_string);
+          break;
     default:
       g_print("Unrecognized type (%d) at make_cc_sender_side_params \n", result->type);
       break;
@@ -245,7 +263,7 @@ CCSenderSideParams*   make_cc_sender_side_params(gchar* params_rawstring)
   return result;
 }
 
-void free_cc_sender_side_params(CCSenderSideParams *congestion_controller_params)
+void free_snd_packet_scheduler_params(SndPacketScheduler *congestion_controller_params)
 {
   if(!congestion_controller_params){
     return;
@@ -269,7 +287,7 @@ RcvTransferParams*  make_rcv_transfer_params(gchar* params_rawstring)
 
        result->rtp.bound_port = atoi(tokens[1]);
 
-       sprintf(result->to_string, "RTP, Bound Port: %d", result->rtp.bound_port);
+       sprintf(result->to_string, "RTP, Bound Port: %hu", result->rtp.bound_port);
 
        break;
      case TRANSFER_TYPE_MPRTP:
@@ -321,14 +339,14 @@ CCReceiverSideParams*   make_cc_receiver_side_params(gchar* params_rawstring)
   result->type = _compare_types(tokens[0], "NONE", "SCREAM", "FBRAPLUS", NULL);
 
   switch(result->type){
-    case CONGESTION_CONTROLLER_TYPE_SCREAM:
+    case SENDING_PACKET_SCHEDULING_TYPE_SCREAM:
 //      _replace_char(",",":",tokens[1]);
       result->snd_transfer_params = make_snd_transfer_params(tokens[1]);
 
       sprintf(result->to_string, "SCReAM congestion controller, Rcv Params: %s",
           result->snd_transfer_params->to_string);
       break;
-    case CONGESTION_CONTROLLER_TYPE_FBRAPLUS:
+    case SENDING_PACKET_SCHEDULER_TYPE_MPRTPFBRAPLUS:
 //      _replace_char(",",":",tokens[1]);
       result->snd_transfer_params = make_snd_transfer_params(tokens[1]);
 
@@ -360,14 +378,18 @@ SinkParams*     make_sink_params(gchar* params_rawstring)
   SinkParams* result = g_malloc0(sizeof(SinkParams));
   gchar       **tokens = g_strsplit(params_rawstring, ":", -1);
 
-  result->type = _compare_types(tokens[0], "AUTOVIDEO", "RAWPROXY", NULL);
+  result->type = _compare_types(tokens[0], "AUTOVIDEO", "RAWPROXY", "FILE", NULL);
 
   switch(result->type){
     case SINK_TYPE_AUTOVIDEO:
       sprintf(result->to_string, "AUTOVIDEO");
       break;
     case SINK_TYPE_RAWPROXY:
-
+      sprintf(result->to_string, "RawProxy");
+      break;
+    case SINK_TYPE_FILE:
+      strcpy(result->file.location, tokens[1]);
+      sprintf(result->to_string, "File location %s", result->file.location);
       break;
     default:
       g_print("Unrecognized type (%d) at make_sink_params \n", result->type);
@@ -441,25 +463,39 @@ void free_statparams_tuple(StatParamsTuple* statparams_tuple)
   g_free(statparams_tuple);
 }
 
+void on_fi_called(gpointer object, gpointer user_data){
+
+}
+
 Notifier* notifier_ctor(void)
 {
   return g_malloc0(sizeof(Notifier));
 }
 
-void notifier_dtor(Notifier* this)
+Notifier* notifier_ref(Notifier* this){
+  ++this->ref;
+  return this;
+}
+
+void notifier_unref(Notifier* this)
 {
   GSList* item = this->listeners;
+  if(0 < --this->ref){
+    return;
+  }
   g_slist_free_full(this->listeners, g_free);
+  g_free(this);
 }
 
 Notifier* make_notifier(const gchar* event_name)
 {
   Notifier* this = notifier_ctor();
   strcpy(this->name, event_name);
+  this->ref = 1;
   return this;
 }
 
-void notifier_add_listener(Notifier* this, listener listener_func, gpointer user_data)
+void notifier_add_listener_full(Notifier* this, listener listener_func, gpointer user_data)
 {
   Listener* listener = g_malloc0(sizeof(Listener));
   listener->listener_func = listener_func;
@@ -468,7 +504,16 @@ void notifier_add_listener(Notifier* this, listener listener_func, gpointer user
   this->listeners = g_slist_prepend(this->listeners, listener);
 }
 
+void notifier_add_listener(Notifier* this, Listener* listener)
+{
+  this->listeners = g_slist_prepend(this->listeners, listener);
+}
+
 static void _foreach_listeners(Listener* listener, gpointer user_data){
+  if(!listener->listener_func){
+    g_print("WARN: No listener function found to call");
+    return;
+  }
   listener->listener_func(listener->listener_obj, user_data);
 }
 
@@ -550,34 +595,7 @@ GstElement* debug_by_src(GstElement*element)
   g_object_set (fakesink, "dump", TRUE, NULL);
   return GST_ELEMENT(debugBin);
 }
-//
-//GstElement* debug_by_sink(GstElement*element)
-//{
-//  GstBin* debugBin     = gst_bin_new("debugBin");
-//  GstElement *tee      = gst_element_factory_make ("tee", NULL);
-//  GstElement *q1       = gst_element_factory_make ("queue", NULL);
-//  GstElement *q2       = gst_element_factory_make ("queue", NULL);
-//  GstElement *fakesink = gst_element_factory_make ("fakesink", NULL);
-//
-//  gst_bin_add_many(debugBin, element, tee, q1, q2, fakesink, NULL);
-//
-//  setup_ghost_sink(tee, debugBin);
-//
-////  gst_element_link_pads(tee, "src_1", q1, "sink");
-////  gst_element_link_pads(q1, "src", element, "sink");
-////  gst_element_link_pads(tee, "src_2", q2, "sink");
-////  gst_element_link_pads(q2, "src", fakesink, "sink");
-//
-//  gst_element_link_pads(tee, "src_1", element, "sink");
-//  gst_element_link_pads(tee, "src_2", fakesink, "sink");
-//
-//  if(GST_IS_PAD(gst_element_get_static_pad(element, "src"))){
-//    setup_ghost_src(element, debugBin);
-//  }
-////  g_object_set(tee, "allow-not-linked", TRUE, NULL);
-//  g_object_set (fakesink, "dump", TRUE, NULL);
-//  return GST_ELEMENT(debugBin);
-//}
+
 
 GstElement* debug_by_sink(GstElement*element)
 {
@@ -591,9 +609,9 @@ GstElement* debug_by_sink(GstElement*element)
   g_object_set (identity, "dump", TRUE, NULL);
 
   setup_ghost_sink(identity, debugBin);
-//  if(GST_IS_PAD(gst_element_get_static_pad(element, "src"))){
-//    setup_ghost_src(element, debugBin);
-//  }
+  if(GST_IS_PAD(gst_element_get_static_pad(element, "src"))){
+    setup_ghost_src(element, debugBin);
+  }
 
   return GST_ELEMENT(debugBin);
 }
@@ -627,30 +645,142 @@ setup_ghost_src (GstElement * src, GstBin * bin)
   setup_ghost_src_by_padnames(src, "src", bin, "src");
 }
 
-static SenderEventers* sender_eventers = NULL;
-SenderEventers* get_sender_eventers(void)
-{
-  if(sender_eventers){
-    return sender_eventers;
-  }
-  sender_eventers = g_malloc0(sizeof(SenderEventers));
-  sender_eventers->on_assembled   = make_notifier("on-assembled");
-  sender_eventers->on_playing     = make_notifier("on-playing");
-  sender_eventers->on_destroy     = make_notifier("on-destroy");
-  sender_eventers->on_target_bitrate_change = make_notifier("on-target-bitrate-change");
 
-  return sender_eventers;
+static ObjectsHolderItem* objects_holder_item_ctor(void){
+  ObjectsHolderItem* this = g_malloc0(sizeof(ObjectsHolderItem));
+  return this;
 }
 
-void sender_eventers_dtor(void)
-{
-  if(!sender_eventers){
+static void object_holder_item_dtor(ObjectsHolderItem* item){
+  if(!item){
     return;
   }
-  notifier_dtor(sender_eventers->on_assembled);
-  notifier_dtor(sender_eventers->on_playing);
-  notifier_dtor(sender_eventers->on_destroy);
-  notifier_dtor(sender_eventers->on_target_bitrate_change);
-  g_free(sender_eventers);
-  sender_eventers = NULL;
+  item->dtor(item->object);
+  g_free(item);
+}
+
+ObjectsHolderItem* make_object_item_holder(gpointer object, GDestroyNotify dtor){
+  ObjectsHolderItem* this = objects_holder_item_ctor();
+  this->object = object;
+  this->dtor = dtor;
+  return this;
+}
+
+ObjectsHolder* objects_holder_ctor(void){
+  ObjectsHolder* this = g_malloc0(sizeof(ObjectsHolder));
+  this->holders = NULL;
+  return this;
+}
+
+void object_holder_dtor(ObjectsHolder* this){
+  g_slist_free_full(this->holders, object_holder_item_dtor);
+}
+
+void objects_holder_add(ObjectsHolder* this, gpointer object, GDestroyNotify dtor)
+{
+  this->holders = g_slist_prepend(this->holders, make_object_item_holder(object, dtor) );
+}
+
+
+
+static Pipeline* pipeline = NULL;
+Pipeline* get_pipeline(void)
+{
+  if(pipeline){
+    return pipeline;
+  }
+  pipeline = g_malloc0(sizeof(Pipeline));
+  pipeline->on_assembled   = make_notifier("on-assembled");
+  pipeline->on_playing     = make_notifier("on-playing");
+  pipeline->on_destroy     = make_notifier("on-destroy");
+  pipeline->on_target_bitrate_change = make_notifier("on-target-bitrate-change");
+
+  pipeline->objects_holder = objects_holder_ctor();
+  pipeline->events_to_notifiers = g_hash_table_new_full(g_str_hash,
+      g_str_equal, g_free, (GDestroyNotify)notifier_unref);
+
+  return pipeline;
+}
+
+void pipeline_dtor(void)
+{
+  if(!pipeline){
+    return;
+  }
+  notifier_unref(pipeline->on_assembled);
+  notifier_unref(pipeline->on_playing);
+  notifier_unref(pipeline->on_destroy);
+  notifier_unref(pipeline->on_target_bitrate_change);
+
+  g_slist_free_full(pipeline->objects, object_holder_dtor);
+  g_hash_table_destroy(pipeline->events_to_notifiers);
+
+  g_free(pipeline);
+  pipeline = NULL;
+}
+
+void pipeline_add_event_notifier(const gchar* event_name, Notifier* notifier)
+{
+  Pipeline* this = get_pipeline();
+  gchar* event_copied_name;
+  if(g_hash_table_lookup(this->events_to_notifiers, event_name) != NULL){
+    g_print("Event %s is already registered in the eventer", event_name);
+    return;
+  }
+  event_copied_name = g_malloc(256);
+  g_print("Add notifier for event %s\n", event_name);
+  strcpy(event_copied_name, event_name);
+  g_hash_table_insert(this->events_to_notifiers, event_copied_name, notifier_ref(notifier));
+}
+
+void pipeline_add_event_listener_full(const gchar* event_name, listener listener_func, gpointer user_data)
+{
+  Pipeline* this = get_pipeline();
+  Notifier* notifier;
+
+  if((notifier = g_hash_table_lookup(this->events_to_notifiers, event_name)) == NULL){
+    notifier = make_notifier(event_name);
+    pipeline_add_event_notifier(event_name, notifier);
+    notifier_unref(notifier);
+    return;
+  }
+
+  notifier_add_listener_full(notifier, listener_func, user_data);
+
+}
+
+void pipeline_add_event_listener(const gchar* event_name, Listener* listener)
+{
+  Pipeline* this = get_pipeline();
+  Notifier* notifier;
+
+  if((notifier = g_hash_table_lookup(this->events_to_notifiers, event_name)) == NULL){
+    g_print("Not found any notifier for event %s, we created one\n", event_name);
+    notifier = make_notifier(event_name);
+    pipeline_add_event_notifier(event_name, notifier);
+    notifier_unref(notifier);
+  }
+
+  g_print("Listener added to pipeline for event %s\n", event_name);
+  notifier_add_listener(notifier, listener);
+
+}
+
+void pipeline_firing_event(const gchar* event_name, gpointer data)
+{
+  Pipeline* this = get_pipeline();
+  Notifier* notifier;
+  if((notifier = g_hash_table_lookup(this->events_to_notifiers, event_name)) == NULL){
+    g_print("Requested event %s not bounded to any Notifier\n", event_name);
+    return;
+  }
+  g_print("Firing event %s\n", event_name);
+  notifier_do(notifier, data);
+}
+
+
+void pipeline_add_object(gpointer object, GDestroyNotify dtor)
+{
+  Pipeline*     this = get_pipeline();
+  objects_holder_add(this->objects_holder, object, dtor);
 }

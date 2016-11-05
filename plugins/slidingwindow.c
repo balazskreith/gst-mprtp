@@ -355,11 +355,11 @@ void slidingwindow_add_plugin(SlidingWindow* this, SlidingWindowPlugin *swplugin
 {
   this->plugins = g_list_append(this->plugins, swplugin);
   if(swplugin->add_pipe){
-    notifier_add_listener(this->on_add_item, (ListenerFunc) swplugin->add_pipe, swplugin->add_data);
+    notifier_add_listener_full(this->on_add_item, (ListenerFunc) swplugin->add_pipe, swplugin->add_data);
   }
 
   if(swplugin->rem_pipe){
-    notifier_add_listener(this->on_rem_item, (ListenerFunc) swplugin->rem_pipe, swplugin->rem_data);
+    notifier_add_listener_full(this->on_rem_item, (ListenerFunc) swplugin->rem_pipe, swplugin->rem_data);
   }
 }
 
@@ -378,18 +378,18 @@ void slidingwindow_add_plugins (SlidingWindow* this, ... )
 
 void slidingwindow_add_on_change(SlidingWindow* this, ListenerFunc add_callback, ListenerFunc rem_callback, gpointer udata)
 {
-  notifier_add_listener(this->on_add_item, add_callback, udata);
-  notifier_add_listener(this->on_rem_item, rem_callback, udata);
+  notifier_add_listener_full(this->on_add_item, add_callback, udata);
+  notifier_add_listener_full(this->on_rem_item, rem_callback, udata);
 }
 
 void slidingwindow_add_on_add_item_cb(SlidingWindow* this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener(this->on_add_item, callback, udata);
+  notifier_add_listener_full(this->on_add_item, callback, udata);
 }
 
 void slidingwindow_add_on_rem_item_cb(SlidingWindow* this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener(this->on_rem_item, callback, udata);
+  notifier_add_listener_full(this->on_rem_item, callback, udata);
 }
 
 gboolean slidingwindow_is_empty(SlidingWindow* this)
@@ -405,7 +405,7 @@ void swplugin_notify(SlidingWindowPlugin* this, gpointer subject)
 SlidingWindowPlugin* make_swplugin(ListenerFunc on_calculated_cb, gpointer udata)
 {
   SlidingWindowPlugin* this = swplugin_ctor();
-  notifier_add_listener(this->on_calculated, on_calculated_cb, udata);
+  notifier_add_listener_full(this->on_calculated, on_calculated_cb, udata);
   return this;
 }
 

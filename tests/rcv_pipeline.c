@@ -123,7 +123,7 @@ int main (int argc, char **argv)
 
   _print_params(session);
 
-  session->receiver  = make_receiver(session->cc_receiver_side_params, session->stat_params_tuple, session->sink_params);
+  session->receiver  = make_receiver(session->cc_receiver_side_params, session->stat_params_tuple, session->rcv_transfer_params);
   session->decoder   = make_decoder(session->codec_params);
   session->sink      = make_sink(session->sink_params);
 

@@ -244,12 +244,12 @@ gpointer bintree3_get_items_sorted_array(bintree3_t *this, guint *length)
 
 void bintree3_add_on_duplicate_cb(bintree3_t *this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener(this->on_duplicate, callback, udata);
+  notifier_add_listener_full(this->on_duplicate, callback, udata);
 }
 
 void bintree3_add_on_print_cb(bintree3_t *this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener(this->on_print, callback, udata);
+  notifier_add_listener_full(this->on_print, callback, udata);
 }
 
 void _ruin_full(bintree3_t *this, bintree3node_t *node)

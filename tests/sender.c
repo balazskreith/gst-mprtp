@@ -5,7 +5,7 @@
 
 static GstElement* _make_rtp_sender(SndTransferParams *params);
 static GstElement* _make_mprtp_sender(SndTransferParams *params);
-
+static GstElement* _make_mprtp_scheduler(Sender* this, SndTransferParams *params);
 
 Sender* sender_ctor(void)
 {
@@ -22,11 +22,15 @@ void sender_dtor(Sender* this)
 }
 
 
-Sender* make_sender(CCSenderSideParams* cc, StatParamsTuple* stat_params_tuple, SndTransferParams *transfer)
+Sender* make_sender(SndPacketScheduler* scheduler, StatParamsTuple* stat_params_tuple, SndTransferParams *transfer)
 {
   Sender* this = sender_ctor();
   GstBin* senderBin     = GST_BIN(gst_bin_new(NULL));
   GstElement *element, *sink;
+
+  //We go backwards of the listed params,
+  //for determining the appropriate sink element
+  //ghostly proxied to the bin.
 
   switch(transfer->type){
     case TRANSFER_TYPE_RTP:
@@ -45,13 +49,15 @@ Sender* make_sender(CCSenderSideParams* cc, StatParamsTuple* stat_params_tuple, 
     sink = element;
   }
 
-
-  if(cc){
-    switch(cc->type){
-      case CONGESTION_CONTROLLER_TYPE_SCREAM:
+  if(scheduler){
+    switch(scheduler->type){
+      case SENDING_PACKET_SCHEDULING_TYPE_SCREAM:
         //TODO: add scream
         break;
-      case CONGESTION_CONTROLLER_TYPE_FBRAPLUS:
+      case SENDING_PACKET_SCHEDULER_TYPE_MPRTP:
+        //TODO: add mprtp scheduler
+        break;
+      case SENDING_PACKET_SCHEDULER_TYPE_MPRTPFBRAPLUS:
         //TODO: add fbra+
         break;
     };
@@ -75,20 +81,8 @@ static GstElement* _make_rtpsink(gchar* dest_ip, guint16 dest_port){
 //        "sync", FALSE,
 //        "async", FALSE,
         NULL);
-
-  {
-    gint32 port;
-    gchar ip[256];
-    g_object_get(rtpSink, "port", &port);
-    g_object_get(rtpSink, "host", ip);
-    g_print("Port: %s:%hu", dest_ip, port);
-  }
-
-//
-//  GstElement *rtpSink  = gst_element_factory_make ("fakesink", NULL);
-//  g_object_set (rtpSink,
-//        "dump", TRUE,
-//        NULL);
+  g_print("UdpSink destination is %s:%hu\n", dest_ip, dest_port);
+//  return debug_by_sink(rtpSink);
   return rtpSink;
 
 }
@@ -122,4 +116,12 @@ GstElement* _make_mprtp_sender(SndTransferParams *params)
   return GST_ELEMENT(senderBin);
 }
 
+GstElement* _make_mprtp_scheduler(Sender* this, SndPacketScheduler* params)
+{
+  GstElement* mprtpSch = gst_element_factory_make("mprtpscheduler", NULL);
+
+  g_object_set(G_OBJECT(mprtpSch),
+      "",,
+      NULL);
+}
 

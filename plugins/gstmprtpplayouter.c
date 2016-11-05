@@ -314,7 +314,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   rcvpackets_set_abs_time_ext_header_id(this->rcvpackets, ABS_TIME_DEFAULT_EXTENSION_HEADER_ID);
   rcvpackets_set_mprtp_ext_header_id(this->rcvpackets, MPRTP_DEFAULT_EXTENSION_HEADER_ID);
 
-  notifier_add_listener(this->on_rtcp_ready, (ListenerFunc) _playouter_on_rtcp_ready, this);
+  notifier_add_listener_full(this->on_rtcp_ready, (ListenerFunc) _playouter_on_rtcp_ready, this);
 }
 
 

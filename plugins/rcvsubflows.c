@@ -184,17 +184,17 @@ void rcvsubflows_iterate(RcvSubflows* this, GFunc process, gpointer udata)
 
 void rcvsubflows_add_on_subflow_joined_cb(RcvSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener(this->on_subflow_joined, callback, udata);
+  notifier_add_listener_full(this->on_subflow_joined, callback, udata);
 }
 
 void rcvsubflows_add_on_subflow_detached_cb(RcvSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener(this->on_subflow_detached, callback, udata);
+  notifier_add_listener_full(this->on_subflow_detached, callback, udata);
 }
 
 void rcvsubflows_add_on_congestion_controlling_type_changed_cb(RcvSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener(this->on_congestion_controlling_type_changed, callback, udata);
+  notifier_add_listener_full(this->on_congestion_controlling_type_changed, callback, udata);
 }
 
 void rcvsubflow_notify_rtcp_fb_cbs(RcvSubflow* subflow, gpointer udata)
@@ -204,7 +204,7 @@ void rcvsubflow_notify_rtcp_fb_cbs(RcvSubflow* subflow, gpointer udata)
 
 void rcvsubflow_add_on_rtcp_fb_cb(RcvSubflow* subflow, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener(subflow->on_rtcp_time_update, callback, udata);
+  notifier_add_listener_full(subflow->on_rtcp_time_update, callback, udata);
 }
 
 void rcvsubflow_rem_on_rtcp_fb_cb(RcvSubflow* subflow, ListenerFunc callback)

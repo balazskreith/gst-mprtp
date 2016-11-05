@@ -8,6 +8,8 @@
 
 typedef struct{
   GstElement* element;
+  Listener    on_playing;
+  Listener    on_destroy;
 }Source;
 
 

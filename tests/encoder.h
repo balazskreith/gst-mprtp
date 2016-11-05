@@ -7,12 +7,14 @@
 #include "pipeline.h"
 
 typedef struct{
-  GstElement* element;
+  GstElement*    element;
+  Notifier*      on_bitrate_chage;
+  ObjectsHolder* objects_holder;
 }Encoder;
 
 Encoder* encoder_ctor(void);
 void encoder_dtor(Encoder* this);
-Encoder* make_encoder(CodecParams *params);
-
+Encoder* make_encoder(CodecParams *codec_params, SinkParams* encodersink_params);
+void encoder_on_bitrate_change(Encoder* this, gint32* target_bitrate);
 
 #endif /* TESTS_SINK_H_ */

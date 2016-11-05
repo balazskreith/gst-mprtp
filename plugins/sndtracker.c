@@ -274,7 +274,7 @@ void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_resp
 
 void sndtracker_add_on_packet_sent(SndTracker * this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener(this->on_packet_sent, callback, udata);
+  notifier_add_listener_full(this->on_packet_sent, callback, udata);
 }
 
 void sndtracker_add_on_packet_sent_with_filter(SndTracker * this, ListenerFunc callback, ListenerFilterFunc filter, gpointer udata)

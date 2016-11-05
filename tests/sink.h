@@ -13,7 +13,6 @@ void sink_dtor(Sink* this);
 Sink* make_sink(SinkParams *params);
 
 
-
 #endif /* TESTS_SINK_H_ */
 
 

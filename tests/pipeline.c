@@ -16,7 +16,7 @@ static gint32 _compare_types(gchar* type, ...)
   return -1;
 }
 
-gchar* _string_test(gchar *subject_str, gchar* failed_str)
+gchar* _null_test(gchar *subject_str, gchar* failed_str)
 {
   return subject_str == NULL ? failed_str : subject_str;
 }
@@ -140,62 +140,220 @@ VideoParams*    make_video_params (gchar* params_rawstring)
   return result;
 }
 
-SenderParams*   make_sender_params(gchar* params_rawstring)
+StatParams*     make_stat_params (gchar* params_rawstring)
 {
-  SenderParams *result = g_malloc0(sizeof(SenderParams));
+  StatParams  *result = g_malloc0(sizeof(StatParams));
   gchar       **tokens = g_strsplit(params_rawstring, ":", -1);
 
-  result->type = _compare_types(tokens[0], "RTPSIMPLE", "RTPSCREAM", "RTPFBRAP", NULL);
+  strcpy(result->touched_sync,     tokens[0]);
+
+  result->csv = atoi(tokens[1]);
+
+  sprintf(result->to_string,
+      "Touched syncronization: %s, CSV logging: %d",
+      result->touched_sync,
+      result->csv
+  );
+
+  return result;
+}
+
+SndTransferParams*  make_snd_transfer_params(gchar* params_rawstring)
+{
+  SndTransferParams *result = g_malloc0(sizeof(SndTransferParams));
+  gchar             **tokens = g_strsplit(params_rawstring, ":", -1);
+
+  result->type = _compare_types(tokens[0], "RTP", "MPRTP", NULL);
+  switch(result->type){
+     case TRANSFER_TYPE_RTP:
+
+       strcpy(result->rtp.dest_ip, tokens[1]);
+       result->rtp.dest_port = atoi(tokens[2]);
+
+       sprintf(result->to_string, "RTP, Dest.: %s:%d", result->rtp.dest_ip, result->rtp.dest_port);
+
+       break;
+     case TRANSFER_TYPE_MPRTP:
+       {
+         gint offset = 1;
+         gint i;
+
+         sprintf(result->to_string, "MPRTP Subflows (%d); ", result->mprtp.subflows_num);
+         result->mprtp.subflows_num = atoi(tokens[1]);
+
+         for(i = 0; i < result->mprtp.subflows_num; ++i){
+           gchar subflow_info[255];
+           SenderSubflow* subflow = g_malloc0(sizeof(SenderSubflow));
+           subflow->id        = atoi(tokens[++offset]);
+           strcpy(subflow->dest_ip, tokens[++offset]);
+           subflow->dest_port = atoi(tokens[++offset]);
+
+           result->mprtp.subflows = g_slist_append(result->mprtp.subflows, subflow);
+           sprintf(subflow_info, "%d Dest.: %s:%d; ",
+               subflow->id,
+               subflow->dest_ip,
+               subflow->dest_port
+           );
+           strcat(result->to_string, subflow_info);
+         }
+       }
+       break;
+     default:
+       g_print("Unrecognized type (%d) at make_snd_transfer_params \n", result->type);
+       break;
+   };
+
+  return result;
+}
+
+void free_snd_transfer_params(SndTransferParams *snd_transfer_params)
+{
+  if(snd_transfer_params->type == TRANSFER_TYPE_MPRTP){
+    g_slist_free_full(snd_transfer_params->mprtp.subflows, g_free);
+  }
+  g_free(snd_transfer_params);
+}
+
+
+CCSenderSideParams*   make_cc_sender_side_params(gchar* params_rawstring)
+{
+  CCSenderSideParams *result = g_malloc0(sizeof(CCSenderSideParams));
+  gchar                     **tokens = g_strsplit(params_rawstring, ":", -1);
+
+  result->type = _compare_types(tokens[0], "NONE", "SCREAM", "FBRAPLUS", NULL);
 
   switch(result->type){
-    case TRANSFER_TYPE_RTPSIMPLE:
+    case CONGESTION_CONTROLLER_TYPE_SCREAM:
+//      _replace_char(",",":",tokens[1]);
+      result->rcv_transfer_params = make_rcv_transfer_params(tokens[1]);
 
-      result->dest_port = atoi(tokens[1]);
-      strcpy(result->dest_ip, tokens[2]);
-
-      sprintf(result->to_string, "Dest IP: %s:%d", result->dest_ip, result->dest_port);
-
+      sprintf(result->to_string, "SCReAM congestion controller, Rcv Params: %s",
+          result->rcv_transfer_params->to_string);
       break;
-    case TRANSFER_TYPE_RTPSCREAM:
+    case CONGESTION_CONTROLLER_TYPE_FBRAPLUS:
+//      _replace_char(",",":",tokens[1]);
+      result->rcv_transfer_params = make_rcv_transfer_params(tokens[1]);
 
-      break;
-    case TRANSFER_TYPE_RTPFBRAP:
-
+      sprintf(result->to_string, "FBRA+ congestion controller, Rcv Params: %s",
+          result->rcv_transfer_params->to_string);
       break;
     default:
-      g_print("Unrecognized type (%d) at make_sender_params \n", result->type);
+      g_print("Unrecognized type (%d) at make_cc_sender_side_params \n", result->type);
       break;
   };
 
   return result;
 }
 
-ReceiverParams* make_receiver_params(gchar* params_rawstring)
+void free_cc_sender_side_params(CCSenderSideParams *congestion_controller_params)
 {
-  ReceiverParams* result = g_malloc0(sizeof(ReceiverParams));
-  gchar       **tokens = g_strsplit(params_rawstring, ":", -1);
+  if(!congestion_controller_params){
+    return;
+  }
+  free_rcv_transfer_params(congestion_controller_params->rcv_transfer_params);
+  g_free(congestion_controller_params);
+}
 
-  result->type = _compare_types(tokens[0], "RTPSIMPLE", "RTPSCREAM", "RTPFBRAP", NULL);
 
-  result->bound_port = atoi(tokens[1]);
+
+
+
+RcvTransferParams*  make_rcv_transfer_params(gchar* params_rawstring)
+{
+  RcvTransferParams *result = g_malloc0(sizeof(RcvTransferParams));
+  gchar             **tokens = g_strsplit(params_rawstring, ":", -1);
+
+  result->type = _compare_types(tokens[0], "RTP", "MPRTP", NULL);
+  switch(result->type){
+     case TRANSFER_TYPE_RTP:
+
+       result->rtp.bound_port = atoi(tokens[1]);
+
+       sprintf(result->to_string, "RTP, Bound Port: %d", result->rtp.bound_port);
+
+       break;
+     case TRANSFER_TYPE_MPRTP:
+       {
+         gint offset = 1;
+         gint i;
+
+         sprintf(result->to_string, "MPRTP Subflows (%d); ", result->mprtp.subflows_num);
+         result->mprtp.subflows_num = atoi(tokens[1]);
+
+         for(i = 0; i < result->mprtp.subflows_num; ++i){
+           gchar subflow_info[255];
+           ReceiverSubflow* subflow = g_malloc0(sizeof(ReceiverSubflow));
+           subflow->id        = atoi(tokens[++offset]);
+           strcpy(subflow->bound_port, tokens[++offset]);
+
+           result->mprtp.subflows = g_slist_append(result->mprtp.subflows, subflow);
+           sprintf(subflow_info, "%d Bound port.: %d; ",
+               subflow->id,
+               subflow->bound_port
+           );
+           strcat(result->to_string, subflow_info);
+         }
+       }
+       break;
+     default:
+       g_print("Unrecognized type (%d) at make_rcv_transfer_params \n", result->type);
+       break;
+   };
+
+  return result;
+}
+
+void free_rcv_transfer_params(RcvTransferParams *rcv_transfer_params)
+{
+  if(rcv_transfer_params->type == TRANSFER_TYPE_MPRTP){
+    g_slist_free_full(rcv_transfer_params->mprtp.subflows, g_free);
+  }
+  g_free(rcv_transfer_params);
+}
+
+
+
+CCReceiverSideParams*   make_cc_receiver_side_params(gchar* params_rawstring)
+{
+  CCReceiverSideParams *result = g_malloc0(sizeof(CCReceiverSideParams));
+  gchar                     **tokens = g_strsplit(params_rawstring, ":", -1);
+
+  result->type = _compare_types(tokens[0], "NONE", "SCREAM", "FBRAPLUS", NULL);
 
   switch(result->type){
-    case TRANSFER_TYPE_RTPSIMPLE:
-      sprintf(result->to_string, "RTPSIMPLE, Port: %d", result->bound_port);
-      break;
-    case TRANSFER_TYPE_RTPSCREAM:
+    case CONGESTION_CONTROLLER_TYPE_SCREAM:
+//      _replace_char(",",":",tokens[1]);
+      result->snd_transfer_params = make_snd_transfer_params(tokens[1]);
 
+      sprintf(result->to_string, "SCReAM congestion controller, Rcv Params: %s",
+          result->snd_transfer_params->to_string);
       break;
-    case TRANSFER_TYPE_RTPFBRAP:
+    case CONGESTION_CONTROLLER_TYPE_FBRAPLUS:
+//      _replace_char(",",":",tokens[1]);
+      result->snd_transfer_params = make_snd_transfer_params(tokens[1]);
 
+      sprintf(result->to_string, "FBRA+ congestion controller, Rcv Params: %s",
+          result->snd_transfer_params->to_string);
       break;
     default:
-      g_print("Unrecognized type (%d) at make_receiver_params \n", result->type);
+      g_print("Unrecognized type (%d) at make_cc_receiver_side_params \n", result->type);
       break;
   };
 
   return result;
 }
+
+void free_cc_receiver_side_params(CCReceiverSideParams *congestion_controller_params)
+{
+  if(!congestion_controller_params){
+    return;
+  }
+  free_rcv_transfer_params(congestion_controller_params->snd_transfer_params);
+  g_free(congestion_controller_params);
+}
+
+
+
 
 SinkParams*     make_sink_params(gchar* params_rawstring)
 {
@@ -217,6 +375,70 @@ SinkParams*     make_sink_params(gchar* params_rawstring)
   };
 
   return result;
+}
+
+StatParamsTuple* make_statparams_tuple_by_raw_strings(gchar* statparams_rawstring,
+                                       gchar* statlogs_sink_params_rawstring,
+                                       gchar* packetlogs_sink_params_rawstring
+                                      )
+{
+  StatParams* stat_params;
+  SinkParams* statlogs_sink_params = NULL;
+  SinkParams* packetlogs_sink_params = NULL;
+
+  if(statparams_rawstring == NULL){
+    return NULL;
+  }
+
+  stat_params = make_stat_params(statparams_rawstring);
+
+  if(statlogs_sink_params_rawstring){
+      statlogs_sink_params = make_sink_params(statlogs_sink_params_rawstring);
+    }
+
+  if(packetlogs_sink_params){
+    packetlogs_sink_params = make_sink_params(packetlogs_sink_params_rawstring);
+    }
+
+  return make_statparams_tuple(stat_params, statlogs_sink_params, packetlogs_sink_params);
+}
+
+StatParamsTuple* make_statparams_tuple(StatParams* stat_params,
+                                       SinkParams* statlogs_sink_params,
+                                       SinkParams* packetlogs_sink_params
+                                      )
+{
+  StatParamsTuple* result = g_malloc0(sizeof(StatParamsTuple));
+
+  result->stat_params = stat_params;
+  result->statlogs_sink_params = statlogs_sink_params;
+  result->packetlogs_sink_params = packetlogs_sink_params;
+
+  sprintf(result->to_string, "%s; StatLogs Sink Params: %s; PacketLogs Sink Params: %s",
+      result->stat_params->to_string,
+      result->statlogs_sink_params->to_string,
+      result->packetlogs_sink_params->to_string
+      );
+  return result;
+}
+
+void free_statparams_tuple(StatParamsTuple* statparams_tuple)
+{
+  if(!statparams_tuple){
+    return;
+  }
+
+  g_free(statparams_tuple->stat_params);
+
+  if(statparams_tuple->packetlogs_sink_params){
+    g_free(statparams_tuple->packetlogs_sink_params);
+  }
+
+  if(statparams_tuple->statlogs_sink_params){
+    g_free(statparams_tuple->statlogs_sink_params);
+  }
+
+  g_free(statparams_tuple);
 }
 
 Notifier* notifier_ctor(void)
@@ -252,6 +474,9 @@ static void _foreach_listeners(Listener* listener, gpointer user_data){
 
 void notifier_do(Notifier* this, gpointer user_data)
 {
+  if(!this->listeners){
+    return;
+  }
   g_slist_foreach(this->listeners, (GFunc)_foreach_listeners, user_data);
 }
 
@@ -271,11 +496,12 @@ cb_state (GstBus * bus, GstMessage * message, gpointer data)
   GstObject *pipe = GST_OBJECT (data);
   GstState old, new, pending;
   gst_message_parse_state_changed (message, &old, &new, &pending);
-  if (message->src == pipe) {
-    g_print ("Pipeline %s changed state from %s to %s\n",
-        GST_OBJECT_NAME (message->src),
-        gst_element_state_get_name (old), gst_element_state_get_name (new));
+  if (message->src != pipe) {
+    return;
   }
+  g_print ("Pipeline %s changed state from %s to %s\n",
+      GST_OBJECT_NAME (message->src),
+      gst_element_state_get_name (old), gst_element_state_get_name (new));
 }
 
 void
@@ -298,6 +524,78 @@ cb_error (GstBus * bus, GstMessage * message, gpointer data)
       error->message);
   g_error_free (error);
   g_main_loop_quit (loop);
+}
+
+GstElement* debug_by_src(GstElement*element)
+{
+  GstBin* debugBin     = gst_bin_new(NULL);
+  GstElement *tee      = gst_element_factory_make ("tee", NULL);
+  GstElement *q1       = gst_element_factory_make ("queue", NULL);
+  GstElement *q2       = gst_element_factory_make ("queue", NULL);
+  GstElement *fakesink = gst_element_factory_make ("fakesink", NULL);
+
+  gst_bin_add_many(debugBin, element, tee, q1, q2, fakesink, NULL);
+
+  gst_element_link_pads(element, "src", tee, "sink");
+  gst_element_link_pads(tee, "src_1", q1, "sink");
+  gst_element_link_pads(tee, "src_2", q2, "sink");
+  gst_element_link_pads(q2, "src", fakesink, "sink");
+
+  if(GST_IS_PAD(gst_element_get_static_pad(element, "sink"))){
+    setup_ghost_sink(element, debugBin);
+  }
+
+  setup_ghost_src(q1, debugBin);
+
+  g_object_set (fakesink, "dump", TRUE, NULL);
+  return GST_ELEMENT(debugBin);
+}
+//
+//GstElement* debug_by_sink(GstElement*element)
+//{
+//  GstBin* debugBin     = gst_bin_new("debugBin");
+//  GstElement *tee      = gst_element_factory_make ("tee", NULL);
+//  GstElement *q1       = gst_element_factory_make ("queue", NULL);
+//  GstElement *q2       = gst_element_factory_make ("queue", NULL);
+//  GstElement *fakesink = gst_element_factory_make ("fakesink", NULL);
+//
+//  gst_bin_add_many(debugBin, element, tee, q1, q2, fakesink, NULL);
+//
+//  setup_ghost_sink(tee, debugBin);
+//
+////  gst_element_link_pads(tee, "src_1", q1, "sink");
+////  gst_element_link_pads(q1, "src", element, "sink");
+////  gst_element_link_pads(tee, "src_2", q2, "sink");
+////  gst_element_link_pads(q2, "src", fakesink, "sink");
+//
+//  gst_element_link_pads(tee, "src_1", element, "sink");
+//  gst_element_link_pads(tee, "src_2", fakesink, "sink");
+//
+//  if(GST_IS_PAD(gst_element_get_static_pad(element, "src"))){
+//    setup_ghost_src(element, debugBin);
+//  }
+////  g_object_set(tee, "allow-not-linked", TRUE, NULL);
+//  g_object_set (fakesink, "dump", TRUE, NULL);
+//  return GST_ELEMENT(debugBin);
+//}
+
+GstElement* debug_by_sink(GstElement*element)
+{
+  GstBin* debugBin     = gst_bin_new("debugBin");
+  GstElement *identity      = gst_element_factory_make ("identity", NULL);
+
+  gst_bin_add_many(debugBin, identity, element, NULL);
+
+  gst_element_link_pads(identity, "src", element, "sink");
+
+  g_object_set (identity, "dump", TRUE, NULL);
+
+  setup_ghost_sink(identity, debugBin);
+//  if(GST_IS_PAD(gst_element_get_static_pad(element, "src"))){
+//    setup_ghost_src(element, debugBin);
+//  }
+
+  return GST_ELEMENT(debugBin);
 }
 
 void
@@ -329,21 +627,30 @@ setup_ghost_src (GstElement * src, GstBin * bin)
   setup_ghost_src_by_padnames(src, "src", bin, "src");
 }
 
-static SenderNotifiers* sender_notifiers = NULL;
-SenderNotifiers* get_sender_eventers(void)
+static SenderEventers* sender_eventers = NULL;
+SenderEventers* get_sender_eventers(void)
 {
-  if(sender_notifiers){
-    return sender_notifiers;
+  if(sender_eventers){
+    return sender_eventers;
   }
-  sender_notifiers = g_malloc0(sizeof(SenderNotifiers));
-  sender_notifiers->on_playing     = make_notifier("on--playing");
-  sender_notifiers->on_destroy     = make_notifier("on-destroy");
-  sender_notifiers->on_target_bitrate_change = make_notifier("on-target-bitrate-change");
+  sender_eventers = g_malloc0(sizeof(SenderEventers));
+  sender_eventers->on_assembled   = make_notifier("on-assembled");
+  sender_eventers->on_playing     = make_notifier("on-playing");
+  sender_eventers->on_destroy     = make_notifier("on-destroy");
+  sender_eventers->on_target_bitrate_change = make_notifier("on-target-bitrate-change");
 
-  return sender_notifiers;
+  return sender_eventers;
 }
 
 void sender_eventers_dtor(void)
 {
-  g_free(sender_notifiers);
+  if(!sender_eventers){
+    return;
+  }
+  notifier_dtor(sender_eventers->on_assembled);
+  notifier_dtor(sender_eventers->on_playing);
+  notifier_dtor(sender_eventers->on_destroy);
+  notifier_dtor(sender_eventers->on_target_bitrate_change);
+  g_free(sender_eventers);
+  sender_eventers = NULL;
 }

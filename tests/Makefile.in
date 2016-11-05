@@ -114,8 +114,10 @@ PROGRAMS = $(noinst_PROGRAMS)
 am_rcv_pipeline_OBJECTS = rcv_pipeline-rcv_pipeline.$(OBJEXT) \
 	rcv_pipeline-decoder.$(OBJEXT) rcv_pipeline-encoder.$(OBJEXT) \
 	rcv_pipeline-pipeline.$(OBJEXT) \
-	rcv_pipeline-receiver.$(OBJEXT) rcv_pipeline-sender.$(OBJEXT) \
-	rcv_pipeline-sink.$(OBJEXT) rcv_pipeline-source.$(OBJEXT) \
+	rcv_pipeline-receiver.$(OBJEXT) \
+	rcv_pipeline-rtpstatmaker.$(OBJEXT) \
+	rcv_pipeline-sender.$(OBJEXT) rcv_pipeline-sink.$(OBJEXT) \
+	rcv_pipeline-source.$(OBJEXT) \
 	rcv_pipeline-transceiver.$(OBJEXT)
 rcv_pipeline_OBJECTS = $(am_rcv_pipeline_OBJECTS)
 am__DEPENDENCIES_1 =
@@ -131,8 +133,10 @@ rcv_pipeline_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 am_snd_pipeline_OBJECTS = snd_pipeline-snd_pipeline.$(OBJEXT) \
 	snd_pipeline-decoder.$(OBJEXT) snd_pipeline-encoder.$(OBJEXT) \
 	snd_pipeline-pipeline.$(OBJEXT) \
-	snd_pipeline-receiver.$(OBJEXT) snd_pipeline-sender.$(OBJEXT) \
-	snd_pipeline-sink.$(OBJEXT) snd_pipeline-source.$(OBJEXT) \
+	snd_pipeline-receiver.$(OBJEXT) \
+	snd_pipeline-rtpstatmaker.$(OBJEXT) \
+	snd_pipeline-sender.$(OBJEXT) snd_pipeline-sink.$(OBJEXT) \
+	snd_pipeline-source.$(OBJEXT) \
 	snd_pipeline-transceiver.$(OBJEXT)
 snd_pipeline_OBJECTS = $(am_snd_pipeline_OBJECTS)
 snd_pipeline_DEPENDENCIES = $(am__DEPENDENCIES_1) \
@@ -378,6 +382,7 @@ rcv_pipeline_SOURCES = rcv_pipeline.c \
 					   encoder.c \
 					   pipeline.c \
 					   receiver.c \
+					   rtpstatmaker.c \
 					   sender.c \
 					   sink.c \
 					   source.c \
@@ -390,6 +395,7 @@ snd_pipeline_SOURCES = snd_pipeline.c \
 					   encoder.c \
 					   pipeline.c \
 					   receiver.c \
+					   rtpstatmaker.c \
 					   sender.c \
 					   sink.c \
 					   source.c \
@@ -459,6 +465,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-pipeline.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-rcv_pipeline.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-receiver.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-rtpstatmaker.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-sender.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-sink.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-source.Po@am__quote@
@@ -467,6 +474,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-encoder.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-pipeline.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-receiver.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-rtpstatmaker.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-sender.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-sink.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-snd_pipeline.Po@am__quote@
@@ -563,6 +571,20 @@ rcv_pipeline-receiver.obj: receiver.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='receiver.c' object='rcv_pipeline-receiver.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-receiver.obj `if test -f 'receiver.c'; then $(CYGPATH_W) 'receiver.c'; else $(CYGPATH_W) '$(srcdir)/receiver.c'; fi`
+
+rcv_pipeline-rtpstatmaker.o: rtpstatmaker.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-rtpstatmaker.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-rtpstatmaker.Tpo -c -o rcv_pipeline-rtpstatmaker.o `test -f 'rtpstatmaker.c' || echo '$(srcdir)/'`rtpstatmaker.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-rtpstatmaker.Tpo $(DEPDIR)/rcv_pipeline-rtpstatmaker.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rtpstatmaker.c' object='rcv_pipeline-rtpstatmaker.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-rtpstatmaker.o `test -f 'rtpstatmaker.c' || echo '$(srcdir)/'`rtpstatmaker.c
+
+rcv_pipeline-rtpstatmaker.obj: rtpstatmaker.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-rtpstatmaker.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-rtpstatmaker.Tpo -c -o rcv_pipeline-rtpstatmaker.obj `if test -f 'rtpstatmaker.c'; then $(CYGPATH_W) 'rtpstatmaker.c'; else $(CYGPATH_W) '$(srcdir)/rtpstatmaker.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-rtpstatmaker.Tpo $(DEPDIR)/rcv_pipeline-rtpstatmaker.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rtpstatmaker.c' object='rcv_pipeline-rtpstatmaker.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-rtpstatmaker.obj `if test -f 'rtpstatmaker.c'; then $(CYGPATH_W) 'rtpstatmaker.c'; else $(CYGPATH_W) '$(srcdir)/rtpstatmaker.c'; fi`
 
 rcv_pipeline-sender.o: sender.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-sender.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-sender.Tpo -c -o rcv_pipeline-sender.o `test -f 'sender.c' || echo '$(srcdir)/'`sender.c
@@ -689,6 +711,20 @@ snd_pipeline-receiver.obj: receiver.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='receiver.c' object='snd_pipeline-receiver.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-receiver.obj `if test -f 'receiver.c'; then $(CYGPATH_W) 'receiver.c'; else $(CYGPATH_W) '$(srcdir)/receiver.c'; fi`
+
+snd_pipeline-rtpstatmaker.o: rtpstatmaker.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-rtpstatmaker.o -MD -MP -MF $(DEPDIR)/snd_pipeline-rtpstatmaker.Tpo -c -o snd_pipeline-rtpstatmaker.o `test -f 'rtpstatmaker.c' || echo '$(srcdir)/'`rtpstatmaker.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-rtpstatmaker.Tpo $(DEPDIR)/snd_pipeline-rtpstatmaker.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rtpstatmaker.c' object='snd_pipeline-rtpstatmaker.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-rtpstatmaker.o `test -f 'rtpstatmaker.c' || echo '$(srcdir)/'`rtpstatmaker.c
+
+snd_pipeline-rtpstatmaker.obj: rtpstatmaker.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-rtpstatmaker.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-rtpstatmaker.Tpo -c -o snd_pipeline-rtpstatmaker.obj `if test -f 'rtpstatmaker.c'; then $(CYGPATH_W) 'rtpstatmaker.c'; else $(CYGPATH_W) '$(srcdir)/rtpstatmaker.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-rtpstatmaker.Tpo $(DEPDIR)/snd_pipeline-rtpstatmaker.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rtpstatmaker.c' object='snd_pipeline-rtpstatmaker.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-rtpstatmaker.obj `if test -f 'rtpstatmaker.c'; then $(CYGPATH_W) 'rtpstatmaker.c'; else $(CYGPATH_W) '$(srcdir)/rtpstatmaker.c'; fi`
 
 snd_pipeline-sender.o: sender.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-sender.o -MD -MP -MF $(DEPDIR)/snd_pipeline-sender.Tpo -c -o snd_pipeline-sender.o `test -f 'sender.c' || echo '$(srcdir)/'`sender.c

@@ -106,17 +106,33 @@ typedef struct{
 }VideoParams;
 
 
-typedef enum{
-  TRANSFER_TYPE_RTPSIMPLE    = 1,
-  TRANSFER_TYPE_RTPSCREAM    = 2,
-  TRANSFER_TYPE_RTPFBRAP     = 3,
-}TransferTypes;//TOOD: change it into containing rtp and mprtp
+typedef struct{
+  gint       csv;
+  gchar      touched_sync[256];
+
+  gchar      to_string[1024];
+
+}StatParams;
 
 typedef struct{
-  guint8 id;
-  gint32 dest_port;
-  gchar  dest_ip[256];
-}SndSubflows;
+  StatParams* stat_params;
+  SinkParams* packetlogs_sink_params;
+  SinkParams* statlogs_sink_params;
+
+  gchar       to_string[2048];
+}StatParamsTuple;
+
+
+typedef enum{
+  TRANSFER_TYPE_RTP    = 1,
+  TRANSFER_TYPE_MPRTP  = 2,
+}TransferTypes;
+
+typedef struct{
+  guint8  id;
+  guint16 dest_port;
+  gchar   dest_ip[256];
+}SenderSubflow;
 
 typedef struct{
   TransferTypes type;
@@ -124,80 +140,97 @@ typedef struct{
     struct{
       gint32 dest_port;
       gchar  dest_ip[256];
-    }RTP;
+    }rtp;
 
     struct{
+      gint    subflows_num;
       GSList* subflows;
-    }MPRTP;
+    }mprtp;
   };
-}SndTransferParams;//TODO: write the script handles the string
+  gchar to_string[1024];
+}SndTransferParams;
 
-typedef enum{
-  CONGESTION_CONTROLLING_TYPE_NONE = 1,
-  CONGESTION_CONTROLLING_TYPE_SCREAM = 1,
-  CONGESTION_CONTROLLING_TYPE_FBRAP = 1,
-}CongestionControllingTypes;
 
 typedef struct{
-  CongestionControllingTypes type;
-
-}CongestionControllerParams;//TODO: write the scripts handles the strings
-
-typedef enum{
-  STAT_COLLECTION_TYPE_NONE          = 1,
-  STAT_COLLECTION_TYPE_ONLY_SENDER   = 2,
-  STAT_COLLECTION_TYPE_ONLY_RECEIVER = 3,
-  STAT_COLLECTION_TYPE_FULL          = 4
-}StatCollectionTypes;
-
-typedef struct{
-  StatCollectionTypes type;
-}StatCollectionParams;//TODO: Write the scripts handles these strings
-
+  guint8  id;
+  guint16 bound_port;
+}ReceiverSubflow;
 
 typedef struct{
   TransferTypes type;
+  union{
+    struct{
+      guint16 bound_port;
+    }rtp;
 
-  gint32     dest_port;
-  gchar      dest_ip[256];
+    struct{
+      gint    subflows_num;
+      GSList* subflows;
+    }mprtp;
+  };
+  gchar to_string[1024];
+}RcvTransferParams;
 
-  gchar      to_string[256];
-}SenderParams;
 
+typedef enum{
+  CONGESTION_CONTROLLER_TYPE_SCREAM    = 1,
+  CONGESTION_CONTROLLER_TYPE_FBRAPLUS  = 2,
+}CongestionControllerTypes;
 
 typedef struct{
-  TransferTypes type;
-  gint32     bound_port;
+  CongestionControllerTypes type;
+  RcvTransferParams* rcv_transfer_params;
+  union{
+    struct{
 
-  gchar      to_string[256];
-}ReceiverParams;
+    }scream;
+    struct{
 
+    }fbrap;
+  };
 
-static gchar codec_params_rawstring_default[]     = "VP8";
-static gchar* codec_params_rawstring              = NULL;
+  gchar to_string[256];
+}CCSenderSideParams;
 
-static gchar video_params_rawstring_default[]     = "352:288:90000:25/1";
-static gchar* video_params_rawstring              = NULL;
+typedef struct{
+  CongestionControllerTypes type;
+  SndTransferParams* snd_transfer_params;
+  union{
+    struct{
 
-static gchar source_params_rawstring_default[]    = "LIVEFILE:foreman_cif.yuv:1:352:288:2:25/1";
-//static gchar source_params_rawstring_default[]    = "TESTVIDEO:1";
-//static gchar source_params_rawstring_default[]    = "TESTVIDEO:1";
-static gchar* source_params_rawstring             = NULL;
+    }scream;
+    struct{
 
-static gchar sink_params_rawstring_default[]      = "AUTOVIDEO";
-static gchar* sink_params_rawstring               = NULL;
+    }fbrap;
+  };
 
-static gchar sender_params_rawstring_default[]    = "RTPSIMPLE:5000:10.0.0.6";
-static gchar* sender_params_rawstring             = NULL;
+  gchar to_string[256];
+}CCReceiverSideParams;//TODO: write this
 
-static gchar receiver_params_rawstring_default[]  = "RTPSIMPLE:5000";
-static gchar* receiver_params_rawstring           = NULL;
+static gchar codec_params_rawstring_default[]           = "VP8";
+static gchar* codec_params_rawstring                    = NULL;
 
-static gchar videosave_params_rawstring_default[] = "";
-static gchar* videosave_params_rawstring          = NULL;
+static gchar video_params_rawstring_default[]           = "352:288:90000:25/1";
+static gchar* video_params_rawstring                    = NULL;
 
-static gchar logging_params_rawstring_default[]   = "";
-static gchar* logging_params_rawstring            = NULL;
+//static gchar source_params_rawstring_default[]        = "TESTVIDEO";
+static gchar source_params_rawstring_default[]          = "LIVEFILE:foreman_cif.yuv:1:352:288:2:25/1";
+//static gchar source_params_rawstring_default[]        = "FILE:foreman_cif.yuv:1:352:288:2:25/1";
+static gchar* source_params_rawstring                   = NULL;
+
+static gchar  sink_params_rawstring_default[]           = "AUTOVIDEO";
+static gchar* sink_params_rawstring                     = NULL;
+
+static gchar  sndtransfer_params_rawstring_default[]    = "RTP:10.0.0.6:5000";
+static gchar* sndtransfer_params_rawstring              = NULL;
+
+static gchar  rcvtransfer_params_rawstring_default[]    = "RTP:5000";
+static gchar* rcvtransfer_params_rawstring              = NULL;
+
+static gchar* stat_params_rawstring                     = NULL;
+static gchar* encodersink_params_rawstring              = NULL;
+static gchar* statlogs_sink_params_rawstring            = NULL;
+static gchar* packetlogs_sink_params_rawstring          = NULL;
 
 static int target_bitrate = 500000;
 static int info           = 0;
@@ -205,15 +238,21 @@ static int info           = 0;
 
 static GOptionEntry entries[] =
 {
-    { "video",     0, 0, G_OPTION_ARG_STRING, &video_params_rawstring,      "video",     NULL },
-    { "codec",     0, 0, G_OPTION_ARG_STRING, &codec_params_rawstring,      "codec",     NULL },
-    { "source",    0, 0, G_OPTION_ARG_STRING, &source_params_rawstring,     "source",    NULL },
-    { "sink",      0, 0, G_OPTION_ARG_STRING, &sink_params_rawstring,       "sink",      NULL },
-    { "sender",    0, 0, G_OPTION_ARG_STRING, &sender_params_rawstring,     "sender",    NULL },
-    { "receiver",  0, 0, G_OPTION_ARG_STRING, &receiver_params_rawstring,   "receiver",  NULL },
+    { "video",     0, 0, G_OPTION_ARG_STRING, &video_params_rawstring,           "video",         NULL },
+    { "codec",     0, 0, G_OPTION_ARG_STRING, &codec_params_rawstring,           "codec",         NULL },
+    { "source",    0, 0, G_OPTION_ARG_STRING, &source_params_rawstring,          "source",        NULL },
+    { "sink",      0, 0, G_OPTION_ARG_STRING, &sink_params_rawstring,            "sink",          NULL },
+    { "sender",    0, 0, G_OPTION_ARG_STRING, &sndtransfer_params_rawstring,     "sender",        NULL },
+    { "receiver",  0, 0, G_OPTION_ARG_STRING, &rcvtransfer_params_rawstring,     "receiver",      NULL },
 
-    { "videosave", 0, 0, G_OPTION_ARG_STRING, &videosave_params_rawstring,  "videosave", NULL },
-    { "logging",   0, 0, G_OPTION_ARG_STRING, &logging_params_rawstring,    "videosave", NULL },
+    //TODO: MUHAHA
+//    { "cc",  0, 0, G_OPTION_ARG_STRING, &congestion_controller_rawstring,    "cc",      NULL },
+//    { "fb",  0, 0, G_OPTION_ARG_STRING, &feedbacker_rawstring,    "fb",      NULL },
+
+    { "stat",           0, 0, G_OPTION_ARG_STRING, &stat_params_rawstring,            "stat",            NULL },
+    { "encodersink",    0, 0, G_OPTION_ARG_STRING, &encodersink_params_rawstring,     "encodersink",     NULL },
+    { "statlogsink",    0, 0, G_OPTION_ARG_STRING, &statlogs_sink_params_rawstring,   "statlogsink",     NULL },
+    { "packetlogsink",  0, 0, G_OPTION_ARG_STRING, &packetlogs_sink_params_rawstring, "packetlogsink",   NULL },
 
     { "target_bitrate", 0, 0, G_OPTION_ARG_INT, &target_bitrate, "target_bitrate", NULL },
 
@@ -221,16 +260,40 @@ static GOptionEntry entries[] =
   { NULL }
 };
 
-gchar* _string_test(gchar *subject_str, gchar* failed_str);
+gchar* _null_test(gchar *subject_str, gchar* failed_str);
 
 void setup_framerate(gchar *string, Framerate* framerate);
 
 SourceParams*   make_source_params(gchar* params_rawstring);
 CodecParams*    make_codec_params (gchar* params_rawstring);
 VideoParams*    make_video_params (gchar* params_rawstring);
-SenderParams*   make_sender_params(gchar* params_rawstring);
-ReceiverParams* make_receiver_params(gchar* params_rawstring);
+StatParams*     make_stat_params (gchar* params_rawstring);
+
+SndTransferParams*  make_snd_transfer_params(gchar* params_rawstring);
+void free_snd_transfer_params(SndTransferParams *snd_transfer_params);
+
+CCSenderSideParams* make_cc_sender_side_params(gchar* params_rawstring);
+void free_cc_sender_side_params(CCSenderSideParams *cc_sender_side_params);
+
+RcvTransferParams*  make_rcv_transfer_params(gchar* params_rawstring);
+void free_rcv_transfer_params(RcvTransferParams *rcv_transfer_params);
+
+CCReceiverSideParams*   make_cc_receiver_side_params(gchar* params_rawstring);
+void free_cc_receiver_side_params(CCReceiverSideParams *congestion_controller_params);
+
 SinkParams*     make_sink_params(gchar* params_rawstring);
+
+StatParamsTuple* make_statparams_tuple_by_raw_strings(gchar* statparams_rawstring,
+                                       gchar* statlogs_sink_params_rawstring,
+                                       gchar* packetlogs_sink_params_rawstring
+                                      );
+
+StatParamsTuple* make_statparams_tuple(StatParams* stat_params,
+                                       SinkParams* statlogs_sink_params,
+                                       SinkParams* packetlogs_sink_params
+                                      );
+
+void free_statparams_tuple(StatParamsTuple* statparams_tuple);
 
 Notifier* notifier_ctor(void);
 void notifier_dtor(Notifier* this);
@@ -243,6 +306,9 @@ void cb_state (GstBus * bus, GstMessage * message, gpointer data);
 void cb_warning (GstBus * bus, GstMessage * message, gpointer data);
 void cb_error (GstBus * bus, GstMessage * message, gpointer data);
 
+GstElement* debug_by_src(GstElement*element);
+GstElement* debug_by_sink(GstElement*element);
+
 void setup_ghost_sink_by_padnames (GstElement * sink, const gchar* sinkpadName, GstBin * bin, const gchar *binPadName);
 void setup_ghost_sink (GstElement * sink, GstBin * bin);
 void setup_ghost_src_by_padnames (GstElement * src, const gchar* srcpadName, GstBin * bin, const gchar *binPadName);
@@ -251,11 +317,12 @@ void setup_ghost_src (GstElement * src, GstBin * bin);
 
 typedef struct{
   Notifier* on_target_bitrate_change;
+  Notifier* on_assembled;
   Notifier* on_playing;
   Notifier* on_destroy;
-}SenderNotifiers;
+}SenderEventers;
 
-SenderNotifiers* get_sender_eventers(void);
+SenderEventers* get_sender_eventers(void);
 void sender_eventers_dtor(void);
 
 

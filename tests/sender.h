@@ -10,4 +10,4 @@ typedef struct{
 
 Sender* sender_ctor(void);
 void sender_dtor(Sender* this);
-Sender* make_sender(SenderParams *params);
+Sender* make_sender(CCSenderSideParams* cc, StatParamsTuple* stat_params_tuple, SndTransferParams *transfer);

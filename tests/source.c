@@ -9,8 +9,6 @@ static GstElement* _make_testvideo_source(SourceParams *params);
 //static void _setup_rawproxy_source(GstBin* encoderBin, SourceParams *params);
 GstElement* _make_livefile_source(SourceParams *params);
 
-static GstFlowReturn _on_new_sample_from_receiver (GstElement * sink, GstElement* source);
-
 Source* source_ctor(void)
 {
   Source* this;
@@ -28,9 +26,10 @@ void source_dtor(Source* this)
 
 Source* make_source(SourceParams *params)
 {
-  GstElement* source;
+
   Source* this = source_ctor();
   GstBin* sourceBin     = GST_BIN(gst_bin_new(NULL));
+  GstElement* source = NULL;
 
   switch(params->type){
     case SOURCE_TYPE_TESTVIDEO:
@@ -74,7 +73,7 @@ GstElement* _make_testvideo_source(SourceParams *params)
 
 GstElement* _make_file_source(SourceParams *params)
 {
-  GstElement* fileSrc          = gst_bin_new(NULL);
+  GstBin* fileSrc              = gst_bin_new(NULL);
   GstElement* multifilesrc     = gst_element_factory_make ("multifilesrc", NULL);
   GstElement* videoparse       = gst_element_factory_make ("videoparse", NULL);
   GstElement* autovideoconvert = gst_element_factory_make ("autovideoconvert", NULL);
@@ -111,8 +110,8 @@ GstElement* _make_file_source(SourceParams *params)
 
 static void _on_playing(GstPipeline *readerPipe, gpointer user_data)
 {
-  gst_element_set_state (GST_ELEMENT (readerPipe), GST_STATE_PLAYING);
   g_print("Livefile source called to play\n");
+  gst_element_set_state (GST_ELEMENT (readerPipe), GST_STATE_PLAYING);
 }
 
 static void _on_destroy(GstPipeline *readerPipe, gpointer user_data)
@@ -123,82 +122,44 @@ static void _on_destroy(GstPipeline *readerPipe, gpointer user_data)
 }
 
 
-GstElement* _make_livefile_source(SourceParams *params)
+static GstFlowReturn _on_new_sample_from_sink (GstElement * sink, GstElement* source)
 {
-  GstPipeline* readerPipe      = gst_pipeline_new("readerPipe");
-  GstElement* fileSrc          = _make_file_source(params);
-  GstElement* appsink    = gst_element_factory_make ("appsink", NULL);
+  GstSample *sample;
+  GstFlowReturn result;
+  GstBuffer* buffer;
 
-  GstElement *appsrc = gst_element_factory_make ("appsrc", NULL);
+  sample = gst_app_sink_pull_sample (GST_APP_SINK (sink));
+  buffer = gst_sample_get_buffer(sample);
+//  result = gst_app_src_push_sample(GST_APP_SRC (source), gst_buffer_ref(buffer));
+  result = gst_app_src_push_buffer (GST_APP_SRC (source), gst_buffer_ref(buffer));
+  gst_sample_unref (sample);
 
-  gst_bin_add_many(GST_BIN(readerPipe),
-
-      fileSrc,
-      appsink,
-      NULL
-
-  );
-
-  g_object_set (G_OBJECT (appsink), "emit-signals", TRUE,
-      //"sync", FALSE, "async", FALSE,
-      NULL);
-
-  g_signal_connect (appsink, "new-sample", G_CALLBACK (_on_new_sample_from_receiver), appsrc);
-
-  gst_element_link_many(fileSrc, appsink, NULL);
-
-  notifier_add_listener(get_sender_eventers()->on_playing, (listener) _on_playing, readerPipe);
-  notifier_add_listener(get_sender_eventers()->on_destroy, (listener) _on_destroy, readerPipe);
-
-  g_object_set (appsrc,
-      "is-live", TRUE,
-      "format", GST_FORMAT_TIME,
-      NULL);
-
-  return appsrc;
+  return result;
 }
+
 //
 //GstElement* _make_livefile_source(SourceParams *params)
 //{
-//  GstPipeline* readerPipe      = gst_pipeline_new("readerPipe");
-//  GstElement* multifilesrc     = gst_element_factory_make ("multifilesrc", NULL);
-//  GstElement* videoparse       = gst_element_factory_make ("videoparse", NULL);
-//  GstElement* autovideoconvert = gst_element_factory_make ("autovideoconvert", NULL);
-//  GstElement* appsink    = gst_element_factory_make ("appsink", NULL);
-//
-//  GstElement *appsrc = gst_element_factory_make ("appsrc", NULL);
+//  GstPipeline* readerPipe = gst_pipeline_new("readerPipe");
+//  GstElement*  fileSrc    = _make_file_source(params);
+//  GstElement*  appsink    = gst_element_factory_make ("appsink", NULL);
+//  GstElement*  appsrc     = gst_element_factory_make ("appsrc", NULL);
 //
 //  gst_bin_add_many(GST_BIN(readerPipe),
 //
-//      multifilesrc,
-//      videoparse,
-//      autovideoconvert,
+//      fileSrc,
 //      appsink,
 //      NULL
 //
 //  );
 //
-//  g_object_set(multifilesrc,
-//      "location", params->file.location,
-//      "loop",     params->file.loop,
-//      NULL
-//  );
-//
-//  g_object_set(videoparse,
-//      "width", atoi(params->file.width),
-//      "height", atoi(params->file.height),
-//      "framerate", params->file.framerate.numerator, params->file.framerate.divider,
-//      "format", params->file.format,
-//      NULL
-//  );
-//
 //  g_object_set (G_OBJECT (appsink), "emit-signals", TRUE,
-//      //"sync", FALSE, "async", FALSE,
+////      "sync", FALSE, "async", FALSE,
 //      NULL);
 //
-//  g_signal_connect (appsink, "new-sample", G_CALLBACK (_on_new_sample_from_receiver), appsrc);
+//  g_signal_connect (appsink, "new-sample", G_CALLBACK (_on_new_sample_from_sink), appsrc);
 //
-//  gst_element_link_many(multifilesrc, videoparse, autovideoconvert, appsink, NULL);
+//  gst_element_link_many(fileSrc, appsink, NULL);
 //
 //  notifier_add_listener(get_sender_eventers()->on_playing, (listener) _on_playing, readerPipe);
 //  notifier_add_listener(get_sender_eventers()->on_destroy, (listener) _on_destroy, readerPipe);
@@ -210,6 +171,78 @@ GstElement* _make_livefile_source(SourceParams *params)
 //
 //  return appsrc;
 //}
+
+GstElement* _make_livefile_source(SourceParams *params)
+{
+  GstPipeline* readerPipe      = gst_pipeline_new("readerPipe");
+  GstBin* sourceBin            = gst_bin_new(NULL);
+  GstElement* multifilesrc     = gst_element_factory_make ("multifilesrc", NULL);
+  GstElement* sink_videoparse  = gst_element_factory_make ("videoparse", NULL);
+  GstElement* src_videoparse   = gst_element_factory_make ("videoparse", NULL);
+  GstElement* autovideoconvert = gst_element_factory_make ("autovideoconvert", NULL);
+
+  GstElement* appsink    = gst_element_factory_make ("appsink", NULL);
+  GstElement *appsrc     = gst_element_factory_make ("appsrc", NULL);
+
+  gst_bin_add_many(GST_BIN(readerPipe),
+
+      multifilesrc,
+      sink_videoparse,
+      autovideoconvert,
+      appsink,
+      NULL
+
+  );
+
+  g_object_set(multifilesrc,
+      "location", params->file.location,
+      "loop",     params->file.loop,
+      NULL
+  );
+
+  g_object_set(sink_videoparse,
+      "width", atoi(params->file.width),
+      "height", atoi(params->file.height),
+      "framerate", params->file.framerate.numerator, params->file.framerate.divider,
+      "format", params->file.format,
+      NULL
+  );
+
+  g_object_set(src_videoparse,
+      "width", atoi(params->file.width),
+      "height", atoi(params->file.height),
+      "framerate", params->file.framerate.numerator, params->file.framerate.divider,
+      "format", params->file.format,
+      NULL
+  );
+
+  g_object_set (G_OBJECT (appsink), "emit-signals", TRUE,
+//      "sync", FALSE, "async", FALSE,
+      NULL);
+
+  g_signal_connect (appsink, "new-sample", G_CALLBACK (_on_new_sample_from_sink), appsrc);
+
+  gst_element_link_many(multifilesrc, sink_videoparse, autovideoconvert, appsink, NULL);
+
+  notifier_add_listener(get_sender_eventers()->on_playing, (listener) _on_playing, readerPipe);
+  notifier_add_listener(get_sender_eventers()->on_destroy, (listener) _on_destroy, readerPipe);
+
+  gst_bin_add_many(sourceBin,
+      appsrc,
+      src_videoparse,
+      NULL);
+
+  g_object_set (appsrc,
+      "is-live", TRUE,
+      "format", GST_FORMAT_TIME,
+      NULL);
+
+  gst_element_link(appsrc, src_videoparse);
+  setup_ghost_src(src_videoparse, sourceBin);
+  return GST_ELEMENT(sourceBin);
+//  return appsrc;
+}
+
 
 //
 //void _setup_rawproxy_source(GstBin* sourceBin, SourceParams *params)
@@ -271,20 +304,6 @@ GstElement* _make_livefile_source(SourceParams *params)
 
 
 
-static GstFlowReturn
-_on_new_sample_from_receiver (GstElement * sink, GstElement* source)
-{
-  GstSample *sample;
-  GstFlowReturn result;
-  GstBuffer* buffer;
 
-  sample = gst_app_sink_pull_sample (GST_APP_SINK (sink));
-  buffer = gst_sample_get_buffer(sample);
-
-  result = gst_app_src_push_buffer (GST_APP_SRC (source), gst_buffer_ref(buffer));
-  gst_sample_unref (sample);
-
-  return result;
-}
 
 

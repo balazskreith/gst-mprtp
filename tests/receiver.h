@@ -10,4 +10,4 @@ typedef struct{
 
 Receiver* receiver_ctor(void);
 void receiver_dtor(Receiver* this);
-Receiver* make_receiver(ReceiverParams *params);
+Receiver* make_receiver(CCReceiverSideParams *cc_receiver_side_params, StatParamsTuple* stat_params_tuple, RcvTransferParams* rcv_transfer_params);

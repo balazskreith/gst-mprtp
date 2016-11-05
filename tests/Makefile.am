@@ -10,6 +10,7 @@ rcv_pipeline_SOURCES = rcv_pipeline.c \
 					   encoder.c \
 					   pipeline.c \
 					   receiver.c \
+					   rtpstatmaker.c \
 					   sender.c \
 					   sink.c \
 					   source.c \
@@ -23,6 +24,7 @@ snd_pipeline_SOURCES = snd_pipeline.c \
 					   encoder.c \
 					   pipeline.c \
 					   receiver.c \
+					   rtpstatmaker.c \
 					   sender.c \
 					   sink.c \
 					   source.c \

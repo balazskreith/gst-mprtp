@@ -5,19 +5,24 @@
 
 static GstElement* _make_rtp_sender(SndTransferParams *params);
 static GstElement* _make_mprtp_sender(SndTransferParams *params);
-static GstElement* _make_mprtp_scheduler(Sender* this, SndTransferParams *params);
+static GstElement* _make_mprtp_scheduler(Sender* this, SndPacketScheduler *params);
+static int _instance_counter = 0;
+
 
 Sender* sender_ctor(void)
 {
   Sender* this;
 
   this = g_malloc0(sizeof(Sender));
+  this->objects_holder = objects_holder_ctor();
+  sprintf(this->bin_name, "SenderBin_%d", _instance_counter++);
 
   return this;
 }
 
 void sender_dtor(Sender* this)
 {
+  object_holder_dtor(this->objects_holder);
   g_free(this);
 }
 
@@ -25,7 +30,7 @@ void sender_dtor(Sender* this)
 Sender* make_sender(SndPacketScheduler* scheduler, StatParamsTuple* stat_params_tuple, SndTransferParams *transfer)
 {
   Sender* this = sender_ctor();
-  GstBin* senderBin     = GST_BIN(gst_bin_new(NULL));
+  GstBin* senderBin     = GST_BIN(gst_bin_new(this->bin_name));
   GstElement *element, *sink;
 
   //We go backwards of the listed params,
@@ -43,7 +48,10 @@ Sender* make_sender(SndPacketScheduler* scheduler, StatParamsTuple* stat_params_
   gst_bin_add(senderBin, element);
 
   if(stat_params_tuple){
-    element = make_rtpstatmaker(stat_params_tuple);
+    RTPStatMaker* rtpstatmaker = make_rtpstatmaker(stat_params_tuple);
+    element = rtpstatmaker->element;
+    objects_holder_add(this->objects_holder, rtpstatmaker, (GDestroyNotify)rtpstatmaker_dtor);
+//    GstElement* identity = gst_element_factory_make("identity", NULL);
     gst_bin_add(senderBin, element);
     gst_element_link_pads(element, "src", sink, "sink");
     sink = element;
@@ -72,9 +80,9 @@ Sender* make_sender(SndPacketScheduler* scheduler, StatParamsTuple* stat_params_
 }
 
 
-static GstElement* _make_rtpsink(gchar* dest_ip, guint16 dest_port){
-  GstElement *rtpSink  = gst_element_factory_make ("udpsink", NULL);
-
+static GstElement* _make_rtpsink(gchar* dest_ip, guint16 dest_port)
+{
+  GstElement *rtpSink  = gst_element_factory_make ("udpsink", "udpsinkkkkkkk");
   g_object_set (rtpSink,
         "port", dest_port,
         "host", dest_ip,
@@ -119,9 +127,9 @@ GstElement* _make_mprtp_sender(SndTransferParams *params)
 GstElement* _make_mprtp_scheduler(Sender* this, SndPacketScheduler* params)
 {
   GstElement* mprtpSch = gst_element_factory_make("mprtpscheduler", NULL);
-
-  g_object_set(G_OBJECT(mprtpSch),
-      "",,
-      NULL);
+  return mprtpSch;
+//  g_object_set(G_OBJECT(mprtpSch),
+//      "",,
+//      NULL);
 }
 

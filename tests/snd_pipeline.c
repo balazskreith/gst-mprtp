@@ -157,10 +157,15 @@ int main (int argc, char **argv)
   session->encodersink_params = encodersink_params_rawstring ? make_sink_params(encodersink_params_rawstring) : NULL;
 
   session->snd_packet_scheduler_params = NULL;
+//  session->stat_params_tuple = make_statparams_tuple_by_raw_strings(
+//      stat_params_rawstring,
+//      statlogs_sink_params_rawstring,
+//      packetlogs_sink_params_rawstring);
+
   session->stat_params_tuple = make_statparams_tuple_by_raw_strings(
-      stat_params_rawstring,
-      statlogs_sink_params_rawstring,
-      packetlogs_sink_params_rawstring);
+      "100:1000:1:triggered_stat",
+      "FILE:snd_statlogs.txt",
+      "FILE:snd_packetlogs.txt");
 
   session->video_params = make_video_params(
       _null_test(video_params_rawstring, video_params_rawstring_default)

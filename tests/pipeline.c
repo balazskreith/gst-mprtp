@@ -156,14 +156,19 @@ StatParams*     make_stat_params (gchar* params_rawstring)
   StatParams  *result = g_malloc0(sizeof(StatParams));
   gchar       **tokens = g_strsplit(params_rawstring, ":", -1);
 
-  strcpy(result->touched_sync,     tokens[0]);
+  result->sampling_time       = atoi(tokens[0]);
+  result->accumulation_length = atoi(tokens[1]);
+  result->csv_logging         = atoi(tokens[2]);
+  strcpy(result->touched_sync,     tokens[3]);
 
-  result->csv = atoi(tokens[1]);
 
   sprintf(result->to_string,
-      "Touched syncronization: %s, CSV logging: %d",
-      result->touched_sync,
-      result->csv
+      "Sampling time: %dms, Acc. length: %dms, CSV logging: %d, Touched sync: %s, ",
+      result->sampling_time,
+      result->accumulation_length,
+      result->csv_logging,
+      result->touched_sync
+
   );
 
   return result;
@@ -331,9 +336,9 @@ void free_rcv_transfer_params(RcvTransferParams *rcv_transfer_params)
 
 
 
-CCReceiverSideParams*   make_cc_receiver_side_params(gchar* params_rawstring)
+RcvPlayouterParams*   make_rcv_playouter_params(gchar* params_rawstring)
 {
-  CCReceiverSideParams *result = g_malloc0(sizeof(CCReceiverSideParams));
+  RcvPlayouterParams *result = g_malloc0(sizeof(RcvPlayouterParams));
   gchar                     **tokens = g_strsplit(params_rawstring, ":", -1);
 
   result->type = _compare_types(tokens[0], "NONE", "SCREAM", "FBRAPLUS", NULL);
@@ -361,7 +366,7 @@ CCReceiverSideParams*   make_cc_receiver_side_params(gchar* params_rawstring)
   return result;
 }
 
-void free_cc_receiver_side_params(CCReceiverSideParams *congestion_controller_params)
+void free_rcv_playouter_params(RcvPlayouterParams *congestion_controller_params)
 {
   if(!congestion_controller_params){
     return;
@@ -416,11 +421,11 @@ StatParamsTuple* make_statparams_tuple_by_raw_strings(gchar* statparams_rawstrin
 
   if(statlogs_sink_params_rawstring){
       statlogs_sink_params = make_sink_params(statlogs_sink_params_rawstring);
-    }
+  }
 
-  if(packetlogs_sink_params){
+  if(packetlogs_sink_params_rawstring){
     packetlogs_sink_params = make_sink_params(packetlogs_sink_params_rawstring);
-    }
+  }
 
   return make_statparams_tuple(stat_params, statlogs_sink_params, packetlogs_sink_params);
 }
@@ -438,9 +443,10 @@ StatParamsTuple* make_statparams_tuple(StatParams* stat_params,
 
   sprintf(result->to_string, "%s; StatLogs Sink Params: %s; PacketLogs Sink Params: %s",
       result->stat_params->to_string,
-      result->statlogs_sink_params->to_string,
-      result->packetlogs_sink_params->to_string
-      );
+      result->statlogs_sink_params ? result->statlogs_sink_params->to_string : NULL,
+      result->packetlogs_sink_params ? result->packetlogs_sink_params->to_string : NULL
+  );
+
   return result;
 }
 

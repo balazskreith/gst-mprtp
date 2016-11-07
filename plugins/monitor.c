@@ -55,6 +55,16 @@ _cmp_seq (guint16 x, guint16 y)
   return 0;
 }
 
+
+static gint _tracked_seq_comparator(gpointer pa, gpointer pb)
+{
+  MonitorPacket *a;
+  guint16* tracked_seq;
+  a = pa; tracked_seq = pb;
+  if(a->tracked_seq == *tracked_seq) return 0;
+  return a->tracked_seq < *tracked_seq ? -1 : 1;
+} \
+
 static void _untrack_packet(Monitor* this, MonitorPacket *packet)
 {
   TrackingStat *stat = packet->tracker;
@@ -119,7 +129,7 @@ monitor_finalize (GObject * object)
   g_object_unref(this->recycle);
   g_object_unref(this->packets_sw);
   g_object_unref(this->sysclock);
-  g_free(this->packets_lookup);
+  g_free(this->tracked_packets);
 }
 
 Monitor* make_monitor(void)
@@ -135,7 +145,7 @@ void
 monitor_init (Monitor * this)
 {
   this->sysclock                 = gst_system_clock_obtain();
-  this->packets_lookup           = g_malloc0(sizeof(MonitorPacket*) * 65536);
+  this->tracked_packets           = g_malloc0(sizeof(MonitorPacket*) * 65536);
   this->packets_sw               = make_slidingwindow(1000, GST_SECOND);
   this->mprtp_ext_header_id      = 0;
 
@@ -157,7 +167,7 @@ void monitor_set_fec_payload_type(Monitor* this, guint8 fec_payload_type)
 
 void monitor_reset(Monitor* this)
 {
-  memset(this->packets_lookup, 0, sizeof(MonitorPacket*) * 65536);
+  memset(this->tracked_packets, 0, sizeof(MonitorPacket*) * 65536);
   this->initialized = FALSE;
 }
 
@@ -189,8 +199,8 @@ MonitorPacket* monitor_track_rtpbuffer(Monitor* this, GstBuffer* buffer)
 
   gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
   tracked_seq = _get_tracked_seq(this, &rtp);
-  packet = this->packets_lookup[tracked_seq];
-  this->packets_lookup[tracked_seq] = NULL;
+  packet = this->tracked_packets[tracked_seq];
+  this->tracked_packets[tracked_seq] = NULL;
 
   if(!packet){
     packet = _make_new_packet(this, tracked_seq);
@@ -210,18 +220,19 @@ MonitorPacket* monitor_track_rtpbuffer(Monitor* this, GstBuffer* buffer)
   if(this->initialized == FALSE){
     this->initialized = TRUE;
     this->tracked_hsn = packet->tracked_seq;
+    _monitor_packet_fire(this, packet, ON_RECEIVED, NULL);
+    goto done;
   }
-
-  if(_cmp_seq(packet->tracked_seq, this->tracked_hsn) <= 0){
+  else if(_cmp_seq(packet->tracked_seq, this->tracked_hsn) <= 0)
+  {
     _monitor_packet_fire(this, packet, ON_DISCARD, NULL);
-    packet = NULL;
     goto done;
   }
 
   while(_cmp_seq(++this->tracked_hsn, packet->tracked_seq) != 0){
     MonitorPacket *missing;
-    missing = this->packets_lookup[this->tracked_hsn];
-    this->packets_lookup[this->tracked_hsn] = NULL;
+    missing = this->tracked_packets[this->tracked_hsn];
+    this->tracked_packets[this->tracked_hsn] = NULL;
     if(!missing){
       missing = _make_new_packet(this, this->tracked_hsn);
     }
@@ -235,7 +246,8 @@ done:
 
 void monitor_track_packetbuffer(Monitor* this, GstBuffer* buffer)
 {
-  MonitorPacket* packet;
+  TrackingStat* tracker = NULL;
+  MonitorPacket *packet, *already_tracked;
   GstMapInfo map = GST_MAP_INFO_INIT;
 
   packet = recycle_retrieve_and_shape(this->recycle, NULL);
@@ -243,13 +255,53 @@ void monitor_track_packetbuffer(Monitor* this, GstBuffer* buffer)
   gst_buffer_map(buffer, &map, GST_MAP_READ);
   memcpy(packet, map.data, sizeof(MonitorPacket));
   gst_buffer_unmap(buffer, &map);
-
-  if(packet->state == MONITOR_PACKET_STATE_DISCARDED){
-    recycle_add(this->recycle, packet);
-    packet = NULL;
+  if(packet->state != MONITOR_PACKET_STATE_DISCARDED){
+    this->tracked_packets[packet->tracked_seq] = packet;
+    goto done;
   }
 
-  this->packets_lookup[packet->tracked_seq] = packet;
+  already_tracked = this->tracked_packets[packet->tracked_seq];
+  if(already_tracked){
+    //If we have not picked it up yet from the lookup table,
+    //then YUPEE, it is not too late to play it out.
+    packet->state = MONITOR_PACKET_STATE_RECEIVED;
+    this->tracked_packets[packet->tracked_seq] = packet;
+    recycle_add(this->recycle, already_tracked);
+    goto done;
+  }
+
+  already_tracked = slidingwindow_peek_custom(this->packets_sw, _tracked_seq_comparator, &packet->tracked_seq);
+  if(!already_tracked || already_tracked->tracker == NULL){
+    //The packet is not tracked any more in anywhere
+    //HERE we assumed that the packet is considered to be lost previously,
+    //but it is actually discarded.
+    --this->stat.lost.total_packets;
+    ++this->stat.discarded.total_packets;
+    recycle_add(this->recycle, packet);
+    goto done;
+  }
+
+  //So the packet is in the sliding window, and it has been tracked
+  //so subtracked it from the tracked stat
+
+  tracker = already_tracked->tracker;
+  tracker->accumulative_bytes -= already_tracked->payload_size;
+  tracker->total_bytes -= already_tracked->payload_size;
+  --tracker->accumulative_packets;
+  --tracker->total_packets;
+
+  //copy the information we know now about the packet
+  memcpy(already_tracked, packet, sizeof(MonitorPacket));
+  recycle_add(this->recycle, packet);
+
+  //and say that yes its discarded and tracking the stat through.
+  tracker = already_tracked->tracker = &this->stat.discarded;
+  tracker->accumulative_bytes += already_tracked->payload_size;
+  tracker->total_bytes += already_tracked->payload_size;
+  ++tracker->accumulative_packets;
+  ++tracker->total_packets;
+
+done:
   return;
 }
 
@@ -286,6 +338,7 @@ void monitor_set_accumulation_length(Monitor* this, GstClockTime length)
 {
   slidingwindow_set_treshold(this->packets_sw, length);
 }
+
 
 
 void _monitor_packet_fire(Monitor* this, MonitorPacket *packet, MonitorPacketEvents event, gpointer arg)

@@ -3,32 +3,36 @@
 #include "receiver.h"
 #include "rtpstatmaker.h"
 
-GstElement* _make_rtp_receiver(Receiver* this,   RcvTransferParams *params);
-GstElement* _make_mprtp_receiver(Receiver* this, RcvTransferParams *params);
+static GstElement* _make_rtp_receiver(Receiver* this,   RcvTransferParams *params);
+static GstElement* _make_mprtp_receiver(Receiver* this, RcvTransferParams *params);
+static int _instance_counter = 0;
+
 
 Receiver* receiver_ctor(void)
 {
   Receiver* this;
 
   this = g_malloc0(sizeof(Receiver));
+  sprintf(this->bin_name, "ReceiverBin_%d", _instance_counter++);
   this->on_caps_change = make_notifier("on-caps-change");
-
+  this->objects_holder = objects_holder_ctor();
   return this;
 }
 
 void receiver_dtor(Receiver* this)
 {
+  object_holder_dtor(this->objects_holder);
   notifier_unref(this->on_caps_change);
   g_free(this);
 }
 
 
-Receiver* make_receiver(CCReceiverSideParams *cc_receiver_side_params,
+Receiver* make_receiver(RcvPlayouterParams *playouter_params,
                         StatParamsTuple* stat_params_tuple,
                         RcvTransferParams* rcv_transfer_params)
 {
   Receiver* this = receiver_ctor();
-  GstBin* receiverBin     = GST_BIN(gst_bin_new(NULL));
+  GstBin* receiverBin     = GST_BIN(gst_bin_new(this->bin_name));
   GstElement* element = NULL;
   GstElement* rtpstatmakerSrc = NULL;
   GstElement* src = NULL;
@@ -44,10 +48,12 @@ Receiver* make_receiver(CCReceiverSideParams *cc_receiver_side_params,
   gst_bin_add(receiverBin, element);
 
   if(stat_params_tuple){
-    if(cc_receiver_side_params){
-      rtpstatmakerSrc = make_transparent_rtpstatmaker(stat_params_tuple->stat_params);
+    if(playouter_params){
+      rtpstatmakerSrc = make_rtpstatmaker_element(stat_params_tuple->stat_params);
     }else{
-      rtpstatmakerSrc = make_rtpstatmaker(stat_params_tuple);
+      RTPStatMaker* rtpstatmaker = make_rtpstatmaker(stat_params_tuple);
+      rtpstatmakerSrc = rtpstatmaker->element;
+      objects_holder_add(this->objects_holder, rtpstatmaker, (GDestroyNotify)rtpstatmaker_dtor);
     }
     element = rtpstatmakerSrc;
 
@@ -57,8 +63,8 @@ Receiver* make_receiver(CCReceiverSideParams *cc_receiver_side_params,
   }
 
 
-  if(cc_receiver_side_params){
-    switch(cc_receiver_side_params->type){
+  if(playouter_params){
+    switch(playouter_params->type){
       case SENDING_PACKET_SCHEDULING_TYPE_SCREAM:
         //TODO: add scream
         break;
@@ -69,13 +75,16 @@ Receiver* make_receiver(CCReceiverSideParams *cc_receiver_side_params,
 //    gst_bin_add(receiverBin, element);
   }
 
-  if(stat_params_tuple && cc_receiver_side_params){
-    element = make_rtpstatmaker(stat_params_tuple);
+  if(stat_params_tuple && playouter_params){
+    RTPStatMaker* rtpstatmaker = make_rtpstatmaker(stat_params_tuple);
+    element = rtpstatmaker->element;
+    objects_holder_add(this->objects_holder, rtpstatmaker, (GDestroyNotify)rtpstatmaker_dtor);
 
     gst_bin_add(receiverBin, element);
     gst_element_link_pads(rtpstatmakerSrc, "packet_src", element, "packet_sink");
     gst_element_link_pads(src, "src", element, "sink");
     src = element;
+
   }
 
 

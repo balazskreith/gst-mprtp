@@ -6,12 +6,14 @@
 
 static GstElement* _make_vp8_encoder(CodecParams *params);
 static GstElement* _make_theora_encoder(CodecParams *params);
+static int _instance_counter = 0;
 
 Encoder* encoder_ctor(void)
 {
   Encoder* this;
 
   this = g_malloc0(sizeof(Encoder));
+  sprintf(this->bin_name, "EncoderBin_%d", _instance_counter++);
   this->on_bitrate_chage = make_notifier("on-bitrate-change");
   this->objects_holder = objects_holder_ctor();
   return this;
@@ -27,7 +29,7 @@ void encoder_dtor(Encoder* this)
 Encoder* make_encoder(CodecParams *codec_params, SinkParams* sink_params)
 {
   Encoder*    this       = encoder_ctor();
-  GstBin*     encoderBin = GST_BIN(gst_bin_new(NULL));
+  GstBin*     encoderBin = GST_BIN(gst_bin_new(this->bin_name));
   GstElement *encoder, *src, *sink;
   GstElement* encoder_sink;
 

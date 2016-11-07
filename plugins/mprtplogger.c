@@ -194,7 +194,12 @@ static void _process(gpointer udata)
   Message* msg;
 
   msg = (Message*) messenger_pop_block(this->messenger);
+
   if(!msg){
+    goto exit;
+  }
+
+  if(!this->enabled && msg->type != MPRTP_LOGGER_MESSAGE_TYPE_STATE_CHANGING){
     goto done;
   }
 
@@ -251,8 +256,9 @@ static void _process(gpointer udata)
       g_warning("Unhandled message with type %d", msg->type);
     break;
   }
-  messenger_throw_block(this->messenger, msg);
 done:
+  messenger_throw_block(this->messenger, msg);
+exit:
   return;
 }
 
@@ -363,7 +369,6 @@ void mprtp_logger(const gchar *filename, const gchar * format, ...)
   va_end (args);
 
   strcpy(msg->filename, filename);
-
   messenger_push_block_unlocked(this->messenger, msg);
   messenger_unlock(this->messenger);
 }
@@ -395,14 +400,10 @@ void _writing(MPRTPLogger* this, WritingMessage *item)
   FILE *fp;
   gchar path[255];
 
-  if(!this->enabled){
-    return;
-  }
   memset(path, 0, 255);
   strcpy(path, this->path);
   strcpy(path, item->filename);
   fp = fopen(path, item->overwrite ? "w" : "a+");
-  g_print("writing %s to %s\n", item->string, path);
   fprintf (fp, "%s", item->string);
   fclose(fp);
 }

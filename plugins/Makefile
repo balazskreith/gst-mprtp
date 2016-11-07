@@ -153,7 +153,7 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-fbrafbproc.lo \
 	libgstmprtp_la-gstmprtpplugin.lo \
 	libgstmprtp_la-gstmprtpscheduler.lo \
 	libgstmprtp_la-gstmprtpsender.lo \
-	libgstmprtp_la-gstrtpstatmaker.lo \
+	libgstmprtp_la-gstrtpstatmaker2.lo \
 	libgstmprtp_la-jitterbuffer.lo libgstmprtp_la-lib_bintree.lo \
 	libgstmprtp_la-lib_datapuffer.lo \
 	libgstmprtp_la-lib_swplugins.lo libgstmprtp_la-mediator.lo \
@@ -424,7 +424,7 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          gstmprtpplugin.c      \
                          gstmprtpscheduler.c   \
                          gstmprtpsender.c      \
-                         gstrtpstatmaker.c     \
+                         gstrtpstatmaker2.c    \
                          jitterbuffer.c        \
                          lib_bintree.c         \
                          lib_datapuffer.c      \
@@ -589,7 +589,7 @@ include ./$(DEPDIR)/libgstmprtp_la-gstmprtpplugin.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpreceiver.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpscheduler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-gstmprtpsender.Plo
-include ./$(DEPDIR)/libgstmprtp_la-gstrtpstatmaker.Plo
+include ./$(DEPDIR)/libgstmprtp_la-gstrtpstatmaker2.Plo
 include ./$(DEPDIR)/libgstmprtp_la-jitterbuffer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-lib_bintree.Plo
 include ./$(DEPDIR)/libgstmprtp_la-lib_datapuffer.Plo
@@ -716,12 +716,12 @@ libgstmprtp_la-gstmprtpsender.lo: gstmprtpsender.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstmprtpsender.lo `test -f 'gstmprtpsender.c' || echo '$(srcdir)/'`gstmprtpsender.c
 
-libgstmprtp_la-gstrtpstatmaker.lo: gstrtpstatmaker.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gstrtpstatmaker.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gstrtpstatmaker.Tpo -c -o libgstmprtp_la-gstrtpstatmaker.lo `test -f 'gstrtpstatmaker.c' || echo '$(srcdir)/'`gstrtpstatmaker.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gstrtpstatmaker.Tpo $(DEPDIR)/libgstmprtp_la-gstrtpstatmaker.Plo
-#	$(AM_V_CC)source='gstrtpstatmaker.c' object='libgstmprtp_la-gstrtpstatmaker.lo' libtool=yes \
+libgstmprtp_la-gstrtpstatmaker2.lo: gstrtpstatmaker2.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-gstrtpstatmaker2.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-gstrtpstatmaker2.Tpo -c -o libgstmprtp_la-gstrtpstatmaker2.lo `test -f 'gstrtpstatmaker2.c' || echo '$(srcdir)/'`gstrtpstatmaker2.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-gstrtpstatmaker2.Tpo $(DEPDIR)/libgstmprtp_la-gstrtpstatmaker2.Plo
+#	$(AM_V_CC)source='gstrtpstatmaker2.c' object='libgstmprtp_la-gstrtpstatmaker2.lo' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstrtpstatmaker.lo `test -f 'gstrtpstatmaker.c' || echo '$(srcdir)/'`gstrtpstatmaker.c
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-gstrtpstatmaker2.lo `test -f 'gstrtpstatmaker2.c' || echo '$(srcdir)/'`gstrtpstatmaker2.c
 
 libgstmprtp_la-jitterbuffer.lo: jitterbuffer.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-jitterbuffer.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-jitterbuffer.Tpo -c -o libgstmprtp_la-jitterbuffer.lo `test -f 'jitterbuffer.c' || echo '$(srcdir)/'`jitterbuffer.c

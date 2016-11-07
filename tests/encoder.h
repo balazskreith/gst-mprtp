@@ -10,6 +10,7 @@ typedef struct{
   GstElement*    element;
   Notifier*      on_bitrate_chage;
   ObjectsHolder* objects_holder;
+  gchar          bin_name[256];
 }Encoder;
 
 Encoder* encoder_ctor(void);

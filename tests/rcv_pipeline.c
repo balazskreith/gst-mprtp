@@ -12,7 +12,7 @@ typedef struct{
 
   StatParamsTuple*      stat_params_tuple;
   RcvTransferParams*    rcv_transfer_params;
-  CCReceiverSideParams* cc_receiver_side_params;
+  RcvPlayouterParams* cc_receiver_side_params;
 
   CodecParams*    codec_params;
   SinkParams*     sink_params;
@@ -102,10 +102,15 @@ int main (int argc, char **argv)
       _null_test(rcvtransfer_params_rawstring, rcvtransfer_params_rawstring_default)
   );
 
+//  session->stat_params_tuple = make_statparams_tuple_by_raw_strings(
+//      stat_params_rawstring,
+//      statlogs_sink_params_rawstring,
+//      packetlogs_sink_params_rawstring);
+
   session->stat_params_tuple = make_statparams_tuple_by_raw_strings(
-      stat_params_rawstring,
-      statlogs_sink_params_rawstring,
-      packetlogs_sink_params_rawstring);
+      "100:1000:1:triggered_stat",
+      "FILE:rcv_statlogs.txt",
+      "FILE:rcv_packetlogs.txt");
 
   session->cc_receiver_side_params = NULL;
 
@@ -159,7 +164,7 @@ int main (int argc, char **argv)
   g_main_loop_unref (loop);
 
   free_statparams_tuple(session->stat_params_tuple);
-  free_cc_receiver_side_params(session->cc_receiver_side_params);
+  free_rcv_playouter_params(session->cc_receiver_side_params);
   free_rcv_transfer_params(session->rcv_transfer_params);
 
   receiver_dtor(session->receiver);

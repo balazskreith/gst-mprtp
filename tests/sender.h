@@ -3,7 +3,9 @@
 #include "pipeline.h"
 
 typedef struct{
-  GstElement* element;
+  GstElement*    element;
+  ObjectsHolder* objects_holder;
+  gchar          bin_name[256];
 }Sender;
 
 

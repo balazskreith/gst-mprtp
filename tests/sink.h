@@ -6,6 +6,7 @@
 
 typedef struct{
   GstElement* element;
+  gchar       bin_name[256];
 }Sink;
 
 Sink* sink_ctor(void);

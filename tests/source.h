@@ -8,6 +8,8 @@
 
 typedef struct{
   GstElement* element;
+  gchar       bin_name[256];
+
   Listener    on_playing;
   Listener    on_destroy;
 }Source;

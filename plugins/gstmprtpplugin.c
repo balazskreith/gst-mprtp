@@ -50,7 +50,7 @@
 #include "gstmprtpsender.h"
 #include "gstmprtpplayouter.h"
 #include "gstmprtpreceiver.h"
-#include "gstrtpstatmaker.h"
+#include "gstrtpstatmaker2.h"
 
 static gboolean
 plugin_init (GstPlugin * plugin)
@@ -63,8 +63,8 @@ plugin_init (GstPlugin * plugin)
       GST_TYPE_MPRTPPLAYOUTER);
   gst_element_register (plugin, "mprtpreceiver", GST_RANK_NONE,
       GST_TYPE_MPRTPRECEIVER);
-  gst_element_register (plugin, "rtpstatmaker", GST_RANK_NONE,
-      GST_TYPE_RTPSTATMAKER);
+  gst_element_register (plugin, "rtpstatmaker2", GST_RANK_NONE,
+      GST_TYPE_RTPSTATMAKER2);
   return TRUE;
 }
 

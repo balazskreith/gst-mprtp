@@ -2,12 +2,13 @@
 
 static void _setup_vp8_decoder(GstBin* decoderBin, CodecParams *params);
 static void _setup_theora_decoder(GstBin* decoderBin, CodecParams *params);
+static int _instance_counter = 0;
 
 Decoder* decoder_ctor(void)
 {
   Decoder* this;
-
   this = g_malloc0(sizeof(Decoder));
+  sprintf(this->bin_name, "DecoderBin_%d", _instance_counter++);
 
   return this;
 }
@@ -20,7 +21,7 @@ void decoder_dtor(Decoder* this)
 Decoder* make_decoder(CodecParams *params)
 {
   Decoder* this = decoder_ctor();
-  GstBin*  decoderBin     = GST_BIN(gst_bin_new(NULL));
+  GstBin*  decoderBin     = GST_BIN(gst_bin_new(this->bin_name));
 
   switch(params->type){
     case CODEC_TYPE_VP8:

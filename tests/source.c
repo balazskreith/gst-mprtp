@@ -9,12 +9,15 @@ static GstElement* _make_testvideo_source(Source* this,SourceParams *params);
 static GstElement* _make_raw_source(Source* this,      SourceParams *params);
 static GstElement* _make_file_source(Source* this,     SourceParams *params);
 static GstElement* _make_v4l2_source(Source* this,     SourceParams *params);
+static int _instance_counter = 0;
 
 Source* source_ctor(void)
 {
   Source* this;
 
   this = g_malloc0(sizeof(Source));
+  sprintf(this->bin_name, "SourceBin_%d", _instance_counter++);
+
   this->on_destroy.listener_func = on_fi_called;
   this->on_playing.listener_func = on_fi_called;
   return this;
@@ -30,7 +33,7 @@ Source* make_source(SourceParams *params)
 {
 
   Source* this = source_ctor();
-  GstBin* sourceBin     = GST_BIN(gst_bin_new(NULL));
+  GstBin* sourceBin     = GST_BIN(gst_bin_new(this->bin_name));
   GstElement* source = NULL;
 
   switch(params->type){

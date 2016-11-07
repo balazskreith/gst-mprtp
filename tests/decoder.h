@@ -7,7 +7,8 @@
 #include "pipeline.h"
 
 typedef struct{
-  GstElement* element;
+  GstElement*    element;
+  gchar          bin_name[256];
 }Decoder;
 
 Decoder* decoder_ctor(void);

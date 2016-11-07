@@ -102,13 +102,10 @@ gpointer messenger_pop_block (Messenger *this)
   gpointer result = NULL;
 
   g_mutex_lock (&this->mutex);
-  while (!result){
+  while(g_queue_is_empty(this->messages)){
     g_cond_wait (&this->cond, &this->mutex);
-    if(g_queue_is_empty(this->messages)){
-      continue;
-    }
-    result = g_queue_pop_head(this->messages);
   }
+  result = g_queue_pop_head(this->messages);
   g_mutex_unlock (&this->mutex);
   return result;
 }

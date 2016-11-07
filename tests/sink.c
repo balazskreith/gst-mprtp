@@ -3,13 +3,15 @@
 static GstElement* _make_autovideo_sink(SinkParams *params);
 static void _setup_rawproxy_sink(GstBin* encoderBin, SinkParams *params);
 static GstElement* _make_file_sink(SinkParams *params);
-
+static int _instance_counter;
 
 Sink* sink_ctor(void)
 {
   Sink* this;
 
   this = g_malloc0(sizeof(Sink));
+
+  sprintf(this->bin_name, "SinkBin_%d", _instance_counter++);
 
   return this;
 }
@@ -23,7 +25,7 @@ void sink_dtor(Sink* this)
 Sink* make_sink(SinkParams *params)
 {
   Sink* this = sink_ctor();
-  GstBin* sinkBin     = GST_BIN(gst_bin_new(NULL));
+  GstBin* sinkBin     = GST_BIN(gst_bin_new(this->bin_name));
   GstElement* sink = NULL;
 
   switch(params->type){
@@ -67,13 +69,11 @@ void _setup_rawproxy_sink(GstBin* sinkBin, SinkParams *params)
 static GstElement* _make_file_sink(SinkParams *params)
 {
   GstBin* fileBin = gst_bin_new(NULL);
-//  GstElement* converter = gst_element_factory_make("videoconvert", NULL);
-  GstElement* queue     = gst_element_factory_make("queue", NULL);
+  GstElement* converter = gst_element_factory_make("videoconvert", NULL);
   GstElement* fileSink  = gst_element_factory_make("filesink", NULL);
 
   gst_bin_add_many(fileBin,
-  //    converter,
-      queue,
+      converter,
       fileSink,
       NULL);
 
@@ -81,10 +81,8 @@ static GstElement* _make_file_sink(SinkParams *params)
       "location", params->file.location,
       NULL);
 
-//  gst_element_link_many(converter, queue, fileSink, NULL);
-  gst_element_link_many(queue, fileSink, NULL);
-//  setup_ghost_sink(converter, fileBin);
-  setup_ghost_sink(queue, fileBin);
+  gst_element_link_many(converter, fileSink, NULL);
+  setup_ghost_sink(converter, fileBin);
   return GST_ELEMENT(fileBin);
 }
 

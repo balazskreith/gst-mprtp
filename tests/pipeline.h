@@ -22,7 +22,7 @@ typedef struct _StatParams StatParams;
 typedef struct _StatParamsTuple StatParamsTuple;
 typedef struct _SndTransferParams SndTransferParams;
 typedef struct _RcvTransferParams RcvTransferParams;
-typedef struct _CCReceiverSideParams CCReceiverSideParams;
+typedef struct _CCReceiverSideParams RcvPlayouterParams;
 typedef struct _CCSenderSideParams SndPacketScheduler;
 
 
@@ -143,7 +143,9 @@ struct _VideoParams{
 
 
 struct _StatParams{
-  gint       csv;
+  gint       sampling_time;
+  gint       accumulation_length;
+  gint       csv_logging;
   gchar      touched_sync[256];
 
   gchar      to_string[1024];
@@ -316,8 +318,8 @@ void free_snd_packet_scheduler_params(SndPacketScheduler *snd_packet_scheduler_p
 RcvTransferParams*  make_rcv_transfer_params(gchar* params_rawstring);
 void free_rcv_transfer_params(RcvTransferParams *rcv_transfer_params);
 
-CCReceiverSideParams*   make_cc_receiver_side_params(gchar* params_rawstring);
-void free_cc_receiver_side_params(CCReceiverSideParams *congestion_controller_params);
+RcvPlayouterParams*   make_rcv_playouter_params(gchar* params_rawstring);
+void free_rcv_playouter_params(RcvPlayouterParams *congestion_controller_params);
 
 SinkParams*     make_sink_params(gchar* params_rawstring);
 

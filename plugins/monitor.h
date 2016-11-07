@@ -73,7 +73,7 @@ struct _Monitor
   GstClock*            sysclock;
   GstClockTime         made;
   SlidingWindow*       packets_sw;
-  MonitorPacket**      packets_lookup;
+  MonitorPacket**      tracked_packets;
   Recycle*             recycle;
 
   guint16              tracked_hsn;

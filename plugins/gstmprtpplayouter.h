@@ -89,7 +89,6 @@ struct _GstMprtpplayouter
 
   DiscardedPacket  discarded_packet;
 
-  gboolean        logging;
 
 
 };

@@ -101,7 +101,7 @@ stream_joiner_finalize (GObject * object)
   while((packet = g_queue_pop_head(this->joinq)) != NULL){
     rcvpacket_unref(packet);
   }
-  g_object_unref(this->joinq);
+  g_queue_free(this->joinq);
   g_object_unref(this->sysclock);
 }
 
@@ -182,18 +182,15 @@ RcvPacket* stream_joiner_pop_packet(StreamJoiner *this)
   if(g_queue_is_empty(this->joinq)){
     goto done;
   }
-
   if(!this->enforced_delay){
     packet = g_queue_pop_head(this->joinq);
     goto done;
   }
-
   packet = g_queue_peek_head(this->joinq);
   {
     GstClockTime actual_delay = get_epoch_time_from_ntp_in_ns(NTP_NOW - packet->abs_snd_ntp_time);
     packet = (actual_delay < this->enforced_delay) ? NULL : g_queue_pop_head(this->joinq);
   }
-
 done:
   return packet;
 

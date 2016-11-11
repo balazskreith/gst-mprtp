@@ -76,6 +76,7 @@ void mprtp_logger_print_memory_consumption(loggerfnc fnc);
 void mprtp_logger_print_obj_memory_consumption(loggerfnc_obj fnc, gpointer udata);
 void mprtp_logger_set_state(gboolean enabled);
 void mprtp_logger_set_target_directory(const gchar *path);
+void mprtp_logger_set_system_command(const gchar *command);
 void mprtp_logger(const gchar *filename, const gchar * format, ...);
 void mprtp_log_one(const gchar *filename, const gchar * format, ...);
 

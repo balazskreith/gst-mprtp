@@ -45,6 +45,7 @@ typedef enum{
   MPRTP_LOGGER_MESSAGE_TYPE_ADD_MEMORY_ALLOCATION    = 4,
   MPRTP_LOGGER_MESSAGE_TYPE_REM_MEMORY_ALLOCATION    = 5,
   MPRTP_LOGGER_MESSAGE_TYPE_PRINT_MEMORY_ALLOCATIONS = 6,
+  MPRTP_LOGGER_MESSAGE_TYPE_SYSTEM_COMMAND           = 7,
 }MessageTypes;
 
 //NOTE: This must be big enough to holds any kind of Message,
@@ -85,6 +86,11 @@ typedef struct{
   MessageTypes       type;
   gchar              filename[255];
 }TargetDirectoryMessage;
+
+typedef struct{
+  MessageTypes       type;
+  gchar              command[255];
+}SystemCommandMessage;
 
 #define alloc_message(type) (type*) _messageblock_ctor()
 #define throw_message(msg) _throw_messageblock((MessageBlock*) msg)
@@ -252,6 +258,12 @@ static void _process(gpointer udata)
       g_hash_table_foreach(this->memory_consumptions, _print_memory_allocation, casted_msg);
     }
     break;
+    case MPRTP_LOGGER_MESSAGE_TYPE_SYSTEM_COMMAND:
+    {
+      SystemCommandMessage* casted_msg = (SystemCommandMessage*) msg;
+      g_print("Command: %s returns %d", casted_msg->command, system(casted_msg->command));
+    }
+    break;
     default:
       g_warning("Unhandled message with type %d", msg->type);
     break;
@@ -351,6 +363,19 @@ void mprtp_logger_set_target_directory(const gchar *path)
 
   msg->type = MPRTP_LOGGER_MESSAGE_TYPE_CHANGE_TARGET_DIRECTORY;
   strcpy(msg->filename, path);
+
+  messenger_push_block_unlocked(this->messenger, msg);
+  messenger_unlock(this->messenger);
+}
+
+void mprtp_logger_set_system_command(const gchar *command)
+{
+  SystemCommandMessage *msg;
+  messenger_lock(this->messenger);
+  msg = messenger_retrieve_block_unlocked(this->messenger);
+
+  msg->type = MPRTP_LOGGER_MESSAGE_TYPE_SYSTEM_COMMAND;
+  strcpy(msg->command, command);
 
   messenger_push_block_unlocked(this->messenger, msg);
   messenger_unlock(this->messenger);

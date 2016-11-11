@@ -50,7 +50,7 @@ typedef enum{
 
 typedef enum{
   CONGESTION_CONTROLLING_TYPE_NONE         = 0,
-  CONGESTION_CONTROLLING_TYPE_FBRAPLUS     = 2,
+  CONGESTION_CONTROLLING_TYPE_FRACTAL     = 2,
 }CongestionControllingType;
 
 

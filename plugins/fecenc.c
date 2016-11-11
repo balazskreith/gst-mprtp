@@ -115,9 +115,9 @@ fecencoder_finalize (GObject * object)
 
   g_free(this->seqtracks);
   g_queue_clear(this->bitstrings);
-  g_object_unref(this->bitstrings);
+  g_queue_free(this->bitstrings);
   g_queue_clear(this->pending_responses);
-  g_object_unref(this->pending_responses);
+  g_queue_free(this->pending_responses);
   g_object_unref(this->sysclock);
   g_object_unref(this->bitstring_recycle);
   g_object_unref(this->messenger);

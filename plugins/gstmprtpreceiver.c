@@ -214,7 +214,7 @@ gst_mprtpreceiver_init (GstMprtpreceiver * mprtpreceiver)
 
   mprtpreceiver->mprtcp_rr_srcpad =
       gst_pad_new_from_static_template
-      (&gst_mprtpreceiver_mprtcp_sr_src_template, "mprtcp_rr_src");
+      (&gst_mprtpreceiver_mprtcp_rr_src_template, "mprtcp_rr_src");
   gst_element_add_pad (GST_ELEMENT (mprtpreceiver),
       mprtpreceiver->mprtcp_rr_srcpad);
 
@@ -685,6 +685,7 @@ _send_mprtcp_buffer (GstMprtpreceiver * this, GstBuffer * buf)
   }
 
   report = (GstMPRTCPSubflowReport *) gst_rtcp_get_first_header (&rtcp);
+//  gst_print_mprtcp(report);
   block = gst_mprtcp_get_first_block (report);
   outpad = this->mprtcp_rr_srcpad;
   gst_mprtcp_block_getdown(&block->info, NULL, &block_length, NULL);

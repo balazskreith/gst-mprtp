@@ -155,7 +155,7 @@ fecdecoder_finalize (GObject * object)
   gst_object_unref(this->thread);
 
   g_object_unref(this->sysclock);
-  g_object_unref(this->messenger);
+//  g_object_unref(this->messenger);
   g_object_unref(this->on_response);
 
 }

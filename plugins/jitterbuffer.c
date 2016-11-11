@@ -142,7 +142,7 @@ jitterbuffer_finalize (GObject * object)
   while((packet = g_queue_pop_head(this->playoutq)) != NULL){
     rcvpacket_unref(packet);
   }
-  g_object_unref(this->playoutq);
+  g_queue_free(this->playoutq);
   g_object_unref(this->sysclock);
 
   g_free(this->subflows);

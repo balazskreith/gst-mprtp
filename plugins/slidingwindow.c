@@ -305,14 +305,14 @@ static gint _slidingwindow_peek_custom_helper(gpointer item, gpointer udata)
 gpointer slidingwindow_peek_custom(SlidingWindow* this, gint (*comparator)(gpointer item, gpointer udata), gpointer udata)
 {
   PeekCustomHelper helper;
-  gpointer result = NULL;
+  SlidingWindowItem* result;
   if(datapuffer_isempty(this->items)){
     return NULL;
   }
   helper.comparator = comparator;
   helper.udata = udata;
   result = datapuffer_peek_custom(this->items, _slidingwindow_peek_custom_helper, &helper);
-  return result;
+  return result ? result->data : NULL;
 }
 
 void slidingwindow_set_treshold(SlidingWindow* this, GstClockTime obsolation_treshold)

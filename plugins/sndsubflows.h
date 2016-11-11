@@ -25,8 +25,6 @@ typedef struct _SndSubflowsPrivate SndSubflowsPrivate;
 #define SNDSUBFLOWS_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),SNDSUBFLOWS_TYPE))
 #define SNDSUBFLOWS_CAST(src)        ((SndSubflows *)(src))
 
-typedef struct _SndSubflow SndSubflow;
-
 typedef enum
 {
   SNDSUBFLOW_STATE_OVERUSED     = -1,
@@ -34,7 +32,7 @@ typedef enum
   SNDSUBFLOW_STATE_UNDERUSED     = 1,
 } SndSubflowState;
 
-struct _SndSubflow
+typedef struct _SndSubflow
 {
   guint8                     id;
   SndSubflows*               base_db;
@@ -62,7 +60,7 @@ struct _SndSubflow
   guint32                    sent_packet_count;
   guint32                    sent_octet_count;
 
-};
+}SndSubflow;
 
 
 

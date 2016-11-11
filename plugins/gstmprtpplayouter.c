@@ -57,6 +57,8 @@ static gboolean gst_mprtpplayouter_src_query (GstPad * sinkpad,
     GstObject * parent, GstQuery * query);
 static gboolean gst_mprtpplayouter_sink_event (GstPad * pad, GstObject * parent,
     GstEvent * event);
+static gboolean gst_mprtpplayouter_mprtp_src_event(GstPad *pad, GstObject *parent,
+    GstEvent *event);
 
 static GstFlowReturn _processing_mprtcp_packet (GstMprtpplayouter * this,
     GstBuffer * buf);
@@ -91,9 +93,6 @@ enum
   PROP_MAX_REAPIR_DELAY,
   PROP_ENFORCED_DELAY,
   PROP_SETUP_RTCP_INTERVAL_TYPE,
-  PROP_RTP_PASSTHROUGH,
-  PROP_LOG_ENABLED,
-  PROP_LOG_PATH,
 
 };
 
@@ -142,6 +141,7 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
   GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
   GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
 
+
   /* Setting up pads and setting metadata should be moved to
      base_class_init if you intend to subclass this class. */
   gst_element_class_add_pad_template (element_class,
@@ -156,7 +156,8 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
 
   gst_element_class_set_static_metadata (GST_ELEMENT_CLASS (klass),
       "MPRTP Playouter", "Generic",
-      "MPRTP Playouter FIXME", "Balázs Kreith <balazs.kreith@gmail.com>");
+      "MPRTP Playouter assembles and playing out rtp streams",
+      "Balázs Kreith <balazs.kreith@gmail.com>");
 
   gobject_class->set_property = gst_mprtpplayouter_set_property;
   gobject_class->get_property = gst_mprtpplayouter_get_property;
@@ -164,78 +165,58 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
   gobject_class->finalize = gst_mprtpplayouter_finalize;
 
   g_object_class_install_property (gobject_class, PROP_MPRTP_EXT_HEADER_ID,
-      g_param_spec_uint ("mprtp-ext-header-id",
-          "Set or get the id for the RTP extension",
-          "Sets or gets the id for the extension header the MpRTP based on. The default is 3",
-          0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
+        g_param_spec_uint ("mprtp-ext-header-id",
+            "Multipath RTP Header Extension ID",
+            "Sets or gets the RTP header extension ID for MPRTP",
+            0, 15, MPRTP_DEFAULT_EXTENSION_HEADER_ID, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_ABS_TIME_EXT_HEADER_ID,
       g_param_spec_uint ("abs-time-ext-header-id",
-          "Set or get the id for the absolute time RTP extension",
-          "Sets or gets the id for the extension header the absolute time based on. The default is 8",
-          0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          "Absolute time RTP extension ID",
+          "Sets or gets the RTP header extension for abs NTP time.",
+          0, 15, ABS_TIME_DEFAULT_EXTENSION_HEADER_ID, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_FEC_PAYLOAD_TYPE,
       g_param_spec_uint ("fec-payload-type",
-          "Set or get the payload type of fec packets",
-          "Set or get the payload type of fec packets. The default is 126",
-          0, 127, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          "Set or get the payload type of FEC packets.",
+          "Set or get the payload type of FEC packets.",
+          0, 127, FEC_PAYLOAD_DEFAULT_ID, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_JOIN_SUBFLOW,
-      g_param_spec_uint ("join-subflow", "the subflow id requested to join",
-          "Join a subflow with a given id.", 0,
-          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+        g_param_spec_uint ("join-subflow",
+            "Join a subflow with a given id",
+            "Join a subflow with a given id.",
+            0, MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_DETACH_SUBFLOW,
-       g_param_spec_uint ("detach-subflow", "the subflow id requested to detach",
-           "Detach a subflow with a given id.", 0,
-           MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_RTP_PASSTHROUGH,
-      g_param_spec_boolean ("rtp-passthrough",
-          "Indicate the passthrough mode on no active subflow case",
-          "Indicate weather the schdeuler let the packets travel "
-          "through the element if it hasn't any active subflow.",
-          TRUE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_LOG_ENABLED,
-      g_param_spec_boolean ("logging",
-          "Indicate weather a log for subflow is enabled or not",
-          "Indicate weather a log for subflow is enabled or not",
-          FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_LOG_PATH,
-        g_param_spec_string ("logs-path",
-            "Determines the path for logfiles",
-            "Determines the path for logfiles",
-            "NULL", G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+    g_object_class_install_property (gobject_class, PROP_DETACH_SUBFLOW,
+        g_param_spec_uint ("detach-subflow",
+            "Detach a subflow with a given id.",
+            "Detach a subflow with a given id.",
+            0, MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SETUP_RTCP_INTERVAL_TYPE,
-        g_param_spec_uint ("setup-rtcp-interval-type",
-                           "RTCP interval types: 0 - regular, 1 - early, 2 - immediate feedback",
-                           "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the mode. "
-                           "RTCP interval types: 0 - regular, 1 - early, 2 - immediate feedback",
-                           0,
-                           4294967295, 2, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+       g_param_spec_uint ("rtcp-interval-type",
+            "RTCP interval types: 0 - regular, 1 - early, 2 - immediate feedback",
+            "RTCP interval types: 0 - regular, 1 - early, 2 - immediate feedback",
+            0,
+            4294967295, 2, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SETUP_CONTROLLING_MODE,
-      g_param_spec_uint ("setup-controlling-mode",
-          "set the controlling mode to the subflow",
-          "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the mode. "
-          "0 - no sending rate controller, 1 - no controlling, but sending SRs, 2 - FBRA with MARC",
+      g_param_spec_uint ("controlling-mode",
+          "Set the controlling mode. 0 - None, 1 - Regular, 2 - FRACTaL",
+          "Set the controlling mode. 0 - None, 1 - Regular, 2 - FRACTaL",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_MAX_REAPIR_DELAY,
       g_param_spec_uint ("max-repair-delay",
-          "the maximal amount of time in ms the playouter waits for FEC response",
-          "the maximal amount of time in ms the playouter waits for FEC response", 0,
+          "Max time in ms the playouter waits for FEC response",
+          "Max time in ms the playouter waits for FEC response", 0,
           100, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_ENFORCED_DELAY,
       g_param_spec_uint ("enforced-delay",
-          "An enforced delay applied to all packet arrives.",
-          "An enforced delay applied to all packet arrives. MPRTP packets are containing an abs_time_extension and it contains the abs ntp time. Enforced delay retrieve packets in a queue until their delay reaches the enforced delay.",
+          "An enforced delay unifying the delys from different paths.",
+          "An enforced delay unifying the delys from different paths.",
           0,
           1000, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
@@ -250,6 +231,11 @@ static void
 gst_mprtpplayouter_init (GstMprtpplayouter * this)
 {
   init_mprtp_logger();
+  //TODO: Only for development use
+  mprtp_logger_set_state(TRUE);
+  mprtp_logger_set_system_command("bash -c '[ ! -d temp_logs ]' && mkdir temp_logs");
+  mprtp_logger_set_system_command("rm temp_logs/*");
+  mprtp_logger_set_target_directory("temp_logs/");
 
   this->mprtp_sinkpad =
       gst_pad_new_from_static_template (&gst_mprtpplayouter_mprtp_sink_template,
@@ -283,8 +269,19 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
 
   gst_pad_set_query_function (this->mprtp_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_sink_query));
+
   gst_pad_set_event_function (this->mprtp_sinkpad,
-      GST_DEBUG_FUNCPTR (gst_mprtpplayouter_sink_event));
+        GST_DEBUG_FUNCPTR (gst_mprtpplayouter_sink_event));
+  GST_PAD_SET_PROXY_CAPS (this->mprtp_sinkpad);
+  GST_PAD_SET_PROXY_ALLOCATION (this->mprtp_sinkpad);
+
+  gst_pad_set_event_function (this->mprtp_srcpad,
+        GST_DEBUG_FUNCPTR (gst_mprtpplayouter_mprtp_src_event));
+  gst_pad_use_fixed_caps (this->mprtp_srcpad);
+  GST_PAD_SET_PROXY_CAPS (this->mprtp_srcpad);
+  GST_PAD_SET_PROXY_ALLOCATION (this->mprtp_srcpad);
+
+
 
   g_mutex_init (&this->mutex);
   g_cond_init(&this->receive_signal);
@@ -344,9 +341,7 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
     const GValue * value, GParamSpec * pspec)
 {
   GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (object);
-  gboolean gboolean_value;
   guint guint_value;
-//  gdouble gdouble_value;
   SubflowSpecProp *subflow_prop;
   GST_DEBUG_OBJECT (this, "set_property");
 
@@ -367,14 +362,6 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       break;
     case PROP_DETACH_SUBFLOW:
       rcvsubflows_detach(this->subflows, g_value_get_uint (value));
-      break;
-    case PROP_LOG_ENABLED:
-      gboolean_value = g_value_get_boolean (value);
-      this->logging = gboolean_value;
-      mprtp_logger_set_state(this->logging);
-      break;
-    case PROP_LOG_PATH:
-      mprtp_logger_set_target_directory(g_value_get_string(value));
       break;
     case PROP_SETUP_RTCP_INTERVAL_TYPE:
       guint_value = g_value_get_uint (value);
@@ -418,9 +405,6 @@ gst_mprtpplayouter_get_property (GObject * object, guint property_id,
       break;
     case PROP_FEC_PAYLOAD_TYPE:
       g_value_set_uint (value, (guint) this->fec_payload_type);
-      break;
-    case PROP_LOG_ENABLED:
-      g_value_set_boolean (value, this->logging);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -478,56 +462,38 @@ gst_mprtpplayouter_sink_query (GstPad * sinkpad, GstObject * parent,
   return result;
 }
 
-
-static gboolean
-gst_mprtpplayouter_sink_event (GstPad * pad, GstObject * parent,
-    GstEvent * event)
+gboolean gst_mprtpplayouter_sink_event(GstPad *pad, GstObject *parent, GstEvent *event)
 {
-  GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (parent);
-  gboolean result;
-  GstPad *peer;
-  GstCaps *caps;
-  const GstStructure *s;
-  gint gint_value;
-  guint guint_value;
+    gboolean ret;
 
-  GST_DEBUG_OBJECT (this, "sink event");
-  switch (GST_EVENT_TYPE (event)) {
-    case GST_EVENT_LATENCY:
-      {
-        GstClockTime latency;
-        gst_event_parse_latency(event, &latency);
-      }
-      goto default_;
-    case GST_EVENT_CAPS:
-      gst_event_parse_caps (event, &caps);
-      s = gst_caps_get_structure (caps, 0);
-      THIS_LOCK (this);
-      if (gst_structure_has_field (s, "clock-rate")) {
-        gst_structure_get_int (s, "clock-rate", &gint_value);
-        g_print("Clock Rate set to %d\n", gint_value);
-        jitterbuffer_set_clock_rate(this->jitterbuffer, gint_value);
-      }
-      if (gst_structure_has_field (s, "clock-base")) {
-        gst_structure_get_uint (s, "clock-base", &guint_value);
-        this->clock_base = (guint64) gint_value;
-      } else {
-        this->clock_base = -1;
-      }
-      THIS_UNLOCK (this);
-      goto default_;
-    default:
-    default_:
-      peer = gst_pad_get_peer (this->mprtp_srcpad);
-            result = gst_pad_send_event (peer, event);
-            gst_object_unref (peer);
-      //result = gst_pad_event_default (pad, parent, event);
-      break;
-  }
+    switch (GST_EVENT_TYPE(event)) {
+        case GST_EVENT_CAPS:
+        case GST_EVENT_FLUSH_STOP:
+        case GST_EVENT_STREAM_START:
+        case GST_EVENT_SEGMENT:
+        default:
+            ret = gst_pad_event_default(pad, parent, event);
+            break;
+    }
 
-  return result;
+    return ret;
 }
 
+gboolean gst_mprtpplayouter_mprtp_src_event(GstPad *pad, GstObject *parent, GstEvent *event)
+{
+    gboolean ret;
+
+    switch (GST_EVENT_TYPE(event)) {
+        case GST_EVENT_FLUSH_START:
+        case GST_EVENT_RECONFIGURE:
+        case GST_EVENT_FLUSH_STOP:
+        default:
+            ret = gst_pad_event_default(pad, parent, event);
+            break;
+    }
+
+    return ret;
+}
 
 void
 gst_mprtpplayouter_dispose (GObject * object)
@@ -556,9 +522,9 @@ gst_mprtpplayouter_change_state (GstElement * element,
     case GST_STATE_CHANGE_NULL_TO_READY:
       break;
     case GST_STATE_CHANGE_READY_TO_PAUSED:
+      gst_pad_start_task(this->mprtp_srcpad, (GstTaskFunction)_playout_process, this, NULL);
       break;
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
-        gst_pad_start_task(this->mprtp_srcpad, (GstTaskFunction)_playout_process, this, NULL);
         break;
       default:
         break;
@@ -671,6 +637,8 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
   rcvtracker_add_packet(this->rcvtracker, packet);
   stream_joiner_push_packet(this->joiner, packet);
+
+//  g_print("Packet from subflow %d arrived with seq: %hu\n", packet->subflow_id, packet->abs_seq);
   g_cond_signal(&this->receive_signal);
 
   rcvctrler_time_update(this->controller);
@@ -732,12 +700,12 @@ _processing_mprtcp_packet (GstMprtpplayouter * this, GstBuffer * buf)
     THIS_UNLOCK (this);
 //  );
 
-//  {
-//      GstRTCPBuffer rtcp = GST_RTCP_BUFFER_INIT;
-//      gst_rtcp_buffer_map(buf, GST_MAP_READ, &rtcp);
-//      gst_print_rtcp_buffer(&rtcp);
-//      gst_rtcp_buffer_unmap(&rtcp);
-//  }
+  {
+      GstRTCPBuffer rtcp = GST_RTCP_BUFFER_INIT;
+      gst_rtcp_buffer_map(buf, GST_MAP_READ, &rtcp);
+      gst_print_rtcp_buffer(&rtcp);
+      gst_rtcp_buffer_unmap(&rtcp);
+  }
   return result;
 }
 
@@ -747,6 +715,10 @@ void _playouter_on_rtcp_ready(GstMprtpplayouter *this, GstBuffer* buffer)
 //  gst_rtcp_buffer_map(buffer, GST_MAP_READ, &rtcp);
 //  gst_print_rtcp_buffer(&rtcp);
 //  gst_rtcp_buffer_unmap(&rtcp);
+  if(!gst_pad_is_linked(this->mprtcp_rr_srcpad)){
+    GST_WARNING_OBJECT(this, "Pads are not linked for MPRTCP");
+    return;
+  }
 
   gst_pad_push(this->mprtcp_rr_srcpad, buffer);
 }
@@ -786,7 +758,6 @@ _playout_process (GstMprtpplayouter *this)
   RcvPacket *packet;
   GstClockTime playout_time;
   guint16 gap_seq;
-
   THIS_LOCK(this);
   playout_time = _now(this);
   while((packet = stream_joiner_pop_packet(this->joiner)) != NULL){
@@ -827,6 +798,7 @@ _playout_process (GstMprtpplayouter *this)
     }
   }
 
+//  g_print("Packet arrived at subflow %d with abs seq %hu forwarded\n", packet->subflow_id, packet->abs_seq);
   gst_pad_push(this->mprtp_srcpad, packet->buffer);
 
 done:

@@ -66,7 +66,7 @@ messenger_finalize (GObject * object)
   while(!g_queue_is_empty(this->messages)){
     g_slice_free1(this->block_size, g_queue_pop_head(this->messages));
   }
-  g_object_unref(this->messages);
+  g_queue_free(this->messages);
   while(!g_queue_is_empty(this->recycle)){
     g_slice_free1(this->block_size, g_queue_pop_head(this->recycle));
   }

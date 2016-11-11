@@ -20,11 +20,35 @@ typedef struct _CodecParams CodecParams;
 typedef struct _VideoParams VideoParams;
 typedef struct _StatParams StatParams;
 typedef struct _StatParamsTuple StatParamsTuple;
-typedef struct _SndTransferParams SndTransferParams;
-typedef struct _RcvTransferParams RcvTransferParams;
-typedef struct _CCReceiverSideParams RcvPlayouterParams;
-typedef struct _CCSenderSideParams SndPacketScheduler;
+typedef struct _TransferParams TransferParams;
+typedef struct _PlayouterParams PlayouterParams;
+typedef struct _SchedulerParams SchedulerParams;
 
+
+typedef struct _MPRTPSubflowUtilizationSignalData{
+  guint                      controlling_mode;
+  gint8                      path_state;
+  gint8                      path_flags_value;
+  gint32                     target_bitrate;
+
+  gdouble                    RTT;
+  guint32                    jitter;
+  gdouble                    lost_rate;
+  guint16                    HSSN;
+  guint16                    cycle_num;
+  guint32                    cum_packet_lost;
+  GstClockTime               owd_median;
+  GstClockTime               owd_min;
+  GstClockTime               owd_max;
+
+}MPRTPSubflowUtilizationSignalData;
+
+
+
+typedef struct _MPRTPPluginSignalData{
+  MPRTPSubflowUtilizationSignalData subflow[32];
+  gint32                            target_media_rate;
+}MPRTPPluginSignalData;
 
 typedef struct{
   gint32 numerator;
@@ -65,7 +89,7 @@ typedef struct _SourceParams{
      gchar              width[16];
      gchar              height[16];
      Framerate          framerate;
-     RcvTransferParams* rcv_transfer_params;
+     TransferParams*    rcv_transfer_params;
    }rawproxy;
 
    struct{
@@ -152,6 +176,13 @@ struct _StatParams{
 
 };
 
+struct _SubflowsParams{
+  guint   length;
+  GSList* subflows;
+  gchar   to_string[1024];
+  guint   ref;
+};
+
 
 struct _StatParamsTuple{
   StatParams* stat_params;
@@ -172,79 +203,68 @@ typedef struct{
   gchar   dest_ip[256];
 }SenderSubflow;
 
-struct _SndTransferParams{
-  TransferTypes type;
-  union{
-    struct{
-      gint32 dest_port;
-      gchar  dest_ip[256];
-    }rtp;
-
-    struct{
-      gint    subflows_num;
-      GSList* subflows;
-    }mprtp;
-  };
-  gchar to_string[1024];
-};
-
-
 typedef struct{
   guint8  id;
   guint16 bound_port;
 }ReceiverSubflow;
 
-struct _RcvTransferParams{
+struct _TransferParams{
   TransferTypes type;
-  union{
-    struct{
-      guint16 bound_port;
-    }rtp;
-
-    struct{
-      gint    subflows_num;
-      GSList* subflows;
-    }mprtp;
-  };
-  gchar to_string[1024];
+  guint         length;
+  GSList*       subflows;
+  gchar         to_string[1024];
+  guint         ref;
 };
 
 typedef enum{
-  SENDING_PACKET_SCHEDULING_TYPE_SCREAM        = 1,
-  SENDING_PACKET_SCHEDULER_TYPE_MPRTP          = 2,
-  SENDING_PACKET_SCHEDULER_TYPE_MPRTPFBRAPLUS  = 3,
+  TRANSFER_CONTROLLER_TYPE_SCREAM        = 1,
+  TRANSFER_CONTROLLER_TYPE_MPRTP          = 2,
+  TRANSFER_CONTROLLER_TYPE_MPRTPRRACTAL  = 3,
 }CongestionControllerTypes;
 
 
-struct _CCSenderSideParams{
+struct _SchedulerParams{
   CongestionControllerTypes type;
-  RcvTransferParams* rcv_transfer_params;
+  TransferParams* rcv_transfer_params;
   union{
     struct{
 
     }scream;
     struct{
+      struct{
+        gint32 target_bitrate;
+      }subflows[256];
+    }mprtp;
 
-    }fbrap;
+    struct{
+    }mprtp_fractal;
   };
 
   gchar to_string[256];
 };
 
-struct _CCReceiverSideParams{
+struct _PlayouterParams{
   CongestionControllerTypes type;
-  SndTransferParams* snd_transfer_params;
+  TransferParams* snd_transfer_params;
   union{
     struct{
 
     }scream;
     struct{
 
-    }fbrap;
+    }mprtp;
+    struct{
+
+    }mprtp_fractal;
   };
 
   gchar to_string[256];
 };//TODO: write this
+
+typedef struct{
+  GstElement* element;
+  gchar       padname[256];
+}Interface;
 
 static gchar codec_params_rawstring_default[]           = "VP8";
 static gchar* codec_params_rawstring                    = NULL;
@@ -264,8 +284,17 @@ static gchar* sink_params_rawstring                     = NULL;
 static gchar  sndtransfer_params_rawstring_default[]    = "RTP:10.0.0.6:5000";
 static gchar* sndtransfer_params_rawstring              = NULL;
 
+static gchar  snd_subflows_params_rawstring_default[]   = "1:1:10.0.0.6:5000";
+static gchar* snd_subflows_params_rawstring             = NULL;
+
+static gchar  rcv_subflows_params_rawstring_default[]   = "1:1:5000";
+static gchar* rcv_subflows_params_rawstring             = NULL;
+
 static gchar  rcvtransfer_params_rawstring_default[]    = "RTP:5000";
 static gchar* rcvtransfer_params_rawstring              = NULL;
+
+static gchar* scheduler_params_rawstring                = NULL;
+static gchar* playouter_params_rawstring                = NULL;
 
 static gchar* stat_params_rawstring                     = NULL;
 static gchar* encodersink_params_rawstring              = NULL;
@@ -285,9 +314,8 @@ static GOptionEntry entries[] =
     { "sender",    0, 0, G_OPTION_ARG_STRING, &sndtransfer_params_rawstring,     "sender",        NULL },
     { "receiver",  0, 0, G_OPTION_ARG_STRING, &rcvtransfer_params_rawstring,     "receiver",      NULL },
 
-    //TODO: MUHAHA
-//    { "scheduler",  0, 0, G_OPTION_ARG_STRING, &scheduler,    "scheduler",      NULL },
-//    { "playouter",  0, 0, G_OPTION_ARG_STRING, &playouter,    "plazouter",      NULL },
+    { "scheduler",  0, 0, G_OPTION_ARG_STRING, &scheduler_params_rawstring,    "scheduler",      NULL },
+    { "playouter",  0, 0, G_OPTION_ARG_STRING, &playouter_params_rawstring,    "playouter",      NULL },
 
     { "stat",           0, 0, G_OPTION_ARG_STRING, &stat_params_rawstring,            "stat",            NULL },
     { "encodersink",    0, 0, G_OPTION_ARG_STRING, &encodersink_params_rawstring,     "encodersink",     NULL },
@@ -300,6 +328,11 @@ static GOptionEntry entries[] =
   { NULL }
 };
 
+Interface* make_interface(GstElement* element, gchar* padname);
+void interface_dtor(Interface* this);
+void connect_interfaces(Interface* source, Interface* sink);
+
+void _print_info(void);
 gchar* _null_test(gchar *subject_str, gchar* failed_str);
 
 void setup_framerate(gchar *string, Framerate* framerate);
@@ -309,17 +342,16 @@ CodecParams*    make_codec_params (gchar* params_rawstring);
 VideoParams*    make_video_params (gchar* params_rawstring);
 StatParams*     make_stat_params (gchar* params_rawstring);
 
-SndTransferParams*  make_snd_transfer_params(gchar* params_rawstring);
-void free_snd_transfer_params(SndTransferParams *snd_transfer_params);
+TransferParams*  make_snd_transfer_params(gchar* params_rawstring);
+TransferParams*  make_rcv_transfer_params(gchar* params_rawstring);
+TransferParams* transfer_params_ref(TransferParams* transfer_params);
+void transfer_params_unref(TransferParams *transfer_params);
 
-SndPacketScheduler* make_snd_packet_scheduler_params(gchar* params_rawstring);
-void free_snd_packet_scheduler_params(SndPacketScheduler *snd_packet_scheduler_params);
+SchedulerParams* make_scheduler_params(gchar* params_rawstring);
+void free_scheduler_params(SchedulerParams *scheduler_params);
 
-RcvTransferParams*  make_rcv_transfer_params(gchar* params_rawstring);
-void free_rcv_transfer_params(RcvTransferParams *rcv_transfer_params);
-
-RcvPlayouterParams*   make_rcv_playouter_params(gchar* params_rawstring);
-void free_rcv_playouter_params(RcvPlayouterParams *congestion_controller_params);
+PlayouterParams*   make_playouter_params(gchar* params_rawstring);
+void free_playouter_params(PlayouterParams *congestion_controller_params);
 
 SinkParams*     make_sink_params(gchar* params_rawstring);
 

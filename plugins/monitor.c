@@ -61,6 +61,7 @@ static gint _tracked_seq_comparator(gpointer pa, gpointer pb)
   MonitorPacket *a;
   guint16* tracked_seq;
   a = pa; tracked_seq = pb;
+
   if(a->tracked_seq == *tracked_seq) return 0;
   return a->tracked_seq < *tracked_seq ? -1 : 1;
 } \
@@ -71,14 +72,12 @@ static void _untrack_packet(Monitor* this, MonitorPacket *packet)
 
   stat->accumulative_bytes -= packet->payload_size;
   --stat->accumulative_packets;
-
   recycle_add(this->recycle, packet);
 }
 
 static void _track_packet(Monitor* this, MonitorPacket* packet)
 {
   TrackingStat* stat = packet->tracker;
-
   stat->total_bytes += packet->payload_size;
   ++stat->total_packets;
   stat->accumulative_bytes += packet->payload_size;
@@ -247,7 +246,7 @@ done:
 void monitor_track_packetbuffer(Monitor* this, GstBuffer* buffer)
 {
   TrackingStat* tracker = NULL;
-  MonitorPacket *packet, *already_tracked;
+  MonitorPacket *packet, *already_tracked = NULL;
   GstMapInfo map = GST_MAP_INFO_INIT;
 
   packet = recycle_retrieve_and_shape(this->recycle, NULL);
@@ -259,6 +258,8 @@ void monitor_track_packetbuffer(Monitor* this, GstBuffer* buffer)
     this->tracked_packets[packet->tracked_seq] = packet;
     goto done;
   }
+
+  g_print("Discarded packet arrived %hu, HSN %hu\n", packet->tracked_seq, this->tracked_hsn);
 
   already_tracked = this->tracked_packets[packet->tracked_seq];
   if(already_tracked){

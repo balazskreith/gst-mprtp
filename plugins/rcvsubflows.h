@@ -25,9 +25,7 @@ typedef struct _RcvSubflowsPrivate RcvSubflowsPrivate;
 
 #define SCHTREE_MAX_VALUE 128
 
-typedef struct _RcvSubflow RcvSubflow;
-
-struct _RcvSubflow
+typedef struct _RcvSubflow
 {
   guint8                     id;
   RcvSubflows*               base_db;
@@ -52,7 +50,7 @@ struct _RcvSubflow
   CongestionControllingType  congestion_controlling_type;
 
   Notifier*                  on_rtcp_time_update;
-};
+}RcvSubflow;
 
 
 struct _RcvSubflows

@@ -101,19 +101,15 @@ enum
   PROP_MPRTP_EXT_HEADER_ID,
   PROP_ABS_TIME_EXT_HEADER_ID,
   PROP_FEC_PAYLOAD_TYPE,
-  PROP_MPATH_KEYFRAME_FILTERING,
+//  PROP_MPATH_KEYFRAME_FILTERING,
   PROP_PACKET_OBSOLATION_TRESHOLD,
   PROP_JOIN_SUBFLOW,
   PROP_DETACH_SUBFLOW,
-  PROP_SET_SUBFLOW_NON_CONGESTED,
-  PROP_SET_SUBFLOW_CONGESTED,
   PROP_SETUP_CONTROLLING_MODE,
   PROP_SET_SENDING_TARGET,
   PROP_SETUP_RTCP_INTERVAL_TYPE,
   PROP_SETUP_REPORT_TIMEOUT,
   PROP_FEC_INTERVAL,
-  PROP_LOG_ENABLED,
-  PROP_LOG_PATH,
 };
 
 /* signals and args */
@@ -209,101 +205,76 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_MPRTP_EXT_HEADER_ID,
       g_param_spec_uint ("mprtp-ext-header-id",
-          "Set or get the id for the Multipath RTP extension",
-          "Sets or gets the id for the extension header the MpRTP based on. The default is 3",
-          0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          "Multipath RTP Header Extension ID",
+          "Sets or gets the RTP header extension ID for MPRTP",
+          0, 15, MPRTP_DEFAULT_EXTENSION_HEADER_ID, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_ABS_TIME_EXT_HEADER_ID,
       g_param_spec_uint ("abs-time-ext-header-id",
-          "Set or get the id for the absolute time RTP extension",
-          "Sets or gets the id for the extension header the absolute time based on. The default is 8",
-          0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          "Absolute time RTP extension ID",
+          "Sets or gets the RTP header extension for abs NTP time.",
+          0, 15, ABS_TIME_DEFAULT_EXTENSION_HEADER_ID, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_FEC_PAYLOAD_TYPE,
       g_param_spec_uint ("fec-payload-type",
-          "Set or get the payload type of FEC packets",
-          "Set or get the payload type of FEC packets. The default is 126",
-          0, 127, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          "Set or get the payload type of FEC packets.",
+          "Set or get the payload type of FEC packets.",
+          0, 127, FEC_PAYLOAD_DEFAULT_ID, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_MPATH_KEYFRAME_FILTERING,
-      g_param_spec_uint ("mpath-keyframe-filtering",
-          "Set or get the keyframe filtering for multiple path",
-          "Set or get the keyframe filtering for multiple path. 0 - no keyframe filtering, 1 - vp8 enc/dec filtering",
-          0, 255, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+//  g_object_class_install_property (gobject_class, PROP_MPATH_KEYFRAME_FILTERING,
+//      g_param_spec_uint ("mpath-keyframe-filtering",
+//          "Set or get the keyframe filtering for multiple path",
+//          "Set or get the keyframe filtering for multiple path. 0 - no keyframe filtering, 1 - vp8 enc/dec filtering",
+//          0, 255, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_PACKET_OBSOLATION_TRESHOLD,
       g_param_spec_uint ("obsolation-treshold",
-          "Set the obsolation treshold at the packet sender queue.",
-          "Set the obsolation treshold at the packet sender queue.",
+          "Set the obsolation treshold for packets.",
+          "Set the obsolation treshold for packets.",
           0, 10000, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_JOIN_SUBFLOW,
-      g_param_spec_uint ("join-subflow", "the subflow id requested to join",
-          "Join a subflow with a given id.", 0,
-          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+      g_param_spec_uint ("join-subflow",
+          "Join a subflow with a given id",
+          "Join a subflow with a given id.",
+          0, MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_DETACH_SUBFLOW,
-      g_param_spec_uint ("detach-subflow", "the subflow id requested to detach",
-          "Detach a subflow with a given id.", 0,
-          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_SET_SUBFLOW_CONGESTED,
-      g_param_spec_uint ("congested-subflow", "set the subflow congested",
-          "Set the subflow congested", 0,
-          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class,
-      PROP_SET_SUBFLOW_NON_CONGESTED,
-      g_param_spec_uint ("non-congested-subflow",
-          "set the subflow non-congested", "Set the subflow non-congested", 0,
-          MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+      g_param_spec_uint ("detach-subflow",
+          "Detach a subflow with a given id.",
+          "Detach a subflow with a given id.",
+          0, MPRTP_PLUGIN_MAX_SUBFLOW_NUM, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SET_SENDING_TARGET,
-      g_param_spec_uint ("setup-sending-target",
-          "set the sending target of the subflow",
-          "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the target",
+      g_param_spec_uint ("sending-target",
+          "Set the sending target for subflows",
+          "Set the sending target for subflows",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SETUP_RTCP_INTERVAL_TYPE,
-     g_param_spec_uint ("setup-rtcp-interval-type",
+     g_param_spec_uint ("rtcp-interval-type",
                         "RTCP interval types: 0 - regular, 1 - early, 2 - immediate feedback",
-                        "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the mode. "
                         "RTCP interval types: 0 - regular, 1 - early, 2 - immediate feedback",
                         0,
                         4294967295, 2, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SETUP_REPORT_TIMEOUT,
-      g_param_spec_uint ("setup-report-timeout",
-          "setup a timeout value for incoming reports on subflows",
-          "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the timeout in ms",
+      g_param_spec_uint ("report-timeout",
+          "Set a report timeout in ms for detaching",
+          "Set a report timeout in ms for detaching",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SETUP_CONTROLLING_MODE,
-      g_param_spec_uint ("setup-controlling-mode",
-          "set the controlling mode to the subflow",
-          "A 32bit unsigned integer for setup a target. The first 8 bit identifies the subflow, the latter the mode. "
-          "0 - no sending rate controller, 1 - no controlling, but sending SRs, 2 - FBRA with MARC",
+      g_param_spec_uint ("controlling-mode",
+          "Set the controlling mode. 0 - None, 1 - Regular, 2 - FRACTaL",
+          "Set the controlling mode. 0 - None, 1 - Regular, 2 - FRACTaL",
           0, 4294967295, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_FEC_INTERVAL,
       g_param_spec_uint ("fec-interval",
-          "Set a stable FEC interval applied on the media stream",
-          "The property value other than 0 request a FEC protection after a specified packet was sent. "
-          "The newly created FEC packet is going to be sent on the path actually selected if the plugin uses multipath.",
+          "Set a stable FEC interval",
+          "Set a stable FEC interval",
           0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_LOG_ENABLED,
-      g_param_spec_boolean ("logging",
-          "Indicate weather a log for subflow is enabled or not",
-          "Indicate weather a log for subflow is enabled or not",
-          FALSE, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-
-  g_object_class_install_property (gobject_class, PROP_LOG_PATH,
-        g_param_spec_string ("logs-path",
-            "Determines the path for logfiles",
-            "Determines the path for logfiles",
-            "NULL", G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   _subflows_utilization =
       g_signal_new ("mprtp-subflows-utilization", G_TYPE_FROM_CLASS (klass),
@@ -321,6 +292,11 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 //  priv = this->priv = GST_MPRTPSCHEDULER_GET_PRIVATE (this);
 
   init_mprtp_logger();
+  //TODO: Only for development use
+  mprtp_logger_set_state(TRUE);
+  mprtp_logger_set_system_command("bash -c '[ ! -d temp_logs ]' && mkdir temp_logs");
+  mprtp_logger_set_system_command("rm temp_logs/*");
+  mprtp_logger_set_target_directory("temp_logs/");
 
   this->rtp_sinkpad =
       gst_pad_new_from_static_template (&gst_mprtpscheduler_rtp_sink_template,
@@ -442,7 +418,7 @@ gst_mprtpscheduler_finalize (GObject * object)
   g_object_unref (this->sndpackets);
   g_object_unref (this->splitter);
   g_object_unref (this->fec_encoder);
-  g_object_unref(this->packetsq);
+  g_queue_free(this->packetsq);
 
   g_object_unref(this->emit_msger);
 
@@ -468,7 +444,6 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
 {
   GstMprtpscheduler *this = GST_MPRTPSCHEDULER (object);
   guint guint_value;
-  gboolean gboolean_value;
   SubflowSpecProp *subflow_prop;
 
   subflow_prop = (SubflowSpecProp*) &guint_value;
@@ -488,29 +463,20 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
     case PROP_JOIN_SUBFLOW:
       sndsubflows_join(this->subflows, g_value_get_uint (value));
       break;
-    case PROP_MPATH_KEYFRAME_FILTERING:
-      g_warning("path keyframe filtering is not implemented yet");
-      break;
+//    case PROP_MPATH_KEYFRAME_FILTERING:
+//      g_warning("path keyframe filtering is not implemented yet");
+//      break;
     case PROP_PACKET_OBSOLATION_TRESHOLD:
       this->obsolation_treshold = g_value_get_uint(value) * GST_MSECOND;
       break;
     case PROP_DETACH_SUBFLOW:
       sndsubflows_detach(this->subflows, g_value_get_uint (value));
       break;
-    case PROP_SET_SUBFLOW_CONGESTED:
-      guint_value = g_value_get_uint (value);
-      sndsubflows_set_path_congested(this->subflows, guint_value, TRUE);
-      break;
-    case PROP_SET_SUBFLOW_NON_CONGESTED:
-      guint_value = g_value_get_uint (value);
-      sndsubflows_set_path_congested(this->subflows, guint_value, FALSE);
-      break;
     case PROP_FEC_INTERVAL:
       this->fec_interval = g_value_get_uint (value);
       break;
     case PROP_SET_SENDING_TARGET:
       guint_value = g_value_get_uint (value);
-
       sndsubflows_set_target_bitrate(this->subflows, subflow_prop->id, subflow_prop->value);
       break;
     case PROP_SETUP_RTCP_INTERVAL_TYPE:
@@ -524,13 +490,6 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
     case PROP_SETUP_REPORT_TIMEOUT:
       guint_value = g_value_get_uint (value);
       sndsubflows_set_report_timeout(this->subflows, subflow_prop->id, subflow_prop->value * GST_MSECOND);
-      break;
-    case PROP_LOG_ENABLED:
-      gboolean_value = g_value_get_boolean (value);
-      mprtp_logger_set_state(gboolean_value);
-      break;
-    case PROP_LOG_PATH:
-      mprtp_logger_set_target_directory(g_value_get_string(value));
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -555,9 +514,9 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
     case PROP_ABS_TIME_EXT_HEADER_ID:
       g_value_set_uint (value, (guint) sndpackets_get_abs_time_ext_header_id(this->sndpackets));
       break;
-    case PROP_MPATH_KEYFRAME_FILTERING:
-      g_warning("path keyframe filtering is not implemented yet");
-      break;
+//    case PROP_MPATH_KEYFRAME_FILTERING:
+//      g_warning("path keyframe filtering is not implemented yet");
+//      break;
     case PROP_FEC_PAYLOAD_TYPE:
       g_value_set_uint (value, (guint) this->fec_payload_type);
       break;
@@ -574,25 +533,6 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
   THIS_UNLOCK(this);
 
 }
-
-//
-//gboolean
-//gst_mprtpscheduler_mprtp_src_event (GstPad * pad, GstObject * parent,
-//    GstEvent * event)
-//{
-//  GstMprtpscheduler *this;
-//  gboolean result;
-//
-//  this = GST_MPRTPSCHEDULER (parent);
-//  THIS_LOCK(this);
-//  switch (GST_EVENT_TYPE (event)) {
-//    default:
-//      result = gst_pad_push_event (this->rtp_sinkpad, event);
-////      result = gst_pad_event_default (pad, parent, event);
-//  }
-//  THIS_UNLOCK(this);
-//  return result;
-//}
 
 
 static GstStateChangeReturn
@@ -788,7 +728,7 @@ gst_mprtpscheduler_mprtcp_rr_sink_chain (GstPad *pad, GstObject *parent, GstBuff
 //      gst_rtcp_buffer_map(buf, GST_MAP_READ, &rtcp);
 //      gst_print_rtcp_buffer(&rtcp);
 //      gst_rtcp_buffer_unmap(&rtcp);
-
+//
 
   this = GST_MPRTPSCHEDULER (parent);
 
@@ -842,45 +782,6 @@ static gboolean gst_mprtpscheduler_mprtp_src_event(GstPad *pad, GstObject *paren
 
     return ret;
 }
-//
-//static gboolean
-//gst_mprtpscheduler_sink_eventfunc (GstPad * srckpad, GstObject * parent,
-//                                   GstEvent * event)
-//{
-//  GstMprtpscheduler * this;
-//  gboolean result = TRUE, forward = TRUE;
-//  g_print("EVENT income: %d - %s\n", GST_EVENT_TYPE (event), GST_EVENT_TYPE_NAME(event));
-//  this = GST_MPRTPSCHEDULER(parent);
-//  switch (GST_EVENT_TYPE (event)) {
-//    case GST_EVENT_FLUSH_START:
-//      break;
-//    case GST_EVENT_FLUSH_STOP:
-//      /* we need new segment info after the flush. */
-//      gst_segment_init (&this->segment, GST_FORMAT_UNDEFINED);
-//      this->position_out = GST_CLOCK_TIME_NONE;
-//      break;
-//    case GST_EVENT_EOS:
-//      break;
-//    case GST_EVENT_TAG:
-//      break;
-//    case GST_EVENT_SEGMENT:
-//    {
-//      gst_event_copy_segment (event, &this->segment);
-//      GST_DEBUG_OBJECT (this, "received SEGMENT %" GST_SEGMENT_FORMAT,
-//          &this->segment);
-//      break;
-//    }
-//    default:
-//      break;
-//  }
-//
-//  if (result && forward)
-//    result = gst_pad_push_event (this->mprtp_srcpad, event);
-//  else
-//    gst_event_unref (event);
-//
-//  return result;
-//}
 
 
 static gboolean
@@ -921,7 +822,11 @@ void _on_rtcp_ready(GstMprtpscheduler * this, GstBuffer *buffer)
 //    gst_rtcp_buffer_map(buffer, GST_MAP_READ, &rtcp);
 //    gst_print_rtcp_buffer(&rtcp);
 //    gst_rtcp_buffer_unmap(&rtcp);
-
+  if(!gst_pad_is_linked(this->mprtcp_sr_srcpad)){
+    GST_WARNING_OBJECT(this, "Pads are not linked for MPRTCP");
+    return;
+  }
+//g_print("On RTCP SR sending\n");
   gst_pad_push(this->mprtcp_sr_srcpad, buffer);
 }
 

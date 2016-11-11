@@ -155,8 +155,13 @@ sndsubflows_init (SndSubflows * this)
 void sndsubflows_join(SndSubflows* this, guint8 id)
 {
   SndSubflow *subflow;
-  subflow = _make_subflow(this, id);
 
+  if(this->subflows[id]){
+    GST_WARNING_OBJECT(this, "Subflow with a given id %d is already joined", id);
+    return;
+  }
+
+  subflow = _make_subflow(this, id);
   this->subflows[id] = subflow;
   ++this->subflows_num;
 
@@ -170,6 +175,11 @@ void sndsubflows_detach(SndSubflows* this, guint8 id)
 {
   SndSubflow* subflow;
   subflow = this->subflows[id];
+
+  if(!subflow){
+    GST_WARNING_OBJECT(this, "Subflow with a given id %d is not exist or it is already detached", id);
+    return;
+  }
 
   notifier_do(this->on_subflow_detached, subflow);
 

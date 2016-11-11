@@ -105,8 +105,8 @@ am__aclocal_m4_deps = $(top_srcdir)/common/m4/as-ac-expand.m4 \
 	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
-DIST_COMMON = $(srcdir)/Makefile.am $(noinst_HEADERS) \
-	$(am__DIST_COMMON)
+DIST_COMMON = $(srcdir)/Makefile.am $(libgstmprtp_la_HEADERS) \
+	$(noinst_HEADERS) $(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
@@ -138,7 +138,8 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(plugindir)"
+am__installdirs = "$(DESTDIR)$(plugindir)" \
+	"$(DESTDIR)$(libgstmprtp_ladir)"
 LTLIBRARIES = $(plugin_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 libgstmprtp_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
@@ -159,12 +160,12 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-fbrafbproc.lo \
 	libgstmprtp_la-lib_swplugins.lo libgstmprtp_la-mediator.lo \
 	libgstmprtp_la-messenger.lo libgstmprtp_la-monitor.lo \
 	libgstmprtp_la-mprtpdefs.lo libgstmprtp_la-mprtplogger.lo \
-	libgstmprtp_la-notifier.lo libgstmprtp_la-rcvctrler.lo \
-	libgstmprtp_la-rcvpackets.lo libgstmprtp_la-rcvsubflows.lo \
-	libgstmprtp_la-rcvtracker.lo libgstmprtp_la-recycle.lo \
-	libgstmprtp_la-reportproc.lo libgstmprtp_la-reportprod.lo \
-	libgstmprtp_la-ricalcer.lo libgstmprtp_la-rtpfecbuffer.lo \
-	libgstmprtp_la-signalreport.lo libgstmprtp_la-slidingwindow.lo \
+	libgstmprtp_la-mprtpsignalreport.lo libgstmprtp_la-notifier.lo \
+	libgstmprtp_la-rcvctrler.lo libgstmprtp_la-rcvpackets.lo \
+	libgstmprtp_la-rcvsubflows.lo libgstmprtp_la-rcvtracker.lo \
+	libgstmprtp_la-recycle.lo libgstmprtp_la-reportproc.lo \
+	libgstmprtp_la-reportprod.lo libgstmprtp_la-ricalcer.lo \
+	libgstmprtp_la-rtpfecbuffer.lo libgstmprtp_la-slidingwindow.lo \
 	libgstmprtp_la-sndctrler.lo libgstmprtp_la-sndsubflows.lo \
 	libgstmprtp_la-sndtracker.lo libgstmprtp_la-sndpackets.lo \
 	libgstmprtp_la-streamjoiner.lo \
@@ -219,7 +220,7 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
-HEADERS = $(noinst_HEADERS)
+HEADERS = $(libgstmprtp_la_HEADERS) $(noinst_HEADERS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 # Read a list of newline-separated strings from the standard input,
 # and print each of them once, without duplicates.  Input order is
@@ -434,6 +435,7 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          monitor.c             \
                          mprtpdefs.c           \
                          mprtplogger.c         \
+                         mprtpsignalreport.c   \
                          notifier.c            \
                          rcvctrler.c           \
                          rcvpackets.c          \
@@ -444,7 +446,6 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          reportprod.c          \
                          ricalcer.c            \
                          rtpfecbuffer.c        \
-                         signalreport.c        \
                          slidingwindow.c       \
                          sndctrler.c           \
                          sndsubflows.c         \
@@ -478,7 +479,6 @@ noinst_HEADERS = fbrafbproc.h          \
                  reportprod.h          \
                  ricalcer.h            \
                  rtpfecbuffer.h        \
-                 signalreport.h        \
                  slidingwindow.h       \
                  sndctrler.h           \
                  sndsubflows.h         \
@@ -487,6 +487,8 @@ noinst_HEADERS = fbrafbproc.h          \
                  streamjoiner.h        \
                  streamsplitter.h      
 
+libgstmprtp_ladir = $(includedir)/gstreamer-1.0/gst/rtp
+libgstmprtp_la_HEADERS = mprtpsignalreport.h               
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
 # libgstmprtp_la_CFLAGS = $(GST_CFLAGS) -I/usr/local/include/gstreamer-1.0 -I/home/balazs/gst/master/gst-plugins-base/gst-libs
@@ -599,6 +601,7 @@ include ./$(DEPDIR)/libgstmprtp_la-messenger.Plo
 include ./$(DEPDIR)/libgstmprtp_la-monitor.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtpdefs.Plo
 include ./$(DEPDIR)/libgstmprtp_la-mprtplogger.Plo
+include ./$(DEPDIR)/libgstmprtp_la-mprtpsignalreport.Plo
 include ./$(DEPDIR)/libgstmprtp_la-notifier.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rcvctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rcvpackets.Plo
@@ -609,7 +612,6 @@ include ./$(DEPDIR)/libgstmprtp_la-reportproc.Plo
 include ./$(DEPDIR)/libgstmprtp_la-reportprod.Plo
 include ./$(DEPDIR)/libgstmprtp_la-ricalcer.Plo
 include ./$(DEPDIR)/libgstmprtp_la-rtpfecbuffer.Plo
-include ./$(DEPDIR)/libgstmprtp_la-signalreport.Plo
 include ./$(DEPDIR)/libgstmprtp_la-slidingwindow.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndctrler.Plo
 include ./$(DEPDIR)/libgstmprtp_la-sndpackets.Plo
@@ -786,6 +788,13 @@ libgstmprtp_la-mprtplogger.lo: mprtplogger.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-mprtplogger.lo `test -f 'mprtplogger.c' || echo '$(srcdir)/'`mprtplogger.c
 
+libgstmprtp_la-mprtpsignalreport.lo: mprtpsignalreport.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-mprtpsignalreport.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-mprtpsignalreport.Tpo -c -o libgstmprtp_la-mprtpsignalreport.lo `test -f 'mprtpsignalreport.c' || echo '$(srcdir)/'`mprtpsignalreport.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-mprtpsignalreport.Tpo $(DEPDIR)/libgstmprtp_la-mprtpsignalreport.Plo
+#	$(AM_V_CC)source='mprtpsignalreport.c' object='libgstmprtp_la-mprtpsignalreport.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-mprtpsignalreport.lo `test -f 'mprtpsignalreport.c' || echo '$(srcdir)/'`mprtpsignalreport.c
+
 libgstmprtp_la-notifier.lo: notifier.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-notifier.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-notifier.Tpo -c -o libgstmprtp_la-notifier.lo `test -f 'notifier.c' || echo '$(srcdir)/'`notifier.c
 	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-notifier.Tpo $(DEPDIR)/libgstmprtp_la-notifier.Plo
@@ -856,13 +865,6 @@ libgstmprtp_la-rtpfecbuffer.lo: rtpfecbuffer.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-rtpfecbuffer.lo `test -f 'rtpfecbuffer.c' || echo '$(srcdir)/'`rtpfecbuffer.c
 
-libgstmprtp_la-signalreport.lo: signalreport.c
-	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-signalreport.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-signalreport.Tpo -c -o libgstmprtp_la-signalreport.lo `test -f 'signalreport.c' || echo '$(srcdir)/'`signalreport.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-signalreport.Tpo $(DEPDIR)/libgstmprtp_la-signalreport.Plo
-#	$(AM_V_CC)source='signalreport.c' object='libgstmprtp_la-signalreport.lo' libtool=yes \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-signalreport.lo `test -f 'signalreport.c' || echo '$(srcdir)/'`signalreport.c
-
 libgstmprtp_la-slidingwindow.lo: slidingwindow.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-slidingwindow.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-slidingwindow.Tpo -c -o libgstmprtp_la-slidingwindow.lo `test -f 'slidingwindow.c' || echo '$(srcdir)/'`slidingwindow.c
 	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-slidingwindow.Tpo $(DEPDIR)/libgstmprtp_la-slidingwindow.Plo
@@ -917,6 +919,27 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
+install-libgstmprtp_laHEADERS: $(libgstmprtp_la_HEADERS)
+	@$(NORMAL_INSTALL)
+	@list='$(libgstmprtp_la_HEADERS)'; test -n "$(libgstmprtp_ladir)" || list=; \
+	if test -n "$$list"; then \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(libgstmprtp_ladir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(libgstmprtp_ladir)" || exit 1; \
+	fi; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_HEADER) $$files '$(DESTDIR)$(libgstmprtp_ladir)'"; \
+	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(libgstmprtp_ladir)" || exit $$?; \
+	done
+
+uninstall-libgstmprtp_laHEADERS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(libgstmprtp_la_HEADERS)'; test -n "$(libgstmprtp_ladir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	dir='$(DESTDIR)$(libgstmprtp_ladir)'; $(am__uninstall_files_from_dir)
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -1004,7 +1027,7 @@ check-am: all-am
 check: check-am
 all-am: Makefile $(LTLIBRARIES) $(HEADERS)
 installdirs:
-	for dir in "$(DESTDIR)$(plugindir)"; do \
+	for dir in "$(DESTDIR)$(plugindir)" "$(DESTDIR)$(libgstmprtp_ladir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -1060,7 +1083,8 @@ info: info-am
 
 info-am:
 
-install-data-am: install-pluginLTLIBRARIES
+install-data-am: install-libgstmprtp_laHEADERS \
+	install-pluginLTLIBRARIES
 
 install-dvi: install-dvi-am
 
@@ -1106,7 +1130,8 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-pluginLTLIBRARIES
+uninstall-am: uninstall-libgstmprtp_laHEADERS \
+	uninstall-pluginLTLIBRARIES
 
 .MAKE: install-am install-strip
 
@@ -1117,13 +1142,14 @@ uninstall-am: uninstall-pluginLTLIBRARIES
 	html-am info info-am install install-am install-data \
 	install-data-am install-dvi install-dvi-am install-exec \
 	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-pluginLTLIBRARIES install-ps install-ps-am \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags tags-am uninstall uninstall-am \
-	uninstall-pluginLTLIBRARIES
+	install-info-am install-libgstmprtp_laHEADERS install-man \
+	install-pdf install-pdf-am install-pluginLTLIBRARIES \
+	install-ps install-ps-am install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags tags-am uninstall uninstall-am \
+	uninstall-libgstmprtp_laHEADERS uninstall-pluginLTLIBRARIES
 
 .PRECIOUS: Makefile
 

@@ -11,8 +11,8 @@ typedef struct{
   Sink*      sink;
 
   StatParamsTuple*      stat_params_tuple;
-  RcvTransferParams*    rcv_transfer_params;
-  RcvPlayouterParams* cc_receiver_side_params;
+  TransferParams*       rcv_transfer_params;
+  PlayouterParams*   playouter_params;
 
   CodecParams*    codec_params;
   SinkParams*     sink_params;
@@ -26,12 +26,12 @@ static void _print_params(ReceiverSide* this)
 {
   g_print("Transfer Params: %s\n", this->rcv_transfer_params->to_string);
 
-  g_print("Codec    Params: %s\n", this->codec_params->to_string);
-  g_print("Sink     Params: %s\n", this->sink_params->to_string);
-  g_print("Video    Params: %s\n", this->video_params->to_string);
+  g_print("Codec     Params: %s\n", this->codec_params->to_string);
+  g_print("Sink      Params: %s\n", this->sink_params->to_string);
+  g_print("Video     Params: %s\n", this->video_params->to_string);
 
-  g_print("CCRcv    Params: %s\n", this->cc_receiver_side_params ? this->cc_receiver_side_params->to_string : "None");
-  g_print("Stat     Params: %s\n", this->stat_params_tuple ? this->stat_params_tuple->to_string : "None");
+  g_print("Playouter Params: %s\n", this->playouter_params ? this->playouter_params->to_string : "None");
+  g_print("Stat      Params: %s\n", this->stat_params_tuple ? this->stat_params_tuple->to_string : "None");
 
 }
 
@@ -58,6 +58,8 @@ static void _connect_receiver_to_decoder(ReceiverSide *this)
           "encoding-name", G_TYPE_STRING, this->codec_params->type_str,
           NULL);
 
+  pipeline_firing_event("on-caps-change", caps);
+
   gst_element_link_filtered(receiver->element, decoder->element, caps);
 }
 
@@ -69,14 +71,6 @@ static void _connect_decoder_to_sink(ReceiverSide *this)
   gst_element_link(decoder->element, sink->element);
 }
 
-
-static void _print_info(void){
-  g_print(
-      "Help for using Receiver Pipeline\n"
-      "\t--receiver=RTPSIMPLE|RTPSCREAM|MPRTP|MPRTPFBRAP\n"
-  );
-}
-
 int main (int argc, char **argv)
 {
   GstPipeline *pipe;
@@ -86,33 +80,36 @@ int main (int argc, char **argv)
   ReceiverSide *session;
   GError *error = NULL;
   GOptionContext *context;
+  gboolean context_parse;
 
   session = g_malloc0(sizeof(ReceiverSide));
   context = g_option_context_new ("Receiver");
   g_option_context_add_main_entries (context, entries, NULL);
-  g_option_context_parse (context, &argc, &argv, &error);
+  context_parse = g_option_context_parse (context, &argc, &argv, &error);
   if(info){
     _print_info();
     return 0;
   }
 
+  g_print("Errors during parse: %s, returned with: %d\n", error ? error->message : "None", context_parse);
   gst_init (&argc, &argv);
 
   session->rcv_transfer_params = make_rcv_transfer_params(
       _null_test(rcvtransfer_params_rawstring, rcvtransfer_params_rawstring_default)
   );
 
+  session->playouter_params = playouter_params_rawstring ? make_playouter_params(playouter_params_rawstring) : NULL;
+
 //  session->stat_params_tuple = make_statparams_tuple_by_raw_strings(
 //      stat_params_rawstring,
 //      statlogs_sink_params_rawstring,
 //      packetlogs_sink_params_rawstring);
 
+
   session->stat_params_tuple = make_statparams_tuple_by_raw_strings(
       "100:1000:1:triggered_stat",
       "FILE:rcv_statlogs.txt",
       "FILE:rcv_packetlogs.txt");
-
-  session->cc_receiver_side_params = NULL;
 
   session->codec_params = make_codec_params(
       _null_test(codec_params_rawstring, codec_params_rawstring_default)
@@ -128,9 +125,11 @@ int main (int argc, char **argv)
 
   _print_params(session);
 
-  session->receiver  = make_receiver(session->cc_receiver_side_params, session->stat_params_tuple, session->rcv_transfer_params);
+  session->receiver  = make_receiver(session->rcv_transfer_params, session->stat_params_tuple, session->playouter_params);
   session->decoder   = make_decoder(session->codec_params);
   session->sink      = make_sink(session->sink_params);
+
+  pipeline_add_event_notifier("on-caps-change", session->receiver->on_caps_change);
 
   loop = g_main_loop_new (NULL, FALSE);
 
@@ -164,8 +163,8 @@ int main (int argc, char **argv)
   g_main_loop_unref (loop);
 
   free_statparams_tuple(session->stat_params_tuple);
-  free_rcv_playouter_params(session->cc_receiver_side_params);
-  free_rcv_transfer_params(session->rcv_transfer_params);
+  free_playouter_params(session->playouter_params);
+  transfer_params_unref(session->rcv_transfer_params);
 
   receiver_dtor(session->receiver);
   decoder_dtor(session->decoder);

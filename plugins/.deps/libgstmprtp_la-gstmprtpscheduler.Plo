@@ -365,7 +365,7 @@ libgstmprtp_la-gstmprtpscheduler.lo: gstmprtpscheduler.c \
  rcvtracker.h rcvpackets.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h \
  rcvsubflows.h mediator.h ricalcer.h sndsubflows.h streamsplitter.h \
- sndpackets.h reportproc.h signalreport.h fecenc.h rtpfecbuffer.h \
+ sndpackets.h reportproc.h mprtpsignalreport.h fecenc.h rtpfecbuffer.h \
  sndtracker.h /usr/include/x86_64-linux-gnu/sys/timex.h \
  /usr/include/x86_64-linux-gnu/sys/time.h \
  /usr/include/x86_64-linux-gnu/bits/timex.h
@@ -1224,7 +1224,7 @@ sndpackets.h:
 
 reportproc.h:
 
-signalreport.h:
+mprtpsignalreport.h:
 
 fecenc.h:
 

@@ -365,7 +365,7 @@ libgstmprtp_la-gstmprtpplayouter.lo: gstmprtpplayouter.c \
  /usr/include/glib-2.0/gio/gliststore.h \
  /usr/include/glib-2.0/gio/gio-autocleanups.h rcvsubflows.h mediator.h \
  rcvctrler.h ricalcer.h sndsubflows.h sndctrler.h reportprod.h \
- streamsplitter.h sndpackets.h reportproc.h signalreport.h fecenc.h \
+ streamsplitter.h sndpackets.h reportproc.h mprtpsignalreport.h fecenc.h \
  rtpfecbuffer.h sndtracker.h fecdec.h jitterbuffer.h \
  /usr/include/glib-2.0/gio/gnetworking.h /usr/include/netdb.h \
  /usr/include/netinet/in.h \
@@ -1249,7 +1249,7 @@ sndpackets.h:
 
 reportproc.h:
 
-signalreport.h:
+mprtpsignalreport.h:
 
 fecenc.h:
 

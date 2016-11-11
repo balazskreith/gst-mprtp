@@ -83,13 +83,15 @@ gpointer datapuffer_peek_custom(datapuffer_t* puffer, gint (*comparator)(gpointe
   do{
     pos = npos;
     item = puffer->items[pos];
+//    g_print("Custom peek: start: %d, end: %d, pos: %d, npos: %d count: %d item: %p\n",
+//        puffer->start, puffer->end, pos, npos, puffer->count, item);
     if(comparator(item, udata) == 0){
       return item;
     }
     if(++npos == puffer->length){
       npos = 0;
     }
-  }while(pos != puffer->end);
+  }while(npos != puffer->end);
   return NULL;
 }
 

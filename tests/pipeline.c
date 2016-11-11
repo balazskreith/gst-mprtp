@@ -16,6 +16,69 @@ static gint32 _compare_types(gchar* type, ...)
   return -1;
 }
 
+Interface* make_interface(GstElement* element, gchar* padname){
+  Interface* result = g_malloc0(sizeof(Interface));
+  result->element = element;
+  strcpy(result->padname, padname);
+  return result;
+}
+void interface_dtor(Interface* this){
+  g_free(this);
+}
+
+void connect_interfaces(Interface* source, Interface* sink){
+  gst_element_link_pads(source->element, source->padname, sink->element, sink->padname);
+}
+
+void _print_info(void)
+{
+  g_print(
+      "Options for using Sender Pipeline\n"
+      "\t--info Print this.\n"
+
+      "\nSender pipeline parameters:\n"
+      "\t--source=TESTVIDEO|RAWPROXY|LIVEFILE:...\n"
+      "\t\t TESTVIDEO\n"
+      "\t\t RAWPROXY:NOT IMPLEMENTED YET\n"
+      "\t\t FILE:location(string):loop(int):width(int):height(int):GstFormatIdentifier(int):framerate(N/M)\n"
+      "\t--encodersink=See the sink param setting\n"
+      "\t--scheduler=SCREAM|MPRTP:MPRTPFRACTAL\n"
+      "\t\t SCREAM\n"
+      "\t\t MPRTP\n"
+      "\t\t MPRTPFRACTAL:num_of_subflows(int):subflow_id:(int):bounded_port(int):...\n"
+      "\t--sender=RTP|MPRTP\n"
+      "\t\t RTP:dest_ip(string):dest_port(int)\n"
+      "\t\t MPRTP:num_of_subflows(int):subflow_id(int):dest_ip(string):dest_port(int):...\n"
+
+      "\nReceiver pipeline parameters:\n"
+      "\t--receiver=RTP|MPRTP\n"
+      "\t\t RTP:dest_ip(string):dest_port(int)\n"
+      "\t\t MPRTP:num_of_subflows(int):subflow_id(int):dest_port(int):...\n"
+      "\t--sink=AUTOVIDEO|FILE|RAWPROXY\n"
+      "\t\t AUTOVIDEO\n"
+      "\t\t FILE:location\n"
+      "\t\t RAWPROXY: NOT IMPLEMENTED YET\n"
+      "\t--playouter=SCREAM|MPRTP|MPRTPFRACTAL"
+      "\t\t SCREAM: NOT IMPLEMENTED YET"
+      "\t\t MPRTP: NOT IMPLEMENTED YET"
+      "\t\t MPRTPFRACTAL:num_of_subflows(int):subflow_id:(int):dest_ip(string):dest_port(int):..."
+
+
+      "\nCommon parameters:\n"
+      "\t--codec=VP8|THEORA\n"
+      "\t--stat=sampling time (int):accumulation length (int):csv logging (int):touch-sync location (string)\n"
+      "\t--packetlogsink=See the --sink param setting\n"
+      "\t--statlogsink=See the --sink param setting\n"
+
+      "\nExamples for sender pipeline:\n"
+      "./snd_pipeline --source=TESTVIDEO --codec=VP8 --sender=RTP:10.0.0.6:5000\n"
+
+      "\nExamples for receiver pipeline:\n"
+      "./rcv_pipeline --receiver=RTP:5000 --codec=VP8 --sink=AUTOVIDEO\n"
+      "\n\n\n"
+  );
+}
+
 gchar* _null_test(gchar *subject_str, gchar* failed_str)
 {
   return subject_str == NULL ? failed_str : subject_str;
@@ -174,44 +237,38 @@ StatParams*     make_stat_params (gchar* params_rawstring)
   return result;
 }
 
-SndTransferParams*  make_snd_transfer_params(gchar* params_rawstring)
+
+TransferParams*  make_snd_transfer_params(gchar* params_rawstring)
 {
-  SndTransferParams *result = g_malloc0(sizeof(SndTransferParams));
-  gchar             **tokens = g_strsplit(params_rawstring, ":", -1);
+  TransferParams *result = g_malloc0(sizeof(TransferParams));
+  gchar          **tokens = g_strsplit(params_rawstring, ":", -1);
+  SenderSubflow  *subflow;
+  gint i, offset;
+  gchar string[256];
 
   result->type = _compare_types(tokens[0], "RTP", "MPRTP", NULL);
+  result->ref = 1;
   switch(result->type){
      case TRANSFER_TYPE_RTP:
-
-       strcpy(result->rtp.dest_ip, tokens[1]);
-       result->rtp.dest_port = atoi(tokens[2]);
-
-       sprintf(result->to_string, "RTP, Dest.: %s:%d", result->rtp.dest_ip, result->rtp.dest_port);
-
+       result->length = 1;
+       subflow = g_malloc0(sizeof(SenderSubflow));
+       strcpy(subflow->dest_ip, tokens[1]);
+       subflow->dest_port = atoi(tokens[2]);
+       result->subflows = g_slist_append(result->subflows, subflow);
+       sprintf(result->to_string, "RTP, Dest.: %s:%d", subflow->dest_ip, subflow->dest_port);
        break;
      case TRANSFER_TYPE_MPRTP:
-       {
-         gint offset = 1;
-         gint i;
-
-         sprintf(result->to_string, "MPRTP Subflows (%d); ", result->mprtp.subflows_num);
-         result->mprtp.subflows_num = atoi(tokens[1]);
-
-         for(i = 0; i < result->mprtp.subflows_num; ++i){
-           gchar subflow_info[255];
-           SenderSubflow* subflow = g_malloc0(sizeof(SenderSubflow));
-           subflow->id        = atoi(tokens[++offset]);
-           strcpy(subflow->dest_ip, tokens[++offset]);
-           subflow->dest_port = atoi(tokens[++offset]);
-
-           result->mprtp.subflows = g_slist_append(result->mprtp.subflows, subflow);
-           sprintf(subflow_info, "%d Dest.: %s:%d; ",
-               subflow->id,
-               subflow->dest_ip,
-               subflow->dest_port
-           );
-           strcat(result->to_string, subflow_info);
-         }
+       result->length = atoi(tokens[1]);
+       offset = 1;
+       sprintf(result->to_string, "MPRTP, Subflows: ");
+       for(i = 0; i < result->length; ++i){
+         subflow = g_malloc0(sizeof(SenderSubflow));
+         subflow->id = atoi(tokens[++offset]);
+         strcpy(subflow->dest_ip, tokens[++offset]);
+         subflow->dest_port = atoi(tokens[++offset]);
+         result->subflows = g_slist_append(result->subflows, subflow);
+         sprintf(string, "ID: %d, Dest.: %s:%d; ", subflow->id, subflow->dest_ip, subflow->dest_port);
+         strcat(result->to_string, string);
        }
        break;
      default:
@@ -222,160 +279,167 @@ SndTransferParams*  make_snd_transfer_params(gchar* params_rawstring)
   return result;
 }
 
-void free_snd_transfer_params(SndTransferParams *snd_transfer_params)
+
+TransferParams*  make_rcv_transfer_params(gchar* params_rawstring)
 {
-  if(snd_transfer_params->type == TRANSFER_TYPE_MPRTP){
-    g_slist_free_full(snd_transfer_params->mprtp.subflows, g_free);
-  }
-  g_free(snd_transfer_params);
-}
-
-
-SndPacketScheduler*   make_snd_packet_scheduler_params(gchar* params_rawstring)
-{
-  SndPacketScheduler *result = g_malloc0(sizeof(SndPacketScheduler));
-  gchar                     **tokens = g_strsplit(params_rawstring, ":", -1);
-
-  result->type = _compare_types(tokens[0], "SCREAM", "MPRTP", "MPRTPFBRAPLUS", NULL);
-
-  switch(result->type){
-    case SENDING_PACKET_SCHEDULING_TYPE_SCREAM:
-//      _replace_char(",",":",tokens[1]);
-      result->rcv_transfer_params = make_rcv_transfer_params(tokens[1]);
-
-      sprintf(result->to_string, "SCReAM congestion controller for packet scheduling, Rcv Params: %s",
-          result->rcv_transfer_params->to_string);
-      break;
-    case SENDING_PACKET_SCHEDULER_TYPE_MPRTPFBRAPLUS:
-    //      _replace_char(",",":",tokens[1]);
-          result->rcv_transfer_params = make_rcv_transfer_params(tokens[1]);
-
-          sprintf(result->to_string, "MPRTP-FBRA+ congestion controller, Rcv Params: %s",
-              result->rcv_transfer_params->to_string);
-          break;
-    case SENDING_PACKET_SCHEDULER_TYPE_MPRTP:
-    //      _replace_char(",",":",tokens[1]);
-          result->rcv_transfer_params = make_rcv_transfer_params(tokens[1]);
-
-          sprintf(result->to_string, "MPRTP congestion controller, Rcv Params: %s",
-              result->rcv_transfer_params->to_string);
-          break;
-    default:
-      g_print("Unrecognized type (%d) at make_cc_sender_side_params \n", result->type);
-      break;
-  };
-
-  return result;
-}
-
-void free_snd_packet_scheduler_params(SndPacketScheduler *congestion_controller_params)
-{
-  if(!congestion_controller_params){
-    return;
-  }
-  free_rcv_transfer_params(congestion_controller_params->rcv_transfer_params);
-  g_free(congestion_controller_params);
-}
-
-
-
-
-
-RcvTransferParams*  make_rcv_transfer_params(gchar* params_rawstring)
-{
-  RcvTransferParams *result = g_malloc0(sizeof(RcvTransferParams));
-  gchar             **tokens = g_strsplit(params_rawstring, ":", -1);
+  TransferParams *result = g_malloc0(sizeof(TransferParams));
+  gchar          **tokens = g_strsplit(params_rawstring, ":", -1);
+  ReceiverSubflow  *subflow;
+  gint i, offset;
+  gchar string[256];
 
   result->type = _compare_types(tokens[0], "RTP", "MPRTP", NULL);
+  result->ref = 1;
   switch(result->type){
      case TRANSFER_TYPE_RTP:
-
-       result->rtp.bound_port = atoi(tokens[1]);
-
-       sprintf(result->to_string, "RTP, Bound Port: %hu", result->rtp.bound_port);
-
+       result->length = 1;
+       subflow = g_malloc0(sizeof(ReceiverSubflow));
+       subflow->bound_port = atoi(tokens[1]);
+       result->subflows = g_slist_append(result->subflows, subflow);
+       sprintf(result->to_string, "RTP, Port: :%d", subflow->bound_port );
        break;
      case TRANSFER_TYPE_MPRTP:
-       {
-         gint offset = 1;
-         gint i;
-
-         sprintf(result->to_string, "MPRTP Subflows (%d); ", result->mprtp.subflows_num);
-         result->mprtp.subflows_num = atoi(tokens[1]);
-
-         for(i = 0; i < result->mprtp.subflows_num; ++i){
-           gchar subflow_info[255];
-           ReceiverSubflow* subflow = g_malloc0(sizeof(ReceiverSubflow));
-           subflow->id        = atoi(tokens[++offset]);
-           strcpy(subflow->bound_port, tokens[++offset]);
-
-           result->mprtp.subflows = g_slist_append(result->mprtp.subflows, subflow);
-           sprintf(subflow_info, "%d Bound port.: %d; ",
-               subflow->id,
-               subflow->bound_port
-           );
-           strcat(result->to_string, subflow_info);
-         }
+       result->length = atoi(tokens[1]);
+       offset = 1;
+       sprintf(result->to_string, "MPRTP, Subflows: ");
+       for(i = 0; i < result->length; ++i){
+         subflow = g_malloc0(sizeof(ReceiverSubflow));
+         subflow->id = atoi(tokens[++offset]);
+         subflow->bound_port = atoi(tokens[++offset]);
+         result->subflows = g_slist_append(result->subflows, subflow);
+         sprintf(string, "ID: %d, Port: %d; ", subflow->id, subflow->bound_port);
+         strcat(result->to_string, string);
        }
        break;
      default:
-       g_print("Unrecognized type (%d) at make_rcv_transfer_params \n", result->type);
+       g_print("Unrecognized type (%d) at make_snd_transfer_params \n", result->type);
        break;
    };
 
   return result;
 }
 
-void free_rcv_transfer_params(RcvTransferParams *rcv_transfer_params)
+TransferParams* transfer_params_ref(TransferParams* transfer_params)
 {
-  if(rcv_transfer_params->type == TRANSFER_TYPE_MPRTP){
-    g_slist_free_full(rcv_transfer_params->mprtp.subflows, g_free);
+  if(!transfer_params){
+    return NULL;
   }
-  g_free(rcv_transfer_params);
+  ++transfer_params->ref;
+  return transfer_params;
+}
+
+void transfer_params_unref(TransferParams *transfer_params)
+{
+  if(0 < --transfer_params->ref){
+    return;
+  }
+  g_slist_free_full(transfer_params->subflows, g_free);
+  g_free(transfer_params);
 }
 
 
-
-RcvPlayouterParams*   make_rcv_playouter_params(gchar* params_rawstring)
+SchedulerParams*   make_scheduler_params(gchar* params_rawstring)
 {
-  RcvPlayouterParams *result = g_malloc0(sizeof(RcvPlayouterParams));
-  gchar                     **tokens = g_strsplit(params_rawstring, ":", -1);
+  SchedulerParams *result = g_malloc0(sizeof(SchedulerParams));
+  gchar           **tokens = g_strsplit(params_rawstring, ":", -1);
+  gchar           *rcv_transfer_params_string = NULL;
 
-  result->type = _compare_types(tokens[0], "NONE", "SCREAM", "FBRAPLUS", NULL);
+  result->type = _compare_types(tokens[0], "SCREAM", "MPRTP", "MPRTPFRACTAL", NULL);
 
   switch(result->type){
-    case SENDING_PACKET_SCHEDULING_TYPE_SCREAM:
-//      _replace_char(",",":",tokens[1]);
-      result->snd_transfer_params = make_snd_transfer_params(tokens[1]);
+    case TRANSFER_CONTROLLER_TYPE_SCREAM:
 
-      sprintf(result->to_string, "SCReAM congestion controller, Rcv Params: %s",
-          result->snd_transfer_params->to_string);
+      rcv_transfer_params_string = g_strjoinv(":", tokens + 1);//From the moment of rcv transfer params
+      sprintf(result->to_string, "SCReAM ");
       break;
-    case SENDING_PACKET_SCHEDULER_TYPE_MPRTPFBRAPLUS:
-//      _replace_char(",",":",tokens[1]);
-      result->snd_transfer_params = make_snd_transfer_params(tokens[1]);
+    case TRANSFER_CONTROLLER_TYPE_MPRTPRRACTAL:
 
-      sprintf(result->to_string, "FBRA+ congestion controller, Rcv Params: %s",
-          result->snd_transfer_params->to_string);
+      rcv_transfer_params_string = g_strjoinv(":", tokens + 1);//From the moment of rcv transfer params
+      sprintf(result->to_string, "MPRTP-FRACTaL ");
+      break;
+    case TRANSFER_CONTROLLER_TYPE_MPRTP:
+      sprintf(result->to_string, "MPRTP ");
+      {
+        gchar string[256];
+        gint i,len,offset;
+        gint32 snd_subflow_id;
+        len = atoi(tokens[1]);
+        offset = 1;
+        memset(string, 0, 256);
+        for(i = 0; i < len; ++i){
+          snd_subflow_id = atoi(tokens[++offset]);
+          result->mprtp.subflows[snd_subflow_id].target_bitrate = atoi(tokens[++offset]);
+          sprintf(string, "Sub: %d, Target: %d; ", snd_subflow_id, result->mprtp.subflows[snd_subflow_id].target_bitrate);
+          strcat(result->to_string, string);
+        }
+      }
       break;
     default:
-      g_print("Unrecognized type (%d) at make_cc_receiver_side_params \n", result->type);
+      g_print("Unrecognized type (%d) at make_cc_sender_side_params \n", result->type);
       break;
   };
-
+  if(rcv_transfer_params_string){
+    result->rcv_transfer_params = make_rcv_transfer_params(rcv_transfer_params_string);
+    strcat(result->to_string, result->rcv_transfer_params->to_string);
+    g_free(rcv_transfer_params_string);
+  }
   return result;
 }
 
-void free_rcv_playouter_params(RcvPlayouterParams *congestion_controller_params)
+void free_scheduler_params(SchedulerParams *snd_packet_scheduler_params)
 {
-  if(!congestion_controller_params){
+  if(!snd_packet_scheduler_params){
     return;
   }
-  free_rcv_transfer_params(congestion_controller_params->snd_transfer_params);
-  g_free(congestion_controller_params);
+  transfer_params_unref(snd_packet_scheduler_params->rcv_transfer_params);
+  g_free(snd_packet_scheduler_params);
 }
 
 
+
+PlayouterParams*   make_playouter_params(gchar* params_rawstring)
+{
+  PlayouterParams *result = g_malloc0(sizeof(PlayouterParams));
+  gchar              **tokens = g_strsplit(params_rawstring, ":", -1);
+  gchar              *snd_transfer_params_string = NULL;
+
+  result->type = _compare_types(tokens[0], "SCREAM", "MPRTP", "MPRTPFRACTAL", NULL);
+
+  switch(result->type){
+    case TRANSFER_CONTROLLER_TYPE_SCREAM:
+
+      snd_transfer_params_string = g_strjoinv(":", tokens + 1);//From the moment of rcv transfer params
+      sprintf(result->to_string, "SCReAM ");
+      break;
+    case TRANSFER_CONTROLLER_TYPE_MPRTP:
+      sprintf(result->to_string, "MPRTP ");
+      break;
+    case TRANSFER_CONTROLLER_TYPE_MPRTPRRACTAL:
+      {
+        snd_transfer_params_string = g_strjoinv(":", tokens + 1);//From the moment of snd transfer params
+        sprintf(result->to_string, "MPRTP-FRACTaL ");
+      }
+      break;
+    default:
+      g_print("Unrecognized type (%d) at make_cc_sender_side_params \n", result->type);
+      break;
+  };
+  if(snd_transfer_params_string){
+    result->snd_transfer_params = make_snd_transfer_params(snd_transfer_params_string);
+    strcat(result->to_string, result->snd_transfer_params->to_string);
+    g_free(snd_transfer_params_string);
+  }
+  return result;
+}
+
+void free_playouter_params(PlayouterParams *rcv_playouter_params)
+{
+  if(!rcv_playouter_params){
+    return;
+  }
+  transfer_params_unref(rcv_playouter_params->snd_transfer_params);
+  g_free(rcv_playouter_params);
+}
 
 
 SinkParams*     make_sink_params(gchar* params_rawstring)
@@ -579,29 +643,22 @@ cb_error (GstBus * bus, GstMessage * message, gpointer data)
 
 GstElement* debug_by_src(GstElement*element)
 {
-  GstBin* debugBin     = gst_bin_new(NULL);
-  GstElement *tee      = gst_element_factory_make ("tee", NULL);
-  GstElement *q1       = gst_element_factory_make ("queue", NULL);
-  GstElement *q2       = gst_element_factory_make ("queue", NULL);
-  GstElement *fakesink = gst_element_factory_make ("fakesink", NULL);
+  GstBin* debugBin     = gst_bin_new("debugBin");
+  GstElement *identity      = gst_element_factory_make ("identity", NULL);
 
-  gst_bin_add_many(debugBin, element, tee, q1, q2, fakesink, NULL);
+  gst_bin_add_many(debugBin, element, identity, NULL);
 
-  gst_element_link_pads(element, "src", tee, "sink");
-  gst_element_link_pads(tee, "src_1", q1, "sink");
-  gst_element_link_pads(tee, "src_2", q2, "sink");
-  gst_element_link_pads(q2, "src", fakesink, "sink");
+  gst_element_link_pads( element, "src", identity, "sink");
 
+  g_object_set (identity, "dump", TRUE, NULL);
+
+  setup_ghost_src(identity, debugBin);
   if(GST_IS_PAD(gst_element_get_static_pad(element, "sink"))){
     setup_ghost_sink(element, debugBin);
   }
 
-  setup_ghost_src(q1, debugBin);
-
-  g_object_set (fakesink, "dump", TRUE, NULL);
   return GST_ELEMENT(debugBin);
 }
-
 
 GstElement* debug_by_sink(GstElement*element)
 {

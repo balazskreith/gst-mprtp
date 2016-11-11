@@ -243,6 +243,7 @@ static void _receiver_report_updater_helper(RcvSubflow *subflow, gpointer udata)
   rcvsubflow_notify_rtcp_fb_cbs(subflow, this->report_producer);
 
   buf = report_producer_end(this->report_producer, &report_length);
+
   if(buf){
     notifier_do(this->on_rtcp_ready, buf);
   }
@@ -348,7 +349,7 @@ _uint16_diff (guint16 start, guint16 end)
 FeedbackProducer* _create_fbraplus(RcvController* this, RcvSubflow* subflow)
 {
   FeedbackProducer *result = g_slice_new0(FeedbackProducer);
-  result->type           = CONGESTION_CONTROLLING_TYPE_FBRAPLUS;
+  result->type           = CONGESTION_CONTROLLING_TYPE_FRACTAL;
   result->subflow        = subflow;
   result->udata          = make_fbrafbproducer(subflow, this->rcvtracker);
   return result;
@@ -394,7 +395,7 @@ void _on_congestion_controlling_changed(RcvController* this, RcvSubflow *subflow
   }
 
   switch(subflow->congestion_controlling_type){
-    case CONGESTION_CONTROLLING_TYPE_FBRAPLUS:
+    case CONGESTION_CONTROLLING_TYPE_FRACTAL:
       this->fbproducers = g_slist_prepend(this->fbproducers, _create_fbraplus(this, subflow));
       break;
     case CONGESTION_CONTROLLING_TYPE_NONE:

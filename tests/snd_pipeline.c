@@ -85,6 +85,20 @@ static void _connect_encoder_to_sender(SenderSide *this)
   gst_element_link(encoder->element, sender->element);
 }
 
+
+static char *development_argv[] = {
+    "program_name",
+    "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1",
+    "--codec=VP8",
+    "--sender=MPRTP:1:1:10.0.0.6:5000",
+    "--scheduler=MPRTPFRACTAL:MPRTP:1:1:5001",
+    "--stat=100:1000:1:triggered_stat",
+    "--statlogsink=FILE:snd_statlogs.txt",
+    "--packetlogsink=FILE:snd_packetlogs.txt"
+};
+
+#define development_argc (sizeof (development_argv) / sizeof (const char *))
+
 int main (int argc, char **argv)
 {
   GstPipeline *pipe;
@@ -95,6 +109,12 @@ int main (int argc, char **argv)
   GError *error = NULL;
   GOptionContext *context;
   gboolean context_parse;
+
+  //For using gdb without set args and other stuff
+  if(1){
+    argc = development_argc;
+    argv = development_argv;
+  }
 
   session = g_malloc0(sizeof(SenderSide));
   context = g_option_context_new ("Sender");
@@ -123,15 +143,10 @@ int main (int argc, char **argv)
 
   session->scheduler_params = scheduler_params_rawstring ? make_scheduler_params(scheduler_params_rawstring) : NULL;;
 
-//  session->stat_params_tuple = make_statparams_tuple_by_raw_strings(
-//      stat_params_rawstring,
-//      statlogs_sink_params_rawstring,
-//      packetlogs_sink_params_rawstring);
-
   session->stat_params_tuple = make_statparams_tuple_by_raw_strings(
-      "100:1000:1:triggered_stat",
-      "FILE:snd_statlogs.txt",
-      "FILE:snd_packetlogs.txt");
+      stat_params_rawstring,
+      statlogs_sink_params_rawstring,
+      packetlogs_sink_params_rawstring);
 
   session->video_params = make_video_params(
       _null_test(video_params_rawstring, video_params_rawstring_default)
@@ -144,6 +159,7 @@ int main (int argc, char **argv)
   session->sender  = make_sender(session->scheduler_params,
       session->stat_params_tuple,
       session->snd_transfer_params);
+//  session->sender = make_sender_custom();
 
   pipeline_add_event_notifier("on-bitrate-change", session->encoder->on_bitrate_chage);
   pipeline_add_event_listener("on-playing", &session->source->on_playing);
@@ -154,6 +170,8 @@ int main (int argc, char **argv)
   pipe = GST_PIPELINE (gst_pipeline_new (NULL));
   bus = gst_element_get_bus (GST_ELEMENT (pipe));
   g_signal_connect (bus, "message::state-changed", G_CALLBACK (cb_state), pipe);
+  g_signal_connect (bus, "message::warning", G_CALLBACK (cb_warning), pipe);
+  g_signal_connect (bus, "message::eos", G_CALLBACK (cb_eos), loop);
   gst_bus_add_signal_watch (bus);
   gst_object_unref (bus);
 
@@ -167,6 +185,8 @@ int main (int argc, char **argv)
   g_print ("starting sender pipeline\n");
   pipeline_firing_event("on-playing", NULL);
   gst_element_set_state (GST_ELEMENT (pipe), GST_STATE_PLAYING);
+
+  GST_DEBUG_BIN_TO_DOT_FILE(session->bin,  GST_DEBUG_GRAPH_SHOW_ALL, "snd_on_playing");
 
   g_main_loop_run (loop);
 

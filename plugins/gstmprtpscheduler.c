@@ -310,26 +310,25 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   GST_PAD_SET_PROXY_CAPS (this->rtp_sinkpad);
   GST_PAD_SET_PROXY_ALLOCATION (this->rtp_sinkpad);
 
-
-  gst_element_add_pad (GST_ELEMENT (this), this->rtp_sinkpad);
-
-  this->mprtcp_rr_sinkpad =
-      gst_pad_new_from_static_template
-      (&gst_mprtpscheduler_mprtcp_rr_sink_template, "mprtcp_rr_sink");
-
-  gst_pad_set_chain_function (this->mprtcp_rr_sinkpad,
-      GST_DEBUG_FUNCPTR (gst_mprtpscheduler_mprtcp_rr_sink_chain));
-
   //  gst_pad_set_event_function (this->rtp_sinkpad,
   //      GST_DEBUG_FUNCPTR (gst_mprtpscheduler_sink_eventfunc));
   gst_pad_set_event_function (this->rtp_sinkpad,
         GST_DEBUG_FUNCPTR (gst_mprtpscheduler_sink_event));
 
+  gst_element_add_pad (GST_ELEMENT (this), this->rtp_sinkpad);
+
+  this->mprtcp_rr_sinkpad =
+      gst_pad_new_from_static_template(&gst_mprtpscheduler_mprtcp_rr_sink_template,
+      "mprtcp_rr_sink");
+
+  gst_pad_set_chain_function (this->mprtcp_rr_sinkpad,
+      GST_DEBUG_FUNCPTR (gst_mprtpscheduler_mprtcp_rr_sink_chain));
+
   gst_element_add_pad (GST_ELEMENT (this), this->mprtcp_rr_sinkpad);
 
   this->mprtcp_sr_srcpad =
-      gst_pad_new_from_static_template
-      (&gst_mprtpscheduler_mprtcp_sr_src_template, "mprtcp_sr_src");
+      gst_pad_new_from_static_template(&gst_mprtpscheduler_mprtcp_sr_src_template,
+      "mprtcp_sr_src");
 
   gst_element_add_pad (GST_ELEMENT (this), this->mprtcp_sr_srcpad);
 
@@ -339,8 +338,10 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   gst_pad_set_event_function (this->mprtp_srcpad,
       GST_DEBUG_FUNCPTR (gst_mprtpscheduler_mprtp_src_event));
-  gst_pad_use_fixed_caps (this->mprtp_srcpad);
-  GST_PAD_SET_PROXY_CAPS (this->mprtp_srcpad);
+  //oh crap... TODO: why is thAT if I use proxy caps than mprtp_srcpad
+  //will not be linked if I linked it with mprtpreceiver mprtcp_rr_sinkpad
+//  gst_pad_use_fixed_caps (this->mprtp_srcpad);
+//  GST_PAD_SET_PROXY_CAPS (this->mprtp_srcpad);
   GST_PAD_SET_PROXY_ALLOCATION (this->mprtp_srcpad);
 
   gst_pad_set_query_function(this->mprtp_srcpad,
@@ -728,7 +729,7 @@ gst_mprtpscheduler_mprtcp_rr_sink_chain (GstPad *pad, GstObject *parent, GstBuff
 //      gst_rtcp_buffer_map(buf, GST_MAP_READ, &rtcp);
 //      gst_print_rtcp_buffer(&rtcp);
 //      gst_rtcp_buffer_unmap(&rtcp);
-//
+
 
   this = GST_MPRTPSCHEDULER (parent);
 
@@ -826,7 +827,7 @@ void _on_rtcp_ready(GstMprtpscheduler * this, GstBuffer *buffer)
     GST_WARNING_OBJECT(this, "Pads are not linked for MPRTCP");
     return;
   }
-//g_print("On RTCP SR sending\n");
+//  g_print("On RTCP SR sending - %d\n", gst_pad_push(this->mprtcp_sr_srcpad, buffer));
   gst_pad_push(this->mprtcp_sr_srcpad, buffer);
 }
 
@@ -854,6 +855,7 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndSubflow* subflow, SndP
 //  g_print("packet %hu sent %d - %hu\n", packet->abs_seq, packet->subflow_id, packet->subflow_seq);
   buffer = sndpacket_retrieve(packet);
   fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(buffer));
+//  g_print("Packet sent  flow result: %d\n", gst_pad_push(this->mprtp_srcpad, buffer));
   gst_pad_push(this->mprtp_srcpad, buffer);
 
   if (!this->riport_flow_signal_sent) {

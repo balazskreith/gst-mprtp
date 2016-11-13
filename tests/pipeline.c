@@ -45,7 +45,7 @@ void _print_info(void)
       "\t--scheduler=SCREAM|MPRTP:MPRTPFRACTAL\n"
       "\t\t SCREAM\n"
       "\t\t MPRTP\n"
-      "\t\t MPRTPFRACTAL:num_of_subflows(int):subflow_id:(int):bounded_port(int):...\n"
+      "\t\t MPRTPFRACTAL:See the receiver param settings\n"
       "\t--sender=RTP|MPRTP\n"
       "\t\t RTP:dest_ip(string):dest_port(int)\n"
       "\t\t MPRTP:num_of_subflows(int):subflow_id(int):dest_ip(string):dest_port(int):...\n"
@@ -61,7 +61,7 @@ void _print_info(void)
       "\t--playouter=SCREAM|MPRTP|MPRTPFRACTAL"
       "\t\t SCREAM: NOT IMPLEMENTED YET"
       "\t\t MPRTP: NOT IMPLEMENTED YET"
-      "\t\t MPRTPFRACTAL:num_of_subflows(int):subflow_id:(int):dest_ip(string):dest_port(int):..."
+      "\t\t MPRTPFRACTAL:See the sender param settings"
 
 
       "\nCommon parameters:\n"

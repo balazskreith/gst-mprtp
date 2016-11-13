@@ -90,7 +90,7 @@ Sender* make_sender(SchedulerParams* scheduler_params, StatParamsTuple* stat_par
       case TRANSFER_CONTROLLER_TYPE_MPRTPRRACTAL:
         scheduler = _make_mprtp_fractal_controller(this, scheduler_params, snd_transfer);
         gst_bin_add(senderBin, scheduler);
-//        gst_element_link_pads(scheduler, "mprtcp_sr_src", _get_mprtcp_sr_sink_element(this), "mprtcp_sr_sink");
+        gst_element_link_pads(scheduler, "mprtcp_sr_src", _get_mprtcp_sr_sink_element(this), "mprtcp_sr_sink");
         break;
     };
     gst_element_link_pads(scheduler, "src", sink, "sink");
@@ -100,6 +100,53 @@ Sender* make_sender(SchedulerParams* scheduler_params, StatParamsTuple* stat_par
 
   this->element = GST_ELEMENT(senderBin);
   setup_ghost_sink(sink, senderBin);
+
+  return this;
+}
+
+Sender* make_sender_custom(void)
+{
+  Sender*     this = sender_ctor();
+  GstBin*     senderBin        = GST_BIN(gst_bin_new(this->bin_name));
+  GstElement* mprtpreceiver    = gst_element_factory_make("mprtpreceiver",  "SndMPRTPReceiver");
+  GstElement* rtcpSrc          = gst_element_factory_make("udpsrc",         "SndRTCPSrc:5003");
+  GstElement* rtcpSink         = gst_element_factory_make("udpsink",        "SndRTCPSink:10.0.0.6:5001");
+  GstElement* rtpSink          = gst_element_factory_make("udpsink",        "SndRTPSink:10.0.0.6:5000");
+  GstElement* mprtpsender      = gst_element_factory_make("mprtpsender",    "SndMPRTPSender");
+  GstElement* scheduler        = gst_element_factory_make("mprtpscheduler", "SndMPRTPScheduler");
+
+  gst_bin_add_many(senderBin,
+       mprtpreceiver,
+       rtcpSrc,
+       rtcpSink,
+       rtpSink,
+       mprtpsender,
+       scheduler,
+
+       NULL);
+
+   g_object_set(G_OBJECT(rtcpSrc),  "port", 5003, NULL);
+   g_object_set(G_OBJECT(rtpSink),  "host", "10.0.0.6", "port", 5000, "sync", FALSE, "async", FALSE, NULL);
+   g_object_set(G_OBJECT(rtcpSink), "host", "10.0.0.6", "port", 5001, "sync", FALSE, "async", FALSE, NULL);
+   g_object_set(G_OBJECT(scheduler),
+       "join-subflow", 1,
+       "controlling-mode", 2,
+       "obsolation-treshold", 0,
+       "rtcp-interval-type", 2,
+       "report-timeout", 0,
+       "fec-interval", 0,
+       NULL);
+
+   gst_element_link_pads(rtcpSrc,       "src",           mprtpreceiver, "mprtcp_sink_1");
+   gst_element_link_pads(mprtpreceiver, "mprtcp_rr_src", scheduler,     "mprtcp_rr_sink");
+   gst_element_link_pads(scheduler,     "mprtp_src",     mprtpsender,   "mprtp_sink");
+   gst_element_link_pads(scheduler,     "mprtcp_sr_src", mprtpsender,   "mprtcp_sr_sink");
+   gst_element_link_pads(mprtpsender,   "mprtcp_src_1",  rtcpSink,      "sink");
+   gst_element_link_pads(mprtpsender,   "src_1",         rtpSink,       "sink");
+
+   setup_ghost_sink_by_padnames(scheduler, "rtp_sink", senderBin, "sink");
+   this->element = GST_ELEMENT(senderBin);
+
 
   return this;
 }
@@ -252,7 +299,7 @@ _mprtp_subflows_utilization (GstElement * mprtpSch, gpointer ptr)
 {
   MPRTPPluginSignalData *signal = ptr;
 //done:
-//  g_print("HAHA: %d", signal->target_media_rate);
+  g_print("HAHA: %d", signal->target_media_rate);
   return;
 }
 
@@ -260,25 +307,14 @@ GstElement* _make_mprtp_fractal_controller(Sender* this, SchedulerParams *schedu
 {
   GstBin*     schBin   = gst_bin_new(NULL);
   GstElement* mprtpSch = _make_mprtp_scheduler(this, snd_transfer_params);
-  GstElement* receiver = _make_mprtp_receiver(scheduler_params->rcv_transfer_params);
-//  Receiver*   receiver = make_receiver(scheduler_params->rcv_transfer_params, NULL, NULL);
+  Receiver*   receiver = make_receiver(scheduler_params->rcv_transfer_params, NULL, NULL);
   GSList*     item;
-//TODO: change it to pure udpsink and udpsrc element/.
-  GstElement* rtcpSink = gst_element_factory_make("udpsink", "RTCPSink:10.0.0.6:5001");
-  GstElement* rtcpSrc  = gst_element_factory_make("udpsrc", "RTCPSrc2:5001");
 
   gst_bin_add_many(schBin,
-//      receiver->element,
-//      receiver,
-      rtcpSink,rtcpSrc,
+      receiver->element,
       mprtpSch,
       NULL
   );
-
-  g_object_set(rtcpSink, "host", "10.0.0.6", "port", 5001, "sync", FALSE, "async", FALSE, NULL);
-  g_object_set(rtcpSrc, "port", 5001, NULL);
-  gst_element_link_pads(rtcpSrc, "src", mprtpSch, "mprtcp_rr_sink");
-  gst_element_link_pads(mprtpSch, "mprtcp_sr_src", rtcpSink, "sink");
 
   g_object_set(mprtpSch,
        "controlling-mode", 2,
@@ -291,15 +327,14 @@ GstElement* _make_mprtp_fractal_controller(Sender* this, SchedulerParams *schedu
 
   g_signal_connect (mprtpSch, "mprtp-subflows-utilization", (GCallback) _mprtp_subflows_utilization, NULL);
 
-//  _setup_mprtcp_pads(this, snd_transfer_params);
+  _setup_mprtcp_pads(this, snd_transfer_params);
 
-//  gst_element_link_pads(receiver_get_mprtcp_rr_src_element(receiver), "mprtcp_rr_src", mprtpSch, "mprtcp_rr_sink");
-//  gst_element_link_pads(receiver, "mprtcp_rr_src", mprtpSch, "mprtcp_rr_sink");
-//  objects_holder_add(this->objects_holder, receiver, (GDestroyNotify)receiver_dtor);
+  gst_element_link_pads(receiver_get_mprtcp_rr_src_element(receiver), "mprtcp_rr_src", mprtpSch, "mprtcp_rr_sink");
+  objects_holder_add(this->objects_holder, receiver, (GDestroyNotify)receiver_dtor);
 
   setup_ghost_sink_by_padnames(mprtpSch, "rtp_sink",  schBin, "sink");
   setup_ghost_src_by_padnames(mprtpSch,  "mprtp_src", schBin, "src");
-//  setup_ghost_src_by_padnames(mprtpSch,  "mprtcp_sr_src",  schBin, "mprtcp_sr_src");
+  setup_ghost_src_by_padnames(mprtpSch,  "mprtcp_sr_src",  schBin, "mprtcp_sr_src");
   return GST_ELEMENT(schBin);
 
 }

@@ -857,7 +857,6 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   GstPad *outpad;
   GstClockTime position, duration;
 
-
   this = GST_MPRTPSENDER (parent);
   GST_DEBUG_OBJECT (this, "RTP/MPRTP/OTHER sink");
   if (!gst_buffer_map (buf, &map, GST_MAP_READ)) {
@@ -865,6 +864,7 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     result = GST_FLOW_CUSTOM_ERROR;
     goto exit;
   }
+
   THIS_READLOCK (this);
   if(this->dirty) {
     if(0) _init_all_subflows(this, buf);

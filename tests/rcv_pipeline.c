@@ -71,6 +71,20 @@ static void _connect_decoder_to_sink(ReceiverSide *this)
   gst_element_link(decoder->element, sink->element);
 }
 
+static char *development_argv[] = {
+    "program_name",
+    "--receiver=MPRTP:1:1:5000",
+    "--codec=VP8",
+    "--sink=AUTOVIDEO",
+    "--playouter=MPRTPFRACTAL:MPRTP:1:1:10.0.0.1:5001",
+    "--stat=100:1000:1:triggered_stat",
+    "--statlogsink=FILE:rcv_statlogs.txt",
+    "--packetlogsink=FILE:rcv_packetlogs.txt"
+};
+
+#define development_argc (sizeof (development_argv) / sizeof (const char *))
+
+
 int main (int argc, char **argv)
 {
   GstPipeline *pipe;
@@ -81,6 +95,11 @@ int main (int argc, char **argv)
   GError *error = NULL;
   GOptionContext *context;
   gboolean context_parse;
+
+  if(1){
+    argc = development_argc;
+    argv = development_argv;
+  }
 
   session = g_malloc0(sizeof(ReceiverSide));
   context = g_option_context_new ("Receiver");
@@ -100,16 +119,11 @@ int main (int argc, char **argv)
 
   session->playouter_params = playouter_params_rawstring ? make_playouter_params(playouter_params_rawstring) : NULL;
 
-//  session->stat_params_tuple = make_statparams_tuple_by_raw_strings(
-//      stat_params_rawstring,
-//      statlogs_sink_params_rawstring,
-//      packetlogs_sink_params_rawstring);
-
-
   session->stat_params_tuple = make_statparams_tuple_by_raw_strings(
-      "100:1000:1:triggered_stat",
-      "FILE:rcv_statlogs.txt",
-      "FILE:rcv_packetlogs.txt");
+      stat_params_rawstring,
+      statlogs_sink_params_rawstring,
+      packetlogs_sink_params_rawstring);
+
 
   session->codec_params = make_codec_params(
       _null_test(codec_params_rawstring, codec_params_rawstring_default)
@@ -126,6 +140,7 @@ int main (int argc, char **argv)
   _print_params(session);
 
   session->receiver  = make_receiver(session->rcv_transfer_params, session->stat_params_tuple, session->playouter_params);
+//  session->receiver  = make_receiver_custom();
   session->decoder   = make_decoder(session->codec_params);
   session->sink      = make_sink(session->sink_params);
 
@@ -149,9 +164,9 @@ int main (int argc, char **argv)
   _connect_receiver_to_decoder(session);
   _connect_decoder_to_sink(session);
 
-
   g_print ("starting receiver pipeline\n");
   gst_element_set_state (GST_ELEMENT (pipe), GST_STATE_PLAYING);
+  GST_DEBUG_BIN_TO_DOT_FILE(session->bin,  GST_DEBUG_GRAPH_SHOW_ALL, "rcv_on_playing");
 
   g_main_loop_run (loop);
 

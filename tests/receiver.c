@@ -10,7 +10,7 @@ typedef struct{
 }Private;
 
 #define _priv(this) ((Private*)(this->priv))
-
+static GstElement* _make_rtpsrc(Receiver* this, guint16 bound_port);
 static GstElement* _make_rtp_receiver(Receiver* this,   TransferParams *params);
 static GstElement* _make_mprtp_receiver(Receiver* this, TransferParams *params);
 static GstElement* _get_mprtcp_sr_src_element(Receiver* this);
@@ -19,7 +19,6 @@ static GstElement* _make_mprtp_playouter(Receiver* this, TransferParams *transfe
 static GstElement* _make_mprtp_controller(Receiver* this, TransferParams *transfer_params);
 static GstElement* _make_mprtp_fractal_controller(Receiver* this,
     PlayouterParams *scheduler_params, TransferParams* snd_transfer_params);
-static GstElement* _make_mprtp_sender(TransferParams *params);
 
 static int _instance_counter = 0;
 
@@ -43,6 +42,56 @@ void receiver_dtor(Receiver* this)
   g_free(this->priv);
   g_free(this);
 }
+
+
+//
+//
+//GstElement* _make_mprtp_fractal_controller(Receiver* this, PlayouterParams* playouter_params, TransferParams* rcv_transfer_params)
+//{
+//  GstBin*     plyBin   = gst_bin_new(NULL);
+//  guint       rtpPort        = 5000;
+//  guint       rtcpPort       = 5001;
+//  GstElement* mprtpPly       = _make_mprtp_playouter(this, rcv_transfer_params);
+//  GstElement* rtcpSink       = gst_element_factory_make("udpsink", "RTCPSink:10.0.0.1:5001");
+//  GstElement* rtcpSrc        = gst_element_factory_make("udpsrc", "RTCPSrc:5001");
+//  GstElement* rtpSrc         = _make_rtpsrc(this, rtpPort);
+//  GstElement* mprtpreceiver  = gst_element_factory_make("mprtpreceiver", "MPRTPReceiver");
+//  GstElement* mprtpsender    = gst_element_factory_make("mprtpsender", "MPRTPSender");
+//
+//  gst_bin_add_many(plyBin,
+//      mprtpPly,
+//      rtcpSink,rtcpSrc,
+////      sender->element,
+////      sender,
+//      NULL
+//  );
+//
+//  g_object_set(rtcpSink, "host", "10.0.0.1", "port", 5001, "sync", FALSE, "async", FALSE, NULL);
+//  g_object_set(rtcpSrc, "port", 5001, NULL);
+////  g_object_set(fakesink, "dump", TRUE, NULL);
+//  gst_element_link_pads(rtcpSrc, "src", mprtpPly, "mprtcp_sr_sink");
+////  gst_element_link_pads(rtcpSrc, "src", fakesink, "sink");
+//  gst_element_link_pads(mprtpPly, "mprtcp_rr_src", rtcpSink, "sink");
+//
+//  g_object_set(mprtpPly,
+//      "controlling-mode", 2,
+//      "rtcp-interval-type", 2,
+//      "max-repair-delay", 10,
+//      "enforced-delay", 0,
+//      NULL
+//  );
+//
+////  _setup_mprtcp_pads(this, rcv_transfer_params);
+//
+////  objects_holder_add(this->objects_holder, sender, (GDestroyNotify) sender_dtor);
+////  gst_element_link_pads(mprtpPly, "mprtcp_rr_src", sender_get_mprtcp_rr_sink_element(sender), "mprtcp_rr_sink");
+////  gst_element_link_pads(mprtpPly, "mprtcp_rr_src", sender, "mprtcp_rr_sink");
+//
+//  setup_ghost_sink_by_padnames(mprtpPly, "mprtp_sink", plyBin, "sink");
+//  setup_ghost_src_by_padnames(mprtpPly,  "mprtp_src", plyBin, "src");
+////  setup_ghost_sink_by_padnames(mprtpPly,  "mprtcp_sr_sink", plyBin, "mprtcp_sr_sink");
+//  return GST_ELEMENT(plyBin);
+//}
 
 
 Receiver* make_receiver(TransferParams* rcv_transfer_params,
@@ -95,7 +144,7 @@ Receiver* make_receiver(TransferParams* rcv_transfer_params,
       case TRANSFER_CONTROLLER_TYPE_MPRTPRRACTAL:
         playouter = _make_mprtp_fractal_controller(this, playouter_params, rcv_transfer_params);
         gst_bin_add(receiverBin, playouter);
-//        gst_element_link_pads(_get_mprtcp_sr_src_element(this), "mprtcp_sr_src", playouter, "mprtcp_sr_sink");
+        gst_element_link_pads(_get_mprtcp_sr_src_element(this), "mprtcp_sr_src", playouter, "mprtcp_sr_sink");
         break;
     };
     gst_element_link_pads(src, "src", playouter, "sink");
@@ -120,6 +169,63 @@ Receiver* make_receiver(TransferParams* rcv_transfer_params,
   return this;
 }
 
+
+
+
+Receiver* make_receiver_custom(void)
+{
+  Receiver* this = receiver_ctor();
+  GstBin* receiverBin          = GST_BIN(gst_bin_new(this->bin_name));
+  GstElement* mprtpreceiver    = gst_element_factory_make("mprtpreceiver",  "RcvMPRTPReceiver");
+  GstElement* rtpSrc           = gst_element_factory_make("udpsrc",         "RcvRTPSrc:5000");
+  GstElement* rtcpSrc          = gst_element_factory_make("udpsrc",         "RcvRTCPSrc:5001");
+  GstElement* mprtpsender      = gst_element_factory_make("mprtpsender",    "RcvMPRTPSender");
+  GstElement* rtcpSink         = gst_element_factory_make("udpsink",        "RcvRTCPSink:10.0.0.1:5001");
+  GstElement* playouter        = gst_element_factory_make("mprtpplayouter", "RcvMPRTPPlayouter");
+
+  gst_bin_add_many(receiverBin,
+      mprtpreceiver,
+      rtpSrc,
+      rtcpSrc,
+      mprtpsender,
+      rtcpSink,
+      playouter,
+      NULL);
+
+//  g_object_set(G_OBJECT(mprtpreceiver), "", NULL);
+  g_object_set(G_OBJECT(rtpSrc),
+      "port", 5000,
+      "caps", gst_caps_new_simple ("application/x-rtp",
+                "media", G_TYPE_STRING, "video",
+                "clock-rate", G_TYPE_INT, 90000,
+                "encoding-name", G_TYPE_STRING, "VP8",
+                NULL),
+      NULL);
+
+  g_object_set(G_OBJECT(rtcpSrc), "port", 5001, NULL);
+//  g_object_set(G_OBJECT(mprtpsender), NULL);
+  g_object_set(G_OBJECT(rtcpSink), "host", "10.0.0.1", "port", 5001, "sync", FALSE, "async", FALSE, NULL);
+  g_object_set(G_OBJECT(playouter),
+      "join-subflow", 1,
+      "controlling-mode", 2,
+      "rtcp-interval-type", 2,
+      "max-repair-delay", 10,
+      "enforced-delay", 0,
+      NULL);
+
+  gst_element_link_pads(rtpSrc,        "src",           mprtpreceiver, "sink_1");
+  gst_element_link_pads(rtcpSrc,       "src",           mprtpreceiver, "mprtcp_sink_1");
+  gst_element_link_pads(mprtpreceiver, "mprtp_src",     playouter,     "mprtp_sink");
+  gst_element_link_pads(mprtpreceiver, "mprtcp_sr_src", playouter,     "mprtcp_sr_sink");
+  gst_element_link_pads(playouter,     "mprtcp_rr_src", mprtpsender,   "mprtcp_rr_sink");
+  gst_element_link_pads(mprtpsender,   "mprtcp_src_1",  rtcpSink,      "sink");
+
+  setup_ghost_src_by_padnames(playouter, "mprtp_src", receiverBin, "src");
+  this->element = GST_ELEMENT(receiverBin);
+
+  return this;
+}
+
 void receiver_on_caps_change(Receiver* this, const GstCaps* caps)
 {
   notifier_do(this->on_caps_change, caps);
@@ -132,7 +238,8 @@ static void _on_rtpSrc_caps_change(GstElement* rtpSrc, const GstCaps* caps)
 
 }
 
-static GstElement* _make_rtpsrc(Receiver* this, guint16 bound_port){
+GstElement* _make_rtpsrc(Receiver* this, guint16 bound_port)
+{
 
   gchar name[256];
   sprintf(name, "UDP Source:%hu", bound_port);
@@ -273,26 +380,13 @@ GstElement* _make_mprtp_fractal_controller(Receiver* this, PlayouterParams* play
 {
   GstBin*     plyBin   = gst_bin_new(NULL);
   GstElement* mprtpPly = _make_mprtp_playouter(this, rcv_transfer_params);
-//  Sender*     sender   = make_sender(NULL, NULL, playouter_params->snd_transfer_params);
-//  GstElement* sender = _make_mprtp_sender(playouter_params->snd_transfer_params);
-  GstElement* rtcpSink = gst_element_factory_make("udpsink", "RTCPSink:10.0.0.1:5001");
-  GstElement* rtcpSrc  = gst_element_factory_make("udpsrc", "RTCPSink1:5009");
-//  GstElement* fakesink = gst_element_factory_make("fakesink", "FAKESINK");
+  Sender*     sender   = make_sender(NULL, NULL, playouter_params->snd_transfer_params);
 
   gst_bin_add_many(plyBin,
       mprtpPly,
-      rtcpSink,rtcpSrc,
-//      sender->element,
-//      sender,
+      sender->element,
       NULL
   );
-
-  g_object_set(rtcpSink, "host", "10.0.0.1", "port", 5001, "sync", FALSE, "async", FALSE, NULL);
-  g_object_set(rtcpSrc, "port", 5001, NULL);
-//  g_object_set(fakesink, "dump", TRUE, NULL);
-  gst_element_link_pads(rtcpSrc, "src", mprtpPly, "mprtcp_sr_sink");
-//  gst_element_link_pads(rtcpSrc, "src", fakesink, "sink");
-  gst_element_link_pads(mprtpPly, "mprtcp_rr_src", rtcpSink, "sink");
 
   g_object_set(mprtpPly,
       "controlling-mode", 2,
@@ -302,48 +396,15 @@ GstElement* _make_mprtp_fractal_controller(Receiver* this, PlayouterParams* play
       NULL
   );
 
-//  _setup_mprtcp_pads(this, rcv_transfer_params);
+  _setup_mprtcp_pads(this, rcv_transfer_params);
 
-//  objects_holder_add(this->objects_holder, sender, (GDestroyNotify) sender_dtor);
-//  gst_element_link_pads(mprtpPly, "mprtcp_rr_src", sender_get_mprtcp_rr_sink_element(sender), "mprtcp_rr_sink");
-//  gst_element_link_pads(mprtpPly, "mprtcp_rr_src", sender, "mprtcp_rr_sink");
+  objects_holder_add(this->objects_holder, sender, (GDestroyNotify) sender_dtor);
+  gst_element_link_pads(mprtpPly, "mprtcp_rr_src", sender_get_mprtcp_rr_sink_element(sender), "mprtcp_rr_sink");
 
   setup_ghost_sink_by_padnames(mprtpPly, "mprtp_sink", plyBin, "sink");
   setup_ghost_src_by_padnames(mprtpPly,  "mprtp_src", plyBin, "src");
-//  setup_ghost_sink_by_padnames(mprtpPly,  "mprtcp_sr_sink", plyBin, "mprtcp_sr_sink");
+  setup_ghost_sink_by_padnames(mprtpPly,  "mprtcp_sr_sink", plyBin, "mprtcp_sr_sink");
   return GST_ELEMENT(plyBin);
 }
 
 
-GstElement* _make_mprtp_sender(TransferParams *params)
-{
-  GstBin *senderBin    = GST_BIN (gst_bin_new (NULL));
-  GstElement* mprtpSnd = gst_element_factory_make ("mprtpsender", NULL);
-  GSList *item;
-
-  gst_bin_add(senderBin, mprtpSnd);
-
-  for(item = params->subflows; item; item = item->next){
-    gchar padName[255];
-    SenderSubflow* subflow = item->data;
-    GstElement *rtpSink = gst_element_factory_make("udpsink", NULL);
-
-    g_object_set(rtpSink,
-        "host", subflow->dest_ip,
-        "port", subflow->dest_port,
-        "sync", FALSE,
-        "async", FALSE,
-        NULL);
-
-    g_print("UdpSink created for %s:%hu\n", subflow->dest_ip, subflow->dest_port);
-    memset(padName, 0, 255);
-    sprintf(padName, "mprtcp_src_%d", subflow->id);
-    gst_bin_add(senderBin, rtpSink);
-    gst_element_link_pads(mprtpSnd, padName, rtpSink, "sink");
-  }
-
-  setup_ghost_sink_by_padnames(mprtpSnd, "mprtp_sink", senderBin, "sink");
-//  setup_ghost_sink_by_padnames(mprtpSnd, "mprtcp_sr_sink", senderBin, "mprtcp_sr_sink");
-  setup_ghost_sink_by_padnames(mprtpSnd, "mprtcp_rr_sink", senderBin, "mprtcp_rr_sink");
-  return GST_ELEMENT(senderBin);
-}

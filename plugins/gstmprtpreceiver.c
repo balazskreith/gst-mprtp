@@ -58,8 +58,8 @@ GST_DEBUG_CATEGORY_STATIC (gst_mprtpreceiver_debug_category);
 
 typedef struct
 {
-  GstPad *inpad;
-  GstPad *async_inpad;
+  GstPad *sinkpad;
+  GstPad *mprtcp_sinkpad;
   guint8 id;
 } Subflow;
 
@@ -219,8 +219,9 @@ gst_mprtpreceiver_init (GstMprtpreceiver * mprtpreceiver)
       mprtpreceiver->mprtcp_rr_srcpad);
 
   mprtpreceiver->mprtp_srcpad =
-      gst_pad_new_from_static_template (&gst_mprtpreceiver_mprtp_src_template,
-      "mprtp_src");
+      gst_pad_new_from_static_template
+      (&gst_mprtpreceiver_mprtp_src_template, "mprtp_src");
+
   gst_element_add_pad (GST_ELEMENT (mprtpreceiver),
       mprtpreceiver->mprtp_srcpad);
 
@@ -322,16 +323,16 @@ gst_mprtpreceiver_request_new_pad (GstElement * element, GstPadTemplate * templ,
   GstMprtpreceiver *this;
   guint8 subflow_id;
   Subflow *subflow = NULL;
-  gboolean async = FALSE;
+  gboolean mprtcp = FALSE;
   GList *it;
 
   this = GST_MPRTPRECEIVER (element);
   GST_DEBUG_OBJECT (this, "requesting pad");
 
   if(sscanf (name, "sink_%hhu", &subflow_id)){
-    async = FALSE;
+    mprtcp = FALSE;
   }else if(sscanf (name, "mprtcp_sink_%hhu", &subflow_id)){
-    async = TRUE;
+    mprtcp = TRUE;
   }
 
   THIS_WRITELOCK (this);
@@ -360,10 +361,10 @@ gst_mprtpreceiver_request_new_pad (GstElement * element, GstPadTemplate * templ,
       this->subflows = g_list_prepend (this->subflows, subflow);
   }
 
-  if(async){
-    subflow->async_inpad = sinkpad;
+  if(mprtcp){
+    subflow->mprtcp_sinkpad = sinkpad;
   }else{
-    subflow->inpad = sinkpad;
+    subflow->sinkpad = sinkpad;
   }
 
   THIS_WRITEUNLOCK (this);
@@ -409,7 +410,7 @@ gst_mprtpreceiver_src_query (GstPad * srcpad, GstObject * parent,
       GstClockTime min, max;
       GstPad *peer;
       if(!g_list_length(this->subflows)) goto default_query;
-      peer = gst_pad_get_peer (((Subflow*)(this->subflows->data))->inpad);
+      peer = gst_pad_get_peer (((Subflow*)(this->subflows->data))->sinkpad);
       if ((result = gst_pad_query (peer, query))) {
           gst_query_parse_latency (query, &live, &min, &max);
           min= 0;
@@ -436,6 +437,7 @@ gst_mprtpreceiver_sink_event (GstPad * pad, GstObject * parent,
   GstMprtpreceiver *this = GST_MPRTPRECEIVER (parent);
   gboolean result = FALSE;
   GstPad *peer;
+//  g_print ("EVENT to the sink: %s\n", GST_EVENT_TYPE_NAME (event));
   GST_DEBUG_OBJECT (this, "sink event");
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_SEGMENT:

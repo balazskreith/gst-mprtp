@@ -55,6 +55,7 @@ Sink* make_sink(SinkParams *params)
 GstElement* _make_autovideo_sink(SinkParams *params)
 {
   GstElement* autovideosink = gst_element_factory_make("autovideosink", NULL);
+//  GstElement* autovideosink = gst_element_factory_make("fakesink", NULL);
 
   g_object_set (autovideosink, "sync", FALSE, NULL);
 

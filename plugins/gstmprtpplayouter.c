@@ -55,6 +55,8 @@ static gboolean gst_mprtpplayouter_sink_query (GstPad * sinkpad,
     GstObject * parent, GstQuery * query);
 static gboolean gst_mprtpplayouter_src_query (GstPad * sinkpad,
     GstObject * parent, GstQuery * query);
+static gboolean gst_mprtpplayouter_mprtcp_rr_src_query (GstPad * sinkpad, GstObject * parent,
+    GstQuery * query);
 static gboolean gst_mprtpplayouter_sink_event (GstPad * pad, GstObject * parent,
     GstEvent * event);
 static gboolean gst_mprtpplayouter_mprtp_src_event(GstPad *pad, GstObject *parent,
@@ -147,8 +149,7 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&gst_mprtpplayouter_mprtp_sink_template));
   gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get
-      (&gst_mprtpplayouter_mprtcp_sr_sink_template));
+      gst_static_pad_template_get(&gst_mprtpplayouter_mprtcp_sr_sink_template));
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&gst_mprtpplayouter_mprtp_src_template));
   gst_element_class_add_pad_template (element_class,
@@ -248,33 +249,32 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   gst_element_add_pad (GST_ELEMENT (this), this->mprtp_srcpad);
 
   this->mprtcp_sr_sinkpad =
-      gst_pad_new_from_static_template
-      (&gst_mprtpplayouter_mprtcp_sr_sink_template, "mprtcp_sr_sink");
+      gst_pad_new_from_static_template(&gst_mprtpplayouter_mprtcp_sr_sink_template,
+      "mprtcp_sr_sink");
   gst_element_add_pad (GST_ELEMENT (this), this->mprtcp_sr_sinkpad);
 
   this->mprtcp_rr_srcpad =
-      gst_pad_new_from_static_template
-      (&gst_mprtpplayouter_mprtcp_rr_src_template, "mprtcp_rr_src");
+      gst_pad_new_from_static_template(&gst_mprtpplayouter_mprtcp_rr_src_template,
+      "mprtcp_rr_src");
   gst_element_add_pad (GST_ELEMENT (this), this->mprtcp_rr_srcpad);
 
-  gst_pad_set_query_function (this->mprtp_srcpad,
-      GST_DEBUG_FUNCPTR (gst_mprtpplayouter_src_query));
   gst_pad_set_query_function (this->mprtcp_rr_srcpad,
-      GST_DEBUG_FUNCPTR (gst_mprtpplayouter_src_query));
+      GST_DEBUG_FUNCPTR (gst_mprtpplayouter_mprtcp_rr_src_query));
 
   gst_pad_set_chain_function (this->mprtcp_sr_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_mprtcp_sr_sink_chain));
+
   gst_pad_set_chain_function (this->mprtp_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_mprtp_sink_chain));
-
   gst_pad_set_query_function (this->mprtp_sinkpad,
       GST_DEBUG_FUNCPTR (gst_mprtpplayouter_sink_query));
-
   gst_pad_set_event_function (this->mprtp_sinkpad,
         GST_DEBUG_FUNCPTR (gst_mprtpplayouter_sink_event));
   GST_PAD_SET_PROXY_CAPS (this->mprtp_sinkpad);
   GST_PAD_SET_PROXY_ALLOCATION (this->mprtp_sinkpad);
 
+  gst_pad_set_query_function (this->mprtp_srcpad,
+      GST_DEBUG_FUNCPTR (gst_mprtpplayouter_src_query));
   gst_pad_set_event_function (this->mprtp_srcpad,
         GST_DEBUG_FUNCPTR (gst_mprtpplayouter_mprtp_src_event));
   gst_pad_use_fixed_caps (this->mprtp_srcpad);
@@ -447,6 +447,22 @@ gst_mprtpplayouter_src_query (GstPad * sinkpad, GstObject * parent,
 
 
 gboolean
+gst_mprtpplayouter_mprtcp_rr_src_query (GstPad * sinkpad, GstObject * parent,
+    GstQuery * query)
+{
+  GstMprtpplayouter *this = GST_MPRTPPLAYOUTER (parent);
+  gboolean result = FALSE;
+  GST_DEBUG_OBJECT (this, "query");
+  switch (GST_QUERY_TYPE (query)) {
+    default:
+      result = gst_pad_peer_query (this->mprtp_srcpad, query);
+      break;
+  }
+  return result;
+}
+
+
+gboolean
 gst_mprtpplayouter_sink_query (GstPad * sinkpad, GstObject * parent,
     GstQuery * query)
 {
@@ -578,6 +594,7 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   GstFlowReturn result = GST_FLOW_OK;
 
   this = GST_MPRTPPLAYOUTER (parent);
+
   GST_DEBUG_OBJECT (this, "RTP/RTCP/MPRTP/MPRTCP sink");
 
   if(!GST_IS_BUFFER(buf)){
@@ -686,26 +703,25 @@ done:
 GstFlowReturn
 _processing_mprtcp_packet (GstMprtpplayouter * this, GstBuffer * buf)
 {
-  GstFlowReturn result;
+  GstFlowReturn result = GST_FLOW_OK;;
 //  PROFILING("_processing_mprtcp_packet LOCK",
     THIS_LOCK (this);
 //  );
 
 //  PROFILING("_processing_mprtcp_packet",
     rcvctrler_receive_mprtcp(this->controller, buf);
-    result = GST_FLOW_OK;
 //  );
 
 //  PROFILING("_processing_mprtcp_packet UNLOCK",
     THIS_UNLOCK (this);
 //  );
 
-  {
-      GstRTCPBuffer rtcp = GST_RTCP_BUFFER_INIT;
-      gst_rtcp_buffer_map(buf, GST_MAP_READ, &rtcp);
-      gst_print_rtcp_buffer(&rtcp);
-      gst_rtcp_buffer_unmap(&rtcp);
-  }
+//  {
+//      GstRTCPBuffer rtcp = GST_RTCP_BUFFER_INIT;
+//      gst_rtcp_buffer_map(buf, GST_MAP_READ, &rtcp);
+//      gst_print_rtcp_buffer(&rtcp);
+//      gst_rtcp_buffer_unmap(&rtcp);
+//  }
   return result;
 }
 
@@ -767,7 +783,7 @@ _playout_process (GstMprtpplayouter *this)
   packet = jitterbuffer_pop_packet(this->jitterbuffer, &playout_time);
   if(!packet){
     if(!playout_time){
-      g_cond_wait(&this->receive_signal, &this->mutex);
+      g_cond_wait_until(&this->receive_signal, &this->mutex, g_get_monotonic_time() + 10 * G_TIME_SPAN_MILLISECOND);
     }else if(_now(this) < playout_time){
 //      g_print("before playout_time, the diff is  %lu\n", playout_time - _now(this));
       _playout_wait(this, playout_time - _now(this), 100);

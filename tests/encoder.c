@@ -4,8 +4,9 @@
 
 #include <stdarg.h>
 
-static GstElement* _make_vp8_encoder(CodecParams *params);
-static GstElement* _make_theora_encoder(CodecParams *params);
+static GstElement* _make_vp8_encoder(Encoder* this, CodecParams *params);
+static GstElement* _make_theora_encoder(Encoder* this, CodecParams *params);
+static void _setup_listener(Encoder* this, subscriber listener_func, gpointer listener_obj);
 static int _instance_counter = 0;
 
 Encoder* encoder_ctor(void)
@@ -14,7 +15,6 @@ Encoder* encoder_ctor(void)
 
   this = g_malloc0(sizeof(Encoder));
   sprintf(this->bin_name, "EncoderBin_%d", _instance_counter++);
-  this->on_bitrate_chage = make_notifier("on-bitrate-change");
   this->objects_holder = objects_holder_ctor();
   return this;
 }
@@ -22,7 +22,6 @@ Encoder* encoder_ctor(void)
 void encoder_dtor(Encoder* this)
 {
   object_holder_dtor(this->objects_holder);
-  notifier_unref(this->on_bitrate_chage);
   g_free(this);
 }
 
@@ -35,10 +34,10 @@ Encoder* make_encoder(CodecParams *codec_params, SinkParams* sink_params)
 
   switch(codec_params->type){
     case CODEC_TYPE_VP8:
-      src = sink = encoder = _make_vp8_encoder(codec_params);
+      src = sink = encoder = _make_vp8_encoder(this, codec_params);
       break;
     case CODEC_TYPE_THEORA:
-      src = sink = encoder = _make_theora_encoder(codec_params);
+      src = sink = encoder = _make_theora_encoder(this, codec_params);
       break;
   };
   gst_bin_add(encoderBin, encoder);
@@ -70,16 +69,22 @@ Encoder* make_encoder(CodecParams *codec_params, SinkParams* sink_params)
   return this;
 }
 
-void encoder_on_bitrate_change(Encoder* this, gint32* target_bitrate)
-{
-  notifier_do(this->on_bitrate_chage, target_bitrate);
+Subscriber* encoder_get_on_bitrate_change_subscriber(Encoder* this){
+  return &this->on_bitrate_change;
+}
+
+void _setup_listener(Encoder* this, subscriber subscriber_func, gpointer subscriber_obj){
+  this->on_bitrate_change.subscriber_func = subscriber_func;
+  this->on_bitrate_change.subscriber_obj  = subscriber_obj;
 }
 
 static void _on_change_vp8_target_bitrate(GstElement* encoder, gint32* target_bitrate){
+
+//  g_print("VP8 encoder is requested to change target bitrate to %d\n", *target_bitrate);
   g_object_set (encoder, "target-bitrate", *target_bitrate, NULL);
 }
 
-GstElement* _make_vp8_encoder(CodecParams *params)
+GstElement* _make_vp8_encoder(Encoder* this, CodecParams *params)
 {
   GstBin* encoderBin    = gst_bin_new(NULL);
   GstElement* encoder   = gst_element_factory_make ("vp8enc", NULL);
@@ -87,8 +92,7 @@ GstElement* _make_vp8_encoder(CodecParams *params)
 
 
   g_object_set (encoder, "target-bitrate", target_bitrate, NULL);
-  notifier_add_listener_full(get_pipeline()->on_target_bitrate_change,
-      (listener)_on_change_vp8_target_bitrate, encoder);
+  _setup_listener(this, (subscriber) _on_change_vp8_target_bitrate, encoder);
 
   g_object_set(encoder,
       "end-usage", 1, /* VPX_CBR */
@@ -127,15 +131,14 @@ static void _on_change_theora_target_bitrate(GstElement* encoder, gint32* target
   g_object_set (encoder, "bitrate", *target_bitrate, NULL);
 }
 
-static GstElement* _make_theora_encoder(CodecParams *params)
+static GstElement* _make_theora_encoder(Encoder* this, CodecParams *params)
 {
   GstBin* encoderBin = gst_bin_new(NULL);
   GstElement *encoder = gst_element_factory_make ("theoraenc", NULL);
   GstElement *payloader = gst_element_factory_make ("rtptheorapay", NULL);
 
   g_object_set (encoder, "bitrate", target_bitrate, NULL);
-  notifier_add_listener_full(get_pipeline()->on_target_bitrate_change,
-      (listener)_on_change_theora_target_bitrate, encoder);
+  _setup_listener(this, (subscriber) _on_change_theora_target_bitrate, encoder);
 
   g_object_set (payloader,
       "config-interval", 2,

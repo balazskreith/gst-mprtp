@@ -359,7 +359,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
 
   this->monitoring    = make_mediator();
-  this->on_rtcp_ready = make_notifier();
+  this->on_rtcp_ready = make_notifier("MPRTPSch: on-rtcp-ready");
 
   this->subflows      = make_sndsubflows(this->monitoring);
   this->sndpackets    = make_sndpackets();
@@ -386,7 +386,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   mediator_set_response_handler(this->monitoring,
       (ListenerFunc) _on_monitoring_response, this);
 
-  notifier_add_listener_full(this->on_rtcp_ready,
+  notifier_add_listener(this->on_rtcp_ready,
       (ListenerFunc) _on_rtcp_ready, this);
 }
 
@@ -885,7 +885,6 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
     goto done;
   }
   packet = (SndPacket*) g_queue_pop_head(this->packetsq);
-
   now = _now(this);
   next_time = now + 10 * GST_MSECOND;
 
@@ -893,14 +892,16 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
   sndctrler_time_update(this->controller);
 
   //Obsolete packets stayed in the q for a while
-  if(0 < this->obsolation_treshold && packet->made < now - this->obsolation_treshold){
-    gst_buffer_unref(sndpacket_retrieve(packet));
-    goto done;
-  }
+  //TODO: turn it on
+//  if(0 < this->obsolation_treshold && packet->made < now - this->obsolation_treshold){
+//    gst_buffer_unref(sndpacket_retrieve(packet));
+//    goto done;
+//  }
 
   subflow = stream_splitter_approve_packet(this->splitter, packet, now, &next_time);
   if(!subflow){
     g_queue_push_head(this->packetsq, packet);
+//    g_print("packet %hu is pushed fron\n", packet->abs_seq);
     if(now < next_time - 500 * GST_USECOND){
 //      g_print("1: now: %lu -> next_time: %lu diff: %lu\n", now, next_time, next_time - now);
       _wait(this, next_time, 500);

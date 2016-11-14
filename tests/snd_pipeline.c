@@ -83,6 +83,10 @@ static void _connect_encoder_to_sender(SenderSide *this)
   Encoder* encoder = this->encoder;
   Sender*  sender = this->sender;
   gst_element_link(encoder->element, sender->element);
+
+  //setup feedback
+  pipeline_add_eventer("on-bitrate-change", sender_get_on_bitrate_change_eventer(sender));
+  pipeline_add_subscriber("on-bitrate-change", encoder_get_on_bitrate_change_subscriber(encoder));
 }
 
 
@@ -161,9 +165,8 @@ int main (int argc, char **argv)
       session->snd_transfer_params);
 //  session->sender = make_sender_custom();
 
-  pipeline_add_event_notifier("on-bitrate-change", session->encoder->on_bitrate_chage);
-  pipeline_add_event_listener("on-playing", &session->source->on_playing);
-  pipeline_add_event_listener("on-destroy", &session->source->on_destroy);
+  pipeline_add_subscriber("on-playing", &session->source->on_playing);
+  pipeline_add_subscriber("on-destroy", &session->source->on_destroy);
 
   loop = g_main_loop_new (NULL, FALSE);
 
@@ -181,6 +184,8 @@ int main (int argc, char **argv)
 
   _connect_source_to_encoder(session);
   _connect_encoder_to_sender(session);
+
+  //TODO: setup a start target bitrate if we have one!
 
   g_print ("starting sender pipeline\n");
   pipeline_firing_event("on-playing", NULL);

@@ -9,7 +9,7 @@
 #define NOTIFIER_H_
 
 #include <gst/gst.h>
-#include "mprtpdefs.h"
+#include "mprtputils.h"
 
 typedef struct _Notifier Notifier;
 typedef struct _NotifierClass NotifierClass;
@@ -25,6 +25,7 @@ typedef struct _NotifierClass NotifierClass;
 struct _Notifier
 {
   GObject          object;
+  gchar            name[256];
   GSList*          listeners;
 };
 
@@ -38,8 +39,8 @@ typedef void (*ListenerFunc)(gpointer udata, gpointer item);
 
 GType notifier_get_type (void);
 
-Notifier *make_notifier(void);
-void notifier_add_listener_full(Notifier *this, ListenerFunc callback, gpointer udata);
+Notifier *make_notifier(const gchar* name);
+void notifier_add_listener(Notifier *this, ListenerFunc callback, gpointer udata);
 void notifier_add_listener_with_filter(Notifier *this, ListenerFunc callback, ListenerFilterFunc filter, gpointer udata);
 void notifier_rem_listener(Notifier *this, ListenerFunc callback);
 void notifier_do(Notifier *this, gpointer subject);

@@ -8,14 +8,16 @@
 
 typedef struct{
   GstElement*    element;
-  Notifier*      on_bitrate_chage;
   ObjectsHolder* objects_holder;
   gchar          bin_name[256];
+
+  Subscriber       on_bitrate_change;
 }Encoder;
 
 Encoder* encoder_ctor(void);
 void encoder_dtor(Encoder* this);
 Encoder* make_encoder(CodecParams *codec_params, SinkParams* encodersink_params);
-void encoder_on_bitrate_change(Encoder* this, gint32* target_bitrate);
+
+Subscriber* encoder_get_on_bitrate_change_subscriber(Encoder* this);
 
 #endif /* TESTS_SINK_H_ */

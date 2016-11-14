@@ -80,6 +80,10 @@ struct _GstMprtpplayouter
 
   guint8          fec_payload_type;
 
+  GstTask*                      thread;
+  GRecMutex                     thread_mutex;
+  GAsyncQueue*                  buffers;
+
   GstPad*         mprtp_srcpad;
   GstPad*         mprtp_sinkpad;
   GstPad*         mprtcp_sr_sinkpad;

@@ -38,9 +38,10 @@ GST_DEBUG_CATEGORY_STATIC (notifier_debug_category);
 G_DEFINE_TYPE (Notifier, notifier, G_TYPE_OBJECT);
 
 typedef struct{
-  ListenerFunc   callback;
-  ListenerFilterFunc filter;
-  gpointer       udata;
+  gchar               name[256];
+  ListenerFunc        callback;
+  ListenerFilterFunc  filter;
+  gpointer            udata;
 }Listener;
 
 
@@ -86,21 +87,26 @@ notifier_init (Notifier * this)
 
 }
 
-Notifier *make_notifier(void)
+Notifier *make_notifier(const gchar* name)
 {
   Notifier *result = g_object_new(NOTIFIER_TYPE, NULL);
+  strcpy(result->name, name);
   return result;
 }
 
-void notifier_add_listener_full(Notifier *this, ListenerFunc callback, gpointer udata)
+void notifier_add_listener(Notifier *this, ListenerFunc callback, gpointer udata)
 {
   Listener *listener = _make_listener(callback, NULL, udata);
+  //Debug purpose:
+  strcpy(listener->name, this->name);
   this->listeners = g_slist_prepend(this->listeners, listener);
 }
 
 void notifier_add_listener_with_filter(Notifier *this, ListenerFunc callback, ListenerFilterFunc filter, gpointer udata)
 {
   Listener *listener = _make_listener(callback, filter, udata);
+  //Debug purpose:
+  strcpy(listener->name, this->name);
   this->listeners = g_slist_prepend(this->listeners, listener);
 }
 
@@ -129,7 +135,11 @@ static void _listener_helper(gpointer item, gpointer udata)
   if(listener->filter && !listener->filter(listener->udata, udata)){
     goto done;
   }
-  listener->callback(listener->udata, udata);
+  if(listener->callback){
+    listener->callback(listener->udata, udata);
+  }else{
+    g_print("Listener callback is undefined");
+  }
 done:
   return;
 }
@@ -146,9 +156,11 @@ void notifier_do(Notifier *this, gpointer subject)
 Listener* _make_listener(ListenerFunc callback, ListenerFilterFunc filter, gpointer udata)
 {
   Listener* result = g_slice_new0(Listener);
-  result->callback = callback;
+//  result->callback = callback;
+  result->callback = GST_DEBUG_FUNCPTR(callback);
   result->filter = filter;
   result->udata = udata;
+
   return result;
 }
 

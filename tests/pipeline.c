@@ -58,10 +58,10 @@ void _print_info(void)
       "\t\t AUTOVIDEO\n"
       "\t\t FILE:location\n"
       "\t\t RAWPROXY: NOT IMPLEMENTED YET\n"
-      "\t--playouter=SCREAM|MPRTP|MPRTPFRACTAL"
-      "\t\t SCREAM: NOT IMPLEMENTED YET"
-      "\t\t MPRTP: NOT IMPLEMENTED YET"
-      "\t\t MPRTPFRACTAL:See the sender param settings"
+      "\t--playouter=SCREAM|MPRTP|MPRTPFRACTAL\n"
+      "\t\t SCREAM: NOT IMPLEMENTED YET\n"
+      "\t\t MPRTP: NOT IMPLEMENTED YET\n"
+      "\t\t MPRTPFRACTAL:See the sender param settings\n"
 
 
       "\nCommon parameters:\n"
@@ -537,62 +537,62 @@ void on_fi_called(gpointer object, gpointer user_data){
 
 }
 
-Notifier* notifier_ctor(void)
+Eventer* eventer_ctor(void)
 {
-  return g_malloc0(sizeof(Notifier));
+  return g_malloc0(sizeof(Eventer));
 }
 
-Notifier* notifier_ref(Notifier* this){
+Eventer* eventer_ref(Eventer* this){
   ++this->ref;
   return this;
 }
 
-void notifier_unref(Notifier* this)
+void eventer_unref(Eventer* this)
 {
-  GSList* item = this->listeners;
+  GSList* item = this->subscribers;
   if(0 < --this->ref){
     return;
   }
-  g_slist_free_full(this->listeners, g_free);
+  g_slist_free_full(this->subscribers, g_free);
   g_free(this);
 }
 
-Notifier* make_notifier(const gchar* event_name)
+Eventer* make_eventer(const gchar* event_name)
 {
-  Notifier* this = notifier_ctor();
+  Eventer* this = eventer_ctor();
   strcpy(this->name, event_name);
   this->ref = 1;
   return this;
 }
 
-void notifier_add_listener_full(Notifier* this, listener listener_func, gpointer user_data)
+void eventer_add_subscriber_full(Eventer* this, subscriber subscriber_func, gpointer user_data)
 {
-  Listener* listener = g_malloc0(sizeof(Listener));
-  listener->listener_func = listener_func;
-  listener->listener_obj     = user_data;
+  Subscriber* subscriber = g_malloc0(sizeof(subscriber));
+  subscriber->subscriber_func = subscriber_func;
+  subscriber->subscriber_obj     = user_data;
 
-  this->listeners = g_slist_prepend(this->listeners, listener);
+  this->subscribers = g_slist_prepend(this->subscribers, subscriber);
 }
 
-void notifier_add_listener(Notifier* this, Listener* listener)
+void eventer_add_subscriber(Eventer* this, Subscriber* subscriber)
 {
-  this->listeners = g_slist_prepend(this->listeners, listener);
+  this->subscribers = g_slist_prepend(this->subscribers, subscriber);
 }
 
-static void _foreach_listeners(Listener* listener, gpointer user_data){
-  if(!listener->listener_func){
-    g_print("WARN: No listener function found to call");
+static void _foreach_subscribers(Subscriber* subscriber, gpointer user_data){
+  if(!subscriber->subscriber_func){
+    g_print("WARN: No subscriber function found to call");
     return;
   }
-  listener->listener_func(listener->listener_obj, user_data);
+  subscriber->subscriber_func(subscriber->subscriber_obj, user_data);
 }
 
-void notifier_do(Notifier* this, gpointer user_data)
+void eventer_do(Eventer* this, gpointer user_data)
 {
-  if(!this->listeners){
+  if(!this->subscribers){
     return;
   }
-  g_slist_foreach(this->listeners, (GFunc)_foreach_listeners, user_data);
+  g_slist_foreach(this->subscribers, (GFunc)_foreach_subscribers, user_data);
 }
 
 
@@ -753,14 +753,14 @@ Pipeline* get_pipeline(void)
     return pipeline;
   }
   pipeline = g_malloc0(sizeof(Pipeline));
-  pipeline->on_assembled   = make_notifier("on-assembled");
-  pipeline->on_playing     = make_notifier("on-playing");
-  pipeline->on_destroy     = make_notifier("on-destroy");
-  pipeline->on_target_bitrate_change = make_notifier("on-target-bitrate-change");
+  pipeline->on_assembled   = make_eventer("on-assembled");
+  pipeline->on_playing     = make_eventer("on-playing");
+  pipeline->on_destroy     = make_eventer("on-destroy");
+  pipeline->on_target_bitrate_change = make_eventer("on-target-bitrate-change");
 
   pipeline->objects_holder = objects_holder_ctor();
-  pipeline->events_to_notifiers = g_hash_table_new_full(g_str_hash,
-      g_str_equal, g_free, (GDestroyNotify)notifier_unref);
+  pipeline->events_to_eventers = g_hash_table_new_full(g_str_hash,
+      g_str_equal, g_free, (GDestroyNotify)eventer_unref);
 
   return pipeline;
 }
@@ -770,75 +770,75 @@ void pipeline_dtor(void)
   if(!pipeline){
     return;
   }
-  notifier_unref(pipeline->on_assembled);
-  notifier_unref(pipeline->on_playing);
-  notifier_unref(pipeline->on_destroy);
-  notifier_unref(pipeline->on_target_bitrate_change);
+  eventer_unref(pipeline->on_assembled);
+  eventer_unref(pipeline->on_playing);
+  eventer_unref(pipeline->on_destroy);
+  eventer_unref(pipeline->on_target_bitrate_change);
 
   g_slist_free_full(pipeline->objects, object_holder_dtor);
-  g_hash_table_destroy(pipeline->events_to_notifiers);
+  g_hash_table_destroy(pipeline->events_to_eventers);
 
   g_free(pipeline);
   pipeline = NULL;
 }
 
-void pipeline_add_event_notifier(const gchar* event_name, Notifier* notifier)
+void pipeline_add_eventer(const gchar* event_name, Eventer* eventer)
 {
   Pipeline* this = get_pipeline();
   gchar* event_copied_name;
-  if(g_hash_table_lookup(this->events_to_notifiers, event_name) != NULL){
+  if(g_hash_table_lookup(this->events_to_eventers, event_name) != NULL){
     g_print("Event %s is already registered in the eventer", event_name);
     return;
   }
   event_copied_name = g_malloc(256);
-  g_print("Add notifier for event %s\n", event_name);
+  g_print("Add eventer for event %s\n", event_name);
   strcpy(event_copied_name, event_name);
-  g_hash_table_insert(this->events_to_notifiers, event_copied_name, notifier_ref(notifier));
+  g_hash_table_insert(this->events_to_eventers, event_copied_name, eventer_ref(eventer));
 }
 
-void pipeline_add_event_listener_full(const gchar* event_name, listener listener_func, gpointer user_data)
+void pipeline_add_subscriber_full(const gchar* event_name, subscriber subscriber_func, gpointer user_data)
 {
   Pipeline* this = get_pipeline();
-  Notifier* notifier;
+  Eventer* eventer;
 
-  if((notifier = g_hash_table_lookup(this->events_to_notifiers, event_name)) == NULL){
-    notifier = make_notifier(event_name);
-    pipeline_add_event_notifier(event_name, notifier);
-    notifier_unref(notifier);
+  if((eventer = g_hash_table_lookup(this->events_to_eventers, event_name)) == NULL){
+    eventer = make_eventer(event_name);
+    pipeline_add_eventer(event_name, eventer);
+    eventer_unref(eventer);
     return;
   }
 
-  notifier_add_listener_full(notifier, listener_func, user_data);
+  eventer_add_subscriber_full(eventer, subscriber_func, user_data);
 
 }
 
-void pipeline_add_event_listener(const gchar* event_name, Listener* listener)
+void pipeline_add_subscriber(const gchar* event_name, Subscriber* subscriber)
 {
   Pipeline* this = get_pipeline();
-  Notifier* notifier;
+  Eventer* eventer;
 
-  if((notifier = g_hash_table_lookup(this->events_to_notifiers, event_name)) == NULL){
-    g_print("Not found any notifier for event %s, we created one\n", event_name);
-    notifier = make_notifier(event_name);
-    pipeline_add_event_notifier(event_name, notifier);
-    notifier_unref(notifier);
+  if((eventer = g_hash_table_lookup(this->events_to_eventers, event_name)) == NULL){
+    g_print("Not found any eventer for event %s, we created one\n", event_name);
+    eventer = make_eventer(event_name);
+    pipeline_add_eventer(event_name, eventer);
+    eventer_unref(eventer);
   }
 
-  g_print("Listener added to pipeline for event %s\n", event_name);
-  notifier_add_listener(notifier, listener);
+  g_print("subscriber added to pipeline for event %s\n", event_name);
+  eventer_add_subscriber(eventer, subscriber);
 
 }
 
 void pipeline_firing_event(const gchar* event_name, gpointer data)
 {
   Pipeline* this = get_pipeline();
-  Notifier* notifier;
-  if((notifier = g_hash_table_lookup(this->events_to_notifiers, event_name)) == NULL){
-    g_print("Requested event %s not bounded to any Notifier\n", event_name);
+  Eventer* eventer;
+  if((eventer = g_hash_table_lookup(this->events_to_eventers, event_name)) == NULL){
+    g_print("Requested event %s not bounded to any Eventer\n", event_name);
     return;
   }
   g_print("Firing event %s\n", event_name);
-  notifier_do(notifier, data);
+  eventer_do(eventer, data);
 }
 
 

@@ -137,9 +137,9 @@ rcvsubflows_init (RcvSubflows * this)
   this->sysclock = gst_system_clock_obtain ();
   this->made                   = _now(this);
 
-  this->on_subflow_detached                     = make_notifier();
-  this->on_subflow_joined                       = make_notifier();
-  this->on_congestion_controlling_type_changed  = make_notifier();
+  this->on_subflow_detached                     = make_notifier("RcvSubflow: on-subflow-detached");
+  this->on_subflow_joined                       = make_notifier("RcvSubflow: on-subflow-joined");
+  this->on_congestion_controlling_type_changed  = make_notifier("RcvSubflow: on-congestion-controlling-change");
 
   this->changed_subflows                        = g_queue_new();
 }
@@ -184,17 +184,17 @@ void rcvsubflows_iterate(RcvSubflows* this, GFunc process, gpointer udata)
 
 void rcvsubflows_add_on_subflow_joined_cb(RcvSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener_full(this->on_subflow_joined, callback, udata);
+  notifier_add_listener(this->on_subflow_joined, callback, udata);
 }
 
 void rcvsubflows_add_on_subflow_detached_cb(RcvSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener_full(this->on_subflow_detached, callback, udata);
+  notifier_add_listener(this->on_subflow_detached, callback, udata);
 }
 
 void rcvsubflows_add_on_congestion_controlling_type_changed_cb(RcvSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener_full(this->on_congestion_controlling_type_changed, callback, udata);
+  notifier_add_listener(this->on_congestion_controlling_type_changed, callback, udata);
 }
 
 void rcvsubflow_notify_rtcp_fb_cbs(RcvSubflow* subflow, gpointer udata)
@@ -204,7 +204,7 @@ void rcvsubflow_notify_rtcp_fb_cbs(RcvSubflow* subflow, gpointer udata)
 
 void rcvsubflow_add_on_rtcp_fb_cb(RcvSubflow* subflow, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener_full(subflow->on_rtcp_time_update, callback, udata);
+  notifier_add_listener(subflow->on_rtcp_time_update, callback, udata);
 }
 
 void rcvsubflow_rem_on_rtcp_fb_cb(RcvSubflow* subflow, ListenerFunc callback)
@@ -239,7 +239,7 @@ RcvSubflow* _make_subflow(RcvSubflows* base_db, guint8 subflow_id)
   RcvSubflow* result = g_malloc0(sizeof(RcvSubflow));
   result->id                       = subflow_id;
   result->base_db                  = base_db;
-  result->on_rtcp_time_update  = make_notifier();
+  result->on_rtcp_time_update  = make_notifier("RcvSubflow: on-rtcp-time-update");
   return result;
 }
 

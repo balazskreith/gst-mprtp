@@ -139,6 +139,7 @@ GstBuffer* sndpacket_retrieve(SndPacket* packet)
   GstBuffer *result;
   _setup_abs_time_extension(packet);
   result = packet->buffer;
+//  g_print("Packet %hu buffer is null by retrieve\n", packet->abs_seq);
   packet->buffer = NULL;
   sndpacket_unref(packet);
   return result;
@@ -150,6 +151,7 @@ void sndpacket_unref(SndPacket *packet)
   if(0 < --packet->ref){
     return;
   }
+//  g_print("Packet %hu buffer is null by unref\n", packet->abs_seq);
   packet->buffer = NULL;
   recycle_add( packet->destiny, packet);
 }
@@ -165,6 +167,9 @@ SndPacket* sndpacket_ref(SndPacket *packet)
 void sndpacket_setup_mprtp(SndPacket *packet, guint8 subflow_id, guint16 subflow_seq)
 {
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  if(!packet->buffer){
+    g_print("Packet %hu has no buffer\n", packet->abs_seq);
+  }
   packet->buffer = gst_buffer_make_writable(packet->buffer);
 
   gst_rtp_buffer_map(packet->buffer, GST_MAP_READWRITE, &rtp);

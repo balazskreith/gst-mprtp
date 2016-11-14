@@ -1,4 +1,4 @@
-#include "mprtpdefs.h"
+#include "mprtputils.h"
 #include <string.h>
 
 void gst_rtp_buffer_set_mprtp_extension(GstRTPBuffer* rtp, guint8 ext_header_id, guint8 subflow_id, guint16 subflow_seq)

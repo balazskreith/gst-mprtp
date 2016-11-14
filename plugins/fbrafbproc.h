@@ -29,7 +29,7 @@ typedef struct _FBRAFBProcessorClass FBRAFBProcessorClass;
 
 typedef struct _FBRAPlusStat
 {
-  GstClockTime             owd_80th;
+  GstClockTime             owd_50th;
   GstClockTime             last_owd;
 
   gint32                   measurements_num;

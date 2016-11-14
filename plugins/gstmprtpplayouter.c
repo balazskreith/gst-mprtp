@@ -82,6 +82,8 @@ _playout_process (
 
 #define _now(this) gst_clock_get_time (this->sysclock)
 
+static void _forward_process(GstMprtpplayouter* this);
+
 
 enum
 {
@@ -291,7 +293,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->sysclock                 = gst_system_clock_obtain();
   this->fec_payload_type         = FEC_PAYLOAD_DEFAULT_ID;
 
-  this->on_rtcp_ready            = make_notifier();
+  this->on_rtcp_ready            = make_notifier("MPRTPPly: on-rtcp-ready");
   this->subflows                 = make_rcvsubflows();
 
   this->fec_decoder              = make_fecdecoder();
@@ -311,7 +313,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   rcvpackets_set_abs_time_ext_header_id(this->rcvpackets, ABS_TIME_DEFAULT_EXTENSION_HEADER_ID);
   rcvpackets_set_mprtp_ext_header_id(this->rcvpackets, MPRTP_DEFAULT_EXTENSION_HEADER_ID);
 
-  notifier_add_listener_full(this->on_rtcp_ready, (ListenerFunc) _playouter_on_rtcp_ready, this);
+  notifier_add_listener(this->on_rtcp_ready, (ListenerFunc) _playouter_on_rtcp_ready, this);
 }
 
 
@@ -541,6 +543,10 @@ gst_mprtpplayouter_change_state (GstElement * element,
       gst_pad_start_task(this->mprtp_srcpad, (GstTaskFunction)_playout_process, this, NULL);
       break;
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
+      this->buffers = g_async_queue_new();
+      this->thread = gst_task_new ((GstTaskFunction)_forward_process, this, NULL);
+      gst_task_set_lock (this->thread, &this->thread_mutex);
+      gst_task_start (this->thread);
         break;
       default:
         break;
@@ -552,6 +558,9 @@ gst_mprtpplayouter_change_state (GstElement * element,
 
     switch (transition) {
       case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
+        gst_task_stop (this->thread);
+        g_async_queue_unref(this->buffers);
+        this->buffers = NULL;
         break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       break;
@@ -645,12 +654,14 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     fecdecoder_add_rtp_buffer(this->fec_decoder, gst_buffer_ref(buf));
   }
 
-  packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
+//  packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
 //  return gst_pad_push(this->mprtp_srcpad, rcvpacket_retrieve_buffer_and_unref(packet));
 
-
+PROFILING("MPRTPPLAYOUTER LOCK",
   THIS_LOCK(this);
+);
 
+//PROFILING("Processing arrived packet",
   packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
   rcvtracker_add_packet(this->rcvtracker, packet);
   stream_joiner_push_packet(this->joiner, packet);
@@ -659,6 +670,8 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   g_cond_signal(&this->receive_signal);
 
   rcvctrler_time_update(this->controller);
+//);
+
   THIS_UNLOCK(this);
 
 done:
@@ -750,15 +763,19 @@ void _playouter_on_repair_response(GstMprtpplayouter *this, GstBuffer *rtpbuf)
   THIS_UNLOCK(this);
 }
 
-
-static void _playout_wait(GstMprtpplayouter *this, GstClockTime waiting_time, gint64 step_in_microseconds)
+static void _wait(GstMprtpplayouter *this, GstClockTime end, gint64 step_in_microseconds)
 {
-  GstClockTime start = _now(this);
   gint64 end_time;
-  while(_now(this) - start < waiting_time){
+  while(_now(this) < end){
     end_time = g_get_monotonic_time() + step_in_microseconds;
     g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);
   }
+}
+
+static void _wait2(GstMprtpplayouter *this, GstClockTime end)
+{
+  gint64 end_time = g_get_monotonic_time() + ( end - _now(this) ) / 1000;
+  g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);
 }
 
 static gboolean _repair_responsed(GstMprtpplayouter *this)
@@ -775,6 +792,9 @@ _playout_process (GstMprtpplayouter *this)
   GstClockTime playout_time;
   guint16 gap_seq;
   THIS_LOCK(this);
+
+
+
   playout_time = _now(this);
   while((packet = stream_joiner_pop_packet(this->joiner)) != NULL){
     jitterbuffer_push_packet(this->jitterbuffer, packet);
@@ -783,10 +803,14 @@ _playout_process (GstMprtpplayouter *this)
   packet = jitterbuffer_pop_packet(this->jitterbuffer, &playout_time);
   if(!packet){
     if(!playout_time){
-      g_cond_wait_until(&this->receive_signal, &this->mutex, g_get_monotonic_time() + 10 * G_TIME_SPAN_MILLISECOND);
+//      g_cond_wait(&this->receive_signal, &this->mutex);
+//      _playout_wait(this, 5 * GST_MSECOND, 500);
+      g_cond_wait_until(&this->receive_signal, &this->mutex, g_get_monotonic_time() + 5 * G_TIME_SPAN_MILLISECOND);
     }else if(_now(this) < playout_time){
 //      g_print("before playout_time, the diff is  %lu\n", playout_time - _now(this));
-      _playout_wait(this, playout_time - _now(this), 100);
+      DISABLE_LINE _wait(this, playout_time, 1000);
+      DISABLE_LINE _wait2(this, playout_time);
+      g_cond_wait_until(&this->waiting_signal, &this->mutex, g_get_monotonic_time() + G_TIME_SPAN_MILLISECOND);
 //      g_print("after waiting until playout_time, the diff is  %lu\n", _now(this) - playout_time);
     }
     goto done;
@@ -809,13 +833,17 @@ _playout_process (GstMprtpplayouter *this)
     rcvtracker_add_discarded_packet(this->rcvtracker, &this->discarded_packet);
 
     if(this->discarded_packet.repairedbuf){
-      gst_pad_push(this->mprtp_srcpad, this->discarded_packet.repairedbuf);
+//      gst_pad_push(this->mprtp_srcpad, this->discarded_packet.repairedbuf);
+      g_async_queue_push(this->buffers, this->discarded_packet.repairedbuf);
       this->discarded_packet.repairedbuf = NULL;
     }
   }
-
+//PROFILING("_playout_process",
 //  g_print("Packet arrived at subflow %d with abs seq %hu forwarded\n", packet->subflow_id, packet->abs_seq);
-  gst_pad_push(this->mprtp_srcpad, packet->buffer);
+//  gst_pad_push(this->mprtp_srcpad, packet->buffer);
+  g_async_queue_push(this->buffers, packet->buffer);
+
+//);
 
 done:
   THIS_UNLOCK(this);
@@ -828,6 +856,11 @@ done:
 //       _playout_process_(this);
 //   );
 //}
+
+void _forward_process(GstMprtpplayouter* this){
+  GstBuffer* buffer = g_async_queue_pop(this->buffers);
+  gst_pad_push(this->mprtp_srcpad, buffer);
+}
 
 #undef THIS_LOCK
 #undef THIS_UNLOCK

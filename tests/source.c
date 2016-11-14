@@ -18,8 +18,8 @@ Source* source_ctor(void)
   this = g_malloc0(sizeof(Source));
   sprintf(this->bin_name, "SourceBin_%d", _instance_counter++);
 
-  this->on_destroy.listener_func = on_fi_called;
-  this->on_playing.listener_func = on_fi_called;
+  this->on_destroy.subscriber_func = on_fi_called;
+  this->on_playing.subscriber_func = on_fi_called;
   return this;
 }
 
@@ -156,11 +156,11 @@ GstElement* _make_file_source(Source* this, SourceParams *params)
 
   gst_element_link_many(multifilesrc, sink_videoparse, autovideoconvert, appsink, NULL);
 
-  this->on_playing.listener_obj  = readerPipe;
-  this->on_playing.listener_func = (listener) _on_playing;
+  this->on_playing.subscriber_obj  = readerPipe;
+  this->on_playing.subscriber_func = (subscriber) _on_playing;
 
-  this->on_destroy.listener_obj  = readerPipe;
-  this->on_destroy.listener_func = (listener) _on_destroy;
+  this->on_destroy.subscriber_obj  = readerPipe;
+  this->on_destroy.subscriber_func = (subscriber) _on_destroy;
 
   gst_bin_add_many(sourceBin,
       appsrc,

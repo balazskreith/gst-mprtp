@@ -200,7 +200,7 @@ libgstmprtp_la-streamsplitter.lo: streamsplitter.c \
  /usr/local/include/gstreamer-1.0/gst/gstcompat.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h \
- streamsplitter.h sndsubflows.h mediator.h mprtpdefs.h mprtplogger.h \
+ streamsplitter.h sndsubflows.h mediator.h mprtputils.h mprtplogger.h \
  messenger.h lib_datapuffer.h /usr/include/stdio.h /usr/include/libio.h \
  /usr/include/_G_config.h /usr/include/wchar.h \
  /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
@@ -215,7 +215,7 @@ libgstmprtp_la-streamsplitter.lo: streamsplitter.c \
  /usr/include/string.h /usr/include/x86_64-linux-gnu/bits/string.h \
  /usr/include/x86_64-linux-gnu/bits/string2.h \
  /usr/include/x86_64-linux-gnu/bits/string3.h /usr/include/assert.h \
- notifier.h sndpackets.h \
+ gstmprtpdefs.h notifier.h sndpackets.h \
  /usr/local/include/gstreamer-1.0/gst/net/gstnetaddressmeta.h \
  /usr/include/glib-2.0/gio/gio.h /usr/include/glib-2.0/gio/giotypes.h \
  /usr/include/glib-2.0/gio/gioenums.h /usr/include/glib-2.0/gio/gaction.h \
@@ -835,7 +835,7 @@ sndsubflows.h:
 
 mediator.h:
 
-mprtpdefs.h:
+mprtputils.h:
 
 mprtplogger.h:
 
@@ -884,6 +884,8 @@ lib_datapuffer.h:
 /usr/include/x86_64-linux-gnu/bits/string3.h:
 
 /usr/include/assert.h:
+
+gstmprtpdefs.h:
 
 notifier.h:
 

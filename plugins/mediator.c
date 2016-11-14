@@ -74,8 +74,8 @@ mediator_finalize (GObject * object)
 void
 mediator_init (Mediator * this)
 {
-  this->on_request  = make_notifier();
-  this->on_response = make_notifier();
+  this->on_request  = make_notifier("Mediator: on-request");
+  this->on_response = make_notifier("Mediator: on-response");
 }
 
 Mediator *make_mediator(void)
@@ -97,10 +97,10 @@ void mediator_set_response(Mediator* this, gpointer response)
 
 void mediator_set_request_handler(Mediator *this, ListenerFunc response_cb, gpointer udata)
 {
-  notifier_add_listener_full(this->on_request, response_cb, udata);
+  notifier_add_listener(this->on_request, response_cb, udata);
 }
 
 void mediator_set_response_handler(Mediator *this, ListenerFunc request_cb, gpointer udata)
 {
-  notifier_add_listener_full(this->on_response, request_cb, udata);
+  notifier_add_listener(this->on_response, request_cb, udata);
 }

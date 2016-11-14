@@ -24,49 +24,49 @@ typedef struct _TransferParams TransferParams;
 typedef struct _PlayouterParams PlayouterParams;
 typedef struct _SchedulerParams SchedulerParams;
 
-
-typedef struct _MPRTPSubflowUtilizationSignalData{
-  guint                      controlling_mode;
-  gint8                      path_state;
-  gint8                      path_flags_value;
-  gint32                     target_bitrate;
-
-  gdouble                    RTT;
-  guint32                    jitter;
-  gdouble                    lost_rate;
-  guint16                    HSSN;
-  guint16                    cycle_num;
-  guint32                    cum_packet_lost;
-  GstClockTime               owd_median;
-  GstClockTime               owd_min;
-  GstClockTime               owd_max;
-
-}MPRTPSubflowUtilizationSignalData;
-
-
-
-typedef struct _MPRTPPluginSignalData{
-  MPRTPSubflowUtilizationSignalData subflow[32];
-  gint32                            target_media_rate;
-}MPRTPPluginSignalData;
+#include <gst/rtp/gstmprtpdefs.h>
+//typedef struct _MPRTPSubflowUtilizationSignalData{
+//  guint                      controlling_mode;
+//  gint8                      path_state;
+//  gint8                      path_flags_value;
+//  gint32                     target_bitrate;
+//
+//  gdouble                    RTT;
+//  guint32                    jitter;
+//  gdouble                    lost_rate;
+//  guint16                    HSSN;
+//  guint16                    cycle_num;
+//  guint32                    cum_packet_lost;
+//  GstClockTime               owd_median;
+//  GstClockTime               owd_min;
+//  GstClockTime               owd_max;
+//
+//}MPRTPSubflowUtilizationSignalData;
+//
+//
+//
+//typedef struct _MPRTPPluginSignalData{
+//  MPRTPSubflowUtilizationSignalData subflow[32];
+//  gint32                            target_media_rate;
+//}MPRTPPluginSignalData;
 
 typedef struct{
   gint32 numerator;
   gint32 divider;
 }Framerate;
 
-typedef void(*listener)(gpointer listener_obj, gpointer argument);
+typedef void(*subscriber)(gpointer subscriber_obj, gpointer argument);
 
 typedef struct{
-  gpointer listener_obj;
-  listener listener_func;
-}Listener;
+  gpointer subscriber_obj;
+  subscriber subscriber_func;
+}Subscriber;
 
 typedef struct{
-  GSList* listeners;
+  GSList* subscribers;
   gchar   name[256];
   guint   ref;
-}Notifier;
+}Eventer;
 
 
 typedef enum{
@@ -369,13 +369,13 @@ void free_statparams_tuple(StatParamsTuple* statparams_tuple);
 
 void on_fi_called(gpointer object, gpointer user_data);
 
-Notifier* notifier_ctor(void);
-void notifier_unref(Notifier* this);
-Notifier* make_notifier(const gchar* event_name);
-void notifier_add_listener_full(Notifier* this, listener listener_func, gpointer user_data);
-void notifier_add_listener(Notifier* this, Listener* listener);
-void notifier_do(Notifier* this, gpointer user_data);
-Notifier* notifier_ref(Notifier* this);
+Eventer* eventer_ctor(void);
+void eventer_unref(Eventer* this);
+Eventer* make_eventer(const gchar* event_name);
+void eventer_add_subscriber_full(Eventer* this, subscriber subscriber_func, gpointer user_data);
+void eventer_add_subscriber(Eventer* this, Subscriber* subscriber);
+void eventer_do(Eventer* this, gpointer user_data);
+Eventer* eventer_ref(Eventer* this);
 
 void cb_eos (GstBus * bus, GstMessage * message, gpointer data);
 void cb_state (GstBus * bus, GstMessage * message, gpointer data);
@@ -405,23 +405,23 @@ void object_holder_dtor(ObjectsHolder* holder);
 void objects_holder_add(ObjectsHolder* this, gpointer object, GDestroyNotify dtor);
 
 typedef struct{
-  Notifier* on_target_bitrate_change;
-  Notifier* on_assembled;
-  Notifier* on_playing;
-  Notifier* on_destroy;
+  Eventer* on_target_bitrate_change;
+  Eventer* on_assembled;
+  Eventer* on_playing;
+  Eventer* on_destroy;
 
   GSList*        objects;
   ObjectsHolder* objects_holder;
-  GHashTable*    events_to_notifiers;
+  GHashTable*    events_to_eventers;
 
 }Pipeline;
 
 Pipeline* get_pipeline(void);
 void pipeline_dtor(void);
 
-void pipeline_add_event_notifier(const gchar* event_name, Notifier* notifier);
-void pipeline_add_event_listener_full(const gchar* event_name, listener listener_func, gpointer user_data);
-void pipeline_add_event_listener(const gchar* event_name, Listener* listener);
+void pipeline_add_eventer(const gchar* event_name, Eventer* eventer);
+void pipeline_add_subscriber_full(const gchar* event_name, subscriber subscriber_func, gpointer user_data);
+void pipeline_add_subscriber(const gchar* event_name, Subscriber* subscriber);
 void pipeline_firing_event(const gchar* event_name, gpointer data);
 
 void pipeline_add_object(gpointer object, GDestroyNotify dtor);

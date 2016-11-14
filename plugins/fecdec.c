@@ -163,7 +163,7 @@ fecdecoder_finalize (GObject * object)
 void
 fecdecoder_init (FECDecoder * this)
 {
-  this->on_response = make_notifier();
+  this->on_response = make_notifier("FECDec: on-response");
   this->thread      = gst_task_new (_fecdec_process, this, NULL);
   this->sysclock    = gst_system_clock_obtain();
   this->messenger   = make_messenger(sizeof(Message));
@@ -286,7 +286,7 @@ static void _fecdec_process(gpointer udata)
     case FECDECODER_MESSAGE_TYPE_RESPONSE_LISTENER:
     {
       ReponseListenerMessage* casted_msg = (ReponseListenerMessage*)msg;
-      notifier_add_listener_full(this->on_response, casted_msg->listener, casted_msg->udata);
+      notifier_add_listener(this->on_response, casted_msg->listener, casted_msg->udata);
     }
     break;
     default:

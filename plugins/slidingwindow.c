@@ -182,8 +182,8 @@ SlidingWindow* make_slidingwindow(guint32 num_limit, GstClockTime obsolation_tre
   result->min_itemnum      = 1;
   result->obsolate         = _slidingwindow_default_obsolation;
   result->obsolate_udata   = result;
-  result->on_add_item      = make_notifier();
-  result->on_rem_item      = make_notifier();
+  result->on_add_item      = make_notifier("SW: on-add-item");
+  result->on_rem_item      = make_notifier("SW: on-rem-item");
   result->data_recycle     = NULL;
   result->items_recycle    = make_recycle_switem( MAX(4, num_limit>>2), _switem_shaper);
 
@@ -355,11 +355,11 @@ void slidingwindow_add_plugin(SlidingWindow* this, SlidingWindowPlugin *swplugin
 {
   this->plugins = g_list_append(this->plugins, swplugin);
   if(swplugin->add_pipe){
-    notifier_add_listener_full(this->on_add_item, (ListenerFunc) swplugin->add_pipe, swplugin->add_data);
+    notifier_add_listener(this->on_add_item, (ListenerFunc) swplugin->add_pipe, swplugin->add_data);
   }
 
   if(swplugin->rem_pipe){
-    notifier_add_listener_full(this->on_rem_item, (ListenerFunc) swplugin->rem_pipe, swplugin->rem_data);
+    notifier_add_listener(this->on_rem_item, (ListenerFunc) swplugin->rem_pipe, swplugin->rem_data);
   }
 }
 
@@ -378,18 +378,18 @@ void slidingwindow_add_plugins (SlidingWindow* this, ... )
 
 void slidingwindow_add_on_change(SlidingWindow* this, ListenerFunc add_callback, ListenerFunc rem_callback, gpointer udata)
 {
-  notifier_add_listener_full(this->on_add_item, add_callback, udata);
-  notifier_add_listener_full(this->on_rem_item, rem_callback, udata);
+  notifier_add_listener(this->on_add_item, add_callback, udata);
+  notifier_add_listener(this->on_rem_item, rem_callback, udata);
 }
 
 void slidingwindow_add_on_add_item_cb(SlidingWindow* this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener_full(this->on_add_item, callback, udata);
+  notifier_add_listener(this->on_add_item, callback, udata);
 }
 
 void slidingwindow_add_on_rem_item_cb(SlidingWindow* this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener_full(this->on_rem_item, callback, udata);
+  notifier_add_listener(this->on_rem_item, callback, udata);
 }
 
 gboolean slidingwindow_is_empty(SlidingWindow* this)
@@ -405,7 +405,7 @@ void swplugin_notify(SlidingWindowPlugin* this, gpointer subject)
 SlidingWindowPlugin* make_swplugin(ListenerFunc on_calculated_cb, gpointer udata)
 {
   SlidingWindowPlugin* this = swplugin_ctor();
-  notifier_add_listener_full(this->on_calculated, on_calculated_cb, udata);
+  notifier_add_listener(this->on_calculated, on_calculated_cb, udata);
   return this;
 }
 
@@ -414,7 +414,7 @@ SlidingWindowPlugin* swplugin_ctor(void)
   SlidingWindowPlugin* this;
   this = malloc(sizeof(SlidingWindowPlugin));
   memset(this, 0, sizeof(SlidingWindowPlugin));
-  this->on_calculated = make_notifier();
+  this->on_calculated = make_notifier("SWPlugin: on-calculated");
   this->disposer = swplugin_dtor;
   return this;
 }

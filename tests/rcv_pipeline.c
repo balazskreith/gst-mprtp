@@ -144,7 +144,7 @@ int main (int argc, char **argv)
   session->decoder   = make_decoder(session->codec_params);
   session->sink      = make_sink(session->sink_params);
 
-  pipeline_add_event_notifier("on-caps-change", session->receiver->on_caps_change);
+  pipeline_add_eventer("on-caps-change", session->receiver->on_caps_change);
 
   loop = g_main_loop_new (NULL, FALSE);
 

@@ -30,7 +30,7 @@ Receiver* receiver_ctor(void)
   this = g_malloc0(sizeof(Receiver));
   this->priv = g_malloc0(sizeof(Private));
   sprintf(this->bin_name, "ReceiverBin_%d", _instance_counter++);
-  this->on_caps_change = make_notifier("on-caps-change");
+  this->on_caps_change = make_eventer("on-caps-change");
   this->objects_holder = objects_holder_ctor();
   return this;
 }
@@ -38,7 +38,7 @@ Receiver* receiver_ctor(void)
 void receiver_dtor(Receiver* this)
 {
   object_holder_dtor(this->objects_holder);
-  notifier_unref(this->on_caps_change);
+  eventer_unref(this->on_caps_change);
   g_free(this->priv);
   g_free(this);
 }
@@ -228,7 +228,7 @@ Receiver* make_receiver_custom(void)
 
 void receiver_on_caps_change(Receiver* this, const GstCaps* caps)
 {
-  notifier_do(this->on_caps_change, caps);
+  eventer_do(this->on_caps_change, caps);
 }
 
 static void _on_rtpSrc_caps_change(GstElement* rtpSrc, const GstCaps* caps)
@@ -247,7 +247,7 @@ GstElement* _make_rtpsrc(Receiver* this, guint16 bound_port)
   g_object_set (rtpSrc, "port", bound_port, NULL);
 
   g_print("UdpSrc is bound to %hu\n", bound_port);
-  notifier_add_listener_full(this->on_caps_change, (listener) _on_rtpSrc_caps_change, rtpSrc);
+  eventer_add_subscriber_full(this->on_caps_change, (subscriber) _on_rtpSrc_caps_change, rtpSrc);
 
 //  return debug_by_src(rtpSrc);
   return rtpSrc;

@@ -145,8 +145,8 @@ bintree3_t *make_bintree3(bintree3cmp cmp)
   result = malloc (sizeof(bintree3_t));
   memset(result, 0, sizeof(bintree3_t));
   result->cmp = cmp;
-  result->on_print     = make_notifier();
-  result->on_duplicate = make_notifier();
+  result->on_print     = make_notifier("Bintree: on-print");
+  result->on_duplicate = make_notifier("Bintree: on-duplicate");
   return result;
 }
 
@@ -244,12 +244,12 @@ gpointer bintree3_get_items_sorted_array(bintree3_t *this, guint *length)
 
 void bintree3_add_on_duplicate_cb(bintree3_t *this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener_full(this->on_duplicate, callback, udata);
+  notifier_add_listener(this->on_duplicate, callback, udata);
 }
 
 void bintree3_add_on_print_cb(bintree3_t *this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener_full(this->on_print, callback, udata);
+  notifier_add_listener(this->on_print, callback, udata);
 }
 
 void _ruin_full(bintree3_t *this, bintree3node_t *node)

@@ -3,13 +3,13 @@
 #include "pipeline.h"
 
 typedef struct{
-  GstElement*    element;
-  Notifier*      on_caps_change;
-  ObjectsHolder* objects_holder;
-  gchar          bin_name[256];
+  GstElement*     element;
+  Eventer*      on_caps_change;
+  ObjectsHolder*  objects_holder;
+  gchar           bin_name[256];
   TransferParams* transfer_params;
 
-  gpointer        priv;
+  gpointer         priv;
 }Receiver;
 
 

@@ -10,7 +10,7 @@
 
 #include <gst/gst.h>
 
-#include "mprtpdefs.h"
+#include "mprtputils.h"
 #include "notifier.h"
 
 typedef struct _Mediator Mediator;

@@ -12,13 +12,7 @@
 #include <gst/rtp/gstrtcpbuffer.h>
 #include <gst/rtp/gstrtpbuffer.h>
 #include "mprtplogger.h"
-
-#define MPRTP_DEFAULT_EXTENSION_HEADER_ID 3
-#define ABS_TIME_DEFAULT_EXTENSION_HEADER_ID 8
-#define FEC_PAYLOAD_DEFAULT_ID 126
-#define SUBFLOW_DEFAULT_SENDING_RATE 500000
-
-#define MPRTP_PLUGIN_MAX_SUBFLOW_NUM 32
+#include "gstmprtpdefs.h"
 
 #define CONSTRAIN(min,max,value) MAX(min, MIN(max, value))
 

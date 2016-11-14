@@ -206,7 +206,7 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
  /usr/include/x86_64-linux-gnu/bits/string2.h /usr/include/stdlib.h \
  /usr/include/x86_64-linux-gnu/bits/string3.h gstmprtpreceiver.h \
  gstmprtcpbuffer.h \
- /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h mprtpdefs.h \
+ /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h mprtputils.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h \
  /usr/local/include/gstreamer-1.0/gst/rtp/gstrtppayloads.h mprtplogger.h \
  messenger.h lib_datapuffer.h \
@@ -215,7 +215,7 @@ libgstmprtp_la-gstmprtpreceiver.lo: gstmprtpreceiver.c \
  /usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h \
  /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
  /usr/include/x86_64-linux-gnu/bits/stdlib.h /usr/include/ctype.h \
- /usr/include/assert.h
+ /usr/include/assert.h gstmprtpdefs.h
 
 /usr/include/stdc-predef.h:
 
@@ -697,7 +697,7 @@ gstmprtcpbuffer.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtcpbuffer.h:
 
-mprtpdefs.h:
+mprtputils.h:
 
 /usr/local/include/gstreamer-1.0/gst/rtp/gstrtpbuffer.h:
 
@@ -724,3 +724,5 @@ lib_datapuffer.h:
 /usr/include/ctype.h:
 
 /usr/include/assert.h:
+
+gstmprtpdefs.h:

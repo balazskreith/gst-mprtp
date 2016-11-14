@@ -26,6 +26,7 @@ Sink* make_sink(SinkParams *params)
 {
   Sink* this = sink_ctor();
   GstBin* sinkBin     = GST_BIN(gst_bin_new(this->bin_name));
+//  GstElement* queue   = gst_element_factory_make("queue",NULL);
   GstElement* sink = NULL;
 
   switch(params->type){
@@ -42,10 +43,13 @@ Sink* make_sink(SinkParams *params)
 
   gst_bin_add_many(sinkBin,
       sink,
+//      queue,
       NULL
   );
 
   setup_ghost_sink(sink, sinkBin);
+//  gst_element_link(queue, sink);
+//  setup_ghost_sink(queue, sinkBin);
 
   this->element = GST_ELEMENT(sinkBin);
 

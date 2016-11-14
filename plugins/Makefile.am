@@ -20,9 +20,8 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          mediator.c            \
                          messenger.c           \
                          monitor.c             \
-                         mprtpdefs.c           \
+                         mprtputils.c          \
                          mprtplogger.c         \
-                         mprtpsignalreport.c   \                         
                          notifier.c            \
                          rcvctrler.c           \
                          rcvpackets.c          \
@@ -55,7 +54,7 @@ noinst_HEADERS = fbrafbproc.h          \
                  mediator.h            \
                  messenger.h           \
                  monitor.h             \
-                 mprtpdefs.h           \
+                 mprtputils.h          \
                  mprtplogger.h         \
                  notifier.h            \
                  rcvctrler.h           \
@@ -75,8 +74,12 @@ noinst_HEADERS = fbrafbproc.h          \
                  streamjoiner.h        \
                  streamsplitter.h      
 
+
+#Oh it seems so terrible, but I do not so care!!!
+#libgstmprtp_ladir = /usr/include/gstreamer-@GST_API_VERSION@/gst/rtp
+
 libgstmprtp_ladir = $(includedir)/gstreamer-@GST_API_VERSION@/gst/rtp
-libgstmprtp_la_HEADERS = mprtpsignalreport.h               
+libgstmprtp_la_HEADERS = gstmprtpdefs.h               
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
 # libgstmprtp_la_CFLAGS = $(GST_CFLAGS) -I/usr/local/include/gstreamer-1.0 -I/home/balazs/gst/master/gst-plugins-base/gst-libs

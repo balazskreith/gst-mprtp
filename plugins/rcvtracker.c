@@ -130,9 +130,9 @@ void
 rcvtracker_init (RcvTracker * this)
 {
   this->sysclock = gst_system_clock_obtain();
-  this->priv                = _priv_ctor();
-  this->on_discarded_packet = make_notifier();
-  this->on_received_packet   = make_notifier();
+  this->priv                 = _priv_ctor();
+  this->on_discarded_packet  = make_notifier("RcvTracker: on-discarded-packet");
+  this->on_received_packet   = make_notifier("RcvTracker: on-received-packet");
 
 
 }
@@ -160,7 +160,7 @@ void rcvtracker_add_discarded_packet(RcvTracker* this, DiscardedPacket* discarde
 
 void rcvtracker_add_on_received_packet_listener(RcvTracker * this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener_full(this->on_received_packet, callback, udata);
+  notifier_add_listener(this->on_received_packet, callback, udata);
 }
 
 void rcvtracker_add_on_received_packet_listener_with_filter(RcvTracker * this, ListenerFunc callback, ListenerFilterFunc filter, gpointer udata)
@@ -179,7 +179,7 @@ void rcvtracker_add_on_discarded_packet_cb(RcvTracker * this,
                                     ListenerFunc callback,
                                     gpointer udata)
 {
-  notifier_add_listener_full(this->on_discarded_packet, callback, udata);
+  notifier_add_listener(this->on_discarded_packet, callback, udata);
 }
 
 

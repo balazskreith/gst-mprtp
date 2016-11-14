@@ -367,7 +367,7 @@ void fbrasubctrler_time_update(FBRASubController *this)
     case SNDSUBFLOW_STATE_OVERUSED:
       this->target_bitrate = MAX(this->bottleneck_point * .6, this->bottleneck_point - _stat(this)->stalled_bytes * 8);
       _change_sndsubflow_target_bitrate(this, this->target_bitrate);
-      //g_print("Overused: Tr: %d, Btl: %d, SB: %d\n", this->target_bitrate, this->bottleneck_point, _stat(this)->stalled_bytes*8);
+//      g_print("Overused: Tr: %d, Btl: %d, SB: %d\n", this->target_bitrate, this->bottleneck_point, _stat(this)->stalled_bytes*8);
       break;
     case SNDSUBFLOW_STATE_STABLE:
       {
@@ -393,7 +393,7 @@ done:
 static void _stat_print(FBRASubController *this)
 {
   FBRAPlusStat *stat = this->stat;
-  g_print("BiF:%-5d (%-5d)->%-5.0f|FEC:%-4d|SR:%-4d|RR:%-4d|Tr:%-4d|Btl:%-4d|Stg:%d-%d-%d-%d|OWD:%-3lu (%-3lu) %2.3f|C:%-2.3f|FL:%-1.2f\n",
+  g_print("BiF:%-5d (%-5d)->%-5.0f|FEC:%-4d|SR:%-4d|RR:%-4d|Tr:%-4d|Btl:%-4d|Stg:%d-%d-%d-%d|OWD:%-3lu +%-3lu (%-3lu) %2.3f|C:%-2.3f|FL:%-1.2f\n",
       stat->bytes_in_flight,
       stat->BiF_80th,
       this->cwnd / 8,
@@ -409,7 +409,8 @@ static void _stat_print(FBRASubController *this)
       this->monitoring_approved,
       this->increasing_approved,
 
-      GST_TIME_AS_MSECONDS(_stat(this)->owd_80th),
+      GST_TIME_AS_MSECONDS(_stat(this)->owd_50th),
+      GST_TIME_AS_MSECONDS(_stat(this)->owd_std),
       GST_TIME_AS_MSECONDS(_stat(this)->last_owd),
       GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000.,
 
@@ -434,7 +435,7 @@ void fbrasubctrler_report_update(
 
   fbrafbprocessor_report_update(this->fbprocessor, summary);
 
-  DISABLE_LINE _stat_print(this);
+  _stat_print(this);
 
   if(10 < _stat(this)->measurements_num){
     _execute_stage(this);
@@ -456,7 +457,7 @@ done:
 static gboolean _distortion(FBRASubController *this)
 {
   //consider fix tresholds
-  GstClockTime owd_th = _stat(this)->owd_80th + CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, _stat(this)->owd_std * 2);
+  GstClockTime owd_th = _stat(this)->owd_50th + CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, _stat(this)->owd_std * 4);
   gint32       BiF_th = _stat(this)->BiF_80th + MAX(5000, _stat(this)->BiF_std * 2);
   gdouble      FL_th  = MIN(_stat(this)->FL_50th, .1);
 

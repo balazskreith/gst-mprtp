@@ -29,7 +29,7 @@ static void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsumm
 static void _process_stat(FBRAFBProcessor *this);
 
 static void _on_BiF_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates);
-static void _on_owd_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates);
+static void _on_owd_50th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates);
 static void _on_FL_50th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates);
 
 static void _on_long_sw_rem(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement);
@@ -51,7 +51,7 @@ static void _owd_logger(FBRAFBProcessor *this)
     sprintf(filename, "owd_%d.csv", this->subflow->id);
     mprtp_logger(filename, "%lu,%lu,%lu,%lu\n",
                    GST_TIME_AS_USECONDS(_stat(this)->last_owd),
-                   GST_TIME_AS_USECONDS(_stat(this)->owd_80th),
+                   GST_TIME_AS_USECONDS(_stat(this)->owd_50th),
                    GST_TIME_AS_USECONDS(this->RTT),
                    (GstClockTime)_stat(this)->srtt / 1000
                    );
@@ -106,7 +106,7 @@ FBRAFBProcessor *make_fbrafbprocessor(SndTracker* sndtracker, SndSubflow* subflo
 {
   FBRAFBProcessor *this;
   this = g_object_new (FBRAFBPROCESSOR_TYPE, NULL);
-  this->on_report_processed = make_notifier();
+  this->on_report_processed = make_notifier("FRACTaL:on-report-processed");
   this->sndtracker = g_object_ref(sndtracker);
   this->subflow    = subflow;
   this->stat       = stat;
@@ -122,7 +122,7 @@ FBRAFBProcessor *make_fbrafbprocessor(SndTracker* sndtracker, SndSubflow* subflo
           make_swpercentile(50, _measurement_FL_cmp, (ListenerFunc) _on_FL_50th_calculated, this));
 
   slidingwindow_add_plugin(this->long_sw,
-        make_swpercentile(80, _measurement_owd_cmp, (ListenerFunc) _on_owd_80th_calculated, this));
+        make_swpercentile(50, _measurement_owd_cmp, (ListenerFunc) _on_owd_50th_calculated, this));
 
 //  if(0){
   slidingwindow_add_on_change(this->short_sw,
@@ -201,8 +201,8 @@ void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
   }
   _stat(this)->last_owd = xrsummary->OWD.median_delay;
 
-  if(_stat(this)->owd_80th){
-    gdouble corr = log(GST_TIME_AS_MSECONDS(_stat(this)->owd_80th));
+  if(_stat(this)->owd_50th){
+    gdouble corr = log(GST_TIME_AS_MSECONDS(_stat(this)->owd_50th));
     corr /= log(GST_TIME_AS_MSECONDS(_stat(this)->last_owd));
     _stat(this)->owd_log_corr = corr;
   }else{
@@ -225,7 +225,10 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
   if(act_seq == end_seq){
     goto done;
   }
-  for(i=0; act_seq <= end_seq; ++act_seq, ++i){
+
+  //g_print("RLE vector from %hu until %hu\n", act_seq, end_seq);
+
+  for(i=0; act_seq != end_seq; ++act_seq, ++i){
     packet = sndtracker_retrieve_sent_packet(this->sndtracker, this->subflow->id, act_seq);
 
     if(!packet || packet->acknowledged){
@@ -277,7 +280,7 @@ void _process_stat(FBRAFBProcessor *this)
   _stat(this)->fec_bitrate           = sndstat->sent_fec_bytes_in_1s * 8;
   _stat(this)->FL_in_1s              = lost_fraction_in_1s;
 
-  _owd_logger(this);
+  DISABLE_LINE _owd_logger(this);
 }
 
 
@@ -295,12 +298,12 @@ void _on_BiF_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *ca
 }
 
 
-void _on_owd_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates)
+void _on_owd_50th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *candidates)
 {
   PercentileResult(FBRAPlusMeasurement,   \
                    owd,                   \
                    candidates,            \
-                   _stat(this)->owd_80th, \
+                   _stat(this)->owd_50th, \
                    this->owd_min,         \
                    this->owd_max,         \
                    0                      \

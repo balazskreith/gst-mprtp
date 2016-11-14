@@ -130,7 +130,7 @@ sndtracker_init (SndTracker * this)
 
   this->priv = _priv_ctor();
 
-  this->on_packet_sent = make_notifier();
+  this->on_packet_sent = make_notifier("SndTracker: on-packet-sent");
 
   slidingwindow_add_on_rem_item_cb(this->sent_sw, (ListenerFunc) _sent_packets_rem_pipe, this);
   slidingwindow_add_on_rem_item_cb(this->fec_sw, (ListenerFunc) _fec_rem_pipe, this);
@@ -169,7 +169,6 @@ SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id
 
 void sndtracker_packet_sent(SndTracker * this, SndPacket* packet)
 {
-
   packet->sent = _now(this);
 
   this->stat.bytes_in_flight += packet->payload_size;
@@ -249,7 +248,6 @@ void sndtracker_packet_acked(SndTracker * this, SndPacket* packet)
       ++subflow->stat.total_received_packets;
     }
 
-    subflow->sent_packets[packet->subflow_seq] = NULL;
   }
 
   slidingwindow_add_data(this->acked_sw,  sndpacket_ref(packet));
@@ -274,7 +272,7 @@ void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_resp
 
 void sndtracker_add_on_packet_sent(SndTracker * this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener_full(this->on_packet_sent, callback, udata);
+  notifier_add_listener(this->on_packet_sent, callback, udata);
 }
 
 void sndtracker_add_on_packet_sent_with_filter(SndTracker * this, ListenerFunc callback, ListenerFilterFunc filter, gpointer udata)
@@ -296,6 +294,10 @@ void _sent_packets_rem_pipe(SndTracker* this, SndPacket* packet)
     Subflow* subflow = _get_subflow(this, packet->subflow_id);
     subflow->stat.sent_bytes_in_1s -= packet->payload_size;
     --subflow->stat.sent_packets_in_1s;
+    if(!packet->acknowledged){
+//      g_print("Packet %hu is not acknowledged in time\n", packet->subflow_seq);
+    }
+    subflow->sent_packets[packet->subflow_seq] = NULL;
   }
 
   if(!packet->acknowledged){

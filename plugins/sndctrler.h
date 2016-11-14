@@ -15,7 +15,7 @@
 #include "messenger.h"
 #include "reportprod.h"
 #include "reportproc.h"
-#include "mprtpsignalreport.h"
+#include "gstmprtpdefs.h"
 #include "fecenc.h"
 #include "sndtracker.h"
 

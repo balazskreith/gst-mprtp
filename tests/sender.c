@@ -18,7 +18,6 @@ static GstElement* _make_mprtp_scheduler(Sender* this, TransferParams* transfer_
 static GstElement* _make_mprtp_controller(Sender* this, SchedulerParams* params, TransferParams* transfer_params);
 static GstElement* _make_mprtp_fractal_controller(Sender* this,
     SchedulerParams *scheduler_params, TransferParams* snd_transfer_params);
-static  GstElement* _make_mprtp_receiver(TransferParams *params);
 static void _setup_mprtcp_pads(Sender* this, TransferParams* transfer_params);
 static int _instance_counter = 0;
 
@@ -31,6 +30,7 @@ Sender* sender_ctor(void)
   this->priv = g_malloc0(sizeof(Private));
   this->objects_holder = objects_holder_ctor();
   sprintf(this->bin_name, "SenderBin_%d", _instance_counter++);
+  this->on_bitrate_change = make_eventer("on-bitrate-change");
 
   return this;
 }
@@ -38,6 +38,7 @@ Sender* sender_ctor(void)
 void sender_dtor(Sender* this)
 {
 
+  eventer_unref(this->on_bitrate_change);
   object_holder_dtor(this->objects_holder);
   g_free(this->priv);
   g_free(this);
@@ -102,6 +103,10 @@ Sender* make_sender(SchedulerParams* scheduler_params, StatParamsTuple* stat_par
   setup_ghost_sink(sink, senderBin);
 
   return this;
+}
+
+Eventer* sender_get_on_bitrate_change_eventer(Sender* this){
+  return this->on_bitrate_change;
 }
 
 Sender* make_sender_custom(void)
@@ -295,11 +300,10 @@ GstElement* _make_mprtp_controller(Sender* this, SchedulerParams* params, Transf
 }
 
 static void
-_mprtp_subflows_utilization (GstElement * mprtpSch, gpointer ptr)
+_mprtp_subflows_utilization (GstElement * mprtpSch, MPRTPPluginSignalData *utilization, Sender* this)
 {
-  MPRTPPluginSignalData *signal = ptr;
-//done:
-  g_print("HAHA: %d", signal->target_media_rate);
+//  g_print("Sender Name: %s", this->bin_name);
+  eventer_do(this->on_bitrate_change, &utilization->target_media_rate);
   return;
 }
 
@@ -325,7 +329,7 @@ GstElement* _make_mprtp_fractal_controller(Sender* this, SchedulerParams *schedu
        NULL
    );
 
-  g_signal_connect (mprtpSch, "mprtp-subflows-utilization", (GCallback) _mprtp_subflows_utilization, NULL);
+  g_signal_connect (mprtpSch, "mprtp-subflows-utilization", (GCallback) _mprtp_subflows_utilization, this);
 
   _setup_mprtcp_pads(this, snd_transfer_params);
 
@@ -339,30 +343,4 @@ GstElement* _make_mprtp_fractal_controller(Sender* this, SchedulerParams *schedu
 
 }
 
-
-GstElement* _make_mprtp_receiver(TransferParams *params)
-{
-  GstBin *receiverBin    = GST_BIN (gst_bin_new (NULL));
-  GstElement* mprtpRcv   = gst_element_factory_make ("mprtpreceiver", NULL);
-  GSList *item;
-
-  gst_bin_add(receiverBin, mprtpRcv);
-  for(item = params->subflows; item; item = item->next){
-    gchar padName[255];
-    ReceiverSubflow* subflow = item->data;
-    GstElement *rtpSrc = gst_element_factory_make("udpsrc", NULL);
-    g_object_set(rtpSrc,
-        "port", subflow->bound_port,
-        NULL);
-    memset(padName, 0, 255);
-    sprintf(padName, "mprtcp_sink_%d", subflow->id);
-    g_print("UDP SInk is created for port: %hu\n", subflow->bound_port);
-    gst_bin_add(receiverBin, rtpSrc);
-    gst_element_link_pads(rtpSrc, "src", mprtpRcv, padName);
-  }
-
-//  setup_ghost_src_by_padnames(mprtpRcv, "mprtp_src", receiverBin, "src");
-  setup_ghost_src_by_padnames(mprtpRcv, "mprtcp_rr_src", receiverBin, "mprtcp_rr_src");
-  return GST_ELEMENT(receiverBin);
-}
 

@@ -27,7 +27,7 @@
 #include <string.h>
 #include "fecenc.h"
 #include "gstmprtcpbuffer.h"
-#include "mprtpdefs.h"
+#include "mprtputils.h"
 
 #define _now(this) gst_clock_get_time (this->sysclock)
 

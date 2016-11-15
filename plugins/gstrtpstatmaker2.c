@@ -391,7 +391,8 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
 
     if(this->csv_logging){
       mprtp_logger(this->packetslog_file,
-          "%hu,%d,%lu,%d,%u,%u,%u,%d\n",
+          "%u,%hu,%d,%lu,%d,%u,%u,%u,%d\n",
+          packet->extended_seq,
           packet->tracked_seq,
           packet->state,
           packet->tracked_ntp,
@@ -708,6 +709,13 @@ _monitorstat_emitter (GstRTPStatMaker2 *this)
   g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);
   if(!this->statlogs_linked){
     goto done;
+  }
+
+  if(this->touched_sync_active){
+    if(!g_file_test(this->touched_sync_location, G_FILE_TEST_EXISTS)){
+      goto done;
+    }
+    this->touched_sync_active = FALSE;
   }
 
 //  buffer = gst_buffer_new_wrapped(g_malloc0(length), length);

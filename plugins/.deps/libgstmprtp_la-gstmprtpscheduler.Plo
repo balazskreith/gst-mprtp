@@ -183,7 +183,6 @@ libgstmprtp_la-gstmprtpscheduler.lo: gstmprtpscheduler.c \
  /usr/local/include/gstreamer-1.0/gst/gstdevicemonitor.h \
  /usr/local/include/gstreamer-1.0/gst/gstdeviceprovider.h \
  /usr/local/include/gstreamer-1.0/gst/gstdeviceproviderfactory.h \
- /usr/local/include/gstreamer-1.0/gst/gstdynamictypefactory.h \
  /usr/local/include/gstreamer-1.0/gst/gstelementmetadata.h \
  /usr/local/include/gstreamer-1.0/gst/gsterror.h /usr/include/errno.h \
  /usr/include/x86_64-linux-gnu/bits/errno.h /usr/include/linux/errno.h \
@@ -798,8 +797,6 @@ libgstmprtp_la-gstmprtpscheduler.lo: gstmprtpscheduler.c \
 /usr/local/include/gstreamer-1.0/gst/gstdeviceprovider.h:
 
 /usr/local/include/gstreamer-1.0/gst/gstdeviceproviderfactory.h:
-
-/usr/local/include/gstreamer-1.0/gst/gstdynamictypefactory.h:
 
 /usr/local/include/gstreamer-1.0/gst/gstelementmetadata.h:
 

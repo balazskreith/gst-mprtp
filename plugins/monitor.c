@@ -178,6 +178,7 @@ static MonitorPacket* _make_new_packet(Monitor* this, guint16 tracked_seq)
   packet->state       = MONITOR_PACKET_STATE_UNKNOWN;
   packet->tracked_ntp = NTP_NOW;
   packet->tracked_seq = tracked_seq;
+  packet->extended_seq = ((guint32)this->cycle_num << 16) | ((guint32)packet->tracked_seq);
 
   return packet;
 }
@@ -217,8 +218,9 @@ MonitorPacket* monitor_track_rtpbuffer(Monitor* this, GstBuffer* buffer)
   }
 
   if(this->initialized == FALSE){
-    this->initialized = TRUE;
-    this->tracked_hsn = packet->tracked_seq;
+    this->initialized  = TRUE;
+    this->tracked_hsn  = packet->extended_seq = packet->tracked_seq;
+    this->cycle_num    = 0;
     _monitor_packet_fire(this, packet, ON_RECEIVED, NULL);
     goto done;
   }
@@ -227,6 +229,14 @@ MonitorPacket* monitor_track_rtpbuffer(Monitor* this, GstBuffer* buffer)
     _monitor_packet_fire(this, packet, ON_DISCARD, NULL);
     goto done;
   }
+  else if(65535 == this->tracked_hsn && 0 == packet->tracked_seq)
+  {
+    //No loss between the overrun
+    ++this->cycle_num;
+    packet->extended_seq = ((guint32)this->cycle_num << 16) | ((guint32)packet->tracked_seq);
+  }
+
+
 
   while(_cmp_seq(++this->tracked_hsn, packet->tracked_seq) != 0){
     MonitorPacket *missing;
@@ -236,6 +246,9 @@ MonitorPacket* monitor_track_rtpbuffer(Monitor* this, GstBuffer* buffer)
       missing = _make_new_packet(this, this->tracked_hsn);
     }
     _monitor_packet_fire(this, missing, ON_LOST, NULL);
+    if(65535 == this->tracked_hsn && 0 < packet->tracked_seq){
+        ++this->cycle_num;//gonna be overrun, but we shouldn't be here if its conseqvent
+    }
   }
   _monitor_packet_fire(this, packet, ON_RECEIVED, NULL);
 done:
@@ -434,8 +447,10 @@ guint16 _get_tracked_seq(Monitor *this, GstRTPBuffer* rtp)
   if(0 < this->mprtp_ext_header_id){
     gst_rtp_buffer_get_mprtp_extension(rtp, this->mprtp_ext_header_id, &subflow_id, &tracked_seq);
     goto done;
+  }else{
+    tracked_seq = gst_rtp_buffer_get_seq(rtp);
   }
-  tracked_seq = gst_rtp_buffer_get_seq(rtp);
+
 done:
   return tracked_seq;
 }

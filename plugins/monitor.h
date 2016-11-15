@@ -52,6 +52,7 @@ typedef void(*MonitorPacketAction)(Monitor*,MonitorPacket*);
 
 struct _MonitorPacket
 {
+  guint32              extended_seq;
   MonitorPacketStates  state;
   guint64              tracked_ntp;
   guint16              tracked_seq;
@@ -76,6 +77,7 @@ struct _Monitor
   MonitorPacket**      tracked_packets;
   Recycle*             recycle;
 
+  guint16              cycle_num;
   guint16              tracked_hsn;
   gboolean             initialized;
   guint8               mprtp_ext_header_id;

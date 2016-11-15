@@ -97,8 +97,8 @@ static char *development_argv[] = {
     "--sender=MPRTP:1:1:10.0.0.6:5000",
     "--scheduler=MPRTPFRACTAL:MPRTP:1:1:5001",
     "--stat=100:1000:1:triggered_stat",
-    "--statlogsink=FILE:snd_statlogs.txt",
-    "--packetlogsink=FILE:snd_packetlogs.txt"
+    "--statlogsink=FILE:temp/snd_statlogs.csv",
+    "--packetlogsink=FILE:temp/snd_packetlogs.csv"
 };
 
 #define development_argc (sizeof (development_argv) / sizeof (const char *))

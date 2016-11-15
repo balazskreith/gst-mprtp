@@ -472,14 +472,15 @@ _reduce_stage(
 
   this->cwnd = MAX(10000, _stat(this)->BiF_80th) * 8;
 
-  if(this->last_distorted < _now(this) - _stat(this)->srtt &&
-     this->distorted_BiF < _stat(this)->bytes_in_flight){
+  if(this->last_distorted < _now(this) - _stat(this)->srtt && this->distorted_BiF < _stat(this)->bytes_in_flight){
     this->bottleneck_point -= MIN(this->bottleneck_point * .4, (_stat(this)->bytes_in_flight - this->distorted_BiF) * 10);
     this->last_distorted = _now(this);
     this->distorted_BiF  = _stat(this)->bytes_in_flight;
     if(_stat(this)->receiver_bitrate * 1.25 < this->bottleneck_point){
       this->bottleneck_point = _stat(this)->receiver_bitrate;
     }
+  }else if(this->last_distorted < _now(this) - 2 * _stat(this)->srtt){
+    this->bottleneck_point *= .8;
   }
 
 

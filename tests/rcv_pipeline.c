@@ -78,8 +78,8 @@ static char *development_argv[] = {
     "--sink=AUTOVIDEO",
     "--playouter=MPRTPFRACTAL:MPRTP:1:1:10.0.0.1:5001",
     "--stat=100:1000:1:triggered_stat",
-    "--statlogsink=FILE:rcv_statlogs.txt",
-    "--packetlogsink=FILE:rcv_packetlogs.txt"
+    "--statlogsink=FILE:temp/rcv_statlogs.csv",
+    "--packetlogsink=FILE:temp/rcv_packetlogs.csv"
 };
 
 #define development_argc (sizeof (development_argv) / sizeof (const char *))
@@ -99,6 +99,8 @@ int main (int argc, char **argv)
   if(1){
     argc = development_argc;
     argv = development_argv;
+    system("rm triggered_stat");
+    system("rm temp/*");
   }
 
   session = g_malloc0(sizeof(ReceiverSide));

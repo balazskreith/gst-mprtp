@@ -291,12 +291,12 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 //  GstMprtpschedulerPrivate *priv;
 //  priv = this->priv = GST_MPRTPSCHEDULER_GET_PRIVATE (this);
 
-  init_mprtp_logger();
-  //TODO: Only for development use
-  mprtp_logger_set_state(TRUE);
-  mprtp_logger_set_system_command("bash -c '[ ! -d temp_logs ]' && mkdir temp_logs");
-  mprtp_logger_set_system_command("rm temp_logs/*");
-  mprtp_logger_set_target_directory("temp_logs/");
+//  init_mprtp_logger();
+//  //TODO: Only for development use
+//  mprtp_logger_set_state(TRUE);
+//  mprtp_logger_set_system_command("bash -c '[ ! -d temp_logs ]' && mkdir temp_logs");
+//  mprtp_logger_set_system_command("rm temp_logs/*");
+//  mprtp_logger_set_target_directory("temp_logs/");
 
   this->rtp_sinkpad =
       gst_pad_new_from_static_template (&gst_mprtpscheduler_rtp_sink_template,

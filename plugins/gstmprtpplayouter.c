@@ -233,12 +233,12 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
 static void
 gst_mprtpplayouter_init (GstMprtpplayouter * this)
 {
-  init_mprtp_logger();
-  //TODO: Only for development use
-  mprtp_logger_set_state(TRUE);
-  mprtp_logger_set_system_command("bash -c '[ ! -d temp_logs ]' && mkdir temp_logs");
-  mprtp_logger_set_system_command("rm temp_logs/*");
-  mprtp_logger_set_target_directory("temp_logs/");
+//  init_mprtp_logger();
+//  //TODO: Only for development use
+//  mprtp_logger_set_state(TRUE);
+//  mprtp_logger_set_system_command("bash -c '[ ! -d temp_logs ]' && mkdir temp_logs");
+//  mprtp_logger_set_system_command("rm temp_logs/*");
+//  mprtp_logger_set_target_directory("temp_logs/");
 
   this->mprtp_sinkpad =
       gst_pad_new_from_static_template (&gst_mprtpplayouter_mprtp_sink_template,

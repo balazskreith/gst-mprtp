@@ -704,6 +704,7 @@ _monitorstat_emitter (GstRTPStatMaker2 *this)
   gint64 end_time;
 
   THIS_LOCK(this);
+
   end_time = g_get_monotonic_time() + this->sampling_time * 1000; //because sampling_time is in ms.
 
   g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);

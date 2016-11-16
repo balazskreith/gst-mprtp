@@ -38,12 +38,17 @@ typedef struct _FBRAPlusStat
   gint32                   BiF_std;
   gint32                   stalled_bytes;
   gint32                   bytes_in_flight;
+  GstClockTime             delay_in_rtpqueue;
   gint32                   sender_bitrate;
   gint32                   receiver_bitrate;
   gint32                   fec_bitrate;
   gdouble                  owd_log_corr;
   GstClockTime             owd_std;
   gdouble                  srtt;
+
+  gint32                   newly_acked_bytes;
+  gdouble                  sr_avg;
+  gdouble                  rr_avg;
 
   gdouble                  FL_in_1s;
   gdouble                  FL_50th;

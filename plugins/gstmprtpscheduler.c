@@ -388,6 +388,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   notifier_add_listener(this->on_rtcp_ready,
       (ListenerFunc) _on_rtcp_ready, this);
+
+  this->obsolation_treshold = 50 * GST_MSECOND;
 }
 
 
@@ -678,7 +680,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
 
   if(0 < sndsubflows_get_subflows_num(this->subflows)){
     packet = sndpackets_make_packet(this->sndpackets, gst_buffer_ref(buffer));
-    g_queue_push_tail(this->packetsq, packet);
+    g_queue_push_tail(this->packetsq, sndtracker_add_packet_to_rtpqueue(this->sndtracker, packet));
     g_cond_signal(&this->receiving_signal);
   }else{
     result = gst_pad_push(this->mprtp_srcpad, buffer);
@@ -892,11 +894,11 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
   sndctrler_time_update(this->controller);
 
   //Obsolete packets stayed in the q for a while
-  //TODO: turn it on
-//  if(0 < this->obsolation_treshold && packet->made < now - this->obsolation_treshold){
-//    gst_buffer_unref(sndpacket_retrieve(packet));
-//    goto done;
-//  }
+  if(0 < this->obsolation_treshold && packet->made < now - this->obsolation_treshold){
+    gst_buffer_unref(sndpacket_retrieve(packet));
+    g_print("Packet obsolated\n");
+    goto done;
+  }
 
   subflow = stream_splitter_approve_packet(this->splitter, packet, now, &next_time);
   if(!subflow){
@@ -934,9 +936,11 @@ mprtpscheduler_emitter_process (gpointer udata)
   messenger_lock(this->emit_msger);
 
   msg = messenger_pop_block_with_timeout_unlocked(this->emit_msger, 10000);
+
   if(!msg){
     goto done;
   }
+//  g_print("Requested media rate: %d\n", msg->target_media_rate);
   g_signal_emit (this, _subflows_utilization, 0 /* details */, msg);
   messenger_throw_block_unlocked(this->emit_msger, msg);
 done:

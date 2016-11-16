@@ -54,6 +54,7 @@ struct _FBRASubController
 
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;
+  GstClockTime              monitoring_approvement_started;
   gboolean                  monitoring_approved;
 
   gboolean                  increasing_approved;
@@ -72,7 +73,8 @@ struct _FBRASubController
 
   gint32                    distorted_BiF;
 
-  gdouble                   cwnd;
+  gdouble                   cwnd;//congestion window
+  gdouble                   awnd;//allowed bitrate window
 
   gpointer                  priv;
 

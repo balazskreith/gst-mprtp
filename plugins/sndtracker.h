@@ -52,6 +52,13 @@ typedef struct _SndTrackerSndStat{
   guint32                   total_received_packets;
 }SndTrackerStat;
 
+typedef struct _RTPQueueStat{
+  gint32                    bytes_in_queue;
+  gint16                    packets_in_queue;
+  GstClockTime              last_arrived;
+  GstClockTime              delay_length;
+}RTPQueueStat;
+
 struct _SndTracker
 {
   GObject                   object;
@@ -63,6 +70,7 @@ struct _SndTracker
 
   gpointer                  priv;
   SndTrackerStat            stat;
+  RTPQueueStat              rtpqstat;
 
   Notifier*                 on_packet_sent;
 };
@@ -77,8 +85,8 @@ GType sndtracker_get_type (void);
 SndTracker *make_sndtracker(SndSubflows* subflows_db);
 void sndtracker_refresh(SndTracker * this);
 
-
 void sndtracker_packet_sent(SndTracker * this, SndPacket* packet);
+SndPacket* sndtracker_add_packet_to_rtpqueue(SndTracker* this, SndPacket* packet);
 SndPacket* sndtracker_retrieve_sent_packet(SndTracker * this, guint8 subflow_id, guint16 subflow_seq);
 void sndtracker_packet_acked(SndTracker * this, SndPacket* packet);
 void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_response);
@@ -87,5 +95,5 @@ void sndtracker_add_on_packet_sent_with_filter(SndTracker * this, ListenerFunc c
 void sndtracker_rem_on_packet_sent(SndTracker * this, ListenerFunc callback);
 SndTrackerStat* sndtracker_get_stat(SndTracker * this);
 SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id);
-
+RTPQueueStat*   sndtracker_get_rtpqstat(SndTracker * this);
 #endif /* SNDTRACKER_H_ */

@@ -3,109 +3,66 @@ programname=$0
 
 NSSND="ns_snd"
 NSRCV="ns_rcv"
-SENDER="sender"
-RECEIVER="receiver"
-LOGSDIR="logs"
-REPORTSDIR="reports"
+LOGSDIR="temp"
 SCRIPTSDIR="scripts"
 TEMPDIR=$SCRIPTSDIR"/temp"
-EVALDIR=$SCRIPTSDIR"/evals"
-CONFDIR=$SCRIPTSDIR"/configs"
-RUNDIR=$SCRIPTSDIR"/runs"
+SYNCTOUCHFILE="triggered_stat"
 
-PRECMD="cerbero-1.6 run"
-
-rm -R -f $LOGSDIR/*
+mkdir $LOGSDIR
+rm $LOGSDIR/*
+rm $SYNCTOUCHFILE
 
 #setup defaults
-DURATION=150
+DURATION=120
 OWD_SND=100
 OWD_RCV=100
 
 
+sudo ip netns exec ns_mid tc qdisc change dev veth2 root handle 1: netem delay "$OWD_SND"ms
+sudo ip netns exec ns_mid tc qdisc change dev veth1 root handle 1: netem delay "$OWD_RCV"ms
 
-while [[ $# -gt 1 ]]
+echo "ntrt -c$CONFDIR/ntrt_snd_meas.ini -m$CONFDIR/ntrt_rmcat2.cmds -t120 " > $LOGSDIR"/ntrt.sh"
+chmod 777 $LOGSDIR"/ntrt.sh"
+
+sudo ip netns exec ns_snd $LOGSDIR"/ntrt.sh" 
+
+#setup the bandwidth
+sudo ip netns exec ns_mid tc qdisc change dev veth2 parent 1: handle 2: tbf rate 1000kbit burst 100kbit latency 300ms minburst 1540
+sudo ip netns exec ns_mid tc qdisc change dev veth1 parent 1: handle 2: tbf rate 1000kbit burst 100kbit latency 300ms minburst 1540
+echo "Environment is ready, lets rock"
+
+#Lets Rock
+touch $SYNCTOUCHFILE
+
+#set the file contains the info for bandwidth in kbit
+echo -n "" > $LOGSDIR/bandwidth.csv
+for i in `seq 1 400`;
 do
-key="$1"
-case $key in
-    -s|--owdsnd)
-    OWD_SND="$2"
-    shift # past argument
-    ;;
-    -r|--owdrcv)
-    OWD_RCV="$2"
-    shift # past argument
-    ;;
-    *)
-            # unknown option
-    ;;
-esac
-shift # past argument or value
-done
+	echo "1000" >> $LOGSDIR/bandwidth.csv
+done 
+echo "Path 1 in forward direction capacity changed to 1000kbit/s"
+sleep 40
 
+sudo ip netns exec ns_mid tc qdisc change dev veth2 parent 1: handle 2: tbf rate 2800kbit burst 100kbit latency 300ms minburst 15400
+for i in `seq 1 200`;
+do
+	echo "2800" >> $LOGSDIR/bandwidth.csv
+done 
+echo "Path 1 in forward direction capacity changed to 2800kbit/s"
+sleep 20
 
-  rm $TEMPDIR/peer1/*
-  rm $TEMPDIR/peer2/*
-  rm $TEMPDIR/peer3/*
-  rm $TEMPDIR/peer4/*
-  rm $TEMPDIR/peer5/*
+sudo ip netns exec ns_mid tc qdisc change dev veth2 parent 1: handle 2: tbf rate 600kbit burst 100kbit latency 300ms minburst 1540
+for i in `seq 1 200`;
+do
+	echo "600" >> $LOGSDIR/bandwidth.csv
+done 
+echo "Path 1 in forward direction capacity changed to 600kbit/s"
+sleep 20
 
-  sudo ip netns exec ns_mid tc qdisc change dev veth2 root handle 1: netem delay "$OWD_SND"ms
-  sudo ip netns exec ns_mid tc qdisc change dev veth1 root handle 1: netem delay "$OWD_RCV"ms
-
-  PEER1_SND="$TEMPDIR/sender_1.sh"
-  PEER1_SND_EMBED="$TEMPDIR/sender_1_cerbero.sh"
-  
-  echo "ntrt -c$CONFDIR/ntrt_snd_meas.ini -m$CONFDIR/ntrt_rmcat1.cmds -t$DURATION &" > $PEER1_SND
-  echo -n "./$SENDER" >> $PEER1_SND
-  ./$CONFDIR/peer1params.sh >> $PEER1_SND
-  echo -n "--save_received_yuvfile=0 " >> $PEER1_SND 
-  echo -n "--use_testsourcevideo=0 " >> $PEER1_SND 
-  chmod 777 $PEER1_SND
-  
-  #echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_SND" > $PEER1_SND_EMBED
-  echo "./$PEER1_SND" > $PEER1_SND_EMBED 
-  chmod 777 $PEER1_SND_EMBED
-
-  PEER1_RCV="$TEMPDIR/receiver_1.sh"
-  PEER1_RCV_EMBED="$TEMPDIR/receiver_1_cerbero.sh"
-  
-  echo "ntrt -c$CONFDIR/ntrt_rcv_meas.ini -t$DURATION &" > $PEER1_RCV
-  echo -n "./$RECEIVER" >> $PEER1_RCV
-  ./$CONFDIR/peer1params.sh >> $PEER1_RCV
-  echo -n "--save_received_yuvfile=0 " >> $PEER1_RCV 
-  chmod 777 $PEER1_RCV
-  
-  #echo "/home/balazs/gst/cerbero-1.6/cerbero-uninstalled run ./$PEER1_RCV" > $PEER1_RCV_EMBED 
-  echo "./$PEER1_RCV" > $PEER1_RCV_EMBED 
-  chmod 777 $PEER1_RCV_EMBED
-
-  #start receiver and sender
-  sudo ip netns exec $NSRCV ./$PEER1_RCV_EMBED 2> $LOGSDIR"/"receiver.log &
-  sleep 2
-  sudo ip netns exec $NSSND ./$PEER1_SND_EMBED 2> $LOGSDIR"/"sender.log &
-
-cleanup()
-# example cleanup function
-{
-  pkill receiver
-  pkill sender
-  pkill ntrt
-  ps -ef | grep 'main.sh' | grep -v grep | awk '{print $2}' | xargs kill
-}
- 
-control_c()
-# run if user hits control-c
-{
-  echo -en "\n*** Program is terminated ***\n"
-  cleanup
-  exit $?
-}
-
-trap control_c SIGINT
-
-sleep $DURATION
-
-cleanup
-
-
+sudo ip netns exec ns_mid tc qdisc change dev veth2 parent 1: handle 2: tbf rate 1000kbit burst 100kbit latency 300ms minburst 1540
+for i in `seq 1 200`;
+do
+	echo "1000" >> $LOGSDIR/bandwidth.csv
+done 
+echo "Path 1 in forward direction capacity changed to 1000kbit/s"
+sleep 20

@@ -93,6 +93,7 @@ static void _connect_encoder_to_sender(SenderSide *this)
 static char *development_argv[] = {
     "program_name",
     "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1",
+//    "--source=TESTVIDEO",
     "--codec=VP8",
     "--sender=MPRTP:1:1:10.0.0.6:5000",
     "--scheduler=MPRTPFRACTAL:MPRTP:1:1:5001",

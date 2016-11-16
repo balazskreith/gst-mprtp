@@ -161,15 +161,31 @@ SndTrackerStat* sndtracker_get_stat(SndTracker * this)
   return &this->stat;
 }
 
+RTPQueueStat*   sndtracker_get_rtpqstat(SndTracker * this){
+  return &this->rtpqstat;
+}
+
 SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id)
 {
   Subflow *subflow = _get_subflow(this, subflow_id);
   return &subflow->stat;
 }
 
+SndPacket* sndtracker_add_packet_to_rtpqueue(SndTracker* this, SndPacket* packet)
+{
+  this->rtpqstat.bytes_in_queue += packet->payload_size;
+  ++this->rtpqstat.packets_in_queue;
+  this->rtpqstat.last_arrived = packet->made;
+  return packet;
+}
+
 void sndtracker_packet_sent(SndTracker * this, SndPacket* packet)
 {
   packet->sent = _now(this);
+
+  this->rtpqstat.bytes_in_queue -= packet->payload_size;
+  --this->rtpqstat.packets_in_queue;
+  this->rtpqstat.delay_length = this->rtpqstat.last_arrived - packet->made;
 
   this->stat.bytes_in_flight += packet->payload_size;
   ++this->stat.packets_in_flight;

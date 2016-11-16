@@ -97,7 +97,7 @@ void
 fbrafbprocessor_init (FBRAFBProcessor * this)
 {
   this->sysclock         = gst_system_clock_obtain();
-  this-> RTT             = 0;
+  this->RTT              = 0;
 
 }
 
@@ -222,6 +222,8 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
 
   act_seq = xr->LostRLE.begin_seq;
   end_seq = xr->LostRLE.end_seq;
+  _stat(this)->newly_acked_bytes = 0;
+
   if(act_seq == end_seq){
     goto done;
   }
@@ -237,6 +239,7 @@ void _process_rle_discvector(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xr
     packet->acknowledged = TRUE;
     packet->lost = !xr->LostRLE.vector[i];
 
+    _stat(this)->newly_acked_bytes += packet->payload_size;
     sndtracker_packet_acked(this->sndtracker, packet);
     last_packet_sent_time = packet->sent;
   }
@@ -261,6 +264,7 @@ void _process_stat(FBRAFBProcessor *this)
 {
   gdouble lost_fraction_in_1s = 0.;
   SndTrackerStat* sndstat = sndtracker_get_subflow_stat(this->sndtracker, this->subflow->id);
+  RTPQueueStat* rtpqstat  = sndtracker_get_rtpqstat(this->sndtracker);
   this->last_bytes_in_flight = sndstat->bytes_in_flight;
 
   if(sndstat->bytes_in_flight < _stat(this)->BiF_80th){
@@ -274,11 +278,25 @@ void _process_stat(FBRAFBProcessor *this)
     lost_fraction_in_1s /= (gdouble) sndstat->acked_packets_in_1s;
   }
 
+  _stat(this)->delay_in_rtpqueue     = rtpqstat->delay_length;
   _stat(this)->bytes_in_flight       = sndstat->bytes_in_flight;
   _stat(this)->sender_bitrate        = sndstat->sent_bytes_in_1s * 8;
   _stat(this)->receiver_bitrate      = sndstat->received_bytes_in_1s * 8;
   _stat(this)->fec_bitrate           = sndstat->sent_fec_bytes_in_1s * 8;
   _stat(this)->FL_in_1s              = lost_fraction_in_1s;
+
+  if(_stat(this)->sr_avg){
+    _stat(this)->sr_avg = .2 * _stat(this)->sender_bitrate + _stat(this)->sr_avg * .8;
+  }else{
+    _stat(this)->sr_avg = _stat(this)->sender_bitrate;
+  }
+
+  if(_stat(this)->rr_avg){
+    _stat(this)->rr_avg = .2 * _stat(this)->receiver_bitrate + _stat(this)->rr_avg * .8;
+  }else{
+    _stat(this)->rr_avg = _stat(this)->receiver_bitrate;
+  }
+
 
   DISABLE_LINE _owd_logger(this);
 }
@@ -369,6 +387,5 @@ void _on_short_sw_add(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement)
 void _on_long_sw_add(FBRAFBProcessor *this, FBRAPlusMeasurement* measurement)
 {
   ++this->owd_std_helper.counter;
-//  _stat(this)->owd_in_ms_std = GST_TIME_AS_MSECONDS(_calculate_std(&this->owd_std_helper, measurement->owd));
   _stat(this)->owd_std = _calculate_std(&this->owd_std_helper, measurement->owd);
 }

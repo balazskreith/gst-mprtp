@@ -858,11 +858,12 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndSubflow* subflow, SndP
 {
   GstBuffer *buffer;
   sndpacket_setup_mprtp(packet, subflow->id, sndsubflow_get_next_subflow_seq(subflow));
-  sndtracker_packet_sent(this->sndtracker, packet);
+  fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(packet->buffer));
 
+  sndtracker_packet_sent(this->sndtracker, packet);
 //  g_print("packet %hu sent %d - %hu\n", packet->abs_seq, packet->subflow_id, packet->subflow_seq);
+
   buffer = sndpacket_retrieve(packet);
-  fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(buffer));
 //  g_print("Packet sent  flow result: %d\n", gst_pad_push(this->mprtp_srcpad, buffer));
 
 //  artifical lost
@@ -934,7 +935,6 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
   }
 
   if(0 < this->fec_interval && (++this->sent_packets % this->fec_interval) == 0){
-//    fecencoder_request_fec(this->fec_encoder, subflow->id);
     _on_monitoring_request(this, subflow);
   }
 

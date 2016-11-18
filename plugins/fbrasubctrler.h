@@ -39,6 +39,7 @@ struct _FBRASubController
   SndSubflow*               subflow;
 
   GstClockTime              last_log;
+  gboolean                  approve_measurement;
 
   gint32                    target_bitrate;
   gint32                    stable_bitrate;
@@ -63,6 +64,10 @@ struct _FBRASubController
   GstClockTime              increasing_rr_reached;
   GstClockTime              increasing_sr_reached;
   gint32                    increasement;
+
+
+  gboolean                  reducing_approved;
+  GstClockTime              reducing_sr_reached;
 
   guint                     pending_event;
   SubRateAction             stage_fnc;

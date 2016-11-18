@@ -124,7 +124,7 @@ monitor_finalize (GObject * object)
   Monitor *this;
 
   this = MONITOR(object);
-
+  g_queue_clear(this->prepared_packets);
   g_object_unref(this->recycle);
   g_object_unref(this->packets_sw);
   g_object_unref(this->sysclock);
@@ -147,6 +147,7 @@ monitor_init (Monitor * this)
   this->tracked_packets           = g_malloc0(sizeof(MonitorPacket*) * 65536);
   this->packets_sw               = make_slidingwindow(1000, GST_SECOND);
   this->mprtp_ext_header_id      = 0;
+  this->prepared_packets         = g_queue_new();
 
   slidingwindow_add_on_change(this->packets_sw,
       (ListenerFunc) _track_packet, (ListenerFunc) _untrack_packet, this);
@@ -191,7 +192,7 @@ static gboolean _is_fec_packet(Monitor* this, MonitorPacket *packet)
   return packet->payload_type == this->fec_payload_type;
 }
 
-MonitorPacket* monitor_track_rtpbuffer(Monitor* this, GstBuffer* buffer)
+void monitor_track_rtpbuffer(Monitor* this, GstBuffer* buffer)
 {
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   MonitorPacket* packet;
@@ -246,13 +247,23 @@ MonitorPacket* monitor_track_rtpbuffer(Monitor* this, GstBuffer* buffer)
       missing = _make_new_packet(this, this->tracked_hsn);
     }
     _monitor_packet_fire(this, missing, ON_LOST, NULL);
+    g_queue_push_tail(this->prepared_packets, missing);
     if(65535 == this->tracked_hsn && 0 < packet->tracked_seq){
         ++this->cycle_num;//gonna be overrun, but we shouldn't be here if its conseqvent
     }
   }
   _monitor_packet_fire(this, packet, ON_RECEIVED, NULL);
 done:
-  return packet;
+  if(packet){
+    g_queue_push_tail(this->prepared_packets, packet);
+  }
+}
+
+MonitorPacket* monitor_pop_prepared_packet(Monitor* this){
+  if(g_queue_is_empty(this->prepared_packets)){
+    return NULL;
+  }
+  return g_queue_pop_head(this->prepared_packets);
 }
 
 
@@ -272,7 +283,7 @@ void monitor_track_packetbuffer(Monitor* this, GstBuffer* buffer)
     goto done;
   }
 
-  g_print("Discarded packet arrived %hu, HSN %hu\n", packet->tracked_seq, this->tracked_hsn);
+  //g_print("Discarded packet arrived %hu, HSN %hu\n", packet->tracked_seq, this->tracked_hsn);
 
   already_tracked = this->tracked_packets[packet->tracked_seq];
   if(already_tracked){
@@ -409,14 +420,17 @@ void _monitor_packet_fire(Monitor* this, MonitorPacket *packet, MonitorPacketEve
       case MONITOR_PACKET_STATE_LOST:
       switch(event){
         case ON_DISCARD:
+//          g_print("Packet %hu considred to be lost and now discarded\n", packet->tracked_seq);
           packet->tracker = &this->stat.discarded;
           packet->state = MONITOR_PACKET_STATE_DISCARDED;
           break;
         case ON_LOST:
+//          g_print("Packet %hu considred to be lost and lost forever\n", packet->tracked_seq);
           packet->tracker = &this->stat.lost;
         break;
         case ON_RECEIVED:
-          packet->tracker = &this->stat.received;
+//          g_print("Packet %hu considred to be lost, but repaired\n", packet->tracked_seq);
+          packet->tracker = &this->stat.repaired;
           packet->state = MONITOR_PACKET_STATE_RECEIVED;
           break;
         default:

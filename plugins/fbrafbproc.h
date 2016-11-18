@@ -35,6 +35,7 @@ typedef struct _FBRAPlusStat
   gint32                   measurements_num;
   gint32                   BiF_80th;
   gint32                   BiF_max;
+  gint32                   BiF_min;
   gint32                   BiF_std;
   gint32                   stalled_bytes;
   gint32                   bytes_in_flight;
@@ -52,6 +53,8 @@ typedef struct _FBRAPlusStat
 
   gdouble                  FL_in_1s;
   gdouble                  FL_50th;
+
+  gdouble                  volume_ratio;
 
 }FBRAPlusStat;
 
@@ -99,6 +102,9 @@ struct _FBRAFBProcessor
   FBRAPlusStdHelper        BiF_std_helper;
   GstClockTime             last_report_updated;
   GstClockTime             last_owd_log;
+
+  gdouble                  last_volume;
+  gdouble                  normal_volume;
 
 };
 

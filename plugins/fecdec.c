@@ -279,6 +279,7 @@ static void _fecdec_process(gpointer udata)
     {
       RepairRequestMessage* casted_msg = (RepairRequestMessage*)msg;
       GstBuffer* rtpbuf;
+//      g_print("Repair request arrived for seq: %hu\n", casted_msg->missing_seq);
       rtpbuf = _get_repaired_rtpbuffer(this, casted_msg->missing_seq);
       notifier_do(this->on_response, rtpbuf);
     }
@@ -459,6 +460,7 @@ GstBuffer* _get_repaired_rtpbuffer(FECDecoder *this, guint16 searched_seq)
 
     result = _repair_rtpbuf_by_segment(this, segment, missing_seq);
 //    gst_print_rtp_buffer(result);
+
     segment->repaired = TRUE;
     break;
   }

@@ -47,13 +47,13 @@ G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
 
 //determine the maximum multiplying factor for aprovements
 //before the target considered to be accepted
-#define APPROVE_MAX_FACTOR 3.0
+#define APPROVE_MAX_FACTOR 2.0
 
 //determines the minimum ramp up bitrate
 #define RAMP_UP_MIN_SPEED 50000
 
 //determines the maximum ramp up bitrate
-#define RAMP_UP_MAX_SPEED 200000
+#define RAMP_UP_MAX_SPEED 250000
 
 //Min target_bitrate [bps]
 //#define TARGET_BITRATE_MIN 500000
@@ -223,6 +223,10 @@ _change_sndsubflow_target_bitrate(
     gint32 new_target);
 
 static void
+_logging(
+    FBRASubController* this);
+
+static void
 _execute_stage(
     FBRASubController *this);
 
@@ -362,6 +366,8 @@ void fbrasubctrler_time_update(FBRASubController *this)
     goto done;
   }
 
+  _logging(this);
+
   fbrafbprocessor_time_update(this->fbprocessor);
 
   if(_stat(this)->measurements_num < 10){
@@ -375,9 +381,9 @@ void fbrasubctrler_time_update(FBRASubController *this)
   switch(this->subflow->state){
     case SNDSUBFLOW_STATE_OVERUSED:
       {
-        gint32 corrigation = CONSTRAIN(0, this->bottleneck_point * .4, _stat(this)->bytes_in_flight - this->distorted_BiF);
+        gint32 corrigation = MAX(0, _stat(this)->bytes_in_flight - _stat(this)->BiF_80th);
         this->cwnd = this->awnd * sr_corr_ratio;
-        _change_sndsubflow_target_bitrate(this, this->bottleneck_point - corrigation);
+        _change_sndsubflow_target_bitrate(this, this->bottleneck_point * _stat(this)->owd_log_corr - corrigation);
       }
       break;
     case SNDSUBFLOW_STATE_STABLE:
@@ -395,6 +401,8 @@ void fbrasubctrler_time_update(FBRASubController *this)
       break;
   }
 
+  this->cwnd = MAX(_min_pacing_bitrate(this), this->cwnd);
+
 done:
   return;
 }
@@ -402,9 +410,10 @@ done:
 static void _stat_print(FBRASubController *this)
 {
   FBRAPlusStat *stat = this->stat;
-  g_print("BiF:%-5d %-3d (%-4d)->%-4.0f|FEC:%-4d|SR:%-4d|RR:%-4d|Tr:%-4d|Btl:%-4d|Stg:%d-%d-%d-%d|OWD:%-3lu+%-3lu (%-3lu) %1.1f|C:%-1.1f|FL:%-1.1f\n",
+  g_print("BiF:%-5d %-1.2f (%-4d)->%-4.0f|FEC:%-4d|SR:%-4d|RR:%-4d|Tr:%-4d|Btl:%-4d|Stg:%d-%d-%d-%d|OWD:%-3lu+%-3lu (%-3lu) %1.1f|C:%-1.1f|FL:%-1.1f\n",
       stat->bytes_in_flight,
-      stat->newly_acked_bytes,
+//      stat->newly_acked_bytes,
+      _stat(this)->volume_ratio,
       stat->BiF_80th,
       this->cwnd / 8,
 
@@ -453,7 +462,7 @@ void fbrasubctrler_report_update(
     _execute_stage(this);
   }
 
-  max_approve_idle_th = CONSTRAIN(100 * GST_MSECOND, 3 * GST_MSECOND, 5 * _stat(this)->srtt);
+  max_approve_idle_th = CONSTRAIN(100 * GST_MSECOND, 3 * GST_SECOND, 5 * _stat(this)->srtt);
 
   if(_subflow(this)->state != SNDSUBFLOW_STATE_OVERUSED){
       fbrafbprocessor_approve_measurement(this->fbprocessor);
@@ -469,58 +478,81 @@ done:
 static gboolean _distortion(FBRASubController *this)
 {
   //consider fix tresholds
-  GstClockTime owd_th = _stat(this)->owd_50th + CONSTRAIN(30 * GST_MSECOND, 150 * GST_MSECOND, _stat(this)->owd_std * 4);
-  gint32       BiF_th = _stat(this)->BiF_80th + MAX(10000, MAX(_stat(this)->BiF_std * 2, _stat(this)->BiF_80th * .2));
+  GstClockTime owd_th = _stat(this)->owd_50th + CONSTRAIN(50 * GST_MSECOND, 250 * GST_MSECOND, _stat(this)->owd_std * 4);
+//  gint32       BiF_th = _stat(this)->BiF_80th + MAX(10000, MAX(_stat(this)->BiF_std * 4, _stat(this)->BiF_80th * 10));
   gdouble      FL_th  = MIN(_stat(this)->FL_50th, .1);
 
   if(owd_th < _stat(this)->last_owd){
     g_print("OWD distorted\n");
   }
 
-  if(BiF_th < _stat(this)->bytes_in_flight){
-    g_print("BiF distorted\n");
-  }
+//  if(BiF_th < _stat(this)->bytes_in_flight){
+//    g_print("BiF distorted\n");
+//  }
 
   if(FL_th < _stat(this)->FL_in_1s){
     g_print("FL distorted\n");
   }
 
-  return owd_th < _stat(this)->last_owd || BiF_th < _stat(this)->bytes_in_flight || FL_th < _stat(this)->FL_in_1s;
+//  return owd_th < _stat(this)->last_owd || BiF_th < _stat(this)->bytes_in_flight || FL_th < _stat(this)->FL_in_1s;
+  return owd_th < _stat(this)->last_owd || FL_th < _stat(this)->FL_in_1s;
 }
 
+static void _undershoot(FBRASubController *this, gint32 turning_point){
+  gint32 keeping_point;
+  _set_bottleneck_point(this, turning_point * .9);
+  keeping_point = CONSTRAIN(turning_point * .5, turning_point * .9, turning_point * pow(_stat(this)->owd_log_corr, 2));
+  _set_keeping_point(this, keeping_point);
+}
 
 void
 _reduce_stage(
     FBRASubController *this)
 {
-  if(this->congestion_detected){
-    this->awnd = MAX(_min_pacing_bitrate(this), _stat(this)->BiF_80th * 8) * .6;
-  }else{
-    this->awnd = MAX(_min_pacing_bitrate(this), _stat(this)->BiF_80th * 8) * 1.2;
-  }
+//  if(_stat(this)->owd_log_corr < .8){
+//    this->awnd = MAX(_min_pacing_bitrate(this), _stat(this)->BiF_80th * 8) * .8;
+//  }else{
+//    this->awnd = MAX(_min_pacing_bitrate(this), _stat(this)->BiF_80th * 8) * 1.2;
+//  }
+
+  this->awnd = _stat(this)->BiF_80th * 8;
 
 
   if(_now(this) < this->last_distorted + _stat(this)->owd_50th){
     //TODO: How to prevent from congestion collepse caused by TCP->jitter corr
-    _set_bottleneck_point(this, _stat(this)->receiver_bitrate * .9);
+//    _set_bottleneck_point(this, _stat(this)->receiver_bitrate * .9);
+//    _set_bottleneck_point(this, _stat(this)->sender_bitrate * _stat(this)->volume_ratio);
+//    _set_bottleneck_point(this, MIN(_stat(this)->sender_bitrate * _stat(this)->owd_log_corr * _stat(this)->owd_log_corr);
+
+    gdouble BiF_ratio = CONSTRAIN(.5, 1., (gdouble) _stat(this)->BiF_80th / (gdouble) _stat(this)->bytes_in_flight);
+    _set_bottleneck_point(this, _stat(this)->receiver_bitrate * BiF_ratio);
     goto done;
   }else if(_now(this) < this->last_distorted + _stat(this)->srtt){
     goto done;
-  }else if(_stat(this)->receiver_bitrate < this->target_bitrate * .75){
+//  }else if(_stat(this)->receiver_bitrate < this->target_bitrate * .75){
     //TODO: considering TCP competing flows
-    _set_bottleneck_point(this, _stat(this)->receiver_bitrate * .9);
-    _set_event(this, EVENT_CONGESTION);
-    goto done;
+//    _set_bottleneck_point(this, _stat(this)->receiver_bitrate * .9);
+//    _undershoot(this, _stat(this)->receiver_bitrate);
+//    _set_event(this, EVENT_CONGESTION);
+//    goto done;
   }else if(_distortion(this)){
-    if(this->target_bitrate * 1.25 < _stat(this)->sender_bitrate || _now(this) < this->last_distorted + 2 * _stat(this)->srtt ){
-      goto done;
+    if(!this->congestion_detected){
+      _undershoot(this, _stat(this)->receiver_bitrate);
+      _set_event(this, EVENT_CONGESTION);
+    }else{
+      //turn congestion control off and approve the incoming target for 2 rtt, because its nonsense.
     }
+    goto done;
+//    if(this->target_bitrate * 1.25 < _stat(this)->sender_bitrate || _now(this) < this->last_distorted + 2 * _stat(this)->srtt ){
+//      goto done;
+//    }
   }
 
+  _change_sndsubflow_target_bitrate(this, this->bottleneck_point * _stat(this)->owd_log_corr);
   _set_bottleneck_point(this, this->target_bitrate);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
 done:
-  _change_sndsubflow_target_bitrate(this, this->bottleneck_point * _stat(this)->owd_log_corr);
+
   return;
 }
 
@@ -529,11 +561,14 @@ _keep_stage(
     FBRASubController *this)
 {
 
-  this->awnd = MAX(_min_pacing_bitrate(this), _stat(this)->BiF_80th * 8 * 1.2);
+  this->awnd = _stat(this)->BiF_80th * 8 * 1.2;
 
   if(_distortion(this)){
     if(_subflow(this)->state != SNDSUBFLOW_STATE_STABLE){
-      _set_bottleneck_point(this, this->target_bitrate);
+//      _set_bottleneck_point(this, this->target_bitrate * .9);
+//      _set_bottleneck_point(this, this->target_bitrate * _stat(this)->owd_log_corr * _stat(this)->owd_log_corr);
+//      _set_bottleneck_point(this, this->target_bitrate * _stat(this)->owd_log_corr * _stat(this)->owd_log_corr);
+      _undershoot(this, _stat(this)->sr_avg);
       _switch_stage_to(this, STAGE_REDUCE, FALSE);
       goto done;
     }
@@ -562,11 +597,14 @@ void
 _probe_stage(
     FBRASubController *this)
 {
-  this->awnd = MAX(_min_pacing_bitrate(this), _stat(this)->BiF_80th * 8 * 1.2);
+  this->awnd = _stat(this)->BiF_80th * 8 * 1.2;
 
   if(_distortion(this)){
     _stop_monitoring(this);
-    _set_bottleneck_point(this, this->target_bitrate);
+//    _set_bottleneck_point(this, this->target_bitrate * _stat(this)->owd_log_corr * _stat(this)->owd_log_corr);
+//    _undershoot(this, _stat(this)->sr_avg + _stat(this)->fec_bitrate);
+    _undershoot(this, this->keeping_point + _stat(this)->fec_bitrate);
+//    _set_bottleneck_point(this, this->target_bitrate);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     goto done;
@@ -594,13 +632,15 @@ _increase_stage(
     FBRASubController *this)
 {
 
-  this->awnd = MAX(_min_pacing_bitrate(this), _stat(this)->BiF_max * 8 * 2);
+  this->awnd = _stat(this)->BiF_max * 8 * 1.5;
 
   if(_distortion(this)){
     _stop_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
-    _set_bottleneck_point(this, this->keeping_point);
+//    _set_bottleneck_point(this, this->keeping_point * _stat(this)->owd_log_corr * _stat(this)->owd_log_corr);
+    _undershoot(this, this->keeping_point + _stat(this)->fec_bitrate);
+//    _set_bottleneck_point(this, this->keeping_point);
     goto done;
   }
 
@@ -803,14 +843,14 @@ void _refresh_increasing_approvement(FBRASubController *this)
   //else if(this->increasing_sr_reached < _now(this) - CONSTRAIN(100 * GST_MSECOND, 2 * GST_SECOND, 3 * _stat(this)->srtt)){
   //}
 
-  if(_min_ramp_up(this) < this->increasement &&  _stat(this)->rr_avg < _stat(this)->sr_avg * .9){
-    return;
-  }
-
-  if(!this->increasing_rr_reached){
-    this->increasing_rr_reached = _now(this);
-    return;
-  }
+//  if(_min_ramp_up(this) < this->increasement &&  _stat(this)->rr_avg < _stat(this)->sr_avg * .9){
+//    return;
+//  }
+//
+//  if(!this->increasing_rr_reached){
+//    this->increasing_rr_reached = _now(this);
+//    return;
+//  }
 
   interval = _get_approvement_interval(this);
 //  g_print("Target approvement interval: %lu (srtt: %f)\n", interval, _stat(this)->srtt);
@@ -899,4 +939,25 @@ void _change_sndsubflow_target_bitrate(FBRASubController* this, gint32 new_targe
 
   sndsubflow_set_target_rate(this->subflow, this->target_bitrate);
 
+}
+
+void _logging(FBRASubController* this)
+{
+  const GstClockTime sampling_time = 100 * GST_MSECOND;
+  if(!g_file_test("triggered_stat", G_FILE_TEST_EXISTS)){
+    return;
+  }
+again:
+  if(_now(this) - sampling_time < this->last_log){
+    return;
+  }
+
+  mprtp_logger("temp/targets.csv", "%d\n", this->target_bitrate);
+
+  if(!this->last_log){
+    this->last_log = _now(this);
+  }else{
+    this->last_log += sampling_time;
+  }
+  goto again;
 }

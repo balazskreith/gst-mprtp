@@ -291,12 +291,12 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 //  GstMprtpschedulerPrivate *priv;
 //  priv = this->priv = GST_MPRTPSCHEDULER_GET_PRIVATE (this);
 
-//  init_mprtp_logger();
-//  //TODO: Only for development use
-//  mprtp_logger_set_state(TRUE);
+  init_mprtp_logger();
+  //TODO: Only for development use
+  mprtp_logger_set_state(TRUE);
 //  mprtp_logger_set_system_command("bash -c '[ ! -d temp_logs ]' && mkdir temp_logs");
 //  mprtp_logger_set_system_command("rm temp_logs/*");
-//  mprtp_logger_set_target_directory("temp_logs/");
+//  mprtp_logger_set_target_directory("temp/");
 
   this->rtp_sinkpad =
       gst_pad_new_from_static_template (&gst_mprtpscheduler_rtp_sink_template,
@@ -389,7 +389,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   notifier_add_listener(this->on_rtcp_ready,
       (ListenerFunc) _on_rtcp_ready, this);
 
-  this->obsolation_treshold = 50 * GST_MSECOND;
+//  this->obsolation_treshold = 50 * GST_MSECOND;
+  this->fec_responses = make_messenger(sizeof(FECEncoderResponse*));
 }
 
 
@@ -835,16 +836,21 @@ void _on_rtcp_ready(GstMprtpscheduler * this, GstBuffer *buffer)
 
 void _on_monitoring_request(GstMprtpscheduler * this, SndSubflow* subflow)
 {
+  if(this->fec_requested){
+    return;
+  }
   fecencoder_request_fec(this->fec_encoder, subflow->id);
+  this->fec_requested = TRUE;
 }
 
 void _on_monitoring_response(GstMprtpscheduler * this, FECEncoderResponse *response)
 {
-  THIS_LOCK(this);
-  sndtracker_add_fec_response(this->sndtracker, response);
-  gst_pad_push(this->mprtp_srcpad, response->fecbuffer);
-  fecencoder_unref_response(response);
-  THIS_UNLOCK(this);
+  messenger_push_block(this->fec_responses, response);
+//  THIS_LOCK(this);
+//  sndtracker_add_fec_response(this->sndtracker, response);
+//  gst_pad_push(this->mprtp_srcpad, response->fecbuffer);
+//  fecencoder_unref_response(response);
+//  THIS_UNLOCK(this);
 }
 
 void
@@ -858,7 +864,22 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndSubflow* subflow, SndP
   buffer = sndpacket_retrieve(packet);
   fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(buffer));
 //  g_print("Packet sent  flow result: %d\n", gst_pad_push(this->mprtp_srcpad, buffer));
+
+//  artifical lost
+//    if(++this->sent_packets % 11 == 0){
+//      gst_buffer_unref(buffer);
+//    }else{
+//      gst_pad_push(this->mprtp_srcpad, buffer);
+//    }
   gst_pad_push(this->mprtp_srcpad, buffer);
+
+  if(this->fec_requested){
+    FECEncoderResponse* response = messenger_pop_block(this->fec_responses);
+    sndtracker_add_fec_response(this->sndtracker, response);
+    gst_pad_push(this->mprtp_srcpad, response->fecbuffer);
+    fecencoder_unref_response(response);
+    this->fec_requested = FALSE;
+  }
 
   if (!this->riport_flow_signal_sent) {
     this->riport_flow_signal_sent = TRUE;
@@ -913,7 +934,8 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
   }
 
   if(0 < this->fec_interval && (++this->sent_packets % this->fec_interval) == 0){
-    fecencoder_request_fec(this->fec_encoder, subflow->id);
+//    fecencoder_request_fec(this->fec_encoder, subflow->id);
+    _on_monitoring_request(this, subflow);
   }
 
   _mprtpscheduler_send_packet(this, subflow, packet);

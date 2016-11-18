@@ -129,7 +129,7 @@ FBRAFBProducer *make_fbrafbproducer(RcvSubflow* subflow, RcvTracker *tracker)
   this = g_object_new (FBRAFBPRODUCER_TYPE, NULL);
   this->subflow         = subflow;
   this->tracker         = g_object_ref(tracker);
-  this->owds_sw         = make_slidingwindow_uint64(20, 200 * GST_MSECOND);
+  this->owds_sw         = make_slidingwindow_uint64(20, 100 * GST_MSECOND);
 
   this->rle_sw          = make_slidingwindow_uint16(100, GST_SECOND);
 
@@ -196,7 +196,7 @@ static gboolean _do_fb(FBRAFBProducer *this)
   if(this->last_fb < _now(this) - 100 * GST_MSECOND){
     return TRUE;
   }
-  return 1 < this->rcved_packets;
+  return 3 < this->rcved_packets;
 }
 
 

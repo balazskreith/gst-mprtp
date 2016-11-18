@@ -369,8 +369,10 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
   }
 
 
-  packet = monitor_track_rtpbuffer(this->monitor, buffer);
+  monitor_track_rtpbuffer(this->monitor, buffer);
 
+again:
+  packet = monitor_pop_prepared_packet(this->monitor);
   if(!packet){
     goto done;
   }
@@ -411,13 +413,13 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
     }
 //    gst_pad_push(this->packetlogs_srcpad, packetbuffer);
   }
-
+  goto again;
 done:
   THIS_UNLOCK(this);
 exit:
   return;
 }
-
+//static int received = 1;
 static GstFlowReturn
 gst_rtpstatmaker2_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
 {
@@ -429,6 +431,12 @@ gst_rtpstatmaker2_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
   gsize size;
 
   size = gst_buffer_get_size (buf);
+
+  //artifical lost
+//    if(++received % 11 == 0){
+//      gst_buffer_unref(buf);
+//      return ret;
+//    }
 
   /* update prev values */
   this->prev_timestamp = GST_BUFFER_TIMESTAMP (buf);

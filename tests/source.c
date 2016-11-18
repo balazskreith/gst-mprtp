@@ -65,14 +65,28 @@ Source* make_source(SourceParams *params)
 
 GstElement* _make_testvideo_source(Source* this, SourceParams *params)
 {
-  GstElement *source = gst_element_factory_make ("videotestsrc", NULL);
+  GstBin*     srcBin     = gst_bin_new(NULL);
+  GstElement* source     = gst_element_factory_make ("videotestsrc", NULL);
+  GstElement* capsfilter = gst_element_factory_make ("capsfilter", NULL);
+
 
   g_object_set (source,
       "is-live", TRUE,
       "horizontal-speed", 15,
       NULL);
 
-  return source;
+  g_object_set(capsfilter, "caps",
+      gst_caps_new_simple("video/x-raw",
+          "framerate", GST_TYPE_FRACTION, 100, 1,
+          "width", G_TYPE_INT, 352,
+          "height",G_TYPE_INT,  288, NULL),
+          NULL);
+
+  gst_bin_add_many(srcBin, source, capsfilter, NULL);
+  gst_element_link(source, capsfilter);
+  setup_ghost_src(capsfilter, srcBin);
+//  return source;
+  return GST_ELEMENT(srcBin);
 }
 
 

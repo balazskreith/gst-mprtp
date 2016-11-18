@@ -176,7 +176,7 @@ mprtp_logger_init (MPRTPLogger * this)
   this->sysclock   = gst_system_clock_obtain ();
   this->made       = _now(this);
   this->messenger  = make_messenger(sizeof(Message));
-  strcpy(this->path, "logs/");
+  memset(this->path, 0, 255);
 
   this->memory_consumptions = g_hash_table_new(g_str_hash, g_str_equal);
 
@@ -426,8 +426,13 @@ void _writing(MPRTPLogger* this, WritingMessage *item)
   gchar path[255];
 
   memset(path, 0, 255);
-  strcpy(path, this->path);
-  strcpy(path, item->filename);
+  if(this->path){
+    strcpy(path, this->path);
+    strcat(path, item->filename);
+  }else{
+    strcpy(path, item->filename);
+  }
+
   fp = fopen(path, item->overwrite ? "w" : "a+");
   fprintf (fp, "%s", item->string);
   fclose(fp);

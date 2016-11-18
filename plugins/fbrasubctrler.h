@@ -38,6 +38,8 @@ struct _FBRASubController
   gboolean                  enabled;
   SndSubflow*               subflow;
 
+  GstClockTime              last_log;
+
   gint32                    target_bitrate;
   gint32                    stable_bitrate;
 

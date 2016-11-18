@@ -701,6 +701,7 @@ gst_mprtpplayouter_mprtcp_sr_sink_chain (GstPad * pad, GstObject * parent,
   gst_buffer_unmap (buf, &info);
 
   if (*buf_2nd_byte == this->fec_payload_type) {
+//    g_print("FEC BUFFER ARRIVED\n");
     fecdecoder_add_fec_buffer(this->fec_decoder, gst_buffer_ref(buf));
     goto done;
   }
@@ -834,6 +835,7 @@ _playout_process (GstMprtpplayouter *this)
 
     if(this->discarded_packet.repairedbuf){
 //      gst_pad_push(this->mprtp_srcpad, this->discarded_packet.repairedbuf);
+//      g_print("repaired buffer appeared\n");
       g_async_queue_push(this->buffers, this->discarded_packet.repairedbuf);
       this->discarded_packet.repairedbuf = NULL;
     }

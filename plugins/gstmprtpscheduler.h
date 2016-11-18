@@ -83,6 +83,8 @@ struct _GstMprtpscheduler
   GQueue*                       packetsq;
   Messenger*                    emit_msger;
 //  GAsyncQueue*                  emitterq;
+  Messenger*                    fec_responses;
+  gboolean                      fec_requested;
   Notifier*                     on_rtcp_ready;
 
   GstMprtpschedulerPrivate*     priv;

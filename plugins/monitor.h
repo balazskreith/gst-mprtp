@@ -84,6 +84,7 @@ struct _Monitor
   guint8               fec_payload_type;
 
   MonitorStat          stat;
+  GQueue*              prepared_packets;
 
 };
 
@@ -100,7 +101,8 @@ void monitor_reset(Monitor* this);
 
 void monitor_set_mprtp_ext_header_id(Monitor* this, guint8 mprtp_ext_header_id);
 void monitor_set_fec_payload_type(Monitor* this, guint8 fec_payload_type);
-MonitorPacket* monitor_track_rtpbuffer(Monitor* this, GstBuffer* buffer);
+void monitor_track_rtpbuffer(Monitor* this, GstBuffer* buffer);
+MonitorPacket* monitor_pop_prepared_packet(Monitor* this);
 void monitor_track_packetbuffer(Monitor* this, GstBuffer* buffer);
 void monitor_setup_packetbufffer(MonitorPacket* packet, GstBuffer *buffer);
 void monitor_setup_monitorstatbufffer(Monitor *this, GstBuffer *buffer);

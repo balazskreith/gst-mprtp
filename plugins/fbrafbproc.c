@@ -119,7 +119,7 @@ FBRAFBProcessor *make_fbrafbprocessor(SndTracker* sndtracker, SndSubflow* subflo
           make_swpercentile(80, _measurement_BiF_cmp, (ListenerFunc) _on_BiF_80th_calculated, this));
 
   slidingwindow_add_plugin(this->short_sw,
-          make_swpercentile(50, _measurement_FL_cmp, (ListenerFunc) _on_FL_50th_calculated, this));
+          make_swpercentile(80, _measurement_FL_cmp, (ListenerFunc) _on_FL_50th_calculated, this));
 
   slidingwindow_add_plugin(this->long_sw,
         make_swpercentile(50, _measurement_owd_cmp, (ListenerFunc) _on_owd_50th_calculated, this));
@@ -188,9 +188,11 @@ void fbrafbprocessor_approve_measurement(FBRAFBProcessor *this)
   measurement->bytes_in_flight = this->last_bytes_in_flight;
   measurement->owd             = _stat(this)->last_owd;
   measurement->fraction_lost   = _stat(this)->FL_in_1s;
+  this->normal_volume          = (_stat(this)->bytes_in_flight / 125) * GST_TIME_AS_MSECONDS(_stat(this)->last_owd);
 
   slidingwindow_add_data(this->long_sw, measurement);
   slidingwindow_add_data(this->short_sw, measurement);
+
 }
 
 
@@ -200,6 +202,10 @@ void _process_owd(FBRAFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
     goto done;
   }
   _stat(this)->last_owd = xrsummary->OWD.median_delay;
+
+  this->last_volume            = (_stat(this)->bytes_in_flight / 125) * GST_TIME_AS_MSECONDS(_stat(this)->last_owd);
+  _stat(this)->volume_ratio    = CONSTRAIN(.5, 1., this->normal_volume / this->last_volume);
+//  g_print("Last owd: %lu\n", _stat(this)->last_owd);
 
   if(_stat(this)->owd_50th){
     gdouble corr = log(GST_TIME_AS_MSECONDS(_stat(this)->owd_50th));
@@ -285,6 +291,7 @@ void _process_stat(FBRAFBProcessor *this)
   _stat(this)->fec_bitrate           = sndstat->sent_fec_bytes_in_1s * 8;
   _stat(this)->FL_in_1s              = lost_fraction_in_1s;
 
+
   if(_stat(this)->sr_avg){
     _stat(this)->sr_avg = .2 * _stat(this)->sender_bitrate + _stat(this)->sr_avg * .8;
   }else{
@@ -309,7 +316,7 @@ void _on_BiF_80th_calculated(FBRAFBProcessor *this, swpercentilecandidates_t *ca
                    bytes_in_flight,       \
                    candidates,            \
                    _stat(this)->BiF_80th, \
-                   this->BiF_min,         \
+                   _stat(this)->BiF_min, \
                    _stat(this)->BiF_max,  \
                    0                      \
                    );

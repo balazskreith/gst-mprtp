@@ -87,8 +87,8 @@ struct _FRACTaLFBProcessor
   GstClock*                sysclock;
 
 //  SlidingWindow*           FL_sw;
-  SlidingWindow*           BiF_sw;
-  SlidingWindow*           owd_sw;
+  SlidingWindow*           short_sw;
+  SlidingWindow*           long_sw;
   Recycle*                 measurements_recycle;
 
   FRACTaLStat*             stat;

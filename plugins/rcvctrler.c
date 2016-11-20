@@ -27,7 +27,7 @@
 #include "streamsplitter.h"
 #include "streamjoiner.h"
 #include "mprtplogger.h"
-#include "fbrafbprod.h"
+#include "fractalfbprod.h"
 #include "rcvctrler.h"
 #include "ricalcer.h"
 
@@ -92,7 +92,7 @@ _uint16_diff (
     guint16 b);
 
 static FeedbackProducer*
-_create_fbraplus(
+_create_fractal(
     RcvController* this,
     RcvSubflow* subflow);
 
@@ -346,12 +346,12 @@ _uint16_diff (guint16 start, guint16 end)
 
 
 
-FeedbackProducer* _create_fbraplus(RcvController* this, RcvSubflow* subflow)
+FeedbackProducer* _create_fractal(RcvController* this, RcvSubflow* subflow)
 {
   FeedbackProducer *result = g_slice_new0(FeedbackProducer);
   result->type           = CONGESTION_CONTROLLING_TYPE_FRACTAL;
   result->subflow        = subflow;
-  result->udata          = make_fbrafbproducer(subflow, this->rcvtracker);
+  result->udata          = make_fractalfbproducer(subflow, this->rcvtracker);
   return result;
 }
 
@@ -396,7 +396,7 @@ void _on_congestion_controlling_changed(RcvController* this, RcvSubflow *subflow
 
   switch(subflow->congestion_controlling_type){
     case CONGESTION_CONTROLLING_TYPE_FRACTAL:
-      this->fbproducers = g_slist_prepend(this->fbproducers, _create_fbraplus(this, subflow));
+      this->fbproducers = g_slist_prepend(this->fbproducers, _create_fractal(this, subflow));
       break;
     case CONGESTION_CONTROLLING_TYPE_NONE:
     default:

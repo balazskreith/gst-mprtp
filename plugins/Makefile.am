@@ -1,11 +1,11 @@
 plugin_LTLIBRARIES = libgstmprtp.la
 
 # sources used to compile this plug-in
-libgstmprtp_la_SOURCES = fbrafbproc.c          \
-                         fbrafbprod.c          \
-                         fbrasubctrler.c       \
-                         fecdec.c              \
+libgstmprtp_la_SOURCES = fecdec.c              \
                          fecenc.c              \
+                         fractalfbproc.c       \
+                         fractalfbprod.c       \
+                         fractalsubctrler.c    \
                          gstmprtcpbuffer.c     \
                          gstmprtpplayouter.c   \
                          gstmprtpreceiver.c    \
@@ -41,11 +41,11 @@ libgstmprtp_la_SOURCES = fbrafbproc.c          \
                          streamsplitter.c      
                     
                     
-noinst_HEADERS = fbrafbproc.h          \
-                 fbrafbprod.h          \
-                 fbrasubctrler.h       \
-                 fecdec.h              \
+noinst_HEADERS = fecdec.h              \
                  fecenc.h              \
+                 fractalfbproc.h       \
+                 fractalfbprod.h       \
+                 fractalsubctrler.h    \
                  gstmprtcpbuffer.h     \
                  jitterbuffer.h        \
                  lib_bintree.h         \

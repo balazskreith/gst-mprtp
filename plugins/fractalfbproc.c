@@ -8,7 +8,7 @@
 #include <string.h>
 #include <stdlib.h>     /* qsort */
 #include <stdio.h>
-#include "fbrafbproc.h"
+#include "fractalfbproc.h"
 #include "reportproc.h"
 
 #define _now(this) gst_clock_get_time (this->sysclock)
@@ -115,8 +115,8 @@ fractalfbprocessor_finalize (GObject * object)
   FRACTaLFBProcessor *this;
   this = FRACTALFBPROCESSOR(object);
 
-  g_object_unref(this->owd_sw);
-  g_object_unref(this->BiF_sw);
+  g_object_unref(this->long_sw);
+  g_object_unref(this->short_sw);
 
   g_object_unref(this->measurements_recycle);
   g_object_unref(this->sysclock);
@@ -143,32 +143,32 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
   this->approvement = approvement;
 
   this->measurements_recycle = make_recycle_measurement(500, (RecycleItemShaper) _measurement_shape);
-  this->BiF_sw               = make_slidingwindow(100, 5 * GST_SECOND);
+  this->short_sw               = make_slidingwindow(100, 5 * GST_SECOND);
 //  this->FL_sw                = make_slidingwindow(100, 5 * GST_SECOND);
-  this->owd_sw               = make_slidingwindow(600, 30 * GST_SECOND);
+  this->long_sw               = make_slidingwindow(600, 30 * GST_SECOND);
 
-  slidingwindow_add_on_data_ref_change(this->owd_sw,  (ListenerFunc) _on_measurement_ref, (ListenerFunc) _on_measurement_unref, this);
+  slidingwindow_add_on_data_ref_change(this->long_sw,  (ListenerFunc) _on_measurement_ref, (ListenerFunc) _on_measurement_unref, this);
 //  slidingwindow_add_on_data_ref_change(this->FL_sw,   (ListenerFunc) _on_measurement_ref, (ListenerFunc) _on_measurement_unref, this);
-  slidingwindow_add_on_data_ref_change(this->BiF_sw,  (ListenerFunc) _on_measurement_ref, (ListenerFunc) _on_measurement_unref, this);
+  slidingwindow_add_on_data_ref_change(this->short_sw,  (ListenerFunc) _on_measurement_ref, (ListenerFunc) _on_measurement_unref, this);
 
-  DISABLE_LINE slidingwindow_setup_debug(this->owd_sw, (SlidingWindowItemSprintf)_long_sw_item_sprintf, g_print);
+  DISABLE_LINE slidingwindow_setup_debug(this->long_sw, (SlidingWindowItemSprintf)_long_sw_item_sprintf, g_print);
 
-  slidingwindow_add_plugin(this->BiF_sw,
+  slidingwindow_add_plugin(this->short_sw,
           make_swpercentile(80, _measurement_BiF_cmp, (ListenerFunc) _on_BiF_80th_calculated, this));
 
-  slidingwindow_add_plugin(this->BiF_sw,
+  slidingwindow_add_plugin(this->short_sw,
           make_swpercentile(50, _measurement_FL_cmp, (ListenerFunc) _on_FL_50th_calculated, this));
 
-  slidingwindow_add_plugin(this->owd_sw,
+  slidingwindow_add_plugin(this->long_sw,
         make_swpercentile(50, _measurement_owd_cmp, (ListenerFunc) _on_owd_50th_calculated, this));
 
 //  if(0){
-  slidingwindow_add_on_change(this->BiF_sw,
+  slidingwindow_add_on_change(this->short_sw,
       (ListenerFunc) _on_BiF_sw_add,
       (ListenerFunc) _on_BiF_sw_rem,
       this);
 
-  slidingwindow_add_on_change(this->owd_sw,
+  slidingwindow_add_on_change(this->long_sw,
       (ListenerFunc) _on_owd_sw_add,
       (ListenerFunc) _on_owd_sw_rem,
       this);
@@ -238,11 +238,11 @@ void fractalfbprocessor_approve_measurement(FRACTaLFBProcessor *this)
   measurement->fraction_lost   = _stat(this)->FL_in_1s;
 
 //  if(approvement->owd){
-    slidingwindow_add_data(this->owd_sw,  measurement);
+    slidingwindow_add_data(this->long_sw,  measurement);
 //  }
 
 //  if(approvement->bytes_in_flight){
-    slidingwindow_add_data(this->BiF_sw,  measurement);
+    slidingwindow_add_data(this->short_sw,  measurement);
 //  }
 
 //  if(approvement->fraction_lost){

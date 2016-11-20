@@ -28,13 +28,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include "fbrasubctrler.h"
+#include "fractalsubctrler.h"
 #include "reportproc.h"
 
-GST_DEBUG_CATEGORY_STATIC (fbrasubctrler_debug_category);
-#define GST_CAT_DEFAULT fbrasubctrler_debug_category
+GST_DEBUG_CATEGORY_STATIC (fractalsubctrler_debug_category);
+#define GST_CAT_DEFAULT fractalsubctrler_debug_category
 
-G_DEFINE_TYPE (FBRASubController, fbrasubctrler, G_TYPE_OBJECT);
+G_DEFINE_TYPE (FRACTaLSubController, fractalsubctrler, G_TYPE_OBJECT);
 
 
 //determine the minimum interval in seconds must be stay in probe stage
@@ -138,7 +138,7 @@ struct _Private{
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
 
- void fbrasubctrler_finalize (GObject * object);
+ void fractalsubctrler_finalize (GObject * object);
 
 
 // const gdouble ST_ = 1.1; //Stable treshold
@@ -150,94 +150,94 @@ struct _Private{
 
  static gboolean
  _rtp_sending_filter(
-     FBRASubController* this,
+     FRACTaLSubController* this,
      SndPacket *packet);
 
  static void
  _on_rtp_sending(
-     FBRASubController* this,
+     FRACTaLSubController* this,
      SndPacket *packet);
 
 static void
 _reduce_stage(
-    FBRASubController *this);
+    FRACTaLSubController *this);
 
 static void
 _keep_stage(
-    FBRASubController *this);
+    FRACTaLSubController *this);
 
 static void
 _probe_stage(
-    FBRASubController *this);
+    FRACTaLSubController *this);
 
 static void
 _increase_stage(
-    FBRASubController *this);
+    FRACTaLSubController *this);
 
 static void
 _switch_stage_to(
-    FBRASubController *this,
+    FRACTaLSubController *this,
     Stage target,
     gboolean execute);
 
 static void
 _set_keeping_point(
-    FBRASubController *this,
+    FRACTaLSubController *this,
     gint32 bitrate);
 
 static void
 _set_bottleneck_point(
-    FBRASubController *this,
+    FRACTaLSubController *this,
     gint32 bitrate);
 
 static void
 _refresh_monitoring_approvement(
-    FBRASubController *this);
+    FRACTaLSubController *this);
 
 static void
 _start_monitoring(
-    FBRASubController *this);
+    FRACTaLSubController *this);
 
 static void
 _stop_monitoring(
-    FBRASubController *this);
+    FRACTaLSubController *this);
 
 static void
 _refresh_increasing_approvement(
-    FBRASubController *this);
+    FRACTaLSubController *this);
 
 static void
 _refresh_reducing_approvement(
-    FBRASubController *this);
+    FRACTaLSubController *this);
 
 static void
 _start_increasement(
-    FBRASubController *this);
+    FRACTaLSubController *this);
 
 static guint
 _get_approvement_interval(
-    FBRASubController* this);
+    FRACTaLSubController* this);
 
 static guint
 _get_monitoring_interval(
-    FBRASubController* this);
+    FRACTaLSubController* this);
 
 static void
 _change_sndsubflow_target_bitrate(
-    FBRASubController* this,
+    FRACTaLSubController* this,
     gint32 new_target);
 
 static void
 _logging(
-    FBRASubController* this);
+    FRACTaLSubController* this);
 
 static void
 _execute_stage(
-    FBRASubController *this);
+    FRACTaLSubController *this);
 
 static void
 _fire(
-    FBRASubController *this,
+    FRACTaLSubController *this,
     Event event);
 
 #define _disable_monitoring(this) _start_monitoring(this, 0)
@@ -248,25 +248,25 @@ _fire(
 //----------------------------------------------------------------------
 
 void
-fbrasubctrler_class_init (FBRASubControllerClass * klass)
+fractalsubctrler_class_init (FRACTaLSubControllerClass * klass)
 {
   GObjectClass *gobject_class;
 
   gobject_class = (GObjectClass *) klass;
 
-  gobject_class->finalize = fbrasubctrler_finalize;
+  gobject_class->finalize = fractalsubctrler_finalize;
 
-  GST_DEBUG_CATEGORY_INIT (fbrasubctrler_debug_category, "fbrasubctrler", 0,
-      "FBRA+ Subflow Rate Controller");
+  GST_DEBUG_CATEGORY_INIT (fractalsubctrler_debug_category, "fractalsubctrler", 0,
+      "FRACTAL+ Subflow Rate Controller");
 
 }
 
 
 void
-fbrasubctrler_finalize (GObject * object)
+fractalsubctrler_finalize (GObject * object)
 {
-  FBRASubController *this;
-  this = FBRASUBCTRLER(object);
+  FRACTaLSubController *this;
+  this = FRACTALSUBCTRLER(object);
 
   sndtracker_rem_on_packet_sent(this->sndtracker, (ListenerFunc) _on_rtp_sending);
 
@@ -281,7 +281,7 @@ fbrasubctrler_finalize (GObject * object)
 
 
 void
-fbrasubctrler_init (FBRASubController * this)
+fractalsubctrler_init (FRACTaLSubController * this)
 {
   this->priv = mprtp_malloc(sizeof(Private));
   this->sysclock = gst_system_clock_obtain();
@@ -301,9 +301,9 @@ fbrasubctrler_init (FBRASubController * this)
   _priv(this)->max_monitoring_interval          = MAX_MONITORING_INTERVAL;
 }
 
-FBRASubController *make_fbrasubctrler(SndTracker *sndtracker, SndSubflow *subflow)
+FRACTaLSubController *make_fractalsubctrler(SndTracker *sndtracker, SndSubflow *subflow)
 {
-  FBRASubController *this   = g_object_new (FBRASUBCTRLER_TYPE, NULL);
+  FRACTaLSubController *this   = g_object_new (FRACTALSUBCTRLER_TYPE, NULL);
 
   this->sndtracker          = g_object_ref(sndtracker);
   this->subflow             = subflow;
@@ -323,26 +323,26 @@ FBRASubController *make_fbrasubctrler(SndTracker *sndtracker, SndSubflow *subflo
   return this;
 }
 
-void fbrasubctrler_enable(FBRASubController *this)
+void fractalsubctrler_enable(FRACTaLSubController *this)
 {
   this->enabled    = TRUE;
 
 
 }
 
-void fbrasubctrler_disable(FBRASubController *this)
+void fractalsubctrler_disable(FRACTaLSubController *this)
 {
   _switch_stage_to(this, STAGE_KEEP, FALSE);
   this->enabled = FALSE;
 
 }
 
-gboolean _rtp_sending_filter(FBRASubController* this, SndPacket *packet)
+gboolean _rtp_sending_filter(FRACTaLSubController* this, SndPacket *packet)
 {
   return this->subflow->id == packet->subflow_id;
 }
 
-void _on_rtp_sending(FBRASubController* this, SndPacket *packet)
+void _on_rtp_sending(FRACTaLSubController* this, SndPacket *packet)
 {
   gdouble pacing_time = 0.;
   gdouble pacing_bitrate;
@@ -365,7 +365,7 @@ void _on_rtp_sending(FBRASubController* this, SndPacket *packet)
 }
 
 
-void fbrasubctrler_time_update(FBRASubController *this)
+void fractalsubctrler_time_update(FRACTaLSubController *this)
 {
   gdouble sr_corr_ratio;
   gdouble rtpqdelay_factor;
@@ -433,7 +433,7 @@ done:
   return;
 }
 
-static void _stat_print(FBRASubController *this)
+static void _stat_print(FRACTaLSubController *this)
 {
   FRACTaLStat *stat = this->stat;
   g_print("BiF:%-5d %-5d->%-4.0f|FEC:%-4d|SR:%-4d|RR:%-4d|Tr:%-4d|Btl:%-4d|%d-%d-%d-%d|OWD:%-3lu+%-3lu (%-3lu) %1.1f-%-1.1f|FL:%-1.2f+%1.2f (%-1.2f)\n",
@@ -470,8 +470,8 @@ static void _stat_print(FBRASubController *this)
 //      stat->stalled_bytes);
 }
 
-void fbrasubctrler_report_update(
-                         FBRASubController *this,
+void fractalsubctrler_report_update(
+                         FRACTaLSubController *this,
                          GstMPRTCPReportSummary *summary)
 {
   GstClockTime max_approve_idle_th;
@@ -497,10 +497,10 @@ void fbrasubctrler_report_update(
     this->approve_measurement = TRUE;
   }
 //  if(_subflow(this)->state != SNDSUBFLOW_STATE_OVERUSED){
-//      fbrafbprocessor_approve_measurement(this->fbprocessor);
+//      fractalfbprocessor_approve_measurement(this->fbprocessor);
 //      this->last_approved = _now(this);
 //  }else if(this->last_approved < _now(this) - max_approve_idle_th){
-//      //fbrafbprocessor_approve_measurement(this->fbprocessor);
+//      //fractalfbprocessor_approve_measurement(this->fbprocessor);
 //  }
 
   if(this->approve_measurement){
@@ -511,7 +511,7 @@ done:
   return;
 }
 
-static gboolean _distortion(FBRASubController *this)
+static gboolean _distortion(FRACTaLSubController *this)
 {
   GstClockTime owd_th = _stat(this)->owd_50th + CONSTRAIN(50 * GST_MSECOND, 250 * GST_MSECOND, _stat(this)->owd_std * 4);
 //  gdouble      FL_th  = MIN(_stat(this)->FL_50th, .1);
@@ -528,7 +528,7 @@ static gboolean _distortion(FBRASubController *this)
   return owd_th < _stat(this)->last_owd || FL_th < _stat(this)->FL_in_1s;
 }
 
-static void _undershoot(FBRASubController *this, gint32 turning_point)
+static void _undershoot(FRACTaLSubController *this, gint32 turning_point)
 {
   gint32 keeping_point;
   keeping_point = CONSTRAIN(turning_point * .5, turning_point * .9, turning_point * pow(_stat(this)->owd_log_corr, 2));
@@ -539,7 +539,7 @@ static void _undershoot(FBRASubController *this, gint32 turning_point)
 
 void
 _reduce_stage(
-    FBRASubController *this)
+    FRACTaLSubController *this)
 {
   this->awnd = _stat(this)->BiF_80th * 8;
 
@@ -571,7 +571,7 @@ done:
 
 void
 _keep_stage(
-    FBRASubController *this)
+    FRACTaLSubController *this)
 {
 
   this->awnd = _stat(this)->BiF_80th * 8 * 1.2;
@@ -605,7 +605,7 @@ done:
 
 void
 _probe_stage(
-    FBRASubController *this)
+    FRACTaLSubController *this)
 {
   this->awnd = _stat(this)->BiF_80th * 8 * 1.2;
 
@@ -631,7 +631,7 @@ done:
 
 void
 _increase_stage(
-    FBRASubController *this)
+    FRACTaLSubController *this)
 {
 
   this->awnd = _stat(this)->BiF_max * 8 * 1.5;
@@ -657,7 +657,7 @@ done:
   return;
 }
 
-void _execute_stage(FBRASubController *this)
+void _execute_stage(FRACTaLSubController *this)
 {
   if(this->pending_event != EVENT_FI){
     _fire(this, this->pending_event);
@@ -677,7 +677,7 @@ void _execute_stage(FBRASubController *this)
 
 void
 _fire(
-    FBRASubController *this,
+    FRACTaLSubController *this,
     Event event)
 {
 
@@ -743,7 +743,7 @@ _fire(
 
 
 void _switch_stage_to(
-    FBRASubController *this,
+    FRACTaLSubController *this,
     Stage target,
     gboolean execute)
 {
@@ -771,17 +771,17 @@ void _switch_stage_to(
 }
 
 
-void _set_keeping_point(FBRASubController *this, gint32 bitrate)
+void _set_keeping_point(FRACTaLSubController *this, gint32 bitrate)
 {
   this->keeping_point = bitrate;
 }
 
-void _set_bottleneck_point(FBRASubController *this, gint32 bitrate)
+void _set_bottleneck_point(FRACTaLSubController *this, gint32 bitrate)
 {
   this->bottleneck_point = bitrate;
 }
 
-void _refresh_monitoring_approvement(FBRASubController *this)
+void _refresh_monitoring_approvement(FRACTaLSubController *this)
 {
   GstClockTime interval;
   gint32  boundary;
@@ -805,7 +805,7 @@ void _refresh_monitoring_approvement(FBRASubController *this)
   this->monitoring_approved = TRUE;
 }
 
-void _start_monitoring(FBRASubController *this)
+void _start_monitoring(FRACTaLSubController *this)
 {
   this->monitoring_interval = _get_monitoring_interval(this);
   this->monitoring_approvement_started  = 0;
@@ -814,14 +814,14 @@ void _start_monitoring(FBRASubController *this)
 //  g_print("Monitoring monitoring interval: %d\n", this->monitoring_interval);
 }
 
-void _stop_monitoring(FBRASubController *this)
+void _stop_monitoring(FRACTaLSubController *this)
 {
   this->monitoring_interval = 0;
   this->monitoring_approvement_started  = 0;
   this->monitoring_approved = FALSE;
 }
 
-void _refresh_increasing_approvement(FBRASubController *this)
+void _refresh_increasing_approvement(FRACTaLSubController *this)
 {
   GstClockTime interval;
   gint32 boundary;
@@ -848,7 +848,7 @@ void _refresh_increasing_approvement(FBRASubController *this)
 }
 
 
-void _refresh_reducing_approvement(FBRASubController *this)
+void _refresh_reducing_approvement(FRACTaLSubController *this)
 {
   GstClockTime interval;
   gint32 boundary;
@@ -874,7 +874,7 @@ void _refresh_reducing_approvement(FBRASubController *this)
   this->reducing_approved = TRUE;
 }
 
-void _start_increasement(FBRASubController *this)
+void _start_increasement(FRACTaLSubController *this)
 {
   this->increasement             = CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), _stat(this)->fec_bitrate);
   this->increasing_rr_reached    = 0;
@@ -885,7 +885,7 @@ void _start_increasement(FBRASubController *this)
 }
 
 
-static gdouble _off_target(FBRASubController *this, gint pow, gdouble eps)
+static gdouble _off_target(FRACTaLSubController *this, gint pow, gdouble eps)
 {
   gint32 refpoint;
   gdouble result;
@@ -905,7 +905,7 @@ static gdouble _off_target(FBRASubController *this, gint pow, gdouble eps)
 }
 
 
-guint _get_approvement_interval(FBRASubController* this)
+guint _get_approvement_interval(FRACTaLSubController* this)
 {
   gdouble off;
   gdouble interval;
@@ -915,7 +915,7 @@ guint _get_approvement_interval(FBRASubController* this)
   return CONSTRAIN(.1 * GST_SECOND,  .6 * GST_SECOND, interval * _stat(this)->srtt);
 }
 
-guint _get_monitoring_interval(FBRASubController* this)
+guint _get_monitoring_interval(FRACTaLSubController* this)
 {
   guint interval;
   gdouble off;
@@ -941,7 +941,7 @@ guint _get_monitoring_interval(FBRASubController* this)
   return interval;
 }
 
-void _change_sndsubflow_target_bitrate(FBRASubController* this, gint32 new_target)
+void _change_sndsubflow_target_bitrate(FRACTaLSubController* this, gint32 new_target)
 {
 //  g_print("new target: %d, min target: %d\n", new_target, _min_target(this));
   if(0 < _max_target(this)){
@@ -954,7 +954,7 @@ void _change_sndsubflow_target_bitrate(FBRASubController* this, gint32 new_targe
 
 }
 
-void _logging(FBRASubController* this)
+void _logging(FRACTaLSubController* this)
 {
   const GstClockTime sampling_time = 100 * GST_MSECOND;
   if(!g_file_test("triggered_stat", G_FILE_TEST_EXISTS)){

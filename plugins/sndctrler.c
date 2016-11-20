@@ -28,7 +28,7 @@
 #include <string.h>
 #include <sys/timex.h>
 #include <stdlib.h>
-#include "fbrasubctrler.h"
+#include "fractalsubctrler.h"
 
 #define THIS_WRITELOCK(this) g_rw_lock_writer_lock(&this->rwmutex)
 #define THIS_WRITEUNLOCK(this) g_rw_lock_writer_unlock(&this->rwmutex)
@@ -87,7 +87,7 @@ _dispose_congestion_controller(
     CongestionController* controller);
 
 static CongestionController*
-_create_fbraplus(
+_create_fractalplus(
     SndController* this,
     SndSubflow* subflow);
 
@@ -470,7 +470,7 @@ void _on_congestion_controlling_changed(SndController* this, SndSubflow *subflow
   switch(subflow->congestion_controlling_type){
     case CONGESTION_CONTROLLING_TYPE_FRACTAL:
       {
-        CongestionController *controller = _create_fbraplus(this, subflow);
+        CongestionController *controller = _create_fractalplus(this, subflow);
         this->controllers = g_slist_prepend(this->controllers, controller);
         controller->enable(controller->udata);
       }
@@ -494,17 +494,17 @@ void _dispose_congestion_controller(SndController* this, CongestionController* c
   g_slice_free(CongestionController, controller);
 }
 
-CongestionController* _create_fbraplus(SndController* this, SndSubflow* subflow)
+CongestionController* _create_fractalplus(SndController* this, SndSubflow* subflow)
 {
   CongestionController *result = g_slice_new0(CongestionController);
   result->type           = CONGESTION_CONTROLLING_TYPE_FRACTAL;
   result->subflow_id     = subflow->id;
-  result->udata          = make_fbrasubctrler(this->sndtracker, subflow);
-  result->disable        = (CallFunc) fbrasubctrler_disable;
+  result->udata          = make_fractalsubctrler(this->sndtracker, subflow);
+  result->disable        = (CallFunc) fractalsubctrler_disable;
   result->dispose        = (CallFunc) g_object_unref;
-  result->enable         = (CallFunc) fbrasubctrler_enable;
-  result->time_update   =  (CallFunc) fbrasubctrler_time_update;
-  result->report_updater = (TransitFunc) fbrasubctrler_report_update;
+  result->enable         = (CallFunc) fractalsubctrler_enable;
+  result->time_update   =  (CallFunc) fractalsubctrler_time_update;
+  result->report_updater = (TransitFunc) fractalsubctrler_report_update;
   return result;
 }
 

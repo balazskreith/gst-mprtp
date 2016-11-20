@@ -27,28 +27,28 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>     /* qsort */
-#include "fbrafbprod.h"
+#include "fractalfbprod.h"
 #include "reportprod.h"
 
 #define _now(this) gst_clock_get_time (this->sysclock)
 
-GST_DEBUG_CATEGORY_STATIC (fbrafbproducer_debug_category);
-#define GST_CAT_DEFAULT fbrafbproducer_debug_category
+GST_DEBUG_CATEGORY_STATIC (fractalfbproducer_debug_category);
+#define GST_CAT_DEFAULT fractalfbproducer_debug_category
 
-G_DEFINE_TYPE (FBRAFBProducer, fbrafbproducer, G_TYPE_OBJECT);
+G_DEFINE_TYPE (FRACTaLFBProducer, fractalfbproducer, G_TYPE_OBJECT);
 
 
 
-static void fbrafbproducer_finalize (GObject * object);
-static gboolean _do_fb(FBRAFBProducer* data);;
-static gboolean _packet_subflow_filter(FBRAFBProducer *this, RcvPacket *packet);
-static void _on_discarded_packet(FBRAFBProducer *this, RcvPacket *packet);
-static void _on_received_packet(FBRAFBProducer *this, RcvPacket *packet);
-static void _setup_xr_rfc7243(FBRAFBProducer * this,ReportProducer* reportproducer);
-static void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this,  ReportProducer* reportproducer);
-static void _setup_xr_owd(FBRAFBProducer * this,  ReportProducer* reportproducer);
-//static void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer);
-static void _on_fb_update(FBRAFBProducer *this,  ReportProducer* reportproducer);
+static void fractalfbproducer_finalize (GObject * object);
+static gboolean _do_fb(FRACTaLFBProducer* data);;
+static gboolean _packet_subflow_filter(FRACTaLFBProducer *this, RcvPacket *packet);
+static void _on_discarded_packet(FRACTaLFBProducer *this, RcvPacket *packet);
+static void _on_received_packet(FRACTaLFBProducer *this, RcvPacket *packet);
+static void _setup_xr_rfc7243(FRACTaLFBProducer * this,ReportProducer* reportproducer);
+static void _setup_xr_rfc3611_rle_lost(FRACTaLFBProducer * this,  ReportProducer* reportproducer);
+static void _setup_xr_owd(FRACTaLFBProducer * this,  ReportProducer* reportproducer);
+//static void _setup_afb_reps(FRACTALFBProducer * this, ReportProducer *reportproducer);
+static void _on_fb_update(FRACTaLFBProducer *this,  ReportProducer* reportproducer);
 
 static gint
 _cmp_seq (guint16 x, guint16 y)
@@ -69,7 +69,7 @@ static guint16 _diff_seq(guint16 a, guint16 b)
   return 0;
 }
 
-static void _on_rle_sw_rem(FBRAFBProducer* this, guint16* seq_num)
+static void _on_rle_sw_rem(FRACTaLFBProducer* this, guint16* seq_num)
 {
   this->vector[*seq_num] = FALSE;
   if(_cmp_seq(this->begin_seq, *seq_num) <= 0){
@@ -77,28 +77,28 @@ static void _on_rle_sw_rem(FBRAFBProducer* this, guint16* seq_num)
   }
 }
 
-//PercentileResultPipeFnc(_owd_percentile_pipe, FBRAFBProducer, median_delay, min_delay, max_delay, RcvPacket, delay, 0);
-PercentileRawResultPipeFnc(_owd_percentile_pipe, FBRAFBProducer, GstClockTime, median_delay, min_delay, max_delay, 0);
+//PercentileResultPipeFnc(_owd_percentile_pipe, FRACTALFBProducer, median_delay, min_delay, max_delay, RcvPacket, delay, 0);
+PercentileRawResultPipeFnc(_owd_percentile_pipe, FRACTaLFBProducer, GstClockTime, median_delay, min_delay, max_delay, 0);
 
 void
-fbrafbproducer_class_init (FBRAFBProducerClass * klass)
+fractalfbproducer_class_init (FRACTaLFBProducerClass * klass)
 {
   GObjectClass *gobject_class;
 
   gobject_class = (GObjectClass *) klass;
 
-  gobject_class->finalize = fbrafbproducer_finalize;
+  gobject_class->finalize = fractalfbproducer_finalize;
 
-  GST_DEBUG_CATEGORY_INIT (fbrafbproducer_debug_category, "fbrafbproducer", 0,
-      "FBRAFBProducer");
+  GST_DEBUG_CATEGORY_INIT (fractalfbproducer_debug_category, "fractalfbproducer", 0,
+      "FRACTALFBProducer");
 
 }
 
 void
-fbrafbproducer_finalize (GObject * object)
+fractalfbproducer_finalize (GObject * object)
 {
-  FBRAFBProducer *this;
-  this = FBRAFBPRODUCER(object);
+  FRACTaLFBProducer *this;
+  this = FRACTALFBPRODUCER(object);
 
   rcvtracker_rem_on_received_packet_listener(this->tracker,  (ListenerFunc)_on_received_packet);
   rcvsubflow_rem_on_rtcp_fb_cb(this->subflow, (ListenerFunc) _on_fb_update);
@@ -111,7 +111,7 @@ fbrafbproducer_finalize (GObject * object)
 }
 
 void
-fbrafbproducer_init (FBRAFBProducer * this)
+fractalfbproducer_init (FRACTaLFBProducer * this)
 {
   this->sysclock = gst_system_clock_obtain();
 
@@ -125,10 +125,10 @@ fbrafbproducer_init (FBRAFBProducer * this)
 //  sprintf(result, "%lu", GST_TIME_AS_MSECONDS(*(guint64*)item));
 //}
 
-FBRAFBProducer *make_fbrafbproducer(RcvSubflow* subflow, RcvTracker *tracker)
+FRACTaLFBProducer *make_fractalfbproducer(RcvSubflow* subflow, RcvTracker *tracker)
 {
-  FBRAFBProducer *this;
-  this = g_object_new (FBRAFBPRODUCER_TYPE, NULL);
+  FRACTaLFBProducer *this;
+  this = g_object_new (FRACTALFBPRODUCER_TYPE, NULL);
   this->subflow         = subflow;
   this->tracker         = g_object_ref(tracker);
   this->owds_sw         = make_slidingwindow_uint64(20, 100 * GST_MSECOND);
@@ -156,27 +156,27 @@ FBRAFBProducer *make_fbrafbproducer(RcvSubflow* subflow, RcvTracker *tracker)
   return this;
 }
 
-void fbrafbproducer_reset(FBRAFBProducer *this)
+void fractalfbproducer_reset(FRACTaLFBProducer *this)
 {
   this->initialized = FALSE;
 }
 
-void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold)
+void fractalfbproducer_set_owd_treshold(FRACTaLFBProducer *this, GstClockTime treshold)
 {
   slidingwindow_set_treshold(this->owds_sw, treshold);
 }
 
-gboolean _packet_subflow_filter(FBRAFBProducer *this, RcvPacket *packet)
+gboolean _packet_subflow_filter(FRACTaLFBProducer *this, RcvPacket *packet)
 {
   return packet->subflow_id == this->subflow->id;
 }
 
-void _on_discarded_packet(FBRAFBProducer *this, RcvPacket *packet)
+void _on_discarded_packet(FRACTaLFBProducer *this, RcvPacket *packet)
 {
   this->discarded_bytes += packet->payload_size;
 }
 
-void _on_received_packet(FBRAFBProducer *this, RcvPacket *packet)
+void _on_received_packet(FRACTaLFBProducer *this, RcvPacket *packet)
 {
 
   slidingwindow_add_data(this->owds_sw, &packet->delay);
@@ -199,7 +199,7 @@ done:
 }
 
 
-static gboolean _do_fb(FBRAFBProducer *this)
+static gboolean _do_fb(FRACTaLFBProducer *this)
 {
   GstClockTime now = _now(this);
   if(now - 20 * GST_MSECOND < this->last_fb){
@@ -212,7 +212,7 @@ static gboolean _do_fb(FBRAFBProducer *this)
 }
 
 
-void _on_fb_update(FBRAFBProducer *this, ReportProducer* reportproducer)
+void _on_fb_update(FRACTaLFBProducer *this, ReportProducer* reportproducer)
 {
   if(!_do_fb(this)){
     goto done;
@@ -235,7 +235,7 @@ done:
   return;
 }
 
-void _setup_xr_rfc7243(FBRAFBProducer * this,ReportProducer* reportproducer)
+void _setup_xr_rfc7243(FRACTaLFBProducer * this,ReportProducer* reportproducer)
 {
   gboolean interval_metric_flag = TRUE;
   gboolean early_bit = FALSE;
@@ -248,7 +248,7 @@ void _setup_xr_rfc7243(FBRAFBProducer * this,ReportProducer* reportproducer)
   this->discarded_bytes = 0;
 }
 
-void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this,ReportProducer* reportproducer)
+void _setup_xr_rfc3611_rle_lost(FRACTaLFBProducer * this,ReportProducer* reportproducer)
 {
 
   if(_cmp_seq(this->end_seq, this->begin_seq) <= 0){
@@ -278,7 +278,7 @@ done:
 
 
 
-void _setup_xr_owd(FBRAFBProducer * this, ReportProducer* reportproducer)
+void _setup_xr_owd(FRACTaLFBProducer * this, ReportProducer* reportproducer)
 {
   guint32      u32_median_delay, u32_min_delay, u32_max_delay;
 

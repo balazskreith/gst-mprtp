@@ -620,6 +620,8 @@ _probe_stage(
   _refresh_monitoring_approvement(this);
   if(!this->monitoring_approved){
     goto done;
+  }else if(_stat(this)->rr_avg < _stat(this)->sr_avg * .9){
+    goto done;
   }
 
   _start_increasement(this);
@@ -865,6 +867,7 @@ void _refresh_reducing_approvement(FRACTaLSubController *this)
     this->reducing_sr_reached = _now(this);
     return;
   }
+
 
   interval = _stat(this)->srtt;
   if(_now(this) - interval < this->reducing_sr_reached){

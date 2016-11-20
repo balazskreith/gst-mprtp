@@ -460,6 +460,7 @@ void _setup_monitor_packet(Monitor* this, MonitorPacket* packet, GstRTPBuffer *r
   packet->payload_size = gst_rtp_buffer_get_payload_len(rtp);
   packet->payload_type = gst_rtp_buffer_get_payload_type(rtp);
   packet->header_size  = gst_rtp_buffer_get_header_len(rtp);
+  packet->marker       = gst_rtp_buffer_get_marker(rtp);
 }
 
 guint16 _get_tracked_seq(Monitor *this, GstRTPBuffer* rtp)

@@ -63,11 +63,6 @@ struct _RTPAbsTimeExtension
 };
 
 typedef struct{
-  guint16    abs_seq;
-  GstBuffer* repairedbuf;
-}DiscardedPacket;
-
-typedef struct{
   guint8   subflow_id;
   guint16  subflow_seq;
   gboolean repaired;

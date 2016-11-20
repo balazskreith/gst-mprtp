@@ -376,6 +376,7 @@ again:
   if(!packet){
     goto done;
   }
+
   packetsrc_linked = gst_pad_is_linked(this->packet_srcpad);
 //  packetsrc_linked = FALSE;
   if(!packetsrc_linked && !this->packetlogs_linked){
@@ -393,7 +394,7 @@ again:
 
     if(this->csv_logging){
       mprtp_logger(this->packetslog_file,
-          "%u,%hu,%d,%lu,%d,%u,%u,%u,%d\n",
+          "%u,%hu,%d,%lu,%d,%u,%u,%u,%d,%lu\n",
           packet->extended_seq,
           packet->tracked_seq,
           packet->state,
@@ -402,7 +403,8 @@ again:
           packet->header_size,
           packet->payload_size,
           packet->timestamp,
-          packet->payload_type
+          packet->payload_type,
+          packet->played_out
       );
 
 //      gst_buffer_map(buffer, &map, GST_MAP_READWRITE);

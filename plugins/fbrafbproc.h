@@ -1,12 +1,12 @@
 /*
- * fbrafbprocessor.h
+ * fractalfbprocessor.h
  *
  *  Created on: Jun 30, 2015
  *      Author: balazs
  */
 
-#ifndef FBRAFBPROCESSOR_H_
-#define FBRAFBPROCESSOR_H_
+#ifndef FRACTALFBPROCESSOR_H_
+#define FRACTALFBPROCESSOR_H_
 
 #include <gst/gst.h>
 
@@ -17,17 +17,17 @@
 #include "reportproc.h"
 
 
-typedef struct _FBRAFBProcessor FBRAFBProcessor;
-typedef struct _FBRAFBProcessorClass FBRAFBProcessorClass;
+typedef struct _FRACTaLFBProcessor FRACTaLFBProcessor;
+typedef struct _FRACTaLFBProcessorClass FRACTaLFBProcessorClass;
 
-#define FBRAFBPROCESSOR_TYPE             (fbrafbprocessor_get_type())
-#define FBRAFBPROCESSOR(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),FBRAFBPROCESSOR_TYPE,FBRAFBProcessor))
-#define FBRAFBPROCESSOR_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass),FBRAFBPROCESSOR_TYPE,FBRAFBProcessorClass))
-#define FBRAFBPROCESSOR_IS_SOURCE(src)          (G_TYPE_CHECK_INSTANCE_TYPE((src),FBRAFBPROCESSOR_TYPE))
-#define FBRAFBPROCESSOR_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),FBRAFBPROCESSOR_TYPE))
-#define FBRAFBPROCESSOR_CAST(src)        ((FBRAFBProcessor *)(src))
+#define FRACTALFBPROCESSOR_TYPE             (fractalfbprocessor_get_type())
+#define FRACTALFBPROCESSOR(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),FRACTALFBPROCESSOR_TYPE,FRACTaLFBProcessor))
+#define FRACTALFBPROCESSOR_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass),FRACTALFBPROCESSOR_TYPE,FRACTaLFBProcessorClass))
+#define FRACTALFBPROCESSOR_IS_SOURCE(src)          (G_TYPE_CHECK_INSTANCE_TYPE((src),FRACTALFBPROCESSOR_TYPE))
+#define FRACTALFBPROCESSOR_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),FRACTALFBPROCESSOR_TYPE))
+#define FRACTALFBPROCESSOR_CAST(src)        ((FRACTALFBProcessor *)(src))
 
-typedef struct _FBRAPlusStat
+typedef struct _FRACTaLStat
 {
   GstClockTime             owd_50th;
   GstClockTime             last_owd;
@@ -37,6 +37,7 @@ typedef struct _FBRAPlusStat
   gint32                   BiF_max;
   gint32                   BiF_min;
   gint32                   BiF_std;
+  gdouble                  FL_std;
   gint32                   stalled_bytes;
   gint32                   bytes_in_flight;
   GstClockTime             delay_in_rtpqueue;
@@ -48,41 +49,50 @@ typedef struct _FBRAPlusStat
   gdouble                  srtt;
 
   gint32                   newly_acked_bytes;
+
   gdouble                  sr_avg;
   gdouble                  rr_avg;
 
   gdouble                  FL_in_1s;
   gdouble                  FL_50th;
 
-  gdouble                  volume_ratio;
+  gdouble                  last_FL;
 
-}FBRAPlusStat;
+
+}FRACTaLStat;
 
 typedef struct{
   guint   counter;
-  gdouble mean; //the mean
+  gdouble mean;
   gdouble var;
   gdouble emp;
-}FBRAPlusStdHelper;
+}FRACTaLStdHelper;
 
 typedef struct{
+  gint32       ref;
   GstClockTime owd;
   gint32       bytes_in_flight;
   gdouble      fraction_lost;
-}FBRAPlusMeasurement;
+}FRACTaLMeasurement;
 
-struct _FBRAFBProcessor
+typedef struct{
+  gboolean owd;
+  gboolean bytes_in_flight;
+  gboolean fraction_lost;
+}FRACTaLApprovement;
+
+struct _FRACTaLFBProcessor
 {
   GObject                  object;
   GstClock*                sysclock;
 
-  SlidingWindow*           short_sw;
-  SlidingWindow*           long_sw;
+//  SlidingWindow*           FL_sw;
+  SlidingWindow*           BiF_sw;
+  SlidingWindow*           owd_sw;
   Recycle*                 measurements_recycle;
 
-  FBRAPlusMeasurement      actual_measurement;
-  FBRAPlusStat*            stat;
-  Notifier*                on_report_processed;
+  FRACTaLStat*             stat;
+  FRACTaLApprovement*      approvement;
   SndTracker*              sndtracker;
   SndSubflow*              subflow;
 
@@ -91,34 +101,35 @@ struct _FBRAFBProcessor
   GstClockTime             RTT;
   GstClockTime             srtt_updated;
 
-  gint32                   BiF_min;
   GstClockTime             owd_min;
   GstClockTime             owd_max;
 
   gdouble                  FL_min;
   gdouble                  FL_max;
 
-  FBRAPlusStdHelper        owd_std_helper;
-  FBRAPlusStdHelper        BiF_std_helper;
+  FRACTaLStdHelper         owd_std_helper;
+  FRACTaLStdHelper         BiF_std_helper;
+  FRACTaLStdHelper         FL_std_helper;
   GstClockTime             last_report_updated;
   GstClockTime             last_owd_log;
 
-  gdouble                  last_volume;
-  gdouble                  normal_volume;
+  gint32                   newly_acked_packets;
+  gint32                   newly_received_packets;
 
 };
 
-struct _FBRAFBProcessorClass{
+struct _FRACTaLFBProcessorClass{
   GObjectClass parent_class;
 
 };
 
-GType fbrafbprocessor_get_type (void);
-FBRAFBProcessor *make_fbrafbprocessor(SndTracker* sndtracker, SndSubflow* subflow, FBRAPlusStat* stat);
+GType fractalfbprocessor_get_type (void);
+FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* subflow,
+    FRACTaLStat* stat, FRACTaLApprovement* approvements);
 
-void fbrafbprocessor_reset(FBRAFBProcessor *this);
-void fbrafbprocessor_approve_measurement(FBRAFBProcessor *this);
-void fbrafbprocessor_time_update(FBRAFBProcessor *this);
-void fbrafbprocessor_report_update(FBRAFBProcessor *this, GstMPRTCPReportSummary *summary);
+void fractalfbprocessor_reset(FRACTaLFBProcessor *this);
+void fractalfbprocessor_approve_measurement(FRACTaLFBProcessor *this);
+void fractalfbprocessor_time_update(FRACTaLFBProcessor *this);
+void fractalfbprocessor_report_update(FRACTaLFBProcessor *this, GstMPRTCPReportSummary *summary);
 
-#endif /* FBRAFBPROCESSOR_H_ */
+#endif /* FRACTALFBPROCESSOR_H_ */

@@ -77,7 +77,6 @@ typedef struct{
 
 typedef struct{
   MessageTypes     type;
-//  DiscardedPacket *discarded_packet;
   guint16          missing_seq;
 }RepairRequestMessage;
 

@@ -64,6 +64,11 @@ void jitterbuffer_set_clock_rate(
     gint32 clock_rate
     );
 
+gboolean
+jitterbuffer_is_packet_discarded(
+    JitterBuffer* this,
+    RcvPacket* packet);
+
 void
 jitterbuffer_push_packet(
     JitterBuffer *this,

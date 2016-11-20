@@ -389,7 +389,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   notifier_add_listener(this->on_rtcp_ready,
       (ListenerFunc) _on_rtcp_ready, this);
 
-//  this->obsolation_treshold = 50 * GST_MSECOND;
+  this->obsolation_treshold = 50 * GST_MSECOND;
   this->fec_responses = make_messenger(sizeof(FECEncoderResponse*));
 }
 
@@ -867,7 +867,7 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndSubflow* subflow, SndP
 //  g_print("Packet sent  flow result: %d\n", gst_pad_push(this->mprtp_srcpad, buffer));
 
 //  artifical lost
-//    if(++this->sent_packets % 11 == 0){
+//    if(++this->sent_packets % 21 == 0){
 //      gst_buffer_unref(buffer);
 //    }else{
 //      gst_pad_push(this->mprtp_srcpad, buffer);

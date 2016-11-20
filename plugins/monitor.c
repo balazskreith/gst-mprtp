@@ -260,10 +260,13 @@ done:
 }
 
 MonitorPacket* monitor_pop_prepared_packet(Monitor* this){
+  MonitorPacket* packet;
   if(g_queue_is_empty(this->prepared_packets)){
     return NULL;
   }
-  return g_queue_pop_head(this->prepared_packets);
+  packet = g_queue_pop_head(this->prepared_packets);
+  packet->played_out = NTP_NOW;
+  return packet;
 }
 
 
@@ -278,6 +281,8 @@ void monitor_track_packetbuffer(Monitor* this, GstBuffer* buffer)
   gst_buffer_map(buffer, &map, GST_MAP_READ);
   memcpy(packet, map.data, sizeof(MonitorPacket));
   gst_buffer_unmap(buffer, &map);
+//  g_print("Packet %hu tracked as %d\n", packet->tracked_seq, packet->state);
+
   if(packet->state != MONITOR_PACKET_STATE_DISCARDED){
     this->tracked_packets[packet->tracked_seq] = packet;
     goto done;
@@ -288,7 +293,8 @@ void monitor_track_packetbuffer(Monitor* this, GstBuffer* buffer)
   already_tracked = this->tracked_packets[packet->tracked_seq];
   if(already_tracked){
     //If we have not picked it up yet from the lookup table,
-    //then YUPEE, it is not too late to play it out.
+    //then YUPEE, it is not too late to play it out here
+    //and it can be marked as received without any side effect
     packet->state = MONITOR_PACKET_STATE_RECEIVED;
     this->tracked_packets[packet->tracked_seq] = packet;
     recycle_add(this->recycle, already_tracked);
@@ -302,6 +308,7 @@ void monitor_track_packetbuffer(Monitor* this, GstBuffer* buffer)
     //but it is actually discarded.
     --this->stat.lost.total_packets;
     ++this->stat.discarded.total_packets;
+    this->stat.discarded.total_bytes+=packet->payload_size;
     recycle_add(this->recycle, packet);
     goto done;
   }
@@ -368,9 +375,10 @@ void monitor_set_accumulation_length(Monitor* this, GstClockTime length)
 
 void _monitor_packet_fire(Monitor* this, MonitorPacket *packet, MonitorPacketEvents event, gpointer arg)
 {
+//  g_print("Action on packet %hu-%d is %d\n", packet->tracked_seq, packet->state, event);
   switch(packet->state){
       case MONITOR_PACKET_STATE_DISCARDED:
-        GST_WARNING("Packet with tracked seq %hu already discarded. How is that happened?", packet->tracked_seq);
+        GST_DEBUG_OBJECT(this, "Packet with tracked seq %hu already discarded. How is that happened?", packet->tracked_seq);
         /* FALL THROUGH */
       case MONITOR_PACKET_STATE_UNKNOWN:
       switch(event){

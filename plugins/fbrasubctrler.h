@@ -38,6 +38,9 @@ struct _FBRASubController
   gboolean                  enabled;
   SndSubflow*               subflow;
 
+  gboolean                  backward_congestion;
+  GstClockTime              last_report;
+
   GstClockTime              last_log;
   gboolean                  approve_measurement;
 
@@ -51,8 +54,9 @@ struct _FBRASubController
   gint32                    bottleneck_point;
   gint32                    keeping_point;
 
-  FBRAFBProcessor*          fbprocessor;
-  FBRAPlusStat*             stat;
+  FRACTaLFBProcessor*       fbprocessor;
+  FRACTaLStat*              stat;
+  FRACTaLApprovement*      approvement;
   guint                     sent_packets;
 
   guint                     monitoring_interval;

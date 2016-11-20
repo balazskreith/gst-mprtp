@@ -223,6 +223,28 @@ SndPacket* sndtracker_retrieve_sent_packet(SndTracker * this, guint8 subflow_id,
   return result;
 }
 
+void sndtracker_packet_found(SndTracker * this, SndPacket* packet)
+{
+  packet->lost = FALSE;
+  //subtract from lost
+
+  this->stat.received_bytes_in_1s += packet->payload_size;
+  ++this->stat.received_packets_in_1s;
+
+  this->stat.total_received_bytes += packet->payload_size;
+  ++this->stat.total_received_packets;
+
+  if(packet->subflow_id != 0){
+    Subflow* subflow = _get_subflow(this, packet->subflow_id);
+
+    subflow->stat.received_bytes_in_1s += packet->payload_size;
+    ++subflow->stat.received_packets_in_1s;
+
+    subflow->stat.total_received_bytes += packet->payload_size;
+    ++subflow->stat.total_received_packets;
+  }
+}
+
 
 void sndtracker_packet_acked(SndTracker * this, SndPacket* packet)
 {
@@ -351,7 +373,7 @@ void _acked_packets_rem_pipe(SndTracker* this, SndPacket* packet)
 
     if(!packet->lost){
       subflow->stat.received_bytes_in_1s -= packet->payload_size;
-      --subflow->stat.total_received_packets;
+      --subflow->stat.received_packets_in_1s;
     }
   }
 

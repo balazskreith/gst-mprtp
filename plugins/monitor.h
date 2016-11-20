@@ -30,7 +30,7 @@ typedef enum{
   MONITOR_PACKET_STATE_RECEIVED  = 1,
   MONITOR_PACKET_STATE_LOST      = 2,
   MONITOR_PACKET_STATE_DISCARDED = 3,
-}MonitorPacketStates;
+}MonitoredPacketStates;
 
 typedef struct{
   gint32 total_bytes;
@@ -53,8 +53,9 @@ typedef void(*MonitorPacketAction)(Monitor*,MonitorPacket*);
 struct _MonitorPacket
 {
   guint32              extended_seq;
-  MonitorPacketStates  state;
+  MonitoredPacketStates  state;
   guint64              tracked_ntp;
+  guint64              played_out;
   guint16              tracked_seq;
 
   gboolean             marker;

@@ -41,8 +41,10 @@ G_DEFINE_TYPE (FBRAFBProducer, fbrafbproducer, G_TYPE_OBJECT);
 
 static void fbrafbproducer_finalize (GObject * object);
 static gboolean _do_fb(FBRAFBProducer* data);;
-static gboolean _receive_packet_filter(FBRAFBProducer *this, RcvPacket *packet);
+static gboolean _packet_subflow_filter(FBRAFBProducer *this, RcvPacket *packet);
+static void _on_discarded_packet(FBRAFBProducer *this, RcvPacket *packet);
 static void _on_received_packet(FBRAFBProducer *this, RcvPacket *packet);
+static void _setup_xr_rfc7243(FBRAFBProducer * this,ReportProducer* reportproducer);
 static void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this,  ReportProducer* reportproducer);
 static void _setup_xr_owd(FBRAFBProducer * this,  ReportProducer* reportproducer);
 //static void _setup_afb_reps(FBRAFBProducer * this, ReportProducer *reportproducer);
@@ -141,7 +143,12 @@ FBRAFBProducer *make_fbrafbproducer(RcvSubflow* subflow, RcvTracker *tracker)
 
   rcvtracker_add_on_received_packet_listener_with_filter(this->tracker,
       (ListenerFunc) _on_received_packet,
-      (ListenerFilterFunc) _receive_packet_filter,
+      (ListenerFilterFunc) _packet_subflow_filter,
+      this);
+
+  rcvtracker_add_on_discarded_packet_listener_with_filter(this->tracker,
+      (ListenerFunc) _on_discarded_packet,
+      (ListenerFilterFunc) _packet_subflow_filter,
       this);
 
   rcvsubflow_add_on_rtcp_fb_cb(subflow, (ListenerFunc) _on_fb_update, this);
@@ -159,9 +166,14 @@ void fbrafbproducer_set_owd_treshold(FBRAFBProducer *this, GstClockTime treshold
   slidingwindow_set_treshold(this->owds_sw, treshold);
 }
 
-gboolean _receive_packet_filter(FBRAFBProducer *this, RcvPacket *packet)
+gboolean _packet_subflow_filter(FBRAFBProducer *this, RcvPacket *packet)
 {
   return packet->subflow_id == this->subflow->id;
+}
+
+void _on_discarded_packet(FBRAFBProducer *this, RcvPacket *packet)
+{
+  this->discarded_bytes += packet->payload_size;
 }
 
 void _on_received_packet(FBRAFBProducer *this, RcvPacket *packet)
@@ -206,8 +218,14 @@ void _on_fb_update(FBRAFBProducer *this, ReportProducer* reportproducer)
     goto done;
   }
 
-
   report_producer_begin(reportproducer, this->subflow->id);
+  //Okay, so discarded byte metrics indicate incipient congestion,
+  //which is in fact indicated by the owd distoration either. This is one point to discard this metric :)
+  //another point is the fact that if competing with tcp, tcp pushes the netqueue
+  //until its limitation, thus discard metrics always appear, and also
+  //if jitter is high discard metrics appear naturally
+  //so now on we try to not to rely on this metric, but for owd and losts.
+  DISABLE_LINE _setup_xr_rfc7243(this, reportproducer);
   _setup_xr_owd(this, reportproducer);
   _setup_xr_rfc3611_rle_lost(this, reportproducer);
 
@@ -217,6 +235,18 @@ done:
   return;
 }
 
+void _setup_xr_rfc7243(FBRAFBProducer * this,ReportProducer* reportproducer)
+{
+  gboolean interval_metric_flag = TRUE;
+  gboolean early_bit = FALSE;
+
+  report_producer_add_xr_discarded_bytes(reportproducer,
+                                         interval_metric_flag,
+                                         early_bit,
+                                         this->discarded_bytes
+                                        );
+  this->discarded_bytes = 0;
+}
 
 void _setup_xr_rfc3611_rle_lost(FBRAFBProducer * this,ReportProducer* reportproducer)
 {

@@ -52,6 +52,8 @@ struct _FBRAFBProducer
   GstClockTime             min_delay;
   GstClockTime             max_delay;
 
+  gint32                   discarded_bytes;
+
   struct{
     gint counter;
     gint sum;

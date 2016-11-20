@@ -67,8 +67,8 @@ RcvTracker *make_rcvtracker(void);
 void rcvtracker_deinit_subflow(RcvTracker *this, guint8 subflow_id);
 void rcvtracker_init_subflow(RcvTracker *this, guint8 subflow_id);
 void rcvtracker_refresh(RcvTracker * this);
-
-void rcvtracker_add_discarded_packet(RcvTracker* this, DiscardedPacket* discarded_packet);
+void rcvtracker_on_recovered_buffer(RcvTracker* this, GstBuffer* repairedbuf);
+void rcvtracker_add_discarded_packet(RcvTracker* this, RcvPacket* packet);
 
 void rcvtracker_add_on_received_packet_listener(RcvTracker * this,
                                         ListenerFunc callback,
@@ -81,9 +81,13 @@ void rcvtracker_add_on_received_packet_listener_with_filter(RcvTracker * this,
 
 void rcvtracker_rem_on_received_packet_listener(RcvTracker * this, ListenerFunc callback);
 
-void rcvtracker_add_on_discarded_packet_cb(RcvTracker * this,
-                                    guint8 subflow_id,
+void rcvtracker_add_on_discarded_packet_listener(RcvTracker * this,
                                     ListenerFunc callback,
+                                    gpointer udata);
+
+void rcvtracker_add_on_discarded_packet_listener_with_filter(RcvTracker * this,
+                                    ListenerFunc callback,
+                                    ListenerFilterFunc filter,
                                     gpointer udata);
 
 void rcvtracker_add_packet(RcvTracker * this, RcvPacket* packet);

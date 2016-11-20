@@ -47,14 +47,17 @@ scope Recycle* make_recycle_##name(gint32 size, RecycleItemShaper shaper)   \
 typedef gpointer (*RecycleItemCtor)(void);
 typedef void (*RecycleItemDtor)(gpointer item);
 typedef void (*RecycleItemShaper)(gpointer result,gpointer udata);
+typedef gboolean (*RecycleItemUnrefAndTest)(gpointer item);
 
 struct _Recycle
 {
-  GObject           object;
-  datapuffer_t*     items;
-  RecycleItemCtor   ctor;
-  RecycleItemDtor   dtor;
-  RecycleItemShaper shaper;
+  GObject                 object;
+  datapuffer_t*           items;
+  RecycleItemCtor         ctor;
+  RecycleItemDtor         dtor;
+
+  RecycleItemShaper       shaper;
+
 };
 
 struct _RecycleClass{
@@ -65,6 +68,7 @@ struct _RecycleClass{
 GType recycle_get_type (void);
 
 Recycle *make_recycle(gint32 size, RecycleItemCtor ctor, RecycleItemDtor dtor, RecycleItemShaper shaper);
+void recycle_set_unref_tester(Recycle* this, RecycleItemUnrefAndTest unref_and_test);
 gpointer recycle_retrieve(Recycle* this);
 gpointer recycle_retrieve_and_shape(Recycle *this, gpointer udata);
 void recycle_add(Recycle* this, gpointer item);

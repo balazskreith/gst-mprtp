@@ -21,8 +21,6 @@
 #include "config.h"
 #endif
 
-#include <gst/rtp/gstrtpbuffer.h>
-#include <gst/rtp/gstrtcpbuffer.h>
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
@@ -53,8 +51,8 @@ recycle_class_init (RecycleClass * klass)
 
   gobject_class->finalize = recycle_finalize;
 
-  GST_DEBUG_CATEGORY_INIT (recycle_debug_category, "rndctrler", 0,
-      "MpRTP Receiving Controller");
+  GST_DEBUG_CATEGORY_INIT (recycle_debug_category, "recycle", 0,
+      "Recycle Controller");
 
 }
 
@@ -83,7 +81,6 @@ Recycle *make_recycle(gint32 size, RecycleItemCtor ctor, RecycleItemDtor dtor, R
   return result;
 }
 
-
 gpointer recycle_retrieve(Recycle* this)
 {
   if(datapuffer_isempty(this->items)){
@@ -103,10 +100,12 @@ gpointer recycle_retrieve_and_shape(Recycle *this, gpointer udata)
 
 void recycle_add(Recycle* this, gpointer item)
 {
+
   if(datapuffer_isfull(this->items)){
     this->dtor(item);
     return;
   }
+
   datapuffer_write(this->items, item);
 }
 

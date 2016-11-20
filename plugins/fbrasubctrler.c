@@ -115,6 +115,7 @@ struct _Private{
 
 #define _priv(this) ((Private*)this->priv)
 #define _stat(this) this->stat
+#define _approvement(this) this->approvement
 #define _subflow(this) (this->subflow)
 
 #define _stage(this) _priv(this)->stage
@@ -270,8 +271,10 @@ fbrasubctrler_finalize (GObject * object)
   sndtracker_rem_on_packet_sent(this->sndtracker, (ListenerFunc) _on_rtp_sending);
 
   mprtp_free(this->priv);
+
   g_object_unref(this->fbprocessor);
   g_free(this->stat);
+  g_free(this->approvement);
   g_object_unref(this->sndtracker);
   g_object_unref(this->sysclock);
 }
@@ -305,8 +308,9 @@ FBRASubController *make_fbrasubctrler(SndTracker *sndtracker, SndSubflow *subflo
   this->sndtracker          = g_object_ref(sndtracker);
   this->subflow             = subflow;
   this->made                = _now(this);
-  this->stat                = g_malloc0(sizeof(FBRAPlusStat));
-  this->fbprocessor         = make_fbrafbprocessor(sndtracker, subflow, this->stat);
+  this->stat                = g_malloc0(sizeof(FRACTaLStat));
+  this->approvement         = g_malloc0(sizeof(FRACTaLApprovement));
+  this->fbprocessor         = make_fractalfbprocessor(sndtracker, subflow, this->stat, this->approvement);
 
   sndsubflow_set_state(subflow, SNDSUBFLOW_STATE_STABLE);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
@@ -370,16 +374,30 @@ void fbrasubctrler_time_update(FBRASubController *this)
     goto done;
   }
 
+  if(!this->backward_congestion && this->last_report < _now(this) - MAX(.5 * GST_SECOND, 3 * _stat(this)->srtt)){
+
+    GST_WARNING_OBJECT(this, "Backward congestion on subflow %d", this->subflow->id);
+
+    _stop_monitoring(this);
+    _set_event(this, EVENT_DISTORTION);
+    _switch_stage_to(this, STAGE_KEEP, TRUE);
+    _change_sndsubflow_target_bitrate(this, this->keeping_point);
+    this->backward_congestion = TRUE;
+    goto done;
+  }else if(this->backward_congestion){
+    goto done;
+  }
+
   _logging(this);
 
-  fbrafbprocessor_time_update(this->fbprocessor);
+  fractalfbprocessor_time_update(this->fbprocessor);
 
   if(_stat(this)->measurements_num < 10){
     this->bottleneck_point = this->target_bitrate = _stat(this)->sender_bitrate;
     goto done;
   }
 
-  sr_corr_ratio    = CONSTRAIN(.5, 1.5, this->target_bitrate / _stat(this)->sr_avg);
+  sr_corr_ratio    = CONSTRAIN(.5, 1.5, this->target_bitrate / _stat(this)->sender_bitrate);
   rtpqdelay_factor = CONSTRAIN(1., 2., (gdouble) _stat(this)->delay_in_rtpqueue / (gdouble) (20 * GST_MSECOND));
 
   switch(this->subflow->state){
@@ -395,6 +413,9 @@ void fbrasubctrler_time_update(FBRASubController *this)
       {
         this->cwnd = this->awnd * rtpqdelay_factor;
 //        _change_sndsubflow_target_bitrate(this, new_target);
+        if(0. < _stat(this)->FL_50th && !this->monitoring_interval){
+          this->monitoring_interval = _mon_min_int(this);
+        }
       }
       break;
     case SNDSUBFLOW_STATE_UNDERUSED:
@@ -414,12 +435,10 @@ done:
 
 static void _stat_print(FBRASubController *this)
 {
-  FBRAPlusStat *stat = this->stat;
-  g_print("BiF:%-5d %-1.2f (%-4d)->%-4.0f|FEC:%-4d|SR:%-4d|RR:%-4d|Tr:%-4d|Btl:%-4d|Stg:%d-%d-%d-%d|OWD:%-3lu+%-3lu (%-3lu) %1.1f|C:%-1.1f|FL:%-1.1f\n",
+  FRACTaLStat *stat = this->stat;
+  g_print("BiF:%-5d %-5d->%-4.0f|FEC:%-4d|SR:%-4d|RR:%-4d|Tr:%-4d|Btl:%-4d|%d-%d-%d-%d|OWD:%-3lu+%-3lu (%-3lu) %1.1f-%-1.1f|FL:%-1.2f+%1.2f (%-1.2f)\n",
       stat->bytes_in_flight,
-//      stat->newly_acked_bytes,
-      _stat(this)->volume_ratio,
-      stat->BiF_80th,
+      stat->newly_acked_bytes,
       this->cwnd / 8,
 
       stat->fec_bitrate / 1000,
@@ -441,7 +460,9 @@ static void _stat_print(FBRASubController *this)
       GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000.,
 
       stat->owd_log_corr,
-      stat->FL_50th
+      stat->FL_50th,
+      stat->FL_std,
+      stat->FL_in_1s
       );
 
 //  g_print("SR: %d | Stalled bytes:%d\n",
@@ -453,13 +474,15 @@ void fbrasubctrler_report_update(
                          FBRASubController *this,
                          GstMPRTCPReportSummary *summary)
 {
-//  GstClockTime max_approve_idle_th;
-
+  GstClockTime max_approve_idle_th;
   if(!this->enabled){
     goto done;
   }
 
-  fbrafbprocessor_report_update(this->fbprocessor, summary);
+  this->backward_congestion = FALSE;
+  this->last_report = _now(this);
+
+  fractalfbprocessor_report_update(this->fbprocessor, summary);
 
   _stat_print(this);
 
@@ -469,7 +492,10 @@ void fbrasubctrler_report_update(
   }
   this->approve_measurement |= _subflow(this)->state != SNDSUBFLOW_STATE_OVERUSED;
 
-//  max_approve_idle_th = CONSTRAIN(100 * GST_MSECOND, 3 * GST_SECOND, 5 * _stat(this)->srtt);
+  max_approve_idle_th = CONSTRAIN(3 * GST_SECOND, 10 * GST_SECOND, 10 * _stat(this)->srtt);
+  if(this->last_approved < _now(this) - max_approve_idle_th){
+    this->approve_measurement = TRUE;
+  }
 //  if(_subflow(this)->state != SNDSUBFLOW_STATE_OVERUSED){
 //      fbrafbprocessor_approve_measurement(this->fbprocessor);
 //      this->last_approved = _now(this);
@@ -478,10 +504,9 @@ void fbrasubctrler_report_update(
 //  }
 
   if(this->approve_measurement){
-    fbrafbprocessor_approve_measurement(this->fbprocessor);
+    fractalfbprocessor_approve_measurement(this->fbprocessor);
     this->last_approved = _now(this);
   }
-
 done:
   return;
 }
@@ -489,15 +514,16 @@ done:
 static gboolean _distortion(FBRASubController *this)
 {
   GstClockTime owd_th = _stat(this)->owd_50th + CONSTRAIN(50 * GST_MSECOND, 250 * GST_MSECOND, _stat(this)->owd_std * 4);
-  gdouble      FL_th  = MIN(_stat(this)->FL_50th, .1);
+//  gdouble      FL_th  = MIN(_stat(this)->FL_50th, .1);
+  gdouble      FL_th  = _stat(this)->FL_50th + CONSTRAIN(0.05, 0.2, _stat(this)->FL_std * 4);
 
-  if(owd_th < _stat(this)->last_owd){
-    g_print("OWD distorted\n");
-  }
+//  if(owd_th < _stat(this)->last_owd){
+//    g_print("OWD distorted\n");
+//  }
 
-  if(FL_th < _stat(this)->FL_in_1s){
-    g_print("FL distorted\n");
-  }
+//  if(FL_th < _stat(this)->FL_in_1s){
+//    g_print("FL distorted\n");
+//  }
 
   return owd_th < _stat(this)->last_owd || FL_th < _stat(this)->FL_in_1s;
 }
@@ -527,10 +553,10 @@ _reduce_stage(
   _refresh_reducing_approvement(this);
   if(!this->reducing_approved){
     if(this->last_distorted < _now(this) - GST_SECOND){
-      _set_keeping_point(this, _stat(this)->receiver_bitrate);
+      _set_keeping_point(this, _stat(this)->receiver_bitrate * .9);
     }else{
       gdouble off = (gdouble)(_now(this) - this->last_distorted) / (gdouble) GST_SECOND;
-      _set_keeping_point(this, _stat(this)->receiver_bitrate * off + this->target_bitrate * (1.-off));
+      _set_keeping_point(this, _stat(this)->receiver_bitrate * .9 * off + this->target_bitrate * (1.-off));
     }
     goto done;
   }
@@ -540,20 +566,6 @@ _reduce_stage(
   _switch_stage_to(this, STAGE_KEEP, FALSE);
 done:
   return;
-
-
-  //
-  //  if(_now(this) < this->last_distorted + _stat(this)->owd_50th){
-  //    gdouble BiF_ratio = CONSTRAIN(.5, 1., (gdouble) _stat(this)->BiF_80th / (gdouble) _stat(this)->bytes_in_flight);
-  //    _set_bottleneck_point(this, _stat(this)->receiver_bitrate * BiF_ratio);
-  //    goto done;
-  //  }else if(_now(this) < this->last_distorted + _stat(this)->srtt){
-  //    goto done;
-  //  }else if(_distortion(this) && !this->congestion_detected){
-  //    _undershoot(this, _stat(this)->receiver_bitrate);
-  //    _set_event(this, EVENT_CONGESTION);
-  //    goto done;
-  //  }
 
 }
 

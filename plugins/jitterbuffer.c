@@ -42,6 +42,7 @@ typedef struct{
   SlidingWindow* packet_skews;
   gdouble        path_skew;
   gint64         last_delay;
+  guint32        last_ts;
 }Subflow;
 
 //----------------------------------------------------------------------
@@ -94,13 +95,14 @@ static void _on_skew_median_calculated(Subflow *subflow, swpercentilecandidates_
                    skew_max,    \
                    0            \
                    );
+
   if(subflow->path_skew == 0.){
     subflow->path_skew = skew_median;
   }else{
     subflow->path_skew = subflow->path_skew * .99 + .01 * skew_median;
   }
-
-  if(0){
+//  g_print("Median skew: %lu\n", GST_TIME_AS_MSECONDS(skew_median));
+  if(0){//For avoiding set but unused warning
     subflow->path_skew += 0 * skew_min + 0 * skew_max;
   }
 }
@@ -115,6 +117,7 @@ static void _on_path_minmax_skew_calculated(JitterBuffer *this, swminmaxstat_t *
   }else{
     this->playout_delay = (this->playout_delay * 255 + max) / 256;
   }
+  this->playout_delay = CONSTRAIN(0, GST_SECOND, this->playout_delay);
 }
 
 //----------------------------------------------------------------------
@@ -179,6 +182,13 @@ void jitterbuffer_set_clock_rate(JitterBuffer *this, gint32 clock_rate)
   this->clock_rate = clock_rate;
 }
 
+gboolean jitterbuffer_is_packet_discarded(JitterBuffer* this, RcvPacket* packet)
+{
+  if(!this->last_seq_init){
+    return FALSE;
+  }
+  return _cmp_seq(packet->abs_seq, this->last_seq) < 0;
+}
 
 void jitterbuffer_push_packet(JitterBuffer *this, RcvPacket* packet)
 {
@@ -192,15 +202,23 @@ void jitterbuffer_push_packet(JitterBuffer *this, RcvPacket* packet)
 
   if(!subflow->last_delay){
     subflow->last_delay = packet->delay;
+    subflow->last_ts    = packet->timestamp;
     subflow->packet_skews = make_slidingwindow_int64(100, 2 * GST_SECOND);
     slidingwindow_add_plugin(subflow->packet_skews,
-        make_swpercentile(500, bintree3cmp_int64, (ListenerFunc)_on_skew_median_calculated, subflow));
+        make_swpercentile(80, bintree3cmp_int64, (ListenerFunc)_on_skew_median_calculated, subflow));
     goto done;
   }
 
-  margin = 10 * GST_MSECOND;
+//  if(_cmp_ts(subflow->last_ts, packet->timestamp) < 0){
+//    margin = 50 * GST_MSECOND;
+//    skew = CONSTRAIN(-1 * margin, margin, (gint64)packet->delay - subflow->last_delay);
+//    slidingwindow_add_data(subflow->packet_skews, &skew);
+//    subflow->last_delay = packet->delay;
+//    subflow->last_ts    = packet->timestamp;
+//  }
+//
+  margin = 50 * GST_MSECOND;
   skew = CONSTRAIN(-1 * margin, margin, (gint64)packet->delay - subflow->last_delay);
-
   slidingwindow_add_data(subflow->packet_skews, &skew);
   subflow->last_delay = packet->delay;
 

@@ -158,6 +158,15 @@ slidingwindow_finalize (GObject * object)
   g_list_free_full(this->plugins, swplugin_dtor);
   g_object_unref(this->on_add_item);
   g_object_unref(this->on_rem_item);
+
+  if(this->on_data_ref){
+    g_object_unref(this->on_data_ref);
+  }
+
+  if(this->on_data_unref){
+    g_object_unref(this->on_data_unref);
+  }
+
 }
 
 void
@@ -186,6 +195,10 @@ SlidingWindow* make_slidingwindow(guint32 num_limit, GstClockTime obsolation_tre
   result->on_rem_item      = make_notifier("SW: on-rem-item");
   result->data_recycle     = NULL;
   result->items_recycle    = make_recycle_switem( MAX(4, num_limit>>2), _switem_shaper);
+  result->made             = _now(result);
+  result->on_data_ref      = NULL;
+  result->on_data_unref    = NULL;
+  result->debug.active     = FALSE;
 
   return result;
 }
@@ -200,9 +213,21 @@ static void _slidingwindow_rem(SlidingWindow* this)
   item = datapuffer_read(this->items);
 
   notifier_do(this->on_rem_item, item->data);
+  notifier_do(this->on_data_unref, item->data);
 
   if(this->data_recycle){
     recycle_add(this->data_recycle, item->data);
+  }
+
+  if(this->debug.active){
+    gchar item_data_str[1024];
+    this->debug.sprintf(item->data, item_data_str);
+    this->debug.logger("Item removed: %p->%s t(%2.1f), c(%d)\n",
+        item,
+        item_data_str,
+        (gdouble) (_now(this) - this->made) / (gdouble) GST_SECOND,
+        datapuffer_readcapacity(this->items)
+    );
   }
 
   recycle_add(this->items_recycle, item);
@@ -214,6 +239,41 @@ void slidingwindow_clear(SlidingWindow* this)
   while(!datapuffer_isempty(this->items)){
       _slidingwindow_rem(this);
   }
+}
+
+void slidingwindow_set_data_recycle(SlidingWindow* this, Recycle* data_recycle)
+{
+  this->data_recycle = data_recycle;
+}
+
+void slidingwindow_add_on_data_ref(SlidingWindow* this, ListenerFunc callback, gpointer udata)
+{
+  if(!this->on_data_ref){
+    this->on_data_ref = make_notifier("SW: on-data-ref");
+  }
+  notifier_add_listener(this->on_data_ref, callback, udata);
+
+}
+
+void slidingwindow_add_on_data_unref(SlidingWindow* this, ListenerFunc callback, gpointer udata)
+{
+  if(!this->on_data_unref){
+    this->on_data_unref = make_notifier("SW: on-data-unref");
+  }
+  notifier_add_listener(this->on_data_unref, callback, udata);
+}
+
+void slidingwindow_add_on_data_ref_change(SlidingWindow* this, ListenerFunc on_data_ref_cb, ListenerFunc on_data_unref_cb, gpointer udata)
+{
+  slidingwindow_add_on_data_ref(this,   on_data_ref_cb,   udata);
+  slidingwindow_add_on_data_unref(this, on_data_unref_cb, udata);
+}
+
+void slidingwindow_setup_debug(SlidingWindow* this, SlidingWindowItemSprintf sprintf, SlidingWindowItemLogger logger)
+{
+  this->debug.sprintf = sprintf;
+  this->debug.logger = logger;
+  this->debug.active = TRUE;
 }
 
 void slidingwindow_set_min_itemnum(SlidingWindow* this, gint min_itemnum)
@@ -346,9 +406,21 @@ void slidingwindow_add_data(SlidingWindow* this, gpointer data)
     item->data = data;
   }
 
+  notifier_do(this->on_data_ref, item->data);
   notifier_do(this->on_add_item, item->data);
 
   datapuffer_write(this->items, item);
+
+  if(this->debug.active){
+      gchar item_data_str[1024];
+      this->debug.sprintf(item->data, item_data_str);
+      this->debug.logger("Item added: %p->%s t(%2.1f), c(%d)\n",
+          item,
+          item_data_str,
+          (gdouble) (_now(this) - this->made) / (gdouble) GST_SECOND,
+          datapuffer_readcapacity(this->items)
+      );
+  }
 }
 
 void slidingwindow_add_plugin(SlidingWindow* this, SlidingWindowPlugin *swplugin)

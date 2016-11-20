@@ -31,10 +31,14 @@ struct _SlidingWindowItem
   GstClockTime  added;
 };
 
+typedef void (*SlidingWindowItemSprintf)(gpointer item_data, gchar* item_to_str);
+typedef void (*SlidingWindowItemLogger)(const gchar* format, ...);
+
 typedef struct _SlidingWindowItem SlidingWindowItem;
 struct _SlidingWindow
 {
   GObject                  object;
+  GstClockTime             made;
   datapuffer_t*            items;
   gint                     min_itemnum;
   GstClock*                sysclock;
@@ -48,9 +52,17 @@ struct _SlidingWindow
   Notifier*                on_add_item;
   Notifier*                on_rem_item;
 
+  Notifier*                on_data_ref;
+  Notifier*                on_data_unref;
+
   Recycle*                 data_recycle;
   Recycle*                 items_recycle;
 
+  struct{
+    gboolean                 active;
+    SlidingWindowItemLogger  logger;
+    SlidingWindowItemSprintf sprintf;
+  }debug;
 };
 
 struct _SlidingWindowClass{
@@ -92,6 +104,13 @@ gpointer slidingwindow_peek_custom(SlidingWindow* this, gint (*comparator)(gpoin
 void slidingwindow_set_act_limit(SlidingWindow* this, gint32 act_limit);
 void slidingwindow_add_int(SlidingWindow* this, gint data);
 void slidingwindow_add_data(SlidingWindow* this, gpointer data);
+void slidingwindow_set_data_recycle(SlidingWindow* this, Recycle* data_recycle);
+
+void slidingwindow_add_on_data_ref(SlidingWindow* this, ListenerFunc callback, gpointer udata);
+void slidingwindow_add_on_data_unref(SlidingWindow* this, ListenerFunc callback, gpointer udata);
+void slidingwindow_add_on_data_ref_change(SlidingWindow* this, ListenerFunc on_data_ref_cb, ListenerFunc on_data_unref_cb, gpointer udata);
+
+void slidingwindow_setup_debug(SlidingWindow* this, SlidingWindowItemSprintf sprintf, SlidingWindowItemLogger logger);
 void slidingwindow_set_min_itemnum(SlidingWindow* this, gint min_itemnum);
 void slidingwindow_setup_custom_obsolation(SlidingWindow* this, gboolean (*custom_obsolation)(gpointer,SlidingWindowItem*),gpointer custom_obsolation_udata);
 void slidingwindow_add_plugin(SlidingWindow* this, SlidingWindowPlugin *plugin);

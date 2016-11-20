@@ -122,6 +122,7 @@ rcvtracker_finalize (GObject * object)
   g_object_unref(this->sysclock);
   g_object_unref(this->on_discarded_packet);
   g_object_unref(this->on_received_packet);
+  g_object_unref(this->on_lost_packet);
   _priv_dtor(this->priv);
 }
 
@@ -133,7 +134,7 @@ rcvtracker_init (RcvTracker * this)
   this->priv                 = _priv_ctor();
   this->on_discarded_packet  = make_notifier("RcvTracker: on-discarded-packet");
   this->on_received_packet   = make_notifier("RcvTracker: on-received-packet");
-
+  this->on_lost_packet       = make_notifier("RcvTracker: on-lost-packet");
 
 }
 
@@ -148,14 +149,15 @@ void rcvtracker_refresh(RcvTracker * this)
   g_slist_foreach(this->joined_subflows, (GFunc) _rcvtracker_refresh_helper, this);
 }
 
-void rcvtracker_add_discarded_packet(RcvTracker* this, DiscardedPacket* discarded_packet)
+void rcvtracker_on_recovered_buffer(RcvTracker* this, GstBuffer* repairedbuf)
+{
+  ++this->stat.recovered_packets;
+}
+
+void rcvtracker_add_discarded_packet(RcvTracker* this, RcvPacket* packet)
 {
   ++this->stat.discarded_packets;
-  if(discarded_packet->repairedbuf != NULL){
-    ++this->stat.recovered_packets;
-  }
-
-  notifier_do(this->on_discarded_packet, discarded_packet);
+  notifier_do(this->on_discarded_packet, packet);
 }
 
 void rcvtracker_add_on_received_packet_listener(RcvTracker * this, ListenerFunc callback, gpointer udata)
@@ -174,12 +176,19 @@ void rcvtracker_rem_on_received_packet_listener(RcvTracker * this, ListenerFunc 
 }
 
 
-void rcvtracker_add_on_discarded_packet_cb(RcvTracker * this,
-                                    guint8 subflow_id,
+void rcvtracker_add_on_discarded_packet_listener(RcvTracker * this,
                                     ListenerFunc callback,
                                     gpointer udata)
 {
   notifier_add_listener(this->on_discarded_packet, callback, udata);
+}
+
+void rcvtracker_add_on_discarded_packet_listener_with_filter(RcvTracker * this,
+                                    ListenerFunc callback,
+                                    ListenerFilterFunc filter,
+                                    gpointer udata)
+{
+  notifier_add_listener_with_filter(this->on_discarded_packet, callback, filter, udata);
 }
 
 

@@ -294,6 +294,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->fec_payload_type         = FEC_PAYLOAD_DEFAULT_ID;
 
   this->on_rtcp_ready            = make_notifier("MPRTPPly: on-rtcp-ready");
+  this->on_recovered_buffer      = make_notifier("MPRTPPly: on-recovered-buffer");
   this->subflows                 = make_rcvsubflows();
 
   this->fec_decoder              = make_fecdecoder();
@@ -313,7 +314,8 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   rcvpackets_set_abs_time_ext_header_id(this->rcvpackets, ABS_TIME_DEFAULT_EXTENSION_HEADER_ID);
   rcvpackets_set_mprtp_ext_header_id(this->rcvpackets, MPRTP_DEFAULT_EXTENSION_HEADER_ID);
 
-  notifier_add_listener(this->on_rtcp_ready, (ListenerFunc) _playouter_on_rtcp_ready, this);
+  notifier_add_listener(this->on_rtcp_ready,       (ListenerFunc) _playouter_on_rtcp_ready,       this);
+  notifier_add_listener(this->on_recovered_buffer, (ListenerFunc) rcvtracker_on_recovered_buffer, this);
 }
 
 
@@ -664,6 +666,12 @@ PROFILING("MPRTPPLAYOUTER LOCK",
 //PROFILING("Processing arrived packet",
   packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
   rcvtracker_add_packet(this->rcvtracker, packet);
+
+  if(jitterbuffer_is_packet_discarded(this->jitterbuffer, packet)){
+//    g_print("Discarded packet: %hu - %hu - %lu\n", packet->abs_seq, this->jitterbuffer->last_seq, GST_TIME_AS_MSECONDS(this->jitterbuffer->playout_delay));
+    rcvtracker_add_discarded_packet(this->rcvtracker, packet);
+    goto unlock_and_done;
+  }
   stream_joiner_push_packet(this->joiner, packet);
 
 //  g_print("Packet from subflow %d arrived with seq: %hu\n", packet->subflow_id, packet->abs_seq);
@@ -672,8 +680,8 @@ PROFILING("MPRTPPLAYOUTER LOCK",
   rcvctrler_time_update(this->controller);
 //);
 
+unlock_and_done:
   THIS_UNLOCK(this);
-
 done:
   return result;
 
@@ -759,7 +767,7 @@ void _playouter_on_repair_response(GstMprtpplayouter *this, GstBuffer *rtpbuf)
     THIS_LOCK(this);
   );
 
-  this->discarded_packet.repairedbuf = rtpbuf;
+  this->repairedbuf = rtpbuf;
   g_cond_signal(&this->repair_signal);
   THIS_UNLOCK(this);
 }
@@ -818,11 +826,10 @@ _playout_process (GstMprtpplayouter *this)
   }
 
   if(jitterbuffer_has_repair_request(this->jitterbuffer, &gap_seq)){
-    this->discarded_packet.abs_seq = gap_seq;
-    if(this->discarded_packet.repairedbuf){
+    if(this->repairedbuf){
       GST_WARNING_OBJECT(this, "A repair packet arrived perhaps later than it was necessary");
-      gst_buffer_unref(this->discarded_packet.repairedbuf);
-      this->discarded_packet.repairedbuf = NULL;
+      gst_buffer_unref(this->repairedbuf);
+      this->repairedbuf = NULL;
     }
 
     fecdecoder_request_repair(this->fec_decoder, gap_seq);
@@ -831,15 +838,15 @@ _playout_process (GstMprtpplayouter *this)
       GST_WARNING_OBJECT(this, "max_repair_delay reached without response. Maybe need to increase it");
     }
 
-    rcvtracker_add_discarded_packet(this->rcvtracker, &this->discarded_packet);
-
-    if(this->discarded_packet.repairedbuf){
+    if(this->repairedbuf){
 //      gst_pad_push(this->mprtp_srcpad, this->discarded_packet.repairedbuf);
-//      g_print("repaired buffer appeared\n");
-      g_async_queue_push(this->buffers, this->discarded_packet.repairedbuf);
-      this->discarded_packet.repairedbuf = NULL;
+//      g_print("Repaired buffer appeared: %hu\n", gap_seq);
+      notifier_do(this->on_recovered_buffer, this->repairedbuf);
+      g_async_queue_push(this->buffers, this->repairedbuf);
+      this->repairedbuf = NULL;
     }
   }
+
 //PROFILING("_playout_process",
 //  g_print("Packet arrived at subflow %d with abs seq %hu forwarded\n", packet->subflow_id, packet->abs_seq);
 //  gst_pad_push(this->mprtp_srcpad, packet->buffer);

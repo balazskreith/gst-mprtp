@@ -28,7 +28,6 @@ gpointer datapuffer_peek_first(datapuffer_t* puffer);
 gpointer datapuffer_peek_last(datapuffer_t* puffer);
 gpointer datapuffer_peek_custom(datapuffer_t* puffer, gint (*comparator)(gpointer item, gpointer udata), gpointer udata);
 void datapuffer_write(datapuffer_t *datapuffer, void *item);
-gint32 datapuffer_capacity(datapuffer_t *datapuffer);
 gint32 datapuffer_readcapacity(datapuffer_t *datapuffer);
 gint32 datapuffer_writecapacity(datapuffer_t *datapuffer);
 gboolean datapuffer_isfull(datapuffer_t *datapuffer);

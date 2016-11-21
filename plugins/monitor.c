@@ -176,7 +176,7 @@ static MonitorPacket* _make_new_packet(Monitor* this, guint16 tracked_seq)
   MonitorPacket* packet;
 
   packet = recycle_retrieve_and_shape(this->recycle, NULL);
-  packet->state       = MONITOR_PACKET_STATE_UNKNOWN;
+  packet->state       = MONITORED_PACKET_STATE_UNKNOWN;
   packet->tracked_ntp = NTP_NOW;
   packet->tracked_seq = tracked_seq;
   packet->extended_seq = ((guint32)this->cycle_num << 16) | ((guint32)packet->tracked_seq);
@@ -283,7 +283,7 @@ void monitor_track_packetbuffer(Monitor* this, GstBuffer* buffer)
   gst_buffer_unmap(buffer, &map);
 //  g_print("Packet %hu tracked as %d\n", packet->tracked_seq, packet->state);
 
-  if(packet->state != MONITOR_PACKET_STATE_DISCARDED){
+  if(packet->state != MONITORED_PACKET_STATE_DISCARDED){
     this->tracked_packets[packet->tracked_seq] = packet;
     goto done;
   }
@@ -295,7 +295,7 @@ void monitor_track_packetbuffer(Monitor* this, GstBuffer* buffer)
     //If we have not picked it up yet from the lookup table,
     //then YUPEE, it is not too late to play it out here
     //and it can be marked as received without any side effect
-    packet->state = MONITOR_PACKET_STATE_RECEIVED;
+    packet->state = MONITORED_PACKET_STATE_RECEIVED;
     this->tracked_packets[packet->tracked_seq] = packet;
     recycle_add(this->recycle, already_tracked);
     goto done;
@@ -377,22 +377,22 @@ void _monitor_packet_fire(Monitor* this, MonitorPacket *packet, MonitorPacketEve
 {
 //  g_print("Action on packet %hu-%d is %d\n", packet->tracked_seq, packet->state, event);
   switch(packet->state){
-      case MONITOR_PACKET_STATE_DISCARDED:
+      case MONITORED_PACKET_STATE_DISCARDED:
         GST_DEBUG_OBJECT(this, "Packet with tracked seq %hu already discarded. How is that happened?", packet->tracked_seq);
         /* FALL THROUGH */
-      case MONITOR_PACKET_STATE_UNKNOWN:
+      case MONITORED_PACKET_STATE_UNKNOWN:
       switch(event){
         case ON_DISCARD:
-          packet->state = MONITOR_PACKET_STATE_DISCARDED;
+          packet->state = MONITORED_PACKET_STATE_DISCARDED;
           packet->tracker = &this->stat.discarded;
         break;
         case ON_RECEIVED:
           packet->tracker = &this->stat.received;
-          packet->state = MONITOR_PACKET_STATE_RECEIVED;
+          packet->state = MONITORED_PACKET_STATE_RECEIVED;
         break;
         case ON_LOST:
           packet->tracker = &this->stat.lost;
-          packet->state = MONITOR_PACKET_STATE_LOST;
+          packet->state = MONITORED_PACKET_STATE_LOST;
         break;
         default:
           GST_WARNING("Unrecognized state transition for event %d at UNKOWN state", event);
@@ -400,14 +400,14 @@ void _monitor_packet_fire(Monitor* this, MonitorPacket *packet, MonitorPacketEve
       }
       break;
 
-      case MONITOR_PACKET_STATE_RECEIVED:
+      case MONITORED_PACKET_STATE_RECEIVED:
       switch(event){
         case ON_RECEIVED:
           packet->tracker = &this->stat.received;
           break;
         case ON_LOST:
           packet->tracker = &this->stat.corrupted;
-          packet->state = MONITOR_PACKET_STATE_LOST;
+          packet->state = MONITORED_PACKET_STATE_LOST;
         break;
         case ON_DISCARD:
           // SHOULD NOT HAPPEN!
@@ -416,7 +416,7 @@ void _monitor_packet_fire(Monitor* this, MonitorPacket *packet, MonitorPacketEve
           // is slower than the tracking process.
           GST_WARNING("Tracked Seq %hu already received and now discarded. "
               "Either your chain for linking StatsMakers are too slow, or I screwed up something again.", packet->tracked_seq);
-          packet->state = MONITOR_PACKET_STATE_DISCARDED;
+          packet->state = MONITORED_PACKET_STATE_DISCARDED;
           packet->tracker = &this->stat.discarded;
           break;
         default:
@@ -425,12 +425,12 @@ void _monitor_packet_fire(Monitor* this, MonitorPacket *packet, MonitorPacketEve
       }
       break;
 
-      case MONITOR_PACKET_STATE_LOST:
+      case MONITORED_PACKET_STATE_LOST:
       switch(event){
         case ON_DISCARD:
 //          g_print("Packet %hu considred to be lost and now discarded\n", packet->tracked_seq);
           packet->tracker = &this->stat.discarded;
-          packet->state = MONITOR_PACKET_STATE_DISCARDED;
+          packet->state = MONITORED_PACKET_STATE_DISCARDED;
           break;
         case ON_LOST:
 //          g_print("Packet %hu considred to be lost and lost forever\n", packet->tracked_seq);
@@ -439,7 +439,7 @@ void _monitor_packet_fire(Monitor* this, MonitorPacket *packet, MonitorPacketEve
         case ON_RECEIVED:
 //          g_print("Packet %hu considred to be lost, but repaired\n", packet->tracked_seq);
           packet->tracker = &this->stat.repaired;
-          packet->state = MONITOR_PACKET_STATE_RECEIVED;
+          packet->state = MONITORED_PACKET_STATE_RECEIVED;
           break;
         default:
           GST_WARNING("Unrecognized state transition for event %d at LOST state", event);

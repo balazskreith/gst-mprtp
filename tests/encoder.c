@@ -43,23 +43,23 @@ Encoder* make_encoder(CodecParams *codec_params, SinkParams* sink_params)
   gst_bin_add(encoderBin, encoder);
 
   if(sink_params){
-    GstElement* tee     = gst_element_factory_make("tee", NULL);
-    GstElement* q1      = gst_element_factory_make("queue", NULL);
-    GstElement* q2      = gst_element_factory_make("queue", NULL);
-    Decoder*    decoder = make_decoder(codec_params);
-    Sink*       sink    = make_sink(sink_params);
+      GstElement* tee     = gst_element_factory_make("tee", NULL);
+      GstElement* q1      = gst_element_factory_make("queue", NULL);
+      GstElement* q2      = gst_element_factory_make("queue", NULL);
+      Decoder*    decoder = make_decoder(codec_params);
+      Sink*       sink    = make_sink(sink_params);
 
-    objects_holder_add(this->objects_holder, sink, (GDestroyNotify)sink_dtor);
-    objects_holder_add(this->objects_holder, decoder, (GDestroyNotify)decoder_dtor);
+      objects_holder_add(this->objects_holder, sink, (GDestroyNotify)sink_dtor);
+      objects_holder_add(this->objects_holder, decoder, (GDestroyNotify)decoder_dtor);
 
-    gst_bin_add_many(encoderBin, tee, q1, q2, decoder->element, sink->element, NULL);
+      gst_bin_add_many(encoderBin, tee, q1, q2, decoder->element, sink->element, NULL);
 
-    gst_element_link(encoder, tee);
-    gst_element_link_pads(tee, "src_1", q1, "sink");
-    src = q1;
+      gst_element_link(encoder, tee);
+      gst_element_link_pads(tee, "src_1", q1, "sink");
+      src = q1;
 
-    gst_element_link_pads(tee, "src_2", q2, "sink");
-    gst_element_link_many(q2, decoder->element, sink->element, NULL);
+      gst_element_link_pads(tee, "src_2", q2, "sink");
+      gst_element_link_many(q2, decoder->element, sink->element, NULL);
   }
 
   setup_ghost_sink(sink, encoderBin);

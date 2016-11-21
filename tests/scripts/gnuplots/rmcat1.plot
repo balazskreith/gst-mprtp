@@ -3,14 +3,11 @@ time=system("date +%Y_%m_%d_%H_%M_%S")
 
 #---------------------------- Variables -----------------------------------
 
-if (!exists("throughput_file")) throughput_file='logs/sub_snd_sum.csv'
-if (!exists("owd_file")) throughput_file='logs/owd.csv'
-if (!exists("output_file")) output_file='reports/summary-snd-rates.pdf'
-if (!exists("path_delay")) path_delay=50000
-if (!exists("fecstat_file")) fecstat_file='logs/fecstat.csv'
+if (!exists("statlogs")) statlogs='statlogs.csv'
+if (!exists("path_delay")) path_delay=0
+if (!exists("output_file")) output_file='statlogs.pdf'
 
 duration=100
-range=2900
 
 font_size=18
 #-------------------------------------------------------------------------
@@ -33,7 +30,7 @@ set tmargin 4
 
 set title "Throughput (kbps)"
 
-set yrange [0:range]
+set yrange [0:3000]
 set ytics 1000
 set xrange [0:duration]
 set xtics 10 offset 0,-1
@@ -43,11 +40,12 @@ unset xlabel
 set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
 
-unset key
-plot throughput_file using ($0*0.1):($1/125) with point pointtype 7 ps 0.2 lc rgb "blue" title "Sending Rate", \
-     throughput_file using ($0*0.1):($2/125) with boxes lc rgb "0x008c48" title "FEC Rate", \
-     throughput_file using ($0*0.1):22 with lines lc rgb "0xDC143C" title "Path Capacity"
-
+#unset key
+plot statlogs using ($0*0.1):($3/125) with point pointtype 7 ps 0.2 lc rgb "blue" title "Sending Rate", \
+     statlogs using ($0*0.1):($4/125) with boxes lc rgb "0x008c48" title "FEC Rate", \
+     statlogs using ($0*0.1):2 with lines lc rgb "0xDC143C" title "Path Capacity"
+     
+#statlogs using ($0*0.1):($8/1000) with point pointtype 3 ps 0.05 lc rgb "0xFF6347" title "Target bitrate", \
 
 #Plot_2
 set yrange [0:1]
@@ -55,26 +53,48 @@ set ytics 0.5
 set xrange [0:duration]
 set xtics 10 offset 0,-1
 
-set title "Network Delay (s)"
+set title "Network Queue (s)"
 unset xlabel
 
 set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
   
-plot owd_file using ($0*0.1):(($1 - path_delay)/1000000) with point pointtype 7 ps 0.2 lc rgb "blue" title "Queue Delay"
+plot statlogs using ($0*0.1):(($5 - path_delay)/1000000) with point pointtype 7 ps 0.2 lc rgb "blue" title "Queue Delay"
   
   
-
 #Plot_3
-
-set title "FFRE"
-set yrange [0:1.1]
+set yrange [0:0.5]
 set ytics 0.25
-set xlabel "Time (s)" offset 0,-1
-set format x "%.0f"
+set xrange [0:duration]
+set xtics 10 offset 0,-1
 
-plot fecstat_file using ($0*0.1):(0 < $2+$3 ? $3/($2+$3) : 0) with filledcurve x1 lc rgb "blue" title "Packet Recovery Efficiency"
+#set title "Queue (kbit/s)"
+#set title "FFRE"
+set title "Playout delays"
+unset xlabel
 
+set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
+set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
+  
+#plot statlogs using ($0*0.1):($6/125) with point pointtype 7 ps 0.2 lc rgb "blue" title "Bytes in flight"
+#plot statlogs using ($0*0.1):7 with boxes lc rgb "blue" title "FFRE"
+plot statlogs using ($0*0.1):($9/1000000) with point pointtype 7 ps 0.2 lc rgb "blue" title "Playout delay (80th)"  
+  
+  
+#Plot_3
+#set yrange [0:100]
+#set ytics 20
+#set xrange [0:duration]
+#set xtics 10 offset 0,-1
+
+#set title "Packet losts"
+#unset xlabel
+
+#set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
+#set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
+  
+#plot statlogs using ($0*0.1):10 with boxes lc rgb "blue" title "losts", \
+#     statlogs using ($0*0.1):11 with boxes lc rgb "green" title "repaired"
 
 #
 unset multiplot

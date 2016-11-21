@@ -17,6 +17,7 @@ typedef struct{
   VideoParams*    video_params;
 
   SinkParams*     encodersink_params;
+  SinkParams*     sourcesink_params;
 
   TransferParams*     snd_transfer_params;
   SchedulerParams* scheduler_params;
@@ -34,6 +35,7 @@ static void _print_params(SenderSide* this)
   g_print("Video     Params: %s\n", this->video_params->to_string);
   g_print("Transfer  Params: %s\n", this->snd_transfer_params->to_string);
 
+  g_print("Src. Sink Params: %s\n", this->sourcesink_params ? this->sourcesink_params->to_string : "NONE");
   g_print("Enc. Sink Params: %s\n", this->encodersink_params ? this->encodersink_params->to_string : "NONE");
   g_print("Scheduler Params: %s\n", this->scheduler_params ? this->scheduler_params->to_string : "None");
   g_print("Stat      Params: %s\n", this->stat_params_tuple ? this->stat_params_tuple->to_string : "None");
@@ -93,13 +95,17 @@ static void _connect_encoder_to_sender(SenderSide *this)
 static char *development_argv[] = {
     "program_name",
     "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1",
+//    "--source=FILE:consumed.yuv:1:352:288:2:25/1",
 //    "--source=TESTVIDEO",
     "--codec=VP8",
-    "--sender=MPRTP:1:1:10.0.0.6:5000",
-    "--scheduler=MPRTPFRACTAL:MPRTP:1:1:5001",
+//    "--sender=MPRTP:1:1:10.0.0.6:5000",
+    "--sender=RTP:10.0.0.6:5000",
+//    "--scheduler=MPRTPFRACTAL:MPRTP:1:1:5001",
+    "--scheduler=SCREAM:RTP:5001",
     "--stat=100:1000:1:triggered_stat",
     "--statlogsink=FILE:temp/snd_statlogs.csv",
-    "--packetlogsink=FILE:temp/snd_packetlogs.csv"
+    "--packetlogsink=FILE:temp/snd_packetlogs.csv",
+    "--sourcesink=FILE:produced.yuv"
 };
 
 #define development_argc (sizeof (development_argv) / sizeof (const char *))
@@ -144,6 +150,8 @@ int main (int argc, char **argv)
       _null_test(sndtransfer_params_rawstring, sndtransfer_params_rawstring_default)
   );
 
+  session->sourcesink_params = sourcesink_params_rawstring ? make_sink_params(sourcesink_params_rawstring) : NULL;
+
   session->encodersink_params = encodersink_params_rawstring ? make_sink_params(encodersink_params_rawstring) : NULL;
 
   session->scheduler_params = scheduler_params_rawstring ? make_scheduler_params(scheduler_params_rawstring) : NULL;;
@@ -159,7 +167,7 @@ int main (int argc, char **argv)
 
   _print_params(session);
 
-  session->source  = make_source(session->source_params);
+  session->source  = make_source(session->source_params, session->sourcesink_params);
   session->encoder = make_encoder(session->codec_params, session->encodersink_params);
   session->sender  = make_sender(session->scheduler_params,
       session->stat_params_tuple,

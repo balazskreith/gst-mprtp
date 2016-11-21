@@ -388,7 +388,7 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
     goto done;
   }
 
-  _logging(this);
+  DISABLE_LINE _logging(this);
 
   fractalfbprocessor_time_update(this->fbprocessor);
 

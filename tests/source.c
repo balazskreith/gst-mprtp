@@ -1,6 +1,6 @@
 #include "source.h"
-#include "transceiver.h"
 #include "receiver.h"
+#include "sink.h"
 
 #include <gst/app/gstappsrc.h>
 #include <gst/app/gstappsink.h>
@@ -16,6 +16,7 @@ Source* source_ctor(void)
   Source* this;
 
   this = g_malloc0(sizeof(Source));
+  this->objects_holder = objects_holder_ctor();
   sprintf(this->bin_name, "SourceBin_%d", _instance_counter++);
 
   this->on_destroy.subscriber_func = on_fi_called;
@@ -25,29 +26,31 @@ Source* source_ctor(void)
 
 void source_dtor(Source* this)
 {
+  object_holder_dtor(this->objects_holder);
   g_free(this);
 }
 
 
-Source* make_source(SourceParams *params)
+Source* make_source(SourceParams *params, SinkParams* sink_params)
 {
 
   Source* this = source_ctor();
   GstBin* sourceBin     = GST_BIN(gst_bin_new(this->bin_name));
   GstElement* source = NULL;
+  GstElement* src = NULL;
 
   switch(params->type){
     case SOURCE_TYPE_TESTVIDEO:
-      source = _make_testvideo_source(this, params);
+      src = source = _make_testvideo_source(this, params);
       break;
     case SOURCE_TYPE_RAWPROXY:
-      source = _make_raw_source(this, params);
+      src = source = _make_raw_source(this, params);
       break;
     case SOURCE_TYPE_FILE:
-      source = _make_file_source(this, params);
+      src = source = _make_file_source(this, params);
       break;
     case SOURCE_TYPE_V4L2:
-      source = _make_v4l2_source(this, params);
+      src = source = _make_v4l2_source(this, params);
       break;
   };
 
@@ -57,7 +60,25 @@ Source* make_source(SourceParams *params)
       NULL
   );
 
-  setup_ghost_src(source,  sourceBin);
+  if(sink_params){
+        GstElement* tee     = gst_element_factory_make("tee", NULL);
+        GstElement* q1      = gst_element_factory_make("queue", NULL);
+        GstElement* q2      = gst_element_factory_make("queue", NULL);
+        Sink*       sink    = make_sink(sink_params);
+
+        objects_holder_add(this->objects_holder, sink, (GDestroyNotify)sink_dtor);
+
+        gst_bin_add_many(sourceBin, tee, q1, q2, sink->element, NULL);
+
+        gst_element_link(source, tee);
+        gst_element_link_pads(tee, "src_1", q1, "sink");
+        src = q1;
+
+        gst_element_link_pads(tee, "src_2", q2, "sink");
+        gst_element_link_many(q2, sink->element, NULL);
+    }
+
+  setup_ghost_src(src,  sourceBin);
 
   this->element = GST_ELEMENT(sourceBin);
   return this;

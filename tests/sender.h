@@ -2,6 +2,9 @@
 #include <gst/rtp/rtp.h>
 #include "pipeline.h"
 
+#ifndef TESTS_SENDER_H_
+#define TESTS_SENDER_H_
+
 typedef struct{
   GstElement*     element;
   ObjectsHolder*  objects_holder;
@@ -21,3 +24,5 @@ Eventer* sender_get_on_bitrate_change_eventer(Sender* this);
 Sender* make_sender_custom(void);
 
 GstElement* sender_get_mprtcp_rr_sink_element(Sender* this);
+
+#endif //TESTS_SENDER_H_

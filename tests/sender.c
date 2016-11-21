@@ -3,10 +3,13 @@
 #include "sender.h"
 #include "rtpstatmaker.h"
 #include "receiver.h"
+#include "owr_arrival_time_meta.h"
 
 typedef struct{
     GstBin*     mprtpSndBin;
     GstElement* mprtpSnd;
+    GstElement* screamqueue;
+    GstElement* rtpbin;
 }Private;
 
 #define _priv(this) ((Private*)(this->priv))
@@ -18,6 +21,8 @@ static GstElement* _make_mprtp_scheduler(Sender* this, TransferParams* transfer_
 static GstElement* _make_mprtp_controller(Sender* this, SchedulerParams* params, TransferParams* transfer_params);
 static GstElement* _make_mprtp_fractal_controller(Sender* this,
     SchedulerParams *scheduler_params, TransferParams* snd_transfer_params);
+static GstElement* _make_scream_controller(Sender* this, SchedulerParams *scheduler_params,
+    TransferParams* snd_transfer_params);
 static void _setup_mprtcp_pads(Sender* this, TransferParams* transfer_params);
 static int _instance_counter = 0;
 
@@ -81,7 +86,8 @@ Sender* make_sender(SchedulerParams* scheduler_params, StatParamsTuple* stat_par
   if(scheduler_params){
     switch(scheduler_params->type){
       case TRANSFER_CONTROLLER_TYPE_SCREAM:
-        //TODO: add scream
+        scheduler = _make_scream_controller(this, scheduler_params, snd_transfer);
+        gst_bin_add(senderBin, scheduler);
         break;
       case TRANSFER_CONTROLLER_TYPE_MPRTP:
         scheduler = _make_mprtp_controller(this, scheduler_params, snd_transfer);
@@ -330,7 +336,9 @@ GstElement* _make_mprtp_fractal_controller(Sender* this, SchedulerParams *schedu
    );
 
   g_signal_connect (mprtpSch, "mprtp-subflows-utilization", (GCallback) _mprtp_subflows_utilization, this);
-
+  if(snd_transfer_params->type != TRANSFER_TYPE_MPRTP){
+    g_print("Configuration Error: FRACTaL congestion controller only works with MPRTP'n");
+  }
   _setup_mprtcp_pads(this, snd_transfer_params);
 
   gst_element_link_pads(receiver_get_mprtcp_rr_src_element(receiver), "mprtcp_rr_src", mprtpSch, "mprtcp_rr_sink");
@@ -342,5 +350,133 @@ GstElement* _make_mprtp_fractal_controller(Sender* this, SchedulerParams *schedu
   return GST_ELEMENT(schBin);
 
 }
+
+
+
+static void _on_feedback_rtcp(GObject *session, guint type, guint fbtype, guint sender_ssrc,
+    guint media_ssrc, GstBuffer *fci, Sender *this)
+{
+    g_return_if_fail(session);
+    g_return_if_fail(this);
+
+    if (type == GST_RTCP_TYPE_RTPFB && fbtype == GST_RTCP_RTPFB_TYPE_SCREAM) {
+        GstElement *scream_queue = NULL;
+        GstMapInfo info = {NULL, 0, NULL, 0, 0, {0}, {0}}; /*GST_MAP_INFO_INIT;*/
+        guint session_id = GPOINTER_TO_UINT(g_object_get_data(session, "session_id"));
+
+        scream_queue = _priv(this)->screamqueue;
+        g_object_set(scream_queue, "scream-controller-id", 2, NULL);
+        //scream_queue = gst_bin_get_by_name(GST_BIN(send_output_bin), "screamqueue");
+
+        /* Read feedback from FCI */
+        if (gst_buffer_map(fci, &info, GST_MAP_READ)) {
+            guint32 timestamp;
+            guint16 highest_seq;
+            guint8 *fci_buf, n_loss, n_ecn;
+            gboolean qbit = FALSE;
+
+            fci_buf = info.data;
+            highest_seq = GST_READ_UINT16_BE(fci_buf);
+            n_loss = GST_READ_UINT8(fci_buf + 2);
+            n_ecn = GST_READ_UINT8(fci_buf + 3);
+            timestamp = GST_READ_UINT32_BE(fci_buf + 4);
+            /* TODO: Fix qbit */
+
+            gst_buffer_unmap(fci, &info);
+//            g_print("m_ssrc: %u | ts: %u | HSSN: %hu | loss: %d | n_ecn: %d | qbit: %d\n", media_ssrc, timestamp, highest_seq, n_loss, n_ecn, qbit);
+            g_signal_emit_by_name(scream_queue, "incoming-feedback", media_ssrc, timestamp, highest_seq, n_loss, n_ecn, qbit);
+
+//            {
+//              gboolean pass_through;
+//              guint controller_id;
+//              g_object_get(scream_queue, "pass-through", &pass_through,
+//                  "scream-controller-id", &controller_id, NULL);
+//              g_print("Pass through: %d controller_id: %d\n", pass_through, controller_id);
+//            }
+        }
+    }
+}
+
+static gboolean _on_scream_payload_adaptation_request(GstElement *screamqueue, guint pt,
+    Sender *this)
+{
+    guint pt_rtx;
+
+    OWR_UNUSED(screamqueue);
+    return TRUE;
+}
+
+static void _on_scream_bitrate_change(GstElement *scream_queue, guint bitrate, guint ssrc, guint pt,
+    Sender *this)
+{
+  gint32 new_bitrate = bitrate;
+  eventer_do(this->on_bitrate_change, &new_bitrate);
+}
+
+GstElement* _make_scream_controller(Sender* this, SchedulerParams *scheduler_params, TransferParams* snd_transfer_params)
+{
+  GstBin*     screamBin    = gst_bin_new(NULL);
+  GstElement* rtpBin       = _priv(this)->rtpbin = gst_element_factory_make("rtpbin", NULL);
+  GstElement* sinkIdentity = gst_element_factory_make("identity", NULL);
+  GstElement* screamqueue  = gst_element_factory_make("screamqueue", NULL);
+  Receiver*   receiver     = make_receiver(scheduler_params->rcv_transfer_params, NULL, NULL);
+  GstElement* rtcpSink     = gst_element_factory_make("udpsink", NULL);
+  gchar*      padName;
+  guint       sessionNum   = 0;
+
+  gst_bin_add_many(screamBin,
+        receiver->element,
+        sinkIdentity,
+        rtpBin,
+        rtcpSink,
+        screamqueue,
+        NULL
+  );
+
+  _priv(this)->screamqueue = screamqueue;
+  objects_holder_add(this->objects_holder, receiver, (GDestroyNotify)receiver_dtor);
+  g_object_set (rtpBin, "rtp-profile", GST_RTP_PROFILE_AVPF, NULL);
+
+  if(snd_transfer_params->type != TRANSFER_TYPE_RTP){
+    g_print("Configuration error: Scream works only with RTP transfer types");
+  }
+  {
+    SenderSubflow* subflow = snd_transfer_params->subflows->data;
+    g_object_set(rtcpSink, "host", subflow->dest_ip, "port", subflow->dest_port + 1,
+        "sync", FALSE, "async", FALSE, NULL);
+  }
+
+  padName = g_strdup_printf ("send_rtp_sink_%u", sessionNum);
+  gst_element_link_pads (sinkIdentity, "src", rtpBin, padName);
+  g_free (padName);
+
+  padName = g_strdup_printf ("send_rtp_src_%u", sessionNum);
+  gst_element_link_pads (rtpBin, padName, screamqueue, "sink");
+  g_free(padName);
+
+  padName = g_strdup_printf ("send_rtcp_src_%u", sessionNum);
+  gst_element_link_pads (rtpBin, padName, rtcpSink, "sink");
+  g_free (padName);
+
+  padName = g_strdup_printf ("recv_rtcp_sink_%u", sessionNum);
+  gst_element_link_pads (receiver->element, "src", rtpBin, padName);
+  g_free (padName);
+
+  {
+    GObject *rtp_session = NULL;
+    g_signal_emit_by_name(rtpBin,  "get-internal-session", 0, &rtp_session);
+    g_signal_connect(rtp_session,  "on-feedback-rtcp", G_CALLBACK(_on_feedback_rtcp), this);
+    g_signal_connect(screamqueue, "on-bitrate-change", G_CALLBACK(_on_scream_bitrate_change), this);
+    g_signal_connect(screamqueue, "on-payload-adaptation-request", (GCallback)_on_scream_payload_adaptation_request, this);
+    g_object_unref(rtp_session);
+  }
+
+  setup_ghost_sink(sinkIdentity, screamBin);
+  setup_ghost_src(screamqueue, screamBin);
+
+  return GST_ELEMENT(screamBin);
+}
+
+
 
 

@@ -13,6 +13,15 @@
 #include <stdlib.h>
 #include <gst/gst.h>
 #include <gst/rtp/rtp.h>
+#include <gst/rtp/gstrtcpbuffer.h>
+#include <gst/rtp/gstrtpbuffer.h>
+#include <gst/rtp/gstrtpdefs.h>
+#include "owr_arrival_time_meta.h"
+
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 typedef struct _SourceParams SourceParams;
 typedef struct _SinkParams SinkParams;
@@ -76,7 +85,7 @@ typedef enum{
   SOURCE_TYPE_V4L2      = 4,
 }SourceTypes;
 
-typedef struct _SourceParams{
+struct _SourceParams{
   SourceTypes type;
   union{
    struct{
@@ -297,6 +306,7 @@ static gchar* scheduler_params_rawstring                = NULL;
 static gchar* playouter_params_rawstring                = NULL;
 
 static gchar* stat_params_rawstring                     = NULL;
+static gchar* sourcesink_params_rawstring               = NULL;
 static gchar* encodersink_params_rawstring              = NULL;
 static gchar* statlogs_sink_params_rawstring            = NULL;
 static gchar* packetlogs_sink_params_rawstring          = NULL;
@@ -319,6 +329,7 @@ static GOptionEntry entries[] =
 
     { "stat",           0, 0, G_OPTION_ARG_STRING, &stat_params_rawstring,            "stat",            NULL },
     { "encodersink",    0, 0, G_OPTION_ARG_STRING, &encodersink_params_rawstring,     "encodersink",     NULL },
+    { "sourcesink",    0, 0, G_OPTION_ARG_STRING,  &sourcesink_params_rawstring,      "sourcesink",     NULL },
     { "statlogsink",    0, 0, G_OPTION_ARG_STRING, &statlogs_sink_params_rawstring,   "statlogsink",     NULL },
     { "packetlogsink",  0, 0, G_OPTION_ARG_STRING, &packetlogs_sink_params_rawstring, "packetlogsink",   NULL },
 

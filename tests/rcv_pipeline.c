@@ -73,10 +73,13 @@ static void _connect_decoder_to_sink(ReceiverSide *this)
 
 static char *development_argv[] = {
     "program_name",
-    "--receiver=MPRTP:1:1:5000",
+//    "--receiver=MPRTP:1:1:5000",
+    "--receiver=RTP:5000",
     "--codec=VP8",
-    "--sink=AUTOVIDEO",
-    "--playouter=MPRTPFRACTAL:MPRTP:1:1:10.0.0.1:5001",
+//    "--sink=AUTOVIDEO",
+    "--sink=FILE:consumed.yuv",
+//    "--playouter=MPRTPFRACTAL:MPRTP:1:1:10.0.0.1:5001",
+    "--playouter=SCREAM:RTP:10.0.0.1:5001",
     "--stat=100:1000:1:triggered_stat",
     "--statlogsink=FILE:temp/rcv_statlogs.csv",
     "--packetlogsink=FILE:temp/rcv_packetlogs.csv"
@@ -101,6 +104,8 @@ int main (int argc, char **argv)
     argv = development_argv;
     system("rm triggered_stat");
     system("rm temp/*");
+//    system("rm produced.yuv");
+//    system("rm consumed.yuv");
   }
 
   session = g_malloc0(sizeof(ReceiverSide));

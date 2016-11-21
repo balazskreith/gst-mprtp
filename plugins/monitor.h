@@ -26,10 +26,10 @@ typedef struct _MonitorClass MonitorClass;
 typedef struct _MonitorPacket MonitorPacket;
 
 typedef enum{
-  MONITOR_PACKET_STATE_UNKNOWN   = 0,
-  MONITOR_PACKET_STATE_RECEIVED  = 1,
-  MONITOR_PACKET_STATE_LOST      = 2,
-  MONITOR_PACKET_STATE_DISCARDED = 3,
+  MONITORED_PACKET_STATE_UNKNOWN   = 0,
+  MONITORED_PACKET_STATE_RECEIVED  = 1,
+  MONITORED_PACKET_STATE_LOST      = 2,
+  MONITORED_PACKET_STATE_DISCARDED = 3,
 }MonitoredPacketStates;
 
 typedef struct{

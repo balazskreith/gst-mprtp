@@ -99,7 +99,7 @@ int main (int argc, char **argv)
   GOptionContext *context;
   gboolean context_parse;
 
-  if(1){
+  if(0){
     argc = development_argc;
     argv = development_argv;
     system("rm triggered_stat");

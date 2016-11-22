@@ -447,7 +447,7 @@ SinkParams*     make_sink_params(gchar* params_rawstring)
   SinkParams* result = g_malloc0(sizeof(SinkParams));
   gchar       **tokens = g_strsplit(params_rawstring, ":", -1);
 
-  result->type = _compare_types(tokens[0], "AUTOVIDEO", "RAWPROXY", "FILE", NULL);
+  result->type = _compare_types(tokens[0], "AUTOVIDEO", "RAWPROXY", "FILE", "FAKESINK", NULL);
 
   switch(result->type){
     case SINK_TYPE_AUTOVIDEO:
@@ -459,6 +459,9 @@ SinkParams*     make_sink_params(gchar* params_rawstring)
     case SINK_TYPE_FILE:
       strcpy(result->file.location, tokens[1]);
       sprintf(result->to_string, "File location %s", result->file.location);
+      break;
+    case SINK_TYPE_FAKESINK:
+      sprintf(result->to_string, "Fakesink");
       break;
     default:
       g_print("Unrecognized type (%d) at make_sink_params \n", result->type);

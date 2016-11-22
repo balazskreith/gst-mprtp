@@ -131,6 +131,7 @@ typedef enum{
   SINK_TYPE_AUTOVIDEO = 1,
   SINK_TYPE_RAWPROXY  = 2,
   SINK_TYPE_FILE      = 3,
+  SINK_TYPE_FAKESINK  = 4,
 }SinkTypes;
 
 struct _SinkParams{

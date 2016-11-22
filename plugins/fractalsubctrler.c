@@ -484,7 +484,7 @@ void fractalsubctrler_report_update(
 
   fractalfbprocessor_report_update(this->fbprocessor, summary);
 
-  _stat_print(this);
+  DISABLE_LINE _stat_print(this);
 
   this->approve_measurement  = FALSE;
   if(10 < _stat(this)->measurements_num){

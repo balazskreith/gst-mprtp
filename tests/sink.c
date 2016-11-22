@@ -39,6 +39,9 @@ Sink* make_sink(SinkParams *params)
     case SINK_TYPE_FILE:
       sink = _make_file_sink(params);
       break;
+    case SINK_TYPE_FAKESINK:
+      sink = gst_element_factory_make("fakesink", NULL);
+      break;
   };
 
   gst_bin_add_many(sinkBin,

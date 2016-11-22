@@ -141,7 +141,7 @@ static GstFlowReturn _on_new_sample_from_sink (GstElement * sink, GstElement* so
 
 GstElement* _make_file_source(Source* this, SourceParams *params)
 {
-  GstPipeline* readerPipe      = gst_pipeline_new("readerPipe");
+  GstPipeline* readerPipe      = gst_pipeline_new(NULL);
   GstBin* sourceBin            = gst_bin_new(NULL);
   GstElement* multifilesrc     = gst_element_factory_make ("multifilesrc", NULL);
   GstElement* sink_videoparse  = gst_element_factory_make ("videoparse", NULL);

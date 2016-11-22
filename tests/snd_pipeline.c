@@ -122,10 +122,10 @@ int main (int argc, char **argv)
   gboolean context_parse;
 
   //For using gdb without set args and other stuff
-  if(1){
-    argc = development_argc;
-    argv = development_argv;
-  }
+//  if(1){
+//    argc = development_argc;
+//    argv = development_argv;
+//  }
 
   session = g_malloc0(sizeof(SenderSide));
   context = g_option_context_new ("Sender");

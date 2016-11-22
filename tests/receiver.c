@@ -671,6 +671,8 @@ _make_scream_controller (Receiver* this,  PlayouterParams* playouter_params, Tra
       srcIdentity,
       NULL);
 
+  g_object_set(rtpBin, "buffer-mode", 1, NULL);//Jitterbuffer in slave mode.
+
   if(rcv_transfer_params->type != TRANSFER_TYPE_RTP){
     g_print("Configuration error: Scream works only with RTP transfer types");
   }
@@ -679,17 +681,17 @@ _make_scream_controller (Receiver* this,  PlayouterParams* playouter_params, Tra
     g_object_set(rtcpSrc, "port", subflow->bound_port + 1, NULL);
   }
 
-  g_signal_connect_data (rtpBin, "request-pt-map", G_CALLBACK (_scream_request_pt_map),
-      this, NULL, 0);
-
-  g_signal_connect_data (rtpBin, "pad-added", G_CALLBACK (_scream_handle_new_stream),
-     this, NULL, 0);
-
   probe_params.mask         = GST_PAD_PROBE_TYPE_BUFFER;
   probe_params.callback     = probe_save_ts;
   probe_params.destroy_data = NULL;
   probe_params.user_data    = NULL;
   eventer_do(this->on_add_rtpSrc_probe, &probe_params);
+
+  g_signal_connect_data (rtpBin, "request-pt-map", G_CALLBACK (_scream_request_pt_map),
+      this, NULL, 0);
+
+  g_signal_connect_data (rtpBin, "pad-added", G_CALLBACK (_scream_handle_new_stream),
+     this, NULL, 0);
 
   padName = g_strdup_printf ("recv_rtp_src_%u", sessionNum);
   _priv(this)->src_for_scream = srcIdentity;

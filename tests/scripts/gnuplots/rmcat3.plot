@@ -3,17 +3,12 @@ time=system("date +%Y_%m_%d_%H_%M_%S")
 
 #---------------------------- Variables -----------------------------------
 
-if (!exists("throughput_file")) throughput_file='logs/sub_snd_sum.csv'
-if (!exists("throughput_file2")) throughput_file2='logs/sub_snd_sum.csv'
-if (!exists("owd_file")) owd_file='logs/owd.csv'
-if (!exists("owd_file2")) owd_file2='logs/owd2.csv'
-if (!exists("output_file")) output_file='reports/summary-snd-rates.pdf'
-if (!exists("path_delay")) path_delay=50000
-if (!exists("fecstat_file")) fecstat_file='logs/fecstat.csv'
-if (!exists("fecstat_file2")) fecstat_file2='logs/fecstat2.csv'
+if (!exists("statlogs")) statlogs='statlogs.csv'
+if (!exists("statlogs2")) statlogs2='statlogs2.csv'
+if (!exists("path_delay")) path_delay=0
+if (!exists("output_file")) output_file='statlogs.pdf'
 
 duration=100
-range=2100
 
 font_size=18
 #-------------------------------------------------------------------------
@@ -34,47 +29,58 @@ set tmargin 4
 # claret:  #0xa21d21
 # lpurple: #0xb43894
 
-set title "Source 1 throughput (kbps)"
+set title "Throughput (kbps)"
 
-set yrange [0:range]
+set yrange [0:3000]
 set ytics 1000
 set xrange [0:duration]
 set xtics 10 offset 0,-1
-set format x ""
+set format x " "
 unset xlabel
 
 set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
 
-unset key
-plot throughput_file using ($0*0.1):(($1+$2)/125) with point pointtype 7 ps 0.2 lc rgb "blue" title "Sending Rate", \
-     throughput_file using ($0*0.1):22 with lines lc rgb "0xDC143C" title "Path Capacity"
+#unset key
+plot statlogs  using ($0*0.1):($3/125) with point pointtype 7 ps 0.2 lc rgb "blue" title "Sending Rate", \
+	 statlogs2 using ($0*0.1):($3/125) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Sending Rate2", \
+     statlogs using ($0*0.1):2 with lines lc rgb "0xDC143C" title "Path Capacity"
      
-     
+#statlogs using ($0*0.1):($8/1000) with point pointtype 3 ps 0.05 lc rgb "0xFF6347" title "Target bitrate"
+
 #Plot_2
-set title "Source 2 throughput (kbps)"
-plot throughput_file2 using ($0*0.1):(($7+$8)/125) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Sending Rate2", \
-     throughput_file2 using ($0*0.1):22 with lines lc rgb "0xf47d23" title "Path Capacity2"
-
-
-#Plot_3
 set yrange [0:1]
 set ytics 0.5
 set xrange [0:duration]
 set xtics 10 offset 0,-1
 
-set title "Network Delays (s)"
-set xlabel "Time (s)" offset 0,-1
-set format x "%.0f"
+set title "Network Queue (s)"
+unset xlabel
 
 set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
   
-plot owd_file using ($0*0.1):(($1 - path_delay)/1000000) with point pointtype 7 ps 0.2 lc rgb "blue" title "Queue Delay", \
-	 owd_file2 using ($0*0.1):(($1 - path_delay)/1000000) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Queue Delay", \
+plot statlogs using ($0*0.1):(($5 - path_delay)/1000000) with point pointtype 7 ps 0.2 lc rgb "blue"      title "Queue Delay", \
+	 statlogs2 using ($0*0.1):(($5 - path_delay)/1000000) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Queue Delay2"                  
   
-#
-unset multiplot
-#
-#
-#
+  
+#Plot_3
+set yrange [-0.25:0.25]
+set ytics 0.25
+set xrange [0:duration]
+set xtics 10 offset 0,-1
+
+#set title "Queue (kbit/s)"
+#set title "FFRE"
+set title "Playout delays"
+unset xlabel
+
+set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
+set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
+  
+#plot statlogs using ($0*0.1):($6/125) with point pointtype 7 ps 0.2 lc rgb "blue" title "Bytes in flight"
+#plot statlogs using ($0*0.1):7 with boxes lc rgb "blue" title "FFRE"
+plot statlogs  using ($0*0.1):($8/1000000) with point pointtype 7 ps 0.2 lc rgb "blue"     title "Playout delay (80th)", \
+     statlogs2 using ($0*0.1):($8/1000000) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Playout delay2 (80th)"  
+  
+  

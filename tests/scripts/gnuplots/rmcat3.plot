@@ -42,11 +42,13 @@ set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
 
 #unset key
-plot statlogs  using ($0*0.1):($3/125) with point pointtype 7 ps 0.2 lc rgb "blue" title "Sending Rate", \
-	 statlogs2 using ($0*0.1):($3/125) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Sending Rate2", \
-     statlogs using ($0*0.1):2 with lines lc rgb "0xDC143C" title "Path Capacity"
+plot statlogs  using ($0*0.1):($4/125) with point pointtype 7 ps 0.2 lc rgb "blue" title "Sending Rate", \
+     statlogs  using ($0*0.1):($5/125) with boxes lc rgb "0x008c48" title "FEC Rate", \
+     statlogs  using ($0*0.1):3 with lines lc rgb "0xDC143C" title "Path Capacity"
      
-#statlogs using ($0*0.1):($8/1000) with point pointtype 3 ps 0.05 lc rgb "0xFF6347" title "Target bitrate"
+plot statlogs2 using ($0*0.1):($4/125) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Sending Rate", \
+     statlogs2 using ($0*0.1):($5/125) with boxes lc rgb "0x008c48" title "FEC Rate", \
+	 statlogs2 using ($0*0.1):2 with lines lc rgb "0xFF6347" title "Path Capacity "
 
 #Plot_2
 set yrange [0:1]
@@ -60,27 +62,7 @@ unset xlabel
 set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
   
-plot statlogs using ($0*0.1):(($5 - path_delay)/1000000) with point pointtype 7 ps 0.2 lc rgb "blue"      title "Queue Delay", \
-	 statlogs2 using ($0*0.1):(($5 - path_delay)/1000000) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Queue Delay2"                  
+plot statlogs using ($0*0.1):(($6 - path_delay)/1000000) with point pointtype 7 ps 0.2 lc rgb "blue"      title "Queue Delay", \
+	 statlogs2 using ($0*0.1):(($6 - path_delay)/1000000) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Queue Delay2"                  
   
-  
-#Plot_3
-set yrange [-0.25:0.25]
-set ytics 0.25
-set xrange [0:duration]
-set xtics 10 offset 0,-1
-
-#set title "Queue (kbit/s)"
-#set title "FFRE"
-set title "Playout delays"
-unset xlabel
-
-set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
-set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
-  
-#plot statlogs using ($0*0.1):($6/125) with point pointtype 7 ps 0.2 lc rgb "blue" title "Bytes in flight"
-#plot statlogs using ($0*0.1):7 with boxes lc rgb "blue" title "FFRE"
-plot statlogs  using ($0*0.1):($8/1000000) with point pointtype 7 ps 0.2 lc rgb "blue"     title "Playout delay (80th)", \
-     statlogs2 using ($0*0.1):($8/1000000) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Playout delay2 (80th)"  
-  
-  
+ 

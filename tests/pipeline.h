@@ -32,6 +32,8 @@ typedef struct _StatParamsTuple StatParamsTuple;
 typedef struct _TransferParams TransferParams;
 typedef struct _PlayouterParams PlayouterParams;
 typedef struct _SchedulerParams SchedulerParams;
+typedef struct _ExtraDelayParams ExtraDelayParams;
+
 
 #include <gst/rtp/gstmprtpdefs.h>
 //typedef struct _MPRTPSubflowUtilizationSignalData{
@@ -186,6 +188,12 @@ struct _StatParams{
 
 };
 
+struct _ExtraDelayParams{
+  gint32     extra_delay_in_ms;
+  gchar      to_string[1024];
+
+};
+
 struct _SubflowsParams{
   guint   length;
   GSList* subflows;
@@ -311,6 +319,7 @@ static gchar* sourcesink_params_rawstring               = NULL;
 static gchar* encodersink_params_rawstring              = NULL;
 static gchar* statlogs_sink_params_rawstring            = NULL;
 static gchar* packetlogs_sink_params_rawstring          = NULL;
+static gchar* extradelay_params_rawstring               = NULL;
 
 static int target_bitrate = 500000;
 static int info           = 0;
@@ -328,11 +337,12 @@ static GOptionEntry entries[] =
     { "scheduler",  0, 0, G_OPTION_ARG_STRING, &scheduler_params_rawstring,    "scheduler",      NULL },
     { "playouter",  0, 0, G_OPTION_ARG_STRING, &playouter_params_rawstring,    "playouter",      NULL },
 
-    { "stat",           0, 0, G_OPTION_ARG_STRING, &stat_params_rawstring,            "stat",            NULL },
-    { "encodersink",    0, 0, G_OPTION_ARG_STRING, &encodersink_params_rawstring,     "encodersink",     NULL },
-    { "sourcesink",    0, 0, G_OPTION_ARG_STRING,  &sourcesink_params_rawstring,      "sourcesink",     NULL },
-    { "statlogsink",    0, 0, G_OPTION_ARG_STRING, &statlogs_sink_params_rawstring,   "statlogsink",     NULL },
-    { "packetlogsink",  0, 0, G_OPTION_ARG_STRING, &packetlogs_sink_params_rawstring, "packetlogsink",   NULL },
+    { "stat",           0, 0, G_OPTION_ARG_STRING, &stat_params_rawstring,             "stat",            NULL },
+    { "encodersink",    0, 0, G_OPTION_ARG_STRING, &encodersink_params_rawstring,      "encodersink",     NULL },
+    { "sourcesink",     0, 0, G_OPTION_ARG_STRING,  &sourcesink_params_rawstring,      "sourcesink",      NULL },
+    { "statlogsink",    0, 0, G_OPTION_ARG_STRING, &statlogs_sink_params_rawstring,    "statlogsink",     NULL },
+    { "packetlogsink",  0, 0, G_OPTION_ARG_STRING, &packetlogs_sink_params_rawstring,  "packetlogsink",   NULL },
+    { "extradelay",     0, 0, G_OPTION_ARG_STRING, &extradelay_params_rawstring,       "extradelay",      NULL },
 
     { "target_bitrate", 0, 0, G_OPTION_ARG_INT, &target_bitrate, "target_bitrate", NULL },
 
@@ -349,10 +359,11 @@ gchar* _null_test(gchar *subject_str, gchar* failed_str);
 
 void setup_framerate(gchar *string, Framerate* framerate);
 
-SourceParams*   make_source_params(gchar* params_rawstring);
-CodecParams*    make_codec_params (gchar* params_rawstring);
-VideoParams*    make_video_params (gchar* params_rawstring);
-StatParams*     make_stat_params (gchar* params_rawstring);
+SourceParams*      make_source_params(gchar* params_rawstring);
+CodecParams*       make_codec_params (gchar* params_rawstring);
+VideoParams*       make_video_params (gchar* params_rawstring);
+StatParams*        make_stat_params (gchar* params_rawstring);
+ExtraDelayParams*  make_extra_delay_params (gchar* params_rawstring);
 
 TransferParams*  make_snd_transfer_params(gchar* params_rawstring);
 TransferParams*  make_rcv_transfer_params(gchar* params_rawstring);

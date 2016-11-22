@@ -393,6 +393,7 @@ void mprtp_logger(const gchar *filename, const gchar * format, ...)
   vsprintf(msg->string, format, args);
   va_end (args);
 
+//  g_print("writing request to file: %s\n", filename);
   strcpy(msg->filename, filename);
   messenger_push_block_unlocked(this->messenger, msg);
   messenger_unlock(this->messenger);
@@ -433,6 +434,7 @@ void _writing(MPRTPLogger* this, WritingMessage *item)
     strcpy(path, item->filename);
   }
 
+//  g_print("writing data to file: %s\n", path);
   fp = fopen(path, item->overwrite ? "w" : "a+");
   fprintf (fp, "%s", item->string);
   fclose(fp);

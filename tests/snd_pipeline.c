@@ -20,8 +20,9 @@ typedef struct{
   SinkParams*     sourcesink_params;
 
   TransferParams*     snd_transfer_params;
-  SchedulerParams* scheduler_params;
+  SchedulerParams*    scheduler_params;
   StatParamsTuple*    stat_params_tuple;
+  ExtraDelayParams*   extra_delay_params;
 
   GstCaps*      video_caps;
 }SenderSide;
@@ -39,6 +40,7 @@ static void _print_params(SenderSide* this)
   g_print("Enc. Sink Params: %s\n", this->encodersink_params ? this->encodersink_params->to_string : "NONE");
   g_print("Scheduler Params: %s\n", this->scheduler_params ? this->scheduler_params->to_string : "None");
   g_print("Stat      Params: %s\n", this->stat_params_tuple ? this->stat_params_tuple->to_string : "None");
+  g_print("Ext. Del. Params: %s\n", this->extra_delay_params ? this->extra_delay_params->to_string : "None");
 
 }
 
@@ -122,10 +124,10 @@ int main (int argc, char **argv)
   gboolean context_parse;
 
   //For using gdb without set args and other stuff
-//  if(1){
-//    argc = development_argc;
-//    argv = development_argv;
-//  }
+  if(0){
+    argc = development_argc;
+    argv = development_argv;
+  }
 
   session = g_malloc0(sizeof(SenderSide));
   context = g_option_context_new ("Sender");
@@ -150,11 +152,13 @@ int main (int argc, char **argv)
       _null_test(sndtransfer_params_rawstring, sndtransfer_params_rawstring_default)
   );
 
-  session->sourcesink_params = sourcesink_params_rawstring ? make_sink_params(sourcesink_params_rawstring) : NULL;
+  session->sourcesink_params  = sourcesink_params_rawstring ? make_sink_params(sourcesink_params_rawstring) : NULL;
 
   session->encodersink_params = encodersink_params_rawstring ? make_sink_params(encodersink_params_rawstring) : NULL;
 
-  session->scheduler_params = scheduler_params_rawstring ? make_scheduler_params(scheduler_params_rawstring) : NULL;;
+  session->scheduler_params   = scheduler_params_rawstring ? make_scheduler_params(scheduler_params_rawstring) : NULL;;
+
+  session->extra_delay_params = extradelay_params_rawstring ? make_extra_delay_params(extradelay_params_rawstring) : NULL;
 
   session->stat_params_tuple = make_statparams_tuple_by_raw_strings(
       stat_params_rawstring,
@@ -171,7 +175,8 @@ int main (int argc, char **argv)
   session->encoder = make_encoder(session->codec_params, session->encodersink_params);
   session->sender  = make_sender(session->scheduler_params,
       session->stat_params_tuple,
-      session->snd_transfer_params);
+      session->snd_transfer_params,
+      session->extra_delay_params);
 //  session->sender = make_sender_custom();
 
   pipeline_add_subscriber("on-playing", &session->source->on_playing);

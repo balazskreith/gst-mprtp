@@ -238,6 +238,23 @@ StatParams*     make_stat_params (gchar* params_rawstring)
 }
 
 
+ExtraDelayParams*  make_extra_delay_params (gchar* params_rawstring)
+{
+  ExtraDelayParams  *result = g_malloc0(sizeof(ExtraDelayParams));
+  gchar       **tokens = g_strsplit(params_rawstring, ":", -1);
+
+  result->extra_delay_in_ms       = atoi(tokens[0]);
+
+
+  sprintf(result->to_string,
+      "Extra delay in ms %d, ",
+      result->extra_delay_in_ms
+  );
+
+  return result;
+}
+
+
 TransferParams*  make_snd_transfer_params(gchar* params_rawstring)
 {
   TransferParams *result = g_malloc0(sizeof(TransferParams));

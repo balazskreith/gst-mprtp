@@ -18,7 +18,10 @@ typedef struct{
 
 Sender* sender_ctor(void);
 void sender_dtor(Sender* this);
-Sender* make_sender(SchedulerParams* cc, StatParamsTuple* stat_params_tuple, TransferParams *transfer);
+Sender* make_sender(SchedulerParams* cc,
+    StatParamsTuple* stat_params_tuple,
+    TransferParams *transfer,
+    ExtraDelayParams* extra_delay_params);
 
 Eventer* sender_get_on_bitrate_change_eventer(Sender* this);
 Sender* make_sender_custom(void);

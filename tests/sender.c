@@ -50,7 +50,10 @@ void sender_dtor(Sender* this)
 }
 
 
-Sender* make_sender(SchedulerParams* scheduler_params, StatParamsTuple* stat_params_tuple, TransferParams *snd_transfer)
+Sender* make_sender(SchedulerParams* scheduler_params,
+    StatParamsTuple* stat_params_tuple,
+    TransferParams *snd_transfer,
+    ExtraDelayParams* extra_delay_params)
 {
   Sender     *this = sender_ctor();
   GstBin     *senderBin = GST_BIN(gst_bin_new(this->bin_name));
@@ -73,6 +76,15 @@ Sender* make_sender(SchedulerParams* scheduler_params, StatParamsTuple* stat_par
       break;
   };
   sink = sender;
+
+  if(extra_delay_params){
+    GstClockTime delay = (GstClockTime) extra_delay_params->extra_delay_in_ms * GST_MSECOND;
+    GstElement* queue = gst_element_factory_make("queue", NULL);
+    g_object_set(queue, "min-threshold-time", delay, NULL);
+    gst_bin_add(senderBin, queue);
+    gst_element_link(queue, sink);
+    sink = queue;
+  }
 
   if(stat_params_tuple){
     RTPStatMaker* rtpstatmaker = make_rtpstatmaker(stat_params_tuple);

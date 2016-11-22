@@ -54,6 +54,7 @@ control_c()
 
 trap control_c SIGINT
 #Lets Rock
+sleep 5
 ./$SCRIPTFILE & 
 sleep $DURATION
 

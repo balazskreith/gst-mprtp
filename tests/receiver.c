@@ -381,7 +381,7 @@ GstElement* _make_mprtp_fractal_controller(Receiver* this, PlayouterParams* play
 {
   GstBin*     plyBin   = GST_BIN (gst_bin_new(NULL));
   GstElement* mprtpPly = _make_mprtp_playouter(this, rcv_transfer_params);
-  Sender*     sender   = make_sender(NULL, NULL, playouter_params->snd_transfer_params);
+  Sender*     sender   = make_sender(NULL, NULL, playouter_params->snd_transfer_params, NULL);
 
   gst_bin_add_many(plyBin,
       mprtpPly,
@@ -652,7 +652,7 @@ _make_scream_controller (Receiver* this,  PlayouterParams* playouter_params, Tra
   GstBin* screamBin = GST_BIN (gst_bin_new("screamBin"));
 
   guint        sessionNum   = 0;
-  Sender*      sender       = make_sender(NULL, NULL, playouter_params->snd_transfer_params);
+  Sender*      sender       = make_sender(NULL, NULL, playouter_params->snd_transfer_params, NULL);
   GstElement * rtpBin       = _priv(this)->rtpbin = gst_element_factory_make("rtpbin", NULL);
   GstElement*  rtcpSrc      = gst_element_factory_make("udpsrc", NULL);
   GstElement*  srcIdentity  = gst_element_factory_make("identity", NULL);

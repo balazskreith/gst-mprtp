@@ -202,6 +202,7 @@ again:
   _get_queue_median(copy, &result, (GCompareDataFunc) _queue_sort_by_BiF);
   this->BiF_logger(&result);
   _get_queue_percentile(copy, &result, (GCompareDataFunc) _queue_sort_by_playout_delay, 80);
+//  _get_queue_max(copy, &result, (GCompareDataFunc) _queue_sort_by_playout_delay);
   this->playout_rcv_logger(&result);
   this->last_sampling += this->sampling_time;
   goto again;
@@ -280,6 +281,7 @@ int main (int argc, char **argv)
   FILE *source, *destination;
   guint32 bytes_in_flight = 0;
   gint32  processed_rows = 0;
+  gint32  sampling_recorded = 0;
   GQueue* records = g_queue_new();
   GQueue* recycle = g_queue_new();
 
@@ -369,16 +371,19 @@ int main (int argc, char **argv)
           result_record.BiF,
           result_record.playout_delay / 1000);
       result_record.refreshed = FALSE;
+      ++sampling_recorded;
     }
 
   }
 
   g_print(
         "Elapsed time:            %fs\n"
-        "Nr. of processed rows:   %d\n",
+        "Nr. of processed rows:   %d\n"
+        "Nr. of recorded sample:  %d\n",
 
         (gdouble)GST_TIME_AS_MSECONDS(dpackets_get_lifetime(dpackets)) / 1000.,
-        processed_rows
+        processed_rows,
+        sampling_recorded
     );
   dpackets_dtor(dpackets);
   g_queue_free_full(records, g_free);

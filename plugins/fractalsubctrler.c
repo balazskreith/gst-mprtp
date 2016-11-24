@@ -73,6 +73,10 @@ G_DEFINE_TYPE (FRACTaLSubController, fractalsubctrler, G_TYPE_OBJECT);
 
 //determines the maximum monitoring interval
 #define MAX_MONITORING_INTERVAL 14
+
+//determines the maximal treshold for fractional lost
+#define MAX_FL_TRESHOLD 0.0
+
 typedef struct _Private Private;
 
 typedef enum{
@@ -109,6 +113,8 @@ struct _Private{
   gint32              max_monitoring_interval;
   gdouble             min_pacing_bitrate;
 
+  gdouble             max_FL_treshold;
+
 };
 
 
@@ -134,6 +140,7 @@ struct _Private{
 #define _max_target(this)             _priv(this)->max_target_bitrate
 #define _mon_min_int(this)            _priv(this)->min_monitoring_interval
 #define _mon_max_int(this)            _priv(this)->max_monitoring_interval
+#define _max_FL_th(this)              _priv(this)->max_FL_treshold
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
@@ -299,6 +306,7 @@ fractalsubctrler_init (FRACTaLSubController * this)
 
   _priv(this)->min_monitoring_interval          = MIN_MONITORING_INTERVAL;
   _priv(this)->max_monitoring_interval          = MAX_MONITORING_INTERVAL;
+  _priv(this)->max_FL_treshold                  = MAX_FL_TRESHOLD;
 }
 
 FRACTaLSubController *make_fractalsubctrler(SndTracker *sndtracker, SndSubflow *subflow)
@@ -397,16 +405,16 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
     goto done;
   }
 
-  sr_corr_ratio    = CONSTRAIN(.5, 1.5, this->target_bitrate / _stat(this)->sender_bitrate);
+
   rtpqdelay_factor = CONSTRAIN(1., 2., (gdouble) _stat(this)->delay_in_rtpqueue / (gdouble) (20 * GST_MSECOND));
 
   switch(this->subflow->state){
     case SNDSUBFLOW_STATE_OVERUSED:
       {
         gint32 corrigation = MAX(0, _stat(this)->bytes_in_flight - _stat(this)->BiF_80th);
-        this->cwnd = this->awnd * sr_corr_ratio;
-//        _change_sndsubflow_target_bitrate(this, this->bottleneck_point * _stat(this)->owd_log_corr - corrigation);
         _change_sndsubflow_target_bitrate(this, this->keeping_point * _stat(this)->owd_log_corr - corrigation);
+        sr_corr_ratio    = CONSTRAIN(.5, 1.5, this->target_bitrate / _stat(this)->sender_bitrate);
+        this->cwnd = this->awnd * sr_corr_ratio;
       }
       break;
     case SNDSUBFLOW_STATE_STABLE:
@@ -436,10 +444,10 @@ done:
 static void _stat_print(FRACTaLSubController *this)
 {
   FRACTaLStat *stat = this->stat;
-  g_print("BiF:%-5d %-5d->%-4.0f|FEC:%-4d|SR:%-4d|RR:%-4d|Tr:%-4d|Btl:%-4d|%d-%d-%d-%d|OWD:%-3lu+%-3lu (%-3lu) %1.1f-%-1.1f|FL:%-1.2f+%1.2f (%-1.2f)\n",
-      stat->bytes_in_flight,
-      stat->newly_acked_bytes,
-      this->cwnd / 8,
+  g_print("BiF:%-3d %-3d->%-3.0f|FEC:%-4d|SR:%-4d|RR:%-4d|Tr:%-4d|Btl:%-4d|%d-%d-%d-%d|OWD:%-3lu+%-3lu (%-3lu) %1.1f-%-1.1f|FL:%-1.2f+%1.2f (%-1.2f)\n",
+      stat->bytes_in_flight / 125,
+      stat->newly_acked_bytes / 125,
+      this->cwnd / 1000,
 
       stat->fec_bitrate / 1000,
 //      stat->sender_bitrate / 1000,
@@ -515,7 +523,7 @@ static gboolean _distortion(FRACTaLSubController *this)
 {
   GstClockTime owd_th = _stat(this)->owd_50th + CONSTRAIN(50 * GST_MSECOND, 250 * GST_MSECOND, _stat(this)->owd_std * 4);
 //  gdouble      FL_th  = MIN(_stat(this)->FL_50th, .1);
-  gdouble      FL_th  = _stat(this)->FL_50th + CONSTRAIN(0.05, 0.2, _stat(this)->FL_std * 4);
+  gdouble      FL_th  = MIN(_max_FL_th(this), _stat(this)->FL_50th + _stat(this)->FL_std * 4);
 
 //  if(owd_th < _stat(this)->last_owd){
 //    g_print("OWD distorted\n");
@@ -541,7 +549,7 @@ void
 _reduce_stage(
     FRACTaLSubController *this)
 {
-  this->awnd = _stat(this)->BiF_80th * 8;
+  this->awnd = _stat(this)->BiF_min * 8;
 
   if(this->target_bitrate < this->keeping_point * .5){
     //TODO: TCP flow compensation and recursive congestion event consideration
@@ -561,8 +569,8 @@ _reduce_stage(
     goto done;
   }
 
-  _set_bottleneck_point(this, this->keeping_point * .9);
-  _change_sndsubflow_target_bitrate(this, this->bottleneck_point);
+  _set_bottleneck_point(this, this->keeping_point);
+  _change_sndsubflow_target_bitrate(this, this->bottleneck_point * .8);
   _switch_stage_to(this, STAGE_KEEP, FALSE);
 done:
   return;

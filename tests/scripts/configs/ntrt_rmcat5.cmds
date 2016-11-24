@@ -1,4 +1,4 @@
 3 120
-O sudo ip netns exec ns_mid tc qdisc change dev veth2 parent 1: handle 2: tbf rate 5000kbit burst 350kbit latency 300ms minburst 1540
+O sudo ip netns exec ns_mid tc qdisc change dev veth2 parent 1: handle 2: tbf rate 3000kbit burst 350kbit latency 300ms minburst 1540
 O sudo ip netns exec ns_mid tc qdisc change dev veth1 parent 1: handle 2: tbf rate 2000kbit burst 100kbit latency 300ms minburst 1540
-I MAPPED_VAR_1_5000
+I MAPPED_VAR_1_3000

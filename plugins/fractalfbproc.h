@@ -73,6 +73,7 @@ typedef struct{
   GstClockTime owd;
   gint32       bytes_in_flight;
   gdouble      fraction_lost;
+  gint8        stability;
 }FRACTaLMeasurement;
 
 typedef struct{

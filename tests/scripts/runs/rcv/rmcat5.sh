@@ -7,8 +7,8 @@ ACTDIR=$SCRIPTSDIR"/runs/snd"
 
 SCREAM="SCReAM"
 FRACTAL="FRACTaL"
-#CC=$SCREAM
-CC=$FRACTAL
+CC=$SCREAM
+#CC=$FRACTAL
 
 
 rm $TEMPDIR/*
@@ -98,63 +98,6 @@ fi
 
 chmod 777 $SCRIPTFILE3
 
-#------------------------------------------------------------------------
-
-SCRIPTFILE4=$TEMPDIR"/receiver4.sh"
-
-echo -n "./rcv_pipeline "                                   > $SCRIPTFILE4
-#echo -n "--sink=FILE:consumed.yuv "                        >> $SCRIPTFILE4
-#echo -n "--sink=AUTOVIDEO "                                >> $SCRIPTFILE4
-echo -n "--sink=FAKESINK "                                 >> $SCRIPTFILE4
-
-echo -n "--codec=VP8 "                                     >> $SCRIPTFILE4
-echo -n "--stat=100:1000:1:triggered_stat "                >> $SCRIPTFILE4
-echo -n "--statlogsink=FILE:temp/rcv_statlogs4.csv "        >> $SCRIPTFILE4
-echo -n "--packetlogsink=FILE:temp/rcv_packetlogs4.csv "    >> $SCRIPTFILE4
-
-
-echo $CC" is used as congestion control for receiver 4"
-if [ $CC = $SCREAM ] 
-then
-	echo -n "--receiver=RTP:5006 "                             >> $SCRIPTFILE4
-	echo -n "--playouter=SCREAM:RTP:10.0.0.1:5007 "            >> $SCRIPTFILE4
-elif [ $CC = $FRACTAL ] 
-then 
-	echo -n "--playouter=MPRTPFRACTAL:MPRTP:1:1:10.0.0.1:5007 " >> $SCRIPTFILE4
-	echo -n "--receiver=MPRTP:1:1:5006 "                        >> $SCRIPTFILE4
-fi
-
-chmod 777 $SCRIPTFILE4
-
-#------------------------------------------------------------------------
-
-SCRIPTFILE5=$TEMPDIR"/receiver5.sh"
-
-echo -n "./rcv_pipeline "                                   > $SCRIPTFILE5
-#echo -n "--sink=FILE:consumed.yuv "                        >> $SCRIPTFILE5
-#echo -n "--sink=AUTOVIDEO "                                >> $SCRIPTFILE5
-echo -n "--sink=FAKESINK "                                 >> $SCRIPTFILE5
-
-echo -n "--codec=VP8 "                                     >> $SCRIPTFILE5
-echo -n "--stat=100:1000:1:triggered_stat "                >> $SCRIPTFILE5
-echo -n "--statlogsink=FILE:temp/rcv_statlogs5.csv "        >> $SCRIPTFILE5
-echo -n "--packetlogsink=FILE:temp/rcv_packetlogs5.csv "    >> $SCRIPTFILE5
-
-
-echo $CC" is used as congestion control for receiver 5"
-if [ $CC = $SCREAM ] 
-then
-	echo -n "--receiver=RTP:5008 "                             >> $SCRIPTFILE5
-	echo -n "--playouter=SCREAM:RTP:10.0.0.1:5009 "            >> $SCRIPTFILE5
-elif [ $CC = $FRACTAL ] 
-then 
-	echo -n "--playouter=MPRTPFRACTAL:MPRTP:1:1:10.0.0.1:5009 " >> $SCRIPTFILE5
-	echo -n "--receiver=MPRTP:1:1:5008 "                        >> $SCRIPTFILE5
-fi
-
-chmod 777 $SCRIPTFILE5
-
-
 
 cleanup()
 {
@@ -177,10 +120,6 @@ sleep 5
 ./$SCRIPTFILE2 &
 sleep 10
 ./$SCRIPTFILE3 &
-sleep 10
-./$SCRIPTFILE4 &
-sleep 10
-./$SCRIPTFILE5 &
  
 sleep 300
 

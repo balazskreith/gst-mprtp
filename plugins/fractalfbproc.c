@@ -364,6 +364,7 @@ void _process_stat(FRACTaLFBProcessor *this)
     lost_fraction_in_1s /= (gdouble) sndstat->acked_packets_in_1s;
   }
 
+
   _stat(this)->delay_in_rtpqueue     = rtpqstat->delay_length;
   _stat(this)->bytes_in_flight       = sndstat->bytes_in_flight;
   _stat(this)->sender_bitrate        = sndstat->sent_bytes_in_1s * 8;

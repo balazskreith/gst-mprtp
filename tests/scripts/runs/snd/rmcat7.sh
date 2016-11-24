@@ -55,9 +55,19 @@ control_c()
 
 trap control_c SIGINT
 #Lets Rock
-iperf -c 10.0.0.6 -p 12345 -t 120 &
+
+let "r=$RANDOM%30"
+iperf -c 10.0.0.6 -p 12345 -t $r &
 sleep 5
-./$SCRIPTFILE & 
+./$SCRIPTFILE &
+for (( c=1; c<=($RANDOM % 10) + 10; c++ ))
+do  
+	let "r=$RANDOM%30"
+	let "s=$RANDOM%20 + 1"
+	iperf -c 10.0.0.6 -p 12345 -t $r &
+	sleep $s
+done
+ 
 sleep 150
 
 cleanup

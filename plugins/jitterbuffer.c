@@ -96,7 +96,7 @@ static void _on_skew_median_calculated(Subflow *subflow, swpercentilecandidates_
                    0            \
                    );
   skew_median = CONSTRAIN((gint64)-50 * (gint64)GST_MSECOND, 50 * GST_MSECOND, skew_median);
-
+//g_print("%ld\n", skew_median);
   if(subflow->path_skew == 0.){
     subflow->path_skew = skew_median;
   }else{

@@ -8,7 +8,7 @@ ACTDIR=$SCRIPTSDIR"/runs/snd"
 SCREAM="SCReAM"
 FRACTAL="FRACTaL"
 CC=$SCREAM
-#CC=$FRACTAL
+CC=$FRACTAL
 
 
 #setup defaults

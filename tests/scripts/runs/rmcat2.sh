@@ -13,7 +13,7 @@ mkdir $LOGSDIR
 
 #setup defaults
 DURATION=120
-OWD_SND=100
+OWD_SND=50
 OWD_RCV=100
 JITTER=0
 

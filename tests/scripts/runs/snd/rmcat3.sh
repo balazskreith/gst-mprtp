@@ -8,7 +8,8 @@ ACTDIR=$SCRIPTSDIR"/runs/snd"
 SCREAM="SCReAM"
 FRACTAL="FRACTaL"
 CC=$SCREAM
-#CC=$FRACTAL
+CC=$FRACTAL
+
 
 
 #setup defaults
@@ -17,7 +18,7 @@ DURATION=150
 SCRIPTFILE=$TEMPDIR"/sender.sh"
 
 echo -n "./snd_pipeline "                                  > $SCRIPTFILE
-echo -n "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1 " >> $SCRIPTFILE
+echo -n "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1 "  >> $SCRIPTFILE
 #echo -n "--sourcesink=FILE:produced.yuv "                 >> $SCRIPTFILE
 
 echo -n "--codec=VP8 "                                    >> $SCRIPTFILE

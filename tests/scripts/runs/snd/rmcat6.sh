@@ -7,8 +7,14 @@ ACTDIR=$SCRIPTSDIR"/runs/snd"
 
 SCREAM="SCReAM"
 FRACTAL="FRACTaL"
-#CC=$SCREAM
-CC=$FRACTAL
+
+if [ -z "$1" ] 
+then
+  CC=$SCREAM
+  CC=$FRACTAL
+else 
+  CC=$1
+fi
 
 
 #setup defaults
@@ -58,7 +64,7 @@ trap control_c SIGINT
 iperf -c 10.0.0.6 -p 12345 -t 120 &
 sleep 5
 ./$SCRIPTFILE & 
-sleep 150
+sleep 130
 
 cleanup
 

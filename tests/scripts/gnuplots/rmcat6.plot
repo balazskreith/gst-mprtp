@@ -30,7 +30,7 @@ set tmargin 4
 
 set title "Throughput (kbps)"
 
-set yrange [0:3000]
+set yrange [0:2000]
 set ytics 1000
 set xrange [0:duration]
 set xtics 10 offset 0,-1

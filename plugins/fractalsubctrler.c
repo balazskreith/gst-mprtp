@@ -549,7 +549,7 @@ void
 _reduce_stage(
     FRACTaLSubController *this)
 {
-  this->awnd = _stat(this)->BiF_min * 8;
+  this->awnd = _stat(this)->BiF_80th * 8;
 
   if(this->target_bitrate < this->keeping_point * .5){
     //TODO: TCP flow compensation and recursive congestion event consideration

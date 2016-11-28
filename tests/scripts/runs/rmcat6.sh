@@ -12,10 +12,16 @@ SYNCTOUCHFILE="triggered_stat"
 mkdir $LOGSDIR
 
 #setup defaults
-DURATION=300
-OWD_SND=50
-OWD_RCV=50
+DURATION=120
+OWD_RCV=100
 JITTER=0
+
+if [ -z "$1" ] 
+then
+  OWD_SND=50
+else 
+  OWD_SND=$1
+fi
 
 
 sudo ip netns exec ns_mid tc qdisc change dev veth2 root handle 1: netem delay "$OWD_SND"ms "$JITTER"ms

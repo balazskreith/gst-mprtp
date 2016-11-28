@@ -7,8 +7,14 @@ ACTDIR=$SCRIPTSDIR"/runs/snd"
 
 SCREAM="SCReAM"
 FRACTAL="FRACTaL"
-CC=$SCREAM
-CC=$FRACTAL
+
+if [ -z "$1" ] 
+then
+  CC=$SCREAM
+  CC=$FRACTAL
+else 
+  CC=$1
+fi
 
 rm $TEMPDIR/*
 rm triggered_stat
@@ -32,12 +38,12 @@ echo -n "--packetlogsink=FILE:temp/rcv_packetlogs.csv "    >> $SCRIPTFILE
 echo $CC" is used as congestion control for receiver 1"
 if [ $CC = $SCREAM ] 
 then
-	echo -n "--receiver=RTP:5000 "                             >> $SCRIPTFILE
-	echo -n "--playouter=SCREAM:RTP:10.0.0.1:5001 "            >> $SCRIPTFILE
+	echo -n "--receiver=RTP:5100 "                             >> $SCRIPTFILE
+	echo -n "--playouter=SCREAM:RTP:10.0.0.1:5101 "            >> $SCRIPTFILE
 elif [ $CC = $FRACTAL ] 
 then 
-	echo -n "--playouter=MPRTPFRACTAL:MPRTP:1:1:10.0.0.1:5001 " >> $SCRIPTFILE
-	echo -n "--receiver=MPRTP:1:1:5000 "                        >> $SCRIPTFILE
+	echo -n "--playouter=MPRTPFRACTAL:MPRTP:1:1:10.0.0.1:5101 " >> $SCRIPTFILE
+	echo -n "--receiver=MPRTP:1:1:5100 "                        >> $SCRIPTFILE
 fi
 
 chmod 777 $SCRIPTFILE
@@ -58,12 +64,12 @@ echo -n "--packetlogsink=FILE:temp/snd_packetlogs2.csv "  >> $SCRIPTFILE2
 echo $CC" is used as congestion control for sender 2"
 if [ $CC = $SCREAM ]
 then
-	echo -n "--sender=RTP:10.0.0.1:5002 "                     >> $SCRIPTFILE2
-	echo -n "--scheduler=SCREAM:RTP:5003 "                    >> $SCRIPTFILE2
+	echo -n "--sender=RTP:10.0.0.1:5102 "                     >> $SCRIPTFILE2
+	echo -n "--scheduler=SCREAM:RTP:5103 "                    >> $SCRIPTFILE2
 elif [ $CC = $FRACTAL ] 
 then 
-	echo -n "--sender=MPRTP:1:1:10.0.0.1:5002 "                >> $SCRIPTFILE2
-	echo -n "--scheduler=MPRTPFRACTAL:MPRTP:1:1:5003 "         >> $SCRIPTFILE2
+	echo -n "--sender=MPRTP:1:1:10.0.0.1:5102 "                >> $SCRIPTFILE2
+	echo -n "--scheduler=MPRTPFRACTAL:MPRTP:1:1:5103 "         >> $SCRIPTFILE2
 fi
 
 chmod 777 $SCRIPTFILE2

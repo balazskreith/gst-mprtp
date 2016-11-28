@@ -12,17 +12,23 @@ SYNCTOUCHFILE="triggered_stat"
 mkdir $LOGSDIR
 
 #setup defaults
-DURATION=300
-OWD_SND=50
+DURATION=100
 OWD_RCV=50
 JITTER=0
+
+if [ -z "$1" ] 
+then
+  OWD_SND=50
+else 
+  OWD_SND=$1
+fi
 
 
 sudo ip netns exec ns_mid tc qdisc change dev veth2 root handle 1: netem delay "$OWD_SND"ms "$JITTER"ms
 sudo ip netns exec ns_mid tc qdisc change dev veth1 root handle 1: netem delay "$OWD_RCV"ms "$JITTER"ms
 
 
-echo "ntrt -c$CONFDIR/ntrt_snd_meas.ini -m$CONFDIR/ntrt_rmcat6.cmds -t120 " > $LOGSDIR"/ntrt.sh"
+echo "ntrt -c$CONFDIR/ntrt_snd_meas.ini -m$CONFDIR/ntrt_rmcat6.cmds -t300 " > $LOGSDIR"/ntrt.sh"
 chmod 777 $LOGSDIR"/ntrt.sh"
 
 

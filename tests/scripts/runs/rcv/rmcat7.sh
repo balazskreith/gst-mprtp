@@ -7,8 +7,14 @@ ACTDIR=$SCRIPTSDIR"/runs/snd"
 
 SCREAM="SCReAM"
 FRACTAL="FRACTaL"
-#CC=$SCREAM
-CC=$FRACTAL
+
+if [ -z "$1" ] 
+then
+  CC=$SCREAM
+  CC=$FRACTAL
+else 
+  CC=$1
+fi
 
 
 rm $TEMPDIR/*
@@ -57,7 +63,7 @@ trap control_c SIGINT
 #Lets Rock
 iperf -s -p 12345 &
 ./$SCRIPTFILE & 
-sleep 150
+sleep 300
 
 cleanup
 

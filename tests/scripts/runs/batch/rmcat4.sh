@@ -3,7 +3,7 @@ programname=$0
 LOGSDIR="temp"
 TEMPDIR="temp_batch"
 
-TEST="rmcat3"
+TEST="rmcat4"
 #ALGORITHM="SCReAM"
 ALGORITHM="FRACTaL"
 OWD=300
@@ -56,6 +56,15 @@ while [  $COUNTER -lt 4 ]; do
 		fi
 	done
 	
+	#Flow 3
+	for FILE in snd_packetlogs3.csv rcv_packetlogs3.csv snd_statlogs3.csv rcv_statlogs3.csv
+	do
+   		if [ ! -f $LOGSDIR"/"$FILE ]; then
+    		INCREASE=0
+    		echo $FILE" not found"
+		fi
+	done
+	
 	if [ $INCREASE -eq 0 ]
 	then
 	  sudo pkill snd_pipeline
@@ -67,7 +76,7 @@ while [  $COUNTER -lt 4 ]; do
 	sleep 50
 	
 	#Validation Part 2
-	for FILE in snd_packetlogs.csv rcv_packetlogs.csv snd_packetlogs2.csv rcv_packetlogs2.csv 
+	for FILE in snd_packetlogs.csv rcv_packetlogs.csv snd_packetlogs2.csv rcv_packetlogs2.csv snd_packetlogs3.csv rcv_packetlogs3.csv 
 	do
 		minimumsize=90000
 		actualsize=$(wc -c <"$LOGSDIR/$FILE")

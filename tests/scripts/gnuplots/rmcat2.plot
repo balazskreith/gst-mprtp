@@ -65,7 +65,7 @@ plot statlogs using ($0*0.1):(($6 - path_delay)/1000000) with point pointtype 7 
   
   
 #Plot_3
-set yrange [-0.25:0.25]
+set yrange [0.0:0.5]
 set ytics 0.25
 set xrange [0:duration]
 set xtics 10 offset 0,-1

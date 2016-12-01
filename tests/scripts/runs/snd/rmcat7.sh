@@ -74,7 +74,7 @@ do
 	sleep $s
 done
  
-sleep 300
+sleep 320
 
 cleanup
 

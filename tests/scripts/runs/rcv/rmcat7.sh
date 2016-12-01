@@ -63,7 +63,7 @@ trap control_c SIGINT
 #Lets Rock
 iperf -s -p 12345 &
 ./$SCRIPTFILE & 
-sleep 300
+sleep 320
 
 cleanup
 

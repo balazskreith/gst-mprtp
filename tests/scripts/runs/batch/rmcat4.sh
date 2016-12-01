@@ -4,9 +4,9 @@ LOGSDIR="temp"
 TEMPDIR="temp_batch"
 
 TEST="rmcat4"
-#ALGORITHM="SCReAM"
-ALGORITHM="FRACTaL"
-OWD=300
+ALGORITHM="SCReAM"
+#ALGORITHM="FRACTaL"
+OWD=50
 JITTER=0
 
 mkdir $TEMPDIR
@@ -25,8 +25,8 @@ chmod 777 $RCVFILE
 sleep 5
 sudo pkill ntrt
 
-COUNTER=2
-while [  $COUNTER -lt 4 ]; do
+COUNTER=1
+while [  $COUNTER -lt 15 ]; do
     echo "The counter is $COUNTER"
     
 	sudo ip netns exec ns_rcv $RCVFILE &
@@ -47,6 +47,16 @@ while [  $COUNTER -lt 4 ]; do
 		fi
 	done
 	
+	if [ $INCREASE -eq 0 ]
+	then
+	  sudo pkill snd_pipeline
+	  sudo pkill rcv_pipeline
+	  sudo pkill ntrt
+	  continue
+	fi
+	
+	
+	sleep 20
 	#Flow 2
 	for FILE in snd_packetlogs2.csv rcv_packetlogs2.csv snd_statlogs2.csv rcv_statlogs2.csv
 	do
@@ -56,6 +66,16 @@ while [  $COUNTER -lt 4 ]; do
 		fi
 	done
 	
+	if [ $INCREASE -eq 0 ]
+	then
+	  sudo pkill snd_pipeline
+	  sudo pkill rcv_pipeline
+	  sudo pkill ntrt
+	  continue
+	fi
+	
+	
+	sleep 20
 	#Flow 3
 	for FILE in snd_packetlogs3.csv rcv_packetlogs3.csv snd_statlogs3.csv rcv_statlogs3.csv
 	do

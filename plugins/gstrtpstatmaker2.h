@@ -67,6 +67,13 @@ struct _GstRTPStatMaker2 {
   GstPad*                       packet_sinkpad;
   GstPad*                       packet_srcpad;
 
+  GstBufferPool*                packetbufferpool;
+
+  GstClockTime                  last_statlog;
+  GstClockTime                  last_packetlog;
+  GQueue*                       packetlogs2write;
+  GQueue*                       packetlogstr2recycle;
+
   gboolean                      touched_sync_active;
   gchar                         touched_sync_location[256];
   gchar                         packetslog_file[256];

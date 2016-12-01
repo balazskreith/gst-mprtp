@@ -64,7 +64,7 @@ trap control_c SIGINT
 iperf -c 10.0.0.6 -p 12345 -t 120 &
 sleep 5
 ./$SCRIPTFILE & 
-sleep 130
+sleep 140
 
 cleanup
 

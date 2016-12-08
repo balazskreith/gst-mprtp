@@ -32,10 +32,6 @@ struct _Messenger
   GQueue*             messages;
   GQueue*             recycle;
 
-  //TODO: datapuffer should be better, since queue consumes and call malloc for creating list item itself.
-  datapuffer_t*       messages2;
-  datapuffer_t*       recycle2;
-
   GCond               cond;
   MessengerItemShaper shaper;
   gsize               block_size;
@@ -55,6 +51,7 @@ Messenger *make_messenger(gsize block_size);
 void messenger_set_recycle_limit(Messenger *this, guint recycle_limit);
 gpointer messenger_pop_block(Messenger *this);
 gpointer messenger_try_pop_block(Messenger *this);
+guint messenger_get_length_with_timeout (Messenger *this, gint64 microseconds);
 gpointer messenger_pop_block_with_timeout (Messenger *this, gint64 microseconds);
 void messenger_push_block(Messenger* this, gpointer message);
 void messenger_throw_block(Messenger* this, gpointer message);

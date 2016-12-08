@@ -52,6 +52,12 @@ enum
 
 };
 
+
+typedef struct{
+  gchar path[256];
+  gchar string[2048];
+}Message;
+
 static GstStaticPadTemplate gst_rtpstatmaker_packet_src_template =
 GST_STATIC_PAD_TEMPLATE ("packet_src",
     GST_PAD_SRC,
@@ -90,8 +96,13 @@ static gboolean gst_rtpstatmaker2_accept_caps (GstBaseTransform * base,
 static gboolean gst_rtpstatmaker2_query (GstBaseTransform * base,
     GstPadDirection direction, GstQuery * query);
 
+static void _fprintf(GstRTPStatMaker2 *this, const gchar *path, const gchar * format, ...);
+
 static void
-_monitorstat_emitter (GstRTPStatMaker2 *this);
+_monitorstat_logger (GstRTPStatMaker2 *this);
+
+static void
+_monitorstat_refresh (GstRTPStatMaker2 *this, gboolean lock);
 
 static void
 gst_rtpstatmaker2_finalize (GObject * object)
@@ -105,8 +116,7 @@ gst_rtpstatmaker2_finalize (GObject * object)
   g_cond_clear (&this->blocked_cond);
   g_cond_clear (&this->waiting_signal);
 
-  g_queue_free_full(this->packetlogs2write,     g_free);
-  g_queue_free_full(this->packetlogstr2recycle, g_free);
+  g_object_unref (this->messenger);
 
   g_object_unref (this->sysclock);
   g_object_unref (this->monitor);
@@ -281,11 +291,9 @@ gst_rtpstatmaker2_init (GstRTPStatMaker2 * this)
   this->monitor = make_monitor();
 
   g_rec_mutex_init (&this->thread_mutex);
-  this->thread = gst_task_new ((GstTaskFunction) _monitorstat_emitter, this, NULL);
+  this->thread = gst_task_new ((GstTaskFunction) _monitorstat_logger, this, NULL);
 
-  this->packetlogs2write     = g_queue_new();
-  this->packetlogstr2recycle = g_queue_new();
-
+  this->messenger = make_messenger(sizeof(Message));
   this->sysclock = gst_system_clock_obtain ();
   this->packetbufferpool = _create_pool(1024, 5, 0);
   gst_buffer_pool_set_active (this->packetbufferpool, TRUE);
@@ -382,6 +390,9 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
   }
 
   THIS_LOCK(this);
+  //g_queue_push_head(this->bufferq, gst_buffer_ref(buffer));
+  //TODO: changepoint
+
   if(this->touched_sync_active){
     if(!g_file_test(this->touched_sync_location, G_FILE_TEST_EXISTS)){
       goto done;
@@ -405,9 +416,7 @@ again:
   }
 
   if(packetsrc_linked){
-    //TODO: 1
     gst_buffer_pool_acquire_buffer (this->packetbufferpool, &packetbuffer, NULL);
-//    packetbuffer    = gst_buffer_new_wrapped(g_malloc0(1024), 1024);
     monitor_setup_packetbufffer(packet, packetbuffer);
     gst_pad_push(this->packet_srcpad, packetbuffer);
     packetbuffer = NULL;
@@ -415,16 +424,8 @@ again:
 
   if(this->packetlogs_linked){
     if(this->csv_logging){
-      gchar* str;
-      if(g_queue_is_empty(this->packetlogstr2recycle)){
-        str = g_malloc(2048);
-      }else{
-        str = g_queue_pop_head(this->packetlogstr2recycle);
-      }
-      memset(str, 0, 2048);
-
       //mprtp_logger(this->packetslog_file,
-      sprintf(str,
+      _fprintf(this, this->packetslog_file,
           "%u,%hu,%d,%lu,%d,%u,%u,%u,%d,%lu\n",
           packet->extended_seq,
           packet->tracked_seq,
@@ -437,18 +438,14 @@ again:
           packet->payload_type,
           packet->played_out
       );
-      g_queue_push_tail(this->packetlogs2write, str);
-
-//      gst_buffer_map(buffer, &map, GST_MAP_READWRITE);
-//      memcpy(map.data, csv, 1024);
-//      gst_buffer_unmap(buffer, &map);
     }else{
-//      monitor_setup_packetbufffer(packet, packetbuffer);
+
     }
-//    gst_pad_push(this->packetlogs_srcpad, packetbuffer);
+
   }
   goto again;
 done:
+  _monitorstat_refresh(this, FALSE);
   THIS_UNLOCK(this);
 exit:
   return;
@@ -736,116 +733,53 @@ gst_rtpstatmaker2_change_state (GstElement * element, GstStateChange transition)
   return ret;
 }
 
-//
-//void
-//_monitorstat_emitter (GstRTPStatMaker2 *this)
-//{
-//  Monitor* monitor;
-//  MonitorStat* stat;
-////  GstBuffer* buffer = NULL;
-//  gint64 end_time;
-//
-//  THIS_LOCK(this);
-//
-//  end_time = g_get_monotonic_time() + this->sampling_time * 1000; //because sampling_time is in ms.
-//
-//  g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);
-//  if(!this->statlogs_linked){
-//    goto done;
-//  }
-//
-//  if(this->touched_sync_active){
-//    if(!g_file_test(this->touched_sync_location, G_FILE_TEST_EXISTS)){
-//      goto done;
-//    }
-//    this->touched_sync_active = FALSE;
-//  }
-//
-////  buffer = gst_buffer_new_wrapped(g_malloc0(length), length);
-//  monitor = this->monitor;
-//  stat = &monitor->stat;
-//
-//  if(this->csv_logging){
-//    mprtp_logger(this->statslog_file,
-//        "%d,%d,%d,%d," //received
-//        "%d,%d,%d,%d," //lost
-//        "%d,%d,%d,%d," //discarded
-//        "%d,%d,%d,%d," //corrupted
-//        "%d,%d,%d,%d," //repaired
-//        "%d,%d,%d,%d\n"  //fec
-//        ,
-//        stat->received.total_packets,
-//        stat->received.total_bytes,
-//        stat->received.accumulative_bytes,
-//        stat->received.accumulative_packets,
-//
-//        stat->lost.total_packets,
-//        stat->lost.total_bytes,
-//        stat->lost.accumulative_bytes,
-//        stat->lost.accumulative_packets,
-//
-//        stat->discarded.total_packets,
-//        stat->discarded.total_bytes,
-//        stat->discarded.accumulative_bytes,
-//        stat->discarded.accumulative_packets,
-//
-//        stat->corrupted.total_packets,
-//        stat->corrupted.total_bytes,
-//        stat->corrupted.accumulative_bytes,
-//        stat->corrupted.accumulative_packets,
-//
-//        stat->repaired.total_packets,
-//        stat->repaired.total_bytes,
-//        stat->repaired.accumulative_bytes,
-//        stat->repaired.accumulative_packets,
-//
-//        stat->fec.total_packets,
-//        stat->fec.total_bytes,
-//        stat->fec.accumulative_bytes,
-//        stat->fec.accumulative_packets
-//      );
-//
-////    gst_buffer_map(buffer, &map, GST_MAP_READWRITE);
-////    memcpy(map.data, csv, length);
-////    gst_buffer_unmap(buffer, &map);
-//
-//  }else{
-////    monitor_setup_monitorstatbufffer(this->monitor, buffer);
-//  }
-//
-////  gst_pad_push(this->statlogs_srcpad, buffer);
-//
-//done:
-//  THIS_UNLOCK(this);
-//  return;
-//}
+void _fprintf(GstRTPStatMaker2 *this, const gchar *path, const gchar * format, ...)
+{
+  Message *msg;
+  va_list args;
+  msg = messenger_retrieve_block(this->messenger);
+  strcpy(msg->path, path);
+  va_start (args, format);
+  vsprintf(msg->string, format, args);
+  va_end (args);
 
+  messenger_push_block(this->messenger, msg);
+}
+
+void
+_monitorstat_logger (GstRTPStatMaker2 *this)
+{
+  guint length;
+  Messenger* messenger = this->messenger;
+  Message* message = NULL;
+  length = messenger_get_length_with_timeout(messenger, 10000);
+  if(length < 1){
+    goto done;
+  }
+  messenger_lock(messenger);
+  while((message = messenger_try_pop_block_unlocked(messenger)) != NULL){
+    FILE* fp = fopen(message->path, "a");
+    fprintf(fp, "%s", message->string);
+    fclose(fp);
+    messenger_throw_block_unlocked(messenger, message);
+  }
+  messenger_unlock(messenger);
+
+done:
+  _monitorstat_refresh(this, TRUE);
+  return;
+}
 
 
 void
-_monitorstat_emitter (GstRTPStatMaker2 *this)
+_monitorstat_refresh (GstRTPStatMaker2 *this, gboolean lock)
 {
   Monitor* monitor;
   MonitorStat* stat;
-  gint64 end_time;
 
-  THIS_LOCK(this);
-
-  //end_time = g_get_monotonic_time() + this->sampling_time * 1000; //because sampling_time is in ms.
-  end_time = g_get_monotonic_time() + 10000; //bsampling in each 10 ms
-
-  g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);
-  if(!g_queue_is_empty(this->packetlogs2write)){
-    FILE* fp = fopen(this->packetslog_file, this->last_packetlog ? "a" : "w");
-    while(!g_queue_is_empty(this->packetlogs2write)){
-        gchar* str = g_queue_pop_head(this->packetlogs2write);
-        fprintf(fp, "%s", str);
-        g_queue_push_tail(this->packetlogstr2recycle, str);
-    }
-    fclose(fp);
-    this->last_packetlog = _now(this);
+  if(lock){
+    THIS_LOCK(this);
   }
-
 
   if(!this->statlogs_linked){
     goto done;
@@ -862,14 +796,11 @@ _monitorstat_emitter (GstRTPStatMaker2 *this)
     this->touched_sync_active = FALSE;
   }
 
-//  buffer = gst_buffer_new_wrapped(g_malloc0(length), length);
   monitor = this->monitor;
   stat = &monitor->stat;
 
   if(this->csv_logging){
-    FILE* fp = fopen(this->statslog_file, this->last_statlog ? "a" : "w");
-    //mprtp_logger(this->statslog_file,
-    fprintf(fp,
+    _fprintf(this, this->statslog_file,
         "%d,%d,%d,%d," //received
         "%d,%d,%d,%d," //lost
         "%d,%d,%d,%d," //discarded
@@ -908,17 +839,19 @@ _monitorstat_emitter (GstRTPStatMaker2 *this)
         stat->fec.accumulative_packets
       );
 
-    fclose(fp);
 
   }else{
-//    monitor_setup_monitorstatbufffer(this->monitor, buffer);
+
   }
 
 //  gst_pad_push(this->statlogs_srcpad, buffer);
   this->last_statlog = _now(this);
 
 done:
-  THIS_UNLOCK(this);
+  if(lock){
+    THIS_UNLOCK(this);
+  }
   return;
 }
+
 

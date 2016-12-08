@@ -7,7 +7,7 @@ if (!exists("statlogs")) statlogs='statlogs.csv'
 if (!exists("path_delay")) path_delay=0
 if (!exists("output_file")) output_file='statlogs.pdf'
 
-duration=100
+duration=300
 
 font_size=18
 #-------------------------------------------------------------------------
@@ -30,7 +30,7 @@ set tmargin 4
 
 set title "Throughput (kbps)"
 
-set yrange [0:3000]
+set yrange [0:2000]
 set ytics 1000
 set xrange [0:duration]
 set xtics 10 offset 0,-1

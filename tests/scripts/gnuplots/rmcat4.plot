@@ -18,7 +18,7 @@ set terminal pdf enhanced rounded size 10,6
 set output output_file
 set datafile separator "," 
 
-set multiplot layout 3, 1 font ",14"
+set multiplot layout 2, 1 font ",18"
 set tmargin 4
 
 #Plot_1
@@ -49,7 +49,7 @@ plot statlogs   using ($0*0.1):($4/125) with point pointtype 7 ps 0.2 lc rgb "bl
      
 
 #Plot_2
-set yrange [0:1]
+set yrange [0:0.5]
 set ytics 0.5
 set xrange [0:duration]
 set xtics 10 offset 0,-1
@@ -65,20 +65,6 @@ plot statlogs  using ($0*0.1):(($6 - path_delay)/1000000) with point pointtype 7
 	 statlogs3 using ($0*0.1 + 40):(($6 - path_delay)/1000000) with point pointtype 7 ps 0.2 lc rgb "0xFF6347"  title "Queue Delay 3"                  
  
  
-#Plot_3
-set yrange [0:0.5]
-set ytics 0.25
-set xrange [0:duration]
-set xtics 10 offset 0,-1
 
-set title "Playout delays"
-unset xlabel 
- 
-plot statlogs  using ($0*0.1):($7/1000000) with point pointtype 7 ps 0.2 lc rgb "blue"     title "Playout delay   ", \
-     statlogs2 using ($0*0.1 + 20):($7/1000000) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Playout delay 2 ", \
-     statlogs3 using ($0*0.1 + 40):($7/1000000) with point pointtype 7 ps 0.2 lc rgb "0xFF6347" title "Playout delay 3 "  
- 
- 
- 
  
  

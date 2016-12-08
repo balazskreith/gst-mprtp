@@ -90,6 +90,7 @@ static void _on_monitoring_request(GstMprtpscheduler * this, SndSubflow* subflow
 static void _on_monitoring_response(GstMprtpscheduler * this, FECEncoderResponse *response);
 static void _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndSubflow* subflow, SndPacket *packet);
 static void mprtpscheduler_approval_process(GstMprtpscheduler *this);
+static void mprtpscheduler_sender_process (gpointer udata);
 static void mprtpscheduler_emitter_process(gpointer udata);
 
 
@@ -298,6 +299,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 //  mprtp_logger_set_system_command("rm temp_logs/*");
 //  mprtp_logger_set_target_directory("temp/");
 
+  this->sendq = g_async_queue_new();
+
   this->rtp_sinkpad =
       gst_pad_new_from_static_template (&gst_mprtpscheduler_rtp_sink_template,
       "rtp_sink");
@@ -349,9 +352,11 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   gst_element_add_pad (GST_ELEMENT (this), this->mprtp_srcpad);
 
-
   this->sysclock = gst_system_clock_obtain ();
   this->thread = gst_task_new (mprtpscheduler_emitter_process, this, NULL);
+
+  this->sending_thread = gst_task_new (mprtpscheduler_sender_process, this, NULL);
+
   g_mutex_init (&this->mutex);
   g_cond_init(&this->waiting_signal);
   g_cond_init(&this->receiving_signal);
@@ -416,6 +421,11 @@ gst_mprtpscheduler_finalize (GObject * object)
   /* clean up object here */
   gst_task_join (this->thread);
   gst_object_unref (this->thread);
+
+  gst_task_join (this->sending_thread);
+  gst_object_unref (this->sending_thread);
+
+  g_async_queue_unref(this->sendq);
 
   g_object_unref (this->sysclock);
   g_object_unref (this->subflows);
@@ -560,6 +570,9 @@ gst_mprtpscheduler_change_state (GstElement * element,
          this, NULL);
        gst_task_set_lock (this->thread, &this->thread_mutex);
        gst_task_start (this->thread);
+
+       gst_task_set_lock (this->sending_thread, &this->sending_thread_mutex);
+       gst_task_start (this->sending_thread);
        break;
      default:
        break;
@@ -572,6 +585,7 @@ gst_mprtpscheduler_change_state (GstElement * element,
    switch (transition) {
      case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
        gst_task_stop (this->thread);
+       gst_task_stop (this->sending_thread);
        break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       break;
@@ -736,17 +750,17 @@ gst_mprtpscheduler_mprtcp_rr_sink_chain (GstPad *pad, GstObject *parent, GstBuff
 
   this = GST_MPRTPSCHEDULER (parent);
 
-  PROFILING("THIS_LOCK",
+  //PROFILING("THIS_LOCK",
     THIS_LOCK(this);
-  );
+  //);
 
-  PROFILING("sndctrler_receive_mprtcp",
+//  PROFILING("sndctrler_receive_mprtcp",
     sndctrler_receive_mprtcp(this->controller, buf);
     result = GST_FLOW_OK;
-  );
-  PROFILING("THIS_UNLOCK",
+//  );
+  //PROFILING("THIS_UNLOCK",
     THIS_UNLOCK(this);
-  );
+  //);
 
   return result;
 
@@ -872,12 +886,17 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndSubflow* subflow, SndP
 //    }else{
 //      gst_pad_push(this->mprtp_srcpad, buffer);
 //    }
-  gst_pad_push(this->mprtp_srcpad, buffer);
+//  PROFILING("_mprtpscheduler_send_packet: gst_pad_push rtpbuffer",
+//  gst_pad_push(this->mprtp_srcpad, buffer);
+  g_async_queue_push(this->sendq, buffer);
+//  );
 
   if(this->fec_requested){
-    FECEncoderResponse* response = messenger_pop_block(this->fec_responses);
+    FECEncoderResponse* response;
+    response = messenger_pop_block(this->fec_responses);
     sndtracker_add_fec_response(this->sndtracker, response);
-    gst_pad_push(this->mprtp_srcpad, response->fecbuffer);
+//    gst_pad_push(this->mprtp_srcpad, response->fecbuffer);
+    g_async_queue_push(this->sendq, response->fecbuffer);
     fecencoder_unref_response(response);
     this->fec_requested = FALSE;
   }
@@ -888,6 +907,19 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndSubflow* subflow, SndP
   }
 
   return;
+}
+
+static void _wait2(GstMprtpscheduler *this, GstClockTime end)
+{
+  GstClockTime now = _now(this);
+  gint64  end_time  = g_get_monotonic_time();
+  if(now < end){
+    guint64 wait_time = MAX((end - now) / 2000, 1000);
+    end_time += wait_time;
+  }else{
+    end_time += 1000;
+  }
+  g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);
 }
 
 
@@ -918,7 +950,6 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
   //Obsolete packets stayed in the q for a while
   if(0 < this->obsolation_treshold && packet->made < now - this->obsolation_treshold){
     gst_buffer_unref(sndpacket_retrieve(packet));
-    g_print("Packet obsolated\n");
     goto done;
   }
 
@@ -928,7 +959,8 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
 //    g_print("packet %hu is pushed fron\n", packet->abs_seq);
     if(now < next_time - 500 * GST_USECOND){
 //      g_print("1: now: %lu -> next_time: %lu diff: %lu\n", now, next_time, next_time - now);
-      _wait(this, next_time, 500);
+      DISABLE_LINE _wait(this, next_time, 500);
+      _wait2(this, next_time);
 //      g_print("2: now: %lu -> next_time: %lu diff: %lu\n", _now(this), next_time, _now(this) - next_time);
     }
     goto done;
@@ -946,6 +978,18 @@ done:
 }
 
 
+void
+mprtpscheduler_sender_process (gpointer udata)
+{
+  GstMprtpscheduler *this;
+  GstBuffer *buf;
+  this = (GstMprtpscheduler *) udata;
+
+  buf = g_async_queue_pop(this->sendq);
+  gst_pad_push(this->mprtp_srcpad, buf);
+
+  return;
+}
 
 void
 mprtpscheduler_emitter_process (gpointer udata)

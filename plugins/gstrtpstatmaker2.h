@@ -71,8 +71,9 @@ struct _GstRTPStatMaker2 {
 
   GstClockTime                  last_statlog;
   GstClockTime                  last_packetlog;
-  GQueue*                       packetlogs2write;
-  GQueue*                       packetlogstr2recycle;
+  Messenger*                    messenger;
+//  GAsyncQueue*                  logs2writeq;
+//  GQueue*                       packetlogstr2recycle;
 
   gboolean                      touched_sync_active;
   gchar                         touched_sync_location[256];

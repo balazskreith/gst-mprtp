@@ -54,6 +54,8 @@ struct _GstMprtpscheduler
   GstPad*                       mprtcp_rr_sinkpad;
   GstPad*                       mprtcp_sr_srcpad;
 
+  GAsyncQueue*                  sendq;
+
   gboolean                      preroll;
 
   SndSubflows*                  subflows;
@@ -72,6 +74,9 @@ struct _GstMprtpscheduler
   GstClockTime                  last_pts;
 
   guint32                       rtcp_sent_octet_sum;
+
+  GstTask*                      sending_thread;
+  GRecMutex                     sending_thread_mutex;
 
   GstTask*                      thread;
   GRecMutex                     thread_mutex;

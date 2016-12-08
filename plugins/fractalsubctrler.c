@@ -412,7 +412,10 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
     case SNDSUBFLOW_STATE_OVERUSED:
       {
         gint32 corrigation = MAX(0, _stat(this)->bytes_in_flight - _stat(this)->BiF_80th);
+//        gint32 new_target = MAX(this->keeping_point - _max_ramp_up(this) * 2, this->keeping_point * _stat(this)->owd_log_corr - corrigation);
+//        _change_sndsubflow_target_bitrate(this, this->keeping_point * _stat(this)->owd_log_corr - corrigation);
         _change_sndsubflow_target_bitrate(this, this->keeping_point * _stat(this)->owd_log_corr - corrigation);
+//        _change_sndsubflow_target_bitrate(this, new_target);
         sr_corr_ratio    = CONSTRAIN(.5, 1.5, this->target_bitrate / _stat(this)->sender_bitrate);
         this->cwnd = this->awnd * sr_corr_ratio;
       }
@@ -552,7 +555,6 @@ _reduce_stage(
   this->awnd = _stat(this)->BiF_80th * 8;
 
   if(this->target_bitrate < this->keeping_point * .5){
-    //TODO: TCP flow compensation and recursive congestion event consideration
     _undershoot(this, this->target_bitrate);
     _set_event(this, EVENT_CONGESTION);
     goto done;
@@ -565,6 +567,7 @@ _reduce_stage(
     }else{
       gdouble off = (gdouble)(_now(this) - this->last_distorted) / (gdouble) GST_SECOND;
       _set_keeping_point(this, _stat(this)->receiver_bitrate * .9 * off + this->target_bitrate * (1.-off));
+//      _set_keeping_point(this, _stat(this)->receiver_bitrate * .9 * off + _stat(this)->sender_bitrate * (1.-off));
     }
     goto done;
   }
@@ -597,7 +600,7 @@ _keep_stage(
     goto done;
   }
 
-  if(_now(this) - MIN(2 * _stat(this)->srtt, GST_SECOND) < this->last_settled){
+  if(_now(this) - MAX(2 * _stat(this)->srtt, GST_SECOND) < this->last_settled){
     gint32 new_target;
     new_target = this->target_bitrate * CONSTRAIN(.99, 1.01, _stat(this)->owd_log_corr);
     _change_sndsubflow_target_bitrate(this, new_target);

@@ -80,7 +80,7 @@ messenger_init (Messenger * this)
   g_cond_init(&this->cond);
   this->messages      = g_queue_new();
   this->recycle       = g_queue_new();
-  this->recycle_limit = 100;
+  this->recycle_limit = 1000;
 }
 
 Messenger *make_messenger(gsize block_size)
@@ -122,6 +122,25 @@ gpointer messenger_try_pop_block(Messenger *this)
   return result;
 }
 
+
+guint messenger_get_length_with_timeout (Messenger *this, gint64 microseconds)
+{
+  gint64 end_time;
+  guint result = 0;
+
+  g_mutex_lock (&this->mutex);
+  end_time = g_get_monotonic_time () + microseconds;
+  while (g_queue_is_empty(this->messages)){
+    if (!g_cond_wait_until (&this->cond, &this->mutex, end_time)){
+      // timeout has passed.
+      goto done;
+    }
+  }
+  result = g_queue_get_length(this->messages);
+done:
+  g_mutex_unlock (&this->mutex);
+  return result;
+}
 
 gpointer messenger_pop_block_with_timeout (Messenger *this, gint64 microseconds)
 {
@@ -199,7 +218,7 @@ void messenger_unlock(Messenger* this)
 
 gpointer messenger_pop_block_unlocked (Messenger *this)
 {
-  gpointer result = NULL;
+  gpointer result = g_queue_pop_head(this->messages);;
   while (!result){
     g_cond_wait (&this->cond, &this->mutex);
     if(g_queue_is_empty(this->messages)){

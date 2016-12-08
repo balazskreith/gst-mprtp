@@ -783,9 +783,18 @@ static void _wait(GstMprtpplayouter *this, GstClockTime end, gint64 step_in_micr
 
 static void _wait2(GstMprtpplayouter *this, GstClockTime end)
 {
-  gint64 end_time = g_get_monotonic_time() + ( end - _now(this) ) / 1000;
+  GstClockTime now = _now(this);
+  gint64  end_time  = g_get_monotonic_time();
+  if(now < end){
+    guint64 wait_time = MAX((end - now) / 2000, 1000);
+    end_time += wait_time;
+  }else{
+    end_time += 1000;
+  }
   g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);
 }
+
+
 
 static gboolean _repair_responsed(GstMprtpplayouter *this)
 {
@@ -798,13 +807,11 @@ static void
 _playout_process (GstMprtpplayouter *this)
 {
   RcvPacket *packet;
-  GstClockTime playout_time;
+  GstClockTime playout_time, now;
   guint16 gap_seq;
   THIS_LOCK(this);
 
-
-
-  playout_time = _now(this);
+  now = playout_time = _now(this);
   while((packet = stream_joiner_pop_packet(this->joiner)) != NULL){
     jitterbuffer_push_packet(this->jitterbuffer, packet);
   }
@@ -812,14 +819,14 @@ _playout_process (GstMprtpplayouter *this)
   packet = jitterbuffer_pop_packet(this->jitterbuffer, &playout_time);
   if(!packet){
     if(!playout_time){
+      //in this case we have no packet in the jitterbuffer
 //      g_cond_wait(&this->receive_signal, &this->mutex);
-//      _playout_wait(this, 5 * GST_MSECOND, 500);
       g_cond_wait_until(&this->receive_signal, &this->mutex, g_get_monotonic_time() + 5 * G_TIME_SPAN_MILLISECOND);
-    }else if(_now(this) < playout_time){
+    }else if(now < playout_time){//we have packet, but it must wait
 //      g_print("before playout_time, the diff is  %lu\n", playout_time - _now(this));
       DISABLE_LINE _wait(this, playout_time, 1000);
-      DISABLE_LINE _wait2(this, playout_time);
-      g_cond_wait_until(&this->waiting_signal, &this->mutex, g_get_monotonic_time() + G_TIME_SPAN_MILLISECOND);
+      _wait2(this, playout_time);
+      DISABLE_LINE g_cond_wait_until(&this->waiting_signal, &this->mutex, g_get_monotonic_time() + G_TIME_SPAN_MILLISECOND);
 //      g_print("after waiting until playout_time, the diff is  %lu\n", _now(this) - playout_time);
     }
     goto done;

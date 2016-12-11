@@ -129,6 +129,8 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
     FRACTaLStat* stat, FRACTaLApprovement* approvements);
 
 void fractalfbprocessor_reset(FRACTaLFBProcessor *this);
+gint32 fractalfbprocessor_get_estimation(FRACTaLFBProcessor *this);
+void fractalfbprocessor_start_estimation(FRACTaLFBProcessor *this);
 void fractalfbprocessor_approve_measurement(FRACTaLFBProcessor *this);
 void fractalfbprocessor_time_update(FRACTaLFBProcessor *this);
 void fractalfbprocessor_report_update(FRACTaLFBProcessor *this, GstMPRTCPReportSummary *summary);

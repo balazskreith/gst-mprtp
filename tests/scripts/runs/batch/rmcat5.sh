@@ -3,7 +3,7 @@ programname=$0
 LOGSDIR="temp"
 TEMPDIR="temp_batch"
 
-TEST="rmcat4"
+TEST="rmcat5"
 
 if [ -z "$1" ]
 then
@@ -137,7 +137,7 @@ while [  $COUNTER -lt $END ]; do
 	  continue
 	fi
 
-	sleep 150
+	sleep 320
 
 	sudo pkill snd_pipeline
 	sudo pkill rcv_pipeline
@@ -145,7 +145,7 @@ while [  $COUNTER -lt $END ]; do
 
 	alg=${ALGORITHM,,}
 
-	TARGET="$TEMPDIR/"$alg"_"$COUNTER"_"$OWD"ms_"$JITTER"ms"
+	TARGET="$TEMPDIR/"$alg"_"$COUNTER"_50x100x150ms_"$JITTER"ms"
 	mkdir $TARGET
 	cp temp/* $TARGET
 

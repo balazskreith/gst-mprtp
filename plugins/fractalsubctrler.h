@@ -82,6 +82,9 @@ struct _FRACTaLSubController
   GstClockTime              last_settled;
   GstClockTime              last_distorted;
 
+  gint32                    rcved_bytes;
+
+
   gint32                    distorted_BiF;
 
   gdouble                   cwnd;//congestion window

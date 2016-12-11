@@ -227,6 +227,7 @@ done:
   return;
 }
 
+
 void fractalfbprocessor_approve_measurement(FRACTaLFBProcessor *this)
 {
 //  FRACTaLApprovement* approvement = this->approvement;
@@ -293,6 +294,7 @@ void _process_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary 
   this->newly_acked_packets      = 0;
   this->newly_received_packets   = 0;
 
+
   if(act_seq == end_seq){
     goto done;
   }
@@ -358,12 +360,10 @@ void _process_stat(FRACTaLFBProcessor *this)
     _stat(this)->stalled_bytes = sndstat->bytes_in_flight - _stat(this)->BiF_80th;
   }
 
-
   if(sndstat->received_packets_in_1s < sndstat->acked_packets_in_1s){
     lost_fraction_in_1s  = sndstat->acked_packets_in_1s - sndstat->received_packets_in_1s;
     lost_fraction_in_1s /= (gdouble) sndstat->acked_packets_in_1s;
   }
-
 
   _stat(this)->delay_in_rtpqueue     = rtpqstat->delay_length;
   _stat(this)->bytes_in_flight       = sndstat->bytes_in_flight;

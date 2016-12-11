@@ -1,24 +1,45 @@
 #!/bin/bash
 programname=$0
 LOGSDIR="temp"
+TEMPDIR="temp_batch"
 
-TEST="rmcat1"
-# ALGORITHM="SCReAM"
-ALGORITHM="FRACTaL"
+TEST="rmcat7"
 OWD=50
 JITTER=0
 
-mkdir temp_batch
-rm temp_batch/*
+if [ -z "$1" ]
+then
+  #ALGORITHM="SCReAM"
+  ALGORITHM="FRACTaL"
+else
+  ALGORITHM=$1
+fi
 
-SNDFILE="temp_batch/snd.sh"
-echo "./scripts/runs/snd/rmcat1.sh $ALGORITHM" > $SNDFILE
+if [ -z "$2" ]
+then
+  OWD=300
+else
+  OWD=$2
+fi
+
+
+mkdir $TEMPDIR
+rm $TEMPDIR/*
+
+SNDFILE="$TEMPDIR/snd.sh"
+echo "./scripts/runs/snd/$TEST.sh $ALGORITHM" > $SNDFILE
 chmod 777 $SNDFILE
 
-RCVFILE="temp_batch/rcv.sh"
-echo "./scripts/runs/rcv/rmcat1.sh $ALGORITHM" > $RCVFILE
+RCVFILE="$TEMPDIR/rcv.sh"
+echo "./scripts/runs/rcv/$TEST.sh $ALGORITHM" > $RCVFILE
 chmod 777 $RCVFILE
 
+#For the initial OWD to be right
+./scripts/runs/$TEST.sh $OWD &
+sleep 5
+sudo pkill ntrt
+rm temp/*
+rm triggered_stat
 
 COUNTER=0
 if [ -z "$3" ]
@@ -35,12 +56,12 @@ while [  $COUNTER -lt $END ]; do
 	sleep 2
 	sudo ip netns exec ns_snd $SNDFILE &
 	sleep 2
-	./scripts/runs/rmcat1.sh $OWD &
+	./scripts/runs/$TEST.sh $OWD &
 	sleep 10
 
 	INCREASE=1
 
-	#Validation part 1.
+	#Flow 1
 	for FILE in snd_packetlogs.csv rcv_packetlogs.csv snd_statlogs.csv rcv_statlogs.csv
 	do
    		if [ ! -f $LOGSDIR"/"$FILE ]; then
@@ -54,17 +75,17 @@ while [  $COUNTER -lt $END ]; do
 	  sudo pkill snd_pipeline
 	  sudo pkill rcv_pipeline
 	  sudo pkill ntrt
+	  sudo pkill iperf
 	  continue
 	fi
 
-	echo "Validation: Necessary logfile exists."
 
 	sleep 50
 
 	#Validation Part 2
 	for FILE in snd_packetlogs.csv rcv_packetlogs.csv
 	do
-		minimumsize=9000
+		minimumsize=90000
 		actualsize=$(wc -c <"$LOGSDIR/$FILE")
 		if [ ! $actualsize -ge $minimumsize ]; then
 		    echo "-----$FILE SIZE IS UNDER $minimumsize BYTES-----"
@@ -78,22 +99,20 @@ while [  $COUNTER -lt $END ]; do
 	  sudo pkill snd_pipeline
 	  sudo pkill rcv_pipeline
 	  sudo pkill ntrt
+	  sudo pkill iperf
 	  continue
 	fi
-
-	echo "Validation: Logfiles size seems ok."
 
 	sleep 150
 
 	sudo pkill snd_pipeline
 	sudo pkill rcv_pipeline
 	sudo pkill ntrt
-
-	#vqmt produced.yuv consumed.yuv 288 352 2000 1 temp/vqmt PSNR
+	sudo pkill iperf
 
 	alg=${ALGORITHM,,}
 
-	TARGET="temp_batch/"$alg"_"$COUNTER"_"$OWD"ms_"$JITTER"ms"
+	TARGET="$TEMPDIR/"$alg"_"$COUNTER"_"$OWD"ms_"$JITTER"ms"
 	mkdir $TARGET
 	cp temp/* $TARGET
 

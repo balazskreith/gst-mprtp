@@ -788,7 +788,6 @@ _monitorstat_refresh (GstRTPStatMaker2 *this, gboolean lock)
     goto done;
   }
 
-
   if(this->touched_sync_active){
     if(!g_file_test(this->touched_sync_location, G_FILE_TEST_EXISTS)){
       goto done;
@@ -798,7 +797,6 @@ _monitorstat_refresh (GstRTPStatMaker2 *this, gboolean lock)
 
   monitor = this->monitor;
   stat = &monitor->stat;
-
   if(this->csv_logging){
     _fprintf(this, this->statslog_file,
         "%d,%d,%d,%d," //received
@@ -845,7 +843,11 @@ _monitorstat_refresh (GstRTPStatMaker2 *this, gboolean lock)
   }
 
 //  gst_pad_push(this->statlogs_srcpad, buffer);
-  this->last_statlog = _now(this);
+  if(0 < this->last_statlog){
+    this->last_statlog += this->sampling_time * GST_MSECOND;
+  }else{
+    this->last_statlog = _now(this);
+  }
 
 done:
   if(lock){

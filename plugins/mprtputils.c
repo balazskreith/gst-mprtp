@@ -65,6 +65,17 @@ guint64 gst_rtp_buffer_get_abs_time_extension(GstRTPBuffer* rtp, guint8 abs_time
   return snd_time;
 }
 
+guint64 gst_rtp_buffer_get_abs_time_extension_new(GstRTPBuffer* rtp, guint8 abs_time_ext_header_id)
+{
+  gpointer pointer = NULL;
+  guint    size;
+  guint64  result = 0;
+
+  gst_rtp_buffer_get_extension_onebyte_header(rtp, abs_time_ext_header_id, 0, &pointer, &size);
+  memcpy (&result, pointer, 3);
+  return result << 14;
+}
+
 gboolean gst_buffer_is_mprtp(GstBuffer* buffer, guint8 mprtp_ext_header_id)
 {
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;

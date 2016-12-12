@@ -10,6 +10,7 @@ JITTER=0
 
 mkdir temp_batch
 rm temp_batch/*
+rm triggered_stat
 
 SNDFILE="temp_batch/snd.sh"
 echo "./scripts/runs/snd/rmcat1.sh $ALGORITHM" > $SNDFILE

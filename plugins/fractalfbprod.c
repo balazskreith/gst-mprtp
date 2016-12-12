@@ -37,7 +37,28 @@ GST_DEBUG_CATEGORY_STATIC (fractalfbproducer_debug_category);
 
 G_DEFINE_TYPE (FRACTaLFBProducer, fractalfbproducer, G_TYPE_OBJECT);
 
+typedef struct{
+  guint64 qdelay_est;
+//  gint32  stability;
+  guint   ref;
+}QDelayEst;
+DEFINE_RECYCLE_TYPE(static, qdelay, QDelayEst)
 
+static void _qdelay_item_shape(QDelayEst* result, gpointer udata)
+{
+  memset(result, 0, sizeof(QDelayEst));
+}
+
+static void _on_qdelay_item_ref(FRACTaLFBProducer* this, QDelayEst* item){
+  ++item->ref;
+}
+
+static void _on_qdelay_item_unref(FRACTaLFBProducer* this, QDelayEst* item){
+  if(0 < --item->ref){
+    return;
+  }
+  recycle_add(this->qdelay_recycle, item);
+}
 
 static void fractalfbproducer_finalize (GObject * object);
 static gboolean _do_fb(FRACTaLFBProducer* data);;
@@ -61,6 +82,17 @@ _cmp_seq (guint16 x, guint16 y)
   return 0;
 }
 
+static gint
+_cmp_ts (guint32 x, guint32 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 2147483648) return -1;
+  if(x > y && x - y > 2147483648) return -1;
+  if(x < y && y - x > 2147483648) return 1;
+  if(x > y && x - y < 2147483648) return 1;
+  return 0;
+}
+
 
 static guint16 _diff_seq(guint16 a, guint16 b)
 {
@@ -77,8 +109,9 @@ static void _on_rle_sw_rem(FRACTaLFBProducer* this, guint16* seq_num)
   }
 }
 
-//PercentileResultPipeFnc(_owd_percentile_pipe, FRACTALFBProducer, median_delay, min_delay, max_delay, RcvPacket, delay, 0);
-PercentileRawResultPipeFnc(_owd_percentile_pipe, FRACTaLFBProducer, GstClockTime, median_delay, min_delay, max_delay, 0);
+
+PercentileResultPipeFnc(_owd_percentile_pipe, FRACTaLFBProducer, median_delay, min_delay, max_delay, QDelayEst, qdelay_est, 0);
+//PercentileRawResultPipeFnc(_owd_percentile_pipe, FRACTaLFBProducer, GstClockTime, median_delay, min_delay, max_delay, 0);
 
 void
 fractalfbproducer_class_init (FRACTaLFBProducerClass * klass)
@@ -131,9 +164,14 @@ FRACTaLFBProducer *make_fractalfbproducer(RcvSubflow* subflow, RcvTracker *track
   this = g_object_new (FRACTALFBPRODUCER_TYPE, NULL);
   this->subflow         = subflow;
   this->tracker         = g_object_ref(tracker);
-  this->owds_sw         = make_slidingwindow_uint64(20, 100 * GST_MSECOND);
+
+  this->qdelay_recycle  = make_recycle_qdelay(256, NULL);
+  this->owds_sw         = make_slidingwindow_uint64(20, 500 * GST_MSECOND);
 
   this->rle_sw          = make_slidingwindow_uint16(100, GST_SECOND);
+
+  slidingwindow_add_on_data_ref_change(this->owds_sw,
+      (ListenerFunc) _on_qdelay_item_ref, (ListenerFunc) _on_qdelay_item_unref, this);
 
   slidingwindow_add_on_rem_item_cb(this->rle_sw, (ListenerFunc) _on_rle_sw_rem, this);
 
@@ -176,10 +214,79 @@ void _on_discarded_packet(FRACTaLFBProducer *this, RcvPacket *packet)
   this->discarded_bytes += packet->payload_size;
 }
 
+static void _refresh_frame_delay(FRACTaLFBProducer *this, RcvPacket* packet)
+{
+  gint32 cmp;
+  if(this->prev_ts == 0){
+    this->prev_ts       = packet->timestamp;
+    this->prev_rcv      = 0;
+    this->head_snd      = this->prev_snd = packet->abs_snd_ntp_chunk;
+    this->head_rcv      = packet->abs_rcv_ntp_time;
+    this->sending_delay = 0;
+    this->frame_delay   = 0;
+    this->prev_qdelay   = 0;
+    return;
+  }
+  if(0 < _cmp_seq(this->prev_seq, packet->abs_seq)){
+    return;
+  }
+  cmp = _cmp_ts(this->prev_ts, packet->timestamp);
+  if(0 <= cmp){
+    if(cmp == 0){//refresh the sending/pacing delay in ntp units
+      this->sending_delay += packet->abs_snd_ntp_chunk - this->prev_snd;
+      this->prev_snd       = packet->abs_snd_ntp_chunk;
+    }
+    return;
+  }
+
+  if(packet->abs_snd_ntp_chunk < this->head_snd){//turnaround
+    g_print("TURNAROUND? %lu->%lX %lu->%lX\n",
+        packet->abs_snd_ntp_chunk, packet->abs_snd_ntp_chunk,
+        this->head_snd, this->head_snd);
+    this->frame_delay = 0x0000004000000000UL - this->head_snd + packet->abs_snd_ntp_chunk;
+  }else{
+    this->frame_delay = packet->abs_snd_ntp_chunk - this->head_snd;
+  }
+
+  this->prev_rcv      = this->head_rcv;
+  this->head_rcv      = packet->abs_rcv_ntp_time;
+  this->sending_delay = 0;
+  this->head_snd      = this->prev_snd = packet->abs_snd_ntp_chunk;
+  this->prev_ts       = packet->timestamp;
+}
+
+static void _add_new_queue_delay_est(FRACTaLFBProducer *this, RcvPacket* packet)
+{
+  QDelayEst *item;
+  guint64 est_rcv_ntp_time;
+
+  _refresh_frame_delay(this, packet);
+  if(this->frame_delay == 0){
+    return;
+  }
+
+  est_rcv_ntp_time = this->prev_rcv + this->frame_delay + this->sending_delay;
+  item = recycle_retrieve_and_shape(this->qdelay_recycle, _qdelay_item_shape);
+  if(packet->abs_rcv_ntp_time < est_rcv_ntp_time){
+    if(packet->abs_rcv_ntp_time < est_rcv_ntp_time - this->prev_qdelay){
+      item->qdelay_est = 0;
+    }else{
+      item->qdelay_est = this->prev_qdelay - (est_rcv_ntp_time - packet->abs_rcv_ntp_time);
+    }
+  }else{
+    item->qdelay_est = packet->abs_rcv_ntp_time - est_rcv_ntp_time;
+  }
+  this->prev_qdelay = item->qdelay_est;
+//  g_print("Added qdelay est: %lu, median: %lu\n",
+//      get_epoch_time_from_ntp_in_ns(item->qdelay_est),
+//      get_epoch_time_from_ntp_in_ns(this->median_delay));
+  slidingwindow_add_data(this->owds_sw, item);
+}
+
 void _on_received_packet(FRACTaLFBProducer *this, RcvPacket *packet)
 {
-
-  slidingwindow_add_data(this->owds_sw, &packet->delay);
+  _add_new_queue_delay_est(this, packet);
+//  slidingwindow_add_data(this->owds_sw, &packet->delay);
   slidingwindow_add_data(this->rle_sw,  &packet->subflow_seq);
 
   ++this->rcved_packets;
@@ -220,7 +327,7 @@ void _on_fb_update(FRACTaLFBProducer *this, ReportProducer* reportproducer)
 
   report_producer_begin(reportproducer, this->subflow->id);
   //Okay, so discarded byte metrics indicate incipient congestion,
-  //which is in fact indicated by the owd distoration either. This is one point to discard this metric :)
+  //which is in fact indicated by the owd distoration either. This is one point of the discard this metric :)
   //another point is the fact that if competing with tcp, tcp pushes the netqueue
   //until its limitation, thus discard metrics always appear, and also
   //if jitter is high discard metrics appear naturally
@@ -278,13 +385,30 @@ done:
 
 
 
+//void _setup_xr_owd(FRACTaLFBProducer * this, ReportProducer* reportproducer)
+//{
+//  guint32      u32_median_delay, u32_min_delay, u32_max_delay;
+//
+//  u32_median_delay = (guint32)(get_ntp_from_epoch_ns(this->median_delay)>>16);
+//  u32_min_delay    = (guint32)(get_ntp_from_epoch_ns(this->min_delay)>>16);
+//  u32_max_delay    = (guint32)(get_ntp_from_epoch_ns(this->max_delay)>>16);
+//
+//  report_producer_add_xr_owd(reportproducer,
+//                             RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION,
+//                             u32_median_delay,
+//                             u32_min_delay,
+//                             u32_max_delay);
+//
+//
+//}
+
 void _setup_xr_owd(FRACTaLFBProducer * this, ReportProducer* reportproducer)
 {
   guint32      u32_median_delay, u32_min_delay, u32_max_delay;
 
-  u32_median_delay = (guint32)(get_ntp_from_epoch_ns(this->median_delay)>>16);
-  u32_min_delay    = (guint32)(get_ntp_from_epoch_ns(this->min_delay)>>16);
-  u32_max_delay    = (guint32)(get_ntp_from_epoch_ns(this->max_delay)>>16);
+  u32_median_delay = this->median_delay >> 16;
+  u32_min_delay    = this->min_delay >> 16;
+  u32_max_delay    = this->max_delay >> 16;
 
   report_producer_add_xr_owd(reportproducer,
                              RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION,
@@ -294,3 +418,6 @@ void _setup_xr_owd(FRACTaLFBProducer * this, ReportProducer* reportproducer)
 
 
 }
+
+
+

@@ -42,6 +42,17 @@ struct _FRACTaLFBProducer
   gboolean*                vector;
   guint                    vector_length;
 
+  Recycle*                 qdelay_recycle;
+  guint64                  prev_qdelay;
+  guint16                  prev_seq;
+  guint64                  prev_snd;
+  guint64                  frame_delay;
+  guint32                  prev_ts;
+  guint64                  prev_rcv;
+  guint64                  head_rcv;
+  guint64                  head_snd;
+  guint64                  sending_delay;
+
   SlidingWindow*           owds_sw;
   SlidingWindow*           rle_sw;
 

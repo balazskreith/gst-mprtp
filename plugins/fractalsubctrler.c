@@ -438,7 +438,7 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
         gint32 corrigation = MAX(0, _stat(this)->bytes_in_flight - _stat(this)->BiF_80th);
 //        gint32 new_target = MAX(this->keeping_point - _max_ramp_up(this) * 2, this->keeping_point * _stat(this)->owd_log_corr - corrigation);
 //        _change_sndsubflow_target_bitrate(this, this->keeping_point * _stat(this)->owd_log_corr - corrigation);
-        _change_sndsubflow_target_bitrate(this, this->keeping_point * MAX(_stat(this)->owd_log_corr, 1.) - corrigation);
+        _change_sndsubflow_target_bitrate(this, this->keeping_point * CONSTRAIN(1.,2.,_stat(this)->owd_log_corr) - corrigation);
 //        _change_sndsubflow_target_bitrate(this, new_target);
         sr_corr_ratio    = CONSTRAIN(.5, 1.5, this->target_bitrate / _stat(this)->sender_bitrate);
         this->cwnd = this->awnd * sr_corr_ratio;
@@ -525,7 +525,7 @@ void fractalsubctrler_report_update(
 
   fractalfbprocessor_report_update(this->fbprocessor, summary);
 
-  DISABLE_LINE _stat_print(this);
+  _stat_print(this);
 
   this->approve_measurement  = FALSE;
   if(10 < _stat(this)->measurements_num){
@@ -598,7 +598,9 @@ _reduce_stage(
       gdouble off = (gdouble)(_now(this) - this->last_distorted) / (gdouble) GST_SECOND;
       this->rcved_bytes += _stat(this)->newly_acked_bytes;
 //      _set_bottleneck_point(this,  this->rcved_bytes * 8 * off + this->target_bitrate * (1.-off) );
-      _set_bottleneck_point(this, _stat(this)->receiver_bitrate * off + this->target_bitrate * (1.-off));
+//      _set_bottleneck_point(this,  this->rcved_bytes * 8 * off + _stat(this)->receiver_bitrate * (1.-off) );
+      _set_bottleneck_point(this,  this->rcved_bytes * 8 * off + this->keeping_point * (1.-off) );
+//      _set_bottleneck_point(this, _stat(this)->receiver_bitrate * off + this->target_bitrate * (1.-off));
     }
     _set_keeping_point(this, this->bottleneck_point * .9);
     goto done;
@@ -966,7 +968,7 @@ guint _get_approvement_interval(FRACTaLSubController* this)
   //interval = off * _appr_min_fact(this) + (1.-off) * _appr_max_fact(this);
   //return CONSTRAIN(.1 * GST_SECOND,  GST_SECOND, interval * _stat(this)->srtt);
 
-  interval = off * _appr_min_time(this) + (1.-off) * _appr_max_time(this);
+  interval = off * MAX(_appr_min_time(this), _stat(this)->srtt) + (1.-off) * _appr_max_time(this);
   return interval * GST_SECOND;
 }
 

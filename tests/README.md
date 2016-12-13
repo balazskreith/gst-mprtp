@@ -18,9 +18,9 @@ please install their plugin either.
 
 ##System overview
 
-.-----.   .-----.   .-----.
-| Snd |<->| Mid |<->| Rcv |
-'-----'   '-----'   '-----'
+.-----.   .-----.   .-----.  
+| Snd |<->| Mid |<->| Rcv |  
+'-----'   '-----'   '-----'  
 
 Figure 1. The overall test system model.    
 Snd,Mid and Rcv are separated domains  

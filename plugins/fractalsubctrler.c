@@ -58,7 +58,7 @@ G_DEFINE_TYPE (FRACTaLSubController, fractalsubctrler, G_TYPE_OBJECT);
 
 //determine the maximum multiplying factor for aprovements
 //before the target considered to be accepted
-#define APPROVE_MAX_TIME 1.5
+#define APPROVE_MAX_TIME 1.0
 
 
 //determines the minimum ramp up bitrate
@@ -438,7 +438,7 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
         gint32 corrigation = MAX(0, _stat(this)->bytes_in_flight - _stat(this)->BiF_80th);
 //        gint32 new_target = MAX(this->keeping_point - _max_ramp_up(this) * 2, this->keeping_point * _stat(this)->owd_log_corr - corrigation);
 //        _change_sndsubflow_target_bitrate(this, this->keeping_point * _stat(this)->owd_log_corr - corrigation);
-        _change_sndsubflow_target_bitrate(this, this->keeping_point * CONSTRAIN(1.,2.,_stat(this)->owd_log_corr) - corrigation);
+        _change_sndsubflow_target_bitrate(this, this->keeping_point * MAX(_stat(this)->owd_log_corr, 1.) - corrigation);
 //        _change_sndsubflow_target_bitrate(this, new_target);
         sr_corr_ratio    = CONSTRAIN(.5, 1.5, this->target_bitrate / _stat(this)->sender_bitrate);
         this->cwnd = this->awnd * sr_corr_ratio;
@@ -554,7 +554,7 @@ done:
 
 static gboolean _distortion(FRACTaLSubController *this)
 {
-  GstClockTime owd_th = _stat(this)->owd_50th + CONSTRAIN(50 * GST_MSECOND, 250 * GST_MSECOND, _stat(this)->owd_std * 4);
+  GstClockTime owd_th = _stat(this)->owd_50th + CONSTRAIN(10 * GST_MSECOND, 100 * GST_MSECOND, _stat(this)->owd_std * 4);
 //  gdouble      FL_th  = MIN(_stat(this)->FL_50th, .1);
   gdouble      FL_th  = MIN(_max_FL_th(this), _stat(this)->FL_50th + _stat(this)->FL_std * 4);
 
@@ -599,8 +599,8 @@ _reduce_stage(
       this->rcved_bytes += _stat(this)->newly_acked_bytes;
 //      _set_bottleneck_point(this,  this->rcved_bytes * 8 * off + this->target_bitrate * (1.-off) );
 //      _set_bottleneck_point(this,  this->rcved_bytes * 8 * off + _stat(this)->receiver_bitrate * (1.-off) );
-      _set_bottleneck_point(this,  this->rcved_bytes * 8 * off + this->keeping_point * (1.-off) );
-//      _set_bottleneck_point(this, _stat(this)->receiver_bitrate * off + this->target_bitrate * (1.-off));
+//      _set_bottleneck_point(this,  this->rcved_bytes * 8 * off + this->keeping_point * (1.-off) );
+      _set_bottleneck_point(this, _stat(this)->receiver_bitrate * off + this->target_bitrate * (1.-off));
     }
     _set_keeping_point(this, this->bottleneck_point * .9);
     goto done;

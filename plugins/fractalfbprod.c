@@ -82,16 +82,16 @@ _cmp_seq (guint16 x, guint16 y)
   return 0;
 }
 
-static gint
-_cmp_ts (guint32 x, guint32 y)
-{
-  if(x == y) return 0;
-  if(x < y && y - x < 2147483648) return -1;
-  if(x > y && x - y > 2147483648) return -1;
-  if(x < y && y - x > 2147483648) return 1;
-  if(x > y && x - y < 2147483648) return 1;
-  return 0;
-}
+//static gint
+//_cmp_ts (guint32 x, guint32 y)
+//{
+//  if(x == y) return 0;
+//  if(x < y && y - x < 2147483648) return -1;
+//  if(x > y && x - y > 2147483648) return -1;
+//  if(x < y && y - x > 2147483648) return 1;
+//  if(x > y && x - y < 2147483648) return 1;
+//  return 0;
+//}
 
 
 static guint16 _diff_seq(guint16 a, guint16 b)
@@ -166,7 +166,7 @@ FRACTaLFBProducer *make_fractalfbproducer(RcvSubflow* subflow, RcvTracker *track
   this->tracker         = g_object_ref(tracker);
 
   this->qdelay_recycle  = make_recycle_qdelay(256, NULL);
-  this->owds_sw         = make_slidingwindow_uint64(20, 500 * GST_MSECOND);
+  this->owds_sw         = make_slidingwindow_uint64(20, 100 * GST_MSECOND);
 
   this->rle_sw          = make_slidingwindow_uint16(100, GST_SECOND);
 
@@ -214,73 +214,37 @@ void _on_discarded_packet(FRACTaLFBProducer *this, RcvPacket *packet)
   this->discarded_bytes += packet->payload_size;
 }
 
-static void _refresh_frame_delay(FRACTaLFBProducer *this, RcvPacket* packet)
-{
-  gint32 cmp;
-  if(this->prev_ts == 0){
-    this->prev_ts       = packet->timestamp;
-    this->prev_rcv      = 0;
-    this->head_snd      = this->prev_snd = packet->abs_snd_ntp_chunk;
-    this->head_rcv      = packet->abs_rcv_ntp_time;
-    this->sending_delay = 0;
-    this->frame_delay   = 0;
-    this->prev_qdelay   = 0;
-    return;
-  }
-  if(0 < _cmp_seq(this->prev_seq, packet->abs_seq)){
-    return;
-  }
-  cmp = _cmp_ts(this->prev_ts, packet->timestamp);
-  if(0 <= cmp){
-    if(cmp == 0){//refresh the sending/pacing delay in ntp units
-      this->sending_delay += packet->abs_snd_ntp_chunk - this->prev_snd;
-      this->prev_snd       = packet->abs_snd_ntp_chunk;
-    }
-    return;
-  }
-
-  if(packet->abs_snd_ntp_chunk < this->head_snd){//turnaround
-    g_print("TURNAROUND? %lu->%lX %lu->%lX\n",
-        packet->abs_snd_ntp_chunk, packet->abs_snd_ntp_chunk,
-        this->head_snd, this->head_snd);
-    this->frame_delay = 0x0000004000000000UL - this->head_snd + packet->abs_snd_ntp_chunk;
-  }else{
-    this->frame_delay = packet->abs_snd_ntp_chunk - this->head_snd;
-  }
-
-  this->prev_rcv      = this->head_rcv;
-  this->head_rcv      = packet->abs_rcv_ntp_time;
-  this->sending_delay = 0;
-  this->head_snd      = this->prev_snd = packet->abs_snd_ntp_chunk;
-  this->prev_ts       = packet->timestamp;
-}
-
 static void _add_new_queue_delay_est(FRACTaLFBProducer *this, RcvPacket* packet)
 {
   QDelayEst *item;
-  guint64 est_rcv_ntp_time;
-
-  _refresh_frame_delay(this, packet);
-  if(this->frame_delay == 0){
+  gint64 drcv, dsnd;
+  if(this->prev_rcv == 0){
+    this->prev_rcv      = packet->abs_rcv_ntp_time;
+    this->prev_snd      = packet->abs_snd_ntp_chunk;
+    this->prev_seq      = packet->abs_seq;
     return;
   }
 
-  est_rcv_ntp_time = this->prev_rcv + this->frame_delay + this->sending_delay;
-  item = recycle_retrieve_and_shape(this->qdelay_recycle, _qdelay_item_shape);
-  if(packet->abs_rcv_ntp_time < est_rcv_ntp_time){
-    if(packet->abs_rcv_ntp_time < est_rcv_ntp_time - this->prev_qdelay){
-      item->qdelay_est = 0;
-    }else{
-      item->qdelay_est = this->prev_qdelay - (est_rcv_ntp_time - packet->abs_rcv_ntp_time);
-    }
-  }else{
-    item->qdelay_est = packet->abs_rcv_ntp_time - est_rcv_ntp_time;
+  if(0 < _cmp_seq(this->prev_seq, packet->abs_seq)){
+    return;
   }
-  this->prev_qdelay = item->qdelay_est;
-//  g_print("Added qdelay est: %lu, median: %lu\n",
-//      get_epoch_time_from_ntp_in_ns(item->qdelay_est),
-//      get_epoch_time_from_ntp_in_ns(this->median_delay));
+
+  if(packet->abs_snd_ntp_chunk < this->prev_snd){//turnaround
+    dsnd = (gint64)(0x0000004000000000UL - this->prev_snd) + (gint64)packet->abs_snd_ntp_chunk;
+  }else{
+    dsnd = (gint64)packet->abs_snd_ntp_chunk - (gint64)this->prev_snd;
+  }
+  dsnd = (gint64)packet->abs_snd_ntp_chunk - (gint64)this->prev_snd;
+  drcv = (gint64)packet->abs_rcv_ntp_time - (gint64)this->prev_rcv;
+
+  item = recycle_retrieve_and_shape(this->qdelay_recycle, _qdelay_item_shape);
+  item->qdelay_est = (dsnd < drcv) ? drcv - dsnd : dsnd - drcv;
+
   slidingwindow_add_data(this->owds_sw, item);
+
+  this->prev_rcv = packet->abs_rcv_ntp_time;
+  this->prev_snd = packet->abs_snd_ntp_chunk;
+
 }
 
 void _on_received_packet(FRACTaLFBProducer *this, RcvPacket *packet)

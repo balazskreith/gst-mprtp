@@ -5,7 +5,7 @@ Accumulation length:     1000ms
 Sampling time:           100ms
 Unit of delay:           us
 Unit of bytes in flight: byte
-Elapsed time:            0.084000s
+Elapsed time:            0.184000s
 Nr. of processed rows:   10619
 Nr. of recorded sample:  1435
 Delta PacketStatlog is made

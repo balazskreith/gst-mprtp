@@ -261,7 +261,7 @@ void _process_owd(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
   }
   _stat(this)->last_owd = xrsummary->OWD.median_delay;
 
-  if(_stat(this)->owd_50th){
+  if(GST_MSECOND < _stat(this)->owd_50th){
     gdouble corr = log(GST_TIME_AS_MSECONDS(_stat(this)->owd_50th));
     corr /= log(GST_TIME_AS_MSECONDS(_stat(this)->last_owd));
     _stat(this)->owd_log_corr = corr;

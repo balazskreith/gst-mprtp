@@ -396,6 +396,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   this->obsolation_treshold = 50 * GST_MSECOND;
   this->fec_responses = make_messenger(sizeof(FECEncoderResponse*));
+
+  this->abs_time_ext_header_id   = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
 }
 
 
@@ -468,6 +470,7 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       sndpackets_set_mprtp_ext_header_id(this->sndpackets, (guint8) g_value_get_uint (value));
       break;
     case PROP_ABS_TIME_EXT_HEADER_ID:
+      this->abs_time_ext_header_id = g_value_get_uint (value);
       sndpackets_set_abs_time_ext_header_id(this->sndpackets, (guint8) g_value_get_uint (value));
       break;
     case PROP_FEC_PAYLOAD_TYPE:
@@ -887,16 +890,16 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndSubflow* subflow, SndP
 //      gst_pad_push(this->mprtp_srcpad, buffer);
 //    }
 //  PROFILING("_mprtpscheduler_send_packet: gst_pad_push rtpbuffer",
-//  gst_pad_push(this->mprtp_srcpad, buffer);
-  g_async_queue_push(this->sendq, buffer);
+  gst_pad_push(this->mprtp_srcpad, buffer);
+//  g_async_queue_push(this->sendq, buffer);
 //  );
 
   if(this->fec_requested){
     FECEncoderResponse* response;
     response = messenger_pop_block(this->fec_responses);
     sndtracker_add_fec_response(this->sndtracker, response);
-//    gst_pad_push(this->mprtp_srcpad, response->fecbuffer);
-    g_async_queue_push(this->sendq, response->fecbuffer);
+    gst_pad_push(this->mprtp_srcpad, response->fecbuffer);
+//    g_async_queue_push(this->sendq, response->fecbuffer);
     fecencoder_unref_response(response);
     this->fec_requested = FALSE;
   }
@@ -978,18 +981,45 @@ done:
 }
 
 
+//void
+//mprtpscheduler_sender_process (gpointer udata)
+//{
+//  GstMprtpscheduler *this;
+//  GstBuffer *buf;
+//  this = (GstMprtpscheduler *) udata;
+//
+//  buf = g_async_queue_pop(this->sendq);
+//  gst_pad_push(this->mprtp_srcpad, buf);
+//
+//  return;
+//}
+
 void
 mprtpscheduler_sender_process (gpointer udata)
 {
   GstMprtpscheduler *this;
   GstBuffer *buf;
-  this = (GstMprtpscheduler *) udata;
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
 
+  this = (GstMprtpscheduler *) udata;
   buf = g_async_queue_pop(this->sendq);
+//  buf = g_async_queue_timeout_pop(this->sendq, 10 * G_TIME_SPAN_MILLISECOND);
+//  if(!buf){
+//    goto done;
+//  }
+  buf = gst_buffer_make_writable(buf);
+
+  gst_rtp_buffer_map(buf, GST_MAP_READWRITE, &rtp);
+  gst_rtp_buffer_set_abs_time_extension(&rtp, this->abs_time_ext_header_id);
+  gst_rtp_buffer_unmap(&rtp);
+  //TODO: place the FEC here to be appropriate
   gst_pad_push(this->mprtp_srcpad, buf);
 
+//done:
   return;
 }
+
+
 
 void
 mprtpscheduler_emitter_process (gpointer udata)

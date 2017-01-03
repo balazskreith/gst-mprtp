@@ -1,11 +1,11 @@
 Make Delta Packet Statlogs.
-Source file:             ../../scripts/saves/rmcat1/fractal_9_50ms_0ms/merged_statlogs.csv
-Destination file:        ../../scripts/saves/rmcat1/fractal_9_50ms_0ms/delta_statlogs.csv
+Source file:             ../../scripts/saves/rmcat7/fractal_9_50ms_0ms/merged_statlogs.csv
+Destination file:        ../../scripts/saves/rmcat7/fractal_9_50ms_0ms/delta_statlogs.csv
 Accumulation length:     1000ms
 Sampling time:           100ms
 Unit of delay:           us
 Unit of bytes in flight: byte
-Elapsed time:            0.184000s
-Nr. of processed rows:   10619
-Nr. of recorded sample:  1435
+Elapsed time:            0.288000s
+Nr. of processed rows:   34679
+Nr. of recorded sample:  3099
 Delta PacketStatlog is made

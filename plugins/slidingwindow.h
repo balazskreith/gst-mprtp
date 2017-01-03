@@ -113,6 +113,7 @@ void slidingwindow_add_on_data_ref_change(SlidingWindow* this, ListenerFunc on_d
 void slidingwindow_setup_debug(SlidingWindow* this, SlidingWindowItemSprintf sprintf, SlidingWindowItemLogger logger);
 void slidingwindow_set_min_itemnum(SlidingWindow* this, gint min_itemnum);
 void slidingwindow_setup_custom_obsolation(SlidingWindow* this, gboolean (*custom_obsolation)(gpointer,SlidingWindowItem*),gpointer custom_obsolation_udata);
+gint32 slidingwindow_get_counter(SlidingWindow* this);
 void slidingwindow_add_plugin(SlidingWindow* this, SlidingWindowPlugin *plugin);
 void slidingwindow_add_plugins (SlidingWindow* this, ... );
 

@@ -137,6 +137,7 @@ guint8 sndpackets_get_mprtp_ext_header_id(SndPackets* this)
 GstBuffer* sndpacket_retrieve(SndPacket* packet)
 {
   GstBuffer *result;
+  DISABLE_LINE _setup_abs_time_extension(packet);
   _setup_abs_time_extension(packet);
   result = packet->buffer;
 //  g_print("Packet %hu buffer is null by retrieve\n", packet->abs_seq);

@@ -29,8 +29,8 @@ typedef struct _FRACTaLFBProcessorClass FRACTaLFBProcessorClass;
 
 typedef struct _FRACTaLStat
 {
-  GstClockTime             owd_50th;
-  GstClockTime             last_owd;
+  GstClockTime             qdelay_50th;
+  GstClockTime             last_qdelay;
 
   gint32                   measurements_num;
   gint32                   BiF_80th;
@@ -44,8 +44,8 @@ typedef struct _FRACTaLStat
   gint32                   sender_bitrate;
   gint32                   receiver_bitrate;
   gint32                   fec_bitrate;
-  gdouble                  owd_log_corr;
-  GstClockTime             owd_std;
+  gdouble                  qdelay_log_corr;
+  GstClockTime             qdelay_std;
   gdouble                  srtt;
 
   gint32                   newly_acked_bytes;
@@ -58,6 +58,7 @@ typedef struct _FRACTaLStat
 
   gdouble                  last_FL;
 
+//  gdouble                  BiF_SR_corr_avg;
 
 }FRACTaLStat;
 
@@ -74,6 +75,8 @@ typedef struct{
   gint32       bytes_in_flight;
   gdouble      fraction_lost;
   gint8        stability;
+  GstClockTime qdelay;
+  gdouble      qdelay_std_t;
 }FRACTaLMeasurement;
 
 typedef struct{
@@ -107,6 +110,13 @@ struct _FRACTaLFBProcessor
 
   gdouble                  FL_min;
   gdouble                  FL_max;
+
+
+  struct{
+    gdouble      avg,std;
+    gint32       counter;
+    GstClockTime sum;
+  }qdelay_std_helper;
 
   FRACTaLStdHelper         owd_std_helper;
   FRACTaLStdHelper         BiF_std_helper;

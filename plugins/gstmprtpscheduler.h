@@ -94,7 +94,7 @@ struct _GstMprtpscheduler
 
   GstMprtpschedulerPrivate*     priv;
 
-
+  guint8 abs_time_ext_header_id;
 };
 
 struct _GstMprtpschedulerClass

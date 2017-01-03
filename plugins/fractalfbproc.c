@@ -50,8 +50,8 @@ static void _owd_logger(FRACTaLFBProcessor *this)
     gchar filename[255];
     sprintf(filename, "owd_%d.csv", this->subflow->id);
     mprtp_logger(filename, "%lu,%lu,%lu,%lu\n",
-                   GST_TIME_AS_USECONDS(_stat(this)->last_owd),
-                   GST_TIME_AS_USECONDS(_stat(this)->owd_50th),
+                   GST_TIME_AS_USECONDS(_stat(this)->last_qdelay),
+                   GST_TIME_AS_USECONDS(_stat(this)->qdelay_50th),
                    GST_TIME_AS_USECONDS(this->RTT),
                    (GstClockTime)_stat(this)->srtt / 1000
                    );
@@ -217,7 +217,7 @@ void fractalfbprocessor_report_update(FRACTaLFBProcessor *this, GstMPRTCPReportS
     goto done;
   }
 
-  ++this->stat->measurements_num;
+
   ++this->rcved_fb_since_changed;
   this->last_report_updated = now;
 
@@ -235,7 +235,7 @@ void fractalfbprocessor_approve_measurement(FRACTaLFBProcessor *this)
 
   measurement->ref             = 1;
   measurement->bytes_in_flight = this->last_bytes_in_flight;
-  measurement->owd             = _stat(this)->last_owd;
+  measurement->owd             = measurement->qdelay = _stat(this)->last_qdelay;
   measurement->fraction_lost   = _stat(this)->FL_in_1s;
 
 //  if(approvement->owd){
@@ -259,15 +259,26 @@ void _process_owd(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
   if(!xrsummary->OWD.median_delay){
     goto done;
   }
-  _stat(this)->last_owd = xrsummary->OWD.median_delay;
-
-  if(GST_MSECOND < _stat(this)->owd_50th){
-    gdouble corr = log(GST_TIME_AS_MSECONDS(_stat(this)->owd_50th));
-    corr /= log(GST_TIME_AS_MSECONDS(_stat(this)->last_owd));
-    _stat(this)->owd_log_corr = corr;
-  }else{
-    _stat(this)->owd_log_corr = 1.;
+  _stat(this)->last_qdelay = xrsummary->OWD.median_delay;
+  if(_stat(this)->last_qdelay <= _stat(this)->qdelay_50th){
+    _stat(this)->qdelay_log_corr = 1.;
+    goto done;
   }
+  {
+    gdouble refpoint = MAX(_stat(this)->qdelay_50th,MAX(_stat(this)->qdelay_std, 15 * GST_MSECOND));
+    gdouble diff = _stat(this)->last_qdelay - refpoint;
+    gdouble ratio = diff / _stat(this)->last_qdelay;
+    _stat(this)->qdelay_log_corr = 1.-CONSTRAIN(0., .5, pow(ratio, 3));
+  }
+//  _stat(this)->qdelay_log_corr = _stat(this)->last_qdelay - _stat(this)->qdelay_50th;
+//  _stat(this)->qdelay_log_corr /= _stat(this)->last_qdelay * 4;
+//  _stat(this)->qdelay_log_corr = 1.-_stat(this)->qdelay_log_corr;
+//
+//  if(_stat(this)->qdelay_50th < _stat(this)->last_qdelay){
+//    _stat(this)->qdelay_log_corr = .9;
+//  }else{
+//    _stat(this)->qdelay_log_corr = 1.;
+//  }
 
 done:
   return;
@@ -372,6 +383,8 @@ void _process_stat(FRACTaLFBProcessor *this)
   _stat(this)->fec_bitrate           = sndstat->sent_fec_bytes_in_1s * 8;
   _stat(this)->FL_in_1s              = lost_fraction_in_1s;
 
+  _stat(this)->measurements_num      = MIN(slidingwindow_get_counter(this->short_sw),
+                                           slidingwindow_get_counter(this->long_sw));
 
   if(_stat(this)->sr_avg){
     _stat(this)->sr_avg = .2 * _stat(this)->sender_bitrate + _stat(this)->sr_avg * .8;
@@ -408,7 +421,7 @@ void _on_owd_50th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t 
   PercentileResult(FRACTaLMeasurement,   \
                    owd,                   \
                    candidates,            \
-                   _stat(this)->owd_50th, \
+                   _stat(this)->qdelay_50th, \
                    this->owd_min,         \
                    this->owd_max,         \
                    0                      \
@@ -462,7 +475,9 @@ void _on_BiF_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 
 void _on_owd_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 {
-  --this->owd_std_helper.counter;
+  --this->qdelay_std_helper.counter;
+  this->qdelay_std_helper.std -= measurement->qdelay_std_t;
+  this->qdelay_std_helper.sum -= measurement->qdelay;
 }
 
 void _on_BiF_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
@@ -477,5 +492,24 @@ void _on_BiF_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 void _on_owd_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 {
   ++this->owd_std_helper.counter;
-  _stat(this)->owd_std = _calculate_std(&this->owd_std_helper, measurement->owd);
+  _stat(this)->qdelay_std = _calculate_std(&this->owd_std_helper, measurement->owd);
+
+//  {
+//    gdouble qdelay;
+//    qdelay = measurement->qdelay;
+//    this->qdelay_std_helper.sum += measurement->qdelay;
+//    if(1 < ++this->qdelay_std_helper.counter){
+//      gdouble avg,std;
+//      avg = this->qdelay_std_helper.sum / (gdouble)this->qdelay_std_helper.counter;
+//      std = qdelay - avg;
+//      std *= std;
+//      measurement->qdelay_std_t = std;
+//    }
+//  }
+//
+//   this->qdelay_std_helper.std += measurement->qdelay_std_t;
+//   _stat(this)->qdelay_std = this->qdelay_std_helper.std;
+
 }
+
+

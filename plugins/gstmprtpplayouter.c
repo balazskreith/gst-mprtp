@@ -316,6 +316,8 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
 
   notifier_add_listener(this->on_rtcp_ready,       (ListenerFunc) _playouter_on_rtcp_ready,       this);
   notifier_add_listener(this->on_recovered_buffer, (ListenerFunc) rcvtracker_on_recovered_buffer, this);
+
+  this->packets_in = g_async_queue_new();
 }
 
 
@@ -330,6 +332,8 @@ gst_mprtpplayouter_finalize (GObject * object)
   g_object_unref (this->sysclock);
   g_object_unref (this->jitterbuffer);
   g_object_unref (this->fec_decoder);
+
+  g_async_queue_unref(this->packets_in);
 
   /* clean up object here */
   G_OBJECT_CLASS (gst_mprtpplayouter_parent_class)->finalize (object);
@@ -545,7 +549,7 @@ gst_mprtpplayouter_change_state (GstElement * element,
       gst_pad_start_task(this->mprtp_srcpad, (GstTaskFunction)_playout_process, this, NULL);
       break;
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
-      this->buffers = g_async_queue_new();
+      this->buffers_out = g_async_queue_new();
       this->thread = gst_task_new ((GstTaskFunction)_forward_process, this, NULL);
       gst_task_set_lock (this->thread, &this->thread_mutex);
       gst_task_start (this->thread);
@@ -561,8 +565,8 @@ gst_mprtpplayouter_change_state (GstElement * element,
     switch (transition) {
       case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
         gst_task_stop (this->thread);
-        g_async_queue_unref(this->buffers);
-        this->buffers = NULL;
+        g_async_queue_unref(this->buffers_out);
+        this->buffers_out = NULL;
         break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       break;
@@ -658,30 +662,35 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 
 //  packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
 //  return gst_pad_push(this->mprtp_srcpad, rcvpacket_retrieve_buffer_and_unref(packet));
-
-PROFILING("MPRTPPLAYOUTER LOCK",
-  THIS_LOCK(this);
-);
-
-//PROFILING("Processing arrived packet",
   packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
-  rcvtracker_add_packet(this->rcvtracker, packet);
-
-  if(jitterbuffer_is_packet_discarded(this->jitterbuffer, packet)){
-//    g_print("Discarded packet: %hu - %hu - %lu\n", packet->abs_seq, this->jitterbuffer->last_seq, GST_TIME_AS_MSECONDS(this->jitterbuffer->playout_delay));
-    rcvtracker_add_discarded_packet(this->rcvtracker, packet);
-    goto unlock_and_done;
-  }
-  stream_joiner_push_packet(this->joiner, packet);
-
-//  g_print("Packet from subflow %d arrived with seq: %hu\n", packet->subflow_id, packet->abs_seq);
+  g_async_queue_push(this->packets_in, packet);
   g_cond_signal(&this->receive_signal);
-
-  rcvctrler_time_update(this->controller);
+//  goto done;
+//
+//
+//PROFILING("MPRTPPLAYOUTER LOCK",
+//  THIS_LOCK(this);
 //);
-
-unlock_and_done:
-  THIS_UNLOCK(this);
+//
+////PROFILING("Processing arrived packet",
+//  packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
+//  rcvtracker_add_packet(this->rcvtracker, packet);
+//
+//  if(jitterbuffer_is_packet_discarded(this->jitterbuffer, packet)){
+////    g_print("Discarded packet: %hu - %hu - %lu\n", packet->abs_seq, this->jitterbuffer->last_seq, GST_TIME_AS_MSECONDS(this->jitterbuffer->playout_delay));
+//    rcvtracker_add_discarded_packet(this->rcvtracker, packet);
+//    goto unlock_and_done;
+//  }
+//  stream_joiner_push_packet(this->joiner, packet);
+//
+////  g_print("Packet from subflow %d arrived with seq: %hu\n", packet->subflow_id, packet->abs_seq);
+//  g_cond_signal(&this->receive_signal);
+//
+//  rcvctrler_time_update(this->controller);
+////);
+//
+//unlock_and_done:
+//  THIS_UNLOCK(this);
 done:
   return result;
 
@@ -811,6 +820,17 @@ _playout_process (GstMprtpplayouter *this)
   guint16 gap_seq;
   THIS_LOCK(this);
 
+  while((packet = g_async_queue_try_pop(this->packets_in)) != NULL){
+    if(jitterbuffer_is_packet_discarded(this->jitterbuffer, packet)){
+    //    g_print("Discarded packet: %hu - %hu - %lu\n", packet->abs_seq, this->jitterbuffer->last_seq, GST_TIME_AS_MSECONDS(this->jitterbuffer->playout_delay));
+      rcvtracker_add_discarded_packet(this->rcvtracker, packet);
+      continue;
+    }
+    rcvtracker_add_packet(this->rcvtracker, packet);
+    stream_joiner_push_packet(this->joiner, packet);
+  }
+  rcvctrler_time_update(this->controller);
+
   now = playout_time = _now(this);
   while((packet = stream_joiner_pop_packet(this->joiner)) != NULL){
     jitterbuffer_push_packet(this->jitterbuffer, packet);
@@ -849,7 +869,7 @@ _playout_process (GstMprtpplayouter *this)
 //      gst_pad_push(this->mprtp_srcpad, this->discarded_packet.repairedbuf);
 //      g_print("Repaired buffer appeared: %hu\n", gap_seq);
       notifier_do(this->on_recovered_buffer, this->repairedbuf);
-      g_async_queue_push(this->buffers, this->repairedbuf);
+      g_async_queue_push(this->buffers_out, this->repairedbuf);
       this->repairedbuf = NULL;
     }
   }
@@ -857,7 +877,7 @@ _playout_process (GstMprtpplayouter *this)
 //PROFILING("_playout_process",
 //  g_print("Packet arrived at subflow %d with abs seq %hu forwarded\n", packet->subflow_id, packet->abs_seq);
 //  gst_pad_push(this->mprtp_srcpad, packet->buffer);
-  g_async_queue_push(this->buffers, packet->buffer);
+  g_async_queue_push(this->buffers_out, packet->buffer);
 
 //);
 
@@ -874,7 +894,7 @@ done:
 //}
 
 void _forward_process(GstMprtpplayouter* this){
-  GstBuffer* buffer = g_async_queue_pop(this->buffers);
+  GstBuffer* buffer = g_async_queue_pop(this->buffers_out);
   gst_pad_push(this->mprtp_srcpad, buffer);
 }
 

@@ -232,6 +232,88 @@ SlidingWindowPlugin* make_swminmax(bintree3cmp cmp, ListenerFunc on_calculated_c
 
 
 
+//-----------------------------------------------------------------------------------
+
+typedef struct _swtendency{
+  SlidingWindowPlugin*    base;
+  SWItemTendencyExtractor extractor;
+  gint32                  counter;
+  gint32                  sum;
+}swtendency_t;
+
+
+static swtendency_t* _swtendencypriv_ctor(SlidingWindowPlugin* base, SWItemTendencyExtractor extractor)
+{
+  swtendency_t* this;
+  this = malloc(sizeof(swtendency_t));
+  memset(this, 0, sizeof(swtendency_t));
+  this->extractor = extractor;
+  this->counter = 0;
+  this->sum     = 0;
+  this->base    = base;
+  return this;
+}
+
+static void _swtendencypriv_disposer(gpointer target)
+{
+  swtendency_t* this = target;
+  if(!target){
+    return;
+  }
+  free(this);
+}
+
+static void _swtendency_disposer(gpointer target)
+{
+  SlidingWindowPlugin* this = target;
+  if(!target){
+    return;
+  }
+
+  _swtendencypriv_disposer(this->priv);
+  this->priv = NULL;
+  g_free(this);
+}
+
+static void _swtendency_add_pipe(gpointer dataptr, gpointer itemptr)
+{
+  swtendency_t* this;
+  gdouble tendency;
+  this = dataptr;
+  this->sum += this->extractor(itemptr);
+  ++this->counter;
+  tendency = (gdouble)this->sum / (gdouble)this->counter;
+  swplugin_notify(this->base, &tendency);
+}
+
+static void _swtendency_rem_pipe(gpointer dataptr, gpointer itemptr)
+{
+  swtendency_t* this;
+  gdouble tendency;
+  this = dataptr;
+  this->sum -= this->extractor(itemptr);
+  --this->counter;
+  tendency = (gdouble)this->sum / (gdouble)this->counter;
+  swplugin_notify(this->base, &tendency);
+}
+
+SlidingWindowPlugin* make_swtendency(bintree3cmp cmp, ListenerFunc on_calculated_cb, gpointer udata,
+    SWItemTendencyExtractor extractor)
+{
+  SlidingWindowPlugin* this;
+  this = swplugin_ctor();
+  this = make_swplugin(on_calculated_cb, udata);
+  this->priv = _swtendencypriv_ctor(this, extractor);
+  this->add_pipe = _swtendency_add_pipe;
+  this->add_data = this->priv;
+  this->rem_pipe = _swtendency_rem_pipe;
+  this->rem_data = this->priv;
+  this->disposer = _swtendency_disposer;
+  return this;
+}
+
+
+
 
 //-----------------------------------------------------------------------------------
 

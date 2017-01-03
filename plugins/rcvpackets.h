@@ -34,6 +34,7 @@ struct _RcvPacket
   GstClockTime         received;
   GstClockTime         delay;
 
+  guint64              abs_snd_ntp_chunk;
   guint64              abs_snd_ntp_time;
   guint64              abs_rcv_ntp_time;
 

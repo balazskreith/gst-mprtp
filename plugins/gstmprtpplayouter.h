@@ -82,7 +82,7 @@ struct _GstMprtpplayouter
 
   GstTask*        thread;
   GRecMutex       thread_mutex;
-  GAsyncQueue*    buffers;
+  GAsyncQueue*    buffers_out;
 
   GstPad*         mprtp_srcpad;
   GstPad*         mprtp_sinkpad;
@@ -93,6 +93,8 @@ struct _GstMprtpplayouter
 
   GstBuffer*      repairedbuf;
   Notifier*       on_recovered_buffer;
+
+  GAsyncQueue*    packets_in;
 
 
 };

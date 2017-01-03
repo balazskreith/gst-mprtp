@@ -287,6 +287,10 @@ void slidingwindow_setup_custom_obsolation(SlidingWindow* this, gboolean (*custo
   this->obsolate_udata = custom_obsolation_udata;
 }
 
+gint32 slidingwindow_get_counter(SlidingWindow* this){
+  return datapuffer_readcapacity(this->items);
+}
+
 static void _slidingwindow_obsolate_num_limit(SlidingWindow* this)
 {
   while(datapuffer_isfull(this->items) || this->num_act_limit < datapuffer_readcapacity(this->items)){

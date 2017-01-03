@@ -102,8 +102,6 @@ typedef struct swpercentilecandidates_struct_t{
 }swpercentilecandidates_t;
 
 
-
-
 typedef struct swint32stat_struct_t{
   gint32  counter;
   gint32  sum;
@@ -116,6 +114,14 @@ typedef struct swint32stat_struct_t{
 SlidingWindowPlugin* make_swminmax(bintree3cmp cmp,
                                   ListenerFunc on_calculated_cb,
                                   gpointer       udata
+                          );
+
+typedef gint32 (*SWItemTendencyExtractor)(gpointer item);
+
+SlidingWindowPlugin* make_swtendency(bintree3cmp cmp,
+                                  ListenerFunc on_calculated_cb,
+                                  gpointer       udata,
+                                  SWItemTendencyExtractor   extractor
                           );
 
 

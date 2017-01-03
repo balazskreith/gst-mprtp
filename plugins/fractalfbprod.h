@@ -42,7 +42,10 @@ struct _FRACTaLFBProducer
   gboolean*                vector;
   guint                    vector_length;
 
-  SlidingWindow*           owds_sw;
+  guint64                  prev_snd;
+  guint16                  prev_seq;
+  guint64                  prev_rcv;
+
   SlidingWindow*           rle_sw;
 
   GstClockTime             last_fb;
@@ -54,13 +57,12 @@ struct _FRACTaLFBProducer
 
   gint32                   discarded_bytes;
 
-  struct{
-    gint counter;
-    gint sum;
-  }tendency;
   gint32                   received_bytes;
 
+  gdouble                  max_dsnd;
+  gdouble                  qdelay_est;
 
+  gdouble                  dsnd_sum,drcv_sum;
 };
 
 struct _FRACTaLFBProducerClass{
@@ -71,7 +73,6 @@ struct _FRACTaLFBProducerClass{
 GType fractalfbproducer_get_type (void);
 FRACTaLFBProducer *make_fractalfbproducer(RcvSubflow* subflow, RcvTracker *tracker);
 void fractalfbproducer_reset(FRACTaLFBProducer *this);
-void fractalfbproducer_set_owd_treshold(FRACTaLFBProducer *this, GstClockTime treshold);
 
 
 #endif /* FRACTALFBPRODUCER_H_ */

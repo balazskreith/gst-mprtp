@@ -27,14 +27,19 @@
 #define NTP_NOW get_ntp_from_epoch_ns(epoch_now_in_ns)
 
 
-#define PROFILING(msg, func) \
+#define PROFILING_GT(msg, func, gt) \
 {  \
   GstClockTime start, elapsed; \
   start = _now(this); \
   func; \
   elapsed = GST_TIME_AS_MSECONDS(_now(this) - start); \
-  if(0 < elapsed) {g_print(msg" elapsed time in ms: %lu\n", elapsed); }\
+  if(gt < elapsed) {g_print(msg" elapsed time in ms: %lu\n", elapsed); }\
 } \
+
+
+#define PROFILING(msg, func) PROFILING_GT(msg, func, 0)
+
+
 
 typedef enum{
   RTCP_INTERVAL_REGULAR_INTERVAL_MODE      = 0,
@@ -78,6 +83,7 @@ void gst_rtp_buffer_get_mprtp_extension(GstRTPBuffer* rtp, guint8 ext_header_id,
 
 void gst_rtp_buffer_set_abs_time_extension(GstRTPBuffer* rtp, guint8 abs_time_ext_header_id);
 guint64 gst_rtp_buffer_get_abs_time_extension(GstRTPBuffer* rtp, guint8 abs_time_ext_header_id);
+guint64 gst_rtp_buffer_get_abs_time_extension_new(GstRTPBuffer* rtp, guint8 abs_time_ext_header_id);
 
 gboolean gst_buffer_is_mprtp(GstBuffer* buffer, guint8 mprtp_ext_header_id);
 gboolean gst_rtp_buffer_is_mprtp(GstRTPBuffer* rtp, guint8 mprtp_ext_header_id);

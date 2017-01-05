@@ -53,10 +53,11 @@ struct _FRACTaLSubController
 
   gint32                    bottleneck_point;
   gint32                    keeping_point;
+  gint32                    inflection_point;
 
   FRACTaLFBProcessor*       fbprocessor;
   FRACTaLStat*              stat;
-  FRACTaLApprovement*      approvement;
+  FRACTaLApprovement*       approvement;
   guint                     sent_packets;
 
   guint                     monitoring_interval;

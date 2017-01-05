@@ -466,7 +466,7 @@ static void _stat_print(FRACTaLSubController *this)
   FRACTaLStat *stat = this->stat;
   g_print("MsN:%d - %1.1f|"
           "BiF:%-3d %-3d->%-3.0f|"
-          "FEC:%-4d|SR:%-4d|RR:%-4d|Tr:%-4d|Btl:%-4d|"
+          "FEC:%-4d|SR:%-4d|RR:%-4d|Tr:%-4d|Btl:%-4d|KP:%-4d|IP:%-4d|"
           "%d-%d-%d-%d|"
           "QD:%-3lu+%-3lu(%-3lu)->%1.2f|"
           "FL:%-1.2f+%1.2f (%-1.2f)\n",
@@ -484,6 +484,8 @@ static void _stat_print(FRACTaLSubController *this)
       (gint32)(stat->rr_avg / 1000),
       this->target_bitrate / 1000,
       this->bottleneck_point / 1000,
+      this->keeping_point / 1000,
+      this->inflection_point / 1000,
 
       _priv(this)->stage,
       this->subflow->state,
@@ -520,6 +522,7 @@ void fractalsubctrler_report_update(
   fractalfbprocessor_report_update(this->fbprocessor, summary);
 
   DISABLE_LINE _stat_print(this);
+  _stat_print(this);
 
   this->approve_measurement  = FALSE;
   if(10 < _stat(this)->measurements_num){
@@ -608,6 +611,7 @@ _keep_stage(
 
   if(_distortion(this)){
     if(_subflow(this)->state != SNDSUBFLOW_STATE_STABLE){
+      this->inflection_point = MIN(_stat(this)->sender_bitrate, _stat(this)->receiver_bitrate);
       _undershoot(this, _stat(this)->sr_avg);
       _switch_stage_to(this, STAGE_REDUCE, FALSE);
       goto done;
@@ -640,6 +644,7 @@ _probe_stage(
   this->awnd = _stat(this)->BiF_80th * 8 * 1.2;
 
   if(_distortion(this)){
+    this->inflection_point = MIN(_stat(this)->sender_bitrate, _stat(this)->receiver_bitrate);
     _stop_monitoring(this);
     _undershoot(this, this->keeping_point + _stat(this)->fec_bitrate);
     _set_event(this, EVENT_DISTORTION);
@@ -668,6 +673,7 @@ _increase_stage(
   this->awnd = _stat(this)->BiF_max * 8 * 1.5;
 
   if(_distortion(this)){
+    this->inflection_point = MIN(_stat(this)->sender_bitrate, _stat(this)->receiver_bitrate);
     _stop_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
@@ -929,6 +935,9 @@ static gdouble _off_target(FRACTaLSubController *this, gint pow, gdouble eps)
   gint i;
   refpoint = MAX(_min_target(this), this->bottleneck_point);
   if(this->target_bitrate <= refpoint){
+    return 0.;
+  }else if(refpoint < this->inflection_point - 1.5 * _max_ramp_up(this) &&
+           this->inflection_point < this->target_bitrate + 1.5 * _max_ramp_up(this)){
     return 0.;
   }
   result = this->target_bitrate - refpoint;

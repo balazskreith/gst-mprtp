@@ -127,53 +127,6 @@ Eventer* sender_get_on_bitrate_change_eventer(Sender* this){
   return this->on_bitrate_change;
 }
 
-Sender* make_sender_custom(void)
-{
-  Sender*     this = sender_ctor();
-  GstBin*     senderBin        = GST_BIN(gst_bin_new(this->bin_name));
-  GstElement* mprtpreceiver    = gst_element_factory_make("mprtpreceiver",  "SndMPRTPReceiver");
-  GstElement* rtcpSrc          = gst_element_factory_make("udpsrc",         "SndRTCPSrc:5003");
-  GstElement* rtcpSink         = gst_element_factory_make("udpsink",        "SndRTCPSink:10.0.0.6:5001");
-  GstElement* rtpSink          = gst_element_factory_make("udpsink",        "SndRTPSink:10.0.0.6:5000");
-  GstElement* mprtpsender      = gst_element_factory_make("mprtpsender",    "SndMPRTPSender");
-  GstElement* scheduler        = gst_element_factory_make("mprtpscheduler", "SndMPRTPScheduler");
-
-  gst_bin_add_many(senderBin,
-       mprtpreceiver,
-       rtcpSrc,
-       rtcpSink,
-       rtpSink,
-       mprtpsender,
-       scheduler,
-
-       NULL);
-
-   g_object_set(G_OBJECT(rtcpSrc),  "port", 5003, NULL);
-   g_object_set(G_OBJECT(rtpSink),  "host", "10.0.0.6", "port", 5000, "sync", FALSE, "async", FALSE, NULL);
-   g_object_set(G_OBJECT(rtcpSink), "host", "10.0.0.6", "port", 5001, "sync", FALSE, "async", FALSE, NULL);
-   g_object_set(G_OBJECT(scheduler),
-       "join-subflow", 1,
-       "controlling-mode", 2,
-       "obsolation-treshold", 0,
-       "rtcp-interval-type", 2,
-       "report-timeout", 0,
-       "fec-interval", 0,
-       NULL);
-
-   gst_element_link_pads(rtcpSrc,       "src",           mprtpreceiver, "mprtcp_sink_1");
-   gst_element_link_pads(mprtpreceiver, "mprtcp_rr_src", scheduler,     "mprtcp_rr_sink");
-   gst_element_link_pads(scheduler,     "mprtp_src",     mprtpsender,   "mprtp_sink");
-   gst_element_link_pads(scheduler,     "mprtcp_sr_src", mprtpsender,   "mprtcp_sr_sink");
-   gst_element_link_pads(mprtpsender,   "mprtcp_src_1",  rtcpSink,      "sink");
-   gst_element_link_pads(mprtpsender,   "src_1",         rtpSink,       "sink");
-
-   setup_ghost_sink_by_padnames(scheduler, "rtp_sink", senderBin, "sink");
-   this->element = GST_ELEMENT(senderBin);
-
-
-  return this;
-}
-
 
 static GstElement* _make_rtpsink(gchar* dest_ip, guint16 dest_port)
 {

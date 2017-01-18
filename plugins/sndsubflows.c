@@ -317,6 +317,19 @@ void sndsubflow_set_state(SndSubflow* subflow, SndSubflowState state)
   notifier_do(subflow->base_db->on_subflow_state_changed, subflow);
 }
 
+void sndsubflow_refresh_report_interval(SndSubflow* subflow)
+{
+  GstClockTime now = _now(subflow->base_db);
+  if(subflow->last_report == 0){
+    subflow->last_report = now;
+    subflow->report_interval = 50 * GST_MSECOND;
+    return;
+  }
+
+  subflow->report_interval = MIN(subflow->report_interval * 1.3, now - subflow->last_report);
+  subflow->last_report = now;
+}
+
 SndSubflowState sndsubflow_get_state(SndSubflow* subflow)
 {
   return subflow->state;

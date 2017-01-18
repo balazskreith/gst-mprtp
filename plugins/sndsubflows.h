@@ -60,6 +60,9 @@ typedef struct _SndSubflow
   guint32                    sent_packet_count;
   guint32                    sent_octet_count;
 
+  GstClockTime               report_interval;
+  GstClockTime               last_report;
+
 }SndSubflow;
 
 
@@ -130,8 +133,10 @@ void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, ListenerFun
 
 //------------------------------------------------------------------------------------------------
 void sndsubflow_set_state(SndSubflow* this, SndSubflowState state);
+void sndsubflow_refresh_report_interval(SndSubflow* subflow);
 SndSubflowState sndsubflow_get_state(SndSubflow* subflow);
 guint16 sndsubflow_get_next_subflow_seq(SndSubflow* subflow);
+
 
 guint8 sndsubflow_get_flags_abs_value(SndSubflow* subflow);
 

@@ -248,6 +248,7 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
   }
 
   _update_subflow_report_utilization(this, subflow, summary);
+  sndsubflow_refresh_report_interval(subflow);
 
   for(it = this->controllers; it; it = it->next){
     CongestionController* controller = it->data;
@@ -401,21 +402,26 @@ void _update_subflow_target_utilization(SndController* this)
 
 void _on_subflow_state_changed(SndController *this, SndSubflow* subflow)
 {
-  if(subflow->state_t1 != SNDSUBFLOW_STATE_OVERUSED && subflow->state == SNDSUBFLOW_STATE_OVERUSED){
-    ++this->overused_subflows;
-    this->time_update_period = 50 * GST_MSECOND;
-    _emit_signal(this);
-    goto done;
+//  if(subflow->state_t1 != SNDSUBFLOW_STATE_OVERUSED && subflow->state == SNDSUBFLOW_STATE_OVERUSED){
+//    ++this->overused_subflows;
+//    this->time_update_period = 50 * GST_MSECOND;
+//    _emit_signal(this);
+//    goto done;
+//  }
+//
+//  if(subflow->state_t1 == SNDSUBFLOW_STATE_OVERUSED && subflow->state != SNDSUBFLOW_STATE_OVERUSED){
+//    if(--this->overused_subflows < 1){
+//      this->time_update_period = 200 * GST_MSECOND;
+//    }
+//    goto done;
+//  }
+
+  {
+    GstClockTime reporting_interval = MIN(subflow->report_interval, this->time_update_period);
+    this->time_update_period = CONSTRAIN(50 * GST_MSECOND, 200 * GST_MSECOND, reporting_interval);
   }
 
-  if(subflow->state_t1 == SNDSUBFLOW_STATE_OVERUSED && subflow->state != SNDSUBFLOW_STATE_OVERUSED){
-    if(--this->overused_subflows < 1){
-      this->time_update_period = 200 * GST_MSECOND;
-    }
-    goto done;
-  }
-
-done:
+//done:
   return;
 }
 
@@ -430,7 +436,7 @@ void _on_subflow_active_changed(SndController* this, SndSubflow *subflow)
 {
   GSList* controller_item;
   CongestionController *controller;
-  controller_item = g_slist_find_custom(this->controllers, _controller_by_subflow_id, (gconstpointer) subflow);
+  controller_item = g_slist_find_custom(this->controllers, (gconstpointer) subflow, _controller_by_subflow_id);
   if(!controller_item){
     return;
   }
@@ -446,7 +452,7 @@ void _on_subflow_detached(SndController* this, SndSubflow *subflow)
 {
   GSList* controller_item;
   CongestionController *controller;
-  controller_item = g_slist_find_custom(this->controllers, _controller_by_subflow_id, (gconstpointer) subflow);
+  controller_item = g_slist_find_custom(this->controllers, (gconstpointer) subflow, _controller_by_subflow_id);
   if(!controller_item){
     return;
   }
@@ -458,7 +464,7 @@ void _on_congestion_controlling_changed(SndController* this, SndSubflow *subflow
 {
   GSList* controller_item;
 
-  controller_item = g_slist_find_custom(this->controllers, _controller_by_subflow_id, (gconstpointer) subflow);
+  controller_item = g_slist_find_custom(this->controllers, (gconstpointer) subflow, _controller_by_subflow_id);
   if(controller_item){
     CongestionController *controller = controller_item->data;
     if(subflow->congestion_controlling_type == controller->type){

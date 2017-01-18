@@ -44,7 +44,7 @@ G_DEFINE_TYPE (StreamSplitter, stream_splitter, G_TYPE_OBJECT);
 
 struct _SchNode
 {
-  gint   remained;
+  gint   remained,total;
   GList* subflows;
 
   SchNode *parent;
@@ -103,7 +103,7 @@ _allowed(
 
 static SchNode *
 _make_schnode(
-    gint remained);
+    gint total);
 
 
 static void
@@ -138,6 +138,11 @@ _refresh_splitter (
 //_vp8_keyframe_filter(
 //		SndPacket *rtp);
 
+static void
+_print_tree (
+    SchNode * node,
+    gint value,
+    gint level);
 
 static void
 _logging(
@@ -203,6 +208,7 @@ stream_splitter_on_target_bitrate_changed(StreamSplitter* this, SndSubflow* subf
   if(abs_delta_target < scheduled_target * .05 && abs_delta_target < 50000){
     return;
   }
+  g_print("Changed subflow: %d target: %d\n", subflow->id, subflow->target_bitrate);
   _refresh_splitter(this);
   this->actual_targets[subflow->id] = subflow->target_bitrate;
 }
@@ -264,15 +270,15 @@ done:
 
 void _create_nodes(gpointer item, gpointer udata)
 {
+
   CreateData *cdata = udata;
   SndSubflow *subflow = item;
-  cdata->actual = subflow->target_bitrate >> 3;
-
-  cdata->root->remained -= _schtree_insert(cdata->root,
-                                          &cdata->actual,
-                                          subflow,
-                                          cdata->total,
-                                          cdata->margin);
+  gint value = subflow->target_bitrate >> 3;
+  _schtree_insert(cdata->root,
+                  &value,
+                  subflow,
+                  cdata->total,
+                  cdata->margin);
 }
 
 SchNode *
@@ -280,7 +286,7 @@ _tree_ctor (StreamSplitter *this)
 {
   CreateData cdata;
   cdata.remained = cdata.total = sndsubflows_get_total_target(this->subflows) >> 3;
-  cdata.margin   = (cdata.total >> SCHTREE_MAX_LEVEL) + 1;
+  cdata.margin   = (cdata.total >> (SCHTREE_MAX_LEVEL + 3)) + 1;
   cdata.root     = _make_schnode(cdata.total);
   sndsubflows_iterate(this->subflows, _create_nodes, &cdata);
   return cdata.root;
@@ -329,11 +335,9 @@ _schtree_insert (SchNode * node, gint *value, SndSubflow * subflow, gint level_v
     node->left->subflows = g_list_prepend(node->left->subflows, subflow);
     dvalue += _schtree_insert(node->left, value, subflow, left_level_value, margin);
   }
-
-  if(*value < 1){
+  if((*value) < 1){
     goto done;
   }
-
   right_level_value = level_value - left_level_value;
   if(!node->right){
     node->right = _make_schnode(right_level_value);
@@ -367,11 +371,12 @@ gboolean _allowed(SchNode *node, SndPacket *packet, GstClockTime now)
 }
 
 
-SchNode *_make_schnode(gint remained)
+SchNode *_make_schnode(gint total)
 {
   SchNode *result;
   result = _schnode_ctor();
-  result->remained = remained;
+  result->remained = total;
+  result->total    = total;
   return result;
 }
 
@@ -394,7 +399,7 @@ _schtree_select_next (SchNode * root, SndPacket *packet, GstClockTime now)
 {
   SchNode *selected, *left, *right;
   gboolean left_allowed,right_allowed;
-
+  g_print("_schtree_select_next\n"); _print_tree(root, root->total, 0);
   selected = root;
   while (selected->left != NULL && selected->right != NULL) {
     left          = selected->left;
@@ -416,6 +421,7 @@ _schtree_select_next (SchNode * root, SndPacket *packet, GstClockTime now)
   }
   if(!selected->subflows){
     g_warning("Problems with subflows at stream splitter");
+    _print_tree(root, root->total, 0);
   }else if(!_allowed(selected, packet, now)){
     selected = NULL;
   }
@@ -461,6 +467,42 @@ _schtree_approve_next (SchNode * selected, guint bytes_to_send)
 //  return is_keyframe;
 //}
 
+
+void _print_tree (SchNode * node, gint value, gint level)
+{
+  gint i;
+  gint right_value, left_value;
+  if (node == NULL) {
+    return;
+  }
+  for (i = 0; i < level; ++i)
+    g_print ("--");
+  if (node->subflows != NULL) {
+      GList *it;
+      g_print (
+             "R: %d | %d->sent_bytes:%d (L:%p,R:%p) subflows:",
+             node->remained,
+             value,
+             node->sent_bytes,
+             node->left,
+             node->right);
+    for(it = node->subflows; it; it = it->next){
+      g_print ("%d ", ((SndSubflow*)it->data)->id);
+    }
+    g_print ("\n");
+  } else {
+    GList *it;
+    g_print ("R: %d | %d->C:%d, (L:%p;R:%p) Subflows: ", node->remained, value, node->sent_bytes, node->left, node->right);
+    for(it = node->subflows; it; it = it->next){
+      g_print ("%d ", ((SndSubflow*)it->data)->id);
+    }
+    g_print("\n");
+  }
+  left_value  = value >> 1;
+  right_value = value - left_value;
+  _print_tree (node->left,  left_value,  level + 1);
+  _print_tree (node->right, right_value, level + 1);
+}
 
 static void _log_tree (SchNode * node, gint value, gint level)
 {

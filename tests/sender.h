@@ -24,7 +24,6 @@ Sender* make_sender(SchedulerParams* cc,
     ExtraDelayParams* extra_delay_params);
 
 Eventer* sender_get_on_bitrate_change_eventer(Sender* this);
-Sender* make_sender_custom(void);
 
 GstElement* sender_get_mprtcp_rr_sink_element(Sender* this);
 

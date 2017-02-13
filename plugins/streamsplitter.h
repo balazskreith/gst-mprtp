@@ -32,9 +32,12 @@ struct _StreamSplitter
   GstClock*            sysclock;
   GstClockTime         made;
   SchNode*             tree;
+  gboolean             refresh;
 
   SndSubflows*         subflows;
   gint32               actual_targets[256];
+
+  gboolean             keyframe_filtering;
 };
 
 struct _StreamSplitterClass{

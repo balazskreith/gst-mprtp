@@ -32,19 +32,13 @@
 GST_DEBUG_CATEGORY_STATIC (stream_splitter_debug_category);
 #define GST_CAT_DEFAULT stream_splitter_debug_category
 
-/* Evaluates to a mask with n bits set */
-#define BITS_MASK(n) ((1<<(n))-1)
-
-/* Returns len bits, with the LSB at position bit */
-#define BITS_GET(val, bit, len) (((val)>>(bit))&BITS_MASK(len))
-
 /* class initialization */
 G_DEFINE_TYPE (StreamSplitter, stream_splitter, G_TYPE_OBJECT);
 
 
 struct _SchNode
 {
-  gint   remained,total;
+  gint   remained,total,level;
   GList* subflows;
 
   SchNode *parent;
@@ -92,6 +86,7 @@ _schtree_insert (
     SchNode *node,
     gint *value,
     SndSubflow * subflow,
+    gint level,
     gint level_value,
     gint margin);
 
@@ -99,10 +94,12 @@ static gboolean
 _allowed(
     SchNode *node,
 	  SndPacket *packet,
-    GstClockTime now);
+    GstClockTime now,
+    SndSubflowState allowed_state);
 
 static SchNode *
 _make_schnode(
+    gint level,
     gint total);
 
 
@@ -116,7 +113,8 @@ static SchNode *
 _schtree_select_next (
     SchNode * root,
 	  SndPacket *packet,
-    GstClockTime now);
+    GstClockTime now,
+    SndSubflowState allowed_state);
 
 
 static void
@@ -154,6 +152,32 @@ _logging(
 //---- Private function implementations to Stream Dealer object --------
 //----------------------------------------------------------------------
 
+
+typedef struct{
+  gdouble target_sum,actual_sum;
+}PrintData;
+static void _sim_bitrate(SndSubflow* subflow, PrintData *data){
+  data->target_sum +=subflow->target_bitrate;
+  data->actual_sum +=subflow->actual_bitrate;
+}
+static void _print_weight(SndSubflow* subflow, PrintData* data){
+  g_print("Subflow %d, target weight: %3.2f actual weight: %3.2f, ",
+      subflow->id,
+      (gdouble) subflow->target_bitrate / data->target_sum,
+      (gdouble) subflow->actual_bitrate / data->actual_sum
+      );
+}
+static GstClockTime last_ratio_printed = 0;
+static void _print_ratios(StreamSplitter *this){
+  PrintData data = {0.,0.};
+  if(_now(this) < last_ratio_printed  + 200 * GST_MSECOND) return;
+  last_ratio_printed = _now(this);
+  sndsubflows_iterate(this->subflows, (GFunc) _sim_bitrate, &data);
+  sndsubflows_iterate(this->subflows, (GFunc) _print_weight, &data);
+  g_print("\n");
+}
+
+
 void
 stream_splitter_class_init (StreamSplitterClass * klass)
 {
@@ -190,13 +214,15 @@ stream_splitter_init (StreamSplitter * this)
 {
   this->sysclock = gst_system_clock_obtain ();
   this->made                   = _now(this);
+  this->refresh                = TRUE;
+  this->keyframe_filtering     = FALSE;
 }
 
 
 void
 stream_splitter_set_mpath_keyframe_filtering(StreamSplitter * this, guint keyframe_filtering)
 {
-  GST_LOG_OBJECT(this, "Currently it is not implemented");
+  this->keyframe_filtering = keyframe_filtering;
 }
 
 void
@@ -204,13 +230,15 @@ stream_splitter_on_target_bitrate_changed(StreamSplitter* this, SndSubflow* subf
 {
   gint32 scheduled_target = this->actual_targets[subflow->id];
   gint32 abs_delta_target = subflow->target_bitrate - scheduled_target;
+  this->refresh = TRUE;
   abs_delta_target *= abs_delta_target < 0 ? -1 : 1;
   if(abs_delta_target < scheduled_target * .05 && abs_delta_target < 50000){
     return;
   }
-  g_print("Changed subflow: %d target: %d\n", subflow->id, subflow->target_bitrate);
-  _refresh_splitter(this);
+
+//  _refresh_splitter(this);
   this->actual_targets[subflow->id] = subflow->target_bitrate;
+  this->refresh = TRUE;
 }
 
 
@@ -219,24 +247,41 @@ static void _sndsubflow_min_pacing_helper(SndSubflow *subflow, GstClockTime *nex
   *next_time = MIN(*next_time, subflow->pacing_time);
 }
 
+static void _select_highest_state(SndSubflow *subflow, SndSubflowState *max_state)
+{
+  *max_state = CONSTRAIN(*max_state, SNDSUBFLOW_STATE_STABLE, subflow->state);
+  //*max_state = MAX(*max_state, subflow->state);
+}
 
 SndSubflow* stream_splitter_approve_packet(StreamSplitter * this,
     SndPacket *packet, GstClockTime now, GstClockTime *next_time)
 {
   SchNode *selected;
   SndSubflow* result = NULL;
+  SndSubflowState min_allowed_state;
+
+  min_allowed_state = SNDSUBFLOW_STATE_OVERUSED;
+  if(this->keyframe_filtering){
+     sndsubflows_iterate(this->subflows, (GFunc)_select_highest_state, &min_allowed_state);
+  }
+
+  if(this->refresh){
+    _refresh_splitter(this);
+    this->refresh = FALSE;
+  }
 
   if (this->tree == NULL) {
     GST_WARNING_OBJECT (this, "No active subflow");
     goto done;
   }
 
+  DISABLE_LINE _print_ratios(this);
 //  sndsubflows_iterate(this->subflows, (GFunc) _sndsubflow_min_pacing_helper, next_time);
 //  if(now < *next_time){
 //    goto done;
 //  }
 
-  selected = _schtree_select_next(this->tree, packet, now);
+  selected = _schtree_select_next(this->tree, packet, now, min_allowed_state);
   if(!selected){
     if(next_time){
       sndsubflows_iterate(this->subflows, (GFunc) _sndsubflow_min_pacing_helper, next_time);
@@ -262,6 +307,11 @@ _refresh_splitter (StreamSplitter *this)
     goto done;
   }
 
+  //if(0)
+  {
+
+  }
+
   this->tree = _tree_ctor(this);
   _logging(this);
 done:
@@ -274,20 +324,28 @@ void _create_nodes(gpointer item, gpointer udata)
   CreateData *cdata = udata;
   SndSubflow *subflow = item;
   gint value = subflow->target_bitrate >> 3;
+  if(!subflow->active){
+    return;
+  }
+
   _schtree_insert(cdata->root,
-                  &value,
-                  subflow,
-                  cdata->total,
-                  cdata->margin);
+                  &value,      //value we distribute
+                  subflow,     //subflow we insert
+                  0,           //level
+                  cdata->total,//level value
+                  cdata->margin
+                  );
+
 }
 
 SchNode *
 _tree_ctor (StreamSplitter *this)
 {
   CreateData cdata;
-  cdata.remained = cdata.total = sndsubflows_get_total_target(this->subflows) >> 3;
-  cdata.margin   = (cdata.total >> (SCHTREE_MAX_LEVEL + 3)) + 1;
-  cdata.root     = _make_schnode(cdata.total);
+  cdata.remained      = cdata.total = sndsubflows_get_total_target(this->subflows) >> 3;
+  cdata.margin        = (cdata.total >> (SCHTREE_MAX_LEVEL + 3)) + 1;
+  cdata.root          = _make_schnode(0, cdata.total);
+
   sndsubflows_iterate(this->subflows, _create_nodes, &cdata);
   return cdata.root;
 }
@@ -307,7 +365,7 @@ _schnode_rdtor (StreamSplitter *this,SchNode * node)
 
 
 gint
-_schtree_insert (SchNode * node, gint *value, SndSubflow * subflow, gint level_value, gint32 margin)
+_schtree_insert (SchNode * node, gint *value, SndSubflow * subflow, gint level, gint level_value, gint32 margin)
 {
   gint dvalue = 0;
   gint left_level_value,right_level_value;
@@ -320,32 +378,38 @@ _schtree_insert (SchNode * node, gint *value, SndSubflow * subflow, gint level_v
     !node->left &&
     !node->right)
   {
+    SchNode* actual = node;
     *value -= node->remained;
     dvalue =  node->remained;
     node->subflows = g_list_prepend(node->subflows, subflow);
+    //refresh sent bytes for correct initial value in case of rapid changes
+    do{
+      actual->sent_bytes += subflow->actual_bitrate >> (level + 3);
+      actual = actual->parent;
+    }while(actual != NULL);
     goto done;
   }
 
   left_level_value = level_value>>1;
   if(!node->left){
-    node->left = _make_schnode(left_level_value);
+    node->left = _make_schnode(level, left_level_value);
     node->left->parent = node;
   }
   if(0 < node->left->remained){
     node->left->subflows = g_list_prepend(node->left->subflows, subflow);
-    dvalue += _schtree_insert(node->left, value, subflow, left_level_value, margin);
+    dvalue += _schtree_insert(node->left, value, subflow, level + 1, left_level_value, margin);
   }
   if((*value) < 1){
     goto done;
   }
   right_level_value = level_value - left_level_value;
   if(!node->right){
-    node->right = _make_schnode(right_level_value);
+    node->right = _make_schnode(level, right_level_value);
     node->right->parent = node;
   }
   if(0 < node->right->remained){
     node->right->subflows = g_list_prepend(node->right->subflows, subflow);
-    dvalue += _schtree_insert(node->right, value, subflow, right_level_value, margin);
+    dvalue += _schtree_insert(node->right, value, subflow, level + 1, right_level_value, margin);
   }
 
 done:
@@ -353,7 +417,7 @@ done:
   return dvalue;
 }
 
-gboolean _allowed(SchNode *node, SndPacket *packet, GstClockTime now)
+gboolean _allowed(SchNode *node, SndPacket *packet, GstClockTime now, SndSubflowState min_allowed_state)
 {
   GList *it;
   SndSubflow *subflow;
@@ -364,19 +428,25 @@ gboolean _allowed(SchNode *node, SndPacket *packet, GstClockTime now)
 //      g_print("pacing: %lu\n", subflow->pacing_time - now);
       continue;
     }
-    //TODO: flag restriction here if we implement it in multipath case
+
+    if(packet->keyframe && subflow->state < min_allowed_state){
+//      g_print("Packet %hu is keyframe and the min state is %d subflow %d state is %d\n",
+//          packet->abs_seq, min_allowed_state, subflow->id, subflow->state);
+      continue;
+    }
     return TRUE;
   }
   return FALSE;
 }
 
 
-SchNode *_make_schnode(gint total)
+SchNode *_make_schnode(gint level, gint total)
 {
   SchNode *result;
   result = _schnode_ctor();
   result->remained = total;
   result->total    = total;
+  result->level    = level;
   return result;
 }
 
@@ -395,17 +465,17 @@ _schnode_ctor (void)
 
 
 SchNode *
-_schtree_select_next (SchNode * root, SndPacket *packet, GstClockTime now)
+_schtree_select_next (SchNode * root, SndPacket *packet, GstClockTime now, SndSubflowState min_allowed_state)
 {
   SchNode *selected, *left, *right;
   gboolean left_allowed,right_allowed;
-  g_print("_schtree_select_next\n"); _print_tree(root, root->total, 0);
+
   selected = root;
   while (selected->left != NULL && selected->right != NULL) {
     left          = selected->left;
     right         = selected->right;
-    left_allowed  = _allowed(left, packet, now);
-    right_allowed = _allowed(right, packet, now);
+    left_allowed  = _allowed(left, packet, now, min_allowed_state);
+    right_allowed = _allowed(right, packet, now, min_allowed_state);
 
     if(!left_allowed && !right_allowed){
       selected = NULL;
@@ -413,16 +483,19 @@ _schtree_select_next (SchNode * root, SndPacket *packet, GstClockTime now)
     }
     if(!left_allowed){
       selected = right;
-    }else if(!right_allowed){
-      selected = left;
-    }else{
-      selected = left->sent_bytes <= right->sent_bytes ? left : right;
+      continue;
     }
+
+    if(!right_allowed){
+      selected = left;
+      continue;
+    }
+    selected = left->sent_bytes <= right->sent_bytes ? left : right;
   }
   if(!selected->subflows){
     g_warning("Problems with subflows at stream splitter");
-    _print_tree(root, root->total, 0);
-  }else if(!_allowed(selected, packet, now)){
+    _print_tree(root, SCHTREE_MAX_VALUE, 0);
+  }else if(!_allowed(selected, packet, now, min_allowed_state)){
     selected = NULL;
   }
 done:

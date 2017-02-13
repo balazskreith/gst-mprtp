@@ -239,6 +239,7 @@ void _setup_rcvpacket(RcvPacket* packet, GstRTPBuffer *rtp)
   packet->payload_size = gst_rtp_buffer_get_payload_len(rtp);
   packet->payload_type = gst_rtp_buffer_get_payload_type(rtp);
   packet->header_size  = gst_rtp_buffer_get_header_len(rtp);
+  packet->marker       = gst_rtp_buffer_get_marker(rtp);
 }
 
 

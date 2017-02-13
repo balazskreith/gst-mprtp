@@ -134,6 +134,7 @@ typedef enum{
   SINK_TYPE_RAWPROXY  = 2,
   SINK_TYPE_FILE      = 3,
   SINK_TYPE_FAKESINK  = 4,
+  SINK_TYPE_MULTIFILE = 5,
 }SinkTypes;
 
 struct _SinkParams{
@@ -151,6 +152,9 @@ struct _SinkParams{
       gchar location[256];
     }file;
 
+    struct{
+      GSList* items;
+    }multifile;
   };
   gchar      to_string[256];
 };
@@ -163,6 +167,8 @@ typedef enum{
 
 struct _CodecParams{
   CodecTypes type;
+  gint       keyframe_mode;
+  gint       keyframe_max_dist;
   gchar      type_str[32];
   gchar      to_string[256];
 
@@ -284,6 +290,13 @@ typedef struct{
   gchar       padname[256];
 }Interface;
 
+typedef struct _SinkFileItem{
+  gchar  path[1024];
+  gint   id;
+}SinkFileItem;
+
+
+
 static gchar codec_params_rawstring_default[]           = "VP8";
 static gchar* codec_params_rawstring                    = NULL;
 
@@ -354,6 +367,11 @@ Interface* make_interface(GstElement* element, gchar* padname);
 void interface_dtor(Interface* this);
 void connect_interfaces(Interface* source, Interface* sink);
 
+SinkFileItem* sink_file_item_ctor();
+void sink_file_item_dtor(SinkFileItem* this);
+SinkFileItem* make_sink_file_item(gint id, gchar* path);
+
+
 void _print_info(void);
 gchar* _null_test(gchar *subject_str, gchar* failed_str);
 
@@ -377,6 +395,7 @@ PlayouterParams*   make_playouter_params(gchar* params_rawstring);
 void free_playouter_params(PlayouterParams *congestion_controller_params);
 
 SinkParams*     make_sink_params(gchar* params_rawstring);
+void free_sink_params(SinkParams* sink_params);
 
 StatParamsTuple* make_statparams_tuple_by_raw_strings(gchar* statparams_rawstring,
                                        gchar* statlogs_sink_params_rawstring,

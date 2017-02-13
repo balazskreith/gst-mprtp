@@ -47,6 +47,7 @@ enum
   PROP_MPRTP_EXT_HEADER_ID,
   PROP_CSV_LOGGING,
   PROP_TOUCHED_SYNC_LOCATION,
+  PROP_NEXTID,
   PROP_PACKETSLOG_LOCATION,
   PROP_STATSLOG_LOCATION,
 
@@ -121,6 +122,15 @@ gst_rtpstatmaker2_finalize (GObject * object)
   g_object_unref (this->sysclock);
   g_object_unref (this->monitor);
 
+  {
+    GSList* it;
+    for(it = this->subflow_monitors_list; it; it = it->next){
+      SubflowMonitor* smonitor = it->data;
+      this->subflow_monitors_lookup[smonitor->id] = NULL;
+      g_object_unref(smonitor->monitor);
+    }
+  }
+
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
 
@@ -192,8 +202,14 @@ gst_rtpstatmaker2_class_init (GstRTPStatMaker2Class * klass)
   g_object_class_install_property (gobject_class, PROP_MPRTP_EXT_HEADER_ID,
       g_param_spec_uint ("mprtp-ext-header-id",
           "MPRTP Header Extesion ID",
-          "The iID for the MPRTP header extension.",
+          "The ID for the MPRTP header extension.",
           0, 15, MPRTP_DEFAULT_EXTENSION_HEADER_ID, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_NEXTID,
+      g_param_spec_uint ("next-id",
+          "Next ID",
+          "The ID for the next MPRTP subflow for logging",
+          0, 255, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_CSV_LOGGING,
       g_param_spec_boolean ("csv-logging",
@@ -368,6 +384,8 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
   MonitorPacket* packet = NULL;
   GstBuffer* packetbuffer = NULL;
   gboolean packetsrc_linked = FALSE;
+  SubflowMonitor* smonitor = NULL;
+  guint8 subflow_id = 0;
 
   if (!GST_IS_BUFFER(buffer)) {
     goto exit;
@@ -400,7 +418,16 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
     this->touched_sync_active = FALSE;
   }
 
-
+  if(0 < this->mprtp_ext_header_id){
+    GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+    gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
+    gst_rtp_buffer_get_mprtp_extension(&rtp, this->mprtp_ext_header_id, &subflow_id, NULL);
+    smonitor = this->subflow_monitors_lookup[subflow_id];
+    if(smonitor){
+      monitor_track_rtpbuffer(smonitor->monitor, buffer);
+    }
+    gst_rtp_buffer_unmap(&rtp);
+  }
   monitor_track_rtpbuffer(this->monitor, buffer);
 
 again:
@@ -424,8 +451,14 @@ again:
 
   if(this->packetlogs_linked){
     if(this->csv_logging){
+      gchar* packetslog_file;
+      if(smonitor){
+        packetslog_file = smonitor->packetslog;
+      }else{
+        packetslog_file = this->packetslog_file;
+      }
       //mprtp_logger(this->packetslog_file,
-      _fprintf(this, this->packetslog_file,
+      _fprintf(this, packetslog_file,
           "%u,%hu,%d,%lu,%d,%u,%u,%u,%d,%lu\n",
           packet->extended_seq,
           packet->tracked_seq,
@@ -498,6 +531,24 @@ gst_rtpstatmaker2_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
 
 }
 
+static SubflowMonitor* _make_subflow_monitor(guint8 id){
+  SubflowMonitor* result = g_malloc0(sizeof(SubflowMonitor));
+  result->monitor = make_monitor();
+  result->id = id;
+  return result;
+}
+
+static SubflowMonitor* _get_subflow_monitor(GstRTPStatMaker2 *this, guint8 id){
+  SubflowMonitor* smonitor;
+  if(this->subflow_monitors_lookup[id]){
+    return this->subflow_monitors_lookup[id];
+  }
+  smonitor = _make_subflow_monitor(id);
+  this->subflow_monitors_list       = g_slist_prepend(this->subflow_monitors_list, smonitor);
+  this->subflow_monitors_lookup[id] = smonitor;
+  return smonitor;
+}
+
 static void
 gst_rtpstatmaker2_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec)
@@ -529,14 +580,29 @@ gst_rtpstatmaker2_set_property (GObject * object, guint prop_id,
       this->touched_sync_active = TRUE;
       strcpy(this->touched_sync_location, g_value_get_string(value));
       break;
+    case PROP_NEXTID:
+      this->next_id_set = TRUE;
+      this->next_id = g_value_get_uint (value);
+      break;
     case PROP_PACKETSLOG_LOCATION:
       this->packetlogs_linked = TRUE;
-      strcpy(this->packetslog_file, g_value_get_string(value));
+      if(this->next_id_set){
+        SubflowMonitor* smonitor = _get_subflow_monitor(this, this->next_id);
+        strcpy(smonitor->packetslog, g_value_get_string(value));
+        this->next_id_set = FALSE;
+      }else{
+        strcpy(this->packetslog_file, g_value_get_string(value));
+      }
       break;
     case PROP_STATSLOG_LOCATION:
       this->statlogs_linked = TRUE;
-      strcpy(this->statslog_file, g_value_get_string(value));
-//      _start_staslog_thread(this);
+      if(this->next_id_set){
+        SubflowMonitor* smonitor = _get_subflow_monitor(this, this->next_id);
+        strcpy(smonitor->statslog, g_value_get_string(value));
+        this->next_id_set = FALSE;
+      }else{
+        strcpy(this->statslog_file, g_value_get_string(value));
+      }
       break;
 
     case PROP_SYNC:
@@ -770,6 +836,46 @@ done:
   return;
 }
 
+static void _statprint(GstRTPStatMaker2* this, MonitorStat* stat, gchar* path){
+  _fprintf(this, path,
+          "%d,%d,%d,%d," //received
+          "%d,%d,%d,%d," //lost
+          "%d,%d,%d,%d," //discarded
+          "%d,%d,%d,%d," //corrupted
+          "%d,%d,%d,%d," //repaired
+          "%d,%d,%d,%d\n"  //fec
+          ,
+          stat->received.total_packets,
+          stat->received.total_bytes,
+          stat->received.accumulative_bytes,
+          stat->received.accumulative_packets,
+
+          stat->lost.total_packets,
+          stat->lost.total_bytes,
+          stat->lost.accumulative_bytes,
+          stat->lost.accumulative_packets,
+
+          stat->discarded.total_packets,
+          stat->discarded.total_bytes,
+          stat->discarded.accumulative_bytes,
+          stat->discarded.accumulative_packets,
+
+          stat->corrupted.total_packets,
+          stat->corrupted.total_bytes,
+          stat->corrupted.accumulative_bytes,
+          stat->corrupted.accumulative_packets,
+
+          stat->repaired.total_packets,
+          stat->repaired.total_bytes,
+          stat->repaired.accumulative_bytes,
+          stat->repaired.accumulative_packets,
+
+          stat->fec.total_packets,
+          stat->fec.total_bytes,
+          stat->fec.accumulative_bytes,
+          stat->fec.accumulative_packets
+        );
+}
 
 void
 _monitorstat_refresh (GstRTPStatMaker2 *this, gboolean lock)
@@ -798,46 +904,17 @@ _monitorstat_refresh (GstRTPStatMaker2 *this, gboolean lock)
   monitor = this->monitor;
   stat = &monitor->stat;
   if(this->csv_logging){
-    _fprintf(this, this->statslog_file,
-        "%d,%d,%d,%d," //received
-        "%d,%d,%d,%d," //lost
-        "%d,%d,%d,%d," //discarded
-        "%d,%d,%d,%d," //corrupted
-        "%d,%d,%d,%d," //repaired
-        "%d,%d,%d,%d\n"  //fec
-        ,
-        stat->received.total_packets,
-        stat->received.total_bytes,
-        stat->received.accumulative_bytes,
-        stat->received.accumulative_packets,
-
-        stat->lost.total_packets,
-        stat->lost.total_bytes,
-        stat->lost.accumulative_bytes,
-        stat->lost.accumulative_packets,
-
-        stat->discarded.total_packets,
-        stat->discarded.total_bytes,
-        stat->discarded.accumulative_bytes,
-        stat->discarded.accumulative_packets,
-
-        stat->corrupted.total_packets,
-        stat->corrupted.total_bytes,
-        stat->corrupted.accumulative_bytes,
-        stat->corrupted.accumulative_packets,
-
-        stat->repaired.total_packets,
-        stat->repaired.total_bytes,
-        stat->repaired.accumulative_bytes,
-        stat->repaired.accumulative_packets,
-
-        stat->fec.total_packets,
-        stat->fec.total_bytes,
-        stat->fec.accumulative_bytes,
-        stat->fec.accumulative_packets
-      );
-
-
+    if(0 < this->mprtp_ext_header_id){
+      GSList* it;
+      for(it = this->subflow_monitors_list; it; it = it->next){
+        SubflowMonitor* smonitor = it->data;
+        stat = &smonitor->monitor->stat;
+        _statprint(this, stat, smonitor->statslog);
+      }
+    }else{
+      stat = &monitor->stat;
+      _statprint(this, stat, this->statslog_file);
+    }
   }else{
 
   }

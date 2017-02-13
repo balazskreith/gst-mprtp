@@ -95,7 +95,7 @@ enum
   PROP_DETACH_SUBFLOW,
   PROP_SETUP_CONTROLLING_MODE,
   PROP_MAX_REAPIR_DELAY,
-  PROP_ENFORCED_DELAY,
+  PROP_MAX_JOIN_DELAY,
   PROP_SETUP_RTCP_INTERVAL_TYPE,
 
 };
@@ -216,8 +216,8 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           "Max time in ms the playouter waits for FEC response", 0,
           100, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_ENFORCED_DELAY,
-      g_param_spec_uint ("enforced-delay",
+  g_object_class_install_property (gobject_class, PROP_MAX_JOIN_DELAY,
+      g_param_spec_uint ("max-join-delay",
           "An enforced delay unifying the delys from different paths.",
           "An enforced delay unifying the delys from different paths.",
           0,
@@ -383,9 +383,10 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
       guint_value = g_value_get_uint (value);
       this->max_repair_delay_in_ms = guint_value;
       break;
-    case PROP_ENFORCED_DELAY:
+    case PROP_MAX_JOIN_DELAY:
       guint_value = g_value_get_uint (value);
-      stream_joiner_set_enforced_delay(this->joiner, guint_value * GST_MSECOND);
+      g_print("Max Join delay is set to %dms\n", guint_value);
+      stream_joiner_set_max_join_delay(this->joiner, guint_value * GST_MSECOND);
       //gst_pad_push_event(this->mprtp_srcpad, gst_event_new_latency(stream_joiner_get_latency(this->joiner)));
       break;
     default:
@@ -439,7 +440,7 @@ gst_mprtpplayouter_src_query (GstPad * sinkpad, GstObject * parent,
           gst_query_parse_latency (query, &live, &min, &max);
 //          min= GST_MSECOND;
 //          min = 0;
-          min = stream_joiner_get_latency(this->joiner);
+          min = stream_joiner_get_max_join_delay(this->joiner);
           max = -1;
           gst_query_set_latency (query, live, min, max);
       }
@@ -639,6 +640,7 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 
   //check weather the packet is rtcp or mprtp
   if (*buf_2nd_byte > 192 && *buf_2nd_byte < 223) {
+    //The packet is an rtcp packet not an mprtcp
     if(GST_IS_BUFFER(buf)){
       gst_pad_push(this->mprtp_srcpad, buf);
     }
@@ -822,7 +824,7 @@ _playout_process (GstMprtpplayouter *this)
 
   while((packet = g_async_queue_try_pop(this->packets_in)) != NULL){
     if(jitterbuffer_is_packet_discarded(this->jitterbuffer, packet)){
-    //    g_print("Discarded packet: %hu - %hu - %lu\n", packet->abs_seq, this->jitterbuffer->last_seq, GST_TIME_AS_MSECONDS(this->jitterbuffer->playout_delay));
+//        g_print("Discarded packet: %hu - %hu - %lu\n", packet->abs_seq, this->jitterbuffer->last_seq, GST_TIME_AS_MSECONDS(this->jitterbuffer->playout_delay));
       rcvtracker_add_discarded_packet(this->rcvtracker, packet);
       continue;
     }

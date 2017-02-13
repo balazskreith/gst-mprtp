@@ -37,6 +37,7 @@ Sender* sender_ctor(void)
   sprintf(this->bin_name, "SenderBin_%d", _instance_counter++);
   this->on_bitrate_change = make_eventer("on-bitrate-change");
 
+  this->on_keyframe.subscriber_func = on_fi_called;
   return this;
 }
 
@@ -270,6 +271,25 @@ GstElement* _make_mprtp_controller(Sender* this, SchedulerParams* params, Transf
   return GST_ELEMENT(schBin);
 }
 
+static void _on_keyframe_filtering(GstElement *mprtpSch, CodecTypes* codec_type){
+
+  guint keyframe_mode = 0;
+
+  switch(*codec_type){
+    case CODEC_TYPE_VP8:
+      keyframe_mode = 1;
+    break;
+    default:
+      keyframe_mode = 0;
+    break;
+  }
+  g_object_set(mprtpSch,
+         "mpath-keyframe-filtering", keyframe_mode,
+         NULL
+     );
+  g_print("Setup Mpath keyframe mode to %d\n", keyframe_mode);
+}
+
 static void
 _mprtp_subflows_utilization (GstElement * mprtpSch, MPRTPPluginSignalData *utilization, Sender* this)
 {
@@ -299,6 +319,9 @@ GstElement* _make_mprtp_fractal_controller(Sender* this, SchedulerParams *schedu
        "fec-interval", 0,
        NULL
    );
+
+  this->on_keyframe.subscriber_func = (subscriber)_on_keyframe_filtering;
+  this->on_keyframe.subscriber_obj = mprtpSch;
 
   g_signal_connect (mprtpSch, "mprtp-subflows-utilization", (GCallback) _mprtp_subflows_utilization, this);
   if(snd_transfer_params->type != TRANSFER_TYPE_MPRTP){

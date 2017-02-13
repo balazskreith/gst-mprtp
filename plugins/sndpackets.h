@@ -17,12 +17,19 @@
 typedef struct _SndPackets SndPackets;
 typedef struct _SndPacketsClass SndPacketsClass;
 
+typedef gboolean(*SndPacketFilterCb)(GstBuffer* rtp);
+
 #define SNDPACKETS_TYPE             (sndpackets_get_type())
 #define SNDPACKETS(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),SNDPACKETS_TYPE,SndPackets))
 #define SNDPACKETS_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass),SNDPACKETS_TYPE,SndPacketsClass))
 #define SNDPACKETS_IS_SOURCE(src)          (G_TYPE_CHECK_INSTANCE_TYPE((src),SNDPACKETS_TYPE))
 #define SNDPACKETS_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),SNDPACKETS_TYPE))
 #define SNDPACKETS_CAST(src)        ((SndPackets *)(src))
+
+typedef enum{
+  SNDPACKET_IFRAME_FILTER_MODE_NONE = 0,
+  SNDPACKET_IFRAME_FILTER_MODE_VP8 = 1,
+}SndPacketIFrameFilters;
 
 typedef struct _SndPacket
 {
@@ -51,6 +58,8 @@ typedef struct _SndPacket
   guint8               mprtp_ext_header_id;
   Recycle*             destiny;
 
+  gboolean             keyframe;
+
 }SndPacket;
 
 
@@ -62,6 +71,8 @@ struct _SndPackets
 //  SndPacket*                 packets;
 
   Recycle*                   recycle;
+
+  SndPacketFilterCb          keyframe_filtercb;
 
   guint8                     abs_time_ext_header_id;
   guint8                     mprtp_ext_header_id;
@@ -83,7 +94,7 @@ SndPacket* sndpackets_make_packet(SndPackets* this, GstBuffer* buffer);
 SndPacket* sndpackets_get_by_abs_seq(SndPackets* this, guint16 abs_seq);
 
 void sndpacket_setup_mprtp(SndPacket *packet, guint8 subflow_id, guint16 subflow_seq);
-
+void sndpackets_set_keyframe_filter_mode(SndPackets* this, guint filter_mode);
 void sndpackets_set_abs_time_ext_header_id(SndPackets* this, guint8 abs_time_ext_header_id);
 guint8 sndpackets_get_abs_time_ext_header_id(SndPackets* this);
 

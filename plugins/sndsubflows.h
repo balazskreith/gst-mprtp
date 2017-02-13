@@ -18,6 +18,7 @@ typedef struct _SndSubflows SndSubflows;
 typedef struct _SndSubflowsClass SndSubflowsClass;
 typedef struct _SndSubflowsPrivate SndSubflowsPrivate;
 
+
 #define SNDSUBFLOWS_TYPE             (sndsubflows_get_type())
 #define SNDSUBFLOWS(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),SNDSUBFLOWS_TYPE,SndSubflows))
 #define SNDSUBFLOWS_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass),SNDSUBFLOWS_TYPE,SndSubflowsClass))
@@ -42,6 +43,7 @@ typedef struct _SndSubflow
   gboolean                   congested;
   gboolean                   active;
 
+  gint32                     actual_bitrate;
   gint32                     target_bitrate;
   guint32                    packet_counter_for_fec;
 
@@ -90,7 +92,9 @@ struct _SndSubflows
 
   gint32               target_rate;
   guint                subflows_num;
+
 };
+
 
 struct _SndSubflowsClass{
   GObjectClass parent_class;

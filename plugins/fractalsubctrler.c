@@ -41,17 +41,6 @@ G_DEFINE_TYPE (FRACTaLSubController, fractalsubctrler, G_TYPE_OBJECT);
 //before the target considered to be accepted
 #define MIN_APPROVE_INTERVAL 50 * GST_MSECOND
 
-//!!!!!!!!!OBSOLATED!!!!!!!!!
-//determine the minimum multiplying factor for aprovements
-//before the target considered to be accepted
-#define APPROVE_MIN_FACTOR 1.0
-
-//!!!!!!!!!OBSOLATED!!!!!!!!!
-//determine the maximum multiplying factor for aprovements
-//before the target considered to be accepted
-#define APPROVE_MAX_FACTOR 2.0
-
-
 //determine the minimum multiplying factor for aprovements
 //before the target considered to be accepted
 #define APPROVE_MIN_TIME 0.1
@@ -113,8 +102,6 @@ struct _Private{
   gdouble             avg_rtp_payload;
 
   GstClockTime        min_approve_interval;
-  gdouble             approve_min_factor;
-  gdouble             approve_max_factor;
 
   gdouble             approve_min_time;
   gdouble             approve_max_time;
@@ -147,8 +134,6 @@ struct _Private{
 #define _min_pacing_bitrate(this)     _priv(this)->min_pacing_bitrate
 #define _appr_interval_eps(this)      _priv(this)->appr_interval_epsilon
 #define _min_appr_int(this)           _priv(this)->min_approve_interval
-#define _appr_min_fact(this)          _priv(this)->approve_min_factor
-#define _appr_max_fact(this)          _priv(this)->approve_max_factor
 
 #define _appr_min_time(this)          _priv(this)->approve_min_time
 #define _appr_max_time(this)          _priv(this)->approve_max_time
@@ -312,8 +297,6 @@ fractalsubctrler_init (FRACTaLSubController * this)
   this->priv = mprtp_malloc(sizeof(Private));
   this->sysclock = gst_system_clock_obtain();
 
-  _priv(this)->approve_min_factor               = APPROVE_MIN_FACTOR;
-  _priv(this)->approve_max_factor               = APPROVE_MAX_FACTOR;
 
   _priv(this)->approve_min_time                 = APPROVE_MIN_TIME;
   _priv(this)->approve_max_time                 = APPROVE_MAX_TIME;
@@ -522,7 +505,6 @@ void fractalsubctrler_report_update(
   fractalfbprocessor_report_update(this->fbprocessor, summary);
 
   DISABLE_LINE _stat_print(this);
-  _stat_print(this);
 
   this->approve_measurement  = FALSE;
   if(10 < _stat(this)->measurements_num){
@@ -957,7 +939,6 @@ guint _get_approvement_interval(FRACTaLSubController* this)
   gdouble interval;
   gdouble eps = MIN(_appr_interval_eps(this), (gdouble)_max_ramp_up(this) / (gdouble)this->target_bitrate);
   off = _off_target(this, 2, eps);
-  //interval = off * _appr_min_fact(this) + (1.-off) * _appr_max_fact(this);
   //return CONSTRAIN(.1 * GST_SECOND,  GST_SECOND, interval * _stat(this)->srtt);
 
   interval = off * MAX(_appr_min_time(this), _stat(this)->srtt / (gdouble)GST_SECOND) + (1.-off) * _appr_max_time(this);

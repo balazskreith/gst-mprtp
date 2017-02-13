@@ -37,13 +37,20 @@ GST_DEBUG_CATEGORY_STATIC (sndpackets_debug_category);
 
 G_DEFINE_TYPE (SndPackets, sndpackets, G_TYPE_OBJECT);
 
+/* Evaluates to a mask with n bits set */
+#define BITS_MASK(n) ((1<<(n))-1)
+
+/* Returns len bits, with the LSB at position bit */
+#define BITS_GET(val, bit, len) (((val)>>(bit))&BITS_MASK(len))
+
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
 
 static void sndpackets_finalize (GObject * object);
 static void _setup_sndpacket(SndPacket* result, GstBuffer* buffer);
-static void _setup_abs_time_extension(SndPacket* packet);;
+static void _setup_abs_time_extension(SndPacket* packet);
+static gboolean _vp8_keyframe_filter(GstBuffer* rtp);
 
 DEFINE_RECYCLE_TYPE(static, sndpacket, SndPacket);
 
@@ -91,6 +98,8 @@ sndpackets_init (SndPackets * this)
   this->abs_time_ext_header_id   = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
 
   this->recycle                  = make_recycle_sndpacket(32, (RecycleItemShaper) _setup_sndpacket);
+
+  this->keyframe_filtercb        = NULL;
 }
 
 
@@ -110,7 +119,21 @@ SndPacket* sndpackets_make_packet(SndPackets* this, GstBuffer* buffer)
   result->mprtp_ext_header_id    = this->mprtp_ext_header_id;
   result->abs_time_ext_header_id = this->abs_time_ext_header_id;
 
+  result->keyframe               = this->keyframe_filtercb ? this->keyframe_filtercb(buffer) : FALSE;
+
   return result;
+}
+
+void sndpackets_set_keyframe_filter_mode(SndPackets* this, guint filtering_mode)
+{
+  switch(filtering_mode){
+  case 1:
+    this->keyframe_filtercb = _vp8_keyframe_filter;
+    break;
+  default:
+    this->keyframe_filtercb = NULL;
+    break;
+  }
 }
 
 void sndpackets_set_abs_time_ext_header_id(SndPackets* this, guint8 abs_time_ext_header_id)
@@ -208,5 +231,25 @@ void _setup_abs_time_extension(SndPacket* packet)
   gst_rtp_buffer_map(packet->buffer, GST_MAP_READWRITE, &rtp);
   gst_rtp_buffer_set_abs_time_extension(&rtp, packet->abs_time_ext_header_id);
   gst_rtp_buffer_unmap(&rtp);
+}
+
+
+
+gboolean
+_vp8_keyframe_filter(GstBuffer* buffer)
+{
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+  gboolean is_keyframe;
+  guint8 *p;
+  unsigned long raw;
+  gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
+  p = gst_rtp_buffer_get_payload(&rtp);
+  /* The frame header is defined as a three byte little endian
+  * value
+  */
+  raw = p[0] | (p[1] << 8) | (p[2] << 16);
+  is_keyframe     = !BITS_GET(raw, 0, 1);
+  gst_rtp_buffer_unmap(&rtp);
+  return is_keyframe;
 }
 

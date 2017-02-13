@@ -152,6 +152,7 @@ sndsubflows_init (SndSubflows * this)
 
 }
 
+
 void sndsubflows_join(SndSubflows* this, guint8 id)
 {
   SndSubflow *subflow;
@@ -162,6 +163,8 @@ void sndsubflows_join(SndSubflows* this, guint8 id)
   }
 
   subflow = _make_subflow(this, id);
+  subflow->active = TRUE;
+
   this->subflows[id] = subflow;
   ++this->subflows_num;
 

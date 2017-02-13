@@ -30,10 +30,13 @@ struct _StreamJoiner
   GObject              object;
   GstClock*            sysclock;
   GstClockTime         made;
-  GQueue*              joinq;
+  GQueue*              outq;
+  GQueue*              frames;
+  Recycle*             frames_recycle;
+  guint16              hsn;
+  gboolean             hsn_init;
 
-  GstClockTime         min_delay;
-  GstClockTime         enforced_delay;
+  GstClockTime         max_join_delay;
 
 };
 struct _StreamJoinerClass{
@@ -44,11 +47,11 @@ StreamJoiner*
 make_stream_joiner(void);
 
 GstClockTime
-stream_joiner_get_latency(
+stream_joiner_get_max_join_delay(
     StreamJoiner *this);
 
 void
-stream_joiner_set_enforced_delay(
+stream_joiner_set_max_join_delay(
     StreamJoiner *this,
     GstClockTime join_delay
 );

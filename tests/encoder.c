@@ -106,8 +106,8 @@ GstElement* _make_vp8_encoder(Encoder* this, CodecParams *params)
       "lag-in-frames", 0,
       "timebase", 1, 90000,
       "error-resilient", 1,
-//      "keyframe-mode", 1, /* VPX_KF_DISABLED */
-//      "keyframe-max-dist", 128,
+      "keyframe-mode", params->keyframe_mode,
+      "keyframe-max-dist", params->keyframe_max_dist,
       NULL);
 
 

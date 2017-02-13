@@ -382,6 +382,7 @@ GstElement* _make_mprtp_fractal_controller(Receiver* this, PlayouterParams* play
   GstBin*     plyBin   = GST_BIN (gst_bin_new(NULL));
   GstElement* mprtpPly = _make_mprtp_playouter(this, rcv_transfer_params);
   Sender*     sender   = make_sender(NULL, NULL, playouter_params->snd_transfer_params, NULL);
+  gint32      subflows_num = g_slist_length(playouter_params->snd_transfer_params->subflows);
 
   gst_bin_add_many(plyBin,
       mprtpPly,
@@ -393,7 +394,7 @@ GstElement* _make_mprtp_fractal_controller(Receiver* this, PlayouterParams* play
       "controlling-mode", 2,
       "rtcp-interval-type", 2,
       "max-repair-delay", 10,
-      "enforced-delay", 0,
+      "max-join-delay", 1 < subflows_num ? 100 : 0,
       NULL
   );
 

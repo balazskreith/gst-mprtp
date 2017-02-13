@@ -29,6 +29,13 @@
 #include <gst/base/gstbasetransform.h>
 #include "monitor.h"
 
+typedef struct _SubflowMonitor{
+  gchar    packetslog[255];
+  gchar    statslog[255];
+  Monitor* monitor;
+  guint8   id;
+}SubflowMonitor;
+
 G_BEGIN_DECLS
 
 
@@ -75,6 +82,10 @@ struct _GstRTPStatMaker2 {
 //  GAsyncQueue*                  logs2writeq;
 //  GQueue*                       packetlogstr2recycle;
 
+  GSList*                       subflow_monitors_list;
+  SubflowMonitor*               subflow_monitors_lookup[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  gboolean                      next_id_set;
+  guint8                        next_id;
   gboolean                      touched_sync_active;
   gchar                         touched_sync_location[256];
   gchar                         packetslog_file[256];

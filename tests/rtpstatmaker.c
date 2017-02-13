@@ -34,31 +34,34 @@ RTPStatMaker* make_rtpstatmaker(StatParamsTuple *params_tuple)
 
   gst_bin_add(statBin, rtpstatmaker);
 
-//  if(statlogs_sink_params){
-//    Sink* statsink = make_sink(statlogs_sink_params);
-//    gst_bin_add(statBin, statsink->element);
-//    gst_element_link_pads(rtpstatmaker, "statlogs_src", statsink->element, "sink");
-//    objects_holder_add(this->holder, statsink, (GDestroyNotify)sink_dtor);
-//  }
-
   if(statlogs_sink_params){
     if(statlogs_sink_params->type == SINK_TYPE_FILE){
       g_object_set(rtpstatmaker, "statslog-location", statlogs_sink_params->file.location, NULL);
+    }else if(statlogs_sink_params->type == SINK_TYPE_MULTIFILE){
+      GSList* it;
+      SinkFileItem* sink_file_item;
+      g_object_set(rtpstatmaker, "mprtp-ext-header-id", 3, NULL);
+      for(it = statlogs_sink_params->multifile.items; it; it = it->next){
+        sink_file_item = it->data;
+        g_object_set(rtpstatmaker, "next-id", sink_file_item->id, NULL);
+        g_object_set(rtpstatmaker, "statslog-location", sink_file_item->path, NULL);
+      }
     }else{
       g_print("Testing pipeline at the moment not support other than file writing for Statistical collection");
     }
   }
 
-//  if(packetlogs_sink_params){
-//    Sink* packetlogsink = make_sink(statlogs_sink_params);
-//    gst_bin_add(statBin, packetlogsink->element);
-//    gst_element_link_pads(rtpstatmaker, "packetlogs_src", packetlogsink->element, "sink");
-//    objects_holder_add(this->holder, packetlogsink, (GDestroyNotify)sink_dtor);
-//  }
-
   if(packetlogs_sink_params){
     if(packetlogs_sink_params->type == SINK_TYPE_FILE){
       g_object_set(rtpstatmaker, "packetslog-location", packetlogs_sink_params->file.location, NULL);
+    }else if(packetlogs_sink_params->type == SINK_TYPE_MULTIFILE){
+      GSList* it;
+      SinkFileItem* sink_file_item;
+      for(it = packetlogs_sink_params->multifile.items; it; it = it->next){
+        sink_file_item = it->data;
+        g_object_set(rtpstatmaker, "next-id", sink_file_item->id, NULL);
+        g_object_set(rtpstatmaker, "packetslog-location", sink_file_item->path, NULL);
+      }
     }else{
       g_print("Testing pipeline at the moment not support other than file writing for Statistical collection");
     }

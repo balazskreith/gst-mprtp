@@ -30,6 +30,28 @@ void connect_interfaces(Interface* source, Interface* sink){
   gst_element_link_pads(source->element, source->padname, sink->element, sink->padname);
 }
 
+
+SinkFileItem* sink_file_item_ctor()
+{
+  SinkFileItem* result = g_malloc0(sizeof(SinkFileItem));
+  return result;
+}
+
+void sink_file_item_dtor(SinkFileItem* this)
+{
+  g_free(this);
+}
+
+
+SinkFileItem* make_sink_file_item(gint id, gchar* path)
+{
+  SinkFileItem* result = sink_file_item_ctor();
+  result->id = id;
+  strcpy(result->path, path);
+  return result;
+}
+
+
 void _print_info(void)
 {
   g_print(
@@ -179,7 +201,9 @@ CodecParams*    make_codec_params (gchar* params_rawstring)
 
     case CODEC_TYPE_VP8:
       sprintf(result->type_str,  "VP8");
-      sprintf(result->to_string, "VP8");
+      result->keyframe_mode = (1 < g_strv_length(tokens)) ? atoi(tokens[1]) : 0;
+      result->keyframe_max_dist = (2 < g_strv_length(tokens)) ? atoi(tokens[2]) : 0;
+      sprintf(result->to_string, "VP8, Keyframe mode: %d, keyframe max dist: %d", result->keyframe_mode, result->keyframe_max_dist);
     break;
 
     default:
@@ -464,7 +488,7 @@ SinkParams*     make_sink_params(gchar* params_rawstring)
   SinkParams* result = g_malloc0(sizeof(SinkParams));
   gchar       **tokens = g_strsplit(params_rawstring, ":", -1);
 
-  result->type = _compare_types(tokens[0], "AUTOVIDEO", "RAWPROXY", "FILE", "FAKESINK", NULL);
+  result->type = _compare_types(tokens[0], "AUTOVIDEO", "RAWPROXY", "FILE", "FAKESINK", "MULTIFILE",NULL);
 
   switch(result->type){
     case SINK_TYPE_AUTOVIDEO:
@@ -480,12 +504,38 @@ SinkParams*     make_sink_params(gchar* params_rawstring)
     case SINK_TYPE_FAKESINK:
       sprintf(result->to_string, "Fakesink");
       break;
+    case SINK_TYPE_MULTIFILE:
+      sprintf(result->to_string, "Multifile");
+      {
+        gchar string[256];
+        gint i,len,offset=1;
+        gint32 sink_id;
+        len = atoi(tokens[offset]);
+        memset(string, 0, 256);
+        for(i = 0; i < len; ++i){
+          SinkFileItem* item;
+          sink_id = atoi(tokens[++offset]);
+          item = make_sink_file_item(sink_id, tokens[++offset]);
+          result->multifile.items = g_slist_prepend(result->multifile.items, item);
+          sprintf(string, " Id: %d, Path: %s; ", sink_id, result->multifile.items->data);
+          strcat(result->to_string, string);
+        }
+      }
+      break;
     default:
       g_print("Unrecognized type (%d) at make_sink_params \n", result->type);
       break;
   };
 
   return result;
+}
+
+void free_sink_params(SinkParams* sink_params)
+{
+  if(sink_params->type == SINK_TYPE_MULTIFILE){
+    g_slist_free_full(sink_params->multifile.items, (GDestroyNotify) sink_file_item_dtor);
+  }
+  g_free(sink_params);
 }
 
 StatParamsTuple* make_statparams_tuple_by_raw_strings(gchar* statparams_rawstring,
@@ -543,11 +593,11 @@ void free_statparams_tuple(StatParamsTuple* statparams_tuple)
   g_free(statparams_tuple->stat_params);
 
   if(statparams_tuple->packetlogs_sink_params){
-    g_free(statparams_tuple->packetlogs_sink_params);
+    free_sink_params(statparams_tuple->packetlogs_sink_params);
   }
 
   if(statparams_tuple->statlogs_sink_params){
-    g_free(statparams_tuple->statlogs_sink_params);
+    free_sink_params(statparams_tuple->statlogs_sink_params);
   }
 
   g_free(statparams_tuple);

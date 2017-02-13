@@ -179,8 +179,9 @@ int main (int argc, char **argv)
       session->extra_delay_params);
 //  session->sender = make_sender_custom();
 
-  pipeline_add_subscriber("on-playing", &session->source->on_playing);
-  pipeline_add_subscriber("on-destroy", &session->source->on_destroy);
+  pipeline_add_subscriber("on-keyframe", &session->sender->on_keyframe);
+  pipeline_add_subscriber("on-playing",  &session->source->on_playing);
+  pipeline_add_subscriber("on-destroy",  &session->source->on_destroy);
 
   loop = g_main_loop_new (NULL, FALSE);
 
@@ -202,6 +203,9 @@ int main (int argc, char **argv)
   //TODO: setup a start target bitrate if we have one!
 
   g_print ("starting sender pipeline\n");
+  if(0 < session->codec_params->keyframe_mode){
+    pipeline_firing_event("on-keyframe", &session->codec_params->type);
+  }
   pipeline_firing_event("on-playing", NULL);
   gst_element_set_state (GST_ELEMENT (pipe), GST_STATE_PLAYING);
 

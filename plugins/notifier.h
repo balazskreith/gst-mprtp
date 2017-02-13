@@ -46,4 +46,5 @@ void notifier_rem_listener(Notifier *this, ListenerFunc callback);
 void notifier_do(Notifier *this, gpointer subject);
 
 
+
 #endif /* NOTIFIER_H_ */

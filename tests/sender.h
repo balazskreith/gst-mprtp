@@ -12,6 +12,8 @@ typedef struct{
   TransferParams* transfer_params;
 
   Eventer*       on_bitrate_change;
+
+  Subscriber     on_keyframe;
   gpointer        priv;
 }Sender;
 

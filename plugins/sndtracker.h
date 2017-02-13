@@ -94,6 +94,7 @@ void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_resp
 void sndtracker_add_on_packet_sent(SndTracker * this, ListenerFunc callback, gpointer udata);
 void sndtracker_add_on_packet_sent_with_filter(SndTracker * this, ListenerFunc callback, ListenerFilterFunc filter, gpointer udata);
 void sndtracker_rem_on_packet_sent(SndTracker * this, ListenerFunc callback);
+
 SndTrackerStat* sndtracker_get_stat(SndTracker * this);
 SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id);
 RTPQueueStat*   sndtracker_get_rtpqstat(SndTracker * this);

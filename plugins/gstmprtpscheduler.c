@@ -102,7 +102,7 @@ enum
   PROP_MPRTP_EXT_HEADER_ID,
   PROP_ABS_TIME_EXT_HEADER_ID,
   PROP_FEC_PAYLOAD_TYPE,
-//  PROP_MPATH_KEYFRAME_FILTERING,
+  PROP_MPATH_KEYFRAME_FILTERING,
   PROP_PACKET_OBSOLATION_TRESHOLD,
   PROP_JOIN_SUBFLOW,
   PROP_DETACH_SUBFLOW,
@@ -222,11 +222,11 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "Set or get the payload type of FEC packets.",
           0, 127, FEC_PAYLOAD_DEFAULT_ID, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-//  g_object_class_install_property (gobject_class, PROP_MPATH_KEYFRAME_FILTERING,
-//      g_param_spec_uint ("mpath-keyframe-filtering",
-//          "Set or get the keyframe filtering for multiple path",
-//          "Set or get the keyframe filtering for multiple path. 0 - no keyframe filtering, 1 - vp8 enc/dec filtering",
-//          0, 255, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (gobject_class, PROP_MPATH_KEYFRAME_FILTERING,
+      g_param_spec_uint ("mpath-keyframe-filtering",
+          "Set or get the keyframe filtering for multiple path",
+          "Set or get the keyframe filtering for multiple path. 0 - no keyframe filtering, 1 - vp8 enc/dec filtering",
+          0, 255, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_PACKET_OBSOLATION_TRESHOLD,
       g_param_spec_uint ("obsolation-treshold",
@@ -441,7 +441,6 @@ gst_mprtpscheduler_finalize (GObject * object)
   G_OBJECT_CLASS (gst_mprtpscheduler_parent_class)->finalize (object);
 }
 
-
 typedef struct _SubflowSpecProp{
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
   guint32  value : 24;
@@ -480,9 +479,11 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
     case PROP_JOIN_SUBFLOW:
       sndsubflows_join(this->subflows, g_value_get_uint (value));
       break;
-//    case PROP_MPATH_KEYFRAME_FILTERING:
-//      g_warning("path keyframe filtering is not implemented yet");
-//      break;
+    case PROP_MPATH_KEYFRAME_FILTERING:
+      guint_value = g_value_get_uint (value);
+      sndpackets_set_keyframe_filter_mode(this->sndpackets, guint_value);
+      stream_splitter_set_mpath_keyframe_filtering(this->splitter, guint_value != SNDPACKET_IFRAME_FILTER_MODE_NONE);
+      break;
     case PROP_PACKET_OBSOLATION_TRESHOLD:
       this->obsolation_treshold = g_value_get_uint(value) * GST_MSECOND;
       break;
@@ -878,12 +879,14 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndSubflow* subflow, SndP
   fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(packet->buffer));
 
   sndtracker_packet_sent(this->sndtracker, packet);
-//  g_print("packet %hu sent %d - %hu\n", packet->abs_seq, packet->subflow_id, packet->subflow_seq);
+  subflow->actual_bitrate = sndtracker_get_subflow_stat(this->sndtracker, subflow->id)->sent_bytes_in_1s << 3;
+//  g_print("packet %hu sent %d - %hu keyframe: %d\n",
+//      packet->abs_seq, packet->subflow_id, packet->subflow_seq, packet->keyframe);
 
   buffer = sndpacket_retrieve(packet);
 //  g_print("Packet sent  flow result: %d\n", gst_pad_push(this->mprtp_srcpad, buffer));
 
-//  artifical lost
+//  artifital lost
 //    if(++this->sent_packets % 21 == 0){
 //      gst_buffer_unref(buffer);
 //    }else{

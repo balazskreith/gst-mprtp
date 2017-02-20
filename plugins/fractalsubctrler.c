@@ -365,6 +365,10 @@ void _on_rtp_sending(FRACTaLSubController* this, SndPacket *packet)
   if(!this->enabled || this->stat->measurements_num < 10){
     return;
   }
+//  if(this->subflow->state == SNDSUBFLOW_STATE_OVERUSED && _now(this) < this->last_distorted + .5 * GST_SECOND){
+//    this->subflow->pacing_time = _now(this) + .5 * GST_SECOND;
+//    return;
+//  }
 
   srtt_in_s = _stat(this)->srtt * .000000001;
   pacing_bitrate = 0. < srtt_in_s ? this->cwnd / srtt_in_s : 50000.;
@@ -447,12 +451,13 @@ done:
 static void _stat_print(FRACTaLSubController *this)
 {
   FRACTaLStat *stat = this->stat;
-  g_print("MsN:%d - %1.1f|"
+  g_print("%d:MsN:%d - %1.1f|"
           "BiF:%-3d %-3d->%-3.0f|"
           "FEC:%-4d|SR:%-4d|RR:%-4d|Tr:%-4d|Btl:%-4d|KP:%-4d|IP:%-4d|"
           "%d-%d-%d-%d|"
           "QD:%-3lu+%-3lu(%-3lu)->%1.2f|"
           "FL:%-1.2f+%1.2f (%-1.2f)\n",
+      this->subflow->id,
       stat->measurements_num,
       GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000.,
 
@@ -505,6 +510,7 @@ void fractalsubctrler_report_update(
   fractalfbprocessor_report_update(this->fbprocessor, summary);
 
   DISABLE_LINE _stat_print(this);
+  _stat_print(this);
 
   this->approve_measurement  = FALSE;
   if(10 < _stat(this)->measurements_num){

@@ -385,6 +385,18 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   sndsubflows_add_on_target_bitrate_changed_cb(this->subflows,
       (ListenerFunc) stream_splitter_on_target_bitrate_changed, this->splitter);
 
+  sndsubflows_add_on_subflow_joined_cb(this->subflows,
+      (ListenerFunc) stream_splitter_on_subflow_joined,
+      this->splitter);
+
+  sndsubflows_add_on_subflow_detached_cb(this->subflows,
+        (ListenerFunc) stream_splitter_on_subflow_detached,
+        this->splitter);
+
+  sndsubflows_add_on_subflow_state_changed_cb(this->subflows,
+        (ListenerFunc) stream_splitter_on_subflow_state_changed,
+        this->splitter);
+
   mediator_set_request_handler(this->monitoring,
       (ListenerFunc) _on_monitoring_request, this);
 
@@ -960,6 +972,7 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
   }
 
   subflow = stream_splitter_approve_packet(this->splitter, packet, now, &next_time);
+
   if(!subflow){
     g_queue_push_head(this->packetsq, packet);
 //    g_print("packet %hu is pushed fron\n", packet->abs_seq);
@@ -971,6 +984,7 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
     }
     goto done;
   }
+//  g_print("Subflow: %d\n", subflow->id);
 
   if(0 < this->fec_interval && (++this->sent_packets % this->fec_interval) == 0){
     _on_monitoring_request(this, subflow);

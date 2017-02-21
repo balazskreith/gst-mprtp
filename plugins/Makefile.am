@@ -34,6 +34,7 @@ libgstmprtp_la_SOURCES = fecdec.c              \
                          rtpfecbuffer.c        \
                          slidingwindow.c       \
                          sndctrler.c           \
+                         sndqueue.c            \
                          sndsubflows.c         \
                          sndtracker.c          \
                          sndpackets.c          \
@@ -68,6 +69,7 @@ noinst_HEADERS = fecdec.h              \
                  rtpfecbuffer.h        \
                  slidingwindow.h       \
                  sndctrler.h           \
+                 sndqueue.h            \
                  sndsubflows.h         \
                  sndpackets.h          \
                  sndtracker.h          \

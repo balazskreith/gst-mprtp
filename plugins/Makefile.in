@@ -167,8 +167,9 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-fecdec.lo \
 	libgstmprtp_la-reportproc.lo libgstmprtp_la-reportprod.lo \
 	libgstmprtp_la-ricalcer.lo libgstmprtp_la-rtpfecbuffer.lo \
 	libgstmprtp_la-slidingwindow.lo libgstmprtp_la-sndctrler.lo \
-	libgstmprtp_la-sndsubflows.lo libgstmprtp_la-sndtracker.lo \
-	libgstmprtp_la-sndpackets.lo libgstmprtp_la-streamjoiner.lo \
+	libgstmprtp_la-sndqueue.lo libgstmprtp_la-sndsubflows.lo \
+	libgstmprtp_la-sndtracker.lo libgstmprtp_la-sndpackets.lo \
+	libgstmprtp_la-streamjoiner.lo \
 	libgstmprtp_la-streamsplitter.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -447,6 +448,7 @@ libgstmprtp_la_SOURCES = fecdec.c              \
                          rtpfecbuffer.c        \
                          slidingwindow.c       \
                          sndctrler.c           \
+                         sndqueue.c            \
                          sndsubflows.c         \
                          sndtracker.c          \
                          sndpackets.c          \
@@ -480,6 +482,7 @@ noinst_HEADERS = fecdec.h              \
                  rtpfecbuffer.h        \
                  slidingwindow.h       \
                  sndctrler.h           \
+                 sndqueue.h            \
                  sndsubflows.h         \
                  sndpackets.h          \
                  sndtracker.h          \
@@ -616,6 +619,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-slidingwindow.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-sndctrler.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-sndpackets.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-sndqueue.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-sndsubflows.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-sndtracker.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-streamjoiner.Plo@am__quote@
@@ -872,6 +876,13 @@ libgstmprtp_la-sndctrler.lo: sndctrler.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sndctrler.c' object='libgstmprtp_la-sndctrler.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-sndctrler.lo `test -f 'sndctrler.c' || echo '$(srcdir)/'`sndctrler.c
+
+libgstmprtp_la-sndqueue.lo: sndqueue.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-sndqueue.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-sndqueue.Tpo -c -o libgstmprtp_la-sndqueue.lo `test -f 'sndqueue.c' || echo '$(srcdir)/'`sndqueue.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-sndqueue.Tpo $(DEPDIR)/libgstmprtp_la-sndqueue.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sndqueue.c' object='libgstmprtp_la-sndqueue.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-sndqueue.lo `test -f 'sndqueue.c' || echo '$(srcdir)/'`sndqueue.c
 
 libgstmprtp_la-sndsubflows.lo: sndsubflows.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-sndsubflows.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-sndsubflows.Tpo -c -o libgstmprtp_la-sndsubflows.lo `test -f 'sndsubflows.c' || echo '$(srcdir)/'`sndsubflows.c

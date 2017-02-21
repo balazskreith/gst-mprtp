@@ -28,6 +28,7 @@
 #include "mprtplogger.h"
 #include "fecenc.h"
 #include "mediator.h"
+#include "sndqueue.h"
 
 G_BEGIN_DECLS
 #define GST_TYPE_MPRTPSCHEDULER   (gst_mprtpscheduler_get_type())
@@ -73,6 +74,8 @@ struct _GstMprtpscheduler
 
   GstClockTime                  last_pts;
 
+  gboolean                      keyframe_filtering;
+
   guint32                       rtcp_sent_octet_sum;
 
   GstTask*                      sending_thread;
@@ -84,8 +87,9 @@ struct _GstMprtpscheduler
   guint32                       fec_interval;
   guint32                       sent_packets;
 
+  SndQueue*                     sndqueue;
   Mediator*                     monitoring;
-  GQueue*                       packetsq;
+//  GQueue*                       packetsq;
   Messenger*                    emit_msger;
 //  GAsyncQueue*                  emitterq;
   Messenger*                    fec_responses;

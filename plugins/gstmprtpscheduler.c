@@ -88,7 +88,7 @@ static gboolean gst_mprtpscheduler_sink_event (GstPad * srckpad, GstObject * par
 static void _on_rtcp_ready(GstMprtpscheduler * this, GstBuffer *buffer);
 static void _on_monitoring_request(GstMprtpscheduler * this, SndSubflow* subflow);
 static void _on_monitoring_response(GstMprtpscheduler * this, FECEncoderResponse *response);
-static void _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndSubflow* subflow, SndPacket *packet);
+static void _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndPacket *packet);
 static void mprtpscheduler_approval_process(GstMprtpscheduler *this);
 static void mprtpscheduler_sender_process (gpointer udata);
 static void mprtpscheduler_emitter_process(gpointer udata);
@@ -368,10 +368,10 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   this->subflows      = make_sndsubflows(this->monitoring);
   this->sndpackets    = make_sndpackets();
-  this->packetsq      = g_queue_new();
   this->emit_msger    = make_messenger(sizeof(MPRTPPluginSignalData));
 
   this->splitter      = make_stream_splitter(this->subflows);
+  this->sndqueue      = make_sndqueue(this->subflows);
   this->fec_encoder   = make_fecencoder(this->monitoring);
   this->sndtracker    = make_sndtracker(this->subflows);
 
@@ -396,6 +396,14 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   sndsubflows_add_on_subflow_state_changed_cb(this->subflows,
         (ListenerFunc) stream_splitter_on_subflow_state_changed,
         this->splitter);
+
+  sndsubflows_add_on_subflow_joined_cb(this->subflows,
+      (ListenerFunc) sndqueue_on_subflow_joined,
+      this->sndqueue);
+
+  sndsubflows_add_on_subflow_detached_cb(this->subflows,
+        (ListenerFunc) sndqueue_on_subflow_detached,
+        this->sndqueue);
 
   mediator_set_request_handler(this->monitoring,
       (ListenerFunc) _on_monitoring_request, this);
@@ -446,7 +454,7 @@ gst_mprtpscheduler_finalize (GObject * object)
   g_object_unref (this->sndpackets);
   g_object_unref (this->splitter);
   g_object_unref (this->fec_encoder);
-  g_queue_free(this->packetsq);
+  g_object_unref (this->sndqueue);
 
   g_object_unref(this->emit_msger);
 
@@ -493,8 +501,9 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       break;
     case PROP_MPATH_KEYFRAME_FILTERING:
       guint_value = g_value_get_uint (value);
+      //TODO: changepoint
       sndpackets_set_keyframe_filter_mode(this->sndpackets, guint_value);
-      stream_splitter_set_mpath_keyframe_filtering(this->splitter, guint_value != SNDPACKET_IFRAME_FILTER_MODE_NONE);
+      this->keyframe_filtering = guint_value != SNDPACKET_IFRAME_FILTER_MODE_NONE;
       break;
     case PROP_PACKET_OBSOLATION_TRESHOLD:
       this->obsolation_treshold = g_value_get_uint(value) * GST_MSECOND;
@@ -650,14 +659,40 @@ gst_mprtpscheduler_query (GstElement * element, GstQuery * query)
   return ret;
 }
 
-
-static void _wait(GstMprtpscheduler *this, GstClockTime end, gint64 step_in_microseconds)
+static void _select_highest_state(SndSubflow *subflow, SndSubflowState *max_state)
 {
-  gint64 end_time;
-  while(_now(this) < end){
-    end_time = g_get_monotonic_time() + step_in_microseconds;
-    g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);
+  *max_state = CONSTRAIN(*max_state, SNDSUBFLOW_STATE_STABLE, subflow->state);
+}
+
+static SndSubflow* _packet_imposer(GstMprtpscheduler* this, SndPacket* packet, SndSubflow* subflow)
+{
+  guint8 min_allowed_state;
+  if(this->keyframe_filtering == FALSE){
+    return subflow;
   }
+
+  if(packet->keyframe){
+    return subflow;
+  }
+
+  sndsubflows_iterate(this->subflows, (GFunc)_select_highest_state, &min_allowed_state);
+  if(min_allowed_state <= subflow->state){
+     return subflow;
+  }
+  {
+    GSList* it;
+    for(it = this->subflows->joined; it; it = it->next){
+      SndSubflow* selected = it->data;
+      if(!selected->active){
+        continue;
+      }
+      if(min_allowed_state <= selected->state){
+        continue;
+      }
+      return selected;
+    }
+  }
+  return subflow;
 }
 
 static GstFlowReturn
@@ -669,6 +704,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   guint8 first_byte;
   guint8 second_byte;
   SndPacket* packet = NULL;
+  SndSubflow* subflow = NULL;
 
   this = GST_MPRTPSCHEDULER (parent);
 
@@ -708,14 +744,21 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   //fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(buffer));
 
   THIS_LOCK(this);
-
-  if(0 < sndsubflows_get_subflows_num(this->subflows)){
-    packet = sndpackets_make_packet(this->sndpackets, gst_buffer_ref(buffer));
-    g_queue_push_tail(this->packetsq, sndtracker_add_packet_to_rtpqueue(this->sndtracker, packet));
-    g_cond_signal(&this->receiving_signal);
-  }else{
+  if(!sndsubflows_get_subflows_num(this->subflows)){
     result = gst_pad_push(this->mprtp_srcpad, buffer);
+    goto unlock_and_done;
   }
+
+  packet = sndpackets_make_packet(this->sndpackets, gst_buffer_ref(buffer));
+  subflow = stream_splitter_select_subflow(this->splitter, packet);
+  if(subflow){
+    subflow = _packet_imposer(this, packet, subflow);
+    sndpacket_setup_mprtp(packet, subflow->id, sndsubflow_get_next_subflow_seq(subflow));
+    fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(packet->buffer));
+    sndqueue_push_packet(this->sndqueue, sndtracker_add_packet_to_rtpqueue(this->sndtracker, packet));
+    g_cond_signal(&this->receiving_signal);
+  }
+unlock_and_done:
   THIS_UNLOCK(this);
 
 done:
@@ -884,16 +927,11 @@ void _on_monitoring_response(GstMprtpscheduler * this, FECEncoderResponse *respo
 }
 
 void
-_mprtpscheduler_send_packet (GstMprtpscheduler * this, SndSubflow* subflow, SndPacket *packet)
+_mprtpscheduler_send_packet (GstMprtpscheduler * this, SndPacket *packet)
 {
   GstBuffer *buffer;
-  sndpacket_setup_mprtp(packet, subflow->id, sndsubflow_get_next_subflow_seq(subflow));
-  fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(packet->buffer));
 
   sndtracker_packet_sent(this->sndtracker, packet);
-  subflow->actual_bitrate = sndtracker_get_subflow_stat(this->sndtracker, subflow->id)->sent_bytes_in_1s << 3;
-//  g_print("packet %hu sent %d - %hu keyframe: %d\n",
-//      packet->abs_seq, packet->subflow_id, packet->subflow_seq, packet->keyframe);
 
   buffer = sndpacket_retrieve(packet);
 //  g_print("Packet sent  flow result: %d\n", gst_pad_push(this->mprtp_srcpad, buffer));
@@ -911,12 +949,14 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndSubflow* subflow, SndP
 
   if(this->fec_requested){
     FECEncoderResponse* response;
-    response = messenger_pop_block(this->fec_responses);
-    sndtracker_add_fec_response(this->sndtracker, response);
-    gst_pad_push(this->mprtp_srcpad, response->fecbuffer);
-//    g_async_queue_push(this->sendq, response->fecbuffer);
-    fecencoder_unref_response(response);
-    this->fec_requested = FALSE;
+    response = messenger_try_pop_block(this->fec_responses);
+    if(response){
+      sndtracker_add_fec_response(this->sndtracker, response);
+      gst_pad_push(this->mprtp_srcpad, response->fecbuffer);
+    //    g_async_queue_push(this->sendq, response->fecbuffer);
+      fecencoder_unref_response(response);
+      this->fec_requested = FALSE;
+    }
   }
 
   if (!this->riport_flow_signal_sent) {
@@ -945,52 +985,44 @@ static void
 mprtpscheduler_approval_process (GstMprtpscheduler *this)
 {
   SndPacket *packet;
-  SndSubflow *subflow;
   GstClockTime now, next_time;
 
 //PROFILING("LOCK",
   THIS_LOCK(this);
 //);
 
-
-  if(g_queue_is_empty(this->packetsq)){
-//    g_cond_wait_until(&this->receiving_signal, &this->mutex, g_get_monotonic_time() + 1000);
+  if(sndqueue_is_empty(this->sndqueue)){
     g_cond_wait(&this->receiving_signal, &this->mutex);
-    goto done;
   }
-  packet = (SndPacket*) g_queue_pop_head(this->packetsq);
-  now = _now(this);
-  next_time = now + 10 * GST_MSECOND;
 
   sndtracker_refresh(this->sndtracker);
   sndctrler_time_update(this->controller);
+
+  now = _now(this);
+  next_time = now + 10 * GST_MSECOND;
+  packet = sndqueue_pop_packet(this->sndqueue, &next_time);
+  if(!packet){
+    if(now < next_time - 500 * GST_USECOND){
+//        g_print("1: now: %lu -> next_time: %lu diff: %lu\n", now, next_time, next_time - now);
+      _wait2(this, next_time);
+//        g_print("2: now: %lu -> next_time: %lu diff: %lu\n", _now(this), next_time, _now(this) - next_time);
+    }
+    goto done;
+  }
 
   //Obsolete packets stayed in the q for a while
   if(0 < this->obsolation_treshold && packet->made < now - this->obsolation_treshold){
     gst_buffer_unref(sndpacket_retrieve(packet));
     goto done;
   }
-
-  subflow = stream_splitter_approve_packet(this->splitter, packet, now, &next_time);
-
-  if(!subflow){
-    g_queue_push_head(this->packetsq, packet);
-//    g_print("packet %hu is pushed fron\n", packet->abs_seq);
-    if(now < next_time - 500 * GST_USECOND){
-//      g_print("1: now: %lu -> next_time: %lu diff: %lu\n", now, next_time, next_time - now);
-      DISABLE_LINE _wait(this, next_time, 500);
-      _wait2(this, next_time);
-//      g_print("2: now: %lu -> next_time: %lu diff: %lu\n", _now(this), next_time, _now(this) - next_time);
-    }
-    goto done;
-  }
 //  g_print("Subflow: %d\n", subflow->id);
 
   if(0 < this->fec_interval && (++this->sent_packets % this->fec_interval) == 0){
+    SndSubflow* subflow = sndsubflows_get_subflow(this->subflows, packet->subflow_id);
     _on_monitoring_request(this, subflow);
   }
 
-  _mprtpscheduler_send_packet(this, subflow, packet);
+  _mprtpscheduler_send_packet(this, packet);
 
 done:
   THIS_UNLOCK(this);

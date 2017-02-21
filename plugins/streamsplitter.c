@@ -209,7 +209,6 @@ stream_splitter_init (StreamSplitter * this)
   this->sysclock = gst_system_clock_obtain ();
   this->made                   = _now(this);
   this->refresh                = TRUE;
-  this->keyframe_filtering     = FALSE;
 
   this->splittersubflows_lookup       = g_malloc0(sizeof(SplitterSubflow) * MPRTP_PLUGIN_MAX_SUBFLOW_NUM);
   this->splittersubflows_list          = NULL;
@@ -217,11 +216,6 @@ stream_splitter_init (StreamSplitter * this)
 }
 
 
-void
-stream_splitter_set_mpath_keyframe_filtering(StreamSplitter * this, guint keyframe_filtering)
-{
-  this->keyframe_filtering = keyframe_filtering;
-}
 
 void
 stream_splitter_on_target_bitrate_changed(StreamSplitter* this, SndSubflow* subflow)
@@ -283,17 +277,10 @@ stream_splitter_on_subflow_state_changed(StreamSplitter* this, SndSubflow* subfl
   sndsubflows_iterate(this->subflows, (GFunc)_select_highest_state, &this->max_state);
 }
 
-SndSubflow* stream_splitter_approve_packet(StreamSplitter * this,
-    SndPacket *packet, GstClockTime now, GstClockTime *next_time)
+SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *packet)
 {
   SchNode *selected;
   SndSubflow* result = NULL;
-  guint8 min_allowed_state;
-  GstClockTime next_allowed_time = 0;
-  gboolean has_allowed_subflow = FALSE;
-  GSList* it;
-
-  min_allowed_state = this->keyframe_filtering ? this->max_state: SNDSUBFLOW_STATE_OVERUSED;
 
   if(this->refresh){
     _clean_tree(this);
@@ -306,32 +293,10 @@ SndSubflow* stream_splitter_approve_packet(StreamSplitter * this,
     goto done;
   }
 
-  for(it = this->splittersubflows_list; it; it = it->next){
-    SplitterSubflow* splitter_subflow = it->data;
-    SndSubflow* subflow = splitter_subflow->subflow;
-
-    if(!next_allowed_time || subflow->pacing_time < next_allowed_time){
-      next_allowed_time = subflow->pacing_time;
-    }
-    if(now < subflow->pacing_time){
-      splitter_subflow->allowed = FALSE;
-      continue;
-    }
-    if(packet->keyframe && subflow->state < min_allowed_state){
-      splitter_subflow->allowed = FALSE;
-      continue;
-    }
-
-    splitter_subflow->allowed = TRUE;
-    has_allowed_subflow = TRUE;
-  }
 
   DISABLE_LINE _print_ratios(this);
 
-  if(!has_allowed_subflow){
-    if(next_time){
-      *next_time = next_allowed_time;
-    }
+  if(!sndsubflows_get_subflows_num(this->subflows)){
     goto done;
   }
   selected = _schtree_select_next(this, this->tree, packet);
@@ -423,32 +388,17 @@ _schnode_ctor (void)
 }
 
 
-static gboolean _allowed_node(StreamSplitter* this, SchNode* node){
-  GSList *it;
-  SndSubflow *subflow;
-  for(it = node->subflows; it; it = it->next){
-    subflow = it->data;
-    if(_get_splitter_subflow(this, subflow->id)->allowed){
-      return TRUE;
-    }
-  }
-  return FALSE;
-}
-
 SchNode* _schtree_select_next(StreamSplitter* this, SchNode *node, SndPacket* packet)
 {
   SchNode *child = NULL, *selected = NULL;
   GSList* it;
 
   if(node->childs == NULL){
-    return _allowed_node(this, node) ? node : NULL;
+    return node;
   }
 
   for(it = node->childs; it; it = it->next){
     child = it->data;
-    if(!_allowed_node(this, child)){
-      continue;
-    }
     if(!selected || child->sent_bytes < selected->sent_bytes){
       selected = child;
     }
@@ -459,6 +409,10 @@ SchNode* _schtree_select_next(StreamSplitter* this, SchNode *node, SndPacket* pa
   }
 
   selected->sent_bytes += packet->payload_size;
+//  if(!this->has_denied_subflow){
+//    selected->sent_bytes += packet->payload_size;
+//  }
+
   if(selected->childs){
     return _schtree_select_next(this, selected, packet);
   }

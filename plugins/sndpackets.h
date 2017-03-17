@@ -50,6 +50,8 @@ typedef struct _SndPacket
 
   guint16              subflow_seq;
   guint8               subflow_id;
+  gpointer             schnode;
+  GstClockTime         scheduled;
 
   gboolean             lost;
   gboolean             acknowledged;

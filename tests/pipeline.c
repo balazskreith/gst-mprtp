@@ -243,18 +243,16 @@ StatParams*     make_stat_params (gchar* params_rawstring)
   StatParams  *result = g_malloc0(sizeof(StatParams));
   gchar       **tokens = g_strsplit(params_rawstring, ":", -1);
 
-  result->sampling_time       = atoi(tokens[0]);
-  result->accumulation_length = atoi(tokens[1]);
-  result->csv_logging         = atoi(tokens[2]);
-  strcpy(result->touched_sync,     tokens[3]);
+  strcpy(result->touched_sync,            tokens[0]);
+  strcpy(result->logfile_path,            tokens[1]);
+  result->mprtp_ext_header_id = atoi(tokens[2]);
 
 
   sprintf(result->to_string,
-      "Sampling time: %dms, Acc. length: %dms, CSV logging: %d, Touched sync: %s, ",
-      result->sampling_time,
-      result->accumulation_length,
-      result->csv_logging,
-      result->touched_sync
+      "Touched sync: %s; Logfile path: %s; MPRTP Ext Header ID: %d",
+      result->touched_sync,
+      result->logfile_path,
+      result->mprtp_ext_header_id
 
   );
 
@@ -536,71 +534,6 @@ void free_sink_params(SinkParams* sink_params)
     g_slist_free_full(sink_params->multifile.items, (GDestroyNotify) sink_file_item_dtor);
   }
   g_free(sink_params);
-}
-
-StatParamsTuple* make_statparams_tuple_by_raw_strings(gchar* statparams_rawstring,
-                                       gchar* statlogs_sink_params_rawstring,
-                                       gchar* packetlogs_sink_params_rawstring
-                                      )
-{
-  StatParams* stat_params;
-  SinkParams* statlogs_sink_params = NULL;
-  SinkParams* packetlogs_sink_params = NULL;
-
-  if(statparams_rawstring == NULL){
-    return NULL;
-  }
-
-  stat_params = make_stat_params(statparams_rawstring);
-
-  if(statlogs_sink_params_rawstring){
-      statlogs_sink_params = make_sink_params(statlogs_sink_params_rawstring);
-  }
-
-  if(packetlogs_sink_params_rawstring){
-    packetlogs_sink_params = make_sink_params(packetlogs_sink_params_rawstring);
-  }
-
-  return make_statparams_tuple(stat_params, statlogs_sink_params, packetlogs_sink_params);
-}
-
-StatParamsTuple* make_statparams_tuple(StatParams* stat_params,
-                                       SinkParams* statlogs_sink_params,
-                                       SinkParams* packetlogs_sink_params
-                                      )
-{
-  StatParamsTuple* result = g_malloc0(sizeof(StatParamsTuple));
-
-  result->stat_params = stat_params;
-  result->statlogs_sink_params = statlogs_sink_params;
-  result->packetlogs_sink_params = packetlogs_sink_params;
-
-  sprintf(result->to_string, "%s; StatLogs Sink Params: %s; PacketLogs Sink Params: %s",
-      result->stat_params->to_string,
-      result->statlogs_sink_params ? result->statlogs_sink_params->to_string : NULL,
-      result->packetlogs_sink_params ? result->packetlogs_sink_params->to_string : NULL
-  );
-
-  return result;
-}
-
-void free_statparams_tuple(StatParamsTuple* statparams_tuple)
-{
-  if(!statparams_tuple){
-    return;
-  }
-
-  g_free(statparams_tuple->stat_params);
-
-  if(statparams_tuple->packetlogs_sink_params){
-    free_sink_params(statparams_tuple->packetlogs_sink_params);
-  }
-
-  if(statparams_tuple->statlogs_sink_params){
-    free_sink_params(statparams_tuple->statlogs_sink_params);
-  }
-
-  g_free(statparams_tuple);
 }
 
 void on_fi_called(gpointer object, gpointer user_data){

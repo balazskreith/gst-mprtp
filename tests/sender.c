@@ -52,7 +52,7 @@ void sender_dtor(Sender* this)
 
 
 Sender* make_sender(SchedulerParams* scheduler_params,
-    StatParamsTuple* stat_params_tuple,
+    StatParams* stat_params,
     TransferParams *snd_transfer,
     ExtraDelayParams* extra_delay_params)
 {
@@ -87,10 +87,8 @@ Sender* make_sender(SchedulerParams* scheduler_params,
     sink = queue;
   }
 
-  if(stat_params_tuple){
-    RTPStatMaker* rtpstatmaker = make_rtpstatmaker(stat_params_tuple);
-    statmaker = rtpstatmaker->element;
-    objects_holder_add(this->objects_holder, rtpstatmaker, (GDestroyNotify)rtpstatmaker_dtor);
+  if(stat_params){
+    statmaker = make_rtpstatmaker_element(stat_params);
     gst_bin_add(senderBin, statmaker);
     gst_element_link_pads(statmaker, "src", sink, "sink");
     sink = statmaker;
@@ -302,7 +300,7 @@ GstElement* _make_mprtp_fractal_controller(Sender* this, SchedulerParams *schedu
 {
   GstBin*     schBin   = gst_bin_new(NULL);
   GstElement* mprtpSch = _make_mprtp_scheduler(this, snd_transfer_params);
-  Receiver*   receiver = make_receiver(scheduler_params->rcv_transfer_params, NULL, NULL);
+  Receiver*   receiver = make_receiver(scheduler_params->rcv_transfer_params, NULL, NULL, NULL);
   GSList*     item;
 
   gst_bin_add_many(schBin,
@@ -407,7 +405,7 @@ GstElement* _make_scream_controller(Sender* this, SchedulerParams *scheduler_par
   GstElement* rtpBin       = _priv(this)->rtpbin = gst_element_factory_make("rtpbin", NULL);
   GstElement* sinkIdentity = gst_element_factory_make("identity", NULL);
   GstElement* screamqueue  = gst_element_factory_make("screamqueue", NULL);
-  Receiver*   receiver     = make_receiver(scheduler_params->rcv_transfer_params, NULL, NULL);
+  Receiver*   receiver     = make_receiver(scheduler_params->rcv_transfer_params, NULL, NULL, NULL);
   GstElement* rtcpSink     = gst_element_factory_make("udpsink", NULL);
   gchar*      padName;
   guint       sessionNum   = 0;

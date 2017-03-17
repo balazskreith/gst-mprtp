@@ -15,8 +15,6 @@
 typedef struct _StreamSplitter StreamSplitter;
 typedef struct _StreamSplitterClass StreamSplitterClass;
 typedef struct _StreamSplitterPrivate StreamSplitterPrivate;
-typedef struct _SchNode SchNode;
-typedef struct _SplitterSubflow SplitterSubflow;
 
 #define STREAM_SPLITTER_TYPE             (stream_splitter_get_type())
 #define STREAM_SPLITTER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),STREAM_SPLITTER_TYPE,StreamSplitter))
@@ -25,32 +23,21 @@ typedef struct _SplitterSubflow SplitterSubflow;
 #define STREAM_SPLITTER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),STREAM_SPLITTER_TYPE))
 #define STREAM_SPLITTER_CAST(src)        ((StreamSplitter *)(src))
 
-#define SCHTREE_MAX_LEVEL 7
-#define SCHTREE_DISTRIBUTION_ACCURACY 0.01
-
-struct _SplitterSubflow{
-  gint32      remained;
-  gboolean    allowed;
-  SndSubflow* subflow;
-};
 
 struct _StreamSplitter
 {
   GObject              object;
   GstClock*            sysclock;
   GstClockTime         made;
-  SchNode*             tree;
-  gboolean             refresh;
-  GstClockTime         last_regular_refresh;
 
   SndSubflows*         subflows;
-  GSList*              splittersubflows_list;
-  SplitterSubflow*     splittersubflows_lookup;
-  gint32               actual_targets[256];
+  gint32               total_bitrate;
+  gint32               actual_rates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  gint32               actual_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  gdouble              actual_weights[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   guint8               max_state;
-
+  gboolean             keyframe_filtering;
   gint32               total_target;
-  gint32               active_subflow_num;
 
 };
 
@@ -61,6 +48,10 @@ struct _StreamSplitterClass{
 StreamSplitter*
 make_stream_splitter(SndSubflows* sndsubflows);
 
+void
+stream_splitter_set_keyframe_filtering(
+    StreamSplitter* this,
+    gboolean keyframe_filtering);
 
 void
 stream_splitter_on_target_bitrate_changed(
@@ -68,14 +59,15 @@ stream_splitter_on_target_bitrate_changed(
     SndSubflow* subflow);
 
 void
-stream_splitter_on_subflow_detached(
+stream_splitter_on_packet_sent(
     StreamSplitter* this,
-    SndSubflow* subflow);
+    SndPacket* packet);
+
 
 void
-stream_splitter_on_subflow_joined(
+stream_splitter_on_packet_obsolated(
     StreamSplitter* this,
-    SndSubflow* subflow);
+    SndPacket* packet);
 
 void
 stream_splitter_on_subflow_state_changed(

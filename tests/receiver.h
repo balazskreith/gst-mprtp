@@ -26,8 +26,11 @@ typedef struct{
 Receiver* receiver_ctor(void);
 void receiver_dtor(Receiver* this);
 Receiver* make_receiver(TransferParams* rcv_transfer_params,
-    StatParamsTuple* stat_params_tuple,
-    PlayouterParams *playouter_params);
+    StatParams* rcv_stat_params,
+    PlayouterParams *playouter_params,
+    StatParams* ply_stat_params
+    );
+
 Receiver* make_receiver_custom(void);
 
 void receiver_on_caps_change(Receiver* this, const GstCaps* caps);

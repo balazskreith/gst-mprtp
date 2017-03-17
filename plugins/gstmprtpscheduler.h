@@ -74,8 +74,6 @@ struct _GstMprtpscheduler
 
   GstClockTime                  last_pts;
 
-  gboolean                      keyframe_filtering;
-
   guint32                       rtcp_sent_octet_sum;
 
   GstTask*                      sending_thread;

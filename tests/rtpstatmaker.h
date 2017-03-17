@@ -12,7 +12,6 @@ typedef struct{
 
 RTPStatMaker* rtpstatmaker_ctor(void);
 void rtpstatmaker_dtor(RTPStatMaker* this);
-RTPStatMaker* make_rtpstatmaker(StatParamsTuple* stat_params_tuple);
 GstElement* make_rtpstatmaker_element(StatParams* stat_params);
 
 #endif /* TESTS_RTPSTATMAKER_H_ */

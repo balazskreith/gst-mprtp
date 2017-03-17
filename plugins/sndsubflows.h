@@ -43,7 +43,6 @@ typedef struct _SndSubflow
   gboolean                   congested;
   gboolean                   active;
 
-  gint32                     actual_bitrate;
   gint32                     target_bitrate;
   guint32                    packet_counter_for_fec;
 
@@ -107,6 +106,7 @@ GType sndsubflows_get_type (void);
 
 void sndsubflows_join(SndSubflows* this, guint8 id);
 void sndsubflows_detach(SndSubflows* this, guint8 id);
+GSList* sndsubflows_get_subflows(SndSubflows* this);
 void sndsubflows_iterate(SndSubflows* this, GFunc process, gpointer udata);
 
 void sndsubflow_monitoring_request(SndSubflow* subflow);

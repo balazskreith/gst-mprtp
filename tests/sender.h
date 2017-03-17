@@ -21,7 +21,7 @@ typedef struct{
 Sender* sender_ctor(void);
 void sender_dtor(Sender* this);
 Sender* make_sender(SchedulerParams* cc,
-    StatParamsTuple* stat_params_tuple,
+    StatParams* stat_params,
     TransferParams *transfer,
     ExtraDelayParams* extra_delay_params);
 

@@ -10,9 +10,10 @@ typedef struct{
   Decoder*   decoder;
   Sink*      sink;
 
-  StatParamsTuple*      stat_params_tuple;
+  StatParams*           rcv_stat_params;
+  StatParams*           ply_stat_params;
   TransferParams*       rcv_transfer_params;
-  PlayouterParams*   playouter_params;
+  PlayouterParams*      playouter_params;
 
   CodecParams*    codec_params;
   SinkParams*     sink_params;
@@ -31,7 +32,8 @@ static void _print_params(ReceiverSide* this)
   g_print("Video     Params: %s\n", this->video_params->to_string);
 
   g_print("Playouter Params: %s\n", this->playouter_params ? this->playouter_params->to_string : "None");
-  g_print("Stat      Params: %s\n", this->stat_params_tuple ? this->stat_params_tuple->to_string : "None");
+  g_print("Rcv Stat  Params: %s\n", this->rcv_stat_params ? this->rcv_stat_params->to_string : "None");
+  g_print("Ply Stat  Params: %s\n", this->ply_stat_params ? this->ply_stat_params->to_string : "None");
 
 }
 
@@ -126,11 +128,10 @@ int main (int argc, char **argv)
 
   session->playouter_params = playouter_params_rawstring ? make_playouter_params(playouter_params_rawstring) : NULL;
 
-  session->stat_params_tuple = make_statparams_tuple_by_raw_strings(
-      stat_params_rawstring,
-      statlogs_sink_params_rawstring,
-      packetlogs_sink_params_rawstring);
-
+  session->rcv_stat_params = make_stat_params(stat_params_rawstring);
+  if(ply_stat_params_rawstring){
+    session->ply_stat_params = make_stat_params(ply_stat_params_rawstring);
+  }
 
   session->codec_params = make_codec_params(
       _null_test(codec_params_rawstring, codec_params_rawstring_default)
@@ -146,7 +147,10 @@ int main (int argc, char **argv)
 
   _print_params(session);
 
-  session->receiver  = make_receiver(session->rcv_transfer_params, session->stat_params_tuple, session->playouter_params);
+  session->receiver  = make_receiver(session->rcv_transfer_params,
+      session->rcv_stat_params,
+      session->playouter_params,
+      session->ply_stat_params);
 //  session->receiver  = make_receiver_custom();
   session->decoder   = make_decoder(session->codec_params);
   session->sink      = make_sink(session->sink_params);
@@ -184,7 +188,8 @@ int main (int argc, char **argv)
   gst_object_unref (pipe);
   g_main_loop_unref (loop);
 
-  free_statparams_tuple(session->stat_params_tuple);
+  g_free(session->rcv_stat_params);
+  g_free(session->ply_stat_params);
   free_playouter_params(session->playouter_params);
   transfer_params_unref(session->rcv_transfer_params);
 

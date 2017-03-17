@@ -27,9 +27,7 @@ echo -n "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1 " >> $SCRIPTFILE
 #echo -n "--sourcesink=FILE:produced.yuv "                 >> $SCRIPTFILE
 
 echo -n "--codec=VP8 "                                    >> $SCRIPTFILE
-echo -n "--stat=100:1000:1:triggered_stat "               >> $SCRIPTFILE
-echo -n "--statlogsink=FILE:temp/snd_statlogs.csv "       >> $SCRIPTFILE
-echo -n "--packetlogsink=FILE:temp/snd_packetlogs.csv "   >> $SCRIPTFILE
+echo -n "--stat=triggered_stat:temp/snd_packets_1.csv:0 " >> $SCRIPTFILE
 
 echo $CC" is used as congestion control for sender 1"
 if [ $CC = $SCREAM ]
@@ -57,9 +55,7 @@ echo -n "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1 "  >> $SCRIPTFILE2
 echo -n "--extradelay=50 "                                 >> $SCRIPTFILE2
 
 echo -n "--codec=VP8 "                                    >> $SCRIPTFILE2
-echo -n "--stat=100:1000:1:triggered_stat "               >> $SCRIPTFILE2
-echo -n "--statlogsink=FILE:temp/snd_statlogs2.csv "       >> $SCRIPTFILE2
-echo -n "--packetlogsink=FILE:temp/snd_packetlogs2.csv "   >> $SCRIPTFILE2
+echo -n "--stat=triggered_stat:temp/snd_packets_2.csv:0 " >> $SCRIPTFILE2
 
 echo $CC" is used as congestion control for sender 2"
 if [ $CC = $SCREAM ]
@@ -86,9 +82,7 @@ echo -n "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1 " >> $SCRIPTFILE3
 echo -n "--extradelay=100 "                                 >> $SCRIPTFILE3
 
 echo -n "--codec=VP8 "                                    >> $SCRIPTFILE3
-echo -n "--stat=100:1000:1:triggered_stat "               >> $SCRIPTFILE3
-echo -n "--statlogsink=FILE:temp/snd_statlogs3.csv "       >> $SCRIPTFILE3
-echo -n "--packetlogsink=FILE:temp/snd_packetlogs3.csv "   >> $SCRIPTFILE3
+echo -n "--stat=triggered_stat:temp/snd_packets_3.csv:0 " >> $SCRIPTFILE3
 
 echo $CC" is used as congestion control for sender 3"
 if [ $CC = $SCREAM ]

@@ -222,7 +222,7 @@ GstElement* _make_v4l2_source(Source* this, SourceParams *params)
 GstElement* _make_raw_source(Source* this, SourceParams *params)
 {
   GstBin*     rawBin      = gst_bin_new(NULL);
-  Receiver*   receiver    = make_receiver(params->rawproxy.rcv_transfer_params, NULL, NULL);
+  Receiver*   receiver    = make_receiver(params->rawproxy.rcv_transfer_params, NULL, NULL, NULL);
   GstElement* rawDepay    = gst_element_factory_make("rtpvrawdepay", NULL);
 
   const GstCaps* caps        = gst_caps_new_simple ("application/x-rtp",

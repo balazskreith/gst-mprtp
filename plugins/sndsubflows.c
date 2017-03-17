@@ -195,6 +195,11 @@ void sndsubflows_detach(SndSubflows* this, guint8 id)
 
 }
 
+GSList* sndsubflows_get_subflows(SndSubflows* this)
+{
+  return this->joined;
+}
+
 void sndsubflows_iterate(SndSubflows* this, GFunc process, gpointer udata)
 {
   if(!this->joined){

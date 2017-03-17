@@ -80,8 +80,10 @@ void receiver_dtor(Receiver* this)
 
 
 Receiver* make_receiver(TransferParams* rcv_transfer_params,
-                        StatParamsTuple* stat_params_tuple,
-                        PlayouterParams *playouter_params)
+                        StatParams* rcv_stat_params,
+                        PlayouterParams *playouter_params,
+                        StatParams* ply_stat_params
+                        )
 {
   Receiver* this = receiver_ctor();
   GstBin* receiverBin          = GST_BIN(gst_bin_new(this->bin_name));
@@ -103,15 +105,8 @@ Receiver* make_receiver(TransferParams* rcv_transfer_params,
   };
   src = receiver;
 
-  if(stat_params_tuple){
-    if(playouter_params){
-      rtpstatmakerSrc = make_rtpstatmaker_element(stat_params_tuple->stat_params);
-    }else{
-      RTPStatMaker* rtpstatmaker = make_rtpstatmaker(stat_params_tuple);
-      rtpstatmakerSrc = rtpstatmaker->element;
-      objects_holder_add(this->objects_holder, rtpstatmaker, (GDestroyNotify)rtpstatmaker_dtor);
-    }
-
+  if(rcv_stat_params){
+    rtpstatmakerSrc = make_rtpstatmaker_element(rcv_stat_params);
     gst_bin_add(receiverBin, rtpstatmakerSrc);
     gst_element_link_pads(src, "src", rtpstatmakerSrc, "sink");
     src = rtpstatmakerSrc;
@@ -138,14 +133,11 @@ Receiver* make_receiver(TransferParams* rcv_transfer_params,
     src = playouter;
   }
 
-  if(stat_params_tuple && playouter_params){
-    RTPStatMaker* rtpstatmaker = make_rtpstatmaker(stat_params_tuple);
-    objects_holder_add(this->objects_holder, rtpstatmaker, (GDestroyNotify)rtpstatmaker_dtor);
-
-    gst_bin_add(receiverBin, rtpstatmaker->element);
-    gst_element_link_pads(rtpstatmakerSrc, "packet_src", rtpstatmaker->element, "packet_sink");
-    gst_element_link_pads(src, "src", rtpstatmaker->element, "sink");
-    src = rtpstatmaker->element;
+  if(ply_stat_params){
+    GstElement* rtpstatmaker = make_rtpstatmaker_element(ply_stat_params);
+    gst_bin_add(receiverBin, rtpstatmaker);
+    gst_element_link_pads(src, "src", rtpstatmaker, "sink");
+    src = rtpstatmaker;
   }
 
 

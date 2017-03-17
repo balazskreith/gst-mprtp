@@ -16,12 +16,7 @@ echo -n "--sourcesink=FILE:produced.yuv "                 >> $SCRIPTFILE
 
 #echo -n "--codec=VP8:1:128 "                              >> $SCRIPTFILE
 echo -n "--codec=VP8 "                                    >> $SCRIPTFILE
-echo -n "--stat=100:1000:1:triggered_stat "               >> $SCRIPTFILE
-#echo -n "--statlogsink=FILE:temp/snd_statlogs.csv "       >> $SCRIPTFILE
-#echo -n "--packetlogsink=FILE:temp/snd_packetlogs.csv "   >> $SCRIPTFILE
-
-echo -n "--statlogsink=MULTIFILE:2:1:temp/snd_statlogs.csv:2:temp/snd_statlogs2.csv "       >> $SCRIPTFILE
-echo -n "--packetlogsink=MULTIFILE:2:1:temp/snd_packetlogs.csv:2:temp/snd_packetlogs2.csv "   >> $SCRIPTFILE
+echo -n "--stat=triggered_stat:temp/snd_packets.csv:3 "           >> $SCRIPTFILE
 
 echo -n "--sender=MPRTP:2:1:10.0.0.6:5000:2:10.0.1.6:5002 " >> $SCRIPTFILE
 echo -n "--scheduler=MPRTPFRACTAL:MPRTP:2:1:5001:2:5003 "   >> $SCRIPTFILE

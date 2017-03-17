@@ -130,7 +130,8 @@ sndtracker_init (SndTracker * this)
 
   this->priv = _priv_ctor();
 
-  this->on_packet_sent = make_notifier("SndTracker: on-packet-sent");
+  this->on_packet_sent      = make_notifier("SndTracker: on-packet-sent");
+  this->on_packet_obsolated = make_notifier("SndTracker: on-packet-obsolated");
 
   slidingwindow_add_on_rem_item_cb(this->sent_sw, (ListenerFunc) _sent_packets_rem_pipe, this);
   slidingwindow_add_on_rem_item_cb(this->fec_sw, (ListenerFunc) _fec_rem_pipe, this);
@@ -313,6 +314,11 @@ void sndtracker_add_on_packet_sent(SndTracker * this, ListenerFunc callback, gpo
   notifier_add_listener(this->on_packet_sent, callback, udata);
 }
 
+void sndtracker_add_on_packet_obsolated(SndTracker * this, ListenerFunc callback, gpointer udata)
+{
+  notifier_add_listener(this->on_packet_obsolated, callback, udata);
+}
+
 void sndtracker_add_on_packet_sent_with_filter(SndTracker * this, ListenerFunc callback, ListenerFilterFunc filter, gpointer udata)
 {
   notifier_add_listener_with_filter(this->on_packet_sent, callback, filter, udata);
@@ -336,6 +342,8 @@ void _sent_packets_rem_pipe(SndTracker* this, SndPacket* packet)
 //      g_print("Packet %hu is not acknowledged in time\n", packet->subflow_seq);
     }
     subflow->sent_packets[packet->subflow_seq] = NULL;
+
+    notifier_do(this->on_packet_obsolated, packet);
   }
 
   if(!packet->acknowledged){

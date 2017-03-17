@@ -37,31 +37,7 @@ G_DEFINE_TYPE (StreamSplitter, stream_splitter, G_TYPE_OBJECT);
 
 
 
-struct _SchNode
-{
-  //  SchNode* parent;
-  GSList*  subflows;
-  GSList*  childs;
-  gint32   sent_bytes;
-  gint16   highest_flag;
-};
-
-
-//
-//typedef struct{
-//  SndSubflow* subflow;
-//  gint32      remained;
-//}SubflowSetupHelper;
-//
-//
-//typedef struct{
-//  SubflowSetupHelper subflows[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-//  gint32             subflow_num;
-//  gint32             total_target;
-//}SubflowSetupArray;
-
 #define _now(this) gst_clock_get_time (this->sysclock)
-#define _get_splitter_subflow(this, id) ((SplitterSubflow*) (this->splittersubflows_lookup + id))
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
@@ -71,102 +47,24 @@ stream_splitter_finalize (
     GObject * object);
 
 
-
-static void
-_create_nodes(
-    StreamSplitter* this,
-    SchNode* node,
-    guint8 subflow_num,
-    guint level);
-
-static SchNode *
-_tree_ctor (
-    StreamSplitter *this);
-
-
-//Functions related to tree
-static gpointer
-_schnode_ctor (void);
-
-
-static SplitterSubflow*
-_get_max_amongst_splitter_subflow(
-    StreamSplitter* this);
-
-static GSList*
-_merge_subflows_list(
-    GSList* target,
-    GSList* source);
-
-static void
-_setup_nodes(
-    StreamSplitter* this,
-    SchNode* node,
-    guint level);
-
-static void
-_clean_tree(
-    StreamSplitter* this);
-
-static void
-_setup_tree(
-    StreamSplitter* this);
-
-static void
-_schnode_rdtor (
-    StreamSplitter *this,
-    SchNode * node);
-
-
-static SchNode *
-_schtree_select_next(
-    StreamSplitter* this,
-    SchNode *node,
-    SndPacket* packet);
-
-
-static void
-_rebuild_tree (
-    StreamSplitter *this);
-
-static void
-_print_tree (
-    SchNode * node,
-    gint value,
-    gint level);
-
-static void
-_logging(
-    gpointer data);
-
-
-
 //----------------------------------------------------------------------
 //---- Private function implementations to Stream Dealer object --------
 //----------------------------------------------------------------------
 
 
-typedef struct{
-  gdouble target_sum,actual_sum;
-}PrintData;
-static void _sim_bitrate(SndSubflow* subflow, PrintData *data){
-  data->target_sum +=subflow->target_bitrate;
-  data->actual_sum +=subflow->actual_bitrate;
-}
-static void _print_weight(SndSubflow* subflow, PrintData* data){
-  g_print("Subflow %d, target weight: %3.2f actual weight: %3.2f, ",
-      subflow->id,
-      (gdouble) subflow->target_bitrate / data->target_sum,
-      (gdouble) subflow->actual_bitrate / data->actual_sum
-      );
-}
 static GstClockTime last_ratio_printed = 0;
 static void _print_ratios(StreamSplitter *this){
-  PrintData data = {0.,0.};
+  GSList* it;
   if(_now(this) < last_ratio_printed  + 200 * GST_MSECOND) return;
+  for(it = sndsubflows_get_subflows(this->subflows); it; it = it->next){
+    SndSubflow* subflow = it->data;
+    g_print("%d: %f-%f | ",
+        subflow->id,
+        (gdouble)subflow->target_bitrate / (gdouble)this->total_target,
+        (gdouble)this->actual_rates[subflow->id] / (gdouble)this->total_bitrate
+        );
+  }
   last_ratio_printed = _now(this);
-  sndsubflows_iterate(this->subflows, (GFunc) _sim_bitrate, &data);
-  sndsubflows_iterate(this->subflows, (GFunc) _print_weight, &data);
   g_print("\n");
 }
 
@@ -199,7 +97,6 @@ stream_splitter_finalize (GObject * object)
   StreamSplitter *this = STREAM_SPLITTER (object);
   g_object_unref (this->sysclock);
   g_object_unref(this->subflows);
-  g_free(this->splittersubflows_lookup);
 }
 
 
@@ -208,58 +105,36 @@ stream_splitter_init (StreamSplitter * this)
 {
   this->sysclock = gst_system_clock_obtain ();
   this->made                   = _now(this);
-  this->refresh                = TRUE;
-
-  this->splittersubflows_lookup       = g_malloc0(sizeof(SplitterSubflow) * MPRTP_PLUGIN_MAX_SUBFLOW_NUM);
-  this->splittersubflows_list          = NULL;
 
 }
 
-
+static void _refresh_weights_helper(SndSubflow *subflow, StreamSplitter* this)
+{
+  this->actual_weights[subflow->id] = (gdouble)subflow->target_bitrate / (gdouble) this->total_target;
+}
 
 void
 stream_splitter_on_target_bitrate_changed(StreamSplitter* this, SndSubflow* subflow)
 {
-  gint32 scheduled_target = this->actual_targets[subflow->id];
-  gint32 abs_delta_target = subflow->target_bitrate - scheduled_target;
-  abs_delta_target *= abs_delta_target < 0 ? -1 : 1;
-//  this->refresh = TRUE;
-
-  if(this->last_regular_refresh < _now(this) - GST_SECOND){
-    this->refresh = TRUE;
-    return;
-  }
-
-  if(abs_delta_target < scheduled_target * .1 && abs_delta_target < 100000){
-    return;
-  }
-
+  this->total_target -= this->actual_targets[subflow->id];
   this->actual_targets[subflow->id] = subflow->target_bitrate;
-  this->refresh                     = TRUE;
-  this->last_regular_refresh        = _now(this);
+  this->total_target += this->actual_targets[subflow->id];
+
+  sndsubflows_iterate(this->subflows, (GFunc)_refresh_weights_helper, this);
 }
 
 void
-stream_splitter_on_subflow_detached(StreamSplitter* this, SndSubflow* subflow)
+stream_splitter_on_packet_sent(StreamSplitter* this, SndPacket* packet)
 {
-  SplitterSubflow* splitter_subflow;
-  splitter_subflow = _get_splitter_subflow(this, subflow->id);
-
-  this->refresh    = TRUE;
-  this->splittersubflows_list = g_slist_remove(this->splittersubflows_list, splitter_subflow);
-  _rebuild_tree(this);
+  this->actual_rates[packet->subflow_id] += packet->payload_size;
+  this->total_bitrate += packet->payload_size;
 }
 
 void
-stream_splitter_on_subflow_joined(StreamSplitter* this, SndSubflow* subflow)
+stream_splitter_on_packet_obsolated(StreamSplitter* this, SndPacket* packet)
 {
-  SplitterSubflow* splitter_subflow;
-  splitter_subflow = _get_splitter_subflow(this, subflow->id);
-  splitter_subflow->subflow = subflow;
-
-  this->refresh    = TRUE;
-  this->splittersubflows_list = g_slist_prepend(this->splittersubflows_list, splitter_subflow);
-  _rebuild_tree(this);
+  this->actual_rates[packet->subflow_id] -= packet->payload_size;
+  this->total_bitrate -= packet->payload_size;
 }
 
 static void _select_highest_state(SndSubflow *subflow, SndSubflowState *max_state)
@@ -273,339 +148,62 @@ stream_splitter_on_subflow_state_changed(StreamSplitter* this, SndSubflow* subfl
   if(subflow->state != SNDSUBFLOW_STATE_OVERUSED){
     return;
   }
-  this->refresh = TRUE;
   sndsubflows_iterate(this->subflows, (GFunc)_select_highest_state, &this->max_state);
 }
 
+void
+stream_splitter_set_keyframe_filtering(StreamSplitter* this, gboolean keyframe_filtering)
+{
+  this->keyframe_filtering = keyframe_filtering;
+}
+
+
 SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *packet)
 {
-  SchNode *selected;
-  SndSubflow* result = NULL;
-
-  if(this->refresh){
-    _clean_tree(this);
-    _setup_tree(this);
-    this->refresh = FALSE;
-  }
-
-  if (this->tree == NULL) {
-    GST_WARNING_OBJECT (this, "No active subflow");
-    goto done;
-  }
-
-
-  DISABLE_LINE _print_ratios(this);
-
-  if(!sndsubflows_get_subflows_num(this->subflows)){
-    goto done;
-  }
-  selected = _schtree_select_next(this, this->tree, packet);
-  result = selected->subflows->data;
-done:
-  return result;
-}
-
-void
-_rebuild_tree (StreamSplitter *this)
-{
-  if(this->tree){
-    _schnode_rdtor(this, this->tree);
-  }
-
-  this->tree = _tree_ctor(this);
-  _logging(this);
-//  _print_tree(this->tree, this->total_target, 0);
-  return;
-}
-
-
-void _create_nodes(StreamSplitter* this,
-                       SchNode* node,
-                       guint8 subflow_num,
-                       guint level)
-{
-  gdouble actual_accuracy = 1./pow(subflow_num, level + 1);
-  guint i;
-
-  if(actual_accuracy <= SCHTREE_DISTRIBUTION_ACCURACY){
-    return;
-  }
-  for(i = 0; i < subflow_num; ++i){
-    node->childs = g_slist_prepend(node->childs, _schnode_ctor());
-  }
-
-  //last child become a parent
-  _create_nodes(this, g_slist_last(node->childs)->data, subflow_num, level + 1);
-}
-
-SchNode *
-_tree_ctor (StreamSplitter *this)
-{
-  guint8 subflow_num = g_slist_length(this->splittersubflows_list);
-  SchNode* root;
-
-  if(!subflow_num){
-    return NULL;
-  }
-
-  root = _schnode_ctor();
-  if(subflow_num < 2){
-    return root;
-  }
-
-  _create_nodes(this, root, subflow_num, 0);
-
-  return root;
-}
-
-void
-_schnode_rdtor (StreamSplitter *this,SchNode * node)
-{
-  SchNode* child;
+  SndSubflow *selected = NULL, *subflow;
   GSList* it;
-
-  if (node == NULL) {
-    return;
-  }
-  for(it = node->childs; it; it = it->next){
-    child = it->data;
-    _schnode_rdtor(this, child);
-  }
-  g_slice_free(SchNode, node);
-//  mprtp_free(node);
-}
+  gdouble selected_sr, actual_sr;
 
 
-gpointer
-_schnode_ctor (void)
-{
-  SchNode *result = g_slice_new0(SchNode);
+  _print_ratios(this);
 
-  result->subflows   = NULL;
-  result->sent_bytes = 0;
-  result->childs     = NULL;
-  return result;
-}
+  for(it = sndsubflows_get_subflows(this->subflows); it; it = it->next)
+  {
+    subflow = it->data;
 
-
-SchNode* _schtree_select_next(StreamSplitter* this, SchNode *node, SndPacket* packet)
-{
-  SchNode *child = NULL, *selected = NULL;
-  GSList* it;
-
-  if(node->childs == NULL){
-    return node;
-  }
-
-  for(it = node->childs; it; it = it->next){
-    child = it->data;
-    if(!selected || child->sent_bytes < selected->sent_bytes){
-      selected = child;
+    if(!subflow->active || this->actual_weights[subflow->id] == 0.){
+      continue;
     }
-  }
-
-  if(!selected){
-    return NULL;
-  }
-
-  selected->sent_bytes += packet->payload_size;
-//  if(!this->has_denied_subflow){
-//    selected->sent_bytes += packet->payload_size;
-//  }
-
-  if(selected->childs){
-    return _schtree_select_next(this, selected, packet);
-  }
-//  if(1 < g_slist_length(selected->subflows)){
-//    return _schtree_select_next(this, selected, packet);
-//  }
-  return selected;
-}
-
-
-
-GSList* _merge_subflows_list(GSList* target, GSList* source)
-{
-  GSList *it, *it2;
-  SndSubflow *selected, *actual;
-  gboolean contains;
-  if(!target && !source){
-    return NULL;
-  }
-  if(!target || !target){
-    return g_slist_copy(source ? source : target);
-  }
-  for(it = source; it; it = it->next){
-    selected = it->data;
-    contains = FALSE;
-    for(it2 = target; it2; it2 = it2->next){
-      actual = it2->data;
-      if(actual->id == selected->id){
-        contains = TRUE;
+    if(this->keyframe_filtering){
+      if(packet->keyframe && subflow->state < this->max_state){
+        continue;
       }
     }
-    if(!contains){
-      target = g_slist_prepend(target, selected);
-    }
-  }
-  return target;
-}
 
-SplitterSubflow* _get_max_amongst_splitter_subflow(StreamSplitter* this)
-{
-  GSList* it;
-  SplitterSubflow *selected = NULL, *actual;
-  for(it = this->splittersubflows_list; it; it = it->next){
-    actual = it->data;
-    if(!selected || selected->remained < actual->remained){
-      selected = actual;
+    if(!selected){
+      selected = subflow;
+      if(this->actual_rates[subflow->id]){
+        selected_sr = (gdouble)this->actual_rates[subflow->id] / (gdouble) this->actual_weights[subflow->id];
+      }else{
+        selected_sr = 0.;
+      }
+      continue;
+    }
+
+    if(this->actual_rates[subflow->id]){
+      actual_sr = (gdouble)this->actual_rates[subflow->id] / (gdouble) this->actual_weights[subflow->id];
+    }else{
+      actual_sr = 0.;
+    }
+
+    if(actual_sr < selected_sr){
+      selected = subflow;
     }
   }
+
   return selected;
 }
-static void _print_splitter_subflows(StreamSplitter* this){
-  GSList* it;
-  for(it = this->splittersubflows_list; it; it = it->next){
-    SplitterSubflow* splitter_subflow = it->data;
-    g_print("Splitter subflow %d, remained: %d\n", splitter_subflow->subflow->id, splitter_subflow->remained);
-  }
-}
-
-void _setup_nodes(StreamSplitter* this,
-                         SchNode* node,
-                         guint level)
-{
-  SchNode* child;
-  GSList* it;
-
-  if(node->childs == NULL){
-    SplitterSubflow* splitter_subflow;
-    gint32 portion;
-
-    DISABLE_LINE _print_splitter_subflows(this);
-    splitter_subflow = _get_max_amongst_splitter_subflow(this);
-    portion          = this->total_target/pow(this->active_subflow_num, level);
-    splitter_subflow->remained -= portion;
-    node->subflows = g_slist_prepend(node->subflows, splitter_subflow->subflow);
-    DISABLE_LINE _print_splitter_subflows(this);
-    DISABLE_LINE g_print("PORTION: %d\n", portion);
-
-    return;
-  }
-
-  for(it = node->childs; it; it = it->next){
-    child = it->data;
-    _setup_nodes(this, child, level + 1);
-    node->subflows = _merge_subflows_list(node->subflows, child->subflows);
-  }
-}
-
-static void _clean_node(SchNode* node){
-  SchNode* child;
-  GSList*  it;
-  if(!node) return;
-
-  for(it = node->childs; it; it = it->next){
-    child = it->data;
-    if(!child) break;
-    _clean_node(child);
-  }
-  g_slist_free(node->subflows);
-  node->subflows = NULL;
-}
-
-void _clean_tree(StreamSplitter* this)
-{
-  _clean_node(this->tree);
-}
-
-
-static void _setup_tree_helper(SndSubflow* subflow, StreamSplitter* this){
-  if(!subflow->active){
-    return;
-  }
-
-  _get_splitter_subflow(this, subflow->id)->remained = subflow->target_bitrate;
-  this->total_target += subflow->target_bitrate;
-  ++this->active_subflow_num;
-}
-
-void _setup_tree(StreamSplitter* this){
-  this->total_target = 0;
-  this->active_subflow_num = 0;
-  sndsubflows_iterate(this->subflows, (GFunc)_setup_tree_helper, this);
-  _setup_nodes(this, this->tree, 0);
-  DISABLE_LINE _print_tree(this->tree, this->total_target, 0);
-}
 
 
 
-void _print_tree (SchNode * node, gint value, gint level)
-{
-  gint i;
-  gint subflow_num = 0;
-  SchNode* child;
-  GSList *it;
-
-  if (node == NULL) {
-    return;
-  }
-  for (i = 0; i < level; ++i){
-    g_print ("--");
-  }
-
-  g_print (
-         "%p: %d sent_bytes:%d subflows:",
-         node,
-         value,
-         node->sent_bytes);
-  for(it = node->subflows; it; it = it->next){
-    g_print ("%d ", ((SndSubflow*)it->data)->id);
-  }
-  g_print(" childs: ");
-  for(it = node->childs; it; it = it->next){
-    child = it->data;
-    g_print("%p ", child);
-    ++subflow_num;
-  }
-  g_print ("\n");
-
-  for(it = node->childs; it; it = it->next){
-     child = it->data;
-    _print_tree (child,  value / subflow_num,  level + 1);
-  }
-}
-
-
-static void _log_subflow(gpointer item, gpointer udata)
-{
-  SndSubflow *subflow = item;
-  StreamSplitter *this = udata;
-  mprtp_logger("streamsplitter.log",
-               "----------------------------------------------------------------\n"
-               "Subflow id: %d\n"
-               "Target bittarget: %d | weight: %f\n",
-
-               subflow->id,
-               subflow->target_bitrate,
-               (gdouble) subflow->target_bitrate / (gdouble) sndsubflows_get_total_target(this->subflows)
-               );
-
-}
-
-
-void _logging(gpointer data)
-{
-  StreamSplitter *this = data;
-  mprtp_logger("streamsplitter.log",
-               "###############################################################\n"
-               "Seconds: %lu\n"
-               "Active subflow num: %d\n"
-               ,
-               GST_TIME_AS_SECONDS(_now(this) - this->made),
-               sndsubflows_get_subflows_num(this->subflows)
-               );
-
-  sndsubflows_iterate(this->subflows, _log_subflow, this);
-}
 

@@ -29,9 +29,9 @@ echo -n "./rcv_pipeline "                                         > $SCRIPTFILE
 echo -n "--sink=FILE:consumed.yuv "                              >> $SCRIPTFILE
 
 echo -n "--codec=VP8 "                                           >> $SCRIPTFILE
-echo -n "--stat=100:1000:1:triggered_stat "                      >> $SCRIPTFILE
-echo -n "--statlogsink=FILE:temp/rcv_statlogs.csv "              >> $SCRIPTFILE
-echo -n "--packetlogsink=FILE:temp/rcv_packetlogs.csv "          >> $SCRIPTFILE
+echo -n "--stat=triggered_stat:rcv_logs.csv:0 "                  >> $SCRIPTFILE
+echo -n "--plystat=triggered_stat:ply_logs.csv:0 "               >> $SCRIPTFILE
+
 
 echo $CC" is used as congestion control for receiver 1"
 if [ $CC = $SCREAM ]

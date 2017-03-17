@@ -27,14 +27,9 @@
 
 #include <gst/gst.h>
 #include <gst/base/gstbasetransform.h>
-#include "monitor.h"
-
-typedef struct _SubflowMonitor{
-  gchar    packetslog[255];
-  gchar    statslog[255];
-  Monitor* monitor;
-  guint8   id;
-}SubflowMonitor;
+#include "mprtputils.h"
+#include "messenger.h"
+#include "rtpfecbuffer.h"
 
 G_BEGIN_DECLS
 
@@ -59,7 +54,7 @@ typedef struct _GstRTPStatMaker2Class GstRTPStatMaker2Class;
  * Opaque #GstRTPStatMaker2 data structure
  */
 struct _GstRTPStatMaker2 {
-  GstBaseTransform   element;
+  GstBaseTransform              element;
 
   /*< private >*/
   GstClockID                    clock_id;
@@ -71,41 +66,16 @@ struct _GstRTPStatMaker2 {
   guint64                       prev_offset_end;
   gchar*                        last_message;
 
-  GstPad*                       packet_sinkpad;
-  GstPad*                       packet_srcpad;
-
-  GstBufferPool*                packetbufferpool;
-
-  GstClockTime                  last_statlog;
-  GstClockTime                  last_packetlog;
-  Messenger*                    messenger;
-//  GAsyncQueue*                  logs2writeq;
-//  GQueue*                       packetlogstr2recycle;
-
-  GSList*                       subflow_monitors_list;
-  SubflowMonitor*               subflow_monitors_lookup[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  gboolean                      next_id_set;
-  guint8                        next_id;
   gboolean                      touched_sync_active;
   gchar                         touched_sync_location[256];
-  gchar                         packetslog_file[256];
-  gchar                         statslog_file[256];
-  guint8                        mprtp_ext_header_id;
 
-  guint8                        fec_payload_type;
-  GstClockTime                  accumulation_length;
-  GstClockTime                  sampling_time;
-  GCond                         waiting_signal;
-
-  GMutex                        mutex;
-  Monitor*                      monitor;
   GstTask*                      thread;
   GRecMutex                     thread_mutex;
-
-  gboolean                      csv_logging;
-  gboolean                      packetsrc_linked;
-  gboolean                      packetlogs_linked;
-  gboolean                      statlogs_linked;
+  GSList*                       loggers;
+  gpointer                      default_logger;
+  Messenger*                    packets;
+  guint8                        mprtp_ext_header_id;
+  guint8                        fec_payload_type;
 
   guint64                       offset;
   GstClockTime                  upstream_latency;

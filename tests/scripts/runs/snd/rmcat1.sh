@@ -24,15 +24,14 @@ SCRIPTFILE=$TEMPDIR"/sender.sh"
 echo -n "./snd_pipeline "                                  > $SCRIPTFILE
 echo -n "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1 " >> $SCRIPTFILE
 echo -n "--sourcesink=FILE:produced.yuv "                 >> $SCRIPTFILE
+echo -n "--stat=triggered_stat:temp/snd_packets.csv:0 "   >> $SCRIPTFILE
 
 echo -n "--codec=VP8 "                                    >> $SCRIPTFILE
 echo -n "--stat=100:1000:1:triggered_stat "               >> $SCRIPTFILE
-echo -n "--statlogsink=FILE:temp/snd_statlogs.csv "       >> $SCRIPTFILE
-echo -n "--packetlogsink=FILE:temp/snd_packetlogs.csv "   >> $SCRIPTFILE
 
 echo $CC" is used as congestion control for sender 1"
 if [ $CC = $SCREAM ] 
-then
+then	
 	echo -n "--sender=RTP:10.0.0.6:5000 "                     >> $SCRIPTFILE
 	echo -n "--scheduler=SCREAM:RTP:5001 "                    >> $SCRIPTFILE
 elif [ $CC = $FRACTAL ] 

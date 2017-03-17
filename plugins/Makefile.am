@@ -19,7 +19,6 @@ libgstmprtp_la_SOURCES = fecdec.c              \
                          lib_swplugins.c       \
                          mediator.c            \
                          messenger.c           \
-                         monitor.c             \
                          mprtputils.c          \
                          mprtplogger.c         \
                          notifier.c            \
@@ -54,7 +53,6 @@ noinst_HEADERS = fecdec.h              \
                  lib_swplugins.h       \
                  mediator.h            \
                  messenger.h           \
-                 monitor.h             \
                  mprtputils.h          \
                  mprtplogger.h         \
                  notifier.h            \

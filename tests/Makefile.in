@@ -90,7 +90,8 @@ build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
 noinst_PROGRAMS = snd_pipeline$(EXEEXT) rcv_pipeline$(EXEEXT) \
-	make_delta_statlogs$(EXEEXT)
+	make_delta_statlogs$(EXEEXT) bcex$(EXEEXT) bwcsv$(EXEEXT) \
+	statmaker$(EXEEXT)
 subdir = tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/common/m4/as-ac-expand.m4 \
@@ -112,16 +113,30 @@ CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 PROGRAMS = $(noinst_PROGRAMS)
-am_make_delta_statlogs_OBJECTS =  \
-	make_delta_statlogs-make_delta_statlogs.$(OBJEXT)
-make_delta_statlogs_OBJECTS = $(am_make_delta_statlogs_OBJECTS)
+am_bcex_OBJECTS = bcex-bcex.$(OBJEXT)
+bcex_OBJECTS = $(am_bcex_OBJECTS)
 am__DEPENDENCIES_1 =
-make_delta_statlogs_DEPENDENCIES = $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+bcex_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+bcex_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(bcex_CFLAGS) $(CFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_bwcsv_OBJECTS = bwcsv-bwcsv.$(OBJEXT)
+bwcsv_OBJECTS = $(am_bwcsv_OBJECTS)
+bwcsv_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+bwcsv_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(bwcsv_CFLAGS) $(CFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_make_delta_statlogs_OBJECTS =  \
+	make_delta_statlogs-make_delta_statlogs.$(OBJEXT)
+make_delta_statlogs_OBJECTS = $(am_make_delta_statlogs_OBJECTS)
+make_delta_statlogs_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 make_delta_statlogs_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
 	$(make_delta_statlogs_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
@@ -155,6 +170,13 @@ snd_pipeline_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 snd_pipeline_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(snd_pipeline_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_statmaker_OBJECTS = statmaker-statmaker.$(OBJEXT)
+statmaker_OBJECTS = $(am_statmaker_OBJECTS)
+statmaker_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+statmaker_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(statmaker_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -190,10 +212,12 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(make_delta_statlogs_SOURCES) $(rcv_pipeline_SOURCES) \
-	$(snd_pipeline_SOURCES)
-DIST_SOURCES = $(make_delta_statlogs_SOURCES) $(rcv_pipeline_SOURCES) \
-	$(snd_pipeline_SOURCES)
+SOURCES = $(bcex_SOURCES) $(bwcsv_SOURCES) \
+	$(make_delta_statlogs_SOURCES) $(rcv_pipeline_SOURCES) \
+	$(snd_pipeline_SOURCES) $(statmaker_SOURCES)
+DIST_SOURCES = $(bcex_SOURCES) $(bwcsv_SOURCES) \
+	$(make_delta_statlogs_SOURCES) $(rcv_pipeline_SOURCES) \
+	$(snd_pipeline_SOURCES) $(statmaker_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -434,6 +458,15 @@ snd_pipeline_LDADD = $(GST_LIBS) $(GST_BASE_LIBS) $(GST_PLUGINS_BASE_LIBS) \
 make_delta_statlogs_SOURCES = make_delta_statlogs.c 
 make_delta_statlogs_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
 make_delta_statlogs_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
+bcex_SOURCES = bcex.c 
+bcex_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
+bcex_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
+bwcsv_SOURCES = bwcsv.c 
+bwcsv_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
+bwcsv_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
+statmaker_SOURCES = statmaker.c 
+statmaker_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
+statmaker_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
 all: all-am
 
 .SUFFIXES:
@@ -477,6 +510,14 @@ clean-noinstPROGRAMS:
 	echo " rm -f" $$list; \
 	rm -f $$list
 
+bcex$(EXEEXT): $(bcex_OBJECTS) $(bcex_DEPENDENCIES) $(EXTRA_bcex_DEPENDENCIES) 
+	@rm -f bcex$(EXEEXT)
+	$(AM_V_CCLD)$(bcex_LINK) $(bcex_OBJECTS) $(bcex_LDADD) $(LIBS)
+
+bwcsv$(EXEEXT): $(bwcsv_OBJECTS) $(bwcsv_DEPENDENCIES) $(EXTRA_bwcsv_DEPENDENCIES) 
+	@rm -f bwcsv$(EXEEXT)
+	$(AM_V_CCLD)$(bwcsv_LINK) $(bwcsv_OBJECTS) $(bwcsv_LDADD) $(LIBS)
+
 make_delta_statlogs$(EXEEXT): $(make_delta_statlogs_OBJECTS) $(make_delta_statlogs_DEPENDENCIES) $(EXTRA_make_delta_statlogs_DEPENDENCIES) 
 	@rm -f make_delta_statlogs$(EXEEXT)
 	$(AM_V_CCLD)$(make_delta_statlogs_LINK) $(make_delta_statlogs_OBJECTS) $(make_delta_statlogs_LDADD) $(LIBS)
@@ -489,12 +530,18 @@ snd_pipeline$(EXEEXT): $(snd_pipeline_OBJECTS) $(snd_pipeline_DEPENDENCIES) $(EX
 	@rm -f snd_pipeline$(EXEEXT)
 	$(AM_V_CCLD)$(snd_pipeline_LINK) $(snd_pipeline_OBJECTS) $(snd_pipeline_LDADD) $(LIBS)
 
+statmaker$(EXEEXT): $(statmaker_OBJECTS) $(statmaker_DEPENDENCIES) $(EXTRA_statmaker_DEPENDENCIES) 
+	@rm -f statmaker$(EXEEXT)
+	$(AM_V_CCLD)$(statmaker_LINK) $(statmaker_OBJECTS) $(statmaker_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bcex-bcex.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bwcsv-bwcsv.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/make_delta_statlogs-make_delta_statlogs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-decoder.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-encoder.Po@am__quote@
@@ -516,6 +563,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-sink.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-snd_pipeline.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-source.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statmaker-statmaker.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -537,6 +585,34 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
+
+bcex-bcex.o: bcex.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bcex_CFLAGS) $(CFLAGS) -MT bcex-bcex.o -MD -MP -MF $(DEPDIR)/bcex-bcex.Tpo -c -o bcex-bcex.o `test -f 'bcex.c' || echo '$(srcdir)/'`bcex.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/bcex-bcex.Tpo $(DEPDIR)/bcex-bcex.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bcex.c' object='bcex-bcex.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bcex_CFLAGS) $(CFLAGS) -c -o bcex-bcex.o `test -f 'bcex.c' || echo '$(srcdir)/'`bcex.c
+
+bcex-bcex.obj: bcex.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bcex_CFLAGS) $(CFLAGS) -MT bcex-bcex.obj -MD -MP -MF $(DEPDIR)/bcex-bcex.Tpo -c -o bcex-bcex.obj `if test -f 'bcex.c'; then $(CYGPATH_W) 'bcex.c'; else $(CYGPATH_W) '$(srcdir)/bcex.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/bcex-bcex.Tpo $(DEPDIR)/bcex-bcex.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bcex.c' object='bcex-bcex.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bcex_CFLAGS) $(CFLAGS) -c -o bcex-bcex.obj `if test -f 'bcex.c'; then $(CYGPATH_W) 'bcex.c'; else $(CYGPATH_W) '$(srcdir)/bcex.c'; fi`
+
+bwcsv-bwcsv.o: bwcsv.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bwcsv_CFLAGS) $(CFLAGS) -MT bwcsv-bwcsv.o -MD -MP -MF $(DEPDIR)/bwcsv-bwcsv.Tpo -c -o bwcsv-bwcsv.o `test -f 'bwcsv.c' || echo '$(srcdir)/'`bwcsv.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/bwcsv-bwcsv.Tpo $(DEPDIR)/bwcsv-bwcsv.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bwcsv.c' object='bwcsv-bwcsv.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bwcsv_CFLAGS) $(CFLAGS) -c -o bwcsv-bwcsv.o `test -f 'bwcsv.c' || echo '$(srcdir)/'`bwcsv.c
+
+bwcsv-bwcsv.obj: bwcsv.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bwcsv_CFLAGS) $(CFLAGS) -MT bwcsv-bwcsv.obj -MD -MP -MF $(DEPDIR)/bwcsv-bwcsv.Tpo -c -o bwcsv-bwcsv.obj `if test -f 'bwcsv.c'; then $(CYGPATH_W) 'bwcsv.c'; else $(CYGPATH_W) '$(srcdir)/bwcsv.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/bwcsv-bwcsv.Tpo $(DEPDIR)/bwcsv-bwcsv.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bwcsv.c' object='bwcsv-bwcsv.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bwcsv_CFLAGS) $(CFLAGS) -c -o bwcsv-bwcsv.obj `if test -f 'bwcsv.c'; then $(CYGPATH_W) 'bwcsv.c'; else $(CYGPATH_W) '$(srcdir)/bwcsv.c'; fi`
 
 make_delta_statlogs-make_delta_statlogs.o: make_delta_statlogs.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(make_delta_statlogs_CFLAGS) $(CFLAGS) -MT make_delta_statlogs-make_delta_statlogs.o -MD -MP -MF $(DEPDIR)/make_delta_statlogs-make_delta_statlogs.Tpo -c -o make_delta_statlogs-make_delta_statlogs.o `test -f 'make_delta_statlogs.c' || echo '$(srcdir)/'`make_delta_statlogs.c
@@ -831,6 +907,20 @@ snd_pipeline-source.obj: source.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='source.c' object='snd_pipeline-source.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-source.obj `if test -f 'source.c'; then $(CYGPATH_W) 'source.c'; else $(CYGPATH_W) '$(srcdir)/source.c'; fi`
+
+statmaker-statmaker.o: statmaker.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statmaker_CFLAGS) $(CFLAGS) -MT statmaker-statmaker.o -MD -MP -MF $(DEPDIR)/statmaker-statmaker.Tpo -c -o statmaker-statmaker.o `test -f 'statmaker.c' || echo '$(srcdir)/'`statmaker.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/statmaker-statmaker.Tpo $(DEPDIR)/statmaker-statmaker.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='statmaker.c' object='statmaker-statmaker.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statmaker_CFLAGS) $(CFLAGS) -c -o statmaker-statmaker.o `test -f 'statmaker.c' || echo '$(srcdir)/'`statmaker.c
+
+statmaker-statmaker.obj: statmaker.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statmaker_CFLAGS) $(CFLAGS) -MT statmaker-statmaker.obj -MD -MP -MF $(DEPDIR)/statmaker-statmaker.Tpo -c -o statmaker-statmaker.obj `if test -f 'statmaker.c'; then $(CYGPATH_W) 'statmaker.c'; else $(CYGPATH_W) '$(srcdir)/statmaker.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/statmaker-statmaker.Tpo $(DEPDIR)/statmaker-statmaker.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='statmaker.c' object='statmaker-statmaker.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statmaker_CFLAGS) $(CFLAGS) -c -o statmaker-statmaker.obj `if test -f 'statmaker.c'; then $(CYGPATH_W) 'statmaker.c'; else $(CYGPATH_W) '$(srcdir)/statmaker.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

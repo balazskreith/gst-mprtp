@@ -21,7 +21,7 @@ typedef struct{
 
   TransferParams*     snd_transfer_params;
   SchedulerParams*    scheduler_params;
-  StatParamsTuple*    stat_params_tuple;
+  StatParams*         stat_params;
   ExtraDelayParams*   extra_delay_params;
 
   GstCaps*      video_caps;
@@ -39,7 +39,7 @@ static void _print_params(SenderSide* this)
   g_print("Src. Sink Params: %s\n", this->sourcesink_params ? this->sourcesink_params->to_string : "NONE");
   g_print("Enc. Sink Params: %s\n", this->encodersink_params ? this->encodersink_params->to_string : "NONE");
   g_print("Scheduler Params: %s\n", this->scheduler_params ? this->scheduler_params->to_string : "None");
-  g_print("Stat      Params: %s\n", this->stat_params_tuple ? this->stat_params_tuple->to_string : "None");
+  g_print("Stat      Params: %s\n", this->stat_params ? this->stat_params->to_string : "None");
   g_print("Ext. Del. Params: %s\n", this->extra_delay_params ? this->extra_delay_params->to_string : "None");
 
 }
@@ -160,10 +160,7 @@ int main (int argc, char **argv)
 
   session->extra_delay_params = extradelay_params_rawstring ? make_extra_delay_params(extradelay_params_rawstring) : NULL;
 
-  session->stat_params_tuple = make_statparams_tuple_by_raw_strings(
-      stat_params_rawstring,
-      statlogs_sink_params_rawstring,
-      packetlogs_sink_params_rawstring);
+  session->stat_params = make_stat_params(stat_params_rawstring);
 
   session->video_params = make_video_params(
       _null_test(video_params_rawstring, video_params_rawstring_default)
@@ -174,7 +171,7 @@ int main (int argc, char **argv)
   session->source  = make_source(session->source_params, session->sourcesink_params);
   session->encoder = make_encoder(session->codec_params, session->encodersink_params);
   session->sender  = make_sender(session->scheduler_params,
-      session->stat_params_tuple,
+      session->stat_params,
       session->snd_transfer_params,
       session->extra_delay_params);
 //  session->sender = make_sender_custom();
@@ -225,7 +222,7 @@ int main (int argc, char **argv)
   encoder_dtor(session->encoder);
   sender_dtor(session->sender);
 
-  free_statparams_tuple(session->stat_params_tuple);
+  g_free(session->stat_params);
   free_scheduler_params(session->scheduler_params);
   transfer_params_unref(session->snd_transfer_params);
   g_free(session);

@@ -20,12 +20,8 @@ echo -n "./rcv_pipeline "                                         > $SCRIPTFILE
 echo -n "--sink=FILE:consumed.yuv "                              >> $SCRIPTFILE
 
 echo -n "--codec=VP8 "                                           >> $SCRIPTFILE
-echo -n "--stat=100:1000:1:triggered_stat "                      >> $SCRIPTFILE
-#echo -n "--statlogsink=FILE:temp/rcv_statlogs.csv "              >> $SCRIPTFILE
-#echo -n "--packetlogsink=FILE:temp/rcv_packetlogs.csv "          >> $SCRIPTFILE
-
-echo -n "--statlogsink=MULTIFILE:2:1:temp/rcv_statlogs.csv:2:temp/rcv_statlogs2.csv "       >> $SCRIPTFILE
-echo -n "--packetlogsink=MULTIFILE:2:1:temp/rcv_packetlogs.csv:2:temp/rcv_packetlogs2.csv "   >> $SCRIPTFILE
+echo -n "--stat=triggered_stat:temp/rcv_packets.csv:3 "                  >> $SCRIPTFILE
+echo -n "--plystat=triggered_stat:temp/ply_packets.csv:3 "               >> $SCRIPTFILE
 
 echo -n "--receiver=MPRTP:2:1:5000:2:5002 "                                >> $SCRIPTFILE
 echo -n "--playouter=MPRTPFRACTAL:MPRTP:2:1:10.0.0.1:5001:2:10.0.1.1:5003 "  >> $SCRIPTFILE

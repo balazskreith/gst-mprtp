@@ -30,9 +30,8 @@ echo -n "./rcv_pipeline "                                   > $SCRIPTFILE
 echo -n "--sink=FAKESINK "                                 >> $SCRIPTFILE
 
 echo -n "--codec=VP8 "                                     >> $SCRIPTFILE
-echo -n "--stat=100:1000:1:triggered_stat "                >> $SCRIPTFILE
-echo -n "--statlogsink=FILE:temp/rcv_statlogs.csv "        >> $SCRIPTFILE
-echo -n "--packetlogsink=FILE:temp/rcv_packetlogs.csv "    >> $SCRIPTFILE
+echo -n "--stat=triggered_stat:rcv_logs_1.csv:0 "          >> $SCRIPTFILE
+echo -n "--plystat=triggered_stat:ply_logs_1.csv:0 "       >> $SCRIPTFILE
 
 
 echo $CC" is used as congestion control for receiver 1"
@@ -57,9 +56,7 @@ echo -n "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1 " >> $SCRIPTFILE2
 #echo -n "--sourcesink=FILE:produced.yuv "                 >> $SCRIPTFILE2
 
 echo -n "--codec=VP8 "                                    >> $SCRIPTFILE2
-echo -n "--stat=100:1000:1:triggered_stat "               >> $SCRIPTFILE2
-echo -n "--statlogsink=FILE:temp/snd_statlogs2.csv "      >> $SCRIPTFILE2
-echo -n "--packetlogsink=FILE:temp/snd_packetlogs2.csv "  >> $SCRIPTFILE2
+echo -n "--stat=triggered_stat:temp/snd_packets_2.csv:0 " >> $SCRIPTFILE2
 
 echo $CC" is used as congestion control for sender 2"
 if [ $CC = $SCREAM ]

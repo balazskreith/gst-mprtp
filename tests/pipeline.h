@@ -28,7 +28,6 @@ typedef struct _SinkParams SinkParams;
 typedef struct _CodecParams CodecParams;
 typedef struct _VideoParams VideoParams;
 typedef struct _StatParams StatParams;
-typedef struct _StatParamsTuple StatParamsTuple;
 typedef struct _TransferParams TransferParams;
 typedef struct _PlayouterParams PlayouterParams;
 typedef struct _SchedulerParams SchedulerParams;
@@ -185,11 +184,10 @@ struct _VideoParams{
 
 
 struct _StatParams{
-  gint       sampling_time;
-  gint       accumulation_length;
-  gint       csv_logging;
   gchar      touched_sync[256];
-
+  gchar      logfile_path[256];
+  guint8     mprtp_ext_header_id;
+//  gchar      default_logfile[256];
   gchar      to_string[1024];
 
 };
@@ -205,15 +203,6 @@ struct _SubflowsParams{
   GSList* subflows;
   gchar   to_string[1024];
   guint   ref;
-};
-
-
-struct _StatParamsTuple{
-  StatParams* stat_params;
-  SinkParams* packetlogs_sink_params;
-  SinkParams* statlogs_sink_params;
-
-  gchar       to_string[2048];
 };
 
 typedef enum{
@@ -328,10 +317,9 @@ static gchar* scheduler_params_rawstring                = NULL;
 static gchar* playouter_params_rawstring                = NULL;
 
 static gchar* stat_params_rawstring                     = NULL;
+static gchar* ply_stat_params_rawstring                 = NULL;
 static gchar* sourcesink_params_rawstring               = NULL;
 static gchar* encodersink_params_rawstring              = NULL;
-static gchar* statlogs_sink_params_rawstring            = NULL;
-static gchar* packetlogs_sink_params_rawstring          = NULL;
 static gchar* extradelay_params_rawstring               = NULL;
 
 static int target_bitrate = 500000;
@@ -351,10 +339,9 @@ static GOptionEntry entries[] =
     { "playouter",  0, 0, G_OPTION_ARG_STRING, &playouter_params_rawstring,    "playouter",      NULL },
 
     { "stat",           0, 0, G_OPTION_ARG_STRING, &stat_params_rawstring,             "stat",            NULL },
+    { "plystat",        0, 0, G_OPTION_ARG_STRING, &ply_stat_params_rawstring,         "plystat",         NULL },
     { "encodersink",    0, 0, G_OPTION_ARG_STRING, &encodersink_params_rawstring,      "encodersink",     NULL },
     { "sourcesink",     0, 0, G_OPTION_ARG_STRING,  &sourcesink_params_rawstring,      "sourcesink",      NULL },
-    { "statlogsink",    0, 0, G_OPTION_ARG_STRING, &statlogs_sink_params_rawstring,    "statlogsink",     NULL },
-    { "packetlogsink",  0, 0, G_OPTION_ARG_STRING, &packetlogs_sink_params_rawstring,  "packetlogsink",   NULL },
     { "extradelay",     0, 0, G_OPTION_ARG_STRING, &extradelay_params_rawstring,       "extradelay",      NULL },
 
     { "target_bitrate", 0, 0, G_OPTION_ARG_INT, &target_bitrate, "target_bitrate", NULL },
@@ -396,18 +383,6 @@ void free_playouter_params(PlayouterParams *congestion_controller_params);
 
 SinkParams*     make_sink_params(gchar* params_rawstring);
 void free_sink_params(SinkParams* sink_params);
-
-StatParamsTuple* make_statparams_tuple_by_raw_strings(gchar* statparams_rawstring,
-                                       gchar* statlogs_sink_params_rawstring,
-                                       gchar* packetlogs_sink_params_rawstring
-                                      );
-
-StatParamsTuple* make_statparams_tuple(StatParams* stat_params,
-                                       SinkParams* statlogs_sink_params,
-                                       SinkParams* packetlogs_sink_params
-                                      );
-
-void free_statparams_tuple(StatParamsTuple* statparams_tuple);
 
 void on_fi_called(gpointer object, gpointer user_data);
 

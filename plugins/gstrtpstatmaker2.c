@@ -41,35 +41,42 @@ enum
 {
   PROP_0,
   PROP_SYNC,
-  PROP_FEC_PAYLOAD_TYPE,
-  PROP_SAMPLING_TIME,
-  PROP_ACCUMULATION_LENGTH,
-  PROP_MPRTP_EXT_HEADER_ID,
-  PROP_CSV_LOGGING,
   PROP_TOUCHED_SYNC_LOCATION,
-  PROP_NEXTID,
-  PROP_PACKETSLOG_LOCATION,
-  PROP_STATSLOG_LOCATION,
-
+  PROP_MPRTP_EXT_HEADER_ID,
+  PROP_FEC_PAYLOAD_TYPE,
+  PROP_LOGGER_PAYLOAD,
+  PROP_LOGGER_SSRC,
+  PROP_LOGGER_SUBFLOW_ID,
+  PROP_NEW_LOGGER,
+  PROP_DEFAULT_LOGFILE_LOCATION
 };
+
+typedef struct _Packet
+{
+  guint64              tracked_ntp;
+  guint16              seq_num;
+  guint32              ssrc;
+  guint8               subflow_id;
+  guint16              subflow_seq;
+
+  gboolean             marker;
+  guint8               payload_type;
+  guint32              timestamp;
+
+  guint                header_size;
+  guint                payload_size;
+
+  guint16              protect_begin;
+  guint16              protect_end;
+}Packet;
 
 
 typedef struct{
-  gchar path[256];
-  gchar string[2048];
-}Message;
-
-static GstStaticPadTemplate gst_rtpstatmaker_packet_src_template =
-GST_STATIC_PAD_TEMPLATE ("packet_src",
-    GST_PAD_SRC,
-    GST_PAD_ALWAYS,
-    GST_STATIC_CAPS_ANY);
-
-static GstStaticPadTemplate gst_rtpstatmaker_packet_sink_template =
-GST_STATIC_PAD_TEMPLATE ("packet_sink",
-    GST_PAD_SINK,
-    GST_PAD_ALWAYS,
-    GST_STATIC_CAPS_ANY);
+  guint32 ssrc;
+  guint8  payload_type;
+  guint32 subflow_id;
+  gchar   path[256];
+}Logger;
 
 
 #define _do_init \
@@ -97,13 +104,9 @@ static gboolean gst_rtpstatmaker2_accept_caps (GstBaseTransform * base,
 static gboolean gst_rtpstatmaker2_query (GstBaseTransform * base,
     GstPadDirection direction, GstQuery * query);
 
-static void _fprintf(GstRTPStatMaker2 *this, const gchar *path, const gchar * format, ...);
-
 static void
 _monitorstat_logger (GstRTPStatMaker2 *this);
 
-static void
-_monitorstat_refresh (GstRTPStatMaker2 *this, gboolean lock);
 
 static void
 gst_rtpstatmaker2_finalize (GObject * object)
@@ -115,21 +118,10 @@ gst_rtpstatmaker2_finalize (GObject * object)
 
   g_free (this->last_message);
   g_cond_clear (&this->blocked_cond);
-  g_cond_clear (&this->waiting_signal);
-
-  g_object_unref (this->messenger);
 
   g_object_unref (this->sysclock);
-  g_object_unref (this->monitor);
-
-  {
-    GSList* it;
-    for(it = this->subflow_monitors_list; it; it = it->next){
-      SubflowMonitor* smonitor = it->data;
-      this->subflow_monitors_lookup[smonitor->id] = NULL;
-      g_object_unref(smonitor->monitor);
-    }
-  }
+  g_object_unref (this->packets);
+  g_free(this->default_logger);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -162,12 +154,6 @@ gst_rtpstatmaker2_class_init (GstRTPStatMaker2Class * klass)
   gst_element_class_add_static_pad_template (gstelement_class, &srctemplate);
   gst_element_class_add_static_pad_template (gstelement_class, &sinktemplate);
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&gst_rtpstatmaker_packet_src_template));
-
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&gst_rtpstatmaker_packet_sink_template));
-
   gstelement_class->change_state =
       GST_DEBUG_FUNCPTR (gst_rtpstatmaker2_change_state);
 
@@ -180,96 +166,63 @@ gst_rtpstatmaker2_class_init (GstRTPStatMaker2Class * klass)
       GST_DEBUG_FUNCPTR (gst_rtpstatmaker2_accept_caps);
   gstbasetrans_class->query = gst_rtpstatmaker2_query;
 
-  g_object_class_install_property (gobject_class, PROP_FEC_PAYLOAD_TYPE,
-      g_param_spec_uint ("fec-payload-type",
-          "Distinguish FEC packets",
-          "Set or get the payload type of FEC packets.",
-          0, 127, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_SAMPLING_TIME,
-      g_param_spec_uint ("sampling-time",
-          "Sampling-time",
-          "Set the sampling time in ms.",
-          0, 100000000, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_ACCUMULATION_LENGTH,
-      g_param_spec_uint ("accumulation-length",
-          "Accumulation-length",
-          "The time window for accumulative statistics.",
-          0, 1000000000, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-
-  g_object_class_install_property (gobject_class, PROP_MPRTP_EXT_HEADER_ID,
-      g_param_spec_uint ("mprtp-ext-header-id",
-          "MPRTP Header Extesion ID",
-          "The ID for the MPRTP header extension.",
-          0, 15, MPRTP_DEFAULT_EXTENSION_HEADER_ID, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_NEXTID,
-      g_param_spec_uint ("next-id",
-          "Next ID",
-          "The ID for the next MPRTP subflow for logging",
-          0, 255, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_CSV_LOGGING,
-      g_param_spec_boolean ("csv-logging",
-          "CSV Logging",
-          "The log format is csv",
-          TRUE, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
   g_object_class_install_property (gobject_class, PROP_TOUCHED_SYNC_LOCATION,
       g_param_spec_string ("touch-sync-location",
             "Simple IPC syncronization",
             "Trigger the collection by a file existance.",
-            "NULL", G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+            "NULL", G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
+  );
 
 
-  g_object_class_install_property (gobject_class, PROP_PACKETSLOG_LOCATION,
-      g_param_spec_string ("packetslog-location",
-            "Packetslog file",
-            "The location of the log for packet dump log.",
-            "NULL", G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (gobject_class, PROP_DEFAULT_LOGFILE_LOCATION,
+      g_param_spec_string ("default-logfile-location",
+            "Logfile location if no logger is matched",
+            "Logfile location if no logger is matched",
+            "NULL", G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
+  );
 
-  g_object_class_install_property (gobject_class, PROP_STATSLOG_LOCATION,
-      g_param_spec_string ("statslog-location",
-            "Statlog file",
-            "The location of the log for accumulative stat. file.",
-            "NULL", G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (gobject_class, PROP_NEW_LOGGER,
+      g_param_spec_string ("new-logger",
+          "Logfile location for a new logfilter",
+          "Logfile location for a new logfilter",
+          "NULL", G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
+  );
 
+  g_object_class_install_property (gobject_class, PROP_LOGGER_SSRC,
+      g_param_spec_uint ("logger-ssrc",
+                "Setup a logger to filter for a given ssrc",
+                "Setup a logger to filter for a given ssrc",
+                0, -1, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
+  );
 
-}
+  g_object_class_install_property (gobject_class, PROP_LOGGER_SUBFLOW_ID,
+      g_param_spec_uint ("logger-subflow-id",
+                "Setup a logger to filter a given subflow id",
+                "Setup a logger to filter a given subflow id",
+                0, -1, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
+  );
 
-static GstFlowReturn
-gst_rtpstatmaker_packet_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *buf)
-{
-  GstRTPStatMaker2 *this;
-  GstFlowReturn result;
+  g_object_class_install_property (gobject_class, PROP_LOGGER_PAYLOAD,
+      g_param_spec_uint ("logger-payload",
+              "Setup a logger to filter a given payload type",
+              "Setup a logger to filter a given payload type",
+                0, 256, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
+  );
 
-  this = GST_RTPSTATMAKER2 (parent);
+  g_object_class_install_property (gobject_class, PROP_MPRTP_EXT_HEADER_ID,
+      g_param_spec_uint ("mprtp-ext-header-id",
+               "Setup the mprtp extension header id",
+               "Setup the mprtp extension header id",
+                0, 16, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
+  );
 
-  THIS_LOCK(this);
+  g_object_class_install_property (gobject_class, PROP_FEC_PAYLOAD_TYPE,
+      g_param_spec_uint ("fec-payload-type",
+               "Setup the fec payload type",
+               "Setup the fec payload type",
+                0, 128, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
+  );
 
-  monitor_track_packetbuffer(this->monitor, buf);
-
-  result = GST_FLOW_OK;
-  THIS_UNLOCK(this);
-
-  return result;
-
-}
-
-static GstBufferPool *
-_create_pool (guint size, guint min_buf, guint max_buf)
-{
-  GstBufferPool *pool = gst_buffer_pool_new ();
-  GstStructure *conf = gst_buffer_pool_get_config (pool);
-  GstCaps *caps = gst_caps_new_empty_simple ("ANY");
-
-  gst_buffer_pool_config_set_params (conf, caps, size, min_buf, max_buf);
-  gst_buffer_pool_set_config (pool, conf);
-  gst_caps_unref (caps);
-
-  return pool;
 }
 
 static void
@@ -281,41 +234,94 @@ gst_rtpstatmaker2_init (GstRTPStatMaker2 * this)
 //  init_mprtp_logger();
 //  mprtp_logger_set_state(TRUE);
 
-  g_mutex_init(&this->mutex);
   g_cond_init (&this->blocked_cond);
-  g_cond_init (&this->waiting_signal);
 
   gst_base_transform_set_gap_aware (GST_BASE_TRANSFORM_CAST (this), TRUE);
-
-
-  this->packet_sinkpad =
-      gst_pad_new_from_static_template
-      (&gst_rtpstatmaker_packet_sink_template, "packet_sink");
-
-  gst_pad_set_chain_function (this->packet_sinkpad,
-      GST_DEBUG_FUNCPTR (gst_rtpstatmaker_packet_sink_chain));
-
-  gst_element_add_pad (GST_ELEMENT (this), this->packet_sinkpad);
-
-  this->packet_srcpad =
-      gst_pad_new_from_static_template
-      (&gst_rtpstatmaker_packet_src_template, "packet_src");
-
-  gst_element_add_pad (GST_ELEMENT (this), this->packet_srcpad);
-
-
-  this->monitor = make_monitor();
 
   g_rec_mutex_init (&this->thread_mutex);
   this->thread = gst_task_new ((GstTaskFunction) _monitorstat_logger, this, NULL);
 
-  this->messenger = make_messenger(sizeof(Message));
+  this->default_logger = g_malloc0(sizeof(Logger));
   this->sysclock = gst_system_clock_obtain ();
-  this->packetbufferpool = _create_pool(1024, 5, 0);
-  gst_buffer_pool_set_active (this->packetbufferpool, TRUE);
+  this->packets = make_messenger(sizeof(Packet));
+
+  this->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
 }
 
 
+
+static void
+gst_rtpstatmaker2_set_property (GObject * object, guint prop_id,
+    const GValue * value, GParamSpec * pspec)
+{
+  GstRTPStatMaker2 *this;
+
+  this = GST_RTPSTATMAKER2 (object);
+
+  switch (prop_id) {
+    case PROP_TOUCHED_SYNC_LOCATION:
+      this->touched_sync_active = TRUE;
+      strcpy(this->touched_sync_location, g_value_get_string(value));
+      break;
+    case PROP_SYNC:
+      this->sync = g_value_get_boolean (value);
+      break;
+    case PROP_MPRTP_EXT_HEADER_ID:
+      this->mprtp_ext_header_id = g_value_get_uint(value);
+      break;
+    case PROP_FEC_PAYLOAD_TYPE:
+      this->fec_payload_type = g_value_get_uint(value);
+      break;
+    case PROP_LOGGER_PAYLOAD:
+     if(this->loggers){
+       Logger* logger = this->loggers->data;
+       logger->payload_type = g_value_get_uint(value);
+     }
+     break;
+    case PROP_LOGGER_SUBFLOW_ID:
+     if(this->loggers){
+       Logger* logger = this->loggers->data;
+       logger->subflow_id = g_value_get_uint(value);
+     }
+     break;
+    case PROP_LOGGER_SSRC:
+      if(this->loggers){
+        Logger* logger = this->loggers->data;
+        logger->ssrc = g_value_get_uint(value);
+      }
+      break;
+    case PROP_NEW_LOGGER:
+      this->loggers = g_slist_prepend(this->loggers, g_malloc0(sizeof(Logger)));
+      strcpy(((Logger*)this->loggers->data)->path, g_value_get_string(value));
+      break;
+    case PROP_DEFAULT_LOGFILE_LOCATION:
+      strcpy(((Logger*)this->default_logger)->path, g_value_get_string(value));
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+  }
+  gst_base_transform_set_passthrough (GST_BASE_TRANSFORM (this), TRUE);
+
+}
+
+static void
+gst_rtpstatmaker2_get_property (GObject * object, guint prop_id, GValue * value,
+    GParamSpec * pspec)
+{
+  GstRTPStatMaker2 *rtpstatmaker2;
+
+  rtpstatmaker2 = GST_RTPSTATMAKER2 (object);
+
+  switch (prop_id) {
+    case PROP_SYNC:
+      g_value_set_boolean (value, rtpstatmaker2->sync);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+  }
+}
 
 static GstFlowReturn
 gst_rtpstatmaker2_do_sync (GstRTPStatMaker2 * this, GstClockTime running_time)
@@ -367,13 +373,45 @@ gst_rtpstatmaker2_sink_event (GstBaseTransform * trans, GstEvent * event)
     case GST_EVENT_STREAM_START:
     case GST_EVENT_SEGMENT:
       gst_event_ref(event);
-      gst_pad_push_event(this->packet_srcpad, event);
       break;
     default:
       break;
   }
-
+  DISABLE_LINE g_print("%d", this->mprtp_ext_header_id);
   return GST_BASE_TRANSFORM_CLASS (parent_class)->sink_event (trans, event);
+}
+
+
+static void _init_packet(GstRTPStatMaker2 *this, Packet* packet, GstBuffer* buf){
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+
+  gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
+
+  packet->timestamp    = gst_rtp_buffer_get_timestamp(&rtp);
+  packet->payload_size = gst_rtp_buffer_get_payload_len(&rtp);
+  packet->payload_type = gst_rtp_buffer_get_payload_type(&rtp);
+  packet->header_size  = gst_rtp_buffer_get_header_len(&rtp);
+  packet->marker       = gst_rtp_buffer_get_marker(&rtp);
+  packet->ssrc         = gst_rtp_buffer_get_ssrc(&rtp);
+  packet->seq_num      = gst_rtp_buffer_get_seq(&rtp);
+  packet->tracked_ntp  = NTP_NOW;
+
+
+
+  if(0 < this->mprtp_ext_header_id){
+    gst_rtp_buffer_get_mprtp_extension(&rtp, this->mprtp_ext_header_id, &packet->subflow_id, &packet->subflow_seq);
+  }
+
+  if(0 < this->fec_payload_type && packet->payload_type == this->fec_payload_type){
+    GstRTPFECHeader fec_header;
+    memcpy(&fec_header, gst_rtp_buffer_get_payload(&rtp), sizeof(GstRTPFECHeader));
+    packet->protect_begin = g_ntohs(fec_header.sn_base);
+    packet->protect_end = g_ntohs(fec_header.sn_base) + fec_header.N_MASK - 1;
+  }else{
+    packet->protect_begin = packet->protect_end = 0;
+  }
+
+  gst_rtp_buffer_unmap(&rtp);
 }
 
 static void
@@ -381,11 +419,7 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
 {
   guint8 first_byte;
   guint8 second_byte;
-  MonitorPacket* packet = NULL;
-  GstBuffer* packetbuffer = NULL;
-  gboolean packetsrc_linked = FALSE;
-  SubflowMonitor* smonitor = NULL;
-  guint8 subflow_id = 0;
+  Packet* packet;
 
   if (!GST_IS_BUFFER(buffer)) {
     goto exit;
@@ -407,82 +441,26 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
     goto exit;
   }
 
-  THIS_LOCK(this);
-  //g_queue_push_head(this->bufferq, gst_buffer_ref(buffer));
-  //TODO: changepoint
-
   if(this->touched_sync_active){
     if(!g_file_test(this->touched_sync_location, G_FILE_TEST_EXISTS)){
-      goto done;
+      goto exit;
     }
     this->touched_sync_active = FALSE;
   }
 
-  if(0 < this->mprtp_ext_header_id){
-    GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-    gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
-    gst_rtp_buffer_get_mprtp_extension(&rtp, this->mprtp_ext_header_id, &subflow_id, NULL);
-    smonitor = this->subflow_monitors_lookup[subflow_id];
-    if(smonitor){
-      monitor_track_rtpbuffer(smonitor->monitor, buffer);
-    }
-    gst_rtp_buffer_unmap(&rtp);
-  }
-  monitor_track_rtpbuffer(this->monitor, buffer);
+  messenger_lock(this->packets);
+  packet = messenger_retrieve_block_unlocked(this->packets);
+  _init_packet(this, packet, buffer);
+  messenger_push_block_unlocked(this->packets, packet);
+  messenger_unlock(this->packets);
 
-again:
-  packet = monitor_pop_prepared_packet(this->monitor);
-  if(!packet){
-    goto done;
-  }
-
-  packetsrc_linked = gst_pad_is_linked(this->packet_srcpad);
-//  packetsrc_linked = FALSE;
-  if(!packetsrc_linked && !this->packetlogs_linked){
-    goto done;
-  }
-
-  if(packetsrc_linked){
-    gst_buffer_pool_acquire_buffer (this->packetbufferpool, &packetbuffer, NULL);
-    monitor_setup_packetbufffer(packet, packetbuffer);
-    gst_pad_push(this->packet_srcpad, packetbuffer);
-    packetbuffer = NULL;
-  }
-
-  if(this->packetlogs_linked){
-    if(this->csv_logging){
-      gchar* packetslog_file;
-      if(smonitor){
-        packetslog_file = smonitor->packetslog;
-      }else{
-        packetslog_file = this->packetslog_file;
-      }
-      //mprtp_logger(this->packetslog_file,
-      _fprintf(this, packetslog_file,
-          "%u,%hu,%d,%lu,%d,%u,%u,%u,%d,%lu\n",
-          packet->extended_seq,
-          packet->tracked_seq,
-          packet->state,
-          packet->tracked_ntp,
-          packet->marker,
-          packet->header_size,
-          packet->payload_size,
-          packet->timestamp,
-          packet->payload_type,
-          packet->played_out
-      );
-    }else{
-
-    }
-
-  }
-  goto again;
-done:
-  _monitorstat_refresh(this, FALSE);
-  THIS_UNLOCK(this);
 exit:
   return;
 }
+
+
+
+
 //static int received = 1;
 static GstFlowReturn
 gst_rtpstatmaker2_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
@@ -531,111 +509,8 @@ gst_rtpstatmaker2_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
 
 }
 
-static SubflowMonitor* _make_subflow_monitor(guint8 id){
-  SubflowMonitor* result = g_malloc0(sizeof(SubflowMonitor));
-  result->monitor = make_monitor();
-  result->id = id;
-  return result;
-}
 
-static SubflowMonitor* _get_subflow_monitor(GstRTPStatMaker2 *this, guint8 id){
-  SubflowMonitor* smonitor;
-  if(this->subflow_monitors_lookup[id]){
-    return this->subflow_monitors_lookup[id];
-  }
-  smonitor = _make_subflow_monitor(id);
-  this->subflow_monitors_list       = g_slist_prepend(this->subflow_monitors_list, smonitor);
-  this->subflow_monitors_lookup[id] = smonitor;
-  return smonitor;
-}
 
-static void
-gst_rtpstatmaker2_set_property (GObject * object, guint prop_id,
-    const GValue * value, GParamSpec * pspec)
-{
-  GstRTPStatMaker2 *this;
-
-  this = GST_RTPSTATMAKER2 (object);
-
-  switch (prop_id) {
-  case PROP_MPRTP_EXT_HEADER_ID:
-      this->mprtp_ext_header_id = (guint8) g_value_get_uint (value);
-      monitor_set_mprtp_ext_header_id(this->monitor, this->mprtp_ext_header_id);
-      break;
-    case PROP_FEC_PAYLOAD_TYPE:
-      this->fec_payload_type = (guint8) g_value_get_uint (value);
-      monitor_set_fec_payload_type(this->monitor, this->fec_payload_type);
-      break;
-    case PROP_ACCUMULATION_LENGTH:
-      this->accumulation_length = (GstClockTime) g_value_get_uint (value) * GST_MSECOND;
-      monitor_set_accumulation_length(this->monitor, this->accumulation_length);
-      break;
-    case PROP_SAMPLING_TIME:
-      this->sampling_time = (GstClockTime) g_value_get_uint (value);
-      break;
-    case PROP_CSV_LOGGING:
-      this->csv_logging = g_value_get_boolean (value);
-      break;
-    case PROP_TOUCHED_SYNC_LOCATION:
-      this->touched_sync_active = TRUE;
-      strcpy(this->touched_sync_location, g_value_get_string(value));
-      break;
-    case PROP_NEXTID:
-      this->next_id_set = TRUE;
-      this->next_id = g_value_get_uint (value);
-      break;
-    case PROP_PACKETSLOG_LOCATION:
-      this->packetlogs_linked = TRUE;
-      if(this->next_id_set){
-        SubflowMonitor* smonitor = _get_subflow_monitor(this, this->next_id);
-        strcpy(smonitor->packetslog, g_value_get_string(value));
-        this->next_id_set = FALSE;
-      }else{
-        strcpy(this->packetslog_file, g_value_get_string(value));
-      }
-      break;
-    case PROP_STATSLOG_LOCATION:
-      this->statlogs_linked = TRUE;
-      if(this->next_id_set){
-        SubflowMonitor* smonitor = _get_subflow_monitor(this, this->next_id);
-        strcpy(smonitor->statslog, g_value_get_string(value));
-        this->next_id_set = FALSE;
-      }else{
-        strcpy(this->statslog_file, g_value_get_string(value));
-      }
-      break;
-
-    case PROP_SYNC:
-      this->sync = g_value_get_boolean (value);
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-      break;
-  }
-  gst_base_transform_set_passthrough (GST_BASE_TRANSFORM (this), TRUE);
-
-}
-
-static void
-gst_rtpstatmaker2_get_property (GObject * object, guint prop_id, GValue * value,
-    GParamSpec * pspec)
-{
-  GstRTPStatMaker2 *rtpstatmaker2;
-
-  rtpstatmaker2 = GST_RTPSTATMAKER2 (object);
-
-  switch (prop_id) {
-    case PROP_SYNC:
-      g_value_set_boolean (value, rtpstatmaker2->sync);
-      break;
-    case PROP_MPRTP_EXT_HEADER_ID:
-      g_value_set_uint (value, rtpstatmaker2->mprtp_ext_header_id);
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-      break;
-  }
-}
 
 static gboolean
 gst_rtpstatmaker2_start (GstBaseTransform * trans)
@@ -799,137 +674,56 @@ gst_rtpstatmaker2_change_state (GstElement * element, GstStateChange transition)
   return ret;
 }
 
-void _fprintf(GstRTPStatMaker2 *this, const gchar *path, const gchar * format, ...)
-{
-  Message *msg;
-  va_list args;
-  msg = messenger_retrieve_block(this->messenger);
-  strcpy(msg->path, path);
-  va_start (args, format);
-  vsprintf(msg->string, format, args);
-  va_end (args);
 
-  messenger_push_block(this->messenger, msg);
+static gboolean _check_logger_match(Logger* logger, Packet* packet){
+  if(0 < logger->ssrc && packet->ssrc == logger->ssrc){
+    return TRUE;
+  }
+  if(0 < logger->payload_type && packet->payload_type == logger->payload_type){
+    return TRUE;
+  }
+
+  if(0 < logger->subflow_id && packet->subflow_id == logger->subflow_id){
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+static Logger* _get_logger(GstRTPStatMaker2* this, Packet* packet){
+  GSList* it;
+  for(it = this->loggers; it; it = it->next){
+    if(_check_logger_match(it->data, packet)){
+      return it->data;
+    }
+  }
+  return this->default_logger;
 }
 
 void
 _monitorstat_logger (GstRTPStatMaker2 *this)
 {
-  guint length;
-  Messenger* messenger = this->messenger;
-  Message* message = NULL;
-  length = messenger_get_length_with_timeout(messenger, 10000);
-  if(length < 1){
-    goto done;
-  }
-  messenger_lock(messenger);
-  while((message = messenger_try_pop_block_unlocked(messenger)) != NULL){
-    FILE* fp = fopen(message->path, "a");
-    fprintf(fp, "%s", message->string);
-    fclose(fp);
-    messenger_throw_block_unlocked(messenger, message);
-  }
-  messenger_unlock(messenger);
+  Packet* packet;
+  Logger* logger;
+  FILE* fp;
+  packet = messenger_pop_block(this->packets);
+  logger = _get_logger(this, packet);
+  fp = fopen(logger->path, "a");
 
-done:
-  _monitorstat_refresh(this, TRUE);
-  return;
-}
+  fprintf(fp, "%lu,%hu,%u,%d,%u,%d,%d,%d,%hu,%hu\n",
+      packet->tracked_ntp,
+      packet->seq_num,
+      packet->ssrc,
+      packet->payload_type,
+      packet->payload_size,
+      packet->subflow_id,
+      packet->subflow_seq,
+      packet->header_size,
+      packet->protect_begin,
+      packet->protect_end);
 
-static void _statprint(GstRTPStatMaker2* this, MonitorStat* stat, gchar* path){
-  _fprintf(this, path,
-          "%d,%d,%d,%d," //received
-          "%d,%d,%d,%d," //lost
-          "%d,%d,%d,%d," //discarded
-          "%d,%d,%d,%d," //corrupted
-          "%d,%d,%d,%d," //repaired
-          "%d,%d,%d,%d\n"  //fec
-          ,
-          stat->received.total_packets,
-          stat->received.total_bytes,
-          stat->received.accumulative_bytes,
-          stat->received.accumulative_packets,
-
-          stat->lost.total_packets,
-          stat->lost.total_bytes,
-          stat->lost.accumulative_bytes,
-          stat->lost.accumulative_packets,
-
-          stat->discarded.total_packets,
-          stat->discarded.total_bytes,
-          stat->discarded.accumulative_bytes,
-          stat->discarded.accumulative_packets,
-
-          stat->corrupted.total_packets,
-          stat->corrupted.total_bytes,
-          stat->corrupted.accumulative_bytes,
-          stat->corrupted.accumulative_packets,
-
-          stat->repaired.total_packets,
-          stat->repaired.total_bytes,
-          stat->repaired.accumulative_bytes,
-          stat->repaired.accumulative_packets,
-
-          stat->fec.total_packets,
-          stat->fec.total_bytes,
-          stat->fec.accumulative_bytes,
-          stat->fec.accumulative_packets
-        );
-}
-
-void
-_monitorstat_refresh (GstRTPStatMaker2 *this, gboolean lock)
-{
-  Monitor* monitor;
-  MonitorStat* stat;
-
-  if(lock){
-    THIS_LOCK(this);
-  }
-
-  if(!this->statlogs_linked){
-    goto done;
-  }
-  if(0 < this->last_statlog && _now(this) - this->sampling_time * GST_MSECOND < this->last_statlog ){
-    goto done;
-  }
-
-  if(this->touched_sync_active){
-    if(!g_file_test(this->touched_sync_location, G_FILE_TEST_EXISTS)){
-      goto done;
-    }
-    this->touched_sync_active = FALSE;
-  }
-
-  monitor = this->monitor;
-  stat = &monitor->stat;
-  if(this->csv_logging){
-    if(0 < this->mprtp_ext_header_id){
-      GSList* it;
-      for(it = this->subflow_monitors_list; it; it = it->next){
-        SubflowMonitor* smonitor = it->data;
-        stat = &smonitor->monitor->stat;
-        _statprint(this, stat, smonitor->statslog);
-      }
-    }else{
-      stat = &monitor->stat;
-      _statprint(this, stat, this->statslog_file);
-    }
-  }else{
-
-  }
-
-//  gst_pad_push(this->statlogs_srcpad, buffer);
-  if(0 < this->last_statlog){
-    this->last_statlog += this->sampling_time * GST_MSECOND;
-  }else{
-    this->last_statlog = _now(this);
-  }
-
-done:
-  if(lock){
-    THIS_UNLOCK(this);
-  }
+  fclose(fp);
+  messenger_throw_block(this->packets, packet);
   return;
 }
 

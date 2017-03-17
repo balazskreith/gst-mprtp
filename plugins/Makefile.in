@@ -159,17 +159,16 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-fecdec.lo \
 	libgstmprtp_la-jitterbuffer.lo libgstmprtp_la-lib_bintree.lo \
 	libgstmprtp_la-lib_datapuffer.lo \
 	libgstmprtp_la-lib_swplugins.lo libgstmprtp_la-mediator.lo \
-	libgstmprtp_la-messenger.lo libgstmprtp_la-monitor.lo \
-	libgstmprtp_la-mprtputils.lo libgstmprtp_la-mprtplogger.lo \
-	libgstmprtp_la-notifier.lo libgstmprtp_la-rcvctrler.lo \
-	libgstmprtp_la-rcvpackets.lo libgstmprtp_la-rcvsubflows.lo \
-	libgstmprtp_la-rcvtracker.lo libgstmprtp_la-recycle.lo \
-	libgstmprtp_la-reportproc.lo libgstmprtp_la-reportprod.lo \
-	libgstmprtp_la-ricalcer.lo libgstmprtp_la-rtpfecbuffer.lo \
-	libgstmprtp_la-slidingwindow.lo libgstmprtp_la-sndctrler.lo \
-	libgstmprtp_la-sndqueue.lo libgstmprtp_la-sndsubflows.lo \
-	libgstmprtp_la-sndtracker.lo libgstmprtp_la-sndpackets.lo \
-	libgstmprtp_la-streamjoiner.lo \
+	libgstmprtp_la-messenger.lo libgstmprtp_la-mprtputils.lo \
+	libgstmprtp_la-mprtplogger.lo libgstmprtp_la-notifier.lo \
+	libgstmprtp_la-rcvctrler.lo libgstmprtp_la-rcvpackets.lo \
+	libgstmprtp_la-rcvsubflows.lo libgstmprtp_la-rcvtracker.lo \
+	libgstmprtp_la-recycle.lo libgstmprtp_la-reportproc.lo \
+	libgstmprtp_la-reportprod.lo libgstmprtp_la-ricalcer.lo \
+	libgstmprtp_la-rtpfecbuffer.lo libgstmprtp_la-slidingwindow.lo \
+	libgstmprtp_la-sndctrler.lo libgstmprtp_la-sndqueue.lo \
+	libgstmprtp_la-sndsubflows.lo libgstmprtp_la-sndtracker.lo \
+	libgstmprtp_la-sndpackets.lo libgstmprtp_la-streamjoiner.lo \
 	libgstmprtp_la-streamsplitter.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -433,7 +432,6 @@ libgstmprtp_la_SOURCES = fecdec.c              \
                          lib_swplugins.c       \
                          mediator.c            \
                          messenger.c           \
-                         monitor.c             \
                          mprtputils.c          \
                          mprtplogger.c         \
                          notifier.c            \
@@ -467,7 +465,6 @@ noinst_HEADERS = fecdec.h              \
                  lib_swplugins.h       \
                  mediator.h            \
                  messenger.h           \
-                 monitor.h             \
                  mprtputils.h          \
                  mprtplogger.h         \
                  notifier.h            \
@@ -603,7 +600,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-lib_swplugins.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-mediator.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-messenger.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-monitor.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-mprtplogger.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-mprtputils.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-notifier.Plo@am__quote@
@@ -771,13 +767,6 @@ libgstmprtp_la-messenger.lo: messenger.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='messenger.c' object='libgstmprtp_la-messenger.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-messenger.lo `test -f 'messenger.c' || echo '$(srcdir)/'`messenger.c
-
-libgstmprtp_la-monitor.lo: monitor.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-monitor.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-monitor.Tpo -c -o libgstmprtp_la-monitor.lo `test -f 'monitor.c' || echo '$(srcdir)/'`monitor.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-monitor.Tpo $(DEPDIR)/libgstmprtp_la-monitor.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='monitor.c' object='libgstmprtp_la-monitor.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-monitor.lo `test -f 'monitor.c' || echo '$(srcdir)/'`monitor.c
 
 libgstmprtp_la-mprtputils.lo: mprtputils.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-mprtputils.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-mprtputils.Tpo -c -o libgstmprtp_la-mprtputils.lo `test -f 'mprtputils.c' || echo '$(srcdir)/'`mprtputils.c

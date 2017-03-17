@@ -32,7 +32,6 @@ sudo ip netns exec ns_mid tc qdisc change dev veth1 root handle 1: netem delay "
 echo "ntrt -c$CONFDIR/ntrt_snd_meas.ini -m$CONFDIR/ntrt_rmcat1.cmds -t130 " > $LOGSDIR"/ntrt.sh"
 chmod 777 $LOGSDIR"/ntrt.sh"
 
-
 #Lets Rock
 touch $SYNCTOUCHFILE
 

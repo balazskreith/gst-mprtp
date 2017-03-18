@@ -91,7 +91,7 @@ host_triplet = @host@
 target_triplet = @target@
 noinst_PROGRAMS = snd_pipeline$(EXEEXT) rcv_pipeline$(EXEEXT) \
 	make_delta_statlogs$(EXEEXT) bcex$(EXEEXT) bwcsv$(EXEEXT) \
-	statmaker$(EXEEXT)
+	statmaker$(EXEEXT) logsplitter$(EXEEXT)
 subdir = tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/common/m4/as-ac-expand.m4 \
@@ -132,6 +132,13 @@ bwcsv_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 bwcsv_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(bwcsv_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_logsplitter_OBJECTS = logsplitter-logsplitter.$(OBJEXT)
+logsplitter_OBJECTS = $(am_logsplitter_OBJECTS)
+logsplitter_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+logsplitter_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(logsplitter_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_make_delta_statlogs_OBJECTS =  \
 	make_delta_statlogs-make_delta_statlogs.$(OBJEXT)
 make_delta_statlogs_OBJECTS = $(am_make_delta_statlogs_OBJECTS)
@@ -212,10 +219,10 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(bcex_SOURCES) $(bwcsv_SOURCES) \
+SOURCES = $(bcex_SOURCES) $(bwcsv_SOURCES) $(logsplitter_SOURCES) \
 	$(make_delta_statlogs_SOURCES) $(rcv_pipeline_SOURCES) \
 	$(snd_pipeline_SOURCES) $(statmaker_SOURCES)
-DIST_SOURCES = $(bcex_SOURCES) $(bwcsv_SOURCES) \
+DIST_SOURCES = $(bcex_SOURCES) $(bwcsv_SOURCES) $(logsplitter_SOURCES) \
 	$(make_delta_statlogs_SOURCES) $(rcv_pipeline_SOURCES) \
 	$(snd_pipeline_SOURCES) $(statmaker_SOURCES)
 am__can_run_installinfo = \
@@ -467,6 +474,9 @@ bwcsv_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $
 statmaker_SOURCES = statmaker.c 
 statmaker_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
 statmaker_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
+logsplitter_SOURCES = logsplitter.c 
+logsplitter_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
+logsplitter_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
 all: all-am
 
 .SUFFIXES:
@@ -518,6 +528,10 @@ bwcsv$(EXEEXT): $(bwcsv_OBJECTS) $(bwcsv_DEPENDENCIES) $(EXTRA_bwcsv_DEPENDENCIE
 	@rm -f bwcsv$(EXEEXT)
 	$(AM_V_CCLD)$(bwcsv_LINK) $(bwcsv_OBJECTS) $(bwcsv_LDADD) $(LIBS)
 
+logsplitter$(EXEEXT): $(logsplitter_OBJECTS) $(logsplitter_DEPENDENCIES) $(EXTRA_logsplitter_DEPENDENCIES) 
+	@rm -f logsplitter$(EXEEXT)
+	$(AM_V_CCLD)$(logsplitter_LINK) $(logsplitter_OBJECTS) $(logsplitter_LDADD) $(LIBS)
+
 make_delta_statlogs$(EXEEXT): $(make_delta_statlogs_OBJECTS) $(make_delta_statlogs_DEPENDENCIES) $(EXTRA_make_delta_statlogs_DEPENDENCIES) 
 	@rm -f make_delta_statlogs$(EXEEXT)
 	$(AM_V_CCLD)$(make_delta_statlogs_LINK) $(make_delta_statlogs_OBJECTS) $(make_delta_statlogs_LDADD) $(LIBS)
@@ -542,6 +556,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bcex-bcex.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bwcsv-bwcsv.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/logsplitter-logsplitter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/make_delta_statlogs-make_delta_statlogs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-decoder.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-encoder.Po@am__quote@
@@ -613,6 +628,20 @@ bwcsv-bwcsv.obj: bwcsv.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bwcsv.c' object='bwcsv-bwcsv.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bwcsv_CFLAGS) $(CFLAGS) -c -o bwcsv-bwcsv.obj `if test -f 'bwcsv.c'; then $(CYGPATH_W) 'bwcsv.c'; else $(CYGPATH_W) '$(srcdir)/bwcsv.c'; fi`
+
+logsplitter-logsplitter.o: logsplitter.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(logsplitter_CFLAGS) $(CFLAGS) -MT logsplitter-logsplitter.o -MD -MP -MF $(DEPDIR)/logsplitter-logsplitter.Tpo -c -o logsplitter-logsplitter.o `test -f 'logsplitter.c' || echo '$(srcdir)/'`logsplitter.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/logsplitter-logsplitter.Tpo $(DEPDIR)/logsplitter-logsplitter.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='logsplitter.c' object='logsplitter-logsplitter.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(logsplitter_CFLAGS) $(CFLAGS) -c -o logsplitter-logsplitter.o `test -f 'logsplitter.c' || echo '$(srcdir)/'`logsplitter.c
+
+logsplitter-logsplitter.obj: logsplitter.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(logsplitter_CFLAGS) $(CFLAGS) -MT logsplitter-logsplitter.obj -MD -MP -MF $(DEPDIR)/logsplitter-logsplitter.Tpo -c -o logsplitter-logsplitter.obj `if test -f 'logsplitter.c'; then $(CYGPATH_W) 'logsplitter.c'; else $(CYGPATH_W) '$(srcdir)/logsplitter.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/logsplitter-logsplitter.Tpo $(DEPDIR)/logsplitter-logsplitter.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='logsplitter.c' object='logsplitter-logsplitter.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(logsplitter_CFLAGS) $(CFLAGS) -c -o logsplitter-logsplitter.obj `if test -f 'logsplitter.c'; then $(CYGPATH_W) 'logsplitter.c'; else $(CYGPATH_W) '$(srcdir)/logsplitter.c'; fi`
 
 make_delta_statlogs-make_delta_statlogs.o: make_delta_statlogs.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(make_delta_statlogs_CFLAGS) $(CFLAGS) -MT make_delta_statlogs-make_delta_statlogs.o -MD -MP -MF $(DEPDIR)/make_delta_statlogs-make_delta_statlogs.Tpo -c -o make_delta_statlogs-make_delta_statlogs.o `test -f 'make_delta_statlogs.c' || echo '$(srcdir)/'`make_delta_statlogs.c

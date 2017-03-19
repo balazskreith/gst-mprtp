@@ -61,7 +61,7 @@ while [  $COUNTER -lt $END ]; do
 	INCREASE=1
 
 	#Validation part 1.
-	for FILE in snd_packets.csv rcv_packets.csv asd
+	for FILE in snd_packets.csv rcv_packets.csv
 	do
    		if [ ! -f $LOGSDIR"/"$FILE ]; then
     		INCREASE=0

@@ -24,10 +24,9 @@ SCRIPTFILE=$TEMPDIR"/sender.sh"
 echo -n "./snd_pipeline "                                  > $SCRIPTFILE
 echo -n "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1 " >> $SCRIPTFILE
 #echo -n "--sourcesink=FILE:produced.yuv "                 >> $SCRIPTFILE
-echo -n "--stat=triggered_stat:temp/snd_packets.csv:0 "   >> $SCRIPTFILE
+echo -n "--stat=triggered_stat:$TEMPDIR/snd_packets.csv:0 "   >> $SCRIPTFILE
 
 echo -n "--codec=VP8 "                                    >> $SCRIPTFILE
-echo -n "--stat=100:1000:1:triggered_stat "               >> $SCRIPTFILE
 
 echo $CC" is used as congestion control for sender 1"
 if [ $CC = $SCREAM ] 

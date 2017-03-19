@@ -26,7 +26,7 @@ cleanup()
   sudo pkill rcv_pipeline
   sudo pkill bcex
   sudo pkill bwcsv
-  sudo pkill mprtp1.sh
+  sudo pkill sleep
 }
  
 control_c()
@@ -70,7 +70,7 @@ while [  $COUNTER -lt $END ]; do
 
 	if [ $INCREASE -eq 0 ]
 	then
-	  control_c
+	  cleanup
 	  continue
 	fi
 
@@ -92,7 +92,7 @@ while [  $COUNTER -lt $END ]; do
 
 	if [ $INCREASE -eq 0 ]
 	then
-	  control_c
+	  cleanup
 	  continue
 	fi
 
@@ -100,7 +100,7 @@ while [  $COUNTER -lt $END ]; do
 
 	sleep 150
 
-	control_c
+	cleanup
 
 	#vqmt produced.yuv consumed.yuv 288 352 2000 1 temp/vqmt PSNR
 

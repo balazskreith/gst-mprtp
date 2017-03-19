@@ -165,7 +165,7 @@ SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *pac
   gdouble selected_sr, actual_sr;
 
 
-  _print_ratios(this);
+  DISABLE_LINE _print_ratios(this);
 
   for(it = sndsubflows_get_subflows(this->subflows); it; it = it->next)
   {

@@ -54,7 +54,16 @@ static Packet* _make_packet(gchar* line){
   _setup_packet(packet, line);
   return packet;
 }
-
+static gint
+_cmp_seq (guint16 x, guint16 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 32768) return -1;
+  if(x > y && x - y > 32768) return -1;
+  if(x < y && y - x > 32768) return 1;
+  if(x > y && x - y < 32768) return 1;
+  return 0;
+}
 
 
 typedef struct{
@@ -183,16 +192,86 @@ static QueueTuple* _get_sending_rates(FILE* fp){
   return tuple;
 }
 
-static gint
-_cmp_seq (guint16 x, guint16 y)
-{
-  if(x == y) return 0;
-  if(x < y && y - x < 32768) return -1;
-  if(x > y && x - y > 32768) return -1;
-  if(x < y && y - x > 32768) return 1;
-  if(x > y && x - y < 32768) return 1;
-  return 0;
+static void _gp_sampler(RateTuple* this){
+  guint32* value = g_malloc0(sizeof(guint32));
+  *value = this->sending_rate;
+  g_queue_push_tail(this->results->q1, value);
 }
+
+static GQueue* _get_goodput_rate(FILE* fp){
+  GQueue* result = g_queue_new();
+  QueueTuple* tuple = g_malloc0(sizeof(QueueTuple));
+  RateTuple rates = {0,0,tuple};
+  SlidingWindow* sw = _make_sliding_window(_add_rate, _rem_rate, _gp_sampler, _packet_tracked_ntp_in_ns, &rates, g_free);
+  gchar line[1024];
+  Packet* packet;
+  guint16 act_seq = 0;
+  gboolean init = FALSE;
+
+  tuple->q1 = result;
+
+  while (fgets(line, 1024, fp)){
+    packet = _make_packet(line);
+    if(init == FALSE){
+      init = TRUE;
+    }else if(_cmp_seq(act_seq, packet->seq_num) > 0){
+      continue;
+    }
+    _sliding_window_push(sw, packet);
+    act_seq = packet->seq_num;
+  }
+  _free_sliding_window(sw);
+  tuple->q1 = NULL;
+  g_free(tuple);
+  return result;
+}
+
+
+typedef struct{
+  guint32 sr_1,sr_2;
+  GQueue* result;
+}RatioTuple;
+
+static void _refresh_ratio(RatioTuple* this, Packet* packet, gint32 multiplier){
+  if(packet->subflow_id == 1){
+    this->sr_1 += _get_sent_bytes(packet) * multiplier;
+  }else if(packet->subflow_id == 2){
+    this->sr_2 += _get_sent_bytes(packet) * multiplier;
+  }
+}
+
+static void _add_ratio(RatioTuple* this, Packet* packet){
+  _refresh_ratio(this, packet, 1);
+}
+
+static void _rem_ratio(RatioTuple* this, Packet* packet){
+  _refresh_ratio(this, packet, -1);
+}
+
+static void _ratio_sampler(RatioTuple* this){
+  gdouble* value = g_malloc0(sizeof(gdouble));
+  *value = (gdouble)this->sr_1 / (gdouble)(this->sr_1 + this->sr_2);
+  g_queue_push_tail(this->result, value);
+//  g_print("%1.3f\n", *value);
+}
+
+
+static GQueue* _get_subflow_ratio(FILE* fp){
+  GQueue* result = g_queue_new();
+  RatioTuple ratios = {0,0,result};
+  SlidingWindow* sw = _make_sliding_window(_add_ratio, _rem_ratio, _ratio_sampler, _packet_tracked_ntp_in_ns, &ratios, g_free);
+  gchar line[1024];
+  Packet* packet;
+
+  while (fgets(line, 1024, fp)){
+    packet = _make_packet(line);
+    _sliding_window_push(sw, packet);
+  }
+  _free_sliding_window(sw);
+  return result;
+}
+
+
 
 static gint _cmp_packets_seq(Packet* a, Packet* b, gpointer udata){
   return _cmp_seq(a->seq_num, b->seq_num);
@@ -225,6 +304,33 @@ static PairedTimestamp* _get_queue_paired_timestamps(Packet* snd_packet, GQueue*
   return result;
 }
 
+typedef struct{
+  guint32 discarded_packets_num;
+  guint32 discarded_bytes;
+}DiscardTuple;
+
+static DiscardTuple* _get_discard_tuple(FILE* fp){
+  DiscardTuple* result = g_malloc0(sizeof(DiscardTuple));
+  gchar line[1024];
+  Packet packet;
+  guint16 act_seq = 0;
+  gboolean init = FALSE;
+
+  while (fgets(line, 1024, fp)){
+    _setup_packet(&packet, line);
+    if(init == FALSE){
+      init = TRUE;
+      act_seq = packet.seq_num;
+    }
+    if(_cmp_seq(act_seq, packet.seq_num) <= 0){
+      act_seq = packet.seq_num;
+      continue;
+    }
+    ++result->discarded_packets_num;
+    result->discarded_bytes += _get_sent_bytes(&packet);
+  }
+  return result;
+}
 
 static GQueue* _get_queue_timestamps(FILE* snd, FILE* rcv){
   GQueue* result = g_queue_new();
@@ -415,6 +521,10 @@ static void _guint32_writer(FILE* fp, gpointer data){
   fprintf(fp, "%u\n", *(guint32*)data);
 }
 
+static void _gdouble_writer(FILE* fp, gpointer data){
+  fprintf(fp, "%1.3f\n", *(gdouble*)data);
+}
+
 static void _fwrite(FILE* fp, GQueue* queue, void (*writer)(FILE*,gpointer)){
   while(!g_queue_is_empty(queue)){
     writer(fp, g_queue_pop_head(queue));
@@ -460,12 +570,15 @@ int main (int argc, char **argv)
     g_print("sr snd_packets - accumulates the sending rate\n");
     g_print("qd snd_packets rcv_packets - calculates the queueing delays for packets\n");
     g_print("qmd snd_packets rcv_packets - calculates the median queueing delays for packets\n");
-    g_print("gp snd_packets rcv_packets - calculates the goodput for packets\n");
+    g_print("gp ply_packets - calculates the goodput for packets\n");
+    g_print("gp_avg ply_packets - calculates the average goodput for packets\n");
     g_print("tcprate tcpdump - calculates the tcp sending rates for tcpdump\n");
     g_print("lr snd_packets rcv_packets - calculates the loss rate for packets\n");
     g_print("ffre snd_packets rcv_packets - calculates the ffre\n");
     g_print("tfs snd_packets tcpdump - calculates traffic fair share\n");
-    g_print("lf snd_packets ply_packets - calculates the lost frames\n");
+    g_print("lf ply_packets - calculates the number of lost frames\n");
+    g_print("ratio snd_packets_1 snd_packets_2 - calculates the ratio between the flows\n");
+    g_print("disc ply_packets - calculates the discarded packets ratio\n");
     return 0;
   }
 
@@ -515,6 +628,50 @@ int main (int argc, char **argv)
      fclose(sndp);
      fclose(rcvp);
    }else if(strcmp(argv[2], "gp") == 0){
+     FILE* plyp;
+     GQueue* rates;
+     if(argc < 3){
+       goto usage;
+     }
+     plyp  = fopen (argv[3],"r");
+     rates = _get_goodput_rate(plyp);
+     _fwrite(fp, rates, _guint32_writer);
+//     g_queue_free_full(rates, g_free);
+     fclose(plyp);
+   }else if(strcmp(argv[2], "gp_avg") == 0){
+     FILE* plyp;
+     GQueue* rates;
+     gdouble* result = g_malloc0(sizeof(gdouble));
+     gdouble len;
+     if(argc < 3){
+       goto usage;
+     }
+     plyp  = fopen (argv[3],"r");
+     rates = _get_goodput_rate(plyp);
+     len = g_queue_get_length(rates);
+     while(!g_queue_is_empty(rates)){
+       gdouble* value = g_queue_pop_head(rates);
+       *result += *value;
+       g_free(value);
+     }
+     *result /= len;
+     g_queue_push_tail(rates, result);
+     _fwrite(fp, rates, _guint32_writer);
+//     g_queue_free_full(rates, g_free);
+     fclose(plyp);
+   }else if(strcmp(argv[2], "ratio") == 0){
+     FILE* sndp;
+     GQueue* ratios;
+     if(argc < 3){
+       goto usage;
+     }
+     sndp  = fopen (argv[3],"r");
+     ratios = _get_subflow_ratio(sndp);
+     _fwrite(fp, ratios, _gdouble_writer);
+     fclose(sndp);
+   }else if(strcmp(argv[2], "lf") == 0){
+     g_print("IMPLEMENT THIS!\n");
+   }else if(strcmp(argv[2], "disc") == 0){
      g_print("IMPLEMENT THIS!\n");
    }else{
     goto usage;

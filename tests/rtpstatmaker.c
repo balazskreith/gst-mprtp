@@ -25,6 +25,7 @@ GstElement* make_rtpstatmaker_element(StatParams* stat_params)
   g_object_set(rtpstatmaker,
       "default-logfile-location",     stat_params->logfile_path,
       "touch-sync-location",          stat_params->touched_sync,
+      "mprtp-ext-header-id",          stat_params->mprtp_ext_header_id,
       NULL);
 
   return rtpstatmaker;

@@ -17,7 +17,8 @@ DURATION=150
 SCRIPTFILE=$TEMPDIR"/receiver.sh"
 
 echo -n "./rcv_pipeline "                                         > $SCRIPTFILE
-echo -n "--sink=FILE:consumed.yuv "                              >> $SCRIPTFILE
+#echo -n "--sink=FILE:consumed.yuv "                              >> $SCRIPTFILE
+echo -n "--sink=FAKESINK "                                        >> $SCRIPTFILE
 
 echo -n "--codec=VP8 "                                           >> $SCRIPTFILE
 echo -n "--stat=triggered_stat:temp/rcv_packets.csv:3 "                  >> $SCRIPTFILE

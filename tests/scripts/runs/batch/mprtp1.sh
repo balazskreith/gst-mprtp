@@ -13,22 +13,12 @@ rm temp_batch/*
 rm triggered_stat
 
 SNDFILE="temp_batch/snd.sh"
-echo "./scripts/runs/snd/rmcat1.sh $ALGORITHM" > $SNDFILE
+echo "./scripts/runs/snd/mprtp1.sh $ALGORITHM" > $SNDFILE
 chmod 777 $SNDFILE
 
 RCVFILE="temp_batch/rcv.sh"
-echo "./scripts/runs/rcv/rmcat1.sh $ALGORITHM" > $RCVFILE
+echo "./scripts/runs/rcv/mprtp1.sh $ALGORITHM" > $RCVFILE
 chmod 777 $RCVFILE
-
-
-COUNTER=0
-if [ -z "$3" ]
-then
-  END=11
-else
-  END=$3
-fi
-
 
 cleanup()
 {
@@ -36,7 +26,7 @@ cleanup()
   sudo pkill rcv_pipeline
   sudo pkill bcex
   sudo pkill bwcsv
-  sudo pkill sleep
+  sudo pkill mprtp1.sh
 }
  
 control_c()
@@ -48,6 +38,15 @@ control_c()
 
 trap control_c SIGINT
 
+
+COUNTER=0
+if [ -z "$3" ]
+then
+  END=1
+else
+  END=$3
+fi
+
 while [  $COUNTER -lt $END ]; do
     echo "The counter is $COUNTER"
 
@@ -55,13 +54,13 @@ while [  $COUNTER -lt $END ]; do
 	sleep 2
 	sudo ip netns exec ns_snd $SNDFILE &
 	sleep 2
-	./scripts/runs/rmcat1.sh $OWD &
+	./scripts/runs/mprtp1.sh $OWD &
 	sleep 10
 
 	INCREASE=1
 
 	#Validation part 1.
-	for FILE in snd_packets.csv rcv_packets.csv asd
+	for FILE in snd_packets.csv rcv_packets.csv
 	do
    		if [ ! -f $LOGSDIR"/"$FILE ]; then
     		INCREASE=0
@@ -71,7 +70,7 @@ while [  $COUNTER -lt $END ]; do
 
 	if [ $INCREASE -eq 0 ]
 	then
-	  cleanup
+	  control_c
 	  continue
 	fi
 
@@ -80,7 +79,7 @@ while [  $COUNTER -lt $END ]; do
 	sleep 50
 
 	#Validation Part 2
-	for FILE in snd_packetlogs.csv rcv_packetlogs.csv
+	for FILE in snd_packets.csv rcv_packets.csv
 	do
 		minimumsize=9000
 		actualsize=$(wc -c <"$LOGSDIR/$FILE")
@@ -93,7 +92,7 @@ while [  $COUNTER -lt $END ]; do
 
 	if [ $INCREASE -eq 0 ]
 	then
-	  cleanup
+	  control_c
 	  continue
 	fi
 
@@ -101,7 +100,7 @@ while [  $COUNTER -lt $END ]; do
 
 	sleep 150
 
-	cleanup
+	control_c
 
 	#vqmt produced.yuv consumed.yuv 288 352 2000 1 temp/vqmt PSNR
 

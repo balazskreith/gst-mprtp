@@ -34,8 +34,8 @@ set rmargin 10
 
 #set title "Throughput (kbps)"
 #unset title
-set key font ",38" 
-set ytics font ",48" 
+set key font ",22" 
+set ytics font ",26" 
 
 if (algorithm eq "scream"){
   #unset key
@@ -47,6 +47,8 @@ set xrange [0:duration]
 set xtics 10 offset 0,-1
 set format x " "
 unset xlabel
+
+set ylabel "Throughput [kbps]" offset -7,0 font ", 22"
 
 set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
@@ -75,14 +77,15 @@ plot statfile using ($0*0.1):($2/125) with point pointtype 7 ps 0.3 lc rgb "blue
 set yrange [0:0.5]
 set ytics 0.25
 set xrange [0:duration]
-set xtics 10 offset 0,-1
+set xtics 10 offset 0,-0.5
 set format x "%3.0f"
-set xtics font ", 36"
+set xtics font ", 26"
 
 #set title "Network Queue (s)"
 #unset title
 
-set xlabel
+set ylabel "Queue Delay [s]" offset -7,0 font ", 22"
+set xlabel "Time [s]" offset 0,-1.1 font ", 22"
 
 set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"

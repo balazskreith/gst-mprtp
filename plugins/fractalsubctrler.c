@@ -414,14 +414,15 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
     goto done;
   }
 
-  rtpqdelay_factor = CONSTRAIN(1., 2., (gdouble) _stat(this)->delay_in_rtpqueue / (gdouble) (20 * GST_MSECOND));
-
+//  rtpqdelay_factor = CONSTRAIN(1., 2., (gdouble) _stat(this)->delay_in_rtpqueue / (gdouble) (20 * GST_MSECOND));
+  rtpqdelay_factor = 30*GST_MSECOND - MIN(30*GST_MSECOND, _stat(this)->last_qdelay) ;
+  rtpqdelay_factor/= (gdouble)(30*GST_MSECOND);
   switch(this->subflow->state){
     case SNDSUBFLOW_STATE_OVERUSED:
       {
 //        gint32 keeping_point = this->keeping_point * CONSTRAIN(.5,1.,_stat(this)->qdelay_log_corr);
         _change_sndsubflow_target_bitrate(this, this->keeping_point - _stat(this)->stalled_bytes * 8);
-        sr_corr_ratio    = CONSTRAIN(.5, 1.5, this->target_bitrate / _stat(this)->sender_bitrate);
+        sr_corr_ratio    = CONSTRAIN(.5, 1.5, (gdouble)this->target_bitrate / (gdouble)_stat(this)->sender_bitrate);
         this->cwnd = this->awnd * sr_corr_ratio;
       }
       break;
@@ -435,13 +436,12 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
       break;
     case SNDSUBFLOW_STATE_UNDERUSED:
     {
-      this->cwnd = this->awnd * (1. + rtpqdelay_factor);
+      this->cwnd = this->awnd * (0.5 + rtpqdelay_factor);
     }
       break;
     default:
       break;
   }
-
   this->cwnd = MAX(_min_pacing_bitrate(this), this->cwnd);
 
 done:
@@ -565,7 +565,7 @@ _reduce_stage(
   if(_now(this) - boundary < this->last_distorted){
     gdouble off = (gdouble)(_now(this) - this->last_distorted) / (gdouble) GST_SECOND;
     this->rcved_bytes += _stat(this)->newly_acked_bytes;
-    _set_bottleneck_point(this,  (this->rcved_bytes * .8 * 8) / off);
+    _set_bottleneck_point(this,  MIN((this->rcved_bytes * .8 * 8) / off, this->inflection_point));
 
 //    if(this->bottleneck_point < MAX(this->keeping_point - _max_ramp_up(this), this->keeping_point * .8)){
 //      _set_keeping_point(this, this->bottleneck_point);
@@ -612,7 +612,7 @@ _keep_stage(
 
   if(_now(this) - MAX(2 * _stat(this)->srtt, GST_SECOND) < this->last_settled){
     gint32 new_target;
-    new_target = this->target_bitrate * CONSTRAIN(.995, 1.01, _stat(this)->qdelay_log_corr);
+    new_target = this->target_bitrate * CONSTRAIN(.99, 1.01, _stat(this)->qdelay_log_corr);
     _change_sndsubflow_target_bitrate(this, new_target);
     goto done;
   }

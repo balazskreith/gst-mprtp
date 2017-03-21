@@ -3,8 +3,8 @@ programname=$0
 LOGSDIR="temp"
 
 TEST="rmcat1"
-# ALGORITHM="SCReAM"
-ALGORITHM="FRACTaL"
+ALGORITHM="SCReAM"
+#ALGORITHM="FRACTaL"
 OWD=50
 JITTER=0
 
@@ -12,13 +12,19 @@ mkdir temp_batch
 rm temp_batch/*
 rm triggered_stat
 
-SNDFILE="temp_batch/snd.sh"
-echo "./scripts/runs/snd/rmcat1.sh $ALGORITHM" > $SNDFILE
-chmod 777 $SNDFILE
+if [ -z "$1" ]
+then
+  ALGORITHM="FRACTaL"
+else
+  ALGORITHM=$1
+fi
 
-RCVFILE="temp_batch/rcv.sh"
-echo "./scripts/runs/rcv/rmcat1.sh $ALGORITHM" > $RCVFILE
-chmod 777 $RCVFILE
+if [ -z "$2" ]
+then
+  OWD="50"
+else
+  OWD=$2
+fi
 
 
 COUNTER=0
@@ -28,6 +34,14 @@ then
 else
   END=$3
 fi
+
+SNDFILE="temp_batch/snd.sh"
+echo "./scripts/runs/snd/rmcat1.sh $ALGORITHM" > $SNDFILE
+chmod 777 $SNDFILE
+
+RCVFILE="temp_batch/rcv.sh"
+echo "./scripts/runs/rcv/rmcat1.sh $ALGORITHM" > $RCVFILE
+chmod 777 $RCVFILE
 
 
 cleanup()
@@ -48,6 +62,8 @@ control_c()
 
 trap control_c SIGINT
 
+alg=${ALGORITHM,,}
+
 while [  $COUNTER -lt $END ]; do
     echo "The counter is $COUNTER"
 
@@ -55,7 +71,7 @@ while [  $COUNTER -lt $END ]; do
 	sleep 2
 	sudo ip netns exec ns_snd $SNDFILE &
 	sleep 2
-	./scripts/runs/rmcat1.sh $OWD &
+	./scripts/runs/rmcat1.sh $OWD $alg &
 	sleep 10
 
 	INCREASE=1
@@ -72,6 +88,7 @@ while [  $COUNTER -lt $END ]; do
 	if [ $INCREASE -eq 0 ]
 	then
 	  cleanup
+	  sleep 60
 	  continue
 	fi
 
@@ -80,9 +97,9 @@ while [  $COUNTER -lt $END ]; do
 	sleep 50
 
 	#Validation Part 2
-	for FILE in snd_packetlogs.csv rcv_packetlogs.csv
+	for FILE in snd_packets.csv rcv_packets.csv
 	do
-		minimumsize=9000
+		minimumsize=2000
 		actualsize=$(wc -c <"$LOGSDIR/$FILE")
 		if [ ! $actualsize -ge $minimumsize ]; then
 		    echo "-----$FILE SIZE IS UNDER $minimumsize BYTES-----"
@@ -94,6 +111,7 @@ while [  $COUNTER -lt $END ]; do
 	if [ $INCREASE -eq 0 ]
 	then
 	  cleanup
+	  sleep 60
 	  continue
 	fi
 

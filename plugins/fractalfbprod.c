@@ -114,8 +114,51 @@ fractalfbproducer_init (FRACTaLFBProducer * this)
   this->vector   = g_malloc0(sizeof(gboolean)  * 65536);
   this->vector_length = 0;
 
+
 }
 
+
+typedef struct{
+  guint64 dsnd;
+  guint64 drcv;
+  gdouble payload_size;
+}Skew;
+
+DEFINE_RECYCLE_TYPE(static, skew_data, Skew);
+
+static void _skew_shaper(Skew* to, Skew* from){
+  memcpy(to,from,sizeof(Skew));
+}
+
+static void _on_skew_add(FRACTaLFBProducer* this, Skew* skew)
+{
+//  this->dsnd_sum += skew->dsnd * MIN(1., skew->payload_size / 1400.);
+//  this->drcv_sum += skew->drcv * MIN(1., skew->payload_size / 1400.);
+//  this->dsnd_sum += skew->dsnd;
+//  this->drcv_sum += skew->drcv;
+}
+
+static void _on_skew_rem(FRACTaLFBProducer* this, Skew* skew)
+{
+//  this->dsnd_sum -= skew->dsnd * MIN(1., skew->payload_size / 1400.);
+//  this->drcv_sum -= skew->drcv * MIN(1., skew->payload_size / 1400.);
+//  this->dsnd_sum -= skew->dsnd;
+//  this->drcv_sum -= skew->drcv;
+}
+
+static gint _cmp_skew(Skew* a, Skew* b){
+//  guint64 ad = a->drcv * MIN(1., a->payload_size / 1400.);
+//  guint64 bd = b->drcv * MIN(1., b->payload_size / 1400.);
+//  return ad < bd ? -1 : 1;
+  return a->drcv == b->drcv ? 0 : a->drcv < b->drcv ? -1 : 1;
+//  return a->dsnd == b->dsnd ? 0 : a->dsnd < b->dsnd ? -1 : 1;
+}
+
+static void _on_max_skew_selected(FRACTaLFBProducer* this, swminmaxstat_t* stat){
+  Skew* max = stat->max;
+  this->dsnd_sum = max->dsnd;
+  this->drcv_sum = max->drcv;
+}
 
 FRACTaLFBProducer *make_fractalfbproducer(RcvSubflow* subflow, RcvTracker *tracker)
 {
@@ -141,6 +184,12 @@ FRACTaLFBProducer *make_fractalfbproducer(RcvSubflow* subflow, RcvTracker *track
 
   rcvsubflow_add_on_rtcp_fb_cb(subflow, (ListenerFunc) _on_fb_update, this);
 
+  this->skew_recycle = make_recycle_skew_data(200, (RecycleItemShaper) _skew_shaper);
+  this->skew_sw = make_slidingwindow(200, 100 * GST_MSECOND);
+  slidingwindow_set_data_recycle(this->skew_sw, this->skew_recycle);
+  slidingwindow_add_on_change(this->skew_sw, (ListenerFunc)_on_skew_add, (ListenerFunc)_on_skew_rem, this);
+  slidingwindow_add_plugin(this->skew_sw, make_swminmax((bintree3cmp)_cmp_skew, (ListenerFunc)_on_max_skew_selected, this));
+
   return this;
 }
 
@@ -159,51 +208,6 @@ void _on_discarded_packet(FRACTaLFBProducer *this, RcvPacket *packet)
   this->discarded_bytes += packet->payload_size;
 }
 
-//guint64 _qdelay_est = 0;
-//static void _add_new_queue_delay_est(FRACTaLFBProducer *this, RcvPacket* packet)
-//{
-//  guint64 skew;
-//  gint64 drcv, dsnd;
-//  if(this->prev_rcv == 0){
-//    this->prev_rcv      = packet->abs_rcv_ntp_time;
-//    this->prev_snd      = packet->abs_snd_ntp_chunk;
-//    this->prev_seq      = packet->abs_seq;
-//    return;
-//  }
-//
-//  if(0 < _cmp_seq(this->prev_seq, packet->abs_seq)){
-//    return;
-//  }
-//
-//  if(packet->abs_snd_ntp_chunk < this->prev_snd){//turnaround
-//    dsnd = (gint64)(0x0000004000000000ULL - this->prev_snd) + (gint64)packet->abs_snd_ntp_chunk;
-//  }else{
-//    dsnd = (gint64)packet->abs_snd_ntp_chunk - (gint64)this->prev_snd;
-//  }
-//  drcv = (gint64)packet->abs_rcv_ntp_time - (gint64)this->prev_rcv;
-//
-//  skew = (dsnd < drcv) ? drcv - dsnd : dsnd - drcv;
-////  qdelay_est = (dsnd < drcv) ? drcv - dsnd : 0;
-//
-//  if(dsnd < drcv){
-//    _qdelay_est += skew;
-//  }else if(skew < _qdelay_est){
-//    _qdelay_est -= skew;
-//  }else{
-//    _qdelay_est = 0;
-//  }
-//
-////  slidingwindow_add_data(this->qdelays_sw, &skew);
-//  slidingwindow_add_data(this->qdelays_sw, &_qdelay_est);
-////  g_print("queue delay est: %lu - median: %lu, num: %d\n",
-////      GST_TIME_AS_MSECONDS(get_epoch_time_from_ntp_in_ns(qdelay_est)),
-////      GST_TIME_AS_MSECONDS(get_epoch_time_from_ntp_in_ns(this->median_delay)),
-////      slidingwindow_get_counter(this->qdelays_sw));
-//  this->prev_rcv = packet->abs_rcv_ntp_time;
-//  this->prev_snd = packet->abs_snd_ntp_chunk;
-//
-//}
-
 static void _add_new_queue_delay_est(FRACTaLFBProducer *this, RcvPacket* packet)
 {
   gdouble skew;
@@ -213,7 +217,7 @@ static void _add_new_queue_delay_est(FRACTaLFBProducer *this, RcvPacket* packet)
     this->prev_snd      = packet->abs_snd_ntp_chunk;
     this->prev_seq      = packet->abs_seq;
 
-    this->dsnd_sum = this->drcv_sum = 0.;
+    this->dsnd_sum      = this->drcv_sum = 0.;
     return;
   }
 
@@ -227,30 +231,30 @@ static void _add_new_queue_delay_est(FRACTaLFBProducer *this, RcvPacket* packet)
     dsnd = (gint64)packet->abs_snd_ntp_chunk - (gint64)this->prev_snd;
   }
   drcv = (gint64)packet->abs_rcv_ntp_time - (gint64)this->prev_rcv;
-
-
-  if(dsnd < get_ntp_from_epoch_ns(10 * GST_MSECOND)){
-    this->dsnd_sum += dsnd * MIN((gdouble)packet->payload_size / 1400., 1.);
-    this->drcv_sum += MIN(get_ntp_from_epoch_ns(50 * GST_MSECOND), drcv) * MIN((gdouble)packet->payload_size / 1400., 1.);
-    goto done;
-  }
-  skew = this->drcv_sum - this->dsnd_sum;
-  this->dsnd_sum = this->drcv_sum = 0.;
-
-  this->qdelay_est = MAX(0., .33 * skew + this->qdelay_est * .67);
-  {
-//    guint64 qdelay_t = MAX(0., skew);
-//    slidingwindow_add_data(this->qdelays_sw, &qdelay_t);
-//    g_print("%c%-8lu\n",
-//            skew < 0. ? '-' : '+',
-//            GST_TIME_AS_MSECONDS(get_epoch_time_from_ntp_in_ns(qdelay_t))
-//            );
-  }
-
-//  slidingwindow_add_data(this->qdelays_sw, &_qdelay_est);
-done:
   this->prev_rcv = packet->abs_rcv_ntp_time;
   this->prev_snd = packet->abs_snd_ntp_chunk;
+
+//  if(5 * GST_MSECOND < get_epoch_time_from_ntp_in_ns(dsnd) && 1000 < packet->payload_size)
+  {
+    Skew skew = {dsnd,drcv,(gdouble)packet->payload_size};
+    slidingwindow_add_data(this->skew_sw, &skew);
+  }
+
+  skew = this->drcv_sum - this->dsnd_sum;
+//  g_print("%8.0f|%8.0f|%c%-8lu\n",
+//          this->drcv_sum,
+//          this->dsnd_sum,
+//          skew < 0. ? '-' : '+',
+//          GST_TIME_AS_MSECONDS(get_epoch_time_from_ntp_in_ns(skew))
+//          );
+//  this->dsnd_sum = this->drcv_sum = 0.;
+
+  {
+//    gdouble alpha = 0. < skew ? CONSTRAIN(.33, .67, skew / (skew + this->qdelay_est)) : .5;
+//    g_print("alpha: %1.3f\n", alpha);
+//    this->qdelay_est = MAX(0., alpha * skew + this->qdelay_est * (1.-alpha));
+  }
+  this->qdelay_est = MAX(0., 1. * skew + this->qdelay_est * 0.);
 
 }
 
@@ -285,7 +289,7 @@ static gboolean _do_fb(FRACTaLFBProducer *this)
   if(this->last_fb < _now(this) - 100 * GST_MSECOND){
     return TRUE;
   }
-  return 3 < this->rcved_packets;
+  return 1 < this->rcved_packets;
 }
 
 

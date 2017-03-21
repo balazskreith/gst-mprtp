@@ -962,6 +962,12 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
   sndtracker_refresh(this->sndtracker);
   sndctrler_time_update(this->controller);
 
+//  if(50 * GST_MSECOND < this->sndtracker->rtpqstat.delay_length){
+//    sndqueue_clear(this->sndqueue);
+//    g_print("%lu\n", this->sndtracker->rtpqstat.delay_length);
+//    this->sndtracker->rtpqstat.delay_length = 0;
+//  }
+
   now = _now(this);
   next_time = now + 10 * GST_MSECOND;
   packet = sndqueue_pop_packet(this->sndqueue, &next_time);

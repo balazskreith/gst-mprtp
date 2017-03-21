@@ -33,9 +33,10 @@ typedef struct _Packet
 }Packet;
 
 static _setup_packet(Packet* packet, gchar* line){
-  sscanf(line, "%lu,%hu,%u,%d,%u,%d,%d,%d,%hu,%hu",
+  sscanf(line, "%lu,%hu,%u,%u,%d,%u,%d,%d,%d,%hu,%hu,%d",
         &packet->tracked_ntp,
         &packet->seq_num,
+        &packet->timestamp,
         &packet->ssrc,
         &packet->payload_type,
         &packet->payload_size,
@@ -43,14 +44,16 @@ static _setup_packet(Packet* packet, gchar* line){
         &packet->subflow_seq,
         &packet->header_size,
         &packet->protect_begin,
-        &packet->protect_end
+        &packet->protect_end,
+        &packet->marker
   );
 }
 
 static _setup_line(Packet* packet, gchar* line){
-   sprintf(line, "%lu,%hu,%u,%d,%u,%d,%d,%d,%hu,%hu",
+   sprintf(line, "%lu,%hu,%u,%u,%d,%u,%d,%d,%d,%hu,%hu,%d",
         packet->tracked_ntp,
         packet->seq_num,
+        packet->timestamp,
         packet->ssrc,
         packet->payload_type,
         packet->payload_size,
@@ -58,7 +61,8 @@ static _setup_line(Packet* packet, gchar* line){
         packet->subflow_seq,
         packet->header_size,
         packet->protect_begin,
-        packet->protect_end
+        packet->protect_end,
+        packet->marker
   );
 }
 
@@ -139,6 +143,6 @@ int main (int argc, char **argv)
   _fwrite(outp, _get_filtered_packets(inp, &filter));
   fclose(inp);
   fclose(outp);
-  g_print("Filtered packets are written into %s\n", argv[1]);
+  g_print("Filtered packets are written into %s\n", argv[2]);
   return 0;
 }

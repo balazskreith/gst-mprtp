@@ -35,9 +35,10 @@ typedef struct _Packet
 
 
 static _setup_packet(Packet* packet, gchar* line){
-  sscanf(line, "%lu,%hu,%u,%d,%u,%d,%d,%d,%hu,%hu",
+  sscanf(line, "%lu,%hu,%u,%u,%d,%u,%d,%d,%d,%hu,%hu,%d",
         &packet->tracked_ntp,
         &packet->seq_num,
+        &packet->timestamp,
         &packet->ssrc,
         &packet->payload_type,
         &packet->payload_size,
@@ -45,7 +46,8 @@ static _setup_packet(Packet* packet, gchar* line){
         &packet->subflow_seq,
         &packet->header_size,
         &packet->protect_begin,
-        &packet->protect_end
+        &packet->protect_end,
+        &packet->marker
   );
 }
 
@@ -196,10 +198,12 @@ static void _gp_sampler(RateTuple* this){
   guint32* value = g_malloc0(sizeof(guint32));
   *value = this->sending_rate;
   g_queue_push_tail(this->results->q1, value);
+  value = g_malloc0(sizeof(guint32));
+  *value = this->fec_rate;
+  g_queue_push_tail(this->results->q2, value);
 }
 
-static GQueue* _get_goodput_rate(FILE* fp){
-  GQueue* result = g_queue_new();
+static QueueTuple* _get_goodput_rate(FILE* fp){
   QueueTuple* tuple = g_malloc0(sizeof(QueueTuple));
   RateTuple rates = {0,0,tuple};
   SlidingWindow* sw = _make_sliding_window(_add_rate, _rem_rate, _gp_sampler, _packet_tracked_ntp_in_ns, &rates, g_free);
@@ -208,22 +212,21 @@ static GQueue* _get_goodput_rate(FILE* fp){
   guint16 act_seq = 0;
   gboolean init = FALSE;
 
-  tuple->q1 = result;
+  tuple->q1 = g_queue_new();
+  tuple->q2 = g_queue_new();
 
   while (fgets(line, 1024, fp)){
     packet = _make_packet(line);
     if(init == FALSE){
       init = TRUE;
-    }else if(_cmp_seq(act_seq, packet->seq_num) > 0){
+    }else if(_cmp_seq(packet->seq_num, act_seq) < 0){
       continue;
     }
     _sliding_window_push(sw, packet);
     act_seq = packet->seq_num;
   }
   _free_sliding_window(sw);
-  tuple->q1 = NULL;
-  g_free(tuple);
-  return result;
+  return tuple;
 }
 
 
@@ -279,6 +282,10 @@ static gint _cmp_packets_seq(Packet* a, Packet* b, gpointer udata){
 
 static gint _cmp_packets_seq_simple(Packet* a, Packet* b){
   return a->seq_num == b->seq_num ? 0 : -1;
+}
+
+static gint _cmp_timestamp(Packet* a, Packet* b){
+  return a->timestamp == b->timestamp ? 0 : -1;
 }
 
 typedef struct _PairedTimestamp{
@@ -382,17 +389,21 @@ typedef struct{
   guint32 lost_bytes;
   guint32 sent_packets_num;
   guint32 lost_packets_num;
+  GQueue* lost_packets;
 }LostTuple;
 
 static LostTuple* _get_lost_tuple(FILE* snd, FILE* rcv){
   LostTuple* result = g_malloc0(sizeof(LostTuple));
-  GQueue* snd_packets = g_queue_new();
-  GQueue* rcv_packets = g_queue_new();
+  GQueue* snd_packets  = g_queue_new();
+  GQueue* rcv_packets  = g_queue_new();
+  GQueue* lost_packets = g_queue_new();
   gchar line[1024];
   Packet *packet,*snd_head, *rcv_tail;
   GstClockTime* pair_timestamp;
   GstClockTime packet_ts = 0;
   guint32 sending_rate = 0;
+
+  result->lost_packets = lost_packets;
 
   while (fgets(line, 1024, snd)){
     packet = _make_packet(line);
@@ -413,14 +424,15 @@ static LostTuple* _get_lost_tuple(FILE* snd, FILE* rcv){
       result->sent_bytes += _get_sent_bytes(sent);
       ++result->sent_packets_num;
       if(!list){
+        g_queue_push_tail(lost_packets, sent);
         result->lost_bytes += _get_sent_bytes(sent);
         ++result->lost_packets_num;
       }else{
         Packet* rcved = list->data;
         g_queue_remove(rcv_packets, rcved);
         g_free(rcved);
+        g_free(sent);
       }
-      g_free(sent);
       snd_head = g_queue_peek_head(snd_packets);
     }
   }
@@ -432,17 +444,129 @@ static LostTuple* _get_lost_tuple(FILE* snd, FILE* rcv){
     result->sent_bytes += _get_sent_bytes(sent);
     ++result->sent_packets_num;
     if(!list){
+      g_queue_push_tail(lost_packets, sent);
       result->lost_bytes += _get_sent_bytes(sent);
       ++result->lost_packets_num;
     }else{
       Packet* rcved = list->data;
       g_queue_remove(rcv_packets, rcved);
       g_free(rcved);
+      g_free(sent);
     }
-    g_free(sent);
+
   }
 
   g_queue_free_full(rcv_packets, g_free);
+  return result;
+}
+
+static guint32 _get_lost_frame_nums(FILE* sndp, FILE* plyp){
+  guint32 result = 0;
+  gchar line[1024];
+  Packet played;
+  guint16 act_seq = 0;
+  gboolean init = FALSE;
+  guint32 lost_timestamp = 0;
+
+  while (fgets(line, 1024, plyp)){
+    _setup_packet(&played, line);
+//    packet = _make_packet(line);
+    if(init == FALSE){
+      init = TRUE;
+      act_seq = played.seq_num;
+    }else if(_cmp_seq(played.seq_num, act_seq) < 0){
+      continue;
+    }
+
+    if((guint16)(act_seq + 1) != played.seq_num){
+      Packet sent;
+      while (fgets(line, 1024, sndp)){
+        _setup_packet(&sent, line);
+        if(_cmp_seq(sent.seq_num, act_seq) < 0){
+          continue;
+        }
+        if(_cmp_seq(played.seq_num, sent.seq_num) <= 0){
+          break;
+        }
+        if(lost_timestamp == sent.timestamp){
+          continue;
+        }
+//        g_print("%hu - %u\n", sent.seq_num, sent.timestamp);
+        lost_timestamp = sent.timestamp;
+        ++result;
+      }
+    }
+    act_seq = played.seq_num;
+  }
+  return result;
+}
+
+typedef struct{
+  guint32 protected_but_lost;
+  guint32 lost_but_recovered;
+}FFRETuple;
+
+
+static gdouble _get_ffre(FILE* sndp, FILE* fecp, FILE* rcvp, FILE* plyp){
+  FFRETuple* ffre_tuple = g_malloc0(sizeof(FFRETuple));
+  gchar line[1024];
+  Packet* packet = g_malloc0(sizeof(Packet));
+  GQueue* protected_but_lost;
+  Packet fecpacket,played;
+  gdouble result;
+  LostTuple* lost_tuple = _get_lost_tuple(sndp, rcvp);
+  GQueue* lost_packets = lost_tuple->lost_packets;
+  Packet* lost_packet = g_queue_pop_head(lost_packets);
+
+  g_free(lost_tuple);
+  if(!lost_packet){
+    g_queue_free(lost_packets);
+    return 0.;
+  }
+  fgets(line, 1024, fecp);
+  _setup_packet(&fecpacket, line);
+  protected_but_lost = g_queue_new();
+
+  while (lost_packet){
+//    g_print("Lost packet: %hu  (%hu-%hu)\n", lost_packet->seq_num, fecpacket.protect_begin, fecpacket.protect_end);
+    if(_cmp_seq(lost_packet->seq_num, fecpacket.protect_begin) < 0){
+//      g_print("Not protected: %hu\n", lost_packet->seq_num);
+      g_free(lost_packet);
+      lost_packet = g_queue_pop_head(lost_packets);
+      continue;
+    }
+    while(_cmp_seq(fecpacket.protect_end, lost_packet->seq_num) < 0 && fgets(line, 1024, fecp)){
+      _setup_packet(&fecpacket, line);
+    }
+    g_queue_push_tail(protected_but_lost, lost_packet);
+    lost_packet = g_queue_pop_head(lost_packets);
+  }
+  fgets(line, 1024, plyp);
+  _setup_packet(&played, line);
+
+  while(!g_queue_is_empty(protected_but_lost)){
+    gint cmp;
+    lost_packet = g_queue_pop_head(protected_but_lost);
+    while((cmp = _cmp_seq(played.seq_num, lost_packet->seq_num)) < 0 && fgets(line, 1024, plyp)){
+      _setup_packet(&played, line);
+    }
+
+    if(!cmp){
+      ++ffre_tuple->lost_but_recovered;
+    }else{
+      ++ffre_tuple->protected_but_lost;
+    }
+    g_free(lost_packet);
+  }
+
+
+  if(!ffre_tuple->lost_but_recovered && !ffre_tuple->protected_but_lost){
+    return 0.;
+  }
+
+  result = (gdouble)(ffre_tuple->lost_but_recovered) /
+           (gdouble)(ffre_tuple->protected_but_lost + ffre_tuple->lost_but_recovered);
+  g_free(ffre_tuple);
   return result;
 }
 
@@ -572,11 +696,12 @@ int main (int argc, char **argv)
     g_print("qmd snd_packets rcv_packets - calculates the median queueing delays for packets\n");
     g_print("gp ply_packets - calculates the goodput for packets\n");
     g_print("gp_avg ply_packets - calculates the average goodput for packets\n");
+    g_print("fec_avg fec_packets - calculates the average fec rate for packets\n");
     g_print("tcprate tcpdump - calculates the tcp sending rates for tcpdump\n");
     g_print("lr snd_packets rcv_packets - calculates the loss rate for packets\n");
-    g_print("ffre snd_packets rcv_packets - calculates the ffre\n");
+    g_print("ffre fec_packets snd_packets rcv_packets ply_packets - calculates the ffre\n");
     g_print("tfs snd_packets tcpdump - calculates traffic fair share\n");
-    g_print("lf ply_packets - calculates the number of lost frames\n");
+    g_print("nlf snd_packets ply_packets - calculates the number of lost frames\n");
     g_print("ratio snd_packets_1 snd_packets_2 - calculates the ratio between the flows\n");
     g_print("disc ply_packets - calculates the discarded packets ratio\n");
     return 0;
@@ -627,19 +752,37 @@ int main (int argc, char **argv)
      _lost_tuple_fwrite(fp, _get_lost_tuple(sndp, rcvp));
      fclose(sndp);
      fclose(rcvp);
+   }else if(strcmp(argv[2], "ffre") == 0){
+     FILE* fecp;
+     FILE* sndp;
+     FILE* rcvp;
+     FILE* plyp;
+     if(argc < 6){
+       goto usage;
+     }
+     fecp        = fopen (argv[3],"r");
+     sndp        = fopen (argv[4],"r");
+     rcvp        = fopen (argv[5],"r");
+     plyp        = fopen (argv[6],"r");
+     fprintf(fp, "%1.3f", _get_ffre(sndp, fecp, rcvp, plyp));
+     fclose(fecp);
+     fclose(sndp);
+     fclose(rcvp);
+     fclose(plyp);
    }else if(strcmp(argv[2], "gp") == 0){
      FILE* plyp;
-     GQueue* rates;
+     QueueTuple* tuple;
      if(argc < 3){
        goto usage;
      }
      plyp  = fopen (argv[3],"r");
-     rates = _get_goodput_rate(plyp);
-     _fwrite(fp, rates, _guint32_writer);
+     tuple = _get_goodput_rate(plyp);
+     _fwrite(fp, tuple->q1, _guint32_writer);
 //     g_queue_free_full(rates, g_free);
      fclose(plyp);
-   }else if(strcmp(argv[2], "gp_avg") == 0){
+   }else if(strcmp(argv[2], "gp_avg") == 0 || strcmp(argv[2], "fec_avg") == 0){
      FILE* plyp;
+     QueueTuple* tuple;
      GQueue* rates;
      gdouble* result = g_malloc0(sizeof(gdouble));
      gdouble len;
@@ -647,16 +790,21 @@ int main (int argc, char **argv)
        goto usage;
      }
      plyp  = fopen (argv[3],"r");
-     rates = _get_goodput_rate(plyp);
+     tuple = _get_goodput_rate(plyp);
+     if(!strcmp(argv[2], "gp_avg")){
+       rates = tuple->q1;
+     }else{
+       rates = tuple->q2;
+     }
      len = g_queue_get_length(rates);
      while(!g_queue_is_empty(rates)){
-       gdouble* value = g_queue_pop_head(rates);
+       guint32* value = g_queue_pop_head(rates);
        *result += *value;
        g_free(value);
      }
      *result /= len;
      g_queue_push_tail(rates, result);
-     _fwrite(fp, rates, _guint32_writer);
+     _fwrite(fp, rates, _gdouble_writer);
 //     g_queue_free_full(rates, g_free);
      fclose(plyp);
    }else if(strcmp(argv[2], "ratio") == 0){
@@ -669,8 +817,17 @@ int main (int argc, char **argv)
      ratios = _get_subflow_ratio(sndp);
      _fwrite(fp, ratios, _gdouble_writer);
      fclose(sndp);
-   }else if(strcmp(argv[2], "lf") == 0){
-     g_print("IMPLEMENT THIS!\n");
+   }else if(strcmp(argv[2], "nlf") == 0){
+     FILE* sndp;
+     FILE* plyp;
+     if(argc < 4){
+       goto usage;
+     }
+     sndp  = fopen (argv[3],"r");
+     plyp  = fopen (argv[4],"r");
+     fprintf(fp, "%d\n", _get_lost_frame_nums(sndp, plyp));
+     fclose(plyp);
+     fclose(sndp);
    }else if(strcmp(argv[2], "disc") == 0){
      g_print("IMPLEMENT THIS!\n");
    }else{

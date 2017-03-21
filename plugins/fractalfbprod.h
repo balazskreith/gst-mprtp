@@ -63,6 +63,9 @@ struct _FRACTaLFBProducer
   gdouble                  qdelay_est;
 
   gdouble                  dsnd_sum,drcv_sum;
+
+  SlidingWindow* skew_sw;
+  Recycle* skew_recycle;
 };
 
 struct _FRACTaLFBProducerClass{

@@ -26,7 +26,7 @@ echo -n "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1 " >> $SCRIPTFILE
 #echo -n "--sourcesink=FILE:produced.yuv "                 >> $SCRIPTFILE
 
 echo -n "--codec=VP8 "                                    >> $SCRIPTFILE
-echo -n "--stat=triggered_stat:temp/snd_packets_1.csv:0 "           >> $SCRIPTFILE
+echo -n "--stat=triggered_stat:$TEMPDIR/snd_packets_1.csv:0 "           >> $SCRIPTFILE
 
 echo $CC" is used as congestion control for sender 1"
 if [ $CC = $SCREAM ]
@@ -52,7 +52,7 @@ echo -n "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1 " >> $SCRIPTFILE2
 #echo -n "--sourcesink=FILE:produced.yuv "                 >> $SCRIPTFILE2
 
 echo -n "--codec=VP8 "                                    >> $SCRIPTFILE2
-echo -n "--stat=triggered_stat:temp/snd_packets_2.csv:0 " >> $SCRIPTFILE2
+echo -n "--stat=triggered_stat:$TEMPDIR/snd_packets_2.csv:0 " >> $SCRIPTFILE2
 
 echo $CC" is used as congestion control for sender 2"
 if [ $CC = $SCREAM ]

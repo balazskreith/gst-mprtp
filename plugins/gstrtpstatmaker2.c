@@ -710,9 +710,10 @@ _monitorstat_logger (GstRTPStatMaker2 *this)
   logger = _get_logger(this, packet);
   fp = fopen(logger->path, "a");
 
-  fprintf(fp, "%lu,%hu,%u,%d,%u,%d,%d,%d,%hu,%hu\n",
+  fprintf(fp, "%lu,%hu,%u,%u,%d,%u,%d,%d,%d,%hu,%hu,%d\n",
       packet->tracked_ntp,
       packet->seq_num,
+      packet->timestamp,
       packet->ssrc,
       packet->payload_type,
       packet->payload_size,
@@ -720,7 +721,8 @@ _monitorstat_logger (GstRTPStatMaker2 *this)
       packet->subflow_seq,
       packet->header_size,
       packet->protect_begin,
-      packet->protect_end);
+      packet->protect_end,
+      packet->marker);
 
   fclose(fp);
   messenger_throw_block(this->packets, packet);

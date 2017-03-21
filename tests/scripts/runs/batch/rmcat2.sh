@@ -20,6 +20,32 @@ RCVFILE="$TEMPDIR/rcv.sh"
 echo "./scripts/runs/rcv/$TEST.sh $ALGORITHM" > $RCVFILE
 chmod 777 $RCVFILE
 
+COUNTER=0
+if [ -z "$3" ]
+then
+  END=11
+else
+  END=$3
+fi
+
+
+cleanup()
+{
+  sudo pkill snd_pipeline
+  sudo pkill rcv_pipeline
+  sudo pkill bcex
+  sudo pkill bwcsv
+  sudo pkill sleep
+}
+ 
+control_c()
+{
+  echo -en "\n*** Program is terminated ***\n"
+  cleanup
+  exit $?
+}
+
+trap control_c SIGINT
 
 COUNTER=6
 while [  $COUNTER -lt 9 ]; do
@@ -35,16 +61,7 @@ while [  $COUNTER -lt 9 ]; do
 	INCREASE=1
 
 	#Flow 1
-	for FILE in snd_packetlogs.csv rcv_packetlogs.csv snd_statlogs.csv rcv_statlogs.csv
-	do
-   		if [ ! -f $LOGSDIR"/"$FILE ]; then
-    		INCREASE=0
-    		echo $FILE" not found"
-		fi
-	done
-
-	#Flow 2
-	for FILE in snd_packetlogs2.csv rcv_packetlogs2.csv snd_statlogs2.csv rcv_statlogs2.csv
+	for FILE in snd_packets_1.csv rcv_packets_1.csv snd_packets_2.csv rcv_packets_2.csv
 	do
    		if [ ! -f $LOGSDIR"/"$FILE ]; then
     		INCREASE=0
@@ -54,16 +71,14 @@ while [  $COUNTER -lt 9 ]; do
 
 	if [ $INCREASE -eq 0 ]
 	then
-	  sudo pkill snd_pipeline
-	  sudo pkill rcv_pipeline
-	  sudo pkill ntrt
+	  cleanup
 	  continue
 	fi
 
 	sleep 50
 
 	#Validation Part 2
-	for FILE in snd_packetlogs.csv rcv_packetlogs.csv snd_packetlogs2.csv rcv_packetlogs2.csv
+	for FILE in snd_packets_1.csv rcv_packets_1.csv snd_packets_2.csv rcv_packets_2.csv
 	do
 		minimumsize=90000
 		actualsize=$(wc -c <"$LOGSDIR/$FILE")
@@ -76,17 +91,13 @@ while [  $COUNTER -lt 9 ]; do
 
 	if [ $INCREASE -eq 0 ]
 	then
-	  sudo pkill snd_pipeline
-	  sudo pkill rcv_pipeline
-	  sudo pkill ntrt
+	  cleanup
 	  continue
 	fi
 
 	sleep 150
 
-	sudo pkill snd_pipeline
-	sudo pkill rcv_pipeline
-	sudo pkill ntrt
+	cleanup
 
 	alg=${ALGORITHM,,}
 

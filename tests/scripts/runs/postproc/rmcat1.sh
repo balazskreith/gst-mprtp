@@ -2,6 +2,7 @@
 programname=$0
 LOGSDIR="temp"
 SCRIPTSDIR="scripts"
+TEST="rmcat1"
 
 SCREAM="scream"
 FRACTAL="fractal"
@@ -14,10 +15,22 @@ else
   CC=$1
 fi
 
+if [ -z "$2" ] 
+then
+  DELAY=50
+else 
+  DELAY=$2
+fi
+
+PATH_DELAY=$DELAY"000"
+
+PLTOFILE=$LOGSDIR/$TEST"_"$CC"_"$DELAY"ms.pdf"
+
 
 #Making split csv file into several one based on conditions
 #----------------------------------------------------------
 ./logsplitter $LOGSDIR/snd_packets.csv $LOGSDIR/snd_rtp_packets.csv payload_type 96
+./logsplitter $LOGSDIR/snd_packets.csv $LOGSDIR/snd_fec_packets.csv payload_type 126
 
 #Making plotstats
 #----------------------------------------------------------
@@ -26,14 +39,17 @@ fi
 paste -d, $LOGSDIR/pathbw.csv $LOGSDIR/sr.csv $LOGSDIR/qmd.csv > $LOGSDIR/plotstat.csv
 
 gnuplot -e "statfile='temp/plotstat.csv'" \
-        -e "algorithm='fractal'" \
-        -e "output_file='temp/rmcat1_fractal_50ms.pdf'" \
-        -e "path_delay='50000'" \
+        -e "algorithm='$CC'" \
+        -e "output_file='$PLTOFILE'" \
+        -e "path_delay='$PATH_DELAY'" \
         $SCRIPTSDIR/runs/plots/rmcat1.plot
 
 #Making datstat
 #----------------------------------------------------------
 #goodput avg, loss rate, number of lost frames, psnr
-./statmaker $LOGSDIR/gp.csv gp_avg $LOGSDIR/ply_packets.csv
-#./statmaker $LOGSDIR/tr.csv lr $LOGSDIR/rcv_packets.csv 
+./statmaker $LOGSDIR/gp_avg.csv gp_avg $LOGSDIR/ply_packets.csv
+./statmaker $LOGSDIR/fec_avg.csv fec_avg $LOGSDIR/snd_fec_packets.csv
+./statmaker $LOGSDIR/lr.csv lr $LOGSDIR/snd_rtp_packets.csv $LOGSDIR/ply_packets.csv
+./statmaker $LOGSDIR/nlf.csv nlf $LOGSDIR/snd_rtp_packets.csv $LOGSDIR/ply_packets.csv
+./statmaker $LOGSDIR/ffre.csv ffre $LOGSDIR/snd_fec_packets.csv $LOGSDIR/snd_rtp_packets.csv $LOGSDIR/rcv_packets.csv $LOGSDIR/ply_packets.csv 
 

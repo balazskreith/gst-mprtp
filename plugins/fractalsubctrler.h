@@ -70,9 +70,10 @@ struct _FRACTaLSubController
   GstClockTime              increasing_sr_reached;
   gint32                    increasement;
 
-
+  GstClockTime              skew_th;
   gboolean                  reducing_approved;
   GstClockTime              reducing_sr_reached;
+  gint32                    turning_point;
 
   guint                     pending_event;
   SubRateAction             stage_fnc;

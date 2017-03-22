@@ -57,6 +57,7 @@ typedef struct _RTPQueueStat{
   gint16                    packets_in_queue;
   GstClockTime              last_arrived;
   GstClockTime              delay_length;
+  gdouble                   rtpq_delay;
 }RTPQueueStat;
 
 struct _SndTracker
@@ -100,4 +101,5 @@ void sndtracker_rem_on_packet_sent(SndTracker * this, ListenerFunc callback);
 SndTrackerStat* sndtracker_get_stat(SndTracker * this);
 SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id);
 RTPQueueStat*   sndtracker_get_rtpqstat(SndTracker * this);
+void            sndtracker_clear_rtpqstat(SndTracker * this);
 #endif /* SNDTRACKER_H_ */

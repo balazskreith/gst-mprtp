@@ -413,10 +413,14 @@ static void _swpercentile_calculate(swpercentile_t *this)
     this->candidates.right = bintree3_get_bottom_data(this->mintree);
   }
 
-  this->candidates.min = bintree3_get_bottom_data(this->maxtree);
-  this->candidates.max = bintree3_get_top_data(this->mintree);
-
 done:
+  if(0 < bintree3_get_nodenum(this->maxtree)){
+    this->candidates.min = bintree3_get_bottom_data(this->maxtree);
+  }
+  if(0 < bintree3_get_nodenum(this->mintree)){
+    this->candidates.max = bintree3_get_top_data(this->mintree);
+  }
+
   swplugin_notify(this->base, &this->candidates);
 }
 

@@ -163,7 +163,12 @@ SndTrackerStat* sndtracker_get_stat(SndTracker * this)
 }
 
 RTPQueueStat*   sndtracker_get_rtpqstat(SndTracker * this){
+  this->rtpqstat.rtpq_delay = (gdouble)this->rtpqstat.bytes_in_queue / (gdouble)this->stat.sent_bytes_in_1s;
   return &this->rtpqstat;
+}
+
+void sndtracker_clear_rtpqstat(SndTracker * this){
+  memset(&this->rtpqstat, 0, sizeof(RTPQueueStat));
 }
 
 SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id)

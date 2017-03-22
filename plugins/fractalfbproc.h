@@ -29,8 +29,8 @@ typedef struct _FRACTaLFBProcessorClass FRACTaLFBProcessorClass;
 
 typedef struct _FRACTaLStat
 {
-  GstClockTime             qdelay_50th;
-  GstClockTime             last_qdelay;
+  GstClockTime             skew_50th;
+  GstClockTime             last_skew;
 
   gint32                   measurements_num;
   gint32                   BiF_80th;
@@ -40,12 +40,12 @@ typedef struct _FRACTaLStat
   gdouble                  FL_std;
   gint32                   stalled_bytes;
   gint32                   bytes_in_flight;
-  GstClockTime             delay_in_rtpqueue;
+  gdouble                  rtpq_delay;
   gint32                   sender_bitrate;
   gint32                   receiver_bitrate;
   gint32                   fec_bitrate;
   gdouble                  qdelay_log_corr;
-  GstClockTime             qdelay_std;
+  GstClockTime             skew_std;
   gdouble                  srtt;
 
   gint32                   newly_acked_bytes;
@@ -54,7 +54,7 @@ typedef struct _FRACTaLStat
   gdouble                  rr_avg;
 
   gdouble                  FL_in_1s;
-  gdouble                  FL_50th;
+  gdouble                  FL_10th;
 
   gdouble                  last_FL;
 

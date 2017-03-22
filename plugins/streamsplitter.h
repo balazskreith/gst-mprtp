@@ -58,6 +58,9 @@ stream_splitter_on_target_bitrate_changed(
     StreamSplitter* this,
     SndSubflow* subflow);
 
+gint32
+stream_splitter_get_total_target(StreamSplitter* this);
+
 void
 stream_splitter_on_packet_sent(
     StreamSplitter* this,

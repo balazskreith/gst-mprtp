@@ -130,21 +130,17 @@ static void _skew_shaper(Skew* to, Skew* from){
   memcpy(to,from,sizeof(Skew));
 }
 
-static void _on_skew_add(FRACTaLFBProducer* this, Skew* skew)
-{
+//static void _on_skew_add(FRACTaLFBProducer* this, Skew* skew)
+//{
 //  this->dsnd_sum += skew->dsnd * MIN(1., skew->payload_size / 1400.);
 //  this->drcv_sum += skew->drcv * MIN(1., skew->payload_size / 1400.);
-//  this->dsnd_sum += skew->dsnd;
-//  this->drcv_sum += skew->drcv;
-}
-
-static void _on_skew_rem(FRACTaLFBProducer* this, Skew* skew)
-{
+//}
+//
+//static void _on_skew_rem(FRACTaLFBProducer* this, Skew* skew)
+//{
 //  this->dsnd_sum -= skew->dsnd * MIN(1., skew->payload_size / 1400.);
 //  this->drcv_sum -= skew->drcv * MIN(1., skew->payload_size / 1400.);
-//  this->dsnd_sum -= skew->dsnd;
-//  this->drcv_sum -= skew->drcv;
-}
+//}
 
 static gint _cmp_skew(Skew* a, Skew* b){
 //  guint64 ad = a->drcv * MIN(1., a->payload_size / 1400.);
@@ -156,9 +152,37 @@ static gint _cmp_skew(Skew* a, Skew* b){
 
 static void _on_max_skew_selected(FRACTaLFBProducer* this, swminmaxstat_t* stat){
   Skew* max = stat->max;
-  this->dsnd_sum = max->dsnd;
-  this->drcv_sum = max->drcv;
+  Skew* min = stat->min;
+  if(max->dsnd < max->drcv){
+    this->max_skew = max->drcv - max->dsnd;
+  }else{
+    this->max_skew = 0;
+  }
+
+  if(min->dsnd < min->drcv){
+    this->min_skew = min->drcv - min->dsnd;
+  }else{
+    this->min_skew = 0;
+  }
 }
+
+//static void _on_skew_perc(gpointer udata, swpercentilecandidates_t* candidates)
+//{
+//  FRACTaLFBProducer* this = udata;
+//  Skew* skew;
+//  if(!candidates->processed){
+//    skew = candidates->max;
+//  }else{
+//    skew = candidates->right ? candidates->right : candidates->left;
+//  }
+//  if(!skew){
+//    this->dsnd_sum = 0;
+//    this->drcv_sum = 0;
+//  }else{
+//    this->dsnd_sum = skew->dsnd;
+//    this->drcv_sum = skew->drcv;
+//  }
+//}
 
 FRACTaLFBProducer *make_fractalfbproducer(RcvSubflow* subflow, RcvTracker *tracker)
 {
@@ -184,11 +208,12 @@ FRACTaLFBProducer *make_fractalfbproducer(RcvSubflow* subflow, RcvTracker *track
 
   rcvsubflow_add_on_rtcp_fb_cb(subflow, (ListenerFunc) _on_fb_update, this);
 
-  this->skew_recycle = make_recycle_skew_data(200, (RecycleItemShaper) _skew_shaper);
-  this->skew_sw = make_slidingwindow(200, 100 * GST_MSECOND);
+  this->skew_recycle = make_recycle_skew_data(100, (RecycleItemShaper) _skew_shaper);
+  this->skew_sw = make_slidingwindow(100, 100 * GST_MSECOND);
   slidingwindow_set_data_recycle(this->skew_sw, this->skew_recycle);
-  slidingwindow_add_on_change(this->skew_sw, (ListenerFunc)_on_skew_add, (ListenerFunc)_on_skew_rem, this);
+//  slidingwindow_add_on_change(this->skew_sw, (ListenerFunc)_on_skew_add, (ListenerFunc)_on_skew_rem, this);
   slidingwindow_add_plugin(this->skew_sw, make_swminmax((bintree3cmp)_cmp_skew, (ListenerFunc)_on_max_skew_selected, this));
+//  slidingwindow_add_plugin(this->skew_sw, make_swpercentile(80, (bintree3cmp)_cmp_skew, (ListenerFunc) _on_skew_perc, this));
 
   return this;
 }
@@ -210,14 +235,11 @@ void _on_discarded_packet(FRACTaLFBProducer *this, RcvPacket *packet)
 
 static void _add_new_queue_delay_est(FRACTaLFBProducer *this, RcvPacket* packet)
 {
-  gdouble skew;
   gdouble drcv, dsnd;
   if(this->prev_rcv == 0){
     this->prev_rcv      = packet->abs_rcv_ntp_time;
     this->prev_snd      = packet->abs_snd_ntp_chunk;
     this->prev_seq      = packet->abs_seq;
-
-    this->dsnd_sum      = this->drcv_sum = 0.;
     return;
   }
 
@@ -234,27 +256,10 @@ static void _add_new_queue_delay_est(FRACTaLFBProducer *this, RcvPacket* packet)
   this->prev_rcv = packet->abs_rcv_ntp_time;
   this->prev_snd = packet->abs_snd_ntp_chunk;
 
-//  if(5 * GST_MSECOND < get_epoch_time_from_ntp_in_ns(dsnd) && 1000 < packet->payload_size)
   {
     Skew skew = {dsnd,drcv,(gdouble)packet->payload_size};
     slidingwindow_add_data(this->skew_sw, &skew);
   }
-
-  skew = this->drcv_sum - this->dsnd_sum;
-//  g_print("%8.0f|%8.0f|%c%-8lu\n",
-//          this->drcv_sum,
-//          this->dsnd_sum,
-//          skew < 0. ? '-' : '+',
-//          GST_TIME_AS_MSECONDS(get_epoch_time_from_ntp_in_ns(skew))
-//          );
-//  this->dsnd_sum = this->drcv_sum = 0.;
-
-  {
-//    gdouble alpha = 0. < skew ? CONSTRAIN(.33, .67, skew / (skew + this->qdelay_est)) : .5;
-//    g_print("alpha: %1.3f\n", alpha);
-//    this->qdelay_est = MAX(0., alpha * skew + this->qdelay_est * (1.-alpha));
-  }
-  this->qdelay_est = MAX(0., 1. * skew + this->qdelay_est * 0.);
 
 }
 
@@ -381,9 +386,9 @@ void _setup_xr_owd(FRACTaLFBProducer * this, ReportProducer* reportproducer)
   guint32      u32_median_delay, u32_min_delay, u32_max_delay;
 
 //  u32_median_delay = this->median_delay >> 16;
-  u32_median_delay = ((guint64)this->qdelay_est) >> 16;
-  u32_min_delay    = this->min_delay >> 16;
-  u32_max_delay    = this->max_delay >> 16;
+  u32_median_delay = this->max_skew >> 16;
+  u32_min_delay    = this->min_skew >> 16;
+  u32_max_delay    = this->max_skew >> 16;
 
   report_producer_add_xr_owd(reportproducer,
                              RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION,

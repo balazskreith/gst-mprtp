@@ -47,25 +47,18 @@ struct _FRACTaLFBProducer
   guint64                  prev_rcv;
 
   SlidingWindow*           rle_sw;
+  SlidingWindow*           skew_sw;
+  Recycle*                 skew_recycle;
+  guint64                  max_skew;
+  guint64                  min_skew;
 
   GstClockTime             last_fb;
   gint                     rcved_packets;
 
-  GstClockTime             median_delay;
-  GstClockTime             min_delay;
-  GstClockTime             max_delay;
-
   gint32                   discarded_bytes;
-
   gint32                   received_bytes;
 
-  gdouble                  max_dsnd;
-  gdouble                  qdelay_est;
 
-  gdouble                  dsnd_sum,drcv_sum;
-
-  SlidingWindow* skew_sw;
-  Recycle* skew_recycle;
 };
 
 struct _FRACTaLFBProducerClass{

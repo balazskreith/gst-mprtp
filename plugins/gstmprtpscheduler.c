@@ -950,6 +950,8 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
 {
   SndPacket *packet;
   GstClockTime now, next_time;
+  gdouble rtpq_rate;
+  gint32 total_target;
 
 //PROFILING("LOCK",
   THIS_LOCK(this);
@@ -962,11 +964,15 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
   sndtracker_refresh(this->sndtracker);
   sndctrler_time_update(this->controller);
 
-//  if(50 * GST_MSECOND < this->sndtracker->rtpqstat.delay_length){
-//    sndqueue_clear(this->sndqueue);
-//    g_print("%lu\n", this->sndtracker->rtpqstat.delay_length);
-//    this->sndtracker->rtpqstat.delay_length = 0;
-//  }
+  total_target = stream_splitter_get_total_target(this->splitter);
+  rtpq_rate =  sndtracker_get_rtpqstat(this->sndtracker)->bytes_in_queue * 8.;
+  rtpq_rate /= (gdouble) (total_target ? total_target : 1000000000);
+
+  if(.5 < rtpq_rate){
+    g_print("clear rtp queue %f / %u = %f\n", sndtracker_get_rtpqstat(this->sndtracker)->bytes_in_queue * 8., total_target, rtpq_rate);
+    sndqueue_clear(this->sndqueue);
+    sndtracker_clear_rtpqstat(this->sndtracker);
+  }
 
   now = _now(this);
   next_time = now + 10 * GST_MSECOND;

@@ -123,6 +123,11 @@ stream_splitter_on_target_bitrate_changed(StreamSplitter* this, SndSubflow* subf
   sndsubflows_iterate(this->subflows, (GFunc)_refresh_weights_helper, this);
 }
 
+gint32 stream_splitter_get_total_target(StreamSplitter* this)
+{
+  return this->total_target;
+}
+
 void
 stream_splitter_on_packet_sent(StreamSplitter* this, SndPacket* packet)
 {

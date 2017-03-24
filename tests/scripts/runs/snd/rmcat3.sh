@@ -54,8 +54,8 @@ echo -n "./rcv_pipeline "                                   > $SCRIPTFILE2
 echo -n "--sink=FAKESINK "                                 >> $SCRIPTFILE2
 
 echo -n "--codec=VP8 "                                      >> $SCRIPTFILE2
-echo -n "--stat=triggered_stat:rcv_logs_2.csv:0 "           >> $SCRIPTFILE2
-echo -n "--plystat=triggered_stat:ply_logs_2.csv:0 "       >> $SCRIPTFILE2
+echo -n "--stat=triggered_stat:temp/rcv_packets_2.csv:0 "           >> $SCRIPTFILE2
+echo -n "--plystat=triggered_stat:temp/ply_packets_2.csv:0 "       >> $SCRIPTFILE2
 
 echo $CC" is used as congestion control for receiver 2"
 if [ $CC = $SCREAM ]

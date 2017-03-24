@@ -81,6 +81,8 @@ struct _GstRTPStatMaker2 {
   GstClockTime                  upstream_latency;
   GCond                         blocked_cond;
   gboolean                      blocked;
+  GQueue*                       packets4process;
+  GQueue*                       packets4recycle;
 };
 
 struct _GstRTPStatMaker2Class {

@@ -30,8 +30,8 @@ echo -n "./rcv_pipeline "                                   > $SCRIPTFILE
 echo -n "--sink=FAKESINK "                                 >> $SCRIPTFILE
 
 echo -n "--codec=VP8 "                                     >> $SCRIPTFILE
-echo -n "--stat=triggered_stat:rcv_logs_1.csv:0 "          >> $SCRIPTFILE
-echo -n "--plystat=triggered_stat:ply_logs_1.csv:0 "       >> $SCRIPTFILE
+echo -n "--stat=triggered_stat:temp/rcv_packets_1.csv:0 "          >> $SCRIPTFILE
+echo -n "--plystat=triggered_stat:temp/ply_packets_1.csv:0 "       >> $SCRIPTFILE
 
 
 echo $CC" is used as congestion control for receiver 1"

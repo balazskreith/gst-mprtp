@@ -28,7 +28,10 @@ sudo ip netns exec ns_mid tc qdisc change dev veth2 root handle 1: netem delay "
 sudo ip netns exec ns_mid tc qdisc change dev veth1 root handle 1: netem delay "$OWD_RCV"ms "$JITTER"ms
 
 
-echo "ntrt -c$CONFDIR/ntrt_snd_meas.ini -m$CONFDIR/ntrt_rmcat4.cmds -t120 " > $LOGSDIR"/ntrt.sh"
+echo "./bcex $CONFDIR/rmcat4.cmds " > $LOGSDIR"/ntrt.sh"
+echo "./bwcsv $LOGSDIR/pathbw.csv 1 3500 1200" >> $LOGSDIR"/ntrt.sh"
+echo "./$SCRIPTSDIR/runs/postproc/rmcat4.sh" >> $LOGSDIR"/ntrt.sh"
+
 chmod 777 $LOGSDIR"/ntrt.sh"
 
 

@@ -917,7 +917,7 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndPacket *packet)
     if(response){
       sndtracker_add_fec_response(this->sndtracker, response);
       gst_pad_push(this->mprtp_srcpad, response->fecbuffer);
-    //    g_async_queue_push(this->sendq, response->fecbuffer);
+//        g_async_queue_push(this->sendq, response->fecbuffer);
       fecencoder_unref_response(response);
       this->fec_requested = FALSE;
     }
@@ -950,8 +950,7 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
 {
   SndPacket *packet;
   GstClockTime now, next_time;
-  gdouble rtpq_rate;
-  gint32 total_target;
+  RTPQueueStat* rtpqstat;
 
 //PROFILING("LOCK",
   THIS_LOCK(this);
@@ -963,13 +962,10 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
 
   sndtracker_refresh(this->sndtracker);
   sndctrler_time_update(this->controller);
+  rtpqstat = sndtracker_get_rtpqstat(this->sndtracker);
 
-  total_target = stream_splitter_get_total_target(this->splitter);
-  rtpq_rate =  sndtracker_get_rtpqstat(this->sndtracker)->bytes_in_queue * 8.;
-  rtpq_rate /= (gdouble) (total_target ? total_target : 1000000000);
-
-  if(.5 < rtpq_rate){
-    g_print("clear rtp queue %f / %u = %f\n", sndtracker_get_rtpqstat(this->sndtracker)->bytes_in_queue * 8., total_target, rtpq_rate);
+  if(5000 < rtpqstat->bytes_in_queue && .5 < rtpqstat->rtpq_delay){
+    g_print("clear rtp queue %f %f\n", rtpqstat->bytes_in_queue * 8., rtpqstat->rtpq_delay);
     sndqueue_clear(this->sndqueue);
     sndtracker_clear_rtpqstat(this->sndtracker);
   }
@@ -978,11 +974,11 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
   next_time = now + 10 * GST_MSECOND;
   packet = sndqueue_pop_packet(this->sndqueue, &next_time);
   if(!packet){
-    if(now < next_time - 500 * GST_USECOND){
+//    if(now < next_time - 500 * GST_USECOND){
 //        g_print("1: now: %lu -> next_time: %lu diff: %lu\n", now, next_time, next_time - now);
-      _wait2(this, next_time);
+      DISABLE_LINE _wait2(this, next_time);
 //        g_print("2: now: %lu -> next_time: %lu diff: %lu\n", _now(this), next_time, _now(this) - next_time);
-    }
+//    }
     goto done;
   }
 

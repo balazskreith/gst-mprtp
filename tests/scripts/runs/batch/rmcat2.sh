@@ -12,6 +12,30 @@ JITTER=0
 mkdir $TEMPDIR
 rm $TEMPDIR/*
 
+if [ -z "$1" ]
+then
+  ALGORITHM="FRACTaL"
+else
+  ALGORITHM=$1
+fi
+
+if [ -z "$2" ]
+then
+  OWD="50"
+else
+  OWD=$2
+fi
+
+
+
+if [ -z "$3" ]
+then
+  END=11
+else
+  END=$3
+fi
+
+
 SNDFILE="$TEMPDIR/snd.sh"
 echo "./scripts/runs/snd/$TEST.sh $ALGORITHM" > $SNDFILE
 chmod 777 $SNDFILE
@@ -19,14 +43,6 @@ chmod 777 $SNDFILE
 RCVFILE="$TEMPDIR/rcv.sh"
 echo "./scripts/runs/rcv/$TEST.sh $ALGORITHM" > $RCVFILE
 chmod 777 $RCVFILE
-
-COUNTER=0
-if [ -z "$3" ]
-then
-  END=11
-else
-  END=$3
-fi
 
 
 cleanup()
@@ -47,8 +63,8 @@ control_c()
 
 trap control_c SIGINT
 
-COUNTER=6
-while [  $COUNTER -lt 9 ]; do
+COUNTER=0
+while [  $COUNTER -lt $END ]; do
     echo "The counter is $COUNTER"
 
 	sudo ip netns exec ns_rcv $RCVFILE &
@@ -80,7 +96,7 @@ while [  $COUNTER -lt 9 ]; do
 	#Validation Part 2
 	for FILE in snd_packets_1.csv rcv_packets_1.csv snd_packets_2.csv rcv_packets_2.csv
 	do
-		minimumsize=90000
+		minimumsize=20000
 		actualsize=$(wc -c <"$LOGSDIR/$FILE")
 		if [ ! $actualsize -ge $minimumsize ]; then
 		    echo "-----$FILE SIZE IS UNDER $minimumsize BYTES-----"

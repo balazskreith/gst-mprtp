@@ -244,6 +244,8 @@ gst_rtpstatmaker2_init (GstRTPStatMaker2 * this)
   this->default_logger = g_malloc0(sizeof(Logger));
   this->sysclock = gst_system_clock_obtain ();
   this->packets = make_messenger(sizeof(Packet));
+  this->packets4process = g_queue_new();
+  this->packets4recycle = g_queue_new();
 
   this->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
 }
@@ -704,28 +706,34 @@ void
 _monitorstat_logger (GstRTPStatMaker2 *this)
 {
   Packet* packet;
-  Logger* logger;
+  Logger* logger = this->default_logger;
   FILE* fp;
-  packet = messenger_pop_block(this->packets);
-  logger = _get_logger(this, packet);
+  messenger_wait_before_pop_all (this->packets, 10 * GST_SECOND, this->packets4process);
+  if(g_queue_is_empty(this->packets4process)){
+    return;
+  }
   fp = fopen(logger->path, "a");
+  while(!g_queue_is_empty(this->packets4process)){
+    packet = g_queue_pop_head(this->packets4process);
+    DISABLE_LINE    logger = _get_logger(this, packet);
+    fprintf(fp, "%lu,%hu,%u,%u,%d,%u,%d,%d,%d,%hu,%hu,%d\n",
+          packet->tracked_ntp,
+          packet->seq_num,
+          packet->timestamp,
+          packet->ssrc,
+          packet->payload_type,
+          packet->payload_size,
+          packet->subflow_id,
+          packet->subflow_seq,
+          packet->header_size,
+          packet->protect_begin,
+          packet->protect_end,
+          packet->marker);
+    g_queue_push_tail(this->packets4recycle, packet);
 
-  fprintf(fp, "%lu,%hu,%u,%u,%d,%u,%d,%d,%d,%hu,%hu,%d\n",
-      packet->tracked_ntp,
-      packet->seq_num,
-      packet->timestamp,
-      packet->ssrc,
-      packet->payload_type,
-      packet->payload_size,
-      packet->subflow_id,
-      packet->subflow_seq,
-      packet->header_size,
-      packet->protect_begin,
-      packet->protect_end,
-      packet->marker);
-
+  }
   fclose(fp);
-  messenger_throw_block(this->packets, packet);
+  messenger_throw_blocks(this->packets, this->packets4recycle);
   return;
 }
 

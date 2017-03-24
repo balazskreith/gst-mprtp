@@ -2,7 +2,7 @@
 programname=$0
 LOGSDIR="temp"
 SCRIPTSDIR="scripts"
-TEST="rmcat1"
+TEST="rmcat2"
 
 SCREAM="scream"
 FRACTAL="fractal"
@@ -29,15 +29,21 @@ PLTOFILE=$LOGSDIR/$TEST"_"$CC"_"$DELAY"ms.pdf"
 
 #Making split csv file into several one based on conditions
 #----------------------------------------------------------
-./logsplitter $LOGSDIR/snd_packets.csv $LOGSDIR/snd_rtp_packets.csv payload_type 96
+./logsplitter $LOGSDIR/snd_packets_1.csv $LOGSDIR/snd_rtp_packets_1.csv payload_type 96
+./logsplitter $LOGSDIR/snd_packets_1.csv $LOGSDIR/snd_fec_packets_1.csv payload_type 126
+
+./logsplitter $LOGSDIR/snd_packets_2.csv $LOGSDIR/snd_rtp_packets_2.csv payload_type 96
+./logsplitter $LOGSDIR/snd_packets_2.csv $LOGSDIR/snd_fec_packets_2.csv payload_type 126
 
 #Making plotstats
 #----------------------------------------------------------
 ./statmaker $LOGSDIR/sr_1.csv sr $LOGSDIR/snd_packets_1.csv
 ./statmaker $LOGSDIR/qmd_1.csv qmd $LOGSDIR/snd_packets_1.csv $LOGSDIR/rcv_packets_1.csv
+
 ./statmaker $LOGSDIR/sr_2.csv sr $LOGSDIR/snd_packets_2.csv
 ./statmaker $LOGSDIR/qmd_2.csv qmd $LOGSDIR/snd_packets_2.csv $LOGSDIR/rcv_packets_2.csv
-paste -d, $LOGSDIR/pathbw.csv $LOGSDIR/sr_1.csv $LOGSDIR/qmd_1.csv $LOGSDIR/sr_2.csv $LOGSDIR/qmd_2.csv > $LOGSDIR/plotstat.csv
+
+paste -d, $LOGSDIR/pathbw.csv $LOGSDIR/sr_1.csv $LOGSDIR/sr_2.csv $LOGSDIR/qmd_1.csv $LOGSDIR/qmd_2.csv > $LOGSDIR/plotstat.csv
 
 gnuplot -e "statfile='temp/plotstat.csv'" \
         -e "algorithm='$CC'" \
@@ -48,6 +54,15 @@ gnuplot -e "statfile='temp/plotstat.csv'" \
 #Making datstat
 #----------------------------------------------------------
 #goodput avg, loss rate, number of lost frames, psnr
-./statmaker $LOGSDIR/gp.csv gp_avg $LOGSDIR/ply_packets.csv
-#./statmaker $LOGSDIR/tr.csv lr $LOGSDIR/rcv_packets.csv 
+./statmaker $LOGSDIR/gp_avg_1.csv gp_avg $LOGSDIR/ply_packets_1.csv
+./statmaker $LOGSDIR/fec_avg_1.csv fec_avg $LOGSDIR/snd_fec_packets_1.csv
+./statmaker $LOGSDIR/lr_1.csv lr $LOGSDIR/snd_rtp_packets_1.csv $LOGSDIR/ply_packets_1.csv
+./statmaker $LOGSDIR/nlf_1.csv nlf $LOGSDIR/snd_rtp_packets_1.csv $LOGSDIR/ply_packets_1.csv
+./statmaker $LOGSDIR/ffre_1.csv ffre $LOGSDIR/snd_fec_packets_1.csv $LOGSDIR/snd_rtp_packets_1.csv $LOGSDIR/rcv_packets_1.csv $LOGSDIR/ply_packets_1.csv 
+
+./statmaker $LOGSDIR/gp_avg_2.csv gp_avg $LOGSDIR/ply_packets_2.csv
+./statmaker $LOGSDIR/fec_avg_2.csv fec_avg $LOGSDIR/snd_fec_packets_2.csv
+./statmaker $LOGSDIR/lr_2.csv lr $LOGSDIR/snd_rtp_packets_2.csv $LOGSDIR/ply_packets_2.csv
+./statmaker $LOGSDIR/nlf_2.csv nlf $LOGSDIR/snd_rtp_packets_2.csv $LOGSDIR/ply_packets_2.csv
+./statmaker $LOGSDIR/ffre_2.csv ffre $LOGSDIR/snd_fec_packets_2.csv $LOGSDIR/snd_rtp_packets_2.csv $LOGSDIR/rcv_packets_2.csv $LOGSDIR/ply_packets_2.csv 
 

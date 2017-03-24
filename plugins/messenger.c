@@ -71,6 +71,7 @@ messenger_finalize (GObject * object)
     g_slice_free1(this->block_size, g_queue_pop_head(this->recycle));
   }
   g_object_unref(this->recycle);
+  g_object_unref(this->sysclock);
 }
 
 void
@@ -78,6 +79,8 @@ messenger_init (Messenger * this)
 {
   g_mutex_init(&this->mutex);
   g_cond_init(&this->cond);
+  g_cond_init(&this->waiting_signal);
+  this->sysclock      = gst_system_clock_obtain();
   this->messages      = g_queue_new();
   this->recycle       = g_queue_new();
   this->recycle_limit = 1000;
@@ -161,6 +164,32 @@ done:
   return result;
 }
 
+static void _wait(Messenger *this, GstClockTime end)
+{
+  GstClockTime now = _now(this);
+  gint64  end_time  = g_get_monotonic_time();
+  if(now < end){
+    guint64 wait_time = MAX((end - now) / 2000, 1000);
+    end_time += wait_time;
+  }else{
+    end_time += 1000;
+  }
+  g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);
+}
+
+
+void messenger_wait_before_pop_all (Messenger *this, GstClockTime waiting, GQueue* queue)
+{
+  g_mutex_lock (&this->mutex);
+  if(0) _wait(this, _now(this) + waiting);
+
+  g_cond_wait_until(&this->waiting_signal, &this->mutex, g_get_monotonic_time() + waiting / 1000);
+  while (!g_queue_is_empty(this->messages)){
+      g_queue_push_tail(queue, g_queue_pop_head(this->messages));
+  }
+  g_mutex_unlock (&this->mutex);
+}
+
 
 void messenger_push_block(Messenger* this, gpointer message)
 {
@@ -185,6 +214,15 @@ void messenger_throw_block(Messenger* this, gpointer message)
   memset(message, 0, this->block_size);
   g_queue_push_tail(this->recycle, message);
 done:
+  g_mutex_unlock(&this->mutex);
+}
+
+void messenger_throw_blocks(Messenger* this, GQueue* messages)
+{
+  g_mutex_lock(&this->mutex);
+  while(!g_queue_is_empty(messages)){
+    messenger_throw_block_unlocked(this, g_queue_pop_head(messages));
+  }
   g_mutex_unlock(&this->mutex);
 }
 

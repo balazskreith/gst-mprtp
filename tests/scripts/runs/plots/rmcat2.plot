@@ -8,7 +8,7 @@ if (!exists("path_delay")) path_delay=0
 if (!exists("output_file")) output_file='statlogs.pdf'
 if (!exists("algorithm")) algorithm='scream'
 
-duration=100
+duration=120
 
 font_size=18
 #-------------------------------------------------------------------------
@@ -58,8 +58,8 @@ set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
 
 if(algorithm eq "fractal") {
 
-plot statfile using ($0*0.1):($2/125) with point pointtype 7 ps 0.3 lc rgb "blue" title "Sending Rate", \
-     statfile using ($0*0.1):(($2+$3)/125) with point pointtype 7 ps 0.3 lc rgb "0x008c48" title "Sending Rate + FEC Rate", \
+plot statfile using ($0*0.1):(($2+$3)/125) with point pointtype 7 ps 0.3 lc rgb "blue" title "Sending Rate + FEC Rate 1", \
+     statfile using ($0*0.1):(($4+$5)/125) with point pointtype 7 ps 0.3 lc rgb "0x008c48" title "Sending Rate + FEC Rate 2", \
      statfile using ($0*0.1):1 with lines lc rgb "0xDC143C" title "Path Capacity"
 
 }
@@ -67,6 +67,7 @@ plot statfile using ($0*0.1):($2/125) with point pointtype 7 ps 0.3 lc rgb "blue
 if(algorithm eq "scream") {
 
 plot statfile using ($0*0.1):($2/125) with point pointtype 7 ps 0.3 lc rgb "blue" title "Sending Rate", \
+	 statfile using ($0*0.1):($4/125) with point pointtype 7 ps 0.3 lc rgb "0x008c48" title "Sending Rate", \
      statfile using ($0*0.1):1 with lines lc rgb "0xDC143C" title "Path Capacity"
 
 }
@@ -90,7 +91,8 @@ set xlabel "Time [s]" offset 0,-1.1 font ", 22"
 set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
   
-plot statfile using ($0*0.1):(($4 - path_delay)/1000000) with point pointtype 7 ps 0.3 lc rgb "blue" title "Queue Delay"
+plot statfile using ($0*0.1):(($6 - path_delay)/1000000) with point pointtype 7 ps 0.3 lc rgb "blue" title "Queue Delay 1", \
+	 statfile using ($0*0.1):(($7 - path_delay)/1000000) with point pointtype 7 ps 0.3 lc rgb "0x008c48" title "Queue Delay 2"
   
   
 

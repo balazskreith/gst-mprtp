@@ -30,7 +30,7 @@ static void _process_stat(FRACTaLFBProcessor *this);
 
 static void _on_BiF_80th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates);
 static void _on_owd_50th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates);
-static void _on_FL_50th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates);
+static void _on_FL_90th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates);
 
 static void _on_owd_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement);
 static void _on_BiF_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement);
@@ -143,7 +143,7 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
   this->approvement = approvement;
 
   this->measurements_recycle = make_recycle_measurement(500, (RecycleItemShaper) _measurement_shape);
-  this->short_sw               = make_slidingwindow(100, 5 * GST_SECOND);
+  this->short_sw               = make_slidingwindow(100, 2 * GST_SECOND);
 //  this->FL_sw                = make_slidingwindow(100, 5 * GST_SECOND);
   this->long_sw               = make_slidingwindow(600, 30 * GST_SECOND);
 
@@ -157,7 +157,7 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
           make_swpercentile(80, _measurement_BiF_cmp, (ListenerFunc) _on_BiF_80th_calculated, this));
 
   slidingwindow_add_plugin(this->short_sw,
-          make_swpercentile(50, _measurement_FL_cmp, (ListenerFunc) _on_FL_50th_calculated, this));
+          make_swpercentile(90, _measurement_FL_cmp, (ListenerFunc) _on_FL_90th_calculated, this));
 
   slidingwindow_add_plugin(this->long_sw,
         make_swpercentile(50, _measurement_owd_cmp, (ListenerFunc) _on_owd_50th_calculated, this));
@@ -428,12 +428,12 @@ void _on_owd_50th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t 
                    );
 }
 
-void _on_FL_50th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates)
+void _on_FL_90th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates)
 {
   PercentileResult(FRACTaLMeasurement,   \
                    fraction_lost,         \
                    candidates,            \
-                   _stat(this)->FL_10th, \
+                   _stat(this)->FL_90th, \
                    this->FL_min,         \
                    this->FL_max,         \
                    0                      \

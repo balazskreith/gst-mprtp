@@ -54,7 +54,7 @@ typedef struct _FRACTaLStat
   gdouble                  rr_avg;
 
   gdouble                  FL_in_1s;
-  gdouble                  FL_10th;
+  gdouble                  FL_90th;
 
   gdouble                  last_FL;
 

@@ -147,7 +147,10 @@ static gint _cmp_skew(Skew* a, Skew* b){
 //  guint64 bd = b->drcv * MIN(1., b->payload_size / 1400.);
 //  return ad < bd ? -1 : 1;
   return a->drcv == b->drcv ? 0 : a->drcv < b->drcv ? -1 : 1;
-//  return a->dsnd == b->dsnd ? 0 : a->dsnd < b->dsnd ? -1 : 1;
+
+//  gdouble ad = log(a->payload_size) - log(get_epoch_time_from_ntp_in_ns(a->drcv) / 1000000) ;
+//  gdouble bd = log(b->payload_size) - log(get_epoch_time_from_ntp_in_ns(b->drcv) / 1000000) ;
+//  return ad < bd ? -1 : 1;
 }
 
 static void _on_max_skew_selected(FRACTaLFBProducer* this, swminmaxstat_t* stat){

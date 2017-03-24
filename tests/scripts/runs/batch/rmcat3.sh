@@ -4,13 +4,37 @@ LOGSDIR="temp"
 TEMPDIR="temp_batch"
 
 TEST="rmcat3"
-#ALGORITHM="SCReAM"
-ALGORITHM="FRACTaL"
-OWD=100
+ALGORITHM="SCReAM"
+# ALGORITHM="FRACTaL"
+OWD=50
 JITTER=0
 
 mkdir $TEMPDIR
 rm $TEMPDIR/*
+
+if [ -z "$1" ]
+then
+  ALGORITHM="FRACTaL"
+else
+  ALGORITHM=$1
+fi
+
+if [ -z "$2" ]
+then
+  OWD="50"
+else
+  OWD=$2
+fi
+
+
+
+if [ -z "$3" ]
+then
+  END=11
+else
+  END=$3
+fi
+
 
 SNDFILE="$TEMPDIR/snd.sh"
 echo "./scripts/runs/snd/$TEST.sh $ALGORITHM" > $SNDFILE
@@ -20,15 +44,27 @@ RCVFILE="$TEMPDIR/rcv.sh"
 echo "./scripts/runs/rcv/$TEST.sh $ALGORITHM" > $RCVFILE
 chmod 777 $RCVFILE
 
-#For the initial OWD to be right
-./scripts/runs/$TEST.sh $OWD &
-sleep 5
-sudo pkill ntrt
-rm temp/*
-rm triggered_stat
 
-COUNTER=1
-while [  $COUNTER -lt 5 ]; do
+cleanup()
+{
+  sudo pkill snd_pipeline
+  sudo pkill rcv_pipeline
+  sudo pkill bcex
+  sudo pkill bwcsv
+  sudo pkill sleep
+}
+ 
+control_c()
+{
+  echo -en "\n*** Program is terminated ***\n"
+  cleanup
+  exit $?
+}
+
+trap control_c SIGINT
+
+COUNTER=0
+while [  $COUNTER -lt $END ]; do
     echo "The counter is $COUNTER"
 
 	sudo ip netns exec ns_rcv $RCVFILE &
@@ -41,16 +77,7 @@ while [  $COUNTER -lt 5 ]; do
 	INCREASE=1
 
 	#Flow 1
-	for FILE in snd_packetlogs.csv rcv_packetlogs.csv snd_statlogs.csv rcv_statlogs.csv
-	do
-   		if [ ! -f $LOGSDIR"/"$FILE ]; then
-    		INCREASE=0
-    		echo $FILE" not found"
-		fi
-	done
-
-	#Flow 2
-	for FILE in snd_packetlogs2.csv rcv_packetlogs2.csv snd_statlogs2.csv rcv_statlogs2.csv
+	for FILE in snd_packets_1.csv rcv_packets_1.csv snd_packets_2.csv rcv_packets_2.csv
 	do
    		if [ ! -f $LOGSDIR"/"$FILE ]; then
     		INCREASE=0
@@ -60,18 +87,16 @@ while [  $COUNTER -lt 5 ]; do
 
 	if [ $INCREASE -eq 0 ]
 	then
-	  sudo pkill snd_pipeline
-	  sudo pkill rcv_pipeline
-	  sudo pkill ntrt
+	  cleanup
 	  continue
 	fi
 
 	sleep 50
 
 	#Validation Part 2
-	for FILE in snd_packetlogs.csv rcv_packetlogs.csv snd_packetlogs2.csv rcv_packetlogs2.csv
+	for FILE in snd_packets_1.csv rcv_packets_1.csv snd_packets_2.csv rcv_packets_2.csv
 	do
-		minimumsize=90000
+		minimumsize=20000
 		actualsize=$(wc -c <"$LOGSDIR/$FILE")
 		if [ ! $actualsize -ge $minimumsize ]; then
 		    echo "-----$FILE SIZE IS UNDER $minimumsize BYTES-----"
@@ -82,17 +107,13 @@ while [  $COUNTER -lt 5 ]; do
 
 	if [ $INCREASE -eq 0 ]
 	then
-	  sudo pkill snd_pipeline
-	  sudo pkill rcv_pipeline
-	  sudo pkill ntrt
+	  cleanup
 	  continue
 	fi
 
 	sleep 150
 
-	sudo pkill snd_pipeline
-	sudo pkill rcv_pipeline
-	sudo pkill ntrt
+	cleanup
 
 	alg=${ALGORITHM,,}
 

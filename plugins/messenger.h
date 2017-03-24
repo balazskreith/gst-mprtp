@@ -28,11 +28,13 @@ typedef void (*MessengerItemShaper)(gpointer result,gpointer udata);
 struct _Messenger
 {
   GObject             object;
+  GstClock*           sysclock;
   GMutex              mutex;
   GQueue*             messages;
   GQueue*             recycle;
 
   GCond               cond;
+  GCond               waiting_signal;
   MessengerItemShaper shaper;
   gsize               block_size;
 
@@ -54,7 +56,9 @@ gpointer messenger_try_pop_block(Messenger *this);
 guint messenger_get_length_with_timeout (Messenger *this, gint64 microseconds);
 gpointer messenger_pop_block_with_timeout (Messenger *this, gint64 microseconds);
 void messenger_push_block(Messenger* this, gpointer message);
+void messenger_wait_before_pop_all (Messenger *this, GstClockTime waiting, GQueue* queue);
 void messenger_throw_block(Messenger* this, gpointer message);
+void messenger_throw_blocks(Messenger* this, GQueue* messages);
 gpointer messenger_retrieve_block(Messenger *this);
 
 void messenger_lock(Messenger* this);

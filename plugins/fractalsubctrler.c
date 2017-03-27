@@ -229,6 +229,14 @@ static void
 _start_increasement(
     FRACTaLSubController *this);
 
+static gdouble
+_off_target(
+    FRACTaLSubController *this, gint pow, gdouble eps);
+
+static gdouble
+_scale_t(
+    FRACTaLSubController *this);
+
 static guint
 _get_approvement_interval(
     FRACTaLSubController* this);
@@ -404,7 +412,7 @@ static void _stat_print(FRACTaLSubController *this)
   FRACTaLStat *stat = this->stat;
   g_print("%d:MsN:%d - %1.1f|"
           "BiF:%-3d %-3d->%-3.0f|"
-          "FEC:%-4d|SR:%-4d|RR:%-4d|Tr:%-4d|Btl:%-4d|KP:%-4d|IP:%-4d|"
+          "FEC:%-4d|SR:%-4d|RR:%-4d|Tr:%-4d (%1.2f)|Btl:%-4d|KP:%-4d|IP:%-4d|"
           "%d-%d-%d-%d|"
           "Sk:%-3lu+%-3lu(%-3lu)->%1.2f,%1.2f|"
           "Q: %1.3f|"
@@ -423,6 +431,7 @@ static void _stat_print(FRACTaLSubController *this)
 //      stat->receiver_bitrate / 1000,
       (gint32)(stat->rr_avg / 1000),
       this->target_bitrate / 1000,
+      _off_target(this, 2, this->off),
       this->bottleneck_point / 1000,
       this->keeping_point / 1000,
       this->inflection_point / 1000,
@@ -531,7 +540,8 @@ void fractalsubctrler_report_update(
 
   fractalfbprocessor_report_update(this->fbprocessor, summary);
 
-   _stat_print(this);
+  DISABLE_LINE _stat_print(this);
+  _stat_print(this);
 
   this->approve_measurement  = FALSE;
   if(10 < _stat(this)->measurements_num){
@@ -558,9 +568,9 @@ gdouble _skew_corr(FRACTaLSubController *this){
 static gboolean _distortion(FRACTaLSubController *this)
 {
 
-  gdouble      FL_th  = MIN(_max_FL_th(this), _stat(this)->FL_90th + _stat(this)->FL_std * 4);
+  gdouble      FL_th  = MIN(_max_FL_th(this), _stat(this)->FL_90th + _stat(this)->FL_std * 2);
 //  gdouble      FL_th  = _max_FL_th(this);
-  this->skew_th = _stat(this)->skew_50th + CONSTRAIN(30 * GST_MSECOND, 80 * GST_MSECOND, _stat(this)->skew_std * 4);
+  this->skew_th = _stat(this)->skew_50th + CONSTRAIN(30 * GST_MSECOND, 80 * GST_MSECOND, _stat(this)->skew_std * 2);
   return this->skew_th < _stat(this)->last_skew || FL_th < _stat(this)->FL_in_1s;
 }
 
@@ -585,7 +595,7 @@ _reduce_stage(
     FRACTaLSubController *this)
 {
   GstClockTime boundary;
-  gint32 low_target_th = MAX(this->keeping_point - 2 * _max_ramp_up(this), this->keeping_point * .6);
+  gint32 low_target_th = MIN(this->keeping_point - 2 * _max_ramp_up(this), this->keeping_point * .6);
 
   if(this->target_bitrate < low_target_th || this->last_distorted < _now(this) - 2 * GST_SECOND){
     _undershoot(this, this->target_bitrate);
@@ -600,12 +610,6 @@ _reduce_stage(
     _set_bottleneck_point(this,  MIN((this->rcved_bytes * .8 * 8) / off, this->inflection_point * .9));
     goto done;
   }
-
-//  if(this->bottleneck_point && this->inflection_point){
-//    gdouble reduction = CONSTRAIN(.6, .8, (gdouble)this->bottleneck_point / (gdouble)this->inflection_point);
-////    this->awnd = _stat(this)->BiF_80th * 8. * .6;
-//    this->awnd = _stat(this)->BiF_80th * 8. * reduction;
-//  }
 
   _set_keeping_point(this, this->bottleneck_point * .9);
   _refresh_reducing_approvement(this);
@@ -928,8 +932,8 @@ void _refresh_increasing_approvement(FRACTaLSubController *this)
     return;
   }
 
-  //  interval = _get_approvement_interval(this);
-  interval = _stat(this)->srtt;
+//  interval = _get_approvement_interval(this);
+  interval = CONSTRAIN(100 * GST_MSECOND, GST_SECOND,_stat(this)->srtt);
   if(_now(this) - interval < this->increasing_sr_reached){
     return;
   }
@@ -976,19 +980,37 @@ void _start_increasement(FRACTaLSubController *this)
   _change_sndsubflow_target_bitrate(this, this->target_bitrate + this->increasement);
 }
 
+static gdouble _get_epsilon(FRACTaLSubController *this){
+  return MIN(_appr_interval_eps(this), (gdouble)_max_ramp_up(this) / (gdouble)this->target_bitrate);
+}
 
-static gdouble _off_target(FRACTaLSubController *this, gint pow, gdouble eps)
+static gint32 _get_refpoint(FRACTaLSubController *this){
+  gint32 dist1,dist2;
+  if(!this->bottleneck_point){
+    return 0;
+  }
+  if(this->target_bitrate < this->bottleneck_point){
+    return this->bottleneck_point;
+  }
+  if(!this->inflection_point || this->target_bitrate < this->inflection_point * (1.-_get_epsilon*(this))){
+    return 0;
+  }
+  return this->inflection_point;
+}
+
+gdouble _off_target(FRACTaLSubController *this, gint pow, gdouble eps)
 {
   gint32 refpoint;
   gdouble result;
   gint i;
-  refpoint = MAX(_min_target(this), this->bottleneck_point);
-  if(this->target_bitrate <= refpoint){
-    return 0.;
-  }else if(refpoint < this->inflection_point - 1.5 * _max_ramp_up(this) &&
-           this->inflection_point < this->target_bitrate + 1.5 * _max_ramp_up(this)){
-    return 0.;
-  }
+  refpoint = MAX(_min_target(this), _closest_point(this) /*this->bottleneck_point*/);
+//  if(this->target_bitrate <= refpoint){
+//    return 0.;
+//  }
+//  else if(refpoint < this->inflection_point - 1.5 * _max_ramp_up(this) &&
+//           this->inflection_point < this->target_bitrate + 1.5 * _max_ramp_up(this)){
+//    return 0.;
+//  }
   result = this->target_bitrate - refpoint;
   result /= this->target_bitrate * eps;
 
@@ -999,13 +1021,24 @@ static gdouble _off_target(FRACTaLSubController *this, gint pow, gdouble eps)
   return result;
 }
 
+gdouble _scale_t(FRACTaLSubController *this)
+{
+  gdouble result   = 0.;
+  gdouble eps      = _get_epsilon(this);
+  gint32 refpoint = MAX(_min_target(this), _get_refpoint(this));
+
+  result = this->target_bitrate - refpoint;
+  result /= (gdouble)this->target_bitrate * eps;
+  return result;
+}
+
 
 guint _get_approvement_interval(FRACTaLSubController* this)
 {
   gdouble off;
   gdouble interval;
   gdouble eps = MIN(_appr_interval_eps(this), (gdouble)_max_ramp_up(this) / (gdouble)this->target_bitrate);
-  off = _off_target(this, 2, eps);
+  this->off = off = _off_target(this, 2, eps);
   //return CONSTRAIN(.1 * GST_SECOND,  GST_SECOND, interval * _stat(this)->srtt);
 
   interval = off * MAX(_appr_min_time(this), _stat(this)->srtt / (gdouble)GST_SECOND) + (1.-off) * _appr_max_time(this);

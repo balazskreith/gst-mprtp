@@ -994,7 +994,9 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
     _on_monitoring_request(this, subflow);
   }
 
-  _mprtpscheduler_send_packet(this, packet);
+//  PROFILING("_mprtpscheduler_send_packet",
+    _mprtpscheduler_send_packet(this, packet);
+//  );
 
 done:
   THIS_UNLOCK(this);

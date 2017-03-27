@@ -820,8 +820,12 @@ _playout_process (GstMprtpplayouter *this)
   RcvPacket *packet;
   GstClockTime playout_time, now;
   guint16 gap_seq;
-  THIS_LOCK(this);
 
+//  PROFILING("_playout_process",
+    THIS_LOCK(this);
+//  );
+
+//  PROFILING("_playout_process_g_async_queue_try_pop",
   while((packet = g_async_queue_try_pop(this->packets_in)) != NULL){
     if(jitterbuffer_is_packet_discarded(this->jitterbuffer, packet)){
 //        g_print("Discarded packet: %hu - %hu - %lu\n", packet->abs_seq, this->jitterbuffer->last_seq, GST_TIME_AS_MSECONDS(this->jitterbuffer->playout_delay));
@@ -831,6 +835,9 @@ _playout_process (GstMprtpplayouter *this)
     rcvtracker_add_packet(this->rcvtracker, packet);
     stream_joiner_push_packet(this->joiner, packet);
   }
+
+//  );
+
   rcvctrler_time_update(this->controller);
 
   now = playout_time = _now(this);

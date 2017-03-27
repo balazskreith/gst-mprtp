@@ -712,6 +712,7 @@ _monitorstat_logger (GstRTPStatMaker2 *this)
   if(g_queue_is_empty(this->packets4process)){
     return;
   }
+//  g_print("MAKING START BEGIN\n");
   fp = fopen(logger->path, "a");
   while(!g_queue_is_empty(this->packets4process)){
     packet = g_queue_pop_head(this->packets4process);
@@ -733,6 +734,7 @@ _monitorstat_logger (GstRTPStatMaker2 *this)
 
   }
   fclose(fp);
+//  g_print("MAKING START END\n");
   messenger_throw_blocks(this->packets, this->packets4recycle);
   return;
 }

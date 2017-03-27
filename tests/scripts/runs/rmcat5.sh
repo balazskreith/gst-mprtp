@@ -13,7 +13,7 @@ mkdir $LOGSDIR
 
 #setup defaults
 DURATION=300
-OWD_RCV=50
+OWD_RCV=100
 JITTER=0
 
 if [ -z "$1" ] 
@@ -28,7 +28,10 @@ sudo ip netns exec ns_mid tc qdisc change dev veth2 root handle 1: netem delay "
 sudo ip netns exec ns_mid tc qdisc change dev veth1 root handle 1: netem delay "$OWD_RCV"ms "$JITTER"ms
 
 
-echo "ntrt -c$CONFDIR/ntrt_snd_meas.ini -m$CONFDIR/ntrt_rmcat5.cmds -t300 " > $LOGSDIR"/ntrt.sh"
+echo "./bcex $CONFDIR/rmcat5.cmds " > $LOGSDIR"/ntrt.sh"
+echo "./bwcsv $LOGSDIR/pathbw.csv 1 3500 3000" >> $LOGSDIR"/ntrt.sh"
+echo "./$SCRIPTSDIR/runs/postproc/rmcat5.sh" >> $LOGSDIR"/ntrt.sh"
+
 chmod 777 $LOGSDIR"/ntrt.sh"
 
 

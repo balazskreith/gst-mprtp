@@ -387,13 +387,13 @@ void _process_stat(FRACTaLFBProcessor *this)
                                            slidingwindow_get_counter(this->long_sw));
 
   if(_stat(this)->sr_avg){
-    _stat(this)->sr_avg = .2 * _stat(this)->sender_bitrate + _stat(this)->sr_avg * .8;
+    _stat(this)->sr_avg = .5 * _stat(this)->sender_bitrate + _stat(this)->sr_avg * .5;
   }else{
     _stat(this)->sr_avg = _stat(this)->sender_bitrate;
   }
 
   if(_stat(this)->rr_avg){
-    _stat(this)->rr_avg = .2 * _stat(this)->receiver_bitrate + _stat(this)->rr_avg * .8;
+    _stat(this)->rr_avg = .5 * _stat(this)->receiver_bitrate + _stat(this)->rr_avg * .5;
   }else{
     _stat(this)->rr_avg = _stat(this)->receiver_bitrate;
   }

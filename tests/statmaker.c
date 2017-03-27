@@ -3,6 +3,13 @@
 #include <stdlib.h>
 #include <gst/gst.h>
 
+#include <netinet/in.h>
+#include <netinet/ip.h>
+#include <net/if.h>
+#include <netinet/if_ether.h>
+
+#include <pcap.h>
+
 #define current_unix_time_in_us g_get_real_time ()
 #define current_unix_time_in_ms (current_unix_time_in_us / 1000L)
 #define current_unix_time_in_s  (current_unix_time_in_ms / 1000L)
@@ -227,6 +234,135 @@ static QueueTuple* _get_goodput_rate(FILE* fp){
   }
   _free_sliding_window(sw);
   return tuple;
+}
+typedef struct{
+  GstClockTime timestamp;
+  guint16      dst_port;
+  guint16      src_port;
+  gint32       size;
+}TCPPacket;
+
+/* ethernet headers are always exactly 14 bytes [1] */
+#define SIZE_ETHERNET 14
+
+static TCPPacket* _make_tcppacket(struct pcap_pkthdr* header, gchar* bytes){
+  TCPPacket* packet = g_malloc0(sizeof(TCPPacket));
+  guint16 ihl;//IP header length
+  struct sniff_ip* ip;
+  packet->timestamp = (GstClockTime)header->ts.tv_sec * GST_SECOND + (GstClockTime)header->ts.tv_usec * GST_USECOND;
+  ip = (struct sniff_ip*)(bytes + SIZE_ETHERNET);
+  ihl = (*(guint8*)(bytes + SIZE_ETHERNET) & 0x0F)*4;
+  packet->size = g_ntohs(*((guint16*) (bytes + SIZE_ETHERNET + 2)));
+  packet->src_port = g_ntohs((guint16*)(bytes + SIZE_ETHERNET + ihl + 0));
+  packet->dst_port = g_ntohs((guint16*)(bytes + SIZE_ETHERNET + ihl + 2));
+  return packet;
+}
+
+typedef struct{
+  guint16      src_port;
+  guint16      dst_port;
+  GstClockTime last;
+}TCPFlow;
+
+typedef struct {
+  guint32 packets_num;
+  guint32 sending_rate;
+  guint32 flownum;
+  GList*  flowslist;
+  QueueTuple* tuple;
+}TCPRate;
+
+static gint _find_tcp_flow(TCPFlow* tcp_flow, TCPPacket* packet){
+  return tcp_flow->dst_port == packet->dst_port && tcp_flow->src_port == packet->src_port ? 0 : -1;
+}
+
+static TCPFlow* _make_tcp_flow(TCPPacket* packet){
+  TCPFlow* this = g_malloc0(sizeof(TCPFlow));
+  this->src_port = packet->src_port;
+  this->dst_port = packet->dst_port;
+
+  return this;
+}
+
+static void _sw_add_tcp_packet(TCPRate* this, TCPPacket* packet){
+  TCPFlow* tcp_flow;
+  this->sending_rate += packet->size;
+  ++this->packets_num;
+
+  tcp_flow = g_list_find_custom(this->flowslist, packet, _find_tcp_flow);
+  if(!tcp_flow){
+    tcp_flow = _make_tcp_flow(packet);
+    this->flowslist = g_list_prepend(this->flowslist, tcp_flow);
+    ++this->flownum;
+  }
+  tcp_flow->last = packet->timestamp;
+}
+
+static void _sw_rem_tcp_packet(TCPRate* this, TCPPacket* packet){
+  TCPFlow* tcp_flow;
+  this->sending_rate -= packet->size;
+  --this->packets_num;
+
+  tcp_flow = g_list_find_custom(this->flowslist, packet, _find_tcp_flow);
+  if(tcp_flow && tcp_flow->last == packet->timestamp){
+    this->flowslist = g_list_remove(this->flowslist, tcp_flow);
+    --this->flownum;
+    g_free(tcp_flow);
+  }
+}
+
+static GstClockTime _tcp_packet_ts_in_ns(TCPPacket* packet){
+  return packet->timestamp;
+}
+
+static void _sw_sampling_tcp_packets(TCPRate* this){
+  guint32* value = g_malloc0(sizeof(guint32));
+  *value = this->sending_rate;
+  g_queue_push_tail(this->tuple->q1, value);
+  value = g_malloc0(sizeof(guint32));
+  *value = this->flownum;
+  g_queue_push_tail(this->tuple->q2, value);
+}
+
+static QueueTuple* tcpstat(gchar* path)
+{
+  pcap_t *pcap;
+  const unsigned char *packet;
+  char errbuf[1400];
+  struct pcap_pkthdr header;
+  TCPPacket* tcp_packet;
+  QueueTuple* results = g_malloc0(sizeof(QueueTuple));
+  TCPRate rates = {0,0,0,NULL, results};
+  results->q1 = g_queue_new();
+  results->q2 = g_queue_new();
+
+  SlidingWindow* sw = _make_sliding_window(
+      _sw_add_tcp_packet,
+      _sw_rem_tcp_packet,
+      _sw_sampling_tcp_packets,
+      _tcp_packet_ts_in_ns,
+      &rates,
+      g_free);
+
+  pcap = pcap_open_offline(path, errbuf);
+  if (pcap == NULL)
+  {
+    g_print("error reading pcap file: %s\n", errbuf);
+    exit(1);
+  }
+
+  /* Now just loop through extracting packets as long as we have
+   * some to read.
+   */
+  while ((packet = pcap_next(pcap, &header)) != NULL){
+    tcp_packet = _make_tcppacket(&header, packet);
+//    g_print("ts: %lu size: %lu %hu-%hu\n", tcp_packet->timestamp, tcp_packet->size, tcp_packet->src_port, tcp_packet->dst_port);
+    _sliding_window_push(sw, tcp_packet);
+  }
+
+  // terminate
+  _free_sliding_window(sw);
+  return results;
 }
 
 
@@ -704,6 +840,7 @@ int main (int argc, char **argv)
     g_print("nlf snd_packets ply_packets - calculates the number of lost frames\n");
     g_print("ratio snd_packets_1 snd_packets_2 - calculates the ratio between the flows\n");
     g_print("disc ply_packets - calculates the discarded packets ratio\n");
+    g_print("tcpstat tcpdump - calculates the tcp rate based on pcap\n");
     return 0;
   }
 
@@ -830,6 +967,14 @@ int main (int argc, char **argv)
      fclose(sndp);
    }else if(strcmp(argv[2], "disc") == 0){
      g_print("IMPLEMENT THIS!\n");
+   }else if(strcmp(argv[2], "tcpstat") == 0){
+     QueueTuple* tuple;
+     if(argc < 3){
+       goto usage;
+     }
+     tuple = tcpstat(argv[3]);
+     _tuple_fwrite(fp, tuple);
+     g_free(tuple);
    }else{
     goto usage;
   }

@@ -55,6 +55,8 @@ struct _FRACTaLSubController
   gint32                    keeping_point;
   gint32                    inflection_point;
 
+  gdouble                   off;
+
   FRACTaLFBProcessor*       fbprocessor;
   FRACTaLStat*              stat;
   FRACTaLApprovement*       approvement;

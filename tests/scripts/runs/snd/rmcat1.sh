@@ -5,6 +5,7 @@ TEMPDIR="temp"
 SCRIPTSDIR="scripts"
 ACTDIR=$SCRIPTSDIR"/runs/snd"
 
+
 SCREAM="SCReAM"
 FRACTAL="FRACTaL"
 
@@ -57,7 +58,9 @@ control_c()
 
 trap control_c SIGINT
 #Lets Rock
-./$SCRIPTFILE & 
+./$SCRIPTFILE &
+
+ 
 sleep $DURATION
 
 cleanup

@@ -26,6 +26,8 @@ PATH_DELAY=$DELAY"000"
 
 PLTOFILE=$LOGSDIR/$TEST"_"$CC"_"$DELAY"ms.pdf"
 
+#Make siome delay in order to wait the 10s log writing
+sleep 10
 
 #Making split csv file into several one based on conditions
 #----------------------------------------------------------

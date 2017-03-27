@@ -44,17 +44,20 @@ typedef struct _FRACTaLStat
   gint32                   sender_bitrate;
   gint32                   receiver_bitrate;
   gint32                   fec_bitrate;
+
   gdouble                  qdelay_log_corr;
   GstClockTime             skew_std;
   gdouble                  srtt;
 
-  gint32                   newly_acked_bytes;
+  gint32                   newly_received_bytes;
 
   gdouble                  sr_avg;
   gdouble                  rr_avg;
 
   gdouble                  FL_in_1s;
-  gdouble                  FL_90th;
+  gdouble                  FL_avg;
+
+  gdouble                  est_receiver_rate;
 
   gdouble                  last_FL;
 
@@ -77,6 +80,7 @@ typedef struct{
   gint8        stability;
   GstClockTime qdelay;
   gdouble      qdelay_std_t;
+  gint32       newly_received_bytes;
 }FRACTaLMeasurement;
 
 typedef struct{
@@ -90,7 +94,7 @@ struct _FRACTaLFBProcessor
   GObject                  object;
   GstClock*                sysclock;
 
-//  SlidingWindow*           FL_sw;
+  SlidingWindow*           srtt_sw;
   SlidingWindow*           short_sw;
   SlidingWindow*           long_sw;
   Recycle*                 measurements_recycle;
@@ -110,6 +114,7 @@ struct _FRACTaLFBProcessor
 
   gdouble                  FL_min;
   gdouble                  FL_max;
+  gint32                   acked_bytes_in_srtt;
 
 
   struct{

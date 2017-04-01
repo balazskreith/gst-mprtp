@@ -38,7 +38,7 @@ typedef struct _FRACTaLStat
   gint32                   BiF_min;
   gint32                   BiF_std;
   gdouble                  FL_std;
-  gint32                   stalled_bytes;
+  gint32                   extra_bytes;
   gint32                   bytes_in_flight;
   gdouble                  rtpq_delay;
   gint32                   sender_bitrate;
@@ -50,6 +50,7 @@ typedef struct _FRACTaLStat
   gdouble                  srtt;
 
   gint32                   newly_received_bytes;
+  gint32                   newly_lost_packets;
 
   gdouble                  sr_avg;
   gdouble                  rr_avg;
@@ -58,6 +59,7 @@ typedef struct _FRACTaLStat
   gdouble                  FL_avg;
 
   gdouble                  est_receiver_rate;
+  gint32                   acked_bytes_in_srtt;
 
   gdouble                  last_FL;
 
@@ -131,6 +133,7 @@ struct _FRACTaLFBProcessor
 
   gint32                   newly_acked_packets;
   gint32                   newly_received_packets;
+  guint16                  HSN;
 
 };
 

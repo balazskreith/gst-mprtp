@@ -61,6 +61,7 @@ control_c()
 {
   echo -en "\n*** Program is terminated ***\n"
   cleanup
+  sudo pkill rmcat7.sh
   exit $?
 }
 

@@ -64,6 +64,18 @@ static void _owd_logger(FRACTaLFBProcessor *this)
 
 }
 
+static gint
+_cmp_seq (guint16 x, guint16 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 32768) return -1;
+  if(x > y && x - y > 32768) return -1;
+  if(x < y && y - x > 32768) return 1;
+  if(x > y && x - y < 32768) return 1;
+  return 0;
+}
+
+
 static void _long_sw_item_sprintf(FRACTaLMeasurement* measurement, gchar* to_string){
   sprintf(to_string, "BiF: %d | FL: %1.2f | OWD: %lu",
       measurement->bytes_in_flight,
@@ -280,7 +292,11 @@ done:
 static void _newly_received_packet(FRACTaLFBProcessor *this, SndPacket* packet)
 {
   ++this->newly_acked_packets;
-  this->newly_received_packets += packet->lost ? 0 : 1;
+  if(packet->lost){
+    DISABLE_LINE _stat(this)->newly_lost_packets += _cmp_seq(this->HSN, packet->subflow_seq) < 0 ? 1 : 0;
+  }else{
+    ++this->newly_received_packets;
+  }
   _stat(this)->newly_received_bytes += packet->lost ? 0 : packet->payload_size;
 }
 
@@ -294,10 +310,10 @@ void _process_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary 
   act_seq = xr->LostRLE.begin_seq;
   end_seq = xr->LostRLE.end_seq;
   _stat(this)->newly_received_bytes = 0;
-  _stat(this)->last_FL           = 0.;
-  this->newly_acked_packets      = 0;
-  this->newly_received_packets   = 0;
-
+  _stat(this)->last_FL              = 0.;
+  this->newly_acked_packets         = 0;
+  this->newly_received_packets      = 0;
+  _stat(this)->newly_lost_packets   = 0;
 
   if(act_seq == end_seq){
     goto done;
@@ -324,6 +340,8 @@ void _process_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary 
     packet->lost = !xr->LostRLE.vector[i];
     if(!packet->lost){
       _newly_received_packet(this, packet);
+    }else{
+      ++_stat(this)->newly_lost_packets;
     }
 
     sndtracker_packet_acked(this->sndtracker, packet);
@@ -340,6 +358,7 @@ void _process_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary 
       this->srtt_updated = now;
       slidingwindow_set_treshold(this->srtt_sw, _stat(this)->srtt);
     }
+    this->HSN = packet->subflow_seq;
   }
 
   if(this->newly_received_packets < this->newly_acked_packets){
@@ -350,6 +369,7 @@ void _process_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary 
   slidingwindow_add_data(this->srtt_sw, &_stat(this)->newly_received_bytes);
 
 done:
+
   return;
 }
 
@@ -365,9 +385,9 @@ void _process_stat(FRACTaLFBProcessor *this)
   this->last_bytes_in_flight = sndstat->bytes_in_flight;
 
   if(sndstat->bytes_in_flight < _stat(this)->BiF_80th){
-    _stat(this)->stalled_bytes = 0;
+    _stat(this)->extra_bytes = 0;
   }else{
-    _stat(this)->stalled_bytes = sndstat->bytes_in_flight - _stat(this)->BiF_80th;
+    _stat(this)->extra_bytes = sndstat->bytes_in_flight - _stat(this)->BiF_80th;
   }
 
   if(sndstat->received_packets_in_1s < sndstat->acked_packets_in_1s){
@@ -493,12 +513,14 @@ static void _calculate_est_rr(FRACTaLFBProcessor *this){
   gdouble acked_bits;
   if(!_stat(this)->est_receiver_rate){
     _stat(this)->est_receiver_rate = this->acked_bytes_in_srtt * 8.;
+    _stat(this)->acked_bytes_in_srtt = this->acked_bytes_in_srtt;
   }
   alpha = _get_ewma_factor(this);
   off = MAX(1., (gdouble) GST_SECOND / _stat(this)->srtt);
   acked_bits = this->acked_bytes_in_srtt * 8.;
-//  _stat(this)->est_receiver_rate *= off;
+  _stat(this)->acked_bytes_in_srtt = this->acked_bytes_in_srtt;
   _stat(this)->est_receiver_rate = _stat(this)->est_receiver_rate * alpha + acked_bits * off * (1.-alpha);
+
 }
 
 void _on_srtt_sw_add(FRACTaLFBProcessor *this, gint32* newly_received_bytes)

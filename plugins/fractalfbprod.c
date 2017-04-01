@@ -297,7 +297,7 @@ static gboolean _do_fb(FRACTaLFBProducer *this)
   if(this->last_fb < _now(this) - 100 * GST_MSECOND){
     return TRUE;
   }
-  return 1 < this->rcved_packets;
+  return 3 < this->rcved_packets;
 }
 
 

@@ -52,6 +52,7 @@ struct _FRACTaLSubController
   GstClockTime              last_executed;
 
   gint32                    bottleneck_point;
+  gint32                    stalled_bytes;
   gint32                    keeping_point;
   gint32                    inflection_point;
 
@@ -73,12 +74,16 @@ struct _FRACTaLSubController
   gint32                    increasement;
 
   GstClockTime              skew_th;
+  gdouble                   FL_th;
   gboolean                  reducing_approved;
   GstClockTime              reducing_sr_reached;
   gint32                    turning_point;
+  gboolean                  jumped;
 
   guint                     pending_event;
   SubRateAction             stage_fnc;
+
+  gint32                    distortion_num;
 
   GstClockTime              congestion_detected;
 
@@ -88,8 +93,6 @@ struct _FRACTaLSubController
 
   gint32                    rcved_bytes;
 
-
-  gint32                    distorted_BiF;
 
   gdouble                   cwnd;//congestion window
   gdouble                   awnd;//allowed bitrate window

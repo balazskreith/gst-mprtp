@@ -3,7 +3,7 @@ programname=$0
 LOGSDIR="temp"
 TEMPDIR="temp_batch"
 
-TEST="rmcat4"
+TEST="rmcat2"
 ALGORITHM="SCReAM"
 # ALGORITHM="FRACTaL"
 OWD=50
@@ -51,11 +51,10 @@ cleanup()
   sudo pkill rcv_pipeline
   sudo pkill snd_pipeline
   sudo pkill rcv_pipeline
-  sudo pkill snd_pipeline
-  sudo pkill rcv_pipeline
   sudo pkill bcex
   sudo pkill bwcsv
   sudo pkill sleep
+  sudo pkill rmcat2.sh
 }
  
 control_c()
@@ -76,12 +75,12 @@ while [  $COUNTER -lt $END ]; do
 	sudo ip netns exec ns_snd $SNDFILE &
 	sleep 0.2
 	./scripts/runs/$TEST.sh $OWD &
-	sleep 50
+	sleep 10
 
 	INCREASE=1
 
 	#Flow 1
-	for FILE in snd_packets_1.csv rcv_packets_1.csv snd_packets_2.csv rcv_packets_2.csv snd_packets_3.csv rcv_packets_3.csv
+	for FILE in snd_packets_1.csv rcv_packets_1.csv snd_packets_2.csv rcv_packets_2.csv
 	do
    		if [ ! -f $LOGSDIR"/"$FILE ]; then
     		INCREASE=0
@@ -95,7 +94,27 @@ while [  $COUNTER -lt $END ]; do
 	  continue
 	fi
 
-	sleep 120
+	sleep 50
+
+	#Validation Part 2
+	for FILE in snd_packets_1.csv rcv_packets_1.csv snd_packets_2.csv rcv_packets_2.csv
+	do
+		minimumsize=20000
+		actualsize=$(wc -c <"$LOGSDIR/$FILE")
+		if [ ! $actualsize -ge $minimumsize ]; then
+		    echo "-----$FILE SIZE IS UNDER $minimumsize BYTES-----"
+		    INCREASE=0
+    		echo $FILE" not found"
+		fi
+	done
+
+	if [ $INCREASE -eq 0 ]
+	then
+	  cleanup
+	  continue
+	fi
+
+	sleep 150
 
 	cleanup
 

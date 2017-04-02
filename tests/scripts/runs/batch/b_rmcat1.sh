@@ -1,16 +1,16 @@
 #!/bin/bash
 programname=$0
 LOGSDIR="temp"
-TEMPDIR="temp_batch"
 
-TEST="rmcat2"
+TEST="rmcat1"
 ALGORITHM="SCReAM"
-# ALGORITHM="FRACTaL"
+#ALGORITHM="FRACTaL"
 OWD=50
 JITTER=0
 
-mkdir $TEMPDIR
-rm $TEMPDIR/*
+mkdir temp_batch
+rm temp_batch/*
+rm triggered_stat
 
 if [ -z "$1" ]
 then
@@ -27,7 +27,7 @@ else
 fi
 
 
-
+COUNTER=0
 if [ -z "$3" ]
 then
   END=11
@@ -35,13 +35,12 @@ else
   END=$3
 fi
 
-
-SNDFILE="$TEMPDIR/snd.sh"
-echo "./scripts/runs/snd/$TEST.sh $ALGORITHM" > $SNDFILE
+SNDFILE="temp_batch/snd.sh"
+echo "./scripts/runs/snd/rmcat1.sh $ALGORITHM" > $SNDFILE
 chmod 777 $SNDFILE
 
-RCVFILE="$TEMPDIR/rcv.sh"
-echo "./scripts/runs/rcv/$TEST.sh $ALGORITHM" > $RCVFILE
+RCVFILE="temp_batch/rcv.sh"
+echo "./scripts/runs/rcv/rmcat1.sh $ALGORITHM" > $RCVFILE
 chmod 777 $RCVFILE
 
 
@@ -52,6 +51,7 @@ cleanup()
   sudo pkill bcex
   sudo pkill bwcsv
   sudo pkill sleep
+  sudo pkill rmcat1.sh
 }
  
 control_c()
@@ -63,7 +63,8 @@ control_c()
 
 trap control_c SIGINT
 
-COUNTER=0
+alg=${ALGORITHM,,}
+
 while [  $COUNTER -lt $END ]; do
     echo "The counter is $COUNTER"
 
@@ -71,13 +72,13 @@ while [  $COUNTER -lt $END ]; do
 	sleep 2
 	sudo ip netns exec ns_snd $SNDFILE &
 	sleep 0.2
-	./scripts/runs/$TEST.sh $OWD &
+	./scripts/runs/rmcat1.sh $OWD $alg &
 	sleep 10
 
 	INCREASE=1
 
-	#Flow 1
-	for FILE in snd_packets_1.csv rcv_packets_1.csv snd_packets_2.csv rcv_packets_2.csv
+	#Validation part 1.
+	for FILE in snd_packets.csv rcv_packets.csv
 	do
    		if [ ! -f $LOGSDIR"/"$FILE ]; then
     		INCREASE=0
@@ -88,15 +89,18 @@ while [  $COUNTER -lt $END ]; do
 	if [ $INCREASE -eq 0 ]
 	then
 	  cleanup
+	  sleep 60
 	  continue
 	fi
+
+	echo "Validation: Necessary logfile exists."
 
 	sleep 50
 
 	#Validation Part 2
-	for FILE in snd_packets_1.csv rcv_packets_1.csv snd_packets_2.csv rcv_packets_2.csv
+	for FILE in snd_packets.csv rcv_packets.csv
 	do
-		minimumsize=20000
+		minimumsize=2000
 		actualsize=$(wc -c <"$LOGSDIR/$FILE")
 		if [ ! $actualsize -ge $minimumsize ]; then
 		    echo "-----$FILE SIZE IS UNDER $minimumsize BYTES-----"
@@ -108,16 +112,21 @@ while [  $COUNTER -lt $END ]; do
 	if [ $INCREASE -eq 0 ]
 	then
 	  cleanup
+	  sleep 60
 	  continue
 	fi
+
+	echo "Validation: Logfiles size seems ok."
 
 	sleep 150
 
 	cleanup
 
+	#vqmt produced.yuv consumed.yuv 288 352 2000 1 temp/vqmt PSNR
+
 	alg=${ALGORITHM,,}
 
-	TARGET="$TEMPDIR/"$alg"_"$COUNTER"_"$OWD"ms_"$JITTER"ms"
+	TARGET="temp_batch/"$alg"_"$COUNTER"_"$OWD"ms_"$JITTER"ms"
 	mkdir $TARGET
 	cp temp/* $TARGET
 

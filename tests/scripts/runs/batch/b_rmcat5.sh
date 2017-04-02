@@ -3,7 +3,7 @@ programname=$0
 LOGSDIR="temp"
 TEMPDIR="temp_batch"
 
-TEST="rmcat6"
+TEST="rmcat5"
 ALGORITHM="SCReAM"
 # ALGORITHM="FRACTaL"
 OWD=50
@@ -49,12 +49,14 @@ cleanup()
 {
   sudo pkill snd_pipeline
   sudo pkill rcv_pipeline
-  sudo pkill tcpdump
+  sudo pkill snd_pipeline
+  sudo pkill rcv_pipeline
+  sudo pkill snd_pipeline
+  sudo pkill rcv_pipeline
   sudo pkill bcex
   sudo pkill bwcsv
   sudo pkill sleep
-  sudo pkill iperf
-  sudo pkill iperf
+  sudo pkill rmcat5.sh
 }
  
 control_c()
@@ -74,13 +76,13 @@ while [  $COUNTER -lt $END ]; do
 	sleep 2
 	sudo ip netns exec ns_snd $SNDFILE &
 	sleep 0.2
-	./scripts/runs/$TEST.sh $OWD &
+	./scripts/runs/$TEST.sh $OWD $ALGORITHM &
 	sleep 50
 
 	INCREASE=1
 
 	#Flow 1
-	for FILE in snd_packets.csv rcv_packets.csv
+	for FILE in snd_packets_1.csv rcv_packets_1.csv snd_packets_2.csv rcv_packets_2.csv snd_packets_3.csv rcv_packets_3.csv
 	do
    		if [ ! -f $LOGSDIR"/"$FILE ]; then
     		INCREASE=0
@@ -94,7 +96,7 @@ while [  $COUNTER -lt $END ]; do
 	  continue
 	fi
 
-	sleep 120
+	sleep 300
 
 	cleanup
 

@@ -3,7 +3,7 @@ programname=$0
 LOGSDIR="temp"
 TEMPDIR="temp_batch"
 
-TEST="rmcat7"
+TEST="rmcat6"
 ALGORITHM="SCReAM"
 # ALGORITHM="FRACTaL"
 OWD=50
@@ -37,7 +37,7 @@ fi
 
 
 SNDFILE="$TEMPDIR/snd.sh"
-echo "./scripts/runs/snd/$TEST.sh $ALGORITHM > temp/sender.log" > $SNDFILE
+echo "./scripts/runs/snd/$TEST.sh $ALGORITHM" > $SNDFILE
 chmod 777 $SNDFILE
 
 RCVFILE="$TEMPDIR/rcv.sh"
@@ -49,19 +49,19 @@ cleanup()
 {
   sudo pkill snd_pipeline
   sudo pkill rcv_pipeline
-  sudo pkill iperf
   sudo pkill tcpdump
   sudo pkill bcex
   sudo pkill bwcsv
   sudo pkill sleep
   sudo pkill iperf
+  sudo pkill iperf
+  sudo pkill rmcat6.sh
 }
  
 control_c()
 {
   echo -en "\n*** Program is terminated ***\n"
   cleanup
-  sudo pkill rmcat7.sh
   exit $?
 }
 
@@ -95,7 +95,7 @@ while [  $COUNTER -lt $END ]; do
 	  continue
 	fi
 
-	sleep 300
+	sleep 120
 
 	cleanup
 

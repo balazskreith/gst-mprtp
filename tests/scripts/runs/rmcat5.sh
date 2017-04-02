@@ -30,7 +30,7 @@ sudo ip netns exec ns_mid tc qdisc change dev veth1 root handle 1: netem delay "
 
 echo "./bcex $CONFDIR/rmcat5.cmds " > $LOGSDIR"/ntrt.sh"
 echo "./bwcsv $LOGSDIR/pathbw.csv 1 3500 3000" >> $LOGSDIR"/ntrt.sh"
-echo "./$SCRIPTSDIR/runs/postproc/rmcat5.sh" >> $LOGSDIR"/ntrt.sh"
+echo "./$SCRIPTSDIR/runs/postproc/rmcat5.sh $1 $2" >> $LOGSDIR"/ntrt.sh"
 
 chmod 777 $LOGSDIR"/ntrt.sh"
 

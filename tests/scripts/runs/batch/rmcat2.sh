@@ -3,7 +3,7 @@ programname=$0
 LOGSDIR="temp"
 TEMPDIR="temp_batch"
 
-TEST="rmcat3"
+TEST="rmcat2"
 ALGORITHM="SCReAM"
 # ALGORITHM="FRACTaL"
 OWD=50
@@ -54,7 +54,7 @@ cleanup()
   sudo pkill bcex
   sudo pkill bwcsv
   sudo pkill sleep
-  sudo pkill rmcat3.sh
+  #sudo pkill rmcat2.sh
 }
  
 control_c()

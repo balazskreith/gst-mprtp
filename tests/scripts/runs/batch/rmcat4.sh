@@ -3,7 +3,7 @@ programname=$0
 LOGSDIR="temp"
 TEMPDIR="temp_batch"
 
-TEST="rmcat5"
+TEST="rmcat4"
 ALGORITHM="SCReAM"
 # ALGORITHM="FRACTaL"
 OWD=50
@@ -47,6 +47,8 @@ chmod 777 $RCVFILE
 
 cleanup()
 {
+  sleep 40
+  sudo pkill sleep
   sudo pkill snd_pipeline
   sudo pkill rcv_pipeline
   sudo pkill snd_pipeline
@@ -55,8 +57,7 @@ cleanup()
   sudo pkill rcv_pipeline
   sudo pkill bcex
   sudo pkill bwcsv
-  sudo pkill sleep
-  sudo pkill rmcat5.sh
+  #sudo pkill rmcat4.sh
 }
  
 control_c()
@@ -76,7 +77,7 @@ while [  $COUNTER -lt $END ]; do
 	sleep 2
 	sudo ip netns exec ns_snd $SNDFILE &
 	sleep 0.2
-	./scripts/runs/$TEST.sh $OWD $ALGORITHM &
+	./scripts/runs/$TEST.sh $OWD &
 	sleep 50
 
 	INCREASE=1
@@ -96,7 +97,7 @@ while [  $COUNTER -lt $END ]; do
 	  continue
 	fi
 
-	sleep 300
+	sleep 120
 
 	cleanup
 

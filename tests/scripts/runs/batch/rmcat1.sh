@@ -51,7 +51,6 @@ cleanup()
   sudo pkill bcex
   sudo pkill bwcsv
   sudo pkill sleep
-  sudo pkill rmcat1.sh
 }
  
 control_c()
@@ -127,6 +126,7 @@ while [  $COUNTER -lt $END ]; do
 	alg=${ALGORITHM,,}
 
 	TARGET="temp_batch/"$alg"_"$COUNTER"_"$OWD"ms_"$JITTER"ms"
+	echo $TARGET
 	mkdir $TARGET
 	cp temp/* $TARGET
 

@@ -30,6 +30,8 @@ else
   ALGORITHM=$2
 fi
 
+alg=${ALGORITHM,,}
+
 echo "The selected OWD is $OWD_SND"
 
 sudo ip netns exec ns_mid tc qdisc change dev veth2 root handle 1: netem delay "$OWD_SND"ms "$JITTER"ms
@@ -37,7 +39,7 @@ sudo ip netns exec ns_mid tc qdisc change dev veth1 root handle 1: netem delay "
 
 echo "./bcex $CONFDIR/rmcat1.cmds " > $LOGSDIR"/ntrt.sh"
 echo "./bwcsv $LOGSDIR/pathbw.csv 4 1000 200 2500 200 600 200 1000 400" >> $LOGSDIR"/ntrt.sh"
-echo "./$SCRIPTSDIR/runs/postproc/rmcat1.sh $ALGORITHM $OWD_SND" >> $LOGSDIR"/ntrt.sh"
+echo "./$SCRIPTSDIR/runs/postproc/rmcat1.sh $alg $OWD_SND" >> $LOGSDIR"/ntrt.sh"
 
 chmod 777 $LOGSDIR"/ntrt.sh"
 

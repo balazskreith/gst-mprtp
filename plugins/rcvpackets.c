@@ -114,12 +114,12 @@ RcvPacket* rcvpackets_get_packet(RcvPackets* this, GstBuffer* buffer)
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   RcvPacket* packet;
 
+
   packet = recycle_retrieve_and_shape(this->recycle, NULL);
 
   gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
 
   _setup_rcvpacket(packet, &rtp);
-
   if(gst_buffer_is_mprtp(buffer, this->mprtp_ext_header_id)){
     _extract_mprtp_info(this, packet, &rtp);
   }
@@ -130,9 +130,7 @@ RcvPacket* rcvpackets_get_packet(RcvPackets* this, GstBuffer* buffer)
   packet->ref      = 1;
   packet->received = _now(this);
   packet->destiny  = this->recycle;
-
   _check_buffer_meta_data(this, packet);
-
   return packet;
 }
 

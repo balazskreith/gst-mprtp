@@ -47,7 +47,7 @@ G_DEFINE_TYPE (FRACTaLSubController, fractalsubctrler, G_TYPE_OBJECT);
 
 //determine the maximum multiplying factor for aprovements
 //before the target considered to be accepted
-#define APPROVE_MAX_TIME 0.5
+#define APPROVE_MAX_TIME 0.6
 
 //determines the minimum ramp up bitrate
 #define RAMP_UP_MIN_SPEED 20000
@@ -547,9 +547,11 @@ void fractalsubctrler_report_update(
   this->approve_measurement  = FALSE;
   if(10 < _stat(this)->measurements_num){
     _execute_stage(this);
+  }else{
+    this->obligated_approvement = _now(this);
   }
   this->approve_measurement |= _subflow(this)->state != SNDSUBFLOW_STATE_OVERUSED;
-  this->approve_measurement |= _stat(this)->measurements_num < 10;
+  this->approve_measurement |= _now(this) < this->obligated_approvement + 10 * GST_SECOND;
 
   if(this->approve_measurement){
     fractalfbprocessor_approve_measurement(this->fbprocessor);
@@ -1026,10 +1028,18 @@ gdouble _scale_t(FRACTaLSubController *this)
   gdouble result   = 0.;
   gdouble eps      = _get_epsilon(this);
   gint32 refpoint = MAX(_min_target(this), _get_refpoint(this));
+//  if(this->target_bitrate < _min_target(this) / eps){
+//    result = this->target_bitrate - _min_target(this);
+//    result /= this->target_bitrate;
+//    result *= result;
+//    result = 1.-result;
+//    goto done;
+//  }
 
   result = this->target_bitrate - refpoint;
   result /= (gdouble)this->target_bitrate * eps;
   result *= result;
+//done:
   return CONSTRAIN(0.,1., result);
 }
 

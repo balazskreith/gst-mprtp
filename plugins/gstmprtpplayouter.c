@@ -664,35 +664,35 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 
 //  packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
 //  return gst_pad_push(this->mprtp_srcpad, rcvpacket_retrieve_buffer_and_unref(packet));
-  packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
-  g_async_queue_push(this->packets_in, packet);
-  g_cond_signal(&this->receive_signal);
+//  packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
+//  g_async_queue_push(this->packets_in, packet);
+//  g_cond_signal(&this->receive_signal);
 //  goto done;
 //
 //
 //PROFILING("MPRTPPLAYOUTER LOCK",
-//  THIS_LOCK(this);
+  THIS_LOCK(this);
 //);
-//
-////PROFILING("Processing arrived packet",
-//  packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
-//  rcvtracker_add_packet(this->rcvtracker, packet);
-//
-//  if(jitterbuffer_is_packet_discarded(this->jitterbuffer, packet)){
-////    g_print("Discarded packet: %hu - %hu - %lu\n", packet->abs_seq, this->jitterbuffer->last_seq, GST_TIME_AS_MSECONDS(this->jitterbuffer->playout_delay));
-//    rcvtracker_add_discarded_packet(this->rcvtracker, packet);
-//    goto unlock_and_done;
-//  }
-//  stream_joiner_push_packet(this->joiner, packet);
-//
-////  g_print("Packet from subflow %d arrived with seq: %hu\n", packet->subflow_id, packet->abs_seq);
-//  g_cond_signal(&this->receive_signal);
-//
-//  rcvctrler_time_update(this->controller);
-////);
-//
-//unlock_and_done:
-//  THIS_UNLOCK(this);
+
+//PROFILING("Processing arrived packet",
+  packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
+  rcvtracker_add_packet(this->rcvtracker, packet);
+
+  if(jitterbuffer_is_packet_discarded(this->jitterbuffer, packet)){
+//    g_print("Discarded packet: %hu - %hu - %lu\n", packet->abs_seq, this->jitterbuffer->last_seq, GST_TIME_AS_MSECONDS(this->jitterbuffer->playout_delay));
+    rcvtracker_add_discarded_packet(this->rcvtracker, packet);
+    goto unlock_and_done;
+  }
+  stream_joiner_push_packet(this->joiner, packet);
+
+//  g_print("Packet from subflow %d arrived with seq: %hu\n", packet->subflow_id, packet->abs_seq);
+  g_cond_signal(&this->receive_signal);
+//  PROFILING("rcvctrler_time_update",
+  rcvctrler_time_update(this->controller);
+//  );
+
+unlock_and_done:
+  THIS_UNLOCK(this);
 done:
   return result;
 
@@ -814,6 +814,7 @@ static gboolean _repair_responsed(GstMprtpplayouter *this)
   return g_cond_wait_until(&this->repair_signal, &this->mutex, end_time);
 }
 
+
 static void
 _playout_process (GstMprtpplayouter *this)
 {
@@ -826,15 +827,15 @@ _playout_process (GstMprtpplayouter *this)
 //  );
 
 //  PROFILING("_playout_process_g_async_queue_try_pop",
-  while((packet = g_async_queue_try_pop(this->packets_in)) != NULL){
-    if(jitterbuffer_is_packet_discarded(this->jitterbuffer, packet)){
-//        g_print("Discarded packet: %hu - %hu - %lu\n", packet->abs_seq, this->jitterbuffer->last_seq, GST_TIME_AS_MSECONDS(this->jitterbuffer->playout_delay));
-      rcvtracker_add_discarded_packet(this->rcvtracker, packet);
-      continue;
-    }
-    rcvtracker_add_packet(this->rcvtracker, packet);
-    stream_joiner_push_packet(this->joiner, packet);
-  }
+//  while((packet = g_async_queue_try_pop(this->packets_in)) != NULL){
+//    if(jitterbuffer_is_packet_discarded(this->jitterbuffer, packet)){
+////        g_print("Discarded packet: %hu - %hu - %lu\n", packet->abs_seq, this->jitterbuffer->last_seq, GST_TIME_AS_MSECONDS(this->jitterbuffer->playout_delay));
+//      rcvtracker_add_discarded_packet(this->rcvtracker, packet);
+//      continue;
+//    }
+//    rcvtracker_add_packet(this->rcvtracker, packet);
+//    stream_joiner_push_packet(this->joiner, packet);
+//  }
 
 //  );
 
@@ -849,13 +850,14 @@ _playout_process (GstMprtpplayouter *this)
   if(!packet){
     if(!playout_time){
       //in this case we have no packet in the jitterbuffer
-//      g_cond_wait(&this->receive_signal, &this->mutex);
-      g_cond_wait_until(&this->receive_signal, &this->mutex, g_get_monotonic_time() + 5 * G_TIME_SPAN_MILLISECOND);
+      g_cond_wait(&this->receive_signal, &this->mutex);
+      //g_cond_wait_until(&this->receive_signal, &this->mutex, g_get_monotonic_time() + 5 * G_TIME_SPAN_MILLISECOND);
     }else if(now < playout_time){//we have packet, but it must wait
 //      g_print("before playout_time, the diff is  %lu\n", playout_time - _now(this));
       DISABLE_LINE _wait(this, playout_time, 1000);
-      _wait2(this, playout_time);
-      DISABLE_LINE g_cond_wait_until(&this->waiting_signal, &this->mutex, g_get_monotonic_time() + G_TIME_SPAN_MILLISECOND);
+      DISABLE_LINE _wait2(this, playout_time);
+//      g_cond_wait_until(&this->waiting_signal, &this->mutex, g_get_monotonic_time() + G_TIME_SPAN_MILLISECOND);
+//      g_usleep(1000);
 //      g_print("after waiting until playout_time, the diff is  %lu\n", _now(this) - playout_time);
     }
     goto done;

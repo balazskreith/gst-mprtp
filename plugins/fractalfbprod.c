@@ -60,13 +60,13 @@ _cmp_seq (guint16 x, guint16 y)
 }
 
 
-
-static guint16 _diff_seq(guint16 a, guint16 b)
-{
-  if(a < b) return b-a;
-  if(b < a) return (65536 - a) + b;
-  return 0;
-}
+//
+//static guint16 _diff_seq(guint16 a, guint16 b)
+//{
+//  if(a < b) return b-a;
+//  if(b < a) return (65536 - a) + b;
+//  return 0;
+//}
 
 static void _on_rle_sw_rem(FRACTaLFBProducer* this, guint16* seq_num)
 {
@@ -112,8 +112,6 @@ fractalfbproducer_init (FRACTaLFBProducer * this)
   this->sysclock = gst_system_clock_obtain();
 
   this->vector   = g_malloc0(sizeof(gboolean)  * 65536);
-  this->vector_length = 0;
-
 
 }
 
@@ -306,8 +304,9 @@ void _on_fb_update(FRACTaLFBProducer *this, ReportProducer* reportproducer)
   if(!_do_fb(this)){
     goto done;
   }
-
+//PROFILING("report_producer_begin",
   report_producer_begin(reportproducer, this->subflow->id);
+//);
   //Okay, so discarded byte metrics indicate incipient congestion,
   //which is in fact indicated by the qdelay distoration either.
   //another point is the fact that if competing with tcp, tcp pushes the netqueue
@@ -315,8 +314,14 @@ void _on_fb_update(FRACTaLFBProducer *this, ReportProducer* reportproducer)
   //if jitter is high discard metrics appear naturally
   //so now on we try to not to rely on this metric, but for qdelay and losts.
   DISABLE_LINE _setup_xr_rfc7243(this, reportproducer);
+
+//  PROFILING("_setup_xr_owd",
   _setup_xr_owd(this, reportproducer);
+//  );
+
+//  PROFILING("_setup_xr_rfc3611_rle_lost",
   _setup_xr_rfc3611_rle_lost(this, reportproducer);
+//  );
 
   this->last_fb = _now(this);
   this->rcved_packets = 0;
@@ -344,15 +349,12 @@ void _setup_xr_rfc3611_rle_lost(FRACTaLFBProducer * this,ReportProducer* reportp
     goto done;
   }
 
-  this->vector_length = _diff_seq(this->begin_seq, this->end_seq) + 1;
-
   report_producer_add_xr_lost_rle(reportproducer,
                                        FALSE,
                                        0,
                                        this->begin_seq,
                                        this->end_seq,
-                                       this->vector + this->begin_seq,
-                                       this->vector_length
+                                       this->vector
                                        );
 
 //  g_print("FB creating begin seq: %d end seq: %d, vector length: %d\n", this->begin_seq, this->end_seq, this->vector_length);

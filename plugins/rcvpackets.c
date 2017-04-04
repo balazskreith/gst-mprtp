@@ -42,7 +42,6 @@ G_DEFINE_TYPE (RcvPackets, rcvpackets, G_TYPE_OBJECT);
 //----------------------------------------------------------------------
 
 static void rcvpackets_finalize (GObject * object);
-static void _check_buffer_meta_data(RcvPackets * this, RcvPacket *packet);
 static void _setup_rcvpacket(RcvPacket* packet, GstRTPBuffer *rtp);
 static void _extract_mprtp_info(RcvPackets* this, RcvPacket* packet, GstRTPBuffer *rtp);
 
@@ -98,8 +97,6 @@ rcvpackets_init (RcvPackets * this)
   this->sysclock                 = gst_system_clock_obtain();
   this->mprtp_ext_header_id      = MPRTP_DEFAULT_EXTENSION_HEADER_ID;
   this->abs_time_ext_header_id   = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
-  this->pivot_address_subflow_id = 0;
-  this->pivot_address            = NULL;
 }
 
 
@@ -130,9 +127,9 @@ RcvPacket* rcvpackets_get_packet(RcvPackets* this, GstBuffer* buffer)
   packet->ref      = 1;
   packet->received = _now(this);
   packet->destiny  = this->recycle;
-  _check_buffer_meta_data(this, packet);
   return packet;
 }
+
 
 
 void rcvpackets_set_abs_time_ext_header_id(RcvPackets* this, guint8 abs_time_ext_header_id)
@@ -154,15 +151,6 @@ guint8 rcvpackets_get_mprtp_ext_header_id(RcvPackets* this)
 {
   return this->mprtp_ext_header_id;
 }
-
-GstBuffer* rcvpacket_retrieve_buffer_and_unref(RcvPacket* packet)
-{
-  GstBuffer *result = packet->buffer;
-  packet->buffer = NULL;
-  rcvpacket_unref(packet);
-  return result;
-}
-
 
 void rcvpacket_unref(RcvPacket *packet)
 {
@@ -199,35 +187,6 @@ void rcvpacket_print(RcvPacket *packet, printfnc print)
         );
 }
 
-
-
-void _check_buffer_meta_data(RcvPackets * this, RcvPacket *packet)
-{
-  GstNetAddressMeta *meta;
-  //to avoid the check_collision problem in rtpsession.
-  meta = gst_buffer_get_net_address_meta (packet->buffer);
-
-  if(!meta){
-    return;
-  }
-
-  if (!this->pivot_address) {
-    this->pivot_address_subflow_id = packet->subflow_id;
-    this->pivot_address = G_SOCKET_ADDRESS (g_object_ref (meta->addr));
-    return;
-  }
-
-  if (packet->subflow_seq == this->pivot_address_subflow_id) {
-    return;
-  }
-
-  if(gst_buffer_is_writable(packet->buffer))
-    gst_buffer_add_net_address_meta (packet->buffer, this->pivot_address);
-  else{
-    packet->buffer = gst_buffer_make_writable(packet->buffer);
-    gst_buffer_add_net_address_meta (packet->buffer, this->pivot_address);
-  }
-}
 
 void _setup_rcvpacket(RcvPacket* packet, GstRTPBuffer *rtp)
 {

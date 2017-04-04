@@ -70,8 +70,7 @@ void report_producer_add_xr_lost_rle(ReportProducer *this,
                                           guint8 thinning,
                                           guint16 begin_seq,
                                           guint16 end_seq,
-                                          gboolean *vector,
-                                          guint vector_length);
+                                          gboolean *vector);
 
 void report_producer_add_xr_discarded_bytes(ReportProducer *this,
                                     guint8 interval_metric_flag,

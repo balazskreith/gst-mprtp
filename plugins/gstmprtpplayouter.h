@@ -96,6 +96,9 @@ struct _GstMprtpplayouter
 
   GAsyncQueue*    packets_in;
 
+  guint32              pivot_clock_rate;
+  GSocketAddress*      pivot_address;
+  guint8               pivot_address_subflow_id;
 
 };
 

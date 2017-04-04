@@ -40,7 +40,6 @@ struct _FRACTaLFBProducer
   guint16                  begin_seq;
   guint16                  end_seq;
   gboolean*                vector;
-  guint                    vector_length;
 
   guint64                  prev_snd;
   guint16                  prev_seq;

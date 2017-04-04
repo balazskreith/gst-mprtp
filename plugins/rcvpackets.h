@@ -51,7 +51,6 @@ struct _RcvPacket
   guint8               subflow_id;
 
   Recycle*             destiny;
-
 };
 
 
@@ -65,10 +64,6 @@ struct _RcvPackets
 
   guint8               abs_time_ext_header_id;
   guint8               mprtp_ext_header_id;
-
-  guint32              pivot_clock_rate;
-  GSocketAddress*      pivot_address;
-  guint8               pivot_address_subflow_id;
 
 };
 
@@ -91,7 +86,6 @@ guint8 rcvpackets_get_abs_time_ext_header_id(RcvPackets* this);
 void rcvpackets_set_mprtp_ext_header_id(RcvPackets* this, guint8 mprtp_ext_header_id);
 guint8 rcvpackets_get_mprtp_ext_header_id(RcvPackets* this);
 
-GstBuffer* rcvpacket_retrieve_buffer_and_unref(RcvPacket* packet);
 void rcvpacket_unref(RcvPacket *packet);
 RcvPacket* rcvpacket_ref(RcvPacket *packet);
 

@@ -209,68 +209,12 @@ void report_producer_add_xr_owd(ReportProducer *this,
 }
 
 
-//void report_producer_add_xr_lost_rle(ReportProducer *this,
-//                                 gboolean early_bit,
-//                                 guint8 thinning,
-//                                 guint16 begin_seq,
-//                                 guint16 end_seq,
-//                                 gboolean *vector)
-//{
-//  gchar databed[1024];
-//  GstRTCPXRRLELostsRLEBlock *block;
-//  GstRTCPXRChunk chunk;
-//  gint bit_i, chunks_length;
-//  guint16 vector_i;
-//  guint16 end_seq_plus_one = end_seq + 1;
-//  gboolean last_is_copied = TRUE;
-//  memset(databed, 0, 1024);
-//  memset(&chunk, 0, sizeof(GstRTCPXRChunk));
-//  block = (GstRTCPXRRLELostsRLEBlock*) databed;
-//  gst_rtcp_xr_rle_losts_setup(block, early_bit, thinning, this->ssrc, begin_seq, end_seq);
-//
-//  for(chunks_length = 0, bit_i = 0, vector_i=begin_seq; vector_i != end_seq_plus_one; ++vector_i){
-//      if(vector[vector_i]){
-//        chunk.Bitvector.bitvector |= (guint16)(1<<bit_i);
-//      }
-//      if(++bit_i < 15) {
-//          last_is_copied = FALSE;
-//          continue;
-//      }
-//      chunk.Bitvector.chunk_type = TRUE;
-//      gst_rtcp_xr_chunk_hton_cpy(&block->chunks[chunks_length], &chunk);
-//      last_is_copied = TRUE;
-//      memset(&chunk, 0, sizeof(GstRTCPXRChunk));
-//      bit_i = 0;
-//      ++chunks_length;
-//  }
-//
-//  if(!last_is_copied){
-//    chunk.Bitvector.chunk_type = TRUE;
-//    gst_rtcp_xr_chunk_hton_cpy(&block->chunks[chunks_length], &chunk);
-//  }
-//
-//  if(2 < chunks_length){
-//    guint16 plus;
-//    guint16 block_length;
-//    gst_rtcp_xr_block_getdown((GstRTCPXRBlock*) block, NULL, &block_length, NULL);
-//    plus = chunks_length-2;
-//    plus += plus % 2 == 1 ? 1 : 0;
-//    block_length += plus>>1;
-//    gst_rtcp_xr_block_change((GstRTCPXRBlock*) block, NULL, &block_length, NULL);
-////    g_print("block_length: %d->%d->%d-%d\n", chunks_length, plus, block_length);
-//  }
-//  _add_xrblock(this, (GstRTCPXRBlock*) block);
-//}
-
-
-
 void report_producer_add_xr_lost_rle(ReportProducer *this,
                                  gboolean early_bit,
                                  guint8 thinning,
                                  guint16 begin_seq,
                                  guint16 end_seq,
-                                 gboolean *vector,
-                                 guint vector_length)
+                                 gboolean *vector)
 {
   gchar databed[1024];
   GstRTCPXRRLELostsRLEBlock *block;
@@ -281,7 +225,7 @@ void report_producer_add_xr_lost_rle(ReportProducer *this,
   memset(&chunk, 0, sizeof(GstRTCPXRChunk));
   block = (GstRTCPXRRLELostsRLEBlock*) databed;
   gst_rtcp_xr_rle_losts_setup(block, early_bit, thinning, this->ssrc, begin_seq, end_seq);
-  for(chunks_num = 0, bit_i = 0, vector_i=0; vector_i<vector_length; ++vector_i){
+  for(chunks_num = 0, bit_i = 0, vector_i=begin_seq; vector_i != end_seq; ++vector_i){
       if(vector[vector_i]){
         chunk.Bitvector.bitvector |= (guint16)(1<<bit_i);
       }
@@ -290,7 +234,9 @@ void report_producer_add_xr_lost_rle(ReportProducer *this,
           continue;
       }
       chunk.Bitvector.chunk_type = TRUE;
+
       gst_rtcp_xr_chunk_hton_cpy(&block->chunks[chunks_num], &chunk);
+//      gst_print_rtcp_xrchunks(block->chunks + chunks_num, &chunk);
       last_is_copied = TRUE;
       memset(&chunk, 0, sizeof(GstRTCPXRChunk));
       bit_i = 0;
@@ -304,7 +250,7 @@ void report_producer_add_xr_lost_rle(ReportProducer *this,
   {
     guint16 block_length;
     gst_rtcp_xr_block_getdown((GstRTCPXRBlock*) block, NULL, &block_length, NULL);
-    for(; 29 < vector_i; vector_i-=29){
+    for(; 1 < chunks_num; chunks_num-=2){
       ++block_length;
     }
 

@@ -306,6 +306,7 @@ void _process_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary 
   guint16 act_seq, end_seq;
   GstClockTime last_packet_sent_time = 0;
   gint i;
+  guint16 last_seq;
 
   act_seq = xr->LostRLE.begin_seq;
   end_seq = xr->LostRLE.end_seq;
@@ -346,6 +347,7 @@ void _process_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary 
 
     sndtracker_packet_acked(this->sndtracker, packet);
     last_packet_sent_time = packet->sent;
+    last_seq = packet->subflow_seq;
   }
 
   if(0 < last_packet_sent_time)
@@ -358,7 +360,7 @@ void _process_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary 
       this->srtt_updated = now;
       slidingwindow_set_treshold(this->srtt_sw, _stat(this)->srtt);
     }
-    this->HSN = packet->subflow_seq;
+    this->HSN = last_seq;
   }
 
   if(this->newly_received_packets < this->newly_acked_packets){

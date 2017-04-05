@@ -47,10 +47,10 @@ G_DEFINE_TYPE (FRACTaLSubController, fractalsubctrler, G_TYPE_OBJECT);
 
 //determine the maximum multiplying factor for aprovements
 //before the target considered to be accepted
-#define APPROVE_MAX_TIME 0.6
+#define APPROVE_MAX_TIME 1.0
 
 //determines the minimum ramp up bitrate
-#define RAMP_UP_MIN_SPEED 20000
+#define RAMP_UP_MIN_SPEED 50000
 
 //determines the maximum ramp up bitrate
 #define RAMP_UP_MAX_SPEED 200000
@@ -475,10 +475,9 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
   if(!this->backward_congestion && this->last_report < _now(this) - MAX(.5 * GST_SECOND, 3 * _stat(this)->srtt)){
 
     GST_WARNING_OBJECT(this, "Backward congestion on subflow %d", this->subflow->id);
-
     _stop_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
-    _switch_stage_to(this, STAGE_KEEP, TRUE);
+    _switch_stage_to(this, STAGE_KEEP, FALSE);
     _change_sndsubflow_target_bitrate(this, this->keeping_point);
     this->backward_congestion = TRUE;
     goto done;
@@ -536,9 +535,13 @@ void fractalsubctrler_report_update(
   if(!this->enabled){
     goto done;
   }
-
-  this->backward_congestion = FALSE;
   this->last_report = _now(this);
+
+  if(this->backward_congestion){
+    this->backward_congestion = FALSE;
+    this->last_distorted = _now(this);
+    goto done;
+  }
 
   fractalfbprocessor_report_update(this->fbprocessor, summary);
 
@@ -549,6 +552,7 @@ void fractalsubctrler_report_update(
     _execute_stage(this);
   }else{
     this->obligated_approvement = _now(this);
+    this->last_distorted = _now(this);
   }
   this->approve_measurement |= _subflow(this)->state != SNDSUBFLOW_STATE_OVERUSED;
   this->approve_measurement |= _now(this) < this->obligated_approvement + 10 * GST_SECOND;
@@ -673,6 +677,7 @@ void
 _keep_stage(
     FRACTaLSubController *this)
 {
+  GstClockTime time_boundary;
   if(_stat(this)->BiF_80th){
     _change_cwnd(this, MIN(this->cwnd * 1.02, _stat(this)->BiF_80th * 8 * 1.2));
   }
@@ -691,7 +696,8 @@ _keep_stage(
     goto done;
   }
 
-  if(_now(this) - CONSTRAIN(300 * GST_MSECOND, GST_SECOND, 2 * _stat(this)->srtt) < this->last_settled){
+  time_boundary = _now(this) - CONSTRAIN(300 * GST_MSECOND, GST_SECOND, 2 * _stat(this)->srtt);
+  if(time_boundary < this->last_settled || time_boundary < this->last_distorted){
     goto done;
   }else if(.1 < _stat(this)->rtpq_delay){
     goto done;
@@ -905,6 +911,7 @@ void _refresh_monitoring_approvement(FRACTaLSubController *this)
   }
   boundary = MAX(_stat(this)->sender_bitrate * ratio, _min_ramp_up(this));
   if(_stat(this)->fec_bitrate < boundary){
+//    g_print("fec bitrate is not ok (%d)\n", boundary);
     return;
   }
   if(!this->monitoring_approvement_started){

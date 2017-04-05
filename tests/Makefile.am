@@ -4,7 +4,8 @@ noinst_PROGRAMS = snd_pipeline             \
                   bcex                     \
                   bwcsv                    \
                   statmaker                \
-                  logsplitter                
+                  logsplitter              \
+                  tablemaker 
                   
                   
 # FIXME 0.11: ignore GValueArray warnings for now until this is sorted
@@ -69,3 +70,7 @@ statmaker_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSIO
 logsplitter_SOURCES = logsplitter.c 
 logsplitter_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
 logsplitter_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
+
+tablemaker_SOURCES = tablemaker.c 
+tablemaker_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
+tablemaker_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)

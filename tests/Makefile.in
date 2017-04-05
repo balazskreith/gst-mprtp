@@ -91,7 +91,7 @@ host_triplet = @host@
 target_triplet = @target@
 noinst_PROGRAMS = snd_pipeline$(EXEEXT) rcv_pipeline$(EXEEXT) \
 	make_delta_statlogs$(EXEEXT) bcex$(EXEEXT) bwcsv$(EXEEXT) \
-	statmaker$(EXEEXT) logsplitter$(EXEEXT)
+	statmaker$(EXEEXT) logsplitter$(EXEEXT) tablemaker$(EXEEXT)
 subdir = tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/common/m4/as-ac-expand.m4 \
@@ -185,6 +185,13 @@ statmaker_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 statmaker_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(statmaker_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_tablemaker_OBJECTS = tablemaker-tablemaker.$(OBJEXT)
+tablemaker_OBJECTS = $(am_tablemaker_OBJECTS)
+tablemaker_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+tablemaker_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(tablemaker_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -221,10 +228,12 @@ am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(bcex_SOURCES) $(bwcsv_SOURCES) $(logsplitter_SOURCES) \
 	$(make_delta_statlogs_SOURCES) $(rcv_pipeline_SOURCES) \
-	$(snd_pipeline_SOURCES) $(statmaker_SOURCES)
+	$(snd_pipeline_SOURCES) $(statmaker_SOURCES) \
+	$(tablemaker_SOURCES)
 DIST_SOURCES = $(bcex_SOURCES) $(bwcsv_SOURCES) $(logsplitter_SOURCES) \
 	$(make_delta_statlogs_SOURCES) $(rcv_pipeline_SOURCES) \
-	$(snd_pipeline_SOURCES) $(statmaker_SOURCES)
+	$(snd_pipeline_SOURCES) $(statmaker_SOURCES) \
+	$(tablemaker_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -477,6 +486,9 @@ statmaker_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSIO
 logsplitter_SOURCES = logsplitter.c 
 logsplitter_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
 logsplitter_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
+tablemaker_SOURCES = tablemaker.c 
+tablemaker_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
+tablemaker_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
 all: all-am
 
 .SUFFIXES:
@@ -548,6 +560,10 @@ statmaker$(EXEEXT): $(statmaker_OBJECTS) $(statmaker_DEPENDENCIES) $(EXTRA_statm
 	@rm -f statmaker$(EXEEXT)
 	$(AM_V_CCLD)$(statmaker_LINK) $(statmaker_OBJECTS) $(statmaker_LDADD) $(LIBS)
 
+tablemaker$(EXEEXT): $(tablemaker_OBJECTS) $(tablemaker_DEPENDENCIES) $(EXTRA_tablemaker_DEPENDENCIES) 
+	@rm -f tablemaker$(EXEEXT)
+	$(AM_V_CCLD)$(tablemaker_LINK) $(tablemaker_OBJECTS) $(tablemaker_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
@@ -579,6 +595,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-snd_pipeline.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-source.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statmaker-statmaker.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tablemaker-tablemaker.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -950,6 +967,20 @@ statmaker-statmaker.obj: statmaker.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='statmaker.c' object='statmaker-statmaker.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statmaker_CFLAGS) $(CFLAGS) -c -o statmaker-statmaker.obj `if test -f 'statmaker.c'; then $(CYGPATH_W) 'statmaker.c'; else $(CYGPATH_W) '$(srcdir)/statmaker.c'; fi`
+
+tablemaker-tablemaker.o: tablemaker.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tablemaker_CFLAGS) $(CFLAGS) -MT tablemaker-tablemaker.o -MD -MP -MF $(DEPDIR)/tablemaker-tablemaker.Tpo -c -o tablemaker-tablemaker.o `test -f 'tablemaker.c' || echo '$(srcdir)/'`tablemaker.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tablemaker-tablemaker.Tpo $(DEPDIR)/tablemaker-tablemaker.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tablemaker.c' object='tablemaker-tablemaker.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tablemaker_CFLAGS) $(CFLAGS) -c -o tablemaker-tablemaker.o `test -f 'tablemaker.c' || echo '$(srcdir)/'`tablemaker.c
+
+tablemaker-tablemaker.obj: tablemaker.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tablemaker_CFLAGS) $(CFLAGS) -MT tablemaker-tablemaker.obj -MD -MP -MF $(DEPDIR)/tablemaker-tablemaker.Tpo -c -o tablemaker-tablemaker.obj `if test -f 'tablemaker.c'; then $(CYGPATH_W) 'tablemaker.c'; else $(CYGPATH_W) '$(srcdir)/tablemaker.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tablemaker-tablemaker.Tpo $(DEPDIR)/tablemaker-tablemaker.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tablemaker.c' object='tablemaker-tablemaker.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tablemaker_CFLAGS) $(CFLAGS) -c -o tablemaker-tablemaker.obj `if test -f 'tablemaker.c'; then $(CYGPATH_W) 'tablemaker.c'; else $(CYGPATH_W) '$(srcdir)/tablemaker.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

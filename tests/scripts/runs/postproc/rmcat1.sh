@@ -54,4 +54,4 @@ gnuplot -e "statfile='temp/plotstat.csv'" \
 ./statmaker $LOGSDIR/lr.csv lr $LOGSDIR/snd_rtp_packets.csv $LOGSDIR/ply_packets.csv
 ./statmaker $LOGSDIR/nlf.csv nlf $LOGSDIR/snd_rtp_packets.csv $LOGSDIR/ply_packets.csv
 ./statmaker $LOGSDIR/ffre.csv ffre $LOGSDIR/snd_fec_packets.csv $LOGSDIR/snd_rtp_packets.csv $LOGSDIR/rcv_packets.csv $LOGSDIR/ply_packets.csv 
-
+awk '{sum+=$1; ++n} END { print sum/(n) }' $LOGSDIR/qmd.csv > $LOGSDIR/qmd_avg.csv

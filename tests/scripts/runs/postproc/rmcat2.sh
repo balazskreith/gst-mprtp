@@ -4,6 +4,7 @@ LOGSDIR="temp"
 SCRIPTSDIR="scripts"
 TEST="rmcat2"
 
+
 SCREAM="scream"
 FRACTAL="fractal"
 
@@ -20,6 +21,13 @@ then
   DELAY=50
 else 
   DELAY=$2
+fi
+
+if [ -z "$3" ] 
+then
+  LOGSDIR="temp"
+else 
+  LOGSDIR=$3
 fi
 
 PATH_DELAY=$DELAY"000"
@@ -47,7 +55,7 @@ sleep 10
 
 paste -d, $LOGSDIR/pathbw.csv $LOGSDIR/sr_1.csv $LOGSDIR/sr_2.csv $LOGSDIR/qmd_1.csv $LOGSDIR/qmd_2.csv > $LOGSDIR/plotstat.csv
 
-gnuplot -e "statfile='temp/plotstat.csv'" \
+gnuplot -e "statfile='$LOGSDIR/plotstat.csv'" \
         -e "algorithm='$CC'" \
         -e "output_file='$PLTOFILE'" \
         -e "path_delay='$PATH_DELAY'" \
@@ -61,10 +69,11 @@ gnuplot -e "statfile='temp/plotstat.csv'" \
 ./statmaker $LOGSDIR/lr_1.csv lr $LOGSDIR/snd_rtp_packets_1.csv $LOGSDIR/ply_packets_1.csv
 ./statmaker $LOGSDIR/nlf_1.csv nlf $LOGSDIR/snd_rtp_packets_1.csv $LOGSDIR/ply_packets_1.csv
 ./statmaker $LOGSDIR/ffre_1.csv ffre $LOGSDIR/snd_fec_packets_1.csv $LOGSDIR/snd_rtp_packets_1.csv $LOGSDIR/rcv_packets_1.csv $LOGSDIR/ply_packets_1.csv 
+awk '{sum+=$1; ++n} END { print sum/(n) }' $LOGSDIR/qmd_1.csv > $LOGSDIR/qmd_avg_1.csv
 
 ./statmaker $LOGSDIR/gp_avg_2.csv gp_avg $LOGSDIR/ply_packets_2.csv
 ./statmaker $LOGSDIR/fec_avg_2.csv fec_avg $LOGSDIR/snd_fec_packets_2.csv
 ./statmaker $LOGSDIR/lr_2.csv lr $LOGSDIR/snd_rtp_packets_2.csv $LOGSDIR/ply_packets_2.csv
 ./statmaker $LOGSDIR/nlf_2.csv nlf $LOGSDIR/snd_rtp_packets_2.csv $LOGSDIR/ply_packets_2.csv
 ./statmaker $LOGSDIR/ffre_2.csv ffre $LOGSDIR/snd_fec_packets_2.csv $LOGSDIR/snd_rtp_packets_2.csv $LOGSDIR/rcv_packets_2.csv $LOGSDIR/ply_packets_2.csv 
-
+awk '{sum+=$1; ++n} END { print sum/(n) }' $LOGSDIR/qmd_2.csv > $LOGSDIR/qmd_avg_2.csv

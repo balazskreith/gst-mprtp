@@ -60,8 +60,7 @@ if(algorithm eq "fractal") {
 
 plot statfile using ($0*0.1):(($2+$3)/125) with point pointtype 7 ps 0.3 lc rgb "blue" title "Sending Rate + FEC Rate 1", \
      statfile using ($0*0.1 + 20):(($5+$6)/125) with point pointtype 7 ps 0.3 lc rgb "0x008c48" title "Sending Rate + FEC Rate 2", \
-     statfile using ($0*0.1 + 40):(($8+$9)/125) with point pointtype 7 ps 0.3 lc rgb "0xFF6347" title "Sending Rate + FEC Rate 3", \
-     statfile using ($0*0.1):1 with lines lc rgb "0xDC143C" title "Path Capacity"
+     statfile using ($0*0.1 + 40):(($8+$9)/125) with point pointtype 7 ps 0.3 lc rgb "0xFF6347" title "Sending Rate + FEC Rate 3"
 
 }
 

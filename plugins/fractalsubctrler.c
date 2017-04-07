@@ -591,30 +591,8 @@ static gboolean _distortion(FRACTaLSubController *this)
 }
 
 
-static void _undershoot(FRACTaLSubController *this, gint32 turning_point)
-{
-  gint32  bottleneck_point,lowpoint;
-  gdouble alpha;
-
-  alpha         = 0.2 * _skew_corr(this) + 0.3 * _FL_corr(this);
-  lowpoint         = MAX(turning_point * pow(1.-alpha, 2), turning_point - 2 * _max_ramp_up(this));
-  bottleneck_point = CONSTRAIN(lowpoint, turning_point, _stat(this)->est_receiver_rate);
-  bottleneck_point = MAX(bottleneck_point * .9, bottleneck_point - _max_ramp_up(this));
-  _set_bottleneck_point(this,  bottleneck_point);
-  _set_keeping_point(this, this->bottleneck_point);
-  _change_sndsubflow_target_bitrate(this, bottleneck_point * .8);
-  _change_cwnd(this, this->awnd * (1.-alpha));
-
-  this->reducing_approved   = FALSE;
-  this->reducing_sr_reached = 0;
-  this->turning_point       = turning_point;
-  this->jumped              = FALSE;
-
-}
-
 static void _reduce_target(FRACTaLSubController *this, gint32 turning_point)
 {
-  DISABLE_LINE _undershoot(this, turning_point);
   if(!_stat(this)->newly_received_bytes){
     gdouble alpha = .5;
     _change_cwnd(this, MIN(this->cwnd, _stat(this)->BiF_80th * 8) * alpha);
@@ -624,7 +602,7 @@ static void _reduce_target(FRACTaLSubController *this, gint32 turning_point)
   }
 
   if(_stat(this)->est_receiver_rate < turning_point){
-    gdouble betha = 1. - 0.2 * _skew_corr(this) - 0.3 * _FL_corr(this);
+    gdouble betha = 1. - 0.3 * _skew_corr(this) - 0.3 * _FL_corr(this);
     _set_bottleneck_point(this, _stat(this)->est_receiver_rate * betha);
     _set_keeping_point(this, this->bottleneck_point);
     _change_cwnd(this, CONSTRAIN(_stat(this)->BiF_80th * 8 * .2, this->cwnd, _stat(this)->acked_bytes_in_srtt * 8) * betha);
@@ -651,7 +629,7 @@ _reduce_stage(
  GstClockTime boundary;
 
   boundary = CONSTRAIN(100 * GST_MSECOND, GST_SECOND, _stat(this)->srtt);
-  if(_now(this) - 2 * boundary < this->last_distorted){
+  if(_now(this) - boundary < this->last_distorted){
     goto done;
   }else if(0 < _stat(this)->newly_lost_packets){
     _reduce_target(this, this->target_bitrate);

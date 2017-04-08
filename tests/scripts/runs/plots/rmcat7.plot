@@ -77,7 +77,7 @@ plot statfile using ($0*0.1):($2/125) with point pointtype 7 ps 0.3 lc rgb "blue
 set yrange [0:0.5]
 set ytics 0.25
 set xrange [0:duration]
-set xtics 10 offset 0,-0.5
+set xtics 25 offset 0,-0.5
 set format x "%3.0f"
 set xtics font ", 26"
 

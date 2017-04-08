@@ -79,7 +79,7 @@ echo -n "./snd_pipeline "                                  > $SCRIPTFILE3
 echo -n "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1 " >> $SCRIPTFILE3
 #echo -n "--sourcesink=FILE:produced.yuv "                 >> $SCRIPTFILE3
 
-echo -n "--extradelay=100 "                                 >> $SCRIPTFILE3
+echo -n "--extradelay=150 "                                 >> $SCRIPTFILE3
 
 echo -n "--codec=VP8 "                                    >> $SCRIPTFILE3
 echo -n "--stat=triggered_stat:temp/snd_packets_3.csv:0 " >> $SCRIPTFILE3

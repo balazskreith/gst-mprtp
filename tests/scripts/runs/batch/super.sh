@@ -1,6 +1,6 @@
 #!/bin/bash
 #TEST="test7"
-TEST="rmcat4"
+TEST="rmcat7"
 ./scripts/runs/batch/$TEST.sh FRACTaL 50 15
 ./scripts/runs/batch/$TEST.sh FRACTaL 100 15
 ./scripts/runs/batch/$TEST.sh FRACTaL 300 15

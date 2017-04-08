@@ -1,0 +1,4 @@
+2 300
+sudo ip netns exec ns_mid tc qdisc change dev veth2 parent 1: handle 2: tbf rate 3500kbit burst 350kbit latency 300ms minburst 1540
+sudo ip netns exec ns_mid tc qdisc change dev veth1 parent 1: handle 2: tbf rate 1000kbit burst 100kbit latency 300ms minburst 1540
+

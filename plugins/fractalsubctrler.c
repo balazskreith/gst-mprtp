@@ -414,7 +414,7 @@ static void _stat_print(FRACTaLSubController *this)
           "BiF:%-3d %-3d->%-3.0f|%-3d|"
           "FEC:%-4d|SR:%-4d|RR:%-4d|%-4d|Tr:%-4d|Btl:%-4d|KP:%-4d|IP:%-4d|"
           "%d-%d-%d-%d|"
-          "Sk:%-3lu+%-3lu(%-3lu)->%1.2f,%1.2f|"
+          "Sk:%-3lu+%-3lu(%-3lu)->%-3lu,%1.2f|"
           "Q: %1.3f|"
           "FL:%-1.2f+%1.2f (%-1.2f)|S:%1.2f|%d|%1.2f\n",
       this->subflow->id,
@@ -442,10 +442,10 @@ static void _stat_print(FRACTaLSubController *this)
       this->monitoring_approved,
       this->increasing_approved,
 
-      GST_TIME_AS_MSECONDS(_stat(this)->skew_50th),
+      GST_TIME_AS_MSECONDS(_stat(this)->queue_delay_50th),
       GST_TIME_AS_MSECONDS(_stat(this)->skew_std),
+      GST_TIME_AS_MSECONDS(_stat(this)->queue_delay),
       GST_TIME_AS_MSECONDS(_stat(this)->last_skew),
-      _stat(this)->qdelay_log_corr,
       _skew_corr(this),
 
       _stat(this)->rtpq_delay,
@@ -546,6 +546,7 @@ void fractalsubctrler_report_update(
   fractalfbprocessor_report_update(this->fbprocessor, summary);
 
   DISABLE_LINE _stat_print(this);
+//  _stat_print(this);
 
   this->approve_measurement  = FALSE;
   if(10 < _stat(this)->measurements_num){
@@ -555,7 +556,7 @@ void fractalsubctrler_report_update(
     this->last_distorted = _now(this);
   }
   this->approve_measurement |= _subflow(this)->state != SNDSUBFLOW_STATE_OVERUSED;
-  this->approve_measurement |= _now(this) < this->obligated_approvement + 10 * GST_SECOND;
+  this->approve_measurement |= _now(this) < this->obligated_approvement + 2 * GST_SECOND;
 
   if(this->approve_measurement){
     fractalfbprocessor_approve_measurement(this->fbprocessor);
@@ -570,7 +571,7 @@ gdouble _skew_corr(FRACTaLSubController *this){
   if(!_stat(this)->last_skew){
     return 0.;
   }
-  return (gdouble) (_stat(this)->last_skew) / (gdouble)(_stat(this)->last_skew + this->skew_th);
+  return (gdouble) (_stat(this)->last_skew) / (gdouble)(_stat(this)->last_skew + this->queue_delay_th);
 }
 
 gdouble _FL_corr(FRACTaLSubController *this){
@@ -586,8 +587,8 @@ static gboolean _distortion(FRACTaLSubController *this)
   if(1 < this->distortion_num){
     return  this->FL_th < _stat(this)->FL_in_1s;
   }
-  this->skew_th = _stat(this)->skew_50th + CONSTRAIN(30 * GST_MSECOND, 80 * GST_MSECOND, _stat(this)->skew_std * 2);
-  return this->skew_th < _stat(this)->last_skew || this->FL_th < _stat(this)->FL_in_1s;
+  this->queue_delay_th = _stat(this)->queue_delay_50th + CONSTRAIN(5 * GST_MSECOND, 10 * GST_MSECOND, _stat(this)->skew_std * 2);
+  return this->queue_delay_th < _stat(this)->queue_delay || this->FL_th < _stat(this)->FL_in_1s;
 }
 
 
@@ -608,9 +609,13 @@ static void _reduce_target(FRACTaLSubController *this, gint32 turning_point)
     _change_cwnd(this, CONSTRAIN(_stat(this)->BiF_80th * 8 * .2, this->cwnd, _stat(this)->acked_bytes_in_srtt * 8) * betha);
     goto done;
   }
-  _set_bottleneck_point(this, turning_point);
-  _set_keeping_point(this, this->bottleneck_point);
-  _change_cwnd(this, MIN(this->cwnd, _stat(this)->BiF_80th * 8) * .8);
+  {
+    gdouble betha = 1. - 0.1 * _skew_corr(this);
+    _set_bottleneck_point(this, MAX(turning_point * betha, turning_point - _max_ramp_up(this)));
+    _set_keeping_point(this, this->bottleneck_point);
+    _change_cwnd(this, MIN(this->cwnd, _stat(this)->BiF_80th * 8) * .8);
+  }
+
 done:
   {
     gint32 new_target = MAX(this->bottleneck_point - _max_ramp_up(this), this->bottleneck_point * .9);

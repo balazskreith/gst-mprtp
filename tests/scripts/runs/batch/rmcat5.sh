@@ -76,7 +76,7 @@ while [  $COUNTER -lt $END ]; do
 	sudo ip netns exec ns_rcv $RCVFILE &
 	sleep 2
 	sudo ip netns exec ns_snd $SNDFILE &
-	sleep 0.2
+	sleep 2
 	./scripts/runs/$TEST.sh $OWD $ALGORITHM &
 	sleep 50
 
@@ -94,6 +94,7 @@ while [  $COUNTER -lt $END ]; do
 	if [ $INCREASE -eq 0 ]
 	then
 	  cleanup
+	  sleep 350
 	  continue
 	fi
 

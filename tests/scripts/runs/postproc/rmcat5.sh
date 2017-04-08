@@ -67,16 +67,18 @@ gnuplot -e "statfile='temp/plotstat.csv'" \
 ./statmaker $LOGSDIR/lr_1.csv lr $LOGSDIR/snd_rtp_packets_1.csv $LOGSDIR/ply_packets_1.csv
 ./statmaker $LOGSDIR/nlf_1.csv nlf $LOGSDIR/snd_rtp_packets_1.csv $LOGSDIR/ply_packets_1.csv
 ./statmaker $LOGSDIR/ffre_1.csv ffre $LOGSDIR/snd_fec_packets_1.csv $LOGSDIR/snd_rtp_packets_1.csv $LOGSDIR/rcv_packets_1.csv $LOGSDIR/ply_packets_1.csv 
+awk '{sum+=$1; ++n} END { print sum/(n) }' $LOGSDIR/qmd_1.csv > $LOGSDIR/qmd_avg_1.csv
 
 ./statmaker $LOGSDIR/gp_avg_2.csv gp_avg $LOGSDIR/ply_packets_2.csv
 ./statmaker $LOGSDIR/fec_avg_2.csv fec_avg $LOGSDIR/snd_fec_packets_2.csv
 ./statmaker $LOGSDIR/lr_2.csv lr $LOGSDIR/snd_rtp_packets_2.csv $LOGSDIR/ply_packets_2.csv
 ./statmaker $LOGSDIR/nlf_2.csv nlf $LOGSDIR/snd_rtp_packets_2.csv $LOGSDIR/ply_packets_2.csv
 ./statmaker $LOGSDIR/ffre_2.csv ffre $LOGSDIR/snd_fec_packets_2.csv $LOGSDIR/snd_rtp_packets_2.csv $LOGSDIR/rcv_packets_2.csv $LOGSDIR/ply_packets_2.csv 
+awk '{sum+=$1; ++n} END { print sum/(n) }' $LOGSDIR/qmd_2.csv > $LOGSDIR/qmd_avg_2.csv
 
 ./statmaker $LOGSDIR/gp_avg_3.csv gp_avg $LOGSDIR/ply_packets_3.csv
 ./statmaker $LOGSDIR/fec_avg_3.csv fec_avg $LOGSDIR/snd_fec_packets_3.csv
 ./statmaker $LOGSDIR/lr_3.csv lr $LOGSDIR/snd_rtp_packets_3.csv $LOGSDIR/ply_packets_3.csv
 ./statmaker $LOGSDIR/nlf_3.csv nlf $LOGSDIR/snd_rtp_packets_3.csv $LOGSDIR/ply_packets_3.csv
 ./statmaker $LOGSDIR/ffre_3.csv ffre $LOGSDIR/snd_fec_packets_3.csv $LOGSDIR/snd_rtp_packets_3.csv $LOGSDIR/rcv_packets_3.csv $LOGSDIR/ply_packets_3.csv 
-
+awk '{sum+=$1; ++n} END { print sum/(n) }' $LOGSDIR/qmd_3.csv > $LOGSDIR/qmd_avg_3.csv

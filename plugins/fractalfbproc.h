@@ -29,7 +29,8 @@ typedef struct _FRACTaLFBProcessorClass FRACTaLFBProcessorClass;
 
 typedef struct _FRACTaLStat
 {
-  GstClockTime             skew_50th;
+  GstClockTime             queue_delay_50th;
+  GstClockTime             queue_delay;
   GstClockTime             last_skew;
 
   gint32                   measurements_num;
@@ -76,7 +77,7 @@ typedef struct{
 
 typedef struct{
   gint32       ref;
-  GstClockTime owd;
+  GstClockTime queue_delay;
   gint32       bytes_in_flight;
   gdouble      fraction_lost;
   gint8        stability;
@@ -134,6 +135,10 @@ struct _FRACTaLFBProcessor
   gint32                   newly_acked_packets;
   gint32                   newly_received_packets;
   guint16                  HSN;
+
+  gint64                  last_max_skew;
+  gint64                  last_min_skew;
+  gint64                  queue_delay;
 
 };
 

@@ -55,7 +55,7 @@ cleanup()
   sudo pkill bwcsv
   sudo pkill sleep
   sudo pkill iperf
-  sudo pkill rmcat7.sh
+  #sudo pkill rmcat7.sh
 }
  
 control_c()
@@ -93,6 +93,7 @@ while [  $COUNTER -lt $END ]; do
 	if [ $INCREASE -eq 0 ]
 	then
 	  cleanup
+	  sleep 350
 	  continue
 	fi
 

@@ -44,7 +44,7 @@ if (algorithm eq "scream"){
 set yrange [0:3500]
 set ytics 1000
 set xrange [0:duration]
-set xtics 10 offset 0,-1
+set xtics 50 offset 0,-1
 set format x " "
 unset xlabel
 
@@ -58,18 +58,18 @@ set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
 
 if(algorithm eq "fractal") {
 
-plot statfile using ($0*0.1):(($2+$3)/125) with point pointtype 7 ps 0.3 lc rgb "blue" title "Sending Rate + FEC Rate 1", \
-     statfile using ($0*0.1 + 20):(($5+$6)/125) with point pointtype 7 ps 0.3 lc rgb "0x008c48" title "Sending Rate + FEC Rate 2", \
-     statfile using ($0*0.1 + 40):(($8+$9)/125) with point pointtype 7 ps 0.3 lc rgb "0xFF6347" title "Sending Rate + FEC Rate 3", \
-     statfile using ($0*0.1):1 with lines lc rgb "0xDC143C" title "Path Capacity"
+plot statfile using ($0*0.1):(($2+$3)/125) with point pointtype 7 ps 0.3 lc rgb "blue" title "Sending Rate (RTT:150)", \
+     statfile using ($0*0.1 + 10):(($5+$6)/125) with point pointtype 7 ps 0.3 lc rgb "0x008c48" title "Sending Rate (RTT:200)", \
+     statfile using ($0*0.1 + 20):(($8+$9)/125) with point pointtype 7 ps 0.3 lc rgb "0xFF6347" title "Sending Rate (RTT:300)"
+     
 
 }
 
 if(algorithm eq "scream") {
 
-plot statfile using ($0*0.1):($2/125) with point pointtype 7 ps 0.3 lc rgb "blue" title "Sending Rate 1", \
-	 statfile using ($0*0.1 + 20):($5/125) with point pointtype 7 ps 0.3 lc rgb "0x008c48" title "Sending Rate 2", \
-	 statfile using ($0*0.1 + 40):($5/125) with point pointtype 7 ps 0.3 lc rgb "0xFF6347" title "Sending Rate"
+plot statfile using ($0*0.1):($2/125) with point pointtype 7 ps 0.3 lc rgb "blue" title "Sending Rate 1 (RTT:150)", \
+	 statfile using ($0*0.1 + 10):($5/125) with point pointtype 7 ps 0.3 lc rgb "0x008c48" title "Sending Rate (RTT:200)", \
+	 statfile using ($0*0.1 + 20):($5/125) with point pointtype 7 ps 0.3 lc rgb "0xFF6347" title "Sending Rate (RTT:300)"
 
 }
      
@@ -77,7 +77,7 @@ plot statfile using ($0*0.1):($2/125) with point pointtype 7 ps 0.3 lc rgb "blue
 set yrange [0:0.5]
 set ytics 0.25
 set xrange [0:duration]
-set xtics 10 offset 0,-0.5
+set xtics 25 offset 0,-0.5
 set format x "%3.0f"
 set xtics font ", 26"
 
@@ -91,8 +91,8 @@ set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
   
 plot statfile using ($0*0.1):(($4 - path_delay)/1000000) with point pointtype 7 ps 0.3 lc rgb "blue" title "Queue Delay 1", \
-	 statfile using ($0*0.1 + 20):(($7 - path_delay)/1000000) with point pointtype 7 ps 0.3 lc rgb "0x008c48" title "Queue Delay 2", \
-	 statfile using ($0*0.1 + 40):(($10 - path_delay)/1000000) with point pointtype 7 ps 0.3 lc rgb "0xFF6347" title "Queue Delay 3"
+	 statfile using ($0*0.1 + 10):(($7 - path_delay)/1000000) with point pointtype 7 ps 0.3 lc rgb "0x008c48" title "Queue Delay 2", \
+	 statfile using ($0*0.1 + 20):(($10 - path_delay)/1000000) with point pointtype 7 ps 0.3 lc rgb "0xFF6347" title "Queue Delay 3"
   
   
 

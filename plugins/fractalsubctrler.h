@@ -74,7 +74,7 @@ struct _FRACTaLSubController
   GstClockTime              increasing_sr_reached;
   gint32                    increasement;
 
-  GstClockTime              skew_th;
+  GstClockTime              queue_delay_th;
   gdouble                   FL_th;
   gboolean                  reducing_approved;
   GstClockTime              reducing_sr_reached;

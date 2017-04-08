@@ -161,9 +161,9 @@ static void _on_max_skew_selected(FRACTaLFBProducer* this, swminmaxstat_t* stat)
   }
 
   if(min->dsnd < min->drcv){
-    this->min_skew = min->drcv - min->dsnd;
-  }else{
     this->min_skew = 0;
+  }else{
+    this->min_skew = min->dsnd - min->drcv;
   }
 }
 

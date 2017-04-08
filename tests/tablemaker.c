@@ -145,7 +145,7 @@ static void _fprintf_single_flow(FILE *fp, Flow* flow)
         flow->fractal50.lr.avg, flow->fractal50.lr.std, flow->scream50.lr.avg, flow->scream50.lr.std);
   fprintfln(fp, " & \\textbf{NoLF} & %4.2f $\\pm$ %4.2f & %4.2f $\\pm$ %4.2f \\\\",
         flow->fractal50.nlf.avg, flow->fractal50.nlf.std, flow->scream50.nlf.avg, flow->scream50.nlf.std);
-  fprintfln(fp, " & \\textbf{FEC Rate {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
+  fprintfln(fp, " & \\textbf{FEC {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
       flow->fractal50.fec.avg, flow->fractal50.fec.std);
   fprintfln(fp, " & \\textbf{FFRE} & %4.2f $\\pm$ %4.2f & - \\\\" ,
       flow->fractal50.ffre.avg, flow->fractal50.ffre.std);
@@ -156,7 +156,7 @@ static void _fprintf_single_flow(FILE *fp, Flow* flow)
       flow->fractal100.gp.avg, flow->fractal100.gp.std, flow->scream100.gp.avg, flow->scream100.gp.std);
   fprintfln(fp, " & \\textbf{LR {[}\\%{]}} & %4.2f $\\pm$ %4.2f & %4.2f $\\pm$ %4.2f \\\\",
       flow->fractal100.lr.avg, flow->fractal100.lr.std, flow->scream100.lr.avg, flow->scream100.lr.std);
-  fprintfln(fp, " & \\textbf{FEC Rate {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
+  fprintfln(fp, " & \\textbf{FEC {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
       flow->fractal100.fec.avg, flow->fractal100.fec.std);
   fprintfln(fp, " & \\textbf{FFRE} & %4.2f $\\pm$ %4.2f & - \\\\" ,
       flow->fractal100.ffre.avg, flow->fractal100.ffre.std);
@@ -169,7 +169,7 @@ static void _fprintf_single_flow(FILE *fp, Flow* flow)
       flow->fractal300.gp.avg, flow->fractal300.gp.std, flow->scream300.gp.avg, flow->scream300.gp.std);
   fprintfln(fp, " & \\textbf{LR {[}\\%{]}} & %4.2f $\\pm$ %4.2f & %4.2f $\\pm$ %4.2f \\\\",
       flow->fractal300.lr.avg, flow->fractal300.lr.std, flow->scream300.lr.avg, flow->scream300.lr.std);
-  fprintfln(fp, " & \\textbf{FEC Rate {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
+  fprintfln(fp, " & \\textbf{FEC {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
       flow->fractal300.fec.avg, flow->fractal300.fec.std);
   fprintfln(fp, " & \\textbf{FFRE} & %4.2f $\\pm$ %4.2f & - \\\\" ,
       flow->fractal300.ffre.avg, flow->fractal300.ffre.std);
@@ -181,7 +181,7 @@ static void _fprintf_single_flow(FILE *fp, Flow* flow)
   fprintln(fp, "\\caption{" );
   fprintln(fp, "TODO: CAPTION" );
   fprintln(fp, "}" );
-  fprintln(fp, "\\label{table:rmcat1}" );
+  fprintln(fp, "\\label{table:rmcatX}" );
   fprintln(fp, "\\end{table}" );
 }
 
@@ -198,7 +198,7 @@ static void _fprintf_two_flows(FILE* fp, Flow* flow1, Flow* flow2)
         flow1->fractal50.lr.avg, flow1->fractal50.lr.std, flow1->scream50.lr.avg, flow1->scream50.lr.std);
   fprintfln(fp, " &  & \\textbf{NoLF} & %4.2f $\\pm$ %4.2f & %4.2f $\\pm$ %4.2f \\\\",
         flow1->fractal50.nlf.avg, flow1->fractal50.nlf.std, flow1->scream50.nlf.avg, flow1->scream50.nlf.std);
-  fprintfln(fp, " &  & \\textbf{FEC Rate {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
+  fprintfln(fp, " &  & \\textbf{FEC {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
       flow1->fractal50.fec.avg, flow1->fractal50.fec.std);
   fprintfln(fp, " &  & \\textbf{FFRE} & %4.2f $\\pm$ %4.2f & - \\\\" ,
       flow1->fractal50.ffre.avg, flow1->fractal50.ffre.std);
@@ -211,7 +211,7 @@ static void _fprintf_two_flows(FILE* fp, Flow* flow1, Flow* flow2)
         flow2->fractal50.lr.avg, flow2->fractal50.lr.std, flow2->scream50.lr.avg, flow2->scream50.lr.std);
   fprintfln(fp, " &  & \\textbf{NoLF} & %4.2f $\\pm$ %4.2f & %4.2f $\\pm$ %4.2f \\\\",
         flow2->fractal50.nlf.avg, flow2->fractal50.nlf.std, flow2->scream50.nlf.avg, flow2->scream50.nlf.std);
-  fprintfln(fp, " &  & \\textbf{FEC Rate {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
+  fprintfln(fp, " &  & \\textbf{FEC {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
       flow2->fractal50.fec.avg, flow2->fractal50.fec.std);
   fprintfln(fp, " &  & \\textbf{FFRE} & %4.2f $\\pm$ %4.2f & - \\\\" ,
       flow2->fractal50.ffre.avg, flow2->fractal50.ffre.std);
@@ -225,7 +225,7 @@ static void _fprintf_two_flows(FILE* fp, Flow* flow1, Flow* flow2)
           flow1->fractal100.lr.avg, flow1->fractal100.lr.std, flow1->scream100.lr.avg, flow1->scream100.lr.std);
     fprintfln(fp, " &  & \\textbf{NoLF} & %4.2f $\\pm$ %4.2f & %4.2f $\\pm$ %4.2f \\\\",
           flow1->fractal100.nlf.avg, flow1->fractal100.nlf.std, flow1->scream100.nlf.avg, flow1->scream100.nlf.std);
-    fprintfln(fp, " &  & \\textbf{FEC Rate {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
+    fprintfln(fp, " &  & \\textbf{FEC {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
         flow1->fractal100.fec.avg, flow1->fractal100.fec.std);
     fprintfln(fp, " &  & \\textbf{FFRE} & %4.2f $\\pm$ %4.2f & - \\\\" ,
         flow1->fractal100.ffre.avg, flow1->fractal100.ffre.std);
@@ -238,7 +238,7 @@ static void _fprintf_two_flows(FILE* fp, Flow* flow1, Flow* flow2)
           flow2->fractal100.lr.avg, flow2->fractal100.lr.std, flow2->scream100.lr.avg, flow2->scream100.lr.std);
     fprintfln(fp, " &  & \\textbf{NoLF} & %4.2f $\\pm$ %4.2f & %4.2f $\\pm$ %4.2f \\\\",
           flow2->fractal100.nlf.avg, flow2->fractal100.nlf.std, flow2->scream100.nlf.avg, flow2->scream100.nlf.std);
-    fprintfln(fp, " &  & \\textbf{FEC Rate {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
+    fprintfln(fp, " &  & \\textbf{FEC {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
         flow2->fractal100.fec.avg, flow2->fractal100.fec.std);
     fprintfln(fp, " &  & \\textbf{FFRE} & %4.2f $\\pm$ %4.2f & - \\\\" ,
         flow2->fractal100.ffre.avg, flow2->fractal100.ffre.std);
@@ -252,7 +252,7 @@ static void _fprintf_two_flows(FILE* fp, Flow* flow1, Flow* flow2)
         flow1->fractal300.lr.avg, flow1->fractal300.lr.std, flow1->scream300.lr.avg, flow1->scream300.lr.std);
     fprintfln(fp, " &  & \\textbf{NoLF} & %4.2f $\\pm$ %4.2f & %4.2f $\\pm$ %4.2f \\\\",
         flow1->fractal300.nlf.avg, flow1->fractal300.nlf.std, flow1->scream300.nlf.avg, flow1->scream300.nlf.std);
-    fprintfln(fp, " &  & \\textbf{FEC Rate {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
+    fprintfln(fp, " &  & \\textbf{FEC {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
       flow1->fractal300.fec.avg, flow1->fractal300.fec.std);
     fprintfln(fp, " &  & \\textbf{FFRE} & %4.2f $\\pm$ %4.2f & - \\\\" ,
       flow1->fractal300.ffre.avg, flow1->fractal300.ffre.std);
@@ -265,7 +265,7 @@ static void _fprintf_two_flows(FILE* fp, Flow* flow1, Flow* flow2)
         flow2->fractal300.lr.avg, flow2->fractal300.lr.std, flow2->scream300.lr.avg, flow2->scream300.lr.std);
     fprintfln(fp, " &  & \\textbf{NoLF} & %4.2f $\\pm$ %4.2f & %4.2f $\\pm$ %4.2f \\\\",
         flow2->fractal300.nlf.avg, flow2->fractal300.nlf.std, flow2->scream300.nlf.avg, flow2->scream300.nlf.std);
-    fprintfln(fp, " &  & \\textbf{FEC Rate {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
+    fprintfln(fp, " &  & \\textbf{FEC {[}kbs{]}} & %4.2f $\\pm$ %4.2f  & - \\\\",
       flow2->fractal300.fec.avg, flow2->fractal300.fec.std);
     fprintfln(fp, " &  & \\textbf{FFRE} & %4.2f $\\pm$ %4.2f & - \\\\" ,
       flow2->fractal300.ffre.avg, flow2->fractal300.ffre.std);
@@ -276,7 +276,7 @@ static void _fprintf_two_flows(FILE* fp, Flow* flow1, Flow* flow2)
   fprintln(fp, "\\caption{");
   fprintln(fp, "TODO: CAPTION!!!");
   fprintln(fp, "}");
-  fprintln(fp, "\\label{table:rmcat3}");
+  fprintln(fp, "\\label{table:rmcatX}");
   fprintln(fp, "\\end{table}");
 
 

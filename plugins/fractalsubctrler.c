@@ -568,10 +568,11 @@ done:
 }
 
 gdouble _skew_corr(FRACTaLSubController *this){
-  if(!_stat(this)->last_skew){
-    return 0.;
-  }
-  return (gdouble) (_stat(this)->last_skew) / (gdouble)(_stat(this)->last_skew + this->queue_delay_th);
+  if(!_stat(this)->queue_delay){
+      return 0.;
+    }
+    return (gdouble) (_stat(this)->queue_delay) / (gdouble)(_stat(this)->last_skew + this->queue_delay_th);
+
 }
 
 gdouble _FL_corr(FRACTaLSubController *this){
@@ -583,11 +584,15 @@ gdouble _FL_corr(FRACTaLSubController *this){
 
 static gboolean _distortion(FRACTaLSubController *this)
 {
+  gdouble alpha = _scale_t(this);
+  gdouble scaling;
   this->FL_th = MIN(_max_FL_th(this), _stat(this)->FL_avg + _stat(this)->FL_std * 2 * this->distortion_num);
   if(1 < this->distortion_num){
     return  this->FL_th < _stat(this)->FL_in_1s;
   }
-  this->queue_delay_th = _stat(this)->queue_delay_50th + CONSTRAIN(5 * GST_MSECOND, 10 * GST_MSECOND, _stat(this)->skew_std * 2);
+  scaling = 2 * (1.-alpha) + 4 * alpha;
+//  g_print("%f\n", scaling);
+  this->queue_delay_th = _stat(this)->queue_delay_50th + CONSTRAIN(5 * scaling * GST_MSECOND, 80 * GST_MSECOND, _stat(this)->skew_std * scaling);
   return this->queue_delay_th < _stat(this)->queue_delay || this->FL_th < _stat(this)->FL_in_1s;
 }
 
@@ -610,8 +615,8 @@ static void _reduce_target(FRACTaLSubController *this, gint32 turning_point)
     goto done;
   }
   {
-    gdouble betha = 1. - 0.1 * _skew_corr(this);
-    _set_bottleneck_point(this, MAX(turning_point * betha, turning_point - _max_ramp_up(this)));
+    gdouble betha = .2 * _skew_corr(this);
+    _set_bottleneck_point(this, turning_point - CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), turning_point * betha));
     _set_keeping_point(this, this->bottleneck_point);
     _change_cwnd(this, MIN(this->cwnd, _stat(this)->BiF_80th * 8) * .8);
   }

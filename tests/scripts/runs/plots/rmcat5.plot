@@ -44,7 +44,7 @@ if (algorithm eq "scream"){
 set yrange [0:3500]
 set ytics 1000
 set xrange [0:duration]
-set xtics 50 offset 0,-1
+set xtics 25 offset 0,-1
 set format x " "
 unset xlabel
 

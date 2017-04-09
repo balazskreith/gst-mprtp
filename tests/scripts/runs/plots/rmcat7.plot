@@ -44,7 +44,7 @@ if (algorithm eq "scream"){
 set yrange [0:2000]
 set ytics 1000
 set xrange [0:duration]
-set xtics 10 offset 0,-1
+set xtics 25 offset 0,-1
 set format x " "
 unset xlabel
 
@@ -58,17 +58,15 @@ set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
 
 if(algorithm eq "fractal") {
 
-plot statfile using ($0*0.1):(($2+$3)/125) with point pointtype 7 ps 0.3 lc rgb "blue" title "Sending Rate + FEC Rate", \
-	 statfile using ($0*0.1):($5/125) with point pointtype 7 ps 0.3 lc rgb "0xFF6347" title "TCP Rate", \
-     statfile using ($0*0.1):1 with lines lc rgb "0xDC143C" title "Path Capacity"
+plot statfile using ($0*0.1+5):(($2+$3)/125) with point pointtype 7 ps 0.3 lc rgb "blue" title "Sending Rate + FEC Rate", \
+	 statfile using ($0*0.1):($5/125) with point pointtype 7 ps 0.3 lc rgb "0xFF6347" title "TCP Rate"
 
 }
 
 if(algorithm eq "scream") {
 
-plot statfile using ($0*0.1):($2/125) with point pointtype 7 ps 0.3 lc rgb "blue" title "Sending Rate", \
-	 statfile using ($0*0.1):($5/125) with point pointtype 7 ps 0.3 lc rgb "0xFF6347" title "TCP Rate", \
-     statfile using ($0*0.1):1 with lines lc rgb "0xDC143C" title "Path Capacity"
+plot statfile using ($0*0.1+5):($2/125) with point pointtype 7 ps 0.3 lc rgb "blue" title "Sending Rate", \
+	 statfile using ($0*0.1):($5/125) with point pointtype 7 ps 0.3 lc rgb "0xFF6347" title "TCP Rate"
 
 }
      

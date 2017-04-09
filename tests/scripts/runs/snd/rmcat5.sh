@@ -40,6 +40,7 @@ then
 	echo -n "--scheduler=MPRTPFRACTAL:MPRTP:1:1:5001 "         >> $SCRIPTFILE
 fi
 
+echo -n " > temp/sender_1.log" >> $SCRIPTFILE
 
 chmod 777 $SCRIPTFILE
 
@@ -68,6 +69,7 @@ then
 	echo -n "--scheduler=MPRTPFRACTAL:MPRTP:1:1:5003 "         >> $SCRIPTFILE2
 fi
 
+echo -n " > temp/sender_2.log" >> $SCRIPTFILE2
 
 chmod 777 $SCRIPTFILE2
 
@@ -95,6 +97,7 @@ then
 	echo -n "--scheduler=MPRTPFRACTAL:MPRTP:1:1:5005 "         >> $SCRIPTFILE3
 fi
 
+echo -n " > temp/sender_3.log" >> $SCRIPTFILE3
 
 chmod 777 $SCRIPTFILE3
 

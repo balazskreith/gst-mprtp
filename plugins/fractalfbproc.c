@@ -172,7 +172,7 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
           make_swpercentile(80, _measurement_BiF_cmp, (ListenerFunc) _on_BiF_80th_calculated, this));
 
   slidingwindow_add_plugin(this->long_sw,
-        make_swpercentile(50, _measurement_queue_delay_cmp, (ListenerFunc) _on_queue_delay_50th_calculated, this));
+        make_swpercentile(80, _measurement_queue_delay_cmp, (ListenerFunc) _on_queue_delay_50th_calculated, this));
 
   slidingwindow_add_on_change(this->srtt_sw, (ListenerFunc)_on_srtt_sw_add, (ListenerFunc)_on_srtt_sw_rem, this);
 //  if(0){

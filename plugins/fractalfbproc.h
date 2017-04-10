@@ -29,9 +29,9 @@ typedef struct _FRACTaLFBProcessorClass FRACTaLFBProcessorClass;
 
 typedef struct _FRACTaLStat
 {
-  GstClockTime             queue_delay_50th;
+  GstClockTime             jitter_50th;
   GstClockTime             queue_delay;
-  GstClockTime             last_skew;
+  GstClockTime             last_flaw;
 
   gint32                   measurements_num;
   gint32                   BiF_80th;
@@ -46,8 +46,8 @@ typedef struct _FRACTaLStat
   gint32                   receiver_bitrate;
   gint32                   fec_bitrate;
 
-  gdouble                  qdelay_log_corr;
-  GstClockTime             skew_std;
+  GstClockTime             flaw_avg;
+  GstClockTime             flaw_std;
   gdouble                  srtt;
 
   gint32                   newly_received_bytes;
@@ -73,15 +73,18 @@ typedef struct{
   gdouble mean;
   gdouble var;
   gdouble emp;
+
+  gdouble sum;
 }FRACTaLStdHelper;
+
 
 typedef struct{
   gint32       ref;
   GstClockTime queue_delay;
+  GstClockTime flaw;
   gint32       bytes_in_flight;
   gdouble      fraction_lost;
   gint8        stability;
-  GstClockTime qdelay;
   gdouble      qdelay_std_t;
   gint32       newly_received_bytes;
 }FRACTaLMeasurement;
@@ -112,21 +115,14 @@ struct _FRACTaLFBProcessor
   GstClockTime             RTT;
   GstClockTime             srtt_updated;
 
-  GstClockTime             owd_min;
-  GstClockTime             owd_max;
+  GstClockTime             jitter_min;
+  GstClockTime             jitter_max;
 
   gdouble                  FL_min;
   gdouble                  FL_max;
   gint32                   acked_bytes_in_srtt;
 
-
-  struct{
-    gdouble      avg,std;
-    gint32       counter;
-    GstClockTime sum;
-  }qdelay_std_helper;
-
-  FRACTaLStdHelper         owd_std_helper;
+  FRACTaLStdHelper         flaw_std_helper;
   FRACTaLStdHelper         BiF_std_helper;
   FRACTaLStdHelper         FL_std_helper;
   GstClockTime             last_report_updated;
@@ -136,8 +132,8 @@ struct _FRACTaLFBProcessor
   gint32                   newly_received_packets;
   guint16                  HSN;
 
-  gint64                  last_max_skew;
-  gint64                  last_min_skew;
+  gint64                  last_raise;
+  gint64                  last_fall;
   gint64                  queue_delay;
 
 };

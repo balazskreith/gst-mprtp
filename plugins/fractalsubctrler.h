@@ -53,8 +53,8 @@ struct _FRACTaLSubController
   GstClockTime              last_executed;
 
   gint32                    bottleneck_point;
-  gint32                    stalled_bytes;
-  gint32                    keeping_point;
+//  gint32                    stalled_bytes;
+//  gint32                    keeping_point;
   gint32                    inflection_point;
 
   GstClockTime              approvement_interval;

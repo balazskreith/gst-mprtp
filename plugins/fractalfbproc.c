@@ -240,6 +240,10 @@ done:
   return;
 }
 
+void fractalfbprocessor_reset_short_sw(FRACTaLFBProcessor *this)
+{
+  slidingwindow_clear(this->short_sw);
+}
 
 void fractalfbprocessor_approve_measurement(FRACTaLFBProcessor *this)
 {
@@ -249,7 +253,7 @@ void fractalfbprocessor_approve_measurement(FRACTaLFBProcessor *this)
   measurement->ref               = 1;
   measurement->bytes_in_flight   = this->last_bytes_in_flight;
   measurement->queue_delay       = _stat(this)->queue_delay;
-  measurement->flaw              = _stat(this)->last_flaw;
+  measurement->flaw              = _stat(this)->last_drift;
   measurement->fraction_lost     = _stat(this)->FL_in_1s;
   measurement->newly_received_bytes = _stat(this)->newly_received_bytes;
 //  if(approvement->owd){
@@ -264,10 +268,10 @@ void fractalfbprocessor_approve_measurement(FRACTaLFBProcessor *this)
 }
 
 static gdouble _get_ewma_factor(FRACTaLFBProcessor *this){
-  if(!_stat(this)->last_flaw){
+  if(!_stat(this)->last_drift){
     return 0.;
   }
-  return (gdouble) _stat(this)->last_flaw / (gdouble)(_stat(this)->last_flaw + _stat(this)->flaw_std);
+  return (gdouble) _stat(this)->last_drift / (gdouble)(_stat(this)->last_drift + _stat(this)->drift_std);
 }
 
 static gdouble _get_BiF_factor(FRACTaLFBProcessor *this){
@@ -282,11 +286,14 @@ void _process_owd(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
   if(!xrsummary->OWD.median_delay){
     goto done;
   }
-  this->queue_delay += (xrsummary->OWD.max_delay - this->last_raise) - (xrsummary->OWD.min_delay - this->last_fall);
+  //this->queue_delay += (xrsummary->OWD.max_delay - this->last_raise) - (xrsummary->OWD.min_delay - this->last_fall);
+//  this->queue_delay += (gint64)(xrsummary->OWD.max_delay + xrsummary->OWD.min_delay) - (gint64)_stat(this)->last_flaw;
   this->last_raise = xrsummary->OWD.max_delay;
   this->last_fall = xrsummary->OWD.min_delay;
 
-  _stat(this)->last_flaw = this->last_raise + this->last_fall;//xrsummary->OWD.median_delay;
+  this->queue_delay += this->last_raise + this->last_fall - _stat(this)->last_drift;
+
+  _stat(this)->last_drift = this->last_raise + this->last_fall;//xrsummary->OWD.median_delay;
   _stat(this)->queue_delay = MAX(this->queue_delay, 0);
 
 //  g_print("Min: %lu Max: %lu QD: %ld J:%lu\n",
@@ -516,7 +523,13 @@ void _on_long_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 {
   --this->flaw_std_helper.counter;
   this->flaw_std_helper.sum -= measurement->flaw;
-  _stat(this)->flaw_avg = this->flaw_std_helper.sum / (gdouble) this->flaw_std_helper.counter;
+  _stat(this)->drift_avg = this->flaw_std_helper.sum / (gdouble) this->flaw_std_helper.counter;
+
+//  --this->raise_stat.count;
+//  this->raise_stat.sum-=measurement->raise;
+//
+//  --this->fall_stat.count;
+//  this->fall_stat.sum-=measurement->fall;
 }
 
 void _on_short_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
@@ -532,8 +545,14 @@ void _on_long_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 {
   ++this->flaw_std_helper.counter;
   this->flaw_std_helper.sum += measurement->flaw;
-  _stat(this)->flaw_avg = this->flaw_std_helper.sum / (gdouble) this->flaw_std_helper.counter;
-  _stat(this)->flaw_std = _calculate_std(&this->flaw_std_helper, measurement->flaw);
+  _stat(this)->drift_avg = this->flaw_std_helper.sum / (gdouble) this->flaw_std_helper.counter;
+  _stat(this)->drift_std = _calculate_std(&this->flaw_std_helper, measurement->flaw);
+
+//  ++this->raise_stat.count;
+//  this->raise_stat.sum+=measurement->raise;
+//
+//  ++this->fall_stat.count;
+//  this->fall_stat.sum+=measurement->fall;
 }
 
 static void _calculate_est_rr(FRACTaLFBProcessor *this){

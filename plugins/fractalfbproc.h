@@ -31,7 +31,14 @@ typedef struct _FRACTaLStat
 {
   GstClockTime             jitter_50th;
   GstClockTime             queue_delay;
-  GstClockTime             last_flaw;
+  GstClockTime             last_drift;
+
+  GstClockTime             last_raise;
+  GstClockTime             raise_avg;
+  GstClockTime             raise_std;
+  GstClockTime             last_fall;
+  GstClockTime             fall_avg;
+  GstClockTime             fall_std;
 
   gint32                   measurements_num;
   gint32                   BiF_80th;
@@ -46,8 +53,8 @@ typedef struct _FRACTaLStat
   gint32                   receiver_bitrate;
   gint32                   fec_bitrate;
 
-  GstClockTime             flaw_avg;
-  GstClockTime             flaw_std;
+  GstClockTime             drift_avg;
+  GstClockTime             drift_std;
   gdouble                  srtt;
 
   gint32                   newly_received_bytes;
@@ -122,6 +129,12 @@ struct _FRACTaLFBProcessor
   gdouble                  FL_max;
   gint32                   acked_bytes_in_srtt;
 
+//  struct{
+//   gdouble sum;
+//   guint32 count;
+//   gdouble avg;
+//  }raise_stat,fall_stat;
+
   FRACTaLStdHelper         flaw_std_helper;
   FRACTaLStdHelper         BiF_std_helper;
   FRACTaLStdHelper         FL_std_helper;
@@ -150,6 +163,7 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
 void fractalfbprocessor_reset(FRACTaLFBProcessor *this);
 gint32 fractalfbprocessor_get_estimation(FRACTaLFBProcessor *this);
 void fractalfbprocessor_start_estimation(FRACTaLFBProcessor *this);
+void fractalfbprocessor_reset_short_sw(FRACTaLFBProcessor *this);
 void fractalfbprocessor_approve_measurement(FRACTaLFBProcessor *this);
 void fractalfbprocessor_time_update(FRACTaLFBProcessor *this);
 void fractalfbprocessor_report_update(FRACTaLFBProcessor *this, GstMPRTCPReportSummary *summary);

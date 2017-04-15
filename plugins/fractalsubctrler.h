@@ -61,8 +61,9 @@ struct _FRACTaLSubController
 
   FRACTaLFBProcessor*       fbprocessor;
   FRACTaLStat*              stat;
-  FRACTaLApprovement*       approvement;
   guint                     sent_packets;
+
+  gdouble                   est_rr;
 
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;

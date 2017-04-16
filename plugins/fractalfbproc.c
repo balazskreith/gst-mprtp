@@ -141,7 +141,8 @@ fractalfbprocessor_init (FRACTaLFBProcessor * this)
   this->measurement      = g_malloc0(sizeof(FRACTaLMeasurement));
 
 }
-
+swplugin_define_on_calculated_double(FRACTaLStat, _on_drift_avg_calculated, drift_avg);
+swplugin_define_swdataextractor(_drift_extractor, FRACTaLMeasurement, drift);
 
 FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* subflow, FRACTaLStat *stat)
 {
@@ -166,6 +167,11 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
 
   slidingwindow_add_plugin(this->short_sw,
           make_swpercentile(80, _measurement_BiF_cmp, (ListenerFunc) _on_BiF_80th_calculated, this));
+
+  slidingwindow_add_plugins(this->long_sw,
+      make_swavg(_on_drift_avg_calculated, this, _drift_extractor),
+          NULL);
+
 
   slidingwindow_add_on_change(this->srtt_sw,
       (ListenerFunc)_on_srtt_sw_add,

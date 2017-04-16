@@ -150,7 +150,7 @@ SlidingWindowPlugin* make_swprinter(void (*sprint)(gpointer,gchar*))
   this->add_data = sprint;
   this->rem_pipe = _swprinter_rem_pipe;
   this->rem_data = sprint;
-  this->disposer = free;
+  this->disposer = g_free;
   this->priv     = NULL;
   return this;
 }
@@ -234,19 +234,19 @@ SlidingWindowPlugin* make_swminmax(bintree3cmp cmp, ListenerFunc on_calculated_c
 
 //-----------------------------------------------------------------------------------
 
-typedef struct _swtendency{
-  SlidingWindowPlugin*    base;
-  SWItemTendencyExtractor extractor;
-  gint32                  counter;
-  gint32                  sum;
-}swtendency_t;
+typedef struct _swavg{
+  SlidingWindowPlugin*  base;
+  SWDataExtractor       extractor;
+  gint32                counter;
+  gdouble               sum;
+}swavg_t;
 
 
-static swtendency_t* _swtendencypriv_ctor(SlidingWindowPlugin* base, SWItemTendencyExtractor extractor)
+static swavg_t* _swavgpriv_ctor(SlidingWindowPlugin* base, SWDataExtractor extractor)
 {
-  swtendency_t* this;
-  this = malloc(sizeof(swtendency_t));
-  memset(this, 0, sizeof(swtendency_t));
+  swavg_t* this;
+  this = malloc(sizeof(swavg_t));
+  memset(this, 0, sizeof(swavg_t));
   this->extractor = extractor;
   this->counter = 0;
   this->sum     = 0;
@@ -254,61 +254,149 @@ static swtendency_t* _swtendencypriv_ctor(SlidingWindowPlugin* base, SWItemTende
   return this;
 }
 
-static void _swtendencypriv_disposer(gpointer target)
+static void _swavgpriv_disposer(gpointer target)
 {
-  swtendency_t* this = target;
+  swavg_t* this = target;
   if(!target){
     return;
   }
   free(this);
 }
 
-static void _swtendency_disposer(gpointer target)
+static void _swavg_disposer(gpointer target)
 {
   SlidingWindowPlugin* this = target;
   if(!target){
     return;
   }
 
-  _swtendencypriv_disposer(this->priv);
+  _swavgpriv_disposer(this->priv);
   this->priv = NULL;
   g_free(this);
 }
 
-static void _swtendency_add_pipe(gpointer dataptr, gpointer itemptr)
-{
-  swtendency_t* this;
-  gdouble tendency;
-  this = dataptr;
-  this->sum += this->extractor(itemptr);
-  ++this->counter;
-  tendency = (gdouble)this->sum / (gdouble)this->counter;
-  swplugin_notify(this->base, &tendency);
+static gdouble _swavg_get_avg(swavg_t* this, gpointer itemptr, gint change){
+  this->sum += this->extractor(itemptr) * change;
+  this->counter+= 1 * change;
+  return this->sum / (gdouble)this->counter;
 }
 
-static void _swtendency_rem_pipe(gpointer dataptr, gpointer itemptr)
+static void _swavg_add_pipe(gpointer dataptr, gpointer itemptr)
 {
-  swtendency_t* this;
-  gdouble tendency;
-  this = dataptr;
-  this->sum -= this->extractor(itemptr);
-  --this->counter;
-  tendency = (gdouble)this->sum / (gdouble)this->counter;
-  swplugin_notify(this->base, &tendency);
+  swavg_t* this = dataptr;
+  gdouble avg = _swavg_get_avg(this, itemptr, 1);
+  swplugin_notify(this->base, &avg);
 }
 
-SlidingWindowPlugin* make_swtendency(bintree3cmp cmp, ListenerFunc on_calculated_cb, gpointer udata,
-    SWItemTendencyExtractor extractor)
+static void _swavg_rem_pipe(gpointer dataptr, gpointer itemptr)
+{
+  swavg_t* this = dataptr;
+  gdouble avg = _swavg_get_avg(this, itemptr, -1);
+  swplugin_notify(this->base, &avg);
+}
+
+SlidingWindowPlugin* make_swavg(ListenerFunc on_calculated_cb, gpointer udata,
+    SWDataExtractor extractor)
 {
   SlidingWindowPlugin* this;
   this = swplugin_ctor();
   this = make_swplugin(on_calculated_cb, udata);
-  this->priv = _swtendencypriv_ctor(this, extractor);
-  this->add_pipe = _swtendency_add_pipe;
+  this->priv = _swavgpriv_ctor(this, extractor);
+  this->add_pipe = _swavg_add_pipe;
   this->add_data = this->priv;
-  this->rem_pipe = _swtendency_rem_pipe;
+  this->rem_pipe = _swavg_rem_pipe;
   this->rem_data = this->priv;
-  this->disposer = _swtendency_disposer;
+  this->disposer = _swavg_disposer;
+  return this;
+}
+
+//-----------------------------------------------------------------------------------
+
+typedef struct _swstd{
+  SlidingWindowPlugin*  base;
+  SWDataExtractor       extractor;
+  gint32                counter;
+  gdouble               mean;
+  gdouble               var;
+  gdouble               emp;
+}swstd_t;
+
+
+static swstd_t* _swstdpriv_ctor(SlidingWindowPlugin* base, SWDataExtractor extractor)
+{
+  swstd_t* this;
+  this = malloc(sizeof(swstd_t));
+  memset(this, 0, sizeof(swstd_t));
+  this->extractor = extractor;
+  this->counter = 0;
+  this->emp     = 0;
+  this->var     = 0;
+  this->mean    = 0;
+  this->base    = base;
+  return this;
+}
+
+static void _swstdpriv_disposer(gpointer target)
+{
+  swstd_t* this = target;
+  if(!target){
+    return;
+  }
+  free(this);
+}
+
+static void _swstd_disposer(gpointer target)
+{
+  SlidingWindowPlugin* this = target;
+  if(!target){
+    return;
+  }
+
+  _swstdpriv_disposer(this->priv);
+  this->priv = NULL;
+  g_free(this);
+}
+
+
+static void _swstd_add_pipe(gpointer dataptr, gpointer itemptr)
+{
+  swstd_t* this = dataptr;
+  gdouble new_item = this->extractor(itemptr);
+  gdouble prev_mean = this->mean;
+  gdouble dprev = new_item - prev_mean;
+  gdouble dact;
+  gdouble n = this->counter;
+  gdouble result = 0.;
+  this->mean += dprev / n;
+  dact = new_item - this->mean;
+  if(this->counter < 2){
+    goto done;
+  }
+  this->emp *= (n - 2.) / (n - 1.);
+  this->emp += pow(dprev, 2) / n;
+  this->var = ( (n-1.) * this->var + dprev * dact ) / n;
+  result = sqrt(this->var);
+done:
+  swplugin_notify(this->base, &result);
+}
+
+static void _swstd_rem_pipe(gpointer dataptr, gpointer itemptr)
+{
+
+}
+
+SlidingWindowPlugin* make_swstd(ListenerFunc on_calculated_cb, gpointer udata,
+    SWDataExtractor extractor)
+{
+  SlidingWindowPlugin* this;
+  this = swplugin_ctor();
+  this = make_swplugin(on_calculated_cb, udata);
+  this->priv = _swstdpriv_ctor(this, extractor);
+  this->add_pipe = _swstd_add_pipe;
+  this->add_data = this->priv;
+  this->rem_pipe = _swstd_rem_pipe;
+  this->rem_data = this->priv;
+  this->disposer = _swstd_disposer;
   return this;
 }
 

@@ -116,12 +116,29 @@ SlidingWindowPlugin* make_swminmax(bintree3cmp cmp,
                                   gpointer       udata
                           );
 
-typedef gint32 (*SWItemTendencyExtractor)(gpointer item);
+typedef gdouble (*SWDataExtractor)(gpointer item);
 
-SlidingWindowPlugin* make_swtendency(bintree3cmp cmp,
-                                  ListenerFunc on_calculated_cb,
+
+#define swplugin_define_on_calculated_double(this_type, on_calculated_fnc, on_calculated_field) \
+    static void on_calculated_fnc(gpointer udata, gpointer result){ \
+      ((this_type*)udata)->on_calculated_field = *(gdouble*)result; \
+    }
+
+#define swplugin_define_swdataextractor(extractor_fnc, item_type, extracted_field) \
+    static gdouble extractor_fnc(gpointer itemptr){ \
+      return ((item_type*)itemptr)->extracted_field; \
+    }
+
+
+SlidingWindowPlugin* make_swavg(ListenerFunc on_calculated_cb,
                                   gpointer       udata,
-                                  SWItemTendencyExtractor   extractor
+                                  SWDataExtractor   extractor
+                          );
+
+
+SlidingWindowPlugin* make_swstd(ListenerFunc on_calculated_cb,
+                                  gpointer       udata,
+                                  SWDataExtractor   extractor
                           );
 
 

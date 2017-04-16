@@ -52,8 +52,11 @@ typedef struct _FRACTaLStat
   gdouble                  lost_avg;
   gdouble                  lost_std;
 
-  gint32                   lost_packets;
+  gdouble                  fraction_lost;
   gint32                   received_bytes_in_srtt;
+  gint32                   sent_bytes_in_srtt;
+
+  gdouble                  rr_sr_corr;
 
 }FRACTaLStat;
 
@@ -63,16 +66,18 @@ typedef struct{
   gdouble var;
   gdouble emp;
 
-  gint64 sum;
+  gdouble sum;
 }FRACTaLStatHelper;
 
 
 typedef struct{
   gint32       ref;
   gint32       drift;
-  gdouble      lost_packets;
+  gdouble      fraction_lost;
   gint32       newly_received_bytes;
   gint32       bytes_in_flight;
+
+  gdouble      sr_avg;
 }FRACTaLMeasurement;
 
 struct _FRACTaLFBProcessor
@@ -103,6 +108,8 @@ struct _FRACTaLFBProcessor
   FRACTaLStatHelper        lost_stat_helper;
   GstClockTime             last_report_updated;
   GstClockTime             last_owd_log;
+
+  gdouble                  sr_avg_srtt;
 
 //  gint32                   newly_acked_packets;
 //  gint32                   newly_received_packets;

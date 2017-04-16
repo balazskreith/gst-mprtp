@@ -330,6 +330,7 @@ void _process_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary 
     GstClockTime now = _now(this);
     GstClockTime rtt = now - last_packet_sent_time;
     GstClockTime boundary;
+    gint lost_packets = 0, sent_packets = 0;;
     this->RTT = (this->RTT == 0) ? rtt : (rtt * .125 + this->RTT * .875);
     if(this->RTT < now - this->srtt_updated){
       _stat(this)->srtt = (_stat(this)->srtt == 0.) ? this->RTT : this->RTT * .125 + _stat(this)->srtt * .875;
@@ -338,17 +339,26 @@ void _process_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary 
     }
     this->HSN = last_seq;
 
+    _stat(this)->sent_bytes_in_srtt = 0;
     boundary = last_packet_sent_time - MAX(100 * GST_MSECOND, _stat(this)->srtt);
     //calculate lost packets in srtt
     for(i=0, --end_seq, act_seq = xr->LostRLE.begin_seq; act_seq != end_seq; --end_seq, ++i){
       packet = sndtracker_retrieve_sent_packet(this->sndtracker, this->subflow->id, end_seq);
+      if(!packet){
+        continue;
+      }
       if(packet->sent < boundary){
         break;
       }
+      _stat(this)->sent_bytes_in_srtt += packet->payload_size;
+      ++sent_packets;
       if(!packet->lost){
         continue;
       }
-      ++measurement->lost_packets;
+      ++lost_packets;
+    }
+    if(0 < sent_packets){
+      measurement->fraction_lost = (gdouble) lost_packets / (gdouble) sent_packets;
     }
   }
 
@@ -367,19 +377,13 @@ void _process_stat(FRACTaLFBProcessor *this)
   gdouble ewma_factor         = _get_ewma_factor(this);
   gdouble alpha;
 
-  if(measurement->ref == 1){//to assign only once.
-    measurement->bytes_in_flight = sndstat->bytes_in_flight;
-  }
-
-
   _stat(this)->rtpq_delay            = rtpqstat->rtpq_delay;
   _stat(this)->bytes_in_flight       = sndstat->bytes_in_flight;
   _stat(this)->sender_bitrate        = sndstat->sent_bytes_in_1s * 8;
   _stat(this)->receiver_bitrate      = sndstat->received_bytes_in_1s * 8;
   _stat(this)->fec_bitrate           = sndstat->sent_fec_bytes_in_1s * 8;
-  _stat(this)->bytes_in_flight       = measurement->bytes_in_flight;
   _stat(this)->measurements_num      = slidingwindow_get_counter(this->long_sw);
-  _stat(this)->lost_packets          = measurement->lost_packets;
+  _stat(this)->fraction_lost         = measurement->fraction_lost;
   _stat(this)->last_drift            = measurement->drift;
 
   if(_stat(this)->sr_avg){
@@ -389,12 +393,20 @@ void _process_stat(FRACTaLFBProcessor *this)
     _stat(this)->sr_avg = _stat(this)->sender_bitrate;
   }
 
+  if(measurement->ref == 1){//to assign only once.
+    measurement->bytes_in_flight = sndstat->bytes_in_flight;
+    measurement->sr_avg = _stat(this)->sr_avg;
+  }
+
   if(_stat(this)->rr_avg){
     alpha = ewma_factor * .5 + .5;
     _stat(this)->rr_avg = alpha * _stat(this)->receiver_bitrate + _stat(this)->rr_avg * (1.-alpha);
   }else{
     _stat(this)->rr_avg = _stat(this)->receiver_bitrate;
   }
+
+  _stat(this)->rr_sr_corr =  _stat(this)->rr_avg / this->sr_avg_srtt;
+//  _stat(this)->rr_sr_corr =  (gdouble)_stat(this)->received_bytes_in_srtt / (gdouble)_stat(this)->sent_bytes_in_srtt;
 
   DISABLE_LINE _owd_logger(this);
 
@@ -444,6 +456,15 @@ static gdouble  _calculate_avg(FRACTaLStatHelper* helper, gint64 new_item, gint 
   return 0.;
 }
 
+static gdouble  _calculate_avg_double(FRACTaLStatHelper* helper, gdouble new_item, gint multiplier){
+  helper->counter += 1 * multiplier;
+  helper->sum += new_item * multiplier;
+  if(0 < helper->counter){
+    return (gdouble)helper->sum / (gdouble)helper->counter;
+  }
+  return 0.;
+}
+
 void _on_short_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 {
   _stat(this)->BiF_avg = _calculate_avg(&this->BiF_stat_helper, measurement->bytes_in_flight, -1);
@@ -458,7 +479,7 @@ void _on_short_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 void _on_long_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 {
   _stat(this)->drift_avg = _calculate_avg(&this->drift_stat_helper, measurement->drift, -1);
-  _stat(this)->lost_avg = _calculate_avg(&this->lost_stat_helper, measurement->lost_packets, -1);
+  _stat(this)->lost_avg = _calculate_avg_double(&this->lost_stat_helper, measurement->fraction_lost, -1);
 }
 
 void _on_long_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
@@ -466,8 +487,8 @@ void _on_long_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
   _stat(this)->drift_avg = _calculate_avg(&this->drift_stat_helper, measurement->drift, 1);
   _stat(this)->drift_std = _calculate_std(&this->drift_stat_helper, measurement->drift);
 
-  _stat(this)->lost_avg = _calculate_avg(&this->lost_stat_helper, measurement->lost_packets, 1);
-  _stat(this)->lost_std = _calculate_std(&this->lost_stat_helper, measurement->lost_packets);
+  _stat(this)->lost_avg = _calculate_avg_double(&this->lost_stat_helper, measurement->fraction_lost, 1);
+  _stat(this)->lost_std = _calculate_std(&this->lost_stat_helper, measurement->fraction_lost);
 
 }
 
@@ -480,6 +501,7 @@ void _on_srtt_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 void _on_srtt_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 {
   _stat(this)->received_bytes_in_srtt -= measurement->newly_received_bytes;
+  this->sr_avg_srtt = measurement->sr_avg;
 }
 
 

@@ -15,6 +15,7 @@
 #include "sndtracker.h"
 #include "sndsubflows.h"
 #include "reportproc.h"
+#include "correlator.h"
 
 
 typedef struct _FRACTaLFBProcessor FRACTaLFBProcessor;
@@ -54,9 +55,14 @@ typedef struct _FRACTaLStat
 
   gdouble                  fraction_lost;
   gint32                   received_bytes_in_srtt;
-  gint32                   sent_bytes_in_srtt;
 
   gdouble                  rr_sr_corr;
+//  gdouble                  rr_sr_avg;
+//  gdouble                  rr_sr_std;
+
+//  gdouble                  est_queue_delay;
+//  gdouble                  est_queue_std;
+//  gdouble                  est_queue_avg;
 
 }FRACTaLStat;
 
@@ -74,16 +80,26 @@ typedef struct{
   gint32       ref;
   gint32       drift;
   gdouble      fraction_lost;
-  gint32       newly_received_bytes;
+//  gint32       newly_received_bytes;
+//  gint32       newly_sent_bytes;
+  gint32       sent_bytes_in_srtt;
+  gint32       rcved_bytes_in_srtt;
   gint32       bytes_in_flight;
 
-  gdouble      sr_avg;
+//  gint32       sent_kbps;
+//  gint32       rcvd_kbps;
+
+//  gdouble      sr_avg;
+//  gdouble      rr_sr_corr;
+//  gdouble      est_queue_delay;
 }FRACTaLMeasurement;
 
 struct _FRACTaLFBProcessor
 {
   GObject                  object;
   GstClock*                sysclock;
+
+  Correlator*              rr_sr_correlator;
 
   SlidingWindow*           srtt_sw;
   SlidingWindow*           short_sw;
@@ -103,13 +119,14 @@ struct _FRACTaLFBProcessor
   gint32                   BiF_min;
   gint32                   BiF_max;
 
+  gint32                   sent_bytes_in_srtt;
+  gint32                   sent_bytes_in_srtt_t;
+
   FRACTaLStatHelper        BiF_stat_helper;
   FRACTaLStatHelper        drift_stat_helper;
   FRACTaLStatHelper        lost_stat_helper;
   GstClockTime             last_report_updated;
   GstClockTime             last_owd_log;
-
-  gdouble                  sr_avg_srtt;
 
 //  gint32                   newly_acked_packets;
 //  gint32                   newly_received_packets;
@@ -118,6 +135,8 @@ struct _FRACTaLFBProcessor
   gint64                  last_raise;
   gint64                  last_fall;
 //  gint64                  queue_delay;
+
+  gdouble                 est_received_bytes_in_srtt;
 
 };
 

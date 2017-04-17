@@ -1,7 +1,8 @@
 plugin_LTLIBRARIES = libgstmprtp.la
 
 # sources used to compile this plug-in
-libgstmprtp_la_SOURCES = fecdec.c              \
+libgstmprtp_la_SOURCES = correlator.c          \
+					     fecdec.c              \
                          fecenc.c              \
                          fractalfbproc.c       \
                          fractalfbprod.c       \
@@ -41,7 +42,8 @@ libgstmprtp_la_SOURCES = fecdec.c              \
                          streamsplitter.c      
                     
                     
-noinst_HEADERS = fecdec.h              \
+noinst_HEADERS = correlator.h          \
+				 fecdec.h              \
                  fecenc.h              \
                  fractalfbproc.h       \
                  fractalfbprod.h       \

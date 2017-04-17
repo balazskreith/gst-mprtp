@@ -276,9 +276,14 @@ static void _swavg_disposer(gpointer target)
 }
 
 static gdouble _swavg_get_avg(swavg_t* this, gpointer itemptr, gint change){
-  this->sum += this->extractor(itemptr) * change;
+  gdouble new_item = this->extractor(itemptr);
+  if(isnan(new_item) || isinf(new_item)){
+    goto done;
+  }
+  this->sum += new_item * change;
   this->counter+= 1 * change;
-  return this->sum / (gdouble)this->counter;
+done:
+  return 0 < this->counter ? this->sum / (gdouble)this->counter : 0.;
 }
 
 static void _swavg_add_pipe(gpointer dataptr, gpointer itemptr)
@@ -365,8 +370,13 @@ static void _swstd_add_pipe(gpointer dataptr, gpointer itemptr)
   gdouble prev_mean = this->mean;
   gdouble dprev = new_item - prev_mean;
   gdouble dact;
-  gdouble n = this->counter;
+  gdouble n;
   gdouble result = 0.;
+  if(isnan(new_item) || isinf(new_item)){
+    goto done;
+  }
+
+  n = ++this->counter;
   this->mean += dprev / n;
   dact = new_item - this->mean;
   if(this->counter < 2){
@@ -382,7 +392,8 @@ done:
 
 static void _swstd_rem_pipe(gpointer dataptr, gpointer itemptr)
 {
-
+  swstd_t* this = dataptr;
+  --this->counter;
 }
 
 SlidingWindowPlugin* make_swstd(ListenerFunc on_calculated_cb, gpointer udata,
@@ -400,6 +411,151 @@ SlidingWindowPlugin* make_swstd(ListenerFunc on_calculated_cb, gpointer udata,
   return this;
 }
 
+
+//-----------------------------------------------------------------------------------
+
+typedef struct _swcorr{
+  SlidingWindowPlugin*  base;
+  SWDataExtractor       extractor_1;
+  SWDataExtractor       extractor_2;
+  gdouble               sum_1;
+  gdouble               sum_2;
+  gdouble               sum_12;
+  gint32                counter_1;
+  gint32                counter_2;
+  SlidingWindow*        delay_in_sw;
+  SlidingWindow*        delay_out_sw;
+  gdouble               I_1_add,I_1_rem;
+}swcorr_t;
+
+typedef struct _swcorr_item_t{
+  gdouble I_1;
+  gdouble I_2;
+}swcorr_item_t;
+
+static void _swcorr_delay_in_rem_pipe(swcorr_t*  dataptr, gdouble* itemptr);
+static void _swcorr_delay_out_rem_pipe(swcorr_t* dataptr, gdouble* itemptr);
+
+static swcorr_t* _swcorrpriv_ctor(SlidingWindowPlugin* base,
+    SWDataExtractor extractor1,
+    SWDataExtractor extractor2,
+    GstClockTime tau,
+    gint         max_length)
+{
+  swcorr_t* this;
+  this = malloc(sizeof(swcorr_t));
+  memset(this, 0, sizeof(swcorr_t));
+  this->extractor_1   = extractor1;
+  this->extractor_2   = extractor2;
+  this->base          = base;
+  this->delay_in_sw   = make_slidingwindow_double(max_length, tau);
+  this->delay_out_sw  = make_slidingwindow_double(max_length, tau);
+
+  slidingwindow_add_on_rem_item_cb(this->delay_in_sw,  (ListenerFunc) _swcorr_delay_in_rem_pipe,  this);
+  slidingwindow_add_on_rem_item_cb(this->delay_out_sw, (ListenerFunc) _swcorr_delay_out_rem_pipe, this);
+
+  return this;
+}
+
+static void _swcorrpriv_disposer(gpointer target)
+{
+  swcorr_t* this = target;
+  if(!target){
+    return;
+  }
+  g_object_unref(this->delay_in_sw);
+  g_object_unref(this->delay_out_sw);
+  free(this);
+}
+
+static void _swcorr_disposer(gpointer target)
+{
+  SlidingWindowPlugin* this = target;
+  if(!target){
+    return;
+  }
+
+  _swcorrpriv_disposer(this->priv);
+  this->priv = NULL;
+  g_free(this);
+}
+
+static gdouble _get_swcorr_g(swcorr_t* this){
+  gdouble c_1 = (gdouble)(1./this->counter_1);
+  gdouble c_2 = (gdouble)(1./this->counter_2);
+  if(!this->counter_1 || !this->counter_2 || this->sum_1 == 0. || this->sum_2 == 0.){
+    return 0.;
+  }
+  return (gdouble) (c_2 * this->sum_12) / (gdouble) ((c_1 * this->sum_1) * (c_2 * this->sum_2)) - 1.;
+}
+
+void _swcorr_delay_in_rem_pipe(swcorr_t* this, gdouble* I_2){
+  ++this->counter_2;
+  this->sum_1 += this->I_1_add;
+  this->sum_2 += *I_2;
+  this->sum_12 += this->I_1_add * (*I_2);
+}
+
+static void _swcorr_add_pipe(gpointer dataptr, gpointer itemptr)
+{
+  gdouble g = 0.;
+  swcorr_t* this = dataptr;
+  gdouble I_2    = this->extractor_2(itemptr);
+  this->I_1_add  = this->extractor_1(itemptr);
+  ++this->counter_1;
+  slidingwindow_add_data(this->delay_in_sw, &I_2);
+
+  g = _get_swcorr_g(this);
+  swplugin_notify(this->base, &g);
+}
+
+
+
+void _swcorr_delay_out_rem_pipe(swcorr_t* this, gdouble* I_2){
+  --this->counter_2;
+  this->sum_1 -= this->I_1_rem;
+  this->sum_2 -= *I_2;
+  this->sum_12 -= this->I_1_rem * (*I_2);
+}
+
+static void _swcorr_rem_pipe(gpointer dataptr, gpointer itemptr)
+{
+  gdouble g = 0.;
+  swcorr_t* this = dataptr;
+  gdouble I_2    = this->extractor_2(itemptr);
+  this->I_1_rem  = this->extractor_1(itemptr);
+  --this->counter_1;
+  slidingwindow_add_data(this->delay_out_sw, &I_2);
+
+  g = _get_swcorr_g(this);
+  swplugin_notify(this->base, &g);
+}
+
+SlidingWindowPlugin* make_swcorr(ListenerFunc on_calculated_cb,
+    gpointer udata,
+    SWDataExtractor extractor1,
+    SWDataExtractor extractor2,
+    GstClockTime tau,
+    gint         max_length)
+{
+  SlidingWindowPlugin* this;
+  this = swplugin_ctor();
+  this = make_swplugin(on_calculated_cb, udata);
+  this->priv = _swcorrpriv_ctor(this, extractor1, extractor2, tau, max_length);
+  this->add_pipe = _swcorr_add_pipe;
+  this->add_data = this->priv;
+  this->rem_pipe = _swcorr_rem_pipe;
+  this->rem_data = this->priv;
+  this->disposer = _swcorr_disposer;
+  return this;
+}
+
+void swcorr_set_tau(SlidingWindowPlugin* plugin, GstClockTime tau)
+{
+  swcorr_t* this = plugin->priv;
+  slidingwindow_set_treshold(this->delay_in_sw,  tau);
+  slidingwindow_set_treshold(this->delay_out_sw, tau);
+}
 
 
 

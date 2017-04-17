@@ -142,6 +142,15 @@ SlidingWindowPlugin* make_swstd(ListenerFunc on_calculated_cb,
                           );
 
 
+SlidingWindowPlugin* make_swcorr(ListenerFunc on_calculated_cb,
+    gpointer udata,
+    SWDataExtractor extractor1,
+    SWDataExtractor extractor2,
+    GstClockTime tau,
+    gint         max_length);
+
+void swcorr_set_tau(SlidingWindowPlugin* plugin, GstClockTime tau);
+
 void swpercentile_set_percentile(
     SlidingWindowPlugin* plugin,
     gint32 percentile

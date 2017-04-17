@@ -41,6 +41,7 @@ struct _FRACTaLSubController
   gboolean                  backward_congestion;
   GstClockTime              last_report;
 
+  GstClockTime              last_corrigated;
   GstClockTime              last_log;
   gboolean                  approve_measurement;
   GstClockTime              obligated_approvement;
@@ -49,6 +50,7 @@ struct _FRACTaLSubController
   gint32                    stable_bitrate;
 
   guint                     rcved_fb_since_changed;
+
 
   GstClockTime              last_executed;
 

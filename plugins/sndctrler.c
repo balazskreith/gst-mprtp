@@ -417,8 +417,9 @@ void _on_subflow_state_changed(SndController *this, SndSubflow* subflow)
 //  }
 
   {
-    GstClockTime reporting_interval = MIN(subflow->report_interval, this->time_update_period);
-    this->time_update_period = CONSTRAIN(50 * GST_MSECOND, 200 * GST_MSECOND, reporting_interval);
+//    GstClockTime reporting_interval = MIN(subflow->report_interval, this->time_update_period);
+//    this->time_update_period = CONSTRAIN(50 * GST_MSECOND, 200 * GST_MSECOND, reporting_interval);
+    this->time_update_period = 50 * GST_MSECOND;
   }
 
 //done:

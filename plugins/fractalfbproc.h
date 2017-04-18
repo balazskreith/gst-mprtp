@@ -43,6 +43,7 @@ typedef struct _FRACTaLStat
   gdouble                  BiF_std;
 
   gdouble                  drift_avg;
+  gdouble                  drift_corr;
   gdouble                  drift_std;
   gint64                   last_drift;
   gdouble                  srtt;
@@ -77,13 +78,14 @@ typedef struct{
 
 
 typedef struct{
-  gint32       ref;
-  gint32       drift;
+  gint32        ref;
+  GstClockTime  drift;
   gdouble      fraction_lost;
 //  gint32       newly_received_bytes;
 //  gint32       newly_sent_bytes;
-  gint32       sent_bytes_in_srtt;
-  gint32       rcved_bytes_in_srtt;
+//  gint32       sent_bytes_in_srtt;
+//  gint32       rcved_bytes_in_srtt;
+  gint32       newly_rcved_fb;
   gint32       bytes_in_flight;
 
 //  gint32       sent_kbps;
@@ -100,6 +102,7 @@ struct _FRACTaLFBProcessor
   GstClock*                sysclock;
 
   Correlator*              rr_sr_correlator;
+  Correlator*              drift_correlator;
 
   SlidingWindow*           srtt_sw;
   SlidingWindow*           short_sw;
@@ -110,7 +113,7 @@ struct _FRACTaLFBProcessor
   SndTracker*              sndtracker;
   SndSubflow*              subflow;
   FRACTaLMeasurement*      measurement;
-  guint                    rcved_fb_since_changed;
+  guint                    newly_rcved_fb;
   GstClockTime             RTT;
   GstClockTime             srtt_updated;
 
@@ -119,13 +122,18 @@ struct _FRACTaLFBProcessor
   gint32                   BiF_min;
   gint32                   BiF_max;
 
-  gint32                   sent_bytes_in_srtt;
-  gint32                   sent_bytes_in_srtt_t;
+  gint32                   received_fb_in_srtt;
+
+  gint32                   newly_sent_bytes;
+  gint32                   newly_received_bytes;
+  gint32                   newly_sent_bytes_t;
+  gint32                   newly_received_bytes_t;
+//  gint32                   sent_bytes_in_srtt_t;
 
   FRACTaLStatHelper        BiF_stat_helper;
   FRACTaLStatHelper        drift_stat_helper;
   FRACTaLStatHelper        lost_stat_helper;
-  GstClockTime             last_report_updated;
+  GstClockTime             last_report_update;
   GstClockTime             last_owd_log;
 
 //  gint32                   newly_acked_packets;

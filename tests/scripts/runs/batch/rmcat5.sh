@@ -78,7 +78,7 @@ while [  $COUNTER -lt $END ]; do
 	sudo ip netns exec ns_snd $SNDFILE &
 	sleep 2
 	./scripts/runs/$TEST.sh $OWD $ALGORITHM &
-	sleep 50
+	sleep 100
 
 	INCREASE=1
 

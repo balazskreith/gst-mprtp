@@ -438,7 +438,7 @@ static void _stat_print(FRACTaLSubController *this)
           "RR/SR:%1.2f|"
           "Tr:%-4d|Btl:%-4d|IP:%-4d|"
           "%d-%d-%d-%d|"
-          "D:%-3lu+%-3lu<-%-3lu|"
+          "D:%-3lu+%-3lu<-%-3lu|%-1.2f"
           "RTPQ:%-1.3f|"
           "L:%-1.2f(%-1.2f)<-%-1.2f|"
           "S:%1.2f|%1.2f|%d|%1.2f\n",
@@ -470,6 +470,7 @@ static void _stat_print(FRACTaLSubController *this)
       (GstClockTime)GST_TIME_AS_MSECONDS(_stat(this)->drift_avg),
       (GstClockTime)GST_TIME_AS_MSECONDS(_stat(this)->drift_std),
       GST_TIME_AS_MSECONDS(_stat(this)->last_drift),
+      _stat(this)->drift_corr,
 
       _stat(this)->rtpq_delay,
 
@@ -529,21 +530,20 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
     case SNDSUBFLOW_STATE_STABLE:
       {
         gdouble scale_t = _scale_t(this);
-        gint32 diff = _stat(this)->sr_avg - _stat(this)->rr_avg;
 //        gint32 new_target;
         if(scale_t < 1.){
           break;
-        }else if(_stat(this)->rr_sr_corr < .1){
-          break;
-        }else if(diff < _min_ramp_up(this)){
+        }else if(_stat(this)->drift_corr < 5.){
           break;
         }
         this->inflection_point = MAX(this->target_bitrate, this->inflection_point);
+        _change_sndsubflow_target_bitrate(this, this->inflection_point - _stat(this)->fec_bitrate * (1.-_stat(this)->drift_corr));
+        this->bottleneck_point = this->target_bitrate;
 //        new_target = MIN(this->target_bitrate, this->inflection_point * (1.-_stat(this)->rr_sr_corr));
         //so we are not at the bottleneck
         //we have a difference larger than the min ramp up
         //and we have an uncorrelated state
-//        _change_sndsubflow_target_bitrate(this, new_target);
+
 //        this->last_corrigated = _now(this);
 
       }
@@ -554,7 +554,7 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
       gdouble scale_t = _scale_t(this);
       if(scale_t < 1.){
         break;
-      }else if(_stat(this)->rr_sr_corr < .1){
+      }else if(_stat(this)->drift_corr < .5){
         break;
       }
 //      this->inflection_point = MAX(this->target_bitrate, this->inflection_point);
@@ -562,8 +562,9 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
       //we have a difference larger than the min ramp up
       //and we have an uncorrelated state
       this->inflection_point = MAX(this->target_bitrate, this->inflection_point);
-      reduction = this->increasement * _stat(this)->rr_sr_corr/.3;
+      reduction = this->increasement * (1.-_stat(this)->drift_corr);
       _change_sndsubflow_target_bitrate(this, this->target_bitrate - reduction);
+      this->bottleneck_point = this->target_bitrate;
       this->increasement -= reduction;
       this->last_corrigated = _now(this);
     }
@@ -672,7 +673,7 @@ static gboolean _distortion(FRACTaLSubController *this)
   {
 //    gdouble scaling = 6.;//_sensitivity(this, 6.0, 4.0);
 //    this->drit_th = _stat(this)->drift_avg + CONSTRAIN(_sensitivity(this, 200.0, 200.0) * GST_MSECOND, 400 * GST_MSECOND, _stat(this)->drift_std * scaling);
-    this->drit_th = CONSTRAIN(150 * GST_MSECOND, 400 * GST_MSECOND, _sensitivity(this, 6.0, 4.0) * _stat(this)->drift_avg + _stat(this)->drift_std * 5);
+    this->drit_th = CONSTRAIN(150 * GST_MSECOND, 5000 * GST_MSECOND, _sensitivity(this, 6.0, 4.0) * _stat(this)->drift_avg + _stat(this)->drift_std * 5);
   }
 //  return FALSE;
   return this->drit_th < _stat(this)->last_drift;
@@ -709,7 +710,7 @@ static void _reduce_target(FRACTaLSubController *this)
 
 done:
   {
-    _change_cwnd(this, cwnd);
+    _change_cwnd(this, cwnd );
     _set_bottleneck_point(this, MIN(turning_point, btlp));
     _change_sndsubflow_target_bitrate(this, btlp - CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), btlp * alpha));
 //    fractalfbprocessor_reset_short_sw(this->fbprocessor);

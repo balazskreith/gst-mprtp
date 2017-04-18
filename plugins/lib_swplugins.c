@@ -372,6 +372,7 @@ static void _swstd_add_pipe(gpointer dataptr, gpointer itemptr)
   gdouble dact;
   gdouble n;
   gdouble result = 0.;
+  gdouble alpha = 0.;
   if(isnan(new_item) || isinf(new_item)){
     goto done;
   }
@@ -384,7 +385,10 @@ static void _swstd_add_pipe(gpointer dataptr, gpointer itemptr)
   }
   this->emp *= (n - 2.) / (n - 1.);
   this->emp += pow(dprev, 2) / n;
-  this->var = ( (n-1.) * this->var + dprev * dact ) / n;
+
+  alpha = MAX(.1, 1. / (gdouble) n);
+//  this->var = ( (n-1.) * this->var + dprev * dact ) / n;
+  this->var = alpha * dprev * dact + (1.-alpha) * this->var;
   result = sqrt(this->var);
 done:
   swplugin_notify(this->base, &result);
@@ -556,7 +560,6 @@ void swcorr_set_tau(SlidingWindowPlugin* plugin, GstClockTime tau)
   slidingwindow_set_treshold(this->delay_in_sw,  tau);
   slidingwindow_set_treshold(this->delay_out_sw, tau);
 }
-
 
 
 //-----------------------------------------------------------------------------------

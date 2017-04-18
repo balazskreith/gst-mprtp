@@ -38,24 +38,51 @@ typedef struct _CorrelatorClass CorrelatorClass;
 
 typedef gdouble (*CorrelatorDataExtractor)(gpointer);
 
+
 typedef struct _CorrelatorChannel{
   gint          counter;
-  datapuffer_t* puffer;
-  gdouble       sum;
+  datapuffer_t* samples;
+  datapuffer_t* variances;
+  guint64       samples_sum;
+  gdouble       samples_avg;
+  gdouble       variance_sum;
+  gdouble       variance;
+  gdouble       std;
+
 }CorrelatorChannel;
+
+
+typedef struct _CorrelationFuncPoint{
+  gdouble covariance_x;
+  gdouble covariance_y;
+  gdouble covariance_xy;
+  gdouble count;
+  gdouble tau;
+}CorrelatorPoint;
+
+typedef gdouble (*CorrelatorNormalizer)(CorrelatorPoint*);
 
 struct _Correlator
 {
   GObject              object;
   GstClock*            sysclock;
   GstClockTime         made;
+
+  gdouble              covariance;
+  gdouble              covariance_sum;
+  datapuffer_t*        covariances;
   datapuffer_t*        delay_puffer;
-  CorrelatorChannel    Ix_ch;
-  CorrelatorChannel    Iy_ch;
-  GQueue*              recycle;
-  Notifier*            on_calculated;
+  CorrelatorChannel    x_ch;
+  CorrelatorChannel    y_ch;
+  GQueue*              uint_recycle;
+  GQueue*              double_recycle;
+  Notifier*            on_correlation_calculated;
 
   gint                 tau;
+  gint                 max_length;
+  gint32               accumulation_length;
+
+  CorrelatorPoint point;
 
   gdouble Gxy,g;
 
@@ -71,7 +98,13 @@ Correlator*
 make_correlator(gint32 tau, gint32 length);
 
 void
-correlator_add_on_calculated_listener(Correlator* this, ListenerFunc listener, gpointer udata);
+correlator_set_tau(Correlator* this, gint32 tau);
+
+void
+correlator_set_accumulation_length(Correlator* this, gint32 accumulation_length);
+
+void
+correlator_add_on_correlation_calculated_listener(Correlator* this, ListenerFunc listener, gpointer udata);
 
 void
 correlator_add_extractors(Correlator* this, CorrelatorDataExtractor Ix_extractor, CorrelatorDataExtractor Iy_extractor);
@@ -80,12 +113,10 @@ void
 correlator_add_data(Correlator* this, gpointer data);
 
 void
-correlator_add_intensity(Correlator* this, gdouble Ix);
+correlator_add_sample(Correlator* this, guint x);
 
 void
-correlator_add_intensities(Correlator* this, gdouble Ix_0, gdouble Iy_0);
-
-
+correlator_add_samples(Correlator* this, guint x, guint y);
 
 GType
 correlator_get_type (void);

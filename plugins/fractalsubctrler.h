@@ -68,11 +68,12 @@ struct _FRACTaLSubController
   gdouble                   est_rr;
 
 
-  gdouble                   drift_sum;
-  gint32                    drift_count;
+  gint32                    congested_drift;
+  gdouble                   congested_lost;
 
   gint32                    est_capacity;
   gdouble                   drift_a;
+  gdouble                   lost_a;
   GstClockTime              deflate_time;
 
   guint                     monitoring_interval;
@@ -85,12 +86,10 @@ struct _FRACTaLSubController
   GstClockTime              increasing_sr_reached;
   gint32                    increasement;
 
-  GstClockTime              drit_th;
+  gint64                    drift_th;
   gdouble                   FL_th;
   gboolean                  reducing_approved;
   GstClockTime              reducing_sr_reached;
-  gint32                    turning_point;
-  gboolean                  jumped;
 
   guint                     pending_event;
   SubRateAction             stage_fnc;
@@ -102,10 +101,13 @@ struct _FRACTaLSubController
   GstClockTime              last_approved;
   GstClockTime              last_settled;
   GstClockTime              last_distorted;
+  GstClockTime              last_cwnd_increased;
+  GstClockTime              last_inflicted;
+
+  gboolean                  cwnd_locked;
 
 
   gdouble                   cwnd;//congestion window
-  gdouble                   awnd;//allowed bitrate window
 
   gpointer                  priv;
 

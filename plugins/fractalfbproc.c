@@ -154,10 +154,9 @@ swplugin_define_swdataextractor(_BiF_extractor, FRACTaLMeasurement, bytes_in_fli
 swplugin_define_on_calculated_double(FRACTaLStat, _on_BiF_avg_calculated, BiF_avg);
 swplugin_define_on_calculated_double(FRACTaLStat, _on_BiF_std_calculated, BiF_std);
 
-correlator_define_on_calculated_listener(FRACTaLStat, _on_rr_sr_corr_calculated, rr_sr_corr);
 
 static void _on_packet_sent(FRACTaLFBProcessor* this, SndPacket* packet){
-  this->newly_sent_bytes += packet->payload_size;
+
 }
 
 FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* subflow, FRACTaLStat *stat)
@@ -177,12 +176,10 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
 
   this->measurement->ref     = 1;
 
-  this->rr_sr_correlator = make_correlator(0, 20);
-  this->drift_correlator = make_correlator(5, 30);//should be 5rtt the total window and 1 rtt the delay.
+  this->drift_correlator = make_correlator(5, 30); //should be 5rtt the total window and 1 rtt the delay.
 
   sndtracker_add_on_packet_sent(this->sndtracker, (ListenerFunc)_on_packet_sent, this);
 
-  correlator_add_on_correlation_calculated_listener(this->rr_sr_correlator, (ListenerFunc) _on_rr_sr_corr_calculated, stat);
   correlator_add_on_correlation_calculated_listener(this->drift_correlator, (ListenerFunc) _on_drift_corr_calculated, stat);
 
   slidingwindow_add_on_data_ref_change(this->long_sw,  (ListenerFunc) _on_measurement_ref, (ListenerFunc) _on_measurement_unref, this);
@@ -194,14 +191,14 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
   slidingwindow_add_plugins(this->short_sw,
           make_swpercentile(80, _measurement_BiF_cmp, (ListenerFunc) _on_BiF_80th_calculated, this),
           make_swavg(_on_BiF_avg_calculated, stat, _BiF_extractor),
-          make_swstd(_on_BiF_std_calculated, stat, _BiF_extractor),
+          make_swstd(_on_BiF_std_calculated, stat, _BiF_extractor, 100),
           NULL);
 
   slidingwindow_add_plugins(this->long_sw,
           make_swpercentile(80, _measurement_drift_cmp, (ListenerFunc) _on_drift_50th_calculated, this),
-          make_swstd(_on_drift_std_calculated, stat, _drift_extractor),
+          make_swstd(_on_drift_std_calculated, stat, _drift_extractor, 100),
           make_swavg(_on_lost_avg_calculated, stat, _lost_extractor),
-          make_swstd(_on_lost_std_calculated, stat, _lost_extractor),
+          make_swstd(_on_lost_std_calculated, stat, _lost_extractor, 100),
           NULL);
 
 
@@ -270,24 +267,6 @@ void fractalfbprocessor_report_update(FRACTaLFBProcessor *this, GstMPRTCPReportS
     goto done;
   }
 
-  correlator_add_samples(this->rr_sr_correlator,
-//      this->newly_received_bytes,
-//      (gdouble)this->newly_received_bytes / (gdouble) (this->BiF_max * .1),
-//      (gdouble)this->newly_received_bytes / (gdouble)this->max_newly_received_bytes,
-      abs(this->newly_received_bytes - this->newly_received_bytes_t),
-//      this->newly_sent_bytes
-//      (gdouble)this->newly_sent_bytes / (gdouble) (this->BiF_max * .1)
-//      (gdouble)this->newly_sent_bytes / (gdouble) this->max_newly_sent_bytes
-      abs(this->newly_sent_bytes - this->newly_sent_bytes_t)
-  );
-
-  this->newly_received_bytes_t = this->newly_received_bytes;
-  this->newly_sent_bytes_t     = this->newly_sent_bytes;
-
-//  correlator_add_sample(this->rr_sr_correlator,
-//      abs(this->newly_sent_bytes - this->newly_received_bytes)
-//  );
-  this->newly_sent_bytes = this->newly_received_bytes = 0;
 
   _process_stat(this);
 
@@ -329,7 +308,6 @@ void _process_owd(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
   this->last_fall  = xrsummary->OWD.min_delay;
 
   measurement->drift = this->last_raise + this->last_fall;
-//  g_print("%lu+%lu=%lu\n", this->last_raise, this->last_fall, measurement->drift);
   correlator_add_sample(this->drift_correlator, GST_TIME_AS_MSECONDS(measurement->drift));
 done:
   return;
@@ -372,8 +350,6 @@ void _process_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary 
     }
     packet->acknowledged = TRUE;
     packet->lost = !xr->LostRLE.vector[i];
-//    this->newly_sent_bytes -= packet->payload_size;
-    this->newly_received_bytes += packet->lost ? 0 : packet->payload_size;
 
     if(!packet->lost){
 //      measurement->newly_received_bytes += packet->payload_size;
@@ -517,9 +493,9 @@ void _on_drift_50th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_
   PercentileResult(FRACTaLMeasurement,   \
                    drift,       \
                    candidates,            \
-                   _stat(this)->drift_avg, \
-                   this->BiF_min, \
-                   this->BiF_max,  \
+                   _stat(this)->drift_median, \
+                   this->drift_min, \
+                   this->drift_max,  \
                    0                      \
                    );
 }

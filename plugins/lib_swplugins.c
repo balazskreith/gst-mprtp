@@ -324,20 +324,26 @@ typedef struct _swstd{
   gdouble               mean;
   gdouble               var;
   gdouble               emp;
+  gdouble               sum;
+  datapuffer_t*         variances;
+  datapuffer_t*         items;
+  GQueue*               double_recycle;
 }swstd_t;
 
 
 static swstd_t* _swstdpriv_ctor(SlidingWindowPlugin* base, SWDataExtractor extractor)
 {
   swstd_t* this;
-  this = malloc(sizeof(swstd_t));
+  this = g_malloc(sizeof(swstd_t));
   memset(this, 0, sizeof(swstd_t));
-  this->extractor = extractor;
-  this->counter = 0;
-  this->emp     = 0;
-  this->var     = 0;
-  this->mean    = 0;
-  this->base    = base;
+  this->extractor      = extractor;
+  this->counter        = 0;
+  this->emp            = 0;
+  this->var            = 0;
+  this->mean           = 0;
+  this->base           = base;
+  this->sum            = 0.;
+  this->double_recycle = g_queue_new();
   return this;
 }
 
@@ -347,6 +353,19 @@ static void _swstdpriv_disposer(gpointer target)
   if(!target){
     return;
   }
+  if(this->variances){
+    datapuffer_clear(this->variances, g_free);
+    datapuffer_dtor(this->variances);
+    this->variances = NULL;
+  }
+
+  if(this->items){
+    datapuffer_clear(this->items, g_free);
+    datapuffer_dtor(this->items);
+    this->items = NULL;
+  }
+  g_queue_free_full(this->double_recycle, g_free);
+  this->double_recycle = NULL;
   free(this);
 }
 
@@ -363,7 +382,8 @@ static void _swstd_disposer(gpointer target)
 }
 
 
-static void _swstd_add_pipe(gpointer dataptr, gpointer itemptr)
+
+static void _swstd_add_knuth_pipe(gpointer dataptr, gpointer itemptr)
 {
   swstd_t* this = dataptr;
   gdouble new_item = this->extractor(itemptr);
@@ -398,22 +418,81 @@ static void _swstd_rem_pipe(gpointer dataptr, gpointer itemptr)
 {
   swstd_t* this = dataptr;
   --this->counter;
+
+}
+
+
+static void _swstd_add_windowed_pipe(gpointer dataptr, gpointer itemptr)
+{
+  swstd_t* this = dataptr;
+  gdouble new_item = this->extractor(itemptr);
+  gdouble avg;
+  gdouble result = 0.;
+  gdouble n;
+  gdouble new_variance;
+  gdouble old_variance = 0.;
+  gdouble* tmp;
+  if(isnan(new_item) || isinf(new_item)){
+    goto done;
+  }
+  if(datapuffer_isfull(this->items)){
+    tmp = datapuffer_read(this->items);
+    this->sum -= *tmp;
+    g_queue_push_tail(this->double_recycle, tmp);
+  }
+
+  this->sum += new_item;
+  tmp = g_queue_is_empty(this->double_recycle) ? g_malloc(sizeof(gdouble)) : g_queue_pop_head(this->double_recycle);
+  memcpy(tmp, &new_item, sizeof(gdouble));
+  datapuffer_write(this->items, tmp);
+
+  n = datapuffer_readcapacity(this->items);
+  avg = this->sum / n;
+  new_variance = pow(new_item - avg, 2);
+  if(datapuffer_isfull(this->variances)){
+    tmp = datapuffer_read(this->variances);
+    old_variance   = *tmp;
+    g_queue_push_tail(this->double_recycle, tmp);
+  }
+
+  this->var += new_variance - old_variance;
+  tmp = g_queue_is_empty(this->double_recycle) ? g_malloc(sizeof(gdouble)) : g_queue_pop_head(this->double_recycle);
+  memcpy(tmp, &new_variance, sizeof(gdouble));
+  datapuffer_write(this->variances, tmp);
+  if(++this->counter < 2){
+    result = 0.;
+  }else{
+    result = sqrt(this->var / n);
+  }
+done:
+  swplugin_notify(this->base, &result);
 }
 
 SlidingWindowPlugin* make_swstd(ListenerFunc on_calculated_cb, gpointer udata,
-    SWDataExtractor extractor)
+    SWDataExtractor extractor, gint32 window_size)
 {
   SlidingWindowPlugin* this;
+  swstd_t* priv;
   this = swplugin_ctor();
   this = make_swplugin(on_calculated_cb, udata);
-  this->priv = _swstdpriv_ctor(this, extractor);
-  this->add_pipe = _swstd_add_pipe;
+  this->priv = priv = _swstdpriv_ctor(this, extractor);
   this->add_data = this->priv;
-  this->rem_pipe = _swstd_rem_pipe;
   this->rem_data = this->priv;
   this->disposer = _swstd_disposer;
+  if(window_size){
+    priv->variances = datapuffer_ctor(window_size);
+    priv->items     = datapuffer_ctor(window_size);
+    this->add_pipe  = _swstd_add_windowed_pipe;
+    this->rem_pipe  = _swstd_rem_pipe;
+  }else{
+    priv->variances = NULL;
+    this->add_pipe  = _swstd_add_knuth_pipe;
+    this->rem_pipe  = _swstd_rem_pipe;
+  }
   return this;
 }
+
+
 
 
 //-----------------------------------------------------------------------------------

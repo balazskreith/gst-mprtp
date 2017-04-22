@@ -66,6 +66,7 @@ struct _FRACTaLSubController
   guint                     sent_packets;
 
   gdouble                   est_rr;
+  gdouble                   est_rr_in_srtt;
 
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;

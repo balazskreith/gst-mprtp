@@ -42,7 +42,7 @@ typedef struct _FRACTaLStat
   gdouble                  BiF_avg;
   gdouble                  BiF_std;
 
-  gdouble                  drift_avg;
+  gdouble                  drift_median;
   gdouble                  drift_corr;
   gdouble                  drift_std;
   gint64                   last_drift;
@@ -57,7 +57,6 @@ typedef struct _FRACTaLStat
   gdouble                  fraction_lost;
   gint32                   received_bytes_in_srtt;
 
-  gdouble                  rr_sr_corr;
 //  gdouble                  rr_sr_avg;
 //  gdouble                  rr_sr_std;
 
@@ -101,7 +100,6 @@ struct _FRACTaLFBProcessor
   GObject                  object;
   GstClock*                sysclock;
 
-  Correlator*              rr_sr_correlator;
   Correlator*              drift_correlator;
 
   SlidingWindow*           srtt_sw;
@@ -117,18 +115,13 @@ struct _FRACTaLFBProcessor
   GstClockTime             RTT;
   GstClockTime             srtt_updated;
 
-  gdouble                  FL_min;
-  gdouble                  FL_max;
+  gdouble                  drift_min;
+  gdouble                  drift_max;
   gint32                   BiF_min;
   gint32                   BiF_max;
 
   gint32                   received_fb_in_srtt;
 
-  gint32                   newly_sent_bytes;
-  gint32                   newly_received_bytes;
-  gint32                   newly_sent_bytes_t;
-  gint32                   newly_received_bytes_t;
-//  gint32                   sent_bytes_in_srtt_t;
 
   FRACTaLStatHelper        BiF_stat_helper;
   FRACTaLStatHelper        drift_stat_helper;

@@ -137,8 +137,9 @@ SlidingWindowPlugin* make_swavg(ListenerFunc on_calculated_cb,
 
 
 SlidingWindowPlugin* make_swstd(ListenerFunc on_calculated_cb,
-                                  gpointer       udata,
-                                  SWDataExtractor   extractor
+                                  gpointer        udata,
+                                  SWDataExtractor extractor,
+                                  gint32          window_size
                           );
 
 

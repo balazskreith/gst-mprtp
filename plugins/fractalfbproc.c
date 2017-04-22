@@ -523,7 +523,7 @@ void _on_long_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 
 void _on_srtt_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 {
-  this->received_fb_in_srtt += measurement->newly_rcved_fb;
+  _stat(this)->received_fb_in_srtt += measurement->newly_rcved_fb;
 //  _stat(this)->received_bytes_in_srtt += measurement->newly_received_bytes;
   //queue delay estimation
 //  _stat(this)->est_queue_delay += MAX(0., _stat(this)->last_drift - _stat(this)->drift_avg - _stat(this)->drift_std * 2.);
@@ -532,7 +532,7 @@ void _on_srtt_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 
 void _on_srtt_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 {
-  this->received_fb_in_srtt -= measurement->newly_rcved_fb;
+  _stat(this)->received_fb_in_srtt -= measurement->newly_rcved_fb;
 //  _stat(this)->received_bytes_in_srtt -= measurement->newly_received_bytes;
 //  this->est_queue_delay -= measurement->est_queue_delay;
 //  this->sent_bytes_in_srtt_t = measurement->sent_bytes_in_srtt;

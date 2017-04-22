@@ -66,7 +66,14 @@ struct _FRACTaLSubController
   guint                     sent_packets;
 
   gdouble                   est_rr;
-  gdouble                   est_rr_in_srtt;
+
+
+  gdouble                   drift_sum;
+  gint32                    drift_count;
+
+  gint32                    est_capacity;
+  gdouble                   drift_a;
+  GstClockTime              deflate_time;
 
   guint                     monitoring_interval;
   GstClockTime              monitoring_started;
@@ -95,8 +102,6 @@ struct _FRACTaLSubController
   GstClockTime              last_approved;
   GstClockTime              last_settled;
   GstClockTime              last_distorted;
-
-  gint32                    rcved_bytes;
 
 
   gdouble                   cwnd;//congestion window

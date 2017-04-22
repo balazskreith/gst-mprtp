@@ -180,10 +180,6 @@ struct _Private{
  _drift_corr(
      FRACTaLSubController *this);
 
- static gdouble
- _BiF_corr(
-     FRACTaLSubController *this);
-
 static gdouble
 _FL_corr(
     FRACTaLSubController *this);
@@ -267,6 +263,10 @@ _change_cwnd(
 
 static gdouble
 _calculate_est_rr(
+    FRACTaLSubController *this);
+
+static gdouble
+_calculate_est_capacity(
     FRACTaLSubController *this);
 
 static void
@@ -437,7 +437,7 @@ static void _stat_print(FRACTaLSubController *this)
           "FEC:%-4d|SR:%-4d|RR:%-4d|%-4d|"
           "Tr:%-4d|Btl:%-4d|IP:%-4d|"
           "%d-%d-%d-%d|"
-          "D:%-3lu+%-3lu<-%-3lu|%-1.2f"
+          "D:%-3lu+%-3lu<-%-3lu|%-1.2f|%1.2f|"
           "RTPQ:%-1.3f|"
           "L:%-1.2f(%-1.2f)<-%-1.2f|"
           "S:%1.2f|%1.2f|%d|%1.2f\n",
@@ -468,6 +468,7 @@ static void _stat_print(FRACTaLSubController *this)
       (GstClockTime)GST_TIME_AS_MSECONDS(_stat(this)->drift_std),
       GST_TIME_AS_MSECONDS(_stat(this)->last_drift),
       _stat(this)->drift_corr,
+      this->drift_a,
 
       _stat(this)->rtpq_delay,
 
@@ -599,12 +600,21 @@ void fractalsubctrler_report_update(
 
   if(this->backward_congestion){
     this->backward_congestion = FALSE;
-    this->last_distorted = _now(this);
+    this->last_distorted      = _now(this);
     goto done;
   }
 
   fractalfbprocessor_report_update(this->fbprocessor, summary);
-  this->est_rr = _calculate_est_rr(this);
+  this->est_rr       = _calculate_est_rr(this);
+  this->est_capacity = _calculate_est_capacity(this);
+  if(this->subflow->state == SNDSUBFLOW_STATE_OVERUSED){
+    this->drift_sum += _stat(this)->drift_corr;
+    ++this->drift_count;
+    this->drift_a =  (gdouble)(this->drift_count * _stat(this)->drift_corr) / this->drift_sum;
+  }else{
+    this->drift_a = 0.;
+  }
+
 
   DISABLE_LINE _stat_print(this);
   _stat_print(this);
@@ -639,12 +649,6 @@ gdouble _drift_corr(FRACTaLSubController *this){
     return (gdouble) (_stat(this)->last_drift) / (gdouble)(_stat(this)->last_drift + this->drit_th);
 }
 
-gdouble _BiF_corr(FRACTaLSubController *this){
-  if(!_stat(this)->bytes_in_flight){
-      return 0.;
-    }
-    return (gdouble) (_stat(this)->bytes_in_flight) / (gdouble)(_stat(this)->BiF_avg + _stat(this)->BiF_std + _stat(this)->bytes_in_flight);
-}
 
 gdouble _FL_corr(FRACTaLSubController *this){
   if(!_stat(this)->fraction_lost){
@@ -901,8 +905,9 @@ _fire(
         case EVENT_CONGESTION:
           this->last_distorted      = _now(this);
           this->congestion_detected = _now(this);
-          this->rcved_bytes         = 0;
           ++this->distortion_num;
+          this->drift_sum       = _stat(this)->drift_corr;
+          ++this->drift_count   = 1;
         break;
         case EVENT_SETTLED:
           this->last_settled        = _now(this);
@@ -922,7 +927,8 @@ _fire(
           ++this->distortion_num;
         case EVENT_DISTORTION:
           this->last_distorted  = _now(this);
-          this->rcved_bytes     = 0;
+          this->drift_sum       = _stat(this)->drift_corr;
+          ++this->drift_count   = 1;
           sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_OVERUSED);
           break;
         case EVENT_READY:
@@ -941,8 +947,9 @@ _fire(
         case EVENT_CONGESTION:
         case EVENT_DISTORTION:
           this->last_distorted = _now(this);
-          this->rcved_bytes    = 0;
           ++this->distortion_num;
+          this->drift_sum       = _stat(this)->drift_corr;
+          ++this->drift_count   = 1;
           sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_OVERUSED);
         break;
         case EVENT_SETTLED:
@@ -1224,21 +1231,26 @@ gdouble _calculate_est_rr(FRACTaLSubController *this)
 {
   gdouble off;
   gdouble alpha;
-//  gdouble betha;
   gdouble received_bits;
 
   received_bits = _stat(this)->received_bytes_in_srtt * 8.;
   if(!this->est_rr){
-    this->est_rr_in_srtt = received_bits;
     return received_bits;
   }
-  alpha = _BiF_corr(this);
   alpha = (gdouble)_stat(this)->bytes_in_flight / (gdouble)(_stat(this)->bytes_in_flight + _stat(this)->BiF_std);
-//  betha = .5 * _FL_corr(this);
   off = CONSTRAIN(.0001, 1., _stat(this)->srtt / (gdouble) GST_SECOND);
-//  this->est_rr_in_srtt = this->est_rr_in_srtt * (1.-alpha) + received_bits * alpha;
-//  return this->est_rr * (1.-off) + this->est_rr_in_srtt;
   return this->est_rr * (1.-alpha) + (received_bits/off) * alpha;
+}
+
+gdouble _calculate_est_capacity(FRACTaLSubController *this)
+{
+  gdouble alpha;
+  gdouble min_rr = MIN(this->est_rr, _stat(this)->rr_avg);
+  if(!this->est_capacity){
+    return min_rr;
+  }
+  alpha = 1. / (gdouble)(_stat(this)->received_fb_in_srtt);
+  return this->est_capacity * (1.-alpha) + min_rr * alpha;
 }
 
 

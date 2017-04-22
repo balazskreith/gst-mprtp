@@ -56,6 +56,7 @@ typedef struct _FRACTaLStat
 
   gdouble                  fraction_lost;
   gint32                   received_bytes_in_srtt;
+  gint32                   received_fb_in_srtt;
 
 //  gdouble                  rr_sr_avg;
 //  gdouble                  rr_sr_std;
@@ -120,7 +121,6 @@ struct _FRACTaLFBProcessor
   gint32                   BiF_min;
   gint32                   BiF_max;
 
-  gint32                   received_fb_in_srtt;
 
 
   FRACTaLStatHelper        BiF_stat_helper;
@@ -137,7 +137,6 @@ struct _FRACTaLFBProcessor
   gint64                  last_fall;
 //  gint64                  queue_delay;
 
-  gdouble                 est_received_bytes_in_srtt;
 
 };
 

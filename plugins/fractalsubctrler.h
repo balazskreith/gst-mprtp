@@ -105,6 +105,7 @@ struct _FRACTaLSubController
   GstClockTime              last_inflicted;
 
   gboolean                  cwnd_locked;
+  gdouble                   inflicted_cwnd;
 
 
   gdouble                   cwnd;//congestion window

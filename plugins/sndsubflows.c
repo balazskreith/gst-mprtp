@@ -320,7 +320,6 @@ void sndsubflows_set_report_timeout(SndSubflows* this, guint8 subflow_id, GstClo
 
 void sndsubflow_set_state(SndSubflow* subflow, SndSubflowState state)
 {
-  subflow->state_t1 = subflow->state;
   subflow->state = state;
   notifier_do(subflow->base_db->on_subflow_state_changed, subflow);
 }

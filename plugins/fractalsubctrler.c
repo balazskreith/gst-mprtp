@@ -334,8 +334,6 @@ fractalsubctrler_init (FRACTaLSubController * this)
   _priv(this)->min_monitoring_interval          = MIN_MONITORING_INTERVAL;
   _priv(this)->max_monitoring_interval          = MAX_MONITORING_INTERVAL;
   _priv(this)->max_FL_treshold                  = MAX_FL_TRESHOLD;
-
-
 }
 
 FRACTaLSubController *make_fractalsubctrler(SndTracker *sndtracker, SndSubflow *subflow)

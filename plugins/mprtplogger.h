@@ -60,11 +60,11 @@ struct _MPRTPLoggerClass{
 //#define mprtp_log_slice_free(type, mem)  g_slice_free(type, mem)
 
 
-//#define mprtp_malloc(bytenum) g_malloc0(bytenum)
-gpointer mprtp_malloc(gsize bytenum);
+#define mprtp_malloc(bytenum) g_malloc0(bytenum)
+//gpointer mprtp_malloc(gsize bytenum);
 
-//#define mprtp_free(bytenum) g_free(bytenum)
-void mprtp_free(gpointer ptr);
+#define mprtp_free(bytenum) g_free(bytenum)
+//void mprtp_free(gpointer ptr);
 
 void init_mprtp_logger(void);
 gpointer mprtp_slice_alloc(const gchar* type_name, gsize size);

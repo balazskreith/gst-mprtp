@@ -85,11 +85,11 @@ struct _GstMprtpscheduler
   guint32                       fec_interval;
   guint32                       sent_packets;
 
+  guint32                       allowed_ssrc;
+
   SndQueue*                     sndqueue;
   Mediator*                     monitoring;
-//  GQueue*                       packetsq;
   Messenger*                    emit_msger;
-//  GAsyncQueue*                  emitterq;
   Messenger*                    fec_responses;
   gboolean                      fec_requested;
   Notifier*                     on_rtcp_ready;

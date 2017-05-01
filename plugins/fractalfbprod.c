@@ -182,25 +182,6 @@ static void _on_max_skew_rcv_selected(FRACTaLFBProducer* this, swminmaxstat_t* s
 }
 
 
-
-//static void _on_skew_perc(gpointer udata, swpercentilecandidates_t* candidates)
-//{
-//  FRACTaLFBProducer* this = udata;
-//  Skew* skew;
-//  if(!candidates->processed){
-//    skew = candidates->max;
-//  }else{
-//    skew = candidates->right ? candidates->right : candidates->left;
-//  }
-//  if(!skew){
-//    this->dsnd_sum = 0;
-//    this->drcv_sum = 0;
-//  }else{
-//    this->dsnd_sum = skew->dsnd;
-//    this->drcv_sum = skew->drcv;
-//  }
-//}
-
 FRACTaLFBProducer *make_fractalfbproducer(RcvSubflow* subflow, RcvTracker *tracker)
 {
   FRACTaLFBProducer *this;
@@ -376,34 +357,11 @@ void _setup_xr_rfc3611_rle_lost(FRACTaLFBProducer * this,ReportProducer* reportp
                                        this->vector
                                        );
 
-//  g_print("FB creating begin seq: %d end seq: %d, vector length: %d\n", this->begin_seq, this->end_seq, this->vector_length);
-  //BAD!
-//  memset(this->vector, 0, sizeof(gboolean) * 65536);
-//  if(_cmp_seq(this->begin_seq, this->end_seq) < 0){
-//    this->begin_seq = this->end_seq + 1;
-//  }
+
 done:
   return;
 }
 
-
-
-//void _setup_xr_owd(FRACTaLFBProducer * this, ReportProducer* reportproducer)
-//{
-//  guint32      u32_median_delay, u32_min_delay, u32_max_delay;
-//
-//  u32_median_delay = (guint32)(get_ntp_from_epoch_ns(this->median_delay)>>16);
-//  u32_min_delay    = (guint32)(get_ntp_from_epoch_ns(this->min_delay)>>16);
-//  u32_max_delay    = (guint32)(get_ntp_from_epoch_ns(this->max_delay)>>16);
-//
-//  report_producer_add_xr_owd(reportproducer,
-//                             RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION,
-//                             u32_median_delay,
-//                             u32_min_delay,
-//                             u32_max_delay);
-//
-//
-//}
 
 void _setup_xr_owd(FRACTaLFBProducer * this, ReportProducer* reportproducer)
 {

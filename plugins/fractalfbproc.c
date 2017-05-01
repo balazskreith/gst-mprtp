@@ -28,14 +28,10 @@ static void _process_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportS
 static void _process_owd(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary);
 static void _process_stat(FRACTaLFBProcessor *this);
 
-static void _on_BiF_80th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates);
-static void _on_drift_50th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates);
+static void _on_drift_80th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates);
 
 static void _on_long_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement);
-static void _on_short_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement);
 static void _on_long_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement);
-static void _on_short_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement);
-
 static void _on_srtt_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement);
 static void _on_srtt_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement);
 
@@ -75,9 +71,7 @@ static void _owd_logger(FRACTaLFBProcessor *this)
 
 
 static void _long_sw_item_sprintf(FRACTaLMeasurement* measurement, gchar* to_string){
-  sprintf(to_string, "BiF: %d",
-      measurement->bytes_in_flight
-  );
+  sprintf(to_string, "-");
 }
 
 
@@ -101,7 +95,6 @@ static void _on_measurement_unref(FRACTaLFBProcessor* this, FRACTaLMeasurement* 
 
 
 StructCmpFnc(_measurement_drift_cmp, FRACTaLMeasurement, drift);
-StructCmpFnc(_measurement_BiF_cmp, FRACTaLMeasurement, bytes_in_flight);
 
 
 
@@ -126,7 +119,6 @@ fractalfbprocessor_finalize (GObject * object)
   this = FRACTALFBPROCESSOR(object);
 
   g_object_unref(this->long_sw);
-  g_object_unref(this->short_sw);
 
   g_object_unref(this->measurements_recycle);
   g_object_unref(this->sysclock);
@@ -143,7 +135,6 @@ fractalfbprocessor_init (FRACTaLFBProcessor * this)
 
 }
 swplugin_define_swdataextractor(_drift_extractor, FRACTaLMeasurement, drift);
-swplugin_define_on_calculated_double(FRACTaLStat, _on_drift_corr_calculated, drift_corr);
 swplugin_define_on_calculated_double(FRACTaLStat, _on_drift_std_calculated, drift_std);
 
 swplugin_define_swdataextractor(_lost_extractor, FRACTaLMeasurement, fraction_lost);
@@ -151,12 +142,19 @@ swplugin_define_on_calculated_double(FRACTaLStat, _on_lost_avg_calculated, lost_
 swplugin_define_on_calculated_double(FRACTaLStat, _on_lost_std_calculated, lost_std);
 
 swplugin_define_swdataextractor(_BiF_extractor, FRACTaLMeasurement, bytes_in_flight);
-swplugin_define_on_calculated_double(FRACTaLStat, _on_BiF_avg_calculated, BiF_avg);
 swplugin_define_on_calculated_double(FRACTaLStat, _on_BiF_std_calculated, BiF_std);
+
 
 
 static void _on_packet_sent(FRACTaLFBProcessor* this, SndPacket* packet){
 
+}
+
+static void _on_packet_queued(FRACTaLFBProcessor* this, SndPacket* packet){
+  if(packet->subflow_id != this->subflow->id){
+    return;
+  }
+  this->newly_queued_bytes += packet->payload_size;
 }
 
 FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* subflow, FRACTaLStat *stat)
@@ -169,47 +167,37 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
 
   this->measurements_recycle = make_recycle_measurement(500, (RecycleItemShaper) _measurement_shape);
 
-  this->short_sw    = make_slidingwindow(100, 2 * GST_SECOND);
   this->srtt_sw     = make_slidingwindow(100, GST_SECOND);
-  this->long_sw     = make_slidingwindow(300, 30 * GST_SECOND);
+  this->long_sw     = make_slidingwindow(200, 15 * GST_SECOND);
   this->measurement = recycle_retrieve_and_shape(this->measurements_recycle, NULL);
 
   this->measurement->ref     = 1;
 
-  this->drift_correlator = make_correlator(5, 30); //should be 5rtt the total window and 1 rtt the delay.
+//  this->drift_correlator = make_correlator(5, 30); //should be 5rtt the total window and 1 rtt the delay.
 
   sndtracker_add_on_packet_sent(this->sndtracker, (ListenerFunc)_on_packet_sent, this);
+  sndtracker_add_on_packet_queued(this->sndtracker, (ListenerFunc)_on_packet_queued, this);
 
-  correlator_add_on_correlation_calculated_listener(this->drift_correlator, (ListenerFunc) _on_drift_corr_calculated, stat);
+//  correlator_add_on_correlation_calculated_listener(this->drift_correlator, (ListenerFunc) _on_drift_corr_calculated, stat);
 
   slidingwindow_add_on_data_ref_change(this->long_sw,  (ListenerFunc) _on_measurement_ref, (ListenerFunc) _on_measurement_unref, this);
-  slidingwindow_add_on_data_ref_change(this->short_sw,  (ListenerFunc) _on_measurement_ref, (ListenerFunc) _on_measurement_unref, this);
   slidingwindow_add_on_data_ref_change(this->srtt_sw,  (ListenerFunc) _on_measurement_ref, (ListenerFunc) _on_measurement_unref, this);
 
   DISABLE_LINE slidingwindow_setup_debug(this->long_sw, (SlidingWindowItemSprintf)_long_sw_item_sprintf, g_print);
 
-  slidingwindow_add_plugins(this->short_sw,
-          make_swpercentile(80, _measurement_BiF_cmp, (ListenerFunc) _on_BiF_80th_calculated, this),
-          make_swavg(_on_BiF_avg_calculated, stat, _BiF_extractor),
-          make_swstd(_on_BiF_std_calculated, stat, _BiF_extractor, 100),
-          NULL);
-
   slidingwindow_add_plugins(this->long_sw,
-          make_swpercentile(80, _measurement_drift_cmp, (ListenerFunc) _on_drift_50th_calculated, this),
-          make_swstd(_on_drift_std_calculated, stat, _drift_extractor, 100),
+          make_swpercentile(80, _measurement_drift_cmp, (ListenerFunc) _on_drift_80th_calculated, this),
+          make_swstd(_on_drift_std_calculated, stat, _drift_extractor, 0),
+          make_swstd(_on_BiF_std_calculated, stat, _BiF_extractor, 0),
           make_swavg(_on_lost_avg_calculated, stat, _lost_extractor),
           make_swstd(_on_lost_std_calculated, stat, _lost_extractor, 100),
+          make_swstd(_on_BiF_std_calculated, stat, _BiF_extractor, 0),
           NULL);
 
 
   slidingwindow_add_on_change(this->srtt_sw,
       (ListenerFunc)_on_srtt_sw_add,
       (ListenerFunc)_on_srtt_sw_rem,
-      this);
-
-  slidingwindow_add_on_change(this->short_sw,
-      (ListenerFunc) _on_short_sw_add,
-      (ListenerFunc) _on_short_sw_rem,
       this);
 
   slidingwindow_add_on_change(this->long_sw,
@@ -271,18 +259,12 @@ void fractalfbprocessor_report_update(FRACTaLFBProcessor *this, GstMPRTCPReportS
   _process_stat(this);
 
   slidingwindow_add_data(this->srtt_sw, this->measurement);
-  slidingwindow_add_data(this->short_sw, this->measurement);
 
   ++this->newly_rcved_fb;
   this->last_report_update = now;
 
 done:
   return;
-}
-
-void fractalfbprocessor_reset_short_sw(FRACTaLFBProcessor *this)
-{
-  slidingwindow_clear(this->short_sw);
 }
 
 void fractalfbprocessor_approve_measurement(FRACTaLFBProcessor *this)
@@ -297,6 +279,16 @@ static gdouble _get_ewma_factor(FRACTaLFBProcessor *this){
   return (gdouble) _stat(this)->last_drift / (gdouble)(_stat(this)->last_drift + _stat(this)->drift_std);
 }
 
+static void _calculate_drift_corr(FRACTaLFBProcessor *this, gdouble actual_drift_in_ms){
+  gdouble avg_drift_in_ms = MAX(30., GST_TIME_AS_MSECONDS(_stat(this)->drift_80th + 4 * _stat(this)->drift_std));
+  gdouble actual_corr = actual_drift_in_ms / avg_drift_in_ms;
+  if(_stat(this)->drift_corr == 0.){
+    _stat(this)->drift_corr = actual_corr;
+  }else{
+    _stat(this)->drift_corr = _stat(this)->drift_corr * .75 + actual_corr * .25;
+  }
+  // _stat(this)->drift_corr = MIN(1., _stat(this)->drift_corr);
+}
 
 void _process_owd(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
 {
@@ -308,7 +300,9 @@ void _process_owd(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
   this->last_fall  = xrsummary->OWD.min_delay;
 
   measurement->drift = this->last_raise + this->last_fall;
-  correlator_add_sample(this->drift_correlator, GST_TIME_AS_MSECONDS(measurement->drift));
+  //
+  _calculate_drift_corr(this, GST_TIME_AS_MSECONDS(measurement->drift));
+//  correlator_add_sample(this->drift_correlator, GST_TIME_AS_MSECONDS(measurement->drift));
 done:
   return;
 }
@@ -407,20 +401,6 @@ done:
   return;
 }
 
-//static gdouble _drift_corr(FRACTaLFBProcessor *this){
-//  if(!_stat(this)->last_drift){
-//      return 0.;
-//    }
-//    return (gdouble) (_stat(this)->last_drift) / (gdouble)(_stat(this)->last_drift + _stat(this)->drift_std * 4.);
-//}
-//
-//static gdouble _BiF_corr(FRACTaLFBProcessor *this){
-//  if(!_stat(this)->bytes_in_flight){
-//      return 0.;
-//    }
-//    return (gdouble) (_stat(this)->bytes_in_flight) / (gdouble)(_stat(this)->BiF_avg + _stat(this)->BiF_std + _stat(this)->bytes_in_flight);
-//}
-
 void _process_stat(FRACTaLFBProcessor *this)
 {
 
@@ -458,6 +438,8 @@ void _process_stat(FRACTaLFBProcessor *this)
     measurement->bytes_in_flight = sndstat->bytes_in_flight;
     measurement->newly_rcved_fb = this->newly_rcved_fb;
     this->newly_rcved_fb = 0;
+    measurement->newly_queued_bytes = this->newly_queued_bytes;
+    this->newly_queued_bytes = 0;
   }
 
 //  correlator_add_samples(this->rr_sr_correlator,
@@ -471,44 +453,22 @@ void _process_stat(FRACTaLFBProcessor *this)
 
   slidingwindow_refresh(this->srtt_sw);
   slidingwindow_refresh(this->long_sw);
-  slidingwindow_refresh(this->short_sw);
 }
 
 
 
-void _on_BiF_80th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates)
-{
-  PercentileResult(FRACTaLMeasurement,   \
-                   bytes_in_flight,       \
-                   candidates,            \
-                   _stat(this)->BiF_80th, \
-                   this->BiF_min, \
-                   this->BiF_max,  \
-                   0                      \
-                   );
-}
-
-void _on_drift_50th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates)
+void _on_drift_80th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates)
 {
   PercentileResult(FRACTaLMeasurement,   \
                    drift,       \
                    candidates,            \
-                   _stat(this)->drift_median, \
+                   _stat(this)->drift_80th, \
                    this->drift_min, \
                    this->drift_max,  \
                    0                      \
                    );
 }
 
-void _on_short_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
-{
-
-}
-
-void _on_short_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
-{
-
-}
 
 void _on_long_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 {
@@ -520,23 +480,15 @@ void _on_long_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 
 }
 
-
 void _on_srtt_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 {
+  _stat(this)->queued_bytes_in_srtt += measurement->newly_queued_bytes;
   _stat(this)->received_fb_in_srtt += measurement->newly_rcved_fb;
-//  _stat(this)->received_bytes_in_srtt += measurement->newly_received_bytes;
-  //queue delay estimation
-//  _stat(this)->est_queue_delay += MAX(0., _stat(this)->last_drift - _stat(this)->drift_avg - _stat(this)->drift_std * 2.);
 
 }
 
 void _on_srtt_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 {
   _stat(this)->received_fb_in_srtt -= measurement->newly_rcved_fb;
-//  _stat(this)->received_bytes_in_srtt -= measurement->newly_received_bytes;
-//  this->est_queue_delay -= measurement->est_queue_delay;
-//  this->sent_bytes_in_srtt_t = measurement->sent_bytes_in_srtt;
+  _stat(this)->queued_bytes_in_srtt -= measurement->newly_queued_bytes;
 }
-
-
-

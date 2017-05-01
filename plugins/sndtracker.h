@@ -75,6 +75,7 @@ struct _SndTracker
 
   Notifier*                 on_packet_sent;
   Notifier*                 on_packet_obsolated;
+  Notifier*                 on_packet_queued;
 };
 
 
@@ -94,6 +95,7 @@ void sndtracker_packet_found(SndTracker * this, SndPacket* packet);
 void sndtracker_packet_acked(SndTracker * this, SndPacket* packet);
 void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_response);
 void sndtracker_add_on_packet_sent(SndTracker * this, ListenerFunc callback, gpointer udata);
+void sndtracker_add_on_packet_queued(SndTracker * this, ListenerFunc callback, gpointer udata);
 void sndtracker_add_on_packet_obsolated(SndTracker * this, ListenerFunc callback, gpointer udata);
 void sndtracker_add_on_packet_sent_with_filter(SndTracker * this, ListenerFunc callback, ListenerFilterFunc filter, gpointer udata);
 void sndtracker_rem_on_packet_sent(SndTracker * this, ListenerFunc callback);

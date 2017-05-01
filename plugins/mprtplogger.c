@@ -123,15 +123,15 @@ _print_memory_allocation(
 //--------- Private functions implementations to SchTree object --------
 //----------------------------------------------------------------------
 
-gpointer mprtp_malloc(gsize bytenum){
-  gpointer result;
-  result = g_malloc0(bytenum);
-  return result;
-}
-
-void mprtp_free(gpointer ptr){
-  g_free(ptr);
-}
+//gpointer mprtp_malloc(gsize bytenum){
+//  gpointer result;
+//  result = g_malloc0(bytenum);
+//  return result;
+//}
+//
+//void mprtp_free(gpointer ptr){
+//  g_free(ptr);
+//}
 
 
 void
@@ -180,10 +180,11 @@ mprtp_logger_init (MPRTPLogger * this)
 
   this->memory_consumptions = g_hash_table_new(g_str_hash, g_str_equal);
 
-  this->process = gst_task_new (_process, this, NULL);
-  g_rec_mutex_init (&this->process_mutex);
-  gst_task_set_lock (this->process, &this->process_mutex);
-  gst_task_start (this->process);
+  if(0) _process(NULL);
+//  this->process = gst_task_new (_process, this, NULL);
+//  g_rec_mutex_init (&this->process_mutex);
+//  gst_task_set_lock (this->process, &this->process_mutex);
+//  gst_task_start (this->process);
 }
 
 void init_mprtp_logger(void)
@@ -194,7 +195,7 @@ void init_mprtp_logger(void)
   this = g_object_new(MPRTPLOGGER_TYPE, NULL);
 }
 
-static void _process(gpointer udata)
+void _process(gpointer udata)
 {
   MPRTPLogger* this = udata;
   Message* msg;

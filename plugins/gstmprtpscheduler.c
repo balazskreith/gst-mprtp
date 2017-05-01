@@ -111,6 +111,7 @@ enum
   PROP_SETUP_RTCP_INTERVAL_TYPE,
   PROP_SETUP_REPORT_TIMEOUT,
   PROP_FEC_INTERVAL,
+  PROP_ALLOWED_SSRC,
 };
 
 /* signals and args */
@@ -277,6 +278,12 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
           "Set a stable FEC interval",
           0, 15, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_ALLOWED_SSRC,
+      g_param_spec_uint ("allowed-ssrc",
+          "Apply MPRTP and Congestion Control only for a certain packet with the given SSRC (0 means any)",
+          "Apply MPRTP and Congestion Control only for a certain packet with the given SSRC (0 means any)",
+          0, 4294967295, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   _subflows_utilization =
       g_signal_new ("mprtp-subflows-utilization", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (GstMprtpschedulerClass, mprtp_media_rate_utilization),
@@ -369,6 +376,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->subflows      = make_sndsubflows(this->monitoring);
   this->sndpackets    = make_sndpackets();
   this->emit_msger    = make_messenger(sizeof(MPRTPPluginSignalData));
+  this->allowed_ssrc  = 0;
 
   this->splitter      = make_stream_splitter(this->subflows);
   this->sndqueue      = make_sndqueue(this->subflows);
@@ -514,6 +522,9 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
     case PROP_FEC_INTERVAL:
       this->fec_interval = g_value_get_uint (value);
       break;
+    case PROP_ALLOWED_SSRC:
+      this->allowed_ssrc = g_value_get_uint (value);
+      break;
     case PROP_SET_SENDING_TARGET:
       guint_value = g_value_get_uint (value);
       sndsubflows_set_target_bitrate(this->subflows, subflow_prop->id, subflow_prop->value);
@@ -564,6 +575,9 @@ gst_mprtpscheduler_get_property (GObject * object, guint property_id,
       break;
     case PROP_FEC_INTERVAL:
       g_value_set_uint (value, (guint) this->fec_interval);
+      break;
+    case PROP_ALLOWED_SSRC:
+      g_value_set_uint (value, (guint) this->allowed_ssrc);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -670,6 +684,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   guint8 second_byte;
   SndPacket* packet = NULL;
   SndSubflow* subflow = NULL;
+  guint32 third_word;
 
   this = GST_MPRTPSCHEDULER (parent);
 
@@ -703,6 +718,15 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     goto done;
   }
 
+  if(0 < this->allowed_ssrc && gst_buffer_extract (buffer, 8, &third_word, 4) != 1){
+    guint32 packet_ssrc = g_ntohs(third_word);
+    if(packet_ssrc != this->allowed_ssrc){
+      GST_DEBUG_OBJECT (this, "RTP packet with SSRC %d let to pass (allowed SSRC: %d)", packet_ssrc, this->allowed_ssrc);
+      gst_pad_push(this->mprtp_srcpad, buffer);
+      goto done;
+    }
+  }
+
   //The problem if we add the fec here: We add an extesnion thereafter and
   //meanwhile the receiver side the bitstting considering the extension
   //here we don't at the creation.
@@ -717,6 +741,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   packet = sndpackets_make_packet(this->sndpackets, gst_buffer_ref(buffer));
   subflow = stream_splitter_select_subflow(this->splitter, packet);
   if(subflow){
+    //TODO: track how many bytes we added to the queue here.
     sndpacket_setup_mprtp(packet, subflow->id, sndsubflow_get_next_subflow_seq(subflow));
     fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(packet->buffer));
     sndqueue_push_packet(this->sndqueue, sndtracker_add_packet_to_rtpqueue(this->sndtracker, packet));

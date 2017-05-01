@@ -82,8 +82,8 @@ control_c()
 
 trap control_c SIGINT
 #Lets Rock
-./$SCRIPTFILE  & 
-./$SCRIPTFILE2 &
+./$SCRIPTFILE  > $TEMPDIR/sender_1.log & 
+./$SCRIPTFILE2 > $TEMPDIR/sender_2.log&
  
 sleep $DURATION
 

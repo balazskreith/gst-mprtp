@@ -113,6 +113,8 @@ sndtracker_finalize (GObject * object)
   g_object_unref(this->acked_sw);
   g_object_unref(this->fec_sw);
   g_object_unref(this->on_packet_sent);
+  g_object_unref(this->on_packet_obsolated);
+  g_object_unref(this->on_packet_queued);
 
   g_object_unref(this->subflows_db);
   g_object_unref(this->sysclock);
@@ -132,6 +134,7 @@ sndtracker_init (SndTracker * this)
 
   this->on_packet_sent      = make_notifier("SndTracker: on-packet-sent");
   this->on_packet_obsolated = make_notifier("SndTracker: on-packet-obsolated");
+  this->on_packet_queued    = make_notifier("SndTracker: on-packet-queued");
 
   slidingwindow_add_on_rem_item_cb(this->sent_sw, (ListenerFunc) _sent_packets_rem_pipe, this);
   slidingwindow_add_on_rem_item_cb(this->fec_sw, (ListenerFunc) _fec_rem_pipe, this);
@@ -182,6 +185,7 @@ SndPacket* sndtracker_add_packet_to_rtpqueue(SndTracker* this, SndPacket* packet
   this->rtpqstat.bytes_in_queue += packet->payload_size;
   ++this->rtpqstat.packets_in_queue;
   this->rtpqstat.last_arrived = packet->made;
+  notifier_do(this->on_packet_queued, packet);
   return packet;
 }
 
@@ -317,6 +321,11 @@ void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_resp
 void sndtracker_add_on_packet_sent(SndTracker * this, ListenerFunc callback, gpointer udata)
 {
   notifier_add_listener(this->on_packet_sent, callback, udata);
+}
+
+void sndtracker_add_on_packet_queued(SndTracker * this, ListenerFunc callback, gpointer udata)
+{
+  notifier_add_listener(this->on_packet_queued, callback, udata);
 }
 
 void sndtracker_add_on_packet_obsolated(SndTracker * this, ListenerFunc callback, gpointer udata)

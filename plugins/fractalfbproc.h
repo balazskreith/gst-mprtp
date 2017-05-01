@@ -39,10 +39,10 @@ typedef struct _FRACTaLStat
   gint32                   fec_bitrate;
 
 
-  gdouble                  BiF_avg;
+//  gdouble                  BiF_avg;
   gdouble                  BiF_std;
 
-  gdouble                  drift_median;
+  gdouble                  drift_80th;
   gdouble                  drift_corr;
   gdouble                  drift_std;
   gint64                   last_drift;
@@ -57,6 +57,7 @@ typedef struct _FRACTaLStat
   gdouble                  fraction_lost;
   gint32                   received_bytes_in_srtt;
   gint32                   received_fb_in_srtt;
+  gint32                   queued_bytes_in_srtt;
 
 //  gdouble                  rr_sr_avg;
 //  gdouble                  rr_sr_std;
@@ -67,33 +68,14 @@ typedef struct _FRACTaLStat
 
 }FRACTaLStat;
 
-typedef struct{
-  guint   counter;
-  gdouble mean;
-  gdouble var;
-  gdouble emp;
-
-  gdouble sum;
-}FRACTaLStatHelper;
-
 
 typedef struct{
   gint32        ref;
   GstClockTime  drift;
   gdouble      fraction_lost;
-//  gint32       newly_received_bytes;
-//  gint32       newly_sent_bytes;
-//  gint32       sent_bytes_in_srtt;
-//  gint32       rcved_bytes_in_srtt;
   gint32       newly_rcved_fb;
+  gint32       newly_queued_bytes;
   gint32       bytes_in_flight;
-
-//  gint32       sent_kbps;
-//  gint32       rcvd_kbps;
-
-//  gdouble      sr_avg;
-//  gdouble      rr_sr_corr;
-//  gdouble      est_queue_delay;
 }FRACTaLMeasurement;
 
 struct _FRACTaLFBProcessor
@@ -101,10 +83,10 @@ struct _FRACTaLFBProcessor
   GObject                  object;
   GstClock*                sysclock;
 
-  Correlator*              drift_correlator;
+//  Correlator*              drift_correlator;
 
   SlidingWindow*           srtt_sw;
-  SlidingWindow*           short_sw;
+//  SlidingWindow*           short_sw;
   SlidingWindow*           long_sw;
   Recycle*                 measurements_recycle;
 
@@ -113,6 +95,7 @@ struct _FRACTaLFBProcessor
   SndSubflow*              subflow;
   FRACTaLMeasurement*      measurement;
   guint                    newly_rcved_fb;
+  gint32                   newly_queued_bytes;
   GstClockTime             RTT;
   GstClockTime             srtt_updated;
 
@@ -121,22 +104,13 @@ struct _FRACTaLFBProcessor
   gint32                   BiF_min;
   gint32                   BiF_max;
 
-
-
-  FRACTaLStatHelper        BiF_stat_helper;
-  FRACTaLStatHelper        drift_stat_helper;
-  FRACTaLStatHelper        lost_stat_helper;
   GstClockTime             last_report_update;
   GstClockTime             last_owd_log;
 
-//  gint32                   newly_acked_packets;
-//  gint32                   newly_received_packets;
   guint16                  HSN;
 
   gint64                  last_raise;
   gint64                  last_fall;
-//  gint64                  queue_delay;
-
 
 };
 
@@ -152,7 +126,6 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
 void fractalfbprocessor_reset(FRACTaLFBProcessor *this);
 gint32 fractalfbprocessor_get_estimation(FRACTaLFBProcessor *this);
 void fractalfbprocessor_start_estimation(FRACTaLFBProcessor *this);
-void fractalfbprocessor_reset_short_sw(FRACTaLFBProcessor *this);
 void fractalfbprocessor_approve_measurement(FRACTaLFBProcessor *this);
 void fractalfbprocessor_time_update(FRACTaLFBProcessor *this);
 void fractalfbprocessor_report_update(FRACTaLFBProcessor *this, GstMPRTCPReportSummary *summary);

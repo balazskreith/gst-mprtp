@@ -49,9 +49,6 @@ struct _FRACTaLFBProducer
   SlidingWindow*           skew_sw;
   Recycle*                 skew_recycle;
 
-  guint64                  max_skew;
-  guint64                  min_skew;
-
   guint64                  raise;
   guint64                  fall;
 

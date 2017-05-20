@@ -55,7 +55,7 @@ cleanup()
   sudo pkill sleep
   sudo pkill iperf
   sudo pkill iperf
-  sudo pkill rmcat6.sh
+  #sudo pkill rmcat6.sh
 }
  
 control_c()

@@ -40,6 +40,21 @@ G_DEFINE_TYPE (ReportProducer, report_producer, G_TYPE_OBJECT);
 
 #define _now(this) (gst_clock_get_time (this->sysclock))
 
+typedef struct {
+  guint8 content[1300];
+  Recycle* recycle;
+}Databed;
+
+DEFINE_RECYCLE_TYPE(static, databed, Databed);
+
+static void
+_databed_shaper(
+    Databed* result,
+    ReportProducer *this);
+
+static void
+_databed_free(Databed* databed);
+
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
@@ -104,6 +119,9 @@ report_producer_init (ReportProducer * this)
   this->made            = _now(this);
   this->xr.actual_block = this->xr.databed = mprtp_malloc(DATABED_LENGTH);
   this->in_progress         = FALSE;
+
+  this->databeds = make_recycle_databed(100, (RecycleItemShaper) _databed_shaper);
+
 }
 
 void report_producer_set_sender_ssrc(ReportProducer *this, guint32 sender_ssrc)
@@ -312,6 +330,14 @@ void report_producer_add_sr(ReportProducer *this,
   _add_length(this, length);
 }
 
+void _databed_shaper(Databed* result, ReportProducer *this) {
+  result->recycle = this->databeds;
+  memcpy(result->content, this->databed, this->length);
+}
+
+void _databed_free(Databed* databed) {
+  recycle_add(databed->recycle, databed);
+}
 
 GstBuffer *report_producer_end(ReportProducer *this, guint *length)
 {
@@ -329,12 +355,20 @@ GstBuffer *report_producer_end(ReportProducer *this, guint *length)
 //  gst_mprtcp_riport_add_block_end(this->report, this->block);
 //  g_print("length: %lu\n", this->length);
 //  gst_print_rtcp(this->databed);
-  data = g_malloc0(this->length);
-  memcpy(data, this->databed, this->length);
-  result = gst_buffer_new_wrapped(data, this->length);
+//  data = g_malloc0(this->length);
+//  memcpy(data, this->databed, this->length);
+//  result = gst_buffer_new_wrapped(data, this->length);
+  {
+    Databed *databed = recycle_retrieve_and_shape(this->databeds, this);
+    data = databed->content;
+    result = gst_buffer_new_wrapped_full(GST_MEMORY_FLAG_READONLY, data,
+        sizeof(Databed), 0, this->length, databed, (GDestroyNotify) _databed_free);
+  }
   if(length) {
     *length = this->length;
   }
+
+
 //  mprtp_logger_open_collector(this->logfile);
 //  gst_printfnc_rtcp(data, mprtp_logger_collect);
 //  mprtp_logger_collect("########### Report produced for after: %lu seconds ###########\n", GST_TIME_AS_SECONDS(_now(this) - this->made));

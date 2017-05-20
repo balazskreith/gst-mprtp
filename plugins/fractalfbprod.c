@@ -135,6 +135,7 @@ static void _on_skew_add(FRACTaLFBProducer* this, Skew* skew)
   }else{
     this->fall += skew->dsnd - skew->drcv;
   }
+//  g_print("_on_skew_add\n");
 }
 
 static void _on_skew_rem(FRACTaLFBProducer* this, Skew* skew)
@@ -144,41 +145,7 @@ static void _on_skew_rem(FRACTaLFBProducer* this, Skew* skew)
   }else{
     this->fall -= skew->dsnd - skew->drcv;
   }
-}
-
-static gint _cmp_rcv_skew(Skew* a, Skew* b){
-  gint64 da,db;
-  if(a->dsnd <= a->drcv){
-    da = a->drcv - a->dsnd;
-  }else{
-    da = a->dsnd - a->drcv;
-    da *= -1;
-  }
-
-  if(b->dsnd <= b->drcv){
-    db = b->drcv - b->dsnd;
-  }else{
-    db = b->dsnd - b->drcv;
-    db *= -1;
-  }
-  return da == db ? 0 : da < db ? -1 : 1;
-//  return a->drcv == b->drcv ? 0 : a->drcv < b->drcv ? -1 : 1;
-}
-
-static void _on_max_skew_rcv_selected(FRACTaLFBProducer* this, swminmaxstat_t* stat){
-  Skew* max = stat->max;
-  Skew* min = stat->min;
-  if(max->dsnd < max->drcv){
-    this->max_skew = max->drcv - max->dsnd;
-  }else{
-    this->max_skew = 0;
-  }
-
-  if(min->dsnd < min->drcv){
-    this->min_skew = 0;
-  }else{
-    this->min_skew = min->dsnd - min->drcv;
-  }
+//  g_print("_on_skew_rem\n");
 }
 
 
@@ -211,8 +178,6 @@ FRACTaLFBProducer *make_fractalfbproducer(RcvSubflow* subflow, RcvTracker *track
   slidingwindow_set_data_recycle(this->skew_sw, this->skew_recycle);
 
   slidingwindow_add_on_change(this->skew_sw, (ListenerFunc)_on_skew_add, (ListenerFunc)_on_skew_rem, this);
-  slidingwindow_add_plugin(this->skew_sw, make_swminmax((bintree3cmp)_cmp_rcv_skew, (ListenerFunc)_on_max_skew_rcv_selected, this));
-//  slidingwindow_add_plugin(this->skew_sw, make_swpercentile(80, (bintree3cmp)_cmp_skew, (ListenerFunc) _on_skew_perc, this));
 
   return this;
 }
@@ -232,7 +197,7 @@ void _on_discarded_packet(FRACTaLFBProducer *this, RcvPacket *packet)
   this->discarded_bytes += packet->payload_size;
 }
 
-static void _add_new_queue_delay_est(FRACTaLFBProducer *this, RcvPacket* packet)
+static void _add_new_skew(FRACTaLFBProducer *this, RcvPacket* packet)
 {
   gdouble drcv, dsnd;
   if(this->prev_rcv == 0){
@@ -245,6 +210,7 @@ static void _add_new_queue_delay_est(FRACTaLFBProducer *this, RcvPacket* packet)
   if(0 < _cmp_seq(this->prev_seq, packet->abs_seq)){
     return;
   }
+  this->prev_seq = packet->abs_seq;
 
   if(packet->abs_snd_ntp_chunk < this->prev_snd){//turnaround
     dsnd = (gint64)(0x0000004000000000ULL - this->prev_snd) + (gint64)packet->abs_snd_ntp_chunk;
@@ -258,13 +224,14 @@ static void _add_new_queue_delay_est(FRACTaLFBProducer *this, RcvPacket* packet)
   {
     Skew skew = {dsnd,drcv,(gdouble)packet->payload_size};
     slidingwindow_add_data(this->skew_sw, &skew);
+//    g_print("%-5hu: %-10lu | %-10lu | %-10lu | %-10lu\n", packet->subflow_seq, skew.drcv, skew.dsnd, this->fall, this->raise);
   }
 
 }
 
 void _on_received_packet(FRACTaLFBProducer *this, RcvPacket *packet)
 {
-  _add_new_queue_delay_est(this, packet);
+  _add_new_skew(this, packet);
   slidingwindow_add_data(this->rle_sw,  &packet->subflow_seq);
 
   ++this->rcved_packets;
@@ -278,7 +245,6 @@ void _on_received_packet(FRACTaLFBProducer *this, RcvPacket *packet)
   if(_cmp_seq(this->end_seq, packet->subflow_seq) < 0){
     this->end_seq = packet->subflow_seq;
   }
-
 done:
   return;
 }
@@ -368,7 +334,7 @@ void _setup_xr_owd(FRACTaLFBProducer * this, ReportProducer* reportproducer)
   guint32      u32_median_delay, u32_min_delay, u32_max_delay;
 
 //  u32_median_delay = this->median_delay >> 16;
-  u32_median_delay = this->max_skew >> 16;
+  u32_median_delay = 1; //temporary, for processing at the other end
 //  u32_min_delay    = this->min_skew >> 16;
   u32_min_delay    = this->fall >> 16;
 //  u32_max_delay    = this->max_skew >> 16;

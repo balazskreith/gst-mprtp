@@ -83,10 +83,8 @@ struct _FRACTaLFBProcessor
   GObject                  object;
   GstClock*                sysclock;
 
-//  Correlator*              drift_correlator;
 
   SlidingWindow*           srtt_sw;
-//  SlidingWindow*           short_sw;
   SlidingWindow*           long_sw;
   Recycle*                 measurements_recycle;
 

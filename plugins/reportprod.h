@@ -40,6 +40,8 @@ struct _ReportProducer
   gsize                    length;
   gboolean                 in_progress;
 
+  Recycle*                 databeds;
+
   struct{
     GstRTCPXRBlock*          head_block;
     gpointer                 actual_block;

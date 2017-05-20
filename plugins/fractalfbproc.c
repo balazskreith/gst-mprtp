@@ -180,8 +180,8 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
 
 //  correlator_add_on_correlation_calculated_listener(this->drift_correlator, (ListenerFunc) _on_drift_corr_calculated, stat);
 
-  slidingwindow_add_on_data_ref_change(this->long_sw,  (ListenerFunc) _on_measurement_ref, (ListenerFunc) _on_measurement_unref, this);
-  slidingwindow_add_on_data_ref_change(this->srtt_sw,  (ListenerFunc) _on_measurement_ref, (ListenerFunc) _on_measurement_unref, this);
+  slidingwindow_add_processors(this->long_sw,  (ListenerFunc) _on_measurement_ref, (ListenerFunc) _on_measurement_unref, this);
+  slidingwindow_add_processors(this->srtt_sw,  (ListenerFunc) _on_measurement_ref, (ListenerFunc) _on_measurement_unref, this);
 
   DISABLE_LINE slidingwindow_setup_debug(this->long_sw, (SlidingWindowItemSprintf)_long_sw_item_sprintf, g_print);
 
@@ -242,8 +242,8 @@ void fractalfbprocessor_report_update(FRACTaLFBProcessor *this, GstMPRTCPReportS
   }
 
   if(summary->XR.OWD.processed){
-      _process_owd(this, &summary->XR);
-      process = TRUE;
+    _process_owd(this, &summary->XR);
+    process = TRUE;
   }
 
   if(summary->XR.DiscardedBytes.processed){
@@ -296,6 +296,7 @@ void _process_owd(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary)
   if(!xrsummary->OWD.median_delay){
     goto done;
   }
+//  g_print("%lu, %lu\n", xrsummary->OWD.min_delay, xrsummary->OWD.max_delay);
   this->last_raise = xrsummary->OWD.max_delay;
   this->last_fall  = xrsummary->OWD.min_delay;
 
@@ -441,13 +442,6 @@ void _process_stat(FRACTaLFBProcessor *this)
     measurement->newly_queued_bytes = this->newly_queued_bytes;
     this->newly_queued_bytes = 0;
   }
-
-//  correlator_add_samples(this->rr_sr_correlator,
-////      _stat(this)->received_bytes_in_srtt,
-//      ((gdouble)_stat(this)->received_bytes_in_srtt / (gdouble)this->BiF_max),
-////      this->sent_bytes_in_srtt_t
-//      ((gdouble)this->sent_bytes_in_srtt_t / (gdouble) this->BiF_max)
-//      );
 
   DISABLE_LINE _owd_logger(this);
 

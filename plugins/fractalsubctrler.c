@@ -572,9 +572,8 @@ void fractalsubctrler_report_update(
 
 
   DISABLE_LINE _stat_print(this);
-  // _stat_print(this);
 
-  this->approve_measurement  = FALSE;
+  this->approve_measurement = FALSE;
   if(10 < _stat(this)->measurements_num){
     _execute_stage(this);
   }else{
@@ -721,10 +720,6 @@ static void _deflate_cwnd(FRACTaLSubController *this)
   }
   _change_cwnd(this, this->cwnd + (queue_cwnd - btl_cwnd) / 2);
 }
-
-// static gboolean _congestion_collapse(FRACTaLSubController *this){
-//   return 2. < this->drift_a;// || .5 < _stat(this)->fraction_lost;
-// }
 
 void
 _reduce_stage(
@@ -1020,10 +1015,7 @@ void _refresh_monitoring_approvement(FRACTaLSubController *this)
   if(!this->monitoring_approvement_started){
     this->monitoring_approvement_started = _now(this);
   }
-//  interval = _get_approvement_interval(this);
   interval = this->approvement_interval;
-//  interval = this->approvement_interval * (1.+_drift_corr(this) * 2);
-//  g_print("Monitoring approvement interval: %lu (srtt: %f)\n", interval, _stat(this)->srtt);
   if(_now(this) - interval < this->monitoring_approvement_started){
     return;
   }

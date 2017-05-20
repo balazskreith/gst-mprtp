@@ -49,11 +49,12 @@ struct _SlidingWindow
   gboolean               (*obsolate)(gpointer, SlidingWindowItem*);
   gpointer                 obsolate_udata;
   GList*                   plugins;
+
   Notifier*                on_add_item;
   Notifier*                on_rem_item;
 
-  Notifier*                on_data_ref;
-  Notifier*                on_data_unref;
+  Notifier*                preprocessors;
+  Notifier*                postprocessors;
 
   Recycle*                 data_recycle;
   Recycle*                 items_recycle;
@@ -106,9 +107,9 @@ void slidingwindow_add_int(SlidingWindow* this, gint data);
 void slidingwindow_add_data(SlidingWindow* this, gpointer data);
 void slidingwindow_set_data_recycle(SlidingWindow* this, Recycle* data_recycle);
 
-void slidingwindow_add_on_data_ref(SlidingWindow* this, ListenerFunc callback, gpointer udata);
-void slidingwindow_add_on_data_unref(SlidingWindow* this, ListenerFunc callback, gpointer udata);
-void slidingwindow_add_on_data_ref_change(SlidingWindow* this, ListenerFunc on_data_ref_cb, ListenerFunc on_data_unref_cb, gpointer udata);
+void slidingwindow_add_preprocessor(SlidingWindow* this, ListenerFunc callback, gpointer udata);
+void slidingwindow_add_postprocessor(SlidingWindow* this, ListenerFunc callback, gpointer udata);
+void slidingwindow_add_processors(SlidingWindow* this, ListenerFunc preprocess_cb, ListenerFunc postprocess_cb, gpointer udata);
 
 void slidingwindow_setup_debug(SlidingWindow* this, SlidingWindowItemSprintf sprintf, SlidingWindowItemLogger logger);
 void slidingwindow_set_min_itemnum(SlidingWindow* this, gint min_itemnum);

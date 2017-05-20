@@ -44,6 +44,7 @@ then
 	echo -n "--playouter=MPRTPFRACTAL:MPRTP:1:1:10.0.0.1:5001 " >> $SCRIPTFILE
 	echo -n "--receiver=MPRTP:1:1:5000 "                        >> $SCRIPTFILE
 fi
+echo -n " > temp/receiver_1.log" >> $SCRIPTFILE
 
 chmod 777 $SCRIPTFILE
 
@@ -72,6 +73,7 @@ then
 	echo -n "--playouter=MPRTPFRACTAL:MPRTP:1:1:10.0.0.1:5003 " >> $SCRIPTFILE2
 	echo -n "--receiver=MPRTP:1:1:5002 "                        >> $SCRIPTFILE2
 fi
+echo -n " > temp/receiver_2.log" >> $SCRIPTFILE2
 
 chmod 777 $SCRIPTFILE2
 
@@ -100,6 +102,8 @@ then
 	echo -n "--playouter=MPRTPFRACTAL:MPRTP:1:1:10.0.0.1:5005 " >> $SCRIPTFILE3
 	echo -n "--receiver=MPRTP:1:1:5004 "                        >> $SCRIPTFILE3
 fi
+
+echo -n " > temp/receiver_3.log" >> $SCRIPTFILE3
 
 chmod 777 $SCRIPTFILE3
 

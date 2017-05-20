@@ -159,12 +159,12 @@ slidingwindow_finalize (GObject * object)
   g_object_unref(this->on_add_item);
   g_object_unref(this->on_rem_item);
 
-  if(this->on_data_ref){
-    g_object_unref(this->on_data_ref);
+  if(this->preprocessors){
+    g_object_unref(this->preprocessors);
   }
 
-  if(this->on_data_unref){
-    g_object_unref(this->on_data_unref);
+  if(this->postprocessors){
+    g_object_unref(this->postprocessors);
   }
 
 }
@@ -196,8 +196,8 @@ SlidingWindow* make_slidingwindow(guint32 num_limit, GstClockTime obsolation_tre
   result->data_recycle     = NULL;
   result->items_recycle    = make_recycle_switem( MAX(4, num_limit>>2), _switem_shaper);
   result->made             = _now(result);
-  result->on_data_ref      = NULL;
-  result->on_data_unref    = NULL;
+  result->preprocessors      = NULL;
+  result->postprocessors    = NULL;
   result->debug.active     = FALSE;
 
   return result;
@@ -213,7 +213,7 @@ static void _slidingwindow_rem(SlidingWindow* this)
   item = datapuffer_read(this->items);
 
   notifier_do(this->on_rem_item, item->data);
-  notifier_do(this->on_data_unref, item->data);
+  notifier_do(this->postprocessors, item->data);
 
   if(this->data_recycle){
     recycle_add(this->data_recycle, item->data);
@@ -246,27 +246,27 @@ void slidingwindow_set_data_recycle(SlidingWindow* this, Recycle* data_recycle)
   this->data_recycle = data_recycle;
 }
 
-void slidingwindow_add_on_data_ref(SlidingWindow* this, ListenerFunc callback, gpointer udata)
+void slidingwindow_add_preprocessor(SlidingWindow* this, ListenerFunc callback, gpointer udata)
 {
-  if(!this->on_data_ref){
-    this->on_data_ref = make_notifier("SW: on-data-ref");
+  if(!this->preprocessors){
+    this->preprocessors = make_notifier("SW: on-data-ref");
   }
-  notifier_add_listener(this->on_data_ref, callback, udata);
+  notifier_add_listener(this->preprocessors, callback, udata);
 
 }
 
-void slidingwindow_add_on_data_unref(SlidingWindow* this, ListenerFunc callback, gpointer udata)
+void slidingwindow_add_postprocessor(SlidingWindow* this, ListenerFunc callback, gpointer udata)
 {
-  if(!this->on_data_unref){
-    this->on_data_unref = make_notifier("SW: on-data-unref");
+  if(!this->postprocessors){
+    this->postprocessors = make_notifier("SW: on-data-unref");
   }
-  notifier_add_listener(this->on_data_unref, callback, udata);
+  notifier_add_listener(this->postprocessors, callback, udata);
 }
 
-void slidingwindow_add_on_data_ref_change(SlidingWindow* this, ListenerFunc on_data_ref_cb, ListenerFunc on_data_unref_cb, gpointer udata)
+void slidingwindow_add_processors(SlidingWindow* this, ListenerFunc preprocess, ListenerFunc postprocess, gpointer udata)
 {
-  slidingwindow_add_on_data_ref(this,   on_data_ref_cb,   udata);
-  slidingwindow_add_on_data_unref(this, on_data_unref_cb, udata);
+  slidingwindow_add_preprocessor(this,  preprocess,  udata);
+  slidingwindow_add_postprocessor(this, postprocess, udata);
 }
 
 void slidingwindow_setup_debug(SlidingWindow* this, SlidingWindowItemSprintf sprintf, SlidingWindowItemLogger logger)
@@ -410,7 +410,7 @@ void slidingwindow_add_data(SlidingWindow* this, gpointer data)
     item->data = data;
   }
 
-  notifier_do(this->on_data_ref, item->data);
+  notifier_do(this->preprocessors, item->data);
   notifier_do(this->on_add_item, item->data);
 
   datapuffer_write(this->items, item);

@@ -878,6 +878,91 @@ guint gst_rtcp_xr_rle_losts_block_get_chunks_num(GstRTCPXRRLELostsRLEBlock *bloc
 }
 
 
+//------------------ XR CC FB RLE ------------------------
+
+
+void
+gst_rtcp_xr_cc_fb_rle_setup(GstRTCPXRCCFeedbackRLEBlock *block,
+                      guint8 report_count,
+                      guint32 timestamp,
+                      guint32 ssrc,
+                      guint16 begin_seq,
+                      guint16 end_seq)
+{
+  block->report_count = report_count;
+  block->block_length = g_htons (4);
+  block->block_type   = GST_RTCP_XR_CC_FB_RLE_BLOCK_TYPE_IDENTIFIER;
+  memset(&block->chunks[0], 0, 4);
+  gst_rtcp_xr_cc_fb_rle_change(block,
+                             &report_count,
+                             &timestamp,
+                             &ssrc,
+                             &begin_seq,
+                             &end_seq);
+}
+
+void gst_rtcp_xr_cc_fb_rle_getdown (GstRTCPXRCCFeedbackRLEBlock *block,
+                             guint8* report_count,
+                             guint32 *timestamp,
+                             guint32 *ssrc,
+                             guint16 *begin_seq,
+                             guint16 *end_seq)
+{
+  if(report_count) {
+    *report_count = block->report_count;
+  }
+  if (ssrc) {
+     *ssrc = g_ntohl (block->ssrc);
+   }
+   if (timestamp) {
+     *timestamp = g_ntohl(block->timestamp);
+   }
+   if (begin_seq) {
+     *begin_seq = g_ntohs (block->begin_seq);
+   }
+   if (end_seq) {
+     *end_seq = g_ntohs (block->end_seq);
+   }
+}
+
+
+void gst_rtcp_xr_cc_fb_rle_change (GstRTCPXRCCFeedbackRLEBlock *block,
+                             guint8* report_count,
+                             guint32 *timestamp,
+                             guint32 *ssrc,
+                             guint16 *begin_seq,
+                             guint16 *end_seq)
+{
+  if(report_count){
+    block->report_count = *report_count;
+  }
+  if (ssrc) {
+      block->ssrc = g_htonl(*ssrc);
+   }
+   if (timestamp) {
+       block->timestamp = g_htonl(*timestamp);
+   }
+   if (begin_seq) {
+       block->begin_seq = g_htons(*begin_seq);
+   }
+   if (end_seq) {
+       block->end_seq = g_htons(*end_seq);
+   }
+}
+
+guint gst_rtcp_xr_cc_fb_rle_block_get_chunks_num(GstRTCPXRCCFeedbackRLEBlock *block)
+{
+  guint chunk_words_num;
+  guint16 block_length;
+
+  block_length = g_ntohs(block->block_length);
+  //the number of words containing chunks
+  chunk_words_num = block_length - 2;
+  //multiply it by two so we get the number of chunks
+  return chunk_words_num<<1;
+}
+
+
 //------------------ XROWD ------------------------
 
 
@@ -1332,6 +1417,9 @@ again:
     case GST_RTCP_XR_DISCARDED_BYTES_BLOCK_TYPE_IDENTIFIER:
       gst_printfnc_rtcp_xr_discarded_bytes_block((GstRTCPXRDiscardedBlock*) block, print);
         break;
+    case GST_RTCP_XR_CC_FB_RLE_BLOCK_TYPE_IDENTIFIER:
+      gst_printfnc_rtcp_xr_cc_fb_rle_block((GstRTCPXRCCFeedbackRLEBlock*) block, print);
+        break;
     default:
       g_warning("Unrecognized XR block to print out at gst_printfnc_rtcp_xr");
       goto done;
@@ -1521,6 +1609,71 @@ gst_printfnc_rtcp_xrchunks(GstRTCPXRChunk * chunk1, GstRTCPXRChunk * chunk2, pri
             );
   }
 
+}
+
+void
+gst_printfnc_rtcp_xrccchunks(GstRTCPXRChunk * chunk1, GstRTCPXRChunk * chunk2, printfnc print)
+{
+  guint16 u16_chunk1 = 0;
+  guint16 u16_chunk2 = 0;
+  GstRTCPXRCCFBRLEChunk *ch1,*ch2;
+//  g_print("BAZDMEG: %X-%X\n", *((guint16*)chunk1), *((guint16*)chunk2));
+  gst_rtcp_xr_chunk_ntoh_cpy((GstRTCPXRChunk *)&u16_chunk1, chunk1);
+  gst_rtcp_xr_chunk_ntoh_cpy((GstRTCPXRChunk *)&u16_chunk2, chunk2);
+
+//  g_print("BAZDMEG2: %X-%X\n", u16_chunk1, u16_chunk2);
+
+
+ ch1 = (GstRTCPXRCCFBRLEChunk *) &u16_chunk1;
+ ch2 = (GstRTCPXRCCFBRLEChunk *) &u16_chunk2;
+ print (
+       "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+       "|%1d|%3d|%24d|%1d|%3d|%24d|\n"
+
+       ,
+       ch1->lost, ch1->ecn, ch1->ato,
+       ch2->lost, ch2->ecn, ch2->ato
+       );
+
+}
+
+void
+gst_printfnc_rtcp_xr_cc_fb_rle_block(GstRTCPXRCCFeedbackRLEBlock* block, printfnc print)
+{
+  guint8 report_count;
+  guint32 timestamp;
+  guint32 ssrc;
+  guint chunks_num;
+  gint chunk_index;
+  guint16 begin_seq, end_seq;
+
+  gst_rtcp_xr_cc_fb_rle_getdown(block, &report_count, &timestamp, &ssrc, &begin_seq, &end_seq);
+
+  print (
+      "+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+\n"
+      "|%15d|%15d|%31d|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63X|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%63X|\n"
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
+      "|%31d|%31d|\n"
+      ,
+      block->block_type, report_count, g_ntohs (block->block_length),
+      timestamp,
+      ssrc, begin_seq, end_seq);
+
+   chunks_num = gst_rtcp_xr_cc_fb_rle_block_get_chunks_num(block);
+
+   for(chunk_index = 0;
+       chunk_index < chunks_num;
+       chunk_index+=2)
+   {
+       GstRTCPXRChunk *chunk1, *chunk2;
+       chunk1 = &block->chunks[chunk_index];
+       chunk2 = &block->chunks[chunk_index + 1];
+       gst_printfnc_rtcp_xrccchunks(chunk1, chunk2, print);
+   }
 }
 
 void

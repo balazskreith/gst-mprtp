@@ -289,7 +289,7 @@ static void _on_keyframe_filtering(GstElement *mprtpSch, CodecTypes* codec_type)
 }
 
 static void
-_mprtp_subflows_utilization (GstElement * mprtpSch, MPRTPPluginSignalData *utilization, Sender* this)
+_mprtp_subflows_utilization (GstElement * mprtpSch, MPRTPPluginSignal *utilization, Sender* this)
 {
 //  g_print("Sender Name: %s", this->bin_name);
   eventer_do(this->on_bitrate_change, &utilization->target_media_rate);

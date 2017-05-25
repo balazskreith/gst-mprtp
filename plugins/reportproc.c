@@ -254,7 +254,7 @@ _processing_rrblock (ReportProcessor *this,
   //--------------------------
   //validating
   //--------------------------
-  gst_rtcp_rrb_getdown (rrb, NULL, &fraction_lost, &summary->RR.cum_packet_lost,
+  gst_rtcp_rrb_getdown (rrb, NULL, &fraction_lost, &summary->RR.total_packet_lost,
                         &HSSN_read, &summary->RR.jitter,
                         &LSR_read, &DLSR_read);
   summary->RR.HSSN = (guint16) (HSSN_read & 0x0000FFFF);
@@ -479,7 +479,7 @@ void _logging(ReportProcessor *this, GstMPRTCPReportSummary* summary)
                  ,
                  summary->RR.HSSN,
                  summary->RR.RTT,
-                 summary->RR.cum_packet_lost,
+                 summary->RR.total_packet_lost,
                  summary->RR.cycle_num,
                  summary->RR.jitter,
                  summary->RR.lost_rate

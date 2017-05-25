@@ -73,7 +73,7 @@ struct _GstMPRTCPReportSummary{
     gdouble           lost_rate;
     guint16           HSSN;
     guint16           cycle_num;
-    guint32           cum_packet_lost;
+    guint32           total_packet_lost;
   }RR;
 
   struct{

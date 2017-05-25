@@ -375,7 +375,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   this->subflows      = make_sndsubflows(this->monitoring);
   this->sndpackets    = make_sndpackets();
-  this->emit_msger    = make_messenger(sizeof(MPRTPPluginSignalData));
+  this->emit_msger    = make_messenger(sizeof(MPRTPPluginSignal));
   this->allowed_ssrc  = 0;
 
   this->splitter      = make_stream_splitter(this->subflows);
@@ -1073,7 +1073,7 @@ void
 mprtpscheduler_emitter_process (gpointer udata)
 {
   GstMprtpscheduler *this;
-  MPRTPPluginSignalData *msg;
+  MPRTPPluginSignal *msg;
 
   this = (GstMprtpscheduler *) udata;
 

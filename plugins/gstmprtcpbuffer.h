@@ -65,6 +65,7 @@
 #define GST_RTCP_XR_DISCARDED_RLE_BLOCK_TYPE_IDENTIFIER 25
 #define GST_RTCP_XR_DISCARDED_BYTES_BLOCK_TYPE_IDENTIFIER 26
 #define GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER 28
+#define GST_RTCP_XR_CC_FB_RLE_BLOCK_TYPE_IDENTIFIER 29
 #define RTCP_XR_RFC7243_I_FLAG_INTERVAL_DURATION 2
 #define RTCP_XR_RFC7243_I_FLAG_SAMPLED_METRIC 1
 #define RTCP_XR_RFC7243_I_FLAG_CUMULATIVE_DURATION 3
@@ -162,11 +163,27 @@ typedef struct PACKED _GstRTCPXRRLEChunk{
 #endif
 }GstRTCPXRRLEChunk;
 
+typedef struct PACKED _GstRTCPXRCCFBRLEChunk{
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
+  guint16 lost:1;
+  guint16 ecn:2;
+  guint16 ato:13;
+#elif G_BYTE_ORDER == G_BIG_ENDIAN
+  guint16 ato:13;
+  guint16 ecn:2;
+  guint16 lost:1;
+#else
+#error "G_BYTE_ORDER should be big or little endian."
+#endif
+}GstRTCPXRCCFBRLEChunk;
+
 
 typedef union PACKED _GstRTCPXRChunk{
   GstRTCPXRRLEChunk       RLE;
   GstRTCPXRBitvectorChunk Bitvector;
+  GstRTCPXRCCFBRLEChunk   CCFeedback;
 }GstRTCPXRChunk;
+
 
 typedef struct PACKED _GstRTCPXRDiscardedRLEBlock
 {  //RTCP extended riport Discarded bytes
@@ -281,7 +298,17 @@ typedef struct PACKED _GstRTCPAFB_REPS{
   #endif
 }GstRTCPAFB_REPS;
 
-
+typedef struct PACKED _GstRTCPXRCCFeedbackRLEBlock
+{  //RTCP extended riport Discarded bytes
+  guint8 block_type;
+  guint8 report_count;
+  guint16 block_length;
+  guint32 timestamp;
+  guint32 ssrc;
+  guint16 begin_seq;
+  guint16 end_seq;
+  GstRTCPXRChunk chunks[2];
+} GstRTCPXRCCFeedbackRLEBlock;
 
 /*MPRTCP struct polymorphism*/
 
@@ -525,6 +552,31 @@ void gst_rtcp_xr_rle_losts_change (GstRTCPXRRLELostsRLEBlock *block,
 guint gst_rtcp_xr_rle_losts_block_get_chunks_num(GstRTCPXRRLELostsRLEBlock *block);
 
 
+void
+gst_rtcp_xr_cc_fb_rle_setup(GstRTCPXRCCFeedbackRLEBlock *block,
+                      guint8 report_count,
+                      guint32 timestamp,
+                      guint32 ssrc,
+                      guint16 begin_seq,
+                      guint16 end_seq);
+
+void gst_rtcp_xr_cc_fb_rle_getdown (GstRTCPXRCCFeedbackRLEBlock *block,
+                             guint8* report_count,
+                             guint32 *timestamp,
+                             guint32 *ssrc,
+                             guint16 *begin_seq,
+                             guint16 *end_seq);
+
+void gst_rtcp_xr_cc_fb_rle_change (GstRTCPXRCCFeedbackRLEBlock *block,
+                             guint8* report_count,
+                             guint32 *timestamp,
+                             guint32 *ssrc,
+                             guint16 *begin_seq,
+                             guint16 *end_seq);
+
+guint gst_rtcp_xr_cc_fb_rle_block_get_chunks_num(GstRTCPXRCCFeedbackRLEBlock *block);
+
+
 
 
 void gst_rtcp_xr_owd_block_setup(GstRTCPXROWDBlock *report,
@@ -638,6 +690,14 @@ void gst_printfnc_rtcp_xr_owd_block (GstRTCPXROWDBlock * block, printfnc print);
 #define gst_print_rtcp_xrchunks(chunk1, chunk2) \
     gst_printfnc_rtcp_xrchunks(chunk1, chunk2, g_print)
 void gst_printfnc_rtcp_xrchunks(GstRTCPXRChunk * chunk1, GstRTCPXRChunk * chunk2, printfnc print);
+
+#define gst_print_rtcp_xrccchunks(chunk1, chunk2) \
+    gst_printfnc_rtcp_xrccchunks(chunk1, chunk2, g_print)
+void gst_printfnc_rtcp_xrccchunks(GstRTCPXRChunk * chunk1, GstRTCPXRChunk * chunk2, printfnc print);
+
+#define gst_print_rtcp_xr_cc_fb_rle_block(block) \
+    gst_printfnc_rtcp_xr_cc_fb_rle_block(block, g_print)
+void gst_printfnc_rtcp_xr_cc_fb_rle_block(GstRTCPXRCCFeedbackRLEBlock* block, printfnc print);
 
 #define gst_print_rtcp_xr_7097(report) \
     gst_printfnc_rtcp_xr_7097(report, g_print)

@@ -153,7 +153,7 @@ sndctrler_finalize (GObject * object)
   g_object_unref (this->subflows);
   g_object_unref (this->sndtracker);
   g_object_unref (this->on_rtcp_ready);
-  g_slice_free(MPRTPPluginSignalData, this->mprtp_signal_data);
+  g_slice_free(MPRTPPluginSignal, this->mprtp_signal_data);
 }
 
 void
@@ -166,7 +166,7 @@ sndctrler_init (SndController * this)
   this->made               = _now(this);
   this->controllers        = NULL;
   this->ricalcer           = make_ricalcer(TRUE);
-  this->mprtp_signal_data  = g_slice_new0(MPRTPPluginSignalData);
+  this->mprtp_signal_data  = g_slice_new0(MPRTPPluginSignal);
   this->time_update_period = 200 * GST_MSECOND;
 
   report_processor_set_logfile(this->report_processor, "snd_reports.log");
@@ -269,12 +269,12 @@ done:
 void
 _emit_signal (SndController *this)
 {
-  MPRTPPluginSignalData *msg;
+  MPRTPPluginSignal *msg;
   messenger_lock(this->emit_msger);
   msg = messenger_retrieve_block_unlocked(this->emit_msger);
 
   _update_subflow_target_utilization(this);
-  memcpy(msg, this->mprtp_signal_data, sizeof(MPRTPPluginSignalData));
+  memcpy(msg, this->mprtp_signal_data, sizeof(MPRTPPluginSignal));
 
   messenger_push_block_unlocked(this->emit_msger, msg);
   messenger_unlock(this->emit_msger);
@@ -357,15 +357,15 @@ _create_sr (SndController * this, SndSubflow * subflow)
 
 void _update_subflow_report_utilization(SndController* this, SndSubflow *subflow, GstMPRTCPReportSummary *summary)
 {
-  MPRTPPluginSignalData* signaldata;
-  MPRTPSubflowUtilizationSignalData *subflowdata;
+  MPRTPPluginSignal* signaldata;
+  MPRTPSubflowUtilizationSignal *subflowdata;
 
   signaldata  = this->mprtp_signal_data;
   subflowdata = &signaldata->subflow[subflow->id];
   if(summary->RR.processed){
     subflowdata->HSSN = summary->RR.HSSN;
     subflowdata->RTT = summary->RR.RTT;
-    subflowdata->cum_packet_lost = summary->RR.cum_packet_lost;
+    subflowdata->total_packet_lost = summary->RR.total_packet_lost;
     subflowdata->cycle_num = summary->RR.cycle_num;
     subflowdata->lost_rate = summary->RR.lost_rate;
     subflowdata->jitter = summary->RR.jitter;
@@ -381,20 +381,23 @@ void _update_subflow_report_utilization(SndController* this, SndSubflow *subflow
 static void _update_sndsubflow(gpointer item, gpointer udata)
 {
   SndSubflow *subflow = item;
-  MPRTPPluginSignalData *signaldata = udata;
-  MPRTPSubflowUtilizationSignalData *subflowdata;
+  MPRTPPluginSignal *signaldata = udata;
+  MPRTPSubflowUtilizationSignal *subflowdata;
 
   subflowdata = &signaldata->subflow[subflow->id];
   subflowdata->target_bitrate = subflow->target_bitrate;
+//  g_print("Subflow %d target: %d\n", subflow->id, subflow->target_bitrate / 1000);
 }
 
 void _update_subflow_target_utilization(SndController* this)
 {
-  MPRTPPluginSignalData* signaldata;
+  MPRTPPluginSignal* signaldata;
 
   signaldata  = this->mprtp_signal_data;
+//  g_print("------------ %2.1f ------------\n", GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000.);
   sndsubflows_iterate(this->subflows, _update_sndsubflow, signaldata);
   signaldata->target_media_rate = sndsubflows_get_total_target(this->subflows);
+//  g_print("Total target: %d\n", signaldata->target_media_rate / 1000);
 }
 
 

@@ -19,10 +19,140 @@
 #define NTP_NOW get_ntp_from_epoch_ns(epoch_now_in_ns)
 #define _now(this) gst_clock_get_time (this->sysclock)
 
+
+#define _define_recycle_pop_method(name, return_type, recycle) \
+  static volatile return_type* name##_pop() { \
+    return_type* result = g_async_queue_try_pop(recycle); \
+    if(!result) { \
+      result = g_malloc0(sizeof(return_type)); \
+    } \
+    return result; \
+  } \
+
+#define _define_recycle_pop_and_set_method(name, return_type, recycle) \
+  static volatile return_type* name##_pop_and_set(gpointer data) { \
+    return_type* result = g_async_queue_try_pop(recycle); \
+    if(!result) { \
+      result = g_malloc0(sizeof(return_type)); \
+    } \
+    memcpy(result, data, sizeof(return_type)); \
+    return result; \
+  } \
+
+#define _define_recycle_push_method(name, return_type, recycle) \
+  static volatile void name##_push(gpointer value) { \
+    g_async_queue_push(recycle, value); \
+  } \
+
+#define _define_recycle_ctor(name, recycle) \
+  static void name##_ctor() { \
+    recycle = g_async_queue_new_full(g_free); \
+  } \
+
+#define _define_recycle_dtor(name, recycle) \
+  static void name##_dtor() { \
+    gst_object_unref(recycle); \
+  } \
+
+#define _define_recycle(return_type, name, recycle) \
+    _define_recycle_ctor(name, recycle) \
+    _define_recycle_dtor(name, recycle) \
+    _define_recycle_push_method(name, return_type, recycle) \
+    _define_recycle_pop_method(name, return_type, recycle) \
+    _define_recycle_pop_and_set_method(name, return_type, recycle) \
+
+
+typedef void (*RefTracker)(gpointer);
+
+typedef struct{
+  volatile gint ref;
+  GFreeFunc dtor;
+}Object;
+
+static void _init_object(Object* object, GFreeFunc dtor) {
+  object->ref = 1;
+  object->dtor = dtor;
+}
+
+static void _object_set_dtor(Object* this, GFreeFunc dtor) {
+  this->dtor = dtor;
+}
+
+static void _object_ref(Object* object) {
+  ++object->ref;
+}
+
+static void _object_unref(Object* object) {
+  if(0 < --object->ref) return;
+  object->dtor(object);
+}
+
+#define _define_primitive_object_accessor(object_type, covered_type, name) \
+  typedef struct { \
+    Object base; \
+    covered_type value; \
+  }object_type; \
+  static object_type* _##make_##name(covered_type* value) { \
+    object_type* result = g_malloc0(sizeof(object_type)); \
+    _init_object(result, g_free); \
+    memcpy(&result->value, value, sizeof(covered_type)); \
+    return result; \
+  } \
+
+_define_primitive_object_accessor(Int32, gint32, int32)
+
+
 #define FEC_PAYLOAD_TYPE 126
+
+#define TUPLE_MAX_ITEMS_NUM 32
+typedef struct{
+  Object   base;
+  gpointer values[TUPLE_MAX_ITEMS_NUM];
+  gint     length;
+}Tuple;
+
+
+static volatile Tuple* _make_tuple(gpointer arg1, ...) {
+  Tuple* this = tuple_recycle_pop();
+  va_list arguments;
+  gpointer value = NULL;
+  _init_object(this, tuple_recycle_push);
+  this->length = 0;
+  this->values[this->length++] = arg1;
+  va_start ( arguments, arg1 );
+  for(value = va_arg( arguments, gpointer); value; value = va_arg(arguments, gpointer)){
+    this->values[this->length++] = value;
+  }
+  va_end ( arguments );
+  return this;
+}
+
+static gpointer _tuple_get(Tuple* this, gint index) {
+  if(MIN(TUPLE_MAX_ITEMS_NUM, this->length) < index) {
+    return NULL;
+  }
+  return this->values[index];
+}
+
+static void _tuple_set(Tuple* this, gint index, gpointer value) {
+  if(MIN(TUPLE_MAX_ITEMS_NUM, this->length) < index) {
+    return;
+  }
+  this->values[index] = value;
+}
+
+static void _tuple_add(Tuple* this, gpointer value) {
+  if(MIN(TUPLE_MAX_ITEMS_NUM, this->length) < index) {
+    return;
+  }
+  this->values[this->length++] = value;
+}
+
 
 typedef struct _Packet
 {
+  Object               base;
+
   guint64              tracked_ntp;
   guint16              seq_num;
   guint32              ssrc;
@@ -59,10 +189,14 @@ static _setup_packet(Packet* packet, gchar* line){
 }
 
 static Packet* _make_packet(gchar* line){
-  Packet* packet = g_malloc0(sizeof(Packet));
+//  Packet* packet = g_malloc0(sizeof(Packet));
+  Packet* packet = packet_recycle_pop();
+  _init_object(packet, packet_recycle_push);
   _setup_packet(packet, line);
   return packet;
 }
+
+
 static gint
 _cmp_seq (guint16 x, guint16 y)
 {
@@ -75,754 +209,1202 @@ _cmp_seq (guint16 x, guint16 y)
 }
 
 
-typedef struct{
-  GQueue* items;
-  void (*addcb)(gpointer udata, gpointer* item);
-  void (*remcb)(gpointer udata, gpointer* item);
-  void (*free)(Packet*);
-  void (*sampler)(gpointer);
-  GstClockTime (*extractor)(gpointer);
-  gpointer udata;
-  GstClockTime first;
-  GstClockTime last;
-  GstClockTime sampled;
-}SlidingWindow;
+#define COMPONENT_MAX_CONNECTION_NUM 16
+typedef struct _Component Component;
+typedef void (*PusherIO)(Component*, gpointer);
 
-SlidingWindow* _make_sliding_window(
-    void (*addcb)(gpointer udata, gpointer* item),
-    void (*remcb)(gpointer udata, gpointer* item),
-    void (*sampler)(gpointer udata),
-    GstClockTime (*extractor)(gpointer),
-    gpointer udata,
-    void (*free)(Packet*)
-)
-{
-  SlidingWindow* this = g_malloc0(sizeof(SlidingWindow));
-  this->addcb     = addcb;
-  this->remcb     = remcb;
-  this->free      = free;
-  this->udata     = udata;
-  this->sampler   = sampler;
-  this->extractor = extractor;
+typedef struct{
+  Component* dst;
+  PusherIO target;
+}PusherConnection;
+
+typedef struct _Component{
+  PusherConnection connections[COMPONENT_MAX_CONNECTION_NUM];
+};
+
+static void _pushconnect_cmp(Component* src, gint io, Component* dst, PusherIO target){
+  PusherConnection* connection = src->connections + io;
+  connection->dst = dst;
+  connection->target = target;
+}
+
+static void _transmit(Component* src, gint io, gpointer data) {
+  PusherConnection* connection = src->connections + io;
+  if(!connection->target) {
+    g_print("Not connected output\n");
+    return;
+  }
+  connection->target(connection->dst, data);
+}
+
+static void _optional_transmit(Component* src, gint io, gpointer data) {
+  PusherConnection* connection = src->connections + io;
+  if(!connection->target) {
+    return;
+  }
+  connection->target(connection->dst, data);
+}
+
+
+/*----------------------- FileReader ---------------------------*/
+typedef void (*toStruct)(gpointer, gchar*);
+
+typedef struct{
+  Component base;
+  gchar path[256];
+  toStruct toStruct;
+  gint linesNum;
+  GQueue* recycle;
+}FileReader;
+
+typedef enum{
+  FILE_READER_OUTPUT = 1,
+}FileReaderIO;
+
+static void _logfile_reader_process(FileReader* this) {
+  gchar line[1024];
+  gpointer data;
+  FILE* fp = fopen(this->path, "r");
+  while (fgets(line, 1024, fp)){
+    data = this->toStruct(line);
+    if(!data) {
+      g_print("A generator process can not produce null while reading!\n");
+      continue;
+    }
+    _transmit(&this->base, FILE_READER_OUTPUT, data);
+    ++this->linesNum;
+  }
+  g_print("FILE READING DONE At %s Lines: %d\n", this->path, this->linesNum);
+  _transmit(&this->base, FILE_READER_OUTPUT, NULL);
+  fclose(fp);
+}
+
+static FileReader* _make_reader(gchar* path, toStruct toStruct) {
+  FileReader* this = g_malloc0(sizeof(FileReader));
+  this->toStruct = toStruct;
+  this->recycle = g_queue_new();
+  strcpy(this->path, path);
+  return this;
+}
+
+static void _dispose_reader(FileReader* this) {
+  g_free(this);
+}
+
+/*----------------------- FileWriter ---------------------------*/
+
+typedef void (*toString)(gchar*, gpointer);
+
+typedef struct{
+  Component base;
+  gchar path[256];
+  toString toString;
+  GQueue* values;
+  gboolean started;
+  gint linesNum;
+  gint processedNum;
+}FileWriter;
+
+typedef enum{
+  FILE_WRITER_TRASH_OUTPUT = 1,
+}FileWriterIO;
+
+static void _file_writer_process(FileWriter* this, gpointer data) {
+  gchar* line;
+  if(!data){
+    g_print("Flush signal at File Writer for %s written lines: %d, processed data: %d\n",
+        this->path, this->linesNum + g_queue_get_length(this->values), this->processedNum);
+    goto flush;
+  }
+  ++this->processedNum;
+  line = line_recycle_pop();
+  this->toString(line, data);
+  g_queue_push_tail(this->values, line);
+  if(g_queue_get_length(this->lines) < 1000){
+    return;
+  }
+
+flush:
+  {
+    FILE* fp;
+    fp = fopen(this->path, this->started ? "a" : "w");
+    this->started = TRUE;
+    while(!g_queue_is_empty(this->lines)) {
+      gchar* line = g_queue_pop_head(this->lines);
+      fprintf(fp, "%s\n", line);
+      line_recycle_push(line);
+      ++this->linesNum;
+    }
+    fclose(fp);
+  }
+
+}
+
+static FileWriter* _make_writer(gchar* path, toString toString) {
+  FileWriter* this = g_malloc0(sizeof(FileWriter));
+  this->lines = g_queue_new();
+  strcpy(this->path, path);
+  this->toString = toString;
+  return this;
+}
+
+static void _dispose_writer(FileWriter* this) {
+  g_queue_clear(this->lines);
+  g_queue_free(this->lines);
+  g_free(this);
+}
+
+/*----------------------- Sorter ---------------------------*/
+
+typedef struct{
+  Component base;
+  GQueue*   items;
+  GCompareDataFunc cmp;
+  gpointer         cmp_udata;
+}Sorter;
+
+typedef enum{
+  SORTER_OUTPUT = 1,
+}SorterIO;
+
+static void _sorter_process(Sorter* this, gpointer data) {
+  if (!data) {
+    g_print("Flush signal at Sorter\n");
+    goto flush;
+  }
+  g_queue_insert_sorted(this->items, data, this->cmp, this->cmp_udata);
+  if (32000 < g_queue_get_length(this->items)) {
+    _transmit(&this->base, SORTER_OUTPUT, g_queue_pop_head(this->items));
+  }
+  return;
+
+flush:
+  while(!g_queue_is_empty(this->items)) {
+    _transmit(&this->base, SORTER_OUTPUT, g_queue_pop_head(this->items));
+  }
+  _transmit(&this->base, SORTER_OUTPUT, NULL);
+}
+
+static Sorter* _make_sorter(GCompareDataFunc cmp, gpointer cmp_udata) {
+  Sorter* this = g_malloc0(sizeof(Sorter));
+  this->cmp = cmp;
+  this->cmp_udata = cmp_udata;
   this->items = g_queue_new();
   return this;
 }
 
-void _free_sliding_window(SlidingWindow* this){
-  g_queue_free_full(this->items, this->free);
+static void _dispose_sorter(Sorter* this) {
+  g_queue_free(this->items);
+  g_free(this);
+}
+
+/*----------------------- Mapper ---------------------------*/
+typedef gpointer (*MapperProcess)(gpointer);
+typedef struct{
+  Component base;
+  MapperProcess process;
+}Mapper;
+
+typedef enum{
+  MAPPER_OUTPUT = 1,
+}MapperIO;
+
+static void _mapper_process(Mapper* this, gpointer data) {
+  gpointer result;
+  if (!data) {
+    _transmit(&this->base, MAPPER_OUTPUT, NULL);
+    return;
+  }
+  result = this->process(data);
+  _transmit(&this->base, MAPPER_OUTPUT, data);
+}
+
+static Mapper* _make_mapper(MapperProcess process) {
+  Mapper* this = g_malloc0(sizeof(Mapper));
+  this->process = process;
+  return this;
+}
+
+static void _dispose_mapper(Mapper* this) {
   g_free(this);
 }
 
 
-void _sliding_window_push(SlidingWindow* this, gpointer* item){
-  g_queue_push_tail(this->items, item);
-  this->last  = this->extractor(item);
-  if(!this->first){
-    this->sampled = this->first = this->last;
-  }
-  if(this->addcb){
-    this->addcb(this->udata, item);
-  }
-  while(this->first < this->last - GST_SECOND){
-    Packet* obsolated = g_queue_pop_head(this->items);
-    if(this->remcb){
-        this->remcb(this->udata, obsolated);
-    }
-    this->first = this->extractor(g_queue_peek_head(this->items));
-    if(this->free){
-      this->free(obsolated);
-    }
-  }
-
-  while(this->sampled < this->last - 100 * GST_MSECOND){
-    if(this->sampler){
-      this->sampler(this->udata);
-      this->sampled += 100 * GST_MSECOND;
-    }
-  }
-}
-
-typedef struct _QueueTuple{
-  GQueue* q1;
-  GQueue* q2;
-}QueueTuple;
-
+/*----------------------- Reducer ---------------------------*/
+typedef void (*ReducerProcess)(gpointer result, gpointer value);
 typedef struct{
-  gint32      sending_rate;
-  gint32      fec_rate;
-  QueueTuple* results;
-}RateTuple;
+  Component base;
+  gpointer result;
+  ReducerProcess process;
+}Reducer;
 
-static gint32 _get_sent_bytes(Packet* packet){
-  return packet->payload_size + packet->header_size + 8 /*UDP header*/;
-}
-static void _refresh_rate(RateTuple* this, Packet* packet, gint32 multiplier){
-  if(packet->payload_type == FEC_PAYLOAD_TYPE){
-     this->fec_rate += _get_sent_bytes(packet) * multiplier;
-   }else{
-     this->sending_rate += _get_sent_bytes(packet) * multiplier;
-   }
-}
+typedef enum{
+  REDUCER_OUTPUT = 1,
+}ReducerIO;
 
-static void _add_rate(RateTuple* this, Packet* packet){
-  _refresh_rate(this, packet, 1);
-}
-
-static void _rem_rate(RateTuple* this, Packet* packet){
-  _refresh_rate(this, packet, -1);
-}
-
-static void _rate_sampler(RateTuple* this){
-  guint32* value = g_malloc0(sizeof(guint32));
-  *value = this->sending_rate;
-  g_queue_push_tail(this->results->q1, value);
-  value = g_malloc0(sizeof(guint32));
-  *value = this->fec_rate;
-  g_queue_push_tail(this->results->q2, value);
-}
-
-static GstClockTime _packet_tracked_ntp_in_ns(Packet* packet){
-  return get_epoch_time_from_ntp_in_ns(packet->tracked_ntp);
-}
-
-static QueueTuple* _get_sending_rates(FILE* fp){
-  QueueTuple* tuple = g_malloc0(sizeof(QueueTuple));
-  RateTuple   rates = {0,0,tuple};
-  SlidingWindow* sw = _make_sliding_window(_add_rate, _rem_rate, _rate_sampler, _packet_tracked_ntp_in_ns, &rates, g_free);
-  gchar line[1024];
-
-  tuple->q1 = g_queue_new();
-  tuple->q2 = g_queue_new();
-
-  while (fgets(line, 1024, fp)){
-     _sliding_window_push(sw, _make_packet(line));
+static void _reducer_process(Reducer* this, gpointer data) {
+  gpointer result;
+  if (!data) {
+    _transmit(&this->base, REDUCER_OUTPUT, this->result);
+    return;
   }
-  _free_sliding_window(sw);
-  return tuple;
+  this->process(result, data);
 }
 
-static void _gp_sampler(RateTuple* this){
-  guint32* value = g_malloc0(sizeof(guint32));
-  *value = this->sending_rate;
-  g_queue_push_tail(this->results->q1, value);
-  value = g_malloc0(sizeof(guint32));
-  *value = this->fec_rate;
-  g_queue_push_tail(this->results->q2, value);
-}
-
-static QueueTuple* _get_goodput_rate(FILE* fp){
-  QueueTuple* tuple = g_malloc0(sizeof(QueueTuple));
-  RateTuple rates = {0,0,tuple};
-  SlidingWindow* sw = _make_sliding_window(_add_rate, _rem_rate, _gp_sampler, _packet_tracked_ntp_in_ns, &rates, g_free);
-  gchar line[1024];
-  Packet* packet;
-  guint16 act_seq = 0;
-  gboolean init = FALSE;
-
-  tuple->q1 = g_queue_new();
-  tuple->q2 = g_queue_new();
-
-  while (fgets(line, 1024, fp)){
-    packet = _make_packet(line);
-    if(init == FALSE){
-      init = TRUE;
-    }else if(_cmp_seq(packet->seq_num, act_seq) < 0){
-      continue;
-    }
-    _sliding_window_push(sw, packet);
-    act_seq = packet->seq_num;
-  }
-  _free_sliding_window(sw);
-  return tuple;
-}
-typedef struct{
-  GstClockTime timestamp;
-  guint16      dst_port;
-  guint16      src_port;
-  gint32       size;
-}TCPPacket;
-
-/* ethernet headers are always exactly 14 bytes [1] */
-#define SIZE_ETHERNET 14
-
-static TCPPacket* _make_tcppacket(struct pcap_pkthdr* header, gchar* bytes){
-  TCPPacket* packet = g_malloc0(sizeof(TCPPacket));
-  guint16 ihl;//IP header length
-  struct sniff_ip* ip;
-  packet->timestamp = (GstClockTime)header->ts.tv_sec * GST_SECOND + (GstClockTime)header->ts.tv_usec * GST_USECOND;
-  ip = (struct sniff_ip*)(bytes + SIZE_ETHERNET);
-  ihl = (*(guint8*)(bytes + SIZE_ETHERNET) & 0x0F)*4;
-  packet->size = g_ntohs(*((guint16*) (bytes + SIZE_ETHERNET + 2)));
-  packet->src_port = g_ntohs((guint16*)(bytes + SIZE_ETHERNET + ihl + 0));
-  packet->dst_port = g_ntohs((guint16*)(bytes + SIZE_ETHERNET + ihl + 2));
-  return packet;
-}
-
-typedef struct{
-  guint16      src_port;
-  guint16      dst_port;
-  GstClockTime last;
-}TCPFlow;
-
-typedef struct {
-  guint32 packets_num;
-  guint32 sending_rate;
-  guint32 flownum;
-  GList*  flowslist;
-  QueueTuple* tuple;
-}TCPRate;
-
-static gint _find_tcp_flow(TCPFlow* tcp_flow, TCPPacket* packet){
-  return tcp_flow->dst_port == packet->dst_port && tcp_flow->src_port == packet->src_port ? 0 : -1;
-}
-
-static TCPFlow* _make_tcp_flow(TCPPacket* packet){
-  TCPFlow* this = g_malloc0(sizeof(TCPFlow));
-  this->src_port = packet->src_port;
-  this->dst_port = packet->dst_port;
-
+static Reducer* _make_reducer(ReducerProcess process, gpointer result) {
+  Reducer* this = g_malloc0(sizeof(Reducer));
+  this->process = process;
+  this->result = result;
   return this;
 }
 
-static void _sw_add_tcp_packet(TCPRate* this, TCPPacket* packet){
-  TCPFlow* tcp_flow;
-  this->sending_rate += packet->size;
-  ++this->packets_num;
+static void _dispose_reducer(Reducer* this) {
+  g_free(this);
+}
 
-  tcp_flow = g_list_find_custom(this->flowslist, packet, _find_tcp_flow);
-  if(!tcp_flow){
-    tcp_flow = _make_tcp_flow(packet);
-    this->flowslist = g_list_prepend(this->flowslist, tcp_flow);
-    ++this->flownum;
+/*----------------------- Merger ---------------------------*/
+typedef gpointer (*MergeProcess)(gpointer,gpointer);
+typedef struct{
+  Component base;
+  GCond* cond;
+  GMutex *mutex;
+  gpointer input_x;
+  gpointer input_y;
+  gboolean flushed_x;
+  gboolean flushed_y;
+  GCompareFunc comparator;
+  RefTracker unref;
+  MergeProcess merge;
+  gint32 processed_num;
+  gint32 invoked_x;
+  gint32 invoked_y;
+}Merger;
+
+typedef enum{
+  MERGER_OUTPUT = 1,
+}MergerIO;
+
+
+static void _merger_unref_data(Merger* this, gpointer data) {
+  if(this->unref && data) {
+    this->unref(data);
   }
-  tcp_flow->last = packet->timestamp;
 }
 
-static void _sw_rem_tcp_packet(TCPRate* this, TCPPacket* packet){
-  TCPFlow* tcp_flow;
-  this->sending_rate -= packet->size;
-  --this->packets_num;
+static void _merger_process_input_x(Merger* this, gpointer data) {
+  gint cmp;
+//  g_print("_merger_process_input_x\n");
+  g_mutex_lock(this->mutex);
+  if (!data) {
+    this->flushed_x = TRUE;
+    _merger_unref_data(this, this->input_x);
+    this->input_x = NULL;
+    if(this->flushed_y) {
+      g_print("Flush siangl at Merger, number of merged object: %d | Invokes: x: %d y:%d\n",
+                this->processed_num, this->invoked_x, this->invoked_y);
+      _transmit(&this->base, MERGER_OUTPUT, NULL);
+    }
+    g_cond_signal(this->cond);
+    goto exit;
+  } else if (this->flushed_y) {
+    _merger_unref_data(this, data);
+    goto exit;
+  }
 
-  tcp_flow = g_list_find_custom(this->flowslist, packet, _find_tcp_flow);
-  if(tcp_flow && tcp_flow->last == packet->timestamp){
-    this->flowslist = g_list_remove(this->flowslist, tcp_flow);
-    --this->flownum;
-    g_free(tcp_flow);
+  ++this->invoked_x;
+
+  while (this->input_x) {
+    if(this->flushed_y) {
+      _merger_unref_data(this, data);
+      _merger_unref_data(this, this->input_x);
+      this->input_x = NULL;
+      goto exit;
+    }
+    g_cond_wait(this->cond, this->mutex);
+  }
+
+  if (!this->input_y) {
+    this->input_x = data;
+    goto exit;
+  }
+
+  g_cond_signal(this->cond);
+
+  // Both are exists
+  if (data) {
+    cmp = this->comparator(data, this->input_y);
+  } else {
+    this->input_x = NULL;
+    goto exit;
+  }
+
+  if (cmp < 0) { // data is smaller than data in input_y
+    _merger_unref_data(this, data);
+  } else if (0 < cmp) { // data is larger than data in input y
+    _merger_unref_data(this, this->input_y);
+    this->input_x = data;
+    this->input_y = NULL;
+  } else { // match
+    gpointer result = this->merge(data, this->input_y);
+    _transmit(&this->base, MERGER_OUTPUT, result);
+    this->input_y = NULL;
+    ++this->processed_num;
+  }
+
+
+exit:
+  g_mutex_unlock(this->mutex);
+}
+
+static void _merger_process_input_y(Merger* this, gpointer data) {
+  gint cmp;
+  g_mutex_lock(this->mutex);
+  if (!data) {
+    this->flushed_y = TRUE;
+    _merger_unref_data(this, this->input_y);
+    this->input_y = NULL;
+    if(this->flushed_x) {
+      g_print("Flush siangl at Merger, number of merged object: %d | Invokes: x: %d y:%d\n",
+                this->processed_num, this->invoked_x, this->invoked_y);
+      _transmit(&this->base, MERGER_OUTPUT, NULL);
+    }
+    g_cond_signal(this->cond);
+    goto exit;
+  } else if (this->flushed_x) {
+    _merger_unref_data(this, data);
+    goto exit;
+  }
+
+  ++this->invoked_y;
+
+  while (this->input_y) {
+    if(this->flushed_x) {
+      _merger_unref_data(this, data);
+      _merger_unref_data(this, this->input_y);
+      this->input_y = NULL;
+      goto exit;
+    }
+    g_cond_wait(this->cond, this->mutex);
+  }
+
+  if (!this->input_x) {
+    this->input_y = data;
+    goto exit;
+  }
+
+  g_cond_signal(this->cond);
+
+  if (data) {
+    cmp = this->comparator(this->input_x, data);
+  } else {
+    this->input_y = NULL;
+    goto exit;
+  }
+
+  if (cmp < 0) { // input_x is smaller than data
+    _merger_unref_data(this, this->input_x);
+    this->input_x = NULL;
+    this->input_y = data;
+  } else if (0 < cmp) { // input_x is larger than data
+    _merger_unref_data(this, data);
+  } else { // match
+    gpointer result = this->merge(this->input_x, data);
+    _transmit(&this->base, MERGER_OUTPUT, result);
+    this->input_x = NULL;
+    ++this->processed_num;
+  }
+
+exit:
+  g_mutex_unlock(this->mutex);
+}
+
+static Merger* _make_merger(GCompareFunc comparator, RefTracker unref, MergeProcess merge) {
+  Merger* this = g_malloc0(sizeof(Merger));
+  this->mutex = g_mutex_new();
+  this->cond = g_cond_new();
+  this->comparator = comparator;
+  this->unref = unref;
+  this->merge = merge;
+  return this;
+}
+
+static void _dispose_merger(Merger* this) {
+  g_mutex_free(this->mutex);
+  g_cond_free(this->cond);
+  g_free(this);
+}
+
+
+/*----------------------- Dispatcher ---------------------------*/
+
+typedef gpointer (*DispatcherCopier)(gpointer);
+typedef struct{
+  Component base;
+  DispatcherCopier cpy;
+}Dispatcher;
+
+static void _dispatcher_process(Dispatcher* this, gpointer data) {
+  gint i;
+  gpointer forwarded = this->cpy ? this->cpy(data) : data;
+
+  for(i = 0; i < COMPONENT_MAX_CONNECTION_NUM; ++i) {
+    PusherConnection* connection = this->base.connections + i;
+    if(!connection->target) continue;
+    connection->target(connection->dst, forwarded);
   }
 }
 
-static GstClockTime _tcp_packet_ts_in_ns(TCPPacket* packet){
-  return packet->timestamp;
+static Dispatcher* _make_dispatcher(DispatcherCopier cpy, PusherIO target, gpointer dst, ...) {
+  Dispatcher* this = g_malloc0(sizeof(Dispatcher));
+  gint io_num = 0;
+  va_list arguments;
+  this->cpy = cpy;
+  _pushconnect_cmp(this, io_num, dst, target);
+  va_start ( arguments, dst );
+  for(target = va_arg( arguments, PusherIO); target; target = va_arg( arguments, PusherIO)){
+    dst = va_arg( arguments, gpointer);
+    _pushconnect_cmp(this, ++io_num, dst, target);
+  }
+  va_end ( arguments );
+  return this;
 }
 
-static void _sw_sampling_tcp_packets(TCPRate* this){
-  guint32* value = g_malloc0(sizeof(guint32));
-  *value = this->sending_rate;
-  g_queue_push_tail(this->tuple->q1, value);
-  value = g_malloc0(sizeof(guint32));
-  *value = this->flownum;
-  g_queue_push_tail(this->tuple->q2, value);
+static void _dispose_dispatcher(Dispatcher* this){
+  g_free(this);
 }
 
-static QueueTuple* tcpstat(gchar* path)
+/*----------------------- Sampler ---------------------------*/
+typedef GstClockTime (*SamplerTimestampExtractor)(gpointer data);
+typedef struct{
+  Component base;
+  GstClockTime sampled;
+  GstClockTime sampling;
+  GstClockTime actual;
+  RefTracker unref;
+  SamplerTimestampExtractor extractor;
+}Sampler;
+
+typedef enum{
+  SAMPLER_OUTPUT = 1,
+}SamplerIO;
+
+static void _sampler_process(Sampler* this, gpointer data) {
+  if (!data) {
+    g_print("Flush signal at Sampler\n");
+    _transmit(&this->base, SAMPLER_OUTPUT, NULL);
+    return;
+  }
+  if (!this->sampled) {
+    this->sampled = this->actual = this->extractor(data);
+    return;
+  }
+  this->actual = this->extractor(data);
+  if(this->actual - this->sampling < this->sampled){
+    if(this->unref) {
+      this->unref(data);
+    }
+    return;
+  }
+  while(this->sampled < this->actual - this->sampling){
+    _transmit(&this->base, SAMPLER_OUTPUT, data);
+    this->sampled += this->sampling;
+  }
+  if(this->unref) {
+    this->unref(data);
+  }
+}
+
+static Sampler* _make_sampler(SamplerTimestampExtractor extractor, RefTracker unref, GstClockTime sampling) {
+  Sampler* this = g_malloc0(sizeof(Sampler));
+  this->sampling = sampling;
+  this->extractor = extractor;
+  this->unref = unref;
+  return this;
+}
+
+static void _dispose_sampler(Sampler* this){
+  g_free(this);
+}
+
+
+/*----------------------- Filter ---------------------------*/
+typedef gboolean (*FilterFunc)(gpointer);
+typedef struct{
+  Component base;
+  GSList* filters;
+  RefTracker unref;
+}Filter;
+
+typedef enum{
+  FILTER_OUTPUT = 1,
+}FilterIO;
+
+static void _filter_process(Filter* this, gpointer data) {
+  GSList* it;
+  gboolean allowed = TRUE;
+  if (!data) {
+    g_print("Flush signal at Filter\n");
+    _transmit(&this->base, FILTER_OUTPUT, NULL);
+    return;
+  }
+  for (it = this->filters; it; it = it->next) {
+    FilterFunc filter = it->data;
+    allowed &= filter(data);
+  }
+  if (!allowed) {
+    if (this->unref) {
+      this->unref(data);
+    }
+    return;
+  }
+  _transmit(&this->base, FILTER_OUTPUT, data);
+}
+
+static Filter* _make_filter(RefTracker unref, FilterFunc filter, ...) {
+  Filter* this = g_malloc0(sizeof(Filter));
+  va_list arguments;
+  this->filters = g_slist_prepend(this->filters, filter);
+  va_start ( arguments, filter );
+  for(filter = va_arg( arguments, FilterFunc); filter; filter = va_arg( arguments, FilterFunc)){
+    this->filters = g_slist_prepend(this->filters, filter);
+  }
+  va_end ( arguments );
+  this->unref = unref;
+  return this;
+}
+
+static void _dispose_filter(Filter* this){
+  g_free(this);
+}
+
+
+/*----------------------- Monitor ---------------------------*/
+
+typedef gboolean (*MonitorQueueIsFull)(GQueue*);
+typedef struct _MonitorPlugin MonitorPlugin;
+typedef void (*MonitorPluginActivator)(MonitorPlugin* , gpointer);
+typedef void (*MonitorPluginNotifier)(gpointer user_data , gpointer value);
+
+typedef gboolean (*MonitorPluginFilter)(gpointer);
+
+typedef struct _MonitorPlugin{
+  MonitorPluginActivator add;
+  MonitorPluginActivator remove;
+  MonitorPluginFilter    filter;
+};
+
+typedef struct{
+  Component base;
+  MonitorQueueIsFull is_full;
+  GSList* plugins;
+  volatile GQueue* items;
+  RefTracker ref,unref;
+  gint processedNum;
+}Monitor;
+
+typedef enum {
+ MONITOR_FLUSH_OUTPUT = 2,
+}MonitorIO;
+
+
+static volatile void _monitor_receive_process(Monitor* this, gpointer value) {
+  GSList* it;
+  if(!value) {
+    g_print("Flush signal at Monitor. processed values: %d\n", this->processedNum);
+    _transmit(&this->base, MONITOR_FLUSH_OUTPUT, NULL);
+    return;
+  }
+
+  if(this->ref){
+    this->ref(value);
+  }
+  ++this->processedNum;
+  g_queue_push_tail(this->items, value);
+  for(it = this->plugins; it; it = it->next) {
+    MonitorPlugin* plugin = it->data;
+    gboolean allowed = plugin->filter ? plugin->filter(value) : TRUE;
+    if(allowed) {
+      plugin->add(plugin, value);
+    }
+  }
+
+  while(this->is_full && this->is_full(this->items)) {
+    gpointer obsolated = g_queue_pop_head(this->items);
+    for(it = this->plugins; it; it = it->next) {
+      MonitorPlugin* plugin = it->data;
+      gboolean allowed = plugin->filter ? plugin->filter(obsolated) : TRUE;
+      if(allowed) {
+        plugin->remove(plugin, obsolated);
+      }
+    }
+    if(this->unref){
+      this->unref(obsolated);
+    }
+  }
+}
+
+static void _monitor_add_plugins(Monitor* this, MonitorPlugin* plugin, ...) {
+  gint io_num = 0;
+  va_list arguments;
+  this->plugins = g_slist_prepend(this->plugins, plugin);
+  va_start ( arguments, plugin );
+  for(plugin = va_arg( arguments, MonitorPlugin*); plugin; plugin = va_arg( arguments, MonitorPlugin*)){
+    this->plugins = g_slist_prepend(this->plugins, plugin);
+  }
+  va_end ( arguments );
+}
+
+static Monitor* _make_monitor(MonitorQueueIsFull is_full, RefTracker ref, RefTracker unref) {
+  Monitor* this = g_malloc0(sizeof(Monitor));
+  this->items = g_queue_new();
+  this->is_full = is_full;
+  this->ref = ref;
+  this->unref = unref;
+  return this;
+}
+
+static void _dispose_monitor(Monitor* this){
+//  g_queue_free(this->items);
+  g_slist_free(this->plugins);
+  g_free(this);
+}
+
+/*======================= Plugin ==========================*/
+
+typedef gint32 (*MonitorPluginInt32Extractor)(gpointer);
+
+typedef struct{
+  MonitorPlugin base;
+  PusherConnection  connection;
+  gint32 result;
+  MonitorPluginInt32Extractor extractor;
+}MonitorSumPlugin;
+
+static void _monitor_sum_plugin_add(MonitorSumPlugin* this, gpointer data) {
+//  g_print("%p %d + %d <-%hu\n", this, this->result, this->extractor(data), ((Packet*)data)->seq_num);
+  this->result += this->extractor(data);
+  this->connection.target(this->connection.dst, &this->result);
+}
+
+static void _monitor_sum_plugin_remove(MonitorSumPlugin* this, gpointer data) {
+//  g_print("%p %d - %d <-%hu\n", this, this->result, this->extractor(data), ((Packet*)data)->seq_num);
+  this->result -= this->extractor(data);
+  this->connection.target(this->connection.dst, &this->result);
+}
+
+static MonitorSumPlugin* _make_monitor_sum_plugin(
+    MonitorPluginFilter filter,
+    MonitorPluginInt32Extractor extractor,
+    Component* dst, PusherIO target)
 {
-  pcap_t *pcap;
-  const unsigned char *packet;
-  char errbuf[1400];
-  struct pcap_pkthdr header;
-  TCPPacket* tcp_packet;
-  QueueTuple* results = g_malloc0(sizeof(QueueTuple));
-  TCPRate rates = {0,0,0,NULL, results};
-  results->q1 = g_queue_new();
-  results->q2 = g_queue_new();
+  MonitorSumPlugin *this = g_malloc0(sizeof(MonitorSumPlugin));
+  this->extractor = extractor;
+  this->base.filter = filter;
+  this->base.add = _monitor_sum_plugin_add;
+  this->base.remove = _monitor_sum_plugin_remove;
+  this->connection.dst = dst;
+  this->connection.target = target;
+  return this;
+}
 
-  SlidingWindow* sw = _make_sliding_window(
-      _sw_add_tcp_packet,
-      _sw_rem_tcp_packet,
-      _sw_sampling_tcp_packets,
-      _tcp_packet_ts_in_ns,
-      &rates,
-      g_free);
 
-  pcap = pcap_open_offline(path, errbuf);
-  if (pcap == NULL)
+
+/*======================= Plugin ==========================*/
+typedef gpointer (*MonitorPluginPointerExtractor)(gpointer);
+#define PERCENTILE_MAX_VALUES_NUM 10000
+typedef struct{
+  MonitorPlugin base;
+  PusherConnection  connection;
+  GQueue* items;
+  GCompareFunc cmp;
+  MonitorPluginPointerExtractor extractor;
+  gpointer values[PERCENTILE_MAX_VALUES_NUM];
+  gint values_index;
+  gint percentile;
+}MonitorPercentilePlugin;
+
+static void _monitor_percentile_plugin_helper(gpointer item, MonitorPercentilePlugin* this) {
+  if(this->values_index < PERCENTILE_MAX_VALUES_NUM) {
+    this->values[this->values_index++] = item;
+//    g_print("Item: %p->%hu\n", item, ((Packet*) _tuple_get(item, 0))->seq_num);
+  }
+}
+
+static void _monitor_percentile_plugin_calculate(MonitorPercentilePlugin* this) {
+  this->values_index = 0;
+  gpointer result;
+
+  g_queue_foreach(this->items, _monitor_percentile_plugin_helper, this);
+//  g_print("--------\n");
+  if (PERCENTILE_MAX_VALUES_NUM <= g_queue_get_length(this->items)) {
+    g_print("Number of items are too large for calculate the percentile in this version");
+  }
+//  g_print("Length: %d\n", this->values_index);
+  qsort(this->values, this->values_index, sizeof(gpointer), this->cmp);
   {
-    g_print("error reading pcap file: %s\n", errbuf);
-    exit(1);
+    gint index = this->values_index * ((gdouble) this->percentile / 100.) - 1;
+    result = this->values[index];
+//    g_print("index: %d\n", index);
   }
 
-  /* Now just loop through extracting packets as long as we have
-   * some to read.
-   */
-  while ((packet = pcap_next(pcap, &header)) != NULL){
-    tcp_packet = _make_tcppacket(&header, packet);
-//    g_print("ts: %lu size: %lu %hu-%hu\n", tcp_packet->timestamp, tcp_packet->size, tcp_packet->src_port, tcp_packet->dst_port);
-    _sliding_window_push(sw, tcp_packet);
-  }
-
-  // terminate
-  _free_sliding_window(sw);
-  return results;
+  this->connection.target(this->connection.dst, this->extractor(result));
 }
 
+static void _monitor_percentile_plugin_add(MonitorPercentilePlugin* this, gpointer data) {
+  g_queue_push_tail(this->items, data);
+  _monitor_percentile_plugin_calculate(this);
+}
+
+static void _monitor_percentile_plugin_remove(MonitorPercentilePlugin* this, gpointer data) {
+  g_queue_pop_head(this->items);
+  _monitor_percentile_plugin_calculate(this);
+}
+
+static MonitorPercentilePlugin* _make_monitor_percentile_plugin(
+    gint percentile,
+    GCompareFunc cmp,
+    MonitorPluginPointerExtractor extractor,
+    MonitorPluginFilter filter,
+    Component* dst,
+    PusherIO target)
+{
+  MonitorPercentilePlugin *this = g_malloc0(sizeof(MonitorPercentilePlugin));
+
+  this->base.filter = filter;
+  this->base.add = _monitor_percentile_plugin_add;
+  this->base.remove = _monitor_percentile_plugin_remove;
+  this->connection.dst = dst;
+  this->connection.target = target;
+  this->items = g_queue_new();
+  this->cmp = cmp;
+  this->extractor = extractor;
+  this->percentile = percentile;
+  return this;
+}
+
+/*======================= Plugin ==========================*/
 
 typedef struct{
-  guint32 sr_1,sr_2;
-  GQueue* result;
-}RatioTuple;
+  MonitorPlugin base;
+  PusherConnection  add_connection;
+  PusherConnection  rem_connection;
+  MonitorPluginPointerExtractor extractor;
+}MonitorExtractorPlugin;
 
-static void _refresh_ratio(RatioTuple* this, Packet* packet, gint32 multiplier){
-  if(packet->subflow_id == 1){
-    this->sr_1 += _get_sent_bytes(packet) * multiplier;
-  }else if(packet->subflow_id == 2){
-    this->sr_2 += _get_sent_bytes(packet) * multiplier;
+static void _monitor_extract_plugin_add(MonitorExtractorPlugin* this, gpointer data) {
+  if (!this->add_connection.target) {
+    return;
   }
+  this->add_connection.target(this->add_connection.dst, this->extractor(data));
 }
 
-static void _add_ratio(RatioTuple* this, Packet* packet){
-  _refresh_ratio(this, packet, 1);
+static void _monitor_extract_plugin_remove(MonitorExtractorPlugin* this, gpointer data) {
+  if (!this->rem_connection.target) {
+    return;
+  }
+  this->rem_connection.target(this->rem_connection.dst, this->extractor(data));
 }
 
-static void _rem_ratio(RatioTuple* this, Packet* packet){
-  _refresh_ratio(this, packet, -1);
+static MonitorExtractorPlugin* _make_monitor_functor_plugin(
+    MonitorPluginFilter filter,
+    MonitorPluginPointerExtractor extractor,
+    Component* add_dst, PusherIO add_target, Component* rem_dst, PusherIO rem_target)
+{
+  MonitorExtractorPlugin *this = g_malloc0(sizeof(MonitorExtractorPlugin));
+  this->extractor = extractor;
+  this->base.filter = filter;
+  this->base.add = _monitor_extract_plugin_add;
+  this->base.remove = _monitor_extract_plugin_remove;
+  this->add_connection.dst = add_dst;
+  this->add_connection.target = add_target;
+  this->rem_connection.dst = rem_dst;
+  this->rem_connection.target = rem_target;
+  return this;
 }
 
-static void _ratio_sampler(RatioTuple* this){
-  gdouble* value = g_malloc0(sizeof(gdouble));
-  *value = (gdouble)this->sr_1 / (gdouble)(this->sr_1 + this->sr_2);
-  g_queue_push_tail(this->result, value);
-//  g_print("%1.3f\n", *value);
+
+/*======================= Plugin ==========================*/
+
+/*----------------------- Tupler ---------------------------*/
+#define MAX_MUXER_VALUES_NUM 32
+
+typedef gpointer (*MuxProcess)(gpointer *values);
+typedef struct{
+  Component base;
+  gpointer values[MAX_MUXER_VALUES_NUM];
+  gint invokes[MAX_MUXER_VALUES_NUM];
+  gint32 barrier_num;
+  gint32 received_num;
+  MuxProcess process;
+  gint processed_num;
+  gint pivot_input;
+}Muxer;
+
+typedef enum {
+ MUXER_OUTPUT = 1,
+}MuxerIO;
+
+static Muxer* _make_muxer(MuxProcess process, gint32 barrier_num, gint pivot_input) {
+  Muxer* this = g_malloc0(sizeof(Muxer));
+  this->barrier_num = barrier_num;
+  this->process = process;
+  this->pivot_input = pivot_input;
+  return this;
 }
 
+static void _dispose_muxer(Muxer* this){
+  g_free(this);
+}
 
-static GQueue* _get_subflow_ratio(FILE* fp){
-  GQueue* result = g_queue_new();
-  RatioTuple ratios = {0,0,result};
-  SlidingWindow* sw = _make_sliding_window(_add_ratio, _rem_ratio, _ratio_sampler, _packet_tracked_ntp_in_ns, &ratios, g_free);
+static void _muxer_flush(Muxer* this) {
   gchar line[1024];
-  Packet* packet;
-
-  while (fgets(line, 1024, fp)){
-    packet = _make_packet(line);
-    _sliding_window_push(sw, packet);
+  gint i;
+  g_print("Muxer receive Flush signal, processed Num: %d\n", this->processed_num);
+  sprintf(line, "Muxer Invokes ");
+  for (i = 0; i < this->barrier_num; ++i) {
+    gchar invoke_str[25];
+    sprintf(invoke_str, "%d: %d ", i, this->invokes[i]);
+    strcat(line, invoke_str);
   }
-  _free_sliding_window(sw);
+  g_print("%s\n", line);
+  _transmit(&this->base, MUXER_OUTPUT, NULL);
+}
+
+static void _muxer_process(Muxer* this) {
+  gpointer data;
+  ++this->processed_num;
+  data = this->process(this->values);
+  memset(this->values, 0, sizeof(gpointer) * MAX_MUXER_VALUES_NUM);
+  this->received_num = 0;
+  _transmit(&this->base, MUXER_OUTPUT, data);
+}
+
+#define _define_muxer_input(num) \
+  static void _muxer_input_##num(Muxer* this, gpointer value) { \
+    if(!this->values[num] && value) { \
+      ++this->received_num; \
+    } \
+    ++this->invokes[num]; \
+    this->values[num] = value; \
+    if(this->received_num == this->barrier_num || this->pivot_input == num) { \
+      _muxer_process(this); \
+    } \
+  } \
+
+
+_define_muxer_input(0)
+_define_muxer_input(1)
+_define_muxer_input(2)
+
+#define _define_field_extractor(return_type, name, item_type, field_name) \
+  static return_type name(gpointer item) { \
+    return ((item_type*) item)->field_name; \
+  } \
+
+#define _define_gpointer_field_extractor(name, item_type, field_name) \
+  static gpointer name(gpointer item) { \
+    return &((item_type*) item)->field_name; \
+  } \
+
+//#define _setup_value(to, from, type) \
+//  to = g_malloc0(sizeof(type)); \
+//  memcpy(to, from, sizeof(type)); \
+
+
+_define_field_extractor(gint32, _payload_extractor, Packet, payload_size);
+_define_field_extractor(guint64, _tracked_ntp_extractor, Packet, tracked_ntp);
+
+static gpointer _simple_passer(gpointer data) {
+  return data;
+}
+
+static void _tuplpe_for_sr_unref(Tuple* tuple) {
+  _object_unref(_tuple_get(tuple, 0)); // Packet
+  _object_unref(_tuple_get(tuple, 1)); // Int32 - sending rate
+  _object_unref(_tuple_get(tuple, 2)); // Int32 - fec rate
+  _object_unref(tuple);
+}
+
+static void _sprintf_sr_tuple(gchar* result, Tuple* sr_tuple){
+  Int32* sending_rate = _tuple_get(sr_tuple, 1);
+  Int32* fec_rate = _tuple_get(sr_tuple, 2);
+  sprintf(result, "%d,%d",
+      sending_rate->value,
+      fec_rate->value
+  );
+}
+
+static gpointer _make_tuple_for_sr(gpointer* values) {
+  gint32 default_value = 0;
+  Packet* packet = values[0];
+  Int32* sending_rate = _make_int32(values[1] ? values[1] : &default_value);
+  Int32* fec_rate = _make_int32(values[2] ? values[2] : &default_value);
+  Tuple* result = _make_tuple(packet, sending_rate, fec_rate, NULL);
   return result;
 }
 
-
-
-static gint _cmp_packets_seq(Packet* a, Packet* b, gpointer udata){
-  return _cmp_seq(a->seq_num, b->seq_num);
+static gboolean _is_fec_packet(Packet* packet) {
+  return packet->payload_type == FEC_PAYLOAD_TYPE;
 }
 
-static gint _cmp_packets_seq_simple(Packet* a, Packet* b){
-  return a->seq_num == b->seq_num ? 0 : -1;
+static gboolean _is_not_fec_packet(Packet* packet) {
+  return packet->payload_type != FEC_PAYLOAD_TYPE;
 }
 
-static gint _cmp_timestamp(Packet* a, Packet* b){
-  return a->timestamp == b->timestamp ? 0 : -1;
-}
-
-typedef struct _PairedTimestamp{
-  guint64 snd_ntp;
-  guint64 rcv_ntp;
-}PairedTimestamp;
-
-
-static PairedTimestamp* _get_queue_paired_timestamps(Packet* snd_packet, GQueue* rcv_packets){
-  PairedTimestamp* result = NULL;
-  Packet* rcv_packet;
-  GList* list;
-  list = g_queue_find_custom(rcv_packets, snd_packet, _cmp_packets_seq_simple);
-  if(!list){
-    return result;
+static volatile gboolean _packet_queue_is_full_1s_tracked_ntp(GQueue* queue) {
+  Packet*head, *tail;
+  GstClockTime elapsed;
+  if(g_queue_is_empty(queue)){
+    return FALSE;
   }
-  rcv_packet = list->data;
+  head = g_queue_peek_head(queue);
+  tail = g_queue_peek_tail(queue);
+  elapsed = tail->tracked_ntp - head->tracked_ntp;
+  return GST_SECOND < get_epoch_time_from_ntp_in_ns(elapsed);
+}
 
-  result = g_malloc0(sizeof(PairedTimestamp));
-//  g_print("%hu - %hu\n", snd_packet->seq_num, rcv_packet->seq_num);
-  result->rcv_ntp = rcv_packet->tracked_ntp;
-  result->snd_ntp = snd_packet->tracked_ntp;
-  return result;
+static GstClockTime _epoch_timestamp_extractor(gpointer sr_tuple) {
+  return get_epoch_time_from_ntp_in_ns(_tracked_ntp_extractor(_tuple_get(sr_tuple, 0)));
+}
+
+static void _write_sr(gchar* input_path, gchar* output_path) {
+
+  //Construction
+  FileReader* reader = _make_reader(input_path, _make_packet);
+  Monitor* monitor = _make_monitor(_packet_queue_is_full_1s_tracked_ntp, _object_ref, _object_unref);
+  Muxer* muxer = _make_muxer(_make_tuple_for_sr, 3, 0);
+  Sampler* sampler = _make_sampler(_epoch_timestamp_extractor, _tuplpe_for_sr_unref, 100 * GST_MSECOND);
+  FileWriter* writer = _make_writer(output_path, _sprintf_sr_tuple);
+
+  //Initialization
+  _monitor_add_plugins(monitor,
+      _make_monitor_functor_plugin(NULL, _simple_passer, muxer, _muxer_input_0, NULL, NULL),
+      _make_monitor_sum_plugin(_is_not_fec_packet, _payload_extractor, muxer, _muxer_input_1),
+      _make_monitor_sum_plugin(_is_fec_packet, _payload_extractor, muxer, _muxer_input_2),
+      NULL);
+
+  //Connection
+  _pushconnect_cmp(reader, FILE_READER_OUTPUT, monitor, _monitor_receive_process);
+  _pushconnect_cmp(monitor, MONITOR_FLUSH_OUTPUT, muxer, _muxer_flush);
+  _pushconnect_cmp(muxer, MUXER_OUTPUT, sampler, _sampler_process);
+  _pushconnect_cmp(sampler, SAMPLER_OUTPUT, writer, _file_writer_process);
+
+  //Start
+  {
+    GThread* process = g_thread_create(_logfile_reader_process, reader, TRUE, NULL);
+    g_thread_join(process);
+  }
+
+  //Dispose
+  _dispose_sampler(sampler);
+  _dispose_reader(reader);
+  _dispose_monitor(monitor);
+  _dispose_muxer(muxer);
+  _dispose_writer(writer);
+}
+
+static gint _cmp_packets(const Packet* packet_x, const Packet* packet_y) {
+  return _cmp_seq(packet_x->seq_num, packet_y->seq_num);
+}
+
+static Tuple* _make_paired_packets_tuple(Packet* packet_x, Packet* packet_y){
+//  g_print("Merged: %hu-%hu\n", packet_x->seq_num, packet_y->seq_num);
+  return _make_tuple(packet_x, packet_y, NULL);
+}
+
+static void _paired_packets_unref(Tuple* paired_packets){
+  Packet* packet_x = _tuple_get(paired_packets, 0);
+  Packet* packet_y = _tuple_get(paired_packets, 1);
+//  _object_unref(packet_x);
+//  _object_unref(packet_y);
+//  _object_unref(paired_packets);
+}
+
+static void _sprintf_paired_packets_for_qd(gchar* result, Tuple* paired_packets) {
+  Packet* packet_x = _tuple_get(paired_packets, 0);
+  Packet* packet_y = _tuple_get(paired_packets, 1);
+  GstClockTime owd; // One Way Delay
+
+  if(packet_x == packet_y)
+    g_print("PacketX: %p | PacketY: %p\n", packet_x, packet_y);
+
+  if(packet_x->tracked_ntp < packet_y->tracked_ntp) {
+    owd = get_epoch_time_from_ntp_in_ns(packet_y->tracked_ntp - packet_x->tracked_ntp);
+  } else {
+    owd = get_epoch_time_from_ntp_in_ns(packet_x->tracked_ntp - packet_y->tracked_ntp);
+  }
+  sprintf(result, "%lu", owd / 1000000);
+
+  _paired_packets_unref(paired_packets);
+}
+
+static gint _cmp_packets_with_udata(const Packet* packet_x, const Packet* packet_y, gpointer udata) {
+  return _cmp_packets(packet_x, packet_y);
+}
+
+static void _write_qd(gchar* snd_packets_path, gchar* rcv_packets_path, gchar* output_path) {
+
+  //Construction
+  FileReader* snd_reader = _make_reader(snd_packets_path, _make_packet);
+  FileReader* rcv_reader = _make_reader(rcv_packets_path, _make_packet);
+  Filter* snd_filter = _make_filter(_object_unref, _is_not_fec_packet, NULL);
+  Filter* rcv_filter = _make_filter(_object_unref, _is_not_fec_packet, NULL);
+  Sorter* rcv_sorter = _make_sorter(_cmp_packets_with_udata, NULL);
+  Merger* merger = _make_merger(_cmp_packets, _object_unref, _make_paired_packets_tuple);
+  FileWriter* writer = _make_writer(output_path, _sprintf_paired_packets_for_qd);
+
+  //Connection
+  _pushconnect_cmp(snd_reader, FILE_READER_OUTPUT, snd_filter, _filter_process);
+  _pushconnect_cmp(rcv_reader, FILE_READER_OUTPUT, rcv_filter, _filter_process);
+  _pushconnect_cmp(snd_filter, FILTER_OUTPUT, merger, _merger_process_input_x);
+  _pushconnect_cmp(rcv_filter, FILTER_OUTPUT, rcv_sorter, _sorter_process);
+  _pushconnect_cmp(rcv_sorter, SORTER_OUTPUT, merger, _merger_process_input_y);
+  _pushconnect_cmp(merger, MERGER_OUTPUT, writer, _file_writer_process);
+
+  //Start
+  {
+    GThread* snd_process = g_thread_create(_logfile_reader_process, snd_reader, TRUE, NULL);
+    GThread* rcv_process = g_thread_create(_logfile_reader_process, rcv_reader, TRUE, NULL);
+    g_thread_join(snd_process);
+    g_thread_join(rcv_process);
+  }
+
+  //Dispose
+  _dispose_filter(snd_filter);
+  _dispose_filter(rcv_filter);
+  _dispose_reader(snd_reader);
+  _dispose_reader(rcv_reader);
+  _dispose_sorter(rcv_sorter);
+  _dispose_merger(merger);
+  _dispose_writer(writer);
+}
+
+
+static volatile gboolean _paired_packets_queue_is_full_1s_tracked_ntp(GQueue* queue) {
+  Packet *head, *tail;
+  GstClockTime elapsed;
+  if(g_queue_is_empty(queue)){
+    return FALSE;
+  }
+  head = _tuple_get(g_queue_peek_head(queue), 0);
+  tail = _tuple_get(g_queue_peek_tail(queue), 0);
+  elapsed = tail->tracked_ntp - head->tracked_ntp;
+  return GST_SECOND < get_epoch_time_from_ntp_in_ns(elapsed);
+}
+
+static GstClockTime _paired_packets_epoch_timestamp_extractor(gpointer tuple) {
+  return get_epoch_time_from_ntp_in_ns(_tracked_ntp_extractor(_tuple_get(tuple, 0)));
+}
+
+static void _paired_packets_ref(Tuple* paired_packets){
+  Packet* packet_x = _tuple_get(paired_packets, 0);
+  Packet* packet_y = _tuple_get(paired_packets, 1);
+  _object_ref(packet_x);
+  _object_ref(packet_y);
+  _object_ref(paired_packets);
+}
+
+static gint _paired_packets_owd_qsort_cmp(Tuple** pair_x, Tuple** pair_y) {
+  Packet *packet_x_snd, *packet_x_rcv;
+  Packet *packet_y_snd, *packet_y_rcv;
+  GstClockTime owd_x, owd_y;
+//  g_print("X Item: %hu\n", ((Packet*) _tuple_get(*pair_x, 0))->seq_num);
+//  g_print("Y Item: %hu\n", ((Packet*) _tuple_get(*pair_y, 0))->seq_num);
+  packet_x_snd = _tuple_get(*pair_x, 0);
+  packet_x_rcv = _tuple_get(*pair_x, 1);
+  packet_y_snd = _tuple_get(*pair_y, 0);
+  packet_y_rcv = _tuple_get(*pair_y, 1);
+  owd_x = get_epoch_time_from_ntp_in_ns( packet_x_rcv->tracked_ntp - packet_x_snd->tracked_ntp);
+  owd_y = get_epoch_time_from_ntp_in_ns( packet_y_rcv->tracked_ntp - packet_y_snd->tracked_ntp);
+  return owd_x == owd_y ? 0 : owd_x < owd_y ? -1 : 1;
 }
 
 typedef struct{
-  guint32 discarded_packets_num;
-  guint32 discarded_bytes;
-}DiscardTuple;
+  Component base;
+  FileReader* snd_reader;
+  FileReader* rcv_reader;
+  Filter* snd_filter;
+  Filter* rcv_filter;
+  Sorter* rcv_sorter;
+}RTPPacketsMerger;
 
-static DiscardTuple* _get_discard_tuple(FILE* fp){
-  DiscardTuple* result = g_malloc0(sizeof(DiscardTuple));
-  gchar line[1024];
-  Packet packet;
-  guint16 act_seq = 0;
-  gboolean init = FALSE;
+static RTPPacketsMerger* _make_rtp_packets_merger(gchar* snd_packets_path, gchar* rcv_packets_path) {
+  FileReader* snd_reader = _make_reader(snd_packets_path, _make_packet);
+  FileReader* rcv_reader = _make_reader(rcv_packets_path, _make_packet);
+  Filter* snd_filter = _make_filter(_object_unref, _is_not_fec_packet, NULL);
+  Filter* rcv_filter = _make_filter(_object_unref, _is_not_fec_packet, NULL);
+  Sorter* rcv_sorter = _make_sorter(_cmp_packets_with_udata, NULL);
+  Merger* merger = _make_merger(_cmp_packets, _object_unref, _make_paired_packets_tuple);
 
-  while (fgets(line, 1024, fp)){
-    _setup_packet(&packet, line);
-    if(init == FALSE){
-      init = TRUE;
-      act_seq = packet.seq_num;
-    }
-    if(_cmp_seq(act_seq, packet.seq_num) <= 0){
-      act_seq = packet.seq_num;
-      continue;
-    }
-    ++result->discarded_packets_num;
-    result->discarded_bytes += _get_sent_bytes(&packet);
-  }
-  return result;
 }
 
-static GQueue* _get_queue_timestamps(FILE* snd, FILE* rcv){
-  GQueue* result = g_queue_new();
-  GQueue* snd_packets = g_queue_new();
-  GQueue* rcv_packets = g_queue_new();
-  gchar line[1024];
-  Packet *packet,*snd_head,*rcv_head, *rcv_tail;
-  GstClockTime* pair_timestamp;
-  GstClockTime packet_ts = 0;
-  guint32 sending_rate = 0;
+static void _write_qmd(gchar* snd_packets_path, gchar* rcv_packets_path, gchar* output_path) {
 
-  while (fgets(line, 1024, snd)){
-    packet = _make_packet(line);
-    g_queue_push_tail(snd_packets, packet);
-  }
-  snd_head = g_queue_peek_head(snd_packets);
+  //Construction
+  FileReader* snd_reader = _make_reader(snd_packets_path, _make_packet);
+  FileReader* rcv_reader = _make_reader(rcv_packets_path, _make_packet);
+  Filter* snd_filter = _make_filter(_object_unref, _is_not_fec_packet, NULL);
+  Filter* rcv_filter = _make_filter(_object_unref, _is_not_fec_packet, NULL);
+  Sorter* rcv_sorter = _make_sorter(_cmp_packets_with_udata, NULL);
+  Merger* merger = _make_merger(_cmp_packets, _object_unref, _make_paired_packets_tuple);
+  Monitor* monitor = _make_monitor(_paired_packets_queue_is_full_1s_tracked_ntp, _paired_packets_ref, _paired_packets_unref);
+  Sampler* sampler = _make_sampler(_paired_packets_epoch_timestamp_extractor, _paired_packets_unref, 100 * GST_MSECOND);
+  FileWriter* writer = _make_writer(output_path, _sprintf_paired_packets_for_qd);
 
-  while (fgets(line, 1024, rcv)){
-    packet = _make_packet(line);
-    g_queue_push_tail(rcv_packets, packet);
+  //Connection
+  _pushconnect_cmp(snd_reader, FILE_READER_OUTPUT, snd_filter, _filter_process);
+  _pushconnect_cmp(rcv_reader, FILE_READER_OUTPUT, rcv_filter, _filter_process);
+  _pushconnect_cmp(snd_filter, FILTER_OUTPUT, merger, _merger_process_input_x);
+  _pushconnect_cmp(rcv_filter, FILTER_OUTPUT, rcv_sorter, _sorter_process);
+  _pushconnect_cmp(rcv_sorter, SORTER_OUTPUT, merger, _merger_process_input_y);
+  _pushconnect_cmp(merger, MERGER_OUTPUT, monitor, _monitor_receive_process);
+  _pushconnect_cmp(monitor, MONITOR_FLUSH_OUTPUT, sampler, _sampler_process);
 
-    rcv_tail = g_queue_peek_tail(rcv_packets);
-    while(get_epoch_time_from_ntp_in_ns(snd_head->tracked_ntp) < get_epoch_time_from_ntp_in_ns(rcv_tail->tracked_ntp) - 30 * GST_SECOND){
-      Packet* p = g_queue_pop_head(snd_packets);
-      pair_timestamp = _get_queue_paired_timestamps(p, rcv_packets);
-      if(pair_timestamp){
-        g_queue_push_tail(result, pair_timestamp);
-      }
-      g_free(p);
-      snd_head = g_queue_peek_head(snd_packets);
-    }
-  }
+  _monitor_add_plugins(monitor,
+      _make_monitor_percentile_plugin(
+          50,
+          _paired_packets_owd_qsort_cmp,
+          _simple_passer,
+          NULL,
+          sampler,
+          _sampler_process
+//          writer,
+//          _file_writer_process
+          ),
+      NULL);
 
-  while(!g_queue_is_empty(snd_packets)){
-    Packet* p = g_queue_pop_head(snd_packets);
-    pair_timestamp = _get_queue_paired_timestamps(p, rcv_packets);
-    if(pair_timestamp){
-      g_queue_push_tail(result, pair_timestamp);
-    }
-    g_free(p);
+  _pushconnect_cmp(sampler, SAMPLER_OUTPUT, writer, _file_writer_process);
+
+  //Start
+  {
+    GThread* snd_process = g_thread_create(_logfile_reader_process, snd_reader, TRUE, NULL);
+    GThread* rcv_process = g_thread_create(_logfile_reader_process, rcv_reader, TRUE, NULL);
+    g_thread_join(snd_process);
+    g_thread_join(rcv_process);
   }
 
-  g_queue_free_full(rcv_packets, g_free);
-  return result;
+  //Dispose
+  _dispose_filter(snd_filter);
+  _dispose_filter(rcv_filter);
+  _dispose_reader(snd_reader);
+  _dispose_reader(rcv_reader);
+  _dispose_sorter(rcv_sorter);
+  _dispose_merger(merger);
+  _dispose_writer(writer);
+  _dispose_monitor(monitor);
+  _dispose_sampler(sampler);
 }
 
-typedef struct{
-  guint32 sent_bytes;
-  guint32 lost_bytes;
-  guint32 sent_packets_num;
-  guint32 lost_packets_num;
-  GQueue* lost_packets;
-}LostTuple;
 
-static LostTuple* _get_lost_tuple(FILE* snd, FILE* rcv){
-  LostTuple* result = g_malloc0(sizeof(LostTuple));
-  GQueue* snd_packets  = g_queue_new();
-  GQueue* rcv_packets  = g_queue_new();
-  GQueue* lost_packets = g_queue_new();
-  gchar line[1024];
-  Packet *packet,*snd_head, *rcv_tail;
-  GstClockTime* pair_timestamp;
-  GstClockTime packet_ts = 0;
-  guint32 sending_rate = 0;
-
-  result->lost_packets = lost_packets;
-
-  while (fgets(line, 1024, snd)){
-    packet = _make_packet(line);
-    g_queue_push_tail(snd_packets, packet);
-  }
-  snd_head = g_queue_peek_head(snd_packets);
-
-  while (fgets(line, 1024, rcv)){
-    packet = _make_packet(line);
-    g_queue_push_tail(rcv_packets, packet);
-
-    rcv_tail = g_queue_peek_tail(rcv_packets);
-    while(get_epoch_time_from_ntp_in_ns(snd_head->tracked_ntp) < get_epoch_time_from_ntp_in_ns(rcv_tail->tracked_ntp) - 30 * GST_SECOND){
-      Packet *sent = g_queue_pop_head(snd_packets);
-      GList* list;
-//      g_queue_foreach(rcv_packets, _print, packet);g_print("\n\n||||||||%hu||||||||||||\n\n", p->seq_num);
-      list = g_queue_find_custom(rcv_packets, sent, _cmp_packets_seq_simple);
-      result->sent_bytes += _get_sent_bytes(sent);
-      ++result->sent_packets_num;
-      if(!list){
-        g_queue_push_tail(lost_packets, sent);
-        result->lost_bytes += _get_sent_bytes(sent);
-        ++result->lost_packets_num;
-      }else{
-        Packet* rcved = list->data;
-        g_queue_remove(rcv_packets, rcved);
-        g_free(rcved);
-        g_free(sent);
-      }
-      snd_head = g_queue_peek_head(snd_packets);
-    }
-  }
-
-  while(!g_queue_is_empty(snd_packets)){
-    Packet* sent = g_queue_pop_head(snd_packets);
-    GList* list;
-    list = g_queue_find_custom(rcv_packets, sent, _cmp_packets_seq_simple);
-    result->sent_bytes += _get_sent_bytes(sent);
-    ++result->sent_packets_num;
-    if(!list){
-      g_queue_push_tail(lost_packets, sent);
-      result->lost_bytes += _get_sent_bytes(sent);
-      ++result->lost_packets_num;
-    }else{
-      Packet* rcved = list->data;
-      g_queue_remove(rcv_packets, rcved);
-      g_free(rcved);
-      g_free(sent);
-    }
-
-  }
-
-  g_queue_free_full(rcv_packets, g_free);
-  return result;
-}
-
-static guint32 _get_lost_frame_nums(FILE* sndp, FILE* plyp){
-  guint32 result = 0;
-  gchar line[1024];
-  Packet played;
-  guint16 act_seq = 0;
-  gboolean init = FALSE;
-  guint32 lost_timestamp = 0;
-
-  while (fgets(line, 1024, plyp)){
-    _setup_packet(&played, line);
-//    packet = _make_packet(line);
-    if(init == FALSE){
-      init = TRUE;
-      act_seq = played.seq_num;
-    }else if(_cmp_seq(played.seq_num, act_seq) < 0){
-      continue;
-    }
-
-    if((guint16)(act_seq + 1) != played.seq_num){
-      Packet sent;
-      while (fgets(line, 1024, sndp)){
-        _setup_packet(&sent, line);
-        if(_cmp_seq(sent.seq_num, act_seq) < 0){
-          continue;
-        }
-        if(_cmp_seq(played.seq_num, sent.seq_num) <= 0){
-          break;
-        }
-        if(lost_timestamp == sent.timestamp){
-          continue;
-        }
-//        g_print("%hu - %u\n", sent.seq_num, sent.timestamp);
-        lost_timestamp = sent.timestamp;
-        ++result;
-      }
-    }
-    act_seq = played.seq_num;
-  }
-  return result;
-}
-
-typedef struct{
-  guint32 protected_but_lost;
-  guint32 lost_but_recovered;
-}FFRETuple;
-
-
-static gdouble _get_ffre(FILE* sndp, FILE* fecp, FILE* rcvp, FILE* plyp){
-  FFRETuple* ffre_tuple = g_malloc0(sizeof(FFRETuple));
-  gchar line[1024];
-  Packet* packet = g_malloc0(sizeof(Packet));
-  GQueue* protected_but_lost;
-  Packet fecpacket,played;
-  gdouble result;
-  LostTuple* lost_tuple = _get_lost_tuple(sndp, rcvp);
-  GQueue* lost_packets = lost_tuple->lost_packets;
-  Packet* lost_packet = g_queue_pop_head(lost_packets);
-
-  g_free(lost_tuple);
-  if(!lost_packet){
-    g_queue_free(lost_packets);
-    return 0.;
-  }
-  fgets(line, 1024, fecp);
-  _setup_packet(&fecpacket, line);
-  protected_but_lost = g_queue_new();
-
-  while (lost_packet){
-//    g_print("Lost packet: %hu  (%hu-%hu)\n", lost_packet->seq_num, fecpacket.protect_begin, fecpacket.protect_end);
-    if(_cmp_seq(lost_packet->seq_num, fecpacket.protect_begin) < 0){
-//      g_print("Not protected: %hu\n", lost_packet->seq_num);
-      g_free(lost_packet);
-      lost_packet = g_queue_pop_head(lost_packets);
-      continue;
-    }
-    while(_cmp_seq(fecpacket.protect_end, lost_packet->seq_num) < 0 && fgets(line, 1024, fecp)){
-      _setup_packet(&fecpacket, line);
-    }
-    g_queue_push_tail(protected_but_lost, lost_packet);
-    lost_packet = g_queue_pop_head(lost_packets);
-  }
-  fgets(line, 1024, plyp);
-  _setup_packet(&played, line);
-
-  while(!g_queue_is_empty(protected_but_lost)){
-    gint cmp;
-    lost_packet = g_queue_pop_head(protected_but_lost);
-    while((cmp = _cmp_seq(played.seq_num, lost_packet->seq_num)) < 0 && fgets(line, 1024, plyp)){
-      _setup_packet(&played, line);
-    }
-
-    if(!cmp){
-      ++ffre_tuple->lost_but_recovered;
-    }else{
-      ++ffre_tuple->protected_but_lost;
-    }
-    g_free(lost_packet);
-  }
-
-
-  if(!ffre_tuple->lost_but_recovered && !ffre_tuple->protected_but_lost){
-    return 0.;
-  }
-
-  result = (gdouble)(ffre_tuple->lost_but_recovered) /
-           (gdouble)(ffre_tuple->protected_but_lost + ffre_tuple->lost_but_recovered);
-  g_free(ffre_tuple);
-  return result;
-}
-
-typedef struct{
-  GList*  items;
-  GQueue* results;
-}MedianTuple;
-
-static GstClockTime _get_delay(PairedTimestamp* timestamps){
-  return get_epoch_time_from_ntp_in_ns(timestamps->rcv_ntp) - get_epoch_time_from_ntp_in_ns(timestamps->snd_ntp);
-}
-
-static gint _paired_timestamp_cmp(PairedTimestamp* a, PairedTimestamp* b){
-  GstClockTime delaya, delayb;
-  delaya = _get_delay(a);
-  delayb = _get_delay(b);
-  if(delaya == delayb) return 0;
-  return delaya < delayb ? -1 : 1;
-}
-
-static void _sw_add_paired_timestamp(MedianTuple* this, PairedTimestamp* paired_timestamp){
-  this->items = g_list_insert_sorted(this->items, paired_timestamp, _paired_timestamp_cmp);
-}
-
-static void _sw_rem_paired_timestamp(MedianTuple* this, PairedTimestamp* paired_timestamp){
-  this->items = g_list_remove(this->items, paired_timestamp);
-}
-
-static void _sw_paired_timestamp_sampler(MedianTuple* this){
-  GstClockTime *value = g_malloc0(sizeof(GstClockTime));
-  guint length = g_list_length(this->items);
-
-  if(length % 2 == 1){
-    *value = _get_delay(g_list_nth(this->items, length / 2)->data);
-  }else{
-    *value = _get_delay(g_list_nth(this->items, length / 2)->data) / 2;
-    *value += _get_delay(g_list_nth(this->items, length / 2 + 1)->data) / 2;
-  }
-  g_queue_push_tail(this->results, value);
-}
-
-static GstClockTime _pair_timestamp_snd_in_ns(PairedTimestamp* paired_timestamp){
-  return get_epoch_time_from_ntp_in_ns(paired_timestamp->snd_ntp);
-}
-
-static GQueue* _get_queue_delay_medians(FILE* snd, FILE* rcv){
-  MedianTuple median_tuple = {NULL, g_queue_new()};
-  SlidingWindow* sw = _make_sliding_window(
-      _sw_add_paired_timestamp,
-      _sw_rem_paired_timestamp,
-      _sw_paired_timestamp_sampler,
-      _pair_timestamp_snd_in_ns, &median_tuple, g_free);
-
-  GQueue* queue_timestamps = _get_queue_timestamps(snd, rcv);
-
-  while (!g_queue_is_empty(queue_timestamps)){
-     _sliding_window_push(sw, g_queue_pop_head(queue_timestamps));
-  }
-  _free_sliding_window(sw);
-  return median_tuple.results;
-}
-
-static void _paired_timestamps_to_delay_writer(FILE* fp, gpointer data){
-  PairedTimestamp* paired_timestamp = data;
-  GstClockTime delay = get_epoch_time_from_ntp_in_ns(paired_timestamp->rcv_ntp) - get_epoch_time_from_ntp_in_ns(paired_timestamp->snd_ntp);
-  fprintf(fp, "%lu\n", delay / 1000 //in us
-      );
-}
-
-static void _gst_clock_time_writer(FILE* fp, gpointer data){
-  GstClockTime delay = *(GstClockTime*)data;
-  fprintf(fp, "%lu\n", delay / 1000);
-}
-
-static void _guint32_writer(FILE* fp, gpointer data){
-  fprintf(fp, "%u\n", *(guint32*)data);
-}
-
-static void _gdouble_writer(FILE* fp, gpointer data){
-  fprintf(fp, "%1.3f\n", *(gdouble*)data);
-}
-
-static void _fwrite(FILE* fp, GQueue* queue, void (*writer)(FILE*,gpointer)){
-  while(!g_queue_is_empty(queue)){
-    writer(fp, g_queue_pop_head(queue));
-  }
-}
-
-static void _tuple_fwrite(FILE* fp, QueueTuple* tuple){
-  GQueue* q1,*q2;
-  q1 = tuple->q1;
-  q2 = tuple->q2;
-  while(!g_queue_is_empty(q1) || !g_queue_is_empty(q2)){
-    guint32 v1 = 0;
-    guint32 v2 = 0;
-    if(!g_queue_is_empty(q1)){
-      v1 = *((guint32*)(g_queue_pop_head(q1)));
-    }
-    if(!g_queue_is_empty(q2)){
-      v2 = *((guint32*)(g_queue_pop_head(q2)));
-    }
-    fprintf(fp, "%u,%u\n",v1,v2);
-  }
-}
-
-static void _lost_tuple_fwrite(FILE* fp, LostTuple* tuple){
-  gdouble fractional_lost = (gdouble)tuple->lost_packets_num / (gdouble)tuple->sent_packets_num;
-  fprintf(fp, "%1.3f\n",fractional_lost);
-}
 
 
 int main (int argc, char **argv)
 {
-  FILE *fp;
-  GQueue* sending_rates;
-  GQueue* queue_delays;
-  char * line = NULL;
-  size_t group_num = 0,group_i,arg_i;
-  guint32 bw_in_kbps;
-  guint32 repeat_num,repeat_i;
+  rational_recycle_ctor();
+  tuple_recycle_ctor();
+  packet_recycle_ctor();
+  int32_recycle_ctor();
+  line_recycle_ctor();
 
   if(argc < 3){
   usage:
@@ -844,142 +1426,38 @@ int main (int argc, char **argv)
     return 0;
   }
 
-  fp = fopen (argv[1],"w");
-  if(strcmp(argv[2], "sr") == 0){
-       FILE* sndp;
-       QueueTuple* tuple;
-       if(argc < 3){
-         goto usage;
-       }
-       sndp        = fopen (argv[3],"r");
-       tuple = _get_sending_rates(sndp);
-       _tuple_fwrite(fp, tuple);
-       g_free(tuple);
-       fclose(sndp);
-   }else if(strcmp(argv[2], "qd") == 0){
-     FILE* sndp;
-     FILE* rcvp;
-      if(argc < 4){
-        goto usage;
-      }
-      sndp        = fopen (argv[3],"r");
-      rcvp        = fopen (argv[4],"r");
-      _fwrite(fp, _get_queue_timestamps(sndp, rcvp), _paired_timestamps_to_delay_writer);
-      fclose(sndp);
-      fclose(rcvp);
-   }else if(strcmp(argv[2], "qmd") == 0){
-     FILE* sndp;
-     FILE* rcvp;
-     if(argc < 4){
-       goto usage;
-     }
-     sndp        = fopen (argv[3],"r");
-     rcvp        = fopen (argv[4],"r");
-     _fwrite(fp, _get_queue_delay_medians(sndp, rcvp), _gst_clock_time_writer);
-     fclose(sndp);
-     fclose(rcvp);
-   }else if(strcmp(argv[2], "lr") == 0){
-     FILE* sndp;
-     FILE* rcvp;
-     if(argc < 4){
-       goto usage;
-     }
-     sndp        = fopen (argv[3],"r");
-     rcvp        = fopen (argv[4],"r");
-     _lost_tuple_fwrite(fp, _get_lost_tuple(sndp, rcvp));
-     fclose(sndp);
-     fclose(rcvp);
-   }else if(strcmp(argv[2], "ffre") == 0){
-     FILE* fecp;
-     FILE* sndp;
-     FILE* rcvp;
-     FILE* plyp;
-     if(argc < 6){
-       goto usage;
-     }
-     fecp        = fopen (argv[3],"r");
-     sndp        = fopen (argv[4],"r");
-     rcvp        = fopen (argv[5],"r");
-     plyp        = fopen (argv[6],"r");
-     fprintf(fp, "%1.3f", _get_ffre(sndp, fecp, rcvp, plyp));
-     fclose(fecp);
-     fclose(sndp);
-     fclose(rcvp);
-     fclose(plyp);
-   }else if(strcmp(argv[2], "gp") == 0){
-     FILE* plyp;
-     QueueTuple* tuple;
-     if(argc < 3){
-       goto usage;
-     }
-     plyp  = fopen (argv[3],"r");
-     tuple = _get_goodput_rate(plyp);
-     _fwrite(fp, tuple->q1, _guint32_writer);
-//     g_queue_free_full(rates, g_free);
-     fclose(plyp);
-   }else if(strcmp(argv[2], "gp_avg") == 0 || strcmp(argv[2], "fec_avg") == 0){
-     FILE* plyp;
-     QueueTuple* tuple;
-     GQueue* rates;
-     gdouble* result = g_malloc0(sizeof(gdouble));
-     gdouble len;
-     if(argc < 3){
-       goto usage;
-     }
-     plyp  = fopen (argv[3],"r");
-     tuple = _get_goodput_rate(plyp);
-     if(!strcmp(argv[2], "gp_avg")){
-       rates = tuple->q1;
-     }else{
-       rates = tuple->q2;
-     }
-     len = g_queue_get_length(rates);
-     while(!g_queue_is_empty(rates)){
-       guint32* value = g_queue_pop_head(rates);
-       *result += *value;
-       g_free(value);
-     }
-     *result /= len;
-     g_queue_push_tail(rates, result);
-     _fwrite(fp, rates, _gdouble_writer);
-//     g_queue_free_full(rates, g_free);
-     fclose(plyp);
-   }else if(strcmp(argv[2], "ratio") == 0){
-     FILE* sndp;
-     GQueue* ratios;
-     if(argc < 3){
-       goto usage;
-     }
-     sndp  = fopen (argv[3],"r");
-     ratios = _get_subflow_ratio(sndp);
-     _fwrite(fp, ratios, _gdouble_writer);
-     fclose(sndp);
-   }else if(strcmp(argv[2], "nlf") == 0){
-     FILE* sndp;
-     FILE* plyp;
-     if(argc < 4){
-       goto usage;
-     }
-     sndp  = fopen (argv[3],"r");
-     plyp  = fopen (argv[4],"r");
-     fprintf(fp, "%d\n", _get_lost_frame_nums(sndp, plyp));
-     fclose(plyp);
-     fclose(sndp);
-   }else if(strcmp(argv[2], "disc") == 0){
-     g_print("IMPLEMENT THIS!\n");
-   }else if(strcmp(argv[2], "tcpstat") == 0){
-     QueueTuple* tuple;
-     if(argc < 3){
-       goto usage;
-     }
-     tuple = tcpstat(argv[3]);
-     _tuple_fwrite(fp, tuple);
-     g_free(tuple);
-   }else{
+  if(strcmp(argv[2], "sr") == 0) {
+    _write_sr(argv[3], argv[1]);
+  }else if(strcmp(argv[2], "qd") == 0) {
+    _write_qd(argv[3], argv[4], argv[1]);
+  }else if(strcmp(argv[2], "qmd") == 0) {
+    _write_qmd(argv[3], argv[4], argv[1]);
+  }else if(strcmp(argv[2], "lr") == 0) {
+
+  }else if(strcmp(argv[2], "ffre") == 0) {
+
+  }else if(strcmp(argv[2], "gp") == 0) {
+
+  }else if(strcmp(argv[2], "gp_avg") == 0 || strcmp(argv[2], "fec_avg") == 0){
+
+  }else if(strcmp(argv[2], "ratio") == 0) {
+
+  }else if(strcmp(argv[2], "nlf") == 0) {
+
+  }else if(strcmp(argv[2], "disc") == 0) {
+    g_print("IMPLEMENT THIS!\n");
+  }else if(strcmp(argv[2], "tcpstat") == 0) {
+
+  }else{
     goto usage;
   }
 
-  fclose(fp);
+//  packet_recycle_dtor();
+//  int32_recycle_dtor();
+//  tuple_recycle_dtor();
+//  line_recycle_dtor();
+//  rational_recycle_dtor();
+
   g_print("Results are made in %s\n", argv[1]);
   return 0;
 }

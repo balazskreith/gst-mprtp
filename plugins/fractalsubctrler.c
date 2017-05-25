@@ -572,6 +572,7 @@ void fractalsubctrler_report_update(
 
 
   DISABLE_LINE _stat_print(this);
+//  if(this->subflow->id == 1) _stat_print(this);
 
   this->approve_measurement = FALSE;
   if(10 < _stat(this)->measurements_num){

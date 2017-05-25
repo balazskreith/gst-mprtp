@@ -35,17 +35,17 @@ typedef struct _MPRTPSubflowUtilizationSignalData{
   gdouble                    lost_rate;
   guint16                    HSSN;
   guint16                    cycle_num;
-  guint32                    cum_packet_lost;
+  guint32                    total_packet_lost;
   GstClockTime               owd_median;
   GstClockTime               owd_min;
   GstClockTime               owd_max;
 
-}MPRTPSubflowUtilizationSignalData;
+}MPRTPSubflowUtilizationSignal;
 
 typedef struct _MPRTPPluginSignalData{
-  MPRTPSubflowUtilizationSignalData subflow[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  MPRTPSubflowUtilizationSignal     subflow[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   gint32                            target_media_rate;
-}MPRTPPluginSignalData;
+}MPRTPPluginSignal;
 
 
 

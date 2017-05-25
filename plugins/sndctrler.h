@@ -46,7 +46,7 @@ struct _SndController
 
   gboolean                   report_is_flowable;
 
-  MPRTPPluginSignalData*     mprtp_signal_data;
+  MPRTPPluginSignal*     mprtp_signal_data;
   GstClockTime               time_update_period;
   gint32                     overused_subflows;
 

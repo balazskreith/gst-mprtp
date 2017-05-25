@@ -2,7 +2,7 @@
 programname=$0
 LOGSDIR="temp"
 
-TEST="rmcat1"
+TEST="mprtp1"
 # ALGORITHM="SCReAM"
 ALGORITHM="FRACTaL"
 OWD=50

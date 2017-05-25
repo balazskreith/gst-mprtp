@@ -54,26 +54,13 @@ set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
 
 #unset key
 
-if(algorithm eq "fractal") {
-
 plot statlogs using ($0*0.1):(($4+$5)/125) with point pointtype 7 ps 0.2 lc rgb "blue" title "Sending Rate + FEC Rate", \
      statlogs  using ($0*0.1):2 with lines lc rgb "0xDC143C" title "Path Capacity"
 
 plot statlogs2 using ($0*0.1):(($4+$5)/125) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Sending Rate + FEC Rate", \
 	 statlogs2 using ($0*0.1):15 with lines lc rgb "0xFF6347" title "Path Capacity "
 
-}
      
-if(algorithm eq "scream") {
-
-plot statlogs  using ($0*0.1):($4/125) with point pointtype 7 ps 0.2 lc rgb "blue" title "Sending Rate", \
-     statlogs  using ($0*0.1):3 with lines lc rgb "0xDC143C" title "Path Capacity"
-
-plot statlogs2 using ($0*0.1):($4/125) with point pointtype 7 ps 0.2 lc rgb "0x008c48" title "Sending Rate", \
-	 statlogs2 using ($0*0.1):2 with lines lc rgb "0xFF6347" title "Path Capacity "
-
-
-}
 
 #Plot_2
 set yrange [0:1]

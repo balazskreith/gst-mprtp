@@ -20,48 +20,6 @@
 #define _now(this) gst_clock_get_time (this->sysclock)
 
 
-#define _define_recycle_pop_method(name, return_type, recycle) \
-  static volatile return_type* name##_pop() { \
-    return_type* result = g_async_queue_try_pop(recycle); \
-    if(!result) { \
-      result = g_malloc0(sizeof(return_type)); \
-    } \
-    return result; \
-  } \
-
-#define _define_recycle_pop_and_set_method(name, return_type, recycle) \
-  static volatile return_type* name##_pop_and_set(gpointer data) { \
-    return_type* result = g_async_queue_try_pop(recycle); \
-    if(!result) { \
-      result = g_malloc0(sizeof(return_type)); \
-    } \
-    memcpy(result, data, sizeof(return_type)); \
-    return result; \
-  } \
-
-#define _define_recycle_push_method(name, return_type, recycle) \
-  static volatile void name##_push(gpointer value) { \
-    g_async_queue_push(recycle, value); \
-  } \
-
-#define _define_recycle_ctor(name, recycle) \
-  static void name##_ctor() { \
-    recycle = g_async_queue_new_full(g_free); \
-  } \
-
-#define _define_recycle_dtor(name, recycle) \
-  static void name##_dtor() { \
-    gst_object_unref(recycle); \
-  } \
-
-#define _define_recycle(return_type, name, recycle) \
-    _define_recycle_ctor(name, recycle) \
-    _define_recycle_dtor(name, recycle) \
-    _define_recycle_push_method(name, return_type, recycle) \
-    _define_recycle_pop_method(name, return_type, recycle) \
-    _define_recycle_pop_and_set_method(name, return_type, recycle) \
-
-
 typedef void (*RefTracker)(gpointer);
 
 typedef struct{
@@ -113,10 +71,10 @@ typedef struct{
 
 
 static volatile Tuple* _make_tuple(gpointer arg1, ...) {
-  Tuple* this = tuple_recycle_pop();
+  Tuple* this = g_malloc0(sizeof(Tuple));
   va_list arguments;
   gpointer value = NULL;
-  _init_object(this, tuple_recycle_push);
+  _init_object(&this->base, g_free);
   this->length = 0;
   this->values[this->length++] = arg1;
   va_start ( arguments, arg1 );
@@ -133,20 +91,20 @@ static gpointer _tuple_get(Tuple* this, gint index) {
   }
   return this->values[index];
 }
-
-static void _tuple_set(Tuple* this, gint index, gpointer value) {
-  if(MIN(TUPLE_MAX_ITEMS_NUM, this->length) < index) {
-    return;
-  }
-  this->values[index] = value;
-}
-
-static void _tuple_add(Tuple* this, gpointer value) {
-  if(MIN(TUPLE_MAX_ITEMS_NUM, this->length) < index) {
-    return;
-  }
-  this->values[this->length++] = value;
-}
+//
+//static void _tuple_set(Tuple* this, gint index, gpointer value) {
+//  if(MIN(TUPLE_MAX_ITEMS_NUM, this->length) < index) {
+//    return;
+//  }
+//  this->values[index] = value;
+//}
+//
+//static void _tuple_add(Tuple* this, gpointer value) {
+//  if(MIN(TUPLE_MAX_ITEMS_NUM, this->length) < index) {
+//    return;
+//  }
+//  this->values[this->length++] = value;
+//}
 
 
 typedef struct _Packet
@@ -189,9 +147,8 @@ static _setup_packet(Packet* packet, gchar* line){
 }
 
 static Packet* _make_packet(gchar* line){
-//  Packet* packet = g_malloc0(sizeof(Packet));
-  Packet* packet = packet_recycle_pop();
-  _init_object(packet, packet_recycle_push);
+  Packet* packet = g_malloc0(sizeof(Packet));
+  _init_object(packet, g_free);
   _setup_packet(packet, line);
   return packet;
 }
@@ -219,6 +176,7 @@ typedef struct{
 }PusherConnection;
 
 typedef struct _Component{
+  gchar name[255];
   PusherConnection connections[COMPONENT_MAX_CONNECTION_NUM];
 };
 
@@ -231,8 +189,8 @@ static void _pushconnect_cmp(Component* src, gint io, Component* dst, PusherIO t
 static void _transmit(Component* src, gint io, gpointer data) {
   PusherConnection* connection = src->connections + io;
   if(!connection->target) {
-    g_print("Not connected output\n");
-    return;
+//    g_print("Not connected output\n");
+    return; // If we want to cause segfault, comment the return
   }
   connection->target(connection->dst, data);
 }
@@ -247,13 +205,13 @@ static void _optional_transmit(Component* src, gint io, gpointer data) {
 
 
 /*----------------------- FileReader ---------------------------*/
-typedef void (*toStruct)(gpointer, gchar*);
+typedef gpointer (*toStruct)(gchar*);
 
 typedef struct{
   Component base;
   gchar path[256];
   toStruct toStruct;
-  gint linesNum;
+  gint written_num;
   GQueue* recycle;
 }FileReader;
 
@@ -272,9 +230,9 @@ static void _logfile_reader_process(FileReader* this) {
       continue;
     }
     _transmit(&this->base, FILE_READER_OUTPUT, data);
-    ++this->linesNum;
+    ++this->written_num;
   }
-  g_print("FILE READING DONE At %s Lines: %d\n", this->path, this->linesNum);
+  g_print("FILE READING DONE At %s Lines: %d\n", this->path, this->written_num);
   _transmit(&this->base, FILE_READER_OUTPUT, NULL);
   fclose(fp);
 }
@@ -299,27 +257,40 @@ typedef struct{
   Component base;
   gchar path[256];
   toString toString;
-  GQueue* values;
+  GQueue* lines;
+  GQueue* recycle;
   gboolean started;
-  gint linesNum;
-  gint processedNum;
+  gint written_num;
+  gint received_num;
 }FileWriter;
 
 typedef enum{
   FILE_WRITER_TRASH_OUTPUT = 1,
 }FileWriterIO;
 
+static gchar* _file_writer_get_line(FileWriter* this, gpointer data) {
+  gchar* result = g_queue_is_empty(this->recycle) ? g_malloc(1024) : g_queue_pop_head(this->recycle);
+  memset(result, 0, 1024);
+  this->toString(result, data);
+  return result;
+}
+
 static void _file_writer_process(FileWriter* this, gpointer data) {
-  gchar* line;
+
   if(!data){
-    g_print("Flush signal at File Writer for %s written lines: %d, processed data: %d\n",
-        this->path, this->linesNum + g_queue_get_length(this->values), this->processedNum);
+    g_print("Flush signal at File Writer for %s written lines: %d, written data: %d\n",
+        this->path, this->written_num + g_queue_get_length(this->lines), this->received_num);
     goto flush;
   }
-  ++this->processedNum;
-  line = line_recycle_pop();
-  this->toString(line, data);
-  g_queue_push_tail(this->values, line);
+//  g_print("FileWriter processing: %p\n", data);
+  ++this->received_num;
+
+  {
+    gchar* line = _file_writer_get_line(this, data);
+    g_queue_push_tail(this->lines, line);
+  }
+
+  _optional_transmit(&this->base, FILE_WRITER_TRASH_OUTPUT, data);
   if(g_queue_get_length(this->lines) < 1000){
     return;
   }
@@ -332,8 +303,8 @@ flush:
     while(!g_queue_is_empty(this->lines)) {
       gchar* line = g_queue_pop_head(this->lines);
       fprintf(fp, "%s\n", line);
-      line_recycle_push(line);
-      ++this->linesNum;
+      ++this->written_num;
+      g_queue_push_tail(this->recycle, line);
     }
     fclose(fp);
   }
@@ -343,13 +314,13 @@ flush:
 static FileWriter* _make_writer(gchar* path, toString toString) {
   FileWriter* this = g_malloc0(sizeof(FileWriter));
   this->lines = g_queue_new();
+  this->recycle = g_queue_new();
   strcpy(this->path, path);
   this->toString = toString;
   return this;
 }
 
 static void _dispose_writer(FileWriter* this) {
-  g_queue_clear(this->lines);
   g_queue_free(this->lines);
   g_free(this);
 }
@@ -361,6 +332,7 @@ typedef struct{
   GQueue*   items;
   GCompareDataFunc cmp;
   gpointer         cmp_udata;
+  gint32           length_threshold;
 }Sorter;
 
 typedef enum{
@@ -374,22 +346,25 @@ static void _sorter_process(Sorter* this, gpointer data) {
   }
   g_queue_insert_sorted(this->items, data, this->cmp, this->cmp_udata);
   if (32000 < g_queue_get_length(this->items)) {
+//    g_print("Transmitted seq (before flush) %hu\n", ((Packet*)g_queue_peek_head(this->items))->seq_num);
     _transmit(&this->base, SORTER_OUTPUT, g_queue_pop_head(this->items));
   }
   return;
 
 flush:
   while(!g_queue_is_empty(this->items)) {
+//    g_print("Transmitted seq (after flush) %hu\n", ((Packet*)g_queue_peek_head(this->items))->seq_num);
     _transmit(&this->base, SORTER_OUTPUT, g_queue_pop_head(this->items));
   }
   _transmit(&this->base, SORTER_OUTPUT, NULL);
 }
 
-static Sorter* _make_sorter(GCompareDataFunc cmp, gpointer cmp_udata) {
+static Sorter* _make_sorter(GCompareDataFunc cmp, gpointer cmp_udata, gint length_threshold) {
   Sorter* this = g_malloc0(sizeof(Sorter));
   this->cmp = cmp;
   this->cmp_udata = cmp_udata;
   this->items = g_queue_new();
+  this->length_threshold = length_threshold;
   return this;
 }
 
@@ -399,7 +374,7 @@ static void _dispose_sorter(Sorter* this) {
 }
 
 /*----------------------- Mapper ---------------------------*/
-typedef gpointer (*MapperProcess)(gpointer);
+typedef void (*MapperProcess)(gpointer);
 typedef struct{
   Component base;
   MapperProcess process;
@@ -412,11 +387,11 @@ typedef enum{
 static void _mapper_process(Mapper* this, gpointer data) {
   gpointer result;
   if (!data) {
-    _transmit(&this->base, MAPPER_OUTPUT, NULL);
+    _optional_transmit(&this->base, MAPPER_OUTPUT, NULL);
     return;
   }
-  result = this->process(data);
-  _transmit(&this->base, MAPPER_OUTPUT, data);
+  this->process(data);
+  _optional_transmit(&this->base, MAPPER_OUTPUT, data);
 }
 
 static Mapper* _make_mapper(MapperProcess process) {
@@ -439,16 +414,18 @@ typedef struct{
 }Reducer;
 
 typedef enum{
-  REDUCER_OUTPUT = 1,
+  REDUCER_DATA_OUTPUT = 1,
+  REDUCER_RESULT_OUTPUT = 2,
 }ReducerIO;
 
 static void _reducer_process(Reducer* this, gpointer data) {
-  gpointer result;
   if (!data) {
-    _transmit(&this->base, REDUCER_OUTPUT, this->result);
+    _optional_transmit(&this->base, REDUCER_RESULT_OUTPUT, this->result);
+    _optional_transmit(&this->base, REDUCER_RESULT_OUTPUT, NULL);
     return;
   }
-  this->process(result, data);
+  this->process(this->result, data);
+  _optional_transmit(&this->base, REDUCER_DATA_OUTPUT, data);
 }
 
 static Reducer* _make_reducer(ReducerProcess process, gpointer result) {
@@ -473,21 +450,58 @@ typedef struct{
   gboolean flushed_x;
   gboolean flushed_y;
   GCompareFunc comparator;
-  RefTracker unref;
   MergeProcess merge;
-  gint32 processed_num;
+  gint32 forwarded_num;
   gint32 invoked_x;
   gint32 invoked_y;
+  PusherConnection on_input_x_flushed;
+  PusherConnection on_input_y_flushed;
 }Merger;
 
 typedef enum{
   MERGER_OUTPUT = 1,
+  MERGER_TRASH_OUTPUT = 2,
+  MERGER_TRASH_OUTPUT_X = 3,
+  MERGER_TRASH_OUTPUT_Y = 4,
 }MergerIO;
 
+static void _merger_add_on_input_x_flushed_handler(Merger* this, gpointer dst, PusherIO target) {
+  this->on_input_x_flushed.dst = dst;
+  this->on_input_x_flushed.target = target;
+}
 
-static void _merger_unref_data(Merger* this, gpointer data) {
-  if(this->unref && data) {
-    this->unref(data);
+static void _merger_add_on_input_y_flushed_handler(Merger* this, gpointer dst, PusherIO target) {
+  this->on_input_y_flushed.dst = dst;
+  this->on_input_y_flushed.target = target;
+}
+
+static void _merger_on_input_x_flushed(Merger* this, gpointer data) {
+  if(!this->on_input_x_flushed.target){
+    return;
+  }
+  this->on_input_x_flushed.target(this->on_input_x_flushed.dst, data);
+}
+
+static void _merger_on_input_y_flushed(Merger* this, gpointer data) {
+  if(!this->on_input_y_flushed.target){
+      return;
+    }
+    this->on_input_y_flushed.target(this->on_input_y_flushed.dst, data);
+}
+
+static void _merger_unref_x_data(Merger* this, gpointer data) {
+  if(this->base.connections[MERGER_TRASH_OUTPUT_X].target){
+    _transmit(&this->base, MERGER_TRASH_OUTPUT_X, data);
+  } else {
+    _transmit(&this->base, MERGER_TRASH_OUTPUT, data);
+  }
+}
+
+static void _merger_unref_y_data(Merger* this, gpointer data) {
+  if(this->base.connections[MERGER_TRASH_OUTPUT_Y].target){
+    _transmit(&this->base, MERGER_TRASH_OUTPUT_Y, data);
+  } else {
+    _transmit(&this->base, MERGER_TRASH_OUTPUT, data);
   }
 }
 
@@ -497,17 +511,18 @@ static void _merger_process_input_x(Merger* this, gpointer data) {
   g_mutex_lock(this->mutex);
   if (!data) {
     this->flushed_x = TRUE;
-    _merger_unref_data(this, this->input_x);
+    _merger_on_input_x_flushed(this, NULL);
+    _merger_unref_x_data(this, this->input_x);
     this->input_x = NULL;
     if(this->flushed_y) {
       g_print("Flush siangl at Merger, number of merged object: %d | Invokes: x: %d y:%d\n",
-                this->processed_num, this->invoked_x, this->invoked_y);
+                this->forwarded_num, this->invoked_x, this->invoked_y);
       _transmit(&this->base, MERGER_OUTPUT, NULL);
     }
     g_cond_signal(this->cond);
     goto exit;
   } else if (this->flushed_y) {
-    _merger_unref_data(this, data);
+    _merger_unref_x_data(this, data);
     goto exit;
   }
 
@@ -515,8 +530,8 @@ static void _merger_process_input_x(Merger* this, gpointer data) {
 
   while (this->input_x) {
     if(this->flushed_y) {
-      _merger_unref_data(this, data);
-      _merger_unref_data(this, this->input_x);
+      _merger_unref_x_data(this, data);
+      _merger_unref_x_data(this, this->input_x);
       this->input_x = NULL;
       goto exit;
     }
@@ -537,18 +552,17 @@ static void _merger_process_input_x(Merger* this, gpointer data) {
     this->input_x = NULL;
     goto exit;
   }
-
   if (cmp < 0) { // data is smaller than data in input_y
-    _merger_unref_data(this, data);
+    _merger_unref_x_data(this, data);
   } else if (0 < cmp) { // data is larger than data in input y
-    _merger_unref_data(this, this->input_y);
+    _merger_unref_y_data(this, this->input_y);
     this->input_x = data;
     this->input_y = NULL;
   } else { // match
     gpointer result = this->merge(data, this->input_y);
     _transmit(&this->base, MERGER_OUTPUT, result);
     this->input_y = NULL;
-    ++this->processed_num;
+    ++this->forwarded_num;
   }
 
 
@@ -561,17 +575,18 @@ static void _merger_process_input_y(Merger* this, gpointer data) {
   g_mutex_lock(this->mutex);
   if (!data) {
     this->flushed_y = TRUE;
-    _merger_unref_data(this, this->input_y);
+    _merger_on_input_y_flushed(this, NULL);
+    _merger_unref_y_data(this, this->input_y);
     this->input_y = NULL;
     if(this->flushed_x) {
       g_print("Flush siangl at Merger, number of merged object: %d | Invokes: x: %d y:%d\n",
-                this->processed_num, this->invoked_x, this->invoked_y);
+                this->forwarded_num, this->invoked_x, this->invoked_y);
       _transmit(&this->base, MERGER_OUTPUT, NULL);
     }
     g_cond_signal(this->cond);
     goto exit;
   } else if (this->flushed_x) {
-    _merger_unref_data(this, data);
+    _merger_unref_y_data(this, data);
     goto exit;
   }
 
@@ -579,8 +594,8 @@ static void _merger_process_input_y(Merger* this, gpointer data) {
 
   while (this->input_y) {
     if(this->flushed_x) {
-      _merger_unref_data(this, data);
-      _merger_unref_data(this, this->input_y);
+      _merger_unref_y_data(this, data);
+      _merger_unref_y_data(this, this->input_y);
       this->input_y = NULL;
       goto exit;
     }
@@ -600,30 +615,28 @@ static void _merger_process_input_y(Merger* this, gpointer data) {
     this->input_y = NULL;
     goto exit;
   }
-
   if (cmp < 0) { // input_x is smaller than data
-    _merger_unref_data(this, this->input_x);
+    _merger_unref_x_data(this, this->input_x);
     this->input_x = NULL;
     this->input_y = data;
   } else if (0 < cmp) { // input_x is larger than data
-    _merger_unref_data(this, data);
+    _merger_unref_y_data(this, data);
   } else { // match
     gpointer result = this->merge(this->input_x, data);
     _transmit(&this->base, MERGER_OUTPUT, result);
     this->input_x = NULL;
-    ++this->processed_num;
+    ++this->forwarded_num;
   }
 
 exit:
   g_mutex_unlock(this->mutex);
 }
 
-static Merger* _make_merger(GCompareFunc comparator, RefTracker unref, MergeProcess merge) {
+static Merger* _make_merger(GCompareFunc comparator, MergeProcess merge) {
   Merger* this = g_malloc0(sizeof(Merger));
   this->mutex = g_mutex_new();
   this->cond = g_cond_new();
   this->comparator = comparator;
-  this->unref = unref;
   this->merge = merge;
   return this;
 }
@@ -635,44 +648,6 @@ static void _dispose_merger(Merger* this) {
 }
 
 
-/*----------------------- Dispatcher ---------------------------*/
-
-typedef gpointer (*DispatcherCopier)(gpointer);
-typedef struct{
-  Component base;
-  DispatcherCopier cpy;
-}Dispatcher;
-
-static void _dispatcher_process(Dispatcher* this, gpointer data) {
-  gint i;
-  gpointer forwarded = this->cpy ? this->cpy(data) : data;
-
-  for(i = 0; i < COMPONENT_MAX_CONNECTION_NUM; ++i) {
-    PusherConnection* connection = this->base.connections + i;
-    if(!connection->target) continue;
-    connection->target(connection->dst, forwarded);
-  }
-}
-
-static Dispatcher* _make_dispatcher(DispatcherCopier cpy, PusherIO target, gpointer dst, ...) {
-  Dispatcher* this = g_malloc0(sizeof(Dispatcher));
-  gint io_num = 0;
-  va_list arguments;
-  this->cpy = cpy;
-  _pushconnect_cmp(this, io_num, dst, target);
-  va_start ( arguments, dst );
-  for(target = va_arg( arguments, PusherIO); target; target = va_arg( arguments, PusherIO)){
-    dst = va_arg( arguments, gpointer);
-    _pushconnect_cmp(this, ++io_num, dst, target);
-  }
-  va_end ( arguments );
-  return this;
-}
-
-static void _dispose_dispatcher(Dispatcher* this){
-  g_free(this);
-}
-
 /*----------------------- Sampler ---------------------------*/
 typedef GstClockTime (*SamplerTimestampExtractor)(gpointer data);
 typedef struct{
@@ -680,17 +655,21 @@ typedef struct{
   GstClockTime sampled;
   GstClockTime sampling;
   GstClockTime actual;
-  RefTracker unref;
   SamplerTimestampExtractor extractor;
+  gint processed_num;
+  gint duplicated_num;
 }Sampler;
 
 typedef enum{
   SAMPLER_OUTPUT = 1,
+  SAMPLER_TRASH_OUTPUT = 2,
 }SamplerIO;
 
 static void _sampler_process(Sampler* this, gpointer data) {
+  gpointer prev_forwarded = NULL;
   if (!data) {
-    g_print("Flush signal at Sampler\n");
+    g_print("Flush signal at Sampler, forwarded sample: %d | duplicated forwards: %d\n",
+        this->processed_num, this->duplicated_num);
     _transmit(&this->base, SAMPLER_OUTPUT, NULL);
     return;
   }
@@ -698,27 +677,27 @@ static void _sampler_process(Sampler* this, gpointer data) {
     this->sampled = this->actual = this->extractor(data);
     return;
   }
+
   this->actual = this->extractor(data);
   if(this->actual - this->sampling < this->sampled){
-    if(this->unref) {
-      this->unref(data);
-    }
+    _optional_transmit(&this->base, SAMPLER_TRASH_OUTPUT, data);
     return;
   }
   while(this->sampled < this->actual - this->sampling){
+    ++this->processed_num;
+    this->duplicated_num += prev_forwarded == data ? 1 : 0;
     _transmit(&this->base, SAMPLER_OUTPUT, data);
     this->sampled += this->sampling;
+    prev_forwarded = data;
   }
-  if(this->unref) {
-    this->unref(data);
-  }
+  _optional_transmit(&this->base, SAMPLER_TRASH_OUTPUT, data);
+
 }
 
-static Sampler* _make_sampler(SamplerTimestampExtractor extractor, RefTracker unref, GstClockTime sampling) {
+static Sampler* _make_sampler(SamplerTimestampExtractor extractor, GstClockTime sampling) {
   Sampler* this = g_malloc0(sizeof(Sampler));
   this->sampling = sampling;
   this->extractor = extractor;
-  this->unref = unref;
   return this;
 }
 
@@ -732,19 +711,21 @@ typedef gboolean (*FilterFunc)(gpointer);
 typedef struct{
   Component base;
   GSList* filters;
-  RefTracker unref;
+  gint32 passed_num;
+  gint32 failed_num;
 }Filter;
 
 typedef enum{
-  FILTER_OUTPUT = 1,
+  FILTER_PASSES_OUTPUT = 1,
+  FILTER_FAILS_OUTPUT = 2,
 }FilterIO;
 
 static void _filter_process(Filter* this, gpointer data) {
   GSList* it;
   gboolean allowed = TRUE;
   if (!data) {
-    g_print("Flush signal at Filter\n");
-    _transmit(&this->base, FILTER_OUTPUT, NULL);
+    g_print("Flush signal at Filter. Passed: %d Failed: %d\n", this->passed_num, this->failed_num);
+    _transmit(&this->base, FILTER_PASSES_OUTPUT, NULL);
     return;
   }
   for (it = this->filters; it; it = it->next) {
@@ -752,15 +733,15 @@ static void _filter_process(Filter* this, gpointer data) {
     allowed &= filter(data);
   }
   if (!allowed) {
-    if (this->unref) {
-      this->unref(data);
-    }
+    _optional_transmit(&this->base, FILTER_FAILS_OUTPUT, data);
+    ++this->failed_num;
     return;
   }
-  _transmit(&this->base, FILTER_OUTPUT, data);
+  _transmit(&this->base, FILTER_PASSES_OUTPUT, data);
+  ++this->passed_num;
 }
 
-static Filter* _make_filter(RefTracker unref, FilterFunc filter, ...) {
+static Filter* _make_filter(FilterFunc filter, ...) {
   Filter* this = g_malloc0(sizeof(Filter));
   va_list arguments;
   this->filters = g_slist_prepend(this->filters, filter);
@@ -769,7 +750,6 @@ static Filter* _make_filter(RefTracker unref, FilterFunc filter, ...) {
     this->filters = g_slist_prepend(this->filters, filter);
   }
   va_end ( arguments );
-  this->unref = unref;
   return this;
 }
 
@@ -798,27 +778,24 @@ typedef struct{
   MonitorQueueIsFull is_full;
   GSList* plugins;
   volatile GQueue* items;
-  RefTracker ref,unref;
-  gint processedNum;
+  gint received_num;
 }Monitor;
 
 typedef enum {
- MONITOR_FLUSH_OUTPUT = 2,
+  MONITOR_FLUSH_OUTPUT = 1,
+  MONITOR_TRASH_OUTPUT = 2,
 }MonitorIO;
 
 
 static volatile void _monitor_receive_process(Monitor* this, gpointer value) {
   GSList* it;
   if(!value) {
-    g_print("Flush signal at Monitor. processed values: %d\n", this->processedNum);
+    g_print("Flush signal at Monitor. processed values: %d\n", this->received_num);
     _transmit(&this->base, MONITOR_FLUSH_OUTPUT, NULL);
     return;
   }
 
-  if(this->ref){
-    this->ref(value);
-  }
-  ++this->processedNum;
+  ++this->received_num;
   g_queue_push_tail(this->items, value);
   for(it = this->plugins; it; it = it->next) {
     MonitorPlugin* plugin = it->data;
@@ -837,9 +814,8 @@ static volatile void _monitor_receive_process(Monitor* this, gpointer value) {
         plugin->remove(plugin, obsolated);
       }
     }
-    if(this->unref){
-      this->unref(obsolated);
-    }
+//    g_print("Monitor trashing: %p\n", obsolated);
+    _optional_transmit(&this->base, MONITOR_TRASH_OUTPUT, obsolated);
   }
 }
 
@@ -854,12 +830,10 @@ static void _monitor_add_plugins(Monitor* this, MonitorPlugin* plugin, ...) {
   va_end ( arguments );
 }
 
-static Monitor* _make_monitor(MonitorQueueIsFull is_full, RefTracker ref, RefTracker unref) {
+static Monitor* _make_monitor(MonitorQueueIsFull is_full) {
   Monitor* this = g_malloc0(sizeof(Monitor));
   this->items = g_queue_new();
   this->is_full = is_full;
-  this->ref = ref;
-  this->unref = unref;
   return this;
 }
 
@@ -908,7 +882,6 @@ static MonitorSumPlugin* _make_monitor_sum_plugin(
 }
 
 
-
 /*======================= Plugin ==========================*/
 typedef gpointer (*MonitorPluginPointerExtractor)(gpointer);
 #define PERCENTILE_MAX_VALUES_NUM 10000
@@ -933,19 +906,15 @@ static void _monitor_percentile_plugin_helper(gpointer item, MonitorPercentilePl
 static void _monitor_percentile_plugin_calculate(MonitorPercentilePlugin* this) {
   this->values_index = 0;
   gpointer result;
+  gint index;
 
   g_queue_foreach(this->items, _monitor_percentile_plugin_helper, this);
-//  g_print("--------\n");
   if (PERCENTILE_MAX_VALUES_NUM <= g_queue_get_length(this->items)) {
     g_print("Number of items are too large for calculate the percentile in this version");
   }
-//  g_print("Length: %d\n", this->values_index);
   qsort(this->values, this->values_index, sizeof(gpointer), this->cmp);
-  {
-    gint index = this->values_index * ((gdouble) this->percentile / 100.) - 1;
-    result = this->values[index];
-//    g_print("index: %d\n", index);
-  }
+  index = this->values_index * ((gdouble) this->percentile / 100.) - 1;
+  result = this->values[index];
 
   this->connection.target(this->connection.dst, this->extractor(result));
 }
@@ -989,28 +958,28 @@ typedef struct{
   PusherConnection  add_connection;
   PusherConnection  rem_connection;
   MonitorPluginPointerExtractor extractor;
-}MonitorExtractorPlugin;
+}MonitorFunctorPlugin;
 
-static void _monitor_extract_plugin_add(MonitorExtractorPlugin* this, gpointer data) {
+static void _monitor_extract_plugin_add(MonitorFunctorPlugin* this, gpointer data) {
   if (!this->add_connection.target) {
     return;
   }
   this->add_connection.target(this->add_connection.dst, this->extractor(data));
 }
 
-static void _monitor_extract_plugin_remove(MonitorExtractorPlugin* this, gpointer data) {
+static void _monitor_extract_plugin_remove(MonitorFunctorPlugin* this, gpointer data) {
   if (!this->rem_connection.target) {
     return;
   }
   this->rem_connection.target(this->rem_connection.dst, this->extractor(data));
 }
 
-static MonitorExtractorPlugin* _make_monitor_functor_plugin(
+static MonitorFunctorPlugin* _make_monitor_functor_plugin(
     MonitorPluginFilter filter,
     MonitorPluginPointerExtractor extractor,
     Component* add_dst, PusherIO add_target, Component* rem_dst, PusherIO rem_target)
 {
-  MonitorExtractorPlugin *this = g_malloc0(sizeof(MonitorExtractorPlugin));
+  MonitorFunctorPlugin *this = g_malloc0(sizeof(MonitorFunctorPlugin));
   this->extractor = extractor;
   this->base.filter = filter;
   this->base.add = _monitor_extract_plugin_add;
@@ -1025,7 +994,8 @@ static MonitorExtractorPlugin* _make_monitor_functor_plugin(
 
 /*======================= Plugin ==========================*/
 
-/*----------------------- Tupler ---------------------------*/
+/*----------------------- Muxer ---------------------------*/
+
 #define MAX_MUXER_VALUES_NUM 32
 
 typedef gpointer (*MuxProcess)(gpointer *values);
@@ -1036,7 +1006,7 @@ typedef struct{
   gint32 barrier_num;
   gint32 received_num;
   MuxProcess process;
-  gint processed_num;
+  gint forwarded_num;
   gint pivot_input;
 }Muxer;
 
@@ -1059,7 +1029,7 @@ static void _dispose_muxer(Muxer* this){
 static void _muxer_flush(Muxer* this) {
   gchar line[1024];
   gint i;
-  g_print("Muxer receive Flush signal, processed Num: %d\n", this->processed_num);
+  g_print("Muxer received Flush signal, forwarded data: %d\n", this->forwarded_num);
   sprintf(line, "Muxer Invokes ");
   for (i = 0; i < this->barrier_num; ++i) {
     gchar invoke_str[25];
@@ -1072,9 +1042,9 @@ static void _muxer_flush(Muxer* this) {
 
 static void _muxer_process(Muxer* this) {
   gpointer data;
-  ++this->processed_num;
+  ++this->forwarded_num;
   data = this->process(this->values);
-  memset(this->values, 0, sizeof(gpointer) * MAX_MUXER_VALUES_NUM);
+//  memset(this->values, 0, sizeof(gpointer) * MAX_MUXER_VALUES_NUM);
   this->received_num = 0;
   _transmit(&this->base, MUXER_OUTPUT, data);
 }
@@ -1095,6 +1065,10 @@ static void _muxer_process(Muxer* this) {
 _define_muxer_input(0)
 _define_muxer_input(1)
 _define_muxer_input(2)
+_define_muxer_input(3)
+_define_muxer_input(4)
+
+//################################ P I P E L I N E S ##########################################################
 
 #define _define_field_extractor(return_type, name, item_type, field_name) \
   static return_type name(gpointer item) { \
@@ -1106,41 +1080,15 @@ _define_muxer_input(2)
     return &((item_type*) item)->field_name; \
   } \
 
-//#define _setup_value(to, from, type) \
-//  to = g_malloc0(sizeof(type)); \
-//  memcpy(to, from, sizeof(type)); \
-
-
 _define_field_extractor(gint32, _payload_extractor, Packet, payload_size);
 _define_field_extractor(guint64, _tracked_ntp_extractor, Packet, tracked_ntp);
 
+static gint32 _counter_extractor(gpointer data) {
+  return 1;
+}
+
 static gpointer _simple_passer(gpointer data) {
   return data;
-}
-
-static void _tuplpe_for_sr_unref(Tuple* tuple) {
-  _object_unref(_tuple_get(tuple, 0)); // Packet
-  _object_unref(_tuple_get(tuple, 1)); // Int32 - sending rate
-  _object_unref(_tuple_get(tuple, 2)); // Int32 - fec rate
-  _object_unref(tuple);
-}
-
-static void _sprintf_sr_tuple(gchar* result, Tuple* sr_tuple){
-  Int32* sending_rate = _tuple_get(sr_tuple, 1);
-  Int32* fec_rate = _tuple_get(sr_tuple, 2);
-  sprintf(result, "%d,%d",
-      sending_rate->value,
-      fec_rate->value
-  );
-}
-
-static gpointer _make_tuple_for_sr(gpointer* values) {
-  gint32 default_value = 0;
-  Packet* packet = values[0];
-  Int32* sending_rate = _make_int32(values[1] ? values[1] : &default_value);
-  Int32* fec_rate = _make_int32(values[2] ? values[2] : &default_value);
-  Tuple* result = _make_tuple(packet, sending_rate, fec_rate, NULL);
-  return result;
 }
 
 static gboolean _is_fec_packet(Packet* packet) {
@@ -1151,6 +1099,20 @@ static gboolean _is_not_fec_packet(Packet* packet) {
   return packet->payload_type != FEC_PAYLOAD_TYPE;
 }
 
+static GstClockTime _get_packets_elapsed_time(Packet* packet1, Packet* packet2) {
+  GstClockTime ntp_dtime;
+  if (packet1->tracked_ntp < packet2->tracked_ntp) {
+    ntp_dtime = packet2->tracked_ntp - packet1->tracked_ntp;
+  } else {
+    ntp_dtime = packet1->tracked_ntp - packet2->tracked_ntp;
+  }
+  return get_epoch_time_from_ntp_in_ns(ntp_dtime);
+}
+
+static GstClockTime _epoch_timestamp_extractor(gpointer sr_tuple) {
+  return get_epoch_time_from_ntp_in_ns(_tracked_ntp_extractor(_tuple_get(sr_tuple, 0)));
+}
+
 static volatile gboolean _packet_queue_is_full_1s_tracked_ntp(GQueue* queue) {
   Packet*head, *tail;
   GstClockTime elapsed;
@@ -1159,35 +1121,140 @@ static volatile gboolean _packet_queue_is_full_1s_tracked_ntp(GQueue* queue) {
   }
   head = g_queue_peek_head(queue);
   tail = g_queue_peek_tail(queue);
-  elapsed = tail->tracked_ntp - head->tracked_ntp;
-  return GST_SECOND < get_epoch_time_from_ntp_in_ns(elapsed);
+  return GST_SECOND < _get_packets_elapsed_time(head, tail);
 }
 
-static GstClockTime _epoch_timestamp_extractor(gpointer sr_tuple) {
-  return get_epoch_time_from_ntp_in_ns(_tracked_ntp_extractor(_tuple_get(sr_tuple, 0)));
+static void _sprintf_sr_fr_tuple(gchar* result, Tuple* sr_tuple){
+  Int32* rtp_payload_rate = _tuple_get(sr_tuple, 1);
+  Int32* fec_payload_rate = _tuple_get(sr_tuple, 2);
+  Int32* rtp_packets_rate = _tuple_get(sr_tuple, 3);
+  Int32* fec_packets_rate = _tuple_get(sr_tuple, 4);
+  sprintf(result, "%d,%d",
+      rtp_payload_rate->value + rtp_packets_rate->value * 28,
+      fec_payload_rate->value + fec_packets_rate->value * 28
+  );
 }
 
-static void _write_sr(gchar* input_path, gchar* output_path) {
+static gpointer _make_sr_fr_tuple(gpointer* values) {
+  gint32 default_value = 0;
+  Packet* packet = values[0];
+  Int32* rtp_payload_rate = _make_int32(values[1] ? values[1] : &default_value);
+  Int32* fec_payload_rate = _make_int32(values[2] ? values[2] : &default_value);
+  Int32* rtp_packets_rate = _make_int32(values[3] ? values[3] : &default_value);
+  Int32* fec_packets_rate = _make_int32(values[4] ? values[4] : &default_value);
+  Tuple* result = _make_tuple(packet, rtp_payload_rate, fec_payload_rate,
+      rtp_packets_rate, fec_packets_rate, NULL);
+//  g_print("Tuple produced: %p\n", result);
+  return result;
+}
+
+static void _sr_fr_full_unref(Tuple* packets_sr_fr) {
+//  g_print("Tuple _sr_fr_full_unref: %p\n", packets_sr_fr);
+//  g_print("Packets ref %d\n", ((Packet*)_tuple_get(packets_sr_fr, 0))->base.ref);
+  _object_unref((Object*)_tuple_get(packets_sr_fr, 0));
+  _object_unref((Object*)_tuple_get(packets_sr_fr, 1));
+  _object_unref((Object*)_tuple_get(packets_sr_fr, 2));
+  _object_unref((Object*)_tuple_get(packets_sr_fr, 3));
+  _object_unref((Object*)_tuple_get(packets_sr_fr, 4));
+  _object_unref((Object*)packets_sr_fr);
+}
+
+typedef struct {
+  Component base;
+  Monitor*  monitor;
+  Muxer*    muxer;
+  Sampler*  sampler;
+  Mapper*   packets_refer;
+  Mapper*   packets_unrefer;
+  Mapper*   tuple_packets_unrefer;
+}RateSampler;
+
+typedef enum{
+  RATE_SAMPLER_TUPLE_OUTPUT = 1
+};
+
+static void _rate_sampler_packet_input_transmitter(RateSampler* this, gpointer data) {
+  _mapper_process(this->packets_refer, data);
+}
+static void _rate_sampler_tuple_output_transmitter(RateSampler* this, gpointer data) {
+  _transmit(&this->base, RATE_SAMPLER_TUPLE_OUTPUT, data);
+}
+
+static RateSampler* _make_rate_sampler() {
+  RateSampler* this = g_malloc0(sizeof(RateSampler));
+  this->monitor = _make_monitor(_packet_queue_is_full_1s_tracked_ntp);
+  this->muxer = _make_muxer(_make_sr_fr_tuple, 5, 0);
+  this->sampler = _make_sampler(_epoch_timestamp_extractor, 100 * GST_MSECOND);
+  this->packets_refer   = _make_mapper((MapperProcess) _object_ref);
+  this->packets_unrefer = _make_mapper((MapperProcess) _object_unref);
+  this->tuple_packets_unrefer = _make_mapper((MapperProcess) _sr_fr_full_unref);
+
+  //Initialization
+  _monitor_add_plugins(this->monitor,
+      _make_monitor_functor_plugin(NULL, _simple_passer, this->muxer, _muxer_input_0, NULL, NULL),
+      _make_monitor_sum_plugin(_is_not_fec_packet, _payload_extractor, this->muxer, _muxer_input_1),
+      _make_monitor_sum_plugin(_is_fec_packet, _payload_extractor, this->muxer, _muxer_input_2),
+      _make_monitor_sum_plugin(_is_not_fec_packet, _counter_extractor, this->muxer, _muxer_input_3),
+      _make_monitor_sum_plugin(_is_fec_packet, _counter_extractor, this->muxer, _muxer_input_4),
+      NULL);
+
+  //Connection
+  _pushconnect_cmp(this->packets_refer, MAPPER_OUTPUT, this->monitor, _monitor_receive_process);
+
+  _pushconnect_cmp(this->muxer, MUXER_OUTPUT, this->sampler, _sampler_process);
+  _pushconnect_cmp(this->sampler, SAMPLER_OUTPUT, this, _rate_sampler_tuple_output_transmitter);
+//  _pushconnect_cmp(muxer, MUXER_OUTPUT, writer, _file_writer_process);
+
+  _pushconnect_cmp(this->monitor, MONITOR_FLUSH_OUTPUT, this->muxer, _muxer_flush);
+  _pushconnect_cmp(this->monitor, MONITOR_TRASH_OUTPUT, this->packets_unrefer, _mapper_process);
+  _pushconnect_cmp(this->sampler, SAMPLER_TRASH_OUTPUT, this->tuple_packets_unrefer, _mapper_process);
+  return this;
+}
+
+static void _dispose_rate_sampler(RateSampler* this) {
+  _dispose_mapper(this->packets_refer);
+  _dispose_mapper(this->packets_unrefer);
+  _dispose_mapper(this->tuple_packets_unrefer);
+
+  _dispose_sampler(this->sampler);
+  _dispose_monitor(this->monitor);
+  _dispose_muxer(this->muxer);
+}
+
+static void _write_rate(gchar* input_path, gchar* output_path) {
 
   //Construction
   FileReader* reader = _make_reader(input_path, _make_packet);
-  Monitor* monitor = _make_monitor(_packet_queue_is_full_1s_tracked_ntp, _object_ref, _object_unref);
-  Muxer* muxer = _make_muxer(_make_tuple_for_sr, 3, 0);
-  Sampler* sampler = _make_sampler(_epoch_timestamp_extractor, _tuplpe_for_sr_unref, 100 * GST_MSECOND);
-  FileWriter* writer = _make_writer(output_path, _sprintf_sr_tuple);
+  Monitor* monitor = _make_monitor(_packet_queue_is_full_1s_tracked_ntp);
+  Muxer* muxer = _make_muxer(_make_sr_fr_tuple, 5, 0);
+  Sampler* sampler = _make_sampler(_epoch_timestamp_extractor, 100 * GST_MSECOND);
+  RateSampler* rate_sampler = _make_rate_sampler();
+  FileWriter* writer = _make_writer(output_path, _sprintf_sr_fr_tuple);
+
+  Mapper* packets_refer   = _make_mapper((MapperProcess) _object_ref);
+  Mapper* packets_unrefer = _make_mapper((MapperProcess) _object_unref);
+  Mapper* tuple_packets_unrefer = _make_mapper((MapperProcess) _sr_fr_full_unref);
 
   //Initialization
   _monitor_add_plugins(monitor,
       _make_monitor_functor_plugin(NULL, _simple_passer, muxer, _muxer_input_0, NULL, NULL),
       _make_monitor_sum_plugin(_is_not_fec_packet, _payload_extractor, muxer, _muxer_input_1),
       _make_monitor_sum_plugin(_is_fec_packet, _payload_extractor, muxer, _muxer_input_2),
+      _make_monitor_sum_plugin(_is_not_fec_packet, _counter_extractor, muxer, _muxer_input_3),
+      _make_monitor_sum_plugin(_is_fec_packet, _counter_extractor, muxer, _muxer_input_4),
       NULL);
 
   //Connection
-  _pushconnect_cmp(reader, FILE_READER_OUTPUT, monitor, _monitor_receive_process);
-  _pushconnect_cmp(monitor, MONITOR_FLUSH_OUTPUT, muxer, _muxer_flush);
+  _pushconnect_cmp(reader, FILE_READER_OUTPUT, packets_refer, _mapper_process);
+  _pushconnect_cmp(packets_refer, MAPPER_OUTPUT, monitor, _monitor_receive_process);
+
   _pushconnect_cmp(muxer, MUXER_OUTPUT, sampler, _sampler_process);
   _pushconnect_cmp(sampler, SAMPLER_OUTPUT, writer, _file_writer_process);
+//  _pushconnect_cmp(muxer, MUXER_OUTPUT, writer, _file_writer_process);
+
+  _pushconnect_cmp(monitor, MONITOR_FLUSH_OUTPUT, muxer, _muxer_flush);
+  _pushconnect_cmp(monitor, MONITOR_TRASH_OUTPUT, packets_unrefer, _mapper_process);
+  _pushconnect_cmp(sampler, SAMPLER_TRASH_OUTPUT, tuple_packets_unrefer, _mapper_process);
 
   //Start
   {
@@ -1196,6 +1263,10 @@ static void _write_sr(gchar* input_path, gchar* output_path) {
   }
 
   //Dispose
+  _dispose_mapper(packets_refer);
+  _dispose_mapper(packets_unrefer);
+  _dispose_mapper(tuple_packets_unrefer);
+
   _dispose_sampler(sampler);
   _dispose_reader(reader);
   _dispose_monitor(monitor);
@@ -1215,9 +1286,79 @@ static Tuple* _make_paired_packets_tuple(Packet* packet_x, Packet* packet_y){
 static void _paired_packets_unref(Tuple* paired_packets){
   Packet* packet_x = _tuple_get(paired_packets, 0);
   Packet* packet_y = _tuple_get(paired_packets, 1);
-//  _object_unref(packet_x);
-//  _object_unref(packet_y);
-//  _object_unref(paired_packets);
+  _object_unref(packet_x);
+  _object_unref(packet_y);
+  _object_unref(paired_packets);
+}
+
+
+typedef struct{
+  Component base;
+  FileReader* snd_reader;
+  FileReader* rcv_reader;
+  Filter* snd_filter;
+  Filter* rcv_filter;
+  Sorter* rcv_sorter;
+  Merger* merger;
+  Mapper* packets_unrefer;
+}RTPPacketsMerger;
+
+typedef enum {
+  RTP_PACKETS_MERGER_OUTPUT = 1,
+  RTP_PACKETS_MERGER_TRASH_OUTPUT = 2,
+}RTPPacketsMergerIO;
+
+static void _rtp_packets_merger_transmitter(RTPPacketsMerger* this, gpointer data) {
+  _transmit(&this->base, RTP_PACKETS_MERGER_OUTPUT, data);
+}
+
+static void _rtp_packets_merger_trash_transmitter(RTPPacketsMerger* this, gpointer data) {
+  _transmit(&this->base, RTP_PACKETS_MERGER_TRASH_OUTPUT, data);
+}
+
+static gint _cmp_packets_with_udata(const Packet* packet_x, const Packet* packet_y, gpointer udata) {
+  return _cmp_packets(packet_x, packet_y);
+}
+
+static RTPPacketsMerger* _make_rtp_packets_merger(gchar* snd_packets_path, gchar* rcv_packets_path) {
+  RTPPacketsMerger* this = g_malloc0(sizeof(RTPPacketsMerger));
+  this->snd_reader = _make_reader(snd_packets_path, _make_packet);
+  this->rcv_reader = _make_reader(rcv_packets_path, _make_packet);
+  this->snd_filter = _make_filter(_is_not_fec_packet, NULL);
+  this->rcv_filter = _make_filter(_is_not_fec_packet, NULL);
+  this->rcv_sorter = _make_sorter(_cmp_packets_with_udata, NULL, 32000);
+  this->merger = _make_merger(_cmp_packets, _make_paired_packets_tuple);
+  this->packets_unrefer = _make_mapper(_object_unref);
+
+  _pushconnect_cmp(this->snd_reader, FILE_READER_OUTPUT, this->snd_filter, _filter_process);
+  _pushconnect_cmp(this->rcv_reader, FILE_READER_OUTPUT, this->rcv_filter, _filter_process);
+  _pushconnect_cmp(this->snd_filter, FILTER_PASSES_OUTPUT, this->merger, _merger_process_input_x);
+  _pushconnect_cmp(this->rcv_filter, FILTER_PASSES_OUTPUT, this->rcv_sorter, _sorter_process);
+  _pushconnect_cmp(this->rcv_sorter, SORTER_OUTPUT, this->merger, _merger_process_input_y);
+  _pushconnect_cmp(this->merger, MERGER_OUTPUT, this, _rtp_packets_merger_transmitter);
+
+  _pushconnect_cmp(this->snd_filter, FILTER_FAILS_OUTPUT, this->packets_unrefer, _mapper_process);
+  _pushconnect_cmp(this->rcv_filter, FILTER_FAILS_OUTPUT, this->packets_unrefer, _mapper_process);
+  _pushconnect_cmp(this->merger, MERGER_TRASH_OUTPUT, this, _rtp_packets_merger_trash_transmitter);
+  _pushconnect_cmp(this, RTP_PACKETS_MERGER_TRASH_OUTPUT, this->packets_unrefer, _mapper_process);
+
+  return this;
+}
+
+static void _rtp_packets_merger_start_and_join(RTPPacketsMerger* this) {
+  GThread* snd_process = g_thread_create(_logfile_reader_process, this->snd_reader, TRUE, NULL);
+  GThread* rcv_process = g_thread_create(_logfile_reader_process, this->rcv_reader, TRUE, NULL);
+  g_thread_join(snd_process);
+  g_thread_join(rcv_process);
+}
+
+static void _dispose_rtp_packets_merger(RTPPacketsMerger* this) {
+  _dispose_filter(this->snd_filter);
+  _dispose_filter(this->rcv_filter);
+  _dispose_reader(this->snd_reader);
+  _dispose_reader(this->rcv_reader);
+  _dispose_sorter(this->rcv_sorter);
+  _dispose_merger(this->merger);
 }
 
 static void _sprintf_paired_packets_for_qd(gchar* result, Tuple* paired_packets) {
@@ -1234,49 +1375,26 @@ static void _sprintf_paired_packets_for_qd(gchar* result, Tuple* paired_packets)
     owd = get_epoch_time_from_ntp_in_ns(packet_x->tracked_ntp - packet_y->tracked_ntp);
   }
   sprintf(result, "%lu", owd / 1000000);
-
-  _paired_packets_unref(paired_packets);
-}
-
-static gint _cmp_packets_with_udata(const Packet* packet_x, const Packet* packet_y, gpointer udata) {
-  return _cmp_packets(packet_x, packet_y);
 }
 
 static void _write_qd(gchar* snd_packets_path, gchar* rcv_packets_path, gchar* output_path) {
 
   //Construction
-  FileReader* snd_reader = _make_reader(snd_packets_path, _make_packet);
-  FileReader* rcv_reader = _make_reader(rcv_packets_path, _make_packet);
-  Filter* snd_filter = _make_filter(_object_unref, _is_not_fec_packet, NULL);
-  Filter* rcv_filter = _make_filter(_object_unref, _is_not_fec_packet, NULL);
-  Sorter* rcv_sorter = _make_sorter(_cmp_packets_with_udata, NULL);
-  Merger* merger = _make_merger(_cmp_packets, _object_unref, _make_paired_packets_tuple);
+  RTPPacketsMerger* rtp_packets_merger = _make_rtp_packets_merger(snd_packets_path, rcv_packets_path);
   FileWriter* writer = _make_writer(output_path, _sprintf_paired_packets_for_qd);
+  Mapper* packets_unrefer = _make_mapper(_object_unref);
 
   //Connection
-  _pushconnect_cmp(snd_reader, FILE_READER_OUTPUT, snd_filter, _filter_process);
-  _pushconnect_cmp(rcv_reader, FILE_READER_OUTPUT, rcv_filter, _filter_process);
-  _pushconnect_cmp(snd_filter, FILTER_OUTPUT, merger, _merger_process_input_x);
-  _pushconnect_cmp(rcv_filter, FILTER_OUTPUT, rcv_sorter, _sorter_process);
-  _pushconnect_cmp(rcv_sorter, SORTER_OUTPUT, merger, _merger_process_input_y);
-  _pushconnect_cmp(merger, MERGER_OUTPUT, writer, _file_writer_process);
+  _pushconnect_cmp(rtp_packets_merger, RTP_PACKETS_MERGER_OUTPUT, writer, _file_writer_process);
+  _pushconnect_cmp(writer, FILE_WRITER_TRASH_OUTPUT, packets_unrefer, _mapper_process);
 
   //Start
-  {
-    GThread* snd_process = g_thread_create(_logfile_reader_process, snd_reader, TRUE, NULL);
-    GThread* rcv_process = g_thread_create(_logfile_reader_process, rcv_reader, TRUE, NULL);
-    g_thread_join(snd_process);
-    g_thread_join(rcv_process);
-  }
+  _rtp_packets_merger_start_and_join(rtp_packets_merger);
 
   //Dispose
-  _dispose_filter(snd_filter);
-  _dispose_filter(rcv_filter);
-  _dispose_reader(snd_reader);
-  _dispose_reader(rcv_reader);
-  _dispose_sorter(rcv_sorter);
-  _dispose_merger(merger);
+  _dispose_rtp_packets_merger(rtp_packets_merger);
   _dispose_writer(writer);
+  _dispose_mapper(packets_unrefer);
 }
 
 
@@ -1308,8 +1426,6 @@ static gint _paired_packets_owd_qsort_cmp(Tuple** pair_x, Tuple** pair_y) {
   Packet *packet_x_snd, *packet_x_rcv;
   Packet *packet_y_snd, *packet_y_rcv;
   GstClockTime owd_x, owd_y;
-//  g_print("X Item: %hu\n", ((Packet*) _tuple_get(*pair_x, 0))->seq_num);
-//  g_print("Y Item: %hu\n", ((Packet*) _tuple_get(*pair_y, 0))->seq_num);
   packet_x_snd = _tuple_get(*pair_x, 0);
   packet_x_rcv = _tuple_get(*pair_x, 1);
   packet_y_snd = _tuple_get(*pair_y, 0);
@@ -1319,93 +1435,252 @@ static gint _paired_packets_owd_qsort_cmp(Tuple** pair_x, Tuple** pair_y) {
   return owd_x == owd_y ? 0 : owd_x < owd_y ? -1 : 1;
 }
 
-typedef struct{
-  Component base;
-  FileReader* snd_reader;
-  FileReader* rcv_reader;
-  Filter* snd_filter;
-  Filter* rcv_filter;
-  Sorter* rcv_sorter;
-}RTPPacketsMerger;
-
-static RTPPacketsMerger* _make_rtp_packets_merger(gchar* snd_packets_path, gchar* rcv_packets_path) {
-  FileReader* snd_reader = _make_reader(snd_packets_path, _make_packet);
-  FileReader* rcv_reader = _make_reader(rcv_packets_path, _make_packet);
-  Filter* snd_filter = _make_filter(_object_unref, _is_not_fec_packet, NULL);
-  Filter* rcv_filter = _make_filter(_object_unref, _is_not_fec_packet, NULL);
-  Sorter* rcv_sorter = _make_sorter(_cmp_packets_with_udata, NULL);
-  Merger* merger = _make_merger(_cmp_packets, _object_unref, _make_paired_packets_tuple);
-
-}
 
 static void _write_qmd(gchar* snd_packets_path, gchar* rcv_packets_path, gchar* output_path) {
 
   //Construction
-  FileReader* snd_reader = _make_reader(snd_packets_path, _make_packet);
-  FileReader* rcv_reader = _make_reader(rcv_packets_path, _make_packet);
-  Filter* snd_filter = _make_filter(_object_unref, _is_not_fec_packet, NULL);
-  Filter* rcv_filter = _make_filter(_object_unref, _is_not_fec_packet, NULL);
-  Sorter* rcv_sorter = _make_sorter(_cmp_packets_with_udata, NULL);
-  Merger* merger = _make_merger(_cmp_packets, _object_unref, _make_paired_packets_tuple);
-  Monitor* monitor = _make_monitor(_paired_packets_queue_is_full_1s_tracked_ntp, _paired_packets_ref, _paired_packets_unref);
-  Sampler* sampler = _make_sampler(_paired_packets_epoch_timestamp_extractor, _paired_packets_unref, 100 * GST_MSECOND);
+  RTPPacketsMerger* rtp_packets_merger = _make_rtp_packets_merger(snd_packets_path, rcv_packets_path);
+  Mapper* paired_packets_refer = _make_mapper(_paired_packets_ref);
+  Mapper* paired_packets_unrefer = _make_mapper(_paired_packets_unref);
+  Monitor* monitor = _make_monitor(_paired_packets_queue_is_full_1s_tracked_ntp);
+  Sampler* sampler = _make_sampler(_paired_packets_epoch_timestamp_extractor, 100 * GST_MSECOND);
   FileWriter* writer = _make_writer(output_path, _sprintf_paired_packets_for_qd);
 
   //Connection
-  _pushconnect_cmp(snd_reader, FILE_READER_OUTPUT, snd_filter, _filter_process);
-  _pushconnect_cmp(rcv_reader, FILE_READER_OUTPUT, rcv_filter, _filter_process);
-  _pushconnect_cmp(snd_filter, FILTER_OUTPUT, merger, _merger_process_input_x);
-  _pushconnect_cmp(rcv_filter, FILTER_OUTPUT, rcv_sorter, _sorter_process);
-  _pushconnect_cmp(rcv_sorter, SORTER_OUTPUT, merger, _merger_process_input_y);
-  _pushconnect_cmp(merger, MERGER_OUTPUT, monitor, _monitor_receive_process);
+  _pushconnect_cmp(rtp_packets_merger, RTP_PACKETS_MERGER_OUTPUT, paired_packets_refer, _mapper_process);
+  _pushconnect_cmp(paired_packets_refer, MAPPER_OUTPUT, monitor, _monitor_receive_process);
   _pushconnect_cmp(monitor, MONITOR_FLUSH_OUTPUT, sampler, _sampler_process);
 
   _monitor_add_plugins(monitor,
       _make_monitor_percentile_plugin(
           50,
           _paired_packets_owd_qsort_cmp,
-          _simple_passer,
-          NULL,
+          _simple_passer, // Extractor
+          NULL, // Filter
           sampler,
           _sampler_process
-//          writer,
-//          _file_writer_process
           ),
       NULL);
 
   _pushconnect_cmp(sampler, SAMPLER_OUTPUT, writer, _file_writer_process);
+  _pushconnect_cmp(sampler, SAMPLER_TRASH_OUTPUT, paired_packets_unrefer, _mapper_process);
 
   //Start
-  {
-    GThread* snd_process = g_thread_create(_logfile_reader_process, snd_reader, TRUE, NULL);
-    GThread* rcv_process = g_thread_create(_logfile_reader_process, rcv_reader, TRUE, NULL);
-    g_thread_join(snd_process);
-    g_thread_join(rcv_process);
-  }
+  _rtp_packets_merger_start_and_join(rtp_packets_merger);
 
   //Dispose
-  _dispose_filter(snd_filter);
-  _dispose_filter(rcv_filter);
-  _dispose_reader(snd_reader);
-  _dispose_reader(rcv_reader);
-  _dispose_sorter(rcv_sorter);
-  _dispose_merger(merger);
+  _dispose_rtp_packets_merger(rtp_packets_merger);
   _dispose_writer(writer);
   _dispose_monitor(monitor);
   _dispose_sampler(sampler);
+
+  _dispose_mapper(paired_packets_unrefer);
+  _dispose_mapper(paired_packets_refer);
+}
+
+typedef struct{
+  gboolean first_rcved;
+  gboolean last_rcved;
+  gint32 lost_bytes;
+  gint32 lost_num;
+  gint32 snd_bytes;
+  gint32 snd_num;
+}TrackedPackets;
+
+static void _tracking_lost_packets(TrackedPackets* tracked_packets, Packet* lost_packet){
+  if(tracked_packets->last_rcved || _is_fec_packet(lost_packet)) {
+    return;
+  }
+//  g_print("Lost seq: %hu\n", lost_packet->seq_num);
+  tracked_packets->lost_bytes += lost_packet->payload_size;
+  ++tracked_packets->lost_num;
+  tracked_packets->snd_bytes += lost_packet->payload_size;
+  ++tracked_packets->snd_num;
+  _object_unref((Packet*)lost_packet);
+}
+
+static void _tracking_rcved_packets(TrackedPackets* tracked_packets, Tuple* paired_packets) {
+  Packet* snd_packet = _tuple_get(paired_packets, 0);
+  tracked_packets->first_rcved = TRUE;
+  tracked_packets->snd_bytes += snd_packet->payload_size;
+  ++tracked_packets->snd_num;
+}
+
+static void _on_inputs_flushed_for_lr(TrackedPackets* tracked_packets, gpointer data) {
+  tracked_packets->last_rcved = TRUE;
+}
+
+static void _sprintf_tracked_packets_for_lots(gchar* result, TrackedPackets* tracked_packets) {
+  gdouble lost_rate = (gdouble)tracked_packets->lost_num / (gdouble)tracked_packets->snd_num;
+  sprintf(result, "%1.3f", lost_rate);
 }
 
 
+static void _write_lr(gchar* snd_packets_path, gchar* rcv_packets_path, gchar* output_path) {
+
+  //Construction
+  TrackedPackets tracked_packets = {0,0,0,0};
+  RTPPacketsMerger* rtp_packets_merger = _make_rtp_packets_merger(snd_packets_path, rcv_packets_path);
+  Reducer* rcv_packets_reducer = _make_reducer(_tracking_rcved_packets, &tracked_packets);
+  Reducer* lost_packets_reducer = _make_reducer(_tracking_lost_packets, &tracked_packets);
+  Mapper* paired_packets_unrefer = _make_mapper(_paired_packets_unref);
+  FileWriter* writer = _make_writer(output_path, _sprintf_tracked_packets_for_lots);
+
+  //Connection
+  _pushconnect_cmp(rtp_packets_merger, RTP_PACKETS_MERGER_OUTPUT, rcv_packets_reducer, _reducer_process);
+  _pushconnect_cmp(rtp_packets_merger, RTP_PACKETS_MERGER_TRASH_OUTPUT, lost_packets_reducer, _reducer_process);
+  _pushconnect_cmp(rcv_packets_reducer, REDUCER_DATA_OUTPUT, paired_packets_unrefer, _mapper_process);
+  _pushconnect_cmp(rcv_packets_reducer, REDUCER_RESULT_OUTPUT, writer, _file_writer_process);
+
+  //Event handlers
+  _merger_add_on_input_x_flushed_handler(rtp_packets_merger->merger, &tracked_packets, _on_inputs_flushed_for_lr);
+  _merger_add_on_input_y_flushed_handler(rtp_packets_merger->merger, &tracked_packets, _on_inputs_flushed_for_lr);
+
+  //Start
+  _rtp_packets_merger_start_and_join(rtp_packets_merger);
+
+  //Dispose
+  _dispose_rtp_packets_merger(rtp_packets_merger);
+  _dispose_writer(writer);
+  _dispose_reducer(lost_packets_reducer);
+  _dispose_reducer(rcv_packets_reducer);
+
+  _dispose_mapper(paired_packets_unrefer);
+}
+
+static gint _cmp_packets_with_fec(const Packet* rtp_packet, const Packet* fec_packet) {
+  if( _cmp_seq(rtp_packet->seq_num, fec_packet->protect_begin) < 0) {
+    return -1;
+  }
+  if( _cmp_seq(fec_packet->protect_end, rtp_packet->seq_num) < 0) {
+    return 1;
+  }
+//  g_print("fec range: %d-%d, lost packet seq: %d\n",
+//      fec_packet->protect_begin, fec_packet->protect_end, rtp_packet->seq_num);
+  return 0;
+}
+
+typedef struct {
+  gboolean last_rcved;
+  gint32 protected_but_lost;
+  gint32 recovered;
+  FileWriter* writer;
+}FFRETuple;
+
+static void _ffre_increase_recovered(FFRETuple* ffre_tuple, gpointer data) {
+  if(ffre_tuple->last_rcved) return;
+  ++ffre_tuple->recovered;
+}
+
+static void _ffre_increase_protected_but_lost(FFRETuple* ffre_tuple, gpointer data) {
+  if(ffre_tuple->last_rcved) return;
+  ++ffre_tuple->protected_but_lost;
+}
+
+static void _ffre_sprintf(gchar* result, FFRETuple* ffre_tuple) {
+  gdouble ffre = (gdouble)ffre_tuple->recovered / (gdouble)(ffre_tuple->recovered + ffre_tuple->protected_but_lost);
+  g_print("recovered packets: %d, protected but lost: %d\n", ffre_tuple->recovered, ffre_tuple->protected_but_lost);
+  sprintf(result, "%1.3f", ffre);
+}
+
+static void _on_inputs_flushed_for_ffre(FFRETuple* ffre_tuple, gpointer data) {
+  ffre_tuple->last_rcved = TRUE;
+  _file_writer_process(ffre_tuple->writer, ffre_tuple);
+  _file_writer_process(ffre_tuple->writer, NULL);
+}
+
+static void _write_ffre(gchar* snd_packets_path, gchar* rcv_packets_path,
+    gchar* ply_packets_path, gchar* fec_packets_path, gchar* output_path) {
+
+  //Construction
+  FileWriter* writer = _make_writer(output_path, _ffre_sprintf);
+  FFRETuple ffre_tuple = {FALSE, 0,0, writer};
+  RTPPacketsMerger* rtp_packets_merger = _make_rtp_packets_merger(snd_packets_path, rcv_packets_path);
+  FileReader* fec_packets_reader = _make_reader(fec_packets_path, _make_packet);
+  FileReader* ply_packets_reader = _make_reader(ply_packets_path, _make_packet);
+  Sorter* ply_packets_sorter = _make_sorter(_cmp_packets_with_udata, NULL, 32000);
+  Merger* not_received_packets_merger = _make_merger(_cmp_packets, _make_paired_packets_tuple);
+  Merger* not_played_packets_merger = _make_merger(_cmp_packets_with_fec, _make_paired_packets_tuple);
+  Reducer* ffre_recovered_reducer = _make_reducer(_ffre_increase_recovered, &ffre_tuple);
+  Reducer* ffre_protected_but_lost_reducer = _make_reducer(_ffre_increase_protected_but_lost, &ffre_tuple);
+  Mapper* paired_packets_unrefer = _make_mapper(_paired_packets_unref);
+  Mapper* packet_unrefer = _make_mapper(_object_unref);
+
+  //Connection
+  _pushconnect_cmp(rtp_packets_merger, RTP_PACKETS_MERGER_OUTPUT, paired_packets_unrefer, _mapper_process);
+  _pushconnect_cmp(rtp_packets_merger, RTP_PACKETS_MERGER_TRASH_OUTPUT, not_received_packets_merger, _merger_process_input_x);
+  _pushconnect_cmp(ply_packets_reader, FILE_READER_OUTPUT, ply_packets_sorter, _sorter_process);
+  _pushconnect_cmp(ply_packets_sorter, SORTER_OUTPUT, not_received_packets_merger, _merger_process_input_y);
+
+  _pushconnect_cmp(not_received_packets_merger, MERGER_OUTPUT, ffre_recovered_reducer, _reducer_process);
+  _pushconnect_cmp(not_received_packets_merger, MERGER_TRASH_OUTPUT_Y, packet_unrefer, _mapper_process);
+  _pushconnect_cmp(not_received_packets_merger, MERGER_TRASH_OUTPUT_X, not_played_packets_merger, _merger_process_input_x);
+  _pushconnect_cmp(ffre_recovered_reducer, REDUCER_DATA_OUTPUT, paired_packets_unrefer, _mapper_process);
+  _pushconnect_cmp(fec_packets_reader, FILE_READER_OUTPUT, not_played_packets_merger, _merger_process_input_y);
+
+  _pushconnect_cmp(not_played_packets_merger, MERGER_OUTPUT, ffre_protected_but_lost_reducer, _reducer_process);
+  _pushconnect_cmp(not_played_packets_merger, MERGER_TRASH_OUTPUT, packet_unrefer, _mapper_process);
+  _pushconnect_cmp(ffre_protected_but_lost_reducer, REDUCER_DATA_OUTPUT, paired_packets_unrefer, _mapper_process);
+
+  //Event handlers
+  _merger_add_on_input_y_flushed_handler(rtp_packets_merger->merger, &ffre_tuple, _on_inputs_flushed_for_ffre);
+
+  //Start
+  {
+    GThread* fec_process = g_thread_create(_logfile_reader_process, fec_packets_reader, TRUE, NULL);
+    GThread* ply_process = g_thread_create(_logfile_reader_process, ply_packets_reader, TRUE, NULL);
+    _rtp_packets_merger_start_and_join(rtp_packets_merger);
+    g_thread_join(fec_process);
+    g_thread_join(ply_process);
+  }
+
+
+  //Dispose
+  _dispose_rtp_packets_merger(rtp_packets_merger);
+  _dispose_merger(not_received_packets_merger);
+  _dispose_merger(not_played_packets_merger);
+  _dispose_writer(writer);
+  _dispose_reducer(ffre_recovered_reducer);
+  _dispose_reducer(ffre_protected_but_lost_reducer);
+  _dispose_mapper(packet_unrefer);
+  _dispose_mapper(paired_packets_unrefer);
+}
+
+static void _lost_packet_sprintf(gchar* result, Packet* lost_packet){
+  sprintf(result, "Lost packet %hu", lost_packet->seq_num);
+}
+
+static void _write_merge_tester(gchar* snd_packets_path, gchar* rcv_packets_path,
+    gchar* ply_packets_path, gchar* fec_packets_path, gchar* output_path) {
+
+  //Construction
+  RTPPacketsMerger* rtp_packets_merger = _make_rtp_packets_merger(snd_packets_path, rcv_packets_path);
+  FileWriter* writer = _make_writer(output_path, _lost_packet_sprintf);
+
+  _pushconnect_cmp(rtp_packets_merger, RTP_PACKETS_MERGER_TRASH_OUTPUT, writer, _file_writer_process);
+
+  _rtp_packets_merger_start_and_join(rtp_packets_merger);
+
+  //Dispose
+  _dispose_rtp_packets_merger(rtp_packets_merger);
+  _dispose_writer(writer);
+}
+
+Int32* _make_int32(gchar* line) {
+  gint32 value;
+
+}
+
+static void _write_gp_fec_avg(gchar* input_path, gchar* output_path) {
+  gchar temp_file[] = "temp.csv";
+  FileReader* reader = _make_reader(temp_file, toStruct)
+  _write_rate(input_path, temp_file);
+
+}
 
 
 int main (int argc, char **argv)
 {
-  rational_recycle_ctor();
-  tuple_recycle_ctor();
-  packet_recycle_ctor();
-  int32_recycle_ctor();
-  line_recycle_ctor();
-
   if(argc < 3){
   usage:
     g_print("Usage: ./program result_path [sr|qd]\n");
@@ -1427,17 +1702,17 @@ int main (int argc, char **argv)
   }
 
   if(strcmp(argv[2], "sr") == 0) {
-    _write_sr(argv[3], argv[1]);
+    _write_rate(argv[3], argv[1]);
   }else if(strcmp(argv[2], "qd") == 0) {
     _write_qd(argv[3], argv[4], argv[1]);
   }else if(strcmp(argv[2], "qmd") == 0) {
     _write_qmd(argv[3], argv[4], argv[1]);
   }else if(strcmp(argv[2], "lr") == 0) {
-
+    _write_lr(argv[3], argv[4], argv[1]);
   }else if(strcmp(argv[2], "ffre") == 0) {
-
+    _write_ffre(argv[3], argv[4], argv[5], argv[6], argv[1]);
   }else if(strcmp(argv[2], "gp") == 0) {
-
+    _write_rate(argv[3], argv[1]);
   }else if(strcmp(argv[2], "gp_avg") == 0 || strcmp(argv[2], "fec_avg") == 0){
 
   }else if(strcmp(argv[2], "ratio") == 0) {
@@ -1452,11 +1727,6 @@ int main (int argc, char **argv)
     goto usage;
   }
 
-//  packet_recycle_dtor();
-//  int32_recycle_dtor();
-//  tuple_recycle_dtor();
-//  line_recycle_dtor();
-//  rational_recycle_dtor();
 
   g_print("Results are made in %s\n", argv[1]);
   return 0;

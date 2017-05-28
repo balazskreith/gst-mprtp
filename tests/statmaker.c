@@ -107,7 +107,7 @@ static gpointer _tuple_get(Tuple* this, gint index) {
 //}
 
 
-typedef struct _Packet
+typedef struct _RTPPacket
 {
   Object               base;
 
@@ -126,10 +126,10 @@ typedef struct _Packet
 
   guint16              protect_begin;
   guint16              protect_end;
-}Packet;
+}RTPPacket;
 
 
-static _setup_packet(Packet* packet, gchar* line){
+static _setup_packet(RTPPacket* packet, gchar* line){
   sscanf(line, "%lu,%hu,%u,%u,%d,%u,%d,%d,%d,%hu,%hu,%d",
         &packet->tracked_ntp,
         &packet->seq_num,
@@ -146,8 +146,8 @@ static _setup_packet(Packet* packet, gchar* line){
   );
 }
 
-static Packet* _make_packet(gchar* line){
-  Packet* packet = g_malloc0(sizeof(Packet));
+static RTPPacket* _make_rtp_packet(gchar* line){
+  RTPPacket* packet = g_malloc0(sizeof(RTPPacket));
   _init_object(packet, g_free);
   _setup_packet(packet, line);
   return packet;
@@ -165,6 +165,54 @@ _cmp_seq (guint16 x, guint16 y)
   return 0;
 }
 
+
+typedef struct _TCPPacket
+{
+  Object       base;
+
+  GstClockTime timestamp;
+  guint16      dst_port;
+  guint16      src_port;
+  gint32       size;
+
+}TCPPacket;
+
+/* ethernet headers are always exactly 14 bytes [1] */
+#define SIZE_ETHERNET 14
+
+static TCPPacket* _make_tcp_packet(struct pcap_pkthdr* header, gchar* bytes){
+  TCPPacket* packet = g_malloc0(sizeof(TCPPacket));
+  guint16 ihl;//IP header length
+  struct sniff_ip* ip;
+  _init_object(&packet->base, g_free);
+  packet->timestamp = (GstClockTime)header->ts.tv_sec * GST_SECOND + (GstClockTime)header->ts.tv_usec * GST_USECOND;
+  ip = (struct sniff_ip*)(bytes + SIZE_ETHERNET);
+  ihl = (*(guint8*)(bytes + SIZE_ETHERNET) & 0x0F)*4;
+  packet->size = g_ntohs(*((guint16*) (bytes + SIZE_ETHERNET + 2)));
+  packet->src_port = g_ntohs((guint16*)(bytes + SIZE_ETHERNET + ihl + 0));
+  packet->dst_port = g_ntohs((guint16*)(bytes + SIZE_ETHERNET + ihl + 2));
+  return packet;
+}
+
+
+typedef struct{
+  Object       base;
+  guint16      src_port;
+  guint16      dst_port;
+  GstClockTime last_timestamp;
+}TCPFlow;
+
+static gint _find_tcp_flow(TCPFlow* tcp_flow, TCPPacket* packet){
+  return tcp_flow->dst_port == packet->dst_port && tcp_flow->src_port == packet->src_port ? 0 : -1;
+}
+
+static TCPFlow* _make_tcp_flow(TCPPacket* packet){
+  TCPFlow* this = g_malloc0(sizeof(TCPFlow));
+  _init_object(&this->base, g_free);
+  this->src_port = packet->src_port;
+  this->dst_port = packet->dst_port;
+  return this;
+}
 
 #define COMPONENT_MAX_CONNECTION_NUM 16
 typedef struct _Component Component;
@@ -203,8 +251,61 @@ static void _optional_transmit(Component* src, gint io, gpointer data) {
   connection->target(connection->dst, data);
 }
 
+/*----------------------- FileStreamer ---------------------------*/
+typedef gpointer (*PcapItemToStreamItem)(struct pcap_pkthdr* header, gchar* packet);
+typedef struct{
+  Component base;
+  gchar path[256];
+  gint written_num;
+  PcapItemToStreamItem toItem;
+
+}PcapFileStreamer;
+
+typedef enum{
+  FILE_STREAM_OUTPUT = 1,
+}PcapFileStreamerIO;
+
+static PcapFileStreamer* _make_pcap_flie_streamer(gchar* path, PcapItemToStreamItem toItem)
+{
+  PcapFileStreamer* this = g_malloc0(sizeof(PcapFileStreamer));
+  strcpy(this->path, path);
+  this->toItem = toItem;
+  return this;
+}
+
+static void _pcap_flie_streamer_process(PcapFileStreamer* this) {
+  pcap_t *pcap;
+  const unsigned char *packet;
+  char errbuf[1400];
+  struct pcap_pkthdr header;
+  gpointer stream_item;
+
+  pcap = pcap_open_offline(this->path, errbuf);
+  if (pcap == NULL) {
+    g_print("error reading pcap file: %s\n", errbuf);
+    exit(1);
+  }
+
+  while ((packet = pcap_next(pcap, &header)) != NULL){
+    stream_item = this->toItem(&header, packet);
+    if(!stream_item) {
+      g_print("A generator process can not produce null while reading!\n");
+      continue;
+    }
+    _transmit(&this->base, FILE_STREAM_OUTPUT, stream_item);
+    ++this->written_num;
+  }
+
+  g_print("FILE READING DONE At %s Lines: %d\n", this->path, this->written_num);
+  _transmit(&this->base, FILE_STREAM_OUTPUT, NULL);
+}
+
+static void _dispose_pcap_flie_streamer(PcapFileStreamer* this) {
+  g_free(this);
+}
 
 /*----------------------- FileReader ---------------------------*/
+
 typedef gpointer (*toStruct)(gchar*);
 
 typedef struct{
@@ -219,7 +320,7 @@ typedef enum{
   FILE_READER_OUTPUT = 1,
 }FileReaderIO;
 
-static void _logfile_reader_process(FileReader* this) {
+static void _file_reader_process(FileReader* this) {
   gchar line[1024];
   gpointer data;
   FILE* fp = fopen(this->path, "r");
@@ -883,6 +984,51 @@ static MonitorSumPlugin* _make_monitor_sum_plugin(
 
 
 /*======================= Plugin ==========================*/
+
+typedef void (*MonitorReducerPluginProcessor)(gpointer result, gpointer data);
+
+typedef struct{
+  MonitorPlugin base;
+  PusherConnection  connection;
+  gpointer result;
+  MonitorReducerPluginProcessor add_reducer;
+  MonitorReducerPluginProcessor rem_reducer;
+}MonitorReducerPlugin;
+
+static void _monitor_reducer_plugin_add(MonitorReducerPlugin* this, gpointer data) {
+  if(this->add_reducer) {
+    this->add_reducer(this->result, data);
+  }
+  this->connection.target(this->connection.dst, this->result);
+}
+
+static void _monitor_reducer_plugin_remove(MonitorReducerPlugin* this, gpointer data) {
+  if(this->rem_reducer) {
+    this->rem_reducer(this->result, data);
+  }
+  this->connection.target(this->connection.dst, &this->result);
+}
+
+static MonitorReducerPlugin* _make_monitor_reducer_plugin(
+    MonitorPluginFilter filter,
+    gpointer result,
+    MonitorReducerPluginProcessor add_reducer,
+    MonitorReducerPluginProcessor rem_reducer,
+    Component* dst, PusherIO target)
+{
+  MonitorReducerPlugin *this = g_malloc0(sizeof(MonitorReducerPlugin));
+  this->add_reducer = add_reducer;
+  this->rem_reducer = rem_reducer;
+  this->base.filter = filter;
+  this->base.add = _monitor_reducer_plugin_add;
+  this->base.remove = _monitor_reducer_plugin_remove;
+  this->connection.dst = dst;
+  this->connection.target = target;
+  return this;
+}
+
+
+/*======================= Plugin ==========================*/
 typedef gpointer (*MonitorPluginPointerExtractor)(gpointer);
 #define PERCENTILE_MAX_VALUES_NUM 10000
 typedef struct{
@@ -1080,8 +1226,8 @@ _define_muxer_input(4)
     return &((item_type*) item)->field_name; \
   } \
 
-_define_field_extractor(gint32, _payload_extractor, Packet, payload_size);
-_define_field_extractor(guint64, _tracked_ntp_extractor, Packet, tracked_ntp);
+_define_field_extractor(gint32, _payload_extractor, RTPPacket, payload_size);
+_define_field_extractor(guint64, _tracked_ntp_extractor, RTPPacket, tracked_ntp);
 
 static gint32 _counter_extractor(gpointer data) {
   return 1;
@@ -1091,15 +1237,15 @@ static gpointer _simple_passer(gpointer data) {
   return data;
 }
 
-static gboolean _is_fec_packet(Packet* packet) {
+static gboolean _is_fec_packet(RTPPacket* packet) {
   return packet->payload_type == FEC_PAYLOAD_TYPE;
 }
 
-static gboolean _is_not_fec_packet(Packet* packet) {
+static gboolean _is_not_fec_packet(RTPPacket* packet) {
   return packet->payload_type != FEC_PAYLOAD_TYPE;
 }
 
-static GstClockTime _get_packets_elapsed_time(Packet* packet1, Packet* packet2) {
+static GstClockTime _get_rtp_packets_elapsed_time(RTPPacket* packet1, RTPPacket* packet2) {
   GstClockTime ntp_dtime;
   if (packet1->tracked_ntp < packet2->tracked_ntp) {
     ntp_dtime = packet2->tracked_ntp - packet1->tracked_ntp;
@@ -1113,31 +1259,20 @@ static GstClockTime _epoch_timestamp_extractor(gpointer sr_tuple) {
   return get_epoch_time_from_ntp_in_ns(_tracked_ntp_extractor(_tuple_get(sr_tuple, 0)));
 }
 
-static volatile gboolean _packet_queue_is_full_1s_tracked_ntp(GQueue* queue) {
-  Packet*head, *tail;
+static volatile gboolean _rtp_packet_queue_is_full_1s_tracked_ntp(GQueue* queue) {
+  RTPPacket*head, *tail;
   GstClockTime elapsed;
   if(g_queue_is_empty(queue)){
     return FALSE;
   }
   head = g_queue_peek_head(queue);
   tail = g_queue_peek_tail(queue);
-  return GST_SECOND < _get_packets_elapsed_time(head, tail);
-}
-
-static void _sprintf_sr_fr_tuple(gchar* result, Tuple* sr_tuple){
-  Int32* rtp_payload_rate = _tuple_get(sr_tuple, 1);
-  Int32* fec_payload_rate = _tuple_get(sr_tuple, 2);
-  Int32* rtp_packets_rate = _tuple_get(sr_tuple, 3);
-  Int32* fec_packets_rate = _tuple_get(sr_tuple, 4);
-  sprintf(result, "%d,%d",
-      rtp_payload_rate->value + rtp_packets_rate->value * 28,
-      fec_payload_rate->value + fec_packets_rate->value * 28
-  );
+  return GST_SECOND < _get_rtp_packets_elapsed_time(head, tail);
 }
 
 static gpointer _make_sr_fr_tuple(gpointer* values) {
   gint32 default_value = 0;
-  Packet* packet = values[0];
+  RTPPacket* packet = values[0];
   Int32* rtp_payload_rate = _make_int32(values[1] ? values[1] : &default_value);
   Int32* fec_payload_rate = _make_int32(values[2] ? values[2] : &default_value);
   Int32* rtp_packets_rate = _make_int32(values[3] ? values[3] : &default_value);
@@ -1182,7 +1317,7 @@ static void _rate_sampler_tuple_output_transmitter(RateSampler* this, gpointer d
 
 static RateSampler* _make_rate_sampler() {
   RateSampler* this = g_malloc0(sizeof(RateSampler));
-  this->monitor = _make_monitor(_packet_queue_is_full_1s_tracked_ntp);
+  this->monitor = _make_monitor(_rtp_packet_queue_is_full_1s_tracked_ntp);
   this->muxer = _make_muxer(_make_sr_fr_tuple, 5, 0);
   this->sampler = _make_sampler(_epoch_timestamp_extractor, 100 * GST_MSECOND);
   this->packets_refer   = _make_mapper((MapperProcess) _object_ref);
@@ -1221,71 +1356,83 @@ static void _dispose_rate_sampler(RateSampler* this) {
   _dispose_muxer(this->muxer);
 }
 
-static void _write_rate(gchar* input_path, gchar* output_path) {
+static void _sprintf_sr_fr_tuple_for_sr_fec(gchar* result, Tuple* sr_tuple){
+  Int32* rtp_payload_rate = _tuple_get(sr_tuple, 1);
+  Int32* fec_payload_rate = _tuple_get(sr_tuple, 2);
+  Int32* rtp_packets_rate = _tuple_get(sr_tuple, 3);
+  Int32* fec_packets_rate = _tuple_get(sr_tuple, 4);
+  sprintf(result, "%d,%d",
+      rtp_payload_rate->value + rtp_packets_rate->value * 28,
+      fec_payload_rate->value + fec_packets_rate->value * 28
+  );
+}
+
+static void _write_sr_fec_rate(gchar* input_path, gchar* output_path) {
 
   //Construction
-  FileReader* reader = _make_reader(input_path, _make_packet);
-  Monitor* monitor = _make_monitor(_packet_queue_is_full_1s_tracked_ntp);
-  Muxer* muxer = _make_muxer(_make_sr_fr_tuple, 5, 0);
-  Sampler* sampler = _make_sampler(_epoch_timestamp_extractor, 100 * GST_MSECOND);
+  FileReader* reader = _make_reader(input_path, _make_rtp_packet);
   RateSampler* rate_sampler = _make_rate_sampler();
-  FileWriter* writer = _make_writer(output_path, _sprintf_sr_fr_tuple);
-
-  Mapper* packets_refer   = _make_mapper((MapperProcess) _object_ref);
-  Mapper* packets_unrefer = _make_mapper((MapperProcess) _object_unref);
-  Mapper* tuple_packets_unrefer = _make_mapper((MapperProcess) _sr_fr_full_unref);
-
-  //Initialization
-  _monitor_add_plugins(monitor,
-      _make_monitor_functor_plugin(NULL, _simple_passer, muxer, _muxer_input_0, NULL, NULL),
-      _make_monitor_sum_plugin(_is_not_fec_packet, _payload_extractor, muxer, _muxer_input_1),
-      _make_monitor_sum_plugin(_is_fec_packet, _payload_extractor, muxer, _muxer_input_2),
-      _make_monitor_sum_plugin(_is_not_fec_packet, _counter_extractor, muxer, _muxer_input_3),
-      _make_monitor_sum_plugin(_is_fec_packet, _counter_extractor, muxer, _muxer_input_4),
-      NULL);
+  FileWriter* writer = _make_writer(output_path, _sprintf_sr_fr_tuple_for_sr_fec);
 
   //Connection
-  _pushconnect_cmp(reader, FILE_READER_OUTPUT, packets_refer, _mapper_process);
-  _pushconnect_cmp(packets_refer, MAPPER_OUTPUT, monitor, _monitor_receive_process);
-
-  _pushconnect_cmp(muxer, MUXER_OUTPUT, sampler, _sampler_process);
-  _pushconnect_cmp(sampler, SAMPLER_OUTPUT, writer, _file_writer_process);
-//  _pushconnect_cmp(muxer, MUXER_OUTPUT, writer, _file_writer_process);
-
-  _pushconnect_cmp(monitor, MONITOR_FLUSH_OUTPUT, muxer, _muxer_flush);
-  _pushconnect_cmp(monitor, MONITOR_TRASH_OUTPUT, packets_unrefer, _mapper_process);
-  _pushconnect_cmp(sampler, SAMPLER_TRASH_OUTPUT, tuple_packets_unrefer, _mapper_process);
+  _pushconnect_cmp(reader, FILE_READER_OUTPUT, rate_sampler, _rate_sampler_packet_input_transmitter);
+  _pushconnect_cmp(rate_sampler, RATE_SAMPLER_TUPLE_OUTPUT, writer, _file_writer_process);
 
   //Start
   {
-    GThread* process = g_thread_create(_logfile_reader_process, reader, TRUE, NULL);
+    GThread* process = g_thread_create(_file_reader_process, reader, TRUE, NULL);
     g_thread_join(process);
   }
 
   //Dispose
-  _dispose_mapper(packets_refer);
-  _dispose_mapper(packets_unrefer);
-  _dispose_mapper(tuple_packets_unrefer);
-
-  _dispose_sampler(sampler);
   _dispose_reader(reader);
-  _dispose_monitor(monitor);
-  _dispose_muxer(muxer);
+  _dispose_rate_sampler(rate_sampler);
   _dispose_writer(writer);
 }
 
-static gint _cmp_packets(const Packet* packet_x, const Packet* packet_y) {
+static void _sprintf_sr_fr_tuple_for_gp(gchar* result, Tuple* sr_tuple){
+  Int32* rtp_payload_rate = _tuple_get(sr_tuple, 1);
+  Int32* rtp_packets_rate = _tuple_get(sr_tuple, 3);
+  sprintf(result, "%d",
+      rtp_payload_rate->value + rtp_packets_rate->value * 28
+  );
+}
+
+static void _write_gp_rate(gchar* input_path, gchar* output_path) {
+
+  //Construction
+  FileReader* reader = _make_reader(input_path, _make_rtp_packet);
+  RateSampler* rate_sampler = _make_rate_sampler();
+  FileWriter* writer = _make_writer(output_path, _sprintf_sr_fr_tuple_for_gp);
+
+  //Connection
+  _pushconnect_cmp(reader, FILE_READER_OUTPUT, rate_sampler, _rate_sampler_packet_input_transmitter);
+  _pushconnect_cmp(rate_sampler, RATE_SAMPLER_TUPLE_OUTPUT, writer, _file_writer_process);
+
+  //Start
+  {
+    GThread* process = g_thread_create(_file_reader_process, reader, TRUE, NULL);
+    g_thread_join(process);
+  }
+
+  //Dispose
+  _dispose_reader(reader);
+  _dispose_rate_sampler(rate_sampler);
+  _dispose_writer(writer);
+}
+
+static gint _cmp_packets(const RTPPacket* packet_x, const RTPPacket* packet_y) {
   return _cmp_seq(packet_x->seq_num, packet_y->seq_num);
 }
 
-static Tuple* _make_paired_packets_tuple(Packet* packet_x, Packet* packet_y){
+static Tuple* _make_paired_packets_tuple(RTPPacket* packet_x, RTPPacket* packet_y){
 //  g_print("Merged: %hu-%hu\n", packet_x->seq_num, packet_y->seq_num);
   return _make_tuple(packet_x, packet_y, NULL);
 }
 
 static void _paired_packets_unref(Tuple* paired_packets){
-  Packet* packet_x = _tuple_get(paired_packets, 0);
-  Packet* packet_y = _tuple_get(paired_packets, 1);
+  RTPPacket* packet_x = _tuple_get(paired_packets, 0);
+  RTPPacket* packet_y = _tuple_get(paired_packets, 1);
   _object_unref(packet_x);
   _object_unref(packet_y);
   _object_unref(paired_packets);
@@ -1316,14 +1463,14 @@ static void _rtp_packets_merger_trash_transmitter(RTPPacketsMerger* this, gpoint
   _transmit(&this->base, RTP_PACKETS_MERGER_TRASH_OUTPUT, data);
 }
 
-static gint _cmp_packets_with_udata(const Packet* packet_x, const Packet* packet_y, gpointer udata) {
+static gint _cmp_packets_with_udata(const RTPPacket* packet_x, const RTPPacket* packet_y, gpointer udata) {
   return _cmp_packets(packet_x, packet_y);
 }
 
 static RTPPacketsMerger* _make_rtp_packets_merger(gchar* snd_packets_path, gchar* rcv_packets_path) {
   RTPPacketsMerger* this = g_malloc0(sizeof(RTPPacketsMerger));
-  this->snd_reader = _make_reader(snd_packets_path, _make_packet);
-  this->rcv_reader = _make_reader(rcv_packets_path, _make_packet);
+  this->snd_reader = _make_reader(snd_packets_path, _make_rtp_packet);
+  this->rcv_reader = _make_reader(rcv_packets_path, _make_rtp_packet);
   this->snd_filter = _make_filter(_is_not_fec_packet, NULL);
   this->rcv_filter = _make_filter(_is_not_fec_packet, NULL);
   this->rcv_sorter = _make_sorter(_cmp_packets_with_udata, NULL, 32000);
@@ -1346,8 +1493,8 @@ static RTPPacketsMerger* _make_rtp_packets_merger(gchar* snd_packets_path, gchar
 }
 
 static void _rtp_packets_merger_start_and_join(RTPPacketsMerger* this) {
-  GThread* snd_process = g_thread_create(_logfile_reader_process, this->snd_reader, TRUE, NULL);
-  GThread* rcv_process = g_thread_create(_logfile_reader_process, this->rcv_reader, TRUE, NULL);
+  GThread* snd_process = g_thread_create(_file_reader_process, this->snd_reader, TRUE, NULL);
+  GThread* rcv_process = g_thread_create(_file_reader_process, this->rcv_reader, TRUE, NULL);
   g_thread_join(snd_process);
   g_thread_join(rcv_process);
 }
@@ -1362,8 +1509,8 @@ static void _dispose_rtp_packets_merger(RTPPacketsMerger* this) {
 }
 
 static void _sprintf_paired_packets_for_qd(gchar* result, Tuple* paired_packets) {
-  Packet* packet_x = _tuple_get(paired_packets, 0);
-  Packet* packet_y = _tuple_get(paired_packets, 1);
+  RTPPacket* packet_x = _tuple_get(paired_packets, 0);
+  RTPPacket* packet_y = _tuple_get(paired_packets, 1);
   GstClockTime owd; // One Way Delay
 
   if(packet_x == packet_y)
@@ -1399,7 +1546,7 @@ static void _write_qd(gchar* snd_packets_path, gchar* rcv_packets_path, gchar* o
 
 
 static volatile gboolean _paired_packets_queue_is_full_1s_tracked_ntp(GQueue* queue) {
-  Packet *head, *tail;
+  RTPPacket *head, *tail;
   GstClockTime elapsed;
   if(g_queue_is_empty(queue)){
     return FALSE;
@@ -1415,16 +1562,16 @@ static GstClockTime _paired_packets_epoch_timestamp_extractor(gpointer tuple) {
 }
 
 static void _paired_packets_ref(Tuple* paired_packets){
-  Packet* packet_x = _tuple_get(paired_packets, 0);
-  Packet* packet_y = _tuple_get(paired_packets, 1);
+  RTPPacket* packet_x = _tuple_get(paired_packets, 0);
+  RTPPacket* packet_y = _tuple_get(paired_packets, 1);
   _object_ref(packet_x);
   _object_ref(packet_y);
   _object_ref(paired_packets);
 }
 
 static gint _paired_packets_owd_qsort_cmp(Tuple** pair_x, Tuple** pair_y) {
-  Packet *packet_x_snd, *packet_x_rcv;
-  Packet *packet_y_snd, *packet_y_rcv;
+  RTPPacket *packet_x_snd, *packet_x_rcv;
+  RTPPacket *packet_y_snd, *packet_y_rcv;
   GstClockTime owd_x, owd_y;
   packet_x_snd = _tuple_get(*pair_x, 0);
   packet_x_rcv = _tuple_get(*pair_x, 1);
@@ -1487,7 +1634,7 @@ typedef struct{
   gint32 snd_num;
 }TrackedPackets;
 
-static void _tracking_lost_packets(TrackedPackets* tracked_packets, Packet* lost_packet){
+static void _tracking_lost_packets(TrackedPackets* tracked_packets, RTPPacket* lost_packet){
   if(tracked_packets->last_rcved || _is_fec_packet(lost_packet)) {
     return;
   }
@@ -1496,11 +1643,11 @@ static void _tracking_lost_packets(TrackedPackets* tracked_packets, Packet* lost
   ++tracked_packets->lost_num;
   tracked_packets->snd_bytes += lost_packet->payload_size;
   ++tracked_packets->snd_num;
-  _object_unref((Packet*)lost_packet);
+  _object_unref((RTPPacket*)lost_packet);
 }
 
 static void _tracking_rcved_packets(TrackedPackets* tracked_packets, Tuple* paired_packets) {
-  Packet* snd_packet = _tuple_get(paired_packets, 0);
+  RTPPacket* snd_packet = _tuple_get(paired_packets, 0);
   tracked_packets->first_rcved = TRUE;
   tracked_packets->snd_bytes += snd_packet->payload_size;
   ++tracked_packets->snd_num;
@@ -1548,7 +1695,7 @@ static void _write_lr(gchar* snd_packets_path, gchar* rcv_packets_path, gchar* o
   _dispose_mapper(paired_packets_unrefer);
 }
 
-static gint _cmp_packets_with_fec(const Packet* rtp_packet, const Packet* fec_packet) {
+static gint _cmp_packets_with_fec(const RTPPacket* rtp_packet, const RTPPacket* fec_packet) {
   if( _cmp_seq(rtp_packet->seq_num, fec_packet->protect_begin) < 0) {
     return -1;
   }
@@ -1596,8 +1743,8 @@ static void _write_ffre(gchar* snd_packets_path, gchar* rcv_packets_path,
   FileWriter* writer = _make_writer(output_path, _ffre_sprintf);
   FFRETuple ffre_tuple = {FALSE, 0,0, writer};
   RTPPacketsMerger* rtp_packets_merger = _make_rtp_packets_merger(snd_packets_path, rcv_packets_path);
-  FileReader* fec_packets_reader = _make_reader(fec_packets_path, _make_packet);
-  FileReader* ply_packets_reader = _make_reader(ply_packets_path, _make_packet);
+  FileReader* fec_packets_reader = _make_reader(fec_packets_path, _make_rtp_packet);
+  FileReader* ply_packets_reader = _make_reader(ply_packets_path, _make_rtp_packet);
   Sorter* ply_packets_sorter = _make_sorter(_cmp_packets_with_udata, NULL, 32000);
   Merger* not_received_packets_merger = _make_merger(_cmp_packets, _make_paired_packets_tuple);
   Merger* not_played_packets_merger = _make_merger(_cmp_packets_with_fec, _make_paired_packets_tuple);
@@ -1627,8 +1774,8 @@ static void _write_ffre(gchar* snd_packets_path, gchar* rcv_packets_path,
 
   //Start
   {
-    GThread* fec_process = g_thread_create(_logfile_reader_process, fec_packets_reader, TRUE, NULL);
-    GThread* ply_process = g_thread_create(_logfile_reader_process, ply_packets_reader, TRUE, NULL);
+    GThread* fec_process = g_thread_create(_file_reader_process, fec_packets_reader, TRUE, NULL);
+    GThread* ply_process = g_thread_create(_file_reader_process, ply_packets_reader, TRUE, NULL);
     _rtp_packets_merger_start_and_join(rtp_packets_merger);
     g_thread_join(fec_process);
     g_thread_join(ply_process);
@@ -1646,38 +1793,231 @@ static void _write_ffre(gchar* snd_packets_path, gchar* rcv_packets_path,
   _dispose_mapper(paired_packets_unrefer);
 }
 
-static void _lost_packet_sprintf(gchar* result, Packet* lost_packet){
-  sprintf(result, "Lost packet %hu", lost_packet->seq_num);
+typedef struct {
+  gint32 counter;
+  gint32 sum;
+  gdouble avg;
+}AvgTuple;
+
+static void _sprintf_avg_tup1e(gchar* result, AvgTuple* avg_tuple){
+  sprintf(result, "%1.3f",
+      avg_tuple->avg
+  );
 }
 
-static void _write_merge_tester(gchar* snd_packets_path, gchar* rcv_packets_path,
-    gchar* ply_packets_path, gchar* fec_packets_path, gchar* output_path) {
+static void _sr_fr_tuple_to_rtp_avg_producer(AvgTuple* result, Tuple* sr_tuple){
+  Int32* rtp_payload_rate = _tuple_get(sr_tuple, 1);
+  Int32* rtp_packets_rate = _tuple_get(sr_tuple, 3);
+  ++result->counter;
+  result->sum += rtp_payload_rate->value + rtp_packets_rate->value * 28;
+  result->avg = (gdouble)result->sum / (gdouble)result->counter;
+}
+
+static void _sr_fr_tuple_to_fec_avg_producer(AvgTuple* result, Tuple* sr_tuple){
+  Int32* fec_payload_rate = _tuple_get(sr_tuple, 2);
+  Int32* fec_packets_rate = _tuple_get(sr_tuple, 4);
+  ++result->counter;
+  result->sum += fec_payload_rate->value + fec_packets_rate->value * 28;
+  result->avg = (gdouble)result->sum / (gdouble)result->counter;
+}
+
+static void _write_avg(gchar* input_path, gchar* output_path, ReducerProcess avg_producer) {
 
   //Construction
-  RTPPacketsMerger* rtp_packets_merger = _make_rtp_packets_merger(snd_packets_path, rcv_packets_path);
-  FileWriter* writer = _make_writer(output_path, _lost_packet_sprintf);
+  AvgTuple avg_tuple = {0,0,0.};
+  FileReader* reader = _make_reader(input_path, _make_rtp_packet);
+  RateSampler* rate_sampler = _make_rate_sampler();
+  Reducer* gp_reducer = _make_reducer(avg_producer, &avg_tuple);
+  FileWriter* writer = _make_writer(output_path, _sprintf_avg_tup1e);
 
-  _pushconnect_cmp(rtp_packets_merger, RTP_PACKETS_MERGER_TRASH_OUTPUT, writer, _file_writer_process);
+  //Connection
+  _pushconnect_cmp(reader, FILE_READER_OUTPUT, rate_sampler, _rate_sampler_packet_input_transmitter);
+  _pushconnect_cmp(rate_sampler, RATE_SAMPLER_TUPLE_OUTPUT, gp_reducer, _reducer_process);
+  _pushconnect_cmp(gp_reducer, REDUCER_RESULT_OUTPUT, writer, _file_writer_process);
 
-  _rtp_packets_merger_start_and_join(rtp_packets_merger);
+  //Start
+  {
+    GThread* process = g_thread_create(_file_reader_process, reader, TRUE, NULL);
+    g_thread_join(process);
+  }
+
+  //Dispose
+  _dispose_reader(reader);
+  _dispose_rate_sampler(rate_sampler);
+  _dispose_writer(writer);
+}
+
+typedef struct{
+  gboolean last_packet_rcved;
+  guint32 last_rcved_timestamp;
+  guint32 last_lost_timestamp;
+  gint32 received;
+  gint32 lost;
+}NLFTuple;
+
+static void _nlf_increase_rcved_frames(NLFTuple* nlf_tuple, Tuple* paired_packets) {
+  RTPPacket* snd_packet = _tuple_get(paired_packets, 0);
+  if(nlf_tuple->last_packet_rcved) return;
+  if(snd_packet->timestamp == nlf_tuple->last_rcved_timestamp)
+  ++nlf_tuple->received;
+  nlf_tuple->last_rcved_timestamp = snd_packet->timestamp;
+}
+
+static void _nlf_increase_lost_rcved_frames(NLFTuple* nlf_tuple, RTPPacket* lost_packet) {
+  if(nlf_tuple->last_packet_rcved) return;
+  if(lost_packet->timestamp == nlf_tuple->last_lost_timestamp)
+  ++nlf_tuple->lost;
+  nlf_tuple->last_lost_timestamp = lost_packet->timestamp;
+}
+
+static void _on_inputs_flushed_for_nlf(NLFTuple* nlf_tuple, gpointer data) {
+  nlf_tuple->last_packet_rcved = TRUE;
+}
+
+static void _nlf_sprintf(gchar* result, NLFTuple* nlf_tuple) {
+  g_print("received frames: %d, lost frames: %d\n", nlf_tuple->received, nlf_tuple->lost);
+  sprintf(result, "%1.3f",
+      nlf_tuple->lost
+  );
+}
+
+static void _print_packet_seq(RTPPacket* packet) {
+  g_print("Packet seq: %hu\n", packet->seq_num);
+}
+
+static void _write_nlf(gchar* snd_packets_path, gchar* ply_packets_path, gchar* output_path) {
+
+  //Construction
+  NLFTuple nlf_tuple = {FALSE, 0, 0, 0, 0};
+  FileWriter* writer = _make_writer(output_path, _nlf_sprintf);
+  RTPPacketsMerger* rtp_packets_merger = _make_rtp_packets_merger(snd_packets_path, ply_packets_path);
+  Reducer* nlf_rcved_frames_reducer = _make_reducer(_nlf_increase_rcved_frames, &nlf_tuple);
+  Reducer* nlf_not_rcved_frames_reducer = _make_reducer(_nlf_increase_lost_rcved_frames, &nlf_tuple);
+  Mapper* paired_packets_unrefer = _make_mapper(_paired_packets_unref);
+  Mapper* packet_unrefer = _make_mapper(_object_unref);
+//  Mapper* packet_seq_printer = _make_mapper(_print_packet_seq);
+
+  //Connection
+  _pushconnect_cmp(rtp_packets_merger, RTP_PACKETS_MERGER_OUTPUT, nlf_rcved_frames_reducer, _reducer_process);
+  _pushconnect_cmp(rtp_packets_merger, RTP_PACKETS_MERGER_TRASH_OUTPUT, nlf_not_rcved_frames_reducer, _reducer_process);
+//  _pushconnect_cmp(rtp_packets_merger, RTP_PACKETS_MERGER_TRASH_OUTPUT, packet_seq_printer, _mapper_process);
+//  _pushconnect_cmp(packet_seq_printer, MAPPER_OUTPUT, nlf_not_rcved_frames_reducer, _reducer_process);
+  _pushconnect_cmp(nlf_rcved_frames_reducer, REDUCER_DATA_OUTPUT, paired_packets_unrefer, _mapper_process);
+  _pushconnect_cmp(nlf_rcved_frames_reducer, REDUCER_RESULT_OUTPUT, writer, _file_writer_process);
+  _pushconnect_cmp(nlf_not_rcved_frames_reducer, REDUCER_DATA_OUTPUT, packet_unrefer, _mapper_process);
+
+  //Event handlers
+  _merger_add_on_input_x_flushed_handler(rtp_packets_merger->merger, &nlf_tuple, _on_inputs_flushed_for_nlf);
+  _merger_add_on_input_y_flushed_handler(rtp_packets_merger->merger, &nlf_tuple, _on_inputs_flushed_for_nlf);
+
+  //Start
+  {
+    _rtp_packets_merger_start_and_join(rtp_packets_merger);
+  }
 
   //Dispose
   _dispose_rtp_packets_merger(rtp_packets_merger);
   _dispose_writer(writer);
+  _dispose_reducer(nlf_rcved_frames_reducer);
+  _dispose_reducer(nlf_not_rcved_frames_reducer);
+  _dispose_mapper(packet_unrefer);
+  _dispose_mapper(paired_packets_unrefer);
 }
 
-Int32* _make_int32(gchar* line) {
-  gint32 value;
+static GstClockTime _get_tcp_packets_elapsed_time(TCPPacket* packet1, TCPPacket* packet2) {
+  GstClockTime dtime;
+  if (packet1->timestamp < packet2->timestamp) {
+    dtime = packet2->timestamp - packet1->timestamp;
+  } else {
+    dtime = packet1->timestamp - packet2->timestamp;
+  }
+  return dtime;
+}
+
+static volatile gboolean _tcp_packet_queue_is_full_1s_tracked_ntp(GQueue* queue) {
+  TCPPacket*head, *tail;
+  GstClockTime elapsed;
+  if(g_queue_is_empty(queue)){
+    return FALSE;
+  }
+  head = g_queue_peek_head(queue);
+  tail = g_queue_peek_tail(queue);
+  return GST_SECOND < _get_tcp_packets_elapsed_time(head, tail);
+}
+
+typedef struct{
+  gint32 packets_num;
+  gint32 sending_rate;
+  gint32 flownum;
+  GSList* flows;
+}TCPStat;
+
+static void _add_tcp_packet(TCPStat* tcpstat, TCPPacket* tcp_packet) {
+  TCPFlow* tcp_flow;
+  ++tcpstat->packets_num;
+  tcpstat->sending_rate += tcp_packet->size;
+
+  tcp_flow = g_list_find_custom(tcpstat->flows, tcp_packet, _find_tcp_flow);
+  if(!tcp_flow){
+    tcp_flow = _make_tcp_flow(tcp_packet);
+    tcpstat->flows = g_list_prepend(tcpstat->flows, tcp_flow);
+    ++tcpstat->flownum;
+  }
+  tcp_flow->last_timestamp = tcp_packet->timestamp;
 
 }
 
-static void _write_gp_fec_avg(gchar* input_path, gchar* output_path) {
-  gchar temp_file[] = "temp.csv";
-  FileReader* reader = _make_reader(temp_file, toStruct)
-  _write_rate(input_path, temp_file);
+static void _rem_tcp_packet(TCPStat* tcpstat, TCPPacket* tcp_packet) {
+  TCPFlow* tcp_flow;
+  --tcpstat->packets_num;
+  tcpstat->sending_rate -= tcp_packet->size;
 
+  tcp_flow = g_list_find_custom(tcpstat->flows, tcp_packet, _find_tcp_flow);
+  if(tcp_flow && tcp_flow->last_timestamp == tcp_packet->timestamp){
+    tcpstat->flows = g_list_remove(tcpstat->flows, tcp_flow);
+    --tcpstat->flownum;
+    g_free(tcp_flow);
+  }
 }
 
+static GstClockTime _extract_tcp_packet_timestamp(TCPPacket* packet) {
+  return packet->timestamp;
+}
+
+static void _sprintf_tcpstat(gchar* result, TCPStat* tcp_stat) {
+  sprintf("%d,%d", tcp_stat->sending_rate, tcp_stat->flownum);
+}
+
+static void _write_tcpstat(gchar* input_path, gchar* output_path) {
+
+  //Construction
+  TCPStat tcpstat = {0, 0, 0, NULL};
+  PcapFileStreamer* reader = _make_pcap_flie_streamer(input_path, _make_tcp_packet);
+  Monitor* monitor = _make_monitor(_tcp_packet_queue_is_full_1s_tracked_ntp);
+  Sampler* sampler = _make_sampler(_extract_tcp_packet_timestamp, 100 * GST_MSECOND);
+  FileWriter* writer = _make_writer(output_path, _sprintf_tcpstat);
+
+  //Initialization
+    _monitor_add_plugins(monitor,
+        _make_monitor_reducer_plugin(NULL, &tcpstat, _add_tcp_packet, _rem_tcp_packet, sampler, _sampler_process),
+        NULL);
+
+  //Connection
+  _pushconnect_cmp(reader, FILE_STREAM_OUTPUT, monitor, _monitor_receive_process);
+  _pushconnect_cmp(sampler, SAMPLER_OUTPUT, writer, _file_writer_process);
+
+  //Start
+  {
+    GThread* process = g_thread_create(_file_reader_process, reader, TRUE, NULL);
+    g_thread_join(process);
+  }
+
+  //Dispose
+  _dispose_reader(reader);
+  _dispose_monitor(monitor);
+  _dispose_sampler(sampler);
+  _dispose_writer(writer);
+}
 
 int main (int argc, char **argv)
 {
@@ -1702,7 +2042,7 @@ int main (int argc, char **argv)
   }
 
   if(strcmp(argv[2], "sr") == 0) {
-    _write_rate(argv[3], argv[1]);
+    _write_sr_fec_rate(argv[3], argv[1]);
   }else if(strcmp(argv[2], "qd") == 0) {
     _write_qd(argv[3], argv[4], argv[1]);
   }else if(strcmp(argv[2], "qmd") == 0) {
@@ -1712,17 +2052,19 @@ int main (int argc, char **argv)
   }else if(strcmp(argv[2], "ffre") == 0) {
     _write_ffre(argv[3], argv[4], argv[5], argv[6], argv[1]);
   }else if(strcmp(argv[2], "gp") == 0) {
-    _write_rate(argv[3], argv[1]);
-  }else if(strcmp(argv[2], "gp_avg") == 0 || strcmp(argv[2], "fec_avg") == 0){
-
+    _write_gp_rate(argv[3], argv[1]);
+  }else if(strcmp(argv[2], "gp_avg") == 0){
+    _write_avg(argv[3], argv[1], _sr_fr_tuple_to_rtp_avg_producer);
+  }else if(strcmp(argv[2], "fec_avg") == 0) {
+    _write_avg(argv[3], argv[1], _sr_fr_tuple_to_fec_avg_producer);
   }else if(strcmp(argv[2], "ratio") == 0) {
 
   }else if(strcmp(argv[2], "nlf") == 0) {
-
+    _write_nlf(argv[3], argv[4], argv[1]);
   }else if(strcmp(argv[2], "disc") == 0) {
     g_print("IMPLEMENT THIS!\n");
   }else if(strcmp(argv[2], "tcpstat") == 0) {
-
+    _write_tcpstat(argv[3], argv[1]);
   }else{
     goto usage;
   }

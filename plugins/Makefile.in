@@ -170,7 +170,7 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-correlator.lo \
 	libgstmprtp_la-sndctrler.lo libgstmprtp_la-sndqueue.lo \
 	libgstmprtp_la-sndsubflows.lo libgstmprtp_la-sndtracker.lo \
 	libgstmprtp_la-sndpackets.lo libgstmprtp_la-streamjoiner.lo \
-	libgstmprtp_la-streamsplitter.lo
+	libgstmprtp_la-streamsplitter.lo libgstmprtp_la-timestamp.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -453,7 +453,8 @@ libgstmprtp_la_SOURCES = correlator.c          \
                          sndtracker.c          \
                          sndpackets.c          \
                          streamjoiner.c        \
-                         streamsplitter.c      
+                         streamsplitter.c      \
+                         timestamp.c
 
 noinst_HEADERS = correlator.h          \
 				 fecdec.h              \
@@ -487,7 +488,8 @@ noinst_HEADERS = correlator.h          \
                  sndpackets.h          \
                  sndtracker.h          \
                  streamjoiner.h        \
-                 streamsplitter.h      
+                 streamsplitter.h      \
+                 timestamp.h   
 
 
 #Oh it seems so terrible, but I do not so care!!!
@@ -624,6 +626,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-sndtracker.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-streamjoiner.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-streamsplitter.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-timestamp.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -918,6 +921,13 @@ libgstmprtp_la-streamsplitter.lo: streamsplitter.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='streamsplitter.c' object='libgstmprtp_la-streamsplitter.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-streamsplitter.lo `test -f 'streamsplitter.c' || echo '$(srcdir)/'`streamsplitter.c
+
+libgstmprtp_la-timestamp.lo: timestamp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-timestamp.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-timestamp.Tpo -c -o libgstmprtp_la-timestamp.lo `test -f 'timestamp.c' || echo '$(srcdir)/'`timestamp.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-timestamp.Tpo $(DEPDIR)/libgstmprtp_la-timestamp.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='timestamp.c' object='libgstmprtp_la-timestamp.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-timestamp.lo `test -f 'timestamp.c' || echo '$(srcdir)/'`timestamp.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

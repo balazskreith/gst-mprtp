@@ -12,20 +12,10 @@
 #include "notifier.h"
 #include "recycle.h"
 
-typedef struct{
-  gboolean                 active;
-  gpointer               (*alloc)(gpointer,gpointer);
-  gpointer                 alloc_udata;
-  void                   (*dealloc)(gpointer,gpointer);
-  gpointer                 dealloc_udata;
-  void                   (*copy)(gpointer, gpointer, gpointer);
-  gpointer                 copy_udata;
-}sallocator_t;
-
-typedef struct _bintree3node{
+typedef struct _bintreenode{
 //  gpointer   data;
-  struct _bintree3node *left;
-  struct _bintree3node *right;
+  struct _bintreenode *left;
+  struct _bintreenode *right;
   GSList *ptrs;
   gint32  ref;
 }bintree3node_t;

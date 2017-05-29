@@ -39,7 +39,8 @@ libgstmprtp_la_SOURCES = correlator.c          \
                          sndtracker.c          \
                          sndpackets.c          \
                          streamjoiner.c        \
-                         streamsplitter.c      
+                         streamsplitter.c      \
+                         timestamp.c
                     
                     
 noinst_HEADERS = correlator.h          \
@@ -74,7 +75,8 @@ noinst_HEADERS = correlator.h          \
                  sndpackets.h          \
                  sndtracker.h          \
                  streamjoiner.h        \
-                 streamsplitter.h      
+                 streamsplitter.h      \
+                 timestamp.h   
 
 
 #Oh it seems so terrible, but I do not so care!!!

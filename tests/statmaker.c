@@ -186,6 +186,8 @@ static TCPPacket* _make_tcp_packet(struct pcap_pkthdr* header, gchar* bytes){
   struct sniff_ip* ip;
   _init_object(&packet->base, g_free);
   packet->timestamp = (GstClockTime)header->ts.tv_sec * GST_SECOND + (GstClockTime)header->ts.tv_usec * GST_USECOND;
+//  g_print("%lu-%lu = %lu\n",
+//      (GstClockTime)header->ts.tv_sec * GST_SECOND, (GstClockTime)header->ts.tv_usec * GST_USECOND, packet->timestamp);
   ip = (struct sniff_ip*)(bytes + SIZE_ETHERNET);
   ihl = (*(guint8*)(bytes + SIZE_ETHERNET) & 0x0F)*4;
   packet->size = g_ntohs(*((guint16*) (bytes + SIZE_ETHERNET + 2)));
@@ -294,6 +296,7 @@ static void _pcap_flie_streamer_process(PcapFileStreamer* this) {
     }
     _transmit(&this->base, FILE_STREAM_OUTPUT, stream_item);
     ++this->written_num;
+//    g_print("%d\n", this->written_num);
   }
 
   g_print("FILE READING DONE At %s Lines: %d\n", this->path, this->written_num);
@@ -780,6 +783,9 @@ static void _sampler_process(Sampler* this, gpointer data) {
   }
 
   this->actual = this->extractor(data);
+  if(this->actual < this->sampling) {
+    return;
+  }
   if(this->actual - this->sampling < this->sampled){
     _optional_transmit(&this->base, SAMPLER_TRASH_OUTPUT, data);
     return;
@@ -1024,6 +1030,7 @@ static MonitorReducerPlugin* _make_monitor_reducer_plugin(
   this->base.remove = _monitor_reducer_plugin_remove;
   this->connection.dst = dst;
   this->connection.target = target;
+  this->result = result;
   return this;
 }
 
@@ -1040,14 +1047,63 @@ typedef struct{
   gpointer values[PERCENTILE_MAX_VALUES_NUM];
   gint values_index;
   gint percentile;
+
+  gint32 read_index, write_index, values_count;
 }MonitorPercentilePlugin;
 
 static void _monitor_percentile_plugin_helper(gpointer item, MonitorPercentilePlugin* this) {
   if(this->values_index < PERCENTILE_MAX_VALUES_NUM) {
     this->values[this->values_index++] = item;
-//    g_print("Item: %p->%hu\n", item, ((Packet*) _tuple_get(item, 0))->seq_num);
+//    g_print("Item: %p->%hu\n", item, ((RTPPacket*) _tuple_get(item, 0))->seq_num);
   }
 }
+//
+//static void _monitor_percentile_plugin_calculate(MonitorPercentilePlugin* this) {
+//  this->values_index = 0;
+//  gpointer result;
+//  gint first_index = this->read_index;
+//  gint last_index = this->write_index == 0 ? PERCENTILE_MAX_VALUES_NUM - 1 : this->write_index - 1;
+//  gint index;
+//  gpointer values;
+//  if (this->read_index == this->write_index) {
+//    return;
+//  } else if(this->read_index == last_index) {
+//    this->connection.target(this->connection.dst, this->extractor(this->values[this->read_index]));
+//    return;
+//  }
+//  values = g_malloc0(sizeof(gpointer) * this->values_count);
+//  if (this->read_index < last_index) {
+//    memcpy(values, this->values + this->read_index, sizeof(gpointer) * this->values_count);
+//  } else {
+//    gint32 count_1 = PERCENTILE_MAX_VALUES_NUM - this->read_index;
+//    gint32 count_2 = this->values_count - count_1;
+//    memcpy(values, this->values + this->read_index, count_1 * sizeof(gpointer));
+//    memcpy(values + count_1, this->values, count_2 * sizeof(gpointer));
+//  }
+//  qsort(values, this->values_count, sizeof(gpointer), this->cmp);
+//  index = this->values_index * ((gdouble) this->percentile / 100.) - 1;
+//  result = this->values[index];
+//  g_free(values);
+//  this->connection.target(this->connection.dst, this->extractor(result));
+//}
+//
+//static void _monitor_percentile_plugin_add(MonitorPercentilePlugin* this, gpointer data) {
+//  this->values[this->write_index] = data;
+//  if(++this->write_index == PERCENTILE_MAX_VALUES_NUM) {
+//    this->write_index = 0;
+//  }
+//  ++this->values_count;
+//  _monitor_percentile_plugin_calculate(this);
+//}
+//
+//static void _monitor_percentile_plugin_remove(MonitorPercentilePlugin* this, gpointer data) {
+//  this->values[this->read_index] = NULL;
+//  if(++this->read_index == PERCENTILE_MAX_VALUES_NUM) {
+//    this->read_index = 0;
+//  }
+//  --this->values_count;
+//  _monitor_percentile_plugin_calculate(this);
+//}
 
 static void _monitor_percentile_plugin_calculate(MonitorPercentilePlugin* this) {
   this->values_index = 0;
@@ -1061,17 +1117,18 @@ static void _monitor_percentile_plugin_calculate(MonitorPercentilePlugin* this) 
   qsort(this->values, this->values_index, sizeof(gpointer), this->cmp);
   index = this->values_index * ((gdouble) this->percentile / 100.) - 1;
   result = this->values[index];
-
   this->connection.target(this->connection.dst, this->extractor(result));
 }
 
 static void _monitor_percentile_plugin_add(MonitorPercentilePlugin* this, gpointer data) {
   g_queue_push_tail(this->items, data);
+//  g_print("Add: %p->%hu\n", data, ((RTPPacket*) _tuple_get(data, 0))->seq_num);
   _monitor_percentile_plugin_calculate(this);
 }
 
 static void _monitor_percentile_plugin_remove(MonitorPercentilePlugin* this, gpointer data) {
-  g_queue_pop_head(this->items);
+  gpointer popped = g_queue_pop_head(this->items);
+//  g_print("Rem: %p-%p->%hu\n", popped, data, ((RTPPacket*) _tuple_get(data, 0))->seq_num);
   _monitor_percentile_plugin_calculate(this);
 }
 
@@ -1564,6 +1621,7 @@ static GstClockTime _paired_packets_epoch_timestamp_extractor(gpointer tuple) {
 static void _paired_packets_ref(Tuple* paired_packets){
   RTPPacket* packet_x = _tuple_get(paired_packets, 0);
   RTPPacket* packet_y = _tuple_get(paired_packets, 1);
+//  g_print("%p-%p <- %hu\n", packet_x, packet_y, packet_x->seq_num);
   _object_ref(packet_x);
   _object_ref(packet_y);
   _object_ref(paired_packets);
@@ -1582,6 +1640,10 @@ static gint _paired_packets_owd_qsort_cmp(Tuple** pair_x, Tuple** pair_y) {
   return owd_x == owd_y ? 0 : owd_x < owd_y ? -1 : 1;
 }
 
+static gpointer _simple_paired_packets_refer(Tuple* tuple) {
+  _paired_packets_ref(tuple);
+  return tuple;
+}
 
 static void _write_qmd(gchar* snd_packets_path, gchar* rcv_packets_path, gchar* output_path) {
 
@@ -1602,7 +1664,7 @@ static void _write_qmd(gchar* snd_packets_path, gchar* rcv_packets_path, gchar* 
       _make_monitor_percentile_plugin(
           50,
           _paired_packets_owd_qsort_cmp,
-          _simple_passer, // Extractor
+          _simple_paired_packets_refer, // Extractor
           NULL, // Filter
           sampler,
           _sampler_process
@@ -1950,21 +2012,22 @@ typedef struct{
   gint32 sending_rate;
   gint32 flownum;
   GSList* flows;
+  GstClockTime last_timestamp;
 }TCPStat;
 
 static void _add_tcp_packet(TCPStat* tcpstat, TCPPacket* tcp_packet) {
   TCPFlow* tcp_flow;
   ++tcpstat->packets_num;
   tcpstat->sending_rate += tcp_packet->size;
-
   tcp_flow = g_list_find_custom(tcpstat->flows, tcp_packet, _find_tcp_flow);
+//  g_print("src port: %hu dst port: %hu\n", tcp_packet->src_port, tcp_packet->dst_port);
   if(!tcp_flow){
     tcp_flow = _make_tcp_flow(tcp_packet);
     tcpstat->flows = g_list_prepend(tcpstat->flows, tcp_flow);
     ++tcpstat->flownum;
   }
   tcp_flow->last_timestamp = tcp_packet->timestamp;
-
+  tcpstat->last_timestamp = tcp_packet->timestamp;
 }
 
 static void _rem_tcp_packet(TCPStat* tcpstat, TCPPacket* tcp_packet) {
@@ -1980,12 +2043,12 @@ static void _rem_tcp_packet(TCPStat* tcpstat, TCPPacket* tcp_packet) {
   }
 }
 
-static GstClockTime _extract_tcp_packet_timestamp(TCPPacket* packet) {
-  return packet->timestamp;
+static GstClockTime _extract_tcp_stat_timestamp(TCPStat* tcp_stat) {
+  return tcp_stat->last_timestamp;
 }
 
 static void _sprintf_tcpstat(gchar* result, TCPStat* tcp_stat) {
-  sprintf("%d,%d", tcp_stat->sending_rate, tcp_stat->flownum);
+  sprintf(result, "%d,%d", tcp_stat->sending_rate, tcp_stat->flownum);
 }
 
 static void _write_tcpstat(gchar* input_path, gchar* output_path) {
@@ -1994,7 +2057,7 @@ static void _write_tcpstat(gchar* input_path, gchar* output_path) {
   TCPStat tcpstat = {0, 0, 0, NULL};
   PcapFileStreamer* reader = _make_pcap_flie_streamer(input_path, _make_tcp_packet);
   Monitor* monitor = _make_monitor(_tcp_packet_queue_is_full_1s_tracked_ntp);
-  Sampler* sampler = _make_sampler(_extract_tcp_packet_timestamp, 100 * GST_MSECOND);
+  Sampler* sampler = _make_sampler(_extract_tcp_stat_timestamp, 100 * GST_MSECOND);
   FileWriter* writer = _make_writer(output_path, _sprintf_tcpstat);
 
   //Initialization
@@ -2004,11 +2067,12 @@ static void _write_tcpstat(gchar* input_path, gchar* output_path) {
 
   //Connection
   _pushconnect_cmp(reader, FILE_STREAM_OUTPUT, monitor, _monitor_receive_process);
+  _pushconnect_cmp(monitor, MONITOR_FLUSH_OUTPUT, writer, _file_writer_process);
   _pushconnect_cmp(sampler, SAMPLER_OUTPUT, writer, _file_writer_process);
 
   //Start
   {
-    GThread* process = g_thread_create(_file_reader_process, reader, TRUE, NULL);
+    GThread* process = g_thread_create(_pcap_flie_streamer_process, reader, TRUE, NULL);
     g_thread_join(process);
   }
 
@@ -2068,7 +2132,6 @@ int main (int argc, char **argv)
   }else{
     goto usage;
   }
-
 
   g_print("Results are made in %s\n", argv[1]);
   return 0;

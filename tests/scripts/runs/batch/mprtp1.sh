@@ -71,6 +71,7 @@ while [  $COUNTER -lt $END ]; do
 	if [ $INCREASE -eq 0 ]
 	then
 	  cleanup
+	  sleep 200
 	  continue
 	fi
 
@@ -93,6 +94,7 @@ while [  $COUNTER -lt $END ]; do
 	if [ $INCREASE -eq 0 ]
 	then
 	  cleanup
+	  sleep 200
 	  continue
 	fi
 

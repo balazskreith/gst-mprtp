@@ -1,0 +1,1 @@
+./rcv_pipeline --sink=FAKESINK --codec=VP8 --stat=triggered_stat:temp/rcv_packets_2.csv:0 --plystat=triggered_stat:temp/ply_packets_2.csv:0 --receiver=RTP:5102 --playouter=SCREAM:RTP:10.0.0.6:5103 

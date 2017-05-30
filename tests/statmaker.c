@@ -1578,7 +1578,7 @@ static void _sprintf_paired_packets_for_qd(gchar* result, Tuple* paired_packets)
   } else {
     owd = get_epoch_time_from_ntp_in_ns(packet_x->tracked_ntp - packet_y->tracked_ntp);
   }
-  sprintf(result, "%lu", owd / 1000000);
+  sprintf(result, "%lu", owd / 1000);
 }
 
 static void _write_qd(gchar* snd_packets_path, gchar* rcv_packets_path, gchar* output_path) {
@@ -2132,7 +2132,8 @@ int main (int argc, char **argv)
   }else{
     goto usage;
   }
-
+  g_print("----------------------------------------\n");
   g_print("Results are made in %s\n", argv[1]);
+  g_print("----------------------------------------\n");
   return 0;
 }

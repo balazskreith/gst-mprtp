@@ -227,15 +227,13 @@ void _fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf)
 
 }
 
-
-
 GstBuffer*
 _fecencoder_get_fec_packet(FECEncoder *this, guint8 subflow_id, gint32* packet_length)
 {
   GstBuffer* result = NULL;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   guint8* payload;
-  gint i;
+//  gint i;
   BitString *actual = NULL;
   BitString *fecbitstring = NULL;
   GstRTPFECHeader *fecheader;
@@ -255,9 +253,10 @@ again:
   actual = g_queue_pop_head(this->bitstrings);
   fecbitstring->length = MAX(fecbitstring->length, actual->length);
 
-  for(i=0; i < fecbitstring->length; ++i){
-    fecbitstring->bytes[i] ^= actual->bytes[i];
-  }
+//  for(i=0; i < fecbitstring->length; ++i){
+//    fecbitstring->bytes[i] ^= actual->bytes[i];
+//  }
+  do_bitxor(fecbitstring->bytes, actual->bytes, fecbitstring->length);
   if(!init){
     init = TRUE;
     fecbitstring->seq_num = actual->seq_num;

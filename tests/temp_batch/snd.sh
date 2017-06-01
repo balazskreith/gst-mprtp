@@ -1,1 +1,1 @@
-./scripts/runs/snd/mprtp7.sh FRACTaL
+./scripts/runs/snd/mprtp6.sh FRACTaL

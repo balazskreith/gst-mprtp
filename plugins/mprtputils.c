@@ -1,11 +1,39 @@
 #include "mprtputils.h"
 #include <string.h>
 
+static void _test_do_bitxor(void);
+
+void do_bitxor(guint8* to, guint8* from, gint32 length) {
+  gint i;
+  for(i=8; i <= length; i+=8){
+    *(guint64*)(to+i-8) ^= *(guint64*)(from+i-8);
+  }
+
+  if (i == length) {
+    return;
+  }
+  i-=8;
+
+  if (i+4 <= length) {
+    *(guint32*)(to+i) ^= *(guint32*)(from+i);
+    i+=4;
+  }
+
+  if (i+2 <= length) {
+    *(guint16*)(to+i) ^= *(guint16*)(from+i);
+    i+=2;
+  }
+  if (i+1 <= length) {
+    *(to + i) ^= *(from + i);
+  }
+}
+
 void gst_rtp_buffer_set_mprtp_extension(GstRTPBuffer* rtp, guint8 ext_header_id, guint8 subflow_id, guint16 subflow_seq)
 {
   MPRTPSubflowHeaderExtension mprtp_ext;
   mprtp_ext.id = subflow_id;
   mprtp_ext.seq = subflow_seq;
+  DISABLE_LINE _test_do_bitxor();
   gst_rtp_buffer_add_extension_onebyte_header (rtp, ext_header_id, (gpointer) &mprtp_ext, sizeof (mprtp_ext));
 }
 
@@ -96,4 +124,70 @@ gboolean gst_rtp_buffer_is_mprtp(GstRTPBuffer* rtp, guint8 mprtp_ext_header_id)
 gboolean gst_rtp_buffer_is_fectype(GstRTPBuffer* rtp, guint8 fec_payload_type)
 {
   return gst_rtp_buffer_get_payload_type(rtp) == fec_payload_type;
+}
+
+static void _test_do_bitxor(void) {
+  {
+    guint8 a[] = {0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10};
+    guint8 b[] = {0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01};
+    do_bitxor(a, b, 8);
+    g_print("test bitxor 8*8bits expected: 1111... value: %X%X%X%X%X%X%X%X\n",
+        a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+  }
+
+  {
+    guint8 a[] = {0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01};
+    guint8 b[] = {0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10};
+    do_bitxor(a, b, 9);
+    g_print("test bitxor 8*9bits expected: 1111... value: %X%X%X%X%X%X%X%X%X\n",
+        a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]);
+  }
+
+  {
+    guint8 a[] = {0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10};
+    guint8 b[] = {0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01};
+    do_bitxor(a, b, 10);
+    g_print("test bitxor 8*10bits expected: 1111... value: %X%X%X%X%X%X%X%X%X%X\n",
+        a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9]);
+  }
+
+  {
+    guint8 a[] = {0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01};
+    guint8 b[] = {0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10};
+    do_bitxor(a, b, 11);
+    g_print("test bitxor 8*11bits expected: 1111... value: %X%X%X%X%X%X%X%X%X%X%X\n",
+        a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10]);
+  }
+
+  {
+    guint8 a[] = {0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10};
+    guint8 b[] = {0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01};
+    do_bitxor(a, b, 12);
+    g_print("test bitxor 8*12bits expected: 1111... value: %X%X%X%X%X%X%X%X%X%X%X%X\n",
+        a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11]);
+  }
+
+  {
+    guint8 a[] = {0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01};
+    guint8 b[] = {0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10};
+    do_bitxor(a, b, 13);
+    g_print("test bitxor 8*13bits expected: 1111... value: %X%X%X%X%X%X%X%X%X%X%X%X%X\n",
+        a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12]);
+  }
+
+  {
+    guint8 a[] = {0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10};
+    guint8 b[] = {0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01};
+    do_bitxor(a, b, 14);
+    g_print("test bitxor 8*13bits expected: 1111... value: %X%X%X%X%X%X%X%X%X%X%X%X%X%X\n",
+        a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13]);
+  }
+
+  {
+    guint8 a[] = {0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01};
+    guint8 b[] = {0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10, 0x01, 0x10};
+    do_bitxor(a, b, 15);
+    g_print("test bitxor 8*13bits expected: 1111... value: %X%X%X%X%X%X%X%X%X%X%X%X%X%X%X\n",
+        a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14]);
+  }
 }

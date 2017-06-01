@@ -73,11 +73,6 @@ _playouter_on_rtcp_ready(
     GstBuffer* buffer);
 
 static void
-_playouter_on_repair_response(
-    GstMprtpplayouter *this,
-    GstBuffer *rtpbuf);
-
-static void
 _render_process (
     GstMprtpplayouter *this);
 
@@ -314,9 +309,6 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->controller               = make_rcvctrler(this->rcvtracker, this->subflows, this->on_rtcp_ready);
 
   this->max_repair_delay_in_ms   = 10;
-
-  fecdecoder_add_response_listener(this->fec_decoder,
-      (ListenerFunc) _playouter_on_repair_response, this);
 
   rcvpackets_set_abs_time_ext_header_id(this->rcvpackets, ABS_TIME_DEFAULT_EXTENSION_HEADER_ID);
   rcvpackets_set_mprtp_ext_header_id(this->rcvpackets, MPRTP_DEFAULT_EXTENSION_HEADER_ID);
@@ -664,10 +656,8 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   }
 
   if (*buf_2nd_byte == this->fec_payload_type) {
-    fecdecoder_add_fec_buffer(this->fec_decoder, gst_buffer_ref(buf));
+    fecdecoder_push_fec_buffer(this->fec_decoder, gst_buffer_ref(buf));
     goto done;
-  }else{
-    fecdecoder_add_rtp_buffer(this->fec_decoder, gst_buffer_ref(buf));
   }
 
 //  packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
@@ -678,8 +668,8 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 //  goto done;
 //
 //
-
   packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
+  fecdecoder_push_rcv_packet(this->fec_decoder, rcvpacket_ref(packet));
   THIS_LOCK(this);
 
 //  PROFILING("rcvtracker_add_packet",
@@ -726,7 +716,7 @@ gst_mprtpplayouter_mprtcp_sr_sink_chain (GstPad * pad, GstObject * parent,
 
   if (*buf_2nd_byte == this->fec_payload_type) {
 //    g_print("FEC BUFFER ARRIVED\n");
-    fecdecoder_add_fec_buffer(this->fec_decoder, gst_buffer_ref(buf));
+    fecdecoder_push_fec_buffer(this->fec_decoder, gst_buffer_ref(buf));
     goto done;
   }
 
@@ -775,25 +765,6 @@ void _playouter_on_rtcp_ready(GstMprtpplayouter *this, GstBuffer* buffer)
   }
 
   gst_pad_push(this->mprtcp_rr_srcpad, buffer);
-}
-
-void _playouter_on_repair_response(GstMprtpplayouter *this, GstBuffer *rtpbuf)
-{
-  PROFILING("_playouter_on_repair_response LOCK",
-    THIS_LOCK(this);
-  );
-
-  this->repairedbuf = rtpbuf;
-  g_cond_signal(&this->repair_signal);
-  THIS_UNLOCK(this);
-}
-
-
-static gboolean _repair_responsed(GstMprtpplayouter *this)
-{
-  gint64 end_time;
-  end_time = g_get_monotonic_time() + this->max_repair_delay_in_ms * G_TIME_SPAN_MILLISECOND;
-  return g_cond_wait_until(&this->repair_signal, &this->mutex, end_time);
 }
 
 
@@ -868,13 +839,7 @@ again:
       this->repairedbuf = NULL;
     }
 
-    fecdecoder_request_repair(this->fec_decoder, gap_seq);
-
-    DISABLE_LINE _repair_responsed(this);
-//    if(!_repair_responsed(this)){
-//      GST_WARNING_OBJECT(this, "max_repair_delay reached without response. Maybe need to increase it");
-//    }
-    g_usleep(1000);
+    this->repairedbuf = fecdecoder_pop_rtp_packet(this->fec_decoder, gap_seq);
 
     if(this->repairedbuf){
 //      g_print("Repaired buffer appeared: %hu\n", gap_seq);

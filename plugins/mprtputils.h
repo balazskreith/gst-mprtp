@@ -40,7 +40,6 @@
 #define PROFILING(msg, func) PROFILING_GT(msg, func, 0)
 
 
-
 typedef enum{
   RTCP_INTERVAL_REGULAR_INTERVAL_MODE      = 0,
   RTCP_INTERVAL_EARLY_RTCP_MODE            = 1,
@@ -49,7 +48,7 @@ typedef enum{
 
 typedef enum{
   CONGESTION_CONTROLLING_TYPE_NONE         = 0,
-  CONGESTION_CONTROLLING_TYPE_FRACTAL     = 2,
+  CONGESTION_CONTROLLING_TYPE_FRACTAL      = 2,
 }CongestionControllingType;
 
 
@@ -78,26 +77,7 @@ typedef struct{
   guint16   cycle_num;
 }SubflowSeqTrack;
 
-typedef struct _GstRtpPacket
-{
-  guint64              abs_snd_ntp_chunk;
-  guint64              abs_rcv_ntp_time;
-
-  gboolean             marker;
-  guint8               payload_type;
-  guint16              abs_seq;
-  guint32              timestamp;
-  guint32              ssrc;
-
-  guint                header_size;
-  guint                payload_size;
-
-  guint16              subflow_seq;
-  guint8               subflow_id;
-
-  gpointer             payload;
-}GstRtpPacket;
-
+void do_bitxor(guint8* to, guint8* from, gint32 length);
 
 void gst_rtp_buffer_set_mprtp_extension(GstRTPBuffer* rtp, guint8 ext_header_id, guint8 subflow_id, guint16 subflow_seq);
 void gst_rtp_buffer_get_mprtp_extension(GstRTPBuffer* rtp, guint8 ext_header_id, guint8 *subflow_id, guint16 *subflow_seq);

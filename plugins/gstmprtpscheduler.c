@@ -926,13 +926,14 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndPacket *packet)
 //  g_print("Packet sent  flow result: %d\n", gst_pad_push(this->mprtp_srcpad, buffer));
 
 //  artifital lost
-//    if(++this->sent_packets % 21 == 0){
-//      gst_buffer_unref(buffer);
-//    }else{
-//      gst_pad_push(this->mprtp_srcpad, buffer);
-//    }
+//  g_print("Sent packet: %hu\n", this->sent_packets);
+//  if(this->sent_packets % 21 == 0){
+//    gst_buffer_unref(buffer);
+//  }else{
+//    gst_pad_push(this->mprtp_srcpad, buffer);
+//  }
 //  PROFILING("_mprtpscheduler_send_packet: gst_pad_push rtpbuffer",
-  gst_pad_push(this->mprtp_srcpad, buffer);
+//  gst_pad_push(this->mprtp_srcpad, buffer);
 //  g_async_queue_push(this->sendq, buffer);
 //  );
 
@@ -1012,12 +1013,14 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
     gst_buffer_unref(sndpacket_retrieve(packet));
     goto done;
   }
-//  g_print("Subflow: %d\n", subflow->id);
 
+//  g_print("Subflow: %d\n", subflow->id);
+//  this->fec_interval = 5;
   if(0 < this->fec_interval && (++this->sent_packets % this->fec_interval) == 0){
     SndSubflow* subflow = sndsubflows_get_subflow(this->subflows, packet->subflow_id);
     _on_monitoring_request(this, subflow);
   }
+
 
 //  PROFILING("_mprtpscheduler_send_packet",
     _mprtpscheduler_send_packet(this, packet);

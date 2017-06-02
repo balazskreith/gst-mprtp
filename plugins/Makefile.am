@@ -1,7 +1,8 @@
 plugin_LTLIBRARIES = libgstmprtp.la
 
 # sources used to compile this plug-in
-libgstmprtp_la_SOURCES = correlator.c          \
+libgstmprtp_la_SOURCES = bintree.c             \
+                         correlator.c          \
 					     fecdec.c              \
                          fecenc.c              \
                          fractalfbproc.c       \
@@ -43,7 +44,8 @@ libgstmprtp_la_SOURCES = correlator.c          \
                          timestampgenerator.c
                     
                     
-noinst_HEADERS = correlator.h          \
+noinst_HEADERS = bintree.h             \
+                 correlator.h          \
 				 fecdec.h              \
                  fecenc.h              \
                  fractalfbproc.h       \

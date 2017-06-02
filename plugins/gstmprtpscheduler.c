@@ -296,6 +296,14 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
 static void
 gst_mprtpscheduler_init (GstMprtpscheduler * this)
 {
+  {
+    SlidingWindow* sw = make_slidingwindow(100, GST_SECOND);
+    slidingwindow_add_plugins(sw,
+        make_swpercentile(50, bintree3cmp_int32, on_calculated_cb, udata)
+        NULL);
+    g_print("%p", ((SndPacket*)(NULL))->abs_seq); // termin
+  }
+
 //  GstMprtpschedulerPrivate *priv;
 //  priv = this->priv = GST_MPRTPSCHEDULER_GET_PRIVATE (this);
 
@@ -427,6 +435,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   this->abs_time_ext_header_id   = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
   this->ts_generator             = make_timestamp_generator(DEFAULT_TIMESTAMP_GENERATOR_CLOCKRATE);
+
+
 }
 
 

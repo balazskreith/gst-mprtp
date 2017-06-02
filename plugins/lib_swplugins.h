@@ -164,6 +164,21 @@ SlidingWindowPlugin* make_swpercentile(
                               gpointer       udata
                               );
 
+typedef gpointer (*SWExtractorFunc)(gpointer source);
+typedef gpointer (*SWMeanCalcer)(gpointer source1, gpointer source2);
+gpointer swpercentile2_mean_calcer_select_left(gpointer source1, gpointer source2);
+gpointer swpercentile2_mean_calcer_select_right(gpointer source1, gpointer source2);
+
+SlidingWindowPlugin* make_swpercentile2(
+                              gint32     percentile,
+                              GCompareFunc  cmp,
+                              ListenerFunc  on_calculated_cb,
+                              gpointer      udata,
+                              SWExtractorFunc extractor,
+                              SWMeanCalcer mean_calcer
+                              );
+
+
 SlidingWindowPlugin* make_swint32_stater(ListenerFunc on_calculated_cb, gpointer on_calculated_udata);
 
 #endif /* INCGUARD_NTRT_LIBRARY_SWPLUGINS_H_ */

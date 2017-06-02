@@ -120,7 +120,6 @@ SndPacket* sndpackets_make_packet(SndPackets* this, GstBuffer* buffer)
   result->abs_time_ext_header_id = this->abs_time_ext_header_id;
 
   result->keyframe               = this->keyframe_filtercb ? this->keyframe_filtercb(buffer) : FALSE;
-
   return result;
 }
 

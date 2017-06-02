@@ -426,6 +426,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->fec_responses = make_messenger(sizeof(FECEncoderResponse*));
 
   this->abs_time_ext_header_id   = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
+  this->ts_generator             = make_timestamp_generator(DEFAULT_TIMESTAMP_GENERATOR_CLOCKRATE);
 }
 
 
@@ -933,7 +934,9 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndPacket *packet)
 //    gst_pad_push(this->mprtp_srcpad, buffer);
 //  }
 //  PROFILING("_mprtpscheduler_send_packet: gst_pad_push rtpbuffer",
-//  gst_pad_push(this->mprtp_srcpad, buffer);
+  gst_pad_push(this->mprtp_srcpad, buffer);
+  //TODO: should goes to a sent process, but we stop ading the abs_time_ext_header
+  packet->sent_ts = timestamp_generator_get_ts(this->ts_generator);
 //  g_async_queue_push(this->sendq, buffer);
 //  );
 
@@ -1014,7 +1017,7 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
     goto done;
   }
 
-//  g_print("Subflow: %d\n", subflow->id);
+ //  g_print("Subflow: %d\n", subflow->id);
 //  this->fec_interval = 5;
   if(0 < this->fec_interval && (++this->sent_packets % this->fec_interval) == 0){
     SndSubflow* subflow = sndsubflows_get_subflow(this->subflows, packet->subflow_id);

@@ -29,6 +29,7 @@
 #include "fecenc.h"
 #include "mediator.h"
 #include "sndqueue.h"
+#include "timestampgenerator.h"
 
 G_BEGIN_DECLS
 #define GST_TYPE_MPRTPSCHEDULER   (gst_mprtpscheduler_get_type())
@@ -56,7 +57,7 @@ struct _GstMprtpscheduler
   GstPad*                       mprtcp_sr_srcpad;
 
   GAsyncQueue*                  sendq;
-
+  TimestampGenerator*           ts_generator;
   gboolean                      preroll;
 
   SndSubflows*                  subflows;

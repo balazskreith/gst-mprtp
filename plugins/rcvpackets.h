@@ -13,7 +13,6 @@
 #include "rcvsubflows.h"
 #include "recycle.h"
 
-
 typedef struct _RcvPackets RcvPackets;
 typedef struct _RcvPacketsClass RcvPacketsClass;
 
@@ -51,6 +50,7 @@ struct _RcvPacket
   guint8               subflow_id;
 
   Recycle*             destiny;
+  guint32              received_ts;
 };
 
 

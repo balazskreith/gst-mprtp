@@ -27,15 +27,15 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "timestamp.h"
+#include "timestampgenerator.h"
 
 
 #define _now(this) (gst_clock_get_time (this->sysclock))
 
-GST_DEBUG_CATEGORY_STATIC (timestamp_debug_category);
-#define GST_CAT_DEFAULT timestamp_debug_category
+GST_DEBUG_CATEGORY_STATIC (timestamp_generator_debug_category);
+#define GST_CAT_DEFAULT timestamp_generator_debug_category
 
-G_DEFINE_TYPE (Timestamp, timestamp, G_TYPE_OBJECT);
+G_DEFINE_TYPE (TimestampGenerator, timestamp_generator, G_TYPE_OBJECT);
 
 #define REGULAR_REPORT_PERIOD_TIME (5*GST_SECOND)
 
@@ -44,50 +44,51 @@ G_DEFINE_TYPE (Timestamp, timestamp, G_TYPE_OBJECT);
 //----------------------------------------------------------------------
 
 static void
-timestamp_finalize (GObject * object);
+timestamp_generator_finalize (GObject * object);
 
 
 void
-timestamp_class_init (TimestampClass * klass)
+timestamp_generator_class_init (TimestampGeneratorClass * klass)
 {
   GObjectClass *gobject_class;
 
   gobject_class = (GObjectClass *) klass;
 
-  gobject_class->finalize = timestamp_finalize;
+  gobject_class->finalize = timestamp_generator_finalize;
 
-  GST_DEBUG_CATEGORY_INIT (timestamp_debug_category, "rndctrler", 0,
+  GST_DEBUG_CATEGORY_INIT (timestamp_generator_debug_category, "rndctrler", 0,
       "MpRTP Receiving Controller");
 
 }
 
 
 void
-timestamp_finalize (GObject * object)
+timestamp_generator_finalize (GObject * object)
 {
-  Timestamp *this = TIMESTAMP (object);
+  TimestampGenerator *this = TIMESTAMPGENERATOR (object);
   g_object_unref(this->sysclock);
 }
 
 void
-timestamp_init (Timestamp * this)
+timestamp_generator_init (TimestampGenerator * this)
 {
   this->sysclock = gst_system_clock_obtain();
 }
 
-Timestamp *make_timestamp(guint32 clockrate)
+TimestampGenerator *make_timestamp_generator(guint32 clockrate)
 {
-  Timestamp *this = g_object_new(TIMESTAMP_TYPE, NULL);
+  TimestampGenerator *this = g_object_new(TIMESTAMPGENERATOR_TYPE, NULL);
   this->made = _now(this);
   this->offset = 0;
   this->clockrate = clockrate;
   return this;
 }
 
-void timestamp_set_clockrate(Timestamp* this, guint32 clockrate) {
+void timestamp_generator_set_clockrate(TimestampGenerator* this, guint32 clockrate) {
   this->clockrate = clockrate;
 }
-guint32 timestmap_get(Timestamp* this) {
+
+guint32 timestamp_generator_get_ts(TimestampGenerator* this) {
   GstClockTime elapsed_in_ns = _now(this) - this->made;
   GstClockTime elapsed_in_s = GST_TIME_AS_SECONDS(elapsed_in_ns);
   GstClockTime elapsed_in_clockrate;

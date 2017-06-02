@@ -55,6 +55,8 @@ void bintree3_add_on_print_cb(bintree3_t *this, ListenerFunc callback, gpointer 
 
 gpointer bintree3_delete_top_data(bintree3_t *this);
 gpointer bintree3_delete_bottom_data(bintree3_t *this);
+bintree3node_t* bintree3_pop_top_data(bintree3_t *this);
+bintree3node_t* bintree3_pop_bottom_data(bintree3_t *this);
 gpointer bintree3_get_top_data(bintree3_t *this);
 gpointer bintree3_get_bottom_data(bintree3_t *this);
 gboolean bintree3_has_value(bintree3_t *this, gpointer data);

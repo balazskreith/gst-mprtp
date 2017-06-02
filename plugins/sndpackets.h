@@ -61,6 +61,7 @@ typedef struct _SndPacket
   Recycle*             destiny;
 
   gboolean             keyframe;
+  guint32              sent_ts;
 
 }SndPacket;
 
@@ -70,10 +71,8 @@ struct _SndPackets
   GObject                    object;
   GstClock*                  sysclock;
   GstClockTime               made;
-//  SndPacket*                 packets;
 
   Recycle*                   recycle;
-
   SndPacketFilterCb          keyframe_filtercb;
 
   guint8                     abs_time_ext_header_id;

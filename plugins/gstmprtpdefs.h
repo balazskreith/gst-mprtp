@@ -23,6 +23,8 @@
 
 #define MPRTP_PLUGIN_MAX_SUBFLOW_NUM 32
 
+#define DEFAULT_TIMESTAMP_GENERATOR_CLOCKRATE 90000
+
 
 typedef struct _MPRTPSubflowUtilizationSignalData{
   guint                      controlling_mode;

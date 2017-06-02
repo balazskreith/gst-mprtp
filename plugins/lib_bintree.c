@@ -6,8 +6,8 @@ static bintree3node_t * _insert(bintree3_t *this, bintree3node_t *actual, bintre
 static bintree3node_t * _insert_into_tree(bintree3_t *this, bintree3node_t *actual, bintree3node_t **insert);
 static bintree3node_t *
 _search_value(bintree3_t *this, gpointer value, bintree3node_t **parent);
-static gboolean
-_deref_from_tree (bintree3_t * this, gpointer value);
+static void _remove_node(bintree3_t * this, bintree3node_t* node, bintree3node_t* parent, bintree3node_t* candidate);
+static gboolean _deref_from_tree (bintree3_t * this, gpointer value);
 static void _refresh_top(bintree3_t *this);
 static void _refresh_bottom(bintree3_t *this);
 static bintree3node_t *_get_rightest_value(bintree3node_t *node, bintree3node_t **parent);
@@ -295,6 +295,26 @@ gpointer bintree3_get_bottom_data(bintree3_t *this)
     return NULL;
   return this->bottom->ptrs->data;
 }
+// TODO: do the replace
+//
+bintree3node_t* bintree3_pop_top_data(bintree3_t *this)
+{
+  bintree3node_t *result, *parent;
+  if(!this->top)
+    return NULL;
+  result = this->top;
+  _search_value(this, this->bottom->ptrs->data, &parent);
+  _remove_node(this, result, parent, NULL);
+  //TODO: dispose the node so check the new top and bottom.
+  return this->top->ptrs->data;
+}
+
+bintree3node_t* bintree3_pop_bottom_data(bintree3_t *this)
+{
+  if(!this->bottom)
+    return NULL;
+  return this->bottom->ptrs->data;
+}
 
 gboolean bintree3_has_value(bintree3_t *this, gpointer data)
 {
@@ -351,6 +371,7 @@ bintree3node_t * _insert_into_tree(bintree3_t *this, bintree3node_t *actual, bin
   gint32 cmp_result;
   if (!actual) {
       ++this->node_counter;
+      this->duplicate_counter += (*insert)->ref - 1;
       return *insert;
   }
   cmp_result = this->cmp (actual->ptrs->data, (*insert)->ptrs->data);
@@ -359,7 +380,8 @@ bintree3node_t * _insert_into_tree(bintree3_t *this, bintree3node_t *actual, bin
 
     notifier_do(this->on_duplicate, (*insert)->ptrs->data);
 
-    actual->ptrs = g_slist_append(actual->ptrs, (*insert)->ptrs->data);
+//    actual->ptrs = g_slist_append(actual->ptrs, (*insert)->ptrs->data);
+    actual->ptrs = g_slist_concat(actual->ptrs, (*insert)->ptrs);
     this->duplicate_counter += (*insert)->ref;
     _trash_bintree3node(this, *insert);
     *insert = actual;
@@ -370,6 +392,14 @@ bintree3node_t * _insert_into_tree(bintree3_t *this, bintree3node_t *actual, bin
   return actual;
 }
 
+void _remove_node(bintree3_t * this, bintree3node_t* node, bintree3node_t* parent, bintree3node_t* candidate) {
+  if (!parent)
+    this->root = candidate;
+  else if (parent->left == node)
+    parent->left = candidate;
+  else
+    parent->right = candidate;
+}
 
 gboolean
 _deref_from_tree (bintree3_t * this, gpointer data)
@@ -411,12 +441,7 @@ survive:
   --this->duplicate_counter;
   return TRUE;
 remove:
-  if (!parent)
-    this->root = candidate;
-  else if (parent->left == node)
-    parent->left = candidate;
-  else
-    parent->right = candidate;
+  _remove_node(this, node, parent, candidate);
   _trash_bintree3node(this, node);
   return TRUE;
 replace:

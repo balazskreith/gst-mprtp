@@ -26,6 +26,7 @@
 #include "rcvctrler.h"
 #include "fecdec.h"
 #include "jitterbuffer.h"
+#include "timestampgenerator.h"
 
 #if GLIB_CHECK_VERSION (2, 35, 7)
 #include <gio/gnetworking.h>
@@ -45,6 +46,7 @@
 #include <sys/socket.h>
 #endif
 #endif
+
 
 G_BEGIN_DECLS
 #define GST_TYPE_MPRTPPLAYOUTER   (gst_mprtpplayouter_get_type())
@@ -77,6 +79,7 @@ struct _GstMprtpplayouter
   RcvPackets*     rcvpackets;
   RcvTracker*     rcvtracker;
   Notifier*       on_rtcp_ready;
+  TimestampGenerator* ts_generator;
 
   guint8          fec_payload_type;
 

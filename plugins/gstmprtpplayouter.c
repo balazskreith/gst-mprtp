@@ -317,6 +317,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   notifier_add_listener(this->on_recovered_buffer, (ListenerFunc) rcvtracker_on_recovered_buffer, this);
 
   this->packets_in = g_async_queue_new();
+  this->ts_generator = make_timestamp_generator(DEFAULT_TIMESTAMP_GENERATOR_CLOCKRATE);
 }
 
 
@@ -669,6 +670,7 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 //
 //
   packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
+  packet->received_ts = timestamp_generator_get_ts(this->ts_generator);
   fecdecoder_push_rcv_packet(this->fec_decoder, rcvpacket_ref(packet));
   THIS_LOCK(this);
 

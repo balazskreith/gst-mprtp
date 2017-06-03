@@ -111,7 +111,7 @@ typedef struct swint32stat_struct_t{
   gdouble dev;
 }swint32stat_t;
 
-SlidingWindowPlugin* make_swminmax(bintree3cmp cmp,
+SlidingWindowPlugin* make_swminmax(GCompareFunc cmp,
                                   ListenerFunc on_calculated_cb,
                                   gpointer       udata
                           );
@@ -166,8 +166,10 @@ SlidingWindowPlugin* make_swpercentile(
 
 typedef gpointer (*SWExtractorFunc)(gpointer source);
 typedef gpointer (*SWMeanCalcer)(gpointer source1, gpointer source2);
-gpointer swpercentile2_mean_calcer_select_left(gpointer source1, gpointer source2);
-gpointer swpercentile2_mean_calcer_select_right(gpointer source1, gpointer source2);
+typedef gpointer (*SWEstimator)(gpointer source1, gpointer source2);
+gpointer swpercentile2_prefer_left_selector(gpointer left, gpointer right);
+gpointer swpercentile2_prefer_right_selector(gpointer left, gpointer right);
+gpointer swpercentile2_self_extractor(gpointer value);
 
 SlidingWindowPlugin* make_swpercentile2(
                               gint32     percentile,
@@ -175,7 +177,8 @@ SlidingWindowPlugin* make_swpercentile2(
                               ListenerFunc  on_calculated_cb,
                               gpointer      udata,
                               SWExtractorFunc extractor,
-                              SWMeanCalcer mean_calcer
+                              SWMeanCalcer mean_calcer,
+                              SWEstimator estimator
                               );
 
 SlidingWindowPlugin* make_swlinpercentile(

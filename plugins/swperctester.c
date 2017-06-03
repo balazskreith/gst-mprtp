@@ -61,7 +61,8 @@ static void _sw_test_performance(gint32 percentile, gint32 runs, gint32 max_rand
             (ListenerFunc) _on_percentile_2_calced,
             &perc2_result,
             (SWExtractorFunc) _extractor,
-            (SWMeanCalcer) _mean_calcer),
+            (SWMeanCalcer) _mean_calcer,
+            NULL),
         NULL);
   slidingwindow_add_plugins(sw3,
         make_swlinpercentile(percentile,
@@ -116,7 +117,8 @@ static void _sw_test_results(gint32 percentile, gint32 runs, gint32 max_random_n
             (ListenerFunc) _on_percentile_2_calced,
             &perc2_result,
             (SWExtractorFunc) _extractor,
-            (SWMeanCalcer) _mean_calcer),
+            (SWMeanCalcer) _mean_calcer,
+            NULL),
         NULL);
   slidingwindow_add_plugins(sw3,
         make_swlinpercentile(percentile,

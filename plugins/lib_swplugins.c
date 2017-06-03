@@ -160,17 +160,17 @@ SlidingWindowPlugin* make_swprinter(void (*sprint)(gpointer,gchar*))
 
 typedef struct _swminmax{
   SlidingWindowPlugin* base;
-  bintree3_t*          tree;
+  Bintree*          tree;
   swminmaxstat_t       stat;
 }swminmax_t;
 
 
-static swminmax_t* _swminmaxpriv_ctor(SlidingWindowPlugin* base, bintree3cmp cmp)
+static swminmax_t* _swminmaxpriv_ctor(SlidingWindowPlugin* base, GCompareFunc cmp)
 {
   swminmax_t* this;
   this = malloc(sizeof(swminmax_t));
   memset(this, 0, sizeof(swminmax_t));
-  this->tree = make_bintree3(cmp);
+  this->tree = make_bintree(cmp);
   this->base = base;
   return this;
 }
@@ -201,9 +201,9 @@ static void _swminmax_add_pipe(gpointer dataptr, gpointer itemptr)
 {
   swminmax_t* this;
   this = dataptr;
-  bintree3_insert_data(this->tree, itemptr);
-  this->stat.min = bintree3_get_bottom_data(this->tree);
-  this->stat.max = bintree3_get_top_data(this->tree);
+  bintree_insert_value(this->tree, itemptr);
+  this->stat.min = bintree_get_bottom_value(this->tree);
+  this->stat.max = bintree_get_top_value(this->tree);
   swplugin_notify(this->base, &this->stat);
 }
 
@@ -211,13 +211,13 @@ static void _swminmax_rem_pipe(gpointer dataptr, gpointer itemptr)
 {
   swminmax_t* this;
   this = dataptr;
-  bintree3_delete_value(this->tree, itemptr);
-  this->stat.min = bintree3_get_bottom_data(this->tree);
-  this->stat.max = bintree3_get_top_data(this->tree);
+  bintree_delete_value(this->tree, itemptr);
+  this->stat.min = bintree_get_bottom_value(this->tree);
+  this->stat.max = bintree_get_top_value(this->tree);
   swplugin_notify(this->base, &this->stat);
 }
 
-SlidingWindowPlugin* make_swminmax(bintree3cmp cmp, ListenerFunc on_calculated_cb, gpointer udata)
+SlidingWindowPlugin* make_swminmax(GCompareFunc cmp, ListenerFunc on_calculated_cb, gpointer udata)
 {
   SlidingWindowPlugin* this;
   this = swplugin_ctor();
@@ -876,10 +876,11 @@ typedef struct _swpercentile2{
   gdouble ratio;
   gint32 required;
   SWMeanCalcer mean_calcer;
+  SWEstimator estimator;
 }swpercentile2_t;
 
 static swpercentile2_t* _swpercentile2priv_ctor(SlidingWindowPlugin* base, gint32 percentile,
-    GCompareFunc cmp, SWExtractorFunc extractor, SWMeanCalcer mean_calcer)
+    GCompareFunc cmp, SWExtractorFunc extractor, SWMeanCalcer mean_calcer, SWEstimator estimator)
 {
   swpercentile2_t* this;
   this = malloc(sizeof(swpercentile2_t));
@@ -891,6 +892,7 @@ static swpercentile2_t* _swpercentile2priv_ctor(SlidingWindowPlugin* base, gint3
   this->percentile = percentile;
   this->extractor = extractor;
   this->mean_calcer = mean_calcer;
+  this->estimator = estimator;
   this->ratio = (gdouble)percentile / (gdouble)(100 - percentile);
   if (this->ratio < 1.) {
     this->required = 1./this->ratio + 1;
@@ -1004,12 +1006,26 @@ static void _swpercentile2_calculate(swpercentile2_t* this) {
       return;
     }
 
-    if (total < this->required || mincounter < 1) {
+    if (total < this->required || mincounter < 1 || mincounter < 1) {
+      if (!this->estimator || (mincounter < 1 && mincounter < 1)) {
+        return;
+      }
+      if (mincounter < 1) {
+        left = bintree_get_bottom_node(maxtree);
+        right = bintree_get_top_node(maxtree);
+      } else if (maxcounter < 1){
+        left = bintree_get_bottom_node(mintree);
+        right = bintree_get_top_node(mintree);
+      } else {
+        left = bintree_get_top_node(maxtree);
+        right = bintree_get_bottom_node(mintree);
+      }
+      selected = this->estimator(left->values->data, right->values->data);
       return;
     }
 
     left = bintree_get_top_node(maxtree);
-    right =bintree_get_bottom_node(mintree);
+    right = bintree_get_bottom_node(mintree);
     position = (gdouble)total * (this->percentile / 100.0);
     useOneIndex = floor(position) != position;
     if (this->ratio == 1.0) {
@@ -1034,7 +1050,11 @@ static void _swpercentile2_calculate(swpercentile2_t* this) {
       if (index2 <= maxcounter) {
         selected = left->values->data;
       } else if (index1 <= maxcounter) {
-        selected = this->mean_calcer(left->values->data, right->values->data);
+        if(this->mean_calcer) {
+          selected = this->mean_calcer(left->values->data, right->values->data);
+        } else {
+          selected = left->values->data;
+        }
       } else {
         selected = right->values->data;
       }
@@ -1081,12 +1101,16 @@ static void _swpercentile2_on_rem(gpointer dataptr, gpointer value)
   _swpercentile2_calculate(this);
 }
 
-gpointer swpercentile2_mean_calcer_select_left(gpointer source1, gpointer source2) {
-  return source1;
+gpointer swpercentile2_prefer_left_selector(gpointer left, gpointer right) {
+  return left ? left : right;
 }
 
-gpointer swpercentile2_mean_calcer_select_right(gpointer source1, gpointer source2) {
-  return source2;
+gpointer swpercentile2_prefer_right_selector(gpointer left, gpointer right) {
+  return right ? right : left;
+}
+
+gpointer swpercentile2_self_extractor(gpointer value) {
+  return value;
 }
 
 SlidingWindowPlugin* make_swpercentile2(
@@ -1095,13 +1119,14 @@ SlidingWindowPlugin* make_swpercentile2(
                               ListenerFunc on_calculated_cb,
                               gpointer     udata,
                               SWExtractorFunc extractor,
-                              SWMeanCalcer mean_calcer
+                              SWMeanCalcer mean_calcer,
+                              SWEstimator estimator
                               )
 {
 
   SlidingWindowPlugin* this;
   this = make_swplugin(on_calculated_cb, udata);
-  this->priv = _swpercentile2priv_ctor(this, percentile, cmp, extractor, mean_calcer);
+  this->priv = _swpercentile2priv_ctor(this, percentile, cmp, extractor, mean_calcer, estimator);
 
   this->add_pipe          = _swpercentile2_on_add;
   this->add_data          = this->priv;

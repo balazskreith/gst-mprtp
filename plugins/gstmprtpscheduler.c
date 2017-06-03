@@ -296,10 +296,10 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
 static void
 gst_mprtpscheduler_init (GstMprtpscheduler * this)
 {
-  {
-    swperctester_do();
-    g_print("%d", ((SndPacket*)(NULL))->abs_seq); // termin
-  }
+//  {
+//    swperctester_do();
+//    g_print("%d", ((SndPacket*)(NULL))->abs_seq); // termin
+//  }
 
   init_mprtp_logger();
   //TODO: Elliminate logger

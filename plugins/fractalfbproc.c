@@ -28,7 +28,7 @@ static void _process_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportS
 static void _process_owd(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary);
 static void _process_stat(FRACTaLFBProcessor *this);
 
-static void _on_drift_80th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates);
+//static void _on_drift_80th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates);
 
 static void _on_long_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement);
 static void _on_long_sw_add(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement);
@@ -96,6 +96,18 @@ static void _on_measurement_unref(FRACTaLFBProcessor* this, FRACTaLMeasurement* 
 
 StructCmpFnc(_measurement_drift_cmp, FRACTaLMeasurement, drift);
 
+
+static GstClockTime* _drift_pointer_extractor(FRACTaLMeasurement* measurement) {
+  return &measurement->drift;
+}
+
+static gpointer _drift_prefer_right_selector(FRACTaLMeasurement* left, FRACTaLMeasurement* right) {
+  return right ? right : left;
+}
+
+static void _on_drift_80th_calculated(FRACTaLFBProcessor* this, GstClockTime* drift) {
+  _stat(this)->drift_80th = *drift;
+}
 
 
 void
@@ -186,7 +198,14 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
   DISABLE_LINE slidingwindow_setup_debug(this->long_sw, (SlidingWindowItemSprintf)_long_sw_item_sprintf, g_print);
 
   slidingwindow_add_plugins(this->long_sw,
-          make_swpercentile(80, _measurement_drift_cmp, (ListenerFunc) _on_drift_80th_calculated, this),
+//          make_swpercentile(80, _measurement_drift_cmp, (ListenerFunc) _on_drift_80th_calculated, this),
+          make_swpercentile2(80,
+              (GCompareFunc) _measurement_drift_cmp,
+              (ListenerFunc) _on_drift_80th_calculated,
+              this,
+              (SWExtractorFunc) _drift_pointer_extractor,
+              (SWMeanCalcer)_drift_prefer_right_selector,
+              (SWEstimator)_drift_prefer_right_selector),
           make_swstd(_on_drift_std_calculated, stat, _drift_extractor, 0),
           make_swstd(_on_BiF_std_calculated, stat, _BiF_extractor, 0),
           make_swavg(_on_lost_avg_calculated, stat, _lost_extractor),
@@ -450,7 +469,7 @@ void _process_stat(FRACTaLFBProcessor *this)
 }
 
 
-
+/*
 void _on_drift_80th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_t *candidates)
 {
   PercentileResult(FRACTaLMeasurement,   \
@@ -462,7 +481,7 @@ void _on_drift_80th_calculated(FRACTaLFBProcessor *this, swpercentilecandidates_
                    0                      \
                    );
 }
-
+*/
 
 void _on_long_sw_rem(FRACTaLFBProcessor *this, FRACTaLMeasurement* measurement)
 {

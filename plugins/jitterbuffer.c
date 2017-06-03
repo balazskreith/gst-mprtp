@@ -85,26 +85,15 @@ _cmp_ts (guint32 x, guint32 y)
 
 #define _subflow(this, id) ((Subflow*)(((Subflow*)this->subflows) + id))
 
-static void _on_skew_median_calculated(Subflow *subflow, swpercentilecandidates_t *candidates)
+static void _on_path_skew_calculated(Subflow *subflow, gint64* skew)
 {
-  gint64 skew_median,skew_min,skew_max;
-  PercentileRawResult(gint64,   \
-                   candidates,  \
-                   skew_median, \
-                   skew_min,    \
-                   skew_max,    \
-                   0            \
-                   );
-  skew_median = CONSTRAIN((gint64)-50 * (gint64)GST_MSECOND, 50 * GST_MSECOND, skew_median);
+  gint64 path_skew;
+  path_skew = CONSTRAIN((gint64)-50 * (gint64)GST_MSECOND, 50 * GST_MSECOND, *skew);
 //g_print("%ld\n", skew_median);
   if(subflow->path_skew == 0.){
-    subflow->path_skew = skew_median;
+    subflow->path_skew = path_skew;
   }else{
-    subflow->path_skew = subflow->path_skew * .99 + .01 * skew_median;
-  }
-//  g_print("Median skew: %lu\n", GST_TIME_AS_MSECONDS(skew_median));
-  if(0){//For avoiding set but unused warning
-    subflow->path_skew += 0 * skew_min + 0 * skew_max;
+    subflow->path_skew = subflow->path_skew * .99 + .01 * path_skew;
   }
 }
 
@@ -165,7 +154,7 @@ jitterbuffer_init (JitterBuffer * this)
   this->path_skews = make_slidingwindow_double(256, 0);
 
   slidingwindow_add_plugin(this->path_skews,
-      make_swminmax(bintree3cmp_double, (ListenerFunc) _on_path_minmax_skew_calculated, this));
+      make_swminmax((GCompareFunc)bintree3cmp_double, (ListenerFunc) _on_path_minmax_skew_calculated, this));
 
 }
 
@@ -191,6 +180,7 @@ gboolean jitterbuffer_is_packet_discarded(JitterBuffer* this, RcvPacket* packet)
   return _cmp_seq(packet->abs_seq, this->last_seq) < 0;
 }
 
+
 void jitterbuffer_push_packet(JitterBuffer *this, RcvPacket* packet)
 {
   Subflow* subflow;
@@ -206,7 +196,15 @@ void jitterbuffer_push_packet(JitterBuffer *this, RcvPacket* packet)
     subflow->last_ts    = packet->timestamp;
     subflow->packet_skews = make_slidingwindow_int64(100, 2 * GST_SECOND);
     slidingwindow_add_plugin(subflow->packet_skews,
-        make_swpercentile(80, bintree3cmp_int64, (ListenerFunc)_on_skew_median_calculated, subflow));
+//        make_swpercentile(80, bintree3cmp_int64, (ListenerFunc)_on_skew_median_calculated, subflow)
+        make_swpercentile2(80,
+            (GCompareFunc)bintree3cmp_int64,
+            (ListenerFunc)_on_path_skew_calculated,
+            subflow,
+            (SWExtractorFunc) swpercentile2_self_extractor,
+            (SWMeanCalcer) swpercentile2_prefer_right_selector,
+            (SWEstimator) swpercentile2_prefer_right_selector)
+        );
     goto done;
   }
 

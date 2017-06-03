@@ -48,6 +48,73 @@ static BintreeNode* _create_node(Bintree* this, gpointer value);
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
 
+
+
+static void
+_sprint_list_of_pointers(GSList* it, gchar *result, guint result_length)
+{
+  gchar helper[255];
+  if(!it){
+    return;
+  }
+  memset(result, 0, result_length);
+  for(; it; it = it->next){
+    memset(helper, 0, 255);
+    sprintf(helper, "(%p)[%d]%c ", it->data, *(gint32*)(it->data), it->next ? ',' : ' ');
+    strcat(result, helper);
+  }
+}
+
+static void
+_setup_indent_level(gchar *result, guint result_length, guint level)
+{
+  gint i;
+  memset(result, 0, result_length);
+  for(i = 0; i < level; ++i){
+    strcat(result, "--");
+  }
+}
+
+void static
+_print_tree (Bintree * tree, BintreeNode* node, gint32 level)
+{
+  gchar string[255];
+  gchar node_values_string[255];
+
+  if (!node) {
+    return;
+  }
+  if(tree->top)  {
+    _sprint_list_of_pointers(tree->top->values, string, 255);
+    //observer_notify(tree->on_print, string);
+  }
+
+  if (!level){
+    gchar str[255];
+    memset(str, 0, 255);
+    sprintf(str, "Tree %p TOP is: %s Node Counter: %u Duplicate counter: %d\n", tree, string, tree->node_counter, tree->duplicate_counter);
+    g_print("%s", str);
+    //notifier_do(tree->on_print, str);
+  }
+  _setup_indent_level(string, 255, level);
+  _sprint_list_of_pointers(node->values, node_values_string, 255);
+
+  memset(string, 0, 255);
+  sprintf(string, "%d->%p->data:%s  ref: %u ->left:%p ->right:%p\n",
+      level, node, node_values_string, node->values_length, node->left, node->right);
+  g_print("%s", string);
+//  notifier_do(tree->on_print, string);
+
+  _print_tree (tree, node->left, level + 1);
+  _print_tree (tree, node->right, level + 1);
+}
+
+void bintree_print(Bintree* this) {
+  _print_tree(this, this->root, 0);
+}
+
+//========================================================================
+
 static void
 bintree_finalize (GObject * object);
 
@@ -144,6 +211,7 @@ BintreeNode* bintree_pop_bottom_node(Bintree* this) {
   _desintegrate_node(this, this->bottom);
   this->duplicate_counter -= result->values_length - 1;
   --this->node_counter;
+  result->right = NULL;
   return result;
 }
 
@@ -155,19 +223,20 @@ BintreeNode* bintree_pop_top_node(Bintree* this) {
   }
   result = this->top;
   _search_node(this, this->top->values->data, &parent);
-  _replace_node(this, this->top, parent, this->bottom->left);
+  _replace_node(this, this->top, parent, this->top->left);
   _desintegrate_node(this, this->top);
   this->duplicate_counter -= result->values_length - 1;
   --this->node_counter;
+  result->left = NULL;
   return result;
 }
 
 
 void _insert(Bintree* this, BintreeNode* insert, BintreeNode* node) {
-  gint cmp;
+  gint cmp = 0;
   BintreeNode* parent = NULL; // This seems to be wrong, but actually not.
   if (!this->root) {
-    this->root = _integrate_node(this, node);
+    this->root = _integrate_node(this, insert);
     this->duplicate_counter = insert->values_length - 1;
     this->node_counter = 1;
     return;
@@ -187,7 +256,6 @@ void _insert(Bintree* this, BintreeNode* insert, BintreeNode* node) {
   }
   ++this->node_counter;
   this->duplicate_counter += insert->values_length - 1;
-  cmp = this->cmp(node->values->data, insert->values->data);
   if (cmp < 0) {
     parent->right = _integrate_node(this, insert);
   } else {
@@ -205,6 +273,7 @@ gboolean bintree_delete_value(Bintree* this, gpointer value) {
   if (1 < node->values_length) {
     node->values = g_slist_remove(node->values, value);
     --node->values_length;
+    --this->duplicate_counter;
     return TRUE;
   }
 

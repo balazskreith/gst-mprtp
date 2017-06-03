@@ -976,10 +976,12 @@ static void _swpercentile2_balancing(swpercentile2_t* this) {
     maxcounter = bintree_get_size(maxtree);
     if (maxtreeThreshold < maxcounter && popFromMaxAllowed) {
       bintree_insert_node_at_bottom(mintree, bintree_pop_top_node(maxtree));
+//      g_print("bintree_insert_node_at_bottom\n");
       continue;
     }
     if (mintreeThreshold < mincounter && popFromMinAllowed) {
       bintree_insert_node_at_top(maxtree, bintree_pop_bottom_node(mintree));
+//      g_print("bintree_insert_node_at_top\n");
       continue;
     }
     break;
@@ -1009,7 +1011,7 @@ static void _swpercentile2_calculate(swpercentile2_t* this) {
     left = bintree_get_top_node(maxtree);
     right =bintree_get_bottom_node(mintree);
     position = (gdouble)total * (this->percentile / 100.0);
-    useOneIndex = floor(position) == position;
+    useOneIndex = floor(position) != position;
     if (this->ratio == 1.0) {
       useOneIndex = total %2 == 1;
     }
@@ -1061,6 +1063,10 @@ static void _swpercentile2_on_add(gpointer dataptr, gpointer value)
   }
   _swpercentile2_balancing(this);
   _swpercentile2_calculate(this);
+//  bintree_print(this->maxtree);
+//  g_print("-----------------\n");
+//  bintree_print(this->mintree);
+//  g_print("==================\n");
 }
 
 static void _swpercentile2_on_rem(gpointer dataptr, gpointer value)
@@ -1102,6 +1108,129 @@ SlidingWindowPlugin* make_swpercentile2(
   this->rem_pipe          = _swpercentile2_on_rem;
   this->rem_data          = this->priv;
   this->disposer          = _swpercentile2_disposer;
+  return this;
+
+}
+
+
+
+//-----------------------------------------------------------------------------------
+
+typedef struct _swlinpercentile{
+  SlidingWindowPlugin* base;
+  gint32 percentile;
+  GCompareFunc cmp;
+  SWExtractorFunc extractor;
+  gdouble ratio;
+  gint32 required;
+  GQueue* items;
+  gpointer* array;
+  gint32 array_length;
+  SWMeanCalcer mean_calcer;
+}swlinpercentile_t;
+
+static swlinpercentile_t* _swlinpercentilepriv_ctor(SlidingWindowPlugin* base, gint32 percentile,
+    GCompareFunc cmp, SWExtractorFunc extractor, SWMeanCalcer mean_calcer)
+{
+  swlinpercentile_t* this;
+  this = malloc(sizeof(swlinpercentile_t));
+  memset(this, 0, sizeof(swlinpercentile_t));
+  this->base = base;
+  this->cmp = cmp;
+  this->percentile = percentile;
+  this->extractor = extractor;
+  this->mean_calcer = mean_calcer;
+  this->ratio = (gdouble)percentile / (gdouble)(100 - percentile);
+  if (this->ratio < 1.) {
+    this->required = 1./this->ratio + 1;
+  } else if (1. < this->ratio) {
+    this->required = this->ratio + 1;
+  } else {
+    this->required = 2;
+  }
+  this->items = g_queue_new();
+  return this;
+}
+
+static void _swlinpercentilepriv_disposer(gpointer target)
+{
+  swlinpercentile_t* this = target;
+  if(!target){
+    return;
+  }
+
+  free(this);
+}
+
+static void _swlinpercentile_disposer(gpointer target)
+{
+  SlidingWindowPlugin* this = target;
+  if(!target){
+    return;
+  }
+
+  _swlinpercentilepriv_disposer(this->priv);
+  this->priv = NULL;
+  free(this);
+}
+
+static void _swlinpercentile_queue_foreach_helper(gpointer item, swlinpercentile_t* this) {
+  this->array[this->array_length++] = item;
+}
+
+static void _swlinpercentile_calculate(swlinpercentile_t* this) {
+  gpointer selected;
+  gdouble position;
+  this->array = g_malloc0(sizeof(gpointer) * g_queue_get_length(this->items));
+  this->array_length = 0;
+  g_queue_foreach(this->items, (GFunc) _swlinpercentile_queue_foreach_helper, this);
+  qsort(this->array, this->array_length, sizeof(gpointer), this->cmp);
+  position = (gdouble) this->array_length * ((gdouble) this->percentile / 100.);
+  if(floor(position) == position) {
+    gint index = position;
+    selected = this->mean_calcer(this->array[index-1], this->array[index]);
+  } else {
+    gint index = floor(position);
+    selected = this->array[index];
+  }
+  swplugin_notify(this->base, this->extractor(selected));
+  g_free(this->array);
+}
+
+static void _swlinpercentile_on_add(gpointer dataptr, gpointer value)
+{
+  swlinpercentile_t* this;
+  this = dataptr;
+  g_queue_push_tail(this->items, value);
+  _swlinpercentile_calculate(this);
+}
+
+static void _swlinpercentile_on_rem(gpointer dataptr, gpointer value)
+{
+  swlinpercentile_t* this = dataptr;
+  g_queue_pop_head(this->items);
+  _swlinpercentile_calculate(this);
+}
+
+SlidingWindowPlugin* make_swlinpercentile(
+                              gint32     percentile,
+                              GCompareFunc  cmp,
+                              ListenerFunc on_calculated_cb,
+                              gpointer     udata,
+                              SWExtractorFunc extractor,
+                              SWMeanCalcer mean_calcer
+                              )
+{
+
+  SlidingWindowPlugin* this;
+  this = make_swplugin(on_calculated_cb, udata);
+  this->priv = _swlinpercentilepriv_ctor(this, percentile, cmp, extractor, mean_calcer);
+
+  this->add_pipe          = _swlinpercentile_on_add;
+  this->add_data          = this->priv;
+  this->rem_pipe          = _swlinpercentile_on_rem;
+  this->rem_data          = this->priv;
+  this->disposer          = _swlinpercentile_disposer;
   return this;
 
 }

@@ -178,6 +178,15 @@ SlidingWindowPlugin* make_swpercentile2(
                               SWMeanCalcer mean_calcer
                               );
 
+SlidingWindowPlugin* make_swlinpercentile(
+                              gint32     percentile,
+                              GCompareFunc  cmp,
+                              ListenerFunc  on_calculated_cb,
+                              gpointer      udata,
+                              SWExtractorFunc extractor,
+                              SWMeanCalcer mean_calcer
+                              );
+
 
 SlidingWindowPlugin* make_swint32_stater(ListenerFunc on_calculated_cb, gpointer on_calculated_udata);
 

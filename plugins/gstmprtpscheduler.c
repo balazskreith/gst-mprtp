@@ -292,73 +292,18 @@ gst_mprtpscheduler_class_init (GstMprtpschedulerClass * klass)
 
 
 }
-
-static void _on_percentile_1_calced(gint32 *result, swpercentilecandidates_t *candidates)
-{
-  gint32 perc,min,max;
-  PercentileRawResult(gint32,   \
-                   candidates,  \
-                   perc, \
-                   min,    \
-                   max,    \
-                   0            \
-                   );
-  *result = perc;
-}
-
-static void _on_percentile_2_calced(gint32 *result, gint32 *perc)
-{
-  *result = *perc;
-}
-
-static gint32* _mean_calcer(gint32* a, gint32* b) {
-  gint32* result = g_malloc(sizeof(gint32));
-  *result = (*a + *b) / 2;
-  return result;
-}
-
-static gint32* _extractor(gint32* source) {
-  return source;
-}
-#include <stdlib.h>
+#include "swperctester.h"
 static void
 gst_mprtpscheduler_init (GstMprtpscheduler * this)
 {
   {
-    SlidingWindow* sw = make_slidingwindow(100, GST_SECOND);
-    gint32 perc1_result, perc2_result, percentile = 50, i;
-    srand(time(NULL));   // should only be called once
-    slidingwindow_add_plugins(sw,
-        make_swpercentile(percentile,
-            bintree3cmp_int32,
-            (ListenerFunc)
-            _on_percentile_1_calced,
-            &perc1_result),
-        make_swpercentile2(percentile,
-            (GCompareFunc) bintree3cmp_int32,
-            (ListenerFunc) _on_percentile_2_calced,
-            &perc2_result,
-            (SWExtractorFunc) _extractor,
-            (SWMeanCalcer) _mean_calcer)
-        NULL);
-    for (i = 0; i < 300; ++i) {
-      gint32* value = g_malloc(sizeof(gint32));
-      *value = rand() % 1000;
-      slidingwindow_add_data(sw, value);
-      g_print("%d - %d\n", perc1_result, perc2_result);
-    }
-    g_print("%p", ((SndPacket*)(NULL))->abs_seq); // termin
+    swperctester_do();
+    g_print("%d", ((SndPacket*)(NULL))->abs_seq); // termin
   }
 
-//  GstMprtpschedulerPrivate *priv;
-//  priv = this->priv = GST_MPRTPSCHEDULER_GET_PRIVATE (this);
-
   init_mprtp_logger();
-  //TODO: Only for development use
+  //TODO: Elliminate logger
   mprtp_logger_set_state(TRUE);
-//  mprtp_logger_set_system_command("bash -c '[ ! -d temp_logs ]' && mkdir temp_logs");
-//  mprtp_logger_set_system_command("rm temp_logs/*");
-//  mprtp_logger_set_target_directory("temp/");
 
   this->sendq = g_async_queue_new();
 

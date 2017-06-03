@@ -49,7 +49,8 @@ typedef struct _Subflow{
   gboolean              initialized;
   RcvTrackerSubflowStat stat;
 
-  GstClockTime          last_mprtp_delay;
+  guint32               last_rcved_ts;
+  guint32               last_rtp_ts;
   gboolean              seq_initialized;
 
   gdouble               path_skew;
@@ -86,6 +87,14 @@ _cmp_seq (guint16 x, guint16 y)
   if(x < y && y - x > 32768) return 1;
   if(x > y && x - y < 32768) return 1;
   return 0;
+}
+
+static guint32 _delta_ts(guint32 last_ts, guint32 actual_ts) {
+  if (last_ts <= actual_ts) {
+    return actual_ts - last_ts;
+  } else {
+    return 4294967296 - last_ts + actual_ts;
+  }
 }
 
 //----------------------------------------------------------------------
@@ -206,15 +215,18 @@ static void _subflow_add_packet(RcvTracker * this, Subflow *subflow, RcvPacket* 
     subflow->stat.highest_seq = packet->subflow_seq;
     subflow->stat.total_received_packets = 1;
     subflow->stat.total_received_bytes = packet->payload_size;
-    subflow->last_mprtp_delay = packet->delay;
+    subflow->last_rcved_ts = packet->received_ts;
+    subflow->last_rtp_ts = packet->timestamp;
     subflow->seq_initialized = TRUE;
     goto done;
   }
 
   //normal jitter calculation for regular rtcp reports
-  skew = (((gint64)subflow->last_mprtp_delay - (gint64)packet->delay));
+  skew = (((gint64)packet->received_ts - (gint64)subflow->last_rcved_ts));
+  skew = (gint64)_delta_ts(subflow->last_rcved_ts, packet->received_ts) - (gint64)_delta_ts(subflow->last_rtp_ts, packet->timestamp);
   subflow->stat.jitter += ((skew < 0?-1*skew:skew) - subflow->stat.jitter) / 16;
-  subflow->last_mprtp_delay = packet->delay;
+  subflow->last_rcved_ts = packet->received_ts; //TODO: this is a chaos if the generator clock rate not match to the rtp packet clock rate
+  subflow->last_rtp_ts = packet->timestamp;
   subflow->stat.cycle_num = (++subflow->stat.total_received_packets)>>16;
   subflow->stat.total_received_bytes += packet->payload_size;
 

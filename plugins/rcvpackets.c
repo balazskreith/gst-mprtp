@@ -210,8 +210,6 @@ void _extract_mprtp_info(RcvPackets* this, RcvPacket* packet, GstRTPBuffer *rtp)
 
   packet->abs_snd_ntp_time = gst_rtp_buffer_get_abs_time_extension(rtp, this->abs_time_ext_header_id);
 
-  packet->delay = get_epoch_time_from_ntp_in_ns(NTP_NOW - packet->abs_snd_ntp_time);
-
   gst_rtp_buffer_get_mprtp_extension(rtp, mprtp_ext_header_id, &packet->subflow_id, &packet->subflow_seq);
 
 }

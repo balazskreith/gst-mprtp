@@ -31,7 +31,7 @@ struct _RcvPacket
   GstBuffer*           buffer;
   gint                 ref;
   GstClockTime         received;
-  GstClockTime         delay;
+//  GstClockTime         delay;
 
   guint64              abs_snd_ntp_chunk;
   guint64              abs_snd_ntp_time;

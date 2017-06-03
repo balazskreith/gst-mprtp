@@ -936,7 +936,7 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndPacket *packet)
 //  }
 //  PROFILING("_mprtpscheduler_send_packet: gst_pad_push rtpbuffer",
   gst_pad_push(this->mprtp_srcpad, buffer);
-  //TODO: should goes to a sent process, but we stop ading the abs_time_ext_header
+  //TODO: should goes to a sent process, but we stop adding the abs_time_ext_header
   packet->sent_ts = timestamp_generator_get_ts(this->ts_generator);
 //  g_async_queue_push(this->sendq, buffer);
 //  );

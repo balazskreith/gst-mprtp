@@ -69,7 +69,7 @@ typedef struct _GstMPRTCPXRReportSummary{
     struct {
      gboolean lost;
      gboolean ecn;
-     guint16  dts;
+     guint16  ato;
     }vector[1024];
     guint vector_length;
   }CongestionControlFeedback;

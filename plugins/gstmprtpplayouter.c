@@ -836,10 +836,11 @@ again:
   playout_time_in_ts = jitterbuffer_get_playout_delay_in_ts(this->jitterbuffer);
 playout:
   if(0 < playout_time_in_ts) {
-    g_print("%hu (%d) -> playout delay: %lu\n",
-        packet->abs_seq, packet->subflow_id, timestamp_generator_get_time(this->rtp_ts_generator, playout_time_in_ts) / 1000);
+//    g_print("%hu (%d) -> playout delay: %lu\n",
+//        packet->abs_seq, packet->subflow_id, timestamp_generator_get_time(this->rtp_ts_generator, playout_time_in_ts) / 1000);
     g_usleep(timestamp_generator_get_time(this->rtp_ts_generator, playout_time_in_ts) / 1000);
   }
+
   if(jitterbuffer_has_repair_request(this->jitterbuffer, &gap_seq)){
     GstBuffer* repairedbuf = fecdecoder_pop_rtp_packet(this->fec_decoder, gap_seq);
     if(repairedbuf){

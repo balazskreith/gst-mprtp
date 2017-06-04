@@ -302,7 +302,7 @@ void _on_fb_update(FRACTaLFBProducer *this, ReportProducer* reportproducer)
 //  );
 
 //  PROFILING("_setup_xr_rfc3611_rle_lost",
-  _setup_xr_rfc3611_rle_lost(this, reportproducer);
+  DISABLE_LINE _setup_xr_rfc3611_rle_lost(this, reportproducer);
 //  );
 
   _setup_xr_cc_fb_rle(this, reportproducer);
@@ -340,8 +340,6 @@ void _setup_xr_rfc3611_rle_lost(FRACTaLFBProducer * this,ReportProducer* reportp
                                        this->end_seq,
                                        this->lost_vector
                                        );
-
-
 done:
   return;
 }
@@ -370,7 +368,6 @@ void _setup_xr_cc_fb_rle(FRACTaLFBProducer * this,  ReportProducer* reportproduc
       this->ecn_vector,
       this->ato_vector
       );
-
 done:
   return;
 }

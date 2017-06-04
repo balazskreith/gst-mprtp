@@ -25,6 +25,7 @@ G_DEFINE_TYPE (FRACTaLFBProcessor, fractalfbprocessor, G_TYPE_OBJECT);
 
 static void fractalfbprocessor_finalize (GObject * object);
 static void _process_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xr);
+static void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xr);
 static void _process_owd(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xrsummary);
 static void _process_stat(FRACTaLFBProcessor *this);
 
@@ -265,6 +266,11 @@ void fractalfbprocessor_report_update(FRACTaLFBProcessor *this, GstMPRTCPReportS
     process = TRUE;
   }
 
+  if(summary->XR.CongestionControlFeedback.processed){
+    _process_cc_rle_discvector(this, &summary->XR);
+    process = TRUE;
+  }
+
   if(summary->XR.DiscardedBytes.processed){
     g_print("Dsicarded byte matric is not used now. Turn it off at producer or implement a handler function");
     process = TRUE;
@@ -420,6 +426,103 @@ done:
 //  measurement->sent_bytes_in_srtt = this->sent_bytes_in_srtt;
   return;
 }
+
+
+
+
+
+
+
+void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xr)
+{
+  SndPacket* packet = NULL;
+  guint16 act_seq, end_seq;
+  GstClockTime last_packet_sent_time = 0;
+  gint i;
+  guint16 last_seq;
+  FRACTaLMeasurement* measurement = this->measurement;
+
+  act_seq = xr->CongestionControlFeedback.begin_seq;
+  end_seq = xr->CongestionControlFeedback.end_seq;
+
+  if(act_seq == end_seq){
+    goto done;
+  }
+
+  //g_print("RLE vector from %hu until %hu\n", act_seq, end_seq);
+
+  for(i=0; act_seq != end_seq; ++act_seq, ++i){
+    packet = sndtracker_retrieve_sent_packet(this->sndtracker, this->subflow->id, act_seq);
+
+    if(!packet){
+      GST_WARNING_OBJECT(this, "Packet %hu has not in subflow tracked sequences. "
+          "Either too late acknowledged or never sent", act_seq);
+      continue;
+    }
+
+    if(packet->acknowledged){
+      if(packet->lost && xr->CongestionControlFeedback.vector[i].lost){
+        sndtracker_packet_found(this->sndtracker, packet);
+      }
+      continue;
+    }
+
+    // TODO: time position.
+    packet->acknowledged = TRUE;
+    packet->lost = !xr->LostRLE.vector[i];
+
+    sndtracker_packet_acked(this->sndtracker, packet);
+    last_packet_sent_time = packet->sent;
+    last_seq = packet->subflow_seq;
+  }
+  if(0 < last_packet_sent_time)
+  {
+    GstClockTime now = _now(this);
+    GstClockTime rtt = now - last_packet_sent_time;
+    GstClockTime boundary;
+    gint lost_packets = 0, sent_packets = 0;;
+    this->RTT = (this->RTT == 0) ? rtt : (rtt * .125 + this->RTT * .875);
+    if(this->RTT < now - this->srtt_updated){
+      _stat(this)->srtt = (_stat(this)->srtt == 0.) ? this->RTT : this->RTT * .125 + _stat(this)->srtt * .875;
+      this->srtt_updated = now;
+      slidingwindow_set_treshold(this->srtt_sw, _stat(this)->srtt);
+    }
+    this->HSN = last_seq;
+
+    boundary = last_packet_sent_time - MAX(100 * GST_MSECOND, _stat(this)->srtt);
+    //calculate lost packets in srtt
+    _stat(this)->received_bytes_in_srtt = 0;
+    for(i=0, --end_seq, act_seq = xr->LostRLE.begin_seq; act_seq != end_seq; --end_seq, ++i){
+      packet = sndtracker_retrieve_sent_packet(this->sndtracker, this->subflow->id, end_seq);
+      if(!packet){
+        continue;
+      }
+      if(packet->sent < boundary){
+        break;
+      }
+      ++sent_packets;
+      if(!packet->lost){
+//        measurement->rcved_bytes_in_srtt += packet->payload_size;
+        _stat(this)->received_bytes_in_srtt += packet->payload_size;
+        continue;
+      }
+      ++lost_packets;
+    }
+//    _stat(this)->received_bytes_in_srtt = measurement->rcved_bytes_in_srtt;
+    if(0 < sent_packets){
+      measurement->fraction_lost = (gdouble) lost_packets / (gdouble) sent_packets;
+    }
+  }
+
+done:
+//  measurement->sent_bytes_in_srtt = this->sent_bytes_in_srtt;
+  return;
+}
+
+
+
+
+
 
 void _process_stat(FRACTaLFBProcessor *this)
 {

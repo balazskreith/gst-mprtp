@@ -405,7 +405,7 @@ _processing_xr_cc_rle_fb_block (ReportProcessor *this,
   GstRTCPXRChunk chunk, *src;
   guint chunk_i;
 
-  summary->XR.LostRLE.processed = TRUE;
+  summary->XR.CongestionControlFeedback.processed = TRUE;
   src = xrb->chunks;
   summary->XR.LostRLE.vector_length = 0;
   gst_rtcp_xr_cc_fb_rle_getdown(xrb,
@@ -418,13 +418,9 @@ _processing_xr_cc_rle_fb_block (ReportProcessor *this,
   chunks_num = gst_rtcp_xr_cc_fb_rle_block_get_chunks_num(xrb);
   for(chunk_i = 0; chunk_i < chunks_num; ++chunk_i){
     gst_rtcp_xr_chunk_ntoh_cpy(&chunk, src + chunk_i);
-    summary->XR.CongestionControlFeedback.vector[chunk_i].dts = chunk.CCFeedback.ato;
+    summary->XR.CongestionControlFeedback.vector[chunk_i].ato = chunk.CCFeedback.ato;
     summary->XR.CongestionControlFeedback.vector[chunk_i].ecn = chunk.CCFeedback.ecn;
     summary->XR.CongestionControlFeedback.vector[chunk_i].lost = chunk.CCFeedback.lost;
-//    for(bit_i = 0; bit_i < 15 && _cmp_seq(seq, summary->XR.LostRLE.end_seq) <= 0; ++bit_i){
-//      summary->XR.LostRLE.vector[summary->XR.LostRLE.vector_length++] =
-//          0 < (chunk.Bitvector.bitvector & (guint16)(1<<bit_i)) ? TRUE : FALSE;
-//    }
   }
 }
 
@@ -462,6 +458,7 @@ _processing_xr(ReportProcessor *this,
   read_words = 1;
 again:
   gst_rtcp_xr_block_getdown(block, &block_type, &block_words, NULL);
+//  g_print("block type: %d\n", block_type);
   switch(block_type){
     case GST_RTCP_XR_OWD_BLOCK_TYPE_IDENTIFIER:
         _processing_xr_owd_block(this, (GstRTCPXROWDBlock*) block, summary);

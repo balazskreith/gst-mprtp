@@ -159,7 +159,6 @@ SndPacket* sndqueue_pop_packet(SndQueue * this, GstClockTime* next_approve)
     if(next_approve){
       *next_approve = MIN(pop_helper.next_approve, *next_approve);
     }
-    goto done;
   }
 
   queue = this->queues[pop_helper.subflow_id];

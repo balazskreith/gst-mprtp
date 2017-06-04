@@ -421,7 +421,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   notifier_add_listener(this->on_rtcp_ready,
       (ListenerFunc) _on_rtcp_ready, this);
 
-  this->obsolation_treshold = 50 * GST_MSECOND;
+  this->obsolation_treshold = 0;//50 * GST_MSECOND;
   this->fec_responses = make_messenger(sizeof(FECEncoderResponse*));
 
   this->abs_time_ext_header_id   = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
@@ -960,25 +960,11 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndPacket *packet)
   return;
 }
 
-static void _wait2(GstMprtpscheduler *this, GstClockTime end)
-{
-  GstClockTime now = _now(this);
-  gint64  end_time  = g_get_monotonic_time();
-  if(now < end){
-    guint64 wait_time = MAX((end - now) / 2000, 1000);
-    end_time += wait_time;
-  }else{
-    end_time += 1000;
-  }
-  g_cond_wait_until(&this->waiting_signal, &this->mutex, end_time);
-}
-
-
 static void
 mprtpscheduler_approval_process (GstMprtpscheduler *this)
 {
   SndPacket *packet;
-  GstClockTime now, next_time;
+  GstClockTime now, next_time = 0;
   RTPQueueStat* rtpqstat;
 
 //PROFILING("LOCK",
@@ -1000,14 +986,12 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
   }
 
   now = _now(this);
-  next_time = now + 10 * GST_MSECOND;
+  next_time = now;
   packet = sndqueue_pop_packet(this->sndqueue, &next_time);
-  if(!packet){
-//    if(now < next_time - 500 * GST_USECOND){
-//        g_print("1: now: %lu -> next_time: %lu diff: %lu\n", now, next_time, next_time - now);
-      DISABLE_LINE _wait2(this, next_time);
-//        g_print("2: now: %lu -> next_time: %lu diff: %lu\n", _now(this), next_time, _now(this) - next_time);
-//    }
+  if (now < next_time) {
+    g_usleep(now - next_time / 1000);
+  }
+  if (!packet) {
     goto done;
   }
 

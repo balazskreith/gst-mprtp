@@ -144,10 +144,7 @@ static gboolean _is_repair_possible(GList *rcv_packets_list, FECPacket* fec_pack
     return FALSE;
   }
   // TODO: if we start using parity format the possibilty of the repair must be changed
-  if (g_list_length(rcv_packets_list) < fec_packet->protected_num - 1) {
-    return FALSE;
-  }
-  return TRUE;
+  return g_list_length(rcv_packets_list) == fec_packet->protected_num - 1;
 }
 
 GstBuffer* fecdecoder_pop_rtp_packet(FECDecoder *this, guint16 seq_num)

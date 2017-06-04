@@ -957,7 +957,7 @@ guint gst_rtcp_xr_cc_fb_rle_block_get_chunks_num(GstRTCPXRCCFeedbackRLEBlock *bl
 
   block_length = g_ntohs(block->block_length);
   //the number of words containing chunks
-  chunk_words_num = block_length - 2;
+  chunk_words_num = block_length - 3;
   //multiply it by two so we get the number of chunks
   return chunk_words_num<<1;
 }
@@ -1628,7 +1628,7 @@ gst_printfnc_rtcp_xrccchunks(GstRTCPXRChunk * chunk1, GstRTCPXRChunk * chunk2, p
  ch2 = (GstRTCPXRCCFBRLEChunk *) &u16_chunk2;
  print (
        "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n"
-       "|%1d|%3d|%24d|%1d|%3d|%24d|\n"
+       "|%1d|%3d|%25d|%1d|%3d|%25d|\n"
 
        ,
        ch1->lost, ch1->ecn, ch1->ato,
@@ -1664,7 +1664,7 @@ gst_printfnc_rtcp_xr_cc_fb_rle_block(GstRTCPXRCCFeedbackRLEBlock* block, printfn
       ssrc, begin_seq, end_seq);
 
    chunks_num = gst_rtcp_xr_cc_fb_rle_block_get_chunks_num(block);
-
+//g_print("-------> chunks num: %d\n", chunks_num);
    for(chunk_index = 0;
        chunk_index < chunks_num;
        chunk_index+=2)

@@ -45,6 +45,7 @@ static void _on_received_packet(FRACTaLFBProducer *this, RcvPacket *packet);
 static void _setup_xr_rfc7243(FRACTaLFBProducer * this,ReportProducer* reportproducer);
 static void _setup_xr_rfc3611_rle_lost(FRACTaLFBProducer * this,  ReportProducer* reportproducer);
 static void _setup_xr_owd(FRACTaLFBProducer * this,  ReportProducer* reportproducer);
+static void _setup_xr_cc_fb_rle(FRACTaLFBProducer * this,  ReportProducer* reportproducer);
 //static void _setup_afb_reps(FRACTALFBProducer * this, ReportProducer *reportproducer);
 static void _on_fb_update(FRACTaLFBProducer *this,  ReportProducer* reportproducer);
 
@@ -59,6 +60,13 @@ _cmp_seq (guint16 x, guint16 y)
   return 0;
 }
 
+static guint32 _delta_ts(guint32 last_ts, guint32 actual_ts) {
+  if (last_ts <= actual_ts) {
+    return actual_ts - last_ts;
+  } else {
+    return 4294967296 - last_ts + actual_ts;
+  }
+}
 
 //
 //static guint16 _diff_seq(guint16 a, guint16 b)
@@ -70,7 +78,7 @@ _cmp_seq (guint16 x, guint16 y)
 
 static void _on_rle_sw_rem(FRACTaLFBProducer* this, guint16* seq_num)
 {
-  this->vector[*seq_num] = FALSE;
+  this->lost_vector[*seq_num] = FALSE;
   if(_cmp_seq(this->begin_seq, *seq_num) <= 0){
     this->begin_seq = *seq_num + 1;
   }
@@ -101,7 +109,10 @@ fractalfbproducer_finalize (GObject * object)
 
   g_object_unref(this->sysclock);
   g_object_unref(this->tracker);
-  mprtp_free(this->vector);
+  mprtp_free(this->lost_vector);
+  mprtp_free(this->ecn_vector);
+  mprtp_free(this->timestamp_vector);
+  mprtp_free(this->ato_vector);
 
 
 }
@@ -111,7 +122,10 @@ fractalfbproducer_init (FRACTaLFBProducer * this)
 {
   this->sysclock = gst_system_clock_obtain();
 
-  this->vector   = g_malloc0(sizeof(gboolean)  * 65536);
+  this->lost_vector = g_malloc0(sizeof(gboolean)  * 65536);
+  this->ecn_vector = g_malloc0(sizeof(gboolean)  * 65536);
+  this->timestamp_vector = g_malloc0(sizeof(guint32) * 65536);
+  this->ato_vector = g_malloc0(sizeof(guint32) * 65536);
 
 }
 
@@ -155,8 +169,8 @@ FRACTaLFBProducer *make_fractalfbproducer(RcvSubflow* subflow, RcvTracker *track
   this = g_object_new (FRACTALFBPRODUCER_TYPE, NULL);
   this->subflow         = subflow;
   this->tracker         = g_object_ref(tracker);
-
-  this->rle_sw          = make_slidingwindow_uint16(100, GST_SECOND);
+  this->ts_generator    = g_object_ref(rcvtracker_get_cc_ts_generator(tracker));
+  this->rle_sw          = make_slidingwindow_uint16(100, .33 * GST_SECOND);
 
 
   slidingwindow_add_on_rem_item_cb(this->rle_sw, (ListenerFunc) _on_rle_sw_rem, this);
@@ -235,7 +249,9 @@ void _on_received_packet(FRACTaLFBProducer *this, RcvPacket *packet)
   slidingwindow_add_data(this->rle_sw,  &packet->subflow_seq);
 
   ++this->rcved_packets;
-  this->vector[packet->subflow_seq] = TRUE;
+  this->lost_vector[packet->subflow_seq] = TRUE;
+  this->timestamp_vector[packet->subflow_seq] = timestamp_generator_get_ts(this->ts_generator);
+//  g_print("%hu = %u %u\n", packet->subflow_seq, this->ato_vector[packet->subflow_seq], timestamp_generator_get_ts(this->ts_generator));
   if(!this->initialized){
     this->initialized = TRUE;
     this->begin_seq = this->end_seq = packet->subflow_seq;
@@ -289,6 +305,8 @@ void _on_fb_update(FRACTaLFBProducer *this, ReportProducer* reportproducer)
   _setup_xr_rfc3611_rle_lost(this, reportproducer);
 //  );
 
+  _setup_xr_cc_fb_rle(this, reportproducer);
+
   this->last_fb = _now(this);
   this->rcved_packets = 0;
 done:
@@ -320,9 +338,38 @@ void _setup_xr_rfc3611_rle_lost(FRACTaLFBProducer * this,ReportProducer* reportp
                                        0,
                                        this->begin_seq,
                                        this->end_seq,
-                                       this->vector
+                                       this->lost_vector
                                        );
 
+
+done:
+  return;
+}
+
+void _setup_xr_cc_fb_rle(FRACTaLFBProducer * this,  ReportProducer* reportproducer) {
+  guint32 report_timestamp;
+  guint16 act_seq;
+  guint32 report_count = 1;
+  if(_cmp_seq(this->end_seq, this->begin_seq) <= 0){
+    goto done;
+  }
+  report_timestamp = timestamp_generator_get_ts(this->ts_generator);
+  for (act_seq = this->begin_seq; act_seq != this->end_seq; ++act_seq) {
+    if (!this->lost_vector[act_seq]) {
+      this->ato_vector[act_seq] = 0;
+    } else {
+      this->ato_vector[act_seq] = _delta_ts(this->timestamp_vector[act_seq], report_timestamp);
+    }
+  }
+  report_producer_add_xr_cc_rle_fb(reportproducer,
+      report_count,
+      report_timestamp,
+      this->begin_seq,
+      this->end_seq,
+      this->lost_vector,
+      this->ecn_vector,
+      this->ato_vector
+      );
 
 done:
   return;

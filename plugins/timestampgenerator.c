@@ -105,3 +105,9 @@ guint32 timestamp_generator_get_ts(TimestampGenerator* this) {
   return result;
 }
 
+GstClockTime timestamp_generator_get_time(TimestampGenerator* this, guint32 timestamp) {
+  GstClockTime result;
+  result = (guint64)timestamp * ((gdouble) GST_SECOND / (gdouble) this->clockrate);
+  return result;
+}
+

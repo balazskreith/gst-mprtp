@@ -14,6 +14,7 @@
 #include "sndpackets.h"
 #include "fecenc.h"
 #include "slidingwindow.h"
+#include "timestampgenerator.h"
 
 typedef struct _SndTracker SndTracker;
 typedef struct _SndTrackerClass SndTrackerClass;
@@ -76,6 +77,8 @@ struct _SndTracker
   Notifier*                 on_packet_sent;
   Notifier*                 on_packet_obsolated;
   Notifier*                 on_packet_queued;
+
+  TimestampGenerator*       ts_generator;
 };
 
 
@@ -86,6 +89,7 @@ struct _SndTrackerClass{
 
 GType sndtracker_get_type (void);
 SndTracker *make_sndtracker(SndSubflows* subflows_db);
+TimestampGenerator* sndtracker_get_ts_generator(SndTracker* this);
 void sndtracker_refresh(SndTracker * this);
 
 void sndtracker_packet_sent(SndTracker * this, SndPacket* packet);

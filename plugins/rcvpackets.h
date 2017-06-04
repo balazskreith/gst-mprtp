@@ -40,7 +40,7 @@ struct _RcvPacket
   gboolean             marker;
   guint8               payload_type;
   guint16              abs_seq;
-  guint32              timestamp;
+  guint32              snd_rtp_ts;
   guint32              ssrc;
 
   guint                header_size;
@@ -50,7 +50,11 @@ struct _RcvPacket
   guint8               subflow_id;
 
   Recycle*             destiny;
-  guint32              received_ts;
+  guint32              cc_ts;
+  guint32              rcv_rtp_ts;
+
+//  gint64               abs_rtp_skew;
+//  gint64               subflow_rtp_skew;
 };
 
 

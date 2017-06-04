@@ -59,6 +59,20 @@ typedef struct _GstMPRTCPXRReportSummary{
     gboolean          early_bit;
     guint32           discarded_packets;
   }DiscardedPackets;
+
+  struct{
+    gboolean          processed;
+    guint8            report_count;
+    guint32           report_timestamp;
+    guint16           begin_seq;
+    guint16           end_seq;
+    struct {
+     gboolean lost;
+     gboolean ecn;
+     guint16  dts;
+    }vector[1024];
+    guint vector_length;
+  }CongestionControlFeedback;
 }GstMPRTCPXRReportSummary;
 
 struct _GstMPRTCPReportSummary{

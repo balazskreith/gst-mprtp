@@ -220,7 +220,7 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
           "An enforced delay unifying the delys from different paths.",
           "An enforced delay unifying the delys from different paths.",
           0,
-          1000, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          10000000, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
 
   element_class->change_state =
@@ -301,10 +301,12 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
 
   this->fec_decoder              = make_fecdecoder();
   this->jitterbuffer             = make_jitterbuffer();
-  this->joiner                   = make_stream_joiner();
 
   this->rcvpackets               = make_rcvpackets();
   this->rcvtracker               = make_rcvtracker();
+  this->cc_ts_generator          = g_object_ref(rcvtracker_get_cc_ts_generator(this->rcvtracker));
+  this->rtp_ts_generator         = g_object_ref(rcvtracker_get_rtp_ts_generator(this->rcvtracker));
+  this->joiner                   = make_stream_joiner(this->rtp_ts_generator);
 
   this->controller               = make_rcvctrler(this->rcvtracker, this->subflows, this->on_rtcp_ready);
 
@@ -317,7 +319,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   notifier_add_listener(this->on_recovered_buffer, (ListenerFunc) rcvtracker_on_recovered_buffer, this);
 
   this->packets_in = g_async_queue_new();
-  this->ts_generator = make_timestamp_generator(DEFAULT_TIMESTAMP_GENERATOR_CLOCKRATE);
+
 }
 
 
@@ -332,7 +334,8 @@ gst_mprtpplayouter_finalize (GObject * object)
   g_object_unref (this->sysclock);
   g_object_unref (this->jitterbuffer);
   g_object_unref (this->fec_decoder);
-
+  g_object_unref(this->cc_ts_generator);
+  g_object_unref(this->rtp_ts_generator);
   g_async_queue_unref(this->packets_in);
 
   /* clean up object here */
@@ -386,7 +389,7 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
     case PROP_MAX_JOIN_DELAY:
       guint_value = g_value_get_uint (value);
       g_print("Max Join delay is set to %dms\n", guint_value);
-      stream_joiner_set_max_join_delay(this->joiner, guint_value * GST_MSECOND);
+      stream_joiner_set_max_join_delay_in_ts(this->joiner, guint_value);
       //gst_pad_push_event(this->mprtp_srcpad, gst_event_new_latency(stream_joiner_get_latency(this->joiner)));
       break;
     default:
@@ -440,7 +443,7 @@ gst_mprtpplayouter_src_query (GstPad * sinkpad, GstObject * parent,
           gst_query_parse_latency (query, &live, &min, &max);
 //          min= GST_MSECOND;
 //          min = 0;
-          min = stream_joiner_get_max_join_delay(this->joiner);
+          min = stream_joiner_get_max_join_delay_in_ts(this->joiner);
           max = -1;
           gst_query_set_latency (query, live, min, max);
       }
@@ -670,7 +673,7 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 //
 //
   packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
-  packet->received_ts = timestamp_generator_get_ts(this->ts_generator);
+  packet->cc_ts = timestamp_generator_get_ts(this->cc_ts_generator);
   fecdecoder_push_rcv_packet(this->fec_decoder, rcvpacket_ref(packet));
   THIS_LOCK(this);
 
@@ -802,53 +805,50 @@ static GstBuffer* _get_buffer_for_forwarding(GstMprtpplayouter * this, RcvPacket
   return result;
 }
 
+
 static void
 _render_process_ (GstMprtpplayouter *this)
 {
   guint16 gap_seq;
   RcvPacket* packet;
   GstBuffer* buffer;
-  GstClockTime playout_time, now;
+  guint32 playout_time_in_ts;
 
   while((packet = g_async_queue_timeout_pop(this->packets_in, 1000)) != NULL){
     if(jitterbuffer_is_packet_discarded(this->jitterbuffer, packet)){
 //        g_print("Discarded packet: %hu - %hu - %lu\n", packet->abs_seq, this->jitterbuffer->last_seq, GST_TIME_AS_MSECONDS(this->jitterbuffer->playout_delay));
       //rcvtracker_add_discarded_packet(this->rcvtracker, packet);
-      //Send it immediately?
+      // TODO: decide whether send it immediately?
       continue;
     }
     stream_joiner_push_packet(this->joiner, packet);
   }
 
-  now = playout_time = _now(this);
   while((packet = stream_joiner_pop_packet(this->joiner)) != NULL){
     jitterbuffer_push_packet(this->jitterbuffer, packet);
   }
 
 again:
-  packet = jitterbuffer_pop_packet(this->jitterbuffer, &playout_time);
+  packet = jitterbuffer_pop_packet(this->jitterbuffer);
   if(!packet){
-    if(now < playout_time && playout_time < now + GST_MSECOND){
-      goto again;
-    }
     goto done;
   }
-
+  playout_time_in_ts = jitterbuffer_get_playout_delay_in_ts(this->jitterbuffer);
+playout:
+  if(0 < playout_time_in_ts) {
+//    g_print("%hu (%d) -> playout delay: %lu\n",
+//        packet->abs_seq, packet->subflow_id, timestamp_generator_get_time(this->rtp_ts_generator, playout_time_in_ts) / 1000);
+    g_usleep(timestamp_generator_get_time(this->rtp_ts_generator, playout_time_in_ts) / 1000);
+  }
   if(jitterbuffer_has_repair_request(this->jitterbuffer, &gap_seq)){
-    if(this->repairedbuf){
-      GST_WARNING_OBJECT(this, "A repair packet arrived perhaps later than it was necessary");
-      gst_buffer_unref(this->repairedbuf);
-      this->repairedbuf = NULL;
-    }
-
-    this->repairedbuf = fecdecoder_pop_rtp_packet(this->fec_decoder, gap_seq);
-
-    if(this->repairedbuf){
+    GstBuffer* repairedbuf = fecdecoder_pop_rtp_packet(this->fec_decoder, gap_seq);
+    if(repairedbuf){
 //      g_print("Repaired buffer appeared: %hu\n", gap_seq);
-      notifier_do(this->on_recovered_buffer, this->repairedbuf);
-      gst_pad_push(this->mprtp_srcpad, this->repairedbuf);
+      notifier_do(this->on_recovered_buffer, repairedbuf);
+      gst_print_rtp_buffer(repairedbuf);
+      gst_pad_push(this->mprtp_srcpad, repairedbuf);
+      goto playout;
 //      g_async_queue_push(this->buffers_out, this->repairedbuf);
-      this->repairedbuf = NULL;
     }
   }
 

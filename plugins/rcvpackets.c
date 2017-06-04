@@ -178,7 +178,7 @@ void rcvpacket_print(RcvPacket *packet, printfnc print)
         "ref:          %-10d\n"
         ,
         packet->abs_seq,
-        packet->timestamp,
+        packet->snd_rtp_ts,
         packet->marker,
         packet->payload_type,
         packet->payload_size,
@@ -191,7 +191,7 @@ void rcvpacket_print(RcvPacket *packet, printfnc print)
 void _setup_rcvpacket(RcvPacket* packet, GstRTPBuffer *rtp)
 {
   packet->abs_seq      = gst_rtp_buffer_get_seq(rtp);
-  packet->timestamp    = gst_rtp_buffer_get_timestamp(rtp);
+  packet->snd_rtp_ts    = gst_rtp_buffer_get_timestamp(rtp);
   packet->ssrc         = gst_rtp_buffer_get_ssrc(rtp);
   packet->payload_size = gst_rtp_buffer_get_payload_len(rtp);
   packet->payload_type = gst_rtp_buffer_get_payload_type(rtp);

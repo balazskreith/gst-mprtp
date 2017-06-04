@@ -279,6 +279,55 @@ void report_producer_add_xr_lost_rle(ReportProducer *this,
 }
 
 
+
+void report_producer_add_xr_cc_rle_fb(ReportProducer *this,
+                                          guint8 report_count,
+                                          guint32 report_timestamp,
+                                          guint16 begin_seq,
+                                          guint16 end_seq,
+                                          gboolean* vector_lost,
+                                          gboolean *vector_ecn,
+                                          guint32 *vector_ato)
+{
+  gchar databed[1024];
+  GstRTCPXRCCFeedbackRLEBlock *block;
+  GstRTCPXRChunk chunk;
+  guint16 vector_i;
+  gint chunks_num;
+
+  memset(databed, 0, 1024);
+  memset(&chunk, 0, sizeof(GstRTCPXRChunk));
+  block = (GstRTCPXRCCFeedbackRLEBlock*) databed;
+
+  gst_rtcp_xr_cc_fb_rle_setup(block, report_count, report_timestamp, this->ssrc, begin_seq, end_seq);
+  for(chunks_num = 0, vector_i=begin_seq; vector_i != end_seq; ++vector_i, ++chunks_num) {
+    if (vector_lost[vector_i]) {
+      chunk.CCFeedback.lost = 1;
+    }
+    if (vector_ecn[vector_i]) {
+      chunk.CCFeedback.ecn = 1;
+    }
+    chunk.CCFeedback.ato = vector_ato[vector_i];
+//  g_print("lost: %d | ecn: %d | ato: %hu->%hu\n", chunk.CCFeedback.lost,
+//      chunk.CCFeedback.ecn, vector_ato[vector_i], chunk.CCFeedback.ato);
+    gst_rtcp_xr_chunk_hton_cpy(&block->chunks[chunks_num], &chunk);
+    memset(&chunk, 0, sizeof(GstRTCPXRChunk));
+  }
+//  g_print("chunks num: %d\n", chunks_num);
+  {
+    guint16 block_length;
+    gst_rtcp_xr_block_getdown((GstRTCPXRBlock*) block, NULL, &block_length, NULL);
+    for(; 2 < chunks_num; chunks_num-=2){
+      ++block_length;
+    }
+
+    gst_rtcp_xr_block_change((GstRTCPXRBlock*) block, NULL, &block_length, NULL);
+  }
+
+  _add_xrblock(this, (GstRTCPXRBlock*) block);
+}
+
+
 void report_producer_add_afb(ReportProducer *this,
                                 guint32 media_source_ssrc,
                                 guint32  fci_id,
@@ -367,7 +416,6 @@ GstBuffer *report_producer_end(ReportProducer *this, guint *length)
   if(length) {
     *length = this->length;
   }
-
 
 //  mprtp_logger_open_collector(this->logfile);
 //  gst_printfnc_rtcp(data, mprtp_logger_collect);

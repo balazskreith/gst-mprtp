@@ -86,6 +86,11 @@ _processing_xr_rle_losts_block (
     GstRTCPXRRLELostsRLEBlock * xrb,
     GstMPRTCPReportSummary* summary);
 
+static void
+_processing_xr_cc_rle_fb_block (ReportProcessor *this,
+                        GstRTCPXRCCFeedbackRLEBlock * xrb,
+                        GstMPRTCPReportSummary* summary);
+
 
 static void
 _processing_srblock (
@@ -390,6 +395,40 @@ _processing_xr_rle_losts_block (ReportProcessor *this,
 }
 
 
+
+void
+_processing_xr_cc_rle_fb_block (ReportProcessor *this,
+                        GstRTCPXRCCFeedbackRLEBlock * xrb,
+                        GstMPRTCPReportSummary* summary)
+{
+  guint chunks_num;
+  GstRTCPXRChunk chunk, *src;
+  guint chunk_i;
+
+  summary->XR.LostRLE.processed = TRUE;
+  src = xrb->chunks;
+  summary->XR.LostRLE.vector_length = 0;
+  gst_rtcp_xr_cc_fb_rle_getdown(xrb,
+      &summary->XR.CongestionControlFeedback.report_count,
+      &summary->XR.CongestionControlFeedback.report_timestamp,
+      NULL, //ssrc
+      &summary->XR.CongestionControlFeedback.begin_seq,
+      &summary->XR.CongestionControlFeedback.end_seq
+  );
+  chunks_num = gst_rtcp_xr_cc_fb_rle_block_get_chunks_num(xrb);
+  for(chunk_i = 0; chunk_i < chunks_num; ++chunk_i){
+    gst_rtcp_xr_chunk_ntoh_cpy(&chunk, src + chunk_i);
+    summary->XR.CongestionControlFeedback.vector[chunk_i].dts = chunk.CCFeedback.ato;
+    summary->XR.CongestionControlFeedback.vector[chunk_i].ecn = chunk.CCFeedback.ecn;
+    summary->XR.CongestionControlFeedback.vector[chunk_i].lost = chunk.CCFeedback.lost;
+//    for(bit_i = 0; bit_i < 15 && _cmp_seq(seq, summary->XR.LostRLE.end_seq) <= 0; ++bit_i){
+//      summary->XR.LostRLE.vector[summary->XR.LostRLE.vector_length++] =
+//          0 < (chunk.Bitvector.bitvector & (guint16)(1<<bit_i)) ? TRUE : FALSE;
+//    }
+  }
+}
+
+
 void
 _processing_srblock(ReportProcessor *this,
                 GstRTCPSRBlock * srb,
@@ -436,6 +475,9 @@ again:
     case GST_RTCP_XR_DISCARDED_PACKETS_BLOCK_TYPE_IDENTIFIER:
         _processing_xr_discarded_packets_block(this, (GstRTCPXRDiscardedBlock*) block, summary);
         break;
+    case GST_RTCP_XR_CC_FB_RLE_BLOCK_TYPE_IDENTIFIER:
+      _processing_xr_cc_rle_fb_block(this, (GstRTCPXRCCFeedbackRLEBlock*) block, summary);
+      break;
     default:
       GST_WARNING_OBJECT(this, "Unrecognized XR block to process");
       goto done;

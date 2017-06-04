@@ -57,7 +57,7 @@ struct _GstMprtpscheduler
   GstPad*                       mprtcp_sr_srcpad;
 
   GAsyncQueue*                  sendq;
-  TimestampGenerator*           ts_generator;
+  TimestampGenerator*           cc_ts_generator;
   gboolean                      preroll;
 
   SndSubflows*                  subflows;

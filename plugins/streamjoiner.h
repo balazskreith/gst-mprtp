@@ -35,8 +35,17 @@ struct _StreamJoiner
   Recycle*             frames_recycle;
   guint16              hsn;
   gboolean             hsn_init;
+  TimestampGenerator*  rtp_ts_generator;
 
-  GstClockTime         max_join_delay;
+  guint16              last_abs_seq;
+  guint32              last_snd_rtp_ts;
+  guint32              last_rcv_rtp_ts;
+  guint8               last_subflow_id;
+
+  guint32              max_join_delay_in_ts;
+  guint32              min_join_delay_in_ts;
+  guint32              join_delay_in_ts;
+
 
 };
 struct _StreamJoinerClass{
@@ -44,17 +53,32 @@ struct _StreamJoinerClass{
 };
 
 StreamJoiner*
-make_stream_joiner(void);
+make_stream_joiner(TimestampGenerator* rtp_ts_generator);
 
-GstClockTime
-stream_joiner_get_max_join_delay(
+guint32
+stream_joiner_get_max_join_delay_in_ts(
     StreamJoiner *this);
 
 void
-stream_joiner_set_max_join_delay(
+stream_joiner_set_max_join_delay_in_ts(
     StreamJoiner *this,
-    GstClockTime join_delay
+    guint32 join_delay_in_ts
 );
+
+
+guint32
+stream_joiner_get_min_join_delay_in_ts(
+    StreamJoiner *this);
+
+void
+stream_joiner_set_min_join_delay_in_ts(
+    StreamJoiner *this,
+    guint32 join_delay_in_ts
+);
+
+guint32
+stream_joiner_get_join_delay_in_ts(
+    StreamJoiner *this);
 
 void
 stream_joiner_push_packet(

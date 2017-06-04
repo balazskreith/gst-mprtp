@@ -49,8 +49,8 @@ typedef struct _Subflow{
   gboolean              initialized;
   RcvTrackerSubflowStat stat;
 
-  guint32               last_rcved_ts;
-  guint32               last_rtp_ts;
+  guint32               last_rcv_rtp_ts;
+  guint32               last_snd_rtp_ts;
   gboolean              seq_initialized;
 
   gdouble               path_skew;
@@ -118,10 +118,18 @@ RcvTracker *make_rcvtracker(void)
 {
   RcvTracker* this;
   this = g_object_new(RCVTRACKER_TYPE, NULL);
-
+  this->cc_ts_generator = make_timestamp_generator(DEFAULT_CC_TIMESTAMP_GENERATOR_CLOCKRATE);
+  this->rtp_ts_generator = make_timestamp_generator(DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE);
   return this;
 }
 
+TimestampGenerator* rcvtracker_get_cc_ts_generator(RcvTracker* this) {
+  return this->cc_ts_generator;
+}
+
+TimestampGenerator* rcvtracker_get_rtp_ts_generator(RcvTracker* this) {
+  return this->rtp_ts_generator;
+}
 
 void
 rcvtracker_finalize (GObject * object)
@@ -132,6 +140,8 @@ rcvtracker_finalize (GObject * object)
   g_object_unref(this->on_discarded_packet);
   g_object_unref(this->on_received_packet);
   g_object_unref(this->on_lost_packet);
+  g_object_unref(this->cc_ts_generator);
+  g_object_unref(this->rtp_ts_generator);
   _priv_dtor(this->priv);
 }
 
@@ -215,18 +225,16 @@ static void _subflow_add_packet(RcvTracker * this, Subflow *subflow, RcvPacket* 
     subflow->stat.highest_seq = packet->subflow_seq;
     subflow->stat.total_received_packets = 1;
     subflow->stat.total_received_bytes = packet->payload_size;
-    subflow->last_rcved_ts = packet->received_ts;
-    subflow->last_rtp_ts = packet->timestamp;
+    subflow->last_rcv_rtp_ts = packet->rcv_rtp_ts;
+    subflow->last_snd_rtp_ts = packet->snd_rtp_ts;
     subflow->seq_initialized = TRUE;
     goto done;
   }
 
-  //normal jitter calculation for regular rtcp reports
-  skew = (((gint64)packet->received_ts - (gint64)subflow->last_rcved_ts));
-  skew = (gint64)_delta_ts(subflow->last_rcved_ts, packet->received_ts) - (gint64)_delta_ts(subflow->last_rtp_ts, packet->timestamp);
+  skew = (gint64)_delta_ts(subflow->last_rcv_rtp_ts, packet->rcv_rtp_ts) - (gint64)_delta_ts(subflow->last_snd_rtp_ts, packet->snd_rtp_ts);
   subflow->stat.jitter += ((skew < 0?-1*skew:skew) - subflow->stat.jitter) / 16;
-  subflow->last_rcved_ts = packet->received_ts; //TODO: this is a chaos if the generator clock rate not match to the rtp packet clock rate
-  subflow->last_rtp_ts = packet->timestamp;
+  subflow->last_rcv_rtp_ts = packet->rcv_rtp_ts; //TODO: this is a chaos if the generator clock rate not match to the rtp packet clock rate
+  subflow->last_snd_rtp_ts = packet->snd_rtp_ts;
   subflow->stat.cycle_num = (++subflow->stat.total_received_packets)>>16;
   subflow->stat.total_received_bytes += packet->payload_size;
 
@@ -254,11 +262,12 @@ done:
 
 void rcvtracker_add_packet(RcvTracker * this, RcvPacket* packet)
 {
+  packet->rcv_rtp_ts = timestamp_generator_get_ts(this->rtp_ts_generator);
+
   if(packet->subflow_id != 0){
     Subflow* subflow = _get_subflow(this, packet->subflow_id);
     _subflow_add_packet(this, subflow, packet);
   }
-
   notifier_do(this->on_received_packet, packet);
 }
 

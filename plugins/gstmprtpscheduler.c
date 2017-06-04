@@ -425,8 +425,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->fec_responses = make_messenger(sizeof(FECEncoderResponse*));
 
   this->abs_time_ext_header_id   = ABS_TIME_DEFAULT_EXTENSION_HEADER_ID;
-  this->ts_generator             = make_timestamp_generator(DEFAULT_TIMESTAMP_GENERATOR_CLOCKRATE);
-
+  this->cc_ts_generator             = g_object_ref(sndtracker_get_ts_generator(this->sndtracker));
 
 }
 
@@ -465,7 +464,7 @@ gst_mprtpscheduler_finalize (GObject * object)
   g_object_unref (this->splitter);
   g_object_unref (this->fec_encoder);
   g_object_unref (this->sndqueue);
-
+  g_object_unref (this->cc_ts_generator);
   g_object_unref(this->emit_msger);
 
   G_OBJECT_CLASS (gst_mprtpscheduler_parent_class)->finalize (object);
@@ -936,8 +935,8 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndPacket *packet)
 //  }
 //  PROFILING("_mprtpscheduler_send_packet: gst_pad_push rtpbuffer",
   gst_pad_push(this->mprtp_srcpad, buffer);
-  //TODO: should goes to a sent process, but we stop adding the abs_time_ext_header
-  packet->sent_ts = timestamp_generator_get_ts(this->ts_generator);
+  //TODO: should goes to a sent process, but we stop ading the abs_time_ext_header
+  packet->sent_ts = timestamp_generator_get_ts(this->cc_ts_generator);
 //  g_async_queue_push(this->sendq, buffer);
 //  );
 

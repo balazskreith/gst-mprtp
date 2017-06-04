@@ -245,6 +245,18 @@ typedef struct PACKED _GstRTCPXRDiscardedBlock
   guint32 discarded_bytes_or_packets;
 } GstRTCPXRDiscardedBlock;
 
+typedef struct PACKED _GstRTCPXRCCFeedbackRLEBlock
+{  //RTCP extended report congestion control feedback message
+  guint8 block_type;
+  guint8 report_count;
+  guint16 block_length;
+  guint32 timestamp;
+  guint32 ssrc;
+  guint16 begin_seq;
+  guint16 end_seq;
+  GstRTCPXRChunk chunks[2];
+} GstRTCPXRCCFeedbackRLEBlock;
+
 typedef union PACKED _GstRTCPXRBlock
 {
   struct{
@@ -298,17 +310,6 @@ typedef struct PACKED _GstRTCPAFB_REPS{
   #endif
 }GstRTCPAFB_REPS;
 
-typedef struct PACKED _GstRTCPXRCCFeedbackRLEBlock
-{  //RTCP extended riport Discarded bytes
-  guint8 block_type;
-  guint8 report_count;
-  guint16 block_length;
-  guint32 timestamp;
-  guint32 ssrc;
-  guint16 begin_seq;
-  guint16 end_seq;
-  GstRTCPXRChunk chunks[2];
-} GstRTCPXRCCFeedbackRLEBlock;
 
 /*MPRTCP struct polymorphism*/
 

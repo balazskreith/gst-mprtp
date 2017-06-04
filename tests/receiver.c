@@ -386,7 +386,7 @@ GstElement* _make_mprtp_fractal_controller(Receiver* this, PlayouterParams* play
       "controlling-mode", 2,
       "rtcp-interval-type", 2,
       "max-repair-delay", 10,
-      "max-join-delay", 1 < subflows_num ? 100 : 0,
+      "max-join-delay", 1 < subflows_num ? 18000 : 0,
       NULL
   );
 

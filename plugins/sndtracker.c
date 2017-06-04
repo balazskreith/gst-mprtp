@@ -115,6 +115,7 @@ sndtracker_finalize (GObject * object)
   g_object_unref(this->on_packet_sent);
   g_object_unref(this->on_packet_obsolated);
   g_object_unref(this->on_packet_queued);
+  g_object_unref(this->ts_generator);
 
   g_object_unref(this->subflows_db);
   g_object_unref(this->sysclock);
@@ -135,6 +136,7 @@ sndtracker_init (SndTracker * this)
   this->on_packet_sent      = make_notifier("SndTracker: on-packet-sent");
   this->on_packet_obsolated = make_notifier("SndTracker: on-packet-obsolated");
   this->on_packet_queued    = make_notifier("SndTracker: on-packet-queued");
+  this->ts_generator        = make_timestamp_generator(DEFAULT_CC_TIMESTAMP_GENERATOR_CLOCKRATE);
 
   slidingwindow_add_on_rem_item_cb(this->sent_sw, (ListenerFunc) _sent_packets_rem_pipe, this);
   slidingwindow_add_on_rem_item_cb(this->fec_sw, (ListenerFunc) _fec_rem_pipe, this);
@@ -151,6 +153,10 @@ SndTracker *make_sndtracker(SndSubflows* subflows_db)
   sndsubflows_add_on_subflow_detached_cb(this->subflows_db, (ListenerFunc) _on_subflow_detached, this);
 
   return this;
+}
+
+TimestampGenerator* sndtracker_get_ts_generator(SndTracker* this) {
+  return this->ts_generator;
 }
 
 void sndtracker_refresh(SndTracker * this)

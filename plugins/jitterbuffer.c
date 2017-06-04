@@ -40,10 +40,12 @@ G_DEFINE_TYPE (JitterBuffer, jitterbuffer, G_TYPE_OBJECT);
 
 typedef struct{
   SlidingWindow* packet_skews;
-  gdouble        path_skew;
-  gint64         last_rcved_ts;
-  guint32        last_packet_ts;
+  gdouble        path_skew_in_ts;
+  guint32        last_rcv_rtp_ts;
+  guint32        last_snd_rtp_ts;
 }Subflow;
+
+static void _refresh_playout_delay(JitterBuffer* this, RcvPacket* packet);
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
@@ -79,43 +81,45 @@ static gint _cmp_rcvpacket_abs_seq(RcvPacket *a, RcvPacket* b, gpointer udata)
 }
 
 //
-static gint
-_cmp_ts (guint32 x, guint32 y)
-{
-  if(x == y) return 0;
-  if(x < y && y - x < 2147483648) return -1;
-  if(x > y && x - y > 2147483648) return -1;
-  if(x < y && y - x > 2147483648) return 1;
-  if(x > y && x - y < 2147483648) return 1;
-  return 0;
-}
+//static gint
+//_cmp_ts (guint32 x, guint32 y)
+//{
+//  if(x == y) return 0;
+//  if(x < y && y - x < 2147483648) return -1;
+//  if(x > y && x - y > 2147483648) return -1;
+//  if(x < y && y - x > 2147483648) return 1;
+//  if(x > y && x - y < 2147483648) return 1;
+//  return 0;
+//}
 //
 
 #define _subflow(this, id) ((Subflow*)(((Subflow*)this->subflows) + id))
 
 static void _on_path_skew_calculated(Subflow *subflow, gint64* skew)
 {
-  gint64 path_skew;
-  path_skew = CONSTRAIN((gint64)-50 * (gint64)GST_MSECOND, 50 * GST_MSECOND, *skew);
+  gint64 path_skew_in_ts;
+  gint64 min_skew_in_ts = -1 * (gint64) (DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE / 10);
+  gint64 max_skew_in_ts = (gint64) (DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE / 10);
+  path_skew_in_ts = CONSTRAIN(min_skew_in_ts, max_skew_in_ts, *skew);
 //g_print("%ld\n", skew_median);
-  if(subflow->path_skew == 0.){
-    subflow->path_skew = path_skew;
+  if(subflow->path_skew_in_ts == 0.){
+    subflow->path_skew_in_ts = path_skew_in_ts;
   }else{
-    subflow->path_skew = subflow->path_skew * .99 + .01 * path_skew;
+    subflow->path_skew_in_ts = subflow->path_skew_in_ts * .99 + .01 * path_skew_in_ts;
   }
 }
 
 static void _on_path_minmax_skew_calculated(JitterBuffer *this, swminmaxstat_t *stat)
 {
   gdouble max;
-  max = *(gdouble*)stat->max;
+  max = MAX(0, *(gdouble*)stat->max);
 
-  if(this->playout_delay == 0.){
-    this->playout_delay = max;
+  if(this->playout_delay_in_ts == 0.){
+    this->playout_delay_in_ts = max;
   }else{
-    this->playout_delay = (this->playout_delay * 255 + max) / 256;
+    this->playout_delay_in_ts = (this->playout_delay_in_ts * 255 + max) / 256;
   }
-  this->playout_delay = CONSTRAIN(0, GST_SECOND, this->playout_delay);
+//  this->playout_delay_in_ts = CONSTRAIN(0, GST_SECOND, this->playout_delay_in_ts);
 }
 
 //----------------------------------------------------------------------
@@ -156,7 +160,6 @@ jitterbuffer_init (JitterBuffer * this)
   this->sysclock   = gst_system_clock_obtain ();
   this->made       = _now(this);
   this->playoutq   = g_queue_new();
-  this->clock_rate = 90000;
 
   this->subflows   = g_malloc0(sizeof(Subflow) * 256);
   this->path_skews = make_slidingwindow_double(256, 0);
@@ -175,10 +178,6 @@ make_jitterbuffer(void)
   return result;
 }
 
-void jitterbuffer_set_clock_rate(JitterBuffer *this, gint32 clock_rate)
-{
-  this->clock_rate = clock_rate;
-}
 
 gboolean jitterbuffer_is_packet_discarded(JitterBuffer* this, RcvPacket* packet)
 {
@@ -191,53 +190,7 @@ gboolean jitterbuffer_is_packet_discarded(JitterBuffer* this, RcvPacket* packet)
 
 void jitterbuffer_push_packet(JitterBuffer *this, RcvPacket* packet)
 {
-  Subflow* subflow;
-  gint64 skew, margin;
   g_queue_insert_sorted(this->playoutq, packet, (GCompareDataFunc) _cmp_rcvpacket_abs_seq, NULL);
-  if(!packet->subflow_id){
-    goto done;
-  }
-  subflow = _subflow(this, packet->subflow_id);
-
-  if(!subflow->last_rcved_ts){
-    subflow->last_rcved_ts = packet->received_ts;
-    subflow->last_packet_ts = packet->timestamp;
-    subflow->packet_skews = make_slidingwindow_int64(100, 2 * GST_SECOND);
-    slidingwindow_add_plugin(subflow->packet_skews,
-        make_swpercentile2(50,
-            (GCompareFunc)bintree3cmp_int64,
-            (ListenerFunc)_on_path_skew_calculated,
-            subflow,
-            (SWExtractorFunc) swpercentile2_self_extractor,
-            (SWMeanCalcer) swpercentile2_prefer_right_selector,
-            (SWEstimator) swpercentile2_prefer_right_selector)
-        );
-    goto done;
-  }
-
-
-  margin = 50 * GST_MSECOND;
-  skew = (((gint64)packet->received_ts - (gint64)subflow->last_rcved_ts));
-  skew = (gint64)_delta_ts(subflow->last_rcved_ts, packet->received_ts) - (gint64)_delta_ts(subflow->last_packet_ts, packet->timestamp);
-  skew = CONSTRAIN(-1 * margin, margin, skew);
-  slidingwindow_add_data(subflow->packet_skews, &skew);
-  subflow->last_rcved_ts = packet->received_ts;
-  subflow->last_packet_ts = packet->timestamp;
-
-  if(!this->last_ts){
-    this->last_ts = packet->timestamp;
-  }
-
-  if(_cmp_ts(packet->timestamp, this->last_ts) <= 0){
-    goto done;
-  }
-  this->last_ts = packet->timestamp;
-
-  slidingwindow_add_data(this->path_skews, &subflow->path_skew);
-  this->playout_time = _now(this) + this->playout_delay;
-
-done:
-  return;
 }
 
 gboolean jitterbuffer_has_repair_request(JitterBuffer* this, guint16 *gap_seq)
@@ -250,16 +203,22 @@ gboolean jitterbuffer_has_repair_request(JitterBuffer* this, guint16 *gap_seq)
   return TRUE;
 }
 
-RcvPacket* jitterbuffer_pop_packet(JitterBuffer *this, GstClockTime *playout_time)
+guint32 jitterbuffer_get_playout_delay_in_ts(JitterBuffer* this) {
+  return this->playout_delay_in_ts;
+}
+
+RcvPacket* jitterbuffer_pop_packet(JitterBuffer *this)
 {
   RcvPacket* packet = NULL;
 
   if(g_queue_is_empty(this->playoutq)){
-    *playout_time = 0;
     goto done;
   }
 
   packet = g_queue_peek_head(this->playoutq);
+
+  _refresh_playout_delay(this, packet);
+
   if(!this->last_seq_init){
     this->last_seq = packet->abs_seq;
     this->last_seq_init = TRUE;
@@ -267,25 +226,49 @@ RcvPacket* jitterbuffer_pop_packet(JitterBuffer *this, GstClockTime *playout_tim
     goto done;
   }
 
-  if(0 < _cmp_seq(this->last_seq, packet->abs_seq)){
-    packet = g_queue_pop_head(this->playoutq);
-    goto done;
-  }
-
-  if(_now(this) < this->playout_time){
-    *playout_time = this->playout_time;
-    packet = NULL;
-    goto done;
-  }
-
   packet = g_queue_pop_head(this->playoutq);
-  if((guint16)(this->last_seq + 2) == packet->abs_seq){
+  if((guint16)(this->last_seq + 2) == packet->abs_seq) {
     this->gap_seq = this->last_seq + 1;
   }
   this->last_seq = packet->abs_seq;
 done:
   return packet;
+}
 
+void _refresh_playout_delay(JitterBuffer* this, RcvPacket* packet) {
+  Subflow* subflow;
+  gint64 skew, margin;
+
+  if(!packet->subflow_id){
+    return;
+  }
+  subflow = _subflow(this, packet->subflow_id);
+
+  if(!subflow->last_rcv_rtp_ts){
+    subflow->last_rcv_rtp_ts = packet->rcv_rtp_ts;
+    subflow->last_snd_rtp_ts = packet->snd_rtp_ts;
+    subflow->packet_skews = make_slidingwindow_int64(100, 2 * GST_SECOND);
+    slidingwindow_add_plugin(subflow->packet_skews,
+        make_swpercentile2(50,
+            (GCompareFunc)bintree3cmp_int64,
+            (ListenerFunc)_on_path_skew_calculated,
+            subflow,
+            (SWExtractorFunc) swpercentile2_self_extractor,
+            (SWMeanCalcer) swpercentile2_prefer_right_selector,
+            (SWEstimator) swpercentile2_prefer_right_selector)
+        );
+    return;
+  }
+
+
+  margin = DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE / 100;
+  skew = (gint64)_delta_ts(subflow->last_rcv_rtp_ts, packet->rcv_rtp_ts) - (gint64)_delta_ts(subflow->last_snd_rtp_ts, packet->snd_rtp_ts);
+  skew = CONSTRAIN(-1 * margin, margin, skew);
+  slidingwindow_add_data(subflow->packet_skews, &skew);
+  subflow->last_rcv_rtp_ts = packet->rcv_rtp_ts;
+  subflow->last_snd_rtp_ts = packet->snd_rtp_ts;
+
+  slidingwindow_add_data(this->path_skews, &subflow->path_skew_in_ts);
 }
 
 

@@ -39,7 +39,10 @@ struct _FRACTaLFBProducer
 
   guint16                  begin_seq;
   guint16                  end_seq;
-  gboolean*                vector;
+  gboolean*                lost_vector;
+  gboolean*                ecn_vector;
+  guint32*                 timestamp_vector;
+  guint32*                 ato_vector;
 
   guint64                  prev_snd;
   guint16                  prev_seq;
@@ -48,6 +51,7 @@ struct _FRACTaLFBProducer
   SlidingWindow*           rle_sw;
   SlidingWindow*           skew_sw;
   Recycle*                 skew_recycle;
+  TimestampGenerator*      ts_generator;
 
   guint64                  raise;
   guint64                  fall;

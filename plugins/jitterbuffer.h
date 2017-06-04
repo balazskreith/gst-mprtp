@@ -41,13 +41,13 @@ struct _JitterBuffer
 
   guint32              last_ts;
 
-  gint32               clock_rate;
+//  gint32               clock_rate;
   GQueue*              playoutq;
 
   gint32               gap_seq;
 
-  GstClockTime         playout_delay;
-  GstClockTime         playout_time;
+  guint32              playout_delay_in_ts;
+//  GstClockTime         playout_time;
   SlidingWindow*       path_skews;
   gpointer             subflows;
 
@@ -58,11 +58,6 @@ struct _JitterBufferClass{
 
 JitterBuffer*
 make_jitterbuffer(void);
-
-void jitterbuffer_set_clock_rate(
-    JitterBuffer *this,
-    gint32 clock_rate
-    );
 
 gboolean
 jitterbuffer_is_packet_discarded(
@@ -79,10 +74,13 @@ jitterbuffer_has_repair_request(
     JitterBuffer *this,
     guint16 *gap_seq);
 
+guint32
+jitterbuffer_get_playout_delay_in_ts(
+    JitterBuffer* this);
+
 RcvPacket*
 jitterbuffer_pop_packet(
-    JitterBuffer *this,
-    GstClockTime *playout_time);
+    JitterBuffer *this);
 
 GType
 jitterbuffer_get_type (void);

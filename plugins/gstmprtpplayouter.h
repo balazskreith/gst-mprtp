@@ -79,7 +79,8 @@ struct _GstMprtpplayouter
   RcvPackets*     rcvpackets;
   RcvTracker*     rcvtracker;
   Notifier*       on_rtcp_ready;
-  TimestampGenerator* ts_generator;
+  TimestampGenerator* cc_ts_generator;
+  TimestampGenerator* rtp_ts_generator;
 
   guint8          fec_payload_type;
 
@@ -94,7 +95,6 @@ struct _GstMprtpplayouter
 
   GstClockTime    max_repair_delay_in_ms;
 
-  GstBuffer*      repairedbuf;
   Notifier*       on_recovered_buffer;
 
   GAsyncQueue*    packets_in;

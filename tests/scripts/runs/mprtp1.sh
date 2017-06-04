@@ -25,8 +25,15 @@ fi
 
 echo "The selected OWD is $OWD_SND"
 
+sudo ip netns exec ns_mid tc qdisc change dev veth2 root handle 1: netem delay 50ms 0ms
+sudo ip netns exec ns_mid tc qdisc change dev veth6 root handle 1: netem delay 150ms 0ms
+
+
 sudo ip netns exec ns_mid tc qdisc change dev veth2 root handle 1: netem delay "$OWD_SND"ms "$JITTER"ms
 sudo ip netns exec ns_mid tc qdisc change dev veth1 root handle 1: netem delay "$OWD_RCV"ms "$JITTER"ms
+sudo ip netns exec ns_mid tc qdisc change dev veth6 root handle 1: netem delay "$OWD_SND"ms "$JITTER"ms
+sudo ip netns exec ns_mid tc qdisc change dev veth5 root handle 1: netem delay "$OWD_RCV"ms "$JITTER"ms
+
 
 echo "./bcex $CONFDIR/mprtp1.cmds " > $LOGSDIR"/ntrt.sh"
 echo "./bwcsv $LOGSDIR/pathbw_1.csv 4 1000 200 2500 200 600 400 1000 400" >> $LOGSDIR"/ntrt.sh"

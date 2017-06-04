@@ -74,6 +74,15 @@ void report_producer_add_xr_lost_rle(ReportProducer *this,
                                           guint16 end_seq,
                                           gboolean *vector);
 
+void report_producer_add_xr_cc_rle_fb(ReportProducer *this,
+                                          guint8 report_count,
+                                          guint32 report_timestamp,
+                                          guint16 begin_seq,
+                                          guint16 end_seq,
+                                          gboolean* vector_lost,
+                                          gboolean *vector_ecn,
+                                          guint32 *vector_ato);
+
 void report_producer_add_xr_discarded_bytes(ReportProducer *this,
                                     guint8 interval_metric_flag,
                                     gboolean early_bit,

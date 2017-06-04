@@ -12,6 +12,7 @@
 #include <gst/gst.h>
 #include "rcvpackets.h"
 #include "mprtputils.h"
+#include "timestampgenerator.h"
 
 typedef struct _RcvTracker RcvTracker;
 typedef struct _RcvTrackerClass RcvTrackerClass;
@@ -48,10 +49,12 @@ struct _RcvTracker
   GstClock*                 sysclock;
   RcvTrackerStat            stat;
   GSList*                   joined_subflows;
-
+  TimestampGenerator*       cc_ts_generator;
+  TimestampGenerator*       rtp_ts_generator;
   Notifier*                 on_received_packet;
   Notifier*                 on_discarded_packet;
   Notifier*                 on_lost_packet;
+
 
   gpointer                  priv;
 };
@@ -64,6 +67,8 @@ struct _RcvTrackerClass{
 
 GType rcvtracker_get_type (void);
 RcvTracker *make_rcvtracker(void);
+TimestampGenerator* rcvtracker_get_cc_ts_generator(RcvTracker* this);
+TimestampGenerator* rcvtracker_get_rtp_ts_generator(RcvTracker* this);
 void rcvtracker_deinit_subflow(RcvTracker *this, guint8 subflow_id);
 void rcvtracker_init_subflow(RcvTracker *this, guint8 subflow_id);
 void rcvtracker_refresh(RcvTracker * this);

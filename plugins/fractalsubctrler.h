@@ -65,13 +65,12 @@ struct _FRACTaLSubController
 
   gdouble                   est_rr;
 
-
   guint64                   congested_drift;
   gdouble                   congested_lost;
 
   gint32                    est_capacity;
-  gdouble                   drift_a;
-  gdouble                   lost_a;
+//  gdouble                   drift_a;
+//  gdouble                   lost_a;
   GstClockTime              deflate_time;
 
   guint                     monitoring_interval;
@@ -84,7 +83,7 @@ struct _FRACTaLSubController
   GstClockTime              increasing_sr_reached;
   gint32                    increasement;
 
-  gint64                    drift_th;
+  gint64                    skew_th;
   gdouble                   FL_th;
   gboolean                  reducing_approved;
   GstClockTime              reducing_sr_reached;

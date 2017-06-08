@@ -74,6 +74,12 @@ G_DEFINE_TYPE (FRACTaLSubController, fractalsubctrler, G_TYPE_OBJECT);
 //determines the maximum monitoring interval
 #define MAX_MONITORING_INTERVAL 14
 
+//determines the maximum value for the evaluation window interval in s
+#define MAX_EVALUATION_WINDOW_INTERVAL 0.5
+
+//determines the minimum value for the evaluation window interval in s
+#define MIN_EVALUATION_WINDOW_INTERVAL 0.1
+
 //determines the maximal treshold for fractional lost
 #define MAX_FL_TRESHOLD 0.2
 
@@ -116,6 +122,8 @@ struct _Parameters{
   gdouble             min_pacing_bitrate;
 
   gdouble             max_FL_treshold;
+  gdouble             min_evaluation_window_interval;
+  gdouble             max_evaluation_window_interval;
 
 };
 
@@ -142,6 +150,9 @@ struct _Parameters{
 #define _mon_min_int(this)            _priv(this)->min_monitoring_interval
 #define _mon_max_int(this)            _priv(this)->max_monitoring_interval
 #define _max_FL_th(this)              _priv(this)->max_FL_treshold
+
+#define _min_ewi(this)                _priv(this)->min_evaluation_window_interval
+#define _max_ewi(this)                _priv(this)->max_evaluation_window_interval
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
@@ -262,10 +273,6 @@ _calculate_est_capacity(
     FRACTaLSubController *this);
 
 static void
-_logging(
-    FRACTaLSubController* this);
-
-static void
 _execute_stage(
     FRACTaLSubController *this);
 
@@ -334,6 +341,9 @@ fractalsubctrler_init (FRACTaLSubController * this)
   _priv(this)->min_monitoring_interval          = MIN_MONITORING_INTERVAL;
   _priv(this)->max_monitoring_interval          = MAX_MONITORING_INTERVAL;
   _priv(this)->max_FL_treshold                  = MAX_FL_TRESHOLD;
+
+  _priv(this)->min_evaluation_window_interval   = MIN_EVALUATION_WINDOW_INTERVAL;
+  _priv(this)->max_evaluation_window_interval   = MAX_EVALUATION_WINDOW_INTERVAL;
 }
 
 FRACTaLSubController *make_fractalsubctrler(SndTracker *sndtracker, SndSubflow *subflow)
@@ -354,6 +364,9 @@ FRACTaLSubController *make_fractalsubctrler(SndTracker *sndtracker, SndSubflow *
       (ListenerFunc) _on_rtp_sending,
       (ListenerFilterFunc) _rtp_sending_filter,
       this);
+
+  fractalfbprocessor_set_evaluation_window_margins(this->fbprocessor,
+      _min_ewi(this) * GST_SECOND, _max_ewi(this) * GST_SECOND);
 
   return this;
 }
@@ -382,7 +395,7 @@ void _on_rtp_sending(FRACTaLSubController* this, SndPacket *packet)
   gdouble srtt_in_s;
 
   ++this->sent_packets;
-  if(!this->enabled || this->stat->measurements_num < 10){
+  if(!this->enabled || this->stat->reference_num < 10){
     return;
   }
 
@@ -407,22 +420,24 @@ static void _stat_print(FRACTaLSubController *this)
 {
   FRACTaLStat *stat = this->stat;
   g_print("%d:MsN:%d - %1.1f|"
-          "BiF:%-3d (%-3d)->%-3.0f|%-3d|"
+          "BiF:%-3d->%-3.0f|"
+          "psi: %-1.1f|%-4d|"
           "FEC:%-4d|SR:%-4d|RR:%-4d|%-4d|%-3d|"
           "Tr:%-4d|Btl:%-4d|IP:%-4d|"
           "%d-%d-%d-%d|"
-          "D:%-3lu+%-3lu<-%-3lu|%-1.2f|%1.2f|"
+          "D:%-3u+%-3u<-%-3u|"
           "RTPQ:%-1.3f|"
-          "L:%-1.2f(%-1.2f)<-%-1.2f|%1.2f|"
+          "L:%-1.2f(%-1.2f)<-%-1.2f|"
           "S:%1.2f|%1.2f|%d|%1.2f\n",
       this->subflow->id,
-      stat->measurements_num,
+      stat->reference_num,
       GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000.,
 
       stat->bytes_in_flight / 125,
-      stat->BiF_80th / 125,
       this->cwnd / 1000.,
-      stat->received_bytes_in_srtt / 125,
+
+      stat->psi,
+      stat->extra_bytes,
 
       stat->fec_bitrate / 1000,
       (gint32)(stat->sr_avg / 1000),
@@ -439,18 +454,15 @@ static void _stat_print(FRACTaLSubController *this)
       this->monitoring_approved,
       this->increasing_approved,
 
-      (GstClockTime)GST_TIME_AS_MSECONDS(_stat(this)->drift_80th),
-      (GstClockTime)GST_TIME_AS_MSECONDS(_stat(this)->drift_std),
-      GST_TIME_AS_MSECONDS(_stat(this)->last_drift),
-      _stat(this)->drift_corr,
-      this->drift_a,
+      (guint32)_stat(this)->skew_80th,
+      (guint32)_stat(this)->skew_std,
+      _stat(this)->last_skew,
 
       _stat(this)->rtpq_delay,
 
-      stat->lost_avg,
-      stat->lost_std,
+      stat->fl_avg,
+      stat->fl_std,
       stat->fraction_lost,
-      this->lost_a,
 
       _scale_t(this),
       _drift_corr(this),
@@ -484,11 +496,9 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
     goto done;
   }
 
-  DISABLE_LINE _logging(this);
-
   fractalfbprocessor_time_update(this->fbprocessor);
 
-  if(_stat(this)->measurements_num < 10){
+  if(_stat(this)->reference_num < 10){
     this->bottleneck_point = this->target_bitrate = _stat(this)->sender_bitrate;
     goto done;
   }
@@ -514,7 +524,7 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
   }
 //  this->cwnd = MAX(_min_pacing_bitrate(this), this->cwnd);
 
-  DISABLE_LINE _stat_print(this);
+  _stat_print(this);
 
 done:
   return;
@@ -525,7 +535,7 @@ static gboolean _approve_measurement(FRACTaLSubController *this){
   if(_subflow(this)->state == SNDSUBFLOW_STATE_OVERUSED){
     goto done;
   }
-  if(_stat(this)->drift_80th + _stat(this)->drift_std * _sensitivity(this, 2.0, 5.0) < _stat(this)->last_drift){
+  if(_stat(this)->skew_80th + _stat(this)->skew_std * _sensitivity(this, 2.0, 5.0) < _stat(this)->last_skew){
     goto done;
   }
   approving = TRUE;
@@ -551,31 +561,12 @@ void fractalsubctrler_report_update(
   fractalfbprocessor_report_update(this->fbprocessor, summary);
   this->est_rr       = _calculate_est_rr(this);
   this->est_capacity = _calculate_est_capacity(this);
-  if(this->subflow->state == SNDSUBFLOW_STATE_OVERUSED){
-    this->drift_a = (gdouble)_stat(this)->last_drift / (gdouble)this->congested_drift;
-  }else{
-    this->drift_a = 0.;
-  }
-
-  if(this->subflow->state == SNDSUBFLOW_STATE_OVERUSED){
-    if(0. < this->congested_lost){
-      this->lost_a = _stat(this)->fraction_lost / this->congested_lost;
-    }else if(0. < _stat(this)->fraction_lost){
-      this->congested_lost = _stat(this)->fraction_lost;
-      this->lost_a = 1.;
-    }else{
-      this->lost_a = 0.;
-    }
-  }else{
-    this->lost_a = 0.;
-  }
-
 
   DISABLE_LINE _stat_print(this);
 //  if(this->subflow->id == 1) _stat_print(this);
 
   this->approve_measurement = FALSE;
-  if(10 < _stat(this)->measurements_num){
+  if(10 < _stat(this)->reference_num){
     _execute_stage(this);
   }else{
     this->obligated_approvement = _now(this);
@@ -583,7 +574,7 @@ void fractalsubctrler_report_update(
   }
 
   if(_approve_measurement(this)){
-    fractalfbprocessor_approve_measurement(this->fbprocessor);
+    fractalfbprocessor_approve_feedback(this->fbprocessor);
     this->last_approved = _now(this);
   }
 
@@ -598,10 +589,10 @@ static gdouble _sensitivity( FRACTaLSubController *this, gdouble at_bottleneck, 
 }
 
 gdouble _drift_corr(FRACTaLSubController *this){
-  if(!_stat(this)->last_drift){
+  if(!_stat(this)->last_skew){
       return 0.;
     }
-    return (gdouble) (_stat(this)->last_drift) / (gdouble)(_stat(this)->last_drift + this->drift_th);
+    return (gdouble) (_stat(this)->last_skew) / (gdouble)(_stat(this)->last_skew + this->skew_th);
 }
 
 
@@ -614,7 +605,7 @@ gdouble _drift_corr(FRACTaLSubController *this){
 
 static gboolean _congestion(FRACTaLSubController *this)
 {
-  this->FL_th = CONSTRAIN(.0001, _max_FL_th(this), _stat(this)->lost_avg + _stat(this)->lost_std * 2);
+  this->FL_th = CONSTRAIN(.0001, _max_FL_th(this), _stat(this)->fl_avg + _stat(this)->fl_std * 2);
   return this->FL_th < _stat(this)->fraction_lost;
 }
 
@@ -625,35 +616,42 @@ static gboolean _distortion(FRACTaLSubController *this)
   }
 
   {
-    gdouble std_scaling = _sensitivity(this, 3.0, 2.0);
+    gdouble std_scaling = _sensitivity(this, 3.0, 1.5);
     gdouble avg_scaling = _sensitivity(this, 1.0, 2.0);
 //    this->drit_th = _stat(this)->drift_avg + CONSTRAIN(_sensitivity(this, 200.0, 200.0) * GST_MSECOND, 400 * GST_MSECOND, _stat(this)->drift_std * scaling);
-    this->drift_th = avg_scaling * _stat(this)->drift_80th + CONSTRAIN(30 * GST_MSECOND, 5000 * GST_MSECOND, _stat(this)->drift_std * std_scaling);
+    this->skew_th = avg_scaling * _stat(this)->skew_80th + CONSTRAIN(100, 4000, _stat(this)->skew_std * std_scaling);
   }
-//  return FALSE;
-  return this->drift_th < _stat(this)->last_drift;
+  if (_stat(this)->last_skew < this->skew_th) {
+    return FALSE;
+  }
+
+  {
+    gdouble ratio = (gdouble)_stat(this)->skew_80th / (gdouble)(_stat(this)->skew_80th + _stat(this)->skew_std);
+    gdouble psi_th = 1 + MIN(.5, ratio);
+    return psi_th < _stat(this)->psi;
+  }
 }
 
 static void _correct_target(FRACTaLSubController *this)
 {
-  gint32 reduction = 0;
-  GstClockTime rtt = _stat(this)->srtt;
-  if(_stat(this)->drift_corr < .4){
-    return;
-  }else if(_now(this) - rtt < this->last_inflicted){
-    return;
-  }
-
-  this->inflection_point = MAX(this->target_bitrate, this->inflection_point);
-  this->last_inflicted = _now(this);
-  if(_min_ramp_up(this) < this->increasement){
-    reduction = MIN(this->increasement * MAX(0., 1. - _stat(this)->drift_corr * 2.), this->increasement - _min_ramp_up(this));
-    this->increasement -= reduction;
-  }else if(_min_ramp_up(this) < _stat(this)->fec_bitrate){
-    reduction = _stat(this)->fec_bitrate * MAX(0., 1. - _stat(this)->drift_corr * 2.);
-  }
-
-  _change_sndsubflow_target_bitrate(this, this->target_bitrate - reduction);
+//  gint32 reduction = 0;
+//  GstClockTime rtt = _stat(this)->srtt;
+//  if(_stat(this)->drift_corr < .4){
+//    return;
+//  }else if(_now(this) - rtt < this->last_inflicted){
+//    return;
+//  }
+//
+//  this->inflection_point = MAX(this->target_bitrate, this->inflection_point);
+//  this->last_inflicted = _now(this);
+//  if(_min_ramp_up(this) < this->increasement){
+//    reduction = MIN(this->increasement * MAX(0., 1. - _stat(this)->drift_corr * 2.), this->increasement - _min_ramp_up(this));
+//    this->increasement -= reduction;
+//  }else if(_min_ramp_up(this) < _stat(this)->fec_bitrate){
+//    reduction = _stat(this)->fec_bitrate * MAX(0., 1. - _stat(this)->drift_corr * 2.);
+//  }
+//
+//  _change_sndsubflow_target_bitrate(this, this->target_bitrate - reduction);
 }
 
 static void _undershoot(FRACTaLSubController *this)
@@ -796,9 +794,7 @@ _keep_stage(
     goto done;
   }
 
-//  this->inflection_point = this->target_bitrate;
   _start_monitoring(this);
-//  _change_cwnd(this, MIN(this->cwnd, _stat(this)->BiF_80th * 8) *  (1 + 1./(gdouble)this->monitoring_interval));
   _switch_stage_to(this, STAGE_PROBE, FALSE);
 
 done:
@@ -809,7 +805,6 @@ void
 _probe_stage(
     FRACTaLSubController *this)
 {
-//  _change_cwnd(this, MAX(_stat(this)->queued_bytes_in_srtt * 8, this->cwnd));
   _change_cwnd(this, _stat(this)->queued_bytes_in_srtt + this->cwnd * .875);
 
   if(_distortion(this)){
@@ -844,8 +839,7 @@ void
 _increase_stage(
     FRACTaLSubController *this)
 {
- // _change_cwnd(this, MAX(_stat(this)->queued_bytes_in_srtt * 8 * 1.2, this->cwnd));
- // _change_cwnd(this, _stat(this)->queued_bytes_in_srtt + this->cwnd * .875);
+  _change_cwnd(this, _stat(this)->queued_bytes_in_srtt + this->cwnd * .875);
 
   if(_distortion(this)){
     _stop_monitoring(this);
@@ -864,7 +858,6 @@ _increase_stage(
   }
 
   _start_monitoring(this);
-//  _change_cwnd(this, MIN(this->cwnd, _stat(this)->BiF_80th * 8) *  (1 + 1./(gdouble)this->monitoring_interval));
   _set_event(this, EVENT_SETTLED);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
 done:
@@ -902,7 +895,7 @@ _fire(
           this->last_distorted      = _now(this);
           this->congestion_detected = _now(this);
           ++this->distortion_num;
-          this->congested_drift = _stat(this)->last_drift;
+          this->congested_drift = _stat(this)->last_skew;
           this->congested_lost  = _stat(this)->fraction_lost;
           this->reducing_approved   = FALSE;
           this->reducing_sr_reached = 0;
@@ -926,7 +919,7 @@ _fire(
           ++this->distortion_num;
         case EVENT_DISTORTION:
           this->last_distorted      = _now(this);
-          this->congested_drift     = _stat(this)->last_drift;
+          this->congested_drift     = _stat(this)->last_skew;
           this->congested_lost      = _stat(this)->fraction_lost;
           this->reducing_approved   = FALSE;
           this->reducing_sr_reached = 0;
@@ -949,7 +942,7 @@ _fire(
         case EVENT_DISTORTION:
           this->last_distorted = _now(this);
           ++this->distortion_num;
-          this->congested_drift = _stat(this)->last_drift;
+          this->congested_drift = _stat(this)->last_skew;
           this->congested_lost  = _stat(this)->fraction_lost;
           this->reducing_approved   = FALSE;
           this->reducing_sr_reached = 0;
@@ -1199,12 +1192,12 @@ gdouble _calculate_est_rr(FRACTaLSubController *this)
   gdouble alpha;
   gdouble received_bits;
 
-  received_bits = _stat(this)->received_bytes_in_srtt * 8.;
+  received_bits = _stat(this)->received_bytes_in_ewi * 8.;
   if(!this->est_rr){
     return received_bits;
   }
   alpha = (gdouble)_stat(this)->bytes_in_flight / (gdouble)(_stat(this)->bytes_in_flight + _stat(this)->BiF_std);
-  off = CONSTRAIN(.0001, 1., _stat(this)->srtt / (gdouble) GST_SECOND);
+  off = _stat(this)->ewi_in_s;
   return this->est_rr * (1.-alpha) + (received_bits/off) * alpha;
 }
 
@@ -1215,28 +1208,8 @@ gdouble _calculate_est_capacity(FRACTaLSubController *this)
   if(!this->est_capacity){
     return min_rr;
   }
-  alpha = 1. / (gdouble)(_stat(this)->received_fb_in_srtt);
+//  alpha = 1. / (gdouble)(_stat(this)->received_fb_in_srtt);
+  alpha = 0.5;
   return this->est_capacity * (1.-alpha) + min_rr * alpha;
 }
 
-
-void _logging(FRACTaLSubController* this)
-{
-  const GstClockTime sampling_time = 100 * GST_MSECOND;
-  if(!g_file_test("triggered_stat", G_FILE_TEST_EXISTS)){
-    return;
-  }
-again:
-  if(_now(this) - sampling_time < this->last_log){
-    return;
-  }
-
-  mprtp_logger("temp/targets.csv", "%d\n", this->target_bitrate);
-
-  if(!this->last_log){
-    this->last_log = _now(this);
-  }else{
-    this->last_log += sampling_time;
-  }
-  goto again;
-}

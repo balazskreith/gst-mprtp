@@ -118,15 +118,26 @@ SlidingWindowPlugin* make_swminmax(GCompareFunc cmp,
 
 typedef gdouble (*SWDataExtractor)(gpointer item);
 
+#define swplugin_define_on_calculated_data(this_type, on_calculated_fnc, on_calculated_field, calculated_field_type) \
+    static void on_calculated_fnc(gpointer udata, gpointer result){ \
+      ((this_type*)udata)->on_calculated_field = *(calculated_field_type*)result; \
+    }
 
 #define swplugin_define_on_calculated_double(this_type, on_calculated_fnc, on_calculated_field) \
-    static void on_calculated_fnc(gpointer udata, gpointer result){ \
-      ((this_type*)udata)->on_calculated_field = *(gdouble*)result; \
-    }
+    swplugin_define_on_calculated_data(this_type, on_calculated_fnc, on_calculated_field, gdouble)
+
+#define swplugin_define_on_calculated_int32(this_type, on_calculated_fnc, on_calculated_field) \
+    swplugin_define_on_calculated_data(this_type, on_calculated_func, on_calculated_field, gint32)
+
 
 #define swplugin_define_swdataextractor(extractor_fnc, item_type, extracted_field) \
     static gdouble extractor_fnc(gpointer itemptr){ \
       return ((item_type*)itemptr)->extracted_field; \
+    }
+
+#define swplugin_define_swdataptrextractor(extractor_fnc, item_type, extracted_field) \
+    static gpointer extractor_fnc(gpointer itemptr){ \
+      return &((item_type*)itemptr)->extracted_field; \
     }
 
 

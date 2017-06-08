@@ -44,22 +44,13 @@ struct _FRACTaLFBProducer
   guint32*                 timestamp_vector;
   guint32*                 ato_vector;
 
-  guint64                  prev_snd;
-  guint16                  prev_seq;
-  guint64                  prev_rcv;
-
   SlidingWindow*           rle_sw;
-  SlidingWindow*           skew_sw;
-  Recycle*                 skew_recycle;
   TimestampGenerator*      ts_generator;
-
-  guint64                  raise;
-  guint64                  fall;
 
   GstClockTime             last_fb;
   gint                     rcved_packets;
 
-  gint32                   discarded_bytes;
+//  gint32                   discarded_bytes;
   gint32                   received_bytes;
 
 

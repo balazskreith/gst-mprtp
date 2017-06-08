@@ -38,6 +38,7 @@ typedef struct _SndPacket
   gint                 ref;
   GstClockTime         made;
   GstClockTime         sent;
+  GstClockTime         queued;
 
   gboolean             marker;
   guint8               payload_type;
@@ -62,7 +63,8 @@ typedef struct _SndPacket
 
   gboolean             keyframe;
   guint32              sent_ts;
-
+  guint32              rcvd_ts;
+  guint32              skew;
 }SndPacket;
 
 

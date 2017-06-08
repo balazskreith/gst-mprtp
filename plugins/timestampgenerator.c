@@ -105,8 +105,25 @@ guint32 timestamp_generator_get_ts(TimestampGenerator* this) {
   return result;
 }
 
+guint32 timestamp_generator_get_ts_for_time(TimestampGenerator* this, GstClockTime time_in_ns) {
+  GstClockTime elapsed_in_s = GST_TIME_AS_SECONDS(time_in_ns);
+  GstClockTime elapsed_in_clockrate;
+  guint32 result;
+  time_in_ns -= elapsed_in_s * GST_SECOND;
+
+  elapsed_in_clockrate = elapsed_in_s * this->clockrate;
+  elapsed_in_clockrate += (gdouble)time_in_ns / (gdouble)GST_SECOND * this->clockrate;
+  if (4294967295 < elapsed_in_clockrate) {
+    result = (elapsed_in_clockrate - 4294967296UL);
+  } else {
+    result = elapsed_in_clockrate;
+  }
+  return result;
+}
+
 GstClockTime timestamp_generator_get_time(TimestampGenerator* this, guint32 timestamp) {
   GstClockTime result;
+//  g_print("double %f\n", ((gdouble) GST_SECOND / (gdouble) this->clockrate));
   result = (guint64)timestamp * ((gdouble) GST_SECOND / (gdouble) this->clockrate);
   return result;
 }

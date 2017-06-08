@@ -1062,6 +1062,7 @@ static void _swpercentile2_calculate(swpercentile2_t* this) {
 
     {
       gpointer result = this->extractor(selected);
+//      g_print("result: %u\n", *(guint32*)result);
       swplugin_notify(this->base, result);
     }
   }

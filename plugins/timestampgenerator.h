@@ -43,6 +43,7 @@ GType timestamp_generator_get_type (void);
 TimestampGenerator *make_timestamp_generator(guint32 clockrate);
 void timestamp_generator_set_clockrate(TimestampGenerator* this, guint32 clockrate);
 guint32 timestamp_generator_get_ts(TimestampGenerator* this);
+guint32 timestamp_generator_get_ts_for_time(TimestampGenerator* this, GstClockTime time_in_ns);
 GstClockTime timestamp_generator_get_time(TimestampGenerator* this, guint32 timestamp);
 
 

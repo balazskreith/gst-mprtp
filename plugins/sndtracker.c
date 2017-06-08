@@ -188,6 +188,7 @@ SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id
 
 SndPacket* sndtracker_add_packet_to_rtpqueue(SndTracker* this, SndPacket* packet)
 {
+  packet->queued = _now(this);
   this->rtpqstat.bytes_in_queue += packet->payload_size;
   ++this->rtpqstat.packets_in_queue;
   this->rtpqstat.last_arrived = packet->made;

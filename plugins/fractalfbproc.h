@@ -30,85 +30,78 @@ typedef struct _FRACTaLFBProcessorClass FRACTaLFBProcessorClass;
 
 typedef struct _FRACTaLStat
 {
-  gint32                   measurements_num;
-  gint32                   BiF_80th;
+  gint32                   reference_num;
   gint32                   bytes_in_flight;
   gdouble                  rtpq_delay;
   gint32                   sender_bitrate;
   gint32                   receiver_bitrate;
   gint32                   fec_bitrate;
 
-
-//  gdouble                  BiF_avg;
   gdouble                  BiF_std;
 
-  gdouble                  drift_80th;
-  gdouble                  drift_corr;
-  gdouble                  drift_std;
-  gint64                   last_drift;
+  guint32                  skew_80th;
+  gdouble                  skew_std; //jitter
+  guint32                  last_skew;
   gdouble                  srtt;
 
   gdouble                  sr_avg;
   gdouble                  rr_avg;
 
-  gdouble                  lost_avg;
-  gdouble                  lost_std;
+  gdouble                  fl_avg;
+  gdouble                  fl_std;
 
   gdouble                  fraction_lost;
-  gint32                   received_bytes_in_srtt;
-  gint32                   received_fb_in_srtt;
+  gdouble                  psi; //pipe stability indicator
+  gint32                   extra_bytes;
+  gdouble                  ewi_in_s;
+  gint32                   received_bytes_in_ewi;
   gint32                   queued_bytes_in_srtt;
-
-//  gdouble                  rr_sr_avg;
-//  gdouble                  rr_sr_std;
-
-//  gdouble                  est_queue_delay;
-//  gdouble                  est_queue_std;
-//  gdouble                  est_queue_avg;
 
 }FRACTaLStat;
 
-
-typedef struct{
-  gint32        ref;
-  GstClockTime  drift;
-  gdouble      fraction_lost;
-  gint32       newly_rcved_fb;
-  gint32       newly_queued_bytes;
-  gint32       bytes_in_flight;
-}FRACTaLMeasurement;
+//
+//typedef struct{
+//  gint32        ref;
+//  GstClockTime  drift;
+//  gdouble      fraction_lost;
+//  gint32       newly_rcved_fb;
+//  gint32       newly_queued_bytes;
+//  gint32       bytes_in_flight;
+//}FRACTaLMeasurement;
 
 struct _FRACTaLFBProcessor
 {
   GObject                  object;
   GstClock*                sysclock;
+  TimestampGenerator*      ts_generator;
+  Recycle*                 reference_point_recycle;
 
+  gint32                   sent_bytes_in_ewi_t;
+  gint32                   rcvd_bytes_in_ewi;
+  gint32                   lost_packets_num_in_ewi;
+  gint32                   sent_packets_num_in_ewi_t;
+  gint32                   received_packets_num_in_ewi;
+  guint32                  ewi_in_ts;
+  guint32                  min_ewi_in_ts;
+  guint32                  max_ewi_in_ts;
+  guint32                  rtt_in_ts;
+  GstClockTime             rtt;
+  GQueue*                  sent_packets_rtt;
+  GQueue*                  sent_packets_ewi_t;
+  GQueue*                  rcvd_packets_ewi;
+  GQueue*                  queued_packets_rtt;
 
-  SlidingWindow*           srtt_sw;
-  SlidingWindow*           long_sw;
-  Recycle*                 measurements_recycle;
+  SlidingWindow*           reference_sw;
 
   FRACTaLStat*             stat;
   SndTracker*              sndtracker;
   SndSubflow*              subflow;
-  FRACTaLMeasurement*      measurement;
-  guint                    newly_rcved_fb;
-  gint32                   newly_queued_bytes;
-  GstClockTime             RTT;
-  GstClockTime             srtt_updated;
-
-  gdouble                  drift_min;
-  gdouble                  drift_max;
-  gint32                   BiF_min;
-  gint32                   BiF_max;
 
   GstClockTime             last_report_update;
-  GstClockTime             last_owd_log;
 
   guint16                  HSN;
 
-  gint64                  last_raise;
-  gint64                  last_fall;
+  guint32                  srtt_in_ts;
 
 };
 
@@ -118,13 +111,14 @@ struct _FRACTaLFBProcessorClass{
 };
 
 GType fractalfbprocessor_get_type (void);
+void fractalfbprocessor_set_evaluation_window_margins(FRACTaLFBProcessor *this, GstClockTime min, GstClockTime max);
 FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* subflow,
     FRACTaLStat* stat);
 
 void fractalfbprocessor_reset(FRACTaLFBProcessor *this);
 gint32 fractalfbprocessor_get_estimation(FRACTaLFBProcessor *this);
 void fractalfbprocessor_start_estimation(FRACTaLFBProcessor *this);
-void fractalfbprocessor_approve_measurement(FRACTaLFBProcessor *this);
+void fractalfbprocessor_approve_feedback(FRACTaLFBProcessor *this);
 void fractalfbprocessor_time_update(FRACTaLFBProcessor *this);
 void fractalfbprocessor_report_update(FRACTaLFBProcessor *this, GstMPRTCPReportSummary *summary);
 

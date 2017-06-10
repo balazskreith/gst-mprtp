@@ -30,7 +30,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "mprtplogger.h"
 #include "mprtputils.h"
 
 

@@ -356,7 +356,7 @@ gst_mprtpreceiver_request_new_pad (GstElement * element, GstPadTemplate * templ,
   }
 
   if(!subflow){
-      subflow = (Subflow *) mprtp_malloc (sizeof (Subflow));
+      subflow = (Subflow *) g_malloc0 (sizeof (Subflow));
       subflow->id = subflow_id;
       this->subflows = g_list_prepend (this->subflows, subflow);
   }

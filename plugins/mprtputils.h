@@ -11,7 +11,6 @@
 #include <gst/gst.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include <gst/rtp/gstrtpbuffer.h>
-#include "mprtplogger.h"
 #include "gstmprtpdefs.h"
 
 #define CONSTRAIN(min,max,value) MAX(min, MIN(max, value))

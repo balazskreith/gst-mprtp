@@ -96,10 +96,10 @@ fractalfbproducer_finalize (GObject * object)
 
   g_object_unref(this->sysclock);
   g_object_unref(this->tracker);
-  mprtp_free(this->lost_vector);
-  mprtp_free(this->ecn_vector);
-  mprtp_free(this->timestamp_vector);
-  mprtp_free(this->ato_vector);
+  g_free(this->lost_vector);
+  g_free(this->ecn_vector);
+  g_free(this->timestamp_vector);
+  g_free(this->ato_vector);
 
 
 }

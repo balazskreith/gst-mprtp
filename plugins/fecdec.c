@@ -276,7 +276,7 @@ GstBuffer* _get_repaired_rtpbuffer(FECDecoder *this, GList* rcv_packets_list, FE
   memcpy(&length, fecbitstring + 8, 2);
   length = g_ntohs(length);
 
-  databed = mprtp_malloc(length + 12);
+  databed = g_malloc0(length + 12);
 
   memcpy(databed,     fecbitstring,     2);
   memcpy(databed + 4, fecbitstring + 4, 4);

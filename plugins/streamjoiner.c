@@ -28,7 +28,6 @@
 #include <string.h>
 #include <stdio.h>
 #include "streamjoiner.h"
-#include "mprtplogger.h"
 
 
 GST_DEBUG_CATEGORY_STATIC (stream_joiner_debug_category);

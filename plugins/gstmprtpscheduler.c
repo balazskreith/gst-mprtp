@@ -301,10 +301,6 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 //    g_print("%d", ((SndPacket*)(NULL))->abs_seq); // termin
 //  }
 
-  init_mprtp_logger();
-  //TODO: Elliminate logger
-  mprtp_logger_set_state(TRUE);
-
   this->sendq = g_async_queue_new();
 
   this->rtp_sinkpad =

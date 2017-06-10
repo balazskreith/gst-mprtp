@@ -25,7 +25,6 @@
 #include "gstmprtcpbuffer.h"
 #include "sndctrler.h"
 #include "streamsplitter.h"
-#include "mprtplogger.h"
 #include "fecenc.h"
 #include "mediator.h"
 #include "sndqueue.h"

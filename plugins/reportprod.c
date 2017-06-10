@@ -106,8 +106,8 @@ report_producer_finalize (GObject * object)
 {
   ReportProducer *this = REPORTPRODUCER (object);
   g_object_unref (this->sysclock);
-  mprtp_free(this->databed);
-  mprtp_free(this->xr.databed);
+  g_free(this->databed);
+  g_free(this->xr.databed);
 }
 
 void
@@ -115,9 +115,9 @@ report_producer_init (ReportProducer * this)
 {
   this->sysclock        = gst_system_clock_obtain ();
   this->ssrc            = g_random_int();
-  this->report          = this->databed = mprtp_malloc(DATABED_LENGTH);
+  this->report          = this->databed = g_malloc0(DATABED_LENGTH);
   this->made            = _now(this);
-  this->xr.actual_block = this->xr.databed = mprtp_malloc(DATABED_LENGTH);
+  this->xr.actual_block = this->xr.databed = g_malloc0(DATABED_LENGTH);
   this->in_progress         = FALSE;
 
   this->databeds = make_recycle_databed(100, (RecycleItemShaper) _databed_shaper);

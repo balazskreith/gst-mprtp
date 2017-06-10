@@ -9,7 +9,6 @@ static int _cmpfunc (const void * pa, const void * pb)
   return *((guint32*)pa) == *((guint32*)pb) ? 0 : *((guint32*)pa) < *((guint32*)pb) ? -1 : 1;
 }
 
-#include "mprtplogger.h"
 static void _median_test_with_qsort(const gchar *filename, guint32* src, guint32* dst, gint length, guint32 *result, GstClockTime *elapsed)
 {
   *elapsed = now;
@@ -87,7 +86,6 @@ void swperctest(void)
       //profile 2 - perc
       _median_test_with_perc(filename, sw, &array[j], &elapsed2);
       g_print("%u,%lu,%u,%lu\n", result1, elapsed1, result2, elapsed2);
-      mprtp_logger(filename, "%u,%lu,%u,%lu\n", result1, elapsed1, result2, elapsed2);
     }
 
     slidingwindow_clear(sw);

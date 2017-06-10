@@ -28,7 +28,6 @@
 #include <string.h>
 #include <stdio.h>
 #include "jitterbuffer.h"
-#include "mprtplogger.h"
 
 
 GST_DEBUG_CATEGORY_STATIC (jitterbuffer_debug_category);

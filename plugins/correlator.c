@@ -28,7 +28,6 @@
 #include <string.h>
 #include <stdio.h>
 #include "correlator.h"
-#include "mprtplogger.h"
 
 
 GST_DEBUG_CATEGORY_STATIC (correlator_debug_category);

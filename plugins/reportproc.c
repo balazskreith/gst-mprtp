@@ -29,7 +29,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "mprtplogger.h"
 
 GST_DEBUG_CATEGORY_STATIC (report_processor_debug_category);
 #define GST_CAT_DEFAULT report_processor_debug_category
@@ -103,11 +102,6 @@ _processing_xr(ReportProcessor *this,
                     GstRTCPXR * xr,
                     GstMPRTCPReportSummary* summary);
 
-static void
-_logging(
-    ReportProcessor *this,
-    GstMPRTCPReportSummary* summary);
-
 
 static gint
 _cmp_seq (guint16 x, guint16 y)
@@ -175,8 +169,6 @@ void report_processor_process_mprtcp(ReportProcessor * this, GstBuffer* buffer, 
   result->updated = _now(this);
   block = gst_mprtcp_get_first_block(report);
   _processing_mprtcp_subflow_block(this, block, result);
-
-  DISABLE_LINE _logging(this, result);
 
   gst_buffer_unmap(buffer, &map);
 }
@@ -490,106 +482,5 @@ again:
   }
 done:
   return;
-}
-
-void _logging(ReportProcessor *this, GstMPRTCPReportSummary* summary)
-{
-  mprtp_logger(this->logfile,
-               "###################################################################\n"
-               "Elapsed ms: %lu\n"
-               "Subflow id: %hu\n"
-               "SSRC: %u\n"
-               ,
-               GST_TIME_AS_MSECONDS(_now(this) - this->made),
-               summary->subflow_id,
-               summary->ssrc
-   );
-
-  if(summary->RR.processed){
-
-    mprtp_logger(this->logfile,
-                 "-------------------------- Receiver Report ---------------------------\n"
-                 "HSSN:            %hu\n"
-                 "RTT:             %lu\n"
-                 "cum_packet_lost: %u\n"
-                 "cycle_num:       %hu\n"
-                 "jitter:          %u\n"
-                 "lost_rate:       %f\n"
-                 ,
-                 summary->RR.HSSN,
-                 summary->RR.RTT,
-                 summary->RR.total_packet_lost,
-                 summary->RR.cycle_num,
-                 summary->RR.jitter,
-                 summary->RR.lost_rate
-    );
-  }
-
-  if(summary->SR.processed){
-
-    mprtp_logger(this->logfile,
-                 "-------------------------- Sender Report ---------------------------\n"
-                 "ntptime:            %lu\n"
-                 "octet_count:        %u\n"
-                 "packet_count:       %u\n"
-                 "rtptime:            %u\n"
-                 ,
-                 summary->SR.ntptime,
-                 summary->SR.octet_count,
-                 summary->SR.packet_count,
-                 summary->SR.rtptime
-    );
-  }
-
-  if(summary->XR.processed && summary->XR.OWD.processed){
-
-    mprtp_logger(this->logfile,
-                 "-------------------------- XR OWD ---------------------------\n"
-                 "interval_metric:    %d\n"
-                 "max_delay:          %lu\n"
-                 "min_delay:          %lu\n"
-                 "median_delay:       %lu\n"
-                 ,
-                 summary->XR.OWD.interval_metric,
-                 summary->XR.OWD.max_delay,
-                 summary->XR.OWD.min_delay,
-                 summary->XR.OWD.median_delay
-    );
-  }
-
-  if(summary->XR.processed && summary->XR.DiscardedBytes.processed){
-
-    mprtp_logger(this->logfile,
-                 "-------------------------- XR_RFC7243 ---------------------------\n"
-                 "interval_metric:    %d\n"
-                 "early_bit:          %d\n"
-                 "discarded_bytes:    %u\n"
-                 ,
-                 summary->XR.DiscardedBytes.interval_metric,
-                 summary->XR.DiscardedBytes.early_bit,
-                 summary->XR.DiscardedBytes.discarded_bytes
-    );
-  }
-
-
-  if(summary->XR.processed && summary->XR.LostRLE.processed){
-      gint i;
-      mprtp_logger(this->logfile,
-                   "-------------------------- XR_RFC7097 ---------------------------\n"
-                   "begin_seq: %hu\n"
-                   "end_seq:   %hu\n"
-                   ,
-                   summary->XR.LostRLE.begin_seq,
-                   summary->XR.LostRLE.end_seq
-      );
-      for(i=0; i<summary->XR.LostRLE.vector_length; ++i){
-          mprtp_logger(this->logfile,
-                           "value %d:    %X\n"
-                           ,
-                           i, summary->XR.LostRLE.vector[i]
-              );
-      }
-    }
-
 }
 

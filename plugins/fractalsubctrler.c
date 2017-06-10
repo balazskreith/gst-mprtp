@@ -308,7 +308,7 @@ fractalsubctrler_finalize (GObject * object)
 
   sndtracker_rem_on_packet_sent(this->sndtracker, (ListenerFunc) _on_rtp_sending);
 
-  mprtp_free(this->priv);
+  g_free(this->priv);
 
   g_object_unref(this->fbprocessor);
   g_free(this->stat);
@@ -320,7 +320,7 @@ fractalsubctrler_finalize (GObject * object)
 void
 fractalsubctrler_init (FRACTaLSubController * this)
 {
-  this->priv     = mprtp_malloc(sizeof(Private));
+  this->priv     = g_malloc0(sizeof(Private));
   this->sysclock = gst_system_clock_obtain();
 
   _priv(this)->approve_min_time                 = APPROVE_MIN_TIME;

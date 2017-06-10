@@ -63,14 +63,11 @@ struct _FRACTaLSubController
   FRACTaLStat*              stat;
   guint                     sent_packets;
 
-  gdouble                   est_rr;
-
   guint64                   congested_drift;
   gdouble                   congested_lost;
 
   gint32                    est_capacity;
-//  gdouble                   drift_a;
-//  gdouble                   lost_a;
+  gdouble                   psi_avg;
   GstClockTime              deflate_time;
 
   guint                     monitoring_interval;
@@ -84,6 +81,7 @@ struct _FRACTaLSubController
   gint32                    increasement;
 
   gint64                    skew_th;
+  gdouble                   psi_th;
   gdouble                   FL_th;
   gboolean                  reducing_approved;
   GstClockTime              reducing_sr_reached;
@@ -101,10 +99,13 @@ struct _FRACTaLSubController
   GstClockTime              last_cwnd_increased;
   GstClockTime              last_inflicted;
 
+  gboolean                  stability_approved;
   gboolean                  cwnd_locked;
-  gdouble                   inflicted_cwnd;
+  gdouble                   bottleneck_cwnd;
+  gdouble                   max_psi;
+  gdouble                   distorted_cwnd;
 
-
+  gint32                    max_extra_bytes;
   gdouble                   cwnd;//congestion window
 
   gpointer                  priv;

@@ -98,7 +98,7 @@ SlidingWindow* make_slidingwindow(guint32 num_limit, GstClockTime obsolation_tre
 void slidingwindow_clear(SlidingWindow* this);
 void slidingwindow_dtor(gpointer target);
 void slidingwindow_refresh(SlidingWindow *this);
-void slidingwindow_set_treshold(SlidingWindow* this, GstClockTime obsolation_treshold);
+void slidingwindow_set_threshold(SlidingWindow* this, GstClockTime obsolation_treshold);
 gpointer slidingwindow_peek_oldest(SlidingWindow* this);
 gpointer slidingwindow_peek_latest(SlidingWindow* this);
 gpointer slidingwindow_peek_custom(SlidingWindow* this, gint (*comparator)(gpointer item, gpointer udata), gpointer udata);

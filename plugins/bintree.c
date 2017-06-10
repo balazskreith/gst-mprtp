@@ -60,7 +60,7 @@ _sprint_list_of_pointers(GSList* it, gchar *result, guint result_length)
   memset(result, 0, result_length);
   for(; it; it = it->next){
     memset(helper, 0, 255);
-    sprintf(helper, "(%p)[%d]%c ", it->data, *(gint32*)(it->data), it->next ? ',' : ' ');
+    sprintf(helper, "(%p)[%ld]%c ", it->data, *(gint64*)(it->data), it->next ? ',' : ' ');
     strcat(result, helper);
   }
 }
@@ -78,28 +78,28 @@ _setup_indent_level(gchar *result, guint result_length, guint level)
 void static
 _print_tree (Bintree * tree, BintreeNode* node, gint32 level)
 {
-  gchar string[255];
-  gchar node_values_string[255];
+  gchar string[4096];
+  gchar node_values_string[4096];
 
   if (!node) {
     return;
   }
   if(tree->top)  {
-    _sprint_list_of_pointers(tree->top->values, string, 255);
+    _sprint_list_of_pointers(tree->top->values, string, 4096);
     //observer_notify(tree->on_print, string);
   }
 
   if (!level){
-    gchar str[255];
-    memset(str, 0, 255);
+    gchar str[4096];
+    memset(str, 0, 4096);
     sprintf(str, "Tree %p TOP is: %s Node Counter: %u Duplicate counter: %d\n", tree, string, tree->node_counter, tree->duplicate_counter);
     g_print("%s", str);
     //notifier_do(tree->on_print, str);
   }
-  _setup_indent_level(string, 255, level);
-  _sprint_list_of_pointers(node->values, node_values_string, 255);
+  _setup_indent_level(string, 4096, level);
+  _sprint_list_of_pointers(node->values, node_values_string, 4096);
 
-  memset(string, 0, 255);
+  memset(string, 0, 4096);
   sprintf(string, "%d->%p->data:%s  ref: %u ->left:%p ->right:%p\n",
       level, node, node_values_string, node->values_length, node->left, node->right);
   g_print("%s", string);
@@ -143,6 +143,30 @@ void
 bintree_init (Bintree * this)
 {
 
+}
+
+static void
+_bintree_foreach (BintreeNode *node, GFunc func, gpointer udata)
+{
+  if (!node) {
+    return;
+  }
+  _bintree_foreach(node->left, func, udata);
+  func(node, udata);
+  _bintree_foreach(node->right, func, udata);
+}
+
+void
+bintree_foreach (Bintree * this, GFunc func, gpointer udata)
+{
+  _bintree_foreach(this->root, func, udata);
+}
+
+gboolean
+bintree_has_value (Bintree * this, gpointer value)
+{
+  BintreeNode* parent;
+  return _search_node(this, value, &parent) != NULL;
 }
 
 Bintree *make_bintree(GCompareFunc cmp) {

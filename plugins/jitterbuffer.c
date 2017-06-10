@@ -260,10 +260,15 @@ void _refresh_playout_delay(JitterBuffer* this, RcvPacket* packet) {
     return;
   }
 
-
   margin = DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE / 100;
   skew = (gint64)_delta_ts(subflow->last_rcv_rtp_ts, packet->rcv_rtp_ts) - (gint64)_delta_ts(subflow->last_snd_rtp_ts, packet->snd_rtp_ts);
   skew = CONSTRAIN(-1 * margin, margin, skew);
+//  bintree_print(((swpercentile2_t*)((SlidingWindowPlugin*)subflow->packet_skews->plugins->data)->priv)->maxtree);
+//  bintree_print(((swpercentile2_t*)((SlidingWindowPlugin*)subflow->packet_skews->plugins->data)->priv)->mintree);
+//  bintree_foreach(((swpercentile2_t*)((SlidingWindowPlugin*)subflow->packet_skews->plugins->data)->priv)->maxtree,
+//      (GFunc) _node_foreach,
+//      ((swpercentile2_t*)((SlidingWindowPlugin*)subflow->packet_skews->plugins->data)->priv)->mintree
+//  );
   slidingwindow_add_data(subflow->packet_skews, &skew);
   subflow->last_rcv_rtp_ts = packet->rcv_rtp_ts;
   subflow->last_snd_rtp_ts = packet->snd_rtp_ts;

@@ -53,6 +53,8 @@ typedef struct _FRACTaLStat
   gdouble                  fraction_lost;
   gdouble                  psi; //pipe stability indicator
   gint32                   extra_bytes;
+  gdouble                  max_psi;
+  gint32                   max_extra_bytes;
   gdouble                  ewi_in_s;
   gint32                   received_bytes_in_ewi;
   gint32                   queued_bytes_in_srtt;
@@ -75,6 +77,7 @@ struct _FRACTaLFBProcessor
   GstClock*                sysclock;
   TimestampGenerator*      ts_generator;
   Recycle*                 reference_point_recycle;
+  Recycle*                 distortion_point_recycle;
 
   gint32                   sent_bytes_in_ewi_t;
   gint32                   rcvd_bytes_in_ewi;
@@ -90,7 +93,7 @@ struct _FRACTaLFBProcessor
   GQueue*                  sent_packets_ewi_t;
   GQueue*                  rcvd_packets_ewi;
   GQueue*                  queued_packets_rtt;
-
+  SlidingWindow*           distortions_sw;
   SlidingWindow*           reference_sw;
 
   FRACTaLStat*             stat;

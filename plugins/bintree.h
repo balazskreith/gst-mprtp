@@ -47,7 +47,8 @@ struct _BintreeClass{
 
 GType bintree_get_type (void);
 void bintree_print(Bintree* this);
-
+void bintree_foreach (Bintree * this, GFunc func, gpointer udata);
+gboolean bintree_has_value (Bintree * this, gpointer value);
 Bintree *make_bintree(GCompareFunc cmp);
 gpointer bintree_get_top_value(Bintree* this);
 gpointer bintree_get_bottom_value(Bintree* this);

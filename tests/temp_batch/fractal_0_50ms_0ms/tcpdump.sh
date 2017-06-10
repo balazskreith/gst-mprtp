@@ -1,1 +1,1 @@
-sudo tcpdump -n tcp -ni veth6 -s0 -w temp/tcps_2.pcap &
+sudo tcpdump -n tcp -ni veth2 -s0 -w temp/tcps.pcap &

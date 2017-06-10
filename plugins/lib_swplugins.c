@@ -637,8 +637,8 @@ SlidingWindowPlugin* make_swcorr(ListenerFunc on_calculated_cb,
 void swcorr_set_tau(SlidingWindowPlugin* plugin, GstClockTime tau)
 {
   swcorr_t* this = plugin->priv;
-  slidingwindow_set_treshold(this->delay_in_sw,  tau);
-  slidingwindow_set_treshold(this->delay_out_sw, tau);
+  slidingwindow_set_threshold(this->delay_in_sw,  tau);
+  slidingwindow_set_threshold(this->delay_out_sw, tau);
 }
 
 
@@ -966,11 +966,15 @@ static void _swpercentile2_balancing(swpercentile2_t* this) {
   }
 
   do{
+    gint32 mintreeNodeLength, maxtreeNodeLength;
     gint32 maxtreeThreshold, mintreeThreshold;
     gboolean popFromMinAllowed = 1 < bintree_get_node_counter(mintree);
     gboolean popFromMaxAllowed = 1 < bintree_get_node_counter(maxtree);
-    gint32 mintreeNodeLength = bintree_get_bottom_node(mintree)->values_length;
-    gint32 maxtreeNodeLength = bintree_get_top_node(maxtree)->values_length;
+    if (!popFromMaxAllowed || !popFromMaxAllowed) {
+      break;
+    }
+    mintreeNodeLength = bintree_get_bottom_node(mintree)->values_length;
+    maxtreeNodeLength = bintree_get_top_node(maxtree)->values_length;
     _swpercentile2_get_thresholds(this, &maxtreeThreshold, &mintreeThreshold);
     popFromMaxAllowed &= mincounter + maxtreeNodeLength <= mintreeThreshold;
     popFromMinAllowed &= maxcounter + mintreeNodeLength <= maxtreeThreshold;
@@ -1021,11 +1025,22 @@ static void _swpercentile2_calculate(swpercentile2_t* this) {
         right = bintree_get_bottom_node(mintree);
       }
       selected = this->estimator(left->values->data, right->values->data);
+//      swplugin_notify(this->base, this->extractor(selected));
       return;
     }
 
     left = bintree_get_top_node(maxtree);
     right = bintree_get_bottom_node(mintree);
+    if(!left && !right) {
+      return;
+    } else if(!left) {
+      swplugin_notify(this->base, this->extractor(right));
+      return;
+    } else if(!right) {
+      swplugin_notify(this->base, this->extractor(left));
+      return;
+    }
+
     position = (gdouble)total * (this->percentile / 100.0);
     useOneIndex = floor(position) != position;
     if (this->ratio == 1.0) {
@@ -1071,9 +1086,26 @@ static void _swpercentile2_on_add(gpointer dataptr, gpointer value)
 {
   swpercentile2_t* this;
   this = dataptr;
-  if (bintree_get_node_counter(this->maxtree) < 1) {
+  if (bintree_get_node_counter(this->maxtree) < 1 && bintree_get_node_counter(this->mintree) < 1) {
     bintree_insert_value(this->maxtree, value);
-    _swpercentile2_calculate(this);
+    return;
+  }
+
+  if (bintree_get_node_counter(this->maxtree) < 1) {
+    if (this->cmp(value, bintree_get_bottom_value(this->mintree)) < 0) {
+      bintree_insert_value(this->maxtree, value);
+    } else {
+      bintree_insert_value(this->mintree, value);
+    }
+    return;
+  }
+
+  if (bintree_get_node_counter(this->mintree) < 1) {
+    if (this->cmp(bintree_get_top_value(this->maxtree), value) < 0) {
+      bintree_insert_value(this->mintree, value);
+    } else {
+      bintree_insert_value(this->maxtree, value);
+    }
     return;
   }
 
@@ -1094,11 +1126,17 @@ static void _swpercentile2_on_rem(gpointer dataptr, gpointer value)
 {
   swpercentile2_t* this;
   this = dataptr;
+  if (bintree_get_size(this->maxtree) < 1) {
+    bintree_delete_value(this->mintree, value);
+    goto done;
+  }
+
   if (this->cmp(value, bintree_get_top_value(this->maxtree)) <= 0) {
     bintree_delete_value(this->maxtree, value);
   } else {
     bintree_delete_value(this->mintree, value);
   }
+done:
   _swpercentile2_calculate(this);
 }
 

@@ -215,7 +215,7 @@ static void _slidingwindow_rem(SlidingWindow* this)
   notifier_do(this->on_rem_item, item->data);
   notifier_do(this->postprocessors, item->data);
 
-  if(this->data_recycle){
+  if(this->data_recycle) {
     recycle_add(this->data_recycle, item->data);
   }
 
@@ -379,7 +379,7 @@ gpointer slidingwindow_peek_custom(SlidingWindow* this, gint (*comparator)(gpoin
   return result ? result->data : NULL;
 }
 
-void slidingwindow_set_treshold(SlidingWindow* this, GstClockTime obsolation_treshold)
+void slidingwindow_set_threshold(SlidingWindow* this, GstClockTime obsolation_treshold)
 {
   this->treshold = obsolation_treshold;
 }

@@ -107,7 +107,7 @@ gint32 datapuffer_writecapacity(datapuffer_t *datapuffer)
 
 gboolean datapuffer_isfull(datapuffer_t *datapuffer)
 {
-        return datapuffer->count == datapuffer->length;
+        return datapuffer->count == datapuffer->length ;
 }
 
 gboolean datapuffer_isempty(datapuffer_t *datapuffer)

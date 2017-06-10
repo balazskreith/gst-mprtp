@@ -156,6 +156,7 @@ void _on_received_packet(FRACTaLFBProducer *this, RcvPacket *packet)
   this->lost_vector[packet->subflow_seq] = TRUE;
   this->timestamp_vector[packet->subflow_seq] = timestamp_generator_get_ts(this->ts_generator);
 //  g_print("%hu = %u %u\n", packet->subflow_seq, this->ato_vector[packet->subflow_seq], timestamp_generator_get_ts(this->ts_generator));
+//  g_print("receiving %hu at subflow %d\n", this->subflow->id, packet->abs_seq);
   if(!this->initialized){
     this->initialized = TRUE;
     this->begin_seq = this->end_seq = packet->subflow_seq;
@@ -217,6 +218,8 @@ void _setup_xr_cc_fb_rle(FRACTaLFBProducer * this,  ReportProducer* reportproduc
     } else {
       this->ato_vector[act_seq] = _delta_ts(this->timestamp_vector[act_seq], report_timestamp);
     }
+//    g_print("reporting at subflow %d sub_seq: %hu, ato: %u\n",
+//        this->subflow->id, act_seq, this->ato_vector[act_seq]);
   }
   report_producer_add_xr_cc_rle_fb(reportproducer,
       report_count,

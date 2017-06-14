@@ -52,6 +52,7 @@ typedef struct _SndSubflow
   SndSubflowState            state;
 
   GstClockTime               pacing_time;
+  guint8                     monitoring_interval;
 
   GstClockTime               next_regular_rtcp;
   GstClockTime               report_timeout;

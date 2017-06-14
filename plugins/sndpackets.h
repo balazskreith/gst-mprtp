@@ -64,7 +64,7 @@ typedef struct _SndPacket
   gboolean             keyframe;
   guint32              sent_ts;
   guint32              rcvd_ts;
-  guint32              skew;
+  gint64               skew;
 }SndPacket;
 
 

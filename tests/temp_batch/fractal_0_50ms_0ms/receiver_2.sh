@@ -1,1 +1,0 @@
-./rcv_pipeline --sink=FAKESINK --codec=VP8 --stat=triggered_stat:temp/rcv_packets_2.csv:3 --plystat=triggered_stat:temp/ply_packets_2.csv:3 --receiver=MPRTP:2:1:5004:2:5006 --playouter=MPRTPFRACTAL:MPRTP:2:1:10.0.0.1:5005:2:10.0.1.1:5007 

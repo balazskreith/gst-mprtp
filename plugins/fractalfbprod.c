@@ -185,7 +185,6 @@ static gboolean _do_fb(FRACTaLFBProducer *this)
   return 3 < this->rcved_packets;
 }
 
-
 void _on_fb_update(FRACTaLFBProducer *this, ReportProducer* reportproducer)
 {
   if(!_do_fb(this)){
@@ -194,7 +193,6 @@ void _on_fb_update(FRACTaLFBProducer *this, ReportProducer* reportproducer)
 //PROFILING("report_producer_begin",
   report_producer_begin(reportproducer, this->subflow->id);
 //);
-
   _setup_xr_cc_fb_rle(this, reportproducer);
 
   this->last_fb = _now(this);

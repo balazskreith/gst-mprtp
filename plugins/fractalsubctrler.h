@@ -63,11 +63,7 @@ struct _FRACTaLSubController
   FRACTaLStat*              stat;
   guint                     sent_packets;
 
-  guint64                   congested_drift;
-  gdouble                   congested_lost;
-
   gint32                    est_capacity;
-  gdouble                   psi_avg;
   GstClockTime              deflate_time;
 
   guint                     monitoring_interval;

@@ -506,7 +506,6 @@ gst_mprtpscheduler_set_property (GObject * object, guint property_id,
       break;
     case PROP_MPATH_KEYFRAME_FILTERING:
       guint_value = g_value_get_uint (value);
-      //TODO: changepoint
       sndpackets_set_keyframe_filter_mode(this->sndpackets, guint_value);
       stream_splitter_set_keyframe_filtering(this->splitter, 0 < guint_value);
       break;
@@ -738,7 +737,6 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   packet = sndpackets_make_packet(this->sndpackets, gst_buffer_ref(buffer));
   subflow = stream_splitter_select_subflow(this->splitter, packet);
   if(subflow){
-    //TODO: track how many bytes we added to the queue here.
     sndpacket_setup_mprtp(packet, subflow->id, sndsubflow_get_next_subflow_seq(subflow));
     fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(packet->buffer));
     sndqueue_push_packet(this->sndqueue, sndtracker_add_packet_to_rtpqueue(this->sndtracker, packet));
@@ -898,7 +896,7 @@ void _on_monitoring_request(GstMprtpscheduler * this, SndSubflow* subflow)
   if(this->fec_requested){
     return;
   }
-  fecencoder_request_fec(this->fec_encoder, subflow->id);
+  fecencoder_request_fec(this->fec_encoder, subflow->id, subflow->monitoring_interval);
   this->fec_requested = TRUE;
 }
 

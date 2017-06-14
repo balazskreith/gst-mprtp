@@ -762,6 +762,7 @@ typedef struct{
   SamplerTimestampExtractor extractor;
   gint processed_num;
   gint duplicated_num;
+  gpointer default_data;
 }Sampler;
 
 typedef enum{
@@ -793,7 +794,7 @@ static void _sampler_process(Sampler* this, gpointer data) {
   while(this->sampled < this->actual - this->sampling){
     ++this->processed_num;
     this->duplicated_num += prev_forwarded == data ? 1 : 0;
-    _transmit(&this->base, SAMPLER_OUTPUT, data);
+    _transmit(&this->base, SAMPLER_OUTPUT, this->default_data ? this->default_data : data);
     this->sampled += this->sampling;
     prev_forwarded = data;
   }
@@ -805,6 +806,7 @@ static Sampler* _make_sampler(SamplerTimestampExtractor extractor, GstClockTime 
   Sampler* this = g_malloc0(sizeof(Sampler));
   this->sampling = sampling;
   this->extractor = extractor;
+  this->default_data = NULL;
   return this;
 }
 
@@ -925,6 +927,9 @@ static volatile void _monitor_receive_process(Monitor* this, gpointer value) {
     _optional_transmit(&this->base, MONITOR_TRASH_OUTPUT, obsolated);
   }
 }
+
+//TODO: hopp! nincs obsolation :) ez lehet osszefuggesben miert neznek ki ugy a grafikonok ahogy
+// A samplernel kell keresni valamit.
 
 static void _monitor_add_plugins(Monitor* this, MonitorPlugin* plugin, ...) {
   gint io_num = 0;
@@ -1057,53 +1062,6 @@ static void _monitor_percentile_plugin_helper(gpointer item, MonitorPercentilePl
 //    g_print("Item: %p->%hu\n", item, ((RTPPacket*) _tuple_get(item, 0))->seq_num);
   }
 }
-//
-//static void _monitor_percentile_plugin_calculate(MonitorPercentilePlugin* this) {
-//  this->values_index = 0;
-//  gpointer result;
-//  gint first_index = this->read_index;
-//  gint last_index = this->write_index == 0 ? PERCENTILE_MAX_VALUES_NUM - 1 : this->write_index - 1;
-//  gint index;
-//  gpointer values;
-//  if (this->read_index == this->write_index) {
-//    return;
-//  } else if(this->read_index == last_index) {
-//    this->connection.target(this->connection.dst, this->extractor(this->values[this->read_index]));
-//    return;
-//  }
-//  values = g_malloc0(sizeof(gpointer) * this->values_count);
-//  if (this->read_index < last_index) {
-//    memcpy(values, this->values + this->read_index, sizeof(gpointer) * this->values_count);
-//  } else {
-//    gint32 count_1 = PERCENTILE_MAX_VALUES_NUM - this->read_index;
-//    gint32 count_2 = this->values_count - count_1;
-//    memcpy(values, this->values + this->read_index, count_1 * sizeof(gpointer));
-//    memcpy(values + count_1, this->values, count_2 * sizeof(gpointer));
-//  }
-//  qsort(values, this->values_count, sizeof(gpointer), this->cmp);
-//  index = this->values_index * ((gdouble) this->percentile / 100.) - 1;
-//  result = this->values[index];
-//  g_free(values);
-//  this->connection.target(this->connection.dst, this->extractor(result));
-//}
-//
-//static void _monitor_percentile_plugin_add(MonitorPercentilePlugin* this, gpointer data) {
-//  this->values[this->write_index] = data;
-//  if(++this->write_index == PERCENTILE_MAX_VALUES_NUM) {
-//    this->write_index = 0;
-//  }
-//  ++this->values_count;
-//  _monitor_percentile_plugin_calculate(this);
-//}
-//
-//static void _monitor_percentile_plugin_remove(MonitorPercentilePlugin* this, gpointer data) {
-//  this->values[this->read_index] = NULL;
-//  if(++this->read_index == PERCENTILE_MAX_VALUES_NUM) {
-//    this->read_index = 0;
-//  }
-//  --this->values_count;
-//  _monitor_percentile_plugin_calculate(this);
-//}
 
 static void _monitor_percentile_plugin_calculate(MonitorPercentilePlugin* this) {
   this->values_index = 0;
@@ -1424,12 +1382,27 @@ static void _sprintf_sr_fr_tuple_for_sr_fec(gchar* result, Tuple* sr_tuple){
   );
 }
 
+static Tuple* _make_default_sr_fr_tuple() {
+  return _make_tuple(
+      _make_int32(0),
+      _make_int32(0),
+      _make_int32(0),
+      _make_int32(0),
+      _make_int32(0),
+      NULL
+      );
+}
+
 static void _write_sr_fec_rate(gchar* input_path, gchar* output_path) {
 
   //Construction
+  Tuple* default_tuple = _make_default_sr_fr_tuple();
   FileReader* reader = _make_reader(input_path, _make_rtp_packet);
   RateSampler* rate_sampler = _make_rate_sampler();
   FileWriter* writer = _make_writer(output_path, _sprintf_sr_fr_tuple_for_sr_fec);
+
+  //set default value:
+  rate_sampler->sampler->default_data = default_tuple;
 
   //Connection
   _pushconnect_cmp(reader, FILE_READER_OUTPUT, rate_sampler, _rate_sampler_packet_input_transmitter);

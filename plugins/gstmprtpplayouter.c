@@ -611,8 +611,9 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   guint8  *buf_2nd_byte;
   RcvPacket* packet;
   GstFlowReturn result = GST_FLOW_OK;
-
+  guint32 rcv_ts;
   this = GST_MPRTPPLAYOUTER (parent);
+  rcv_ts = timestamp_generator_get_ts(this->cc_ts_generator);
 
   GST_DEBUG_OBJECT (this, "RTP/RTCP/MPRTP/MPRTCP sink");
 
@@ -672,7 +673,7 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 //
 //
   packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
-  packet->cc_ts = timestamp_generator_get_ts(this->cc_ts_generator);
+  packet->cc_ts = rcv_ts;
   fecdecoder_push_rcv_packet(this->fec_decoder, rcvpacket_ref(packet));
   THIS_LOCK(this);
 
@@ -687,6 +688,7 @@ done:
   return result;
 
 }
+
 
 void _rcvctrler_time_update(GstMprtpplayouter *this)
 {

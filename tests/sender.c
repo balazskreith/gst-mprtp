@@ -198,11 +198,11 @@ GstElement* _make_mprtp_sender(Sender* this, TransferParams *params)
 {
   GstBin *senderBin    = GST_BIN (gst_bin_new (NULL));
   GstElement* mprtpSnd = gst_element_factory_make ("mprtpsender", NULL);
-  GSList *item;
+  GSList *item = params->subflows;
 
   gst_bin_add(senderBin, mprtpSnd);
 
-  for(item = params->subflows; item; item = item->next){
+  if (g_list_length(params->subflows) < 2) {
     gchar padName[255];
     SenderSubflow* subflow = item->data;
     GstElement *rtpSink;
@@ -212,6 +212,25 @@ GstElement* _make_mprtp_sender(Sender* this, TransferParams *params)
     rtpSink = _make_rtpsink(subflow->dest_ip, subflow->dest_port);
     gst_bin_add(senderBin, rtpSink);
     gst_element_link_pads(mprtpSnd, padName, rtpSink, "sink");
+  }
+  else for(; item; item = item->next)
+  {
+    gchar padName[255];
+    SenderSubflow* subflow = item->data;
+    GstElement *rtpSink;
+    gchar queueName[255];
+    GstElement* queue;
+
+    memset(padName, 0, 255);
+    memset(queueName, 0, 255);
+    sprintf(padName, "src_%d", subflow->id);
+    sprintf(queueName, "queue_%d", subflow->id);
+    queue = gst_element_factory_make ("queue", queueName);
+    rtpSink = _make_rtpsink(subflow->dest_ip, subflow->dest_port);
+    gst_bin_add(senderBin, rtpSink);
+    gst_bin_add(senderBin, queue);
+    gst_element_link_pads(mprtpSnd, padName, queue, "sink");
+    gst_element_link_pads(queue, "src", rtpSink, "sink");
   }
 
   setup_ghost_sink_by_padnames(mprtpSnd, "mprtp_sink", senderBin, "sink");

@@ -39,14 +39,15 @@ typedef struct _FRACTaLStat
 
   gdouble                  BiF_std;
 
-  guint32                  skew_80th;
+  gint64                   skew_80th;
   gdouble                  skew_std; //jitter
-  guint32                  last_skew;
+  gint64                   last_skew;
   gdouble                  srtt;
 
   gdouble                  sr_avg;
   gdouble                  rr_avg;
 
+  gdouble                  psi_std;
   gdouble                  fl_avg;
   gdouble                  fl_std;
 
@@ -55,9 +56,11 @@ typedef struct _FRACTaLStat
   gint32                   extra_bytes;
   gdouble                  max_psi;
   gint32                   max_extra_bytes;
+  gint32                   extra_bytes_80th;
   gdouble                  ewi_in_s;
   gint32                   received_bytes_in_ewi;
   gint32                   queued_bytes_in_srtt;
+  guint16                  sent_packets_in_1s;
 
 }FRACTaLStat;
 
@@ -83,7 +86,7 @@ struct _FRACTaLFBProcessor
   gint32                   rcvd_bytes_in_ewi;
   gint32                   lost_packets_num_in_ewi;
   gint32                   sent_packets_num_in_ewi_t;
-  gint32                   received_packets_num_in_ewi;
+  gint32                   rcvd_packets_num_in_ewi;
   guint32                  ewi_in_ts;
   guint32                  min_ewi_in_ts;
   guint32                  max_ewi_in_ts;

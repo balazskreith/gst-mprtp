@@ -8,12 +8,14 @@ TEST="rmcat2"
 TARGET="temp_super"
 SOURCE="temp_batch"
 tests=( rmcat1 rmcat2 rmcat3 rmcat4 rmcat5 rmcat6 rmcat7 )
+tests=( rmcat4 rmcat5 ) 
+#tests=( mprtp1 mprtp2 mprtp3 mprtp4 mprtp5 mprtp6 mprtp7 )
 #tests=( rmcat1 )
 #owds=( 50 100 300 )
 owds=( 50 )
 #algorithms=( FRACTaL SCReAM )
 algorithms=( FRACTaL )
-testnum=3
+testnum=5
 
 
 for test in "${tests[@]}"

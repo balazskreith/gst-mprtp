@@ -150,26 +150,27 @@ static gboolean _is_repair_possible(GList *rcv_packets_list, FECPacket* fec_pack
 GstBuffer* fecdecoder_pop_rtp_packet(FECDecoder *this, guint16 seq_num)
 {
   GstBuffer* result = NULL;
-  GList* fec_packets_list;
-  GList* rcv_packets_list = NULL, *it;
+  GList* rcv_packets_list = NULL, *fec_it;
   FECPacket* fec_packet;
+  GList* rtp_it;
   g_mutex_lock (&this->mutex);
-  fec_packets_list = g_queue_find_custom(this->fec_packets, &seq_num, (GCompareFunc)_cmp_fec_packet_by_missing_seq);
-  if(!fec_packets_list) {
-    goto done;
-  }
-  fec_packet = fec_packets_list->data;
-  for (it = this->rcv_packets->head; it; it = it->next) {
-    if (_cmp_rcv_packet_by_missing_seq(it->data, fec_packet) != 0) {
+  for(fec_it = this->fec_packets->head; fec_it; fec_it = fec_it->next) {
+    if (_cmp_fec_packet_by_missing_seq(fec_it->data,  &seq_num) != 0) {
       continue;
     }
-    rcv_packets_list = g_list_prepend(rcv_packets_list, it->data);
+    fec_packet = fec_it->data;
+    for (rtp_it = this->rcv_packets->head; rtp_it; rtp_it = rtp_it->next) {
+      if (_cmp_rcv_packet_by_missing_seq(rtp_it->data, fec_packet) != 0) {
+        continue;
+      }
+      rcv_packets_list = g_list_prepend(rcv_packets_list, rtp_it->data);
+    }
+    if(!_is_repair_possible(rcv_packets_list, fec_packet)) {
+      continue;
+    }
+    result = _get_repaired_rtpbuffer(this, rcv_packets_list, fec_packet, seq_num);
+    break;
   }
-  if(!_is_repair_possible(rcv_packets_list, fec_packet)) {
-    goto done;
-  }
-  result = _get_repaired_rtpbuffer(this, rcv_packets_list, fec_packet, seq_num);
-done:
   g_mutex_unlock (&this->mutex);
   return result;
 }

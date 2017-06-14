@@ -71,6 +71,7 @@ typedef struct{
 typedef struct{
   MessageTypes type;
   guint8       subflow_id;
+  guint8       protected_num;
 }FECRequestMessage;
 
 typedef struct{
@@ -83,7 +84,7 @@ static BitString* _make_bitstring(FECEncoder* this, GstBuffer* buf);
 static void _fecenc_process(FECEncoder * this);
 static FECEncoderResponse* _fec_response_ctor(void);
 static void _fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf);
-static GstBuffer* _fecencoder_get_fec_packet(FECEncoder *this, guint8 subflow_id, gint32* packet_length);
+static GstBuffer* _fecencoder_get_fec_packet(FECEncoder *this, guint8 subflow_id, guint8 protected_num, gint32* packet_length);
 
 DEFINE_RECYCLE_TYPE(static, bitstring, BitString);
 
@@ -176,7 +177,7 @@ void fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buffer)
   messenger_unlock(this->messenger);
 }
 
-void fecencoder_request_fec(FECEncoder *this, guint8 subflow_id)
+void fecencoder_request_fec(FECEncoder *this, guint8 subflow_id, guint8 protected_num)
 {
   FECRequestMessage* msg;
   messenger_lock(this->messenger);
@@ -184,6 +185,7 @@ void fecencoder_request_fec(FECEncoder *this, guint8 subflow_id)
   msg = messenger_retrieve_block_unlocked(this->messenger);
   msg->type = FECENCODER_MESSAGE_TYPE_FEC_REQUEST;
   msg->subflow_id = subflow_id;
+  msg->protected_num = protected_num;
   messenger_push_block_unlocked(this->messenger, msg);
   messenger_unlock(this->messenger);
 }
@@ -222,49 +224,44 @@ void _fecencoder_add_rtpbuffer(FECEncoder *this, GstBuffer *buf)
   //Too many bitstring
   while(this->max_protection_num <= g_queue_get_length(this->bitstrings)){
     recycle_add(this->bitstring_recycle, g_queue_pop_head(this->bitstrings));
-
   }
 
 }
 
+static BitString* _assemble_fec_bitstring(FECEncoder *this, guint8 subflow_id, guint8 protected_num, gint* n_mask) {
+  BitString* result = recycle_retrieve_and_shape(this->bitstring_recycle, NULL);
+  BitString *actual = NULL;
+  GList* it;
+  gboolean init = FALSE;
+  *n_mask = 0;
+  for (it = this->bitstrings->tail; it && *n_mask < protected_num; it = it->prev) {
+    ++(*n_mask);
+    actual = it->data;
+    result->length = MAX(result->length, actual->length);
+    do_bitxor(result->bytes, actual->bytes, result->length);
+    if(!init){
+      init = TRUE;
+      result->seq_num = actual->seq_num;
+      result->ssrc    = actual->ssrc;
+    }
+  }
+  return result;
+}
+
 GstBuffer*
-_fecencoder_get_fec_packet(FECEncoder *this, guint8 subflow_id, gint32* packet_length)
+_fecencoder_get_fec_packet(FECEncoder *this, guint8 subflow_id, guint8 protected_num, gint32* packet_length)
 {
   GstBuffer* result = NULL;
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
   guint8* payload;
-//  gint i;
-  BitString *actual = NULL;
   BitString *fecbitstring = NULL;
   GstRTPFECHeader *fecheader;
-  gboolean init = FALSE;
-  gint n_mask = 0;
+  gint n_mask;
   if(g_queue_is_empty(this->bitstrings)){
     goto done;
   }
 
-  fecbitstring = recycle_retrieve_and_shape(this->bitstring_recycle, NULL);
-again:
-  if(g_queue_get_length(this->bitstrings) < 1){
-    goto create;
-  }
-  ++n_mask;
-
-  actual = g_queue_pop_head(this->bitstrings);
-  fecbitstring->length = MAX(fecbitstring->length, actual->length);
-
-//  for(i=0; i < fecbitstring->length; ++i){
-//    fecbitstring->bytes[i] ^= actual->bytes[i];
-//  }
-  do_bitxor(fecbitstring->bytes, actual->bytes, fecbitstring->length);
-  if(!init){
-    init = TRUE;
-    fecbitstring->seq_num = actual->seq_num;
-    fecbitstring->ssrc    = actual->ssrc;
-  }
-  recycle_add(this->bitstring_recycle, actual);
-  goto again;
-create:
+  fecbitstring = _assemble_fec_bitstring(this, subflow_id, protected_num, &n_mask);
   result = gst_rtp_buffer_new_allocate (
       fecbitstring->length + 10, /*fecheader is 20 byte, we use 10 byte from febitstring for creating its header */
       0,
@@ -326,7 +323,7 @@ BitString* _make_bitstring(FECEncoder* this, GstBuffer* buf)
 
 static void _send_fec_response(FECEncoder* this, FECEncoderResponse *response)
 {
-  response->fecbuffer  = _fecencoder_get_fec_packet(this, response->subflow_id, &response->payload_size);
+  response->fecbuffer  = _fecencoder_get_fec_packet(this, response->subflow_id, response->protected_num, &response->payload_size);
   if(!response->fecbuffer){
     g_queue_push_tail(this->pending_responses, response);
   }else{
@@ -364,6 +361,7 @@ static void _process_message(FECEncoder* this, Message* message)
       FECRequestMessage* fec_request = (FECRequestMessage*)message;
       FECEncoderResponse* fec_response = _fec_response_ctor();
       fec_response->subflow_id = fec_request->subflow_id;
+      fec_response->protected_num = fec_request->protected_num;
       _send_fec_response(this, fec_response);
     }
     break;

@@ -20,12 +20,13 @@ GST_DEBUG_CATEGORY_STATIC (fractalfbprocessor_debug_category);
 G_DEFINE_TYPE (FRACTaLFBProcessor, fractalfbprocessor, G_TYPE_OBJECT);
 
 typedef struct {
-  guint32 skew;
+  gint64 skew;
   gdouble fraction_lost;
   gdouble psi;
   gint32  bytes_in_flight;
   GstClockTime rtt;
   guint32 rtt_in_ts;
+  gint32 extra_bytes;
 }ReferencePoint;
 
 typedef struct {
@@ -137,18 +138,26 @@ static void _on_minmax_distortion_point_calculated(gpointer udata, swminmaxstat_
 }
 
 swplugin_define_on_calculated_double(FRACTaLStat, _on_skew_std_calculated, skew_std);
+swplugin_define_on_calculated_double(FRACTaLStat, _on_psi_std_calculated, psi_std);
 
 swplugin_define_on_calculated_double(FRACTaLStat, _on_lost_avg_calculated, fl_avg);
 swplugin_define_on_calculated_double(FRACTaLStat, _on_lost_std_calculated, fl_std);
 
+
+
 swplugin_define_swdataextractor(_BiF_extractor, ReferencePoint, bytes_in_flight);
 swplugin_define_on_calculated_double(FRACTaLStat, _on_BiF_std_calculated, BiF_std);
-swplugin_define_on_calculated_data(FRACTaLStat, _on_skew_80th_calculated, skew_80th, guint32);
+static void _on_skew_80th_calculated(gpointer udata, gpointer result){
+  ((FRACTaLStat*)udata)->skew_80th = MAX(0, *(gint64*)result);
+}
 
 StructCmpFnc(_cmp_distortion_point_psi, DistortionPoint, psi);
 swplugin_define_swdataextractor(_fraction_lost_extractor, ReferencePoint, fraction_lost);
 swplugin_define_swdataptrextractor(_skew_ptr_extractor, ReferencePoint, skew);
 swplugin_define_swdataextractor(_skew_value_extractor, ReferencePoint, skew);
+swplugin_define_swdataextractor(_psi_value_extractor, DistortionPoint, psi);
+
+//swplugin_define_swdataptrextractor(_extra_bytes_ptr_extractor, ReferencePoint, extra_bytes);
 
 swplugin_define_on_calculated_data(FRACTaLStat, _on_srtt_calculated, srtt, gdouble);
 swplugin_define_swdataextractor(_rtt_extractor, ReferencePoint, rtt);
@@ -157,9 +166,9 @@ swplugin_define_swdataextractor(_rtt_in_ts_extractor, ReferencePoint, rtt_in_ts)
 
 static gint _cmp_reference_point_skew(gpointer pa, gpointer pb)
 {
-//  g_print("skew to compare: %u, %u\n", ((ReferencePoint*)pa)->skew, ((ReferencePoint*)pb)->skew);
-  return _cmp_ts(((ReferencePoint*)pa)->skew, ((ReferencePoint*)pb)->skew);
+  return bintree3cmp_int64(&((ReferencePoint*)pa)->skew, &((ReferencePoint*)pb)->skew);
 }
+
 
 
 static void _on_packet_sent(FRACTaLFBProcessor* this, SndPacket* packet) {
@@ -250,6 +259,7 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
               (GCompareFunc) _cmp_distortion_point_psi,
               (ListenerFunc) _on_minmax_distortion_point_calculated,
               stat),
+          make_swstd(_on_psi_std_calculated, stat, _psi_value_extractor, 100),
           NULL);
 
   fractalfbprocessor_set_evaluation_window_margins(this, 0.25 * GST_SECOND, 0.5 * GST_SECOND);
@@ -305,15 +315,17 @@ void fractalfbprocessor_approve_feedback(FRACTaLFBProcessor *this)
   reference_point.skew = _stat(this)->last_skew;
   reference_point.rtt = this->rtt;
   reference_point.rtt_in_ts = this->rtt_in_ts;
+  reference_point.extra_bytes = _stat(this)->extra_bytes;
+//  g_print("extra_bytes: %d\n", _stat(this)->extra_bytes);
   slidingwindow_add_data(this->reference_sw,  &reference_point);
   _refresh_ewi(this);
 }
 
 static gdouble _get_ewma_factor(FRACTaLFBProcessor *this){
-  if(!_stat(this)->last_skew){
+  if(_stat(this)->last_skew < 1){
     return 0.;
   }
-  return (gdouble) _stat(this)->last_skew / (gdouble)(_stat(this)->last_skew + _stat(this)->skew_std);
+  return  (gdouble) _stat(this)->last_skew / (gdouble)(_stat(this)->last_skew + _stat(this)->skew_std) ;
 }
 
 static void _push_sent_packet_in_ewi(FRACTaLFBProcessor *this, SndPacket* packet) {
@@ -325,9 +337,11 @@ static void _push_sent_packet_in_ewi(FRACTaLFBProcessor *this, SndPacket* packet
 static void _refresh_sent_packets_rtt(FRACTaLFBProcessor *this) {
   //ewi - evaluation window interval
   SndPacket* sent_rtt_head;
+  SndPacket* sent_rtt_tail;
   SndPacket* sent_ewi_head;
   guint32 dts;
-  guint32 dts_threshold = this->ewi_in_ts;
+  guint32 dts_ewi_threshold = this->ewi_in_ts - timestamp_generator_get_ts_for_time(this->ts_generator, 50 * GST_MSECOND);
+  guint32 dts_rtt_threshold = this->rtt_in_ts;
   do {
     if (g_queue_is_empty(this->sent_packets_rtt)) {
       return;
@@ -337,10 +351,15 @@ static void _refresh_sent_packets_rtt(FRACTaLFBProcessor *this) {
       _push_sent_packet_in_ewi(this, g_queue_pop_head(this->sent_packets_rtt));
       continue;
     }
+    sent_rtt_tail = g_queue_peek_tail(this->sent_packets_rtt);
+    dts = _delta_ts(sent_rtt_head->sent_ts, sent_rtt_tail->sent_ts);
+    if (_cmp_ts(dts, dts_rtt_threshold) < 0) {
+      break;
+    }
     sent_ewi_head = g_queue_peek_head(this->sent_packets_ewi_t);
     dts = _delta_ts(sent_ewi_head->sent_ts, sent_rtt_head->sent_ts);
 //    g_print("%u-%u-%u-%d\n", sent_ewi_head->sent_ts, sent_rtt_head->sent_ts, dts, _cmp_ts(dts_threshold, dts));
-    if (_cmp_ts(dts_threshold, dts) < 0) {
+    if (_cmp_ts(dts_ewi_threshold, dts) < 0) {
       break;
     }
     sent_rtt_head = g_queue_pop_head(this->sent_packets_rtt);
@@ -392,7 +411,7 @@ static void _refresh_rcvd_packets(FRACTaLFBProcessor *this) {
     if (head->lost) {
       --this->lost_packets_num_in_ewi;
     } else {
-      --this->received_packets_num_in_ewi;
+      --this->rcvd_packets_num_in_ewi;
       this->rcvd_bytes_in_ewi -= head->payload_size;
       _stat(this)->last_skew -= head->skew;
     }
@@ -400,11 +419,11 @@ static void _refresh_rcvd_packets(FRACTaLFBProcessor *this) {
   }while(1);
 
   _refresh_sent_packets_ewi(this);
-  if (!this->received_packets_num_in_ewi || !this->lost_packets_num_in_ewi) {
+  if (!this->rcvd_packets_num_in_ewi || !this->lost_packets_num_in_ewi) {
     _stat(this)->fraction_lost = 0;
   } else {
     _stat(this)->fraction_lost = (gdouble) this->lost_packets_num_in_ewi /
-        (gdouble) (this->lost_packets_num_in_ewi + this->received_packets_num_in_ewi);
+        (gdouble) (this->lost_packets_num_in_ewi + this->rcvd_packets_num_in_ewi);
   }
 //  g_print("skew sum: %u\n", _stat(this)->last_skew);
 }
@@ -414,7 +433,7 @@ static void _push_rcv_packet(FRACTaLFBProcessor *this, SndPacket* packet) {
 //    g_print("add lost packet num: %hu\n", packet->subflow_seq);
     ++this->lost_packets_num_in_ewi;
   } else {
-    ++this->received_packets_num_in_ewi;
+    ++this->rcvd_packets_num_in_ewi;
     this->rcvd_bytes_in_ewi += packet->payload_size;
     _stat(this)->last_skew += packet->skew;
   }
@@ -489,14 +508,14 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
       guint32 drcv_ts = _delta_ts(last_packet->rcvd_ts, packet->rcvd_ts);
       guint32 dsnd_ts = _delta_ts(last_packet->sent_ts, packet->sent_ts);
       gint32 skew =  (gint32)drcv_ts - (gint32)dsnd_ts;
-      guint32 abs_skew = skew < 0 ? -1 * skew : skew;
+      gint64 abs_skew = skew < 0 ? -1 * skew : skew;
       if (!reference_skew_init || abs_skew < reference_skew) {
         reference_skew_init = TRUE;
         reference_skew = abs_skew;
         reference_sent_ts = packet->sent_ts;
         reference_ato = xr->CongestionControlFeedback.vector[i].ato;
       }
-      packet->skew = abs_skew;
+      packet->skew = dsnd_ts < this->ewi_in_ts ? skew : 0;
 //      g_print("processing at subflow %d act_abs_seq: %hu, act_sub_seq: %hu "
 //          "last_abs_seq: %hu last_sub_seq: %hu, skew: %u\n",
 //              this->subflow->id, packet->abs_seq, packet->subflow_seq,
@@ -518,10 +537,38 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
 
 done:
   _refresh_rcvd_packets(this);
+  if (_delta_ts(((SndPacket*)g_queue_peek_head(this->rcvd_packets_ewi))->rcvd_ts,
+      ((SndPacket*)g_queue_peek_tail(this->rcvd_packets_ewi))->rcvd_ts) <
+      _delta_ts(((SndPacket*)g_queue_peek_head(this->sent_packets_ewi_t))->sent_ts,
+                      ((SndPacket*)g_queue_peek_tail(this->sent_packets_ewi_t))->sent_ts) * .5) {
+  g_print("subflow %d (%u) sent_ewi_dt: %u [%hu (%hu) - %hu (%hu)], "
+          "rcvd_ewi_dt: %u  [%hu (%hu) - %hu (%hu)] ewi_in_ts: %u\n", this->subflow->id, this->rtt_in_ts,
+      _delta_ts(((SndPacket*)g_queue_peek_head(this->sent_packets_ewi_t))->sent_ts,
+                ((SndPacket*)g_queue_peek_tail(this->sent_packets_ewi_t))->sent_ts),
+        ((SndPacket*)g_queue_peek_head(this->sent_packets_ewi_t))->abs_seq,
+        ((SndPacket*)g_queue_peek_head(this->sent_packets_ewi_t))->subflow_seq,
+        ((SndPacket*)g_queue_peek_tail(this->sent_packets_ewi_t))->abs_seq,
+        ((SndPacket*)g_queue_peek_tail(this->sent_packets_ewi_t))->subflow_seq,
+
+      _delta_ts(((SndPacket*)g_queue_peek_head(this->rcvd_packets_ewi))->rcvd_ts,
+                ((SndPacket*)g_queue_peek_tail(this->rcvd_packets_ewi))->rcvd_ts),
+        ((SndPacket*)g_queue_peek_head(this->rcvd_packets_ewi))->abs_seq,
+        ((SndPacket*)g_queue_peek_head(this->rcvd_packets_ewi))->subflow_seq,
+        ((SndPacket*)g_queue_peek_tail(this->rcvd_packets_ewi))->abs_seq,
+        ((SndPacket*)g_queue_peek_tail(this->rcvd_packets_ewi))->subflow_seq,
+
+      this->ewi_in_ts);
+  }
+//  g_print("subflow %d sent in ewi: %d (%d) "
+//          "rcvd in ewi: %d (%d)\n",
+//          this->subflow->id,
+//          this->sent_bytes_in_ewi_t, this->sent_packets_num_in_ewi_t,
+//          this->rcvd_bytes_in_ewi, this->rcvd_packets_num_in_ewi);
   if (!this->sent_bytes_in_ewi_t || !this->rcvd_bytes_in_ewi) {
-    _stat(this)->psi = (gdouble) this->sent_bytes_in_ewi_t / (gdouble) this->rcvd_bytes_in_ewi;
-  } else {
     _stat(this)->psi = 1.;
+  } else {
+    _stat(this)->psi = (gdouble) this->sent_bytes_in_ewi_t / (gdouble) this->rcvd_bytes_in_ewi;
+
   }
   _stat(this)->extra_bytes = MAX(0, this->sent_bytes_in_ewi_t - this->rcvd_bytes_in_ewi);
   {
@@ -550,6 +597,7 @@ void _process_stat(FRACTaLFBProcessor *this)
   _stat(this)->fec_bitrate           = sndstat->sent_fec_bytes_in_1s * 8;
   _stat(this)->reference_num         = slidingwindow_get_counter(this->reference_sw);
   _stat(this)->received_bytes_in_ewi = this->rcvd_bytes_in_ewi;
+  _stat(this)->sent_packets_in_1s    = sndstat->sent_packets_in_1s;
 
   if(_stat(this)->sr_avg){
     alpha = ewma_factor * .5 + .5;

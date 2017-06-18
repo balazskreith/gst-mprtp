@@ -1,3 +1,3 @@
-./bcex scripts/configs/rmcat2.cmds 
-./bwcsv temp/pathbw.csv 5 2000 250 1000 250 1750 250 500 250 1000 200
-./scripts/runs/postproc/rmcat2.sh
+./bcex scripts/configs/rmcat5.cmds 
+./bwcsv temp/pathbw.csv 1 3500 3000
+./scripts/runs/postproc/rmcat5.sh fractal 50

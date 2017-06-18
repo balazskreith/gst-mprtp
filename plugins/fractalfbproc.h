@@ -84,6 +84,7 @@ struct _FRACTaLFBProcessor
 
   gint32                   sent_bytes_in_ewi_t;
   gint32                   rcvd_bytes_in_ewi;
+  gint32                   extra_bytes;
   gint32                   lost_packets_num_in_ewi;
   gint32                   sent_packets_num_in_ewi_t;
   gint32                   rcvd_packets_num_in_ewi;
@@ -92,8 +93,7 @@ struct _FRACTaLFBProcessor
   guint32                  max_ewi_in_ts;
   guint32                  rtt_in_ts;
   GstClockTime             rtt;
-  GQueue*                  sent_packets_rtt;
-  GQueue*                  sent_packets_ewi_t;
+  GQueue*                  sent_packets;
   GQueue*                  rcvd_packets_ewi;
   GQueue*                  queued_packets_rtt;
   SlidingWindow*           distortions_sw;

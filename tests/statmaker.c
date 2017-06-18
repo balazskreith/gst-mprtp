@@ -762,7 +762,6 @@ typedef struct{
   SamplerTimestampExtractor extractor;
   gint processed_num;
   gint duplicated_num;
-  gpointer default_data;
 }Sampler;
 
 typedef enum{
@@ -794,7 +793,7 @@ static void _sampler_process(Sampler* this, gpointer data) {
   while(this->sampled < this->actual - this->sampling){
     ++this->processed_num;
     this->duplicated_num += prev_forwarded == data ? 1 : 0;
-    _transmit(&this->base, SAMPLER_OUTPUT, this->default_data ? this->default_data : data);
+    _transmit(&this->base, SAMPLER_OUTPUT,  data);
     this->sampled += this->sampling;
     prev_forwarded = data;
   }
@@ -806,7 +805,6 @@ static Sampler* _make_sampler(SamplerTimestampExtractor extractor, GstClockTime 
   Sampler* this = g_malloc0(sizeof(Sampler));
   this->sampling = sampling;
   this->extractor = extractor;
-  this->default_data = NULL;
   return this;
 }
 
@@ -896,6 +894,22 @@ typedef enum {
 }MonitorIO;
 
 
+static volatile void _monitor_refresh(Monitor* this, gpointer null_value) {
+  GSList* it;
+  while(this->is_full && this->is_full(this->items)) {
+    gpointer obsolated = g_queue_pop_head(this->items);
+    for(it = this->plugins; it; it = it->next) {
+      MonitorPlugin* plugin = it->data;
+      gboolean allowed = plugin->filter ? plugin->filter(obsolated) : TRUE;
+      if(allowed) {
+        plugin->remove(plugin, obsolated);
+      }
+    }
+//    g_print("Monitor trashing: %p\n", obsolated);
+    _optional_transmit(&this->base, MONITOR_TRASH_OUTPUT, obsolated);
+  }
+}
+
 static volatile void _monitor_receive_process(Monitor* this, gpointer value) {
   GSList* it;
   if(!value) {
@@ -913,19 +927,7 @@ static volatile void _monitor_receive_process(Monitor* this, gpointer value) {
       plugin->add(plugin, value);
     }
   }
-
-  while(this->is_full && this->is_full(this->items)) {
-    gpointer obsolated = g_queue_pop_head(this->items);
-    for(it = this->plugins; it; it = it->next) {
-      MonitorPlugin* plugin = it->data;
-      gboolean allowed = plugin->filter ? plugin->filter(obsolated) : TRUE;
-      if(allowed) {
-        plugin->remove(plugin, obsolated);
-      }
-    }
-//    g_print("Monitor trashing: %p\n", obsolated);
-    _optional_transmit(&this->base, MONITOR_TRASH_OUTPUT, obsolated);
-  }
+  _monitor_refresh(this, NULL);
 }
 
 //TODO: hopp! nincs obsolation :) ez lehet osszefuggesben miert neznek ki ugy a grafikonok ahogy
@@ -1229,6 +1231,50 @@ _define_muxer_input(2)
 _define_muxer_input(3)
 _define_muxer_input(4)
 
+
+
+
+/*----------------------- Dedispatcher ---------------------------*/
+
+typedef gpointer (*MuxProcess)(gpointer *values);
+typedef struct{
+  Component base;
+  guint32   output_length;
+}Dispatcher;
+
+static Dispatcher* _make_dispatcher(void) {
+  Dispatcher* this = g_malloc0(sizeof(Dispatcher));
+  this->output_length = 0;
+  return this;
+}
+
+static void _dispose_dispatcher(Dispatcher* this){
+  g_free(this);
+}
+
+static void _dispatcher_add_output(Dispatcher* this, Component* dst, PusherIO target) {
+  _pushconnect_cmp(&this->base, this->output_length++, dst, target);
+}
+
+static void _dispatcher_add_outputs(Dispatcher* this, Component* dst, PusherIO target, ...) {
+  gint io_num = 0;
+  va_list arguments;
+  _dispatcher_add_output(this, dst, target);
+  va_start ( arguments, target );
+  for(dst = va_arg( arguments, Component*); dst; dst = va_arg( arguments, Component*)) {
+    _dispatcher_add_output(this, dst, va_arg( arguments, PusherIO));
+  }
+  va_end ( arguments );
+}
+
+static void _dispatcher_process(Dispatcher* this, gpointer value) {
+  gint output_id;
+  for (output_id = 0; output_id < this->output_length; ++output_id) {
+    _transmit(&this->base, output_id, value);
+  }
+}
+
+
 //################################ P I P E L I N E S ##########################################################
 
 #define _define_field_extractor(return_type, name, item_type, field_name) \
@@ -1310,13 +1356,14 @@ static void _sr_fr_full_unref(Tuple* packets_sr_fr) {
 }
 
 typedef struct {
-  Component base;
-  Monitor*  monitor;
-  Muxer*    muxer;
-  Sampler*  sampler;
-  Mapper*   packets_refer;
-  Mapper*   packets_unrefer;
-  Mapper*   tuple_packets_unrefer;
+  Component   base;
+  Monitor*    monitor;
+  Muxer*      muxer;
+  Sampler*    sampler;
+  Mapper*     packets_refer;
+  Mapper*     packets_unrefer;
+  Mapper*     tuple_packets_unrefer;
+  Dispatcher* dispatcher;
 }RateSampler;
 
 typedef enum{
@@ -1338,6 +1385,7 @@ static RateSampler* _make_rate_sampler() {
   this->packets_refer   = _make_mapper((MapperProcess) _object_ref);
   this->packets_unrefer = _make_mapper((MapperProcess) _object_unref);
   this->tuple_packets_unrefer = _make_mapper((MapperProcess) _sr_fr_full_unref);
+  this->dispatcher = _make_dispatcher();
 
   //Initialization
   _monitor_add_plugins(this->monitor,
@@ -1348,8 +1396,14 @@ static RateSampler* _make_rate_sampler() {
       _make_monitor_sum_plugin(_is_fec_packet, _counter_extractor, this->muxer, _muxer_input_4),
       NULL);
 
+  _dispatcher_add_outputs(this->dispatcher,
+      this->tuple_packets_unrefer, _mapper_process,
+      this->monitor, _monitor_refresh,
+      NULL);
+
   //Connection
   _pushconnect_cmp(this->packets_refer, MAPPER_OUTPUT, this->monitor, _monitor_receive_process);
+
 
   _pushconnect_cmp(this->muxer, MUXER_OUTPUT, this->sampler, _sampler_process);
   _pushconnect_cmp(this->sampler, SAMPLER_OUTPUT, this, _rate_sampler_tuple_output_transmitter);
@@ -1357,7 +1411,8 @@ static RateSampler* _make_rate_sampler() {
 
   _pushconnect_cmp(this->monitor, MONITOR_FLUSH_OUTPUT, this->muxer, _muxer_flush);
   _pushconnect_cmp(this->monitor, MONITOR_TRASH_OUTPUT, this->packets_unrefer, _mapper_process);
-  _pushconnect_cmp(this->sampler, SAMPLER_TRASH_OUTPUT, this->tuple_packets_unrefer, _mapper_process);
+  _pushconnect_cmp(this->sampler, SAMPLER_TRASH_OUTPUT, this->dispatcher, _dispatcher_process);
+//  _pushconnect_cmp(this->sampler, SAMPLER_TRASH_OUTPUT, this->tuple_packets_unrefer, _mapper_process);
   return this;
 }
 
@@ -1369,6 +1424,7 @@ static void _dispose_rate_sampler(RateSampler* this) {
   _dispose_sampler(this->sampler);
   _dispose_monitor(this->monitor);
   _dispose_muxer(this->muxer);
+  _dispose_dispatcher(this->dispatcher);
 }
 
 static void _sprintf_sr_fr_tuple_for_sr_fec(gchar* result, Tuple* sr_tuple){
@@ -1382,27 +1438,12 @@ static void _sprintf_sr_fr_tuple_for_sr_fec(gchar* result, Tuple* sr_tuple){
   );
 }
 
-static Tuple* _make_default_sr_fr_tuple() {
-  return _make_tuple(
-      _make_int32(0),
-      _make_int32(0),
-      _make_int32(0),
-      _make_int32(0),
-      _make_int32(0),
-      NULL
-      );
-}
-
 static void _write_sr_fec_rate(gchar* input_path, gchar* output_path) {
 
   //Construction
-  Tuple* default_tuple = _make_default_sr_fr_tuple();
   FileReader* reader = _make_reader(input_path, _make_rtp_packet);
   RateSampler* rate_sampler = _make_rate_sampler();
   FileWriter* writer = _make_writer(output_path, _sprintf_sr_fr_tuple_for_sr_fec);
-
-  //set default value:
-  rate_sampler->sampler->default_data = default_tuple;
 
   //Connection
   _pushconnect_cmp(reader, FILE_READER_OUTPUT, rate_sampler, _rate_sampler_packet_input_transmitter);

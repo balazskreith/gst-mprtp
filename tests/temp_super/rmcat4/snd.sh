@@ -1,1 +1,1 @@
-./scripts/runs/snd/rmcat4.sh FRACTaL
+./scripts/runs/snd/rmcat5.sh FRACTaL

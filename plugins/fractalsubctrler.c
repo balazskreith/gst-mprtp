@@ -535,7 +535,7 @@ static void _stat_print(FRACTaLSubController *this)
 
 
   // Subflow restrictions
-//  if (this->subflow->id != 2) return;
+  if (this->subflow->id != 2) return;
 
   g_print("%s\n",result);
 
@@ -709,7 +709,13 @@ static void _refresh_bottleneck(FRACTaLSubController *this) {
 //    this->bottleneck_point -= CONSTRAIN(2 * _min_ramp_up(this), _max_ramp_up(this), _stat(this)->max_extra_bytes * 12);
 //    this->bottleneck_point = this->est_capacity - _stat(this)->max_extra_bytes * 12;
   }
-  this->bottleneck_point = _stat(this)->sr_avg - _stat(this)->max_extra_bytes * 12;
+
+  if (this->distortion_num < 2) {
+    this->bottleneck_point = this->est_capacity - _stat(this)->max_extra_bytes * 12;
+  } else {
+    this->bottleneck_point = _stat(this)->sr_avg * .9 - _stat(this)->max_extra_bytes * 12;
+  }
+//  this->bottleneck_point = _stat(this)->sr_avg - _stat(this)->max_extra_bytes * 12;
   this->bottleneck_point -= CONSTRAIN(2 * _min_ramp_up(this), _max_ramp_up(this), this->bottleneck_point * .1);
   _change_sndsubflow_target_bitrate(this, this->bottleneck_point);
 //  _change_cwnd(this, MAX(e * this->bottleneck_cwnd, this->cwnd));
@@ -720,18 +726,27 @@ static void _refresh_target(FRACTaLSubController *this) {
   gint32 dtarget;
   gint32 target = MAX(this->target_bitrate, this->bottleneck_point);
   gint32 extra = 0;
-  gdouble scale = ((_stat(this)->max_psi - 1.0 - _stat(this)->psi_std * 2) / _stat(this)->max_psi);
+  gdouble scale;
+  GstClockTime deflate_time = 0;
+  if (1.0 +  _stat(this)->psi_std * 2 < _stat(this)->max_psi) {
+    scale = ((_stat(this)->max_psi - 1.0 - _stat(this)->psi_std * 2) / _stat(this)->max_psi);
+  } else {
+    scale = 0.0;
+  }
   scale *= scale;
   extra += _stat(this)->max_extra_bytes * 8;// + _min_ramp_up(this);
   if ( _stat(this)->skew_80th < _stat(this)->last_skew ) {
-    extra += CONSTRAIN(0., 3., log10(_stat(this)->last_skew - _stat(this)->skew_80th)) * _min_ramp_up(this);
-    g_print("H: %ld-%ld=%f\n", _stat(this)->last_skew, _stat(this)->skew_80th,
-        log10(_stat(this)->last_skew - _stat(this)->skew_80th));
+    gdouble off = CONSTRAIN(0., 3., log10(_stat(this)->last_skew - _stat(this)->skew_80th));
+    extra += off * _min_ramp_up(this);
+    deflate_time = off * _stat(this)->srtt;
   } else {
     extra +=  _min_ramp_up(this);
+    deflate_time = _stat(this)->max_psi * _stat(this)->srtt;
   }
   dtarget = MIN(_max_ramp_up(this), target * scale + extra);
   _change_sndsubflow_target_bitrate(this, target - dtarget);
+
+  this->deflate_time = MIN(deflate_time, GST_SECOND) + _now(this);
 }
 
 static void _undershoot(FRACTaLSubController *this)
@@ -865,7 +880,8 @@ _probe_stage(
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     _undershoot(this);
     goto done;
-  } else if (_now(this) - CONSTRAIN(300 * GST_MSECOND, GST_SECOND, 2 * _stat(this)->srtt) < this->last_distorted) {
+//  } else if (_now(this) - CONSTRAIN(300 * GST_MSECOND, GST_SECOND, 2 * _stat(this)->srtt) < this->last_distorted) {
+  } else if (_now(this) < this->deflate_time) {
     _refresh_target(this);
     goto done;
   } else if (_distortion(this)) {
@@ -899,7 +915,7 @@ _increase_stage(
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     _undershoot(this);
     goto done;
-  } else if (_now(this) - CONSTRAIN(300 * GST_MSECOND, GST_SECOND, 2 * _stat(this)->srtt) < this->last_distorted) {
+  } else if (_now(this) < this->deflate_time) {
     _refresh_target(this);
     goto done;
   }else if (_distortion(this)) {
@@ -984,6 +1000,7 @@ _fire(
           sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_UNDERUSED);
           break;
         case EVENT_SETTLED:
+          this->distortion_num      = 0;
           this->last_settled = _now(this);
           break;
         case EVENT_FI:

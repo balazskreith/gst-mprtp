@@ -388,7 +388,8 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
     }
 
     packet->rcvd_ts = _subtract_ts(report_timestamp, act_ato);
-    if (last_packet && last_packet->timestamp == packet->timestamp) {
+    if (last_packet) {
+//    if (last_packet && last_packet->timestamp == packet->timestamp) {
       guint32 drcv_ts = _delta_ts(last_packet->rcvd_ts, packet->rcvd_ts);
       guint32 dsnd_ts = _delta_ts(last_packet->sent_ts, packet->sent_ts);
       gint32 skew =  (gint32)drcv_ts - (gint32)dsnd_ts;

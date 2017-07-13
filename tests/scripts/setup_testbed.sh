@@ -105,46 +105,47 @@ sudo ip netns exec $NS_MID ip address add 127.0.0.1/8 dev lo
 sudo ip netns exec $NS_MID ip link set dev lo up
 
 
+#J> Setup LXBs in NS_MID
+sudo ip netns exec $NS_MID ip link add name br0 type bridge
+sudo ip netns exec $NS_MID ip link set dev br0 up
+sudo ip netns exec $NS_MID ip link add name br1 type bridge
+sudo ip netns exec $NS_MID ip link set dev br1 up
+sudo ip netns exec $NS_MID ip link add name br2 type bridge
+sudo ip netns exec $NS_MID ip link set dev br2 up
+## Bring up veths in MID
+sudo ip netns exec $NS_MID ip link set dev $S2M1 up
+sudo ip netns exec $NS_MID ip link set dev $M2R1 up
+sudo ip netns exec $NS_MID ip link set dev $S2M2 up
+sudo ip netns exec $NS_MID ip link set dev $M2R2 up
+sudo ip netns exec $NS_MID ip link set dev $S2M3 up
+sudo ip netns exec $NS_MID ip link set dev $M2R3 up
+## Add veth to LXBs
+sudo ip netns exec $NS_MID ip link set $S2M1 master br0
+sudo ip netns exec $NS_MID ip link set $M2R1 master br0
+sudo ip netns exec $NS_MID ip link set $S2M2 master br1
+sudo ip netns exec $NS_MID ip link set $M2R2 master br1
+sudo ip netns exec $NS_MID ip link set $S2M3 master br2
+sudo ip netns exec $NS_MID ip link set $M2R3 master br2
+
+
 #Bring up interface in namespace
 sudo ip netns exec $NS_SND ip link set dev $S1 up
-sudo ip netns exec $NS_SND ip address add 10.0.0.1/30 dev $S1
-sudo ip netns exec $NS_MID ip link set dev $S2M1 up
-sudo ip netns exec $NS_MID ip address add 10.0.0.2/30 dev $S2M1
-sudo ip netns exec $NS_MID ip link set dev $M2R1 up
-sudo ip netns exec $NS_MID ip address add 10.0.0.5/30 dev $M2R1
+sudo ip netns exec $NS_SND ip address add 10.0.0.1/24 dev $S1
 sudo ip netns exec $NS_RCV ip link set dev $R1 up
-sudo ip netns exec $NS_RCV ip address add 10.0.0.6/30 dev $R1
+sudo ip netns exec $NS_RCV ip address add 10.0.0.6/24 dev $R1
 
 sudo ip netns exec $NS_SND ip link set dev $S2 up
-sudo ip netns exec $NS_SND ip address add 10.0.1.1/30 dev $S2
-sudo ip netns exec $NS_MID ip link set dev $S2M2 up
-sudo ip netns exec $NS_MID ip address add 10.0.1.2/30 dev $S2M2
-sudo ip netns exec $NS_MID ip link set dev $M2R2 up
-sudo ip netns exec $NS_MID ip address add 10.0.1.5/30 dev $M2R2
+sudo ip netns exec $NS_SND ip address add 10.0.1.1/24 dev $S2
 sudo ip netns exec $NS_RCV ip link set dev $R2 up
-sudo ip netns exec $NS_RCV ip address add 10.0.1.6/30 dev $R2
+sudo ip netns exec $NS_RCV ip address add 10.0.1.6/24 dev $R2
 
 sudo ip netns exec $NS_SND ip link set dev $S3 up
-sudo ip netns exec $NS_SND ip address add 10.0.2.1/30 dev $S3
-sudo ip netns exec $NS_MID ip link set dev $S2M3 up
-sudo ip netns exec $NS_MID ip address add 10.0.2.2/30 dev $S2M3
-sudo ip netns exec $NS_MID ip link set dev $M2R3 up
-sudo ip netns exec $NS_MID ip address add 10.0.2.5/30 dev $M2R3
+sudo ip netns exec $NS_SND ip address add 10.0.2.1/24 dev $S3
 sudo ip netns exec $NS_RCV ip link set dev $R3 up
-sudo ip netns exec $NS_RCV ip address add 10.0.2.6/30 dev $R3
+sudo ip netns exec $NS_RCV ip address add 10.0.2.6/24 dev $R3
 
 
-#Add ip routes
-sudo ip netns exec $NS_SND ip route add 10.0.0.4/30 dev $S1 via 10.0.0.2
-sudo ip netns exec $NS_RCV ip route add 10.0.0.0/30 dev $R1 via 10.0.0.5
-
-sudo ip netns exec $NS_SND ip route add 10.0.1.4/30 dev $S2 via 10.0.1.2
-sudo ip netns exec $NS_RCV ip route add 10.0.1.0/30 dev $R2 via 10.0.1.5
-
-sudo ip netns exec $NS_SND ip route add 10.0.2.4/30 dev $S3 via 10.0.2.2
-sudo ip netns exec $NS_RCV ip route add 10.0.2.0/30 dev $R3 via 10.0.2.5
-
-#Add Ip forwarding rule
+#Add IP forwarding rule
 sudo ip netns exec $NS_MID sysctl -w net.ipv4.ip_forward=1
 #dd of=/proc/sys/net/ipv4/ip_forward <<<1
 

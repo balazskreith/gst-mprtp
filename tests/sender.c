@@ -231,6 +231,12 @@ GstElement* _make_mprtp_sender(Sender* this, TransferParams *params)
     gst_bin_add(senderBin, queue);
     gst_element_link_pads(mprtpSnd, padName, queue, "sink");
     gst_element_link_pads(queue, "src", rtpSink, "sink");
+
+//    memset(padName, 0, 255);
+//    sprintf(padName, "src_%d", subflow->id);
+//    rtpSink = _make_rtpsink(subflow->dest_ip, subflow->dest_port);
+//    gst_bin_add(senderBin, rtpSink);
+//    gst_element_link_pads(mprtpSnd, padName, rtpSink, "sink");
   }
 
   setup_ghost_sink_by_padnames(mprtpSnd, "mprtp_sink", senderBin, "sink");

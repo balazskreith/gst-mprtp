@@ -58,9 +58,14 @@ typedef struct _FRACTaLStat
   gint32                   max_extra_bytes;
   gint32                   extra_bytes_80th;
   gdouble                  ewi_in_s;
+  gint32                   received_bytes_in_rtt;
   gint32                   received_bytes_in_ewi;
   gint32                   queued_bytes_in_srtt;
   guint16                  sent_packets_in_1s;
+
+  GstClockTime qd_50th;
+  GstClockTime last_qd;
+  GstClockTime qd_std;
 
 }FRACTaLStat;
 
@@ -95,9 +100,18 @@ struct _FRACTaLFBProcessor
   GstClockTime             rtt;
   GQueue*                  sent_packets;
   GQueue*                  rcvd_packets_ewi;
+  GQueue*                  rcvd_packes_in_rtt;
   GQueue*                  queued_packets_rtt;
   SlidingWindow*           distortions_sw;
   SlidingWindow*           reference_sw;
+  SlidingWindow*           skews_sw;
+
+  SlidingWindow*           ewi_sw;
+
+  gint32 skews[128];
+  gint32 skew;
+  GstClockTime last_skew_ref;
+  gint32 skews_index;
 
   FRACTaLStat*             stat;
   SndTracker*              sndtracker;
@@ -106,6 +120,7 @@ struct _FRACTaLFBProcessor
   GstClockTime             last_report_update;
 
   guint16                  HSN;
+
 
   guint32                  srtt_in_ts;
 

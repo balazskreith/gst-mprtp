@@ -72,16 +72,19 @@ struct _SlidingWindowClass{
 };
 
 typedef struct _SlidingWindowPlugin{
-  void      (*rem_pipe)(gpointer,gpointer);
-  gpointer    rem_data;
-  void      (*add_pipe)(gpointer,gpointer);
-  gpointer    add_data;
-  void      (*disposer)(gpointer);
-  void      (*clear)(gpointer);
-  Notifier*   on_calculated;
-  gpointer    priv;
+  void             (*rem_pipe)(gpointer,gpointer);
+  gpointer           rem_data;
+  void             (*add_pipe)(gpointer,gpointer);
+  gpointer           add_data;
+  void             (*disposer)(gpointer);
+  void             (*clear)(gpointer);
+  Notifier*          on_calculated;
+  gpointer           priv;
 }SlidingWindowPlugin;
 
+typedef gboolean (*SlidingWindowObsolateFunc)(gpointer udata, SlidingWindowItem* item);
+
+typedef gboolean (*SWPluginFilterFunc)(gpointer item);
 
 GType slidingwindow_get_type (void);
 SlidingWindow* make_slidingwindow_uint16(guint32 num_limit, GstClockTime obsolation_treshold);
@@ -100,7 +103,7 @@ void slidingwindow_dtor(gpointer target);
 void slidingwindow_refresh(SlidingWindow *this);
 void slidingwindow_set_threshold(SlidingWindow* this, GstClockTime obsolation_treshold);
 gpointer slidingwindow_peek_oldest(SlidingWindow* this);
-gpointer slidingwindow_peek_latest(SlidingWindow* this);
+gpointer slidingwindow_peek_newest(SlidingWindow* this);
 gpointer slidingwindow_peek_custom(SlidingWindow* this, gint (*comparator)(gpointer item, gpointer udata), gpointer udata);
 void slidingwindow_set_act_limit(SlidingWindow* this, gint32 act_limit);
 void slidingwindow_add_int(SlidingWindow* this, gint data);
@@ -113,7 +116,7 @@ void slidingwindow_add_processors(SlidingWindow* this, ListenerFunc preprocess_c
 
 void slidingwindow_setup_debug(SlidingWindow* this, SlidingWindowItemSprintf sprintf, SlidingWindowItemLogger logger);
 void slidingwindow_set_min_itemnum(SlidingWindow* this, gint min_itemnum);
-void slidingwindow_setup_custom_obsolation(SlidingWindow* this, gboolean (*custom_obsolation)(gpointer,SlidingWindowItem*),gpointer custom_obsolation_udata);
+void slidingwindow_setup_custom_obsolation(SlidingWindow* this, SlidingWindowObsolateFunc custom_obsolate, gpointer custom_obsolation_udata);
 gint32 slidingwindow_get_counter(SlidingWindow* this);
 void slidingwindow_add_plugin(SlidingWindow* this, SlidingWindowPlugin *plugin);
 void slidingwindow_add_plugins (SlidingWindow* this, ... );

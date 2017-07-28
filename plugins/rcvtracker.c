@@ -120,6 +120,7 @@ RcvTracker *make_rcvtracker(void)
   this = g_object_new(RCVTRACKER_TYPE, NULL);
   this->cc_ts_generator = make_timestamp_generator(DEFAULT_CC_TIMESTAMP_GENERATOR_CLOCKRATE);
   this->rtp_ts_generator = make_timestamp_generator(DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE);
+
   return this;
 }
 
@@ -210,6 +211,11 @@ void rcvtracker_add_on_discarded_packet_listener_with_filter(RcvTracker * this,
   notifier_add_listener_with_filter(this->on_discarded_packet, callback, filter, udata);
 }
 
+
+RcvTrackerStat* rcvtracker_get_stat(RcvTracker * this)
+{
+  return &this->stat;
+}
 
 RcvTrackerSubflowStat* rcvtracker_get_subflow_stat(RcvTracker * this, guint8 subflow_id)
 {

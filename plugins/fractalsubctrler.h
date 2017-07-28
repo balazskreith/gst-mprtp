@@ -55,13 +55,15 @@ struct _FRACTaLSubController
   GstClockTime              last_executed;
 
   gint32                    bottleneck_point;
-  gint32                    inflection_point;
+  gint32                    congested_bitrate;
 
   GstClockTime              approvement_interval;
 
   FRACTaLFBProcessor*       fbprocessor;
   FRACTaLStat*              stat;
   guint                     sent_packets;
+  guint16                   border_packet_seq;
+  gboolean                  set_border_packet;
 
   gint32                    est_capacity;
   GstClockTime              deflate_time;
@@ -76,8 +78,8 @@ struct _FRACTaLSubController
   GstClockTime              increasing_sr_reached;
   gint32                    increasement;
 
-  gint64                    skew_th;
-  gdouble                   psi_th;
+  gint64                    QD_th;
+  gint32                    EB_th;
   gdouble                   FL_th;
   gboolean                  reducing_approved;
   GstClockTime              reducing_sr_reached;
@@ -98,8 +100,10 @@ struct _FRACTaLSubController
   gboolean                  stability_approved;
   gboolean                  cwnd_locked;
   gdouble                   bottleneck_cwnd;
-  gdouble                   max_psi;
-  gdouble                   distorted_cwnd;
+  gdouble                   min_psi;
+  gdouble                   psi;
+  gdouble                   congested_cwnd;
+  GstClockTime            (*refresh_target)(FRACTaLSubController* this);
 
   gint32                    max_extra_bytes;
   gdouble                   cwnd;//congestion window

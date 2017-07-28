@@ -69,6 +69,11 @@ rcvctrler_finalize (GObject * object);
 
 //------------------------ Outgoing Report Producer -------------------------
 static void
+_on_received_packet(
+    RcvController *this,
+    RcvPacket *packet);
+
+static void
 _receiver_report_updater(
     RcvController * this);
 
@@ -76,7 +81,6 @@ static void
 _create_rr(
     RcvController *this,
     RcvSubflow *subflow);
-
 
 //------------------------- Utility functions --------------------------------
 
@@ -104,6 +108,18 @@ static void
 _on_congestion_controlling_changed(
     RcvController* this,
     RcvSubflow *subflow);
+
+
+static gint
+_cmp_seq (guint16 x, guint16 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 32768) return -1;
+  if(x > y && x - y > 32768) return -1;
+  if(x < y && y - x > 32768) return 1;
+  if(x > y && x - y < 32768) return 1;
+  return 0;
+}
 
 
 void
@@ -165,11 +181,18 @@ make_rcvctrler(
   this->subflows      = g_object_ref(subflows);
   this->rcvtracker    = g_object_ref(rcvtracker);
 
+  this->rtcp_fb_frame_interval_th = 1; // TODO: make it configurable
+  this->fb_timeout = 100 * GST_MSECOND;
+
   rcvsubflows_add_on_subflow_detached_cb(
       this->subflows, (ListenerFunc)_on_subflow_detached, this);
 
   rcvsubflows_add_on_congestion_controlling_type_changed_cb(
       this->subflows, (ListenerFunc)_on_congestion_controlling_changed, this);
+
+  rcvtracker_add_on_received_packet_listener(rcvtracker,
+      (ListenerFunc) _on_received_packet,
+      this);
 
   return this;
 }
@@ -234,9 +257,51 @@ static void _receiver_report_updater_helper(RcvSubflow *subflow, gpointer udata)
     goto done;
   }
 
-  if(ricalcer_rtcp_regular_allowed_rcvsubflow(this->ricalcer, subflow)){
-    report_producer_begin(this->report_producer, subflow->id);
-    _create_rr(this, subflow);
+  if(!ricalcer_rtcp_regular_allowed_rcvsubflow(this->ricalcer, subflow)){
+    return;
+  }
+
+  report_producer_begin(this->report_producer, subflow->id);
+  _create_rr(this, subflow);
+  buf = report_producer_end(this->report_producer, &report_length);
+  if(buf){
+    notifier_do(this->on_rtcp_ready, buf);
+  }
+
+  // old code
+
+//  if(ricalcer_rtcp_regular_allowed_rcvsubflow(this->ricalcer, subflow)){
+//    report_producer_begin(this->report_producer, subflow->id);
+//    _create_rr(this, subflow);
+//  }
+
+//  PROFILING("rcvsubflow_notify_rtcp_fb_cbs",
+//  rcvsubflow_notify_rtcp_fb_cbs(subflow, this->report_producer);
+//  );
+
+//  buf = report_producer_end(this->report_producer, &report_length);
+//
+//  if(buf){
+//    notifier_do(this->on_rtcp_ready, buf);
+//  }
+
+  //report_length += 12 /* RTCP HEADER*/ + (28<<3) /*UDP+IP HEADER*/;
+  //ricalcer_update_avg_report_size(ricaler, report_length);
+
+done:
+  return;
+}
+
+static void _receiver_fb_report_updater_helper(RcvSubflow *subflow, gpointer udata)
+{
+  RcvController*            this;
+  GstBuffer*                buf;
+  guint                     report_length = 0;
+
+  this = udata;
+
+  if(subflow->congestion_controlling_type == CONGESTION_CONTROLLING_TYPE_NONE){
+    goto done;
   }
 
 //  PROFILING("rcvsubflow_notify_rtcp_fb_cbs",
@@ -256,6 +321,48 @@ done:
   return;
 }
 
+static void _do_fb_report(RcvController *this) {
+  rcvsubflows_iterate(this->subflows, (GFunc) _receiver_fb_report_updater_helper, this);
+  this->rtcp_fb_frame_interval_rcvd = 0;
+  this->last_fb_report = _now(this);
+  this->last_rcvd_ts = 0;
+//  g_print("do_report HSN: %hu\n", this->HSN);
+}
+
+void _on_received_packet( RcvController *this, RcvPacket *packet)
+{
+  if (this->rtcp_fb_frame_interval_th < 1) {
+    return;
+  }
+
+  if (!this->HSN) {
+    this->HSN = packet->abs_seq;
+    this->last_fb_report = _now(this);
+  } else if(_cmp_seq(packet->abs_seq, this->HSN) <= 0) {
+    return;
+  }
+  this->HSN = packet->abs_seq;
+  if (!this->last_rcvd_ts) {
+    this->last_rcvd_ts = packet->snd_rtp_ts;
+    this->rtcp_fb_frame_interval_rcvd = 1;
+  } else if (this->last_rcvd_ts != packet->snd_rtp_ts) {
+    this->last_rcvd_ts = packet->snd_rtp_ts;
+    ++this->rtcp_fb_frame_interval_rcvd;
+    return;
+  }
+
+  if (this->rtcp_fb_frame_interval_rcvd < this->rtcp_fb_frame_interval_th) {
+    return;
+  } else if (!packet->marker) {
+    return;
+  } else if(_now(this) - 50 * GST_MSECOND < this->last_fb_report) {
+    return;
+  }
+
+  _do_fb_report(this);
+
+}
+
 void
 _receiver_report_updater(RcvController * this)
 {
@@ -266,6 +373,18 @@ _receiver_report_updater(RcvController * this)
 
   rcvsubflows_iterate(this->subflows, (GFunc) _receiver_report_updater_helper, this);
 
+  {
+//    RcvTrackerStat* stat = rcvtracker_get_stat(this->rcvtracker);
+//    gdouble rr = stat->receiver_rate / 125;
+//    this->rtcp_fb_frame_interval_th = CONSTRAIN(1, 3, 2000. / rr);
+//    this->fb_timeout = (this->rtcp_fb_frame_interval_th) * 100 * GST_MSECOND;
+//    g_print("Timeout: %lu | interval: %d\n", GST_TIME_AS_MSECONDS(this->fb_timeout), this->rtcp_fb_frame_interval_th);
+  }
+
+  if (this->last_fb_report < _now(this) - this->fb_timeout) { // Timeout!
+    // TODO: do a compound packet in this case
+    _do_fb_report(this);
+  }
 done:
   return;
 }
@@ -407,8 +526,3 @@ done:
   return;
 }
 
-#undef MAX_RIPORT_INTERVAL
-#undef THIS_READLOCK
-#undef THIS_READUNLOCK
-#undef THIS_WRITELOCK
-#undef THIS_WRITEUNLOCK

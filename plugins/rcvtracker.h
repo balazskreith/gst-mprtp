@@ -28,6 +28,7 @@ typedef struct _RcvTrackerStat{
   gdouble    max_skew;
   gint32     discarded_packets;
   gint32     recovered_packets;
+  gint32     receiver_rate;
 }RcvTrackerStat;
 
 
@@ -54,7 +55,6 @@ struct _RcvTracker
   Notifier*                 on_received_packet;
   Notifier*                 on_discarded_packet;
   Notifier*                 on_lost_packet;
-
 
   gpointer                  priv;
 };
@@ -96,6 +96,7 @@ void rcvtracker_add_on_discarded_packet_listener_with_filter(RcvTracker * this,
                                     gpointer udata);
 
 void rcvtracker_add_packet(RcvTracker * this, RcvPacket* packet);
+RcvTrackerStat* rcvtracker_get_stat(RcvTracker * this);
 RcvTrackerSubflowStat* rcvtracker_get_subflow_stat(RcvTracker * this, guint8 subflow_id);
 
 #endif /* RCVTRACKER_H_ */

@@ -188,7 +188,7 @@ SlidingWindow* make_slidingwindow(guint32 num_limit, GstClockTime obsolation_tre
   result->sysclock         = gst_system_clock_obtain();
   result->treshold         = obsolation_treshold;
   result->num_limit        = result->num_act_limit = num_limit;
-  result->min_itemnum      = 1;
+  result->min_itemnum      = 0;
   result->obsolate         = _slidingwindow_default_obsolation;
   result->obsolate_udata   = result;
   result->on_add_item      = make_notifier("SW: on-add-item");
@@ -281,9 +281,10 @@ void slidingwindow_set_min_itemnum(SlidingWindow* this, gint min_itemnum)
   this->min_itemnum = min_itemnum;
 }
 
-void slidingwindow_setup_custom_obsolation(SlidingWindow* this, gboolean (*custom_obsolation)(gpointer,SlidingWindowItem*),gpointer custom_obsolation_udata)
+
+void slidingwindow_setup_custom_obsolation(SlidingWindow* this, SlidingWindowObsolateFunc custom_obsolate,gpointer custom_obsolation_udata)
 {
-  this->obsolate = custom_obsolation_udata;
+  this->obsolate = custom_obsolate;
   this->obsolate_udata = custom_obsolation_udata;
 }
 
@@ -344,7 +345,7 @@ gpointer slidingwindow_peek_oldest(SlidingWindow* this)
   return item->data;
 }
 
-gpointer slidingwindow_peek_latest(SlidingWindow* this)
+gpointer slidingwindow_peek_newest(SlidingWindow* this)
 {
   SlidingWindowItem *item;
   if(datapuffer_isempty(this->items)){
@@ -494,6 +495,8 @@ SlidingWindowPlugin* swplugin_ctor(void)
   this->disposer = swplugin_dtor;
   return this;
 }
+
+
 
 void swplugin_dtor(gpointer target)
 {

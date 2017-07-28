@@ -87,6 +87,7 @@ RcvPackets* make_rcvpackets(void)
   RcvPackets* this;
   this = g_object_new (RCVPACKETS_TYPE, NULL);
   this->recycle = make_recycle_rcvpacket(256, (RecycleItemShaper)_rcvpacket_shaper);
+
   return this;
 }
 
@@ -127,6 +128,7 @@ RcvPacket* rcvpackets_get_packet(RcvPackets* this, GstBuffer* buffer)
   packet->ref      = 1;
   packet->received = _now(this);
   packet->destiny  = this->recycle;
+
   return packet;
 }
 
@@ -191,7 +193,7 @@ void rcvpacket_print(RcvPacket *packet, printfnc print)
 void _setup_rcvpacket(RcvPacket* packet, GstRTPBuffer *rtp)
 {
   packet->abs_seq      = gst_rtp_buffer_get_seq(rtp);
-  packet->snd_rtp_ts    = gst_rtp_buffer_get_timestamp(rtp);
+  packet->snd_rtp_ts   = gst_rtp_buffer_get_timestamp(rtp);
   packet->ssrc         = gst_rtp_buffer_get_ssrc(rtp);
   packet->payload_size = gst_rtp_buffer_get_payload_len(rtp);
   packet->payload_type = gst_rtp_buffer_get_payload_type(rtp);

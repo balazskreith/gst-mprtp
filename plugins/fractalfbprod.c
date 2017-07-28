@@ -173,16 +173,17 @@ done:
 
 static gboolean _do_fb(FRACTaLFBProducer *this)
 {
-  GstClockTime now = _now(this);
-  slidingwindow_refresh(this->rle_sw);
-
-  if(now - 20 * GST_MSECOND < this->last_fb){
-    return FALSE;
-  }
-  if(this->last_fb < _now(this) - 100 * GST_MSECOND){
-    return TRUE;
-  }
-  return 3 < this->rcved_packets;
+//  GstClockTime now = _now(this);
+//  slidingwindow_refresh(this->rle_sw);
+//
+//  if(now - 20 * GST_MSECOND < this->last_fb){
+//    return FALSE;
+//  }
+//  if(this->last_fb < _now(this) - 100 * GST_MSECOND){
+//    return TRUE;
+//  }
+//  return 20 < this->rcved_packets;
+  return 0 < this->rcved_packets;
 }
 
 void _on_fb_update(FRACTaLFBProducer *this, ReportProducer* reportproducer)

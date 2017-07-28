@@ -49,6 +49,13 @@ struct _RcvController
   GstMPRTCPReportSummary    reports_summary;
   GstClockTime              last_time_update;
   ReportIntervalCalculator* ricalcer;
+
+  guint16 HSN;
+  gint32 last_rcvd_ts;
+  gint32 rtcp_fb_frame_interval_rcvd;
+  gint32 rtcp_fb_frame_interval_th;
+  GstClockTime last_fb_report;
+  GstClockTime fb_timeout;
 };
 
 

@@ -158,8 +158,9 @@ SlidingWindowPlugin* make_swprinter(void (*sprint)(gpointer,gchar*))
 
 typedef struct _swminmax{
   SlidingWindowPlugin* base;
-  Bintree*          tree;
+  Bintree*             tree;
   swminmaxstat_t       stat;
+  SWPluginFilterFunc   filter;
 }swminmax_t;
 
 
@@ -199,6 +200,9 @@ static void _swminmax_add_pipe(gpointer dataptr, gpointer itemptr)
 {
   swminmax_t* this;
   this = dataptr;
+  if (this->filter && !this->filter(itemptr)) {
+    return;
+  }
   bintree_insert_value(this->tree, itemptr);
   this->stat.min = bintree_get_bottom_value(this->tree);
   this->stat.max = bintree_get_top_value(this->tree);
@@ -209,10 +213,19 @@ static void _swminmax_rem_pipe(gpointer dataptr, gpointer itemptr)
 {
   swminmax_t* this;
   this = dataptr;
+  if (this->filter && !this->filter(itemptr)) {
+      return;
+    }
   bintree_delete_value(this->tree, itemptr);
   this->stat.min = bintree_get_bottom_value(this->tree);
   this->stat.max = bintree_get_top_value(this->tree);
   swplugin_notify(this->base, &this->stat);
+}
+
+void swminmax_set_filter(SlidingWindowPlugin* plugin,  SWPluginFilterFunc filter)
+{
+  swminmax_t* this = plugin->priv;
+  this->filter = filter;
 }
 
 SlidingWindowPlugin* make_swminmax(GCompareFunc cmp, ListenerFunc on_calculated_cb, gpointer udata)
@@ -311,6 +324,78 @@ SlidingWindowPlugin* make_swavg(ListenerFunc on_calculated_cb, gpointer udata,
   this->rem_pipe = _swavg_rem_pipe;
   this->rem_data = this->priv;
   this->disposer = _swavg_disposer;
+  return this;
+}
+
+
+
+//-----------------------------------------------------------------------------------
+
+typedef struct _swsum{
+  SlidingWindowPlugin*  base;
+  SWDataExtractor       extractor;
+  gdouble               sum;
+}swsum_t;
+
+
+static swsum_t* _swsumpriv_ctor(SlidingWindowPlugin* base, SWDataExtractor extractor)
+{
+  swsum_t* this;
+  this = malloc(sizeof(swsum_t));
+  memset(this, 0, sizeof(swsum_t));
+  this->extractor = extractor;
+  this->base    = base;
+  this->sum     = 0;
+  return this;
+}
+
+static void _swsumpriv_disposer(gpointer target)
+{
+  swsum_t* this = target;
+  if(!target){
+    return;
+  }
+  free(this);
+}
+
+static void _swsum_disposer(gpointer target)
+{
+  SlidingWindowPlugin* this = target;
+  if(!target){
+    return;
+  }
+
+  _swsumpriv_disposer(this->priv);
+  this->priv = NULL;
+  g_free(this);
+}
+
+static void _swsum_add_pipe(gpointer dataptr, gpointer itemptr)
+{
+  swsum_t* this = dataptr;
+  this->sum += this->extractor(itemptr);
+  swplugin_notify(this->base, &this->sum);
+}
+
+static void _swsum_rem_pipe(gpointer dataptr, gpointer itemptr)
+{
+  swsum_t* this = dataptr;
+  this->sum -= this->extractor(itemptr);
+  swplugin_notify(this->base, &this->sum);
+}
+
+SlidingWindowPlugin* make_swsum(ListenerFunc on_calculated_cb, gpointer udata,
+    SWDataExtractor extractor)
+{
+  SlidingWindowPlugin* this;
+  this = swplugin_ctor();
+  this = make_swplugin(on_calculated_cb, udata);
+  this->priv = _swsumpriv_ctor(this, extractor);
+  this->add_pipe = _swsum_add_pipe;
+  this->add_data = this->priv;
+  this->rem_pipe = _swsum_rem_pipe;
+  this->rem_data = this->priv;
+  this->disposer = _swsum_disposer;
   return this;
 }
 
@@ -1007,9 +1092,8 @@ static void _swpercentile2_calculate(swpercentile2_t* this) {
     if (total < 1) {
       return;
     }
-
-    if (total < this->required || mincounter < 1 || mincounter < 1) {
-      if (!this->estimator || (mincounter < 1 && mincounter < 1)) {
+    if (total < this->required || mincounter < 1 || maxcounter < 1) {
+      if (!this->estimator || (mincounter < 1 && maxcounter < 1)) {
         return;
       }
       if (mincounter < 1) {

@@ -111,6 +111,7 @@ typedef struct swint32stat_struct_t{
   gdouble dev;
 }swint32stat_t;
 
+void swminmax_set_filter(SlidingWindowPlugin* plugin,  SWPluginFilterFunc filter);
 SlidingWindowPlugin* make_swminmax(GCompareFunc cmp,
                                   ListenerFunc on_calculated_cb,
                                   gpointer       udata
@@ -130,8 +131,18 @@ typedef gdouble (*SWDataExtractor)(gpointer item);
     swplugin_define_on_calculated_data(this_type, on_calculated_func, on_calculated_field, gint32)
 
 
-#define swplugin_define_swdataextractor(extractor_fnc, item_type, extracted_field) \
+#define swplugin_define_swselfdoubleextractor(extractor_fnc, item_type) \
     static gdouble extractor_fnc(gpointer itemptr){ \
+      return *(item_type*)itemptr; \
+    }
+
+#define swplugin_define_swdoubleextractor(extractor_fnc, item_type, extracted_field) \
+    static gdouble extractor_fnc(gpointer itemptr){ \
+      return ((item_type*)itemptr)->extracted_field; \
+    }
+
+#define swplugin_define_swdataextractor(return_type, extractor_fnc, item_type, extracted_field) \
+    static return_type extractor_fnc(gpointer itemptr){ \
       return ((item_type*)itemptr)->extracted_field; \
     }
 
@@ -145,6 +156,10 @@ SlidingWindowPlugin* make_swavg(ListenerFunc on_calculated_cb,
                                   gpointer       udata,
                                   SWDataExtractor   extractor
                           );
+
+SlidingWindowPlugin* make_swsum(ListenerFunc on_calculated_cb,
+                                gpointer udata,
+                                SWDataExtractor extractor);
 
 
 SlidingWindowPlugin* make_swstd(ListenerFunc on_calculated_cb,

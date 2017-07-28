@@ -20,13 +20,15 @@ GST_DEBUG_CATEGORY_STATIC (fractalfbprocessor_debug_category);
 G_DEFINE_TYPE (FRACTaLFBProcessor, fractalfbprocessor, G_TYPE_OBJECT);
 
 typedef struct {
-  gint64 skew;
+//  gint64 skew;
   gdouble fraction_lost;
   gdouble psi;
-  gint32  bytes_in_flight;
+//  gint32  bytes_in_flight;
   GstClockTime rtt;
   guint32 rtt_in_ts;
   gint32 extra_bytes;
+  guint32 dts;
+  GstClockTime queue_delay;
 }ReferencePoint;
 
 typedef struct {
@@ -35,22 +37,11 @@ typedef struct {
 }DistortionPoint;
 
 
-//----------------------------------------------------------------------
-//-------- Private functions belongs to Scheduler tree object ----------
-//----------------------------------------------------------------------
-
 static void fractalfbprocessor_finalize (GObject * object);
 static void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xr);
 static void _process_stat(FRACTaLFBProcessor *this);
 
-static void _refresh_sent_packets_in_ewi_t(FRACTaLFBProcessor* this);
-void _push_rcvd_packets_in_ewi(FRACTaLFBProcessor *this, SndPacket* packet);
-static void _refresh_rcvd_packets_in_ewi(FRACTaLFBProcessor* this);
-static void _push_rcvd_packets_in_srtt(FRACTaLFBProcessor *this, SndPacket* packet);
-
-//----------------------------------------------------------------------
-//--------- Private functions implementations to SchTree object --------
-//----------------------------------------------------------------------
+//void _push_rcvd_packets_in_ewi(FRACTaLFBProcessor *this, SndPacket* packet);
 
 static guint32 _delta_ts(guint32 last_ts, guint32 actual_ts) {
   if (last_ts <= actual_ts) {
@@ -64,40 +55,44 @@ static guint32 _delta_ts(guint32 last_ts, guint32 actual_ts) {
 //while the number it is subtracted from is the minuend
 #define _subtract_ts(minuend, subtrahend) _delta_ts(subtrahend, minuend)
 
-static gint
-_cmp_ts (guint32 x, guint32 y)
-{
-  if(x == y) return 0;
-  if(x < y && y - x < 2147483648) return -1;
-  if(x > y && x - y > 2147483648) return -1;
-  if(x < y && y - x > 2147483648) return 1;
-  if(x > y && x - y < 2147483648) return 1;
-  return 0;
-}
+//static gint
+//_cmp_ts (guint32 x, guint32 y)
+//{
+//  if(x == y) return 0;
+//  if(x < y && y - x < 2147483648) return -1;
+//  if(x > y && x - y > 2147483648) return -1;
+//  if(x < y && y - x > 2147483648) return 1;
+//  if(x > y && x - y < 2147483648) return 1;
+//  return 0;
+//}
 
 
-static gint
-_cmp_seq (guint16 x, guint16 y)
-{
-  if(x == y) return 0;
-  if(x < y && y - x < 32768) return -1;
-  if(x > y && x - y > 32768) return -1;
-  if(x < y && y - x > 32768) return 1;
-  if(x > y && x - y < 32768) return 1;
-  return 0;
-}
+//static gint
+//_cmp_seq (guint16 x, guint16 y)
+//{
+//  if(x == y) return 0;
+//  if(x < y && y - x < 32768) return -1;
+//  if(x > y && x - y > 32768) return -1;
+//  if(x < y && y - x > 32768) return 1;
+//  if(x > y && x - y < 32768) return 1;
+//  return 0;
+//}
+
+
+//static gint
+//_cmp_rcv_snd_ts (SndPacket* x, SndPacket *y)
+//{
+//  guint32 dx = _delta_ts(x->sent_ts, x->rcvd_ts);
+//  guint32 dy = _delta_ts(y->sent_ts, y->rcvd_ts);
+//  return dx == dy ? 0 : dx < dy ? -1 : 1;
+//}
 
 
 
 DEFINE_RECYCLE_TYPE(static, reference_point, ReferencePoint);
-DEFINE_RECYCLE_TYPE(static, distortion_point, DistortionPoint);
 
 static void _reference_point_shaper(ReferencePoint* to, ReferencePoint* from) {
   memcpy(to, from, sizeof(ReferencePoint));
-}
-
-static void _distortion_point_shaper(DistortionPoint* to, DistortionPoint* from) {
-  memcpy(to, from, sizeof(DistortionPoint));
 }
 
 void
@@ -120,8 +115,6 @@ fractalfbprocessor_finalize (GObject * object)
   FRACTaLFBProcessor *this;
   this = FRACTALFBPROCESSOR(object);
 
-  g_object_unref(this->reference_sw);
-
   g_object_unref(this->reference_point_recycle);
   g_object_unref(this->sysclock);
   g_object_unref(this->sndtracker);
@@ -133,155 +126,126 @@ fractalfbprocessor_init (FRACTaLFBProcessor * this)
   this->sysclock         = gst_system_clock_obtain();
 }
 
-static void _on_minmax_distortion_point_calculated(gpointer udata, swminmaxstat_t* minmax) {
-  DistortionPoint* max = minmax->max;
-  FRACTaLStat* stat = udata;
-  stat->max_psi = MAX(max->psi, 1.);
-  stat->max_extra_bytes = max->extra_bytes;
+
+static void _on_min_dts_calculated(FRACTaLFBProcessor* this, swminmaxstat_t* stat) {
+  this->min_dts = ((ReferencePoint*)stat->min)->dts;
 }
 
-swplugin_define_on_calculated_double(FRACTaLStat, _on_skew_std_calculated, skew_std);
-swplugin_define_on_calculated_double(FRACTaLStat, _on_psi_std_calculated, psi_std);
+//swplugin_define_on_calculated_double(FRACTaLStat, _on_skew_std_calculated, skew_std);
+//swplugin_define_on_calculated_double(FRACTaLStat, _on_psi_std_calculated, psi_std);
 
 swplugin_define_on_calculated_double(FRACTaLStat, _on_lost_avg_calculated, fl_avg);
 swplugin_define_on_calculated_double(FRACTaLStat, _on_lost_std_calculated, fl_std);
 
-
-swplugin_define_swdataextractor(_BiF_extractor, ReferencePoint, bytes_in_flight);
-swplugin_define_on_calculated_double(FRACTaLStat, _on_BiF_std_calculated, BiF_std);
+swplugin_define_on_calculated_data(FRACTaLFBProcessor, _on_dts_50th_calculated, dts_50th, guint32);
+swplugin_define_on_calculated_data(FRACTaLStat, _on_queue_delay_50th_calculated, queue_delay_50th, GstClockTime);
 //static void _on_skew_80th_calculated(gpointer udata, gpointer result){
 //  ((FRACTaLStat*)udata)->skew_80th = MAX(0, *(gint64*)result);
 //}
 
-static void _on_skew_80th_calculated(gpointer udata, gpointer result){
-  ((FRACTaLStat*)udata)->skew_80th = MAX(0, *(gint32*)result);
-}
-
-StructCmpFnc(_cmp_distortion_point_psi, DistortionPoint, psi);
-swplugin_define_swdataextractor(_fraction_lost_extractor, ReferencePoint, fraction_lost);
-//swplugin_define_swdataptrextractor(_skew_ptr_extractor, ReferencePoint, skew);
-swplugin_define_swdataextractor(_skew_value_extractor, ReferencePoint, skew);
-swplugin_define_swdataextractor(_psi_value_extractor, DistortionPoint, psi);
-
-//swplugin_define_swdataptrextractor(_extra_bytes_ptr_extractor, ReferencePoint, extra_bytes);
-
-swplugin_define_on_calculated_data(FRACTaLStat, _on_srtt_calculated, srtt, gdouble);
-swplugin_define_swdataextractor(_rtt_extractor, ReferencePoint, rtt);
-
-
-//static gint _cmp_reference_point_skew(gpointer pa, gpointer pb)
-//{
-//  return bintree3cmp_int64(&((ReferencePoint*)pa)->skew, &((ReferencePoint*)pb)->skew);
+//static void _on_qd_50th_calculated(gpointer udata, gpointer result){
+//  ((FRACTaLStat*)udata)->skew_80th = MAX(0, *(gint32*)result);
 //}
 
-static void _on_packet_sent(FRACTaLFBProcessor* this, SndPacket* packet) {
-  if(packet->subflow_id != this->subflow->id){
-    return;
-  }
-  g_queue_push_tail(this->sent_packets, sndpacket_ref(packet));
-}
+StructCmpFnc(_cmp_reference_point_dts, ReferencePoint, dts);
+StructCmpFnc(_cmp_reference_point_queue_delay, ReferencePoint, queue_delay);
+swplugin_define_swdoubleextractor(_fraction_lost_extractor, ReferencePoint, fraction_lost);
 
-static void _on_packet_queued(FRACTaLFBProcessor* this, SndPacket* packet){
-  if(packet->subflow_id != this->subflow->id){
-    return;
-  }
-  _stat(this)->queued_bytes_in_srtt += packet->payload_size;
-  g_queue_push_tail(this->queued_packets_rtt, sndpacket_ref(packet));
-  do {
-    SndPacket* head;
-    if (g_queue_is_empty(this->queued_packets_rtt)) {
-      return;
-    }
-    head = g_queue_peek_head(this->queued_packets_rtt);
-    if (packet->queued - _stat(this)->srtt <= head->queued) {
-      return;
-    }
-    head = g_queue_pop_head(this->queued_packets_rtt);
-    _stat(this)->queued_bytes_in_srtt -= head->payload_size;
-    sndpacket_unref(head);
-  }while(1);
-}
+swplugin_define_swdoubleextractor(_rtt_extractor, ReferencePoint, rtt);
+swplugin_define_on_calculated_data(FRACTaLStat, _on_srtt_calculated, srtt, gdouble);
+swplugin_define_swdataextractor(gdouble, _queue_delay_value_extractor, ReferencePoint, queue_delay);
+swplugin_define_swdataptrextractor(_queue_delay_ptr_extractor, ReferencePoint, queue_delay);
+swplugin_define_on_calculated_data(FRACTaLStat, _on_queue_delay_std_calculated, queue_delay_std, gdouble);
 
-static void _refresh_ewi(FRACTaLFBProcessor *this) {
-  this->ewi_in_ts = CONSTRAIN(this->min_ewi_in_ts, this->max_ewi_in_ts, this->srtt_in_ts);
-  _stat(this)->ewi_in_s = (gdouble) timestamp_generator_get_time(this->ts_generator, this->ewi_in_ts) / (gdouble) GST_SECOND;
-  slidingwindow_set_threshold(this->distortions_sw, MAX(2 * _stat(this)->srtt, _stat(this)->ewi_in_s)  * GST_SECOND);
-
-  slidingwindow_set_threshold(this->ewi_sw,  MAX(2 * _stat(this)->srtt, _stat(this)->ewi_in_s)  * GST_SECOND);
-  // TODO: refresh the ewi_in_ts properly
-}
+static void _on_packet_sent(FRACTaLFBProcessor* this, SndPacket* packet);
+static void _on_packet_queued(FRACTaLFBProcessor* this, SndPacket* packet);
+static void _on_psi_sw_rem(FRACTaLFBProcessor *this, SndPacket* packet);
+static void _on_psi_postprocessor(FRACTaLFBProcessor *this, SndPacket* packet);
+static void _refresh_windows_thresholds(FRACTaLFBProcessor *this);
 
 void fractalfbprocessor_set_evaluation_window_margins(FRACTaLFBProcessor *this, GstClockTime min, GstClockTime max) {
 
   this->min_ewi_in_ts = timestamp_generator_get_ts_for_time(this->ts_generator, min);
   this->max_ewi_in_ts = timestamp_generator_get_ts_for_time(this->ts_generator, max);
-  _refresh_ewi(this);
+  _refresh_windows_thresholds(this);
 }
 
-//static gboolean _ewi_sw_obsolate(FRACTaLFBProcessor *this, SlidingWindowItem* item) {
-//  SndPacket* head = item->data;
-//  SndPacket* tail = slidingwindow_peek_latest(this->ewi_sw);
-//  guint32 delta_ts = _delta_ts(head->sent_ts, tail->sent_ts);
-//  return this->ewi_in_ts < delta_ts;
-//}
+
+static gboolean _psi_sw_obsolate(FRACTaLFBProcessor *this, SlidingWindowItem* item) {
+  SndPacket* head = item->data;
+  SndPacket* tail = slidingwindow_peek_newest(this->psi_sw);
+  guint32 delta_ts;
+  if (!head->acknowledged) {
+    delta_ts  = _delta_ts(head->sent_ts, tail->sent_ts);
+    return GST_SECOND < timestamp_generator_get_time(this->ts_generator, delta_ts);
+  }
+  if (!tail->acknowledged || head->lost || tail->lost) {
+    delta_ts  = _delta_ts(head->sent_ts, tail->sent_ts);
+    return 2 * _stat(this)->srtt < timestamp_generator_get_time(this->ts_generator, delta_ts);
+  }
+  delta_ts  = _delta_ts(head->rcvd_ts, tail->rcvd_ts);
+  return 2 * _stat(this)->srtt < timestamp_generator_get_time(this->ts_generator, delta_ts);
+//  if (!head->lost)
+//  delta_ts  = _delta_ts(head->sent_ts, tail->sent_ts);
+//  return _stat(this)->srtt < timestamp_generator_get_time(this->ts_generator, delta_ts);
+}
+
+static gboolean _swminmax_filter(ReferencePoint* item) {
+  return 0 < item->dts;
+}
 
 FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* subflow, FRACTaLStat *stat)
 {
   FRACTaLFBProcessor *this;
+  SlidingWindowPlugin* swminmax;
   this = g_object_new (FRACTALFBPROCESSOR_TYPE, NULL);
   this->sndtracker   = g_object_ref(sndtracker);
   this->subflow      = subflow;
   this->stat         = stat;
   this->reference_point_recycle = make_recycle_reference_point(200, (RecycleItemShaper) _reference_point_shaper);
-  this->distortion_point_recycle = make_recycle_distortion_point(100, (RecycleItemShaper) _distortion_point_shaper);
   this->reference_sw = make_slidingwindow_with_data_recycle(200, 15 * GST_SECOND, this->reference_point_recycle);
-  this->skews_sw = make_slidingwindow_int32(500, 10 * GST_SECOND);
-  this->distortions_sw = make_slidingwindow_with_data_recycle(100, GST_SECOND, this->distortion_point_recycle);
+  this->ewi_sw = make_slidingwindow_uint32(200, GST_SECOND);
+  this->psi_sw = make_slidingwindow(500, GST_SECOND);
   this->ts_generator = sndtracker_get_ts_generator(sndtracker);
   this->sent_packets = g_queue_new();
-  this->rcvd_packets_ewi = g_queue_new();
-  this->rcvd_packes_in_rtt = g_queue_new();
   this->queued_packets_rtt = g_queue_new();
 
   sndtracker_add_on_packet_sent(this->sndtracker, (ListenerFunc)_on_packet_sent, this);
   sndtracker_add_on_packet_queued(this->sndtracker, (ListenerFunc)_on_packet_queued, this);
 
 //  correlator_add_on_correlation_calculated_listener(this->drift_correlator, (ListenerFunc) _on_drift_corr_calculated, stat);
+  swminmax = make_swminmax( (GCompareFunc) _cmp_reference_point_dts, (ListenerFunc) _on_min_dts_calculated, this);
+  swminmax_set_filter(swminmax, (SWPluginFilterFunc)_swminmax_filter);
+
+  slidingwindow_setup_custom_obsolation(this->psi_sw, (SlidingWindowObsolateFunc) _psi_sw_obsolate, this);
+  slidingwindow_add_on_rem_item_cb(this->psi_sw, (ListenerFunc) _on_psi_sw_rem, this);
+  slidingwindow_add_postprocessor(this->psi_sw, (ListenerFunc) _on_psi_postprocessor, this);
 
   slidingwindow_add_plugins(this->reference_sw,
 //          make_swpercentile(80, _measurement_drift_cmp, (ListenerFunc) _on_drift_80th_calculated, this),
-//          make_swpercentile2(80,
-//              (GCompareFunc) _cmp_reference_point_skew,
-//              (ListenerFunc) _on_skew_80th_calculated,
-//              stat,
-//              (SWExtractorFunc) _skew_ptr_extractor,
-//              (SWMeanCalcer) swpercentile2_prefer_right_selector,
-//              (SWEstimator) swpercentile2_prefer_right_selector),
-          make_swstd(_on_skew_std_calculated, stat, _skew_value_extractor, 0),
+          make_swpercentile2(50,
+              (GCompareFunc) _cmp_reference_point_queue_delay,
+              (ListenerFunc) _on_queue_delay_50th_calculated,
+              stat,
+              (SWExtractorFunc) _queue_delay_ptr_extractor,
+              (SWMeanCalcer) swpercentile2_prefer_right_selector,
+              (SWEstimator) swpercentile2_prefer_right_selector),
+          make_swstd(_on_queue_delay_std_calculated, stat, _queue_delay_value_extractor, 0),
+          swminmax,
           make_swavg(_on_lost_avg_calculated, stat, _fraction_lost_extractor),
           make_swstd(_on_lost_std_calculated, stat, _fraction_lost_extractor, 100),
           make_swavg(_on_srtt_calculated, stat, _rtt_extractor),
-          make_swstd(_on_BiF_std_calculated, stat, _BiF_extractor, 0),
           NULL);
 
-  slidingwindow_add_plugin(this->skews_sw,
-      make_swpercentile2(80,
-                    (GCompareFunc) bintree3cmp_int32,
-                    (ListenerFunc) _on_skew_80th_calculated,
-                    stat,
-                    (SWExtractorFunc) swpercentile2_self_extractor,
-                    (SWMeanCalcer) swpercentile2_prefer_right_selector,
-                    (SWEstimator) swpercentile2_prefer_right_selector));
-
-  slidingwindow_add_plugins(this->distortions_sw,
-          make_swminmax(
-              (GCompareFunc) _cmp_distortion_point_psi,
-              (ListenerFunc) _on_minmax_distortion_point_calculated,
-              stat),
-          make_swstd(_on_psi_std_calculated, stat, _psi_value_extractor, 100),
+  slidingwindow_add_plugins(this->ewi_sw,
+          make_swpercentile2(50,
+              (GCompareFunc) bintree3cmp_uint32,
+              (ListenerFunc) _on_dts_50th_calculated,
+              this,
+              (SWExtractorFunc) swpercentile2_self_extractor,
+              (SWMeanCalcer) swpercentile2_prefer_right_selector,
+              (SWEstimator) swpercentile2_prefer_right_selector),
           NULL);
-
-  this->ewi_sw = make_slidingwindow(1000, this->ewi_in_ts);
 
   fractalfbprocessor_set_evaluation_window_margins(this, 0.25 * GST_SECOND, 0.5 * GST_SECOND);
   return this;
@@ -331,49 +295,32 @@ done:
 void fractalfbprocessor_approve_feedback(FRACTaLFBProcessor *this)
 {
   ReferencePoint reference_point;
-  reference_point.bytes_in_flight = _stat(this)->bytes_in_flight;
+//  reference_point.bytes_in_flight = _stat(this)->bytes_in_flight;
   reference_point.fraction_lost = _stat(this)->fraction_lost;
-  reference_point.skew = _stat(this)->last_skew;
   reference_point.rtt = this->rtt;
   reference_point.rtt_in_ts = this->rtt_in_ts;
-  reference_point.extra_bytes = _stat(this)->extra_bytes;
-  slidingwindow_add_data(this->reference_sw,  &reference_point);
-  _refresh_ewi(this);
+  reference_point.extra_bytes = _stat(this)->psi_extra_bytes;
+  reference_point.dts = this->dts_50th;
+  reference_point.queue_delay = _stat(this)->last_queue_delay;
   this->srtt_in_ts = this->srtt_in_ts * .9 + this->rtt_in_ts * .1;
-  {
-    gint i;
-    for (i = 0; i < this->skews_index; ++i) {
-      slidingwindow_add_data(this->skews_sw, this->skews + i);
-    }
-  }
-
+  slidingwindow_add_data(this->reference_sw,  &reference_point);
 }
 
 static gdouble _get_ewma_factor(FRACTaLFBProcessor *this){
-  if(_stat(this)->last_skew < 1){
+  if(_stat(this)->last_queue_delay < 1){
     return 0.;
   }
-  return  (gdouble) _stat(this)->last_skew / (gdouble)(_stat(this)->last_skew + _stat(this)->skew_std) ;
+  return  (gdouble) _stat(this)->last_queue_delay / (gdouble)(_stat(this)->last_queue_delay + _stat(this)->queue_delay_std);
 }
 
-static SndPacket* _get_tail_rcved_packet(FRACTaLFBProcessor *this) {
-  GList* it;
-  for (it = this->rcvd_packets_ewi->tail; it; it = it->next) {
-    SndPacket* packet = it->data;
-    if (!packet->lost) {
-      return packet;
-    }
-  }
-  return NULL;
-}
 
 void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xr)
 {
-  SndPacket* packet = NULL, *last_packet = NULL;
+  SndPacket* packet = NULL;
   guint16 act_seq, end_seq;
   gint i;
-  guint32 reference_skew = 0, reference_sent_ts = 0, reference_ato = 0;
-  gboolean reference_skew_init = FALSE;
+  guint32 reference_dts = 0, reference_sent_ts = 0, reference_ato = 0;
+  gboolean reference_dts_init = FALSE;
   guint32 act_ato;
   guint32 report_timestamp;
 
@@ -383,11 +330,9 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
   if(act_seq == end_seq){
     goto done;
   }
+  _stat(this)->HSN = end_seq;
 
-  this->skews_index = 0;
-  _stat(this)->last_skew = 0;
 //  g_print("RLE vector from %hu until %hu\n", act_seq, end_seq);
-  last_packet = _get_tail_rcved_packet(this);
   for(i=0; act_seq != end_seq; ++act_seq, ++i) {
 
     packet = sndtracker_retrieve_sent_packet(this->sndtracker, this->subflow->id, act_seq);
@@ -402,11 +347,12 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
 
     if(packet->acknowledged) {
       if(packet->lost && xr->CongestionControlFeedback.vector[i].lost) {
-        --this->lost_packets_num_in_ewi;
-        this->rcvd_bytes_in_ewi += packet->payload_size;
+        --this->psi_lost_packets;
+        ++this->psi_received_packets;
+        this->psi_received_bytes += packet->payload_size;
         packet->lost = FALSE;
         packet->rcvd_ts = _subtract_ts(report_timestamp, act_ato);
-        _push_rcvd_packets_in_ewi(this, packet);
+//        _push_rcvd_packets_in_ewi(this, packet);
         sndtracker_packet_found(this->sndtracker, packet);
       }
       continue;
@@ -416,55 +362,33 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
       packet->acknowledged = TRUE;
       packet->lost = TRUE;
       packet->skew = 0;
-      _push_rcvd_packets_in_ewi(this, packet);
+      ++this->psi_lost_packets;
       sndtracker_packet_acked(this->sndtracker, packet);
       continue;
     }
 
     packet->rcvd_ts = _subtract_ts(report_timestamp, act_ato);
-    if (last_packet) {
-//    if (last_packet && last_packet->timestamp == packet->timestamp) {
-      guint32 drcv_ts = _delta_ts(last_packet->rcvd_ts, packet->rcvd_ts);
-      guint32 dsnd_ts = _delta_ts(last_packet->sent_ts, packet->sent_ts);
-      gint32 skew =  (gint32)drcv_ts - (gint32)dsnd_ts;
-      gint64 abs_skew = skew < 0 ? -1 * skew : skew;
-      if (!reference_skew_init || abs_skew < reference_skew) {
-        reference_skew_init = TRUE;
-        reference_skew = abs_skew;
+    {
+      guint32 dts = _delta_ts(packet->sent_ts, packet->rcvd_ts);
+      slidingwindow_add_data(this->ewi_sw, &dts);
+      if (!reference_dts_init || dts < reference_dts) {
+        reference_dts = dts;
         reference_sent_ts = packet->sent_ts;
-        reference_ato = xr->CongestionControlFeedback.vector[i].ato;
-      }
-//      packet->skew = dsnd_ts < 300 ? skew : 0;
-      packet->skew = skew;
-      if (this->last_skew_ref == 0 || 5 * GST_MSECOND < packet->sent - this->last_skew_ref) {
-        if (this->skew) {
-          this->skews[this->skews_index++] = this->skew;
-//          this->skews[this->skews_index++] = _delta_ts(packet->rcvd_ts, packet->sent_ts);
-          _stat(this)->last_skew += this->skew;
-//          _stat(this)->last_skew += _delta_ts(packet->rcvd_ts, packet->sent_ts);
-        }
-        this->skew = 0;
-//        g_print("last skew ref: %lu - %lu = %lu\n", GST_TIME_AS_MSECONDS(packet->sent), GST_TIME_AS_MSECONDS(this->last_skew_ref), GST_TIME_AS_MSECONDS(packet->sent - this->last_skew_ref));
-        this->last_skew_ref = packet->sent;
-      } else {
-        this->skew += skew;
-//        g_print("added skew: %d\n", skew);
+        reference_ato = act_ato;
+        reference_dts_init = TRUE;
       }
     }
-    last_packet = packet;
+    this->psi_received_bytes += packet->payload_size;
+    ++this->psi_received_packets;
     packet->acknowledged = TRUE;
     packet->lost = FALSE;
-    _push_rcvd_packets_in_ewi(this, packet);
-    _push_rcvd_packets_in_srtt(this, packet);
+//    _push_rcvd_packets_in_ewi(this, packet);
+//    _push_rcvd_packets_in_srtt(this, packet);
     sndtracker_packet_acked(this->sndtracker, packet);
 
 //    g_print("Packet at %d with absseq: %hu subseq: %hu sent_ts: %u rcvd_ts: %u skew: %ld\n",
 //             packet->subflow_id, packet->abs_seq, packet->subflow_seq, packet->sent_ts, packet->rcvd_ts, packet->skew);
   }
-  if (0 < this->skews_index) {
-    _stat(this)->last_skew /= this->skews_index;
-  }
-
 
   if (reference_sent_ts) {
     guint32 current_ts = timestamp_generator_get_ts(this->ts_generator);
@@ -476,34 +400,15 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
     }
   }
 
+  _refresh_windows_thresholds(this);
 done:
-  _refresh_rcvd_packets_in_ewi(this);
 //  g_print("subflow %d sent in ewi: %d (%d) "
 //          "rcvd in ewi: %d (%d)\n",
 //          this->subflow->id,
 //          this->sent_bytes_in_ewi_t, this->sent_packets_num_in_ewi_t,
 //          this->rcvd_bytes_in_ewi, this->rcvd_packets_num_in_ewi);
-  if (this->sent_bytes_in_ewi_t < 10 || !this->rcvd_bytes_in_ewi) {
-    _stat(this)->psi = 1.;
-  } else {
-    _stat(this)->psi = (gdouble) this->sent_bytes_in_ewi_t / (gdouble) this->rcvd_bytes_in_ewi;
-  }
 
-  if (!this->rcvd_packets_num_in_ewi || !this->lost_packets_num_in_ewi) {
-    _stat(this)->fraction_lost = 0;
-  } else {
-    _stat(this)->fraction_lost = (gdouble) this->lost_packets_num_in_ewi /
-        (gdouble) (this->lost_packets_num_in_ewi + this->rcvd_packets_num_in_ewi);
-  }
 
-  _stat(this)->extra_bytes = MAX(0, this->sent_bytes_in_ewi_t - this->rcvd_bytes_in_ewi + this->extra_bytes);
-
-  {
-    DistortionPoint distortion_point;
-    distortion_point.psi = _stat(this)->psi;
-    distortion_point.extra_bytes = _stat(this)->extra_bytes;
-    slidingwindow_add_data(this->distortions_sw, &distortion_point);
-  }
   return;
 }
 
@@ -518,13 +423,23 @@ void _process_stat(FRACTaLFBProcessor *this)
   gdouble alpha;
 
   _stat(this)->rtpq_delay            = rtpqstat->rtpq_delay;
-  _stat(this)->bytes_in_flight       = sndstat->bytes_in_flight;
   _stat(this)->sender_bitrate        = sndstat->sent_bytes_in_1s * 8;
   _stat(this)->receiver_bitrate      = sndstat->received_bytes_in_1s * 8;
   _stat(this)->fec_bitrate           = sndstat->sent_fec_bytes_in_1s * 8;
-  _stat(this)->reference_num         = slidingwindow_get_counter(this->reference_sw);
-  _stat(this)->received_bytes_in_ewi = this->rcvd_bytes_in_ewi;
+  _stat(this)->measurements_num      = slidingwindow_get_counter(this->reference_sw);
   _stat(this)->sent_packets_in_1s    = sndstat->sent_packets_in_1s;
+
+//  g_print("%d %d - %d\n", slidingwindow_get_counter(this->ewi_sw), this->dts_50th, this->min_dts);
+  if (0 < this->min_dts && this->min_dts < this->dts_50th) {
+    _stat(this)->last_queue_delay =
+          GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->ts_generator, this->dts_50th - this->min_dts));
+  } else {
+    _stat(this)->last_queue_delay = 0;
+  }
+
+  _stat(this)->psi_received_bytes    = this->psi_received_bytes;
+  _stat(this)->psi_sent_bytes        = this->psi_sent_bytes;
+  _stat(this)->psi_extra_bytes       = MAX(0, this->psi_sent_bytes - this->psi_received_bytes);
 
   if(_stat(this)->sr_avg){
     alpha = ewma_factor * .5 + .5;
@@ -541,117 +456,85 @@ void _process_stat(FRACTaLFBProcessor *this)
   }
 
   slidingwindow_refresh(this->reference_sw);
-  slidingwindow_refresh(this->distortions_sw);
+  slidingwindow_refresh(this->psi_sw);
+  slidingwindow_refresh(this->ewi_sw);
+
+  if (!this->psi_received_packets || !this->psi_lost_packets) {
+    _stat(this)->fraction_lost = 0;
+  } else {
+    _stat(this)->fraction_lost = (gdouble) this->psi_lost_packets /
+        (gdouble) (this->psi_lost_packets + this->psi_received_packets);
+  }
 }
 
-void _refresh_sent_packets_in_ewi_t(FRACTaLFBProcessor* this) {
-  //ewi - evaluation window interval
-  SndPacket* rcvd_head;
-  SndPacket* sent_head;
-  SndPacket* sent_tail;
-  GList* it;
-  if (g_queue_is_empty(this->rcvd_packets_ewi)) {
+
+
+static void _on_packet_sent(FRACTaLFBProcessor* this, SndPacket* packet) {
+  if(packet->subflow_id != this->subflow->id){
     return;
   }
-  rcvd_head = g_queue_peek_head(this->rcvd_packets_ewi);
-
-  do {
-    if(g_queue_is_empty(this->sent_packets)) {
+  g_queue_push_tail(this->sent_packets, sndpacket_ref(packet));
+  do{
+    SndPacket* head;
+    if (g_queue_is_empty(this->sent_packets)) {
       return;
     }
-    sent_head = g_queue_peek_head(this->sent_packets);
-    if (_cmp_seq(rcvd_head->subflow_seq, sent_head->subflow_seq) <= 0) {
-      break;
+    head = g_queue_peek_head(this->sent_packets);
+    if (packet->sent - head->sent < _stat(this)->srtt) {
+      return;
     }
-    sndpacket_unref(g_queue_pop_head(this->sent_packets));
-  }while(1);
+    this->psi_sent_bytes += head->payload_size;
+    ++this->psi_sent_packets;
+    slidingwindow_add_data(this->psi_sw, g_queue_pop_head(this->sent_packets));
+  } while(1);
+}
 
-  sent_tail = this->sent_packets->tail->data;
-
-  this->sent_bytes_in_ewi_t = 0;
-  this->sent_packets_num_in_ewi_t = 0;
-  for(it = this->sent_packets->head; it; it = it->next) {
-    SndPacket* packet = it->data;
-    if (this->ewi_in_ts <= _delta_ts(sent_head->sent_ts, packet->sent_ts)) {
-      break;
-    }
-    if (_delta_ts(packet->sent_ts, sent_tail->sent_ts) < this->srtt_in_ts) {
-      break;
-    }
-    this->sent_bytes_in_ewi_t += packet->payload_size;
-    ++this->sent_packets_num_in_ewi_t;
-  }
-
-  this->extra_bytes = 0;
-  if (!it) {
+static void _on_packet_queued(FRACTaLFBProcessor* this, SndPacket* packet) {
+  if(packet->subflow_id != this->subflow->id){
     return;
   }
-
-  for(; it; it = it->next) {
-    SndPacket* packet = it->data;
-    if (_delta_ts(packet->sent_ts, sent_tail->sent_ts) <= this->rtt_in_ts) {
-      break;
+  _stat(this)->queued_bytes_in_srtt += packet->payload_size;
+  g_queue_push_tail(this->queued_packets_rtt, sndpacket_ref(packet));
+  do {
+    SndPacket* head;
+    if (g_queue_is_empty(this->queued_packets_rtt)) {
+      return;
     }
-    this->extra_bytes += packet->payload_size;
-  }
+    head = g_queue_peek_head(this->queued_packets_rtt);
+    if (packet->queued - _stat(this)->srtt <= head->queued) {
+      return;
+    }
+    head = g_queue_pop_head(this->queued_packets_rtt);
+    _stat(this)->queued_bytes_in_srtt -= head->payload_size;
+    sndpacket_unref(head);
+  }while(1);
 }
 
-void _push_rcvd_packets_in_ewi(FRACTaLFBProcessor *this, SndPacket* packet) {
+static void _on_psi_sw_rem(FRACTaLFBProcessor *this, SndPacket* packet) {
+  this->psi_sent_bytes -= packet->payload_size;
+  --this->psi_sent_packets;
+
   if (packet->lost) {
-    ++this->lost_packets_num_in_ewi;
-  } else {
-    ++this->rcvd_packets_num_in_ewi;
-    this->rcvd_bytes_in_ewi += packet->payload_size;
-//    _stat(this)->last_skew += packet->skew; // TODO: backtrack note 1
+    --this->psi_lost_packets;
+  } else if (packet->acknowledged){
+    --this->psi_received_packets;
+    this->psi_received_bytes -= packet->payload_size;
+//    g_print("%d:\n", this->psi_received_bytes);
   }
-  g_queue_push_tail(this->rcvd_packets_ewi, sndpacket_ref(packet));
+
 }
 
-void _refresh_rcvd_packets_in_ewi(FRACTaLFBProcessor* this) {
-  //ewi - evaluation window interval
-  SndPacket* head;
-  SndPacket* tail;
-  guint32 dts;
-  guint32 dts_threshold = this->ewi_in_ts;
-  do {
-    if(g_queue_is_empty(this->rcvd_packets_ewi)) {
-      break;
-    }
-    head = g_queue_peek_head(this->rcvd_packets_ewi);
-    tail = g_queue_peek_tail(this->rcvd_packets_ewi);
-    dts = _delta_ts(head->rcvd_ts, tail->rcvd_ts);
-    if (_cmp_ts(dts, dts_threshold) < 0) {
-      break;
-    }
-    if (head->lost) {
-      --this->lost_packets_num_in_ewi;
-    } else {
-      --this->rcvd_packets_num_in_ewi;
-      this->rcvd_bytes_in_ewi -= head->payload_size;
-//      _stat(this)->last_skew -= head->skew; // TODO: backtrack note 2
-    }
-    sndpacket_unref(g_queue_pop_head(this->rcvd_packets_ewi));
-  }while(1);
-  _refresh_sent_packets_in_ewi_t(this);
+static void _on_psi_postprocessor(FRACTaLFBProcessor *this, SndPacket* packet) {
+  sndpacket_unref(packet);
 }
 
+static void _refresh_windows_thresholds(FRACTaLFBProcessor *this) {
 
-void _push_rcvd_packets_in_srtt(FRACTaLFBProcessor *this, SndPacket* packet) {
-  SndPacket* head;
-  guint32 dts;
-  g_queue_push_tail(this->rcvd_packes_in_rtt, sndpacket_ref(packet));
-  _stat(this)->received_bytes_in_rtt += packet->payload_size;
-  do {
-    if(g_queue_is_empty(this->rcvd_packes_in_rtt)) {
-      break;
-    }
-    head = g_queue_peek_head(this->rcvd_packes_in_rtt);
-    dts = _delta_ts(head->rcvd_ts, packet->rcvd_ts);
-    if (_cmp_ts(dts, this->srtt_in_ts) < 0) {
-      break;
-    }
-    _stat(this)->received_bytes_in_rtt += head->payload_size;
-    sndpacket_unref(g_queue_pop_head(this->rcvd_packes_in_rtt));
-  }while(1);
+  guint32 ewi_in_ts = CONSTRAIN(this->min_ewi_in_ts, this->max_ewi_in_ts, this->srtt_in_ts);
+  GstClockTime ewi_in_ns = timestamp_generator_get_time(this->ts_generator, ewi_in_ts);
+  guint32 psi_in_ns = MIN(_stat(this)->srtt + _stat(this)->queue_delay_std * 2, GST_SECOND);
+
+  slidingwindow_set_threshold(this->ewi_sw, ewi_in_ns);
+  slidingwindow_set_threshold(this->psi_sw, psi_in_ns);
 }
 

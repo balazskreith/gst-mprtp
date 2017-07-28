@@ -30,42 +30,33 @@ typedef struct _FRACTaLFBProcessorClass FRACTaLFBProcessorClass;
 
 typedef struct _FRACTaLStat
 {
-  gint32                   reference_num;
-  gint32                   bytes_in_flight;
+  gint32                   measurements_num;
   gdouble                  rtpq_delay;
   gint32                   sender_bitrate;
   gint32                   receiver_bitrate;
   gint32                   fec_bitrate;
 
-  gdouble                  BiF_std;
+  GstClockTime             queue_delay_50th;
+  GstClockTime             last_queue_delay;
+  GstClockTime             queue_delay_std;
 
-  gint64                   skew_80th;
-  gdouble                  skew_std; //jitter
-  gint64                   last_skew;
+  guint16                  HSN;
+
   gdouble                  srtt;
 
   gdouble                  sr_avg;
   gdouble                  rr_avg;
 
-  gdouble                  psi_std;
   gdouble                  fl_avg;
   gdouble                  fl_std;
 
   gdouble                  fraction_lost;
-  gdouble                  psi; //pipe stability indicator
-  gint32                   extra_bytes;
-  gdouble                  max_psi;
-  gint32                   max_extra_bytes;
-  gint32                   extra_bytes_80th;
   gdouble                  ewi_in_s;
-  gint32                   received_bytes_in_rtt;
-  gint32                   received_bytes_in_ewi;
+  gint32                   psi_received_bytes;//pipe stability indicator
+  gint32                   psi_sent_bytes;
+  gint32                   psi_extra_bytes;
   gint32                   queued_bytes_in_srtt;
   guint16                  sent_packets_in_1s;
-
-  GstClockTime qd_50th;
-  GstClockTime last_qd;
-  GstClockTime qd_std;
 
 }FRACTaLStat;
 
@@ -85,33 +76,29 @@ struct _FRACTaLFBProcessor
   GstClock*                sysclock;
   TimestampGenerator*      ts_generator;
   Recycle*                 reference_point_recycle;
-  Recycle*                 distortion_point_recycle;
 
-  gint32                   sent_bytes_in_ewi_t;
-  gint32                   rcvd_bytes_in_ewi;
+  gint32                   psi_received_packets;
+  gint32                   psi_received_bytes;
+  gint32                   psi_sent_bytes;
+  gint32                   psi_sent_packets;
+  gint32                   psi_lost_packets;
   gint32                   extra_bytes;
-  gint32                   lost_packets_num_in_ewi;
-  gint32                   sent_packets_num_in_ewi_t;
-  gint32                   rcvd_packets_num_in_ewi;
   guint32                  ewi_in_ts;
   guint32                  min_ewi_in_ts;
   guint32                  max_ewi_in_ts;
+  guint32                  dts_50th;
+  guint32                  min_dts;
   guint32                  rtt_in_ts;
   GstClockTime             rtt;
   GQueue*                  sent_packets;
-  GQueue*                  rcvd_packets_ewi;
-  GQueue*                  rcvd_packes_in_rtt;
+//  GQueue*                  rcvd_packets_ewi;
+//  GQueue*                  rcvd_packes_in_rtt;
   GQueue*                  queued_packets_rtt;
-  SlidingWindow*           distortions_sw;
+//  SlidingWindow*           distortions_sw;
   SlidingWindow*           reference_sw;
-  SlidingWindow*           skews_sw;
+  SlidingWindow*           psi_sw;
 
   SlidingWindow*           ewi_sw;
-
-  gint32 skews[128];
-  gint32 skew;
-  GstClockTime last_skew_ref;
-  gint32 skews_index;
 
   FRACTaLStat*             stat;
   SndTracker*              sndtracker;

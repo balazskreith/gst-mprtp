@@ -879,26 +879,22 @@ _probe_stage(
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     _undershoot(this);
     goto done;
-  } else if(_now(this) < this->last_distorted + this->deflate_time) {
-    _start_monitoring(this);
-    goto done;
-  }else if (_distortion(this)) {
-    _alleviate(this, MIN(this->target_bitrate, _stat(this)->rr_avg) -
-        CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), this->target_bitrate * .1));
-//    if (this->last_distorted < _now(this) - _stat(this)->srtt) {
-//      if (this->bottleneck_point < this->target_bitrate) {
-//        this->bottleneck_point += (this->target_bitrate - this->bottleneck_point) / 2;
-//      }
+  }
 
-//    }
-    _stop_monitoring(this);
-//    _set_event(this, EVENT_DISTORTION);
-    goto done;
+  if (this->bottleneck_point < this->target_bitrate) {
+    gint32 delta = this->target_bitrate - this->bottleneck_point;
+    gdouble ratio = CONSTRAIN(0., 1., (gdouble)(_stat(this)->psi_extra_bytes) / (gdouble)(_stat(this)->psi_extra_bytes + _stat(this)->psi_received_bytes));
+    gint32 monitoring_interval;
+    this->bottleneck_point += delta * ratio;
+    monitoring_interval = _get_monitoring_interval(this);
+    if (this->monitoring_interval + 1 < monitoring_interval) {
+      _start_monitoring(this);
+      goto done;
+    }
   }
 
   _refresh_monitoring_approvement(this);
   if(!this->monitoring_approved){
-//    g_print("monitoring not approved at %d\n", this->subflow->id);
     goto done;
   }
   // _change_cwnd(this, this->cwnd * (1 + 1./(gdouble)this->monitoring_interval));
@@ -920,13 +916,26 @@ _increase_stage(
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     _undershoot(this);
     goto done;
-  }else if (_distortion(this)) {
+  }
+  else if (0 && _distortion(this)) {
     _stop_monitoring(this);
     _alleviate(this, this->target_bitrate - _stat(this)->fec_bitrate -
             CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), _stat(this)->psi_extra_bytes * 8));
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     goto done;
+  }
+
+  if (this->bottleneck_point < this->target_bitrate) {
+    gint32 delta = this->target_bitrate - this->bottleneck_point;
+    gdouble ratio = CONSTRAIN(0., 1., (gdouble)(_stat(this)->psi_extra_bytes) / (gdouble)(_stat(this)->psi_extra_bytes + _stat(this)->psi_received_bytes));
+    this->bottleneck_point += delta * ratio;
+//    if (.2 < ratio)
+    {
+      gint32 reduction = this->increasement * ratio;
+      this->increasement -= reduction;
+      _change_sndsubflow_target_bitrate(this, this->target_bitrate - reduction);
+    }
   }
 
   _refresh_increasing_approvement(this);

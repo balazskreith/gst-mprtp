@@ -43,6 +43,7 @@ typedef struct _FRACTaLStat
   guint16                  HSN;
 
   gdouble                  srtt;
+  gdouble                  skew_avg;
 
   gdouble                  sr_avg;
   gdouble                  rr_avg;
@@ -89,6 +90,10 @@ struct _FRACTaLFBProcessor
   guint32                  dts_50th;
   guint32                  min_dts;
   guint32                  rtt_in_ts;
+
+  gint32                   skew_sum, skew_counter, snd_ts, rcvd_ts;
+  SndPacket*               last_packet;
+
   GstClockTime             rtt;
   GQueue*                  sent_packets;
 //  GQueue*                  rcvd_packets_ewi;

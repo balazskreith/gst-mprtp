@@ -83,10 +83,17 @@ Recycle *make_recycle(gint32 size, RecycleItemCtor ctor, RecycleItemDtor dtor, R
 
 gpointer recycle_retrieve(Recycle* this)
 {
+  gpointer result = NULL;
   if(datapuffer_isempty(this->items)){
-    return this->ctor();
+    result = this->ctor();
+    goto done;
   }
-  return datapuffer_read(this->items);
+  result = datapuffer_read(this->items);
+  if (!result) {
+    result = this->ctor();
+  }
+done:
+  return result;
 }
 
 gpointer recycle_retrieve_and_shape(Recycle *this, gpointer udata)

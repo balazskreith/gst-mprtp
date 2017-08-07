@@ -85,6 +85,19 @@ static volatile Tuple* _make_tuple(gpointer arg1, ...) {
   return this;
 }
 
+static volatile Tuple* _tuple_extend(Tuple* this, gpointer arg1, ...) {
+  va_list arguments;
+  gpointer value = NULL;
+  this->length = 0;
+  this->values[this->length++] = arg1;
+  va_start ( arguments, arg1 );
+  for(value = va_arg( arguments, gpointer); value; value = va_arg(arguments, gpointer)){
+    this->values[this->length++] = value;
+  }
+  va_end ( arguments );
+  return this;
+}
+
 static gpointer _tuple_get(Tuple* this, gint index) {
   if(MIN(TUPLE_MAX_ITEMS_NUM, this->length) < index) {
     return NULL;
@@ -474,6 +487,38 @@ static Sorter* _make_sorter(GCompareDataFunc cmp, gpointer cmp_udata, gint lengt
 
 static void _dispose_sorter(Sorter* this) {
   g_queue_free(this->items);
+  g_free(this);
+}
+
+/*----------------------- Transformer ---------------------------*/
+typedef gpointer (*TransformerProcess)(gpointer udata, gpointer item);
+typedef struct{
+  Component base;
+  gpointer udata;
+  TransformerProcess process;
+}Transformer;
+
+typedef enum{
+  TRANSFORMER_OUTPUT = 1,
+}TransformerIO;
+
+static void _transformer_process(Transformer* this, gpointer data) {
+  gpointer result;
+  if (!data) {
+    _optional_transmit(&this->base, TRANSFORMER_OUTPUT, NULL);
+    return;
+  }
+  _optional_transmit(&this->base, TRANSFORMER_OUTPUT, this->process(this->udata, data));
+}
+
+static Transformer* _make_transformer(TransformerProcess process, gpointer udata) {
+  Transformer* this = g_malloc0(sizeof(Transformer));
+  this->process = process;
+  this->udata = udata;
+  return this;
+}
+
+static void _dispose_transformer(Transformer* this) {
   g_free(this);
 }
 
@@ -2097,6 +2142,150 @@ static void _write_tcpstat(gchar* input_path, gchar* output_path) {
   _dispose_writer(writer);
 }
 
+typedef struct{
+  gchar* fields;
+
+  struct{
+    gint32                counter;
+    gdouble               mean;
+    gdouble               var;
+    gdouble               emp;
+    gdouble               sum;
+  }std_knuth;
+}FieldExtractor;
+
+// tracked_ntp;   tr
+// seq_num;       se
+// ssrc;          c
+// subflow_id;    i
+// subflow_seq;   q
+// marker;        mk
+// payload_type;  p
+// timestamp;     a
+// header_size;   h
+// payload_size;  z
+// protect_begin; g
+// protect_end;   n
+
+static gpointer _fields_extractor(FieldExtractor* this, Tuple* packets) {
+  gchar* fields = this->fields;
+  RTPPacket* packet_x = _tuple_get(packets, 0);
+  RTPPacket* packet_y = _tuple_get(packets, 1);
+  gboolean started = FALSE;
+  gchar* result = g_malloc0(255);
+  gint i;
+  for (i = 0; fields[i] != '\0'; ++i) {
+    gchar buf[255];
+    memset(buf, 0, 255);
+    if (started) {
+      strcat(result, ",");
+    }
+    switch (fields[i]) {
+    case 't':
+      sprintf(buf, "%lu", packet_x->tracked_ntp);
+      break;
+    case 'r':
+      sprintf(buf, "%lu", packet_y->tracked_ntp);
+      break;
+    case 's':
+      sprintf(buf, "%hu", packet_x->seq_num);
+      break;
+    case 'e':
+      sprintf(buf, "%hu", packet_y->seq_num);
+      break;
+    case 'i':
+      sprintf(buf, "%u", packet_x->ssrc);
+      break;
+    case 'q':
+      sprintf(buf, "%hu", packet_y->subflow_seq);
+      break;
+    case 'm':
+      sprintf(buf, "%d", packet_x->marker);
+      break;
+    case 'k':
+      sprintf(buf, "%d", packet_y->marker);
+      break;
+    case 'a':
+      sprintf(buf, "%u", packet_x->timestamp);
+      break;
+    case 'h':
+      sprintf(buf, "%u", packet_x->header_size);
+      break;
+    case 'z':
+      sprintf(buf, "%u", packet_x->payload_size);
+      break;
+    case 'g':
+      sprintf(buf, "%hu", packet_x->protect_begin);
+      break;
+    case 'n':
+      sprintf(buf, "%hu", packet_x->protect_end);
+      break;
+
+    case 'x':
+    {
+      GstClockTime dt = get_epoch_time_from_ntp_in_ns(packet_y->tracked_ntp - packet_x->tracked_ntp);
+      sprintf(buf, "%hu", GST_TIME_AS_MSECONDS(dt));
+    }
+      break;
+    case 'y':
+    {
+      GstClockTime dt = get_epoch_time_from_ntp_in_ns(packet_y->tracked_ntp - packet_x->tracked_ntp);
+      gdouble new_item = GST_TIME_AS_MSECONDS(dt);
+      gdouble prev_mean = this->std_knuth.mean;
+      gdouble dprev = new_item - prev_mean;
+      gdouble n = ++this->std_knuth.counter;
+      this->std_knuth.mean += dprev / n;
+      gdouble dact = new_item - this->std_knuth.mean;
+      if(this->std_knuth.counter < 2){
+        break;
+      }
+      this->std_knuth.emp *= (n - 2.) / (n - 1.);
+      this->std_knuth.emp += pow(dprev, 2) / n;
+
+//      alpha = MAX(.1, 1. / (gdouble) n);
+      this->std_knuth.var = ( (n-1.) * this->std_knuth.var + dprev * dact ) / n;
+//      this->std.var = alpha * dprev * dact + (1.-alpha) * this->std.var;
+      sprintf(buf, "%f", MAX(sqrt(this->std_knuth.var), 30.));
+    }
+      break;
+    }
+    started = TRUE;
+    strcat(result, buf);
+  }
+  return result;
+}
+
+static void _sprintf_string(gchar* result, gchar* string)  {
+  sprintf(result, "%s", string);
+}
+
+
+
+static void _join_rtp_logfiles(gchar* snd_packets_path,
+    gchar* rcv_packets_path, gchar* output_path, gchar* fields) {
+  FieldExtractor extractor;
+
+  memset(&extractor, 0, sizeof(FieldExtractor));
+  extractor.fields = fields;
+
+  //Construction
+  RTPPacketsMerger* rtp_packets_merger = _make_rtp_packets_merger(snd_packets_path, rcv_packets_path);
+  Transformer* field_extractor = _make_transformer(_fields_extractor, &extractor);
+  FileWriter* writer = _make_writer(output_path, _sprintf_string);
+
+  //Connection
+  _pushconnect_cmp(rtp_packets_merger, RTP_PACKETS_MERGER_OUTPUT, field_extractor, _transformer_process);
+  _pushconnect_cmp(field_extractor, TRANSFORMER_OUTPUT, writer, _file_writer_process);
+
+  //Start
+  _rtp_packets_merger_start_and_join(rtp_packets_merger);
+
+  //Dispose
+  _dispose_rtp_packets_merger(rtp_packets_merger);
+  _dispose_writer(writer);
+
+}
+
 int main (int argc, char **argv)
 {
   if(argc < 3){
@@ -2116,6 +2305,7 @@ int main (int argc, char **argv)
     g_print("ratio snd_packets_1 snd_packets_2 - calculates the ratio between the flows\n");
     g_print("disc ply_packets - calculates the discarded packets ratio\n");
     g_print("tcpstat tcpdump - calculates the tcp rate based on pcap\n");
+    g_print("join rtp_file1 rtp_file2 fields - join two rtp logfile and print the requested fields to output file\n");
     return 0;
   }
 
@@ -2143,6 +2333,8 @@ int main (int argc, char **argv)
     g_print("IMPLEMENT THIS!\n");
   }else if(strcmp(argv[2], "tcpstat") == 0) {
     _write_tcpstat(argv[3], argv[1]);
+  }else if(strcmp(argv[2], "join") == 0) {
+    _join_rtp_logfiles(argv[3], argv[4], argv[1], argv[5]);
   }else{
     goto usage;
   }

@@ -12,12 +12,12 @@
 
 typedef struct datapuffer_struct_t
 {
-        gpointer                *items;                ///< A pointer array of data the puffer will uses for storing
-        gint32                   length;               ///< The maximal amount of data the puffer can store
-        gint32                   start;        ///< index for read operations. It points to the next element going to be read
-        gint32                   end;      ///< index for write operations. It points to the last element, which was written by the puffer
-        gint32                   count;
-        gpointer                 read;
+        gpointer                *items;    ///< A pointer array of data the puffer will uses for storing
+        gint32                   length;   ///< The maximal amount of data the puffer can store
+        volatile gint32          start;    ///< index for read operations. It points to the next element going to be read
+        volatile gint32          end;      ///< index for write operations. It points to the last element, which was written by the puffer
+        volatile gint32          count;
+        volatile gpointer        read;
 } datapuffer_t;
 
 

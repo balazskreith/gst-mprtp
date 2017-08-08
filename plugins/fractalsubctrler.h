@@ -101,7 +101,7 @@ struct _FRACTaLSubController
   gboolean                  cwnd_locked;
   gdouble                   bottleneck_cwnd;
   gdouble                   min_psi;
-  gdouble                   psi, psi2, min_psi2;
+  gdouble                   psi, psi2, min_psi2, psi2_dist;
   gdouble                   congested_cwnd;
   GstClockTime            (*refresh_target)(FRACTaLSubController* this);
 

@@ -1,1 +1,1 @@
-./rcv_pipeline --sink=FAKESINK --codec=VP8 --stat=triggered_stat:temp/rcv_packets.csv:3 --plystat=triggered_stat:temp/ply_packets.csv:3 --receiver=MPRTP:2:1:5000:2:5002 --playouter=MPRTPFRACTAL:MPRTP:2:1:10.0.0.1:5001:2:10.0.1.1:5003 
+./rcv_pipeline --sink=FAKESINK --codec=VP8 --stat=triggered_stat:temp/rcv_packets_1.csv:0 --plystat=triggered_stat:temp/ply_packets_1.csv:0 --playouter=MPRTPFRACTAL:MPRTP:1:1:10.0.0.1:5001 --receiver=MPRTP:1:1:5000  > temp/receiver_1.log

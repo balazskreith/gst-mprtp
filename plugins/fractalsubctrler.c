@@ -468,14 +468,15 @@ static void _stat_print(FRACTaLSubController *this)
   { // psi info
     gchar info[128];
     memset(info, 0, 128);
-    sprintf(info, "PSI: %-4d|%-4d|%-4d|%-1.2f|%-1.2f|%1.2f|%1.2f",
+    sprintf(info, "PSI: %-4d|%-4d|%-4d|%-1.2f|%-1.2f|%1.2f|%1.2f|%1.2f|",
         stat->psi_sent_bytes / 125,
         stat->psi_received_bytes /125,
         stat->psi_extra_bytes/ 125,
         this->eb_ratio,
         this->deb_ratio,
         this->psi2,
-        this->min_psi2
+        this->min_psi2,
+        this->psi2_dist
     );
     strcat(result, info);
   }
@@ -721,7 +722,7 @@ void fractalsubctrler_report_update(
   } else {
     this->psi2 = 1.;
   }
-
+  this->psi2_dist = this->psi2_dist * .9 + MAX(.1, 1.-this->psi2) * .1;
   this->min_psi2 = CONSTRAIN(.5, 1., MIN(this->psi2, this->min_psi2 * 1.005));
 
 done:
@@ -748,6 +749,10 @@ static gboolean _congestion(FRACTaLSubController *this)
       CONSTRAIN(MIN_QUEUE_DELAY_THRESHOLD, MAX_QUEUE_DELAY_THRESHOLD, _stat(this)->queue_delay_std * slack);
 
   if ( this->QD_th < _stat(this)->last_queue_delay) {
+    return TRUE;
+  }
+
+  if ( this->psi2 < 1. - 2. * this->psi2_dist) {
     return TRUE;
   }
 
@@ -885,11 +890,24 @@ _probe_stage(
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     _undershoot(this, this->target_bitrate + _stat(this)->fec_bitrate);
     goto done;
-  } else if (this->psi2 < this->min_psi2 && this->bottleneck_point < this->target_bitrate) {
-    this->bottleneck_point = this->target_bitrate;
-    _start_monitoring(this);
-    goto done;
   }
+//  else if (this->psi2 < this->min_psi2 && this->bottleneck_point < this->target_bitrate) {
+//    this->bottleneck_point = this->target_bitrate;
+//    _start_monitoring(this);
+//    goto done;
+//  }
+
+//  if (this->bottleneck_point < this->target_bitrate && this->psi2 < this->psi2_dist) {
+//        gint32 delta = this->target_bitrate - this->bottleneck_point;
+//        this->bottleneck_point += delta * (1.-this->psi2);
+//    }
+//
+  if (this->bottleneck_point < this->target_bitrate && this->psi2 < 1. - this->psi2_dist) {
+      gint32 delta = this->target_bitrate - this->bottleneck_point;
+      this->bottleneck_point += delta * (1.-this->psi2);
+  }
+
+
 
   _refresh_monitoring_approvement(this);
   if(!this->monitoring_approved){
@@ -914,13 +932,19 @@ _increase_stage(
     _switch_stage_to(this, STAGE_REDUCE, FALSE);
     _undershoot(this, this->target_bitrate + _stat(this)->fec_bitrate);
     goto done;
-  } else if (this->psi2 < this->min_psi2) {
-    gint32 delta = MAX(0, this->increasement - _min_ramp_up(this));
-    this->increasement -= delta;
-    _change_sndsubflow_target_bitrate(this, this->target_bitrate - delta);
-    this->bottleneck_point = this->target_bitrate;
-    _start_monitoring(this);
-    goto done;
+  }
+//  else if (this->psi2 < this->min_psi2) {
+//    gint32 delta = MAX(0, this->increasement - _min_ramp_up(this));
+//    this->increasement -= delta;
+//    _change_sndsubflow_target_bitrate(this, this->target_bitrate - delta);
+//    this->bottleneck_point = this->target_bitrate;
+//    _start_monitoring(this);
+//    goto done;
+//  }
+
+  if (this->bottleneck_point < this->target_bitrate && this->psi2 < 1. - this->psi2_dist) {
+      gint32 delta = this->target_bitrate - this->bottleneck_point;
+      this->bottleneck_point += delta * (1.-this->psi2);
   }
 
   _refresh_increasing_approvement(this);
@@ -1213,9 +1237,9 @@ gdouble _scale_t(FRACTaLSubController *this)
     return 0.;
   }
 
-  if (abs(this->target_bitrate - this->bottleneck_point) < _max_ramp_up(this)) {
-    return 0.;
-  }
+//  if (abs(this->target_bitrate - this->bottleneck_point) < _max_ramp_up(this) / 2) {
+//    return 0.;
+//  }
 
   result = this->target_bitrate - refpoint;
   result /= (gdouble)this->target_bitrate * eps;

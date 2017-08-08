@@ -91,8 +91,6 @@ struct _FRACTaLFBProcessor
   guint32                  min_dts;
   guint32                  rtt_in_ts;
 
-  gint32                   skew_sum, skew_counter, snd_ts, rcvd_ts;
-  SndPacket*               last_packet;
 
   GstClockTime             rtt;
   GQueue*                  sent_packets;

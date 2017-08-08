@@ -29,7 +29,6 @@ typedef struct {
   gint32 extra_bytes;
   guint32 dts;
   GstClockTime queue_delay;
-  gint32 skew;
 }ReferencePoint;
 
 typedef struct {
@@ -68,16 +67,16 @@ static guint32 _delta_ts(guint32 last_ts, guint32 actual_ts) {
 //}
 
 
-static gint
-_cmp_seq (guint16 x, guint16 y)
-{
-  if(x == y) return 0;
-  if(x < y && y - x < 32768) return -1;
-  if(x > y && x - y > 32768) return -1;
-  if(x < y && y - x > 32768) return 1;
-  if(x > y && x - y < 32768) return 1;
-  return 0;
-}
+//static gint
+//_cmp_seq (guint16 x, guint16 y)
+//{
+//  if(x == y) return 0;
+//  if(x < y && y - x < 32768) return -1;
+//  if(x > y && x - y > 32768) return -1;
+//  if(x < y && y - x > 32768) return 1;
+//  if(x > y && x - y < 32768) return 1;
+//  return 0;
+//}
 
 //static gint
 //_cmp_rcv_snd_ts (SndPacket* x, SndPacket *y)
@@ -141,10 +140,8 @@ StructCmpFnc(_cmp_reference_point_dts, ReferencePoint, dts);
 StructCmpFnc(_cmp_reference_point_queue_delay, ReferencePoint, queue_delay);
 swplugin_define_swdoubleextractor(_fraction_lost_extractor, ReferencePoint, fraction_lost);
 
-swplugin_define_swdoubleextractor(_skew_extractor, ReferencePoint, skew);
 swplugin_define_swdoubleextractor(_rtt_extractor, ReferencePoint, rtt);
 swplugin_define_on_calculated_data(FRACTaLStat, _on_srtt_calculated, srtt, gdouble);
-swplugin_define_on_calculated_data(FRACTaLStat, _on_skew_avg_calculated, skew_avg, gdouble);
 
 swplugin_define_swdataextractor(gdouble, _queue_delay_value_extractor, ReferencePoint, queue_delay);
 swplugin_define_swdataptrextractor(_queue_delay_ptr_extractor, ReferencePoint, queue_delay);
@@ -225,7 +222,6 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
           make_swavg(_on_lost_avg_calculated, stat, _fraction_lost_extractor),
           make_swstd(_on_lost_std_calculated, stat, _fraction_lost_extractor, 100),
           make_swavg(_on_srtt_calculated, stat, _rtt_extractor),
-          make_swavg(_on_skew_avg_calculated, stat, _skew_extractor),
           NULL);
 
   slidingwindow_add_plugins(this->ewi_sw,
@@ -288,8 +284,6 @@ void fractalfbprocessor_approve_feedback(FRACTaLFBProcessor *this)
   reference_point.extra_bytes = _stat(this)->psi_extra_bytes;
   reference_point.dts = this->dts_50th;
   reference_point.queue_delay = _stat(this)->last_queue_delay;
-  reference_point.skew = 0 < this->skew_counter ? this->skew_sum / this->skew_counter : 0;
-  this->skew_sum = this->skew_counter = 0;
   this->srtt_in_ts = this->srtt_in_ts * .9 + this->rtt_in_ts * .1;
   slidingwindow_add_data(this->reference_sw,  &reference_point);
 }
@@ -364,27 +358,11 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
       }
     }
 
-    // Skew calculation
-    {
-      SndPacket* last_packet = this->last_packet;
-      if (last_packet && _cmp_seq(last_packet->subflow_seq, packet->subflow_seq) < 0) {
-        if (last_packet->timestamp != packet->timestamp) {
-          this->skew_sum += this->rcvd_ts - this->snd_ts;
-          ++this->skew_counter;
-          this->rcvd_ts = this->snd_ts = 0;
-        }
-        this->rcvd_ts += _delta_ts(last_packet->rcvd_ts, packet->rcvd_ts);
-        this->snd_ts += _delta_ts(last_packet->sent_ts, packet->sent_ts);
-      }
-    }
-
     this->psi_received_bytes += packet->payload_size;
     ++this->psi_received_packets;
     packet->acknowledged = TRUE;
     packet->lost = FALSE;
-    this->last_packet = packet;
     sndtracker_packet_acked(this->sndtracker, packet);
-
   }
 
   if (reference_sent_ts) {

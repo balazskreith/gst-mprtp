@@ -722,7 +722,7 @@ void fractalsubctrler_report_update(
   } else {
     this->psi2 = 1.;
   }
-  this->psi2_dist = this->psi2_dist * .9 + MAX(.1, 1.-this->psi2) * .1;
+  this->psi2_dist = this->psi2_dist * .9 + MAX(.05, 1.-this->psi2) * .1;
   this->min_psi2 = CONSTRAIN(.5, 1., MIN(this->psi2, this->min_psi2 * 1.005));
 
 done:
@@ -752,7 +752,7 @@ static gboolean _congestion(FRACTaLSubController *this)
     return TRUE;
   }
 
-  if ( this->psi2 < 1. - 2. * this->psi2_dist) {
+  if ( this->psi2 < 1. - 2.5 * this->psi2_dist) {
     return TRUE;
   }
 

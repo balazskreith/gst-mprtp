@@ -741,9 +741,11 @@ static gboolean _congestion(FRACTaLSubController *this)
   this->FL_th = CONSTRAIN(.0001, _max_FL_th(this), _stat(this)->fl_avg + _stat(this)->fl_std * 2.);
   if (this->FL_th < _stat(this)->fraction_lost) {
     return TRUE;
-  } else if (0 < this->distortion_num) {
-    return FALSE;
   }
+
+//  else if (0 < this->distortion_num) {
+//    return FALSE;
+//  }
 
   this->QD_th = slack * _stat(this)->queue_delay_50th +
       CONSTRAIN(MIN_QUEUE_DELAY_THRESHOLD, MAX_QUEUE_DELAY_THRESHOLD, _stat(this)->queue_delay_std * slack);
@@ -766,36 +768,38 @@ static gboolean _congestion(FRACTaLSubController *this)
   return FALSE;
 }
 
-static GstClockTime _restrict_target(FRACTaLSubController *this)
+static void _restrict_target(FRACTaLSubController *this)
 {
   GstClockTime elapsed = _now(this) - this->last_distorted;
   gdouble alpha;
   gint32 new_target;
+  gdouble ratio;
 //
   alpha = CONSTRAIN(.5, .9, (gdouble)elapsed / _stat(this)->ewi_in_s * GST_SECOND); // the more we close to srtt the more the estimation might be punctual
   this->bottleneck_point = this->est_capacity * alpha + this->bottleneck_point * (1.-alpha);
-  new_target = this->bottleneck_point - _stat(this)->psi_extra_bytes * 12;
+  new_target = this->bottleneck_point - _stat(this)->psi_extra_bytes * 8;
   _change_sndsubflow_target_bitrate(this, CONSTRAIN(this->bottleneck_point * .6, this->target_bitrate, new_target));
 
-  _change_cwnd(this, this->congested_cwnd * CONSTRAIN(.6, .8, this->min_psi));
-  return CONSTRAIN(this->deflate_time, GST_SECOND, exp(1./this->psi) * _stat(this)->srtt);
+  ratio = (gdouble) this->target_bitrate / (gdouble) this->congested_bitrate;
+  _change_cwnd(this, this->congested_cwnd * ratio);
+//  return CONSTRAIN(this->deflate_time, GST_SECOND, exp(1./this->psi) * _stat(this)->srtt);
 }
 
 
 static void _undershoot(FRACTaLSubController *this, gint32 turning_point)
 {
   gint32 new_target;
-
+  gdouble ratio;
   this->congested_cwnd = this->cwnd;
   this->congested_bitrate = this->target_bitrate;
   this->bottleneck_point = CONSTRAIN(turning_point * .5, turning_point * .9, this->est_capacity);
-  this->refresh_target = _restrict_target;
 
   new_target = this->bottleneck_point - _stat(this)->psi_extra_bytes * 8;
   _change_sndsubflow_target_bitrate(this, MAX(new_target, this->bottleneck_point * .6));
 
-  _change_cwnd(this, this->congested_cwnd * CONSTRAIN(.6, .8, this->min_psi));
-  this->deflate_time = 2 * _stat(this)->srtt;
+  ratio = (gdouble) this->target_bitrate / (gdouble) this->congested_bitrate;
+  _change_cwnd(this, this->congested_cwnd * ratio);
+//  this->deflate_time = 2 * _stat(this)->srtt;
 }
 
 
@@ -814,20 +818,29 @@ _reduce_stage(
   GstClockTime now = _now(this);
 
   if (now - _stat(this)->srtt < this->last_distorted) {
-    this->deflate_time = this->refresh_target(this);
+    _restrict_target(this);
     goto done;
   }
 
   _refresh_reducing_approvement(this);
-  if(now - this->deflate_time < this->last_distorted) {
+  if(_congestion(this)){
+    gint32 new_target;
+    gdouble ratio;
     if (this->est_capacity < this->target_bitrate * .5) {
       _undershoot(this, this->target_bitrate);
       _set_event(this, EVENT_CONGESTION);
+      goto done;
+    } else if(this->last_distorted < _now(this) - GST_SECOND) {
+      this->bottleneck_point = _stat(this)->receiver_bitrate;
+    }else{
+      gdouble off = (gdouble)(_now(this) - this->last_distorted) / (gdouble) GST_SECOND;
+      this->bottleneck_point = _stat(this)->receiver_bitrate * off + this->est_capacity * (1.-off);
     }
-    goto done;
-  } else if(_congestion(this)) {
-    _undershoot(this, this->target_bitrate);
-    _set_event(this, EVENT_CONGESTION);
+    new_target = this->bottleneck_point - _stat(this)->psi_extra_bytes * 8;
+    _change_sndsubflow_target_bitrate(this, MAX(new_target, this->bottleneck_point * .6));
+
+    ratio = (gdouble) this->target_bitrate / (gdouble) this->congested_bitrate;
+    _change_cwnd(this, this->congested_cwnd * ratio);
     goto done;
   } else if(!this->reducing_approved) {
     goto done;

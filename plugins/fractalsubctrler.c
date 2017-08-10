@@ -836,7 +836,7 @@ _reduce_stage(
       gdouble off = (gdouble)(_now(this) - this->last_distorted) / (gdouble) GST_SECOND;
       this->bottleneck_point = _stat(this)->receiver_bitrate * off + this->est_capacity * (1.-off);
     }
-    new_target = this->bottleneck_point - _stat(this)->psi_extra_bytes * 8;
+    new_target = this->bottleneck_point - _stat(this)->psi_extra_bytes * 8 - _min_ramp_up(this);
     _change_sndsubflow_target_bitrate(this, MAX(new_target, this->bottleneck_point * .6));
 
     ratio = (gdouble) this->target_bitrate / (gdouble) this->congested_bitrate;

@@ -50,26 +50,23 @@ set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
 
 #unset key
 
-plot statfile using ($0*0.1):(($2+$3+$6+$7)/125) with point pointtype 7 ps 0.3 lc rgb "0x662c91" title "Total (SR + FEC)", \
+plot statfile using ($0*0.1):(($2+$3+$6+$7)/125) with point pointtype 7 ps 0.3 lc rgb "0xf47d23" title "Total (SR + FEC)", \
      statfile using ($0*0.1):($1+$5) with lines lc rgb "red" lw 2 title "Aggr Capacity"
 
 
-#Plot_2
 set yrange [0:1.2]
 set ytics 0.25
 set xrange [0:duration]
 set xtics 10 offset 0,-0.5
-set format x "%3.0f"
 set xtics font ", 26"
+set format x " "
 set key horizontal top right
 
+set title "Load balancing" font ",22" 
 set ylabel "Ratio" offset -7,0 font ", 22"
-set xlabel "Time [s]" offset 0,-1.1 font ", 22"
 
 set grid ytics lt 0 lw 1 lc rgb "#bbbbbb"
 set grid xtics lt 0 lw 1 lc rgb "#bbbbbb"
   
 plot statfile using ($0*0.1):(1) with filledcurves x1 lc rgb "0x008c48" title "Subflow 2", \
      statfile using ($0*0.1):(($2+$3)/($2+$3+$6+$7)) with filledcurves x1 lc rgb "blue" title "Subflow 1"
-
-

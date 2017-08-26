@@ -674,7 +674,9 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 //
   packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
   packet->cc_ts = rcv_ts;
-  fecdecoder_push_rcv_packet(this->fec_decoder, rcvpacket_ref(packet));
+
+  // TODO: 0 for testing
+//  fecdecoder_push_rcv_packet(this->fec_decoder, rcvpacket_ref(packet));
   THIS_LOCK(this);
 
 //  PROFILING("rcvtracker_add_packet",
@@ -842,7 +844,8 @@ playout:
     g_usleep(timestamp_generator_get_time(this->rtp_ts_generator, playout_time_in_ts) / 1000);
   }
 
-  if(jitterbuffer_has_repair_request(this->jitterbuffer, &gap_seq)){
+  // TODO: 0 for testing
+  if(0 && jitterbuffer_has_repair_request(this->jitterbuffer, &gap_seq)){
     GstBuffer* repairedbuf = fecdecoder_pop_rtp_packet(this->fec_decoder, gap_seq);
     if(repairedbuf){
 //      g_print("Repaired buffer appeared: %hu\n", gap_seq);

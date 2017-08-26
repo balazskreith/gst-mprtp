@@ -1422,7 +1422,7 @@ static void _rate_sampler_tuple_output_transmitter(RateSampler* this, gpointer d
   _transmit(&this->base, RATE_SAMPLER_TUPLE_OUTPUT, data);
 }
 
-static RateSampler* _make_rate_sampler() {
+static RateSampler* _make_rate_sampler(void) {
   RateSampler* this = g_malloc0(sizeof(RateSampler));
   this->monitor = _make_monitor(_rtp_packet_queue_is_full_1s_tracked_ntp);
   this->muxer = _make_muxer(_make_sr_fr_tuple, 5, 0);
@@ -1449,7 +1449,6 @@ static RateSampler* _make_rate_sampler() {
   //Connection
   _pushconnect_cmp(this->packets_refer, MAPPER_OUTPUT, this->monitor, _monitor_receive_process);
 
-
   _pushconnect_cmp(this->muxer, MUXER_OUTPUT, this->sampler, _sampler_process);
   _pushconnect_cmp(this->sampler, SAMPLER_OUTPUT, this, _rate_sampler_tuple_output_transmitter);
 //  _pushconnect_cmp(muxer, MUXER_OUTPUT, writer, _file_writer_process);
@@ -1472,7 +1471,7 @@ static void _dispose_rate_sampler(RateSampler* this) {
   _dispose_dispatcher(this->dispatcher);
 }
 
-static void _sprintf_sr_fr_tuple_for_sr_fec(gchar* result, Tuple* sr_tuple){
+static void _sprintf_sr_fr_tuple_for_sr_fec(gchar* result, Tuple* sr_tuple) {
   Int32* rtp_payload_rate = _tuple_get(sr_tuple, 1);
   Int32* fec_payload_rate = _tuple_get(sr_tuple, 2);
   Int32* rtp_packets_rate = _tuple_get(sr_tuple, 3);
@@ -1784,7 +1783,7 @@ static void _sprintf_tracked_packets_for_lots(gchar* result, TrackedPackets* tra
 }
 
 
-static void _write_lr(gchar* snd_packets_path, gchar* rcv_packets_path, gchar* output_path) {
+static void _write_accumulated_lr(gchar* snd_packets_path, gchar* rcv_packets_path, gchar* output_path) {
 
   //Construction
   TrackedPackets tracked_packets = {0,0,0,0};
@@ -1815,6 +1814,100 @@ static void _write_lr(gchar* snd_packets_path, gchar* rcv_packets_path, gchar* o
 
   _dispose_mapper(paired_packets_unrefer);
 }
+
+typedef struct {
+  gboolean added_init;
+  gboolean removed_init;
+  guint16 last_added_sn;
+  guint16 last_removed_sn;
+  GstClockTime last_ts;
+  gint32 received_packet_num;
+  gint32 lost_packet_num;
+  Component* dst;
+  PusherIO target;
+}LostRateTracker;
+
+
+
+static LostRateTracker* _make_lost_tracker(Component* dst, PusherIO target) {
+  LostRateTracker* this = g_malloc0(sizeof(LostRateTracker));
+  this->dst = dst;
+  this->target = target;
+  return this;
+}
+
+static void _add_to_lost_rate_tracker(LostRateTracker* this, RTPPacket* packet) {
+  guint16 act_seq;
+  ++this->received_packet_num;
+  if (!this->added_init) goto done;
+  for (act_seq = this->last_added_sn; ++act_seq != packet->seq_num; ) {
+    ++this->lost_packet_num;
+  }
+done:
+  this->added_init = TRUE;
+  this->last_added_sn = packet->seq_num;
+  this->last_ts = get_epoch_time_from_ntp_in_ns(packet->tracked_ntp);
+  this->target(this->dst, this);
+}
+
+static void _rem_to_lost_rate_tracker(LostRateTracker* this, RTPPacket* packet) {
+  guint16 act_seq;
+  --this->received_packet_num;
+  if (!this->removed_init) goto done;
+  for (act_seq = this->last_removed_sn; ++act_seq != packet->seq_num;) {
+    --this->lost_packet_num;
+  }
+done:
+  this->removed_init = TRUE;
+  this->last_removed_sn = packet->seq_num;
+}
+
+static GstClockTime _packet_epoch_timestamp_extractor(LostRateTracker* lost_tracker) {
+  return lost_tracker->last_ts;
+}
+
+static void _sprint_lost_rate_trakcer(gchar* result, LostRateTracker* lost_rates){
+  sprintf(result, "%1.3f",
+      (gdouble)lost_rates->lost_packet_num / (gdouble)(lost_rates->received_packet_num + lost_rates->lost_packet_num)
+  );
+}
+
+static void _write_lost_rates(gchar* ply_packets_path, gchar* output_path) {
+  FileReader* reader = _make_reader(ply_packets_path, _make_rtp_packet);
+  Sorter* packets_sorter = _make_sorter(_cmp_packets_with_udata, NULL, 32000);
+  Monitor* monitor = _make_monitor(_rtp_packet_queue_is_full_1s_tracked_ntp);
+  Sampler* sampler = _make_sampler(_packet_epoch_timestamp_extractor, 100 * GST_MSECOND);
+  LostRateTracker* lost_tracker = _make_lost_tracker(sampler, _sampler_process);
+  FileWriter* writer = _make_writer(output_path, _sprint_lost_rate_trakcer);
+  Dispatcher* dispatcher = _make_dispatcher();
+
+  //Initialization
+  _monitor_add_plugins(monitor,
+      _make_monitor_functor_plugin(NULL, _simple_passer, lost_tracker, _add_to_lost_rate_tracker, lost_tracker, _rem_to_lost_rate_tracker),
+      NULL);
+
+  _dispatcher_add_outputs(dispatcher,
+      monitor, _monitor_receive_process,
+      sampler, _sampler_process,
+      NULL);
+
+  //Connection
+  _pushconnect_cmp(reader, FILE_READER_OUTPUT, packets_sorter, _sorter_process);
+  _pushconnect_cmp(packets_sorter, SORTER_OUTPUT, monitor, _monitor_receive_process);
+  _pushconnect_cmp(sampler, SAMPLER_OUTPUT, writer, _file_writer_process);
+
+  _pushconnect_cmp(monitor, MONITOR_FLUSH_OUTPUT, writer, _file_writer_process);
+
+
+  //Start
+  {
+    GThread* process = g_thread_create(_file_reader_process, reader, TRUE, NULL);
+    g_thread_join(process);
+  }
+}
+
+
+
 
 static gint _cmp_packets_with_fec(const RTPPacket* rtp_packet, const RTPPacket* fec_packet) {
   if( _cmp_seq(rtp_packet->seq_num, fec_packet->protect_begin) < 0) {
@@ -2299,6 +2392,7 @@ int main (int argc, char **argv)
     g_print("fec_avg fec_packets - calculates the average fec rate for packets\n");
     g_print("tcprate tcpdump - calculates the tcp sending rates for tcpdump\n");
     g_print("lr snd_packets rcv_packets - calculates the loss rate for packets\n");
+    g_print("lp ply_packets - calculates the loss rate for packets in 100ms time resolution\n");
     g_print("ffre fec_packets snd_packets rcv_packets ply_packets - calculates the ffre\n");
     g_print("tfs snd_packets tcpdump - calculates traffic fair share\n");
     g_print("nlf snd_packets ply_packets - calculates the number of lost frames\n");
@@ -2316,7 +2410,7 @@ int main (int argc, char **argv)
   }else if(strcmp(argv[2], "qmd") == 0) {
     _write_qmd(argv[3], argv[4], argv[1]);
   }else if(strcmp(argv[2], "lr") == 0) {
-    _write_lr(argv[3], argv[4], argv[1]);
+    _write_accumulated_lr(argv[3], argv[4], argv[1]);
   }else if(strcmp(argv[2], "ffre") == 0) {
     _write_ffre(argv[3], argv[4], argv[5], argv[6], argv[1]);
   }else if(strcmp(argv[2], "gp") == 0) {
@@ -2335,6 +2429,8 @@ int main (int argc, char **argv)
     _write_tcpstat(argv[3], argv[1]);
   }else if(strcmp(argv[2], "join") == 0) {
     _join_rtp_logfiles(argv[3], argv[4], argv[1], argv[5]);
+  }else if(strcmp(argv[2], "lp") == 0) {
+    _write_lost_rates(argv[3], argv[1]);
   }else{
     goto usage;
   }

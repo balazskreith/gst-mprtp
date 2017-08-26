@@ -11,6 +11,7 @@
 #include <gst/gst.h>
 #include "sndsubflows.h"
 #include "sndpackets.h"
+#include "sndtracker.h"
 
 typedef struct _StreamSplitter StreamSplitter;
 typedef struct _StreamSplitterClass StreamSplitterClass;
@@ -30,6 +31,8 @@ struct _StreamSplitter
   GstClock*            sysclock;
   GstClockTime         made;
 
+  gdouble              refresh_ratio;
+  GstClockTime         last_refresh;
   SndSubflows*         subflows;
   gint32               total_bitrate;
   gint32               actual_rates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];

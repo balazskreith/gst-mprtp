@@ -278,7 +278,7 @@ void fractalfbprocessor_approve_feedback(FRACTaLFBProcessor *this)
 {
   ReferencePoint reference_point;
 
-  reference_point.fraction_lost = _stat(this)->fraction_lost;
+  reference_point.fraction_lost = CONSTRAIN(0.0, 1.0, _stat(this)->fraction_lost);
   reference_point.rtt = this->rtt;
   reference_point.rtt_in_ts = this->rtt_in_ts;
   reference_point.extra_bytes = _stat(this)->psi_extra_bytes;

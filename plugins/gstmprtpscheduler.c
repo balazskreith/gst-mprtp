@@ -388,6 +388,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   sndsubflows_add_on_target_bitrate_changed_cb(this->subflows,
       (ListenerFunc) stream_splitter_on_target_bitrate_changed, this->splitter);
 
+
   sndsubflows_add_on_subflow_state_changed_cb(this->subflows,
         (ListenerFunc) stream_splitter_on_subflow_state_changed,
         this->splitter);
@@ -1068,6 +1069,7 @@ mprtpscheduler_emitter_process (gpointer udata)
   if(!msg){
     goto done;
   }
+//  msg->target_media_rate = stream_splitter_get_total_media_rate
 //  g_print("Requested media rate: %d\n", msg->target_media_rate);
   g_signal_emit (this, _subflows_utilization, 0 /* details */, msg);
   messenger_throw_block_unlocked(this->emit_msger, msg);

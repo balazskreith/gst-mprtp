@@ -81,6 +81,7 @@ struct _FRACTaLSubController
   gint64                    QD_th;
   gint32                    EB_th;
   gdouble                   FL_th;
+  gdouble                   qd_dist_avg;
   gboolean                  reducing_approved;
   GstClockTime              reducing_sr_reached;
 
@@ -100,8 +101,11 @@ struct _FRACTaLSubController
   gboolean                  stability_approved;
   gboolean                  cwnd_locked;
   gdouble                   bottleneck_cwnd;
-  gdouble                   min_psi;
-  gdouble                   psi, psi2, min_psi2, psi2_dist;
+//  gdouble                   min_psi;
+//  gdouble                   psi;
+  gdouble                   psi2;
+//  gdouble                   min_psi2;
+  gdouble                   psi2_dist;
   gdouble                   congested_cwnd;
   GstClockTime            (*refresh_target)(FRACTaLSubController* this);
 
@@ -112,12 +116,12 @@ struct _FRACTaLSubController
 
   SndTracker*               sndtracker;
 
-  gdouble                   eb_ratio;
-  gdouble                   eb_ratio_t;
-  gdouble                   eb_ratio_t2;
-  gdouble                   deb_ratio;
-  gdouble                   eb_ratio_ewma;
-  gdouble                   max_eb_ratio;
+//  gdouble                   eb_ratio;
+//  gdouble                   eb_ratio_t;
+//  gdouble                   eb_ratio_t2;
+//  gdouble                   deb_ratio;
+//  gdouble                   eb_ratio_ewma;
+//  gdouble                   max_eb_ratio;
 
 };
 

@@ -29,9 +29,18 @@ struct _SndQueue
   GObject                   object;
   GstClock*                 sysclock;
   SndSubflows*              subflows;
-  GQueue*                   queues[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  GQueue*                   packets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  gdouble                   threshold;
+  volatile gint32           queued_bytes;
+  volatile guint32          last_ts;
+  volatile gint32           actual_rates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32           actual_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32           cwnd[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gboolean         empty;
+  volatile gint32           total_bitrate;
+  volatile gint32           total_target;
 
-  GQueue*                   next_stack;
+  Notifier*                 on_clear;
 };
 
 
@@ -43,10 +52,13 @@ struct _SndQueueClass{
 GType sndqueue_get_type (void);
 SndQueue *make_sndqueue(SndSubflows* subflows_db);
 
+void sndqueue_add_on_clear(SndQueue * this, ListenerFunc callback, gpointer udata);
 void sndqueue_on_subflow_joined(SndQueue* this, SndSubflow* subflow);
 void sndqueue_on_subflow_detached(SndQueue* this, SndSubflow* subflow);
+void sndqueue_on_packet_sent(SndQueue* this, SndPacket* packet);
+void sndqueue_on_packet_obsolated(SndQueue* this, SndPacket* packet);
+void sndqueue_on_subflow_target_bitrate_chaned(SndQueue* this, SndSubflow* subflow);
 
-void sndqueue_clear(SndQueue * this);
 void sndqueue_push_packet(SndQueue * this, SndPacket* packet);
 SndPacket* sndqueue_pop_packet(SndQueue* this, GstClockTime* next_approve);
 gboolean sndqueue_is_empty(SndQueue* this);

@@ -531,6 +531,10 @@ static void _swstd_add_windowed_pipe(gpointer dataptr, gpointer itemptr)
   datapuffer_write(this->items, tmp);
 
   n = datapuffer_readcapacity(this->items);
+  if (n < 1.) {
+    goto done;
+  }
+
   avg = this->sum / n;
   new_variance = pow(new_item - avg, 2);
   if(datapuffer_isfull(this->variances)){
@@ -540,6 +544,9 @@ static void _swstd_add_windowed_pipe(gpointer dataptr, gpointer itemptr)
   }
 
   this->var += new_variance - old_variance;
+  if (this->var < 1.) {
+    goto done;
+  }
   tmp = g_queue_is_empty(this->double_recycle) ? g_malloc(sizeof(gdouble)) : g_queue_pop_head(this->double_recycle);
   memcpy(tmp, &new_variance, sizeof(gdouble));
   datapuffer_write(this->variances, tmp);

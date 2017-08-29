@@ -101,16 +101,11 @@ struct _FRACTaLSubController
   gboolean                  stability_approved;
   gboolean                  cwnd_locked;
   gdouble                   bottleneck_cwnd;
-//  gdouble                   min_psi;
-//  gdouble                   psi;
-  gdouble                   psi2;
-//  gdouble                   min_psi2;
-  gdouble                   psi2_dist;
-  gdouble                   congested_cwnd;
+  gdouble                   psi;
+  gdouble                   psi_dist;
   GstClockTime            (*refresh_target)(FRACTaLSubController* this);
 
   gint32                    max_extra_bytes;
-  gdouble                   cwnd;//congestion window
 
   gpointer                  priv;
 

@@ -128,6 +128,7 @@ sndsubflows_finalize (GObject * object)
   g_object_unref(this->on_path_active_changed);
   g_object_unref(this->on_target_bitrate_changed);
   g_object_unref(this->on_subflow_state_changed);
+  g_object_unref(this->on_subflow_state_stat_changed);
 
   g_object_unref(this->changed_subflows);
 
@@ -147,6 +148,7 @@ sndsubflows_init (SndSubflows * this)
   this->on_path_active_changed                  = make_notifier("SndSubflow: on-path-active-changed");
   this->on_target_bitrate_changed               = make_notifier("SndSubflow: on-target-bitrate-changed");
   this->on_subflow_state_changed                = make_notifier("SndSubflow: on-subflow-state-changed");
+  this->on_subflow_state_stat_changed           = make_notifier("SndSubflow: on-subflow-state-stat");
 
   this->changed_subflows                        = g_queue_new();
 
@@ -223,6 +225,11 @@ void sndsubflows_add_on_subflow_state_changed_cb(SndSubflows* this, ListenerFunc
   notifier_add_listener(this->on_subflow_state_changed, callback, udata);
 }
 
+void sndsubflows_add_on_subflow_state_stat_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata)
+{
+  notifier_add_listener(this->on_subflow_state_stat_changed, callback, udata);
+}
+
 void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata)
 {
   notifier_add_listener(this->on_congestion_controlling_type_changed, callback, udata);
@@ -247,16 +254,25 @@ void sndsubflow_monitoring_request(SndSubflow* subflow)
 void sndsubflow_set_target_rate(SndSubflow* subflow, gint32 target_rate)
 {
   SndSubflows *subflows = subflow->base_db;
-  subflows->target_rate -= subflow->target_bitrate;
-  subflows->target_rate += subflow->target_bitrate = target_rate;
+//  subflows->target_rate -= subflow->target_bitrate;
+//  subflows->target_rate += subflow->target_bitrate = target_rate;
+  subflow->target_bitrate = target_rate;
 
   notifier_do(subflows->on_target_bitrate_changed, subflow);
 }
 
-gint32 sndsubflows_get_total_target(SndSubflows* this)
-{
-  return this->target_rate;
+void sndsubflow_set_rtt(SndSubflow* subflow, GstClockTime rtt) {
+  subflow->rtt = rtt;
 }
+
+void sndsubflow_set_eqd(SndSubflow* subflow, gint32 eqd) {
+  subflow->eqd = eqd;
+}
+
+//gint32 sndsubflows_get_total_target(SndSubflows* this)
+//{
+//  return this->target_rate;
+//}
 
 guint sndsubflows_get_subflows_num(SndSubflows* this)
 {
@@ -296,17 +312,17 @@ void sndsubflows_set_path_congested(SndSubflows* this, guint8 subflow_id, gboole
   CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, congested, value, NULL);
 }
 
-static void _sum_subflow_target(SndSubflow* subflow, SndSubflows* subflows)
+static void _on_subflow_target_changed(SndSubflow* subflow, SndSubflows* subflows)
 {
-  subflows->target_rate += subflow->target_bitrate;
+//  subflows->target_rate += subflow->target_bitrate;
   notifier_do(subflows->on_target_bitrate_changed, subflow);
 }
 
 void sndsubflows_set_target_bitrate(SndSubflows* this, guint8 subflow_id, gint32 target_bitrate)
 {
   CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, target_bitrate, target_bitrate, NULL);
-  this->target_rate = 0;
-  g_slist_foreach(this->joined, (GFunc) _sum_subflow_target, this);
+//  this->target_rate = 0;
+  g_slist_foreach(this->joined, (GFunc) _on_subflow_target_changed, this);
 }
 
 void sndsubflows_set_report_timeout(SndSubflows* this, guint8 subflow_id, GstClockTime report_timeout)
@@ -317,11 +333,28 @@ void sndsubflows_set_report_timeout(SndSubflows* this, guint8 subflow_id, GstClo
 
 //-----------------------------------------------------------------------------------------------------------
 
+static void _collect_on_subflow_state_stat(SndSubflow* subflow, SndSubflowsStateStat* state_stat)
+{
+  if (state_stat->max < subflow->state) {
+    state_stat->max = subflow->state;
+  }
+
+  if (subflow->state < state_stat->min) {
+    state_stat->min = subflow->state;
+  }
+}
 
 void sndsubflow_set_state(SndSubflow* subflow, SndSubflowState state)
 {
+  SndSubflows* this = subflow->base_db;
+  SndSubflowsStateStat state_stat;
   subflow->state = state;
-  notifier_do(subflow->base_db->on_subflow_state_changed, subflow);
+  notifier_do(this->on_subflow_state_changed, subflow);
+
+  state_stat.min = SNDSUBFLOW_STATE_UNDERUSED;
+  state_stat.max = SNDSUBFLOW_STATE_OVERUSED;
+  g_slist_foreach(this->joined, (GFunc) _collect_on_subflow_state_stat, &state_stat);
+  notifier_do(this->on_subflow_state_stat_changed, &state_stat);
 }
 
 void sndsubflow_refresh_report_interval(SndSubflow* subflow)

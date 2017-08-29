@@ -148,7 +148,6 @@ swplugin_define_swdataptrextractor(_queue_delay_ptr_extractor, ReferencePoint, q
 swplugin_define_on_calculated_data(FRACTaLStat, _on_queue_delay_std_calculated, queue_delay_std, gdouble);
 
 static void _on_packet_sent(FRACTaLFBProcessor* this, SndPacket* packet);
-static void _on_packet_queued(FRACTaLFBProcessor* this, SndPacket* packet);
 static void _on_psi_sw_rem(FRACTaLFBProcessor *this, SndPacket* packet);
 static void _on_psi_postprocessor(FRACTaLFBProcessor *this, SndPacket* packet);
 static void _refresh_windows_thresholds(FRACTaLFBProcessor *this);
@@ -195,10 +194,8 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
   this->psi_sw = make_slidingwindow(500, GST_SECOND);
   this->ts_generator = sndtracker_get_ts_generator(sndtracker);
   this->sent_packets = g_queue_new();
-  this->queued_packets_rtt = g_queue_new();
 
   sndtracker_add_on_packet_sent(this->sndtracker, (ListenerFunc)_on_packet_sent, this);
-  sndtracker_add_on_packet_queued(this->sndtracker, (ListenerFunc)_on_packet_queued, this);
 
 //  correlator_add_on_correlation_calculated_listener(this->drift_correlator, (ListenerFunc) _on_drift_corr_calculated, stat);
   swminmax = make_swminmax( (GCompareFunc) _cmp_reference_point_dts, (ListenerFunc) _on_min_dts_calculated, this);
@@ -460,26 +457,6 @@ static void _on_packet_sent(FRACTaLFBProcessor* this, SndPacket* packet) {
   } while(1);
 }
 
-static void _on_packet_queued(FRACTaLFBProcessor* this, SndPacket* packet) {
-  if(packet->subflow_id != this->subflow->id){
-    return;
-  }
-  _stat(this)->queued_bytes_in_srtt += packet->payload_size;
-  g_queue_push_tail(this->queued_packets_rtt, sndpacket_ref(packet));
-  do {
-    SndPacket* head;
-    if (g_queue_is_empty(this->queued_packets_rtt)) {
-      return;
-    }
-    head = g_queue_peek_head(this->queued_packets_rtt);
-    if (packet->queued - _stat(this)->srtt <= head->queued) {
-      return;
-    }
-    head = g_queue_pop_head(this->queued_packets_rtt);
-    _stat(this)->queued_bytes_in_srtt -= head->payload_size;
-    sndpacket_unref(head);
-  }while(1);
-}
 
 static void _on_psi_sw_rem(FRACTaLFBProcessor *this, SndPacket* packet) {
   this->psi_sent_bytes -= packet->payload_size;
@@ -506,6 +483,7 @@ static void _refresh_windows_thresholds(FRACTaLFBProcessor *this) {
   guint32 psi_in_ns = MIN(_stat(this)->srtt + _stat(this)->queue_delay_std * 2, GST_SECOND);
 
   slidingwindow_set_threshold(this->ewi_sw, ewi_in_ns);
+//  slidingwindow_set_threshold(this->ewi_sw, .1 * GST_SECOND);
   slidingwindow_set_threshold(this->psi_sw, psi_in_ns);
 }
 

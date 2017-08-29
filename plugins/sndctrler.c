@@ -396,7 +396,7 @@ void _update_subflow_target_utilization(SndController* this)
   signaldata  = this->mprtp_signal_data;
 //  g_print("------------ %2.1f ------------\n", GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000.);
   sndsubflows_iterate(this->subflows, _update_sndsubflow, signaldata);
-  signaldata->target_media_rate = sndsubflows_get_total_target(this->subflows);
+//  signaldata->target_media_rate = sndsubflows_get_total_target(this->subflows);
 //  g_print("Total target: %d\n", signaldata->target_media_rate / 1000);
 }
 

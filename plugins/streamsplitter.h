@@ -35,9 +35,11 @@ struct _StreamSplitter
   GstClockTime         last_refresh;
   SndSubflows*         subflows;
   gint32               total_bitrate;
-  gint32               actual_rates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  gint32               actual_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  gdouble              actual_weights[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32               actual_rates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32               actual_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32               extra_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gboolean             target_is_reached;
+//  gdouble              actual_weights[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   guint8               max_state;
   gboolean             keyframe_filtering;
   gint32               total_target;
@@ -56,13 +58,15 @@ stream_splitter_set_keyframe_filtering(
     StreamSplitter* this,
     gboolean keyframe_filtering);
 
-void
-stream_splitter_on_target_bitrate_changed(
-    StreamSplitter* this,
-    SndSubflow* subflow);
 
 gint32
-stream_splitter_get_total_target(StreamSplitter* this);
+stream_splitter_get_total_media_rate(
+    StreamSplitter* this);
+
+void
+stream_splitter_on_packet_queued(
+    StreamSplitter* this,
+    SndPacket* packet);
 
 void
 stream_splitter_on_packet_sent(
@@ -75,11 +79,22 @@ stream_splitter_on_packet_obsolated(
     StreamSplitter* this,
     SndPacket* packet);
 
+
+void
+stream_splitter_on_subflow_target_bitrate_chaned(
+    StreamSplitter* this,
+    SndSubflow* subflow);
+
+
 void
 stream_splitter_on_subflow_state_changed(
     StreamSplitter* this,
     SndSubflow* subflow);
 
+void
+stream_splitter_on_subflow_state_stat_changed(
+    StreamSplitter* this,
+    SndSubflowsStateStat* state_stat);
 
 SndSubflow*
 stream_splitter_select_subflow(

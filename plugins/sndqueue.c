@@ -39,6 +39,15 @@ GST_DEBUG_CATEGORY_STATIC (sndqueue_debug_category);
 G_DEFINE_TYPE (SndQueue, sndqueue, G_TYPE_OBJECT);
 
 
+typedef struct {
+  GQueue* pacingq;
+  GQueue* rttq;
+  gdouble rtt;
+  gdouble cwnd;
+}TransmissionQueue;
+
+#define _tqueue(this, subflow_id) \
+  ((TransmissionQueue*)this->tqueues[subflow_id])
 //----------------------------------------------------------------------
 //-------- Private functions belongs to the object ----------
 //----------------------------------------------------------------------
@@ -73,13 +82,16 @@ sndqueue_finalize (GObject * object)
 
   g_object_unref(this->subflows);
   g_object_unref(this->sysclock);
+  g_object_unref(this->on_clear);
 }
 
 
 void
 sndqueue_init (SndQueue * this)
 {
+  this->threshold = .5;
   this->sysclock = gst_system_clock_obtain();
+  this->on_clear = make_notifier("SndQueue: on-clear");
 }
 
 SndQueue *make_sndqueue(SndSubflows* subflows_db)
@@ -89,43 +101,89 @@ SndQueue *make_sndqueue(SndSubflows* subflows_db)
   this = g_object_new(SNDQUEUE_TYPE, NULL);
   this->subflows = g_object_ref(subflows_db);
   for(i = 0; i < MPRTP_PLUGIN_MAX_SUBFLOW_NUM; ++i){
-    this->queues[i] = NULL;
+    this->packets[i] = NULL;
   }
   return this;
 }
 
+void sndqueue_add_on_clear(SndQueue * this, ListenerFunc callback, gpointer udata)
+{
+  notifier_add_listener(this->on_clear, callback, udata);
+}
+
 void sndqueue_on_subflow_joined(SndQueue* this, SndSubflow* subflow)
 {
-  this->queues[subflow->id] = g_queue_new();
+  this->packets[subflow->id] = g_queue_new();
 }
 
 void sndqueue_on_subflow_detached(SndQueue* this, SndSubflow* subflow)
 {
-  g_object_unref(this->queues[subflow->id]);
-  this->queues[subflow->id] = NULL;
+  g_object_unref(this->packets[subflow->id]);
+  this->packets[subflow->id] = NULL;
 }
 
-void sndqueue_push_packet(SndQueue * this, SndPacket* packet)
+
+void
+sndqueue_on_packet_sent(SndQueue* this, SndPacket* packet)
 {
-  GQueue* queue = this->queues[packet->subflow_id];
-
-  if(!queue){
-    GST_WARNING("Sending queue for subflow %d is not available", packet->subflow_id);
-    return;
-  }
-  g_queue_push_tail(queue, packet);
-
-  sndsubflows_get_subflow(this->subflows, packet->subflow_id);
+  this->actual_rates[packet->subflow_id] += packet->payload_size<<3; //convert bytes to bits
+  this->total_bitrate += packet->payload_size<<3;
 }
+
+void
+sndqueue_on_packet_obsolated(SndQueue* this, SndPacket* packet)
+{
+  this->actual_rates[packet->subflow_id] -= packet->payload_size<<3; //convert bytes to bits
+  this->total_bitrate -= packet->payload_size<<3;
+}
+
+void
+sndqueue_on_subflow_target_bitrate_chaned(SndQueue* this, SndSubflow* subflow)
+{
+  this->total_target -= this->actual_targets[subflow->id];
+  this->actual_targets[subflow->id] = subflow->target_bitrate;
+  this->total_target += this->actual_targets[subflow->id];
+}
+
+static gboolean _is_packets_queue_full(SndQueue * this) {
+  if (this->threshold == 0.) {
+    return FALSE;
+  } else if (this->queued_bytes < 5000) {
+    return FALSE;
+  }
+//  g_print("%d * %f = %f < %d\n", MAX(this->total_target, this->total_bitrate), this->threshold,
+//      MAX(this->total_target, this->total_bitrate) * this->threshold, (this->queued_bytes<<3));
+  return MAX(this->total_target, this->total_bitrate) * this->threshold < (this->queued_bytes<<3);
+}
+
 
 static void _clear_helper(SndSubflow* subflow, GQueue** queues){
   GQueue* queue = queues[subflow->id];
   g_queue_clear(queue);
 }
 
-void sndqueue_clear(SndQueue * this)
+static void _clear_packets_queue(SndQueue * this) {
+  // TODO: clear the rtpqstat in sndtracker
+  sndsubflows_iterate(this->subflows, (GFunc) _clear_helper, this->packets);
+  this->queued_bytes = 0;
+  notifier_do(this->on_clear, NULL);
+}
+
+void sndqueue_push_packet(SndQueue * this, SndPacket* packet)
 {
-  sndsubflows_iterate(this->subflows, (GFunc) _clear_helper, this->queues);
+  GQueue* queue = this->packets[packet->subflow_id];
+
+  if(!queue){
+    GST_WARNING("Sending queue for subflow %d is not available", packet->subflow_id);
+    return;
+  }
+  g_queue_push_tail(queue, packet);
+  this->empty = FALSE;
+  this->queued_bytes += packet->payload_size;
+  if (_is_packets_queue_full(this)) {
+    g_print("clear rtp queue %d %d\n", this->queued_bytes, this->total_bitrate);
+    _clear_packets_queue(this);
+  }
 }
 
 typedef struct{
@@ -135,7 +193,7 @@ typedef struct{
 }PopHelperTuple;
 
 static void _pop_helper(SndSubflow* subflow, PopHelperTuple* pop_helper){
-  if(g_queue_is_empty(pop_helper->this->queues[subflow->id])){
+  if(g_queue_is_empty(pop_helper->this->packets[subflow->id])){
     return;
   }
 
@@ -143,6 +201,26 @@ static void _pop_helper(SndSubflow* subflow, PopHelperTuple* pop_helper){
     pop_helper->subflow_id   = subflow->id;
     pop_helper->next_approve = subflow->pacing_time;
   }
+}
+
+static void _set_pacing_time(SndQueue * this, guint8 subflow_id, SndPacket* packet) {
+  SndSubflow* subflow = sndsubflows_get_subflow(this->subflows, subflow_id);
+  gdouble pacing_interval_in_s;
+  gint32 pacing_byterate;
+  switch (subflow->state) {
+    case SNDSUBFLOW_STATE_OVERUSED:
+      pacing_byterate = this->actual_targets[subflow_id] / 8;
+      break;
+    case SNDSUBFLOW_STATE_UNDERUSED:
+      pacing_byterate = MAX(this->actual_rates[subflow_id], this->actual_targets[subflow_id]) / 5;
+      break;
+    default:
+    case SNDSUBFLOW_STATE_STABLE:
+      pacing_byterate = MAX(this->actual_rates[subflow_id], this->actual_targets[subflow_id]) / 7;
+      break;
+  }
+  pacing_interval_in_s = (gdouble) packet->payload_size / (gdouble) pacing_byterate;
+  subflow->pacing_time = _now(this) + pacing_interval_in_s * GST_SECOND;
 }
 
 SndPacket* sndqueue_pop_packet(SndQueue * this, GstClockTime* next_approve)
@@ -153,35 +231,42 @@ SndPacket* sndqueue_pop_packet(SndQueue * this, GstClockTime* next_approve)
   GstClockTime now = _now(this);
 
   sndsubflows_iterate(this->subflows, (GFunc) _pop_helper, &pop_helper);
-  if(!pop_helper.subflow_id){
+
+  if(!pop_helper.subflow_id) {
+    this->empty = TRUE;
     goto done;
   }else if(now < pop_helper.next_approve){
     if(next_approve){
       *next_approve = MIN(pop_helper.next_approve, *next_approve);
     }
+    goto done;
   }
 
-  queue = this->queues[pop_helper.subflow_id];
+  queue = this->packets[pop_helper.subflow_id];
   result = g_queue_pop_head(queue);
+  _set_pacing_time(this, pop_helper.subflow_id, result);
+  this->queued_bytes -= result->payload_size;
+  this->last_ts = result->timestamp;
 done:
   return result;
 }
 
-typedef struct{
-  gboolean result;
-  SndQueue*    this;
-}EmptyTuple;
-
-static void _empty_helper(SndSubflow* subflow, EmptyTuple* empty_tuple)
-{
-  empty_tuple->result &= g_queue_is_empty(empty_tuple->this->queues[subflow->id]);
-}
+//typedef struct{
+//  gboolean result;
+//  SndQueue*    this;
+//}EmptyTuple;
+//
+//static void _empty_helper(SndSubflow* subflow, EmptyTuple* empty_tuple)
+//{
+//  empty_tuple->result &= g_queue_is_empty(empty_tuple->this->packets[subflow->id]);
+//}
 
 gboolean sndqueue_is_empty(SndQueue* this)
 {
-  EmptyTuple empty_tuple = {TRUE,this};
-  sndsubflows_iterate(this->subflows, (GFunc) _empty_helper, &empty_tuple);
-  return empty_tuple.result;
+//  EmptyTuple empty_tuple = {TRUE,this};
+//  sndsubflows_iterate(this->subflows, (GFunc) _empty_helper, &empty_tuple);
+//  return empty_tuple.result;
+  return this->empty;
 }
 
 

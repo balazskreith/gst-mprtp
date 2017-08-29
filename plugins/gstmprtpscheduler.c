@@ -385,29 +385,54 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
       this->emit_msger);
 
   fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
-  sndsubflows_add_on_target_bitrate_changed_cb(this->subflows,
-      (ListenerFunc) stream_splitter_on_target_bitrate_changed, this->splitter);
 
+  sndsubflows_add_on_target_bitrate_changed_cb(this->subflows,
+      (ListenerFunc) stream_splitter_on_subflow_target_bitrate_chaned,
+      this->splitter);
 
   sndsubflows_add_on_subflow_state_changed_cb(this->subflows,
-        (ListenerFunc) stream_splitter_on_subflow_state_changed,
-        this->splitter);
+      (ListenerFunc) stream_splitter_on_subflow_state_changed,
+      this->splitter);
 
-  sndsubflows_add_on_subflow_joined_cb(this->subflows,
-      (ListenerFunc) sndqueue_on_subflow_joined,
-      this->sndqueue);
-
-  sndsubflows_add_on_subflow_detached_cb(this->subflows,
-        (ListenerFunc) sndqueue_on_subflow_detached,
-        this->sndqueue);
+  sndsubflows_add_on_subflow_state_stat_changed_cb(this->subflows,
+      (ListenerFunc) stream_splitter_on_subflow_state_stat_changed,
+      this->splitter);
 
   sndtracker_add_on_packet_sent(this->sndtracker,
-      (GFunc) stream_splitter_on_packet_sent,
+      (ListenerFunc) stream_splitter_on_packet_sent,
       this->splitter);
 
-  sndtracker_add_on_packet_obsolated(this->sndtracker,
-      (GFunc) stream_splitter_on_packet_obsolated,
+  sndtracker_add_on_packet_queued(this->sndtracker,
+      (ListenerFunc) stream_splitter_on_packet_queued,
       this->splitter);
+
+  sndqueue_add_on_clear(this->sndqueue,
+      (ListenerFunc) sndtracker_clear_rtpqstat,
+      this->sndtracker);
+
+  sndtracker_add_on_packet_obsolated(this->sndtracker,
+      (ListenerFunc) stream_splitter_on_packet_obsolated,
+      this->splitter);
+
+  sndsubflows_add_on_subflow_joined_cb(this->subflows,
+     (ListenerFunc) sndqueue_on_subflow_joined,
+     this->sndqueue);
+
+  sndsubflows_add_on_subflow_detached_cb(this->subflows,
+     (ListenerFunc) sndqueue_on_subflow_detached,
+     this->sndqueue);
+
+  sndsubflows_add_on_target_bitrate_changed_cb(this->subflows,
+     (ListenerFunc) sndqueue_on_subflow_target_bitrate_chaned,
+     this->sndqueue);
+
+  sndtracker_add_on_packet_sent(this->sndtracker,
+     (ListenerFunc) sndqueue_on_packet_sent,
+     this->sndqueue);
+
+  sndtracker_add_on_packet_obsolated(this->sndtracker,
+     (ListenerFunc) sndqueue_on_packet_obsolated,
+     this->sndqueue);
 
   mediator_set_request_handler(this->monitoring,
       (ListenerFunc) _on_monitoring_request, this);
@@ -960,7 +985,7 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
 {
   SndPacket *packet;
   GstClockTime now, next_time = 0;
-  RTPQueueStat* rtpqstat;
+//  RTPQueueStat* rtpqstat;
 
 //PROFILING("LOCK",
   THIS_LOCK(this);
@@ -972,13 +997,7 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
 
   sndtracker_refresh(this->sndtracker);
   sndctrler_time_update(this->controller);
-  rtpqstat = sndtracker_get_rtpqstat(this->sndtracker);
-
-  if(5000 < rtpqstat->bytes_in_queue && .5 < rtpqstat->rtpq_delay){
-    g_print("clear rtp queue %f %f\n", rtpqstat->bytes_in_queue * 8., rtpqstat->rtpq_delay);
-    sndqueue_clear(this->sndqueue);
-    sndtracker_clear_rtpqstat(this->sndtracker);
-  }
+//  rtpqstat = sndtracker_get_rtpqstat(this->sndtracker);
 
   now = _now(this);
   next_time = now;
@@ -1069,7 +1088,7 @@ mprtpscheduler_emitter_process (gpointer udata)
   if(!msg){
     goto done;
   }
-//  msg->target_media_rate = stream_splitter_get_total_media_rate
+  msg->target_media_rate = stream_splitter_get_total_media_rate(this->splitter);
 //  g_print("Requested media rate: %d\n", msg->target_media_rate);
   g_signal_emit (this, _subflows_utilization, 0 /* details */, msg);
   messenger_throw_block_unlocked(this->emit_msger, msg);

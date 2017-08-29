@@ -33,6 +33,11 @@ typedef enum
   SNDSUBFLOW_STATE_UNDERUSED     = 1,
 } SndSubflowState;
 
+typedef struct {
+  SndSubflowState min;
+  SndSubflowState max;
+}SndSubflowsStateStat;
+
 typedef struct _SndSubflow
 {
   guint8                     id;
@@ -65,6 +70,10 @@ typedef struct _SndSubflow
   GstClockTime               report_interval;
   GstClockTime               last_report;
 
+  GstClockTime               rtt;
+  gint32                     eqd;
+  gdouble                    cwnd;
+
 }SndSubflow;
 
 
@@ -87,10 +96,11 @@ struct _SndSubflows
   Notifier*            on_path_active_changed;
   Notifier*            on_target_bitrate_changed;
   Notifier*            on_subflow_state_changed;
+  Notifier*            on_subflow_state_stat_changed;
 
   Mediator*            monitoring_handler;
 
-  gint32               target_rate;
+//  gint32               target_rate;
   guint                subflows_num;
 
 };
@@ -112,7 +122,9 @@ void sndsubflows_iterate(SndSubflows* this, GFunc process, gpointer udata);
 
 void sndsubflow_monitoring_request(SndSubflow* subflow);
 void sndsubflow_set_target_rate(SndSubflow* subflow, gint32 target_rate);
-gint32 sndsubflows_get_total_target(SndSubflows* this);
+void sndsubflow_set_rtt(SndSubflow* subflow, GstClockTime rtt);
+void sndsubflow_set_eqd(SndSubflow* subflow, gint32 eqd);
+//gint32 sndsubflows_get_total_target(SndSubflows* this);
 guint sndsubflows_get_subflows_num(SndSubflows* this);
 SndSubflow* sndsubflows_get_subflow(SndSubflows* this, guint8 subflow_id);
 
@@ -131,6 +143,7 @@ void sndsubflows_set_report_timeout(SndSubflows* this, guint8 subflow_id, GstClo
 void sndsubflows_add_on_subflow_joined_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_subflow_detached_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_subflow_state_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
+void sndsubflows_add_on_subflow_state_stat_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);

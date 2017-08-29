@@ -173,12 +173,12 @@ SndTrackerStat* sndtracker_get_stat(SndTracker * this)
   return &this->stat;
 }
 
-RTPQueueStat*   sndtracker_get_rtpqstat(SndTracker * this){
+RTPQueueStat* sndtracker_get_rtpqstat(SndTracker * this) {
   this->rtpqstat.rtpq_delay = (gdouble)this->rtpqstat.bytes_in_queue / (gdouble)this->stat.sent_bytes_in_1s;
   return &this->rtpqstat;
 }
 
-void sndtracker_clear_rtpqstat(SndTracker * this){
+void sndtracker_clear_rtpqstat(SndTracker * this, gpointer nulldata){
   memset(&this->rtpqstat, 0, sizeof(RTPQueueStat));
 }
 

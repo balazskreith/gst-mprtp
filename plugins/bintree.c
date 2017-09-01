@@ -49,6 +49,17 @@ static BintreeNode* _create_node(Bintree* this, gpointer value);
 //----------------------------------------------------------------------
 
 
+typedef struct {
+//  gint64 skew;
+  gdouble fraction_lost;
+  gdouble psi;
+//  gint32  bytes_in_flight;
+  GstClockTime rtt;
+  guint32 rtt_in_ts;
+  gint32 extra_bytes;
+  guint32 dts;
+  GstClockTime queue_delay;
+}ReferencePoint;
 
 static void
 _sprint_list_of_pointers(GSList* it, gchar *result, guint result_length)
@@ -60,7 +71,8 @@ _sprint_list_of_pointers(GSList* it, gchar *result, guint result_length)
   memset(result, 0, result_length);
   for(; it; it = it->next){
     memset(helper, 0, 255);
-    sprintf(helper, "(%p)[%ld]%c ", it->data, *(gint64*)(it->data), it->next ? ',' : ' ');
+//    sprintf(helper, "(%p)[%lu]%c ", it->data, *(guint64*)(it->data), it->next ? ',' : ' ');
+    sprintf(helper, "(%p)[%lu]%c ", it->data, ((ReferencePoint*)(it->data))->queue_delay, it->next ? ',' : ' ');
     strcat(result, helper);
   }
 }

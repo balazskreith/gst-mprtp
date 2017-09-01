@@ -115,7 +115,6 @@ sndtracker_finalize (GObject * object)
   g_object_unref(this->on_packet_sent);
   g_object_unref(this->on_stat_changed);
   g_object_unref(this->on_packet_obsolated);
-  g_object_unref(this->on_packet_queued);
   g_object_unref(this->ts_generator);
 
   g_object_unref(this->subflows_db);
@@ -136,7 +135,6 @@ sndtracker_init (SndTracker * this)
 
   this->on_packet_sent      = make_notifier("SndTracker: on-packet-sent");
   this->on_packet_obsolated = make_notifier("SndTracker: on-packet-obsolated");
-  this->on_packet_queued    = make_notifier("SndTracker: on-packet-queued");
   this->on_stat_changed     = make_notifier("SndTracker: on-stat-changed");
   this->ts_generator        = make_timestamp_generator(DEFAULT_CC_TIMESTAMP_GENERATOR_CLOCKRATE);
 
@@ -145,7 +143,7 @@ sndtracker_init (SndTracker * this)
   slidingwindow_add_on_rem_item_cb(this->acked_sw, (ListenerFunc) _acked_packets_rem_pipe, this);
 }
 
-SndTracker *make_sndtracker(SndSubflows* subflows_db)
+SndTracker *make_sndtracker(SndSubflows* subflows_db, SndQueue* sndqueue)
 {
   SndTracker* this;
   this = g_object_new(SNDTRACKER_TYPE, NULL);
@@ -153,7 +151,7 @@ SndTracker *make_sndtracker(SndSubflows* subflows_db)
 
   sndsubflows_add_on_subflow_joined_cb(this->subflows_db, (ListenerFunc) _on_subflow_joined, this);
   sndsubflows_add_on_subflow_detached_cb(this->subflows_db, (ListenerFunc) _on_subflow_detached, this);
-
+  this->sndqueue = sndqueue;
   return this;
 }
 
@@ -174,12 +172,7 @@ SndTrackerStat* sndtracker_get_stat(SndTracker * this)
 }
 
 RTPQueueStat* sndtracker_get_rtpqstat(SndTracker * this) {
-  this->rtpqstat.rtpq_delay = (gdouble)this->rtpqstat.bytes_in_queue / (gdouble)this->stat.sent_bytes_in_1s;
-  return &this->rtpqstat;
-}
-
-void sndtracker_clear_rtpqstat(SndTracker * this, gpointer nulldata){
-  memset(&this->rtpqstat, 0, sizeof(RTPQueueStat));
+  return sndqueue_get_stat(this->sndqueue);
 }
 
 SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id)
@@ -188,23 +181,9 @@ SndTrackerStat* sndtracker_get_subflow_stat(SndTracker * this, guint8 subflow_id
   return &subflow->stat;
 }
 
-SndPacket* sndtracker_add_packet_to_rtpqueue(SndTracker* this, SndPacket* packet)
-{
-  packet->queued = _now(this);
-  this->rtpqstat.bytes_in_queue += packet->payload_size;
-  ++this->rtpqstat.packets_in_queue;
-  this->rtpqstat.last_arrived = packet->made;
-  notifier_do(this->on_packet_queued, packet);
-  return packet;
-}
-
 void sndtracker_packet_sent(SndTracker * this, SndPacket* packet)
 {
   packet->sent = _now(this);
-
-  this->rtpqstat.bytes_in_queue -= packet->payload_size;
-  --this->rtpqstat.packets_in_queue;
-  this->rtpqstat.delay_length = this->rtpqstat.last_arrived - packet->made;
 
   this->stat.bytes_in_flight += packet->payload_size;
   ++this->stat.packets_in_flight;
@@ -332,11 +311,6 @@ void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_resp
 void sndtracker_add_on_packet_sent(SndTracker * this, ListenerFunc callback, gpointer udata)
 {
   notifier_add_listener(this->on_packet_sent, callback, udata);
-}
-
-void sndtracker_add_on_packet_queued(SndTracker * this, ListenerFunc callback, gpointer udata)
-{
-  notifier_add_listener(this->on_packet_queued, callback, udata);
 }
 
 void sndtracker_add_on_packet_obsolated(SndTracker * this, ListenerFunc callback, gpointer udata)

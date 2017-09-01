@@ -375,8 +375,9 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   this->splitter      = make_stream_splitter(this->subflows);
   this->sndqueue      = make_sndqueue(this->subflows);
+  this->sndtracker    = make_sndtracker(this->subflows, this->sndqueue);
   this->fec_encoder   = make_fecencoder(this->monitoring);
-  this->sndtracker    = make_sndtracker(this->subflows);
+
 
   this->controller = make_sndctrler(
       this->sndtracker,
@@ -402,13 +403,9 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
       (ListenerFunc) stream_splitter_on_packet_sent,
       this->splitter);
 
-  sndtracker_add_on_packet_queued(this->sndtracker,
+  sndqueue_add_on_packet_queued(this->sndqueue,
       (ListenerFunc) stream_splitter_on_packet_queued,
       this->splitter);
-
-  sndqueue_add_on_clear(this->sndqueue,
-      (ListenerFunc) sndtracker_clear_rtpqstat,
-      this->sndtracker);
 
   sndtracker_add_on_packet_obsolated(this->sndtracker,
       (ListenerFunc) stream_splitter_on_packet_obsolated,
@@ -765,7 +762,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   if(subflow){
     sndpacket_setup_mprtp(packet, subflow->id, sndsubflow_get_next_subflow_seq(subflow));
     fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(packet->buffer));
-    sndqueue_push_packet(this->sndqueue, sndtracker_add_packet_to_rtpqueue(this->sndtracker, packet));
+    sndqueue_push_packet(this->sndqueue, packet);
     g_cond_signal(&this->receiving_signal);
   }
 unlock_and_done:

@@ -23,15 +23,24 @@ typedef struct _SndQueueClass SndQueueClass;
 #define SNDQUEUE_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),SNDQUEUE_TYPE))
 #define SNDQUEUE_CAST(src)        ((SndQueue *)(src))
 
+typedef struct _RTPQueueStat{
+  gint32                    bytes_in_queue;
+  gint16                    packets_in_queue;
+  gdouble                   rtpq_delay;
+  volatile gint32           queued_bytes[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+}RTPQueueStat;
 
 struct _SndQueue
 {
   GObject                   object;
   GstClock*                 sysclock;
   SndSubflows*              subflows;
+//  RTPQueueStat*             rtpqstat;
+  RTPQueueStat              stat;
   GQueue*                   packets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  GQueue*                   tmp_queue;
   gdouble                   threshold;
-  volatile gint32           queued_bytes;
+//  volatile gint32           total_queued_bytes;
   volatile guint32          last_ts;
   volatile gint32           actual_rates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   volatile gint32           actual_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
@@ -39,8 +48,8 @@ struct _SndQueue
   volatile gboolean         empty;
   volatile gint32           total_bitrate;
   volatile gint32           total_target;
-
-  Notifier*                 on_clear;
+  guint32                   clear_end_ts;
+  Notifier*                 on_packet_queued;
 };
 
 
@@ -52,7 +61,7 @@ struct _SndQueueClass{
 GType sndqueue_get_type (void);
 SndQueue *make_sndqueue(SndSubflows* subflows_db);
 
-void sndqueue_add_on_clear(SndQueue * this, ListenerFunc callback, gpointer udata);
+void sndqueue_add_on_packet_queued(SndQueue * this, ListenerFunc callback, gpointer udata);
 void sndqueue_on_subflow_joined(SndQueue* this, SndSubflow* subflow);
 void sndqueue_on_subflow_detached(SndQueue* this, SndSubflow* subflow);
 void sndqueue_on_packet_sent(SndQueue* this, SndPacket* packet);
@@ -62,6 +71,6 @@ void sndqueue_on_subflow_target_bitrate_chaned(SndQueue* this, SndSubflow* subfl
 void sndqueue_push_packet(SndQueue * this, SndPacket* packet);
 SndPacket* sndqueue_pop_packet(SndQueue* this, GstClockTime* next_approve);
 gboolean sndqueue_is_empty(SndQueue* this);
-
+RTPQueueStat* sndqueue_get_stat(SndQueue* this);
 #endif /* SNDQUEUE_H_ */
 

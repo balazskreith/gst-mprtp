@@ -55,16 +55,16 @@ static guint32 _delta_ts(guint32 last_ts, guint32 actual_ts) {
 //while the number it is subtracted from is the minuend
 #define _subtract_ts(minuend, subtrahend) _delta_ts(subtrahend, minuend)
 
-//static gint
-//_cmp_ts (guint32 x, guint32 y)
-//{
-//  if(x == y) return 0;
-//  if(x < y && y - x < 2147483648) return -1;
-//  if(x > y && x - y > 2147483648) return -1;
-//  if(x < y && y - x > 2147483648) return 1;
-//  if(x > y && x - y < 2147483648) return 1;
-//  return 0;
-//}
+static gint
+_cmp_ts (guint32 x, guint32 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 2147483648) return -1;
+  if(x > y && x - y > 2147483648) return -1;
+  if(x < y && y - x > 2147483648) return 1;
+  if(x > y && x - y < 2147483648) return 1;
+  return 0;
+}
 
 
 //static gint
@@ -127,7 +127,7 @@ fractalfbprocessor_init (FRACTaLFBProcessor * this)
 
 
 static void _on_min_dts_calculated(FRACTaLFBProcessor* this, swminmaxstat_t* stat) {
-  this->min_dts = ((ReferencePoint*)stat->min)->dts;
+//  this->min_dts = ((ReferencePoint*)stat->min)->dts;
 }
 
 swplugin_define_on_calculated_double(FRACTaLStat, _on_lost_avg_calculated, fl_avg);
@@ -194,6 +194,7 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
   this->psi_sw = make_slidingwindow(500, GST_SECOND);
   this->ts_generator = sndtracker_get_ts_generator(sndtracker);
   this->sent_packets = g_queue_new();
+  this->dts = 0;
 
   sndtracker_add_on_packet_sent(this->sndtracker, (ListenerFunc)_on_packet_sent, this);
 
@@ -346,6 +347,9 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
     packet->rcvd_ts = _subtract_ts(report_timestamp, act_ato);
     {
       guint32 dts = _delta_ts(packet->sent_ts, packet->rcvd_ts);
+      if (!this->min_dts || _cmp_ts(dts, this->min_dts) < 0) {
+        this->min_dts = dts;
+      }
       slidingwindow_add_data(this->ewi_sw, &dts);
       if (!reference_dts_init || dts < reference_dts) {
         reference_dts = dts;
@@ -387,7 +391,7 @@ void _process_stat(FRACTaLFBProcessor *this)
   gdouble ewma_factor         = _get_ewma_factor(this);
   gdouble alpha;
 
-  _stat(this)->rtpq_delay            = rtpqstat->rtpq_delay;
+  _stat(this)->rtpq_delay            = (gdouble) rtpqstat->bytes_in_queue * 8 / (gdouble) this->subflow->target_bitrate;
   _stat(this)->sender_bitrate        = sndstat->sent_bytes_in_1s * 8;
   _stat(this)->receiver_bitrate      = sndstat->received_bytes_in_1s * 8;
   _stat(this)->fec_bitrate           = sndstat->sent_fec_bytes_in_1s * 8;
@@ -398,7 +402,9 @@ void _process_stat(FRACTaLFBProcessor *this)
 //  g_print("%d %d - %d\n", slidingwindow_get_counter(this->ewi_sw), this->dts_50th, this->min_dts);
   if (0 < this->min_dts && this->min_dts < this->dts_50th) {
     _stat(this)->last_queue_delay =
-          GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->ts_generator, this->dts_50th - this->min_dts));
+              GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->ts_generator, _delta_ts(this->min_dts, this->dts_50th)));
+//    _stat(this)->last_queue_delay =
+//          GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->ts_generator, this->dts_50th - this->min_dts));
   } else {
     _stat(this)->last_queue_delay = 0;
   }

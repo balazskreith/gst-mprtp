@@ -43,7 +43,6 @@ typedef struct _FRACTaLStat
   guint16                  HSN;
 
   gdouble                  srtt;
-  gdouble                  skew_avg;
 
   gdouble                  sr_avg;
   gdouble                  rr_avg;
@@ -56,7 +55,6 @@ typedef struct _FRACTaLStat
   gint32                   psi_received_bytes;//pipe stability indicator
   gint32                   psi_sent_bytes;
   gint32                   psi_extra_bytes;
-//  gint32                   queued_bytes_in_srtt;
   guint16                  sent_packets_in_1s;
 
 }FRACTaLStat;
@@ -91,7 +89,7 @@ struct _FRACTaLFBProcessor
   guint32                  min_dts;
   guint32                  rtt_in_ts;
 
-
+  GstClockTime             dts;
   GstClockTime             rtt;
   GQueue*                  sent_packets;
   SlidingWindow*           reference_sw;

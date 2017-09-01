@@ -95,7 +95,7 @@ struct _FRACTaLSubController
   GstClockTime              last_approved;
   GstClockTime              last_settled;
   GstClockTime              last_distorted;
-  GstClockTime              last_cwnd_increased;
+  GstClockTime              last_increased;
   GstClockTime              last_inflicted;
 
   gboolean                  stability_approved;

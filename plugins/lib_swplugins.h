@@ -197,6 +197,16 @@ gpointer swpercentile2_prefer_left_selector(gpointer left, gpointer right);
 gpointer swpercentile2_prefer_right_selector(gpointer left, gpointer right);
 gpointer swpercentile2_self_extractor(gpointer value);
 
+SlidingWindowPlugin* make_swpercentile2_debug(
+                              gint32     percentile,
+                              GCompareFunc  cmp,
+                              ListenerFunc on_calculated_cb,
+                              gpointer     udata,
+                              SWExtractorFunc extractor,
+                              SWMeanCalcer mean_calcer,
+                              SWEstimator estimator
+                              );
+
 SlidingWindowPlugin* make_swpercentile2(
                               gint32     percentile,
                               GCompareFunc  cmp,

@@ -967,6 +967,7 @@ typedef struct _swpercentile2{
   gint32 required;
   SWMeanCalcer mean_calcer;
   SWEstimator estimator;
+  gboolean debug;
 }swpercentile2_t;
 
 static swpercentile2_t* _swpercentile2priv_ctor(SlidingWindowPlugin* base, gint32 percentile,
@@ -1060,9 +1061,10 @@ static void _swpercentile2_balancing(swpercentile2_t* this) {
     gint32 maxtreeThreshold, mintreeThreshold;
     gboolean popFromMinAllowed = 1 < bintree_get_node_counter(mintree);
     gboolean popFromMaxAllowed = 1 < bintree_get_node_counter(maxtree);
-    if (!popFromMaxAllowed || !popFromMaxAllowed) {
-      break;
-    }
+//    if (this->debug) g_print("%d | %d\n", bintree_get_node_counter(maxtree), bintree_get_node_counter(mintree));
+//    if (!popFromMaxAllowed && !popFromMaxAllowed) {
+//      break;
+//    }
     mintreeNodeLength = bintree_get_bottom_node(mintree)->values_length;
     maxtreeNodeLength = bintree_get_top_node(maxtree)->values_length;
     _swpercentile2_get_thresholds(this, &maxtreeThreshold, &mintreeThreshold);
@@ -1070,6 +1072,13 @@ static void _swpercentile2_balancing(swpercentile2_t* this) {
     popFromMinAllowed &= maxcounter + mintreeNodeLength <= maxtreeThreshold;
     mincounter = bintree_get_size(mintree);
     maxcounter = bintree_get_size(maxtree);
+    if (this->debug) {
+      g_print("mintreeNodeLength: %d | popFromMinAllowed: %d | mincounter: %d | %d | %d\n",
+              mintreeNodeLength, popFromMinAllowed, mincounter, mintree->duplicate_counter, mintree->node_counter);
+      g_print("maxtreeNodeLength: %d | popFromMaxAllowed: %d | maxcounter: %d | %d | %d\n",
+          maxtreeNodeLength, popFromMaxAllowed, maxcounter, maxtree->duplicate_counter, maxtree->node_counter);
+    }
+
     if (maxtreeThreshold < maxcounter && popFromMaxAllowed) {
       bintree_insert_node_at_bottom(mintree, bintree_pop_top_node(maxtree));
 //      g_print("bintree_insert_node_at_bottom\n");
@@ -1133,7 +1142,7 @@ static void _swpercentile2_calculate(swpercentile2_t* this) {
     position = (gdouble)total * (this->percentile / 100.0);
     useOneIndex = floor(position) != position;
     if (this->ratio == 1.0) {
-      useOneIndex = total %2 == 1;
+      useOneIndex = total % 2 == 1;
     }
 
     if (useOneIndex) {
@@ -1205,10 +1214,12 @@ static void _swpercentile2_on_add(gpointer dataptr, gpointer value)
   }
   _swpercentile2_balancing(this);
   _swpercentile2_calculate(this);
-//  bintree_print(this->maxtree);
-//  g_print("-----------------\n");
-//  bintree_print(this->mintree);
-//  g_print("==================\n");
+  if (this->debug) {
+    bintree_print(this->maxtree);
+    g_print("-----------------\n");
+    bintree_print(this->mintree);
+    g_print("==================\n");
+  }
 }
 
 static void _swpercentile2_on_rem(gpointer dataptr, gpointer value)
@@ -1239,6 +1250,21 @@ gpointer swpercentile2_prefer_right_selector(gpointer left, gpointer right) {
 
 gpointer swpercentile2_self_extractor(gpointer value) {
   return value;
+}
+
+SlidingWindowPlugin* make_swpercentile2_debug(
+                              gint32     percentile,
+                              GCompareFunc  cmp,
+                              ListenerFunc on_calculated_cb,
+                              gpointer     udata,
+                              SWExtractorFunc extractor,
+                              SWMeanCalcer mean_calcer,
+                              SWEstimator estimator
+                              )
+{
+  SlidingWindowPlugin* this = make_swpercentile2(percentile, cmp, on_calculated_cb, udata, extractor, mean_calcer, estimator);
+  ((swpercentile2_t*) this->priv)->debug = TRUE;
+  return this;
 }
 
 SlidingWindowPlugin* make_swpercentile2(

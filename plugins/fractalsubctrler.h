@@ -46,6 +46,7 @@ struct _FRACTaLSubController
   gboolean                  approve_measurement;
   GstClockTime              obligated_approvement;
 
+  gint32                    inflicted_bitrate;
   gint32                    target_bitrate;
   gint32                    stable_bitrate;
 

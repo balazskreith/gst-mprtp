@@ -12,6 +12,7 @@
 #include "sndsubflows.h"
 #include "sndpackets.h"
 #include "sndtracker.h"
+#include "sndqueue.h"
 
 typedef struct _StreamSplitter StreamSplitter;
 typedef struct _StreamSplitterClass StreamSplitterClass;
@@ -34,8 +35,10 @@ struct _StreamSplitter
   gdouble              refresh_ratio;
   GstClockTime         last_refresh;
   SndSubflows*         subflows;
-  gint32               total_bitrate;
-  volatile gint32               actual_rates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  GQueue*              packets;
+  SndQueue*            sndqueue;
+//  gint32               total_bitrate;
+//  volatile gint32               actual_rates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   volatile gint32               actual_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   volatile gint32               extra_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   volatile gboolean             target_is_reached;
@@ -51,7 +54,7 @@ struct _StreamSplitterClass{
 };
 
 StreamSplitter*
-make_stream_splitter(SndSubflows* sndsubflows);
+make_stream_splitter(SndSubflows* sndsubflows, SndQueue* sndqueue);
 
 void
 stream_splitter_set_keyframe_filtering(

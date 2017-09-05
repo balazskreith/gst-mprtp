@@ -28,6 +28,8 @@ typedef struct _RTPQueueStat{
   gint16                    packets_in_queue;
   gdouble                   rtpq_delay;
   volatile gint32           queued_bytes[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32           actual_bitrates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32           total_bitrate;
 }RTPQueueStat;
 
 struct _SndQueue
@@ -35,16 +37,16 @@ struct _SndQueue
   GObject                   object;
   GstClock*                 sysclock;
   SndSubflows*              subflows;
+  SndSubflowState           tracked_states[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  gint32                    num_subflow_overused;
+  gboolean                  queued_bytes_considered;
 //  RTPQueueStat*             rtpqstat;
   RTPQueueStat              stat;
   GQueue*                   packets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  GQueue*                   tmp_queue;
+  GQueue*                   unqueued_packets;
   gdouble                   threshold;
 //  volatile gint32           total_queued_bytes;
-  volatile guint32          last_ts;
-  volatile gint32           actual_rates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   volatile gint32           actual_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  volatile gint32           cwnd[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   volatile gboolean         empty;
   volatile gint32           total_bitrate;
   volatile gint32           total_target;
@@ -64,9 +66,8 @@ SndQueue *make_sndqueue(SndSubflows* subflows_db);
 void sndqueue_add_on_packet_queued(SndQueue * this, ListenerFunc callback, gpointer udata);
 void sndqueue_on_subflow_joined(SndQueue* this, SndSubflow* subflow);
 void sndqueue_on_subflow_detached(SndQueue* this, SndSubflow* subflow);
-void sndqueue_on_packet_sent(SndQueue* this, SndPacket* packet);
-void sndqueue_on_packet_obsolated(SndQueue* this, SndPacket* packet);
-void sndqueue_on_subflow_target_bitrate_chaned(SndQueue* this, SndSubflow* subflow);
+void sndqueue_on_subflow_state_changed(SndQueue* this, SndSubflow* subflow);
+void sndqueue_on_subflow_target_bitrate_changed(SndQueue* this, SndSubflow* subflow);
 
 void sndqueue_push_packet(SndQueue * this, SndPacket* packet);
 SndPacket* sndqueue_pop_packet(SndQueue* this, GstClockTime* next_approve);

@@ -37,7 +37,7 @@ GST_DEBUG_CATEGORY_STATIC (stream_splitter_debug_category);
 G_DEFINE_TYPE (StreamSplitter, stream_splitter, G_TYPE_OBJECT);
 
 
-
+#define _qstat(this) sndqueue_get_stat(this->sndqueue)
 #define _now(this) gst_clock_get_time (this->sysclock)
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
@@ -62,7 +62,7 @@ static void _print_ratios(StreamSplitter *this){
     g_print("%d: %f-%f | ",
         subflow->id,
         (gdouble)subflow->target_bitrate / (gdouble)this->total_target,
-        (gdouble)this->actual_rates[subflow->id] / (gdouble)this->total_bitrate
+        (gdouble)_qstat(this)->actual_bitrates[subflow->id] / (gdouble)_qstat(this)->total_bitrate
         );
   }
   last_ratio_printed = _now(this);
@@ -84,11 +84,13 @@ stream_splitter_class_init (StreamSplitterClass * klass)
 
 }
 
-StreamSplitter* make_stream_splitter(SndSubflows* sndsubflows)
+StreamSplitter* make_stream_splitter(SndSubflows* sndsubflows, SndQueue* sndqueue)
 {
   StreamSplitter *this;
   this = g_object_new (STREAM_SPLITTER_TYPE, NULL);
   this->subflows = g_object_ref(sndsubflows);
+  this->packets = g_queue_new();
+  this->sndqueue = sndqueue;
   return this;
 }
 
@@ -98,6 +100,7 @@ stream_splitter_finalize (GObject * object)
   StreamSplitter *this = STREAM_SPLITTER (object);
   g_object_unref (this->sysclock);
   g_object_unref(this->subflows);
+  g_object_unref(this->packets);
 }
 
 
@@ -118,9 +121,21 @@ gint32 stream_splitter_get_total_media_rate(StreamSplitter* this)
 void
 stream_splitter_on_packet_queued(StreamSplitter* this, SndPacket* packet)
 {
-  this->actual_rates[packet->subflow_id] += packet->payload_size<<3; //convert bytes to bits
-  this->total_bitrate += packet->payload_size<<3;
-//  g_print("packet %hu is queued\n", packet->abs_seq);
+  GstClockTime threshold = _now(this) - GST_SECOND;
+
+  g_queue_push_tail(this->packets, sndpacket_ref(packet));
+
+  while(!g_queue_is_empty(this->packets)) {
+    SndPacket* head = g_queue_peek_head(this->packets);
+    if (threshold <= head->queued) {
+      break;
+    }
+    head = g_queue_pop_head(this->packets);
+    if (_qstat(this)->actual_bitrates[head->subflow_id]  < this->actual_targets[head->subflow_id] - 22800) {
+      this->target_is_reached = FALSE;
+    }
+    sndpacket_unref(head);
+  }
 }
 
 void
@@ -133,12 +148,12 @@ stream_splitter_on_packet_sent(StreamSplitter* this, SndPacket* packet)
 void
 stream_splitter_on_packet_obsolated(StreamSplitter* this, SndPacket* packet)
 {
-  this->actual_rates[packet->subflow_id] -= packet->payload_size<<3; //convert bytes to bits
-  this->total_bitrate -= packet->payload_size<<3;
-
-  if (this->actual_rates[packet->subflow_id]  < this->actual_targets[packet->subflow_id]) {
-    this->target_is_reached = FALSE;
-  }
+//  this->actual_rates[packet->subflow_id] -= packet->payload_size<<3; //convert bytes to bits
+//  this->total_bitrate -= packet->payload_size<<3;
+//
+//  if (this->actual_rates[packet->subflow_id]  < this->actual_targets[packet->subflow_id]) {
+//    this->target_is_reached = FALSE;
+//  }
 }
 
 static void _operate_on_total_target(StreamSplitter* this, SndSubflow* subflow, gint op) {
@@ -199,9 +214,9 @@ SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *pac
 
   for (it = sndsubflows_get_subflows(this->subflows); it; it = it->next) {
     subflow = it->data;
-    drate = this->actual_targets[subflow->id] - this->actual_rates[subflow->id];
+    drate = this->actual_targets[subflow->id] - _qstat(this)->actual_bitrates[subflow->id];
 
-    if (this->actual_rates[subflow->id] < this->actual_targets[subflow->id] + 11200 /* 1400 bytes * 8 */) {
+    if (_qstat(this)->actual_bitrates[subflow->id] < this->actual_targets[subflow->id] - MAX(11200, this->actual_targets[subflow->id] * .1) /*  1400 bytes * 8 */) {
       target_is_reached = FALSE;
     }
 

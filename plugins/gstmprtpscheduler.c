@@ -373,8 +373,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->emit_msger    = make_messenger(sizeof(MPRTPPluginSignal));
   this->allowed_ssrc  = 0;
 
-  this->splitter      = make_stream_splitter(this->subflows);
   this->sndqueue      = make_sndqueue(this->subflows);
+  this->splitter      = make_stream_splitter(this->subflows, this->sndqueue);
   this->sndtracker    = make_sndtracker(this->subflows, this->sndqueue);
   this->fec_encoder   = make_fecencoder(this->monitoring);
 
@@ -420,16 +420,12 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
      this->sndqueue);
 
   sndsubflows_add_on_target_bitrate_changed_cb(this->subflows,
-     (ListenerFunc) sndqueue_on_subflow_target_bitrate_chaned,
+     (ListenerFunc) sndqueue_on_subflow_target_bitrate_changed,
      this->sndqueue);
 
-  sndtracker_add_on_packet_sent(this->sndtracker,
-     (ListenerFunc) sndqueue_on_packet_sent,
-     this->sndqueue);
-
-  sndtracker_add_on_packet_obsolated(this->sndtracker,
-     (ListenerFunc) sndqueue_on_packet_obsolated,
-     this->sndqueue);
+  sndsubflows_add_on_subflow_state_stat_changed_cb(this->subflows,
+        (ListenerFunc) sndqueue_on_subflow_state_changed,
+        this->sndqueue);
 
   mediator_set_request_handler(this->monitoring,
       (ListenerFunc) _on_monitoring_request, this);

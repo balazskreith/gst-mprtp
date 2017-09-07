@@ -35,6 +35,7 @@ typedef struct _FRACTaLStat
   gint32                   sender_bitrate;
   gint32                   receiver_bitrate;
   gint32                   fec_bitrate;
+  gint32                   rcved_bytes_in_ewi;
 
   GstClockTime             queue_delay_50th;
   GstClockTime             last_queue_delay;
@@ -52,10 +53,8 @@ typedef struct _FRACTaLStat
 
   gdouble                  fraction_lost;
   gdouble                  ewi_in_s;
-  gint32                   psi_received_bytes;//pipe stability indicator
-  gint32                   psi_sent_bytes;
-  gint32                   psi_extra_bytes;
   guint16                  sent_packets_in_1s;
+
 
 }FRACTaLStat;
 
@@ -76,12 +75,12 @@ struct _FRACTaLFBProcessor
   TimestampGenerator*      ts_generator;
   Recycle*                 reference_point_recycle;
 
-  gint32                   psi_received_packets;
-  gint32                   psi_received_bytes;
-  gint32                   psi_sent_bytes;
-  gint32                   psi_sent_packets;
-  gint32                   psi_lost_packets;
-  gint32                   extra_bytes;
+//  gint32                   psi_received_packets;
+//  gint32                   psi_received_bytes;
+//  gint32                   psi_sent_bytes;
+//  gint32                   psi_sent_packets;
+//  gint32                   psi_lost_packets;
+//  gint32                   extra_bytes;
   guint32                  ewi_in_ts;
   guint32                  min_ewi_in_ts;
   guint32                  max_ewi_in_ts;
@@ -93,7 +92,7 @@ struct _FRACTaLFBProcessor
   GstClockTime             rtt;
   GQueue*                  sent_packets;
   SlidingWindow*           reference_sw;
-  SlidingWindow*           psi_sw;
+//  SlidingWindow*           psi_sw;
 
   SlidingWindow*           ewi_sw;
 

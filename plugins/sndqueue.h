@@ -47,6 +47,7 @@ struct _SndQueue
   gdouble                   threshold;
 //  volatile gint32           total_queued_bytes;
   volatile gint32           actual_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32           pacing_bitrate[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   volatile gboolean         empty;
   volatile gint32           total_bitrate;
   volatile gint32           total_target;

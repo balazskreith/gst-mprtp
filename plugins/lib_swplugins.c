@@ -373,6 +373,7 @@ static void _swsum_disposer(gpointer target)
 static void _swsum_add_pipe(gpointer dataptr, gpointer itemptr)
 {
   swsum_t* this = dataptr;
+//  g_print("%f += %")
   this->sum += this->extractor(itemptr);
   swplugin_notify(this->base, &this->sum);
 }

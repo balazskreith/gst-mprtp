@@ -60,7 +60,7 @@ typedef struct {
   guint32 dts;
   GstClockTime queue_delay;
 }ReferencePoint;
-
+#include "sndpackets.h"
 static void
 _sprint_list_of_pointers(GSList* it, gchar *result, guint result_length)
 {
@@ -72,7 +72,7 @@ _sprint_list_of_pointers(GSList* it, gchar *result, guint result_length)
   for(; it; it = it->next){
     memset(helper, 0, 255);
 //    sprintf(helper, "(%p)[%lu]%c ", it->data, *(guint64*)(it->data), it->next ? ',' : ' ');
-    sprintf(helper, "(%p)[%lu]%c ", it->data, ((ReferencePoint*)(it->data))->queue_delay, it->next ? ',' : ' ');
+    sprintf(helper, "(%p)[%hu]%c ", it->data, ((SndPacket*)(it->data))->abs_seq, it->next ? ',' : ' ');
     strcat(result, helper);
   }
 }

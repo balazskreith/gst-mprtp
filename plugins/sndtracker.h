@@ -52,6 +52,7 @@ typedef struct _SndTrackerSndStat{
 
   guint32                   total_received_bytes;
   guint32                   total_received_packets;
+  gint32                    lost_packets_in_1s;
 }SndTrackerStat;
 
 

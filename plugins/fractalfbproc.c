@@ -26,7 +26,6 @@ typedef struct {
 //  gint32  bytes_in_flight;
   GstClockTime rtt;
   guint32 rtt_in_ts;
-  gint32 extra_bytes;
   guint32 dts;
   GstClockTime queue_delay;
 }ReferencePoint;
@@ -78,14 +77,13 @@ _cmp_ts (guint32 x, guint32 y)
 //  return 0;
 //}
 
-//static gint
-//_cmp_rcv_snd_ts (SndPacket* x, SndPacket *y)
-//{
-//  guint32 dx = _delta_ts(x->sent_ts, x->rcvd_ts);
-//  guint32 dy = _delta_ts(y->sent_ts, y->rcvd_ts);
-//  return dx == dy ? 0 : dx < dy ? -1 : 1;
-//}
-
+static gint
+_cmp_rcv_snd_dts (SndPacket* x, SndPacket *y)
+{
+  guint32 dx = _delta_ts(x->sent_ts, x->rcvd_ts);
+  guint32 dy = _delta_ts(y->sent_ts, y->rcvd_ts);
+  return dx == dy ? 0 : dx < dy ? -1 : 1;
+}
 
 
 DEFINE_RECYCLE_TYPE(static, reference_point, ReferencePoint);
@@ -125,31 +123,29 @@ fractalfbprocessor_init (FRACTaLFBProcessor * this)
   this->sysclock         = gst_system_clock_obtain();
 }
 
-
-static void _on_min_dts_calculated(FRACTaLFBProcessor* this, swminmaxstat_t* stat) {
-//  this->min_dts = ((ReferencePoint*)stat->min)->dts;
-}
-
 swplugin_define_on_calculated_double(FRACTaLStat, _on_lost_avg_calculated, fl_avg);
 swplugin_define_on_calculated_double(FRACTaLStat, _on_lost_std_calculated, fl_std);
 
-swplugin_define_on_calculated_data(FRACTaLFBProcessor, _on_dts_50th_calculated, dts_50th, guint32);
+//swplugin_define_on_calculated_data(FRACTaLFBProcessor, _on_dts_50th_calculated, dts_50th, guint32);
+static void _on_dts_50th_calculated(FRACTaLFBProcessor* this, SndPacket* packet){
+  this->dts_50th = _delta_ts(packet->sent_ts, packet->rcvd_ts);
+}
+
+swplugin_define_on_calculated_data(FRACTaLStat, _on_rcvd_bytes_sum, rcved_bytes_in_ewi, gdouble);
 swplugin_define_on_calculated_data(FRACTaLStat, _on_queue_delay_50th_calculated, queue_delay_50th, GstClockTime);
 
-StructCmpFnc(_cmp_reference_point_dts, ReferencePoint, dts);
 StructCmpFnc(_cmp_reference_point_queue_delay, ReferencePoint, queue_delay);
 swplugin_define_swdoubleextractor(_fraction_lost_extractor, ReferencePoint, fraction_lost);
 
 swplugin_define_swdoubleextractor(_rtt_extractor, ReferencePoint, rtt);
 swplugin_define_on_calculated_data(FRACTaLStat, _on_srtt_calculated, srtt, gdouble);
 
+swplugin_define_swdataextractor(gdouble, _sndpacket_payload_extractor, SndPacket, payload_size);
 swplugin_define_swdataextractor(gdouble, _queue_delay_value_extractor, ReferencePoint, queue_delay);
 swplugin_define_swdataptrextractor(_queue_delay_ptr_extractor, ReferencePoint, queue_delay);
 swplugin_define_on_calculated_data(FRACTaLStat, _on_queue_delay_std_calculated, queue_delay_std, gdouble);
 
 static void _on_packet_sent(FRACTaLFBProcessor* this, SndPacket* packet);
-static void _on_psi_sw_rem(FRACTaLFBProcessor *this, SndPacket* packet);
-static void _on_psi_postprocessor(FRACTaLFBProcessor *this, SndPacket* packet);
 static void _refresh_windows_thresholds(FRACTaLFBProcessor *this);
 
 void fractalfbprocessor_set_evaluation_window_margins(FRACTaLFBProcessor *this, GstClockTime min, GstClockTime max) {
@@ -159,39 +155,16 @@ void fractalfbprocessor_set_evaluation_window_margins(FRACTaLFBProcessor *this, 
   _refresh_windows_thresholds(this);
 }
 
-
-static gboolean _psi_sw_obsolate(FRACTaLFBProcessor *this, SlidingWindowItem* item) {
-  SndPacket* head = item->data;
-  SndPacket* tail = slidingwindow_peek_newest(this->psi_sw);
-  guint32 delta_ts;
-  if (!head->acknowledged) {
-    delta_ts  = _delta_ts(head->sent_ts, tail->sent_ts);
-    return GST_SECOND < timestamp_generator_get_time(this->ts_generator, delta_ts);
-  }
-  if (!tail->acknowledged || head->lost || tail->lost) {
-    delta_ts  = _delta_ts(head->sent_ts, tail->sent_ts);
-    return 2 * _stat(this)->srtt < timestamp_generator_get_time(this->ts_generator, delta_ts);
-  }
-  delta_ts  = _delta_ts(head->rcvd_ts, tail->rcvd_ts);
-  return 2 * _stat(this)->srtt < timestamp_generator_get_time(this->ts_generator, delta_ts);
-}
-
-static gboolean _swminmax_filter(ReferencePoint* item) {
-  return 0 < item->dts;
-}
-
 FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* subflow, FRACTaLStat *stat)
 {
   FRACTaLFBProcessor *this;
-  SlidingWindowPlugin* swminmax;
   this = g_object_new (FRACTALFBPROCESSOR_TYPE, NULL);
   this->sndtracker   = g_object_ref(sndtracker);
   this->subflow      = subflow;
   this->stat         = stat;
   this->reference_point_recycle = make_recycle_reference_point(200, (RecycleItemShaper) _reference_point_shaper);
   this->reference_sw = make_slidingwindow_with_data_recycle(200, 15 * GST_SECOND, this->reference_point_recycle);
-  this->ewi_sw = make_slidingwindow_uint32(200, GST_SECOND);
-  this->psi_sw = make_slidingwindow(500, GST_SECOND);
+  this->ewi_sw = make_slidingwindow(200, GST_SECOND);
   this->ts_generator = sndtracker_get_ts_generator(sndtracker);
   this->sent_packets = g_queue_new();
   this->dts = 0;
@@ -199,12 +172,6 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
   sndtracker_add_on_packet_sent(this->sndtracker, (ListenerFunc)_on_packet_sent, this);
 
 //  correlator_add_on_correlation_calculated_listener(this->drift_correlator, (ListenerFunc) _on_drift_corr_calculated, stat);
-  swminmax = make_swminmax( (GCompareFunc) _cmp_reference_point_dts, (ListenerFunc) _on_min_dts_calculated, this);
-  swminmax_set_filter(swminmax, (SWPluginFilterFunc)_swminmax_filter);
-
-  slidingwindow_setup_custom_obsolation(this->psi_sw, (SlidingWindowObsolateFunc) _psi_sw_obsolate, this);
-  slidingwindow_add_on_rem_item_cb(this->psi_sw, (ListenerFunc) _on_psi_sw_rem, this);
-  slidingwindow_add_postprocessor(this->psi_sw, (ListenerFunc) _on_psi_postprocessor, this);
 
   slidingwindow_add_plugins(this->reference_sw,
 //          make_swpercentile(80, _measurement_drift_cmp, (ListenerFunc) _on_drift_80th_calculated, this),
@@ -216,15 +183,18 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
               (SWMeanCalcer) swpercentile2_prefer_right_selector,
               (SWEstimator) swpercentile2_prefer_right_selector),
           make_swstd(_on_queue_delay_std_calculated, stat, _queue_delay_value_extractor, 0),
-          swminmax,
           make_swavg(_on_lost_avg_calculated, stat, _fraction_lost_extractor),
           make_swstd(_on_lost_std_calculated, stat, _fraction_lost_extractor, 100),
           make_swavg(_on_srtt_calculated, stat, _rtt_extractor),
           NULL);
 
   slidingwindow_add_plugins(this->ewi_sw,
+          make_swsum(
+              (ListenerFunc) _on_rcvd_bytes_sum,
+              stat,
+              (SWDataExtractor) _sndpacket_payload_extractor),
           make_swpercentile2(50,
-              (GCompareFunc) bintree3cmp_uint32,
+              (GCompareFunc) _cmp_rcv_snd_dts,
               (ListenerFunc) _on_dts_50th_calculated,
               this,
               (SWExtractorFunc) swpercentile2_self_extractor,
@@ -279,7 +249,6 @@ void fractalfbprocessor_approve_feedback(FRACTaLFBProcessor *this)
   reference_point.fraction_lost = CONSTRAIN(0.0, 1.0, _stat(this)->fraction_lost);
   reference_point.rtt = this->rtt;
   reference_point.rtt_in_ts = this->rtt_in_ts;
-  reference_point.extra_bytes = _stat(this)->psi_extra_bytes;
   reference_point.dts = this->dts_50th;
   reference_point.queue_delay = _stat(this)->last_queue_delay;
   this->srtt_in_ts = this->srtt_in_ts * .9 + this->rtt_in_ts * .1;
@@ -325,9 +294,6 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
 
     if(packet->acknowledged) {
       if(packet->lost && xr->CongestionControlFeedback.vector[i].lost) {
-        --this->psi_lost_packets;
-        ++this->psi_received_packets;
-        this->psi_received_bytes += packet->payload_size;
         packet->lost = FALSE;
         packet->rcvd_ts = _subtract_ts(report_timestamp, act_ato);
         sndtracker_packet_found(this->sndtracker, packet);
@@ -339,7 +305,6 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
       packet->acknowledged = TRUE;
       packet->lost = TRUE;
       packet->skew = 0;
-      ++this->psi_lost_packets;
       sndtracker_packet_acked(this->sndtracker, packet);
       continue;
     }
@@ -350,7 +315,9 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
       if (!this->min_dts || _cmp_ts(dts, this->min_dts) < 0) {
         this->min_dts = dts;
       }
-      slidingwindow_add_data(this->ewi_sw, &dts);
+      // TODO: add sending packets instead of guint32 to ewi
+//      slidingwindow_add_data(this->ewi_sw, &dts);
+      slidingwindow_add_data(this->ewi_sw, packet);
       if (!reference_dts_init || dts < reference_dts) {
         reference_dts = dts;
         reference_sent_ts = packet->sent_ts;
@@ -359,8 +326,6 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
       }
     }
 
-    this->psi_received_bytes += packet->payload_size;
-    ++this->psi_received_packets;
     packet->acknowledged = TRUE;
     packet->lost = FALSE;
     sndtracker_packet_acked(this->sndtracker, packet);
@@ -409,10 +374,6 @@ void _process_stat(FRACTaLFBProcessor *this)
     _stat(this)->last_queue_delay = 0;
   }
 
-  _stat(this)->psi_received_bytes    = this->psi_received_bytes;
-  _stat(this)->psi_sent_bytes        = this->psi_sent_bytes;
-  _stat(this)->psi_extra_bytes       = MAX(0, this->psi_sent_bytes - this->psi_received_bytes);
-
   if(_stat(this)->sr_avg){
     alpha = ewma_factor * .5 + .5;
     _stat(this)->sr_avg = alpha * _stat(this)->sender_bitrate + _stat(this)->sr_avg * (1.-alpha);
@@ -427,18 +388,15 @@ void _process_stat(FRACTaLFBProcessor *this)
     _stat(this)->rr_avg = _stat(this)->receiver_bitrate;
   }
 
-  // psi thing
+  if (0 < sndstat->lost_packets_in_1s) {
+    _stat(this)->fraction_lost = (gdouble)sndstat->lost_packets_in_1s / (gdouble) (sndstat->lost_packets_in_1s + sndstat->received_packets_in_1s);
+  } else {
+    _stat(this)->fraction_lost = 0.;
+  }
 
   slidingwindow_refresh(this->reference_sw);
-  slidingwindow_refresh(this->psi_sw);
   slidingwindow_refresh(this->ewi_sw);
 
-  if (!this->psi_received_packets || !this->psi_lost_packets) {
-    _stat(this)->fraction_lost = 0;
-  } else {
-    _stat(this)->fraction_lost = (gdouble) this->psi_lost_packets /
-        (gdouble) (this->psi_lost_packets + this->psi_received_packets);
-  }
 }
 
 
@@ -447,49 +405,15 @@ static void _on_packet_sent(FRACTaLFBProcessor* this, SndPacket* packet) {
   if(packet->subflow_id != this->subflow->id){
     return;
   }
-  g_queue_push_tail(this->sent_packets, sndpacket_ref(packet));
-  do{
-    SndPacket* head;
-    if (g_queue_is_empty(this->sent_packets)) {
-      return;
-    }
-    head = g_queue_peek_head(this->sent_packets);
-    if (packet->sent - head->sent < _stat(this)->srtt) {
-      return;
-    }
-    this->psi_sent_bytes += head->payload_size;
-    ++this->psi_sent_packets;
-    slidingwindow_add_data(this->psi_sw, g_queue_pop_head(this->sent_packets));
-  } while(1);
 }
 
 
-static void _on_psi_sw_rem(FRACTaLFBProcessor *this, SndPacket* packet) {
-  this->psi_sent_bytes -= packet->payload_size;
-  --this->psi_sent_packets;
-
-  if (packet->lost) {
-    --this->psi_lost_packets;
-  } else if (packet->acknowledged){
-    --this->psi_received_packets;
-    this->psi_received_bytes -= packet->payload_size;
-//    g_print("%d:\n", this->psi_received_bytes);
-  }
-
-}
-
-static void _on_psi_postprocessor(FRACTaLFBProcessor *this, SndPacket* packet) {
-  sndpacket_unref(packet);
-}
 
 static void _refresh_windows_thresholds(FRACTaLFBProcessor *this) {
 
   guint32 ewi_in_ts = CONSTRAIN(this->min_ewi_in_ts, this->max_ewi_in_ts, this->srtt_in_ts);
   GstClockTime ewi_in_ns = timestamp_generator_get_time(this->ts_generator, ewi_in_ts);
-  guint32 psi_in_ns = MIN(_stat(this)->srtt + _stat(this)->queue_delay_std * 2, GST_SECOND);
 
   slidingwindow_set_threshold(this->ewi_sw, ewi_in_ns);
-//  slidingwindow_set_threshold(this->ewi_sw, .1 * GST_SECOND);
-  slidingwindow_set_threshold(this->psi_sw, psi_in_ns);
 }
 

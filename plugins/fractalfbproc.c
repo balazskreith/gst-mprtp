@@ -231,7 +231,6 @@ void fractalfbprocessor_report_update(FRACTaLFBProcessor *this, GstMPRTCPReportS
     _process_cc_rle_discvector(this, &summary->XR);
     process = TRUE;
   }
-
   if(!process){
     goto done;
   }

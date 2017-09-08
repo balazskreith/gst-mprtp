@@ -748,6 +748,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
   //fecencoder_add_rtpbuffer(this->fec_encoder, gst_buffer_ref(buffer));
 
   THIS_LOCK(this);
+//  PROFILING("gst_mprtpscheduler_rtp_sink_chain",
   if(!sndsubflows_get_subflows_num(this->subflows)){
     result = gst_pad_push(this->mprtp_srcpad, buffer);
     goto unlock_and_done;
@@ -761,6 +762,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     sndqueue_push_packet(this->sndqueue, packet);
     g_cond_signal(&this->receiving_signal);
   }
+//  );
 unlock_and_done:
   THIS_UNLOCK(this);
 
@@ -816,10 +818,10 @@ gst_mprtpscheduler_mprtcp_rr_sink_chain (GstPad *pad, GstObject *parent, GstBuff
     THIS_LOCK(this);
   //);
 
-//  PROFILING("sndctrler_receive_mprtcp",
+  PROFILING("sndctrler_receive_mprtcp",
     sndctrler_receive_mprtcp(this->controller, buf);
     result = GST_FLOW_OK;
-//  );
+  );
   //PROFILING("THIS_UNLOCK",
     THIS_UNLOCK(this);
   //);
@@ -933,10 +935,11 @@ void
 _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndPacket *packet)
 {
   GstBuffer *buffer;
-
+//  PROFILING("sndtracker_packet_sent",
   sndtracker_packet_sent(this->sndtracker, packet);
 
   buffer = sndpacket_retrieve(packet);
+//  );
 //  g_print("Packet sent  flow result: %d\n", gst_pad_push(this->mprtp_srcpad, buffer));
 
 //  artifital lost
@@ -946,13 +949,12 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndPacket *packet)
 //  }else{
 //    gst_pad_push(this->mprtp_srcpad, buffer);
 //  }
-//  PROFILING("_mprtpscheduler_send_packet: gst_pad_push rtpbuffer",
+//  PROFILING("gst_pad_push rtpbuffer",
   gst_pad_push(this->mprtp_srcpad, buffer);
-  //TODO: should goes to a sent process, but we stop ading the abs_time_ext_header
+  //TODO: should goes to a sent process, but we stop adding the abs_time_ext_header
   packet->sent_ts = timestamp_generator_get_ts(this->cc_ts_generator);
 //  g_async_queue_push(this->sendq, buffer);
 //  );
-
   if(this->fec_requested){
     FECEncoderResponse* response;
     response = messenger_try_pop_block(this->fec_responses);
@@ -969,7 +971,6 @@ _mprtpscheduler_send_packet (GstMprtpscheduler * this, SndPacket *packet)
     this->riport_flow_signal_sent = TRUE;
     sndctrler_report_can_flow(this->controller);
   }
-
   return;
 }
 
@@ -980,7 +981,7 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
   GstClockTime now, next_time = 0;
 //  RTPQueueStat* rtpqstat;
 
-//PROFILING("LOCK",
+//PROFILING("mprtpscheduler_approval_process",
   THIS_LOCK(this);
 //);
 
@@ -996,7 +997,8 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
   next_time = now;
   packet = sndqueue_pop_packet(this->sndqueue, &next_time);
   if (now < next_time) {
-    g_usleep(now - next_time / 1000);
+//    g_usleep((now - next_time) / 1000);
+    goto done;
   }
   if (!packet) {
     goto done;
@@ -1016,9 +1018,9 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
   }
 
 
-//  PROFILING("_mprtpscheduler_send_packet",
+  PROFILING("_mprtpscheduler_send_packet",
     _mprtpscheduler_send_packet(this, packet);
-//  );
+  );
 
 done:
   THIS_UNLOCK(this);

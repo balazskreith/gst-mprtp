@@ -576,6 +576,7 @@ _get_packet_mptype (GstMprtpreceiver * this,
     GST_WARNING_OBJECT (this, "could not extract first byte from buffer");
     goto done;
   }
+
   if (PACKET_IS_DTLS (first_byte)) {
     goto done;
   }
@@ -593,7 +594,6 @@ _get_packet_mptype (GstMprtpreceiver * this,
       result = PACKET_IS_MPRTCP;
       goto done;
     }
-
     if (G_UNLIKELY (!gst_rtp_buffer_map (buf, GST_MAP_READ, &rtp))) {
       GST_WARNING_OBJECT (this, "The RTP packet is not readable");
       goto done;
@@ -646,8 +646,9 @@ gst_mprtpreceiver_sink_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
   }
 
   THIS_READLOCK (this);
-
+//  PROFILING("gst_mprtpreceiver_sink_chain",
   packet_type = _get_packet_mptype (this, buf, &map, &subflow_id);
+//  );
   if (packet_type == PACKET_IS_MPRTCP) {
     result = _send_mprtcp_buffer (this, buf);
   } else if(packet_type == PACKET_IS_MPRTP_MONITORING){
@@ -659,6 +660,7 @@ gst_mprtpreceiver_sink_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
   }
 
   THIS_READUNLOCK (this);
+
 exit:
   return result;
 }

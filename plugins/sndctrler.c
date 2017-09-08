@@ -238,8 +238,9 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
 
   summary = &this->reports_summary;
   memset(summary, 0, sizeof(GstMPRTCPReportSummary));
-
+//PROFILING("sndctrler_receive_mprtcp",
   report_processor_process_mprtcp(this->report_processor, buf, summary);
+//);
   subflow = sndsubflows_get_subflow(this->subflows, summary->subflow_id);
 
   if(!subflow){

@@ -1,1 +1,1 @@
-./scripts/runs/snd/mprtp1.sh FRACTaL
+./scripts/runs/snd/rmcat7.sh FRACTaL > temp/sender.log

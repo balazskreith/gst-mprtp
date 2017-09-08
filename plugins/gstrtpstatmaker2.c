@@ -442,20 +442,21 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
     GST_DEBUG_OBJECT (this, "RTCP Packet arrived on rtp sink");
     goto exit;
   }
-
+//  PROFILING("gstrtpstatmaker",
   if(this->touched_sync_active){
     if(!g_file_test(this->touched_sync_location, G_FILE_TEST_EXISTS)){
       goto exit;
     }
     this->touched_sync_active = FALSE;
   }
-
+//  );
+//PROFILING("gstrtpstatmaker",
   messenger_lock(this->packets);
   packet = messenger_retrieve_block_unlocked(this->packets);
   _init_packet(this, packet, buffer);
   messenger_push_block_unlocked(this->packets, packet);
   messenger_unlock(this->packets);
-
+//);
 exit:
   return;
 }

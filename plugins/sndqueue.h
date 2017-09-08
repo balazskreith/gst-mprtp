@@ -30,6 +30,7 @@ typedef struct _RTPQueueStat{
   volatile gint32           queued_bytes[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   volatile gint32           actual_bitrates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   volatile gint32           total_bitrate;
+  gint32                    total_pushed_packets;
 }RTPQueueStat;
 
 struct _SndQueue
@@ -41,6 +42,7 @@ struct _SndQueue
   gint32                    num_subflow_overused;
   gboolean                  queued_bytes_considered;
 //  RTPQueueStat*             rtpqstat;
+  guint                     dropping_policy;
   RTPQueueStat              stat;
   GQueue*                   packets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   GQueue*                   unqueued_packets;

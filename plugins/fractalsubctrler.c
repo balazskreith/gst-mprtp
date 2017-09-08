@@ -596,7 +596,6 @@ void fractalsubctrler_report_update(
   if(!this->enabled){
     goto done;
   }
-
   this->last_report = _now(this);
 
   if(this->backward_congestion){
@@ -623,7 +622,6 @@ void fractalsubctrler_report_update(
     fractalfbprocessor_approve_feedback(this->fbprocessor);
     this->last_approved = _now(this);
   }
-
 done:
   return;
 }
@@ -672,34 +670,30 @@ static gboolean _congestion(FRACTaLSubController *this)
   return FALSE;
 }
 
+
+static void _undershoot(FRACTaLSubController *this, gint32 turning_point)
+{
+  gint32 new_target;
+  this->congested_bitrate = MAX(turning_point, _stat(this)->sr_avg * .9);
+  if (1 < this->distortion_num) {
+    this->bottleneck_point = CONSTRAIN(turning_point / 2, turning_point * .9, this->est_capacity * .8);
+  } else {
+    this->bottleneck_point = CONSTRAIN(turning_point - _max_ramp_up(this), turning_point - 2 * _min_ramp_up(this), this->est_capacity + _stat(this)->fec_bitrate);
+  }
+  this->bottleneck_point = MIN(this->congested_bitrate * .9, this->bottleneck_point);
+  new_target = this->bottleneck_point - 2 * _min_ramp_up(this);
+  _change_sndsubflow_target_bitrate(this, new_target);
+}
+
 static void _restrict_target(FRACTaLSubController *this)
 {
   gint32 new_target;
-
   gdouble alpha = this->congested_bitrate - this->est_capacity;
   alpha /= (gdouble) this->congested_bitrate;
   this->bottleneck_point = this->bottleneck_point * (1.-alpha) + this->est_capacity * alpha;
   new_target = this->bottleneck_point - 2 * _min_ramp_up(this);
   _change_sndsubflow_target_bitrate(this, new_target);
 
-}
-
-
-static void _undershoot(FRACTaLSubController *this, gint32 turning_point)
-{
-  gint32 new_target;
-  this->congested_bitrate = MAX(turning_point, _stat(this)->sr_avg * .9);
-
-
-//  new_target = this->bottleneck_point - _stat(this)->psi_extra_bytes * 8;
-  if (1 < this->distortion_num) {
-    this->bottleneck_point = CONSTRAIN(turning_point / 2, turning_point * .9, this->est_capacity * .8);
-  } else {
-    this->bottleneck_point = CONSTRAIN(turning_point - _max_ramp_up(this), turning_point - 2 * _min_ramp_up(this), this->est_capacity + _stat(this)->fec_bitrate);
-  }
-  //  this->bottleneck_point = CONSTRAIN( this->congested_bitrate * .5, this->congested_bitrate * .9, this->est_capacity + _stat(this)->fec_bitrate);
-  new_target = this->bottleneck_point - 2 * _min_ramp_up(this);
-  _change_sndsubflow_target_bitrate(this, new_target);
 }
 
 void
@@ -720,19 +714,21 @@ _reduce_stage(
   _refresh_reducing_approvement(this);
   if(_congestion(this)){
     gint32 new_target;
+//    gdouble us;
 //    gdouble ratio;
     if(this->last_distorted < _now(this) - GST_SECOND) {
-      this->bottleneck_point = this->bottleneck_point * .9 + _stat(this)->receiver_bitrate * .1;
+      this->bottleneck_point = this->bottleneck_point * .8 + _stat(this)->receiver_bitrate * .2;
     }else{
       gdouble off = (gdouble)(_now(this) - this->last_distorted) / (gdouble) GST_SECOND;
       this->bottleneck_point = _stat(this)->receiver_bitrate * off + this->est_capacity * (1.-off);
     }
-//    new_target = this->bottleneck_point - _stat(this)->psi_extra_bytes * 8;
+
+    this->bottleneck_point = MIN(this->congested_bitrate * .9, this->bottleneck_point);
+//    us = this->FL_th < _stat(this)->fraction_lost ? .4 : .1;
     new_target = this->bottleneck_point;
-    new_target -= MAX(2 * _min_ramp_up(this), this->bottleneck_point * .1);
-    _change_sndsubflow_target_bitrate(this, MAX(new_target, this->bottleneck_point * .6));
-//    ratio = (gdouble) this->target_bitrate / (gdouble) this->congested_bitrate;
-//    _change_cwnd(this, this->congested_cwnd * ratio);
+    new_target -= CONSTRAIN(2 * _min_ramp_up(this), _max_ramp_up(this), this->bottleneck_point * .1);
+
+    _change_sndsubflow_target_bitrate(this, MAX(new_target, this->bottleneck_point * .4));
     goto done;
   } else if(!this->reducing_approved) {
     goto done;
@@ -1056,7 +1052,7 @@ void _refresh_increasing_approvement(FRACTaLSubController *this)
     return;
   }
 
-  boundary = CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), this->increasement) * .8;
+  boundary = CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), this->increasement) * .95;
   if(_stat(this)->sr_avg < this->target_bitrate - boundary){
     return;
   }

@@ -36,7 +36,7 @@
 } \
 
 
-#define PROFILING(msg, func) PROFILING_GT(msg, func, 0)
+#define PROFILING(msg, func) PROFILING_GT(msg, func, 10)
 
 
 typedef enum{

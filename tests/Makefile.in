@@ -89,9 +89,8 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-noinst_PROGRAMS = snd_pipeline$(EXEEXT) rcv_pipeline$(EXEEXT) \
-	make_delta_statlogs$(EXEEXT) bcex$(EXEEXT) bwcsv$(EXEEXT) \
-	statmaker$(EXEEXT) logsplitter$(EXEEXT) tablemaker$(EXEEXT)
+noinst_PROGRAMS = make_delta_statlogs$(EXEEXT) bcex$(EXEEXT) \
+	bwcsv$(EXEEXT) logsplitter$(EXEEXT) tablemaker$(EXEEXT)
 subdir = tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/common/m4/as-ac-expand.m4 \
@@ -148,43 +147,6 @@ make_delta_statlogs_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
 	$(make_delta_statlogs_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-am_rcv_pipeline_OBJECTS = rcv_pipeline-rcv_pipeline.$(OBJEXT) \
-	rcv_pipeline-decoder.$(OBJEXT) rcv_pipeline-encoder.$(OBJEXT) \
-	rcv_pipeline-owr_arrival_time_meta.$(OBJEXT) \
-	rcv_pipeline-pipeline.$(OBJEXT) \
-	rcv_pipeline-receiver.$(OBJEXT) \
-	rcv_pipeline-rtpstatmaker.$(OBJEXT) \
-	rcv_pipeline-sender.$(OBJEXT) rcv_pipeline-sink.$(OBJEXT) \
-	rcv_pipeline-source.$(OBJEXT)
-rcv_pipeline_OBJECTS = $(am_rcv_pipeline_OBJECTS)
-rcv_pipeline_DEPENDENCIES = $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-rcv_pipeline_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(rcv_pipeline_CFLAGS) \
-	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-am_snd_pipeline_OBJECTS = snd_pipeline-snd_pipeline.$(OBJEXT) \
-	snd_pipeline-decoder.$(OBJEXT) snd_pipeline-encoder.$(OBJEXT) \
-	snd_pipeline-owr_arrival_time_meta.$(OBJEXT) \
-	snd_pipeline-pipeline.$(OBJEXT) \
-	snd_pipeline-receiver.$(OBJEXT) \
-	snd_pipeline-rtpstatmaker.$(OBJEXT) \
-	snd_pipeline-sender.$(OBJEXT) snd_pipeline-sink.$(OBJEXT) \
-	snd_pipeline-source.$(OBJEXT)
-snd_pipeline_OBJECTS = $(am_snd_pipeline_OBJECTS)
-snd_pipeline_DEPENDENCIES = $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-snd_pipeline_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(snd_pipeline_CFLAGS) \
-	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-am_statmaker_OBJECTS = statmaker-statmaker.$(OBJEXT)
-statmaker_OBJECTS = $(am_statmaker_OBJECTS)
-statmaker_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
-statmaker_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(statmaker_CFLAGS) \
-	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_tablemaker_OBJECTS = tablemaker-tablemaker.$(OBJEXT)
 tablemaker_OBJECTS = $(am_tablemaker_OBJECTS)
 tablemaker_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
@@ -227,13 +189,9 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(bcex_SOURCES) $(bwcsv_SOURCES) $(logsplitter_SOURCES) \
-	$(make_delta_statlogs_SOURCES) $(rcv_pipeline_SOURCES) \
-	$(snd_pipeline_SOURCES) $(statmaker_SOURCES) \
-	$(tablemaker_SOURCES)
+	$(make_delta_statlogs_SOURCES) $(tablemaker_SOURCES)
 DIST_SOURCES = $(bcex_SOURCES) $(bwcsv_SOURCES) $(logsplitter_SOURCES) \
-	$(make_delta_statlogs_SOURCES) $(rcv_pipeline_SOURCES) \
-	$(snd_pipeline_SOURCES) $(statmaker_SOURCES) \
-	$(tablemaker_SOURCES)
+	$(make_delta_statlogs_SOURCES) $(tablemaker_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -431,26 +389,6 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-rcv_pipeline_SOURCES = rcv_pipeline.c \
-					   decoder.c \
-					   encoder.c \
-					   owr_arrival_time_meta.c \
-					   pipeline.c \
-					   receiver.c \
-					   rtpstatmaker.c \
-					   sender.c \
-					   sink.c \
-					   source.c 
-
-rcv_pipeline_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) \
-                        $(GST_CFLAGS)	$(GST_NET_CFLAGS) $(WARNING_CFLAGS) \
-                        $(ERROR_CFLAGS)
-
-rcv_pipeline_LDADD = $(GST_LIBS) $(GST_BASE_LIBS) $(GST_PLUGINS_BASE_LIBS) \
-            $(GST_NET_LIBS) -lgstrtp-@GST_API_VERSION@ \
-	        $(GST_BASE_LIBS) $(GST_LIBS_LIBS) \
-	        -lgstapp-$(GST_API_VERSION)
-
 snd_pipeline_SOURCES = snd_pipeline.c \
 					   decoder.c \
 					   encoder.c \
@@ -480,9 +418,6 @@ bcex_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(
 bwcsv_SOURCES = bwcsv.c 
 bwcsv_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
 bwcsv_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
-statmaker_SOURCES = statmaker.c 
-statmaker_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
-statmaker_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD) -lpcap
 logsplitter_SOURCES = logsplitter.c 
 logsplitter_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
 logsplitter_LDADD = $(GST_LIBS) $(GST_PLUGINS_BASE_LIBS) -lgstapp-$(GST_API_VERSION) $(GST_BASE_LIBS) $(LDADD)
@@ -548,18 +483,6 @@ make_delta_statlogs$(EXEEXT): $(make_delta_statlogs_OBJECTS) $(make_delta_statlo
 	@rm -f make_delta_statlogs$(EXEEXT)
 	$(AM_V_CCLD)$(make_delta_statlogs_LINK) $(make_delta_statlogs_OBJECTS) $(make_delta_statlogs_LDADD) $(LIBS)
 
-rcv_pipeline$(EXEEXT): $(rcv_pipeline_OBJECTS) $(rcv_pipeline_DEPENDENCIES) $(EXTRA_rcv_pipeline_DEPENDENCIES) 
-	@rm -f rcv_pipeline$(EXEEXT)
-	$(AM_V_CCLD)$(rcv_pipeline_LINK) $(rcv_pipeline_OBJECTS) $(rcv_pipeline_LDADD) $(LIBS)
-
-snd_pipeline$(EXEEXT): $(snd_pipeline_OBJECTS) $(snd_pipeline_DEPENDENCIES) $(EXTRA_snd_pipeline_DEPENDENCIES) 
-	@rm -f snd_pipeline$(EXEEXT)
-	$(AM_V_CCLD)$(snd_pipeline_LINK) $(snd_pipeline_OBJECTS) $(snd_pipeline_LDADD) $(LIBS)
-
-statmaker$(EXEEXT): $(statmaker_OBJECTS) $(statmaker_DEPENDENCIES) $(EXTRA_statmaker_DEPENDENCIES) 
-	@rm -f statmaker$(EXEEXT)
-	$(AM_V_CCLD)$(statmaker_LINK) $(statmaker_OBJECTS) $(statmaker_LDADD) $(LIBS)
-
 tablemaker$(EXEEXT): $(tablemaker_OBJECTS) $(tablemaker_DEPENDENCIES) $(EXTRA_tablemaker_DEPENDENCIES) 
 	@rm -f tablemaker$(EXEEXT)
 	$(AM_V_CCLD)$(tablemaker_LINK) $(tablemaker_OBJECTS) $(tablemaker_LDADD) $(LIBS)
@@ -574,27 +497,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bwcsv-bwcsv.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/logsplitter-logsplitter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/make_delta_statlogs-make_delta_statlogs.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-decoder.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-encoder.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-owr_arrival_time_meta.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-pipeline.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-rcv_pipeline.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-receiver.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-rtpstatmaker.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-sender.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-sink.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rcv_pipeline-source.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-decoder.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-encoder.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-owr_arrival_time_meta.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-pipeline.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-receiver.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-rtpstatmaker.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-sender.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-sink.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-snd_pipeline.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snd_pipeline-source.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statmaker-statmaker.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tablemaker-tablemaker.Po@am__quote@
 
 .c.o:
@@ -673,300 +575,6 @@ make_delta_statlogs-make_delta_statlogs.obj: make_delta_statlogs.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='make_delta_statlogs.c' object='make_delta_statlogs-make_delta_statlogs.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(make_delta_statlogs_CFLAGS) $(CFLAGS) -c -o make_delta_statlogs-make_delta_statlogs.obj `if test -f 'make_delta_statlogs.c'; then $(CYGPATH_W) 'make_delta_statlogs.c'; else $(CYGPATH_W) '$(srcdir)/make_delta_statlogs.c'; fi`
-
-rcv_pipeline-rcv_pipeline.o: rcv_pipeline.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-rcv_pipeline.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-rcv_pipeline.Tpo -c -o rcv_pipeline-rcv_pipeline.o `test -f 'rcv_pipeline.c' || echo '$(srcdir)/'`rcv_pipeline.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-rcv_pipeline.Tpo $(DEPDIR)/rcv_pipeline-rcv_pipeline.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rcv_pipeline.c' object='rcv_pipeline-rcv_pipeline.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-rcv_pipeline.o `test -f 'rcv_pipeline.c' || echo '$(srcdir)/'`rcv_pipeline.c
-
-rcv_pipeline-rcv_pipeline.obj: rcv_pipeline.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-rcv_pipeline.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-rcv_pipeline.Tpo -c -o rcv_pipeline-rcv_pipeline.obj `if test -f 'rcv_pipeline.c'; then $(CYGPATH_W) 'rcv_pipeline.c'; else $(CYGPATH_W) '$(srcdir)/rcv_pipeline.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-rcv_pipeline.Tpo $(DEPDIR)/rcv_pipeline-rcv_pipeline.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rcv_pipeline.c' object='rcv_pipeline-rcv_pipeline.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-rcv_pipeline.obj `if test -f 'rcv_pipeline.c'; then $(CYGPATH_W) 'rcv_pipeline.c'; else $(CYGPATH_W) '$(srcdir)/rcv_pipeline.c'; fi`
-
-rcv_pipeline-decoder.o: decoder.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-decoder.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-decoder.Tpo -c -o rcv_pipeline-decoder.o `test -f 'decoder.c' || echo '$(srcdir)/'`decoder.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-decoder.Tpo $(DEPDIR)/rcv_pipeline-decoder.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='decoder.c' object='rcv_pipeline-decoder.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-decoder.o `test -f 'decoder.c' || echo '$(srcdir)/'`decoder.c
-
-rcv_pipeline-decoder.obj: decoder.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-decoder.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-decoder.Tpo -c -o rcv_pipeline-decoder.obj `if test -f 'decoder.c'; then $(CYGPATH_W) 'decoder.c'; else $(CYGPATH_W) '$(srcdir)/decoder.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-decoder.Tpo $(DEPDIR)/rcv_pipeline-decoder.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='decoder.c' object='rcv_pipeline-decoder.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-decoder.obj `if test -f 'decoder.c'; then $(CYGPATH_W) 'decoder.c'; else $(CYGPATH_W) '$(srcdir)/decoder.c'; fi`
-
-rcv_pipeline-encoder.o: encoder.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-encoder.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-encoder.Tpo -c -o rcv_pipeline-encoder.o `test -f 'encoder.c' || echo '$(srcdir)/'`encoder.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-encoder.Tpo $(DEPDIR)/rcv_pipeline-encoder.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='encoder.c' object='rcv_pipeline-encoder.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-encoder.o `test -f 'encoder.c' || echo '$(srcdir)/'`encoder.c
-
-rcv_pipeline-encoder.obj: encoder.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-encoder.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-encoder.Tpo -c -o rcv_pipeline-encoder.obj `if test -f 'encoder.c'; then $(CYGPATH_W) 'encoder.c'; else $(CYGPATH_W) '$(srcdir)/encoder.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-encoder.Tpo $(DEPDIR)/rcv_pipeline-encoder.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='encoder.c' object='rcv_pipeline-encoder.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-encoder.obj `if test -f 'encoder.c'; then $(CYGPATH_W) 'encoder.c'; else $(CYGPATH_W) '$(srcdir)/encoder.c'; fi`
-
-rcv_pipeline-owr_arrival_time_meta.o: owr_arrival_time_meta.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-owr_arrival_time_meta.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-owr_arrival_time_meta.Tpo -c -o rcv_pipeline-owr_arrival_time_meta.o `test -f 'owr_arrival_time_meta.c' || echo '$(srcdir)/'`owr_arrival_time_meta.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-owr_arrival_time_meta.Tpo $(DEPDIR)/rcv_pipeline-owr_arrival_time_meta.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='owr_arrival_time_meta.c' object='rcv_pipeline-owr_arrival_time_meta.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-owr_arrival_time_meta.o `test -f 'owr_arrival_time_meta.c' || echo '$(srcdir)/'`owr_arrival_time_meta.c
-
-rcv_pipeline-owr_arrival_time_meta.obj: owr_arrival_time_meta.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-owr_arrival_time_meta.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-owr_arrival_time_meta.Tpo -c -o rcv_pipeline-owr_arrival_time_meta.obj `if test -f 'owr_arrival_time_meta.c'; then $(CYGPATH_W) 'owr_arrival_time_meta.c'; else $(CYGPATH_W) '$(srcdir)/owr_arrival_time_meta.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-owr_arrival_time_meta.Tpo $(DEPDIR)/rcv_pipeline-owr_arrival_time_meta.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='owr_arrival_time_meta.c' object='rcv_pipeline-owr_arrival_time_meta.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-owr_arrival_time_meta.obj `if test -f 'owr_arrival_time_meta.c'; then $(CYGPATH_W) 'owr_arrival_time_meta.c'; else $(CYGPATH_W) '$(srcdir)/owr_arrival_time_meta.c'; fi`
-
-rcv_pipeline-pipeline.o: pipeline.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-pipeline.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-pipeline.Tpo -c -o rcv_pipeline-pipeline.o `test -f 'pipeline.c' || echo '$(srcdir)/'`pipeline.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-pipeline.Tpo $(DEPDIR)/rcv_pipeline-pipeline.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='pipeline.c' object='rcv_pipeline-pipeline.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-pipeline.o `test -f 'pipeline.c' || echo '$(srcdir)/'`pipeline.c
-
-rcv_pipeline-pipeline.obj: pipeline.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-pipeline.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-pipeline.Tpo -c -o rcv_pipeline-pipeline.obj `if test -f 'pipeline.c'; then $(CYGPATH_W) 'pipeline.c'; else $(CYGPATH_W) '$(srcdir)/pipeline.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-pipeline.Tpo $(DEPDIR)/rcv_pipeline-pipeline.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='pipeline.c' object='rcv_pipeline-pipeline.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-pipeline.obj `if test -f 'pipeline.c'; then $(CYGPATH_W) 'pipeline.c'; else $(CYGPATH_W) '$(srcdir)/pipeline.c'; fi`
-
-rcv_pipeline-receiver.o: receiver.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-receiver.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-receiver.Tpo -c -o rcv_pipeline-receiver.o `test -f 'receiver.c' || echo '$(srcdir)/'`receiver.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-receiver.Tpo $(DEPDIR)/rcv_pipeline-receiver.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='receiver.c' object='rcv_pipeline-receiver.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-receiver.o `test -f 'receiver.c' || echo '$(srcdir)/'`receiver.c
-
-rcv_pipeline-receiver.obj: receiver.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-receiver.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-receiver.Tpo -c -o rcv_pipeline-receiver.obj `if test -f 'receiver.c'; then $(CYGPATH_W) 'receiver.c'; else $(CYGPATH_W) '$(srcdir)/receiver.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-receiver.Tpo $(DEPDIR)/rcv_pipeline-receiver.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='receiver.c' object='rcv_pipeline-receiver.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-receiver.obj `if test -f 'receiver.c'; then $(CYGPATH_W) 'receiver.c'; else $(CYGPATH_W) '$(srcdir)/receiver.c'; fi`
-
-rcv_pipeline-rtpstatmaker.o: rtpstatmaker.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-rtpstatmaker.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-rtpstatmaker.Tpo -c -o rcv_pipeline-rtpstatmaker.o `test -f 'rtpstatmaker.c' || echo '$(srcdir)/'`rtpstatmaker.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-rtpstatmaker.Tpo $(DEPDIR)/rcv_pipeline-rtpstatmaker.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rtpstatmaker.c' object='rcv_pipeline-rtpstatmaker.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-rtpstatmaker.o `test -f 'rtpstatmaker.c' || echo '$(srcdir)/'`rtpstatmaker.c
-
-rcv_pipeline-rtpstatmaker.obj: rtpstatmaker.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-rtpstatmaker.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-rtpstatmaker.Tpo -c -o rcv_pipeline-rtpstatmaker.obj `if test -f 'rtpstatmaker.c'; then $(CYGPATH_W) 'rtpstatmaker.c'; else $(CYGPATH_W) '$(srcdir)/rtpstatmaker.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-rtpstatmaker.Tpo $(DEPDIR)/rcv_pipeline-rtpstatmaker.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rtpstatmaker.c' object='rcv_pipeline-rtpstatmaker.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-rtpstatmaker.obj `if test -f 'rtpstatmaker.c'; then $(CYGPATH_W) 'rtpstatmaker.c'; else $(CYGPATH_W) '$(srcdir)/rtpstatmaker.c'; fi`
-
-rcv_pipeline-sender.o: sender.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-sender.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-sender.Tpo -c -o rcv_pipeline-sender.o `test -f 'sender.c' || echo '$(srcdir)/'`sender.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-sender.Tpo $(DEPDIR)/rcv_pipeline-sender.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sender.c' object='rcv_pipeline-sender.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-sender.o `test -f 'sender.c' || echo '$(srcdir)/'`sender.c
-
-rcv_pipeline-sender.obj: sender.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-sender.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-sender.Tpo -c -o rcv_pipeline-sender.obj `if test -f 'sender.c'; then $(CYGPATH_W) 'sender.c'; else $(CYGPATH_W) '$(srcdir)/sender.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-sender.Tpo $(DEPDIR)/rcv_pipeline-sender.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sender.c' object='rcv_pipeline-sender.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-sender.obj `if test -f 'sender.c'; then $(CYGPATH_W) 'sender.c'; else $(CYGPATH_W) '$(srcdir)/sender.c'; fi`
-
-rcv_pipeline-sink.o: sink.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-sink.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-sink.Tpo -c -o rcv_pipeline-sink.o `test -f 'sink.c' || echo '$(srcdir)/'`sink.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-sink.Tpo $(DEPDIR)/rcv_pipeline-sink.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sink.c' object='rcv_pipeline-sink.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-sink.o `test -f 'sink.c' || echo '$(srcdir)/'`sink.c
-
-rcv_pipeline-sink.obj: sink.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-sink.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-sink.Tpo -c -o rcv_pipeline-sink.obj `if test -f 'sink.c'; then $(CYGPATH_W) 'sink.c'; else $(CYGPATH_W) '$(srcdir)/sink.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-sink.Tpo $(DEPDIR)/rcv_pipeline-sink.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sink.c' object='rcv_pipeline-sink.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-sink.obj `if test -f 'sink.c'; then $(CYGPATH_W) 'sink.c'; else $(CYGPATH_W) '$(srcdir)/sink.c'; fi`
-
-rcv_pipeline-source.o: source.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-source.o -MD -MP -MF $(DEPDIR)/rcv_pipeline-source.Tpo -c -o rcv_pipeline-source.o `test -f 'source.c' || echo '$(srcdir)/'`source.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-source.Tpo $(DEPDIR)/rcv_pipeline-source.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='source.c' object='rcv_pipeline-source.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-source.o `test -f 'source.c' || echo '$(srcdir)/'`source.c
-
-rcv_pipeline-source.obj: source.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -MT rcv_pipeline-source.obj -MD -MP -MF $(DEPDIR)/rcv_pipeline-source.Tpo -c -o rcv_pipeline-source.obj `if test -f 'source.c'; then $(CYGPATH_W) 'source.c'; else $(CYGPATH_W) '$(srcdir)/source.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rcv_pipeline-source.Tpo $(DEPDIR)/rcv_pipeline-source.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='source.c' object='rcv_pipeline-source.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rcv_pipeline_CFLAGS) $(CFLAGS) -c -o rcv_pipeline-source.obj `if test -f 'source.c'; then $(CYGPATH_W) 'source.c'; else $(CYGPATH_W) '$(srcdir)/source.c'; fi`
-
-snd_pipeline-snd_pipeline.o: snd_pipeline.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-snd_pipeline.o -MD -MP -MF $(DEPDIR)/snd_pipeline-snd_pipeline.Tpo -c -o snd_pipeline-snd_pipeline.o `test -f 'snd_pipeline.c' || echo '$(srcdir)/'`snd_pipeline.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-snd_pipeline.Tpo $(DEPDIR)/snd_pipeline-snd_pipeline.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='snd_pipeline.c' object='snd_pipeline-snd_pipeline.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-snd_pipeline.o `test -f 'snd_pipeline.c' || echo '$(srcdir)/'`snd_pipeline.c
-
-snd_pipeline-snd_pipeline.obj: snd_pipeline.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-snd_pipeline.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-snd_pipeline.Tpo -c -o snd_pipeline-snd_pipeline.obj `if test -f 'snd_pipeline.c'; then $(CYGPATH_W) 'snd_pipeline.c'; else $(CYGPATH_W) '$(srcdir)/snd_pipeline.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-snd_pipeline.Tpo $(DEPDIR)/snd_pipeline-snd_pipeline.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='snd_pipeline.c' object='snd_pipeline-snd_pipeline.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-snd_pipeline.obj `if test -f 'snd_pipeline.c'; then $(CYGPATH_W) 'snd_pipeline.c'; else $(CYGPATH_W) '$(srcdir)/snd_pipeline.c'; fi`
-
-snd_pipeline-decoder.o: decoder.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-decoder.o -MD -MP -MF $(DEPDIR)/snd_pipeline-decoder.Tpo -c -o snd_pipeline-decoder.o `test -f 'decoder.c' || echo '$(srcdir)/'`decoder.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-decoder.Tpo $(DEPDIR)/snd_pipeline-decoder.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='decoder.c' object='snd_pipeline-decoder.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-decoder.o `test -f 'decoder.c' || echo '$(srcdir)/'`decoder.c
-
-snd_pipeline-decoder.obj: decoder.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-decoder.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-decoder.Tpo -c -o snd_pipeline-decoder.obj `if test -f 'decoder.c'; then $(CYGPATH_W) 'decoder.c'; else $(CYGPATH_W) '$(srcdir)/decoder.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-decoder.Tpo $(DEPDIR)/snd_pipeline-decoder.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='decoder.c' object='snd_pipeline-decoder.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-decoder.obj `if test -f 'decoder.c'; then $(CYGPATH_W) 'decoder.c'; else $(CYGPATH_W) '$(srcdir)/decoder.c'; fi`
-
-snd_pipeline-encoder.o: encoder.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-encoder.o -MD -MP -MF $(DEPDIR)/snd_pipeline-encoder.Tpo -c -o snd_pipeline-encoder.o `test -f 'encoder.c' || echo '$(srcdir)/'`encoder.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-encoder.Tpo $(DEPDIR)/snd_pipeline-encoder.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='encoder.c' object='snd_pipeline-encoder.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-encoder.o `test -f 'encoder.c' || echo '$(srcdir)/'`encoder.c
-
-snd_pipeline-encoder.obj: encoder.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-encoder.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-encoder.Tpo -c -o snd_pipeline-encoder.obj `if test -f 'encoder.c'; then $(CYGPATH_W) 'encoder.c'; else $(CYGPATH_W) '$(srcdir)/encoder.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-encoder.Tpo $(DEPDIR)/snd_pipeline-encoder.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='encoder.c' object='snd_pipeline-encoder.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-encoder.obj `if test -f 'encoder.c'; then $(CYGPATH_W) 'encoder.c'; else $(CYGPATH_W) '$(srcdir)/encoder.c'; fi`
-
-snd_pipeline-owr_arrival_time_meta.o: owr_arrival_time_meta.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-owr_arrival_time_meta.o -MD -MP -MF $(DEPDIR)/snd_pipeline-owr_arrival_time_meta.Tpo -c -o snd_pipeline-owr_arrival_time_meta.o `test -f 'owr_arrival_time_meta.c' || echo '$(srcdir)/'`owr_arrival_time_meta.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-owr_arrival_time_meta.Tpo $(DEPDIR)/snd_pipeline-owr_arrival_time_meta.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='owr_arrival_time_meta.c' object='snd_pipeline-owr_arrival_time_meta.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-owr_arrival_time_meta.o `test -f 'owr_arrival_time_meta.c' || echo '$(srcdir)/'`owr_arrival_time_meta.c
-
-snd_pipeline-owr_arrival_time_meta.obj: owr_arrival_time_meta.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-owr_arrival_time_meta.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-owr_arrival_time_meta.Tpo -c -o snd_pipeline-owr_arrival_time_meta.obj `if test -f 'owr_arrival_time_meta.c'; then $(CYGPATH_W) 'owr_arrival_time_meta.c'; else $(CYGPATH_W) '$(srcdir)/owr_arrival_time_meta.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-owr_arrival_time_meta.Tpo $(DEPDIR)/snd_pipeline-owr_arrival_time_meta.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='owr_arrival_time_meta.c' object='snd_pipeline-owr_arrival_time_meta.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-owr_arrival_time_meta.obj `if test -f 'owr_arrival_time_meta.c'; then $(CYGPATH_W) 'owr_arrival_time_meta.c'; else $(CYGPATH_W) '$(srcdir)/owr_arrival_time_meta.c'; fi`
-
-snd_pipeline-pipeline.o: pipeline.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-pipeline.o -MD -MP -MF $(DEPDIR)/snd_pipeline-pipeline.Tpo -c -o snd_pipeline-pipeline.o `test -f 'pipeline.c' || echo '$(srcdir)/'`pipeline.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-pipeline.Tpo $(DEPDIR)/snd_pipeline-pipeline.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='pipeline.c' object='snd_pipeline-pipeline.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-pipeline.o `test -f 'pipeline.c' || echo '$(srcdir)/'`pipeline.c
-
-snd_pipeline-pipeline.obj: pipeline.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-pipeline.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-pipeline.Tpo -c -o snd_pipeline-pipeline.obj `if test -f 'pipeline.c'; then $(CYGPATH_W) 'pipeline.c'; else $(CYGPATH_W) '$(srcdir)/pipeline.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-pipeline.Tpo $(DEPDIR)/snd_pipeline-pipeline.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='pipeline.c' object='snd_pipeline-pipeline.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-pipeline.obj `if test -f 'pipeline.c'; then $(CYGPATH_W) 'pipeline.c'; else $(CYGPATH_W) '$(srcdir)/pipeline.c'; fi`
-
-snd_pipeline-receiver.o: receiver.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-receiver.o -MD -MP -MF $(DEPDIR)/snd_pipeline-receiver.Tpo -c -o snd_pipeline-receiver.o `test -f 'receiver.c' || echo '$(srcdir)/'`receiver.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-receiver.Tpo $(DEPDIR)/snd_pipeline-receiver.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='receiver.c' object='snd_pipeline-receiver.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-receiver.o `test -f 'receiver.c' || echo '$(srcdir)/'`receiver.c
-
-snd_pipeline-receiver.obj: receiver.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-receiver.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-receiver.Tpo -c -o snd_pipeline-receiver.obj `if test -f 'receiver.c'; then $(CYGPATH_W) 'receiver.c'; else $(CYGPATH_W) '$(srcdir)/receiver.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-receiver.Tpo $(DEPDIR)/snd_pipeline-receiver.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='receiver.c' object='snd_pipeline-receiver.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-receiver.obj `if test -f 'receiver.c'; then $(CYGPATH_W) 'receiver.c'; else $(CYGPATH_W) '$(srcdir)/receiver.c'; fi`
-
-snd_pipeline-rtpstatmaker.o: rtpstatmaker.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-rtpstatmaker.o -MD -MP -MF $(DEPDIR)/snd_pipeline-rtpstatmaker.Tpo -c -o snd_pipeline-rtpstatmaker.o `test -f 'rtpstatmaker.c' || echo '$(srcdir)/'`rtpstatmaker.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-rtpstatmaker.Tpo $(DEPDIR)/snd_pipeline-rtpstatmaker.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rtpstatmaker.c' object='snd_pipeline-rtpstatmaker.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-rtpstatmaker.o `test -f 'rtpstatmaker.c' || echo '$(srcdir)/'`rtpstatmaker.c
-
-snd_pipeline-rtpstatmaker.obj: rtpstatmaker.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-rtpstatmaker.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-rtpstatmaker.Tpo -c -o snd_pipeline-rtpstatmaker.obj `if test -f 'rtpstatmaker.c'; then $(CYGPATH_W) 'rtpstatmaker.c'; else $(CYGPATH_W) '$(srcdir)/rtpstatmaker.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-rtpstatmaker.Tpo $(DEPDIR)/snd_pipeline-rtpstatmaker.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rtpstatmaker.c' object='snd_pipeline-rtpstatmaker.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-rtpstatmaker.obj `if test -f 'rtpstatmaker.c'; then $(CYGPATH_W) 'rtpstatmaker.c'; else $(CYGPATH_W) '$(srcdir)/rtpstatmaker.c'; fi`
-
-snd_pipeline-sender.o: sender.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-sender.o -MD -MP -MF $(DEPDIR)/snd_pipeline-sender.Tpo -c -o snd_pipeline-sender.o `test -f 'sender.c' || echo '$(srcdir)/'`sender.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-sender.Tpo $(DEPDIR)/snd_pipeline-sender.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sender.c' object='snd_pipeline-sender.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-sender.o `test -f 'sender.c' || echo '$(srcdir)/'`sender.c
-
-snd_pipeline-sender.obj: sender.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-sender.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-sender.Tpo -c -o snd_pipeline-sender.obj `if test -f 'sender.c'; then $(CYGPATH_W) 'sender.c'; else $(CYGPATH_W) '$(srcdir)/sender.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-sender.Tpo $(DEPDIR)/snd_pipeline-sender.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sender.c' object='snd_pipeline-sender.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-sender.obj `if test -f 'sender.c'; then $(CYGPATH_W) 'sender.c'; else $(CYGPATH_W) '$(srcdir)/sender.c'; fi`
-
-snd_pipeline-sink.o: sink.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-sink.o -MD -MP -MF $(DEPDIR)/snd_pipeline-sink.Tpo -c -o snd_pipeline-sink.o `test -f 'sink.c' || echo '$(srcdir)/'`sink.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-sink.Tpo $(DEPDIR)/snd_pipeline-sink.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sink.c' object='snd_pipeline-sink.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-sink.o `test -f 'sink.c' || echo '$(srcdir)/'`sink.c
-
-snd_pipeline-sink.obj: sink.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-sink.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-sink.Tpo -c -o snd_pipeline-sink.obj `if test -f 'sink.c'; then $(CYGPATH_W) 'sink.c'; else $(CYGPATH_W) '$(srcdir)/sink.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-sink.Tpo $(DEPDIR)/snd_pipeline-sink.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sink.c' object='snd_pipeline-sink.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-sink.obj `if test -f 'sink.c'; then $(CYGPATH_W) 'sink.c'; else $(CYGPATH_W) '$(srcdir)/sink.c'; fi`
-
-snd_pipeline-source.o: source.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-source.o -MD -MP -MF $(DEPDIR)/snd_pipeline-source.Tpo -c -o snd_pipeline-source.o `test -f 'source.c' || echo '$(srcdir)/'`source.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-source.Tpo $(DEPDIR)/snd_pipeline-source.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='source.c' object='snd_pipeline-source.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-source.o `test -f 'source.c' || echo '$(srcdir)/'`source.c
-
-snd_pipeline-source.obj: source.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -MT snd_pipeline-source.obj -MD -MP -MF $(DEPDIR)/snd_pipeline-source.Tpo -c -o snd_pipeline-source.obj `if test -f 'source.c'; then $(CYGPATH_W) 'source.c'; else $(CYGPATH_W) '$(srcdir)/source.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/snd_pipeline-source.Tpo $(DEPDIR)/snd_pipeline-source.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='source.c' object='snd_pipeline-source.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(snd_pipeline_CFLAGS) $(CFLAGS) -c -o snd_pipeline-source.obj `if test -f 'source.c'; then $(CYGPATH_W) 'source.c'; else $(CYGPATH_W) '$(srcdir)/source.c'; fi`
-
-statmaker-statmaker.o: statmaker.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statmaker_CFLAGS) $(CFLAGS) -MT statmaker-statmaker.o -MD -MP -MF $(DEPDIR)/statmaker-statmaker.Tpo -c -o statmaker-statmaker.o `test -f 'statmaker.c' || echo '$(srcdir)/'`statmaker.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/statmaker-statmaker.Tpo $(DEPDIR)/statmaker-statmaker.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='statmaker.c' object='statmaker-statmaker.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statmaker_CFLAGS) $(CFLAGS) -c -o statmaker-statmaker.o `test -f 'statmaker.c' || echo '$(srcdir)/'`statmaker.c
-
-statmaker-statmaker.obj: statmaker.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statmaker_CFLAGS) $(CFLAGS) -MT statmaker-statmaker.obj -MD -MP -MF $(DEPDIR)/statmaker-statmaker.Tpo -c -o statmaker-statmaker.obj `if test -f 'statmaker.c'; then $(CYGPATH_W) 'statmaker.c'; else $(CYGPATH_W) '$(srcdir)/statmaker.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/statmaker-statmaker.Tpo $(DEPDIR)/statmaker-statmaker.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='statmaker.c' object='statmaker-statmaker.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statmaker_CFLAGS) $(CFLAGS) -c -o statmaker-statmaker.obj `if test -f 'statmaker.c'; then $(CYGPATH_W) 'statmaker.c'; else $(CYGPATH_W) '$(srcdir)/statmaker.c'; fi`
 
 tablemaker-tablemaker.o: tablemaker.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tablemaker_CFLAGS) $(CFLAGS) -MT tablemaker-tablemaker.o -MD -MP -MF $(DEPDIR)/tablemaker-tablemaker.Tpo -c -o tablemaker-tablemaker.o `test -f 'tablemaker.c' || echo '$(srcdir)/'`tablemaker.c

@@ -1,1 +1,1 @@
-./scripts/runs/rcv/mprtp1.sh FRACTaL
+./scripts/runs/rcv/rmcat7.sh FRACTaL

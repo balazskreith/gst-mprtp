@@ -52,6 +52,7 @@ GST_DEBUG_CATEGORY_STATIC (gst_mprtpsender_debug_category);
 #define PACKET_IS_DTLS(b) (b > 0x13 && b < 0x40)
 #define PACKET_IS_RTCP(b) (b > 192 && b < 223)
 
+#define _now(this) (gst_clock_get_time(this->sysclock))
 
 static void gst_mprtpsender_set_property (GObject * object,
     guint property_id, const GValue * value, GParamSpec * pspec);
@@ -329,6 +330,8 @@ gst_mprtpsender_init (GstMprtpsender * mprtpsender)
       GST_DEBUG_FUNCPTR (gst_mprtpsender_mprtp_sink_query_handler));
   //GST_OBJECT_FLAG_SET (mprtpsender->mprtp_sinkpad, GST_PAD_FLAG_PROXY_CAPS);
 
+  mprtpsender->sysclock = gst_system_clock_obtain();
+
   gst_element_add_pad (GST_ELEMENT (mprtpsender), mprtpsender->mprtp_sinkpad);
 
 //  GST_PAD_SET_PROXY_CAPS (mprtpsender->mprtp_sinkpad);
@@ -428,6 +431,7 @@ gst_mprtpsender_finalize (GObject * object)
 
   GST_DEBUG_OBJECT (mprtpsender, "finalize");
 
+  g_object_unref(mprtpsender->sysclock);
   /* clean up object here */
   G_OBJECT_CLASS (gst_mprtpsender_parent_class)->finalize (object);
 }
@@ -858,6 +862,7 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   GstClockTime position, duration;
 
   this = GST_MPRTPSENDER (parent);
+//PROFILING("gst_mprtpsender_mprtp_sink_chain",
   GST_DEBUG_OBJECT (this, "RTP/MPRTP/OTHER sink");
   if (!gst_buffer_map (buf, &map, GST_MAP_READ)) {
     GST_ERROR_OBJECT (this, "Buffer is not readable");
@@ -916,9 +921,12 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
         GST_TIME_ARGS (position));
     this->segment.position = position;
   }
+
   result = gst_pad_push (outpad, buf);
+
 done:
   THIS_READUNLOCK (this);
+//);
 exit:
   return result;
 

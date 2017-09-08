@@ -47,6 +47,9 @@ struct _StreamSplitter
   gboolean             keyframe_filtering;
   gint32               total_target;
 
+  SndSubflow*          last_selected;
+  guint32              last_ts;
+
 };
 
 struct _StreamSplitterClass{

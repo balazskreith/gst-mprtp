@@ -171,7 +171,6 @@ stream_splitter_on_subflow_target_bitrate_chaned(StreamSplitter* this, SndSubflo
   } else {
     this->actual_targets[subflow->id] = subflow->target_bitrate;
   }
-
   _operate_on_total_target(this, subflow, 1);
 }
 
@@ -244,6 +243,7 @@ SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *pac
 
 //  g_print("%s selected: %d packet seq: %hu\n", string, selected->id, packet->abs_seq);
   this->target_is_reached = target_is_reached;
+//  this->last_selected = selected;
   return selected;
 }
 

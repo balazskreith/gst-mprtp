@@ -234,7 +234,8 @@ void sndqueue_push_packet(SndQueue * this, SndPacket* packet)
   _stat(this)->queued_bytes[packet->subflow_id] += packet->payload_size;
   _stat(this)->bytes_in_queue += packet->payload_size;
 
-  ++_stat(this)->packets_in_queue;
+  ++_stat(this)->total_packets_in_queue;
+  ++_stat(this)->packets_in_queue[packet->subflow_id];
 
   packet->queued = _now(this);
   notifier_do(this->on_packet_queued, packet);
@@ -246,7 +247,8 @@ void sndqueue_push_packet(SndQueue * this, SndPacket* packet)
       SndPacket* head = g_queue_pop_head(queue);
       _stat(this)->queued_bytes[head->subflow_id] -= head->payload_size;
       _stat(this)->bytes_in_queue -= head->payload_size;
-     --_stat(this)->packets_in_queue;
+     --_stat(this)->total_packets_in_queue;
+     --_stat(this)->packets_in_queue[subflow->id];
       sndpacket_unref(head);
     }
     if (_is_queue_below_threshold(this, subflow)) {
@@ -280,19 +282,21 @@ static void _pop_helper(SndSubflow* subflow, PopHelperTuple* pop_helper) {
 static void _set_pacing_time(SndQueue * this, guint8 subflow_id, SndPacket* packet) {
   SndSubflow* subflow = sndsubflows_get_subflow(this->subflows, subflow_id);
   gdouble pacing_interval_in_s;
+  gdouble alpha = 1. / (gdouble)_stat(this)->packets_in_queue[subflow->id];
   volatile gint32* pacing_bitrate = this->pacing_bitrate + subflow->id;
+
   if (*pacing_bitrate == 0) {
     *pacing_bitrate = this->actual_targets[subflow_id] / 8;
   } else if (subflow->state == SNDSUBFLOW_STATE_OVERUSED || !this->queued_bytes_considered) {
     *pacing_bitrate = this->actual_targets[subflow_id] / 8;
   } else if (subflow->state == SNDSUBFLOW_STATE_STABLE) {
-    *pacing_bitrate = *pacing_bitrate * .8 +
-        (MAX(this->stat.actual_bitrates[subflow_id], this->actual_targets[subflow_id]) / 7) * .2;
-//    *pacing_bitrate = (1.2 * this->actual_targets[subflow_id]) / 8;
+    *pacing_bitrate = *pacing_bitrate * alpha +
+        (MAX(this->stat.actual_bitrates[subflow_id], this->actual_targets[subflow_id]) / 7) * (1.-alpha);
+//    *pacing_bitrate = (1.0 * this->actual_targets[subflow_id]) / 8;
   } else if (subflow->state == SNDSUBFLOW_STATE_UNDERUSED) {
-    *pacing_bitrate = *pacing_bitrate * 67 +
-            (MAX(this->stat.actual_bitrates[subflow_id], this->actual_targets[subflow_id]) / 7) * .33;
-//    *pacing_bitrate = (1.5 * this->actual_targets[subflow_id]) / 8;
+    *pacing_bitrate = *pacing_bitrate * alpha +
+            (MAX(this->stat.actual_bitrates[subflow_id], this->actual_targets[subflow_id]) / 7) * (1.-alpha);
+//    *pacing_bitrate = (1.2 * this->actual_targets[subflow_id]) / 8;
   }
 
   pacing_interval_in_s = (gdouble) packet->payload_size / (gdouble) *pacing_bitrate;
@@ -315,7 +319,9 @@ SndPacket* sndqueue_pop_packet(SndQueue * this, GstClockTime* next_approve)
     if(next_approve){
       *next_approve = MIN(pop_helper.next_approve, *next_approve);
     }
-    goto done;
+    if (*next_approve < now - GST_MSECOND) {
+      goto done;
+    }
   }
 
   queue = this->packets[pop_helper.subflow_id];
@@ -325,7 +331,8 @@ SndPacket* sndqueue_pop_packet(SndQueue * this, GstClockTime* next_approve)
   _stat(this)->queued_bytes[result->subflow_id] -= result->payload_size;
   _stat(this)->bytes_in_queue -= result->payload_size;
 
- --_stat(this)->packets_in_queue;
+ --_stat(this)->total_packets_in_queue;
+ --_stat(this)->packets_in_queue[result->subflow_id];
 
  g_queue_insert_sorted(this->unqueued_packets, result, (GCompareDataFunc) _cmp_packet_queued, NULL);
  _refresh_unqueued_packets(this);

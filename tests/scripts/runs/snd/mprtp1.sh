@@ -11,7 +11,8 @@ DURATION=150
 SCRIPTFILE=$TEMPDIR"/sender.sh"
 
 echo -n "./snd_pipeline "                                  > $SCRIPTFILE
-echo -n "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1 " >> $SCRIPTFILE
+#echo -n "--source=FILE:foreman_cif.yuv:1:352:288:2:25/1 " >> $SCRIPTFILE
+echo -n "--source=TESTVIDEO " >> $SCRIPTFILE
 
 echo -n "--codec=VP8 "                                    >> $SCRIPTFILE
 echo -n "--stat=triggered_stat:temp/snd_packets.csv:3 "   >> $SCRIPTFILE

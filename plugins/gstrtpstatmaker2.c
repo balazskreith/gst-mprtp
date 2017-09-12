@@ -15,6 +15,8 @@
 
 #include "gstrtpstatmaker2.h"
 
+
+
 static GstStaticPadTemplate sinktemplate = GST_STATIC_PAD_TEMPLATE ("sink",
     GST_PAD_SINK,
     GST_PAD_ALWAYS,
@@ -79,6 +81,56 @@ typedef struct{
 }Logger;
 
 
+
+
+
+static SocketWriter* _make_socket_writer(const gchar* sock_path) {
+
+  SocketWriter* this = g_malloc0(sizeof(SocketWriter));
+  sprintf(this->sock_path, "/tmp/%s\n", sock_path);
+//  strcpy(this->sock_path, sock_path);
+  /****************************************/
+  /* Create a UNIX domain datagram socket */
+  /****************************************/
+  this->client_socket = socket(AF_UNIX, SOCK_DGRAM, 0);
+  if (this->client_socket == -1) {
+      g_print("SOCKET ERROR at opening client socket (%s)\n", this->sock_path);
+      return NULL;
+  }
+  /***************************************/
+  /* Set up the UNIX sockaddr structure  */
+  /* by using AF_UNIX for the family and */
+  /* giving it a filepath to send to.    */
+  /***************************************/
+  this->remote.sun_family = AF_UNIX;
+  strcpy(this->remote.sun_path, this->sock_path);
+
+  return this;
+}
+
+static void _socket_writer_sendto(SocketWriter* this, gpointer data, guint len) {
+  /***************************************/
+  /* Copy the data to be sent to the     */
+  /* buffer and send it to the server.   */
+  /***************************************/
+  if (sendto(this->client_socket, data, len, 0, (struct sockaddr *) &this->remote, sizeof(this->remote)) == -1) {
+    if (!this->error_reported) {
+      g_print("SENDTO ERROR at sending to remote socket %s\n", this->sock_path);
+      perror("socket error");
+      close(this->client_socket);
+      this->error_reported = TRUE;
+    }
+    return;
+  }
+}
+
+//static void socket_writer_close(SocketWriter* this) {
+//  close(this->client_socket);
+//}
+//
+
+
+
 #define _do_init \
     GST_DEBUG_CATEGORY_INIT (gst_rtpstatmaker2_debug, "rtpstatmaker2", 0, "rtpstatmaker2 element");
 #define gst_rtpstatmaker2_parent_class parent_class
@@ -105,10 +157,6 @@ static gboolean gst_rtpstatmaker2_query (GstBaseTransform * base,
     GstPadDirection direction, GstQuery * query);
 
 static void
-_monitorstat_logger (GstRTPStatMaker2 *this);
-
-
-static void
 gst_rtpstatmaker2_finalize (GObject * object)
 {
   GstRTPStatMaker2 *this;
@@ -120,8 +168,7 @@ gst_rtpstatmaker2_finalize (GObject * object)
   g_cond_clear (&this->blocked_cond);
 
   g_object_unref (this->sysclock);
-  g_object_unref (this->packets);
-  g_free(this->default_logger);
+  g_free(this->tmp_packet);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -238,15 +285,8 @@ gst_rtpstatmaker2_init (GstRTPStatMaker2 * this)
 
   gst_base_transform_set_gap_aware (GST_BASE_TRANSFORM_CAST (this), TRUE);
 
-  g_rec_mutex_init (&this->thread_mutex);
-  this->thread = gst_task_new ((GstTaskFunction) _monitorstat_logger, this, NULL);
-
-  this->default_logger = g_malloc0(sizeof(Logger));
   this->sysclock = gst_system_clock_obtain ();
-  this->packets = make_messenger(sizeof(Packet));
-  this->packets4process = g_queue_new();
-  this->packets4recycle = g_queue_new();
-
+  this->tmp_packet = g_malloc0(sizeof(Packet));
   this->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
 }
 
@@ -262,8 +302,6 @@ gst_rtpstatmaker2_set_property (GObject * object, guint prop_id,
 
   switch (prop_id) {
     case PROP_TOUCHED_SYNC_LOCATION:
-      this->touched_sync_active = TRUE;
-      strcpy(this->touched_sync_location, g_value_get_string(value));
       break;
     case PROP_SYNC:
       this->sync = g_value_get_boolean (value);
@@ -275,29 +313,22 @@ gst_rtpstatmaker2_set_property (GObject * object, guint prop_id,
       this->fec_payload_type = g_value_get_uint(value);
       break;
     case PROP_LOGGER_PAYLOAD:
-     if(this->loggers){
-       Logger* logger = this->loggers->data;
-       logger->payload_type = g_value_get_uint(value);
-     }
      break;
     case PROP_LOGGER_SUBFLOW_ID:
-     if(this->loggers){
-       Logger* logger = this->loggers->data;
-       logger->subflow_id = g_value_get_uint(value);
-     }
      break;
     case PROP_LOGGER_SSRC:
-      if(this->loggers){
-        Logger* logger = this->loggers->data;
-        logger->ssrc = g_value_get_uint(value);
-      }
       break;
     case PROP_NEW_LOGGER:
-      this->loggers = g_slist_prepend(this->loggers, g_malloc0(sizeof(Logger)));
-      strcpy(((Logger*)this->loggers->data)->path, g_value_get_string(value));
       break;
     case PROP_DEFAULT_LOGFILE_LOCATION:
-      strcpy(((Logger*)this->default_logger)->path, g_value_get_string(value));
+      {
+        const gchar *path = g_value_get_string(value);
+        const gchar *sock_path = path;
+        gchar *next;
+        while ((next = strpbrk(sock_path + 1, "\\/"))) sock_path = next;
+        if (path != sock_path) ++sock_path;
+        this->socket_writer = _make_socket_writer(sock_path);
+      }
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -421,7 +452,6 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
 {
   guint8 first_byte;
   guint8 second_byte;
-  Packet* packet;
 
   if (!GST_IS_BUFFER(buffer)) {
     goto exit;
@@ -442,26 +472,18 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
     GST_DEBUG_OBJECT (this, "RTCP Packet arrived on rtp sink");
     goto exit;
   }
-//  PROFILING("gstrtpstatmaker",
-  if(this->touched_sync_active){
-    if(!g_file_test(this->touched_sync_location, G_FILE_TEST_EXISTS)){
-      goto exit;
-    }
-    this->touched_sync_active = FALSE;
+
+
+  _init_packet(this, (Packet*)this->tmp_packet, buffer);
+PROFILING("_socket_writer_sendto",
+  if (this->socket_writer) {
+    _socket_writer_sendto(this->socket_writer, this->tmp_packet, sizeof(Packet));
   }
-//  );
-//PROFILING("gstrtpstatmaker",
-  messenger_lock(this->packets);
-  packet = messenger_retrieve_block_unlocked(this->packets);
-  _init_packet(this, packet, buffer);
-  messenger_push_block_unlocked(this->packets, packet);
-  messenger_unlock(this->packets);
+);
 //);
 exit:
   return;
 }
-
-
 
 
 //static int received = 1;
@@ -474,7 +496,7 @@ gst_rtpstatmaker2_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
   GstClockTime runpts = GST_CLOCK_TIME_NONE;
   GstClockTime runtimestamp;
   gsize size;
-
+  PROFILING("gstrtpstatmaker",
   size = gst_buffer_get_size (buf);
 
   //artifical lost
@@ -507,7 +529,7 @@ gst_rtpstatmaker2_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
   this->offset += size;
 
   _monitor_rtp_packet(this, buf);
-
+);
   return ret;
 
 }
@@ -628,9 +650,6 @@ gst_rtpstatmaker2_change_state (GstElement * element, GstStateChange transition)
       this->blocked = FALSE;
       g_cond_broadcast (&this->blocked_cond);
 
-      gst_task_set_lock(this->thread, &this->thread_mutex);
-      gst_task_start(this->thread);
-
       GST_OBJECT_UNLOCK (this);
       break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
@@ -654,9 +673,6 @@ gst_rtpstatmaker2_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
       GST_OBJECT_LOCK (this);
 
-      gst_task_join (this->thread);
-      gst_object_unref (this->thread);
-
       this->upstream_latency = 0;
       this->blocked = TRUE;
       GST_OBJECT_UNLOCK (this);
@@ -677,67 +693,5 @@ gst_rtpstatmaker2_change_state (GstElement * element, GstStateChange transition)
   return ret;
 }
 
-
-static gboolean _check_logger_match(Logger* logger, Packet* packet){
-  if(0 < logger->ssrc && packet->ssrc == logger->ssrc){
-    return TRUE;
-  }
-  if(0 < logger->payload_type && packet->payload_type == logger->payload_type){
-    return TRUE;
-  }
-
-  if(0 < logger->subflow_id && packet->subflow_id == logger->subflow_id){
-    return TRUE;
-  }
-
-  return FALSE;
-}
-
-static Logger* _get_logger(GstRTPStatMaker2* this, Packet* packet){
-  GSList* it;
-  for(it = this->loggers; it; it = it->next){
-    if(_check_logger_match(it->data, packet)){
-      return it->data;
-    }
-  }
-  return this->default_logger;
-}
-
-void
-_monitorstat_logger (GstRTPStatMaker2 *this)
-{
-  Packet* packet;
-  Logger* logger = this->default_logger;
-  FILE* fp;
-  messenger_wait_before_pop_all (this->packets, 10 * GST_SECOND, this->packets4process);
-  if(g_queue_is_empty(this->packets4process)){
-    return;
-  }
-//  g_print("MAKING START BEGIN\n");
-  fp = fopen(logger->path, "a");
-  while(!g_queue_is_empty(this->packets4process)){
-    packet = g_queue_pop_head(this->packets4process);
-    DISABLE_LINE    logger = _get_logger(this, packet);
-    fprintf(fp, "%lu,%hu,%u,%u,%d,%u,%d,%d,%d,%hu,%hu,%d\n",
-          packet->tracked_ntp,
-          packet->seq_num,
-          packet->timestamp,
-          packet->ssrc,
-          packet->payload_type,
-          packet->payload_size,
-          packet->subflow_id,
-          packet->subflow_seq,
-          packet->header_size,
-          packet->protect_begin,
-          packet->protect_end,
-          packet->marker);
-    g_queue_push_tail(this->packets4recycle, packet);
-
-  }
-  fclose(fp);
-//  g_print("MAKING START END\n");
-  messenger_throw_blocks(this->packets, this->packets4recycle);
-  return;
-}
 
 

@@ -1213,8 +1213,10 @@ static void _swpercentile2_on_add(gpointer dataptr, gpointer value)
   } else {
     bintree_insert_value(this->mintree, value);
   }
+  PROFILING2("swpercentile2",
   _swpercentile2_balancing(this);
   _swpercentile2_calculate(this);
+  );
   if (this->debug) {
     bintree_print(this->maxtree);
     g_print("-----------------\n");

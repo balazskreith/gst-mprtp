@@ -100,6 +100,7 @@ sndpackets_init (SndPackets * this)
   this->recycle                  = make_recycle_sndpacket(32, (RecycleItemShaper) _setup_sndpacket);
 
   this->keyframe_filtercb        = NULL;
+
 }
 
 
@@ -193,7 +194,13 @@ void sndpacket_setup_mprtp(SndPacket *packet, guint8 subflow_id, guint16 subflow
   if(!packet->buffer){
     g_print("Packet %hu has no buffer\n", packet->abs_seq);
   }
-  packet->buffer = gst_buffer_make_writable(packet->buffer);
+
+  {
+//    GstBuffer* prev = packet->buffer;
+    packet->buffer = gst_buffer_make_writable(packet->buffer);
+//    g_print("%p -> %p\n", prev, packet->buffer);
+  }
+
 
   gst_rtp_buffer_map(packet->buffer, GST_MAP_READWRITE, &rtp);
   gst_rtp_buffer_set_mprtp_extension(&rtp, packet->mprtp_ext_header_id, subflow_id, subflow_seq);

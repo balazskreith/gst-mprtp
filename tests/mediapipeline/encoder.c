@@ -97,7 +97,7 @@ GstElement* _make_vp8_encoder(Encoder* this, CodecParams *params)
   g_object_set(encoder,
       "end-usage", 1, /* VPX_CBR */
       "deadline", G_GINT64_CONSTANT(1), /* VPX_DL_REALTIME */
-      "cpu-used", -6,
+      "cpu-used",  -6,
       "min-quantizer", 2,
       "buffer-initial-size", 300,
       "buffer-optimal-size", 300,

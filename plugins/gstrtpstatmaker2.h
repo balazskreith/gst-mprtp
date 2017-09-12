@@ -48,6 +48,30 @@ G_BEGIN_DECLS
 typedef struct _GstRTPStatMaker2 GstRTPStatMaker2;
 typedef struct _GstRTPStatMaker2Class GstRTPStatMaker2Class;
 
+
+/************************************************************/
+/* This is a datagram socket client sample program for UNIX */
+/* domain sockets. This program creates a socket and sends  */
+/* data to a server.                                        */
+/************************************************************/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <fcntl.h>
+#include <unistd.h>
+typedef struct{
+  gchar sock_path[256];
+  int client_socket;
+  struct sockaddr_un remote;
+  gboolean error_reported;
+}SocketWriter;
+
+
 /**
  * GstRTPStatMaker2:
  *
@@ -66,14 +90,14 @@ struct _GstRTPStatMaker2 {
   guint64                       prev_offset_end;
   gchar*                        last_message;
 
-  gboolean                      touched_sync_active;
-  gchar                         touched_sync_location[256];
+//  gboolean                      touched_sync_active;
+//  gchar                         touched_sync_location[256];
 
-  GstTask*                      thread;
-  GRecMutex                     thread_mutex;
-  GSList*                       loggers;
-  gpointer                      default_logger;
-  Messenger*                    packets;
+//  GstTask*                      thread;
+//  GRecMutex                     thread_mutex;
+//  GSList*                       loggers;
+//  gpointer                      default_logger;
+//  Messenger*                    packets;
   guint8                        mprtp_ext_header_id;
   guint8                        fec_payload_type;
 
@@ -81,8 +105,8 @@ struct _GstRTPStatMaker2 {
   GstClockTime                  upstream_latency;
   GCond                         blocked_cond;
   gboolean                      blocked;
-  GQueue*                       packets4process;
-  GQueue*                       packets4recycle;
+  SocketWriter*                 socket_writer;
+  gpointer                      tmp_packet;
 };
 
 struct _GstRTPStatMaker2Class {

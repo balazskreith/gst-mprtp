@@ -8,6 +8,9 @@ ALGORITHM="SCReAM"
 OWD=50
 JITTER=0
 
+LISTENER_IN="/tmp/statlistener.cmds"
+LISTENER_OUT="/tmp/statslistener.out"
+
 mkdir temp_batch
 rm temp_batch/*
 rm triggered_stat
@@ -46,6 +49,9 @@ chmod 777 $RCVFILE
 
 cleanup()
 {
+  echo "DONE" >> $LISTENER_IN
+  sleep 1
+  sudo pkill statlistener
   sudo pkill snd_pipeline
   sudo pkill rcv_pipeline
   sudo pkill bcex
@@ -64,61 +70,31 @@ trap control_c SIGINT
 
 alg=${ALGORITHM,,}
 
+echo "increase the number of datagrams for unix sockets"
+sudo sysctl net.core.wmem_max=8192
+
+rm $LISTENER_IN
+
 while [  $COUNTER -lt $END ]; do
     echo "The counter is $COUNTER"
+	./statlistener temp $LISTENER_IN &
+	echo "ADD snd_packets.csv rcv_packets.csv ply_packets.csv" > $LISTENER_IN
 
 	sudo ip netns exec ns_rcv $RCVFILE &
 	sleep 2
 	sudo ip netns exec ns_snd $SNDFILE &
 	sleep 0.2
 	./scripts/runs/rmcat1.sh $OWD $alg &
-	sleep 30
 
 	INCREASE=1
-
-	#Validation part 1.
-	for FILE in snd_packets.csv rcv_packets.csv
-	do
-   		if [ ! -f $LOGSDIR"/"$FILE ]; then
-    		INCREASE=0
-    		echo $FILE" not found"
-		fi
-	done
-
-	if [ $INCREASE -eq 0 ]
-	then
-	  cleanup
-	  sleep 60
-	  continue
-	fi
-
-	echo "Validation: Necessary logfile exists."
-
-	sleep 50
-
-	#Validation Part 2
-	for FILE in snd_packets.csv rcv_packets.csv
-	do
-		minimumsize=2000
-		actualsize=$(wc -c <"$LOGSDIR/$FILE")
-		if [ ! $actualsize -ge $minimumsize ]; then
-		    echo "-----$FILE SIZE IS UNDER $minimumsize BYTES-----"
-		    INCREASE=0
-    		echo $FILE" not found"
-		fi
-	done
-
-	if [ $INCREASE -eq 0 ]
-	then
-	  cleanup
-	  sleep 60
-	  continue
-	fi
-
-	echo "Validation: Logfiles size seems ok."
-
 	sleep 150
-
+    echo "VALIDATE /tmp/statlistener.valid" >> $LISTENER_IN
+	INCREASE=$(cat << /tmp/statlistener.valid)
+	echo "DONE" >> $LISTENER_IN
+	if [ $INCREASE -eq 0 ]
+	then
+	  echo "Increase is 0"
+	fi
 	cleanup
 
 	#vqmt produced.yuv consumed.yuv 288 352 2000 1 temp/vqmt PSNR

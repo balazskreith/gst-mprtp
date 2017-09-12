@@ -38,6 +38,17 @@
 
 #define PROFILING(msg, func) PROFILING_GT(msg, func, 10)
 
+#include <time.h>
+#define PROFILING_GT2(msg, func, gt) \
+{  \
+  clock_t start, elapsed; \
+  start = clock(); \
+  func; \
+  elapsed = (clock()-start)/(double)CLOCKS_PER_SEC * 1000; \
+  if(gt < elapsed) {g_print(msg" elapsed time in ms: %lu\n", elapsed); }\
+} \
+
+#define PROFILING2(msg, func) PROFILING_GT2(msg, func, 10)
 
 typedef enum{
   RTCP_INTERVAL_REGULAR_INTERVAL_MODE      = 0,

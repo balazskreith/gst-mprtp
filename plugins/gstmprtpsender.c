@@ -869,7 +869,7 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
     result = GST_FLOW_CUSTOM_ERROR;
     goto exit;
   }
-
+PROFILING("gst_mprtpsender_mprtp_sink_chain",
   THIS_READLOCK (this);
   if(this->dirty) {
     if(0) _init_all_subflows(this, buf);
@@ -924,9 +924,10 @@ gst_mprtpsender_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 
   result = gst_pad_push (outpad, buf);
 
+
 done:
   THIS_READUNLOCK (this);
-//);
+);
 exit:
   return result;
 
@@ -941,6 +942,7 @@ gst_mprtpsender_mprtcp_sink_chain (GstPad * pad, GstObject * parent,
   GstFlowReturn result = GST_FLOW_OK;
   Subflow *subflow = NULL;
   this = GST_MPRTPSENDER (parent);
+PROFILING("gst_mprtpsender_mprtcp_sink_chain",
   THIS_READLOCK (this);
   DISABLE_LINE subflow = _get_subflow_from_blocks (this, buf);
   subflow = _get_subflow_from_report(this, buf);
@@ -962,6 +964,7 @@ gst_mprtpsender_mprtcp_sink_chain (GstPad * pad, GstObject * parent,
 
 done:
   THIS_READUNLOCK (this);
+);
   return result;
 }
 

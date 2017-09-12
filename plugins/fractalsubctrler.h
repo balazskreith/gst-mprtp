@@ -41,22 +41,18 @@ struct _FRACTaLSubController
   gboolean                  backward_congestion;
   GstClockTime              last_report;
 
-  GstClockTime              last_corrigated;
-  GstClockTime              last_log;
   gboolean                  approve_measurement;
   GstClockTime              obligated_approvement;
 
-  gint32                    inflicted_bitrate;
   gint32                    target_bitrate;
-  gint32                    stable_bitrate;
 
   guint                     rcved_fb_since_changed;
-
 
   GstClockTime              last_executed;
 
   gint32                    bottleneck_point;
   gint32                    congested_bitrate;
+  gdouble                   heavy_congestion_th;
 
   GstClockTime              approvement_interval;
 
@@ -70,6 +66,7 @@ struct _FRACTaLSubController
   GstClockTime              deflate_time;
 
   guint                     monitoring_interval;
+  gint32                    monitoring_target_bitrate;
   GstClockTime              monitoring_started;
   GstClockTime              monitoring_approvement_started;
   gboolean                  monitoring_approved;
@@ -80,9 +77,7 @@ struct _FRACTaLSubController
   gint32                    increasement;
 
   gint64                    QD_th;
-  gint32                    EB_th;
   gdouble                   FL_th;
-  gdouble                   qd_dist_avg;
   gboolean                  reducing_approved;
   GstClockTime              reducing_sr_reached;
 
@@ -104,18 +99,9 @@ struct _FRACTaLSubController
   gdouble                   bottleneck_cwnd;
   GstClockTime            (*refresh_target)(FRACTaLSubController* this);
 
-  gint32                    max_extra_bytes;
-
   gpointer                  priv;
 
   SndTracker*               sndtracker;
-
-//  gdouble                   eb_ratio;
-//  gdouble                   eb_ratio_t;
-//  gdouble                   eb_ratio_t2;
-//  gdouble                   deb_ratio;
-//  gdouble                   eb_ratio_ewma;
-//  gdouble                   max_eb_ratio;
 
 };
 

@@ -149,7 +149,9 @@ void notifier_do(Notifier *this, gpointer subject)
   if(!this){
     return;
   }
+//PROFILING2("notifier_do",
   g_slist_foreach(this->listeners, _listener_helper, subject);
+//);
 }
 
 

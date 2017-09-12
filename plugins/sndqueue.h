@@ -25,10 +25,11 @@ typedef struct _SndQueueClass SndQueueClass;
 
 typedef struct _RTPQueueStat{
   gint32                    bytes_in_queue;
-  gint16                    packets_in_queue;
+  gint16                    total_packets_in_queue;
   gdouble                   rtpq_delay;
   volatile gint32           queued_bytes[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   volatile gint32           actual_bitrates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32           packets_in_queue[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   volatile gint32           total_bitrate;
   gint32                    total_pushed_packets;
 }RTPQueueStat;

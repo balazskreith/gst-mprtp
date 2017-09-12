@@ -217,13 +217,14 @@ sndctrler_time_update (SndController *this)
   if(0 < this->last_regular_emit && now < this->last_regular_emit + this->time_update_period){
     goto done;
   }
+PROFILING("sndctrler_time_update",
   for(it = this->controllers; it; it = it->next){
     CongestionController* controller = it->data;
     controller->time_update(controller->udata);
   }
   _emit_signal(this);
   _sender_report_updater(this);
-
+);
   this->last_regular_emit = now;
 done:
   return;
@@ -235,14 +236,14 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
   SndSubflow *subflow;
   GstMPRTCPReportSummary *summary;
   GSList* it;
-
+PROFILING("report_processor_process_mprtcp",
   summary = &this->reports_summary;
   memset(summary, 0, sizeof(GstMPRTCPReportSummary));
 //PROFILING("sndctrler_receive_mprtcp",
   report_processor_process_mprtcp(this->report_processor, buf, summary);
 //);
   subflow = sndsubflows_get_subflow(this->subflows, summary->subflow_id);
-
+);
   if(!subflow){
     g_warning("Report arrived referring to subflow not exists");
     goto done;
@@ -250,7 +251,7 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
 
   _update_subflow_report_utilization(this, subflow, summary);
   sndsubflow_refresh_report_interval(subflow);
-
+PROFILING("report_updater",
   for(it = this->controllers; it; it = it->next){
     CongestionController* controller = it->data;
     if(controller->subflow_id != summary->subflow_id){
@@ -259,7 +260,7 @@ sndctrler_receive_mprtcp (SndController *this, GstBuffer * buf)
     controller->report_updater(controller->udata, summary);
     break;
   }
-
+);
 done:
   return;
 }
@@ -423,7 +424,7 @@ void _on_subflow_state_changed(SndController *this, SndSubflow* subflow)
   {
 //    GstClockTime reporting_interval = MIN(subflow->report_interval, this->time_update_period);
 //    this->time_update_period = CONSTRAIN(50 * GST_MSECOND, 200 * GST_MSECOND, reporting_interval);
-    this->time_update_period = 50 * GST_MSECOND;
+    this->time_update_period = 100 * GST_MSECOND;
   }
 
 //done:

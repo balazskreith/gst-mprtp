@@ -55,6 +55,7 @@ struct _GstMprtpscheduler
   GstPad*                       mprtcp_rr_sinkpad;
   GstPad*                       mprtcp_sr_srcpad;
 
+
   GAsyncQueue*                  sendq;
   TimestampGenerator*           cc_ts_generator;
   gboolean                      preroll;
@@ -64,7 +65,7 @@ struct _GstMprtpscheduler
   StreamSplitter*               splitter;
   SndController*                controller;
   SndTracker*                   sndtracker;
-  gboolean                      riport_flow_signal_sent;
+  gboolean                      report_flow_signal_sent;
   GstSegment                    segment;
   GstClockTime                  position_out;
 
@@ -75,9 +76,6 @@ struct _GstMprtpscheduler
   GstClockTime                  last_pts;
 
   guint32                       rtcp_sent_octet_sum;
-
-  GstTask*                      sending_thread;
-  GRecMutex                     sending_thread_mutex;
 
   GstTask*                      thread;
   GRecMutex                     thread_mutex;

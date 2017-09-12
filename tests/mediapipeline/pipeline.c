@@ -198,7 +198,6 @@ CodecParams*    make_codec_params (gchar* params_rawstring)
       sprintf(result->type_str,  "THEORA");
       sprintf(result->to_string, "THEORA");
       break;
-
     case CODEC_TYPE_VP8:
       sprintf(result->type_str,  "VP8");
       result->keyframe_mode = (1 < g_strv_length(tokens)) ? atoi(tokens[1]) : 0;

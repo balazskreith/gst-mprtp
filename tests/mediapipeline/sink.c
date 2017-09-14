@@ -59,6 +59,8 @@ Sink* make_sink(SinkParams *params)
   return this;
 }
 
+
+
 GstElement* _make_autovideo_sink(SinkParams *params)
 {
   GstElement* autovideosink = gst_element_factory_make("autovideosink", NULL);

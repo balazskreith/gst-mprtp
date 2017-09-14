@@ -21,6 +21,7 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          lib_swplugins.c       \
                          mediator.c            \
                          messenger.c           \
+                         mkfifo.c              \
                          mprtputils.c          \
                          notifier.c            \
                          rcvctrler.c           \
@@ -58,6 +59,7 @@ noinst_HEADERS = bintree.h             \
                  lib_swplugins.h       \
                  mediator.h            \
                  messenger.h           \
+                 mkfifo.h              \
                  mprtputils.h          \
                  notifier.h            \
                  rcvctrler.h           \

@@ -694,7 +694,7 @@ static void _restrict_target(FRACTaLSubController *this)
   gdouble alpha = this->congested_bitrate - this->est_capacity;
   alpha /= (gdouble) this->congested_bitrate;
   this->bottleneck_point = this->bottleneck_point * (1.-alpha) + this->est_capacity * alpha;
-  new_target = this->bottleneck_point - 1 * _max_ramp_up(this);
+  new_target = this->bottleneck_point - MIN(1 * _max_ramp_up(this), this->congested_bitrate - this->bottleneck_point);
   _change_sndsubflow_target_bitrate(this, new_target);
 
 }
@@ -1151,9 +1151,7 @@ gdouble _scale_t(FRACTaLSubController *this)
     return 1.;
   }
   result = drate;
-  result /= (gdouble) epspoint; // TODO: if it works elliminate eps
-//  result *= result;
-//  g_print("%d (%d) -> %f\n", delta, cpoint, result);
+  result /= (gdouble) epspoint;
   return CONSTRAIN(0., 1., result);
 }
 

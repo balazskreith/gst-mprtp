@@ -20078,7 +20078,7 @@ _ACEOF
 GST_PLUGIN_LDFLAGS='-module -avoid-version -export-symbols-regex _*\(gst_\|Gst\|GST_\).*'
 
 
-ac_config_files="$ac_config_files Makefile plugins/Makefile tools/Makefile tests/Makefile tests/mediapipeline/Makefile tests/statmakerpipeline/Makefile"
+ac_config_files="$ac_config_files Makefile plugins/Makefile tools/Makefile tests/Makefile tests/mediapipeline/Makefile tests/statmakerpipeline/Makefile tests/statsrelayer/Makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -21221,6 +21221,7 @@ do
     "tests/Makefile") CONFIG_FILES="$CONFIG_FILES tests/Makefile" ;;
     "tests/mediapipeline/Makefile") CONFIG_FILES="$CONFIG_FILES tests/mediapipeline/Makefile" ;;
     "tests/statmakerpipeline/Makefile") CONFIG_FILES="$CONFIG_FILES tests/statmakerpipeline/Makefile" ;;
+    "tests/statsrelayer/Makefile") CONFIG_FILES="$CONFIG_FILES tests/statsrelayer/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

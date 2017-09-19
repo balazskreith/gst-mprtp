@@ -13,6 +13,7 @@ StatsRelayer* make_statsrelayer(void);
 void statsrelayer_add_group(StatsRelayer* this, const gchar* string);
 void statsrelayer_rem_group(StatsRelayer* this, const gchar* name);
 void statsrelayer_flush_group(StatsRelayer* this, const gchar* name);
+void statsrelayer_list_group(StatsRelayer* this, const gchar* name);
 void statsrelayer_dtor(StatsRelayer* this);
 
 #endif /* TESTS_STATSRELAYER_STATSRELAYER_H_ */

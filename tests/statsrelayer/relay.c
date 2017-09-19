@@ -17,16 +17,8 @@ Relay* make_relay(const gchar* string, guint item_size) {
   return this;
 }
 
-void relay_set_on_first_received(Relay* this, Process* on_first_received) {
-  buffer_set_on_first_received(this->buffer, on_first_received);
-}
-
 void relay_start(Relay* this) {
   process_call(this->source->start_process);
-}
-
-void relay_collect(Relay* this) {
-  buffer_collect(this->buffer);
 }
 
 void relay_flush(Relay* this) {
@@ -39,10 +31,8 @@ void relay_stop(Relay* this) {
 }
 
 void relay_dtor(Relay* this) {
+  source_dtor(this->source);
   buffer_dtor(this->buffer);
   sink_dtor(this->sink);
-  source_dtor(this->source);
-
   g_free(this);
 }
-

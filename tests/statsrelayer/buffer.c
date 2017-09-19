@@ -1,10 +1,12 @@
 #include "buffer.h"
 #include <string.h>
+#include <stdio.h>
 
 static void _process(Buffer* this, gpointer item);
 
 Buffer* make_buffer(guint item_size) {
   Buffer* this = g_malloc0(sizeof(Buffer));
+  fprintf(stdout, "Create Buffer\n");
   this->items = g_queue_new();
   this->recycle = g_queue_new();
   this->input = make_pushport((PushCb)_process, this);
@@ -19,13 +21,6 @@ void buffer_dtor(Buffer* this) {
   g_free(this);
 }
 
-void buffer_collect(Buffer* this) {
-  this->collect = TRUE;
-}
-
-void buffer_set_on_first_received(Buffer* this, Process* on_first_received) {
-  this->on_first_received = on_first_received;
-}
 
 void buffer_flush(Buffer* this) {
   while(!g_queue_is_empty(this->items)) {
@@ -44,18 +39,6 @@ void buffer_prepare(Buffer* this, guint num) {
 
 void _process(Buffer* this, gpointer item) {
   gpointer new_item = item;
-  if (!this->first_received) {
-    if (this->on_first_received) {
-      process_call(this->on_first_received);
-    } else {
-      this->collect = TRUE;
-    }
-    this->first_received = TRUE;
-  }
-  if (!this->collect) {
-    return;
-  }
-
   if (!g_queue_is_empty(this->recycle)) {
     new_item = g_queue_pop_head(this->recycle);
   } else {

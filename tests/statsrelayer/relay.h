@@ -14,9 +14,7 @@ typedef struct {
 }Relay;
 
 Relay* make_relay(const gchar* string, guint item_size);
-void relay_set_on_first_received(Relay* this, Process* on_first_received);
 void relay_start(Relay* this);
-void relay_collect(Relay* this);
 void relay_flush(Relay* this);
 void relay_stop(Relay* this);
 void relay_dtor(Relay* this);

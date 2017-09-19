@@ -44,6 +44,7 @@ gint32 common_assign_string_to_int(gchar* type, ...)
 
   va_start ( arguments, type );
   for(token = va_arg( arguments,  gchar*); token; token = va_arg(arguments,  gchar*), ++result){
+//    g_print("comparing |%s|%s|\n", token, type);
     if(!strcmp(type, token)){
       return result;
     }

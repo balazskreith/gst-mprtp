@@ -3,7 +3,19 @@
 #include <gst/gst.h>
 #include <glib.h>
 
-typedef struct _Packet
+#ifdef __WIN32__
+
+#define PACKED
+#pragma pack(push,1)
+
+
+#else
+
+#define PACKED __attribute__ ((__packed__))
+
+#endif
+
+typedef struct PACKED _RTPStatPacket
 {
   guint64              tracked_ntp;
   guint16              seq_num;
@@ -11,8 +23,8 @@ typedef struct _Packet
   guint8               subflow_id;
   guint16              subflow_seq;
 
-  gboolean             marker;
-  guint8               payload_type;
+  guint8               marker : 1;
+  guint8               payload_type : 7;
   guint32              timestamp;
 
   guint                header_size;
@@ -20,7 +32,12 @@ typedef struct _Packet
 
   guint16              protect_begin;
   guint16              protect_end;
-}Packet;
+}RTPStatPacket;
+
+typedef struct {
+  gpointer subject;
+  guint length;
+}WriteItem;
 
 typedef void (*PushCb)(gpointer udata, gpointer item);
 typedef gpointer (*PullCb)(gpointer this);
@@ -45,5 +62,16 @@ void process_call(Process* this);
 #define process_dtor(target) g_free(target)
 
 gint32 common_assign_string_to_int(gchar* type, ...);
+
+#ifdef __WIN32__
+
+#pragma pack(pop)
+#undef PACKED
+
+#else
+
+#undef PACKED
+
+#endif
 
 #endif /* TESTS_STATSRELAYER_COMMON_H_ */

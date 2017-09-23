@@ -112,9 +112,9 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 PROGRAMS = $(noinst_PROGRAMS)
 am_statsrelayer_OBJECTS = statsrelayer-buffer.$(OBJEXT) \
-	statsrelayer-common.$(OBJEXT) statsrelayer-main.$(OBJEXT) \
-	statsrelayer-relay.$(OBJEXT) statsrelayer-sink.$(OBJEXT) \
-	statsrelayer-source.$(OBJEXT) \
+	statsrelayer-common.$(OBJEXT) statsrelayer-mapper.$(OBJEXT) \
+	statsrelayer-main.$(OBJEXT) statsrelayer-relay.$(OBJEXT) \
+	statsrelayer-sink.$(OBJEXT) statsrelayer-source.$(OBJEXT) \
 	statsrelayer-statsrelayer.$(OBJEXT)
 statsrelayer_OBJECTS = $(am_statsrelayer_OBJECTS)
 am__DEPENDENCIES_1 =
@@ -363,6 +363,7 @@ top_srcdir = @top_srcdir@
 TARGETPATH = ../                  
 statsrelayer_SOURCES = buffer.c \
 					   common.c \
+					   mapper.c \
 					   main.c \
 					   relay.c \
 					   sink.c \
@@ -434,6 +435,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statsrelayer-buffer.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statsrelayer-common.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statsrelayer-main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statsrelayer-mapper.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statsrelayer-relay.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statsrelayer-sink.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statsrelayer-source.Po@am__quote@
@@ -487,6 +489,20 @@ statsrelayer-common.obj: common.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='common.c' object='statsrelayer-common.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -c -o statsrelayer-common.obj `if test -f 'common.c'; then $(CYGPATH_W) 'common.c'; else $(CYGPATH_W) '$(srcdir)/common.c'; fi`
+
+statsrelayer-mapper.o: mapper.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -MT statsrelayer-mapper.o -MD -MP -MF $(DEPDIR)/statsrelayer-mapper.Tpo -c -o statsrelayer-mapper.o `test -f 'mapper.c' || echo '$(srcdir)/'`mapper.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/statsrelayer-mapper.Tpo $(DEPDIR)/statsrelayer-mapper.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mapper.c' object='statsrelayer-mapper.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -c -o statsrelayer-mapper.o `test -f 'mapper.c' || echo '$(srcdir)/'`mapper.c
+
+statsrelayer-mapper.obj: mapper.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -MT statsrelayer-mapper.obj -MD -MP -MF $(DEPDIR)/statsrelayer-mapper.Tpo -c -o statsrelayer-mapper.obj `if test -f 'mapper.c'; then $(CYGPATH_W) 'mapper.c'; else $(CYGPATH_W) '$(srcdir)/mapper.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/statsrelayer-mapper.Tpo $(DEPDIR)/statsrelayer-mapper.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mapper.c' object='statsrelayer-mapper.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -c -o statsrelayer-mapper.obj `if test -f 'mapper.c'; then $(CYGPATH_W) 'mapper.c'; else $(CYGPATH_W) '$(srcdir)/mapper.c'; fi`
 
 statsrelayer-main.o: main.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -MT statsrelayer-main.o -MD -MP -MF $(DEPDIR)/statsrelayer-main.Tpo -c -o statsrelayer-main.o `test -f 'main.c' || echo '$(srcdir)/'`main.c

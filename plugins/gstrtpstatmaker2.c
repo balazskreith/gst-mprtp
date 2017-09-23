@@ -53,25 +53,6 @@ enum
   PROP_DEFAULT_LOGFILE_LOCATION
 };
 
-typedef struct _Packet
-{
-  guint64              tracked_ntp;
-  guint16              seq_num;
-  guint32              ssrc;
-  guint8               subflow_id;
-  guint16              subflow_seq;
-
-  gboolean             marker;
-  guint8               payload_type;
-  guint32              timestamp;
-
-  guint                header_size;
-  guint                payload_size;
-
-  guint16              protect_begin;
-  guint16              protect_end;
-}Packet;
-
 
 typedef struct{
   guint32 ssrc;
@@ -79,9 +60,6 @@ typedef struct{
   guint32 subflow_id;
   gchar   path[256];
 }Logger;
-
-
-
 
 
 static SocketWriter* _make_socket_writer(const gchar* sock_path) {
@@ -286,7 +264,7 @@ gst_rtpstatmaker2_init (GstRTPStatMaker2 * this)
   gst_base_transform_set_gap_aware (GST_BASE_TRANSFORM_CAST (this), TRUE);
 
   this->sysclock = gst_system_clock_obtain ();
-  this->tmp_packet = g_malloc0(sizeof(Packet));
+  this->tmp_packet = g_malloc0(sizeof(RTPStatPacket));
   this->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
 }
 
@@ -415,7 +393,7 @@ gst_rtpstatmaker2_sink_event (GstBaseTransform * trans, GstEvent * event)
 }
 
 
-static void _init_packet(GstRTPStatMaker2 *this, Packet* packet, GstBuffer* buf){
+static void _init_packet(GstRTPStatMaker2 *this, RTPStatPacket* packet, GstBuffer* buf){
   GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
 
   gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp);
@@ -474,10 +452,10 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
   }
 
 
-  _init_packet(this, (Packet*)this->tmp_packet, buffer);
+  _init_packet(this, (RTPStatPacket*)this->tmp_packet, buffer);
 PROFILING("_socket_writer_sendto",
   if (this->socket_writer) {
-    _socket_writer_sendto(this->socket_writer, this->tmp_packet, sizeof(Packet));
+    _socket_writer_sendto(this->socket_writer, this->tmp_packet, sizeof(RTPStatPacket));
   }
 );
 //);

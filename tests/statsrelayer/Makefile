@@ -112,9 +112,9 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 PROGRAMS = $(noinst_PROGRAMS)
 am_statsrelayer_OBJECTS = statsrelayer-buffer.$(OBJEXT) \
-	statsrelayer-common.$(OBJEXT) statsrelayer-main.$(OBJEXT) \
-	statsrelayer-relay.$(OBJEXT) statsrelayer-sink.$(OBJEXT) \
-	statsrelayer-source.$(OBJEXT) \
+	statsrelayer-common.$(OBJEXT) statsrelayer-mapper.$(OBJEXT) \
+	statsrelayer-main.$(OBJEXT) statsrelayer-relay.$(OBJEXT) \
+	statsrelayer-sink.$(OBJEXT) statsrelayer-source.$(OBJEXT) \
 	statsrelayer-statsrelayer.$(OBJEXT)
 statsrelayer_OBJECTS = $(am_statsrelayer_OBJECTS)
 am__DEPENDENCIES_1 =
@@ -363,6 +363,7 @@ top_srcdir = ../..
 TARGETPATH = ../                  
 statsrelayer_SOURCES = buffer.c \
 					   common.c \
+					   mapper.c \
 					   main.c \
 					   relay.c \
 					   sink.c \
@@ -434,6 +435,7 @@ distclean-compile:
 include ./$(DEPDIR)/statsrelayer-buffer.Po
 include ./$(DEPDIR)/statsrelayer-common.Po
 include ./$(DEPDIR)/statsrelayer-main.Po
+include ./$(DEPDIR)/statsrelayer-mapper.Po
 include ./$(DEPDIR)/statsrelayer-relay.Po
 include ./$(DEPDIR)/statsrelayer-sink.Po
 include ./$(DEPDIR)/statsrelayer-source.Po
@@ -487,6 +489,20 @@ statsrelayer-common.obj: common.c
 #	$(AM_V_CC)source='common.c' object='statsrelayer-common.obj' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -c -o statsrelayer-common.obj `if test -f 'common.c'; then $(CYGPATH_W) 'common.c'; else $(CYGPATH_W) '$(srcdir)/common.c'; fi`
+
+statsrelayer-mapper.o: mapper.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -MT statsrelayer-mapper.o -MD -MP -MF $(DEPDIR)/statsrelayer-mapper.Tpo -c -o statsrelayer-mapper.o `test -f 'mapper.c' || echo '$(srcdir)/'`mapper.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/statsrelayer-mapper.Tpo $(DEPDIR)/statsrelayer-mapper.Po
+#	$(AM_V_CC)source='mapper.c' object='statsrelayer-mapper.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -c -o statsrelayer-mapper.o `test -f 'mapper.c' || echo '$(srcdir)/'`mapper.c
+
+statsrelayer-mapper.obj: mapper.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -MT statsrelayer-mapper.obj -MD -MP -MF $(DEPDIR)/statsrelayer-mapper.Tpo -c -o statsrelayer-mapper.obj `if test -f 'mapper.c'; then $(CYGPATH_W) 'mapper.c'; else $(CYGPATH_W) '$(srcdir)/mapper.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/statsrelayer-mapper.Tpo $(DEPDIR)/statsrelayer-mapper.Po
+#	$(AM_V_CC)source='mapper.c' object='statsrelayer-mapper.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -c -o statsrelayer-mapper.obj `if test -f 'mapper.c'; then $(CYGPATH_W) 'mapper.c'; else $(CYGPATH_W) '$(srcdir)/mapper.c'; fi`
 
 statsrelayer-main.o: main.c
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -MT statsrelayer-main.o -MD -MP -MF $(DEPDIR)/statsrelayer-main.Tpo -c -o statsrelayer-main.o `test -f 'main.c' || echo '$(srcdir)/'`main.c

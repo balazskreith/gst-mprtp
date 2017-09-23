@@ -33,8 +33,9 @@ static void _print_help(void) {
   g_print("NAME   aA-zZ0-9*\n");
   g_print("GROUP  NAME RELAYS [SIZE]\n");
   g_print("NAME   aA-zZ0-9\n");
-  g_print("RELAYS RELAY!...\n");
-  g_print("RELAY  SOURCE|SINK\n");
+  g_print("RELAYS RELAY|...\n");
+  g_print("RELAY  SOURCE!MAPPER!SINK\n");
+  g_print("MAPPER binary!packet2csv\n");
   g_print("SOURCE file|mkfifo|unix_dgram_socket:PATH\n");
   g_print("SINK   file|mkfifo|unix_dgram_socket:PATH\n");
   g_print("PATH   aA-zZ0-9/\n");
@@ -68,7 +69,8 @@ typedef enum {
   CMD_REM_GROUP = 2,
   CMD_LIST = 3,
   CMD_FLUSH_GROUP = 4,
-  CMD_EXIT = 5
+  CMD_PREPARE_GROUP = 5,
+  CMD_EXIT = 6
 }Command;
 
 void _execute(StatsRelayer* this, gchar* strings) {
@@ -91,7 +93,7 @@ void _execute(StatsRelayer* this, gchar* strings) {
     memcpy(cmd, string, 3);
     fprintf(stdout, "-------------------------------\n");
     fprintf(stdout, "Command received: %s\n", string);
-    command = common_assign_string_to_int(cmd, "add", "rem", "lst", "fls", "ext", NULL);
+    command = common_assign_string_to_int(cmd, "add", "rem", "lst", "fls", "pre", "ext", NULL);
     switch (command) {
       case CMD_ADD_GROUP:
         statsrelayer_add_group(this, string + 4);
@@ -104,6 +106,9 @@ void _execute(StatsRelayer* this, gchar* strings) {
         break;
       case CMD_FLUSH_GROUP:
         statsrelayer_flush_group(this, string + 4);
+        break;
+      case CMD_PREPARE_GROUP:
+        statsrelayer_prepare_group(this, string + 4);
         break;
       case CMD_EXIT:
         statsrelayer_rem_group(this, "*");

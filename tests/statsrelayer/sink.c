@@ -14,40 +14,26 @@
 #include <unistd.h>
 #include <time.h>
 
-static void _write_file(Sink* this, gpointer item, gint item_size);
-static void _write_mkfifo(Sink* this, gpointer item, gint item_size);
-static void _sendto_unix_socket(Sink* this, gpointer item, gint item_size);
+static void _write_file(Sink* this, WriteItem* write_item);
+static void _write_mkfifo(Sink* this, WriteItem* write_item);
+static void _sendto_unix_socket(Sink* this, WriteItem* write_item);
 
 static void _close_file(Sink* this);
 static void _close_socket(Sink* this);
 
-static void _packet_to_csv_proxy(Sink* this, gpointer item);
-static void _binary_proxy(Sink* this, gpointer item);
-
-Sink* make_sink(const gchar* string, guint item_size) {
+Sink* make_sink(const gchar* string) {
   Sink* this = g_malloc0(sizeof(Sink));
   gchar **tokens = g_strsplit(string, ":", -1);
   this->type = common_assign_string_to_int(tokens[0], "file", "mkfifo", "unix_dgram_socket", NULL);
   this->type_in_string = g_ascii_strup(tokens[0], strlen(tokens[0]));
-  this->format = common_assign_string_to_int(tokens[1], "binary", "packet2csv", NULL);
-  this->format_in_string = g_ascii_strup(tokens[1], strlen(tokens[1]));
-  fprintf(stdout, "Create Sink. Type: %s Format: %s\n", this->type_in_string, this->format_in_string);
-  switch(this->format) {
-    case WRITE_FORMAT_PACKET_CSV:
-      this->input = make_pushport((PushCb)_packet_to_csv_proxy, this);
-      break;
-    default:
-    case WRITE_FORMAT_BINARY:
-      this->input = make_pushport((PushCb)_binary_proxy, this);
-      break;
-  }
+  fprintf(stdout, "Create Sink. Type: %s \n", this->type_in_string);
 
   switch (this->type) {
     case SINK_TYPE_FILE:
-      strcpy(this->path, tokens[2]);
-      this->writer_process = _write_file;
+      strcpy(this->path, tokens[1]);
       this->stop_process = make_process((ProcessCb)_close_file, this);
-      if (3 < g_strv_length(tokens)) {
+      this->input = make_pushport((PushCb)_write_file, this);
+      if (2 < g_strv_length(tokens)) {
         strcpy(this->file_open_mode, tokens[3]);
       } else {
         strcpy(this->file_open_mode, "wb");
@@ -55,19 +41,18 @@ Sink* make_sink(const gchar* string, guint item_size) {
       fprintf(stdout, "File open mode: %s\n", this->file_open_mode);
     break;
     case SINK_TYPE_MKFIFO:
-      strcpy(this->path, tokens[2]);
-      this->writer_process = _write_mkfifo;
-      this->stop_process = make_process((ProcessCb)_close_socket, this);
+      strcpy(this->path, tokens[1]);
+      this->input = make_pushport((PushCb)_write_file, this);
+      this->stop_process = make_process((ProcessCb)_write_mkfifo, this);
       break;
     case SINK_TYPE_UNIX_DGRAM_SOCKET:
-      strcpy(this->path, tokens[2]);
-      this->writer_process = _sendto_unix_socket;
+      strcpy(this->path, tokens[1]);
       this->stop_process = make_process((ProcessCb)_close_socket, this);
+      this->input = make_pushport((PushCb)_sendto_unix_socket, this);
       break;
     default:
       fprintf(stderr, "No Type for source\n");
   }
-  this->item_size = item_size;
   g_strfreev(tokens);
   return this;
 }
@@ -76,9 +61,6 @@ const gchar* sink_get_type_in_string(Sink* this) {
   return this->type_in_string;
 }
 
-const gchar* sink_get_format_in_string(Sink* this) {
-  return this->format_in_string;
-}
 
 const gchar* sink_get_path(Sink* this) {
   return this->path;
@@ -91,7 +73,7 @@ void sink_dtor(Sink* this) {
   g_free(this);
 }
 
-void _write_file(Sink* this, gpointer item, gint item_size) {
+void _write_file(Sink* this, WriteItem* write_item) {
   size_t write_result;
   if (!this->fp) {
     this->fp = fopen(this->path, this->file_open_mode);
@@ -101,13 +83,13 @@ void _write_file(Sink* this, gpointer item, gint item_size) {
     }
   }
 
-  write_result = fwrite(item, item_size, 1, this->fp);
+  write_result = fwrite(write_item->subject, write_item->length, 1, this->fp);
   if (write_result < 0) {
     fprintf(stderr, "Error during write a file : %s\n", this->path);
   }
 }
 
-void _write_mkfifo(Sink* this, gpointer item, gint item_size) {
+void _write_mkfifo(Sink* this, WriteItem* write_item) {
   size_t write_result;
   if (!g_file_test(this->path, G_FILE_ERROR_EXIST)) {
     mkfifo(this->path, 0666);
@@ -115,13 +97,13 @@ void _write_mkfifo(Sink* this, gpointer item, gint item_size) {
   if (!this->socket) {
     this->socket = open(this->path, O_WRONLY | O_NONBLOCK);
   }
-  write_result = write(this->socket, item, item_size);
+  write_result = write(this->socket, write_item->subject, write_item->length);
   if (write_result <= 0) {
     fprintf(stderr, "Error during write an mkfifo : %s\n", this->path);
   }
 }
 
-void _sendto_unix_socket(Sink* this, gpointer item, gint item_size) {
+void _sendto_unix_socket(Sink* this, WriteItem* write_item) {
   int sent_bytes;
   struct sockaddr_un remote;
   if (!this->socket) {
@@ -135,33 +117,10 @@ void _sendto_unix_socket(Sink* this, gpointer item, gint item_size) {
   remote.sun_family = AF_UNIX;
   strcpy(remote.sun_path, this->path);
 
-  sent_bytes = sendto(this->socket, item, item_size, 0, (struct sockaddr *) &remote, sizeof(remote));
+  sent_bytes = sendto(this->socket, write_item->subject, write_item->length, 0, (struct sockaddr *) &remote, sizeof(remote));
   if (sent_bytes < 0) {
     fprintf(stderr, "Errors occured during sending");
   }
-}
-
-void _packet_to_csv_proxy(Sink* this, gpointer item) {
-  Packet* packet = item;
-  gchar buffer[255];
-  gint buffer_size = sprintf(buffer,"%lu,%hu,%u,%u,%d,%u,%d,%d,%d,%hu,%hu,%d\n",
-      packet->tracked_ntp,
-      packet->seq_num,
-      packet->timestamp,
-      packet->ssrc,
-      packet->payload_type,
-      packet->payload_size,
-      packet->subflow_id,
-      packet->subflow_seq,
-      packet->header_size,
-      packet->protect_begin,
-      packet->protect_end,
-      packet->marker);
-  this->writer_process(this, buffer, buffer_size);
-}
-
-void _binary_proxy(Sink* this, gpointer item) {
-  this->writer_process(this, item, this->item_size);
 }
 
 void _close_file(Sink* this) {

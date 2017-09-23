@@ -33,6 +33,47 @@
 
 G_BEGIN_DECLS
 
+#ifdef __WIN32__
+
+#define PACKED
+#pragma pack(push,1)
+
+
+#else
+
+#define PACKED __attribute__ ((__packed__))
+
+#endif
+
+typedef struct PACKED _RTPStatPacket
+{
+  guint64              tracked_ntp;
+  guint16              seq_num;
+  guint32              ssrc;
+  guint8               subflow_id;
+  guint16              subflow_seq;
+
+  guint8               marker : 1;
+  guint8               payload_type : 7;
+  guint32              timestamp;
+
+  guint                header_size;
+  guint                payload_size;
+
+  guint16              protect_begin;
+  guint16              protect_end;
+}RTPStatPacket;
+
+#ifdef __WIN32__
+
+#pragma pack(pop)
+#undef PACKED
+
+#else
+
+#undef PACKED
+
+#endif
 
 #define GST_TYPE_RTPSTATMAKER2 \
   (gst_rtpstatmaker2_get_type())

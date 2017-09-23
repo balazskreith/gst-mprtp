@@ -17,19 +17,10 @@ typedef enum {
   SINK_TYPE_UNIX_DGRAM_SOCKET = 3
 }SinkType;
 
-typedef enum {
-  WRITE_FORMAT_BINARY = 1,
-  WRITE_FORMAT_PACKET_CSV = 2,
-}WriteFormat;
-
 typedef struct _Sink Sink;
-typedef void (*SinkWriterProcess)(Sink* this, gpointer item, gint item_length);
 
 struct _Sink{
   SinkType type;
-  WriteFormat format;
-  gchar* format_in_string;
-  SinkWriterProcess writer_process;
   gchar path[1024];
   gchar* type_in_string;
   union {
@@ -37,7 +28,6 @@ struct _Sink{
     gint socket;
   };
   PushPort* input;
-  guint item_size;
   Process* stop_process;
   union { // some utils merged for different type of sink
     struct {
@@ -47,9 +37,8 @@ struct _Sink{
   };
 };
 
-Sink* make_sink(const gchar* string, guint item_size);
+Sink* make_sink(const gchar* string);
 const gchar* sink_get_type_in_string(Sink* this);
-const gchar* sink_get_format_in_string(Sink* this);
 const gchar* sink_get_path(Sink* this);
 void sink_dtor(Sink* this);
 

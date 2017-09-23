@@ -57,7 +57,7 @@ void statsrelayer_add_group(StatsRelayer* this, const gchar* string) {
   gchar *name = NULL;
   RelaysGroup* relays_group = g_malloc0(sizeof(RelaysGroup));
   gchar **tokens = g_strsplit(string, " ", -1);
-  relays_group->item_size = sizeof(Packet);
+  relays_group->item_size = sizeof(RTPStatPacket);
   name = tokens[0];
   relays = tokens[1];
   if (2 < g_strv_length(tokens)) {
@@ -71,7 +71,7 @@ void statsrelayer_add_group(StatsRelayer* this, const gchar* string) {
 
 //  fprintf(stdout, "%s -> add group name: %s (%s)\n", string, name, relays);
   if (relays) {
-    gchar **tokens = g_strsplit(relays, "!", -1);
+    gchar **tokens = g_strsplit(relays, "|", -1);
     gint i, len = g_strv_length(tokens);
     for (i = 0; i < len; ++i) {
       Relay* relay;
@@ -133,6 +133,22 @@ void statsrelayer_flush_group(StatsRelayer* this, const gchar* name) {
   _statsrelayer_execute_on_group(this, name, (ExecuteOnGroupCb)_flush_group);
 }
 
+
+static void _prepare_group(StatsRelayer* this, RelaysGroup* relays_group) {
+  GSList* it;
+  gint prepare_num = 500000;
+  for (it = relays_group->threads; it; it = it->next) {
+    GThread* thread = it->data;
+    Relay* relay = thread->data;
+    relay_prepare(relay, prepare_num);
+  }
+  fprintf(stdout, "Relays group %s is prepared %d item to accept items\n", relays_group->name, prepare_num);
+}
+
+void statsrelayer_prepare_group(StatsRelayer* this, const gchar* name) {
+  _statsrelayer_execute_on_group(this, name, (ExecuteOnGroupCb)_prepare_group);
+}
+
 void statsrelayer_dtor(StatsRelayer* this) {
   g_free(this);
 }
@@ -163,16 +179,15 @@ static void _list_group(StatsRelayer* this, RelaysGroup* relays_group) {
   fprintf(stdout, "ITEM SIZE: %d\n", relays_group->item_size);
   //                        10        20        30        40        50        60
   //               123456789012345678901234567890123456789012345678901234567890
-  fprintf(stdout, "SOURCES                                                    SINKS\n");
+  fprintf(stdout, "SOURCES                                                    MAP:SINKS\n");
   for (it = relays_group->threads; it; it = it->next) {
     GThread* thread = it->data;
     Relay* relay = thread->data;
     gchar source[256];
     gchar sink[256];
     sprintf(source, "%s:%s", source_get_type_in_string(relay->source), source_get_path(relay->source));
-    sprintf(sink, "%s:%s:%s", sink_get_type_in_string(relay->sink),
-        sink_get_format_in_string(relay->sink), sink_get_path(relay->sink));
-    fprintf(stdout, "%-59s%s\n", source, sink);
+    sprintf(sink, "%s:%s", sink_get_type_in_string(relay->sink), sink_get_path(relay->sink));
+    fprintf(stdout, "%-59s%s:%s\n", source, mapper_get_type_in_string(relay->mapper), sink);
   }
 }
 

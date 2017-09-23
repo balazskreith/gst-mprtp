@@ -6,6 +6,7 @@ ERROR_CFLAGS=
 
 statsrelayer_SOURCES = buffer.c \
 					   common.c \
+					   mapper.c \
 					   main.c \
 					   relay.c \
 					   sink.c \

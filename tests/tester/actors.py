@@ -55,8 +55,8 @@ class RTPReceiver(Actor):
         return self.__rtcp_port
 
     @property
-    def rtp_ip(self):
-        return self.__rtp_ip
+    def rtcp_ip(self):
+        return self.__rtcp_ip
 
     @property
     def rtp_port(self):

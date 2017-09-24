@@ -1,6 +1,7 @@
 from time import sleep
 from pushers import *
-import asyncio
+import logging
+import threading
 
 class FlowsCtrler:
     def __init__(self):
@@ -11,21 +12,12 @@ class FlowsCtrler:
     def add_flows(self, *flows):
         self.__flows.append(flows)
 
-    async def start(self):
-        coroutines = [self.start_flow(flow) for flow in self.__flows]
-        completed, pending = await asyncio.wait(coroutines)
-        # futures = [self.start_flow(flow) for flow in self.__flows]
-        # loop = asyncio.new_event_loop()
-        # loop.run_until_complete(asyncio.wait(futures))
-        # loop.close()
-
-        #  # start our tasks asynchronously in futures
-        # tasks = [asyncio.async(self.start_flow(flow)) for flow in self.__flows]
-        #
-        # # untill all futures are done
-        # while not all(task.done() for task in tasks):
-        #     # take a short nap
-        #     yield from asyncio.sleep(0.01)
+    def start(self):
+        threads = [threading.Thread(target=self.start_flow(flow)) for flow in self.__flows]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
         pass
 
     def stop(self):
@@ -42,13 +34,13 @@ class FlowsCtrler:
     def sink_cmd_output(self):
         return self.__sink_cmd_output
 
-    async def start_flow(self, flow_tuple):
-        # print(flow[0][0].start_delay)
+    def start_flow(self, flow_tuple):
         flow = flow_tuple[0][0]
+        logging.debug("start flow: " + str(flow))
         if (0 < flow.start_delay):
             sleep(flow.start_delay)
 
-        sink_start_cmd = flow.source_unit.get_start_cmd()
+        sink_start_cmd = flow.sink_unit.get_start_cmd()
         self.sink_cmd_output.transmit(sink_start_cmd)
 
         if (0 < flow.sink_to_source_delay):

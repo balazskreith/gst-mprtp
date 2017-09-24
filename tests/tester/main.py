@@ -6,14 +6,28 @@ from flowsctrler import *
 from pathconfig import *
 from pathctrler import *
 from testctrler import *
+from collections import deque
 
-def make_path_stage(stages_seq):
-    first_path_stage = path_stage = None
-    for stage in stages_seq:
-        path_stage = PathStage(duration = stage["duration"], path_config = stage["config"], next = path_stage)
-        if (first_path_stage == None):
-            first_path_stage = path_stage
-    return first_path_stage
+import logging
+import sys
+
+root = logging.getLogger()
+root.setLevel(logging.DEBUG)
+
+ch = logging.StreamHandler(sys.stdout)
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+root.addHandler(ch)
+
+
+def make_path_stage(stages_deque):
+    if len(stages_deque) == 0:
+        return None
+    stage = stages_deque.popleft()
+    result = PathStage(duration = stage["duration"], path_config = stage["config"], next_stage = make_path_stage(stages_deque))
+    # print(result)
+    return result
 
 def make_midbox_ctrler(*path_ctrler):
     result = MidboxCtrler()
@@ -41,7 +55,7 @@ def make_rmcat1_pathctrler(latency, jitter):
     }]
 
     # return make_path_ctrler(path_name="veth2", path_stage = make_path_stage(stages))
-    return PathShellCtrler(path_name="veth2", path_stage = make_path_stage(stages))
+    return PathShellCtrler(path_name="veth2", path_stage = make_path_stage(deque(stages)))
 
 
 def make_rmcat1_rtp_flows():

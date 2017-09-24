@@ -1,6 +1,7 @@
-import asyncio
 from time import sleep
 from pushers import *
+import logging
+import threading
 
 class MidboxCtrler:
     def __init__(self):
@@ -36,23 +37,12 @@ class MidboxShellCtrler(MidboxCtrler):
     def add_path_ctrlers(self, *path_ctrlers):
         self.__path_ctrlers.append(path_ctrlers)
 
-    async def start(self):
-        coroutines = [self.start_path_ctrler(path_ctrler) for path_ctrler in self.__path_ctrlers]
-        completed, pending = await asyncio.wait(coroutines)
-
-        # futures = [self.start_path_ctrler(path_ctrler) for path_ctrler in self.__path_ctrlers]
-        # loop = asyncio.new_event_loop()
-        # loop.run_until_complete(asyncio.wait(futures))
-        # loop.close()
-        # print(self.__path_ctrlers)
-        # start our tasks asynchronously in futures
-
-        # tasks = [asyncio.async(self.start_path_ctrler(path_ctrler)) for path_ctrler in self.__path_ctrlers]
-        #
-        # # untill all futures are done
-        # while not all(task.done() for task in tasks):
-        #     # take a short nap
-        #     yield from asyncio.sleep(0.01)
+    def start(self):
+        threads = [threading.Thread(target=self.start_path_ctrler(path_ctrler)) for path_ctrler in self.__path_ctrlers]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
         pass
 
     def stop(self):
@@ -61,8 +51,9 @@ class MidboxShellCtrler(MidboxCtrler):
     def pause(self):
         pass
 
-    async def start_path_ctrler(self, path_tuple):
+    def start_path_ctrler(self, path_tuple):
         path_ctrler = path_tuple[0]
-        # print(path_ctrler.get_cmd())
+        logging.debug("start path ctrler: " + str(path_ctrler))
         for command in path_ctrler.get_cmd():
+            logging.debug(command)
             self.cmd_output.transmit(command)

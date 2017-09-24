@@ -9,7 +9,7 @@ class PathStage(PathConfig):
     duration : int
         The duration of the test stage
     """
-    def __init__(self, duration, path_config, next = None):
+    def __init__(self, duration, path_config, next_stage = None):
         """
 
         Initialize a TestStage object
@@ -21,7 +21,7 @@ class PathStage(PathConfig):
         """
         self.__duration = duration
         self.__path_config = path_config
-        self.__next = None
+        self.__next = next_stage
 
     @property
     def duration(self):
@@ -37,3 +37,6 @@ class PathStage(PathConfig):
     def next(self):
         """Get Next Path Config"""
         return self.__next
+
+    def __str__(self):
+        return "Path Stage: duration: " + str(self.__duration) + " " + str(self.__path_config)  

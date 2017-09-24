@@ -43,14 +43,9 @@ enum
 {
   PROP_0,
   PROP_SYNC,
-  PROP_TOUCHED_SYNC_LOCATION,
   PROP_MPRTP_EXT_HEADER_ID,
   PROP_FEC_PAYLOAD_TYPE,
-  PROP_LOGGER_PAYLOAD,
-  PROP_LOGGER_SSRC,
-  PROP_LOGGER_SUBFLOW_ID,
-  PROP_NEW_LOGGER,
-  PROP_DEFAULT_LOGFILE_LOCATION
+  PROP_DEFAULT_MKFIFO_LOCATION
 };
 
 
@@ -60,52 +55,6 @@ typedef struct{
   guint32 subflow_id;
   gchar   path[256];
 }Logger;
-
-
-static SocketWriter* _make_socket_writer(const gchar* sock_path) {
-
-  SocketWriter* this = g_malloc0(sizeof(SocketWriter));
-  sprintf(this->sock_path, "/tmp/%s\n", sock_path);
-//  strcpy(this->sock_path, sock_path);
-  /****************************************/
-  /* Create a UNIX domain datagram socket */
-  /****************************************/
-  this->client_socket = socket(AF_UNIX, SOCK_DGRAM, 0);
-  if (this->client_socket == -1) {
-      g_print("SOCKET ERROR at opening client socket (%s)\n", this->sock_path);
-      return NULL;
-  }
-  /***************************************/
-  /* Set up the UNIX sockaddr structure  */
-  /* by using AF_UNIX for the family and */
-  /* giving it a filepath to send to.    */
-  /***************************************/
-  this->remote.sun_family = AF_UNIX;
-  strcpy(this->remote.sun_path, this->sock_path);
-
-  return this;
-}
-
-static void _socket_writer_sendto(SocketWriter* this, gpointer data, guint len) {
-  /***************************************/
-  /* Copy the data to be sent to the     */
-  /* buffer and send it to the server.   */
-  /***************************************/
-  if (sendto(this->client_socket, data, len, 0, (struct sockaddr *) &this->remote, sizeof(this->remote)) == -1) {
-    if (!this->error_reported) {
-      g_print("SENDTO ERROR at sending to remote socket %s\n", this->sock_path);
-      perror("socket error");
-      close(this->client_socket);
-      this->error_reported = TRUE;
-    }
-    return;
-  }
-}
-
-//static void socket_writer_close(SocketWriter* this) {
-//  close(this->client_socket);
-//}
-//
 
 
 
@@ -191,48 +140,14 @@ gst_rtpstatmaker2_class_init (GstRTPStatMaker2Class * klass)
       GST_DEBUG_FUNCPTR (gst_rtpstatmaker2_accept_caps);
   gstbasetrans_class->query = gst_rtpstatmaker2_query;
 
-  g_object_class_install_property (gobject_class, PROP_TOUCHED_SYNC_LOCATION,
-      g_param_spec_string ("touch-sync-location",
-            "Simple IPC syncronization",
-            "Trigger the collection by a file existance.",
-            "NULL", G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
-  );
 
-
-  g_object_class_install_property (gobject_class, PROP_DEFAULT_LOGFILE_LOCATION,
+  g_object_class_install_property (gobject_class, PROP_DEFAULT_MKFIFO_LOCATION,
       g_param_spec_string ("default-logfile-location",
             "Logfile location if no logger is matched",
             "Logfile location if no logger is matched",
             "NULL", G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
   );
 
-  g_object_class_install_property (gobject_class, PROP_NEW_LOGGER,
-      g_param_spec_string ("new-logger",
-          "Logfile location for a new logfilter",
-          "Logfile location for a new logfilter",
-          "NULL", G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
-  );
-
-  g_object_class_install_property (gobject_class, PROP_LOGGER_SSRC,
-      g_param_spec_uint ("logger-ssrc",
-                "Setup a logger to filter for a given ssrc",
-                "Setup a logger to filter for a given ssrc",
-                0, -1, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
-  );
-
-  g_object_class_install_property (gobject_class, PROP_LOGGER_SUBFLOW_ID,
-      g_param_spec_uint ("logger-subflow-id",
-                "Setup a logger to filter a given subflow id",
-                "Setup a logger to filter a given subflow id",
-                0, -1, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
-  );
-
-  g_object_class_install_property (gobject_class, PROP_LOGGER_PAYLOAD,
-      g_param_spec_uint ("logger-payload",
-              "Setup a logger to filter a given payload type",
-              "Setup a logger to filter a given payload type",
-                0, 256, 0, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
-  );
 
   g_object_class_install_property (gobject_class, PROP_MPRTP_EXT_HEADER_ID,
       g_param_spec_uint ("mprtp-ext-header-id",
@@ -279,8 +194,6 @@ gst_rtpstatmaker2_set_property (GObject * object, guint prop_id,
   this = GST_RTPSTATMAKER2 (object);
 
   switch (prop_id) {
-    case PROP_TOUCHED_SYNC_LOCATION:
-      break;
     case PROP_SYNC:
       this->sync = g_value_get_boolean (value);
       break;
@@ -290,22 +203,15 @@ gst_rtpstatmaker2_set_property (GObject * object, guint prop_id,
     case PROP_FEC_PAYLOAD_TYPE:
       this->fec_payload_type = g_value_get_uint(value);
       break;
-    case PROP_LOGGER_PAYLOAD:
-     break;
-    case PROP_LOGGER_SUBFLOW_ID:
-     break;
-    case PROP_LOGGER_SSRC:
-      break;
-    case PROP_NEW_LOGGER:
-      break;
-    case PROP_DEFAULT_LOGFILE_LOCATION:
+    case PROP_DEFAULT_MKFIFO_LOCATION:
       {
         const gchar *path = g_value_get_string(value);
         const gchar *sock_path = path;
         gchar *next;
         while ((next = strpbrk(sock_path + 1, "\\/"))) sock_path = next;
         if (path != sock_path) ++sock_path;
-        this->socket_writer = _make_socket_writer(sock_path);
+
+        this->fifofd =
       }
       break;
     default:

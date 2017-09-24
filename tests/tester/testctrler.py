@@ -2,6 +2,7 @@ from midboxctrler import MidboxCtrler
 from testbedctrler import TestBedCtrler
 from flowsctrler import FlowsCtrler
 import asyncio
+import threading
 
 class TestCtrler:
     def __init__(self, testbed_ctrler, midbox_ctrler, flows_ctrler):
@@ -17,10 +18,14 @@ class TestCtrler:
 
 
     def start(self):
-        futures = [self.__midbox_ctrler.start(), self.__flows_ctrler.start()]
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(asyncio.wait(futures))
-        loop.close()
+        threads = [
+            threading.Thread(target=self.__flows_ctrler.start),
+            threading.Thread(target=self.__midbox_ctrler.start)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
 
     def end(self):
         pass

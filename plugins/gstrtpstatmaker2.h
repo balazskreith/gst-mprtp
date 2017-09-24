@@ -90,28 +90,6 @@ typedef struct _GstRTPStatMaker2 GstRTPStatMaker2;
 typedef struct _GstRTPStatMaker2Class GstRTPStatMaker2Class;
 
 
-/************************************************************/
-/* This is a datagram socket client sample program for UNIX */
-/* domain sockets. This program creates a socket and sends  */
-/* data to a server.                                        */
-/************************************************************/
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <fcntl.h>
-#include <unistd.h>
-typedef struct{
-  gchar sock_path[256];
-  int client_socket;
-  struct sockaddr_un remote;
-  gboolean error_reported;
-}SocketWriter;
-
 
 /**
  * GstRTPStatMaker2:
@@ -146,7 +124,7 @@ struct _GstRTPStatMaker2 {
   GstClockTime                  upstream_latency;
   GCond                         blocked_cond;
   gboolean                      blocked;
-  SocketWriter*                 socket_writer;
+  gint                          fifofd;
   gpointer                      tmp_packet;
 };
 

@@ -42,12 +42,12 @@ class RTPReceiverShellTrafficUnit(TrafficUnit, RTPReceiver):
         self.__ply_stat = ply_stat
 
     def get_start_cmd(self):
-        args = []
-        args.append("--codec=" + self.codec)
-        if (self.algorithm == Algoritms.FRACTaL):
+        args = [" "]
+        args.append("--codec=" + str(self.codec))
+        if (self.algorithm == Algorithms.FRACTaL):
             args.append("--receiver=MPRTP:1:1:" + str(self.rtp_port))
             args.append("--playouter=MPRTPFRACTAL:MPRTP:1:1:" + str(self.rtcp_ip) + ":" + str(self.rtcp_port))
-        elif (self.algorithm == Algoritms.SCReAM):
+        elif (self.algorithm == Algorithms.SCReAM):
             args.append("--receiver=RTP:" + str(self.rtp_port))
             args.append("--playouter=SCREAM:RTP:" + str(self.rtcp_ip) + ":" + str(self.rtcp_port))
         if (self.__rcv_stat):
@@ -62,6 +62,15 @@ class RTPReceiverShellTrafficUnit(TrafficUnit, RTPReceiver):
 
     def get_pause_cmd(self):
         return ShellCommand("ls -a")
+
+    def __str__(self):
+        infos = [" "]
+        infos.append("codec: " + str(self.codec))
+        infos.append("algorithm: " + str(self.algorithm))
+        infos.append("send RTCP to: " + str(self.rtcp_ip) + ":" + str(self.rtcp_port))
+        infos.append("listen RTP at: " + str(self.rtp_port))
+        infos.append("save rcv stat at: " + self.__rcv_stat + " ply stat at: " + self.__ply_stat)
+        return "RTPReceiverShellTrafficUnit " + " ".join(infos)
 
 
 class RTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
@@ -93,7 +102,7 @@ class RTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
         self.__snd_stat = snd_stat
 
     def get_start_cmd(self):
-        args = []
+        args = [" "]
         args.append("--codec=" + str(self.codec))
         if (self.algorithm == Algorithms.FRACTaL):
             args.append("--sender=MPRTP:1:1:" + str(self.rtp_ip) + ":" + str(self.rtp_port))
@@ -111,6 +120,15 @@ class RTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
 
     def get_pause_cmd(self):
         return ShellCommand("ls -a")
+
+    def __str__(self):
+        infos = [" "]
+        infos.append("codec: " + str(self.codec))
+        infos.append("algorithm: " + str(self.algorithm))
+        infos.append("send RTP to: " + str(self.rtp_ip) + ":" + str(self.rtp_port))
+        infos.append("listen RTCP at: " + str(self.rtcp_port))
+        infos.append("save snd stat at: "+self.__snd_stat)
+        return "RTPSenderShellTrafficUnit " + " ".join(infos)
 
 class TCPServer(Actor):
     pass

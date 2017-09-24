@@ -38,29 +38,34 @@ class PathConfig:
     @property
     def bandwidth(self):
         """Gets the bandwidth"""
-        return self.__bandwidth
+        return int(self.__bandwidth)
 
     @property
     def jitter(self):
         """Gets the jitter"""
-        return self.__jitter
+        return int(self.__jitter)
 
     @property
     def latency(self):
-        """Gets the forward_latency"""
-        return self.__latency
+        """Gets the latency"""
+        return int(self.__latency)
 
     @property
     def burst(self):
         """Gets the burst"""
-        return self.__burst
+        return int(self.__burst)
 
     @property
     def min_burst(self):
         """Gets the min_burst"""
-        return self.__min_burst
+        return int(self.__min_burst)
 
     @property
     def queue_algorithm(self):
         """Gets the forward_latency"""
         return self.__queue_algorithm
+
+    def __str__(self):
+        return "PathConfig: bandwidth: " + str(self.__bandwidth) + " jitter: " + str(self.__jitter) + \
+            " latency: " + str(self.__latency) + " burst: " + str(self.__burst) + " min_burst: " + str(self.__min_burst) + \
+            "queue algorithm: " + str(self.__queue_algorithm)

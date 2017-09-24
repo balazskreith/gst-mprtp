@@ -57,3 +57,7 @@ class RTPFlow(Flow):
             algorithm=algorithm, rtp_port=rtp_port, rtcp_ip=rtcp_ip, rtcp_port=rtcp_port,
             rcv_stat="rcv_packets_1.csv", ply_stat="ply_packets_1.csv")
         Flow.__init__(self, rtp_sender, rtp_receiver, 2, start_delay)
+
+    def __str__(self):
+        units = [" ", str(self.source_unit), str(self.sink_unit)]
+        return "RTPFlow: " + "\n".join(units)

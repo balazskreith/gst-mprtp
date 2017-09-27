@@ -3,10 +3,26 @@ from command import *
 import logging
 
 class Commander:
+    """
+    Represent a Commander
+    """
     def execute(self, command, shell = False, input_cmd = None):
+        """
+        Parameters:
+        -----------
+        command : Command
+            The command must be executed
+        shell : boolean
+            Indicate whether using shell is obligated or not
+        input_cmd
+            if shell is used input_cmd is going to be the command given to the shell
+        """
         raise NotImplementedError
 
 class ShellCommander(Commander):
+    """
+    Represent a Commander give command in linux shell
+    """
     def __init__(self):
         pass
 
@@ -19,6 +35,9 @@ class ShellCommander(Commander):
                 command.stderr(err)
 
 class LinuxNamespaceCommander(ShellCommander):
+    """
+    Represent a Commander give command in a specified namespace inside of a linux shell
+    """
     def __init__(self, namespace):
         ShellCommander.__init__(self)
         self.__namespace = namespace

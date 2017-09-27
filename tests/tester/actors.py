@@ -44,22 +44,27 @@ class RTPReceiver(Actor):
 
     @property
     def codec(self):
+        """Get the Codec property"""
         return self.__codec
 
     @property
     def algorithm(self):
+        """Get the Algorithm property"""
         return self.__algorithm
 
     @property
     def rtcp_port(self):
+        """Get the RTCP port property"""
         return self.__rtcp_port
 
     @property
     def rtcp_ip(self):
+        """Get the RTCP IP property"""
         return self.__rtcp_ip
 
     @property
     def rtp_port(self):
+        """Get the RTP IP property"""
         return self.__rtp_port
 
 
@@ -75,26 +80,32 @@ class RTPSender(Actor):
 
     @property
     def path(self):
+        """Get the Path property"""
         return self.__path
 
     @property
     def codec(self):
+        """Get the Codec property"""
         return self.__codec
 
     @property
     def algorithm(self):
+        """Get the Algorithm property"""
         return self.__algorithm
 
     @property
     def rtcp_port(self):
+        """Get the RTCP Port property"""
         return self.__rtcp_port
 
     @property
     def rtp_ip(self):
+        """Get the RTP IP property"""
         return self.__rtp_ip
 
     @property
     def rtp_port(self):
+        """Get the RTP Port property"""
         return self.__rtp_port
 
 class TCPServer(Actor):

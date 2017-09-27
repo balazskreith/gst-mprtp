@@ -57,6 +57,7 @@ guint messenger_get_length_with_timeout (Messenger *this, gint64 microseconds);
 gpointer messenger_pop_block_with_timeout (Messenger *this, gint64 microseconds);
 void messenger_push_block(Messenger* this, gpointer message);
 void messenger_wait_before_pop_all (Messenger *this, GstClockTime waiting, GQueue* queue);
+void messenger_release_wait(Messenger* this);
 void messenger_throw_block(Messenger* this, gpointer message);
 void messenger_throw_blocks(Messenger* this, GQueue* messages);
 gpointer messenger_retrieve_block(Messenger *this);

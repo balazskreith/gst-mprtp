@@ -13,9 +13,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <gst/gst.h>
+#include <signal.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <time.h>
+
 #include "gstrtpstatmaker2.h"
-
-
 
 static GstStaticPadTemplate sinktemplate = GST_STATIC_PAD_TEMPLATE ("sink",
     GST_PAD_SINK,
@@ -49,15 +61,6 @@ enum
 };
 
 
-typedef struct{
-  guint32 ssrc;
-  guint8  payload_type;
-  guint32 subflow_id;
-  gchar   path[256];
-}Logger;
-
-
-
 #define _do_init \
     GST_DEBUG_CATEGORY_INIT (gst_rtpstatmaker2_debug, "rtpstatmaker2", 0, "rtpstatmaker2 element");
 #define gst_rtpstatmaker2_parent_class parent_class
@@ -84,6 +87,10 @@ static gboolean gst_rtpstatmaker2_query (GstBaseTransform * base,
     GstPadDirection direction, GstQuery * query);
 
 static void
+_monitorstat_logger (GstRTPStatMaker2 *this);
+
+
+static void
 gst_rtpstatmaker2_finalize (GObject * object)
 {
   GstRTPStatMaker2 *this;
@@ -95,8 +102,10 @@ gst_rtpstatmaker2_finalize (GObject * object)
   g_cond_clear (&this->blocked_cond);
 
   g_object_unref (this->sysclock);
-  g_free(this->tmp_packet);
-
+  g_object_unref (this->packets);
+  if (this->fifofd) {
+    close(this->fifofd);
+  }
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
 
@@ -142,12 +151,11 @@ gst_rtpstatmaker2_class_init (GstRTPStatMaker2Class * klass)
 
 
   g_object_class_install_property (gobject_class, PROP_DEFAULT_MKFIFO_LOCATION,
-      g_param_spec_string ("default-logfile-location",
+      g_param_spec_string ("mkfifo-location",
             "Logfile location if no logger is matched",
             "Logfile location if no logger is matched",
             "NULL", G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS)
   );
-
 
   g_object_class_install_property (gobject_class, PROP_MPRTP_EXT_HEADER_ID,
       g_param_spec_uint ("mprtp-ext-header-id",
@@ -178,8 +186,13 @@ gst_rtpstatmaker2_init (GstRTPStatMaker2 * this)
 
   gst_base_transform_set_gap_aware (GST_BASE_TRANSFORM_CAST (this), TRUE);
 
+  g_rec_mutex_init (&this->thread_mutex);
+  this->thread = gst_task_new ((GstTaskFunction) _monitorstat_logger, this, NULL);
+
   this->sysclock = gst_system_clock_obtain ();
-  this->tmp_packet = g_malloc0(sizeof(RTPStatPacket));
+  this->packets = make_messenger(sizeof(RTPStatPacket));
+  this->packets4process = g_queue_new();
+  this->packets4recycle = g_queue_new();
   this->fec_payload_type = FEC_PAYLOAD_DEFAULT_ID;
 }
 
@@ -204,14 +217,10 @@ gst_rtpstatmaker2_set_property (GObject * object, guint prop_id,
       this->fec_payload_type = g_value_get_uint(value);
       break;
     case PROP_DEFAULT_MKFIFO_LOCATION:
-      {
-        const gchar *path = g_value_get_string(value);
-        const gchar *sock_path = path;
-        gchar *next;
-        while ((next = strpbrk(sock_path + 1, "\\/"))) sock_path = next;
-        if (path != sock_path) ++sock_path;
-
-        this->fifofd =
+      strcpy(this->path, g_value_get_string(value));
+      if(!g_file_test(this->path, G_FILE_TEST_EXISTS)){
+        mkfifo(this->path, 0666);
+        this->fifofd = open(this->path, O_RDONLY);
       }
       break;
     default:
@@ -336,6 +345,7 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
 {
   guint8 first_byte;
   guint8 second_byte;
+  RTPStatPacket* packet;
 
   if (!GST_IS_BUFFER(buffer)) {
     goto exit;
@@ -357,17 +367,19 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
     goto exit;
   }
 
-
-  _init_packet(this, (RTPStatPacket*)this->tmp_packet, buffer);
-PROFILING("_socket_writer_sendto",
-  if (this->socket_writer) {
-    _socket_writer_sendto(this->socket_writer, this->tmp_packet, sizeof(RTPStatPacket));
-  }
-);
+//  );
+//PROFILING("gstrtpstatmaker",
+  messenger_lock(this->packets);
+  packet = messenger_retrieve_block_unlocked(this->packets);
+  _init_packet(this, packet, buffer);
+  messenger_push_block_unlocked(this->packets, packet);
+  messenger_unlock(this->packets);
 //);
 exit:
   return;
 }
+
+
 
 
 //static int received = 1;
@@ -380,7 +392,7 @@ gst_rtpstatmaker2_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
   GstClockTime runpts = GST_CLOCK_TIME_NONE;
   GstClockTime runtimestamp;
   gsize size;
-  PROFILING("gstrtpstatmaker",
+
   size = gst_buffer_get_size (buf);
 
   //artifical lost
@@ -413,7 +425,7 @@ gst_rtpstatmaker2_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
   this->offset += size;
 
   _monitor_rtp_packet(this, buf);
-);
+
   return ret;
 
 }
@@ -534,6 +546,9 @@ gst_rtpstatmaker2_change_state (GstElement * element, GstStateChange transition)
       this->blocked = FALSE;
       g_cond_broadcast (&this->blocked_cond);
 
+      gst_task_set_lock(this->thread, &this->thread_mutex);
+      gst_task_start(this->thread);
+
       GST_OBJECT_UNLOCK (this);
       break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
@@ -556,6 +571,9 @@ gst_rtpstatmaker2_change_state (GstElement * element, GstStateChange transition)
   switch (transition) {
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
       GST_OBJECT_LOCK (this);
+      messenger_release_wait(this->packets);
+      gst_task_join (this->thread);
+      gst_object_unref (this->thread);
 
       this->upstream_latency = 0;
       this->blocked = TRUE;
@@ -577,5 +595,27 @@ gst_rtpstatmaker2_change_state (GstElement * element, GstStateChange transition)
   return ret;
 }
 
+
+void
+_monitorstat_logger (GstRTPStatMaker2 *this)
+{
+  RTPStatPacket* packet;
+  messenger_wait_before_pop_all (this->packets, 1 * GST_SECOND, this->packets4process);
+  if(g_queue_is_empty(this->packets4process)){
+    return;
+  }
+
+  while(!g_queue_is_empty(this->packets4process)){
+    packet = g_queue_pop_head(this->packets4process);
+    if (write(this->fifofd, packet, sizeof(RTPStatPacket)) < 0) {
+      // do nothing
+    }
+    g_queue_push_tail(this->packets4recycle, packet);
+
+  }
+//  g_print("MAKING START END\n");
+  messenger_throw_blocks(this->packets, this->packets4recycle);
+  return;
+}
 
 

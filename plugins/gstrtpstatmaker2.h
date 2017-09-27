@@ -33,6 +33,67 @@
 
 G_BEGIN_DECLS
 
+
+#define GST_TYPE_RTPSTATMAKER2 \
+  (gst_rtpstatmaker2_get_type())
+#define GST_RTPSTATMAKER2(obj) \
+  (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_RTPSTATMAKER2,GstRTPStatMaker2))
+#define GST_RTPSTATMAKER2_CLASS(klass) \
+  (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_RTPSTATMAKER2,GstRTPStatMaker2Class))
+#define GST_IS_RTPSTATMAKER2(obj) \
+  (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_RTPSTATMAKER2))
+#define GST_IS_RTPSTATMAKER2_CLASS(klass) \
+  (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_RTPSTATMAKER2))
+
+typedef struct _GstRTPStatMaker2 GstRTPStatMaker2;
+typedef struct _GstRTPStatMaker2Class GstRTPStatMaker2Class;
+
+/**
+ * GstRTPStatMaker2:
+ *
+ * Opaque #GstRTPStatMaker2 data structure
+ */
+struct _GstRTPStatMaker2 {
+  GstBaseTransform              element;
+
+  /*< private >*/
+  GstClockID                    clock_id;
+  GstClock*                     sysclock;
+  gboolean                      sync;
+  GstClockTime                  prev_timestamp;
+  GstClockTime                  prev_duration;
+  guint64                       prev_offset;
+  guint64                       prev_offset_end;
+  gchar*                        last_message;
+
+  GstTask*                      thread;
+  GRecMutex                     thread_mutex;
+  Messenger*                    packets;
+  guint8                        mprtp_ext_header_id;
+  guint8                        fec_payload_type;
+
+  gchar                         path[256];
+  gint                          fifofd;
+
+  guint64                       offset;
+  GstClockTime                  upstream_latency;
+  GCond                         blocked_cond;
+  gboolean                      blocked;
+  GQueue*                       packets4process;
+  GQueue*                       packets4recycle;
+};
+
+struct _GstRTPStatMaker2Class {
+  GstBaseTransformClass parent_class;
+
+  /* signals */
+  void (*handoff) (GstElement *element, GstBuffer *buf);
+};
+
+GType gst_rtpstatmaker2_get_type (void);
+
+G_END_DECLS
+
 #ifdef __WIN32__
 
 #define PACKED
@@ -74,69 +135,5 @@ typedef struct PACKED _RTPStatPacket
 #undef PACKED
 
 #endif
-
-#define GST_TYPE_RTPSTATMAKER2 \
-  (gst_rtpstatmaker2_get_type())
-#define GST_RTPSTATMAKER2(obj) \
-  (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_RTPSTATMAKER2,GstRTPStatMaker2))
-#define GST_RTPSTATMAKER2_CLASS(klass) \
-  (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_RTPSTATMAKER2,GstRTPStatMaker2Class))
-#define GST_IS_RTPSTATMAKER2(obj) \
-  (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_RTPSTATMAKER2))
-#define GST_IS_RTPSTATMAKER2_CLASS(klass) \
-  (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_RTPSTATMAKER2))
-
-typedef struct _GstRTPStatMaker2 GstRTPStatMaker2;
-typedef struct _GstRTPStatMaker2Class GstRTPStatMaker2Class;
-
-
-
-/**
- * GstRTPStatMaker2:
- *
- * Opaque #GstRTPStatMaker2 data structure
- */
-struct _GstRTPStatMaker2 {
-  GstBaseTransform              element;
-
-  /*< private >*/
-  GstClockID                    clock_id;
-  GstClock*                     sysclock;
-  gboolean                      sync;
-  GstClockTime                  prev_timestamp;
-  GstClockTime                  prev_duration;
-  guint64                       prev_offset;
-  guint64                       prev_offset_end;
-  gchar*                        last_message;
-
-//  gboolean                      touched_sync_active;
-//  gchar                         touched_sync_location[256];
-
-//  GstTask*                      thread;
-//  GRecMutex                     thread_mutex;
-//  GSList*                       loggers;
-//  gpointer                      default_logger;
-//  Messenger*                    packets;
-  guint8                        mprtp_ext_header_id;
-  guint8                        fec_payload_type;
-
-  guint64                       offset;
-  GstClockTime                  upstream_latency;
-  GCond                         blocked_cond;
-  gboolean                      blocked;
-  gint                          fifofd;
-  gpointer                      tmp_packet;
-};
-
-struct _GstRTPStatMaker2Class {
-  GstBaseTransformClass parent_class;
-
-  /* signals */
-  void (*handoff) (GstElement *element, GstBuffer *buf);
-};
-
-GType gst_rtpstatmaker2_get_type (void);
-
-G_END_DECLS
 
 #endif /* __GST_RTPSTATMAKER2_H__ */

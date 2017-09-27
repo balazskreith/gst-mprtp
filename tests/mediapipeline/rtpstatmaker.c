@@ -23,8 +23,7 @@ GstElement* make_rtpstatmaker_element(StatParams* stat_params)
   GstElement* rtpstatmaker = gst_element_factory_make ("rtpstatmaker2", NULL);
 
   g_object_set(rtpstatmaker,
-      "default-logfile-location",     stat_params->logfile_path,
-      "touch-sync-location",          stat_params->touched_sync,
+      "mkfifo-location",              stat_params->mkfifo,
       "mprtp-ext-header-id",          stat_params->mprtp_ext_header_id,
       NULL);
 

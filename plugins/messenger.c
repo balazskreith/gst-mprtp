@@ -190,6 +190,10 @@ void messenger_wait_before_pop_all (Messenger *this, GstClockTime waiting, GQueu
   g_mutex_unlock (&this->mutex);
 }
 
+void messenger_release_wait(Messenger* this) {
+  g_cond_broadcast(&this->waiting_signal);
+}
+
 
 void messenger_push_block(Messenger* this, gpointer message)
 {

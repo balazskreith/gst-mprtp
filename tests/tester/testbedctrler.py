@@ -4,7 +4,22 @@ from pushers import *
 import os
 
 class TestBedCtrler:
+    """
+    Represent controller for the testbed
+    """
     def __init__(self, testbed_cmd_input, source_cmd_input, midbox_cmd_input, sink_cmd_input):
+        """
+        Parameters
+        ----------
+        testbed_cmd_input : Sink
+            A sink for the testbed
+        midbox_cmd_input : Sink
+            A sink for the midbox
+        source_cmd_input : Sink
+            A sink for the test source
+        sink_cmd_input : Sink
+            A sink for the testbed sink
+        """
         self.__testbed_cmd_input = testbed_cmd_input
         self.__source_cmd_input = source_cmd_input
         self.__midbox_cmd_input = midbox_cmd_input
@@ -12,18 +27,22 @@ class TestBedCtrler:
 
     @property
     def testbed_cmd_input(self):
+        """Gets the testbed command input sink property"""
         return self.__testbed_cmd_input
 
     @property
     def source_cmd_input(self):
+        """Gets the testbed source command input sink property"""
         return self.__source_cmd_input
 
     @property
     def midbox_cmd_input(self):
+        """Gets the testbed midbox command input sink property"""
         return self.__midbox_cmd_input
 
     @property
     def sink_cmd_input(self):
+        """Gets the sink source command input sink property"""
         return self.__sink_cmd_input
 
 class LinuxTestBedCtrler(TestBedCtrler):

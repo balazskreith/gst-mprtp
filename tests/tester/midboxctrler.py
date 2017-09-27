@@ -5,28 +5,29 @@ import threading
 
 class MidboxCtrler:
     def __init__(self):
+        """
+        Represent a Controller for the middlebox
+        """
         self.__sink_cmd_output = Source()
         self.__source_cmd_output = Source()
         self.__path_stages = []
 
     def add_path_stage(self, *path_stages):
+        """Add a path stage"""
         self.__path_stages.append(path_stages)
 
     @property
     def path_stages(self):
+        """Get the path stages property"""
         return self.__path_stages
 
     def start(self):
-        raise NotImplementedError
-
-    def stop(self):
-        raise NotImplementedError
-
-    def pause(self):
+        """Start the controller"""
         raise NotImplementedError
 
     @property
     def cmd_output(self):
+        """Get the command output property"""
         return self.__source_cmd_output
 
 class MidboxShellCtrler(MidboxCtrler):
@@ -43,12 +44,6 @@ class MidboxShellCtrler(MidboxCtrler):
             thread.start()
         for thread in threads:
             thread.join()
-        pass
-
-    def stop(self):
-        pass
-
-    def pause(self):
         pass
 
     def start_path_ctrler(self, path_tuple):

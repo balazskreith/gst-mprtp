@@ -242,15 +242,13 @@ StatParams*     make_stat_params (gchar* params_rawstring)
   StatParams  *result = g_malloc0(sizeof(StatParams));
   gchar       **tokens = g_strsplit(params_rawstring, ":", -1);
 
-  strcpy(result->touched_sync,            tokens[0]);
-  strcpy(result->logfile_path,            tokens[1]);
-  result->mprtp_ext_header_id = atoi(tokens[2]);
+  strcpy(result->mkfifo,            tokens[0]);
+  result->mprtp_ext_header_id = atoi(tokens[1]);
 
 
   sprintf(result->to_string,
-      "Touched sync: %s; Logfile path: %s; MPRTP Ext Header ID: %d",
-      result->touched_sync,
-      result->logfile_path,
+      "mkfifo: %s; MPRTP Ext Header ID: %d",
+      result->mkfifo,
       result->mprtp_ext_header_id
 
   );

@@ -150,5 +150,6 @@ sudo ip netns exec $NS_MID sysctl -w net.ipv4.ip_forward=1
 #dd of=/proc/sys/net/ipv4/ip_forward <<<1
 
 sudo ip netns exec $NS_MID "./scripts/setup_ns_mid.sh"
+scripts/setup_statsrelayer.sh
 
 

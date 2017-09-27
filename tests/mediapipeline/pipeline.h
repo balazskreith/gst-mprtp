@@ -184,10 +184,9 @@ struct _VideoParams{
 
 
 struct _StatParams{
-  gchar      touched_sync[256];
-  gchar      logfile_path[256];
+  gchar      mkfifo[256];
   guint8     mprtp_ext_header_id;
-//  gchar      default_logfile[256];
+//  guint8     fec_payload_header_id;
   gchar      to_string[1024];
 
 };

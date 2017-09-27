@@ -97,11 +97,13 @@ void _read_mkfifo(Source* this) {
     mkfifo(this->path, 0666);
   }
   this->socket = open(this->path, O_RDONLY | O_NONBLOCK);
+  if (this->socket < 0) {
+    perror("mkfifo:open");
+  }
   while(!this->stop) {
     memset(this->databed, 0, this->item_size);
     read_bytes = read(this->socket, this->databed, this->item_size);
     if (read_bytes == 0) { // The mkfifo is not open for writing
-      this->socket = open(this->path, O_RDONLY | O_NONBLOCK);
       g_usleep(100000);
       continue;
     } else if (read_bytes < 0) {

@@ -14,12 +14,13 @@ typedef struct {
   gchar name[255];
   GSList* threads;
   volatile guint first_arrived;
-//  Process* on_first_arrived;
   Process* on_item_rcved;
   guint flushed_count;
   RelaysGroupState state;
   guint item_size;
 }RelaysGroup;
+
+
 
 StatsRelayer* make_statsrelayer(void) {
   StatsRelayer* this = g_malloc0(sizeof(StatsRelayer));

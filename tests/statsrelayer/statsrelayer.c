@@ -1,198 +1,247 @@
 #include "statsrelayer.h"
 #include "common.h"
-#include "relay.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "mapper.h"
+#include "source.h"
+#include "sink.h"
+#include "buffer.h"
 
-typedef enum {
-  STATE_WAITING = 0,
-  STATE_COLLECTING = 1,
-  STATE_FLUSHING = 2
-}RelaysGroupState;
+typedef void (*SprintfElement)(gpointer component, gchar* info);
 
-typedef struct {
-  gchar name[255];
+typedef struct{
+  gpointer component;
+  PushPort **output;
+  PushPort *input;
+  GFreeFunc dtor;
+  SprintfElement sprintf_cmp;
+  Process* flush;
+  Process* start_process;
+  Process* stop_process;
+}Element;
+
+typedef struct{
+  GSList* elements;
   GSList* threads;
-  volatile guint first_arrived;
-  Process* on_item_rcved;
-  guint flushed_count;
-  RelaysGroupState state;
-  guint item_size;
-}RelaysGroup;
+  gchar name[255];
+  gboolean started;
+}Pipeline;
 
-
+typedef void (*ExecuteOnPipelineCb)(StatsRelayer* this, Pipeline* pipeline);
+static Element* _make_element(gchar* string);
+static void _statsrelayer_execute_on_pipeline(StatsRelayer* this, const gchar* name, ExecuteOnPipelineCb callback);
+static void _start_pipeline(StatsRelayer* this, Pipeline* pipeline);
+static void _stop_pipeline(StatsRelayer* this, Pipeline* pipeline);
 
 StatsRelayer* make_statsrelayer(void) {
   StatsRelayer* this = g_malloc0(sizeof(StatsRelayer));
   return this;
 }
 
-typedef void (*ExecuteOnGroupCb)(StatsRelayer* this, RelaysGroup* relays_group);
+void statsrelayer_add_pipeline(StatsRelayer* this, const gchar* string) {
+  Pipeline* result = g_malloc0(sizeof(Pipeline));
+  gchar* last_chr_in_name = strchr(string, ' ');
+  gchar **tokens;
+  gint i, len;
+  Element *prev_element, *element;
+  gchar info_string[1024];
 
-static void _statsrelayer_execute_on_group(StatsRelayer* this, const gchar* name, ExecuteOnGroupCb callback) {
-  GSList* it;
-  GQueue* subjects = g_queue_new();
-  for (it = this->groups; it; it = it->next) {
-    RelaysGroup* relays_group = it->data;
-    if (strcmp(name, "*") != 0 && strcmp(name, relays_group->name) != 0) {
+  memcpy(result->name, string, last_chr_in_name - string);
+  tokens = g_strsplit(last_chr_in_name + 1, "!", -1);
+  len = g_strv_length(tokens);
+  fprintf(stdout, "Add pipeline %s\n", result->name);
+  for (i = 0; i < len; ++i) {
+    element = _make_element(tokens[i]);
+    memset(info_string, 0, 1024);
+    fprintf(stdout, "Parse string %s for an element\n", tokens[i]);
+    element->sprintf_cmp(element->component, info_string);
+    fprintf(stdout, "Added element: %s\n", info_string);
+    if (!element) {
       continue;
     }
-    g_queue_push_tail(subjects, relays_group);
+    if (i == 0 || !element->input) {
+      result->elements = g_slist_append(result->elements, element);
+      prev_element = element;
+      continue;
+    }
+    *prev_element->output = element->input;
+    result->elements = g_slist_append(result->elements, element);
+    prev_element = element;
+  }
+  _start_pipeline(this, result);
+  this->pipelines = g_slist_append(this->pipelines, result);
+  g_strfreev(tokens);
+}
+
+
+static void _list_pipeline(StatsRelayer* this, Pipeline* pipeline) {
+  GSList* it;
+  gchar info_string[1024];
+  fprintf(stdout, "- - - - - - - - - - - P i p e l i n e - - - - - - - - - - - - \n");
+  fprintf(stdout, "Name: %s\n", pipeline->name);
+  for (it = pipeline->elements; it; it = it->next) {
+    Element* element = it->data;
+    memset(info_string, 0, 1024);
+    element->sprintf_cmp(element->component, info_string);
+    fprintf(stdout, "%s", info_string);
+  }
+}
+
+void statsrelayer_list_pipeline(StatsRelayer* this, const gchar* name) {
+  _statsrelayer_execute_on_pipeline(this, name, (ExecuteOnPipelineCb)_list_pipeline);
+}
+
+static void _rem_pipeline(StatsRelayer* this, Pipeline* pipeline) {
+  GSList* it;
+  for (it = pipeline->elements; it; it = it->next) {
+    Element* element = it->data;
+    element->dtor(element);
+  }
+  this->pipelines = g_slist_remove(it, pipeline);
+}
+
+void statsrelayer_rem_pipeline(StatsRelayer* this, const gchar* name) {
+  _statsrelayer_execute_on_pipeline(this, name, (ExecuteOnPipelineCb)_rem_pipeline);
+}
+
+static void _flush_pipeline(StatsRelayer* this, Pipeline* pipeline) {
+  GSList* it;
+  for (it = pipeline->elements; it; it = it->next) {
+    Element* element = it->data;
+    if (!element->flush) continue;
+    process_call(element->flush);
+  }
+}
+
+void statsrelayer_flush_pipeline(StatsRelayer* this, const gchar* name) {
+  _statsrelayer_execute_on_pipeline(this, name, (ExecuteOnPipelineCb)_flush_pipeline);
+}
+
+
+void _start_pipeline(StatsRelayer* this, Pipeline* pipeline) {
+  GSList* it;
+  if (pipeline->started) {
+    return;
+  }
+  for (it = pipeline->elements; it; it = it->next) {
+    Element* element = it->data;
+    GThread* thread;
+    gchar thread_name[255];
+    if (!element->start_process) continue;
+    memset(thread_name, 0, 255);
+    sprintf(thread_name, "%s-%p", pipeline->name, element);
+    thread = g_thread_new(thread_name, (GThreadFunc) process_call, element->start_process);
+    pipeline->threads = g_slist_append(pipeline->threads, thread);
+  }
+  pipeline->started = TRUE;
+}
+
+void statsrelayer_start_pipeline(StatsRelayer* this, const gchar* name) {
+  _statsrelayer_execute_on_pipeline(this, name, (ExecuteOnPipelineCb)_start_pipeline);
+}
+
+void _stop_pipeline(StatsRelayer* this, Pipeline* pipeline) {
+  GSList* it;
+  if (!pipeline->started) {
+    return;
+  }
+  for (it = pipeline->elements; it; it = it->next) {
+    Element* element = it->data;
+    if (!element->stop_process) continue;
+    process_call(element->stop_process);
+  }
+
+  for (it = pipeline->threads; it; it = it->next) {
+    GThread* thread = it->data;
+    g_thread_join(thread);
+  }
+  g_slist_free(pipeline->threads);
+  pipeline->threads = NULL;
+  pipeline->started = FALSE;
+}
+
+void statsrelayer_stop_pipeline(StatsRelayer* this, const gchar* name) {
+  _statsrelayer_execute_on_pipeline(this, name, (ExecuteOnPipelineCb)_stop_pipeline);
+}
+
+
+void statsrelayer_dtor(StatsRelayer* this) {
+  statsrelayer_rem_pipeline(this, "*");
+  g_free(this);
+}
+
+Element* _make_element(gchar* string) {
+  Element* result = g_malloc0(sizeof(Element));
+  gchar *last_char_in_name;
+  gchar name[255];
+  last_char_in_name = strchr(string, ':');
+  memset(name, 0, 255);
+  if (last_char_in_name) {
+    memcpy(name, string, last_char_in_name - string);
+    fprintf(stdout, "Parse |%s|, add element: |%s| params: |%s|\n", string, name, last_char_in_name + 1);
+  }else {
+    strcpy(name, string);
+    fprintf(stdout, "Parse |%s|, add element: |%s|\n", string, name);
+  }
+
+  if(strcmp(name, MAPPER_ELEMENT_NAME) == 0) {
+    Mapper* mapper = make_mapper(last_char_in_name + 1, sizeof(RTPStatPacket));
+    result->component = mapper;
+    result->dtor = (GFreeFunc) mapper_dtor;
+    result->output = &mapper->output;
+    result->input = mapper->input;
+    result->sprintf_cmp = (SprintfElement) mapper_sprintf;
+    result->start_process = result->stop_process = NULL;
+  }else if(strcmp(name, SOURCE_ELEMENT_NAME) == 0) {
+    Source* source = make_source(last_char_in_name + 1, sizeof(RTPStatPacket));
+    result->component = source;
+    result->dtor = (GFreeFunc) source_dtor;
+    result->output = &source->output;
+    result->input = NULL;
+    result->sprintf_cmp = (SprintfElement) source_sprintf;
+    result->start_process = source->start_process;
+    result->stop_process = source->stop_process;
+  }else if(strcmp(name, BUFFER_ELEMENT_NAME) == 0) {
+    Buffer* buffer = make_buffer(sizeof(RTPStatPacket));
+    result->component = buffer;
+    result->dtor = (GFreeFunc) buffer_dtor;
+    result->input = buffer->input;
+    result->output = &buffer->output;
+    result->sprintf_cmp = (SprintfElement) buffer_sprintf;
+    result->flush = make_process((ProcessCb) buffer_flush, buffer);
+    result->start_process = result->stop_process = NULL;
+  } else if(strcmp(name, SINK_ELEMENT_NAME) == 0) {
+    Sink* sink = make_sink(last_char_in_name + 1);
+    result->component = sink;
+    result->dtor = (GFreeFunc) sink_dtor;
+    result->input = sink->input;
+    result->sprintf_cmp = (SprintfElement) sink_sprintf;
+    result->start_process = NULL;
+    result->stop_process = sink->stop_process;
+  } else {
+    g_free(result);
+    result = NULL;
+  }
+  return result;
+}
+
+
+void _statsrelayer_execute_on_pipeline(StatsRelayer* this, const gchar* name, ExecuteOnPipelineCb callback) {
+  GSList* it;
+  GQueue* subjects = g_queue_new();
+  for (it = this->pipelines; it; it = it->next) {
+    Pipeline* pipeline = it->data;
+    if (strcmp(name, "*") != 0 && strcmp(name, pipeline->name) != 0) {
+      continue;
+    }
+    g_queue_push_tail(subjects, pipeline);
   }
 
   while(!g_queue_is_empty(subjects)) {
-    RelaysGroup* relays_group = g_queue_pop_head(subjects);
-    callback(this, relays_group);
+    Pipeline* pipeline = g_queue_pop_head(subjects);
+    callback(this, pipeline);
   }
   g_queue_free(subjects);
 }
 
-static gint _gslist_find_relays_group_by_name_helper(gconstpointer  a, gconstpointer  b) {
-  const RelaysGroup* relays_group_a = a;
-  const RelaysGroup* relays_group_b = b;
-  return strcmp(relays_group_a->name, relays_group_b->name);
-}
-
-void statsrelayer_add_group(StatsRelayer* this, const gchar* string) {
-  gchar *relays = NULL;
-  gchar *name = NULL;
-  RelaysGroup* relays_group = g_malloc0(sizeof(RelaysGroup));
-  gchar **tokens = g_strsplit(string, " ", -1);
-  relays_group->item_size = sizeof(RTPStatPacket);
-  name = tokens[0];
-  relays = tokens[1];
-  if (2 < g_strv_length(tokens)) {
-    relays_group->item_size = atoi(tokens[2]);
-  }
-
-  if (g_slist_find_custom(this->groups, name, (GCompareFunc)_gslist_find_relays_group_by_name_helper)) {
-    fprintf(stderr, "Group %s already exists\n", name);
-    return;
-  }
-
-//  fprintf(stdout, "%s -> add group name: %s (%s)\n", string, name, relays);
-  if (relays) {
-    gchar **tokens = g_strsplit(relays, "|", -1);
-    gint i, len = g_strv_length(tokens);
-    for (i = 0; i < len; ++i) {
-      Relay* relay;
-      GThread* thread;
-      gchar thread_name[255];
-      sprintf(thread_name, "%s-relay-%d", name, i);
-      fprintf(stdout, "Create a relay based on string: %s\n", tokens[i]);
-      relay = make_relay(tokens[i], relays_group->item_size);
-      thread = g_thread_new(thread_name, (GThreadFunc) relay_start, relay);
-      relays_group->threads = g_slist_prepend(relays_group->threads, thread);
-    }
-
-    g_strfreev(tokens);
-  }
-
-  if (name) {
-    strcpy(relays_group->name, name);
-  }
-  relays_group->state = STATE_WAITING;
-  this->groups = g_slist_prepend(this->groups, relays_group);
-  g_strfreev(tokens);
-  fprintf(stdout, "Relays group %s is added\n", relays_group->name);
-}
-
-static void _rem_group(StatsRelayer* this, RelaysGroup* relays_group) {
-  GSList* it;
-  this->groups = g_slist_remove(this->groups, relays_group);
-  for (it = relays_group->threads; it; it = it->next) {
-    GThread* thread = it->data;
-    Relay* relay = thread->data;
-    relay_stop(relay);
-    g_thread_join(thread);
-    relay_dtor(relay);
-  }
-  fprintf(stdout, "Relays group %s is removed\n", relays_group->name);
-  g_free(relays_group);
-}
-
-void statsrelayer_rem_group(StatsRelayer* this, const gchar* name) {
-  _statsrelayer_execute_on_group(this, name, (ExecuteOnGroupCb)_rem_group);
-}
-
-
-static void _flush_group(StatsRelayer* this, RelaysGroup* relays_group) {
-  GSList* it;
-  relays_group->state = STATE_FLUSHING;
-  fprintf(stdout, "Relays group %s is ordered to flush\n", relays_group->name);
-  for (it = relays_group->threads; it; it = it->next) {
-    GThread* thread = it->data;
-    Relay* relay = thread->data;
-    relay_flush(relay);
-  }
-  ++relays_group->flushed_count;
-  relays_group->state = STATE_COLLECTING;
-  fprintf(stdout, "Relays group %s is flushed\n", relays_group->name);
-}
-
-void statsrelayer_flush_group(StatsRelayer* this, const gchar* name) {
-  _statsrelayer_execute_on_group(this, name, (ExecuteOnGroupCb)_flush_group);
-}
-
-
-static void _prepare_group(StatsRelayer* this, RelaysGroup* relays_group) {
-  GSList* it;
-  gint prepare_num = 500000;
-  for (it = relays_group->threads; it; it = it->next) {
-    GThread* thread = it->data;
-    Relay* relay = thread->data;
-    relay_prepare(relay, prepare_num);
-  }
-  fprintf(stdout, "Relays group %s is prepared %d item to accept items\n", relays_group->name, prepare_num);
-}
-
-void statsrelayer_prepare_group(StatsRelayer* this, const gchar* name) {
-  _statsrelayer_execute_on_group(this, name, (ExecuteOnGroupCb)_prepare_group);
-}
-
-void statsrelayer_dtor(StatsRelayer* this) {
-  g_free(this);
-}
-
-static void _set_state_string(RelaysGroup* relays_group, gchar* result) {
-  switch(relays_group->state) {
-  case STATE_WAITING:
-      sprintf(result, "Waiting");
-      break;
-  case STATE_COLLECTING:
-      sprintf(result, "Collecting");
-      break;
-  case STATE_FLUSHING:
-      sprintf(result, "Flushing");
-      break;
-  }
-}
-
-static void _list_group(StatsRelayer* this, RelaysGroup* relays_group) {
-  GSList* it;
-  gchar state[256];
-  memset(state, 0, 256);
-  _set_state_string(relays_group, state);
-  fprintf(stdout, "- - - - - - - - - - - R e l a y s G r o u p - - - - - - - - - - - - \n");
-  fprintf(stdout, "NAME:      %s\n", relays_group->name);
-  fprintf(stdout, "STATE:     %s\n", state);
-  fprintf(stdout, "FLUSHED:   %d\n", relays_group->flushed_count);
-  fprintf(stdout, "ITEM SIZE: %d\n", relays_group->item_size);
-  //                        10        20        30        40        50        60
-  //               123456789012345678901234567890123456789012345678901234567890
-  fprintf(stdout, "SOURCES                                                    MAP:SINKS\n");
-  for (it = relays_group->threads; it; it = it->next) {
-    GThread* thread = it->data;
-    Relay* relay = thread->data;
-    gchar source[256];
-    gchar sink[256];
-    sprintf(source, "%s:%s", source_get_type_in_string(relay->source), source_get_path(relay->source));
-    sprintf(sink, "%s:%s", sink_get_type_in_string(relay->sink), sink_get_path(relay->sink));
-    fprintf(stdout, "%-59s%s:%s\n", source, mapper_get_type_in_string(relay->mapper), sink);
-  }
-}
-
-void statsrelayer_list_group(StatsRelayer* this, const gchar* name) {
-  _statsrelayer_execute_on_group(this, name, (ExecuteOnGroupCb)_list_group);
-}
 

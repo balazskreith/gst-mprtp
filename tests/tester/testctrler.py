@@ -42,3 +42,10 @@ class TestCtrler:
             thread.start()
         for thread in threads:
             thread.join()
+
+    def stop(self):
+        """
+        Stop the test
+        """
+        self.__flows_ctrler.stop()
+        self.__midbox_ctrler.stop()

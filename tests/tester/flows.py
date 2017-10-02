@@ -4,7 +4,8 @@ class Flow:
     """
     Represent a flow contains a source and sink part
     """
-    def __init__(self, source_unit, sink_unit, sink_to_source_delay = 0, start_delay = 0):
+    def __init__(self, source_unit, sink_unit, sink_to_source_delay = 0, start_delay = 0,
+        source_program_name = None, sink_program_name = None):
         """
         Parameters:
         -----------
@@ -21,6 +22,18 @@ class Flow:
         self.__sink_unit = sink_unit
         self.__sink_to_source_delay = sink_to_source_delay
         self.__start_delay = start_delay
+        self.__source_program_name = source_program_name
+        self.__sink_program_name = sink_program_name
+
+    @property
+    def sink_program_name(self):
+        """Get the sink_program_name property"""
+        return self.__sink_program_name
+
+    @property
+    def source_program_name(self):
+        """Get the sink_program_name property"""
+        return self.__source_program_name
 
     @property
     def source_unit(self):
@@ -47,13 +60,15 @@ class RTPFlow(Flow):
     Represent an RTP Flow
 
     """
-    def __init__(self, path, codec, algorithm, rtp_ip, rtp_port, rtcp_ip, rtcp_port, start_delay = 0,
+    def __init__(self, name, path, codec, algorithm, rtp_ip, rtp_port, rtcp_ip, rtcp_port, start_delay = 0,
     source_type = "FILE:foreman_cif.yuv:1:352:288:2:25/1", sink_type = "FAKESINK", mprtp_ext_header_id = 0):
         """
         Init the parameter for the test
 
         Parameters
         ----------
+        name : string
+            The name of the flow
         path : string
             The folder where snd and rcv pipeline are found
         codec : Codecs
@@ -71,13 +86,16 @@ class RTPFlow(Flow):
         start : int
             Indicate the start delay from the moment it is started
         """
-        rtp_sender = RTPSenderShellTrafficUnit(path=path + "snd_pipeline", codec=codec,
-            algorithm=algorithm, rtcp_port=rtcp_port, rtp_ip=rtp_ip, rtp_port=rtp_port, snd_stat="snd_packets_1.csv",
+        self.__name = name
+        snd_pipeline = "snd_pipeline"
+        rcv_pipeline = "rcv_pipeline"
+        rtp_sender = RTPSenderShellTrafficUnit(name=name+"-snd", path=path, program_name = snd_pipeline, codec=codec,
+            algorithm=algorithm, rtcp_port=rtcp_port, rtp_ip=rtp_ip, rtp_port=rtp_port, snd_stat="/tmp/snd_packets_1.csv",
             source_type=source_type, mprtp_ext_header_id=mprtp_ext_header_id)
 
-        rtp_receiver = RTPReceiverShellTrafficUnit(path=path + "rcv_pipeline", codec=codec,
+        rtp_receiver = RTPReceiverShellTrafficUnit(name=name+"-rcv", path=path, program_name = rcv_pipeline, codec=codec,
             algorithm=algorithm, rtp_port=rtp_port, rtcp_ip=rtcp_ip, rtcp_port=rtcp_port,
-            rcv_stat="rcv_packets_1.csv", ply_stat="ply_packets_1.csv",
+            rcv_stat="/tmp/rcv_packets_1.csv", ply_stat="/tmp/ply_packets_1.csv",
             sink_type=sink_type, mprtp_ext_header_id=mprtp_ext_header_id)
         Flow.__init__(self, rtp_sender, rtp_receiver, 2, start_delay)
 

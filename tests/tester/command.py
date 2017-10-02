@@ -22,6 +22,9 @@ class Command:
         self.__stdout = stdout
         self.__stderr = stderr
 
+    def logging(self, message):
+        logging.debug(message.decode("utf-8") if type(message) is bytes else message)
+
     @property
     def message(self):
         """Get the Message property"""
@@ -46,7 +49,7 @@ class Command:
         return str(self.__message)
 
 class ShellCommand(Command):
-    def __init__(self, message, stdout = None, stderr = None):
+    def __init__(self, message, stdout = logging.debug, stderr = logging.debug):
         Command.__init__(self, message, stdout, stderr)
         # print(message)
 

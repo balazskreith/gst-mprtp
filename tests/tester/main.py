@@ -9,6 +9,7 @@ from testctrler import *
 from collections import deque
 from tests import *
 from testctrlerbuilder import *
+from time import sleep
 
 import logging
 import sys
@@ -35,4 +36,6 @@ def make_test(type):
 
 test = make_test('rmcat1')
 test_ctrler = TestCtrlerBuilder.make(test)
-test_ctrler.start()
+threading.Thread(target=test_ctrler.start).start()
+sleep(test.duration)
+test_ctrler.stop()

@@ -113,8 +113,8 @@ CONFIG_CLEAN_VPATH_FILES =
 PROGRAMS = $(noinst_PROGRAMS)
 am_statsrelayer_OBJECTS = statsrelayer-buffer.$(OBJEXT) \
 	statsrelayer-common.$(OBJEXT) statsrelayer-mapper.$(OBJEXT) \
-	statsrelayer-main.$(OBJEXT) statsrelayer-relay.$(OBJEXT) \
-	statsrelayer-sink.$(OBJEXT) statsrelayer-source.$(OBJEXT) \
+	statsrelayer-main.$(OBJEXT) statsrelayer-sink.$(OBJEXT) \
+	statsrelayer-source.$(OBJEXT) \
 	statsrelayer-statsrelayer.$(OBJEXT)
 statsrelayer_OBJECTS = $(am_statsrelayer_OBJECTS)
 am__DEPENDENCIES_1 =
@@ -365,7 +365,6 @@ statsrelayer_SOURCES = buffer.c \
 					   common.c \
 					   mapper.c \
 					   main.c \
-					   relay.c \
 					   sink.c \
 					   source.c \
 					   statsrelayer.c 
@@ -436,7 +435,6 @@ include ./$(DEPDIR)/statsrelayer-buffer.Po
 include ./$(DEPDIR)/statsrelayer-common.Po
 include ./$(DEPDIR)/statsrelayer-main.Po
 include ./$(DEPDIR)/statsrelayer-mapper.Po
-include ./$(DEPDIR)/statsrelayer-relay.Po
 include ./$(DEPDIR)/statsrelayer-sink.Po
 include ./$(DEPDIR)/statsrelayer-source.Po
 include ./$(DEPDIR)/statsrelayer-statsrelayer.Po
@@ -517,20 +515,6 @@ statsrelayer-main.obj: main.c
 #	$(AM_V_CC)source='main.c' object='statsrelayer-main.obj' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -c -o statsrelayer-main.obj `if test -f 'main.c'; then $(CYGPATH_W) 'main.c'; else $(CYGPATH_W) '$(srcdir)/main.c'; fi`
-
-statsrelayer-relay.o: relay.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -MT statsrelayer-relay.o -MD -MP -MF $(DEPDIR)/statsrelayer-relay.Tpo -c -o statsrelayer-relay.o `test -f 'relay.c' || echo '$(srcdir)/'`relay.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/statsrelayer-relay.Tpo $(DEPDIR)/statsrelayer-relay.Po
-#	$(AM_V_CC)source='relay.c' object='statsrelayer-relay.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -c -o statsrelayer-relay.o `test -f 'relay.c' || echo '$(srcdir)/'`relay.c
-
-statsrelayer-relay.obj: relay.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -MT statsrelayer-relay.obj -MD -MP -MF $(DEPDIR)/statsrelayer-relay.Tpo -c -o statsrelayer-relay.obj `if test -f 'relay.c'; then $(CYGPATH_W) 'relay.c'; else $(CYGPATH_W) '$(srcdir)/relay.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/statsrelayer-relay.Tpo $(DEPDIR)/statsrelayer-relay.Po
-#	$(AM_V_CC)source='relay.c' object='statsrelayer-relay.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -c -o statsrelayer-relay.obj `if test -f 'relay.c'; then $(CYGPATH_W) 'relay.c'; else $(CYGPATH_W) '$(srcdir)/relay.c'; fi`
 
 statsrelayer-sink.o: sink.c
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(statsrelayer_CFLAGS) $(CFLAGS) -MT statsrelayer-sink.o -MD -MP -MF $(DEPDIR)/statsrelayer-sink.Tpo -c -o statsrelayer-sink.o `test -f 'sink.c' || echo '$(srcdir)/'`sink.c

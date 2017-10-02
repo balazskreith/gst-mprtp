@@ -21,7 +21,7 @@ static void _read_stdin(Source* this);
 static void _set_stop(Source* this);
 
 Source* make_source(const gchar* string, guint item_size) {
-  Source* this = g_malloc0(sizeof(Source));
+  Source *this = g_malloc0(sizeof(Source));
   gchar **tokens = g_strsplit(string, ":", -1);
   this->type = common_assign_string_to_int(tokens[0], "file", "mkfifo", "unix_dgram_socket", "stdin", NULL);
   this->type_in_string = g_ascii_strup(tokens[0], strlen(tokens[0]));
@@ -70,6 +70,21 @@ void source_dtor(Source* this) {
   g_free(this);
 }
 
+void source_sprintf(Source* this, gchar* string) {
+  sprintf(string, "Source type: %s, target: %s, number of sent items: %d, amount of bytes: %d\n",
+      this->type_in_string, this->path, this->sent_packets, this->sent_bytes);
+}
+
+void source_reset_metrics(Source* this) {
+  this->sent_packets = 0;
+  this->sent_bytes = 0;
+}
+
+static void _refresh_metrics(Source* this, guint item_length) {
+  ++this->sent_packets;
+  this->sent_bytes += item_length;
+}
+
 void _read_file(Source* this) {
   FILE* fp = fopen(this->path, "rb");
   size_t read_result;
@@ -87,6 +102,7 @@ void _read_file(Source* this) {
       continue;
     }
     pushport_send(this->output, this->databed);
+    _refresh_metrics(this, this->item_size);
   }
   fclose(fp);
 }
@@ -96,14 +112,14 @@ void _read_mkfifo(Source* this) {
   if (!g_file_test(this->path, G_FILE_ERROR_EXIST)) {
     mkfifo(this->path, 0666);
   }
-  this->socket = open(this->path, O_RDONLY | O_NONBLOCK);
+  this->socket = open(this->path, O_RDONLY);
   if (this->socket < 0) {
     perror("mkfifo:open");
   }
   while(!this->stop) {
     memset(this->databed, 0, this->item_size);
     read_bytes = read(this->socket, this->databed, this->item_size);
-    if (read_bytes == 0) { // The mkfifo is not open for writing
+    if (read_bytes == 0 || errno == EAGAIN) { // The mkfifo is not open for writing
       g_usleep(100000);
       continue;
     } else if (read_bytes < 0) {
@@ -113,6 +129,7 @@ void _read_mkfifo(Source* this) {
       continue;
     }
     pushport_send(this->output, this->databed);
+    _refresh_metrics(this, this->item_size);
   }
   close(this->socket);
 }
@@ -152,7 +169,7 @@ void _rcvfrom_unix_socket(Source* this) {
       continue;
     }
     pushport_send(this->output, this->databed);
-
+    _refresh_metrics(this, this->item_size);
   }
 
   close(this->socket);
@@ -170,19 +187,20 @@ void _read_stdin(Source* this) {
 
  while(!this->stop) {
    memset(this->databed, 0, this->item_size);
-    FD_ZERO(&fds);
-    FD_SET(STDIN_FILENO, &fds); //STDIN_FILENO is 0
-    select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
-    read = FD_ISSET(STDIN_FILENO, &fds);
-    if(read < 0) {
-      perror("stdin error");
-    } else if (0 == read) {
-      continue;
-    }
-    if(!fgets (this->databed, this->item_size, stdin)) {
-      continue;
-    }
-    pushport_send(this->output, this->databed);
+   FD_ZERO(&fds);
+   FD_SET(STDIN_FILENO, &fds); //STDIN_FILENO is 0
+   select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
+   read = FD_ISSET(STDIN_FILENO, &fds);
+   if(read < 0) {
+     perror("stdin error");
+   } else if (0 == read) {
+     continue;
+   }
+   if(!fgets (this->databed, this->item_size, stdin)) {
+     continue;
+   }
+   pushport_send(this->output, this->databed);
+   _refresh_metrics(this, this->item_size);
  }
 }
 

@@ -218,10 +218,11 @@ gst_rtpstatmaker2_set_property (GObject * object, guint prop_id,
       break;
     case PROP_DEFAULT_MKFIFO_LOCATION:
       strcpy(this->path, g_value_get_string(value));
+//      g_print("mkfifo location:%s\n", this->path);
       if(!g_file_test(this->path, G_FILE_TEST_EXISTS)){
         mkfifo(this->path, 0666);
-        this->fifofd = open(this->path, O_RDONLY);
       }
+      this->fifofd = open(this->path, O_WRONLY);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -610,8 +611,8 @@ _monitorstat_logger (GstRTPStatMaker2 *this)
     if (write(this->fifofd, packet, sizeof(RTPStatPacket)) < 0) {
       // do nothing
     }
+//    g_print("item sent to fifo: %d\n", this->fifofd);
     g_queue_push_tail(this->packets4recycle, packet);
-
   }
 //  g_print("MAKING START END\n");
   messenger_throw_blocks(this->packets, this->packets4recycle);

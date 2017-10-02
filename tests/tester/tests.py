@@ -12,8 +12,28 @@ class MyTest(object):
     """
     Represent a test
     """
-    def __init__(self, midbox_ctrler, flow_ctrler):
-        pass
+    def __init__(self, name, duration):
+        """
+        Private method making path stages
+        Parameters:
+        -----------
+        name : str
+            the name of the test
+        duration : int
+            The duration of the test in seconds
+        """
+        self.__name = name
+        self.__duration = duration
+
+    @property
+    def duration(self):
+        """Gets the duration of the test in seconds"""
+        return self.__duration
+
+    @property
+    def name(self):
+        """Gets the name of the test"""
+        return self.__name
 
     def make_path_stage(self,stages_deque):
         """
@@ -39,7 +59,7 @@ class MyTest(object):
 
 class RMCAT1(MyTest):
     def __init__(self, latency, jitter, source_type, sink_type, mprtp_ext_header = 0, fec_payload_type_id = 0):
-        super(MyTest, self).__init__()
+        MyTest.__init__(self, "rmcat1", 122)
 
         self.__latency = latency
         self.__jitter = jitter
@@ -49,7 +69,8 @@ class RMCAT1(MyTest):
         self.__fec_payload_type_id = fec_payload_type_id
 
     def get_flows(self):
-        rtp_flow = RTPFlow(path="./",
+        rtp_flow = RTPFlow(name="rtpflow_1",
+            path="./",
             codec=Codecs.VP8,
             algorithm=Algorithms.FRACTaL,
             rtp_ip="10.0.0.6",

@@ -26,6 +26,14 @@ class PathCtrler:
         """
         self.__path_name = path_name
         self.__path_stage = path_stage
+        self.__stop = False
+
+    def stop(self):
+        """Get stop"""
+        self.__stop = True
+
+    def isStopped(self):
+        return self.__stop
 
     @property
     def path_name(self):
@@ -47,6 +55,17 @@ class PathShellCtrler(PathCtrler):
     Represent a controller using shell commands for the path
 
     """
+    def __init__(self, path_name, path_stage):
+        """
+        Init the parameter for the test
+
+        Parameters
+        ----------
+        path_name : str
+            the ethernet port of the path
+        """
+        PathCtrler.__init__(self, path_name, path_stage)
+
     def get_cmd(self):
         actual_stage = self.path_stage
         while actual_stage != None:
@@ -58,8 +77,12 @@ class PathShellCtrler(PathCtrler):
             "minburst " + str(path_config.min_burst) \
             )
             yield ShellCommand(command)
-            if (0 < actual_stage.duration):
-                sleep(actual_stage.duration)
+            for step in range(0, actual_stage.duration):
+                sleep(1)
+                if (self.isStopped()):
+                    return
+            # if (0 < actual_stage.duration):
+                # sleep(actual_stage.duration)
             actual_stage = actual_stage.next
 
     def __str__(self):

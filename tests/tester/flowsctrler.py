@@ -32,6 +32,14 @@ class FlowsCtrler:
             thread.join()
         pass
 
+    def stop(self):
+        for flow_tuple in self.__flows:
+            flow = flow_tuple[0]
+            source_stop_cmd = flow.source_unit.get_stop_cmd()
+            self.source_cmd_output.transmit(source_stop_cmd)
+            sink_stop_cmd = flow.sink_unit.get_stop_cmd()
+            self.sink_cmd_output.transmit(sink_stop_cmd)
+
     @property
     def source_cmd_output(self):
         """Gets the source command output"""

@@ -21,10 +21,16 @@ struct _Mapper{
   PushPort* output;
   WriteItem write_item;
   guint item_size;
+
+  guint transcieved_packets_num;
+  guint rcved_bytes;
+  guint sent_bytes;
 };
 
 Mapper* make_mapper(const gchar* string, guint item_size);
 const gchar* mapper_get_type_in_string(Mapper* this);
+void mapper_sprintf(Mapper* this, gchar* string);
+void mapper_reset_metrics(Mapper* this);
 void mapper_dtor(Mapper* this);
 
 #endif /* TESTS_STATSRELAYER_MAPPER_H_ */

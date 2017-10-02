@@ -8,7 +8,6 @@ statsrelayer_SOURCES = buffer.c \
 					   common.c \
 					   mapper.c \
 					   main.c \
-					   relay.c \
 					   sink.c \
 					   source.c \
 					   statsrelayer.c 

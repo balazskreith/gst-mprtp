@@ -42,8 +42,8 @@ Sink* make_sink(const gchar* string) {
     break;
     case SINK_TYPE_MKFIFO:
       strcpy(this->path, tokens[1]);
-      this->input = make_pushport((PushCb)_write_file, this);
       this->stop_process = make_process((ProcessCb)_write_mkfifo, this);
+      this->input = make_pushport((PushCb)_write_mkfifo, this);
       break;
     case SINK_TYPE_UNIX_DGRAM_SOCKET:
       strcpy(this->path, tokens[1]);
@@ -55,6 +55,16 @@ Sink* make_sink(const gchar* string) {
   }
   g_strfreev(tokens);
   return this;
+}
+
+void sink_sprintf(Sink* this, gchar* string) {
+  sprintf(string, "Sink type: %s, path: %s number of sent items: %d, amount of bytes: %d\n",
+      this->type_in_string, this->path, this->packets_num, this->bytes_num);
+}
+
+void sink_reset_metrics(Sink* this) {
+  this->packets_num = 0;
+  this->bytes_num = 0;
 }
 
 const gchar* sink_get_type_in_string(Sink* this) {
@@ -73,6 +83,11 @@ void sink_dtor(Sink* this) {
   g_free(this);
 }
 
+static void _refresh_metrics(Sink* this, WriteItem* item) {
+  ++this->packets_num;
+  this->bytes_num += item->length;
+}
+
 void _write_file(Sink* this, WriteItem* write_item) {
   size_t write_result;
   if (!this->fp) {
@@ -87,6 +102,7 @@ void _write_file(Sink* this, WriteItem* write_item) {
   if (write_result < 0) {
     fprintf(stderr, "Error during write a file : %s\n", this->path);
   }
+  _refresh_metrics(this, write_item);
 }
 
 void _write_mkfifo(Sink* this, WriteItem* write_item) {
@@ -101,6 +117,7 @@ void _write_mkfifo(Sink* this, WriteItem* write_item) {
   if (write_result <= 0) {
     fprintf(stderr, "Error during write an mkfifo : %s\n", this->path);
   }
+  _refresh_metrics(this, write_item);
 }
 
 void _sendto_unix_socket(Sink* this, WriteItem* write_item) {
@@ -121,6 +138,7 @@ void _sendto_unix_socket(Sink* this, WriteItem* write_item) {
   if (sent_bytes < 0) {
     fprintf(stderr, "Errors occured during sending");
   }
+  _refresh_metrics(this, write_item);
 }
 
 void _close_file(Sink* this) {

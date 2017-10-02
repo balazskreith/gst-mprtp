@@ -65,12 +65,11 @@ done:
 
 typedef enum {
   CMD_NOT_RECOGNIZED = -1,
-  CMD_ADD_GROUP = 1,
-  CMD_REM_GROUP = 2,
+  CMD_ADD_PIPELINE = 1,
+  CMD_REM_PIPELINE = 2,
   CMD_LIST = 3,
-  CMD_FLUSH_GROUP = 4,
-  CMD_PREPARE_GROUP = 5,
-  CMD_EXIT = 6
+  CMD_FLUSH_PIPELINE = 4,
+  CMD_EXIT = 5
 }Command;
 
 void _execute(StatsRelayer* this, gchar* strings) {
@@ -93,25 +92,23 @@ void _execute(StatsRelayer* this, gchar* strings) {
     memcpy(cmd, string, 3);
     fprintf(stdout, "-------------------------------\n");
     fprintf(stdout, "Command received: %s\n", string);
-    command = common_assign_string_to_int(cmd, "add", "rem", "lst", "fls", "pre", "ext", NULL);
+    command = common_assign_string_to_int(cmd, "add", "rem", "lst", "fls", "ext", NULL);
     switch (command) {
-      case CMD_ADD_GROUP:
-        statsrelayer_add_group(this, string + 4);
+      case CMD_ADD_PIPELINE:
+        statsrelayer_add_pipeline(this, string + 4);
         break;
-      case CMD_REM_GROUP:
-        statsrelayer_rem_group(this, string + 4);
+      case CMD_REM_PIPELINE:
+        statsrelayer_rem_pipeline(this, string + 4);
         break;
       case CMD_LIST:
-        statsrelayer_list_group(this, string + 4);
+        statsrelayer_list_pipeline(this, string + 4);
         break;
-      case CMD_FLUSH_GROUP:
-        statsrelayer_flush_group(this, string + 4);
+      case CMD_FLUSH_PIPELINE:
+        statsrelayer_flush_pipeline(this, string + 4);
         break;
-      case CMD_PREPARE_GROUP:
-        statsrelayer_prepare_group(this, string + 4);
         break;
       case CMD_EXIT:
-        statsrelayer_rem_group(this, "*");
+        statsrelayer_rem_pipeline(this, "*");
         process_call(source->stop_process);
         break;
       case CMD_NOT_RECOGNIZED:

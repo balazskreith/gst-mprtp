@@ -35,9 +35,13 @@ struct _Sink{
       gchar file_open_mode[256];
     };
   };
+  guint packets_num;
+  guint bytes_num;
 };
 
 Sink* make_sink(const gchar* string);
+void sink_sprintf(Sink* this, gchar* string);
+void sink_reset_metrics(Sink* this);
 const gchar* sink_get_type_in_string(Sink* this);
 const gchar* sink_get_path(Sink* this);
 void sink_dtor(Sink* this);

@@ -23,7 +23,7 @@ class RTPReceiverShellTrafficUnit(TrafficUnit, RTPReceiver):
     """
     Represent an RTP receiver for shell traffic unit
     """
-    def __init__(self, path, codec, algorithm, rtp_port, rtcp_ip, rtcp_port, rcv_stat, ply_stat, sink_type, mprtp_ext_header_id = 0):
+    def __init__(self, name, path, program_name, codec, algorithm, rtp_port, rtcp_ip, rtcp_port, rcv_stat, ply_stat, sink_type, mprtp_ext_header_id = 0):
         """
         Init the parameter for the test
 
@@ -46,12 +46,14 @@ class RTPReceiverShellTrafficUnit(TrafficUnit, RTPReceiver):
         ply_stat : str
             Indicate the stats the traffic unit played out
         """
-        RTPReceiver.__init__(self, path, codec, algorithm, rtp_port, rtcp_ip, rtcp_port)
+        RTPReceiver.__init__(self, path + program_name, codec, algorithm, rtp_port, rtcp_ip, rtcp_port)
         TrafficUnit.__init__(self)
         self.__rcv_stat = rcv_stat
         self.__ply_stat = ply_stat
         self.__sink_type = sink_type
         self.__mprtp_ext_header_id = mprtp_ext_header_id;
+        self.__name = name
+        self.__program_name = program_name
 
     def get_start_cmd(self):
         args = [" "]
@@ -68,13 +70,22 @@ class RTPReceiverShellTrafficUnit(TrafficUnit, RTPReceiver):
             args.append("--plystat=" + self.__ply_stat + ":" + str(self.__mprtp_ext_header_id))
         args.append("--sink=" + self.__sink_type)
 
-        return ShellCommand(self.path + " ".join(args))
+        return ShellCommand(self.path + " ".join(args), stdout = self.logging, stderr = self.logging)
 
     def get_stop_cmd(self):
-        return ShellCommand("ls -a")
+        return ShellCommand("pkill " + self.__program_name)
 
     def get_pause_cmd(self):
         return ShellCommand("ls -a")
+
+    def logging(self, message):
+        if message == None:
+            return
+        with open(self.__name + ".log", "w") as f:
+            if isinstance(message, bytes):
+                f.write(message.decode("utf-8"))
+            else:
+                f.write(message)
 
     def __str__(self):
         infos = [" "]
@@ -90,7 +101,7 @@ class RTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
     """
     Represent an RTP sender for shell traffic unit
     """
-    def __init__(self, path, codec, algorithm, rtcp_port, rtp_ip, rtp_port, snd_stat, source_type, mprtp_ext_header_id = 0):
+    def __init__(self, name, path, program_name, codec, algorithm, rtcp_port, rtp_ip, rtp_port, snd_stat, source_type, mprtp_ext_header_id = 0):
         """
         Init the parameter for the test
 
@@ -113,11 +124,23 @@ class RTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
         ply_stat : str
             Indicate the stats the traffic unit played out
         """
-        RTPSender.__init__(self, path, codec, algorithm, rtcp_port, rtp_ip, rtp_port)
+        RTPSender.__init__(self, path + program_name, codec, algorithm, rtcp_port, rtp_ip, rtp_port)
         TrafficUnit.__init__(self)
+        self.__program_name = program_name
         self.__snd_stat = snd_stat
         self.__source_type = source_type
-        self.__mprtp_ext_header_id = mprtp_ext_header_id;
+        self.__mprtp_ext_header_id = mprtp_ext_header_id
+        self.__name = name
+        self.__program_name = program_name
+
+    def logging(self, message):
+        if message == None:
+            return
+        with open(self.__name + ".log", "w") as f:
+            if isinstance(message, bytes):
+                f.write(message.decode("utf-8"))
+            else:
+                f.write(message)
 
     def get_start_cmd(self):
         args = [" "]
@@ -132,10 +155,10 @@ class RTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
             args.append("--stat=" + self.__snd_stat + ":" + str(self.__mprtp_ext_header_id))
         args.append("--source=" + str(self.__source_type))
 
-        return ShellCommand(self.path + " ".join(args))
+        return ShellCommand(self.path + " ".join(args), stdout = self.logging, stderr = self.logging)
 
     def get_stop_cmd(self):
-        return ShellCommand("ls -a")
+        return ShellCommand("pkill " + self.__program_name)
 
     def get_pause_cmd(self):
         return ShellCommand("ls -a")

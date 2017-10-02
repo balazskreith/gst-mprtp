@@ -298,7 +298,7 @@ void report_producer_add_xr_cc_rle_fb(ReportProducer *this,
   memset(databed, 0, 1024);
   memset(&chunk, 0, sizeof(GstRTCPXRChunk));
   block = (GstRTCPXRCCFeedbackRLEBlock*) databed;
-
+//g_print("begin_seq: %hu, end_seq: %hu\n", begin_seq, end_seq);
   gst_rtcp_xr_cc_fb_rle_setup(block, report_count, report_timestamp, this->ssrc, begin_seq, end_seq);
   for(chunks_num = 0, vector_i=begin_seq; vector_i != end_seq; ++vector_i, ++chunks_num) {
     if (vector_lost[vector_i]) {

@@ -16,11 +16,18 @@ typedef struct {
   guint item_size;
   PushPort* input;
   PushPort* output;
+
+  guint rcved_packets;
+  guint sent_packets;
+  guint rcved_bytes;
+  guint sent_bytes;
 }Buffer;
 
 Buffer* make_buffer(guint item_size);
 void buffer_dtor(Buffer* this);
 void buffer_flush(Buffer* this);
+void buffer_sprintf(Buffer* this, gchar* string);
+void buffer_reset_metrics(Buffer* this);
 void buffer_prepare(Buffer* this, guint num);
 
 #endif /* TESTS_STATSRELAYER_BUFFER_H_ */

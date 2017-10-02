@@ -52,6 +52,23 @@ void mapper_dtor(Mapper* this) {
   g_free(this);
 }
 
+void mapper_sprintf(Mapper* this, gchar* string) {
+  sprintf(string, "Mapper type: %s, number of transcieved items: %d, amount of bytes: %d->%d\n",
+      this->type_in_string, this->transcieved_packets_num, this->rcved_bytes, this->sent_bytes);
+}
+
+void mapper_reset_metrics(Mapper* this) {
+  this->transcieved_packets_num = 0;
+  this->rcved_bytes = 0;
+  this->sent_bytes = 0;
+}
+
+static void _refresh_metrics(Mapper* this, guint rcved_item_length, guint sent_item_length) {
+  ++this->transcieved_packets_num;
+  this->rcved_bytes += rcved_item_length;
+  this->sent_bytes += sent_item_length;
+}
+
 void _packet_to_csv_proxy(Mapper* this, gpointer item) {
   RTPStatPacket* packet = item;
   gchar* buffer = this->write_item.subject;
@@ -72,12 +89,16 @@ void _packet_to_csv_proxy(Mapper* this, gpointer item) {
       packet->marker);
 
   this->write_item.length = buffer_size;
+//  g_print("%s\n", buffer);
   pushport_send(this->output, &this->write_item);
+  _refresh_metrics(this, this->item_size, buffer_size);
 }
 
 void _binary_proxy(Mapper* this, gpointer item) {
   this->write_item.subject = item;
   this->write_item.length = this->item_size;
   pushport_send(this->output, &this->write_item);
+  _refresh_metrics(this, this->item_size, this->item_size);
 }
+
 

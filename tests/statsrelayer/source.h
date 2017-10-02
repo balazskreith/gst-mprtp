@@ -28,10 +28,15 @@ typedef struct {
   volatile gboolean stop;
   gchar* type_in_string;
   gint socket;
+
+  guint sent_packets;
+  guint sent_bytes;
 }Source;
 
 Source* make_source(const gchar* string, guint item_size);
 const gchar* source_get_type_in_string(Source* this);
+void source_reset_metrics(Source* this);
+void source_sprintf(Source* this, gchar* string);
 const gchar* source_get_path(Source* this);
 void source_dtor(Source* this) ;
 

@@ -2,6 +2,9 @@
 #define TESTS_STATSRELAYER_COMMON_H_
 #include <gst/gst.h>
 #include <glib.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef __WIN32__
 
@@ -38,6 +41,15 @@ typedef struct {
   gpointer subject;
   guint length;
 }WriteItem;
+
+#define MAPPER_ELEMENT_NAME "mapper"
+//const char* const MAPPER_ELEMENT_NAME = "mapper";
+#define SOURCE_ELEMENT_NAME "source"
+//const char* const SOURCE_ELEMENT_NAME = "source";
+#define BUFFER_ELEMENT_NAME "buffer"
+//const char* const BUFFER_ELEMENT_NAME = "buffer";
+#define SINK_ELEMENT_NAME "sink"
+//const char* const SINK_ELEMENT_NAME = "sink";
 
 typedef void (*PushCb)(gpointer udata, gpointer item);
 typedef gpointer (*PullCb)(gpointer this);

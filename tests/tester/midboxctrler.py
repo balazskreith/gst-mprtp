@@ -25,6 +25,10 @@ class MidboxCtrler:
         """Start the controller"""
         raise NotImplementedError
 
+    def stop(self):
+        """Stop the controller"""
+        raise NotImplementedError
+
     @property
     def cmd_output(self):
         """Get the command output property"""
@@ -44,7 +48,11 @@ class MidboxShellCtrler(MidboxCtrler):
             thread.start()
         for thread in threads:
             thread.join()
-        pass
+
+    def stop(self):
+        for path_tuple in self.__path_ctrlers:
+            path_ctrler = path_tuple[0]
+            path_ctrler.stop()
 
     def start_path_ctrler(self, path_tuple):
         path_ctrler = path_tuple[0]

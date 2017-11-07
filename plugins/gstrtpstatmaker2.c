@@ -86,8 +86,8 @@ static gboolean gst_rtpstatmaker2_accept_caps (GstBaseTransform * base,
 static gboolean gst_rtpstatmaker2_query (GstBaseTransform * base,
     GstPadDirection direction, GstQuery * query);
 
-static void
-_monitorstat_logger (GstRTPStatMaker2 *this);
+//static void
+//_monitorstat_logger (GstRTPStatMaker2 *this);
 
 
 static void
@@ -186,8 +186,8 @@ gst_rtpstatmaker2_init (GstRTPStatMaker2 * this)
 
   gst_base_transform_set_gap_aware (GST_BASE_TRANSFORM_CAST (this), TRUE);
 
-  g_rec_mutex_init (&this->thread_mutex);
-  this->thread = gst_task_new ((GstTaskFunction) _monitorstat_logger, this, NULL);
+//  g_rec_mutex_init (&this->thread_mutex);
+//  this->thread = gst_task_new ((GstTaskFunction) _monitorstat_logger, this, NULL);
 
   this->sysclock = gst_system_clock_obtain ();
   this->packets = make_messenger(sizeof(RTPStatPacket));
@@ -340,13 +340,14 @@ static void _init_packet(GstRTPStatMaker2 *this, RTPStatPacket* packet, GstBuffe
 
   gst_rtp_buffer_unmap(&rtp);
 }
-
+static RTPStatPacket packet;
 static void
 _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
 {
   guint8 first_byte;
   guint8 second_byte;
-  RTPStatPacket* packet;
+//  RTPStatPacket* packet;
+
 
   if (!GST_IS_BUFFER(buffer)) {
     goto exit;
@@ -370,12 +371,22 @@ _monitor_rtp_packet (GstRTPStatMaker2 *this, GstBuffer * buffer)
 
 //  );
 //PROFILING("gstrtpstatmaker",
-  messenger_lock(this->packets);
-  packet = messenger_retrieve_block_unlocked(this->packets);
-  _init_packet(this, packet, buffer);
-  messenger_push_block_unlocked(this->packets, packet);
-  messenger_unlock(this->packets);
+//  messenger_lock(this->packets);
+//  packet = messenger_retrieve_block_unlocked(this->packets);
+//  _init_packet(this, packet, buffer);
+//  messenger_push_block_unlocked(this->packets, packet);
+//  messenger_unlock(this->packets);
 //);
+
+  PROFILING("gstrtpstatmaker",
+  _init_packet(this, &packet, buffer);
+  if (write(this->fifofd, &packet, sizeof(RTPStatPacket)) < 0) {
+
+  } else {
+
+  }
+  );
+
 exit:
   return;
 }
@@ -547,8 +558,8 @@ gst_rtpstatmaker2_change_state (GstElement * element, GstStateChange transition)
       this->blocked = FALSE;
       g_cond_broadcast (&this->blocked_cond);
 
-      gst_task_set_lock(this->thread, &this->thread_mutex);
-      gst_task_start(this->thread);
+//      gst_task_set_lock(this->thread, &this->thread_mutex);
+//      gst_task_start(this->thread);
 
       GST_OBJECT_UNLOCK (this);
       break;
@@ -572,9 +583,9 @@ gst_rtpstatmaker2_change_state (GstElement * element, GstStateChange transition)
   switch (transition) {
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
       GST_OBJECT_LOCK (this);
-      messenger_release_wait(this->packets);
-      gst_task_join (this->thread);
-      gst_object_unref (this->thread);
+//      messenger_release_wait(this->packets);
+//      gst_task_join (this->thread);
+//      gst_object_unref (this->thread);
 
       this->upstream_latency = 0;
       this->blocked = TRUE;
@@ -597,26 +608,28 @@ gst_rtpstatmaker2_change_state (GstElement * element, GstStateChange transition)
 }
 
 
-void
-_monitorstat_logger (GstRTPStatMaker2 *this)
-{
-  RTPStatPacket* packet;
-  messenger_wait_before_pop_all (this->packets, 1 * GST_SECOND, this->packets4process);
-  if(g_queue_is_empty(this->packets4process)){
-    return;
-  }
-
-  while(!g_queue_is_empty(this->packets4process)){
-    packet = g_queue_pop_head(this->packets4process);
-    if (write(this->fifofd, packet, sizeof(RTPStatPacket)) < 0) {
-      // do nothing
-    }
-//    g_print("item sent to fifo: %d\n", this->fifofd);
-    g_queue_push_tail(this->packets4recycle, packet);
-  }
-//  g_print("MAKING START END\n");
-  messenger_throw_blocks(this->packets, this->packets4recycle);
-  return;
-}
+//void
+//_monitorstat_logger (GstRTPStatMaker2 *this)
+//{
+//  RTPStatPacket* packet;
+//  messenger_wait_before_pop_all (this->packets, 1 * GST_SECOND, this->packets4process);
+//  if(g_queue_is_empty(this->packets4process)){
+//    return;
+//  }
+//
+//  while(!g_queue_is_empty(this->packets4process)){
+//    packet = g_queue_pop_head(this->packets4process);
+//    if (write(this->fifofd, packet, sizeof(RTPStatPacket)) < 0) {
+////      perror("mkfifo");
+//      // do nothing
+//    } else {
+////      g_print("item sent to fifo: %d\n", this->fifofd);
+//    }
+//    g_queue_push_tail(this->packets4recycle, packet);
+//  }
+////  g_print("MAKING START END\n");
+//  messenger_throw_blocks(this->packets, this->packets4recycle);
+//  return;
+//}
 
 

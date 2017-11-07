@@ -16,6 +16,7 @@ void statsrelayer_flush_pipeline(StatsRelayer* this, const gchar* name);
 void statsrelayer_start_pipeline(StatsRelayer* this, const gchar* name);
 void statsrelayer_stop_pipeline(StatsRelayer* this, const gchar* name);
 void statsrelayer_list_pipeline(StatsRelayer* this, const gchar* name);
+void statsrelayer_reset_pipeline(StatsRelayer* this, const gchar* name);
 void statsrelayer_dtor(StatsRelayer* this);
 
 #endif /* TESTS_STATSRELAYER_STATSRELAYER_H_ */

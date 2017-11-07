@@ -24,6 +24,9 @@ Mapper* make_mapper(const gchar* string, guint item_size) {
   gchar **tokens = g_strsplit(string, ":", -1);
   this->type = common_assign_string_to_int(tokens[0], "binary", "packet2csv", NULL);
   this->type_in_string = g_ascii_strup(tokens[0], strlen(tokens[0]));
+
+  this->reset_process = make_process((ProcessCb)mapper_reset_metrics, this);
+
   fprintf(stdout, "Create Mapper. Type: %s\n", this->type_in_string);
   switch(this->type) {
     case MAPPER_FORMAT_PACKET_CSV:
@@ -58,6 +61,7 @@ void mapper_sprintf(Mapper* this, gchar* string) {
 }
 
 void mapper_reset_metrics(Mapper* this) {
+  fprintf(stdout, "Reset mapper");
   this->transcieved_packets_num = 0;
   this->rcved_bytes = 0;
   this->sent_bytes = 0;

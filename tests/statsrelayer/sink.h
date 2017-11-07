@@ -29,6 +29,7 @@ struct _Sink{
   };
   PushPort* input;
   Process* stop_process;
+  Process* reset_process;
   union { // some utils merged for different type of sink
     struct {
       gboolean file_opened;

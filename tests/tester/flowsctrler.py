@@ -11,6 +11,7 @@ class FlowsCtrler:
         self.__sink_cmd_output = Source()
         self.__source_cmd_output = Source()
         self.__flows = []
+        self.__max_sink_to_source_delay = 0
 
     def add_flows(self, *flows):
         """
@@ -50,6 +51,16 @@ class FlowsCtrler:
         """Gets the sink command output"""
         return self.__sink_cmd_output
 
+    @property
+    def max_sink_to_source_delay(self):
+        """Gets the __sink_to_source_delay"""
+        result = 0
+        for flow_tuple in self.__flows:
+            flow = flow_tuple[0]
+            if (result < flow.sink_to_source_delay):
+                result = flow.sink_to_source_delay
+        return result
+
     def start_flow(self, flow_tuple):
         """
         Private method used to start a specific flow for a thread
@@ -65,9 +76,14 @@ class FlowsCtrler:
         if (0 < flow.sink_to_source_delay):
             sleep(flow.sink_to_source_delay)
 
+        if (self.__max_sink_to_source_delay < flow.sink_to_source_delay):
+            self.__max_sink_to_source_delay = flow.sink_to_source_delay
+
         source_start_cmd = flow.source_unit.get_start_cmd()
         source_thread = threading.Thread(target=self.source_cmd_output.transmit, args=(source_start_cmd, ))
         source_thread.start()
+
+        self.__ready = True
 
         sink_thread.join()
         source_thread.join()

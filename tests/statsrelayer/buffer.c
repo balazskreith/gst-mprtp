@@ -11,6 +11,7 @@ Buffer* make_buffer(guint item_size) {
   this->recycle = g_queue_new();
   this->input = make_pushport((PushCb)_process, this);
   this->item_size = item_size;
+  this->reset_process = make_process((ProcessCb)buffer_reset_metrics, this);
   return this;
 }
 
@@ -23,6 +24,7 @@ void buffer_dtor(Buffer* this) {
 
 
 void buffer_flush(Buffer* this) {
+  gint count = g_queue_get_length(this->items);
   while(!g_queue_is_empty(this->items)) {
     gpointer item = g_queue_pop_head(this->items);
     pushport_send(this->output, item);
@@ -30,6 +32,7 @@ void buffer_flush(Buffer* this) {
     ++this->sent_packets;
     this->sent_bytes += this->item_size;
   }
+  g_print("Buffer flushed %d items out.\n", count);
 }
 
 void buffer_sprintf(Buffer* this, gchar* string) {
@@ -38,6 +41,7 @@ void buffer_sprintf(Buffer* this, gchar* string) {
 }
 
 void buffer_reset_metrics(Buffer* this) {
+  fprintf(stdout, "Reset buffer");
   this->rcved_packets = 0;
   this->sent_packets = 0;
   this->rcved_bytes = 0;

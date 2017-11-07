@@ -25,10 +25,11 @@ typedef struct {
   gpointer databed;
   Process* start_process;
   Process* stop_process;
+  Process* reset_process;
   volatile gboolean stop;
   gchar* type_in_string;
   gint socket;
-
+  gboolean reset;
   guint sent_packets;
   guint sent_bytes;
 }Source;

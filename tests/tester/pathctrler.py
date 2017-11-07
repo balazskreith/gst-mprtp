@@ -76,7 +76,7 @@ class PathShellCtrler(PathCtrler):
             "latency " + str(path_config.latency) + "ms " + \
             "minburst " + str(path_config.min_burst) \
             )
-            yield ShellCommand(command)
+            yield ShellCommand(command, stdout = print, stderr = print)
             for step in range(0, actual_stage.duration):
                 sleep(1)
                 if (self.isStopped()):

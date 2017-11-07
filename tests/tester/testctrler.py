@@ -3,6 +3,7 @@ from testbedctrler import TestBedCtrler
 from flowsctrler import FlowsCtrler
 import asyncio
 import threading
+from time import sleep
 
 class TestCtrler:
     """
@@ -34,14 +35,17 @@ class TestCtrler:
         """
         Start the test
         """
-        threads = [
-            threading.Thread(target=self.__flows_ctrler.start),
-            threading.Thread(target=self.__midbox_ctrler.start)
-        ]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
+        flows_ctrler_thread = threading.Thread(target=self.__flows_ctrler.start)
+        midbox_ctrler_thread = threading.Thread(target=self.__midbox_ctrler.start)
+        flows_ctrler_thread.start()
+        sleep(self.__flows_ctrler.max_sink_to_source_delay)
+        midbox_ctrler_thread.start()
+
+        flows_ctrler_thread.join()
+        midbox_ctrler_thread.join()
+
+    def get_max_source_to_sink_delay(self):
+        return self.__flows_ctrler.max_sink_to_source_delay
 
     def stop(self):
         """

@@ -26,6 +26,8 @@ Source* make_source(const gchar* string, guint item_size) {
   this->type = common_assign_string_to_int(tokens[0], "file", "mkfifo", "unix_dgram_socket", "stdin", NULL);
   this->type_in_string = g_ascii_strup(tokens[0], strlen(tokens[0]));
   fprintf(stdout, "Create Source. Type: %s\n", tokens[0]);
+
+  this->reset_process = make_process((ProcessCb)source_reset_metrics, this);
   switch (this->type) {
     case SOURCE_TYPE_FILE:
       strcpy(this->path, tokens[1]);
@@ -76,6 +78,7 @@ void source_sprintf(Source* this, gchar* string) {
 }
 
 void source_reset_metrics(Source* this) {
+  fprintf(stdout, "Reset source socket");
   this->sent_packets = 0;
   this->sent_bytes = 0;
 }
@@ -132,6 +135,7 @@ void _read_mkfifo(Source* this) {
     _refresh_metrics(this, this->item_size);
   }
   close(this->socket);
+  g_print("mkfifo read is closed\n");
 }
 
 void _rcvfrom_unix_socket(Source* this) {

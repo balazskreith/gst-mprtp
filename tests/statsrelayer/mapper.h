@@ -22,6 +22,7 @@ struct _Mapper{
   WriteItem write_item;
   guint item_size;
 
+  Process* reset_process;
   guint transcieved_packets_num;
   guint rcved_bytes;
   guint sent_bytes;

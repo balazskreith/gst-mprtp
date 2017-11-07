@@ -18,6 +18,9 @@ static void _write_file(Sink* this, WriteItem* write_item);
 static void _write_mkfifo(Sink* this, WriteItem* write_item);
 static void _sendto_unix_socket(Sink* this, WriteItem* write_item);
 
+static void _reset_file(Sink* this);
+static void _reset_socket(Sink* this);
+
 static void _close_file(Sink* this);
 static void _close_socket(Sink* this);
 
@@ -39,16 +42,19 @@ Sink* make_sink(const gchar* string) {
         strcpy(this->file_open_mode, "wb");
       }
       fprintf(stdout, "File open mode: %s\n", this->file_open_mode);
+      this->reset_process = make_process((ProcessCb)_reset_file, this);
     break;
     case SINK_TYPE_MKFIFO:
       strcpy(this->path, tokens[1]);
       this->stop_process = make_process((ProcessCb)_write_mkfifo, this);
       this->input = make_pushport((PushCb)_write_mkfifo, this);
+      this->reset_process = make_process((ProcessCb)_reset_socket, this);
       break;
     case SINK_TYPE_UNIX_DGRAM_SOCKET:
       strcpy(this->path, tokens[1]);
       this->stop_process = make_process((ProcessCb)_close_socket, this);
       this->input = make_pushport((PushCb)_sendto_unix_socket, this);
+      this->reset_process = make_process((ProcessCb)_reset_socket, this);
       break;
     default:
       fprintf(stderr, "No Type for source\n");
@@ -141,12 +147,35 @@ void _sendto_unix_socket(Sink* this, WriteItem* write_item) {
   _refresh_metrics(this, write_item);
 }
 
+static void _reset_metrics(Sink* this) {
+  this->bytes_num = 0;
+  this->packets_num = 0;
+}
+
+void _reset_file(Sink* this) {
+  fprintf(stdout, "Reset sink file\n");
+  _reset_metrics(this);
+  _close_file(this);
+}
+
+void _reset_socket(Sink* this) {
+  fprintf(stdout, "Reset sink socket\n");
+  _reset_metrics(this);
+  _close_socket(this);
+}
+
 void _close_file(Sink* this) {
+  if (!this->fp) {
+    return;
+  }
   fclose(this->fp);
   this->fp = NULL;
 }
 
 void _close_socket(Sink* this) {
+  if (!this->socket) {
+    return;
+  }
   close(this->socket);
   this->socket = 0;
 }

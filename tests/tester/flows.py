@@ -60,7 +60,7 @@ class RTPFlow(Flow):
     Represent an RTP Flow
 
     """
-    def __init__(self, name, path, codec, algorithm, rtp_ip, rtp_port, rtcp_ip, rtcp_port, start_delay = 0,
+    def __init__(self, name, flownum, path, codec, algorithm, rtp_ip, rtp_port, rtcp_ip, rtcp_port, start_delay = 0,
     source_type = "FILE:foreman_cif.yuv:1:352:288:2:25/1", sink_type = "FAKESINK", mprtp_ext_header_id = 0):
         """
         Init the parameter for the test
@@ -87,17 +87,18 @@ class RTPFlow(Flow):
             Indicate the start delay from the moment it is started
         """
         self.__name = name
+        self.__flownum = flownum
         snd_pipeline = "snd_pipeline"
         rcv_pipeline = "rcv_pipeline"
         rtp_sender = RTPSenderShellTrafficUnit(name=name+"-snd", path=path, program_name = snd_pipeline, codec=codec,
-            algorithm=algorithm, rtcp_port=rtcp_port, rtp_ip=rtp_ip, rtp_port=rtp_port, snd_stat="/tmp/snd_packets_1.csv",
+            algorithm=algorithm, rtcp_port=rtcp_port, rtp_ip=rtp_ip, rtp_port=rtp_port, snd_stat="/tmp/snd_packets_" + str(self.__flownum) + ".csv",
             source_type=source_type, mprtp_ext_header_id=mprtp_ext_header_id)
 
         rtp_receiver = RTPReceiverShellTrafficUnit(name=name+"-rcv", path=path, program_name = rcv_pipeline, codec=codec,
             algorithm=algorithm, rtp_port=rtp_port, rtcp_ip=rtcp_ip, rtcp_port=rtcp_port,
-            rcv_stat="/tmp/rcv_packets_1.csv", ply_stat="/tmp/ply_packets_1.csv",
+            rcv_stat="/tmp/rcv_packets_" + str(self.__flownum) + ".csv", ply_stat="/tmp/ply_packets_" + str(self.__flownum) + ".csv",
             sink_type=sink_type, mprtp_ext_header_id=mprtp_ext_header_id)
-        Flow.__init__(self, rtp_sender, rtp_receiver, 2, start_delay)
+        Flow.__init__(self, rtp_sender, rtp_receiver, sink_to_source_delay = 2, start_delay = start_delay)
 
     def __str__(self):
         """Get the human readable format of the object"""

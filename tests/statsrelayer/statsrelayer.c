@@ -18,6 +18,7 @@ typedef struct{
   Process* flush;
   Process* start_process;
   Process* stop_process;
+  Process* reset_process;
 }Element;
 
 typedef struct{
@@ -91,6 +92,23 @@ void statsrelayer_list_pipeline(StatsRelayer* this, const gchar* name) {
   _statsrelayer_execute_on_pipeline(this, name, (ExecuteOnPipelineCb)_list_pipeline);
 }
 
+static void _reset_pipeline(StatsRelayer* this, Pipeline* pipeline) {
+  GSList* it;
+  fprintf(stdout, "reset: %s\n", pipeline->name);
+  for (it = pipeline->elements; it; it = it->next) {
+    Element* element = it->data;
+    if (!element->reset_process) {
+      continue;
+    }
+    process_call(element->reset_process);
+  }
+}
+
+void statsrelayer_reset_pipeline(StatsRelayer* this, const gchar* name) {
+  fprintf(stdout, "Reset pipeline: %s\n", name);
+  _statsrelayer_execute_on_pipeline(this, name, (ExecuteOnPipelineCb)_reset_pipeline);
+}
+
 static void _rem_pipeline(StatsRelayer* this, Pipeline* pipeline) {
   GSList* it;
   for (it = pipeline->elements; it; it = it->next) {
@@ -106,6 +124,7 @@ void statsrelayer_rem_pipeline(StatsRelayer* this, const gchar* name) {
 
 static void _flush_pipeline(StatsRelayer* this, Pipeline* pipeline) {
   GSList* it;
+  g_print("Pipeline %s ordered to be flushed.\n", pipeline->name);
   for (it = pipeline->elements; it; it = it->next) {
     Element* element = it->data;
     if (!element->flush) continue;
@@ -192,6 +211,7 @@ Element* _make_element(gchar* string) {
     result->input = mapper->input;
     result->sprintf_cmp = (SprintfElement) mapper_sprintf;
     result->start_process = result->stop_process = NULL;
+    result->reset_process = mapper->reset_process;
   }else if(strcmp(name, SOURCE_ELEMENT_NAME) == 0) {
     Source* source = make_source(last_char_in_name + 1, sizeof(RTPStatPacket));
     result->component = source;
@@ -201,6 +221,7 @@ Element* _make_element(gchar* string) {
     result->sprintf_cmp = (SprintfElement) source_sprintf;
     result->start_process = source->start_process;
     result->stop_process = source->stop_process;
+    result->reset_process = source->reset_process;
   }else if(strcmp(name, BUFFER_ELEMENT_NAME) == 0) {
     Buffer* buffer = make_buffer(sizeof(RTPStatPacket));
     result->component = buffer;
@@ -210,6 +231,7 @@ Element* _make_element(gchar* string) {
     result->sprintf_cmp = (SprintfElement) buffer_sprintf;
     result->flush = make_process((ProcessCb) buffer_flush, buffer);
     result->start_process = result->stop_process = NULL;
+    result->reset_process = buffer->reset_process;
   } else if(strcmp(name, SINK_ELEMENT_NAME) == 0) {
     Sink* sink = make_sink(last_char_in_name + 1);
     result->component = sink;
@@ -218,7 +240,9 @@ Element* _make_element(gchar* string) {
     result->sprintf_cmp = (SprintfElement) sink_sprintf;
     result->start_process = NULL;
     result->stop_process = sink->stop_process;
+    result->reset_process = sink->reset_process;
   } else {
+    result->reset_process = NULL;
     g_free(result);
     result = NULL;
   }

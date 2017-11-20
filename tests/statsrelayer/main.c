@@ -51,6 +51,7 @@ static StatsRelayer* this;
 static void term(int signum)
 {
   gchar command[255];
+  g_print("term signal received\n");
   sprintf(command, "fls *");
   _execute(this, command);
   memset(command, 0, 255);
@@ -62,6 +63,7 @@ static void term(int signum)
 
 int main(int argc, char *argv[]) {
   struct sigaction action;
+  gchar* src_params;
 
   if (argc < 2) {
     _print_help();
@@ -72,16 +74,21 @@ int main(int argc, char *argv[]) {
   memset(&action, 0, sizeof(action));
   action.sa_handler = term;
   sigaction(SIGTERM, &action, NULL);
-
   if (strcmp(argv[1], "-d") == 0) {
     _execute_default(this);
-    while(1){
-      g_usleep(1000000);
+//    unlink("/tmp/statsrelayer.cmd.in");
+//    mkfifo("/tmp/statsrelayer.cmd.in", 0666);
+//    src_params = g_malloc0(255);
+//    strcpy(src_params, "mkfifo:/tmp/statsrelayer.cmd.in");
+    while(1) {
+      g_usleep(100000);
     }
-    goto done;
+
+  } else {
+    src_params = argv[1];
   }
 
-  source = make_source(argv[1], 1024);
+  source = make_source(src_params, 1024);
   source->output = make_pushport((PushCb) _execute, this);
   process_call(source->start_process);
   process_call(source->stop_process);
@@ -114,6 +121,7 @@ void _execute_default(StatsRelayer* this)
   const gchar* sources[] = {"snd", "rcv", "ply"};
   gchar command[255];
   gint i,j;
+  g_print("_execute_default\n");
   sprintf(command, "lst *");
   _execute(this, command);
   for (i = 0; i < 3; ++i) {

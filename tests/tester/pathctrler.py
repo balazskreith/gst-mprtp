@@ -42,13 +42,46 @@ class PathCtrler:
 
     @property
     def path_stage(self):
-        """Get path_name"""
+        """Get path_stage"""
         return self.__path_stage
 
     def get_cmd(self):
         """Get a sequence of cmd"""
         raise NotImplementedError
 
+class PathPcapListener(PathCtrler):
+    """
+    Represent a controller using shell commands for the path
+
+    """
+    def __init__(self, network_type = "tcp", network_interface = "veth2", log_path = None):
+        """
+        Init the parameter for the test
+
+        Parameters
+        ----------
+        path_name : str
+            the ethernet port of the path
+        """
+        self.__network_type = network_type
+        self.__network_interface = network_interface
+        self.__log_path = log_path
+        PathCtrler.__init__(self, network_interface, None)
+
+    def get_cmd(self):
+        args = []
+        args.append("-n " + self.__network_type)
+        args.append("-ni " + self.__network_interface)
+        args.append("-s0")
+        if (self.__log_path is not None):
+            args.append("-w " + self.__log_path)
+        command = ShellCommand("tcpdump " + ' '.join(args))
+        yield ShellCommand(command, stdout = print, stderr = print)
+        return
+
+    def __str__(self):
+        """Human readable format for PathPcapListener"""
+        return "PathPcapListener network_type: " + self.__network_type + " network_interface: " + self.__network_interface + " log_path: " + self.__log_path
 
 class PathShellCtrler(PathCtrler):
     """

@@ -5,7 +5,7 @@ class Flow:
     Represent a flow contains a source and sink part
     """
     def __init__(self, source_unit, sink_unit, sink_to_source_delay = 0, start_delay = 0,
-        source_program_name = None, sink_program_name = None):
+        source_program_name = None, sink_program_name = None, flipped = False):
         """
         Parameters:
         -----------
@@ -24,6 +24,7 @@ class Flow:
         self.__start_delay = start_delay
         self.__source_program_name = source_program_name
         self.__sink_program_name = sink_program_name
+        self.__flipped = flipped
 
     @property
     def sink_program_name(self):
@@ -55,13 +56,18 @@ class Flow:
         """Get the start delay property"""
         return self.__start_delay
 
+    @property
+    def flipped(self):
+        """Get the flipped property"""
+        return self.__flipped
+
 class RTPFlow(Flow):
     """
     Represent an RTP Flow
 
     """
     def __init__(self, name, flownum, path, codec, algorithm, rtp_ip, rtp_port, rtcp_ip, rtcp_port, start_delay = 0,
-    source_type = "FILE:foreman_cif.yuv:1:352:288:2:25/1", sink_type = "FAKESINK", mprtp_ext_header_id = 0):
+    source_type = "FILE:foreman_cif.yuv:1:352:288:2:25/1", sink_type = "FAKESINK", mprtp_ext_header_id = 0, flipped = False):
         """
         Init the parameter for the test
 
@@ -85,6 +91,8 @@ class RTPFlow(Flow):
             The port the RTCP traffic is sent to / listened from
         start : int
             Indicate the start delay from the moment it is started
+        flipped : bool
+            Indicate for any controller whether the flow sink and source needs to be flipped or not
         """
         self.__name = name
         self.__flownum = flownum
@@ -98,9 +106,103 @@ class RTPFlow(Flow):
             algorithm=algorithm, rtp_port=rtp_port, rtcp_ip=rtcp_ip, rtcp_port=rtcp_port,
             rcv_stat="/tmp/rcv_packets_" + str(self.__flownum) + ".csv", ply_stat="/tmp/ply_packets_" + str(self.__flownum) + ".csv",
             sink_type=sink_type, mprtp_ext_header_id=mprtp_ext_header_id)
-        Flow.__init__(self, rtp_sender, rtp_receiver, sink_to_source_delay = 2, start_delay = start_delay)
+        Flow.__init__(self, rtp_sender, rtp_receiver, sink_to_source_delay = 2, start_delay = start_delay, flipped = flipped)
 
     def __str__(self):
         """Get the human readable format of the object"""
         units = [" ", str(self.source_unit), str(self.sink_unit)]
         return "RTPFlow: " + "\n".join(units)
+
+
+class MPRTPFlow(Flow):
+    """
+    Represent an RTP Flow
+
+    """
+    def __init__(self, name, flownum, path, codec, algorithm, rtp_ips, rtp_ports, rtcp_ips, rtcp_ports, start_delay = 0,
+    source_type = "FILE:foreman_cif.yuv:1:352:288:2:25/1", sink_type = "FAKESINK", mprtp_ext_header_id = 0, flipped = False):
+        """
+        Init the parameter for the test
+
+        Parameters
+        ----------
+        name : string
+            The name of the flow
+        path : string
+            The folder where snd and rcv pipeline are found
+        codec : Codecs
+            The codec used for en/decoding the stream
+        algorithm : Algorithms
+            The algorithm used for congestion controlling
+        rtp_ip : str
+            The IP the RTP traffic is sent to / listened from
+        rtp_port : int
+            The port the RTP traffic is sent to / listened from
+        rtcp_ip : str
+            The IP the RTCP traffic is sent to / listened from
+        rtcp_port : int
+            The port the RTCP traffic is sent to / listened from
+        start : int
+            Indicate the start delay from the moment it is started
+        flipped : bool
+            Indicate for any controller whether the flow sink and source needs to be flipped or not
+        """
+        self.__name = name
+        self.__flownum = flownum
+        snd_pipeline = "snd_pipeline"
+        rcv_pipeline = "rcv_pipeline"
+        mprtp_sender = MPRTPSenderShellTrafficUnit(name=name+"-snd", path=path, program_name = snd_pipeline, codec=codec,
+            algorithm=algorithm, rtcp_ports=rtcp_ports, rtp_ips=rtp_ips, rtp_ports=rtp_ports, snd_stat="/tmp/snd_packets_" + str(self.__flownum) + ".csv",
+            source_type=source_type, mprtp_ext_header_id=mprtp_ext_header_id)
+
+        mprtp_receiver = MPRTPReceiverShellTrafficUnit(name=name+"-rcv", path=path, program_name = rcv_pipeline, codec=codec,
+            algorithm=algorithm, rtp_ports=rtp_ports, rtcp_ips=rtcp_ips, rtcp_ports=rtcp_ports,
+            rcv_stat="/tmp/rcv_packets_" + str(self.__flownum) + ".csv", ply_stat="/tmp/ply_packets_" + str(self.__flownum) + ".csv",
+            sink_type=sink_type, mprtp_ext_header_id=mprtp_ext_header_id)
+        Flow.__init__(self, mprtp_sender, mprtp_receiver, sink_to_source_delay = 2, start_delay = start_delay, flipped = flipped)
+
+    def __str__(self):
+        """Get the human readable format of the object"""
+        units = [" ", str(self.source_unit), str(self.sink_unit)]
+        return "RTPFlow: " + "\n".join(units)
+
+
+class TCPFlow(Flow):
+    """
+    Represent an RTP Flow
+
+    """
+    def __init__(self, name, server_ip, server_port, tcp_server = None, start_delay = 0, duration = 0, create_client = True):
+        """
+        Init the parameter for the test
+
+        Parameters
+        ----------
+        name : string
+            The name of the flow
+        server_ip : str
+            The IP the RTCP traffic is sent to / listened from
+        server_port : int
+            The port the RTCP traffic is sent to / listened from
+        """
+        self.__name = name
+        self.__server_ip = server_ip
+        self.__server_port = server_port
+        if tcp_server is None:
+            self.__tcp_server = TCPServerTrafficShellUnit("TCPServer", server_ip, server_port)
+        else:
+            self.__tcp_server = tcp_server
+
+        self.__duration = duration
+
+        tcp_client = TCPClientTrafficShellUnit("TCPClient", self.__tcp_server, duration) if create_client is True else None
+        Flow.__init__(self, tcp_client, self.__tcp_server if tcp_server is None else None, sink_to_source_delay = 0, start_delay = start_delay)
+
+    @property
+    def tcp_server(self):
+        return self.__tcp_server
+
+    def __str__(self):
+        """Get the human readable format of the object"""
+        units = [" ", str(self.source_unit), str(self.sink_unit), "start_delay: " + str(self.start_delay), "duration: " + str(self.__duration)]
+        return "TCPlow: " + "\n".join(units)

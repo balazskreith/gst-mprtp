@@ -10,16 +10,6 @@ class MidboxCtrler:
         """
         self.__sink_cmd_output = Source()
         self.__source_cmd_output = Source()
-        self.__path_stages = []
-
-    def add_path_stage(self, *path_stages):
-        """Add a path stage"""
-        self.__path_stages.append(path_stages)
-
-    @property
-    def path_stages(self):
-        """Get the path stages property"""
-        return self.__path_stages
 
     def start(self):
         """Start the controller"""
@@ -43,7 +33,7 @@ class MidboxShellCtrler(MidboxCtrler):
         self.__path_ctrlers.append(path_ctrlers)
 
     def start(self):
-        threads = [threading.Thread(target=self.start_path_ctrler(path_ctrler)) for path_ctrler in self.__path_ctrlers]
+        threads = [threading.Thread(target=self.start_path_ctrler, args=(path_ctrler, )) for path_ctrler in self.__path_ctrlers]
         for thread in threads:
             thread.start()
         for thread in threads:

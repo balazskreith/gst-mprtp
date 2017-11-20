@@ -36,10 +36,13 @@ class FlowsCtrler:
     def stop(self):
         for flow_tuple in self.__flows:
             flow = flow_tuple[0]
-            source_stop_cmd = flow.source_unit.get_stop_cmd()
-            self.source_cmd_output.transmit(source_stop_cmd)
-            sink_stop_cmd = flow.sink_unit.get_stop_cmd()
-            self.sink_cmd_output.transmit(sink_stop_cmd)
+            if (flow.source_unit is not None):
+                source_stop_cmd = flow.source_unit.get_stop_cmd()
+                self.source_cmd_output.transmit(source_stop_cmd)
+
+            if (flow.sink_unit is not None):
+                sink_stop_cmd = flow.sink_unit.get_stop_cmd()
+                self.sink_cmd_output.transmit(sink_stop_cmd)
 
     @property
     def source_cmd_output(self):
@@ -67,23 +70,42 @@ class FlowsCtrler:
         """
         flow = flow_tuple[0]
         logging.debug("start flow: " + str(flow))
+        sink_cmd_output_transmitter = self.sink_cmd_output.transmit
+        source_cmd_output_transmitter = self.source_cmd_output.transmit
+        sink_to_join = True
+        source_to_join = True
+        if (flow.flipped):
+            source_cmd_output_transmitter = self.sink_cmd_output.transmit
+            sink_cmd_output_transmitter = self.source_cmd_output.transmit
+
         if (0 < flow.start_delay):
             sleep(flow.start_delay)
 
-        sink_start_cmd = flow.sink_unit.get_start_cmd()
-        sink_thread = threading.Thread(target=self.sink_cmd_output.transmit, args=(sink_start_cmd, ))
-        sink_thread.start()
+        if (flow.sink_unit is not None):
+            sink_start_cmd = flow.sink_unit.get_start_cmd()
+            sink_thread = threading.Thread(target=sink_cmd_output_transmitter, args=(sink_start_cmd, ))
+            sink_thread.start()
+        else:
+            sink_to_join = False
+
         if (0 < flow.sink_to_source_delay):
             sleep(flow.sink_to_source_delay)
+
+        if (flow.source_unit is not None):
+            source_start_cmd = flow.source_unit.get_start_cmd()
+            source_thread = threading.Thread(target=source_cmd_output_transmitter, args=(source_start_cmd, ))
+            source_thread.start()
+        else:
+            source_to_join = False
 
         if (self.__max_sink_to_source_delay < flow.sink_to_source_delay):
             self.__max_sink_to_source_delay = flow.sink_to_source_delay
 
-        source_start_cmd = flow.source_unit.get_start_cmd()
-        source_thread = threading.Thread(target=self.source_cmd_output.transmit, args=(source_start_cmd, ))
-        source_thread.start()
 
         self.__ready = True
 
-        sink_thread.join()
-        source_thread.join()
+        if sink_to_join:
+            sink_thread.join()
+
+        if source_to_join:
+            source_thread.join()

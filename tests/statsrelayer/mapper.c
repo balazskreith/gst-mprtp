@@ -78,7 +78,7 @@ void _packet_to_csv_proxy(Mapper* this, gpointer item) {
   gchar* buffer = this->write_item.subject;
   gint buffer_size;
   memset(buffer, 0, MAX_PACKET_BUF_SIZE);
-  buffer_size = sprintf(buffer,"%lu,%hu,%u,%u,%d,%u,%d,%d,%d,%hu,%hu,%d\n",
+  buffer_size = sprintf(buffer,"%lu,%hu,%u,%d,%d,%u,%d,%d,%d,%hu,%hu,%d\n",
       packet->tracked_ntp,
       packet->seq_num,
       packet->timestamp,

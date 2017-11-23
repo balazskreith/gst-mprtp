@@ -122,7 +122,7 @@ class MPEvaluator:
     """
     Represent an evaluator creating the necessary aggregated statistical files for plotting and summarizing
     """
-    def __init__(self, target_dir = None, snd_path = None, rcv_path = None, ply_path = None, tcp_path = None, bandwidths = None):
+    def __init__(self, target_dir = None, snd_path = None, rcv_path = None, ply_path = None, tcp_path = None, bandwidths = None, multipath_flownum = 1):
         """
         Parameters:
         -----------
@@ -143,6 +143,7 @@ class MPEvaluator:
         self.__ply_path = ply_path
         self.__tcp_path = tcp_path
         self.__bandwidths = bandwidths
+        self.__multipath_flownum = multipath_flownum
         self.__commander = ShellCommander(stdout = print, stderr = print)
         print(' '.join([snd_path, rcv_path, ply_path]))
 
@@ -180,6 +181,14 @@ class MPEvaluator:
         commands = []
         subindex = self.__snd_path[-6:]
         subindex = subindex[:2]
+
+        for subflow_id in range(1, self.__multipath_flownum + 1):
+
+            if 0 < self.__multipath_flownum:
+                subflow_postfix = "_" + str(subflow_id)
+            else:
+                subflow_postfix = ""
+
         result = {
             "sr_csv": self.__target_dir + "sr" + subindex + ".csv",
             "qmd_csv": self.__target_dir + "qmd" + subindex + ".csv",
@@ -217,7 +226,7 @@ class MPEvaluator:
         if (self.__tcp_path is not None):
             commands.append([statsmaker, result["tcp_csv"], "tcpstat", self.__tcp_path])
         else:
-            commands.append([statsmaker, result["tcp_csv"], None, self.__tcp_path])
+            result["tcp_csv"] = None
         # commands.append([statsmaker, result["ffre"], "ffre", snd_fec_packets, snd_rtp_packets, self.__rcv_path, self.__ply_path])
 
         # commands.append(["./paste.sh"])

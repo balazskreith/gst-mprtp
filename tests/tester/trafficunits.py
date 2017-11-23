@@ -5,6 +5,7 @@ from command import *
 class TrafficUnit:
     """Represent a TrafficUnit"""
     def __init__(self):
+        self.__packetlogs = []
         pass
 
     def get_start_cmd(self):
@@ -18,6 +19,15 @@ class TrafficUnit:
     def get_pause_cmd(self):
         """"Gets the pause command for the unit"""
         raise NotImplementedError
+
+    def get_logfile(self):
+        return None
+
+    def add_packetlogs(self, *packetlogs):
+        self.__packetlogs.extend(packetlogs)
+
+    def get_packetlogs(self):
+        return self.__packetlogs
 
 class RTPReceiverShellTrafficUnit(TrafficUnit, RTPReceiver):
     """
@@ -54,6 +64,7 @@ class RTPReceiverShellTrafficUnit(TrafficUnit, RTPReceiver):
         self.__mprtp_ext_header_id = mprtp_ext_header_id;
         self.__name = name
         self.__program_name = program_name
+        self.add_packetlogs(rcv_stat, ply_stat)
 
     def get_start_cmd(self):
         args = [" "]
@@ -78,10 +89,13 @@ class RTPReceiverShellTrafficUnit(TrafficUnit, RTPReceiver):
     def get_pause_cmd(self):
         return ShellCommand("ls -a")
 
+    def get_logfile(self):
+        return self.__name + ".log"
+
     def logging(self, message):
         if message == None:
             return
-        with open(self.__name + ".log", "w") as f:
+        with open(self.get_logfile(), "w") as f:
             if isinstance(message, bytes):
                 f.write(message.decode("utf-8"))
             else:
@@ -132,11 +146,15 @@ class RTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
         self.__mprtp_ext_header_id = mprtp_ext_header_id
         self.__name = name
         self.__program_name = program_name
+        self.add_packetlogs(snd_stat)
+
+    def get_logfile(self):
+        return self.__name + ".log"
 
     def logging(self, message):
         if message == None:
             return
-        with open(self.__name + ".log", "w") as f:
+        with open(self.get_logfile(), "w") as f:
             if isinstance(message, bytes):
                 f.write(message.decode("utf-8"))
             else:
@@ -208,19 +226,20 @@ class MPRTPReceiverShellTrafficUnit(TrafficUnit, RTPReceiver):
         self.__mprtp_ext_header_id = mprtp_ext_header_id;
         self.__name = name
         self.__program_name = program_name
+        self.add_packetlogs(rcv_stat, ply_stat)
 
     def get_start_cmd(self):
         args = [" "]
         args.append("--codec=" + str(self.codec.name))
-        args.append("--receiver=MPRTP:1:1:" + str(self.rtp_port))
-        args.append("--playouter=MPRTPFRACTAL:MPRTP:1:1:" + str(self.rtcp_ip) + ":" + str(self.rtcp_port))
-
+        subflows_num = len(self.rtcp_ip)
+        receiver = "--receiver=MPRTP:" + str(subflows_num)
+        playouter = "--playouter=MPRTPFRACTAL:MPRTP:" + str(subflows_num)
         for subflow_id in range(1,subflows_num+1):
-            receiver += str(subflow_id) + ":" + str(self.rtp_port[subflow_id-1])
-            playouter += str(subflow_id) + ":" + str(self.rtcp_ip[subflow_id-1]) + + ":" + str(self.rtcp_port[subflow_id-1])
+            receiver += ":" + str(subflow_id) + ":" + str(self.rtp_port[subflow_id-1])
+            playouter += ":" + str(subflow_id) + ":" + str(self.rtcp_ip[subflow_id-1]) + ":" + str(self.rtcp_port[subflow_id-1])
 
         args.append(receiver)
-        args.append(scheduler)
+        args.append(playouter)
 
         if (self.__rcv_stat):
             args.append("--stat=" + self.__rcv_stat + ":" + str(self.__mprtp_ext_header_id))
@@ -236,10 +255,13 @@ class MPRTPReceiverShellTrafficUnit(TrafficUnit, RTPReceiver):
     def get_pause_cmd(self):
         return ShellCommand("ls -a")
 
+    def get_logfile(self):
+        return self.__name + ".log"
+
     def logging(self, message):
         if message == None:
             return
-        with open(self.__name + ".log", "w") as f:
+        with open(self.get_logfile(), "w") as f:
             if isinstance(message, bytes):
                 f.write(message.decode("utf-8"))
             else:
@@ -290,11 +312,15 @@ class MPRTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
         self.__mprtp_ext_header_id = mprtp_ext_header_id
         self.__name = name
         self.__program_name = program_name
+        self.add_packetlogs(snd_stat)
+
+    def get_logfile(self):
+        return self.__name + ".log"
 
     def logging(self, message):
         if message == None:
             return
-        with open(self.__name + ".log", "w") as f:
+        with open(self.get_logfile(), "w") as f:
             if isinstance(message, bytes):
                 f.write(message.decode("utf-8"))
             else:
@@ -303,12 +329,13 @@ class MPRTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
     def get_start_cmd(self):
         args = [" "]
         args.append("--codec=" + str(self.codec.name))
+
         subflows_num = len(self.rtp_ip)
-        sender = "--sender=MPRTP:" + str(subflow_num) + ":"
-        scheduler = "--scheduler=MPRTPFRACTAL:MPRTP:" + str(subflow_num) + ":"
+        sender = "--sender=MPRTP:" + str(subflows_num)
+        scheduler = "--scheduler=MPRTPFRACTAL:MPRTP:" + str(subflows_num)
         for subflow_id in range(1,subflows_num+1):
-            sender += str(subflow_id) + ":" + str(self.rtp_ip[subflow_id-1]) + + ":" + str(self.rtp_port[subflow_id-1])
-            scheduler += str(subflow_id) + ":" + str(self.rtcp_port[subflow_id-1])
+            sender += ":" + str(subflow_id) + ":" + str(self.rtp_ip[subflow_id-1]) + ":" + str(self.rtp_port[subflow_id-1])
+            scheduler += ":" + str(subflow_id) + ":" + str(self.rtcp_port[subflow_id-1])
 
         args.append(sender)
         args.append(scheduler)
@@ -342,10 +369,13 @@ class TCPServerTrafficShellUnit(TrafficUnit, TCPServer):
         TrafficUnit.__init__(self)
         self.__name = name
 
+    def get_logfile(self):
+        return self.__name + ".log"
+
     def logging(self, message):
         if message == None:
             return
-        with open(self.__name + ".log", "w") as f:
+        with open(self.get_logfile(), "w") as f:
             if isinstance(message, bytes):
                 f.write(message.decode("utf-8"))
             else:
@@ -379,10 +409,13 @@ class TCPClientTrafficShellUnit(TrafficUnit, TCPClient):
         self.__name = name
         self.__duration = duration
 
+    def get_logfile(self):
+        return self.__name + ".log"
+
     def logging(self, message):
         if message == None:
             return
-        with open(self.__name + ".log", "w") as f:
+        with open(self.get_logfile(), "w") as f:
             if isinstance(message, bytes):
                 f.write(message.decode("utf-8"))
             else:

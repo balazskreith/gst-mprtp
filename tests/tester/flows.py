@@ -5,7 +5,7 @@ class Flow:
     Represent a flow contains a source and sink part
     """
     def __init__(self, source_unit, sink_unit, sink_to_source_delay = 0, start_delay = 0,
-        source_program_name = None, sink_program_name = None, flipped = False):
+        source_program_name = None, sink_program_name = None, flipped = False, packetlogs = [], outputlogs = []):
         """
         Parameters:
         -----------
@@ -25,6 +25,8 @@ class Flow:
         self.__source_program_name = source_program_name
         self.__sink_program_name = sink_program_name
         self.__flipped = flipped
+        self.__packetlogs = packetlogs
+        self.__outputlogs = outputlogs
 
     @property
     def sink_program_name(self):
@@ -35,6 +37,16 @@ class Flow:
     def source_program_name(self):
         """Get the sink_program_name property"""
         return self.__source_program_name
+
+    @property
+    def packetlogs(self):
+        """Get the packetlogs property"""
+        return self.__packetlogs
+
+    @property
+    def outputlogs(self):
+        """Get the outputlogs property"""
+        return self.__outputlogs
 
     @property
     def source_unit(self):
@@ -98,15 +110,21 @@ class RTPFlow(Flow):
         self.__flownum = flownum
         snd_pipeline = "snd_pipeline"
         rcv_pipeline = "rcv_pipeline"
+        snd_packetlog = "/tmp/snd_packets_" + str(self.__flownum) + ".csv"
+        rcv_packetlog = "/tmp/rcv_packets_" + str(self.__flownum) + ".csv"
+        ply_packetlog = "/tmp/ply_packets_" + str(self.__flownum) + ".csv"
         rtp_sender = RTPSenderShellTrafficUnit(name=name+"-snd", path=path, program_name = snd_pipeline, codec=codec,
-            algorithm=algorithm, rtcp_port=rtcp_port, rtp_ip=rtp_ip, rtp_port=rtp_port, snd_stat="/tmp/snd_packets_" + str(self.__flownum) + ".csv",
+            algorithm=algorithm, rtcp_port=rtcp_port, rtp_ip=rtp_ip, rtp_port=rtp_port, snd_stat=snd_packetlog,
             source_type=source_type, mprtp_ext_header_id=mprtp_ext_header_id)
 
         rtp_receiver = RTPReceiverShellTrafficUnit(name=name+"-rcv", path=path, program_name = rcv_pipeline, codec=codec,
             algorithm=algorithm, rtp_port=rtp_port, rtcp_ip=rtcp_ip, rtcp_port=rtcp_port,
-            rcv_stat="/tmp/rcv_packets_" + str(self.__flownum) + ".csv", ply_stat="/tmp/ply_packets_" + str(self.__flownum) + ".csv",
-            sink_type=sink_type, mprtp_ext_header_id=mprtp_ext_header_id)
-        Flow.__init__(self, rtp_sender, rtp_receiver, sink_to_source_delay = 2, start_delay = start_delay, flipped = flipped)
+            rcv_stat=rcv_packetlog, ply_stat=ply_packetlog, sink_type=sink_type, mprtp_ext_header_id=mprtp_ext_header_id)
+
+        outputlogs = [rtp_sender.get_logfile(), rtp_receiver.get_logfile()]
+        packetlogs = [snd_packetlog rcv_packetlog, ply_packetlog]
+        Flow.__init__(self, rtp_sender, rtp_receiver, sink_to_source_delay = 2, start_delay = start_delay, flipped = flipped,
+            outputlogs = outputlogs, packetlogs = packetlogs)
 
     def __str__(self):
         """Get the human readable format of the object"""
@@ -151,15 +169,23 @@ class MPRTPFlow(Flow):
         self.__flownum = flownum
         snd_pipeline = "snd_pipeline"
         rcv_pipeline = "rcv_pipeline"
+        snd_packetlog = "/tmp/snd_packets_" + str(self.__flownum) + ".csv"
+        rcv_packetlog = "/tmp/rcv_packets_" + str(self.__flownum) + ".csv"
+        ply_packetlog = "/tmp/ply_packets_" + str(self.__flownum) + ".csv"
         mprtp_sender = MPRTPSenderShellTrafficUnit(name=name+"-snd", path=path, program_name = snd_pipeline, codec=codec,
-            algorithm=algorithm, rtcp_ports=rtcp_ports, rtp_ips=rtp_ips, rtp_ports=rtp_ports, snd_stat="/tmp/snd_packets_" + str(self.__flownum) + ".csv",
+            algorithm=algorithm, rtcp_ports=rtcp_ports, rtp_ips=rtp_ips, rtp_ports=rtp_ports, snd_stat=snd_packetlog,
             source_type=source_type, mprtp_ext_header_id=mprtp_ext_header_id)
 
         mprtp_receiver = MPRTPReceiverShellTrafficUnit(name=name+"-rcv", path=path, program_name = rcv_pipeline, codec=codec,
             algorithm=algorithm, rtp_ports=rtp_ports, rtcp_ips=rtcp_ips, rtcp_ports=rtcp_ports,
-            rcv_stat="/tmp/rcv_packets_" + str(self.__flownum) + ".csv", ply_stat="/tmp/ply_packets_" + str(self.__flownum) + ".csv",
+            rcv_stat=rcv_packetlog, ply_stat=ply_packetlog,
             sink_type=sink_type, mprtp_ext_header_id=mprtp_ext_header_id)
-        Flow.__init__(self, mprtp_sender, mprtp_receiver, sink_to_source_delay = 2, start_delay = start_delay, flipped = flipped)
+
+        outputlogs = [rtp_sender.get_logfile(), rtp_receiver.get_logfile()]
+        packetlogs = [snd_packetlog rcv_packetlog, ply_packetlog]
+
+        Flow.__init__(self, mprtp_sender, mprtp_receiver, sink_to_source_delay = 2, start_delay = start_delay, flipped = flipped,
+            outputlogs = outputlogs, packetlogs = packetlogs)
 
     def __str__(self):
         """Get the human readable format of the object"""
@@ -188,15 +214,20 @@ class TCPFlow(Flow):
         self.__name = name
         self.__server_ip = server_ip
         self.__server_port = server_port
+        outputlogs = []
+        packetlogs = []
         if tcp_server is None:
             self.__tcp_server = TCPServerTrafficShellUnit("TCPServer", server_ip, server_port)
+            outputlogs.append()
+            packetlogs.append()
         else:
             self.__tcp_server = tcp_server
 
         self.__duration = duration
-
         tcp_client = TCPClientTrafficShellUnit("TCPClient", self.__tcp_server, duration) if create_client is True else None
-        Flow.__init__(self, tcp_client, self.__tcp_server if tcp_server is None else None, sink_to_source_delay = 0, start_delay = start_delay)
+
+        Flow.__init__(self, tcp_client, self.__tcp_server if tcp_server is None else None, sink_to_source_delay = 0, start_delay = start_delay,
+            outputlogs = outputlogs, packetlogs = packetlogs)
 
     @property
     def tcp_server(self):

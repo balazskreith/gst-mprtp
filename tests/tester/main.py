@@ -50,6 +50,12 @@ class Tester:
     def setup(self, algorithm, params):
         self.__target_dir = params.target
         self.__test = self.__make_test(params.type, algorithm, params.latency, params.jitter, params.source, params.sink)
+        self.__plotter = None
+        self.__evaluator = None
+
+        self.__test.add_evaluator(self.__evaluator)
+        self.__evaluator.add_plotter(self.__plotter)
+
         self.__test_ctrler = TestCtrlerBuilder.make(self.__test)
         self.__duration = self.__test.duration + self.__test_ctrler.get_max_source_to_sink_delay() + 2
 

@@ -1,7 +1,0 @@
-Make Delta Packet Statlogs.
-Source file:             ../../scripts/saves/mprtp1/fractal_0_50ms_0ms/merged_statlogs2.csv
-Destination file:        ../../scripts/saves/mprtp1/fractal_0_50ms_0ms/delta_statlogs2.csv
-Accumulation length:     1000ms
-Sampling time:           100ms
-Unit of delay:           us
-Unit of bytes in flight: byte

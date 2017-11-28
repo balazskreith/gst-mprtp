@@ -1,1 +1,0 @@
-./snd_pipeline --source=FILE:foreman_cif.yuv:1:352:288:2:25/1 --codec=VP8 --stat=triggered_stat:temp/snd_packets_1.csv:0 --sender=MPRTP:1:1:10.0.0.6:5100 --scheduler=MPRTPFRACTAL:MPRTP:1:1:5101 

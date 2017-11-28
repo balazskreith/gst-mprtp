@@ -1,1 +1,0 @@
-./rcv_pipeline --sink=FILE:consumed.yuv --codec=VP8 --stat=100:1000:1:triggered_stat --statlogsink=MULTIFILE:2:1:temp/rcv_statlogs.csv:2:temp/rcv_statlogs2.csv --packetlogsink=MULTIFILE:2:1:temp/rcv_packetlogs.csv:2:temp/rcv_packetlogs2.csv --receiver=MPRTP:2:1:5000:2:5002 --playouter=MPRTPFRACTAL:MPRTP:2:1:10.0.0.1:5001:2:10.0.1.1:5003 

@@ -15,7 +15,7 @@ class PathCtrler:
     get_cmd : Command[]
         Returns a sequence of commands for controlling the path
     """
-    def __init__(self, path_name, path_stage):
+    def __init__(self, path_name, path_stage, packetlogs = [], outputlogs = []):
         """
         Init the parameter for the test
 
@@ -27,6 +27,8 @@ class PathCtrler:
         self.__path_name = path_name
         self.__path_stage = path_stage
         self.__stop = False
+        self.__packetlogs = packetlogs
+        self.__outputlogs = outputlogs
 
     def stop(self):
         """Get stop"""
@@ -34,6 +36,16 @@ class PathCtrler:
 
     def isStopped(self):
         return self.__stop
+
+    @property
+    def packetlogs(self):
+        """Get path_name"""
+        return self.__packetlogs
+
+    @property
+    def outputlogs(self):
+        """Get path_name"""
+        return self.__outputlogs
 
     @property
     def path_name(self):
@@ -66,7 +78,7 @@ class PathPcapListener(PathCtrler):
         self.__network_type = network_type
         self.__network_interface = network_interface
         self.__log_path = log_path
-        PathCtrler.__init__(self, network_interface, None)
+        PathCtrler.__init__(self, network_interface, None, packetlogs = [self.__log_path], outputlogs = [])
 
     def get_cmd(self):
         args = []

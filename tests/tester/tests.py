@@ -10,21 +10,11 @@ from collections import deque
 
 import numpy as np
 
-class TestDescriptor:
-    def __init__(self):
-        pass
-
-    def add_flow(self):
-        pass
-
-    def add_path(self):
-        pass
-
 class MyTest(object):
     """
     Represent a test
     """
-    def __init__(self, name, duration, algorithm, latency, jitter, evaluator):
+    def __init__(self, name, duration, algorithm, latency, jitter):
         """
         Private method making path stages
         Parameters:
@@ -42,23 +32,12 @@ class MyTest(object):
         self.__forward_path_bandwidths = []
         self.__backward_path_bandwidths = []
         self.__multipath = False
-        self.__evaluator = None
-        self.__descriptor = TestDescriptor()
 
     def set_multipath(self, value):
         self.__multipath = value
 
     def add_evaluator(self, evaluator):
         self.__evaluator = evaluator
-
-    @property
-    def evaluator(self):
-        return self.__evaluator
-
-    @property
-    def descriptor(self):
-        """Returns the descriptor of the test"""
-        return self.__descriptor
 
     @property
     def multipath(self):
@@ -115,6 +94,9 @@ class MyTest(object):
         """Gets the name of the test"""
         return self.__name
 
+    def get_plot_description(self):
+        return []
+
     def make_path_stage(self, stages_deque, bandwidths):
         """
         Private method making path stages
@@ -147,7 +129,6 @@ class MyTest(object):
         path_stages = self.make_path_stage(stages_deque, bandwidths)
         return bandwidths, path_stages
 
-
     def get_flows(self):
         """"Gets the flows for the test"""
         return []
@@ -176,10 +157,10 @@ class RMCAT1(MyTest):
         self.__forward_flow = None
         self.__flows = self.__generate_flows()
         self.__path_ctrlers = self.__generate_path_ctrlers()
-
+        self.__description = self.__generate_description()
 
     def __generate_flows(self):
-        rtp_flow = RTPFlow(name="rtpflow_1",
+        self.__forward_flow = RTPFlow(name="rtpflow_1",
             path="./",
             flownum=1,
             codec=Codecs.VP8,
@@ -192,8 +173,8 @@ class RMCAT1(MyTest):
             source_type = self.__source_type,
             sink_type = self.__sink_type,
             mprtp_ext_header_id = self.__mprtp_ext_header_id)
-        self.__forward_flow = [rtp_flow]
-        return self.__forward_flows
+        result = [self.__forward_flow]
+        return result
 
     def __generate_path_ctrlers(self):
         stages = [
@@ -220,6 +201,29 @@ class RMCAT1(MyTest):
         result = [self.__forward_path_ctrler]
         return result
 
+    def __generate_description(self):
+        forward_flow = {
+            "flow_id": "rtpflow",
+            "title": "RTP",
+            "plot_fec": True,
+            "fec_title": "RTP + FEC",
+            "path_ctrler": self.__forward_path_ctrler,
+            "flow": self.__forward_flow,
+            "evaluations": None,
+            "sources": None,
+        }
+        return [forward_flow]
+
+    def get_plot_description(self):
+        return [{
+            "plot_id": "flow",
+            "filename": '_'.join([self.name, str(self.algorithm.name), str(self.latency) + "ms", str(self.jitter) + "ms"]),
+            "type": "srqmd",
+            "flow_ids": ["rtpflow"],
+            "bandwidths": self.__forward_bandwidths,
+            "plot_bandwidth": True,
+        }]
+
     def get_flows(self):
         return self.__flows
 
@@ -227,13 +231,8 @@ class RMCAT1(MyTest):
         return self.__path_ctrlers
 
     def get_descriptions(self):
-        forward_flow = {
-            "name": None,
-            "path": self.__forward_path_ctrler,
-            "flows": [self.__forward_flow],
-            "plot_fec": True, # TODO: No, not here, but in the evaluator init params whether plot the FEC or not
-        }
-        return [forward_flow]
+        return self.__description
+
 
 
 class RMCAT2(MyTest):
@@ -254,6 +253,7 @@ class RMCAT2(MyTest):
         self.__forward_flow_2 = None
         self.__flows = self.__generate_flows()
         self.__path_ctrlers = self.__generate_path_ctrlers()
+        self.__description = self.__generate_description()
 
     def __generate_flows(self):
         self.__forward_flow_1 = RTPFlow(name="rtpflow_1",
@@ -315,6 +315,37 @@ class RMCAT2(MyTest):
         result = [self.__forward_path_ctrler]
         return result
 
+    def __generate_description(self):
+        forward_flow_1 = {
+            "flow_id": "rtpflow_1",
+            "title": "RTP 1",
+            "path_ctrler": self.__forward_path_ctrler,
+            "flow": self.__forward_flow_1,
+            "evaluations": None,
+            "sources": None,
+        }
+
+        forward_flow_2 = {
+            "flow_id": "rtpflow_2",
+            "title": "RTP 2",
+            "path_ctrler": self.__forward_path_ctrler,
+            "flow": self.__forward_flow_2,
+            "evaluations": None,
+            "sources": None,
+        }
+        return [forward_flow_1, forward_flow_2]
+
+    def get_plot_description(self):
+        return [{
+            "plot_id": "flows",
+            "filename": '_'.join([self.name, str(self.algorithm.name), str(self.latency) + "ms",
+                                 str(self.jitter) + "ms"]),
+            "type": "srqmd",
+            "flow_ids": ["rtpflow_1", "rtpflow_2"],
+            "bandwidths": self.__forward_bandwidths,
+            "plot_bandwidth": True,
+        }]
+
     def get_flows(self):
         return self.__flows
 
@@ -322,12 +353,7 @@ class RMCAT2(MyTest):
         return self.__path_ctrlers
 
     def get_descriptions(self):
-        forward_flow = {
-            "name": None,
-            "path": self.__forward_path_ctrler,
-            "flows": [self.__forward_flow_1, self.__forward_flow_2],
-        }
-        return [forward_flow]
+        return self.__description
 
 
 class RMCAT3(MyTest):
@@ -352,6 +378,7 @@ class RMCAT3(MyTest):
 
         self.__flows = self.__generate_flows()
         self.__path_ctrlers = self.__generate_path_ctrlers()
+        self.__description = self.__generate_description()
 
     def __generate_flows(self):
         self.__forward_flow = RTPFlow(name="rtpflow_1",
@@ -366,7 +393,8 @@ class RMCAT3(MyTest):
             start_delay = 0,
             source_type = self.__source_type,
             sink_type = self.__sink_type,
-            mprtp_ext_header_id = self.__mprtp_ext_header_id)
+            mprtp_ext_header_id = self.__mprtp_ext_header_id
+            )
 
         self.__backward_flow = RTPFlow(name="rtpflow_2",
             path="./",
@@ -381,7 +409,9 @@ class RMCAT3(MyTest):
             source_type = self.__source_type,
             sink_type = self.__sink_type,
             mprtp_ext_header_id = self.__mprtp_ext_header_id,
-            flipped = True)
+            flipped = True
+            )
+
         result = [self.__forward_flow, self.__backward_flow]
         return result
 
@@ -427,6 +457,47 @@ class RMCAT3(MyTest):
 
         return result
 
+    def __generate_description(self):
+        forward_flow = {
+            "flow_id": "rtpflow_1",
+            "title": "RTP 1",
+            "path_ctrler": self.__forward_path_ctrler,
+            "flow": self.__forward_flow,
+            "evaluations": None,
+            "sources": None,
+        }
+
+        backward_flow = {
+            "flow_id": "rtpflow_2",
+            "title": "RTP 2",
+            "path_ctrler": self.__backward_path_ctrler,
+            "flow": self.__backward_flow,
+            "evaluations": None,
+            "sources": None,
+        }
+        return [forward_flow, backward_flow]
+
+    def get_plot_description(self):
+        return [{
+            "plot_id": "forward_flows",
+            "filename": '_'.join([self.name, "forward", str(self.algorithm.name), str(self.latency) + "ms",
+                                 str(self.jitter) + "ms"]),
+            "type": "srqmd",
+            "flow_ids": ["rtpflow_1"],
+            "bandwidths": self.__forward_bandwidths,
+            "plot_bandwidth": True,
+        },
+        {
+            "plot_id": "backward_flows",
+            "filename": '_'.join([self.name, "backward", str(self.algorithm.name), str(self.latency) + "ms",
+                                 str(self.jitter) + "ms"]),
+            "type": "srqmd",
+            "flow_ids": ["rtpflow_2"],
+            "bandwidths": self.__backward_bandwidths,
+            "plot_bandwidth": True,
+        },
+        ]
+
     def get_flows(self):
         return self.__flows
 
@@ -434,21 +505,7 @@ class RMCAT3(MyTest):
         return self.__path_ctrlers
 
     def get_descriptions(self):
-        forward_flow = {
-            "name": "forward",
-            "path_ctrler": self.__forward_path_ctrler,
-            "flows": [self.__forward_flow],
-            "bandwidths": self.__forward_bandwidths,
-        }
-
-        backward_flow = {
-            "name": "backward",
-            "path_ctrler": self.__backward_path_ctrler,
-            "flows": [self.__backward_flow],
-            "bandwidths": self.__backward_bandwidths,
-        }
-
-        return [forward_flow, backward_flow]
+        return self.__description
 
 
 class RMCAT4(MyTest):
@@ -471,6 +528,7 @@ class RMCAT4(MyTest):
 
         self.__flows = self.__generate_flows()
         self.__path_ctrlers = self.__generate_path_ctrlers()
+        self.__description = self.__generate_description()
 
     def __generate_flows(self):
         self.__forward_flow_1 = RTPFlow(name="rtpflow_1",
@@ -485,7 +543,8 @@ class RMCAT4(MyTest):
             start_delay = 0,
             source_type = self.__source_type,
             sink_type = self.__sink_type,
-            mprtp_ext_header_id = self.__mprtp_ext_header_id)
+            mprtp_ext_header_id = self.__mprtp_ext_header_id,
+            )
 
         self.__forward_flow_2 = RTPFlow(name="rtpflow_2",
             path="./",
@@ -499,7 +558,8 @@ class RMCAT4(MyTest):
             start_delay = 10,
             source_type = self.__source_type,
             sink_type = self.__sink_type,
-            mprtp_ext_header_id = self.__mprtp_ext_header_id)
+            mprtp_ext_header_id = self.__mprtp_ext_header_id
+            )
 
         self.__forward_flow_3 = RTPFlow(name="rtpflow_3",
             path="./",
@@ -513,7 +573,8 @@ class RMCAT4(MyTest):
             start_delay = 20,
             source_type = self.__source_type,
             sink_type = self.__sink_type,
-            mprtp_ext_header_id = self.__mprtp_ext_header_id)
+            mprtp_ext_header_id = self.__mprtp_ext_header_id
+            )
 
         result = [self.__forward_flow_1, self.__forward_flow_2, self.__forward_flow_3]
         return result
@@ -529,8 +590,50 @@ class RMCAT4(MyTest):
         self.__forward_path_ctrler = PathShellCtrler(path_name="veth2", path_stage = path_stage)
 
         result = [self.__forward_path_ctrler]
-
         return result
+
+    def __generate_description(self):
+        forward_flow_1 = {
+            "flow_id": "rtpflow_1",
+            "title": "Flow 1",
+            "path_ctrler": self.__forward_path_ctrler,
+            "flow": self.__forward_flow_1,
+            "plot": None,
+            "evaluations": None,
+            "sources": None,
+        }
+
+        forward_flow_2 = {
+            "flow_id": "rtpflow_2",
+            "title": "Flow 2",
+            "path_ctrler": self.__forward_path_ctrler,
+            "flow": self.__forward_flow_2,
+            "plot": None,
+            "evaluations": None,
+            "sources": None,
+        }
+
+        forward_flow_3 = {
+            "flow_id": "rtpflow_3",
+            "title": "Flow 3",
+            "path_ctrler": self.__forward_path_ctrler,
+            "flow": self.__forward_flow_3,
+            "plot": None,
+            "evaluations": None,
+            "sources": None,
+        }
+        return [forward_flow_1, forward_flow_2, forward_flow_3]
+
+    def get_plot_description(self):
+        return [{
+            "type": "srqmd",
+            "plot_id": "flows",
+            "filename": '_'.join([self.name, str(self.algorithm.name), str(self.latency) + "ms",
+                                 str(self.jitter) + "ms"]),
+            "flow_ids": ["rtpflow_1", "rtpflow_2", "rtpflow_3"],
+            "bandwidths": self.__forward_bandwidths,
+            "plot_bandwidth": True,
+        }]
 
     def get_flows(self):
         return self.__flows
@@ -539,14 +642,7 @@ class RMCAT4(MyTest):
         return self.__path_ctrlers
 
     def get_descriptions(self):
-        forward_flow = {
-            "name": "forward",
-            "path_ctrler": self.__forward_path_ctrler,
-            "flows": [self.__forward_flow_1, self.__forward_flow_2, self.__forward_flow_3],
-            "bandwidths": self.__forward_bandwidths
-        }
-
-        return [forward_flow]
+      return self.__description
 
 class RMCAT5(MyTest):
     def __init__(self, algorithm, latency, jitter, source_type, sink_type, mprtp_ext_header = 0, fec_payload_type_id = 0):
@@ -568,6 +664,7 @@ class RMCAT5(MyTest):
 
         self.__flows = self.__generate_flows()
         self.__path_ctrlers = self.__generate_path_ctrlers()
+        self.__description = self.__generate_description()
 
     def __generate_flows(self):
         self.__forward_flow_1 = RTPFlow(name="rtpflow_1",
@@ -582,7 +679,8 @@ class RMCAT5(MyTest):
             start_delay = 0,
             source_type = self.__source_type,
             sink_type = self.__sink_type,
-            mprtp_ext_header_id = self.__mprtp_ext_header_id)
+            mprtp_ext_header_id = self.__mprtp_ext_header_id
+            )
 
         self.__forward_flow_2 = RTPFlow(name="rtpflow_2",
             path="./",
@@ -596,7 +694,8 @@ class RMCAT5(MyTest):
             start_delay = 10,
             source_type = self.__source_type,
             sink_type = self.__sink_type,
-            mprtp_ext_header_id = self.__mprtp_ext_header_id)
+            mprtp_ext_header_id = self.__mprtp_ext_header_id
+            )
 
         self.__forward_flow_3 = RTPFlow(name="rtpflow_3",
             path="./",
@@ -610,7 +709,8 @@ class RMCAT5(MyTest):
             start_delay = 20,
             source_type = self.__source_type,
             sink_type = self.__sink_type,
-            mprtp_ext_header_id = self.__mprtp_ext_header_id)
+            mprtp_ext_header_id = self.__mprtp_ext_header_id
+            )
 
         result = [self.__forward_flow_1, self.__forward_flow_2, self.__forward_flow_3]
         return result
@@ -626,8 +726,53 @@ class RMCAT5(MyTest):
         self.__forward_path_ctrler = PathShellCtrler(path_name="veth2", path_stage = path_stage)
 
         result = [self.__forward_path_ctrler]
-
         return result
+
+    def __generate_description(self):
+        forward_flow_1 = {
+            "flow_id": "rtpflow_1",
+            "title": "Flow 1",
+            "path_ctrler": self.__forward_path_ctrler,
+            "flow": self.__forward_flow_1,
+            "bandwidths": self.__forward_bandwidths,
+            "plot": None,
+            "evaluations": None,
+            "sources": None,
+        }
+
+        forward_flow_2 = {
+            "flow_id": "rtpflow_2",
+            "title": "Flow 2",
+            "path_ctrler": self.__forward_path_ctrler,
+            "flow": self.__forward_flow_2,
+            "plot": None,
+            "evaluations": None,
+            "sources": None,
+        }
+
+        forward_flow_3 = {
+            "flow_id": "rtpflow_3",
+            "title": "Flow 3",
+            "path_ctrler": self.__forward_path_ctrler,
+            "flow": self.__forward_flow_3,
+            "plot": None,
+            "evaluations": None,
+            "sources": None,
+        }
+        return [forward_flow_1, forward_flow_2, forward_flow_3]
+
+    def get_plot_description(self):
+        return [{
+            "type": "srqmd",
+            "plot_id": "flows",
+            "sr_title": "Sending Rates",
+            "qmd_title": "Queue delay",
+            "filename": '_'.join([self.name, str(self.algorithm.name), str(self.latency) + "ms",
+                                 str(self.jitter) + "ms"]),
+            "flow_ids": ["rtpflow_1", "rtpflow_2", "rtpflow_3"],
+            "bandwidths": self.__forward_bandwidths,
+            "plot_bandwidth": True,
+        }]
 
     def get_flows(self):
         return self.__flows
@@ -636,14 +781,7 @@ class RMCAT5(MyTest):
         return self.__path_ctrlers
 
     def get_descriptions(self):
-        forward_flow = {
-            "name": "forward",
-            "path_ctrler": self.__forward_path_ctrler,
-            "flows": [self.__forward_flow_1, self.__forward_flow_2, self.__forward_flow_3],
-            "bandwidths": self.__forward_bandwidths
-        }
-
-        return [forward_flow]
+        return self.__description
 
 
 class RMCAT6(MyTest):
@@ -663,9 +801,11 @@ class RMCAT6(MyTest):
         self.__forward_pcap_ctrler = None
         self.__forward_rtp_flow = None
         self.__forward_tcp_flow = None
+        self.__tcp_packetlog = "tcp_packets_1.pcap"
 
         self.__flows = self.__generate_flows()
         self.__path_ctrlers = self.__generate_path_ctrlers()
+        self.__description = self.__generate_description()
 
     def __generate_flows(self):
         self.__forward_rtp_flow = RTPFlow(name="rtpflow_1",
@@ -680,9 +820,13 @@ class RMCAT6(MyTest):
             start_delay = 3,
             source_type = self.__source_type,
             sink_type = self.__sink_type,
-            mprtp_ext_header_id = self.__mprtp_ext_header_id)
+            mprtp_ext_header_id = self.__mprtp_ext_header_id,
 
-        self.__forward_tcp_flow = TCPFlow(name = "TCPLong flow", server_ip = "10.0.0.6", server_port = "12345", duration = 120)
+        )
+
+        self.__forward_tcp_flow = TCPFlow(name="TCPLong flow", server_ip="10.0.0.6",
+                                          server_port="12345", duration=120, packetlogs=[self.__tcp_packetlog]
+                                          )
         return [self.__forward_rtp_flow, self.__forward_tcp_flow]
 
     def __generate_path_ctrlers(self):
@@ -694,9 +838,43 @@ class RMCAT6(MyTest):
         ]
         self.__forward_bandwidths, path_stage = self.make_bandwidths_and_path_stage(deque(stages))
         self.__forward_path_ctrler = PathShellCtrler(path_name="veth2", path_stage = path_stage)
-        self.__forward_pcap_listener = PathPcapListener(network_type = "tcp", network_interface = "veth2", log_path = "tcp_packets_1.pcap")
+        self.__forward_pcap_listener = PathPcapListener(network_type = "tcp", network_interface = "veth2",
+                                                        log_path = self.__tcp_packetlog)
         result = [self.__forward_path_ctrler, self.__forward_pcap_listener]
         return result
+
+    def __generate_description(self):
+        forward_rtp_flow = {
+            "flow_id": "rtpflow",
+            "title": "RTP",
+            "path_ctrler": self.__forward_path_ctrler,
+            "flow": self.__forward_rtp_flow,
+            "evaluations": None,
+            "sources": None,
+        }
+
+        forward_tcp_flow = {
+            "flow_id": "tcpflow",
+            "title": "TCP",
+            "path_ctrler": self.__forward_path_ctrler,
+            "flow": self.__forward_tcp_flow,
+            "evaluations": None,
+            "sources": None,
+        }
+        return [forward_rtp_flow, forward_tcp_flow]
+
+    def get_plot_description(self):
+        return [{
+            "plot_id": "flows",
+            "sr_title": "Sending Rates",
+            "qmd_title": "Queue delay",
+            "filename": '_'.join([self.name, str(self.algorithm.name), str(self.latency) + "ms",
+                                 str(self.jitter) + "ms"]),
+            "type": "srqmd",
+            "flow_ids": ["rtpflow", "tcpflow"],
+            "bandwidths": self.__forward_bandwidths,
+            "plot_bandwidth": False,
+        }]
 
     def get_flows(self):
         return self.__flows
@@ -705,16 +883,7 @@ class RMCAT6(MyTest):
         return self.__path_ctrlers
 
     def get_descriptions(self):
-        forward_flow = {
-            "name": "forward",
-            "path_ctrler": self.__forward_path_ctrler,
-            "flows": [self.__forward_rtp_flow, self.__forward_tcp_flow],
-            "bandwidths": self.__forward_bandwidths,
-            "pcap_ctrler": self.__forward_pcap_listener,
-        }
-
-        return [forward_flow]
-
+        return self.__description
 
 class RMCAT7(MyTest):
     def __init__(self, algorithm, latency, jitter, source_type, sink_type, mprtp_ext_header = 0, fec_payload_type_id = 0):
@@ -733,9 +902,11 @@ class RMCAT7(MyTest):
         self.__forward_pcap_ctrler = None
         self.__forward_rtp_flow = None
         self.__forward_tcp_flow = None
+        self.__tcp_packetlog = "tcp_packets.pcap"
 
         self.__flows = self.__generate_flows()
         self.__path_ctrlers = self.__generate_path_ctrlers()
+        self.__description = self.__generate_description()
 
     def __generate_flows(self):
         self.__forward_rtp_flow = RTPFlow(name="rtpflow_1",
@@ -750,9 +921,12 @@ class RMCAT7(MyTest):
             start_delay = 3,
             source_type = self.__source_type,
             sink_type = self.__sink_type,
-            mprtp_ext_header_id = self.__mprtp_ext_header_id)
+            mprtp_ext_header_id = self.__mprtp_ext_header_id
+        )
 
-        self.__forward_tcp_flow = TCPFlow(name = "TCPLong flow", server_ip = "10.0.0.6", server_port = "12345", duration = 300, create_client = False)
+        self.__forward_tcp_flow = TCPFlow(name = "TCPLong flow", server_ip = "10.0.0.6",
+                                          server_port = "12345", duration = 300, create_client = False,
+                                          packetlogs=[self.__tcp_packetlog])
 
         result = [self.__forward_rtp_flow, self.__forward_tcp_flow]
         start_time = 0
@@ -763,8 +937,9 @@ class RMCAT7(MyTest):
             for x in range(0,end):
                 duration = int(np.random.exponential(scale = 20.0)) + 1
                 tcp_server = self.__forward_tcp_flow.tcp_server
-                tcp_flow = TCPFlow(name = "TCPLong flow", server_ip = None, server_port = None, tcp_server = tcp_server, start_delay = start_time,
-                    duration = duration)
+                tcp_flow = TCPFlow(name = "TCPLong flow", server_ip = None, server_port = None,
+                                   tcp_server = tcp_server, start_delay = start_time,
+                                    duration = duration)
                 start_time_plus = duration if start_time_plus < duration else start_time_plus
                 start_time += int(np.random.uniform(low = 0, high = duration / 2)) + 1
                 result.append(tcp_flow)
@@ -774,14 +949,48 @@ class RMCAT7(MyTest):
         stages = [
         {
             "duration": 300,
-            "config" : PathConfig(bandwidth = 2000, latency = self.__latency, jitter = self.__jitter)
+            "config" : PathConfig(bandwidth=2000, latency=self.__latency, jitter=self.__jitter)
         },
         ]
         self.__forward_bandwidths, path_stage = self.make_bandwidths_and_path_stage(deque(stages))
         self.__forward_path_ctrler = PathShellCtrler(path_name="veth2", path_stage = path_stage)
-        self.__forward_pcap_listener = PathPcapListener(network_type = "tcp", network_interface = "veth2", log_path = "tcp_packets_1.pcap")
+        self.__forward_pcap_listener = PathPcapListener(network_type="tcp",
+                                                        network_interface="veth2", log_path=self.__tcp_packetlog)
         result = [self.__forward_path_ctrler, self.__forward_pcap_listener]
         return result
+
+    def __generate_description(self):
+        forward_rtp_flow = {
+            "flow_id": "rtpflow",
+            "title": "RTP",
+            "path_ctrler": self.__forward_path_ctrler,
+            "flow": self.__forward_rtp_flow,
+            "evaluations": None,
+            "sources": None,
+        }
+
+        forward_tcp_flow = {
+            "flow_id": "tcpflow",
+            "title": "TCP",
+            "path_ctrler": self.__forward_path_ctrler,
+            "flow": self.__forward_tcp_flow,
+            "evaluations": None,
+            "sources": None,
+        }
+        return [forward_rtp_flow, forward_tcp_flow]
+
+    def get_plot_description(self):
+        return [{
+            "plot_id": "flows",
+            "sr_title": "Sending Rates",
+            "qmd_title": "Queue delay",
+            "filename": '_'.join([self.name, str(self.algorithm.name), str(self.latency) + "ms",
+                                 str(self.jitter) + "ms"]),
+            "type": "srqmd",
+            "flow_ids": ["rtpflow", "tcpflow"],
+            "bandwidths": self.__forward_bandwidths,
+            "plot_bandwidth": False,
+        }]
 
     def get_flows(self):
         return self.__flows
@@ -790,15 +999,9 @@ class RMCAT7(MyTest):
         return self.__path_ctrlers
 
     def get_descriptions(self):
-        forward_flow = {
-            "name": "forward",
-            "path_ctrler": self.__forward_path_ctrler,
-            "flows": [self.__forward_rtp_flow, self.__forward_tcp_flow],
-            "bandwidths": self.__forward_bandwidths,
-            "pcap_ctrler": self.__forward_pcap_listener,
-        }
+        return self.__description
 
-        return [forward_flow]
+
 
 class MPRTP1(MyTest):
     def __init__(self, algorithm, latency, jitter, source_type, sink_type, mprtp_ext_header = 3, fec_payload_type_id = 126):
@@ -814,10 +1017,13 @@ class MPRTP1(MyTest):
 
         self.__forward_bandwidths_1 = None
         self.__forward_path_ctrler_1 = None
+        self.__forward_bandwidths_2 = None
+        self.__forward_path_ctrler_2 = None
         self.__forward_rtp_flow = None
 
         self.__flows = self.__generate_flows()
         self.__path_ctrlers = self.__generate_path_ctrlers()
+        self.__description = self.__generate_description()
 
     def __generate_flows(self):
         self.__forward_rtp_flow = MPRTPFlow(name="mprtpflow_1",
@@ -832,7 +1038,9 @@ class MPRTP1(MyTest):
             start_delay = 0,
             source_type = self.__source_type,
             sink_type = self.__sink_type,
-            mprtp_ext_header_id = self.__mprtp_ext_header_id)
+            mprtp_ext_header_id = self.__mprtp_ext_header_id,
+            subflow_ids=[1,2]
+            )
 
         result = [self.__forward_rtp_flow]
         return result
@@ -878,6 +1086,68 @@ class MPRTP1(MyTest):
         result = [self.__forward_path_ctrler_1, self.__forward_path_ctrler_2]
         return result
 
+    def __generate_description(self):
+        forward_flow_1 = {
+            "flow_id": "rtpsubflow_1",
+            "title": "RTP",
+            "fec_title": "RTP + FEC",
+            "plot_fec": True,
+            "path_ctrler": self.__forward_rtp_flow,
+            "flow": self.__forward_rtp_flow,
+            "bandwidths": self.__forward_bandwidths_1,
+            "subflow_id": 1,
+            "evaluations": None,
+            "sources": None,
+        }
+
+        forward_flow_2 = {
+            "flow_id": "rtpsubflow_2",
+            "title": "RTP",
+            "fec_title": "RTP + FEC",
+            "plot_fec": True,
+            "path_ctrler": self.__forward_rtp_flow,
+            "flow": self.__forward_rtp_flow,
+            "bandwidths": self.__forward_bandwidths_2,
+            "subflow_id": 2,
+            "evaluations": None,
+            "sources": None,
+        }
+        return [forward_flow_1, forward_flow_2]
+
+    def get_plot_description(self):
+        return [{
+            "type": "srqmd",
+            "plot_id": "subflow_1",
+            "sr_title": "Sending Rate for Subflow 1",
+            "qmd_title": "Queue delay for Subflow 1",
+            "filename": '_'.join([self.name, "srqmd", "subflow_1", str(self.algorithm.name), str(self.latency) + "ms",
+                                 str(self.jitter) + "ms"]),
+            "flow_ids": ["rtpsubflow_1"],
+            "bandwidths": self.__forward_bandwidths_1,
+            "plot_bandwidth": True,
+        },
+        {
+            "plot_id": "subflow_2",
+            "type": "srqmd",
+            "sr_title": "Sending Rate for Subflow 2",
+            "qmd_title": "Queue delay for Subflow 2",
+            "filename": '_'.join(
+                [self.name, "srqmd", "subflow_2", str(self.algorithm.name), str(self.latency) + "ms",
+                 str(self.jitter) + "ms"]),
+            "flow_ids": ["rtpsubflow_2"],
+            "bandwidths": self.__forward_bandwidths_2,
+            "plot_bandwidth": False,
+        },
+        {
+            "type": "aggr",
+            "sr_title": "Sending Rate for Subflow 1", # sending rates
+            "disr_title": "Queue delay for Subflow 1", # distribution of the sending rates
+            "filename": '_'.join([self.name, "aggr", str(self.algorithm.name), str(self.latency) + "ms",
+                                 str(self.jitter) + "ms"]),
+            "flow_ids": ["rtpsubflow_2", "rtpflow_2"],
+        }
+        ]
+
     def get_flows(self):
         return self.__flows
 
@@ -885,20 +1155,4 @@ class MPRTP1(MyTest):
         return self.__path_ctrlers
 
     def get_descriptions(self):
-        forward_flow_1 = {
-            "name": "subflow_1",
-            "path_ctrler": self.__forward_path_ctrler_1,
-            "flows": [self.__forward_rtp_flow],
-            "bandwidths": self.__forward_bandwidths_1,
-            "subflow_ids": [1]
-        }
-
-        forward_flow_2 = {
-            "name": "subflow_2",
-            "path_ctrler": self.__forward_path_ctrler_2,
-            "flows": [self.__forward_rtp_flow],
-            "bandwidths": self.__forward_bandwidths_2,
-            "subflow_ids": [2]
-        }
-
-        return [forward_flow_1, forward_flow_2]
+        return self.__description

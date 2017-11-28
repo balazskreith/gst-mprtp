@@ -281,7 +281,8 @@ class MPRTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
     """
     Represent an RTP sender for shell traffic unit
     """
-    def __init__(self, name, path, program_name, codec, algorithm, rtcp_ports, rtp_ips, rtp_ports, snd_stat, source_type, mprtp_ext_header_id = 0):
+    def __init__(self, name, path, program_name, codec, algorithm, rtcp_ports,
+                 rtp_ips, rtp_ports, snd_stat, source_type, mprtp_ext_header_id = 0):
         """
         Init the parameter for the test
 

@@ -646,27 +646,12 @@ static gboolean _congestion(FRACTaLSubController *this)
     return TRUE;
   }
 
-//  else if (0 < this->distortion_num) {
-//    return FALSE;
-//  }
-
   this->QD_th = slack * _stat(this)->queue_delay_50th +
       CONSTRAIN(MIN_QUEUE_DELAY_THRESHOLD, MAX_QUEUE_DELAY_THRESHOLD, _stat(this)->queue_delay_std * slack);
 
   if ( this->QD_th < _stat(this)->last_queue_delay) {
     return TRUE;
   }
-
-//  if (this->psi < 1. - MAX(2 * this->psi_dist, .2) ) {
-//    return TRUE;
-//  }
-
-//  if (50 < _stat(this)->psi_extra_bytes / 125 && this->max_eb_ratio + .2 < this->eb_ratio) {
-//    return TRUE;
-//  }
-//  if (.3 < this->deb_ratio) {
-//    return TRUE;
-//  }
 
   return FALSE;
 }

@@ -649,8 +649,6 @@ static void _swbuckets_disposer(gpointer target)
   g_free(this);
 }
 
-
-
 static void _swbuckets_add_pipe(gpointer dataptr, gpointer itemptr)
 {
   swbuckets_t* this = dataptr;

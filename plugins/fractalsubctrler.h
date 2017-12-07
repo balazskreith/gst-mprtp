@@ -45,6 +45,7 @@ struct _FRACTaLSubController
   GstClockTime              obligated_approvement;
 
   gint32                    target_bitrate;
+  gint32                    tracked_target;
 
   guint                     rcved_fb_since_changed;
 

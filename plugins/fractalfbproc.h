@@ -28,6 +28,13 @@ typedef struct _FRACTaLFBProcessorClass FRACTaLFBProcessorClass;
 #define FRACTALFBPROCESSOR_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),FRACTALFBPROCESSOR_TYPE))
 #define FRACTALFBPROCESSOR_CAST(src)        ((FRACTALFBProcessor *)(src))
 
+#define BUCKET_LIST_LENGTH 5
+typedef struct {
+  GQueue* pushed_items;
+  guint buckets[BUCKET_LIST_LENGTH];
+  GstClockTime window_size;
+}BucketList;
+
 typedef struct _FRACTaLStat
 {
   gint32                   measurements_num;
@@ -37,9 +44,9 @@ typedef struct _FRACTaLStat
   gint32                   fec_bitrate;
   gint32                   rcved_bytes_in_ewi;
 
-  GstClockTime             queue_delay_50th;
-  GstClockTime             last_queue_delay;
-  GstClockTime             queue_delay_std;
+//  GstClockTime             queue_delay_50th;
+//  GstClockTime             last_queue_delay;
+//  GstClockTime             queue_delay_std;
 
   guint16                  HSN;
 
@@ -48,25 +55,20 @@ typedef struct _FRACTaLStat
   gdouble                  sr_avg;
   gdouble                  rr_avg;
 
-  gdouble                  fl_avg;
-  gdouble                  fl_std;
+  gdouble                  FL_10;
 
   gdouble                  fraction_lost;
   gdouble                  ewi_in_s;
   guint16                  sent_packets_in_1s;
 
+  gdouble                  qdelay_congestion;
+  gdouble                  qdelay_non_congestion;
+  gdouble                  qdelay_influence;
+  gdouble                  qdelay_dinfluence;
+  gdouble                  qdelay_std;
+
 
 }FRACTaLStat;
-
-//
-//typedef struct{
-//  gint32        ref;
-//  GstClockTime  drift;
-//  gdouble      fraction_lost;
-//  gint32       newly_rcved_fb;
-//  gint32       newly_queued_bytes;
-//  gint32       bytes_in_flight;
-//}FRACTaLMeasurement;
 
 struct _FRACTaLFBProcessor
 {
@@ -75,16 +77,9 @@ struct _FRACTaLFBProcessor
   TimestampGenerator*      ts_generator;
   Recycle*                 reference_point_recycle;
 
-//  gint32                   psi_received_packets;
-//  gint32                   psi_received_bytes;
-//  gint32                   psi_sent_bytes;
-//  gint32                   psi_sent_packets;
-//  gint32                   psi_lost_packets;
-//  gint32                   extra_bytes;
   guint32                  ewi_in_ts;
   guint32                  min_ewi_in_ts;
   guint32                  max_ewi_in_ts;
-  guint32                  dts_50th;
   guint32                  min_dts;
   guint32                  rtt_in_ts;
 
@@ -92,8 +87,7 @@ struct _FRACTaLFBProcessor
   GstClockTime             rtt;
   GQueue*                  sent_packets;
   SlidingWindow*           reference_sw;
-//  SlidingWindow*           psi_sw;
-
+  SlidingWindow*           measurements;
   SlidingWindow*           ewi_sw;
 
   FRACTaLStat*             stat;
@@ -104,9 +98,17 @@ struct _FRACTaLFBProcessor
 
   guint16                  HSN;
 
-
+  gdouble                  qdelay_inf_avg;
   guint32                  srtt_in_ts;
-
+  gboolean                 collect_non_congestion_reference;
+  gboolean                 collect_congestion_reference;
+  gdouble                  qts_std;
+  gdouble                  last_qts;
+  gdouble                  first_bucket_size;
+  GQueue*                  bucket_recycle;
+  BucketList*              actual_bucket;
+  BucketList*              congestion_bucket;
+  BucketList*              non_congestion_bucket;
 };
 
 struct _FRACTaLFBProcessorClass{
@@ -123,6 +125,8 @@ void fractalfbprocessor_reset(FRACTaLFBProcessor *this);
 gint32 fractalfbprocessor_get_estimation(FRACTaLFBProcessor *this);
 void fractalfbprocessor_start_estimation(FRACTaLFBProcessor *this);
 void fractalfbprocessor_approve_feedback(FRACTaLFBProcessor *this);
+void fractalfbprocessor_set_congestion_reference(FRACTaLFBProcessor* this, gboolean value);
+void fractalfbprocessor_set_non_congestion_reference(FRACTaLFBProcessor* this, gboolean value);
 void fractalfbprocessor_time_update(FRACTaLFBProcessor *this);
 void fractalfbprocessor_report_update(FRACTaLFBProcessor *this, GstMPRTCPReportSummary *summary);
 

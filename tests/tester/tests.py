@@ -1127,8 +1127,8 @@ class MPRTP1(MyTest):
             "plot_bandwidth": True,
         },
         {
-            "plot_id": "subflow_2",
             "type": "srqmd",
+            "plot_id": "subflow_2",
             "sr_title": "Sending Rate for Subflow 2",
             "qmd_title": "Queue delay for Subflow 2",
             "filename": '_'.join(

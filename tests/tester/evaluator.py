@@ -1,5 +1,4 @@
 from commander import *
-from command import *
 import subprocess
 import csv
 import gzip
@@ -39,14 +38,14 @@ class Evaluator:
     def __write_average(source, target):
         average = 0
         with open(source, "r") as f:
-            Sum = 0
+            sum = 0
             row_count = 0
             for row in f:
                 for column in row.split(','):
                     n=float(column)
-                    Sum += n
+                    sum += n
                 row_count += 1
-            average = Sum / row_count
+            average = sum / row_count
         with open(target, 'w') as f:
             writer = csv.writer(f)
             writer.writerow([average])

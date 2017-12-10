@@ -28,10 +28,13 @@ typedef struct _FRACTaLFBProcessorClass FRACTaLFBProcessorClass;
 #define FRACTALFBPROCESSOR_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),FRACTALFBPROCESSOR_TYPE))
 #define FRACTALFBPROCESSOR_CAST(src)        ((FRACTALFBProcessor *)(src))
 
-#define BUCKET_LIST_LENGTH 5
+#define QDELAY_BUCKET_LIST_LENGTH 5
+#define DRATE_BUCKET_LIST_LENGTH 4
+
 typedef struct {
+  guint length;
   GQueue* pushed_items;
-  guint buckets[BUCKET_LIST_LENGTH];
+  guint *vector;
   GstClockTime window_size;
 }BucketList;
 
@@ -57,15 +60,18 @@ typedef struct _FRACTaLStat
 
   gdouble                  FL_10;
 
+  gdouble                  FL_th;
   gdouble                  fraction_lost;
   gdouble                  ewi_in_s;
   guint16                  sent_packets_in_1s;
 
   gdouble                  qdelay_congestion;
   gdouble                  qdelay_non_congestion;
-  gdouble                  qdelay_influence;
-  gdouble                  qdelay_dinfluence;
+  gdouble                  qdelay_dstability;
   gdouble                  qdelay_std;
+
+  gdouble                  overused_range;
+  gdouble                  cos_overused_range;
 
 
 }FRACTaLStat;
@@ -98,17 +104,17 @@ struct _FRACTaLFBProcessor
 
   guint16                  HSN;
 
-  gdouble                  qdelay_inf_avg;
   guint32                  srtt_in_ts;
-  gboolean                 collect_non_congestion_reference;
-  gboolean                 collect_congestion_reference;
   gdouble                  qts_std;
   gdouble                  last_qts;
-  gdouble                  first_bucket_size;
+  gdouble                  first_qdelay_bucket_size;
+  gdouble                  first_drate_bucket_size;
   GQueue*                  bucket_recycle;
-  BucketList*              actual_bucket;
-  BucketList*              congestion_bucket;
-  BucketList*              non_congestion_bucket;
+  BucketList*              actual_drate_bucket;
+  BucketList*              actual_qdelay_bucket;
+  guint*                   congestion_reference_vector;
+  guint*                   non_congestion_reference_vector;
+  guint*                   drate_reference_vector;
 };
 
 struct _FRACTaLFBProcessorClass{
@@ -125,8 +131,6 @@ void fractalfbprocessor_reset(FRACTaLFBProcessor *this);
 gint32 fractalfbprocessor_get_estimation(FRACTaLFBProcessor *this);
 void fractalfbprocessor_start_estimation(FRACTaLFBProcessor *this);
 void fractalfbprocessor_approve_feedback(FRACTaLFBProcessor *this);
-void fractalfbprocessor_set_congestion_reference(FRACTaLFBProcessor* this, gboolean value);
-void fractalfbprocessor_set_non_congestion_reference(FRACTaLFBProcessor* this, gboolean value);
 void fractalfbprocessor_time_update(FRACTaLFBProcessor *this);
 void fractalfbprocessor_report_update(FRACTaLFBProcessor *this, GstMPRTCPReportSummary *summary);
 

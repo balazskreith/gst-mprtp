@@ -46,6 +46,7 @@ struct _FRACTaLSubController
 
   gint32                    target_bitrate;
   gint32                    tracked_target;
+  gint32                    set_target;
 
   guint                     rcved_fb_since_changed;
 
@@ -76,6 +77,9 @@ struct _FRACTaLSubController
   GstClockTime              increasing_rr_reached;
   GstClockTime              increasing_sr_reached;
   gint32                    increasement;
+
+  gint32 last_approved_sr;
+  GstClockTime sr_reached;
 
   gint64                    QD_th;
   gdouble                   FL_th;

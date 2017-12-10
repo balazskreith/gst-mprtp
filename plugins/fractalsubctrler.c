@@ -1251,7 +1251,7 @@ void _influence_target(FRACTaLSubController *this) {
   }
 
   alpha = _stat(this)->qdelay_non_congestion - _stat(this)->qdelay_congestion;
-  max_decrease = MAX(_stat(this)->overused_range / 5, 5000);
+  max_decrease = CONSTRAIN(5000, 50000, _stat(this)->overused_range / 3);
   max_increase = MIN((this->set_target - this->target_bitrate) / 10, 2000);
   new_target = this->set_target * alpha + (this->target_bitrate - max_decrease) * (1.-alpha);
   _change_sndsubflow_target_bitrate(this, MIN(this->target_bitrate + max_increase, new_target));

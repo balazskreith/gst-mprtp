@@ -2,6 +2,7 @@ plugin_LTLIBRARIES = libgstmprtp.la
 
 # sources used to compile this plug-in
 libgstmprtp_la_SOURCES = bintree.c             \
+                         bucket.c              \
                          correlator.c          \
 					     fecdec.c              \
                          fecenc.c              \
@@ -46,6 +47,7 @@ libgstmprtp_la_SOURCES = bintree.c             \
                     
                     
 noinst_HEADERS = bintree.h             \
+                 bucket.h              \
                  correlator.h          \
 				 fecdec.h              \
                  fecenc.h              \

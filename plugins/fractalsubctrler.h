@@ -74,7 +74,7 @@ struct _FRACTaLSubController
   gboolean                  monitoring_approved;
 
   gboolean                  increasing_approved;
-  GstClockTime              increasing_rr_reached;
+  GstClockTime              increasing_started;
   GstClockTime              increasing_sr_reached;
   gint32                    increasement;
 
@@ -98,6 +98,7 @@ struct _FRACTaLSubController
   GstClockTime              last_distorted;
   GstClockTime              last_increased;
   GstClockTime              last_inflicted;
+  GstClockTime              last_reset;
 
   gboolean                  stability_approved;
   gboolean                  cwnd_locked;
@@ -107,7 +108,6 @@ struct _FRACTaLSubController
   gpointer                  priv;
 
   SndTracker*               sndtracker;
-
 };
 
 struct _FRACTaLSubControllerClass{

@@ -65,7 +65,8 @@ class Plotter:
         commands.append('set lmargin 20')
         commands.append('set rmargin 10')
 
-        commands.append('set key font ",22"')
+        commands.append('set key font ",18"')
+        commands.append('set key box opaque height 1')
         commands.append('set ytics font ",26"')
 
         commands.append('set yrange [0:' + str(sr_range) + ']')

@@ -16,6 +16,7 @@
 #include "sndsubflows.h"
 #include "reportproc.h"
 #include "correlator.h"
+#include "bucket.h"
 
 
 typedef struct _FRACTaLFBProcessor FRACTaLFBProcessor;
@@ -65,13 +66,14 @@ typedef struct _FRACTaLStat
   gdouble                  ewi_in_s;
   guint16                  sent_packets_in_1s;
 
-  gdouble                  qdelay_congestion;
-  gdouble                  qdelay_non_congestion;
-  gdouble                  qdelay_dstability;
-  gdouble                  qdelay_std;
+//  gdouble                  qdelay_congestion;
+  gdouble                  qdelay_stability;
+  gdouble                  qdelay_var_stability;
+//  gdouble                  qdelay_dstability;
+//  gdouble                  qdelay_std;
 
   gdouble                  overused_range;
-  gdouble                  cos_overused_range;
+  gdouble                  drate_stability;
 
 
 }FRACTaLStat;
@@ -107,14 +109,22 @@ struct _FRACTaLFBProcessor
   guint32                  srtt_in_ts;
   gdouble                  qts_std;
   gdouble                  last_qts;
-  gdouble                  first_qdelay_bucket_size;
-  gdouble                  first_drate_bucket_size;
-  GQueue*                  bucket_recycle;
-  BucketList*              actual_drate_bucket;
-  BucketList*              actual_qdelay_bucket;
-  guint*                   congestion_reference_vector;
-  guint*                   non_congestion_reference_vector;
-  guint*                   drate_reference_vector;
+  Bucket*                  drate_bucket;
+  Bucket*                  qdelay_bucket;
+  Bucket*                  qdelay_devs;
+//  Bucket*                  stability;
+  gdouble                  drate_buckets[5];
+  gdouble                  drate_avg;
+
+//  gdouble                  first_qdelay_bucket_size;
+//  gdouble                  first_drate_bucket_size;
+//  GQueue*                  bucket_recycle;
+//
+//  BucketList*              actual_drate_bucket;
+//  BucketList*              actual_qdelay_bucket;
+//  guint*                   congestion_reference_vector;
+//  guint*                   non_congestion_reference_vector;
+//  guint*                   drate_reference_vector;
 };
 
 struct _FRACTaLFBProcessorClass{

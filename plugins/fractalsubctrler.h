@@ -104,6 +104,7 @@ struct _FRACTaLSubController
   gboolean                  cwnd_locked;
   gdouble                   bottleneck_cwnd;
   GstClockTime            (*refresh_target)(FRACTaLSubController* this);
+  gboolean                  aggressive;
 
   gpointer                  priv;
 

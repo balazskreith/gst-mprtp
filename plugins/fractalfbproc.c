@@ -142,7 +142,7 @@ static void _setup_buckets(FRACTaLFBProcessor* this) {
     bucket_set_positive_reference(this->qdelay_devs, positive_reference);
     bucket_set_transform_reference(this->qdelay_devs, transform_reference);
     bucket_set_bucket_sizes(this->qdelay_devs, bucket_sizes);
-    bucket_set_window_size(this->qdelay_devs, 10 * GST_SECOND);
+    bucket_set_window_size(this->qdelay_devs, 30 * GST_SECOND);
   }
 }
 
@@ -337,6 +337,7 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
 //  g_print("first bucket size: %f\n", this->first_bucket_size);
   _refresh_windows_thresholds(this);
 done:
+  ++_stat(this)->measurements_num;
   return;
 }
 
@@ -354,7 +355,7 @@ void _process_stat(FRACTaLFBProcessor *this)
   _stat(this)->sender_bitrate        = sndstat->sent_bytes_in_1s * 8;
   _stat(this)->receiver_bitrate      = sndstat->received_bytes_in_1s * 8;
   _stat(this)->fec_bitrate           = sndstat->sent_fec_bytes_in_1s * 8;
-  _stat(this)->measurements_num      = slidingwindow_get_counter(this->reference_sw);
+//  _stat(this)->measurements_num      = slidingwindow_get_counter(this->reference_sw);
   _stat(this)->sent_packets_in_1s    = sndstat->sent_packets_in_1s;
 
   _stat(this)->qdelay_stability = .5 * bucket_get_positive_cosine_similarity(this->qdelay_bucket) +

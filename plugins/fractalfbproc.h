@@ -75,6 +75,10 @@ typedef struct _FRACTaLStat
   gdouble                  overused_range;
   gdouble                  drate_stability;
 
+  gdouble                  d2rate_fluc;
+
+  gdouble                  drate_avg;
+
 
 }FRACTaLStat;
 
@@ -112,9 +116,15 @@ struct _FRACTaLFBProcessor
   Bucket*                  drate_bucket;
   Bucket*                  qdelay_bucket;
   Bucket*                  qdelay_devs;
+  SlidingWindow*           d2rate_sw;
 //  Bucket*                  stability;
   gdouble                  drate_buckets[5];
   gdouble                  drate_avg;
+
+  gint32                   last_drate;
+  gdouble                  d2rate_sum;
+
+  gdouble                  fb_interval_avg;
 
 //  gdouble                  first_qdelay_bucket_size;
 //  gdouble                  first_drate_bucket_size;

@@ -16,6 +16,7 @@
 #include "sndsubflows.h"
 #include "reportproc.h"
 #include "correlator.h"
+#include "bucket.h"
 
 
 typedef struct _FRACTaLFBProcessor FRACTaLFBProcessor;
@@ -28,6 +29,16 @@ typedef struct _FRACTaLFBProcessorClass FRACTaLFBProcessorClass;
 #define FRACTALFBPROCESSOR_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),FRACTALFBPROCESSOR_TYPE))
 #define FRACTALFBPROCESSOR_CAST(src)        ((FRACTALFBProcessor *)(src))
 
+#define QDELAY_BUCKET_LIST_LENGTH 5
+#define DRATE_BUCKET_LIST_LENGTH 4
+
+typedef struct {
+  guint length;
+  GQueue* pushed_items;
+  guint *vector;
+  GstClockTime window_size;
+}BucketList;
+
 typedef struct _FRACTaLStat
 {
   gint32                   measurements_num;
@@ -37,9 +48,9 @@ typedef struct _FRACTaLStat
   gint32                   fec_bitrate;
   gint32                   rcved_bytes_in_ewi;
 
-  GstClockTime             queue_delay_50th;
-  GstClockTime             last_queue_delay;
-  GstClockTime             queue_delay_std;
+//  GstClockTime             queue_delay_50th;
+//  GstClockTime             last_queue_delay;
+//  GstClockTime             queue_delay_std;
 
   guint16                  HSN;
 
@@ -48,25 +59,19 @@ typedef struct _FRACTaLStat
   gdouble                  sr_avg;
   gdouble                  rr_avg;
 
-  gdouble                  fl_avg;
-  gdouble                  fl_std;
+  gdouble                  FL_10;
 
+  gdouble                  FL_th;
   gdouble                  fraction_lost;
   gdouble                  ewi_in_s;
   guint16                  sent_packets_in_1s;
 
+  gdouble                  qdelay_stability;
+  gdouble                  qdelay_var_stability;
+  gdouble                  drate_avg;
+
 
 }FRACTaLStat;
-
-//
-//typedef struct{
-//  gint32        ref;
-//  GstClockTime  drift;
-//  gdouble      fraction_lost;
-//  gint32       newly_rcved_fb;
-//  gint32       newly_queued_bytes;
-//  gint32       bytes_in_flight;
-//}FRACTaLMeasurement;
 
 struct _FRACTaLFBProcessor
 {
@@ -75,16 +80,9 @@ struct _FRACTaLFBProcessor
   TimestampGenerator*      ts_generator;
   Recycle*                 reference_point_recycle;
 
-//  gint32                   psi_received_packets;
-//  gint32                   psi_received_bytes;
-//  gint32                   psi_sent_bytes;
-//  gint32                   psi_sent_packets;
-//  gint32                   psi_lost_packets;
-//  gint32                   extra_bytes;
   guint32                  ewi_in_ts;
   guint32                  min_ewi_in_ts;
   guint32                  max_ewi_in_ts;
-  guint32                  dts_50th;
   guint32                  min_dts;
   guint32                  rtt_in_ts;
 
@@ -92,8 +90,7 @@ struct _FRACTaLFBProcessor
   GstClockTime             rtt;
   GQueue*                  sent_packets;
   SlidingWindow*           reference_sw;
-//  SlidingWindow*           psi_sw;
-
+  SlidingWindow*           measurements;
   SlidingWindow*           ewi_sw;
 
   FRACTaLStat*             stat;
@@ -104,8 +101,13 @@ struct _FRACTaLFBProcessor
 
   guint16                  HSN;
 
-
   guint32                  srtt_in_ts;
+  gdouble                  qts_std;
+  gdouble                  last_qts;
+  Bucket*                  qdelay_bucket;
+  Bucket*                  qdelay_devs;
+
+  gdouble                  fb_interval_avg;
 
 };
 

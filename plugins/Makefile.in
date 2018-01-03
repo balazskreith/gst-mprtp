@@ -146,8 +146,9 @@ libgstmprtp_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_libgstmprtp_la_OBJECTS = libgstmprtp_la-bintree.lo \
-	libgstmprtp_la-correlator.lo libgstmprtp_la-fecdec.lo \
-	libgstmprtp_la-fecenc.lo libgstmprtp_la-fractalfbproc.lo \
+	libgstmprtp_la-bucket.lo libgstmprtp_la-correlator.lo \
+	libgstmprtp_la-fecdec.lo libgstmprtp_la-fecenc.lo \
+	libgstmprtp_la-fractalfbproc.lo \
 	libgstmprtp_la-fractalfbprod.lo \
 	libgstmprtp_la-fractalsubctrler.lo \
 	libgstmprtp_la-gstmprtcpbuffer.lo \
@@ -418,6 +419,7 @@ plugin_LTLIBRARIES = libgstmprtp.la
 
 # sources used to compile this plug-in
 libgstmprtp_la_SOURCES = bintree.c             \
+                         bucket.c              \
                          correlator.c          \
 					     fecdec.c              \
                          fecenc.c              \
@@ -461,6 +463,7 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          swperctester.c
 
 noinst_HEADERS = bintree.h             \
+                 bucket.h              \
                  correlator.h          \
 				 fecdec.h              \
                  fecenc.h              \
@@ -594,6 +597,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-bintree.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-bucket.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-correlator.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fecdec.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fecenc.Plo@am__quote@
@@ -663,6 +667,13 @@ libgstmprtp_la-bintree.lo: bintree.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bintree.c' object='libgstmprtp_la-bintree.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-bintree.lo `test -f 'bintree.c' || echo '$(srcdir)/'`bintree.c
+
+libgstmprtp_la-bucket.lo: bucket.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-bucket.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-bucket.Tpo -c -o libgstmprtp_la-bucket.lo `test -f 'bucket.c' || echo '$(srcdir)/'`bucket.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-bucket.Tpo $(DEPDIR)/libgstmprtp_la-bucket.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bucket.c' object='libgstmprtp_la-bucket.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-bucket.lo `test -f 'bucket.c' || echo '$(srcdir)/'`bucket.c
 
 libgstmprtp_la-correlator.lo: correlator.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-correlator.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-correlator.Tpo -c -o libgstmprtp_la-correlator.lo `test -f 'correlator.c' || echo '$(srcdir)/'`correlator.c

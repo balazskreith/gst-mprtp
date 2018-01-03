@@ -1,4 +1,7 @@
 import subprocess
+
+import math
+
 from command import *
 import os
 import logging
@@ -68,3 +71,4 @@ class LinuxNamespaceCommander(ShellCommander):
         enter_shell_cmd = ShellCommand(" ".join(["ip", "netns", "exec", self.__namespace, "bash"]),
         stdout = command.stdout, stderr = command.stderr)
         super().execute(command = enter_shell_cmd, shell = True, input_cmd = command.to_bytes())
+

@@ -198,17 +198,57 @@ stream_splitter_set_keyframe_filtering(StreamSplitter* this, gboolean keyframe_f
 }
 
 
+//SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *packet)
+//{
+//  SndSubflow *selected = NULL, *subflow;
+//  GSList* it;
+//  volatile gdouble dratio;
+//  volatile gdouble selected_dratio = 0;
+//  gboolean target_is_reached = TRUE;
+//
+//  DISABLE_LINE _print_ratios(this);
+//
+//  for (it = sndsubflows_get_subflows(this->subflows); it; it = it->next) {
+//      subflow = it->data;
+//
+//      if (_qstat(this)->actual_bitrates[subflow->id] < this->actual_targets[subflow->id] - MAX(11200, this->actual_targets[subflow->id] * .1) /*  1400 bytes * 8 */) {
+//        target_is_reached = FALSE;
+//      }
+//
+//      if (this->target_is_reached) {
+//        dratio = log(this->extra_targets[subflow->id] + this->actual_targets[subflow->id]) - log(_qstat(this)->actual_bitrates[subflow->id]);
+//      } else {
+//        dratio = log(this->actual_targets[subflow->id]) - log(_qstat(this)->actual_bitrates[subflow->id]);
+//      }
+//
+//      if(!subflow->active){
+//        continue;
+//      }
+//
+//      if(this->keyframe_filtering){
+//        if(packet->keyframe && subflow->state < this->max_state){
+//          continue;
+//        }
+//      }
+//
+//      if (!selected || selected_dratio < dratio) {
+//        selected = subflow;
+//        selected_dratio = dratio;
+//      }
+//    }
+//
+//    this->target_is_reached = target_is_reached;
+//    return selected;
+//}
+
+
 SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *packet)
 {
   SndSubflow *selected = NULL, *subflow;
   GSList* it;
-//  gdouble selected_sr, actual_sr;
-//  gdouble weight;
   volatile gint32 drate;
   volatile gint32 selected_drate = 0;
   gboolean target_is_reached = TRUE;
-//  gchar string[255];
-//  memset(string, 0, 255);
   DISABLE_LINE _print_ratios(this);
 
   for (it = sndsubflows_get_subflows(this->subflows); it; it = it->next) {

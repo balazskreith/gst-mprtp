@@ -85,15 +85,8 @@ G_DEFINE_TYPE (FRACTaLSubController, fractalsubctrler, G_TYPE_OBJECT);
 //determines the minimum value for the evaluation window interval in s
 #define MIN_EVALUATION_WINDOW_INTERVAL 0.1
 
-//determines the distortion threshold for the ratio of sent/received bytes
-#define PIPE_STABILITY_DISTORTION_THRESHOLD 1.3
-
-//determines the skew distortion threshold
-#define SKEW_DISTORTION_THRESHOLD 1000
-
-#define MIN_QUEUE_DELAY_THRESHOLD 30  // TODO using queue delay to define whether its incipient congestion or not.
-#define MAX_QUEUE_DELAY_THRESHOLD 400
-#define MIN_EXTRA_BYTES_THRESHOLD 5000 // TODO using portion of the ratio of rcv/sent
+// determines the factor for reducing target considering rate differences
+#define REDUCE_DRATE_FACTOR 1.5
 
 typedef struct _Private Private;
 
@@ -136,8 +129,7 @@ struct _Private{
   gdouble             min_evaluation_window_interval;
   gdouble             max_evaluation_window_interval;
 
-  gdouble             pipe_stability_distortion_th;
-  guint32             skew_distortion_threshold;
+  gdouble             reduce_drate_factor;
 
 };
 
@@ -168,8 +160,8 @@ struct _Private{
 #define _min_ewi(this)                _priv(this)->min_evaluation_window_interval
 #define _max_ewi(this)                _priv(this)->max_evaluation_window_interval
 
-#define _psi_dist_th(this)            _priv(this)->pipe_stability_distortion_th
-#define _skew_dist_th(this)           _priv(this)->skew_distortion_threshold
+#define _reduce_drate(this)           _priv(this)->reduce_drate_factor
+
 
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
@@ -355,8 +347,7 @@ fractalsubctrler_init (FRACTaLSubController * this)
   _priv(this)->min_evaluation_window_interval   = MIN_EVALUATION_WINDOW_INTERVAL;
   _priv(this)->max_evaluation_window_interval   = MAX_EVALUATION_WINDOW_INTERVAL;
 
-  _priv(this)->pipe_stability_distortion_th     = PIPE_STABILITY_DISTORTION_THRESHOLD;
-  _priv(this)->skew_distortion_threshold        = SKEW_DISTORTION_THRESHOLD;
+  _priv(this)->reduce_drate_factor              = REDUCE_DRATE_FACTOR;
 }
 
 FRACTaLSubController *make_fractalsubctrler(SndTracker *sndtracker, SndSubflow *subflow)
@@ -482,16 +473,12 @@ static void _stat_print(FRACTaLSubController *this)
   { // targets info
     gchar info[128];
     memset(info, 0, 128);
-    sprintf(info, "Tr:%-4d|Btl:%-4d|ST:%-4d|CR:%-4d|OR:%-4.0f|%-1.2f|%-4.2f|",
+    sprintf(info, "Tr:%-4d|Btl:%-4d|ST:%-4d|CR:%-4d|dR:%-4.2f|",
         this->target_bitrate / 1000,
         this->bottleneck_point / 1000,
         this->set_target / 1000,
         this->congested_bitrate / 1000,
-        _stat(this)->overused_range / 1000,
-        _stat(this)->drate_stability,
-//        _stat(this)->d2rate_fluc
         _stat(this)->drate_avg / 1000
-//        this->fbprocessor->d2rate_sum / 1000.
     );
     strcat(result, info);
   }
@@ -713,7 +700,6 @@ static void _undershoot(FRACTaLSubController *this, gint32 turning_point) {
   _change_sndsubflow_target_bitrate(this, MIN(this->target_bitrate, new_target));
 }
 
-
 void
 _reduce_stage(
     FRACTaLSubController *this)
@@ -722,7 +708,7 @@ _reduce_stage(
 
   if (_congestion(this)) {
     if (0. < _stat(this)->drate_avg) {
-      new_target = _stat(this)->sr_avg + _stat(this)->fec_bitrate - _stat(this)->drate_avg * 2;
+      new_target = _stat(this)->sr_avg + _stat(this)->fec_bitrate - _stat(this)->drate_avg * _reduce_drate(this);
       this->reducing_sr_reached = 0;
       this->reducing_approved = FALSE;
       _change_sndsubflow_target_bitrate(this, MIN(this->target_bitrate, new_target));

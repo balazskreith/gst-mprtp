@@ -66,17 +66,8 @@ typedef struct _FRACTaLStat
   gdouble                  ewi_in_s;
   guint16                  sent_packets_in_1s;
 
-//  gdouble                  qdelay_congestion;
   gdouble                  qdelay_stability;
   gdouble                  qdelay_var_stability;
-//  gdouble                  qdelay_dstability;
-//  gdouble                  qdelay_std;
-
-  gdouble                  overused_range;
-  gdouble                  drate_stability;
-
-  gdouble                  d2rate_fluc;
-
   gdouble                  drate_avg;
 
 
@@ -113,28 +104,11 @@ struct _FRACTaLFBProcessor
   guint32                  srtt_in_ts;
   gdouble                  qts_std;
   gdouble                  last_qts;
-  Bucket*                  drate_bucket;
   Bucket*                  qdelay_bucket;
   Bucket*                  qdelay_devs;
-  SlidingWindow*           d2rate_sw;
-//  Bucket*                  stability;
-  gdouble                  drate_buckets[5];
-  gdouble                  drate_avg;
-
-  gint32                   last_drate;
-  gdouble                  d2rate_sum;
 
   gdouble                  fb_interval_avg;
 
-//  gdouble                  first_qdelay_bucket_size;
-//  gdouble                  first_drate_bucket_size;
-//  GQueue*                  bucket_recycle;
-//
-//  BucketList*              actual_drate_bucket;
-//  BucketList*              actual_qdelay_bucket;
-//  guint*                   congestion_reference_vector;
-//  guint*                   non_congestion_reference_vector;
-//  guint*                   drate_reference_vector;
 };
 
 struct _FRACTaLFBProcessorClass{

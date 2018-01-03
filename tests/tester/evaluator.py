@@ -133,7 +133,7 @@ class Evaluator:
                 position = source.index(".csv")
                 source = packetlog[:position] + "_s" + str(subflow_id) + packetlog[position:]
                 command = [self.__logsplitter, packetlog, source, "subflow_id " + str(subflow_id)]
-                subprocess.call(command)
+                subprocess.call(' '.join(command), shell=True)
                 extra_source_files.append(source)
 
             if "snd" in source:
@@ -154,7 +154,8 @@ class Evaluator:
                 print("Unrecognized file:" + source)
 
         for command in commands:
-            subprocess.call(command)
+            # subprocess.call(command)
+            subprocess.call(' '.join(command), shell=True)
 
         return result, extra_source_files
 

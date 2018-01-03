@@ -1048,6 +1048,141 @@ class MPRTP1(MyTest):
     def __generate_path_ctrlers(self):
         flow_stages_1 = [
         {
+            "duration": 125,
+            "config" : PathConfig(bandwidth = 2000, latency = self.__latency, jitter = self.__jitter)
+        }]
+
+        flow_stages_2 = [
+        {
+            "duration": 125,
+            "config" : PathConfig(bandwidth=2000, latency=self.__latency, jitter=self.__jitter)
+        }]
+
+        self.__forward_bandwidths_1, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stages_1))
+        self.__forward_path_ctrler_1 = PathShellCtrler(path_name="veth2", path_stage = path_stage)
+
+        self.__forward_bandwidths_2, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stages_2))
+        self.__forward_path_ctrler_2 = PathShellCtrler(path_name="veth6", path_stage = path_stage)
+        result = [self.__forward_path_ctrler_1, self.__forward_path_ctrler_2]
+        return result
+
+    def __generate_description(self):
+        forward_flow_1 = {
+            "flow_id": "rtpsubflow_1",
+            "title": "RTP",
+            "fec_title": "RTP + FEC",
+            "plot_fec": True,
+            "path_ctrler": self.__forward_rtp_flow,
+            "flow": self.__forward_rtp_flow,
+            "bandwidths": self.__forward_bandwidths_1,
+            "subflow_id": 1,
+            "evaluations": None,
+            "sources": None,
+        }
+
+        forward_flow_2 = {
+            "flow_id": "rtpsubflow_2",
+            "title": "RTP",
+            "fec_title": "RTP + FEC",
+            "plot_fec": True,
+            "path_ctrler": self.__forward_rtp_flow,
+            "flow": self.__forward_rtp_flow,
+            "bandwidths": self.__forward_bandwidths_2,
+            "subflow_id": 2,
+            "evaluations": None,
+            "sources": None,
+        }
+        return [forward_flow_1, forward_flow_2]
+
+    def get_plot_description(self):
+        return [{
+            "type": "srqmd",
+            "plot_id": "subflow_1",
+            "sr_title": "Sending Rate for Subflow 1",
+            "qmd_title": "Queue delay for Subflow 1",
+            "filename": '_'.join([self.name, "srqmd", "subflow_1", str(self.algorithm.name), str(self.latency) + "ms",
+                                 str(self.jitter) + "ms"]),
+            "flow_ids": ["rtpsubflow_1"],
+            "bandwidths": self.__forward_bandwidths_1,
+            "plot_bandwidth": False,
+        },
+        {
+            "type": "srqmd",
+            "plot_id": "subflow_2",
+            "sr_title": "Sending Rate for Subflow 2",
+            "qmd_title": "Queue delay for Subflow 2",
+            "filename": '_'.join(
+                [self.name, "srqmd", "subflow_2", str(self.algorithm.name), str(self.latency) + "ms",
+                 str(self.jitter) + "ms"]),
+            "flow_ids": ["rtpsubflow_2"],
+            "bandwidths": self.__forward_bandwidths_2,
+            "plot_bandwidth": False,
+        },
+        {
+            "type": "aggr",
+            "sr_title": "Sending Rate for Subflow 1", # sending rates
+            "disr_title": "Queue delay for Subflow 1", # distribution of the sending rates
+            "filename": '_'.join([self.name, "aggr", str(self.algorithm.name), str(self.latency) + "ms",
+                                 str(self.jitter) + "ms"]),
+            "flow_ids": ["rtpsubflow_2", "rtpflow_2"],
+        }
+        ]
+
+    def get_flows(self):
+        return self.__flows
+
+    def get_path_ctrlers(self):
+        return self.__path_ctrlers
+
+    def get_descriptions(self):
+        return self.__description
+
+
+class MPRTP2(MyTest):
+    def __init__(self, algorithm, latency, jitter, source_type, sink_type, mprtp_ext_header = 3, fec_payload_type_id = 126):
+        MyTest.__init__(self, "mprtp1", 125, algorithm, str(latency), str(jitter))
+
+        self.__algorithm = algorithm
+        self.__latency = latency
+        self.__jitter = jitter
+        self.__source_type = source_type
+        self.__sink_type = sink_type
+        self.__mprtp_ext_header_id = mprtp_ext_header
+        self.__fec_payload_type_id = fec_payload_type_id
+
+        self.__forward_bandwidths_1 = None
+        self.__forward_path_ctrler_1 = None
+        self.__forward_bandwidths_2 = None
+        self.__forward_path_ctrler_2 = None
+        self.__forward_rtp_flow = None
+
+        self.__flows = self.__generate_flows()
+        self.__path_ctrlers = self.__generate_path_ctrlers()
+        self.__description = self.__generate_description()
+
+    def __generate_flows(self):
+        self.__forward_rtp_flow = MPRTPFlow(name="mprtpflow_1",
+            path="./",
+            flownum=1,
+            codec=Codecs.VP8,
+            algorithm=self.algorithm,
+            rtp_ips=["10.0.0.6", "10.0.1.6"],
+            rtp_ports=[5000, 5002],
+            rtcp_ips=["10.0.0.1", "10.0.1.1"],
+            rtcp_ports=[5001, 5003],
+            start_delay = 0,
+            source_type = self.__source_type,
+            sink_type = self.__sink_type,
+            mprtp_ext_header_id = self.__mprtp_ext_header_id,
+            subflow_ids=[1,2]
+            )
+
+        result = [self.__forward_rtp_flow]
+        return result
+
+    def __generate_path_ctrlers(self):
+        flow_stages_1 = [
+        {
             "duration": 25,
             "config" : PathConfig(bandwidth = 2000, latency = self.__latency, jitter = self.__jitter)
         },
@@ -1074,7 +1209,7 @@ class MPRTP1(MyTest):
         flow_stages_2 = [
         {
             "duration": 125,
-            "config" : PathConfig(bandwidth = 2000, latency = self.__latency, jitter = self.__jitter)
+            "config" : PathConfig(bandwidth=2000, latency=self.__latency, jitter=self.__jitter)
         }
         ]
 
@@ -1082,7 +1217,7 @@ class MPRTP1(MyTest):
         self.__forward_path_ctrler_1 = PathShellCtrler(path_name="veth2", path_stage = path_stage)
 
         self.__forward_bandwidths_2, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stages_2))
-        self.__forward_path_ctrler_2 = PathShellCtrler(path_name="veth4", path_stage = path_stage)
+        self.__forward_path_ctrler_2 = PathShellCtrler(path_name="veth6", path_stage = path_stage)
         result = [self.__forward_path_ctrler_1, self.__forward_path_ctrler_2]
         return result
 

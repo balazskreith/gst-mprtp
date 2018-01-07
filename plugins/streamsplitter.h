@@ -42,14 +42,14 @@ struct _StreamSplitter
   GSList* stable_subflows;
   GSList* increasing_subflows;
 
-  gboolean no_congested;
-  gboolean no_stable;
-  gboolean no_increasing;
+  gboolean has_congested;
+  gboolean has_stable;
+  gboolean has_increasing;
 //  gint32               total_bitrate;
 //  volatile gint32               actual_rates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   volatile gint32               actual_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  volatile gint32               extra_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  volatile gboolean             target_is_reached;
+//  volatile gint32               extra_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+//  volatile gboolean             target_is_reached;
 //  gdouble              actual_weights[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   guint8               max_state;
   gboolean             keyframe_filtering;

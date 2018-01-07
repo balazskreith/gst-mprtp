@@ -25,7 +25,7 @@ class Plotter:
             if plot_type is "srqmd":
                 self.__generate_srqmd(test, plot_description)
             elif plot_type is "aggr":
-                self.__generate_aggr(test)
+                self.__generate_aggr(test, plot_description)
         pass
 
     def __generate_srqmd(self, test, plot_description):
@@ -109,7 +109,8 @@ class Plotter:
 
             if sr_csv is not None:
                 line = 'plot' if sr_plot_written is False else '\t'
-                line += ' \'' + sr_csv + '\' using ($0*0.1 + ' + start_delay + '):(' + ('($1+$2)' if plot_fec is False else '$1') + '/125)'
+                line += ' \'' + sr_csv + '\' using ($0*0.1 + ' + start_delay + '):(' + (
+                '($1+$2)' if plot_fec is False else '$1') + '/125)'
                 line += ' with point pointtype 7 ps 0.3'
                 line += ' lc rgb "' + flow_color + '" title "' + title + '"'
                 line += ", \\" if last_one is False or plot_bandwidth is True or \
@@ -118,11 +119,11 @@ class Plotter:
                 sr_plot_written = True
 
             if plot_fec is True:
-                sr_plot.append('\t\'' + sr_csv + '\' using ($0*0.1 + ' +
-                               start_delay + '):(($1+$2)/125) with point pointtype 7 ps 0.3 lc rgb "' +
-                               next(colors) + '" title "' + fec_title + '"' + \
-                               ", \\" if last_one is False or plot_bandwidth is True or \
-                                  tcpstat_csv is not None else "")
+                line = '\t\'' + sr_csv + '\' using ($0*0.1 + '
+                line += start_delay + '):(($1+$2)/125) with point pointtype 7 ps 0.3 lc rgb "'
+                line += next(colors) + '" title "' + fec_title + '"'
+                line += ", \\" if last_one is False or plot_bandwidth is True or tcpstat_csv is not None else ""
+                sr_plot.append(line)
 
             if tcpstat_csv is not None:
                 sr_plot.append('\t\'' + tcpstat_csv + \
@@ -170,5 +171,5 @@ class Plotter:
                 f.write("%s\n" % item)
         subprocess.check_output('gnuplot ' + plot_file, shell=True)
 
-    def __generate_aggr(self, test):
+    def __generate_aggr(self, test, plot_description):
         pass

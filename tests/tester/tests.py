@@ -1140,7 +1140,7 @@ class MPRTP1(MyTest):
 
 class MPRTP2(MyTest):
     def __init__(self, algorithm, latency, jitter, source_type, sink_type, mprtp_ext_header = 3, fec_payload_type_id = 126):
-        MyTest.__init__(self, "mprtp1", 125, algorithm, str(latency), str(jitter))
+        MyTest.__init__(self, "mprtp2", 125, algorithm, str(latency), str(jitter))
 
         self.__algorithm = algorithm
         self.__latency = latency

@@ -91,6 +91,10 @@ StreamSplitter* make_stream_splitter(SndSubflows* sndsubflows, SndQueue* sndqueu
   this->subflows = g_object_ref(sndsubflows);
   this->packets = g_queue_new();
   this->sndqueue = sndqueue;
+
+  this->congested_subflows = NULL;
+  this->stable_subflows = NULL;
+  this->increasing_subflows = NULL;
   return this;
 }
 
@@ -101,6 +105,10 @@ stream_splitter_finalize (GObject * object)
   g_object_unref (this->sysclock);
   g_object_unref(this->subflows);
   g_object_unref(this->packets);
+
+  g_slist_free(this->congested_subflows);
+  g_slist_free(this->stable_subflows);
+  g_slist_free(this->increasing_subflows);
 }
 
 
@@ -166,7 +174,7 @@ stream_splitter_on_subflow_target_bitrate_chaned(StreamSplitter* this, SndSubflo
 {
   _operate_on_total_target(this, subflow, -1);
 
-  if (subflow->state == SNDSUBFLOW_STATE_UNDERUSED) {
+  if (subflow->state == SNDSUBFLOW_STATE_INCREASING) {
     this->extra_targets[subflow->id] = subflow->target_bitrate - this->actual_targets[subflow->id];
   } else {
     this->actual_targets[subflow->id] = subflow->target_bitrate;
@@ -179,16 +187,43 @@ stream_splitter_on_subflow_state_changed(StreamSplitter* this, SndSubflow* subfl
 {
   _operate_on_total_target(this, subflow, -1);
 
-  if (subflow->state != SNDSUBFLOW_STATE_UNDERUSED) {
+  if (subflow->state != SNDSUBFLOW_STATE_INCREASING) {
     this->actual_targets[subflow->id] = subflow->target_bitrate;
     this->extra_targets[subflow->id] = 0;
   }
   _operate_on_total_target(this, subflow, 1);
+
+  switch (subflow->state) {
+    case SNDSUBFLOW_STATE_INCREASING:
+      this->congested_subflows = g_slist_remove(this->congested_subflows, subflow);
+      this->stable_subflows = g_slist_remove(this->stable_subflows, subflow);
+      this->increasing_subflows = g_slist_prepend(this->increasing_subflows, subflow);
+      break;
+    case SNDSUBFLOW_STATE_CONGESTED:
+      this->stable_subflows = g_slist_remove(this->stable_subflows, subflow);
+      this->increasing_subflows = g_slist_remove(this->increasing_subflows, subflow);
+      this->congested_subflows = g_slist_prepend(this->congested_subflows, subflow);
+      break;
+    default:
+    case SNDSUBFLOW_STATE_STABLE:
+      this->congested_subflows = g_slist_remove(this->congested_subflows, subflow);
+      this->increasing_subflows = g_slist_remove(this->increasing_subflows, subflow);
+      this->stable_subflows = g_slist_prepend(this->stable_subflows, subflow);
+      break;
+
+  this->no_congested = g_slist_length(this->congested_subflows) < 1;
+  this->no_stable = g_slist_length(this->stable_subflows) < 1;
+  this->no_increasing = g_slist_length(this->increasing_subflows) < 1;
+}
+
+
 }
 
 void
 stream_splitter_on_subflow_state_stat_changed(StreamSplitter* this, SndSubflowsStateStat* state_stat) {
   this->max_state = CONSTRAIN(state_stat->min, SNDSUBFLOW_STATE_STABLE, state_stat->max);
+
+
 }
 
 void
@@ -198,48 +233,60 @@ stream_splitter_set_keyframe_filtering(StreamSplitter* this, gboolean keyframe_f
 }
 
 
-//SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *packet)
-//{
-//  SndSubflow *selected = NULL, *subflow;
-//  GSList* it;
-//  volatile gdouble dratio;
-//  volatile gdouble selected_dratio = 0;
-//  gboolean target_is_reached = TRUE;
-//
-//  DISABLE_LINE _print_ratios(this);
-//
-//  for (it = sndsubflows_get_subflows(this->subflows); it; it = it->next) {
-//      subflow = it->data;
-//
-//      if (_qstat(this)->actual_bitrates[subflow->id] < this->actual_targets[subflow->id] - MAX(11200, this->actual_targets[subflow->id] * .1) /*  1400 bytes * 8 */) {
-//        target_is_reached = FALSE;
-//      }
-//
-//      if (this->target_is_reached) {
-//        dratio = log(this->extra_targets[subflow->id] + this->actual_targets[subflow->id]) - log(_qstat(this)->actual_bitrates[subflow->id]);
-//      } else {
-//        dratio = log(this->actual_targets[subflow->id]) - log(_qstat(this)->actual_bitrates[subflow->id]);
-//      }
-//
-//      if(!subflow->active){
-//        continue;
-//      }
-//
-//      if(this->keyframe_filtering){
-//        if(packet->keyframe && subflow->state < this->max_state){
-//          continue;
-//        }
-//      }
-//
-//      if (!selected || selected_dratio < dratio) {
-//        selected = subflow;
-//        selected_dratio = dratio;
-//      }
-//    }
-//
-//    this->target_is_reached = target_is_reached;
-//    return selected;
-//}
+SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *packet) {
+
+}
+
+SndSubflow* _simple_selector_subflow(StreamSplitter * this, GSList* subflows, SndPacket *packet)
+{
+  SndSubflow *selected = NULL, *subflow;
+  GSList* it;
+  volatile gint32 drate;
+  volatile gint32 selected_drate = 0;
+  gboolean target_is_reached = TRUE;
+  DISABLE_LINE _print_ratios(this);
+
+  for (it = subflows; it; it = it->next) {
+    subflow = it->data;
+    drate = this->actual_targets[subflow->id] - _qstat(this)->actual_bitrates[subflow->id];
+
+    if (_qstat(this)->actual_bitrates[subflow->id] < this->actual_targets[subflow->id] - MAX(11200, this->actual_targets[subflow->id] * .1) /*  1400 bytes * 8 */) {
+      target_is_reached = FALSE;
+    }
+
+    if (this->target_is_reached) {
+      drate += this->extra_targets[subflow->id];
+    }
+
+    if (drate < 0) {
+      drate += drate * 3;
+    }
+
+    if(!subflow->active){
+      continue;
+    }
+
+    if(this->keyframe_filtering){
+      if(packet->keyframe && subflow->state < this->max_state){
+        continue;
+      }
+    }
+//    sprintf(string, "%s %d: %d-%d=%d, ", string, subflow->id,
+//        this->actual_targets[subflow->id], this->actual_rates[subflow->id], drate);
+
+    if (!selected || selected_drate < drate) {
+      selected = subflow;
+      selected_drate = drate;
+    }
+  }
+
+//  g_print("%s selected: %d packet seq: %hu\n", string, selected->id, packet->abs_seq);
+  this->target_is_reached = target_is_reached;
+//  this->last_selected = selected;
+  return selected;
+}
+
+
 
 
 SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *packet)
@@ -261,6 +308,10 @@ SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *pac
 
     if (this->target_is_reached) {
       drate += this->extra_targets[subflow->id];
+    }
+
+    if (drate < 0) {
+      drate += drate * 3;
     }
 
     if(!subflow->active){

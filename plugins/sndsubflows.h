@@ -28,9 +28,9 @@ typedef struct _SndSubflowsPrivate SndSubflowsPrivate;
 
 typedef enum
 {
-  SNDSUBFLOW_STATE_OVERUSED     = -1,
-  SNDSUBFLOW_STATE_STABLE       = 0,
-  SNDSUBFLOW_STATE_UNDERUSED     = 1,
+  SNDSUBFLOW_STATE_CONGESTED      = -1,
+  SNDSUBFLOW_STATE_STABLE         = 0,
+  SNDSUBFLOW_STATE_INCREASING     = 1,
 } SndSubflowState;
 
 typedef struct {
@@ -147,7 +147,6 @@ void sndsubflows_add_on_subflow_state_stat_changed_cb(SndSubflows* this, Listene
 void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
-
 
 //------------------------------------------------------------------------------------------------
 void sndsubflow_set_state(SndSubflow* this, SndSubflowState state);

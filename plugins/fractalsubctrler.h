@@ -54,7 +54,6 @@ struct _FRACTaLSubController
 
   gint32                    bottleneck_point;
   gint32                    congested_bitrate;
-  gdouble                   heavy_congestion_th;
 
   GstClockTime              approvement_interval;
 
@@ -63,9 +62,6 @@ struct _FRACTaLSubController
   guint                     sent_packets;
   guint16                   border_packet_seq;
   gboolean                  set_border_packet;
-
-  gint32                    est_capacity;
-  GstClockTime              deflate_time;
 
   guint                     monitoring_interval;
   gint32                    monitoring_target_bitrate;
@@ -81,7 +77,6 @@ struct _FRACTaLSubController
   gint32 last_approved_sr;
   GstClockTime sr_reached;
 
-  gint64                    QD_th;
   gdouble                   FL_th;
   gboolean                  reducing_approved;
   GstClockTime              reducing_sr_reached;
@@ -100,11 +95,8 @@ struct _FRACTaLSubController
   GstClockTime              last_inflicted;
   GstClockTime              last_reset;
 
-  gboolean                  stability_approved;
-  gboolean                  cwnd_locked;
   gdouble                   bottleneck_cwnd;
   GstClockTime            (*refresh_target)(FRACTaLSubController* this);
-  gboolean                  aggressive;
 
   gpointer                  priv;
 
@@ -113,7 +105,8 @@ struct _FRACTaLSubController
 
 struct _FRACTaLSubControllerClass{
   GObjectClass parent_class;
-
+  gint32 approved_increasement;
+  gint subflows_num;
 };
 GType fractalsubctrler_get_type (void);
 FRACTaLSubController *make_fractalsubctrler(SndTracker *sndtracker, SndSubflow *subflow);

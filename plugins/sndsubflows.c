@@ -351,8 +351,8 @@ void sndsubflow_set_state(SndSubflow* subflow, SndSubflowState state)
   subflow->state = state;
   notifier_do(this->on_subflow_state_changed, subflow);
 
-  state_stat.min = SNDSUBFLOW_STATE_UNDERUSED;
-  state_stat.max = SNDSUBFLOW_STATE_OVERUSED;
+  state_stat.min = SNDSUBFLOW_STATE_INCREASING;
+  state_stat.max = SNDSUBFLOW_STATE_CONGESTED;
   g_slist_foreach(this->joined, (GFunc) _collect_on_subflow_state_stat, &state_stat);
   notifier_do(this->on_subflow_state_stat_changed, &state_stat);
 }

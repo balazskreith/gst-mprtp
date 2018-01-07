@@ -37,6 +37,14 @@ struct _StreamSplitter
   SndSubflows*         subflows;
   GQueue*              packets;
   SndQueue*            sndqueue;
+
+  GSList* congested_subflows;
+  GSList* stable_subflows;
+  GSList* increasing_subflows;
+
+  gboolean no_congested;
+  gboolean no_stable;
+  gboolean no_increasing;
 //  gint32               total_bitrate;
 //  volatile gint32               actual_rates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   volatile gint32               actual_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
@@ -46,6 +54,9 @@ struct _StreamSplitter
   guint8               max_state;
   gboolean             keyframe_filtering;
   gint32               total_target;
+
+  gint32               sr_avg[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  GstClockTime         last_updated[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
 
   SndSubflow*          last_selected;
   guint32              last_ts;

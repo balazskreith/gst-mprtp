@@ -1344,6 +1344,7 @@ static gpointer _simple_passer(gpointer data) {
 }
 
 static gboolean _is_fec_packet(RTPPacket* packet) {
+//  g_print("%d, %d -> %d\n", packet->seq_num, packet->payload_type, packet->payload_type == FEC_PAYLOAD_TYPE);
   return packet->payload_type == FEC_PAYLOAD_TYPE;
 }
 

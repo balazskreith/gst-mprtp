@@ -258,10 +258,6 @@ _change_sndsubflow_target_bitrate(
     FRACTaLSubController* this,
     gint32 new_target);
 
-static gdouble
-_get_estimated_capacity(
-    FRACTaLSubController *this);
-
 static void
 _execute_stage(
     FRACTaLSubController *this);
@@ -279,9 +275,10 @@ static void
 _increase_helper(
     FRACTaLSubController *this);
 
-static void
-_refresh_aggressivity_flag(
-    FRACTaLSubController *this);
+static gint32
+_get_approved_increasement(
+    FRACTaLSubController *this,
+    gint32 requested_increasement);
 
 #define _disable_monitoring(this) _start_monitoring(this, 0)
 
@@ -302,6 +299,8 @@ fractalsubctrler_class_init (FRACTaLSubControllerClass * klass)
   GST_DEBUG_CATEGORY_INIT (fractalsubctrler_debug_category, "fractalsubctrler", 0,
       "FRACTAL+ Subflow Rate Controller");
 
+  klass->approved_increasement = 5;
+  g_print("HERE %d", klass->approved_increasement);
 }
 
 
@@ -319,6 +318,11 @@ fractalsubctrler_finalize (GObject * object)
   g_free(this->stat);
   g_object_unref(this->sndtracker);
   g_object_unref(this->sysclock);
+
+  {
+    FRACTaLSubControllerClass* klass = (FRACTaLSubControllerClass*) this->object.g_type_instance.g_class;
+    --klass->subflows_num;
+  }
 }
 
 
@@ -348,6 +352,11 @@ fractalsubctrler_init (FRACTaLSubController * this)
   _priv(this)->max_evaluation_window_interval   = MAX_EVALUATION_WINDOW_INTERVAL;
 
   _priv(this)->reduce_drate_factor              = REDUCE_DRATE_FACTOR;
+
+  {
+    FRACTaLSubControllerClass* klass = (FRACTaLSubControllerClass*)this->object.g_type_instance.g_class;
+    ++klass->subflows_num;
+  }
 }
 
 FRACTaLSubController *make_fractalsubctrler(SndTracker *sndtracker, SndSubflow *subflow)
@@ -562,7 +571,7 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
   }
 
   switch(this->subflow->state){
-    case SNDSUBFLOW_STATE_OVERUSED:
+    case SNDSUBFLOW_STATE_CONGESTED:
       {
 
       }
@@ -572,7 +581,7 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
 
       }
       break;
-    case SNDSUBFLOW_STATE_UNDERUSED:
+    case SNDSUBFLOW_STATE_INCREASING:
     {
 
     }
@@ -597,7 +606,7 @@ done:
 }
 
 static gboolean _approve_measurement(FRACTaLSubController *this){
-  if(_subflow(this)->state == SNDSUBFLOW_STATE_OVERUSED) {
+  if(_subflow(this)->state == SNDSUBFLOW_STATE_CONGESTED) {
     if (this->last_distorted < _now(this) - 2 * GST_SECOND) {
       this->obligated_approvement = _now(this);
     }
@@ -636,7 +645,6 @@ void fractalsubctrler_report_update(
     _keep_stage(this);
     goto done;
   }
-  this->est_capacity = _get_estimated_capacity(this);
 
   DISABLE_LINE _stat_print(this);
   _stat_print(this);
@@ -652,8 +660,6 @@ void fractalsubctrler_report_update(
     fractalfbprocessor_approve_feedback(this->fbprocessor);
     this->last_approved = _now(this);
   }
-
-  _refresh_aggressivity_flag(this);
 
 done:
   return;
@@ -798,7 +804,7 @@ _probe_stage(
   _switch_stage_to(this, STAGE_INCREASE, FALSE);
 
   this->set_target = MAX(this->set_target * .95, this->target_bitrate);
-  g_print("set target: %d | target: %d\n", this->set_target, this->target_bitrate);
+//  g_print("set target: %d | target: %d\n", this->set_target, this->target_bitrate);
 done:
   return;
 }
@@ -824,7 +830,7 @@ _increase_stage(
     this->set_target -= this->increasement;
     this->bottleneck_point = MAX(this->target_bitrate, _stat(this)->sr_avg);
     _change_sndsubflow_target_bitrate(this, this->set_target);
-    g_print("set target: %d | target: %d\n", this->set_target, this->target_bitrate);
+//    g_print("set target: %d | target: %d\n", this->set_target, this->target_bitrate);
     goto done;
   }
 
@@ -867,7 +873,7 @@ _fire(
 {
 
   switch(_subflow(this)->state){
-    case SNDSUBFLOW_STATE_OVERUSED:
+    case SNDSUBFLOW_STATE_CONGESTED:
       switch(event){
         case EVENT_CONGESTION:
           this->last_distorted      = _now(this);
@@ -900,11 +906,11 @@ _fire(
           this->last_distorted      = _now(this);
           this->reducing_approved   = FALSE;
           this->reducing_sr_reached = 0;
-          sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_OVERUSED);
+          sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_CONGESTED);
           break;
         case EVENT_READY:
           this->last_increased = _now(this);
-          sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_UNDERUSED);
+          sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_INCREASING);
           break;
         case EVENT_SETTLED:
           this->distortion_num      = 0;
@@ -915,7 +921,7 @@ _fire(
         break;
       }
     break;
-    case SNDSUBFLOW_STATE_UNDERUSED:
+    case SNDSUBFLOW_STATE_INCREASING:
       switch(event){
         case EVENT_DISTORTION:
         case EVENT_CONGESTION:
@@ -924,7 +930,7 @@ _fire(
           this->reducing_approved   = FALSE;
           this->reducing_sr_reached = 0;
           this->tracked_target = 0;
-          sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_OVERUSED);
+          sndsubflow_set_state(this->subflow, SNDSUBFLOW_STATE_CONGESTED);
         break;
         case EVENT_SETTLED:
           this->distortion_num = 0;
@@ -1118,7 +1124,7 @@ void _start_increasement(FRACTaLSubController *this)
 {
   gint32 increasement = CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), _stat(this)->fec_bitrate);
 //  increasement *= _sensitivity(this, .5, 1.);
-  this->increasement             = increasement;
+  this->increasement             = _get_approved_increasement(this, increasement);
   this->increasing_started       = _now(this);
   this->increasing_sr_reached    = 0;
   this->increasing_approved      = FALSE;
@@ -1176,15 +1182,6 @@ guint _get_monitoring_interval(FRACTaLSubController* this)
   result = CONSTRAIN(_mon_min_int(this), _mon_max_int(this), this->target_bitrate / monitoring_target_bitrate);
   return result;
 
-//  max_interval = CONSTRAIN(_mon_min_int(this), _mon_max_int(this),  _stat(this)->sent_packets_in_1s / 5);
-//
-//  scale_t = _scale_t(this);
-//
-//  this->monitoring_target_bitrate = MAX(_max_ramp_up(this) * scale_t, _min_ramp_up(this));
-//  interval = this->target_bitrate / this->monitoring_target_bitrate + (scale_t < .5 ? 1 : 0);
-//  interval = CONSTRAIN(_mon_min_int(this), max_interval, interval);
-//  this->monitoring_target_bitrate = MIN(this->monitoring_target_bitrate, this->target_bitrate / interval);
-//  return interval;
 }
 
 void _change_sndsubflow_target_bitrate(FRACTaLSubController* this, gint32 new_target)
@@ -1197,24 +1194,6 @@ void _change_sndsubflow_target_bitrate(FRACTaLSubController* this, gint32 new_ta
   sndsubflow_set_target_rate(this->subflow, this->target_bitrate);
 }
 
-
-gdouble _get_estimated_capacity(FRACTaLSubController *this)
-{
-  gdouble srtt_in_s;
-  gdouble alpha;
-  gdouble received_bits;
-  gdouble est_rr;
-
-  received_bits = _stat(this)->rcved_bytes_in_ewi * 8.;
-  if(!this->est_capacity){
-    return received_bits;
-  }
-  alpha = .5;
-
-  srtt_in_s = _stat(this)->srtt * .000000001;
-  est_rr = received_bits / srtt_in_s;
-  return MIN(this->est_capacity * (1.-alpha) + est_rr * alpha, _stat(this)->rr_avg);
-}
 
 
 void _probe_helper(FRACTaLSubController *this) {
@@ -1263,21 +1242,27 @@ void _increase_helper(FRACTaLSubController *this) {
 
   alpha = MIN(1., alpha / _stat(this)->qdelay_var_stability);
   {
-//    gdouble beta = _stat(this)->qdelay_var_stability;
     gint32 upper_limit = MIN(this->set_target, this->target_bitrate + 5000);
-//    gint32 lower_limit = this->set_target - this->increasement * 2 * beta;
     gint32 lower_limit = this->set_target - this->increasement * 2;
     gint32 tr_hat = upper_limit * alpha + lower_limit * (1.-alpha);
-//    gint32 new_target = tr_hat * beta + this->target_bitrate * (1.-beta);
     _change_sndsubflow_target_bitrate(this, tr_hat);
   }
 }
 
-void _refresh_aggressivity_flag(FRACTaLSubController *this) {
-  if (this->aggressive && .8 < _stat(this)->qdelay_var_stability) {
-     this->aggressive = FALSE;
-  } else if (!this->aggressive && _stat(this)->qdelay_var_stability < .4) {
-    this->aggressive = TRUE;
-  }
-}
+gint32 _get_approved_increasement(FRACTaLSubController *this, gint32 requested_increasement) {
+  FRACTaLSubControllerClass* klass = (FRACTaLSubControllerClass*) this->object.g_type_instance.g_class;
 
+  if (klass->subflows_num < 2) {
+    return requested_increasement;
+  }
+
+  if (klass->approved_increasement == 0 || requested_increasement < klass->approved_increasement){
+    klass->approved_increasement = requested_increasement;
+    g_print("requested_increasement: %d", requested_increasement);
+    return requested_increasement;
+  }
+
+  klass->approved_increasement = MIN(klass->approved_increasement + _min_ramp_up(this) / 5, requested_increasement);
+  g_print("approved_increasement: %d", klass->approved_increasement);
+  return klass->approved_increasement;
+}

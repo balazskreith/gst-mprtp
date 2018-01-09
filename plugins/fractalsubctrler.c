@@ -88,6 +88,12 @@ G_DEFINE_TYPE (FRACTaLSubController, fractalsubctrler, G_TYPE_OBJECT);
 // determines the factor for reducing target considering rate differences
 #define REDUCE_DRATE_FACTOR 1.5
 
+// Determines the factor of allowed in minimal target bitrate for correction in stable states
+#define MULTIPATH_CORECTION_FACTOR .05
+
+// Determines the factor of allowed in minimal target bitrate for correction in stable states
+#define MULTIPATH_INCREASEMENT_FACTOR 10000
+
 typedef struct _Private Private;
 
 typedef enum{
@@ -131,6 +137,9 @@ struct _Private{
 
   gdouble             reduce_drate_factor;
 
+  gdouble             multipath_correction_factor;
+  gdouble             multipath_increasement_factor;
+
 };
 
 #define _priv(this) ((Private*)this->priv)
@@ -162,7 +171,8 @@ struct _Private{
 
 #define _reduce_drate(this)           _priv(this)->reduce_drate_factor
 
-
+#define _mp_correction_factor(this)   _priv(this)->multipath_correction_factor
+#define _mp_increasement_factor(this) _priv(this)->multipath_increasement_factor
 //----------------------------------------------------------------------
 //-------- Private functions belongs to Scheduler tree object ----------
 //----------------------------------------------------------------------
@@ -357,6 +367,9 @@ fractalsubctrler_init (FRACTaLSubController * this)
   _priv(this)->max_evaluation_window_interval   = MAX_EVALUATION_WINDOW_INTERVAL;
 
   _priv(this)->reduce_drate_factor              = REDUCE_DRATE_FACTOR;
+
+  _priv(this)->multipath_correction_factor      = MULTIPATH_CORECTION_FACTOR;
+  _priv(this)->multipath_increasement_factor    = MULTIPATH_INCREASEMENT_FACTOR;
 
   {
     FRACTaLSubControllerClass* klass = (FRACTaLSubControllerClass*)this->object.g_type_instance.g_class;
@@ -1267,7 +1280,7 @@ gint32 _get_approved_increasement(FRACTaLSubController *this, gint32 requested_i
     return requested_increasement;
   }
 
-  klass->approved_increasement = MIN(klass->approved_increasement + _min_ramp_up(this) / 5, requested_increasement);
+  klass->approved_increasement = MIN(klass->approved_increasement +  _mp_increasement_factor(this), requested_increasement);
   g_print("approved_increasement: %d", klass->approved_increasement);
   return klass->approved_increasement;
 }
@@ -1282,7 +1295,7 @@ gint32 _get_approved_corrections(FRACTaLSubController *this, gint32 requested_co
 //    return this->set_target;
 //  }
 
-  min_correction = MIN(this->target_bitrate * .05, this->set_target - requested_correction);
+  min_correction = MIN(this->target_bitrate * _mp_correction_factor(this), this->set_target - requested_correction);
   if (klass->approved_correction == 0 || min_correction < klass->approved_correction){
     klass->approved_correction = min_correction;
     return this->set_target - min_correction;

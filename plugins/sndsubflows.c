@@ -348,6 +348,7 @@ void sndsubflow_set_state(SndSubflow* subflow, SndSubflowState state)
 {
   SndSubflows* this = subflow->base_db;
   SndSubflowsStateStat state_stat;
+  subflow->prev_state = subflow->state;
   subflow->state = state;
   notifier_do(this->on_subflow_state_changed, subflow);
 

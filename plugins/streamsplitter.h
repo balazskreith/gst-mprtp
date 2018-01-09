@@ -41,6 +41,7 @@ struct _StreamSplitter
   GSList* congested_subflows;
   GSList* stable_subflows;
   GSList* increasing_subflows;
+  GSList* available_subflows;
 
   gboolean has_congested;
   gboolean has_stable;
@@ -48,7 +49,8 @@ struct _StreamSplitter
 //  gint32               total_bitrate;
 //  volatile gint32               actual_rates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   volatile gint32               actual_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-//  volatile gint32               extra_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32               supplied_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32               extra_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
 //  volatile gboolean             target_is_reached;
 //  gdouble              actual_weights[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   guint8               max_state;
@@ -84,6 +86,11 @@ void
 stream_splitter_on_packet_queued(
     StreamSplitter* this,
     SndPacket* packet);
+
+void
+stream_splitter_on_subflow_joined(
+    StreamSplitter* this,
+    SndSubflow* subflow);
 
 void
 stream_splitter_on_packet_sent(

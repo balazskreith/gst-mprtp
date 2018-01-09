@@ -106,6 +106,7 @@ struct _FRACTaLSubController
 struct _FRACTaLSubControllerClass{
   GObjectClass parent_class;
   gint32 approved_increasement;
+  gint32 approved_correction;
   gint subflows_num;
 };
 GType fractalsubctrler_get_type (void);

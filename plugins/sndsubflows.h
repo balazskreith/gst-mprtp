@@ -54,6 +54,7 @@ typedef struct _SndSubflow
   guint32                    total_sent_packets_num;
   guint32                    total_sent_payload_bytes;
 
+  SndSubflowState            prev_state;
   SndSubflowState            state;
 
   GstClockTime               pacing_time;

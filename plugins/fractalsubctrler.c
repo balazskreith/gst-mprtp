@@ -280,6 +280,11 @@ _get_approved_increasement(
     FRACTaLSubController *this,
     gint32 requested_increasement);
 
+static gint32
+_get_approved_corrections(
+    FRACTaLSubController *this,
+    gint32 requested_correction);
+
 #define _disable_monitoring(this) _start_monitoring(this, 0)
 
 
@@ -1217,7 +1222,7 @@ void _probe_helper(FRACTaLSubController *this) {
   {
 //    gdouble beta = _stat(this)->qdelay_var_stability;
     gint32 upper_limit = this->target_bitrate;
-    gint32 lower_limit = _stat(this)->sr_avg * (.95 * alpha + .8 * (1.-alpha));
+    gint32 lower_limit = _get_approved_corrections(this, _stat(this)->sr_avg * (.95 * alpha + .8 * (1.-alpha)));
     gint32 tr_hat = upper_limit * alpha + lower_limit * (1.-alpha);
 //    gint32 new_target = tr_hat * beta + this->target_bitrate * (1.-beta);
     _change_sndsubflow_target_bitrate(this, tr_hat);
@@ -1243,7 +1248,7 @@ void _increase_helper(FRACTaLSubController *this) {
   alpha = MIN(1., alpha / _stat(this)->qdelay_var_stability);
   {
     gint32 upper_limit = MIN(this->set_target, this->target_bitrate + 5000);
-    gint32 lower_limit = this->set_target - this->increasement * 2;
+    gint32 lower_limit = _get_approved_corrections(this, this->set_target - this->increasement * 2);
     gint32 tr_hat = upper_limit * alpha + lower_limit * (1.-alpha);
     _change_sndsubflow_target_bitrate(this, tr_hat);
   }
@@ -1265,4 +1270,24 @@ gint32 _get_approved_increasement(FRACTaLSubController *this, gint32 requested_i
   klass->approved_increasement = MIN(klass->approved_increasement + _min_ramp_up(this) / 5, requested_increasement);
   g_print("approved_increasement: %d", klass->approved_increasement);
   return klass->approved_increasement;
+}
+
+gint32 _get_approved_corrections(FRACTaLSubController *this, gint32 requested_correction) {
+  FRACTaLSubControllerClass* klass = (FRACTaLSubControllerClass*) this->object.g_type_instance.g_class;
+  gint32 min_correction;
+  if (klass->subflows_num < 2) {
+    return requested_correction;
+  }
+//  else {
+//    return this->set_target;
+//  }
+
+  min_correction = MIN(this->target_bitrate * .05, this->set_target - requested_correction);
+  if (klass->approved_correction == 0 || min_correction < klass->approved_correction){
+    klass->approved_correction = min_correction;
+    return this->set_target - min_correction;
+  }
+
+  klass->approved_correction = MIN(klass->approved_correction + _min_ramp_up(this) / 5, min_correction);
+  return this->set_target - klass->approved_correction;
 }

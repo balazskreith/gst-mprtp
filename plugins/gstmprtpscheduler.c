@@ -410,6 +410,10 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
       this->splitter);
 
   sndsubflows_add_on_subflow_joined_cb(this->subflows,
+     (ListenerFunc) stream_splitter_on_subflow_joined,
+     this->splitter);
+
+  sndsubflows_add_on_subflow_joined_cb(this->subflows,
      (ListenerFunc) sndqueue_on_subflow_joined,
      this->sndqueue);
 

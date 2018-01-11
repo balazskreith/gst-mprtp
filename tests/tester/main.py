@@ -130,6 +130,14 @@ class Tester:
                 source_type=source_type,
                 sink_type=sink_type
             )
+        elif (type == "mprtp3"):
+            result = MPRTP3(
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type
+            )
         return result
 
 parser = argparse.ArgumentParser()

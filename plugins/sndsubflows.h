@@ -96,6 +96,7 @@ struct _SndSubflows
   Notifier*            on_congestion_controlling_type_changed;
   Notifier*            on_path_active_changed;
   Notifier*            on_target_bitrate_changed;
+  Notifier*            on_stable_target_bitrate_changed;
   Notifier*            on_subflow_state_changed;
   Notifier*            on_subflow_state_stat_changed;
 
@@ -123,6 +124,7 @@ void sndsubflows_iterate(SndSubflows* this, GFunc process, gpointer udata);
 
 void sndsubflow_monitoring_request(SndSubflow* subflow);
 void sndsubflow_set_target_rate(SndSubflow* subflow, gint32 target_rate);
+void sndsubflow_set_stable_target_rate(SndSubflow* subflow, gint32 target_rate);
 void sndsubflow_set_rtt(SndSubflow* subflow, GstClockTime rtt);
 void sndsubflow_set_eqd(SndSubflow* subflow, gint32 eqd);
 //gint32 sndsubflows_get_total_target(SndSubflows* this);
@@ -148,7 +150,7 @@ void sndsubflows_add_on_subflow_state_stat_changed_cb(SndSubflows* this, Listene
 void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
-
+void sndsubflows_add_on_stable_target_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 //------------------------------------------------------------------------------------------------
 void sndsubflow_set_state(SndSubflow* this, SndSubflowState state);
 void sndsubflow_refresh_report_interval(SndSubflow* subflow);

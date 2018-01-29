@@ -129,6 +129,7 @@ sndsubflows_finalize (GObject * object)
   g_object_unref(this->on_target_bitrate_changed);
   g_object_unref(this->on_subflow_state_changed);
   g_object_unref(this->on_subflow_state_stat_changed);
+  g_object_unref(this->on_stable_target_bitrate_changed);
 
   g_object_unref(this->changed_subflows);
 
@@ -147,6 +148,7 @@ sndsubflows_init (SndSubflows * this)
   this->on_congestion_controlling_type_changed  = make_notifier("SndSubflow: on-congestion-controlling-type-changed");
   this->on_path_active_changed                  = make_notifier("SndSubflow: on-path-active-changed");
   this->on_target_bitrate_changed               = make_notifier("SndSubflow: on-target-bitrate-changed");
+  this->on_stable_target_bitrate_changed        = make_notifier("SndSubflow: on-stable-target-bitrate-changed");
   this->on_subflow_state_changed                = make_notifier("SndSubflow: on-subflow-state-changed");
   this->on_subflow_state_stat_changed           = make_notifier("SndSubflow: on-subflow-state-stat");
 
@@ -245,6 +247,11 @@ void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, ListenerFun
   notifier_add_listener(this->on_target_bitrate_changed, callback, udata);
 }
 
+void sndsubflows_add_on_stable_target_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata)
+{
+  notifier_add_listener(this->on_stable_target_bitrate_changed, callback, udata);
+}
+
 void sndsubflow_monitoring_request(SndSubflow* subflow)
 {
   SndSubflows *subflows = subflow->base_db;
@@ -259,6 +266,12 @@ void sndsubflow_set_target_rate(SndSubflow* subflow, gint32 target_rate)
   subflow->target_bitrate = target_rate;
 
   notifier_do(subflows->on_target_bitrate_changed, subflow);
+}
+
+void sndsubflow_set_stable_target_rate(SndSubflow* subflow, gint32 target_rate)
+{
+  SndSubflows *subflows = subflow->base_db;
+  notifier_do(subflows->on_stable_target_bitrate_changed, subflow);
 }
 
 void sndsubflow_set_rtt(SndSubflow* subflow, GstClockTime rtt) {

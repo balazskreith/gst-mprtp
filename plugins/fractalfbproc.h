@@ -63,6 +63,7 @@ typedef struct _FRACTaLStat
 
   gdouble                  FL_th;
   gdouble                  fraction_lost;
+  gdouble                  fraction_lost_avg;
   gdouble                  ewi_in_s;
   guint16                  sent_packets_in_1s;
 

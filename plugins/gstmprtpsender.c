@@ -1014,7 +1014,7 @@ done:
   return result;
 }
 
-gboolean
+static gboolean
 _select_subflow (GstMprtpsender * this, guint8 id, Subflow ** result)
 {
 //  GList *it;

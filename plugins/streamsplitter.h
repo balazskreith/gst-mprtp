@@ -38,30 +38,20 @@ struct _StreamSplitter
   GQueue*              packets;
   SndQueue*            sndqueue;
 
-  GSList* congested_subflows;
-  GSList* stable_subflows;
-  GSList* increasing_subflows;
-  GSList* available_subflows;
-
-  gboolean has_congested;
-  gboolean has_stable;
-  gboolean has_increasing;
-//  gint32               total_bitrate;
-//  volatile gint32               actual_rates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  volatile gint32               actual_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  volatile gint32               supplied_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  volatile gint32               extra_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-//  volatile gboolean             target_is_reached;
-//  gdouble              actual_weights[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32      stable_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32      set_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   guint8               max_state;
   gboolean             keyframe_filtering;
   gint32               total_target;
-
-  gint32               sr_avg[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  GstClockTime         last_updated[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  gint32               total_stable_target;
+  gdouble              target_off;
+  gint32               sending_rate_avg;
 
   SndSubflow*          last_selected;
   guint32              last_ts;
+  gint                 mode;
+  guint32              last_timestamp;
+  SndSubflow*          last_subflow;
 
 };
 
@@ -103,6 +93,10 @@ stream_splitter_on_packet_obsolated(
     StreamSplitter* this,
     SndPacket* packet);
 
+void
+stream_splitter_on_subflow_stable_target_bitrate_chaned(
+    StreamSplitter* this,
+    SndSubflow* subflow);
 
 void
 stream_splitter_on_subflow_target_bitrate_chaned(

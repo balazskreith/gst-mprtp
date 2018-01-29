@@ -389,6 +389,10 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
       (ListenerFunc) stream_splitter_on_subflow_target_bitrate_chaned,
       this->splitter);
 
+  sndsubflows_add_on_stable_target_bitrate_changed_cb(this->subflows,
+      (ListenerFunc) stream_splitter_on_subflow_stable_target_bitrate_chaned,
+      this->splitter);
+
   sndsubflows_add_on_subflow_state_changed_cb(this->subflows,
       (ListenerFunc) stream_splitter_on_subflow_state_changed,
       this->splitter);

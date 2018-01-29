@@ -48,6 +48,8 @@ struct _FRACTaLSubController
   gint32                    tracked_target;
   gint32                    set_target;
 
+  gdouble                   tcp_flow_presented;
+
   guint                     rcved_fb_since_changed;
 
   GstClockTime              last_executed;

@@ -359,7 +359,8 @@ void _process_stat(FRACTaLFBProcessor *this)
         .5 * (1. - bucket_get_negative_cosine_similarity(this->qdelay_devs));
 
   if(_stat(this)->sr_avg){
-    alpha = ewma_factor * .5 + .5;
+//    alpha = ewma_factor * .5 + .5;
+    alpha = 1.;
     _stat(this)->sr_avg = alpha * _stat(this)->sender_bitrate + _stat(this)->sr_avg * (1.-alpha);
   }else{
     _stat(this)->sr_avg = _stat(this)->sender_bitrate;
@@ -385,7 +386,18 @@ void _process_stat(FRACTaLFBProcessor *this)
     _stat(this)->drate_avg = drate * alpha + _stat(this)->drate_avg * (1.-alpha);
   }
 
-  _stat(this)->FL_th = _stat(this)->FL_th * .98 + _stat(this)->fraction_lost * .02;
+  {
+//    gdouble alpha = CONSTRAIN(.2, .98, _stat(this)->qdelay_var_stability);
+    gdouble alpha = .98;
+    _stat(this)->FL_th = _stat(this)->FL_th * alpha + _stat(this)->fraction_lost * (1.0 - alpha);
+  }
+
+  if (0. < _stat(this)->fraction_lost) {
+    gdouble alpha = .98;
+    _stat(this)->fraction_lost_avg = _stat(this)->fraction_lost_avg * alpha + _stat(this)->fraction_lost * (1.-alpha);
+  }
+
+
   slidingwindow_refresh(this->reference_sw);
   slidingwindow_refresh(this->ewi_sw);
 

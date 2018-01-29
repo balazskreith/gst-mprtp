@@ -36,6 +36,10 @@ GST_DEBUG_CATEGORY_STATIC (stream_splitter_debug_category);
 /* class initialization */
 G_DEFINE_TYPE (StreamSplitter, stream_splitter, G_TYPE_OBJECT);
 
+enum{
+  FRAME_SCHEDULING = 1,
+  PACKET_SCHEDULING = 2,
+};
 
 #define _qstat(this) sndqueue_get_stat(this->sndqueue)
 #define _now(this) gst_clock_get_time (this->sysclock)
@@ -47,14 +51,10 @@ static void
 stream_splitter_finalize (
     GObject * object);
 
-static SndSubflow* _select_subflow(
+static SndSubflow*
+_select_next_subflow(
     StreamSplitter * this,
-    GSList* subflows,
-    SndPacket *packet,
-    gboolean use_extra_bytes,
-    gint32* min_target,
-    gint32* max_drate);
-
+    SndPacket *packet);
 //----------------------------------------------------------------------
 //---- Private function implementations to Stream Dealer object --------
 //----------------------------------------------------------------------
@@ -68,7 +68,8 @@ static void _print_ratios(StreamSplitter *this){
     SndSubflow* subflow = it->data;
     g_print("%d: %f-%f | ",
         subflow->id,
-        (gdouble)subflow->target_bitrate / (gdouble)this->total_target,
+        (gdouble)subflow->target_bitrate / (gdouble)this->total_stable_target,
+//        (gdouble) this->stable_targets[subflow->id] / 1000,
         (gdouble)_qstat(this)->actual_bitrates[subflow->id] / (gdouble)_qstat(this)->total_bitrate
         );
   }
@@ -99,14 +100,9 @@ StreamSplitter* make_stream_splitter(SndSubflows* sndsubflows, SndQueue* sndqueu
   this->packets = g_queue_new();
   this->sndqueue = sndqueue;
 
-  this->congested_subflows = NULL;
-  this->stable_subflows = NULL;
-  this->increasing_subflows = NULL;
-  this->available_subflows = NULL;
-
-  this->has_stable = FALSE;
-  this->has_congested = FALSE;
-  this->has_increasing = FALSE;
+  this->total_target = 0;
+  this->total_stable_target = 0;
+  this->mode = PACKET_SCHEDULING;
   return this;
 }
 
@@ -118,10 +114,6 @@ stream_splitter_finalize (GObject * object)
   g_object_unref(this->subflows);
   g_object_unref(this->packets);
 
-  g_slist_free(this->congested_subflows);
-  g_slist_free(this->stable_subflows);
-  g_slist_free(this->increasing_subflows);
-  g_slist_free(this->available_subflows);
 }
 
 
@@ -136,118 +128,63 @@ stream_splitter_init (StreamSplitter * this)
 gint32 stream_splitter_get_total_media_rate(StreamSplitter* this)
 {
   // TODO: considering EQD here
+  // calculate off
+  {
+    gint32 total_sending_rate = _qstat(this)->total_bitrate + _qstat(this)->bytes_in_queue * 8;
+    this->sending_rate_avg = total_sending_rate * .5 + this->sending_rate_avg * .5;
+    if (this->total_target == this->total_stable_target) {
+      this->target_off = 1.;
+    } else {
+      this->target_off = (gdouble) (this->sending_rate_avg - this->total_target);
+      this->target_off /= (gdouble) (this->total_target - this->total_stable_target);
+      this->target_off = 1 + CONSTRAIN(-1., 0., this->target_off);
+    }
+  }
   return this->total_target;
 }
 
 void
 stream_splitter_on_packet_queued(StreamSplitter* this, SndPacket* packet)
 {
-//  GstClockTime threshold = _now(this) - GST_SECOND;
-//
-//  g_queue_push_tail(this->packets, sndpacket_ref(packet));
-//
-//  while(!g_queue_is_empty(this->packets)) {
-//    SndPacket* head = g_queue_peek_head(this->packets);
-//    if (threshold <= head->queued) {
-//      break;
-//    }
-//    head = g_queue_pop_head(this->packets);
-//    if (_qstat(this)->actual_bitrates[head->subflow_id]  < this->actual_targets[head->subflow_id] - 22800) {
-//      this->target_is_reached = FALSE;
-//    }
-//    sndpacket_unref(head);
-//  }
+
 }
 
 void
 stream_splitter_on_subflow_joined(StreamSplitter* this, SndSubflow* subflow)
 {
-  this->stable_subflows = g_slist_prepend(this->stable_subflows, subflow);
-  this->available_subflows = g_slist_prepend(this->stable_subflows, subflow);
-  this->has_stable = TRUE;
+
 }
 
 void
 stream_splitter_on_packet_sent(StreamSplitter* this, SndPacket* packet)
 {
-//  this->actual_rates[packet->subflow_id] += packet->payload_size<<3; //convert bytes to bits
-//  this->total_bitrate += packet->payload_size;
+
 }
 
 void
 stream_splitter_on_packet_obsolated(StreamSplitter* this, SndPacket* packet)
 {
-//  this->actual_rates[packet->subflow_id] -= packet->payload_size<<3; //convert bytes to bits
-//  this->total_bitrate -= packet->payload_size<<3;
-//
-//  if (this->actual_rates[packet->subflow_id]  < this->actual_targets[packet->subflow_id]) {
-//    this->target_is_reached = FALSE;
-//  }
+
 }
 
-static void _operate_on_total_target(StreamSplitter* this, SndSubflow* subflow, gint op) {
-//  gint32 subflow_total = this->actual_targets[subflow->id] + this->extra_targets[subflow->id];
-  gint32 subflow_total = this->actual_targets[subflow->id];
-  this->total_target += op * subflow_total;
+void
+stream_splitter_on_subflow_stable_target_bitrate_chaned(StreamSplitter* this, SndSubflow* subflow) {
+  this->total_stable_target -= this->stable_targets[subflow->id];
+  this->stable_targets[subflow->id] = subflow->target_bitrate;
+  this->total_stable_target += this->stable_targets[subflow->id];
 }
 
 void
 stream_splitter_on_subflow_target_bitrate_chaned(StreamSplitter* this, SndSubflow* subflow)
 {
-  _operate_on_total_target(this, subflow, -1);
-
-  if (subflow->state == SNDSUBFLOW_STATE_INCREASING) {
-    this->extra_targets[subflow->id] = subflow->target_bitrate - this->actual_targets[subflow->id];
-  } else {
-    this->actual_targets[subflow->id] = subflow->target_bitrate;
-  }
-
-  this->actual_targets[subflow->id] = subflow->target_bitrate;
-  _operate_on_total_target(this, subflow, 1);
+  this->total_target -= this->set_targets[subflow->id];
+  this->set_targets[subflow->id] = subflow->target_bitrate;
+  this->total_target += this->set_targets[subflow->id];
 }
 
 void
 stream_splitter_on_subflow_state_changed(StreamSplitter* this, SndSubflow* subflow)
 {
-  _operate_on_total_target(this, subflow, -1);
-
-  if (subflow->state != SNDSUBFLOW_STATE_INCREASING) {
-    this->actual_targets[subflow->id] = subflow->target_bitrate;
-    this->extra_targets[subflow->id] = 0;
-  } else {
-    this->actual_targets[subflow->id] = subflow->target_bitrate;
-  }
-
-  if (subflow->prev_state == SNDSUBFLOW_STATE_CONGESTED && subflow->state != SNDSUBFLOW_STATE_CONGESTED) {
-    this->available_subflows = g_slist_prepend(this->available_subflows, subflow);
-  } else if(subflow->prev_state != SNDSUBFLOW_STATE_CONGESTED && subflow->state == SNDSUBFLOW_STATE_CONGESTED) {
-    this->available_subflows = g_slist_remove(this->available_subflows, subflow);
-  }
-
-  _operate_on_total_target(this, subflow, 1);
-
-  switch (subflow->state) {
-    case SNDSUBFLOW_STATE_INCREASING:
-      this->congested_subflows = g_slist_remove(this->congested_subflows, subflow);
-      this->stable_subflows = g_slist_remove(this->stable_subflows, subflow);
-      this->increasing_subflows = g_slist_prepend(this->increasing_subflows, subflow);
-      break;
-    case SNDSUBFLOW_STATE_CONGESTED:
-      this->congested_subflows = g_slist_prepend(this->congested_subflows, subflow);
-      this->stable_subflows = g_slist_remove(this->stable_subflows, subflow);
-      this->increasing_subflows = g_slist_remove(this->increasing_subflows, subflow);
-      break;
-    default:
-    case SNDSUBFLOW_STATE_STABLE:
-      this->congested_subflows = g_slist_remove(this->congested_subflows, subflow);
-      this->stable_subflows = g_slist_prepend(this->stable_subflows, subflow);
-      this->increasing_subflows = g_slist_remove(this->increasing_subflows, subflow);
-      break;
-  }
-
-  this->has_congested = 0 < g_slist_length(this->congested_subflows);
-  this->has_stable = 0 < g_slist_length(this->stable_subflows);
-  this->has_increasing = 0 < g_slist_length(this->increasing_subflows);
 
 }
 
@@ -262,159 +199,55 @@ stream_splitter_set_keyframe_filtering(StreamSplitter* this, gboolean keyframe_f
   this->keyframe_filtering = keyframe_filtering;
 }
 
-
 SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *packet) {
-  gboolean use_extra_bitrates = FALSE;
-//  const gint32 min_drate_th = 11200; /*  1400 bytes * 8 */
-  gint32 min_target; // minimum of the targets
-  gint32 max_drate; // maximum of drates -> if it is negative all subflow reached it's target
-  SndSubflow* selected = NULL;
-
-  // Only one of them is TRUE
-  if (this->has_stable ^ this->has_congested ^ this->has_increasing) {
-      use_extra_bitrates = this->has_increasing;
-      selected = _select_subflow(this, sndsubflows_get_subflows(this->subflows), packet, use_extra_bitrates, &min_target, &max_drate);
-    return selected;
+  switch(this->mode) {
+    case FRAME_SCHEDULING:
+      if (this->last_timestamp != 0 && packet->timestamp == this->last_timestamp) {
+        return this->last_subflow;
+      }
+      this->last_subflow = _select_next_subflow(this, packet);
+      this->last_timestamp = packet->timestamp;
+      return this->last_subflow;
+    default:
+    case PACKET_SCHEDULING:
+      return _select_next_subflow(this, packet);
   }
-
-  // No congested subflow available
-  if (!this->has_congested) {
-    selected = _select_subflow(this, sndsubflows_get_subflows(this->subflows), packet, use_extra_bitrates, &min_target, &max_drate);
-    if (max_drate < 0) {
-      use_extra_bitrates = TRUE;
-      selected = _select_subflow(this, sndsubflows_get_subflows(this->subflows), packet, use_extra_bitrates, NULL, &max_drate);
-    }
-    return selected;
-  }
-
-  if (!this->has_increasing) {
-    selected = _select_subflow(this, this->stable_subflows, packet, use_extra_bitrates, NULL, &max_drate);
-    if (max_drate < 0) {
-      selected = _select_subflow(this, this->congested_subflows, packet, use_extra_bitrates, NULL, &max_drate);
-    }
-    return selected;
-  }
-
-  if (!this->has_stable) {
-    use_extra_bitrates = TRUE;
-    selected = _select_subflow(this, this->increasing_subflows, packet, use_extra_bitrates, NULL, &max_drate);
-    if (max_drate < 0) {
-      selected = _select_subflow(this, this->congested_subflows, packet, use_extra_bitrates, NULL, &max_drate);
-    }
-    return selected;
-  }
-
-  selected = _select_subflow(this, this->available_subflows, packet, use_extra_bitrates, NULL, &max_drate);
-  if (0 < max_drate) {
-    return selected;
-  }
-
-  use_extra_bitrates = TRUE;
-  selected = _select_subflow(this, this->available_subflows, packet, use_extra_bitrates, NULL, &max_drate);
-  if (0 < max_drate) {
-    return selected;
-  }
-
-  // all subflows are reached the target
-  return _select_subflow(this, this->congested_subflows, packet, use_extra_bitrates, NULL, &max_drate);
 }
 
-SndSubflow* _select_subflow(StreamSplitter * this, GSList* subflows, SndPacket *packet, gboolean use_extra_bytes,
-    gint32* min_target, gint32* max_drate)
-{
-  SndSubflow *selected = NULL, *subflow;
-  GSList* it;
-  volatile gint32 drate;
-  volatile gint32 selected_drate = 0;
-//  gboolean target_is_reached = TRUE;
-  DISABLE_LINE _print_ratios(this);
+SndSubflow* _select_next_subflow(StreamSplitter * this, SndPacket *packet) {
+    SndSubflow *selected = NULL, *subflow;
+    GSList* it;
+    volatile gint32 drate;
+    volatile gint32 selected_drate = 0;
+    DISABLE_LINE _print_ratios(this);
 
-  if (min_target) {
-    *min_target = 1000*1000*1000;
-  }
-  *max_drate = -1000*1000*1000;
+    for (it = sndsubflows_get_subflows(this->subflows); it; it = it->next) {
+      subflow = it->data;
+      drate = _qstat(this)->actual_bitrates[subflow->id] + _qstat(this)->queued_bytes[subflow->id] * 8;
+      if (0 < this->stable_targets[subflow->id]) {
+        drate -= this->stable_targets[subflow->id] * (1.-this->target_off) + this->set_targets[subflow->id] * this->target_off;
+      } else {
+        drate -= this->set_targets[subflow->id];
+      }
 
-  for (it = subflows; it; it = it->next) {
-    subflow = it->data;
-    drate = this->actual_targets[subflow->id];
-    if (use_extra_bytes) {
-      drate += this->extra_targets[subflow->id];
-    }
-    drate -= _qstat(this)->actual_bitrates[subflow->id] + _qstat(this)->queued_bytes[subflow->id] * 8;
+      if(!subflow->active){
+        continue;
+      }
 
-    if (!selected || selected_drate < drate) {
-      selected = subflow;
-      selected_drate = drate;
-    }
+      if(this->keyframe_filtering){
+        if(packet->keyframe && subflow->state < this->max_state){
+          continue;
+        }
+      }
 
-    if (min_target) {
-      if (this->actual_targets[subflow->id] < *min_target) {
-        *min_target = this->actual_targets[subflow->id];
+      if (!selected || drate < selected_drate) {
+        selected = subflow;
+        selected_drate = drate;
       }
     }
-
-    if (*max_drate < drate) {
-      *max_drate = drate;
-    }
-
-  }
-
-//  g_print("%s selected: %d packet seq: %hu\n", string, selected->id, packet->abs_seq);
-//  this->last_selected = selected;
-  return selected;
+    return selected;
 }
 
-
-
-
-//SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *packet)
-//{
-//  SndSubflow *selected = NULL, *subflow;
-//  GSList* it;
-//  volatile gint32 drate;
-//  volatile gint32 selected_drate = 0;
-//  gboolean target_is_reached = TRUE;
-//  DISABLE_LINE _print_ratios(this);
-//
-//  for (it = sndsubflows_get_subflows(this->subflows); it; it = it->next) {
-//    subflow = it->data;
-//    drate = this->actual_targets[subflow->id] - _qstat(this)->actual_bitrates[subflow->id];
-//
-//    if (_qstat(this)->actual_bitrates[subflow->id] < this->actual_targets[subflow->id] - MAX(11200, this->actual_targets[subflow->id] * .1) /*  1400 bytes * 8 */) {
-//      target_is_reached = FALSE;
-//    }
-//
-//    if (this->target_is_reached) {
-//      drate += this->extra_targets[subflow->id];
-//    }
-//
-//    if (drate < 0) {
-//      drate += drate * 3;
-//    }
-//
-//    if(!subflow->active){
-//      continue;
-//    }
-//
-//    if(this->keyframe_filtering){
-//      if(packet->keyframe && subflow->state < this->max_state){
-//        continue;
-//      }
-//    }
-////    sprintf(string, "%s %d: %d-%d=%d, ", string, subflow->id,
-////        this->actual_targets[subflow->id], this->actual_rates[subflow->id], drate);
-//
-//    if (!selected || selected_drate < drate) {
-//      selected = subflow;
-//      selected_drate = drate;
-//    }
-//  }
-//
-////  g_print("%s selected: %d packet seq: %hu\n", string, selected->id, packet->abs_seq);
-//  this->target_is_reached = target_is_reached;
-////  this->last_selected = selected;
-//  return selected;
-//}
 
 
 

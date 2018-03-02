@@ -1,6 +1,7 @@
 #include "decoder.h"
 
 static void _setup_vp8_decoder(GstBin* decoderBin, CodecParams *params);
+static void _setup_vp9_decoder(GstBin* decoderBin, CodecParams *params);
 static void _setup_theora_decoder(GstBin* decoderBin, CodecParams *params);
 static int _instance_counter = 0;
 
@@ -25,8 +26,11 @@ Decoder* make_decoder(CodecParams *params)
 
   switch(params->type){
     case CODEC_TYPE_VP8:
-      _setup_vp8_decoder(decoderBin, params);
-      break;
+        _setup_vp8_decoder(decoderBin, params);
+        break;
+    case CODEC_TYPE_VP9:
+        _setup_vp9_decoder(decoderBin, params);
+        break;
     case CODEC_TYPE_THEORA:
       _setup_theora_decoder(decoderBin, params);
       break;
@@ -37,6 +41,20 @@ Decoder* make_decoder(CodecParams *params)
 }
 
 static void _setup_vp8_decoder(GstBin* decoderBin, CodecParams *params)
+{
+  GstElement *depayloader = gst_element_factory_make ("rtpvp8depay", NULL);
+  GstElement *decoder     = gst_element_factory_make ("vp8dec", NULL);
+  GstElement *converter   = gst_element_factory_make ("videoconvert", NULL);
+
+  gst_bin_add_many (decoderBin, depayloader, decoder, converter, NULL);
+  gst_element_link_many (depayloader, decoder, converter, NULL);
+
+  setup_ghost_sink (depayloader, decoderBin);
+  setup_ghost_src  (converter, decoderBin);
+
+}
+
+static void _setup_vp9_decoder(GstBin* decoderBin, CodecParams *params)
 {
   GstElement *depayloader = gst_element_factory_make ("rtpvp8depay", NULL);
   GstElement *decoder     = gst_element_factory_make ("vp8dec", NULL);

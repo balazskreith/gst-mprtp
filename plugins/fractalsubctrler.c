@@ -88,12 +88,6 @@ G_DEFINE_TYPE (FRACTaLSubController, fractalsubctrler, G_TYPE_OBJECT);
 // determines the factor for reducing target considering rate differences
 #define REDUCE_DRATE_FACTOR 1.5
 
-// Determines the factor of allowed in minimal target bitrate for correction in stable states
-#define MULTIPATH_CORECTION_FACTOR .05
-
-// Determines the factor of allowed in minimal target bitrate for correction in stable states
-#define MULTIPATH_INCREASEMENT_FACTOR 10000
-
 // Determine the threshold that a continous lost happens that considered to be a tcp flow
 #define TCP_LOST_THRESHOLD 0.1
 
@@ -140,9 +134,6 @@ struct _Private{
 
   gdouble             reduce_drate_factor;
 
-  gdouble             multipath_correction_factor;
-  gdouble             multipath_increasement_factor;
-
   gdouble             tcp_lost_threshold;
 
 };
@@ -175,9 +166,6 @@ struct _Private{
 #define _max_ewi(this)                _priv(this)->max_evaluation_window_interval
 
 #define _reduce_drate(this)           _priv(this)->reduce_drate_factor
-
-#define _mp_correction_factor(this)   _priv(this)->multipath_correction_factor
-#define _mp_increasement_factor(this) _priv(this)->multipath_increasement_factor
 
 #define _tcp_lost_threshold(this)     _priv(this)->tcp_lost_threshold
 //----------------------------------------------------------------------
@@ -292,15 +280,6 @@ static void
 _increase_helper(
     FRACTaLSubController *this);
 
-static gint32
-_get_approved_increasement(
-    FRACTaLSubController *this,
-    gint32 requested_increasement);
-
-static gint32
-_get_approved_corrections(
-    FRACTaLSubController *this,
-    gint32 requested_correction);
 
 #define _disable_monitoring(this) _start_monitoring(this, 0)
 
@@ -378,9 +357,6 @@ fractalsubctrler_init (FRACTaLSubController * this)
 
   _priv(this)->reduce_drate_factor              = REDUCE_DRATE_FACTOR;
 
-  _priv(this)->multipath_correction_factor      = MULTIPATH_CORECTION_FACTOR;
-  _priv(this)->multipath_increasement_factor    = MULTIPATH_INCREASEMENT_FACTOR;
-
   _priv(this)->tcp_lost_threshold               = TCP_LOST_THRESHOLD;
   {
     FRACTaLSubControllerClass* klass = (FRACTaLSubControllerClass*)this->object.g_type_instance.g_class;
@@ -416,12 +392,14 @@ FRACTaLSubController *make_fractalsubctrler(SndTracker *sndtracker, SndSubflow *
 
 void fractalsubctrler_enable(FRACTaLSubController *this)
 {
-  this->enabled    = TRUE;
+  this->enabled = TRUE;
 }
 
 void fractalsubctrler_disable(FRACTaLSubController *this)
 {
   _switch_stage_to(this, STAGE_KEEP, FALSE);
+  _change_sndsubflow_target_bitrate(this, 0);
+  _stop_monitoring(this);
   this->enabled = FALSE;
 }
 
@@ -448,131 +426,106 @@ void _on_rtp_sending(FRACTaLSubController* this, SndPacket *packet)
   }
 }
 
-
+static gboolean header_printed = FALSE;
 static void _stat_print(FRACTaLSubController *this)
 {
   FRACTaLStat *stat = this->stat;
   gchar result[1024];
   memset(result, 0, 1024);
 
-  { // subflow and measurement num info
-    gchar info[128];
-    memset(info, 0, 128);
-    sprintf(info, "%-1d|%-3d|%-3.1f|",
-        this->subflow->id,
-        stat->measurements_num,
-        GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000.
-    );
-    strcat(result, info);
+  if (!header_printed) {
+    sprintf(result,
+        "Subflow ID,"             // 1
+        "Measurements,"           // 2
+        "Elapsed time in sec,"    // 3
+        "Estimated Receiver Rate,"        // 4
+        "Rate difference,"        // 5
+        "Queued Bytes,"           // 6
+        "FEC bitrate,"            // 7
+        "FEC target,"             // 8
+        "FEC interval,"           // 9
+        "Sending Rate [kbps],"    // 10
+        "Receiver Rate [kbps],"   // 11
+        "Received in EWI [kbps]," // 12
+        "Target Rate [kbps],"     // 13
+        "Bottleneck Point [kbps],"// 14
+        "Set Target [kbps],"      // 15
+        "Congested Target [kbps],"// 16
+        "dRate [kbps],"           // 17
+        "FRACTaL Stage,"          // 18
+        "Subflow State,"          // 19
+        "Monitoring Approved,"    // 20
+        "Increasing Approved,"    // 21
+        "Fractional Lost,"        // 22
+        "TCP Flow Presented,"     // 23
+        "Fractional Lost Threshold," // 24
+        "Queue Delay Stability,"     // 25
+        "Queue Delay Variance Stability," // 26
+        );
+    g_print("Stat:%s\n",result);
+    header_printed = TRUE;
+    memset(result, 0, 1024);
   }
 
-//  { // BiF info
-//    gchar info[128];
-//    memset(info, 0, 128);
-//    sprintf(info, "BiF:%-3d(%-3.0f)|",
-//        stat->bytes_in_flight / 125,
-//        stat->BiF_std / 125
-//    );
-//    strcat(result, info);
-//  }
+  sprintf(result,
+          "%2d,"     // 1
+          "%3d,"     // 2
+          "%3.1f,"   // 3
+          "%4f,"     // 4
+          "%4f,"     // 5
+          "%3f,"     // 6
+          "%4d,"     // 7
+          "%4d,"     // 8
+          "%2d,"     // 9
+          "%4d,"     // 10
+          "%4d,"     // 11
+          "%4d,"     // 12
+          "%4d,"     // 13
+          "%4d,"     // 14
+          "%4d,"     // 15
+          "%4d,"     // 16
+          "%4d,"     // 17
+          "%1d,"     // 18
+          "%1d,"     // 19
+          "%1d,"     // 20
+          "%1d,"     // 21
+          "%1.2f,"   // 22
+          "%1.2f,"   // 23
+          "%1.2f,"   // 24
+          "%1.2f,"   // 25
+          "%1.2f,"   // 26
+          ,
+          this->subflow->id,                         // 1
+          stat->measurements_num,                    // 2
+          GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000., // 3
+          _stat(this)->rr_hat / 125,                 // 4
+          _stat(this)->drr,                          // 5
+          _stat(this)->rtpq_delay,                   // 6
+          stat->fec_bitrate / 1000,                  // 7
+          this->monitoring_target_bitrate / 1000,    // 8
+          this->monitoring_interval,                 // 9
+          (gint32)(stat->sr_avg / 1000),             // 10
+          (gint32)(stat->rr_avg / 1000),             // 11
+          (gint32)(stat->rcved_bytes_in_ewi / 125),  // 12
+          this->target_bitrate / 1000,               // 13
+          this->bottleneck_point / 1000,             // 14
+          this->set_target / 1000,                   // 15
+          this->congested_bitrate / 1000,            // 16
+          (gint32)(_stat(this)->drate_avg / 1000),   // 17
+          _priv(this)->stage,                        // 18
+          this->subflow->state,                      // 19
+          this->monitoring_approved,                 // 20
+          this->increasing_approved,                 // 21
+          stat->fraction_lost,                       // 22
+          this->tcp_flow_presented,                  // 23
+          stat->FL_th,                               // 24
+          _stat(this)->qdelay_stability,             // 25
+          _stat(this)->qdelay_var_stability          // 26
+          );
 
-  { // extra bytes info
-    gchar info[128];
-    memset(info, 0, 128);
-    sprintf(info, "QB:%-3f|",
-        _stat(this)->rtpq_delay
-    );
-    strcat(result, info);
-  }
-
-  { // FEC rate info
-    gchar info[128];
-    memset(info, 0, 128);
-    sprintf(info, "FEC:%-4d|%-4d|%-2d|",
-        stat->fec_bitrate / 1000,
-        this->monitoring_target_bitrate / 1000,
-        this->monitoring_interval
-    );
-    strcat(result, info);
-  }
-
-  { // sending-receiving rates info
-    gchar info[128];
-    memset(info, 0, 128);
-//    sprintf(info, "SR:%-4d|RR:%-4d|RR^:%d->%-4d|",
-    sprintf(info, "SR:%-4d|RR:%-4d|RR^:%d|",
-        (gint32)(stat->sr_avg / 1000),
-        (gint32)(stat->rr_avg / 1000),
-        (gint32)(stat->rcved_bytes_in_ewi / 125)
-    );
-    strcat(result, info);
-  }
-
-  { // targets info
-    gchar info[128];
-    memset(info, 0, 128);
-    sprintf(info, "Tr:%-4d|Btl:%-4d|ST:%-4d|CR:%-4d|dR:%-4.2f|",
-        this->target_bitrate / 1000,
-        this->bottleneck_point / 1000,
-        this->set_target / 1000,
-        this->congested_bitrate / 1000,
-        _stat(this)->drate_avg / 1000
-    );
-    strcat(result, info);
-  }
-
-  { // states info
-    gchar info[128];
-    memset(info, 0, 128);
-    sprintf(info, "%d|%d|%d|%d|",
-        _priv(this)->stage,
-        this->subflow->state,
-        this->monitoring_approved,
-        this->increasing_approved
-    );
-    strcat(result, info);
-  }
-
-
-  { // fraction lost info
-    gchar info[128];
-    memset(info, 0, 128);
-    sprintf(info, "FL:%-1.2f|%-1.2f|%-1.2f|",
-        stat->fraction_lost,
-        this->tcp_flow_presented,
-        stat->FL_th
-    );
-    strcat(result, info);
-  }
-
-  { // skew info
-    gchar info[128];
-    memset(info, 0, 128);
-    sprintf(info, "QD:%-1.2f|%-1.2f|",
-        _stat(this)->qdelay_stability,
-        _stat(this)->qdelay_var_stability
-    );
-    strcat(result, info);
-  }
-
-//  { // scaling info
-//    gchar info[128];
-//    memset(info, 0, 128);
-//    sprintf(info, "%1.2f|%1.2f|%d|%1.2f|",
-//        _scale_t(this),
-//        this->monitoring_interval,
-//        (gdouble)this->approvement_interval / (gdouble)GST_SECOND
-//    );
-//    strcat(result, info);
-//  }
-
-
-  // Subflow restrictions
-//  if (this->subflow->id != 2) return;
-//  bucket_print(this->stage_buckets, "Stages");
-  g_print("%s\n",result);
-
+  g_print("Stat:%s\n",result);
 }
+
 
 void fractalsubctrler_time_update(FRACTaLSubController *this)
 {
@@ -589,9 +542,12 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
     _change_sndsubflow_target_bitrate(this, MIN(_stat(this)->sr_avg, _stat(this)->rr_avg) * .9);
     this->backward_congestion = TRUE;
     goto done;
-  }else if(this->backward_congestion){
+  } else if(this->backward_congestion) {
     goto done;
   }
+
+  // check the frequency and command to send packet if it is not enough
+  // request fec packets if it is not enough.
 
   fractalfbprocessor_time_update(this->fbprocessor);
 
@@ -710,7 +666,7 @@ static gboolean _congestion(FRACTaLSubController *this)
 //    return _stat(this)->FL_th < _stat(this)->fraction_lost;
 //  }
 //  this->FL_th = _stat(this)->FL_th + MIN(_stat(this)->fraction_lost_avg, .1) *  (1.-alpha);
-  this->FL_th = _stat(this)->FL_th + this->tcp_flow_presented * .1;
+  this->FL_th = _stat(this)->FL_th + this->tcp_flow_presented * .05;
   return this->FL_th < _stat(this)->fraction_lost;
 }
 
@@ -820,6 +776,7 @@ _probe_stage(
     goto done;
   }
 
+  DISABLE_LINE _probe_helper(this);
   _probe_helper(this);
   if (_max_ramp_up(this) / 2 < _stat(this)->fec_bitrate && this->monitoring_interval < _get_monitoring_interval(this)) {
     _start_monitoring(this);
@@ -855,6 +812,7 @@ _increase_stage(
     goto done;
   }
 
+  DISABLE_LINE _increase_helper(this);
   _increase_helper(this);
   if (this->target_bitrate < this->set_target - this->increasement || 0
 //      (this->increasing_started < _now(this) - _stat(this)->srtt * _sensitivity(this, 20, 10))
@@ -1160,7 +1118,7 @@ void _start_increasement(FRACTaLSubController *this)
 {
   gint32 increasement = CONSTRAIN(_min_ramp_up(this), _max_ramp_up(this), _stat(this)->fec_bitrate);
 //  increasement *= _sensitivity(this, .5, 1.);
-  this->increasement             = _get_approved_increasement(this, increasement);
+  this->increasement             = increasement;
   this->increasing_started       = _now(this);
   this->increasing_sr_reached    = 0;
   this->increasing_approved      = FALSE;
@@ -1208,8 +1166,9 @@ guint _get_monitoring_interval(FRACTaLSubController* this)
 {
   gint result;
   gint32 monitoring_target_bitrate;
-  gdouble qd_var_stability = _stat(this)->qdelay_var_stability;
-  monitoring_target_bitrate = _sensitivity(this, _min_ramp_up(this), _max_ramp_up(this)) * _stat(this)->qdelay_stability;
+//  gdouble qd_var_stability = _stat(this)->qdelay_var_stability;
+  gdouble qd_var_stability = 1.-this->tcp_flow_presented;
+  monitoring_target_bitrate = _sensitivity(this, _min_ramp_up(this), _max_ramp_up(this));
   monitoring_target_bitrate = monitoring_target_bitrate * qd_var_stability +
       (_max_ramp_up(this) + _max_ramp_up(this)) * .5 * (1.-qd_var_stability);
   result = CONSTRAIN(_mon_min_int(this), _mon_max_int(this), this->target_bitrate / monitoring_target_bitrate);
@@ -1234,17 +1193,20 @@ void _probe_helper(FRACTaLSubController *this) {
   gdouble beta = 1.-MAX(_stat(this)->drate_avg, 0.) / _stat(this)->sr_avg;
   gint32 max_target = MAX(this->target_bitrate, this->set_target);
   alpha = MIN(alpha, beta);
+  if (0){
   if (this->bottleneck_point + 3 * _max_ramp_up(this) < this->target_bitrate) {
     this->bottleneck_point = this->target_bitrate - 3 * _max_ramp_up(this);
   } else if (alpha < .99){
     this->bottleneck_point += (max_target - this->bottleneck_point) * (1.-alpha);
-  }
+  }}
 
-  alpha = MIN(1., alpha / _stat(this)->qdelay_var_stability);
+//  alpha = MIN(1., alpha / MAX(0.25, _stat(this)->qdelay_var_stability));
+  alpha = MIN(1., alpha / (1.-this->tcp_flow_presented));
+  if (this->tcp_flow_presented < .5 && .5 < _stat(this)->qdelay_var_stability)
   {
     gint32 upper_limit = this->target_bitrate;
     gdouble room = (.95 * alpha + .85 * (1.-alpha));
-    gint32 lower_limit = _get_approved_corrections(this, _stat(this)->sr_avg * room);
+    gint32 lower_limit = _stat(this)->sr_avg * room;
     gint32 tr_hat = upper_limit * alpha + lower_limit * (1.-alpha);
     _change_sndsubflow_target_bitrate(this, tr_hat);
   }
@@ -1254,55 +1216,24 @@ void _probe_helper(FRACTaLSubController *this) {
 void _increase_helper(FRACTaLSubController *this) {
   gdouble alpha = _stat(this)->qdelay_stability;
   gint32 max_target = MAX(this->target_bitrate, this->set_target);
+  if (0){
   if (this->bottleneck_point + 3 * _max_ramp_up(this) < this->target_bitrate) {
     this->bottleneck_point = this->target_bitrate - 3 * _max_ramp_up(this);
   } else if (alpha < .99){
     this->bottleneck_point += (max_target - this->bottleneck_point) * (1.-alpha);
-  }
+  }}
 
-  alpha = MIN(1., alpha / _stat(this)->qdelay_var_stability);
+//  alpha = MIN(1., alpha / MAX(0.25, _stat(this)->qdelay_var_stability));
+  alpha = MIN(1., alpha / (1.-this->tcp_flow_presented));
+  if (this->tcp_flow_presented < .5 && .5 < _stat(this)->qdelay_var_stability)
   {
+
     gint32 upper_limit = MIN(this->set_target, this->target_bitrate + 5000);
     gdouble room = (1. * alpha + 2. * (1.-alpha));
-    gint32 lower_limit = _get_approved_corrections(this, this->set_target - this->increasement * room);
+    gint32 lower_limit = this->set_target - this->increasement * room;
     gint32 tr_hat = upper_limit * alpha + lower_limit * (1.-alpha);
     _change_sndsubflow_target_bitrate(this, tr_hat);
   }
-}
-
-gint32 _get_approved_increasement(FRACTaLSubController *this, gint32 requested_increasement) {
-  FRACTaLSubControllerClass* klass = (FRACTaLSubControllerClass*) this->object.g_type_instance.g_class;
-
-  if (klass->subflows_num < 5) {
-    return requested_increasement;
-  }
-
-  if (klass->approved_increasement == 0 || requested_increasement < klass->approved_increasement){
-    klass->approved_increasement = requested_increasement;
-    g_print("requested_increasement: %d", requested_increasement);
-    return requested_increasement;
-  }
-
-  klass->approved_increasement = MIN(klass->approved_increasement +  _mp_increasement_factor(this), requested_increasement);
-  g_print("approved_increasement: %d", klass->approved_increasement);
-  return klass->approved_increasement;
-}
-
-gint32 _get_approved_corrections(FRACTaLSubController *this, gint32 requested_correction) {
-  FRACTaLSubControllerClass* klass = (FRACTaLSubControllerClass*) this->object.g_type_instance.g_class;
-  gint32 min_correction;
-  if (klass->subflows_num < 5) {
-    return requested_correction;
-  }
-
-  min_correction = MIN(this->target_bitrate * _mp_correction_factor(this), this->set_target - requested_correction);
-  if (klass->approved_correction == 0 || min_correction < klass->approved_correction){
-    klass->approved_correction = min_correction;
-    return this->set_target - min_correction;
-  }
-
-  klass->approved_correction = MIN(klass->approved_correction + _min_ramp_up(this) / 5, min_correction);
-  return this->set_target - klass->approved_correction;
 }
 
 void _check_tcp(FRACTaLSubController *this){

@@ -200,9 +200,13 @@ stream_splitter_set_keyframe_filtering(StreamSplitter* this, gboolean keyframe_f
 }
 
 SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *packet) {
+  gboolean new_frame = this->last_timestamp == 0 || packet->timestamp != this->last_timestamp;
+//  if (new_frame) {
+//    // Calculate the avarage packet per frame
+//  }
   switch(this->mode) {
     case FRAME_SCHEDULING:
-      if (this->last_timestamp != 0 && packet->timestamp == this->last_timestamp) {
+      if (new_frame) {
         return this->last_subflow;
       }
       this->last_subflow = _select_next_subflow(this, packet);

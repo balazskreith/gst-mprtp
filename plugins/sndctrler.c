@@ -94,6 +94,11 @@ _create_fractalplus(
 //----------------------------------------------------------------------------
 
 //------------------------ Outgoing Report Producer -------------------------
+
+static void
+_perform_adaptive_activation (
+    SndController *this);
+
 static void
 _emit_signal (
     SndController *this);
@@ -168,6 +173,8 @@ sndctrler_init (SndController * this)
   this->ricalcer           = make_ricalcer(TRUE);
   this->mprtp_signal_data  = g_slice_new0(MPRTPPluginSignal);
   this->time_update_period = 200 * GST_MSECOND;
+  this->adaptive_activation = FALSE;
+  this->first_update = 0;
 
   report_processor_set_logfile(this->report_processor, "snd_reports.log");
   report_producer_set_logfile(this->report_producer, "snd_produced_reports.log");
@@ -217,6 +224,15 @@ sndctrler_time_update (SndController *this)
   if(0 < this->last_regular_emit && now < this->last_regular_emit + this->time_update_period){
     goto done;
   }
+
+  if (this->adaptive_activation) {
+    if (!this->first_update) {
+      this->first_update = _now(this);
+    } else if (this->first_update < _now(this) - 5 * GST_SECOND) {
+      _perform_adaptive_activation(this);
+    }
+  }
+
 PROFILING("sndctrler_time_update",
   for(it = this->controllers; it; it = it->next){
     CongestionController* controller = it->data;
@@ -267,6 +283,40 @@ done:
 
 
 //---------------------------------------------------------------------------
+
+void
+_perform_adaptive_activation (SndController *this) {
+  guint subflows_num = sndsubflows_get_subflows_num(this->subflows);
+  gint active_subflows_num = sndsubflows_get_active_subflows_num(this->subflows);
+  gdouble packets_per_frame = sndtracker_get_packets_per_frame(this->sndtracker);
+  GstClockTime intervals_per_frame = sndtracker_get_intervals_per_frame(this->sndtracker);
+
+  gdouble ratio = (GST_SECOND * packets_per_frame) / (intervals_per_frame * active_subflows_num);
+  g_print("ratio: %f, actives: %d, subflows: %d, packets/frame: %f, intervals: %lu\n",
+      ratio, active_subflows_num, subflows_num, packets_per_frame, intervals_per_frame);
+
+  if (active_subflows_num < subflows_num && 40. < ratio) {
+    GSList* it = sndsubflows_get_subflows(this->subflows);
+    SndSubflow* subflow = NULL;
+    for (; it; it = it->next) {
+      subflow = it->data;
+      if (!subflow->active) {
+        break;
+      }
+    }
+    sndsubflows_set_path_active(this->subflows, subflow->id, TRUE);
+  } else if (1 < active_subflows_num && ratio < 20.) {
+    GSList* it = sndsubflows_get_subflows(this->subflows);
+    SndSubflow* subflow = NULL;
+    for (; it; it = it->next) {
+      subflow = it->data;
+      if (subflow->active) {
+        break;
+      }
+    }
+    sndsubflows_set_path_active(this->subflows, subflow->id, FALSE);
+  }
+}
 
 void
 _emit_signal (SndController *this)

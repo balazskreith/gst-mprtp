@@ -59,6 +59,9 @@ typedef struct _FRACTaLStat
   gdouble                  sr_avg;
   gdouble                  rr_avg;
 
+  gdouble                  rr_hat;
+  gdouble                  drr;
+
   gdouble                  FL_10;
 
   gdouble                  FL_th;
@@ -74,12 +77,14 @@ typedef struct _FRACTaLStat
 
 }FRACTaLStat;
 
+
 struct _FRACTaLFBProcessor
 {
   GObject                  object;
   GstClock*                sysclock;
   TimestampGenerator*      ts_generator;
   Recycle*                 reference_point_recycle;
+  GstClockTime             made;
 
   guint32                  ewi_in_ts;
   guint32                  min_ewi_in_ts;
@@ -108,7 +113,16 @@ struct _FRACTaLFBProcessor
   Bucket*                  qdelay_bucket;
   Bucket*                  qdelay_devs;
 
+  guint32                  last_dts;
   gdouble                  fb_interval_avg;
+
+  guint16 cc_begin_seq, cc_end_seq;
+
+  gdouble sr_history[32];
+  gdouble rr_history[32];
+  guint history_index;
+  gdouble b,m,r;
+
 
 };
 

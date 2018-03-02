@@ -65,6 +65,13 @@ typedef struct _SndPacket
   guint32              sent_ts;
   guint32              rcvd_ts;
   gint64               skew;
+
+  // TODO: delete it when statistical analysis is finished
+  guint32 dts;
+  guint32 qts;
+  guint32 subflow_skew;
+  guint arrival_status;
+
 }SndPacket;
 
 

@@ -13,6 +13,16 @@ typedef struct{
 
   Subscriber     on_playing;
   Subscriber     on_destroy;
+
+  union {
+    struct{
+      GQueue* buffers;
+      gint cached_bytes;
+      GstElement* appsrc;
+      GstPipeline* readerPipe;
+      gint interval_in_ms;
+    }livesource;
+  };
 }Source;
 
 

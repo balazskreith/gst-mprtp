@@ -222,6 +222,7 @@ void stream_joiner_push_packet(StreamJoiner *this, RcvPacket* packet)
   Frame* frame;
   GList* list;
 
+  packet = rcvpacket_ref(packet);
   if(this->max_join_delay_in_ts == 0){
     g_queue_push_tail(this->outq, packet);
     goto done;
@@ -278,7 +279,7 @@ done:
   if(!packet) {
     return NULL;
   }
-
+  rcvpacket_unref(packet);
   _refresh_join_delay(this, packet);
 
   if(this->hsn_init){

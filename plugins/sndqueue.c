@@ -186,7 +186,7 @@ static gboolean _is_queue_over_threshold(SndQueue* this, SndSubflow* subflow) {
   } else {
     boundary = MAX(this->actual_targets[subflow->id], 0);
   }
-//  g_print("%d < %f\n", _stat(this)->queued_bytes[subflow->id]<<3, boundary * this->threshold);
+//  g_print("queued bytes: %d < %f\n", _stat(this)->queued_bytes[subflow->id]<<3, boundary * this->threshold);
 //  return FALSE;
   return  boundary * this->threshold < (_stat(this)->queued_bytes[subflow->id]<<3);
 }

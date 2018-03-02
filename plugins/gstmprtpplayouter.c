@@ -675,8 +675,7 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
   packet->cc_ts = rcv_ts;
 
-  // TODO: 0 for testing
-//  fecdecoder_push_rcv_packet(this->fec_decoder, rcvpacket_ref(packet));
+  fecdecoder_push_rcv_packet(this->fec_decoder, packet);
   THIS_LOCK(this);
 
 //  PROFILING("rcvtracker_add_packet",
@@ -864,7 +863,7 @@ playout:
   gst_pad_push(this->mprtp_srcpad, buffer);
 //  );
 //  g_async_queue_push(this->buffers_out,  packet->buffer);
-  rcvpacket_unref(packet);
+  rcvpacket_unref(packet); // The final point where the original ref should be zerod
   goto again;
 done:
   return;

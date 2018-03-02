@@ -79,9 +79,8 @@ void report_producer_add_xr_cc_rle_fb(ReportProducer *this,
                                           guint32 report_timestamp,
                                           guint16 begin_seq,
                                           guint16 end_seq,
-                                          gboolean* vector_lost,
-                                          gboolean *vector_ecn,
-                                          guint32 *vector_ato);
+                                          GstRTCPXRChunk* chunks,
+                                          gint chunks_length);
 
 void report_producer_add_xr_discarded_bytes(ReportProducer *this,
                                     guint8 interval_metric_flag,

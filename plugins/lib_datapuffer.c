@@ -95,6 +95,21 @@ gpointer datapuffer_peek_custom(datapuffer_t* puffer, gint (*comparator)(gpointe
   return NULL;
 }
 
+void datapuffer_iterate(datapuffer_t* puffer, DataPufferIterator iterator, gpointer udata)
+{
+  gint32 pos;
+  gint32 npos = puffer->start;
+  gpointer item;
+  do{
+    pos = npos;
+    item = puffer->items[pos];
+    iterator(item, udata);
+    if(++npos == puffer->length){
+      npos = 0;
+    }
+  }while(npos != puffer->end);
+}
+
 gint32 datapuffer_readcapacity(datapuffer_t *datapuffer)
 {
         return datapuffer->count;

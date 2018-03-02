@@ -171,6 +171,7 @@ void sndsubflows_join(SndSubflows* this, guint8 id)
 
   this->subflows[id] = subflow;
   ++this->subflows_num;
+  ++this->active_subflows_num;
 
   this->joined = g_slist_prepend(this->joined, subflow);
   sndsubflows_set_target_bitrate(this, id, SUBFLOW_DEFAULT_SENDING_RATE);
@@ -292,6 +293,13 @@ guint sndsubflows_get_subflows_num(SndSubflows* this)
   return this->subflows_num;
 }
 
+gint sndsubflows_get_active_subflows_num(SndSubflows* this)
+{
+  return this->active_subflows_num;
+}
+
+
+
 SndSubflow* sndsubflows_get_subflow(SndSubflows* this, guint8 subflow_id)
 {
   return this->subflows[subflow_id];
@@ -308,6 +316,7 @@ void sndsubflows_set_path_active(SndSubflows* this, guint8 subflow_id, gboolean 
 {
   CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, active, value, this->changed_subflows);
   NOTIFY_CHANGED_SUBFLOWS(this->changed_subflows, this->on_path_active_changed);
+  this->active_subflows_num += value ? 1 : -1;
 }
 
 void sndsubflows_set_rtcp_interval_type(SndSubflows* this, guint8 subflow_id, RTCPIntervalType new_type)

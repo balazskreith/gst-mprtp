@@ -178,7 +178,15 @@ class Plotter:
         filename = plot_description.get("filename", "unknown")
         plot_file = self.__target_dir + filename + ".plot"
         output_file = self.__target_dir + filename + ".pdf"
-        colors = iter(["blue", "0x008c48", "#0xf47d23", "#0x662c91", "#0xa21d21", "#0xb43894"])
+        # colors = iter(["blue", "0x008c48", "#0xf47d23", "#0x662c91", "#0xa21d21", "#0xb43894", "black", "black", "black",
+        #                "blue", "0x008c48", "#0xf47d23", "#0x662c91", "#0xa21d21", "#0xb43894", "black", "black", "black"])
+        colors_source = ['#a50026', '#d73027', '#f46d43', '#fdae61',
+                       '#fee090', '#ffffbf', '#e0f3f8', '#abd9e9',
+                       '#74add1', '#4575b4', '#313695']
+        colors = iter(colors_source)
+        aggr_rtp_color = "blue"
+        aggr_rtp_fec_color = "0x008c48"
+        aggr_tcp_color = "#0xf47d23"
         plot_id = plot_description.get('plot_id', None)
         plot_bandwidth = plot_description.get("plot_bandwidth", False)
         bandwidths = plot_description.get("bandwidths", [1])
@@ -311,7 +319,7 @@ class Plotter:
             line += ' \'' + sr_csv + '\' using ($0*0.1):(' + (
                 '($1+$2)' if plot_fec is False else '$1') + '/125)'
             line += ' with point pointtype 7 ps 0.3'
-            line += ' lc rgb "' + flow_color + '" title "' + title + '"'
+            line += ' lc rgb "' + aggr_rtp_color + '" title "' + title + '"'
             line += ", \\" if plot_bandwidth is True or \
                               tcpstat_csv is not None or plot_fec is True else ""
             sr_plot.append(line)
@@ -319,14 +327,14 @@ class Plotter:
         if plot_fec is True:
             line = '\t\'' + sr_csv + '\' using ($0*0.1)'
             line += ':(($1+$2)/125) with point pointtype 7 ps 0.3 lc rgb "'
-            line += next(colors) + '" title "' + fec_title + '"'
+            line += aggr_rtp_fec_color + '" title "' + fec_title + '"'
             line += ", \\" if plot_bandwidth is True or tcpstat_csv is not None else ""
             sr_plot.append(line)
 
         if tcpstat_csv is not None:
             sr_plot.append('\t\'' + tcpstat_csv + \
                            '\' using ($0*0.1):(($1+$2)/125) with point pointtype 7 ps 0.3 lc rgb "' + \
-                           next(colors) + '" title "' + tcp_title + '"' + \
+                           aggr_tcp_color + '" title "' + tcp_title + '"' + \
                            (", \\" if plot_bandwidth is True else ""))
 
         if plot_bandwidth:

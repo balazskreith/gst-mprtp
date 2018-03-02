@@ -414,6 +414,14 @@ _processing_xr_cc_rle_fb_block (ReportProcessor *this,
     summary->XR.CongestionControlFeedback.vector[chunk_i].ecn = chunk.CCFeedback.ecn;
     summary->XR.CongestionControlFeedback.vector[chunk_i].lost = chunk.CCFeedback.lost;
   }
+  if (summary->XR.CongestionControlFeedback.begin_seq < summary->XR.CongestionControlFeedback.end_seq) {
+      summary->XR.CongestionControlFeedback.vector_length = summary->XR.CongestionControlFeedback.end_seq -
+          summary->XR.CongestionControlFeedback.begin_seq + 1;
+  } else {
+    summary->XR.CongestionControlFeedback.vector_length = 65536 -
+        summary->XR.CongestionControlFeedback.begin_seq + summary->XR.CongestionControlFeedback.end_seq + 1;
+  }
+
 }
 
 

@@ -1002,11 +1002,11 @@ class RMCAT7(MyTest):
         return self.__description
 
 
-
 class MPRTP1(MyTest):
-    def __init__(self, algorithm, latency, jitter, source_type, sink_type, mprtp_ext_header = 3, fec_payload_type_id = 126):
-        MyTest.__init__(self, "mprtp1", 125, algorithm, str(latency), str(jitter))
+    def __init__(self, algorithm, latency, jitter, source_type, sink_type, mprtp_ext_header = 3, fec_payload_type_id = 126, subflows_num=2):
+        MyTest.__init__(self, "mprtp1", 150, algorithm, str(latency), str(jitter))
 
+        self._forward_bandwidths = []
         self.__algorithm = algorithm
         self.__latency = latency
         self.__jitter = jitter
@@ -1014,6 +1014,7 @@ class MPRTP1(MyTest):
         self.__sink_type = sink_type
         self.__mprtp_ext_header_id = mprtp_ext_header
         self.__fec_payload_type_id = fec_payload_type_id
+        self._subflows_num = subflows_num
 
         self.__forward_bandwidths_1 = None
         self.__forward_path_ctrler_1 = None
@@ -1021,112 +1022,108 @@ class MPRTP1(MyTest):
         self.__forward_path_ctrler_2 = None
         self.__forward_rtp_flow = None
 
+        self._flow_ids = []
         self.__flows = self.__generate_flows()
         self.__path_ctrlers = self.__generate_path_ctrlers()
         self.__description = self.__generate_description()
 
     def __generate_flows(self):
-        self.__forward_rtp_flow = MPRTPFlow(name="mprtpflow_1",
+        rtp_ips = ["10.0.0.6", "10.0.1.6", "10.0.2.6", "10.0.3.6", "10.0.4.6", "10.0.5.6", "10.0.6.6", "10.0.7.6",
+                   "10.0.8.6", "10.0.9.6"]
+        rtcp_ips = ["10.0.0.1", "10.0.1.1", "10.0.2.1", "10.0.3.1", "10.0.4.1", "10.0.5.1", "10.0.6.1", "10.0.7.1",
+                    "10.0.8.1", "10.0.9.1"]
+        rtp_ports = [5000, 5002, 5004, 5006, 5008, 5010, 5012, 5014, 5016, 5018]
+        rtcp_ports = [5001, 5003, 5005, 5007, 5009, 5011, 5013, 5015, 5017, 5019]
+        subflow_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        self.__forward_rtp_flow = MPRTPFlow(name="mprtpflow_1" + "_" + str(self._subflows_num),
             path="./",
             flownum=1,
             codec=Codecs.VP8,
             algorithm=self.algorithm,
-            rtp_ips=["10.0.0.6", "10.0.1.6"],
-            rtp_ports=[5000, 5002],
-            rtcp_ips=["10.0.0.1", "10.0.1.1"],
-            rtcp_ports=[5001, 5003],
+            rtp_ips=rtp_ips[:self._subflows_num],
+            rtp_ports=rtp_ports[:self._subflows_num],
+            rtcp_ips=rtcp_ips[:self._subflows_num],
+            rtcp_ports=rtcp_ports[:self._subflows_num],
             start_delay = 0,
             source_type = self.__source_type,
             sink_type = self.__sink_type,
             mprtp_ext_header_id = self.__mprtp_ext_header_id,
-            subflow_ids=[1,2]
+            subflow_ids=subflow_ids[:self._subflows_num]
             )
 
         result = [self.__forward_rtp_flow]
         return result
 
     def __generate_path_ctrlers(self):
-        flow_stages_1 = [
-        {
-            "duration": 125,
-            "config" : PathConfig(bandwidth = 2000, latency = self.__latency, jitter = self.__jitter)
-        }]
-
-        flow_stages_2 = [
-        {
-            "duration": 125,
-            "config" : PathConfig(bandwidth=2000, latency=self.__latency, jitter=self.__jitter)
-        }]
-
-        self.__forward_bandwidths_1, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stages_1))
-        self.__forward_path_ctrler_1 = PathShellCtrler(path_name="veth2", path_stage = path_stage)
-
-        self.__forward_bandwidths_2, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stages_2))
-        self.__forward_path_ctrler_2 = PathShellCtrler(path_name="veth6", path_stage = path_stage)
-        result = [self.__forward_path_ctrler_1, self.__forward_path_ctrler_2]
+        result = []
+        path_names = ["veth2", "veth6", "veth10", "veth14", "veth18",
+                      "veth22", "veth26", "veth30", "veth34", "veth38"]
+        max_bw = max(800, int(5000 / self._subflows_num))
+        for subflow_id in range(self._subflows_num):
+            flow_stage = [
+            {
+                "duration": 150,
+                "config": PathConfig(bandwidth=max_bw, latency=self.__latency, jitter=self.__jitter)
+            }
+            ]
+            forward_bandwidths, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stage))
+            forward_path_ctrler = PathShellCtrler(path_name=path_names[subflow_id], path_stage=path_stage)
+            self._forward_bandwidths.append(forward_bandwidths)
+            result.append(forward_path_ctrler)
         return result
 
     def __generate_description(self):
-        forward_flow_1 = {
-            "flow_id": "rtpsubflow_1",
-            "title": "RTP",
-            "fec_title": "RTP + FEC",
-            "plot_fec": True,
-            "path_ctrler": self.__forward_rtp_flow,
-            "flow": self.__forward_rtp_flow,
-            "bandwidths": self.__forward_bandwidths_1,
-            "subflow_id": 1,
-            "evaluations": None,
-            "sources": None,
-        }
-
-        forward_flow_2 = {
-            "flow_id": "rtpsubflow_2",
-            "title": "RTP",
-            "fec_title": "RTP + FEC",
-            "plot_fec": True,
-            "path_ctrler": self.__forward_rtp_flow,
-            "flow": self.__forward_rtp_flow,
-            "bandwidths": self.__forward_bandwidths_2,
-            "subflow_id": 2,
-            "evaluations": None,
-            "sources": None,
-        }
-        return [forward_flow_1, forward_flow_2]
+        self._flow_ids = ["rtpsubflow_1", "rtpsubflow_2", "rtpsubflow_3", "rtpsubflow_4", "rtpsubflow_5",
+                          "rtpsubflow_6", "rtpsubflow_7", "rtpsubflow_8", "rtpsubflow_9", "rtpsubflow_10"]
+        result = []
+        for subflow_id in range(self._subflows_num):
+            forward_flow = {
+                "flow_id": self._flow_ids[subflow_id],
+                "title": "RTP",
+                "fec_title": "RTP + FEC",
+                "plot_fec": True,
+                "path_ctrler": self.__forward_rtp_flow,
+                "flow": self.__forward_rtp_flow,
+                "bandwidths": self._forward_bandwidths[subflow_id],
+                "subflow_id": subflow_id + 1,
+                "evaluations": None,
+                "sources": None,
+            }
+            result.append(forward_flow)
+        return result
 
     def get_plot_description(self):
-        return [{
-            "type": "srqmd",
-            "plot_id": "subflow_1",
-            "sr_title": "Sending Rate for Subflow 1",
-            "qmd_title": "Queue delay for Subflow 1",
-            "filename": '_'.join([self.name, "srqmd", "subflow_1", str(self.algorithm.name), str(self.latency) + "ms",
-                                 str(self.jitter) + "ms"]),
-            "flow_ids": ["rtpsubflow_1"],
-            "bandwidths": self.__forward_bandwidths_1,
-            "plot_bandwidth": False,
-        },
-        {
-            "type": "srqmd",
-            "plot_id": "subflow_2",
-            "sr_title": "Sending Rate for Subflow 2",
-            "qmd_title": "Queue delay for Subflow 2",
-            "filename": '_'.join(
-                [self.name, "srqmd", "subflow_2", str(self.algorithm.name), str(self.latency) + "ms",
-                 str(self.jitter) + "ms"]),
-            "flow_ids": ["rtpsubflow_2"],
-            "bandwidths": self.__forward_bandwidths_2,
-            "plot_bandwidth": False,
-        },
-        {
+        result = []
+        for subflow_id in range(self._subflows_num):
+            result.append({
+                "type": "srqmd",
+                "plot_id": "subflow_" + str(subflow_id + 1),
+                "sr_title": "Sending Rate for Subflow " + str(subflow_id + 1),
+                "qmd_title": "Queue delay for Subflow " + str(subflow_id + 1),
+                "filename": '_'.join(
+                    [self.name, "srqmd", "subflow_" + str(subflow_id), str(self.algorithm.name), str(self.latency) + "ms",
+                     str(self.jitter) + "ms"]),
+                "flow_ids": self._flow_ids[subflow_id],
+                "bandwidths": self._forward_bandwidths[subflow_id],
+                "plot_bandwidth": True,
+            })
+        bandwidths = [self._forward_bandwidths[0][i] * self._subflows_num for i in range(len(self._forward_bandwidths[0]))]
+        # print(bandwidths)
+        result.append({
             "type": "aggr",
-            "sr_title": "Sending Rate for Subflow 1", # sending rates
-            "disr_title": "Queue delay for Subflow 1", # distribution of the sending rates
+            "plot_id": "aggregated",
+            "sr_title": "Aggregated Sending Rate",  # sending rates
+            "disr_title": "Ratio between Subflows",  # distribution of the sending rates
             "filename": '_'.join([self.name, "aggr", str(self.algorithm.name), str(self.latency) + "ms",
-                                 str(self.jitter) + "ms"]),
-            "flow_ids": ["rtpsubflow_2", "rtpflow_2"],
-        }
-        ]
+                                  str(self.jitter) + "ms"]),
+            "flow_ids": self._flow_ids[:self._subflows_num],
+            "plot_bandwidth": True,
+            "bandwidths": bandwidths,
+            "plot_fec": True,
+            "fec_title": "RTP + FEC",
+            "title": "RTP"
+        })
+        return result
 
     def get_flows(self):
         return self.__flows
@@ -1136,12 +1133,14 @@ class MPRTP1(MyTest):
 
     def get_descriptions(self):
         return self.__description
+
 
 
 class MPRTP2(MyTest):
-    def __init__(self, algorithm, latency, jitter, source_type, sink_type, mprtp_ext_header = 3, fec_payload_type_id = 126):
-        MyTest.__init__(self, "mprtp2", 125, algorithm, str(latency), str(jitter))
+    def __init__(self, algorithm, latency, jitter, source_type, sink_type, mprtp_ext_header = 3, fec_payload_type_id = 126, subflows_num=2):
+        MyTest.__init__(self, "mprtp2", 150, algorithm, str(latency), str(jitter))
 
+        self._forward_bandwidths = []
         self.__algorithm = algorithm
         self.__latency = latency
         self.__jitter = jitter
@@ -1149,6 +1148,7 @@ class MPRTP2(MyTest):
         self.__sink_type = sink_type
         self.__mprtp_ext_header_id = mprtp_ext_header
         self.__fec_payload_type_id = fec_payload_type_id
+        self._subflows_num = subflows_num
 
         self.__forward_bandwidths_1 = None
         self.__forward_path_ctrler_1 = None
@@ -1156,138 +1156,124 @@ class MPRTP2(MyTest):
         self.__forward_path_ctrler_2 = None
         self.__forward_rtp_flow = None
 
+        self._flow_ids = []
         self.__flows = self.__generate_flows()
         self.__path_ctrlers = self.__generate_path_ctrlers()
         self.__description = self.__generate_description()
 
     def __generate_flows(self):
-        self.__forward_rtp_flow = MPRTPFlow(name="mprtpflow_1",
+        rtp_ips = ["10.0.0.6", "10.0.1.6", "10.0.2.6", "10.0.3.6", "10.0.4.6", "10.0.5.6", "10.0.6.6", "10.0.7.6",
+                   "10.0.8.6", "10.0.9.6"]
+        rtcp_ips = ["10.0.0.1", "10.0.1.1", "10.0.2.1", "10.0.3.1", "10.0.4.1", "10.0.5.1", "10.0.6.1", "10.0.7.1",
+                    "10.0.8.1", "10.0.9.1"]
+        rtp_ports = [5000, 5002, 5004, 5006, 5008, 5010, 5012, 5014, 5016, 5018]
+        rtcp_ports = [5001, 5003, 5005, 5007, 5009, 5011, 5013, 5015, 5017, 5019]
+        subflow_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        self.__forward_rtp_flow = MPRTPFlow(name="mprtpflow_2" + "_" + str(self._subflows_num),
             path="./",
             flownum=1,
             codec=Codecs.VP8,
             algorithm=self.algorithm,
-            rtp_ips=["10.0.0.6", "10.0.1.6"],
-            rtp_ports=[5000, 5002],
-            rtcp_ips=["10.0.0.1", "10.0.1.1"],
-            rtcp_ports=[5001, 5003],
+            rtp_ips=rtp_ips[:self._subflows_num],
+            rtp_ports=rtp_ports[:self._subflows_num],
+            rtcp_ips=rtcp_ips[:self._subflows_num],
+            rtcp_ports=rtcp_ports[:self._subflows_num],
             start_delay = 0,
             source_type = self.__source_type,
             sink_type = self.__sink_type,
             mprtp_ext_header_id = self.__mprtp_ext_header_id,
-            subflow_ids=[1,2]
+            subflow_ids=subflow_ids[:self._subflows_num]
             )
 
         result = [self.__forward_rtp_flow]
         return result
 
     def __generate_path_ctrlers(self):
-        flow_stages_1 = [
-        {
-            "duration": 25,
-            "config" : PathConfig(bandwidth = 2000, latency = self.__latency, jitter = self.__jitter)
-        },
-        {
-            "duration": 25,
-            "config" : PathConfig(bandwidth = 1000, latency = self.__latency, jitter = self.__jitter)
-        },
-        {
-            "duration": 25,
-            "config" : PathConfig(bandwidth = 1750, latency = self.__latency, jitter = self.__jitter)
-        },
-        {
-            "duration": 25,
-            "config" : PathConfig(bandwidth = 500, latency = self.__latency, jitter = self.__jitter)
-        },
-        {
-            "duration": 25,
-            "config" : PathConfig(bandwidth = 1000, latency = self.__latency, jitter = self.__jitter)
-        }]
-
-        self.__forward_bandwidths_1, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stages_1))
-        self.__forward_path_ctrler_1 = PathShellCtrler(path_name="veth2", path_stage = path_stage)
-
-        flow_stages_2 = [
-        {
-            "duration": 125,
-            "config" : PathConfig(bandwidth=2000, latency=self.__latency, jitter=self.__jitter)
-        }
-        ]
-
-        self.__forward_bandwidths_1, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stages_1))
-        self.__forward_path_ctrler_1 = PathShellCtrler(path_name="veth2", path_stage = path_stage)
-
-        self.__forward_bandwidths_2, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stages_2))
-        self.__forward_path_ctrler_2 = PathShellCtrler(path_name="veth6", path_stage = path_stage)
-        result = [self.__forward_path_ctrler_1, self.__forward_path_ctrler_2]
+        result = []
+        path_names = ["veth2", "veth6", "veth10", "veth14", "veth18",
+                      "veth22", "veth26", "veth30", "veth34", "veth38"]
+        max_bw = max(800, int(5000 / self._subflows_num))
+        min_bw = max(400, int(2500 / self._subflows_num))
+        for subflow_id in range(self._subflows_num):
+            flow_stage = [
+            {
+                "duration": 25,
+                "config": PathConfig(bandwidth=min_bw, latency=self.__latency, jitter=self.__jitter)
+            },
+            {
+                "duration": 25,
+                "config": PathConfig(bandwidth=max_bw, latency=self.__latency, jitter=self.__jitter)
+            },
+            {
+                "duration": 25,
+                "config": PathConfig(bandwidth=min_bw, latency=self.__latency, jitter=self.__jitter)
+            },
+            {
+                "duration": 25,
+                "config": PathConfig(bandwidth=max_bw, latency=self.__latency, jitter=self.__jitter)
+            },
+            {
+                "duration": 50,
+                "config": PathConfig(bandwidth=min_bw, latency=self.__latency, jitter=self.__jitter)
+            }]
+            forward_bandwidths, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stage))
+            forward_path_ctrler = PathShellCtrler(path_name=path_names[subflow_id], path_stage=path_stage)
+            self._forward_bandwidths.append(forward_bandwidths)
+            result.append(forward_path_ctrler)
         return result
 
     def __generate_description(self):
-        forward_flow_1 = {
-            "flow_id": "rtpsubflow_1",
-            "title": "RTP",
-            "fec_title": "RTP + FEC",
-            "plot_fec": True,
-            "path_ctrler": self.__forward_rtp_flow,
-            "flow": self.__forward_rtp_flow,
-            "bandwidths": self.__forward_bandwidths_1,
-            "subflow_id": 1,
-            "evaluations": None,
-            "sources": None,
-        }
-
-        forward_flow_2 = {
-            "flow_id": "rtpsubflow_2",
-            "title": "RTP",
-            "fec_title": "RTP + FEC",
-            "plot_fec": True,
-            "path_ctrler": self.__forward_rtp_flow,
-            "flow": self.__forward_rtp_flow,
-            "bandwidths": self.__forward_bandwidths_2,
-            "subflow_id": 2,
-            "evaluations": None,
-            "sources": None,
-        }
-        return [forward_flow_1, forward_flow_2]
+        self._flow_ids = ["rtpsubflow_1", "rtpsubflow_2", "rtpsubflow_3", "rtpsubflow_4", "rtpsubflow_5",
+                          "rtpsubflow_6", "rtpsubflow_7", "rtpsubflow_8", "rtpsubflow_9", "rtpsubflow_10"]
+        result = []
+        for subflow_id in range(self._subflows_num):
+            forward_flow = {
+                "flow_id": self._flow_ids[subflow_id],
+                "title": "RTP",
+                "fec_title": "RTP + FEC",
+                "plot_fec": True,
+                "path_ctrler": self.__forward_rtp_flow,
+                "flow": self.__forward_rtp_flow,
+                "bandwidths": self._forward_bandwidths[subflow_id],
+                "subflow_id": subflow_id + 1,
+                "evaluations": None,
+                "sources": None,
+            }
+            result.append(forward_flow)
+        return result
 
     def get_plot_description(self):
-        return [{
-            "type": "srqmd",
-            "plot_id": "subflow_1",
-            "sr_title": "Sending Rate for Subflow 1",
-            "qmd_title": "Queue delay for Subflow 1",
-            "filename": '_'.join([self.name, "srqmd", "subflow_1", str(self.algorithm.name), str(self.latency) + "ms",
-                                 str(self.jitter) + "ms"]),
-            "flow_ids": ["rtpsubflow_1"],
-            "bandwidths": self.__forward_bandwidths_1,
-            "plot_bandwidth": True,
-        },
-        {
-            "type": "srqmd",
-            "plot_id": "subflow_2",
-            "sr_title": "Sending Rate for Subflow 2",
-            "qmd_title": "Queue delay for Subflow 2",
-            "filename": '_'.join(
-                [self.name, "srqmd", "subflow_2", str(self.algorithm.name), str(self.latency) + "ms",
-                 str(self.jitter) + "ms"]),
-            "flow_ids": ["rtpsubflow_2"],
-            "bandwidths": self.__forward_bandwidths_2,
-            "plot_bandwidth": False,
-        },
-        {
+        result = []
+        for subflow_id in range(self._subflows_num):
+            result.append({
+                "type": "srqmd",
+                "plot_id": "subflow_" + str(subflow_id + 1),
+                "sr_title": "Sending Rate for Subflow " + str(subflow_id + 1),
+                "qmd_title": "Queue delay for Subflow " + str(subflow_id + 1),
+                "filename": '_'.join(
+                    [self.name, "srqmd", "subflow_" + str(subflow_id), str(self.algorithm.name), str(self.latency) + "ms",
+                     str(self.jitter) + "ms"]),
+                "flow_ids": self._flow_ids[subflow_id],
+                "bandwidths": self._forward_bandwidths[subflow_id],
+                "plot_bandwidth": True,
+            })
+        bandwidths = [self._forward_bandwidths[0][i] * self._subflows_num for i in range(len(self._forward_bandwidths[0]))]
+        # print(bandwidths)
+        result.append({
             "type": "aggr",
             "plot_id": "aggregated",
-            "sr_title": "Aggregated Sending Rate", # sending rates
-            "disr_title": "Ratio between Subflows", # distribution of the sending rates
+            "sr_title": "Aggregated Sending Rate",  # sending rates
+            "disr_title": "Ratio between Subflows",  # distribution of the sending rates
             "filename": '_'.join([self.name, "aggr", str(self.algorithm.name), str(self.latency) + "ms",
-                                 str(self.jitter) + "ms"]),
-            "flow_ids": ["rtpsubflow_1", "rtpsubflow_2"],
+                                  str(self.jitter) + "ms"]),
+            "flow_ids": self._flow_ids[:self._subflows_num],
             "plot_bandwidth": True,
-            "bandwidths": [self.__forward_bandwidths_1[i] + self.__forward_bandwidths_2[i] for i in range(len(self.__forward_bandwidths_1))],
+            "bandwidths": bandwidths,
             "plot_fec": True,
             "fec_title": "RTP + FEC",
             "title": "RTP"
-        }
-        ]
+        })
+        return result
 
     def get_flows(self):
         return self.__flows
@@ -1297,13 +1283,13 @@ class MPRTP2(MyTest):
 
     def get_descriptions(self):
         return self.__description
-
 
 
 class MPRTP3(MyTest):
-    def __init__(self, algorithm, latency, jitter, source_type, sink_type, mprtp_ext_header = 3, fec_payload_type_id = 126):
-        MyTest.__init__(self, "mprtp3", 125, algorithm, str(latency), str(jitter))
+    def __init__(self, algorithm, latency, jitter, source_type, sink_type, mprtp_ext_header = 3, fec_payload_type_id = 126, subflows_num=2):
+        MyTest.__init__(self, "mprtp3", max(150, 25 * subflows_num + 50), algorithm, str(latency), str(jitter))
 
+        self._forward_bandwidths = []
         self.__algorithm = algorithm
         self.__latency = latency
         self.__jitter = jitter
@@ -1311,6 +1297,7 @@ class MPRTP3(MyTest):
         self.__sink_type = sink_type
         self.__mprtp_ext_header_id = mprtp_ext_header
         self.__fec_payload_type_id = fec_payload_type_id
+        self._subflows_num = subflows_num
 
         self.__forward_bandwidths_1 = None
         self.__forward_path_ctrler_1 = None
@@ -1318,146 +1305,125 @@ class MPRTP3(MyTest):
         self.__forward_path_ctrler_2 = None
         self.__forward_rtp_flow = None
 
+        self._flow_ids = []
         self.__flows = self.__generate_flows()
         self.__path_ctrlers = self.__generate_path_ctrlers()
         self.__description = self.__generate_description()
 
     def __generate_flows(self):
-        self.__forward_rtp_flow = MPRTPFlow(name="mprtpflow_1",
+        rtp_ips = ["10.0.0.6", "10.0.1.6", "10.0.2.6", "10.0.3.6", "10.0.4.6", "10.0.5.6", "10.0.6.6", "10.0.7.6",
+                   "10.0.8.6", "10.0.9.6"]
+        rtcp_ips = ["10.0.0.1", "10.0.1.1", "10.0.2.1", "10.0.3.1", "10.0.4.1", "10.0.5.1", "10.0.6.1", "10.0.7.1",
+                   "10.0.8.1", "10.0.9.1"]
+        rtp_ports = [5000, 5002, 5004, 5006, 5008, 5010, 5012, 5014, 5016, 5018]
+        rtcp_ports = [5001, 5003, 5005, 5007, 5009, 5011, 5013, 5015, 5017, 5019]
+        subflow_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        self.__forward_rtp_flow = MPRTPFlow(name="mprtpflow_3" + "_" + str(self._subflows_num),
             path="./",
             flownum=1,
             codec=Codecs.VP8,
             algorithm=self.algorithm,
-            rtp_ips=["10.0.0.6", "10.0.1.6"],
-            rtp_ports=[5000, 5002],
-            rtcp_ips=["10.0.0.1", "10.0.1.1"],
-            rtcp_ports=[5001, 5003],
+            rtp_ips=rtp_ips[:self._subflows_num],
+            rtp_ports=rtp_ports[:self._subflows_num],
+            rtcp_ips=rtcp_ips[:self._subflows_num],
+            rtcp_ports=rtcp_ports[:self._subflows_num],
             start_delay = 0,
             source_type = self.__source_type,
             sink_type = self.__sink_type,
             mprtp_ext_header_id = self.__mprtp_ext_header_id,
-            subflow_ids=[1,2]
+            subflow_ids=subflow_ids[:self._subflows_num]
             )
 
         result = [self.__forward_rtp_flow]
         return result
 
     def __generate_path_ctrlers(self):
-        flow_stages_1 = [
-        {
-            "duration": 20,
-            "config" : PathConfig(bandwidth = 1000, latency = self.__latency, jitter = self.__jitter)
-        },
-        {
-            "duration": 20,
-            "config" : PathConfig(bandwidth = 2800, latency = self.__latency, jitter = self.__jitter)
-        },
-        {
-            "duration": 20,
-            "config" : PathConfig(bandwidth = 600, latency = self.__latency, jitter = self.__jitter)
-        },
-        {
-            "duration": 40,
-            "config" : PathConfig(bandwidth = 1000, latency = self.__latency, jitter = self.__jitter)
-        },
-        ]
-
-        self.__forward_bandwidths_1, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stages_1))
-        self.__forward_path_ctrler_1 = PathShellCtrler(path_name="veth2", path_stage = path_stage)
-
-        flow_stages_2 = [{
-            "duration": 40,
-            "config" : PathConfig(bandwidth = 1000, latency = self.__latency, jitter = self.__jitter)
-        },
-        {
-            "duration": 20,
-            "config" : PathConfig(bandwidth = 2800, latency = self.__latency, jitter = self.__jitter)
-        },
-        {
-            "duration": 20,
-            "config" : PathConfig(bandwidth = 600, latency = self.__latency, jitter = self.__jitter)
-        },
-        {
-            "duration": 20,
-            "config" : PathConfig(bandwidth = 1000, latency = self.__latency, jitter = self.__jitter)
-        },
-        ]
-
-        self.__forward_bandwidths_1, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stages_1))
-        self.__forward_path_ctrler_1 = PathShellCtrler(path_name="veth2", path_stage = path_stage)
-
-        self.__forward_bandwidths_2, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stages_2))
-        self.__forward_path_ctrler_2 = PathShellCtrler(path_name="veth6", path_stage = path_stage)
-        result = [self.__forward_path_ctrler_1, self.__forward_path_ctrler_2]
+        result = []
+        path_names=["veth2", "veth6", "veth10", "veth14", "veth18", "veth22", "veth26", "veth30", "veth34", "veth38"]
+        offset = 1000
+        min_bw = max(500, int(2000 / self._subflows_num))
+        duration = max(150, 25 * self._subflows_num + 50)
+        for subflow_id in range(self._subflows_num):
+            flow_stage = [
+            {
+                "duration": 25 * subflow_id,
+                "config": PathConfig(bandwidth=min_bw, latency=self.__latency, jitter=self.__jitter)
+            },
+            {
+                "duration": 25,
+                "config": PathConfig(bandwidth=min_bw + offset, latency=self.__latency, jitter=self.__jitter)
+            },
+            {
+                "duration": 25 * (self._subflows_num - subflow_id - 1),
+                "config": PathConfig(bandwidth=min_bw, latency=self.__latency, jitter=self.__jitter)
+            },
+            {
+                "duration": 50,
+                "config": PathConfig(bandwidth=min_bw + int(offset / self._subflows_num), latency=self.__latency, jitter=self.__jitter)
+            }
+            ]
+            forward_bandwidths, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stage))
+            forward_path_ctrler = PathShellCtrler(path_name=path_names[subflow_id], path_stage=path_stage)
+            self._forward_bandwidths.append(forward_bandwidths)
+            result.append(forward_path_ctrler)
         return result
 
     def __generate_description(self):
-        forward_flow_1 = {
-            "flow_id": "rtpsubflow_1",
-            "title": "RTP",
-            "fec_title": "RTP + FEC",
-            "plot_fec": True,
-            "path_ctrler": self.__forward_rtp_flow,
-            "flow": self.__forward_rtp_flow,
-            "bandwidths": self.__forward_bandwidths_1,
-            "subflow_id": 1,
-            "evaluations": None,
-            "sources": None,
-        }
-
-        forward_flow_2 = {
-            "flow_id": "rtpsubflow_2",
-            "title": "RTP",
-            "fec_title": "RTP + FEC",
-            "plot_fec": True,
-            "path_ctrler": self.__forward_rtp_flow,
-            "flow": self.__forward_rtp_flow,
-            "bandwidths": self.__forward_bandwidths_2,
-            "subflow_id": 2,
-            "evaluations": None,
-            "sources": None,
-        }
-        return [forward_flow_1, forward_flow_2]
+        self._flow_ids = ["rtpsubflow_1", "rtpsubflow_2", "rtpsubflow_3", "rtpsubflow_4", "rtpsubflow_5",
+                          "rtpsubflow_6", "rtpsubflow_7", "rtpsubflow_8", "rtpsubflow_9", "rtpsubflow_10"]
+        result = []
+        for subflow_id in range(self._subflows_num):
+            forward_flow = {
+                "flow_id": self._flow_ids[subflow_id],
+                "title": "RTP",
+                "fec_title": "RTP + FEC",
+                "plot_fec": True,
+                "path_ctrler": self.__forward_rtp_flow,
+                "flow": self.__forward_rtp_flow,
+                "bandwidths": self._forward_bandwidths[subflow_id],
+                "subflow_id": subflow_id + 1,
+                "evaluations": None,
+                "sources": None,
+            }
+            result.append(forward_flow)
+        return result
 
     def get_plot_description(self):
-        return [{
-            "type": "srqmd",
-            "plot_id": "subflow_1",
-            "sr_title": "Sending Rate for Subflow 1",
-            "qmd_title": "Queue delay for Subflow 1",
-            "filename": '_'.join([self.name, "srqmd", "subflow_1", str(self.algorithm.name), str(self.latency) + "ms",
-                                 str(self.jitter) + "ms"]),
-            "flow_ids": ["rtpsubflow_1"],
-            "bandwidths": self.__forward_bandwidths_1,
-            "plot_bandwidth": True,
-        },
-        {
-            "type": "srqmd",
-            "plot_id": "subflow_2",
-            "sr_title": "Sending Rate for Subflow 2",
-            "qmd_title": "Queue delay for Subflow 2",
-            "filename": '_'.join(
-                [self.name, "srqmd", "subflow_2", str(self.algorithm.name), str(self.latency) + "ms",
-                 str(self.jitter) + "ms"]),
-            "flow_ids": ["rtpsubflow_2"],
-            "bandwidths": self.__forward_bandwidths_2,
-            "plot_bandwidth": False,
-        },
-        {
+        result = []
+        for subflow_id in range(self._subflows_num):
+            result.append({
+                "type": "srqmd",
+                "plot_id": "subflow_" + str(subflow_id + 1),
+                "sr_title": "Sending Rate for Subflow " + str(subflow_id + 1),
+                "qmd_title": "Queue delay for Subflow " + str(subflow_id + 1),
+                "filename": '_'.join(
+                    [self.name, "srqmd", "subflow_" + str(subflow_id), str(self.algorithm.name), str(self.latency) + "ms",
+                     str(self.jitter) + "ms"]),
+                "flow_ids": self._flow_ids[subflow_id],
+                "bandwidths": self._forward_bandwidths[subflow_id],
+                "plot_bandwidth": True,
+            })
+        bandwidths = [0] * len(self._forward_bandwidths[0])
+        for subflow_id in range(self._subflows_num):
+            for i in range(len(self._forward_bandwidths[0])):
+                bandwidths[i] += self._forward_bandwidths[subflow_id][i]
+
+        # print(bandwidths)
+        result.append({
             "type": "aggr",
             "plot_id": "aggregated",
-            "sr_title": "Aggregated Sending Rate", # sending rates
-            "disr_title": "Ratio between Subflows", # distribution of the sending rates
+            "sr_title": "Aggregated Sending Rate",  # sending rates
+            "disr_title": "Ratio between Subflows",  # distribution of the sending rates
             "filename": '_'.join([self.name, "aggr", str(self.algorithm.name), str(self.latency) + "ms",
-                                 str(self.jitter) + "ms"]),
-            "flow_ids": ["rtpsubflow_1", "rtpsubflow_2"],
+                                  str(self.jitter) + "ms"]),
+            "flow_ids": self._flow_ids[:self._subflows_num],
             "plot_bandwidth": True,
-            "bandwidths": [self.__forward_bandwidths_1[i] + self.__forward_bandwidths_2[i] for i in range(len(self.__forward_bandwidths_1))],
+            "bandwidths": bandwidths,
             "plot_fec": True,
             "fec_title": "RTP + FEC",
             "title": "RTP"
-        }
-        ]
+        })
+        return result
 
     def get_flows(self):
         return self.__flows
@@ -1467,3 +1433,149 @@ class MPRTP3(MyTest):
 
     def get_descriptions(self):
         return self.__description
+
+
+class MPRTP4(MyTest):
+    def __init__(self, algorithm, latency, jitter, source_type, sink_type, mprtp_ext_header = 3, fec_payload_type_id = 126, subflows_num=2):
+        MyTest.__init__(self, "mprtp4", max(100, 25 * subflows_num * 2), algorithm, str(latency), str(jitter))
+
+        self._forward_bandwidths = []
+        self.__algorithm = algorithm
+        self.__latency = latency
+        self.__jitter = jitter
+        self.__source_type = source_type
+        self.__sink_type = sink_type
+        self.__mprtp_ext_header_id = mprtp_ext_header
+        self.__fec_payload_type_id = fec_payload_type_id
+        self._subflows_num = subflows_num
+
+        self.__forward_bandwidths_1 = None
+        self.__forward_path_ctrler_1 = None
+        self.__forward_bandwidths_2 = None
+        self.__forward_path_ctrler_2 = None
+        self.__forward_rtp_flow = None
+
+        self._flow_ids = []
+        self.__flows = self.__generate_flows()
+        self.__path_ctrlers = self.__generate_path_ctrlers()
+        self.__description = self.__generate_description()
+
+    def __generate_flows(self):
+        rtp_ips = ["10.0.0.6", "10.0.1.6", "10.0.2.6", "10.0.3.6", "10.0.4.6", "10.0.5.6", "10.0.6.6", "10.0.7.6",
+                   "10.0.8.6", "10.0.9.6"]
+        rtcp_ips = ["10.0.0.1", "10.0.1.1", "10.0.2.1", "10.0.3.1", "10.0.4.1", "10.0.5.1", "10.0.6.1", "10.0.7.1",
+                   "10.0.8.1", "10.0.9.1"]
+        rtp_ports = [5000, 5002, 5004, 5006, 5008, 5010, 5012, 5014, 5016, 5018]
+        rtcp_ports = [5001, 5003, 5005, 5007, 5009, 5011, 5013, 5015, 5017, 5019]
+        subflow_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        self.__forward_rtp_flow = MPRTPFlow(name="mprtpflow_4" + "_" + str(self._subflows_num),
+            path="./",
+            flownum=1,
+            codec=Codecs.VP8,
+            algorithm=self.algorithm,
+            rtp_ips=rtp_ips[:self._subflows_num],
+            rtp_ports=rtp_ports[:self._subflows_num],
+            rtcp_ips=rtcp_ips[:self._subflows_num],
+            rtcp_ports=rtcp_ports[:self._subflows_num],
+            start_delay = 0,
+            source_type = self.__source_type,
+            sink_type = self.__sink_type,
+            mprtp_ext_header_id = self.__mprtp_ext_header_id,
+            subflow_ids=subflow_ids[:self._subflows_num]
+            )
+
+        result = [self.__forward_rtp_flow]
+        return result
+
+    def __generate_path_ctrlers(self):
+        result = []
+        path_names=["veth2", "veth6", "veth10", "veth14", "veth18", "veth22", "veth26", "veth30", "veth34", "veth38"]
+        offset = 1000
+        min_bw = max(400, int(2000 / self._subflows_num))
+        space = self._subflows_num - 1
+        flow_stages = [{
+                "duration": 25,
+                "config": PathConfig(bandwidth=min_bw + offset, latency=self.__latency, jitter=self.__jitter)
+            }]
+        flow_stages.extend([{
+                "duration": 25,
+                "config": PathConfig(bandwidth=min_bw, latency=self.__latency, jitter=self.__jitter)
+            }] * space)
+        flow_stages = flow_stages * 2
+
+        for subflow_id in range(self._subflows_num):
+            flow_stage = deque(flow_stages)
+            flow_stage.rotate(subflow_id)
+            forward_bandwidths, path_stage = self.make_bandwidths_and_path_stage(flow_stage)
+            forward_path_ctrler = PathShellCtrler(path_name=path_names[subflow_id], path_stage=path_stage)
+            self._forward_bandwidths.append(forward_bandwidths)
+            result.append(forward_path_ctrler)
+        return result
+
+    def __generate_description(self):
+        self._flow_ids = ["rtpsubflow_1", "rtpsubflow_2", "rtpsubflow_3", "rtpsubflow_4", "rtpsubflow_5",
+                          "rtpsubflow_6", "rtpsubflow_7", "rtpsubflow_8", "rtpsubflow_9", "rtpsubflow_10"]
+        result = []
+        for subflow_id in range(self._subflows_num):
+            forward_flow = {
+                "flow_id": self._flow_ids[subflow_id],
+                "title": "RTP",
+                "fec_title": "RTP + FEC",
+                "plot_fec": True,
+                "path_ctrler": self.__forward_rtp_flow,
+                "flow": self.__forward_rtp_flow,
+                "bandwidths": self._forward_bandwidths[subflow_id],
+                "subflow_id": subflow_id + 1,
+                "evaluations": None,
+                "sources": None,
+            }
+            result.append(forward_flow)
+        return result
+
+    def get_plot_description(self):
+        result = []
+        for subflow_id in range(self._subflows_num):
+            result.append({
+                "type": "srqmd",
+                "plot_id": "subflow_" + str(subflow_id + 1),
+                "sr_title": "Sending Rate for Subflow " + str(subflow_id + 1),
+                "qmd_title": "Queue delay for Subflow " + str(subflow_id + 1),
+                "filename": '_'.join(
+                    [self.name, "srqmd", "subflow_" + str(subflow_id), str(self.algorithm.name), str(self.latency) + "ms",
+                     str(self.jitter) + "ms"]),
+                "flow_ids": self._flow_ids[subflow_id],
+                "bandwidths": self._forward_bandwidths[subflow_id],
+                "plot_bandwidth": True,
+            })
+        bandwidths = [0] * len(self._forward_bandwidths[0])
+        for subflow_id in range(self._subflows_num):
+            for i in range(len(self._forward_bandwidths[0])):
+                bandwidths[i] += self._forward_bandwidths[subflow_id][i]
+
+        # print(bandwidths)
+        result.append({
+            "type": "aggr",
+            "plot_id": "aggregated",
+            "sr_title": "Aggregated Sending Rate",  # sending rates
+            "disr_title": "Ratio between Subflows",  # distribution of the sending rates
+            "filename": '_'.join([self.name, "aggr", str(self.algorithm.name), str(self.latency) + "ms",
+                                  str(self.jitter) + "ms"]),
+            "flow_ids": self._flow_ids[:self._subflows_num],
+            "plot_bandwidth": True,
+            "bandwidths": bandwidths,
+            "plot_fec": True,
+            "fec_title": "RTP + FEC",
+            "title": "RTP"
+        })
+        return result
+
+    def get_flows(self):
+        return self.__flows
+
+    def get_path_ctrlers(self):
+        return self.__path_ctrlers
+
+    def get_descriptions(self):
+        return self.__description
+
+

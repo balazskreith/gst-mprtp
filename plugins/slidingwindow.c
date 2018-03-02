@@ -326,6 +326,23 @@ again:
   goto again;
 }
 
+void slidingwindow_filter_out_from_tail(SlidingWindow* this, SlidingWindowPredicator predicator, gpointer udata) {
+  volatile SlidingWindowItem *item;
+again:
+  if(datapuffer_readcapacity(this->items) <= this->min_itemnum) {
+    return;
+  }
+  item = datapuffer_peek_first(this->items);
+  if(!item){
+    return;
+  }
+  if(predicator(udata, item->data) == FALSE) {
+    return;
+  }
+  _slidingwindow_rem(this);
+  goto again;
+}
+
 void slidingwindow_refresh(SlidingWindow *this)
 {
   if(datapuffer_isempty(this->items)){
@@ -380,6 +397,29 @@ gpointer slidingwindow_peek_custom(SlidingWindow* this, gint (*comparator)(gpoin
   return result ? result->data : NULL;
 }
 
+typedef struct{
+  SlidingWindowIterator iterator;
+  gpointer udata;
+}IteratorHelper;
+
+static void _slidingwindow_iterator_helper(gpointer item, gpointer udata)
+{
+  IteratorHelper* helper = udata;
+  SlidingWindowItem* sitem = item;
+  helper->iterator(sitem->data, helper->udata);
+}
+
+void slidingwindow_iterate(SlidingWindow* this, SlidingWindowIterator iterator, gpointer udata)
+{
+  IteratorHelper helper;
+  if(datapuffer_isempty(this->items)){
+    return;
+  }
+  helper.iterator = iterator;
+  helper.udata = udata;
+  datapuffer_iterate(this->items, (DataPufferIterator)_slidingwindow_iterator_helper, &helper);
+}
+
 void slidingwindow_set_threshold(SlidingWindow* this, GstClockTime obsolation_treshold)
 {
   this->treshold = obsolation_treshold;
@@ -420,7 +460,7 @@ void slidingwindow_add_data(SlidingWindow* this, gpointer data)
       gchar item_data_str[1024];
       this->debug.sprintf(item->data, item_data_str);
       this->debug.logger("Item added: %p->%s t(%2.1f), c(%d)\n",
-          item,
+          this->items,
           item_data_str,
           (gdouble) (_now(this) - this->made) / (gdouble) GST_SECOND,
           datapuffer_readcapacity(this->items)

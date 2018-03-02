@@ -104,6 +104,7 @@ struct _SndSubflows
 
 //  gint32               target_rate;
   guint                subflows_num;
+  gint                 active_subflows_num;
 
 };
 
@@ -129,6 +130,7 @@ void sndsubflow_set_rtt(SndSubflow* subflow, GstClockTime rtt);
 void sndsubflow_set_eqd(SndSubflow* subflow, gint32 eqd);
 //gint32 sndsubflows_get_total_target(SndSubflows* this);
 guint sndsubflows_get_subflows_num(SndSubflows* this);
+gint sndsubflows_get_active_subflows_num(SndSubflows* this);
 SndSubflow* sndsubflows_get_subflow(SndSubflows* this, guint8 subflow_id);
 
 void sndsubflows_set_mprtp_ext_header_id(SndSubflows* this, guint8 mprtp_ext_header_id);

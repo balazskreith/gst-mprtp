@@ -55,6 +55,117 @@ _cmp_ts (guint32 x, guint32 y)
 }
 
 
+// https://stackoverflow.com/questions/5083465/fast-efficient-least-squares-fit-algorithm-in-c
+// linear regression
+#include <stdlib.h>
+#include <math.h>                           /* math functions */
+
+
+
+inline static gdouble sqr(gdouble x) {
+    return x*x;
+}
+
+
+static int linreg(int n, const gdouble x[], const gdouble y[], gdouble* m, gdouble* b, gdouble* r){
+  gdouble   sumx = 0.0;                      /* sum of x     */
+  gdouble   sumx2 = 0.0;                     /* sum of x**2  */
+  gdouble   sumxy = 0.0;                     /* sum of x * y */
+  gdouble   sumy = 0.0;                      /* sum of y     */
+  gdouble   sumy2 = 0.0;                     /* sum of y**2  */
+  gdouble denom;
+
+  for (int i=0; i<n; ++i){
+      sumx  += x[i];
+      sumx2 += sqr(x[i]);
+      sumxy += x[i] * y[i];
+      sumy  += y[i];
+      sumy2 += sqr(y[i]);
+  }
+
+  denom = (n * sumx2 - sqr(sumx));
+  if (denom == 0) {
+      // singular matrix. can't solve the problem.
+      *m = 0;
+      *b = 0;
+      if (r) *r = 0;
+          return 1;
+  }
+
+  *m = (n * sumxy  -  sumx * sumy) / denom;
+  *b = (sumy * sumx2  -  sumx * sumxy) / denom;
+  if (r!=NULL) {
+      *r = (sumxy - sumx * sumy / n) /    /* compute correlation coeff */
+            sqrt((sumx2 - sqr(sumx)/n) *
+            (sumy2 - sqr(sumy)/n));
+  }
+
+  return 0;
+}
+
+
+
+
+
+static gboolean csv_header_printed = FALSE;
+static void _print_packet_stat(FRACTaLFBProcessor *this, SndPacket* packet) {
+  gchar result[1024];
+  if (packet->subflow_id != this->subflow->id) {
+    return;
+  }
+  memset(result, 0, 1024);
+
+  if (!csv_header_printed) {
+    sprintf(result,
+        "Subflow ID,"             // 1
+        "Elapsed time in sec,"    // 2
+        "Minimal dts,"            // 3
+        "Queue Delay,"            // 4
+        "Seqence Number,"         // 5
+        "Arrival State,"          // 6
+        "Skew,"                   // 7
+        "Ref,"                    // 8
+        "Begin Sequence,"         // 9
+        "End Sequcence,"          // 10
+        );
+
+    g_print("Packet:%s\n",result);
+    csv_header_printed = TRUE;
+    memset(result, 0, 1024);
+  }
+
+  sprintf(result,
+          "%2d,"     // 1
+          "%3.1f,"   // 2
+          "%6u,"     // 3
+          "%6u,"     // 4
+          "%6u,"     // 5
+          "%1u,"     // 6
+          "%6u,"     // 7
+          "%2d,"     // 8
+          "%6hu,"    // 9
+          "%6hu,"    // 10
+          ,
+          this->subflow->id,                         // 1
+          GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000., // 2
+          this->min_dts,                             // 3
+          packet->qts,                               // 4
+          packet->subflow_seq,                       // 5
+          packet->arrival_status,                    // 6
+          packet->subflow_skew,                      // 7
+          packet->ref,                               // 8
+          this->cc_begin_seq,                        // 9
+          this->cc_end_seq                           // 10
+          );
+
+  g_print("Packet:%s\n",result);
+  if (packet->arrival_status == 0) {
+    g_print("Unknown: %hu, %hu\n", packet->subflow_seq, packet->subflow_id);
+  }
+
+}
+
+
 DEFINE_RECYCLE_TYPE(static, reference_point, ReferencePoint);
 
 static void _reference_point_shaper(ReferencePoint* to, ReferencePoint* from) {
@@ -149,12 +260,14 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
   this->ts_generator = sndtracker_get_ts_generator(sndtracker);
   this->sent_packets = g_queue_new();
   this->dts = 0;
+  this->made = _now(this);
   this->qdelay_bucket = make_bucket(QDELAY_BUCKET_LIST_LENGTH, 10 * GST_MSECOND);
   this->qdelay_devs = make_bucket(2, 0);
   _setup_buckets(this);
 
-
   sndtracker_add_on_packet_sent(this->sndtracker, (ListenerFunc)_on_packet_sent, this);
+  sndtracker_add_on_packet_obsolated(this->sndtracker, (ListenerFunc)_print_packet_stat, this);
+
 
   slidingwindow_add_plugins(this->reference_sw,
           make_swavg(_on_srtt_calculated, stat, _rtt_extractor),
@@ -231,6 +344,7 @@ static gdouble _get_ewma_factor(FRACTaLFBProcessor *this){
       timestamp_generator_get_ts_for_time(this->ts_generator, 10 * GST_MSECOND));
 }
 
+
 void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSummary *xr)
 {
   SndPacket* packet = NULL;
@@ -241,22 +355,27 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
   guint32 act_ato;
   guint32 report_timestamp;
 
-  act_seq = xr->CongestionControlFeedback.begin_seq;
-  end_seq = xr->CongestionControlFeedback.end_seq;
+  this->cc_begin_seq = act_seq = xr->CongestionControlFeedback.begin_seq;
+  this->cc_end_seq = end_seq = xr->CongestionControlFeedback.end_seq;
   report_timestamp = xr->CongestionControlFeedback.report_timestamp;
+//  g_print("CC ack at %d begin: %hu end: %hu\n",
+//        this->subflow->id, act_seq, end_seq);
   if(act_seq == end_seq){
     goto done;
   }
   _stat(this)->HSN = end_seq;
   this->min_dts += timestamp_generator_get_ts_for_time(this->ts_generator, 5 * GST_MSECOND);
-//  g_print("RLE vector from %hu until %hu\n", act_seq, end_seq);
-  for(i=0; act_seq != end_seq; ++act_seq, ++i) {
+
+//  g_print("Received chunks: %d (%d->%d): ", this->subflow->id, act_seq, end_seq);
+//  for(i=0; act_seq != end_seq; ++act_seq, ++i) {
+  for (i = 0; i < xr->CongestionControlFeedback.vector_length; ++i, ++act_seq) {
     packet = sndtracker_retrieve_sent_packet(this->sndtracker, this->subflow->id, act_seq);
     if(!packet){
       GST_WARNING_OBJECT(this, "Packet %hu has not in subflow tracked sequences. "
           "Either too late acknowledged or never sent", act_seq);
       continue;
     }
+//    g_print("(%d, %d) ", (guint16)(packet->subflow_seq), xr->CongestionControlFeedback.vector[i].lost);
 
     act_ato = xr->CongestionControlFeedback.vector[i].ato;
 
@@ -265,6 +384,7 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
         packet->lost = FALSE;
         packet->rcvd_ts = _subtract_ts(report_timestamp, act_ato);
         sndtracker_packet_found(this->sndtracker, packet);
+        packet->arrival_status |= 4;
       }
       continue;
     }
@@ -274,8 +394,11 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
       packet->lost = TRUE;
       packet->skew = 0;
       sndtracker_packet_acked(this->sndtracker, packet);
+      packet->arrival_status |= 1;
       continue;
     }
+    packet->arrival_status |= 2;
+
     packet->rcvd_ts = _subtract_ts(report_timestamp, act_ato);
     {
       guint32 dts = _delta_ts(packet->sent_ts, packet->rcvd_ts);
@@ -294,6 +417,13 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
         this->qts_std = (qts_dist + 31. * this->qts_std) / 32.;
       }
 
+      packet->dts = dts;
+      packet->qts = qts;
+      if (0 < this->last_dts) {
+        packet->subflow_skew = dts < this->last_dts ? this->last_dts - dts : dts - this->last_dts;
+      }
+      this->last_dts = dts;
+
       // TODO: add sending packets instead of guint32 to ewi
 //      slidingwindow_add_data(this->ewi_sw, &dts);
       slidingwindow_add_data(this->ewi_sw, packet);
@@ -310,6 +440,7 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
     packet->lost = FALSE;
     sndtracker_packet_acked(this->sndtracker, packet);
   }
+//  g_print("\n");
 
   if (reference_sent_ts) {
     guint32 current_ts = timestamp_generator_get_ts(this->ts_generator);
@@ -371,6 +502,20 @@ void _process_stat(FRACTaLFBProcessor *this)
     _stat(this)->rr_avg = alpha * _stat(this)->receiver_bitrate + _stat(this)->rr_avg * (1.-alpha);
   }else{
     _stat(this)->rr_avg = _stat(this)->receiver_bitrate;
+  }
+
+  {
+    guint index = this->history_index & 31;
+    gdouble rr_t = _stat(this)->receiver_bitrate;
+    this->sr_history[index] = _stat(this)->sender_bitrate;
+    this->rr_history[index] = _stat(this)->receiver_bitrate;
+    if ((this->history_index & 15) == 0) {
+      linreg(MIN(this->history_index, 32), this->sr_history, this->rr_history, &this->m, &this->b, &this->r);
+    }
+    ++this->history_index;
+
+    _stat(this)->rr_hat = _stat(this)->sender_bitrate * this->m + this->b;
+    _stat(this)->drr = pow((rr_t - _stat(this)->rr_hat) / (rr_t), 2);
   }
 
   if (0 < sndstat->lost_packets_in_1s) {

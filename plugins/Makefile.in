@@ -160,17 +160,18 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-bintree.lo \
 	libgstmprtp_la-gstrtpstatmaker2.lo \
 	libgstmprtp_la-jitterbuffer.lo libgstmprtp_la-lib_bintree.lo \
 	libgstmprtp_la-lib_datapuffer.lo \
-	libgstmprtp_la-lib_swplugins.lo libgstmprtp_la-mediator.lo \
-	libgstmprtp_la-messenger.lo libgstmprtp_la-mkfifo.lo \
-	libgstmprtp_la-mprtputils.lo libgstmprtp_la-notifier.lo \
-	libgstmprtp_la-rcvctrler.lo libgstmprtp_la-rcvpackets.lo \
-	libgstmprtp_la-rcvsubflows.lo libgstmprtp_la-rcvtracker.lo \
-	libgstmprtp_la-recycle.lo libgstmprtp_la-reportproc.lo \
-	libgstmprtp_la-reportprod.lo libgstmprtp_la-ricalcer.lo \
-	libgstmprtp_la-rtpfecbuffer.lo libgstmprtp_la-slidingwindow.lo \
-	libgstmprtp_la-sndctrler.lo libgstmprtp_la-sndqueue.lo \
-	libgstmprtp_la-sndsubflows.lo libgstmprtp_la-sndtracker.lo \
-	libgstmprtp_la-sndpackets.lo libgstmprtp_la-streamjoiner.lo \
+	libgstmprtp_la-lib_swplugins.lo libgstmprtp_la-linreger.lo \
+	libgstmprtp_la-mediator.lo libgstmprtp_la-messenger.lo \
+	libgstmprtp_la-mkfifo.lo libgstmprtp_la-mprtputils.lo \
+	libgstmprtp_la-notifier.lo libgstmprtp_la-rcvctrler.lo \
+	libgstmprtp_la-rcvpackets.lo libgstmprtp_la-rcvsubflows.lo \
+	libgstmprtp_la-rcvtracker.lo libgstmprtp_la-recycle.lo \
+	libgstmprtp_la-reportproc.lo libgstmprtp_la-reportprod.lo \
+	libgstmprtp_la-ricalcer.lo libgstmprtp_la-rtpfecbuffer.lo \
+	libgstmprtp_la-slidingwindow.lo libgstmprtp_la-sndctrler.lo \
+	libgstmprtp_la-sndqueue.lo libgstmprtp_la-sndsubflows.lo \
+	libgstmprtp_la-sndtracker.lo libgstmprtp_la-sndpackets.lo \
+	libgstmprtp_la-streamjoiner.lo \
 	libgstmprtp_la-streamsplitter.lo \
 	libgstmprtp_la-timestampgenerator.lo \
 	libgstmprtp_la-swperctester.lo
@@ -437,6 +438,7 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          lib_bintree.c         \
                          lib_datapuffer.c      \
                          lib_swplugins.c       \
+                         linreger.c            \
                          mediator.c            \
                          messenger.c           \
                          mkfifo.c              \
@@ -475,6 +477,7 @@ noinst_HEADERS = bintree.h             \
                  lib_bintree.h         \
                  lib_datapuffer.h      \
                  lib_swplugins.h       \
+                 linreger.h            \
                  mediator.h            \
                  messenger.h           \
                  mkfifo.h              \
@@ -615,6 +618,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-lib_bintree.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-lib_datapuffer.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-lib_swplugins.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-linreger.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-mediator.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-messenger.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-mkfifo.Plo@am__quote@
@@ -793,6 +797,13 @@ libgstmprtp_la-lib_swplugins.lo: lib_swplugins.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='lib_swplugins.c' object='libgstmprtp_la-lib_swplugins.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-lib_swplugins.lo `test -f 'lib_swplugins.c' || echo '$(srcdir)/'`lib_swplugins.c
+
+libgstmprtp_la-linreger.lo: linreger.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-linreger.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-linreger.Tpo -c -o libgstmprtp_la-linreger.lo `test -f 'linreger.c' || echo '$(srcdir)/'`linreger.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-linreger.Tpo $(DEPDIR)/libgstmprtp_la-linreger.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='linreger.c' object='libgstmprtp_la-linreger.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-linreger.lo `test -f 'linreger.c' || echo '$(srcdir)/'`linreger.c
 
 libgstmprtp_la-mediator.lo: mediator.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-mediator.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-mediator.Tpo -c -o libgstmprtp_la-mediator.lo `test -f 'mediator.c' || echo '$(srcdir)/'`mediator.c

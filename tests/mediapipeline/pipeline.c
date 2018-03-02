@@ -204,7 +204,12 @@ CodecParams*    make_codec_params (gchar* params_rawstring)
       result->keyframe_max_dist = (2 < g_strv_length(tokens)) ? atoi(tokens[2]) : 0;
       sprintf(result->to_string, "VP8, Keyframe mode: %d, keyframe max dist: %d", result->keyframe_mode, result->keyframe_max_dist);
     break;
-
+    case CODEC_TYPE_VP9:
+      sprintf(result->type_str,  "VP9");
+      result->keyframe_mode = (1 < g_strv_length(tokens)) ? atoi(tokens[1]) : 0;
+      result->keyframe_max_dist = (2 < g_strv_length(tokens)) ? atoi(tokens[2]) : 0;
+      sprintf(result->to_string, "VP9, Keyframe mode: %d, keyframe max dist: %d", result->keyframe_mode, result->keyframe_max_dist);
+      break;
     default:
       g_print("Unrecognized type (%d) at make_codec_params \n", result->type);
       break;
@@ -396,12 +401,12 @@ SchedulerParams*   make_scheduler_params(gchar* params_rawstring)
     case TRANSFER_CONTROLLER_TYPE_MPRTP:
       sprintf(result->to_string, "MPRTP ");
       {
-        gchar string[256];
+        gchar string[512];
         gint i,len,offset;
         gint32 snd_subflow_id;
         len = atoi(tokens[1]);
         offset = 1;
-        memset(string, 0, 256);
+        memset(string, 0, 512);
         for(i = 0; i < len; ++i){
           snd_subflow_id = atoi(tokens[++offset]);
           result->mprtp.subflows[snd_subflow_id].target_bitrate = atoi(tokens[++offset]);

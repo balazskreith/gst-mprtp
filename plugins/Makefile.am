@@ -20,6 +20,7 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          lib_bintree.c         \
                          lib_datapuffer.c      \
                          lib_swplugins.c       \
+                         linreger.c            \
                          mediator.c            \
                          messenger.c           \
                          mkfifo.c              \
@@ -59,6 +60,7 @@ noinst_HEADERS = bintree.h             \
                  lib_bintree.h         \
                  lib_datapuffer.h      \
                  lib_swplugins.h       \
+                 linreger.h            \
                  mediator.h            \
                  messenger.h           \
                  mkfifo.h              \

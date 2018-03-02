@@ -306,9 +306,5 @@ static Private* _priv_ctor(void)
 
 static void _priv_dtor(Private *priv)
 {
-//  Subflow *subflow;
-//  gint i;
-//  for(i = 0; i < 256; ++i){
-//    subflow = priv->subflows + i;
-//  }
+
 }

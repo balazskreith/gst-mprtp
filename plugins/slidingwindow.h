@@ -33,6 +33,7 @@ struct _SlidingWindowItem
 
 typedef void (*SlidingWindowItemSprintf)(gpointer item_data, gchar* item_to_str);
 typedef void (*SlidingWindowItemLogger)(const gchar* format, ...);
+typedef gboolean (*SlidingWindowPredicator)(gpointer udata, gpointer item);
 
 typedef struct _SlidingWindowItem SlidingWindowItem;
 struct _SlidingWindow
@@ -82,6 +83,8 @@ typedef struct _SlidingWindowPlugin{
   gpointer           priv;
 }SlidingWindowPlugin;
 
+typedef void (*SlidingWindowIterator)(gpointer item, gpointer udata);
+
 typedef gboolean (*SlidingWindowObsolateFunc)(gpointer udata, SlidingWindowItem* item);
 
 typedef gboolean (*SWPluginFilterFunc)(gpointer item);
@@ -97,14 +100,17 @@ SlidingWindow* make_slidingwindow_with_data_recycle(guint32 num_limit,
                                                   GstClockTime obsolation_treshold,
                                                   Recycle* data_recycle
                                                   );
+
 SlidingWindow* make_slidingwindow(guint32 num_limit, GstClockTime obsolation_treshold);
 void slidingwindow_clear(SlidingWindow* this);
 void slidingwindow_dtor(gpointer target);
+void slidingwindow_filter_out_from_tail(SlidingWindow* this, SlidingWindowPredicator predicator, gpointer udata);
 void slidingwindow_refresh(SlidingWindow *this);
 void slidingwindow_set_threshold(SlidingWindow* this, GstClockTime obsolation_treshold);
 gpointer slidingwindow_peek_oldest(SlidingWindow* this);
 gpointer slidingwindow_peek_newest(SlidingWindow* this);
 gpointer slidingwindow_peek_custom(SlidingWindow* this, gint (*comparator)(gpointer item, gpointer udata), gpointer udata);
+void slidingwindow_iterate(SlidingWindow* this, SlidingWindowIterator iterator, gpointer udata);
 void slidingwindow_set_act_limit(SlidingWindow* this, gint32 act_limit);
 void slidingwindow_add_int(SlidingWindow* this, gint data);
 void slidingwindow_add_data(SlidingWindow* this, gpointer data);

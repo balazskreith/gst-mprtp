@@ -17,6 +17,7 @@
 #include "reportproc.h"
 #include "correlator.h"
 #include "bucket.h"
+#include "linreger.h"
 
 
 typedef struct _FRACTaLFBProcessor FRACTaLFBProcessor;
@@ -29,7 +30,7 @@ typedef struct _FRACTaLFBProcessorClass FRACTaLFBProcessorClass;
 #define FRACTALFBPROCESSOR_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),FRACTALFBPROCESSOR_TYPE))
 #define FRACTALFBPROCESSOR_CAST(src)        ((FRACTALFBProcessor *)(src))
 
-#define QDELAY_BUCKET_LIST_LENGTH 5
+#define QDELAY_BUCKET_LIST_LENGTH 3
 #define DRATE_BUCKET_LIST_LENGTH 4
 
 typedef struct {
@@ -75,6 +76,13 @@ typedef struct _FRACTaLStat
   gdouble                  drate_avg;
 
 
+  gdouble avg_qd;
+  gint qd_min, qd_max;
+  gint lost_or_discarded;
+  gint arrived_packets;
+  gdouble qdelay_stability_stab,qdelay_stability_avg;
+
+
 }FRACTaLStat;
 
 
@@ -94,9 +102,7 @@ struct _FRACTaLFBProcessor
 
   GstClockTime             dts;
   GstClockTime             rtt;
-  GQueue*                  sent_packets;
   SlidingWindow*           reference_sw;
-  SlidingWindow*           measurements;
   SlidingWindow*           ewi_sw;
 
   FRACTaLStat*             stat;
@@ -104,6 +110,7 @@ struct _FRACTaLFBProcessor
   SndSubflow*              subflow;
 
   GstClockTime             last_report_update;
+  GstClockTime             first_report_update;
 
   guint16                  HSN;
 
@@ -112,16 +119,21 @@ struct _FRACTaLFBProcessor
   gdouble                  last_qts;
   Bucket*                  qdelay_bucket;
   Bucket*                  qdelay_devs;
+  Bucket*                  qdelay_new;
 
   guint32                  last_dts;
   gdouble                  fb_interval_avg;
 
+  LinearRegressor*         queue_regressor;
+  gdouble max_sr, max_sample;
+
   guint16 cc_begin_seq, cc_end_seq;
 
-  gdouble sr_history[32];
-  gdouble rr_history[32];
-  guint history_index;
-  gdouble b,m,r;
+  LinearRegressor* rate_regressor;
+//  gdouble sr_history[32];
+//  gdouble rr_history[32];
+//  guint history_index;
+//  gdouble b,m,r;
 
 
 };

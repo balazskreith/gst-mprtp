@@ -61,52 +61,6 @@ _cmp_ts (guint32 x, guint32 y)
 #include <math.h>                           /* math functions */
 
 
-
-inline static gdouble sqr(gdouble x) {
-    return x*x;
-}
-
-
-static int linreg(int n, const gdouble x[], const gdouble y[], gdouble* m, gdouble* b, gdouble* r){
-  gdouble   sumx = 0.0;                      /* sum of x     */
-  gdouble   sumx2 = 0.0;                     /* sum of x**2  */
-  gdouble   sumxy = 0.0;                     /* sum of x * y */
-  gdouble   sumy = 0.0;                      /* sum of y     */
-  gdouble   sumy2 = 0.0;                     /* sum of y**2  */
-  gdouble denom;
-
-  for (int i=0; i<n; ++i){
-      sumx  += x[i];
-      sumx2 += sqr(x[i]);
-      sumxy += x[i] * y[i];
-      sumy  += y[i];
-      sumy2 += sqr(y[i]);
-  }
-
-  denom = (n * sumx2 - sqr(sumx));
-  if (denom == 0) {
-      // singular matrix. can't solve the problem.
-      *m = 0;
-      *b = 0;
-      if (r) *r = 0;
-          return 1;
-  }
-
-  *m = (n * sumxy  -  sumx * sumy) / denom;
-  *b = (sumy * sumx2  -  sumx * sumxy) / denom;
-  if (r!=NULL) {
-      *r = (sumxy - sumx * sumy / n) /    /* compute correlation coeff */
-            sqrt((sumx2 - sqr(sumx)/n) *
-            (sumy2 - sqr(sumy)/n));
-  }
-
-  return 0;
-}
-
-
-
-
-
 static gboolean csv_header_printed = FALSE;
 static void _print_packet_stat(FRACTaLFBProcessor *this, SndPacket* packet) {
   gchar result[1024];
@@ -127,6 +81,8 @@ static void _print_packet_stat(FRACTaLFBProcessor *this, SndPacket* packet) {
         "Ref,"                    // 8
         "Begin Sequence,"         // 9
         "End Sequcence,"          // 10
+        "Sending Rate,"           // 11
+        "Fraction Lost,"          // 12
         );
 
     g_print("Packet:%s\n",result);
@@ -145,6 +101,8 @@ static void _print_packet_stat(FRACTaLFBProcessor *this, SndPacket* packet) {
           "%2d,"     // 8
           "%6hu,"    // 9
           "%6hu,"    // 10
+          "%6d,"     // 11
+          "%f,"      // 12
           ,
           this->subflow->id,                         // 1
           GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000., // 2
@@ -155,7 +113,9 @@ static void _print_packet_stat(FRACTaLFBProcessor *this, SndPacket* packet) {
           packet->subflow_skew,                      // 7
           packet->ref,                               // 8
           this->cc_begin_seq,                        // 9
-          this->cc_end_seq                           // 10
+          this->cc_end_seq,                          // 10
+          _stat(this)->sender_bitrate / 1000,        // 11
+          _stat(this)->fraction_lost                 // 12
           );
 
   g_print("Packet:%s\n",result);
@@ -221,6 +181,7 @@ void fractalfbprocessor_set_evaluation_window_margins(FRACTaLFBProcessor *this, 
 }
 
 static void _setup_buckets(FRACTaLFBProcessor* this) {
+  if (0)
   {
     guint transform_reference[5] = {1, 1, 1, 1, 1};
     guint positive_reference[5] =  {1, 0, 0, 0, 0};
@@ -233,6 +194,17 @@ static void _setup_buckets(FRACTaLFBProcessor* this) {
   }
 
   {
+     guint transform_reference[3] = {1, 1, 1};
+     guint positive_reference[3] =  {1, 0, 0};
+     guint negative_reference[3] =  {0, 1, 4};
+     gdouble bucket_sizes[3] = {10 * GST_MSECOND, GST_SECOND, 0};
+     bucket_set_negative_reference(this->qdelay_bucket, negative_reference);
+     bucket_set_positive_reference(this->qdelay_bucket, positive_reference);
+     bucket_set_transform_reference(this->qdelay_bucket, transform_reference);
+     bucket_set_bucket_sizes(this->qdelay_bucket, bucket_sizes);
+   }
+
+  {
     guint transform_reference[2] = {1, 1};
     guint positive_reference[2] =  {0, 1};
     guint negative_reference[2] =  {1, 0};
@@ -242,6 +214,18 @@ static void _setup_buckets(FRACTaLFBProcessor* this) {
     bucket_set_transform_reference(this->qdelay_devs, transform_reference);
     bucket_set_bucket_sizes(this->qdelay_devs, bucket_sizes);
     bucket_set_window_size(this->qdelay_devs, 30 * GST_SECOND);
+  }
+
+  {
+    guint transform_reference[3] = {1, 1, 1};
+    guint positive_reference[3] =  {0, 1, 4};
+    guint negative_reference[3] =  {1, 0, 0};
+    gdouble bucket_sizes[3] = {.5, 1.0, 2.0};
+    bucket_set_negative_reference(this->qdelay_new, negative_reference);
+    bucket_set_positive_reference(this->qdelay_new, positive_reference);
+    bucket_set_transform_reference(this->qdelay_new, transform_reference);
+    bucket_set_bucket_sizes(this->qdelay_new, bucket_sizes);
+    bucket_set_window_size(this->qdelay_new, GST_SECOND);
   }
 }
 
@@ -258,11 +242,14 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
   this->reference_sw = make_slidingwindow_with_data_recycle(200, 15 * GST_SECOND, this->reference_point_recycle);
   this->ewi_sw = make_slidingwindow(200, GST_SECOND);
   this->ts_generator = sndtracker_get_ts_generator(sndtracker);
-  this->sent_packets = g_queue_new();
   this->dts = 0;
   this->made = _now(this);
   this->qdelay_bucket = make_bucket(QDELAY_BUCKET_LIST_LENGTH, 10 * GST_MSECOND);
   this->qdelay_devs = make_bucket(2, 0);
+
+  this->qdelay_new = make_bucket(3, GST_SECOND);
+  this->rate_regressor = make_linear_regressor(32, 0);
+  this->queue_regressor = make_linear_regressor(50, 0);
   _setup_buckets(this);
 
   sndtracker_add_on_packet_sent(this->sndtracker, (ListenerFunc)_on_packet_sent, this);
@@ -320,6 +307,9 @@ void fractalfbprocessor_report_update(FRACTaLFBProcessor *this, GstMPRTCPReportS
     this->fb_interval_avg = this->fb_interval_avg * .8 + interval * .2;
   }
   this->last_report_update = now;
+  if (!this->first_report_update) {
+    this->first_report_update = now;
+  }
 done:
   return;
 }
@@ -354,6 +344,7 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
   gboolean reference_dts_init = FALSE;
   guint32 act_ato;
   guint32 report_timestamp;
+  gint number_of_qd_packets = 0;
 
   this->cc_begin_seq = act_seq = xr->CongestionControlFeedback.begin_seq;
   this->cc_end_seq = end_seq = xr->CongestionControlFeedback.end_seq;
@@ -365,6 +356,11 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
   }
   _stat(this)->HSN = end_seq;
   this->min_dts += timestamp_generator_get_ts_for_time(this->ts_generator, 5 * GST_MSECOND);
+
+  _stat(this)->lost_or_discarded = 0;
+  _stat(this)->avg_qd = 0.0;
+  _stat(this)->qd_min = 1000;
+  _stat(this)->qd_max = 0;
 
 //  g_print("Received chunks: %d (%d->%d): ", this->subflow->id, act_seq, end_seq);
 //  for(i=0; act_seq != end_seq; ++act_seq, ++i) {
@@ -395,8 +391,10 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
       packet->skew = 0;
       sndtracker_packet_acked(this->sndtracker, packet);
       packet->arrival_status |= 1;
+      ++_stat(this)->lost_or_discarded;
       continue;
     }
+    ++number_of_qd_packets;
     packet->arrival_status |= 2;
 
     packet->rcvd_ts = _subtract_ts(report_timestamp, act_ato);
@@ -416,6 +414,10 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
         this->last_qts = qts;
         this->qts_std = (qts_dist + 31. * this->qts_std) / 32.;
       }
+
+      _stat(this)->avg_qd += qts;
+      _stat(this)->qd_max = MAX(_stat(this)->qd_max, qts);
+      _stat(this)->qd_min = MIN(_stat(this)->qd_min, qts);
 
       packet->dts = dts;
       packet->qts = qts;
@@ -441,6 +443,38 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
     sndtracker_packet_acked(this->sndtracker, packet);
   }
 //  g_print("\n");
+  if (0 < number_of_qd_packets) {
+    _stat(this)->avg_qd /= (gdouble) number_of_qd_packets;
+  } else {
+    _stat(this)->avg_qd = 0.0;
+  }
+
+  _stat(this)->arrived_packets = number_of_qd_packets;
+
+  if (this->subflow->state != SNDSUBFLOW_STATE_CONGESTED)
+  {
+    gdouble sample;
+    gdouble sr = _stat(this)->sender_bitrate / 100000.;
+    sample = (gdouble)(1 + _stat(this)->lost_or_discarded) /
+             (gdouble)(1 + _stat(this)->lost_or_discarded + _stat(this)->arrived_packets)
+             * _stat(this)->avg_qd;
+    this->max_sample = MAX(log(1.+sample), this->max_sample * .98);
+    this->max_sr = MAX((1.+sr), this->max_sr * .98);
+//    _stat(this)->qdelay_stability_avg = sample * .01 + _stat(this)->qdelay_stability_stab * .99;
+//    bucket_set_bucket_chain(this->qdelay_new, MIN(_stat(this)->qdelay_stability_avg * 2., .05), 2.);
+//    bucket_add_value(this->qdelay_new, sample);
+
+//    linear_regressor_add_samples(this->queue_regressor, sr / this->max_sr, sample / this->max_sample);
+    linear_regressor_add_samples(this->queue_regressor, sr * this->max_sample, log(1 + sample) * this->max_sr);
+    _stat(this)->qdelay_stability_stab = linear_regressor_get_m(this->queue_regressor);
+//    _stat(this)->qdelay_stability = 1.-_stat(this)->qdelay_stability_stab;
+    _stat(this)->qdelay_stability_avg = linear_regressor_get_r(this->queue_regressor);
+//    _stat(this)->qdelay_stability_stab = _stat(this)->qdelay_stability_stab * .1 + MAX(0, sample - _stat(this)->qdelay_stability_avg) * .9;
+//    _stat(this)->qdelay_stability_stab = MAX(bucket_get_stability(this->qdelay_new), 0.);
+
+//    _stat(this)->qdelay_stability_avg = sample * .05 + _stat(this)->qdelay_stability_avg * .95;
+  }
+
 
   if (reference_sent_ts) {
     guint32 current_ts = timestamp_generator_get_ts(this->ts_generator);
@@ -505,17 +539,10 @@ void _process_stat(FRACTaLFBProcessor *this)
   }
 
   {
-    guint index = this->history_index & 31;
     gdouble rr_t = _stat(this)->receiver_bitrate;
-    this->sr_history[index] = _stat(this)->sender_bitrate;
-    this->rr_history[index] = _stat(this)->receiver_bitrate;
-    if ((this->history_index & 15) == 0) {
-      linreg(MIN(this->history_index, 32), this->sr_history, this->rr_history, &this->m, &this->b, &this->r);
-    }
-    ++this->history_index;
-
-    _stat(this)->rr_hat = _stat(this)->sender_bitrate * this->m + this->b;
+    _stat(this)->rr_hat = linear_regressor_predict(this->rate_regressor, _stat(this)->sender_bitrate);
     _stat(this)->drr = pow((rr_t - _stat(this)->rr_hat) / (rr_t), 2);
+    linear_regressor_add_samples(this->rate_regressor, _stat(this)->sender_bitrate, _stat(this)->receiver_bitrate);
   }
 
   if (0 < sndstat->lost_packets_in_1s) {
@@ -562,6 +589,9 @@ static void _refresh_windows_thresholds(FRACTaLFBProcessor *this) {
   guint32 ewi_in_ts = CONSTRAIN(this->min_ewi_in_ts, this->max_ewi_in_ts, this->srtt_in_ts);
   GstClockTime ewi_in_ns = timestamp_generator_get_time(this->ts_generator, ewi_in_ts);
   bucket_set_window_size(this->qdelay_bucket, ewi_in_ns);
+
+  bucket_set_window_size(this->qdelay_new, ewi_in_ns);
+
   slidingwindow_set_threshold(this->ewi_sw, ewi_in_ns);
 }
 

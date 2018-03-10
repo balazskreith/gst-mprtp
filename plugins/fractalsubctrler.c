@@ -461,6 +461,13 @@ static void _stat_print(FRACTaLSubController *this)
         "Fractional Lost Threshold," // 24
         "Queue Delay Stability,"     // 25
         "Queue Delay Variance Stability," // 26
+        "QD Avg,"                    // 27
+        "Lost or Discarded Nums,"    // 28
+        "QD Min,"                    // 29
+        "QD Max,"                    // 30
+        "Arrived Packets,"           // 31
+        "QD New Stability Stab,"     // 32
+        "QD New Stability Avg,"      // 33
         );
     g_print("Stat:%s\n",result);
     header_printed = TRUE;
@@ -494,11 +501,18 @@ static void _stat_print(FRACTaLSubController *this)
           "%1.2f,"   // 24
           "%1.2f,"   // 25
           "%1.2f,"   // 26
+          "%1.2f,"   // 27
+          "%d,"      // 28
+          "%d,"      // 29
+          "%d,"      // 30
+          "%d,"      // 31
+          "%f,"      // 32
+          "%f,"      // 33
           ,
           this->subflow->id,                         // 1
           stat->measurements_num,                    // 2
           GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000., // 3
-          _stat(this)->rr_hat / 125,                 // 4
+          _stat(this)->rr_hat / 1000,                // 4
           _stat(this)->drr,                          // 5
           _stat(this)->rtpq_delay,                   // 6
           stat->fec_bitrate / 1000,                  // 7
@@ -520,7 +534,14 @@ static void _stat_print(FRACTaLSubController *this)
           this->tcp_flow_presented,                  // 23
           stat->FL_th,                               // 24
           _stat(this)->qdelay_stability,             // 25
-          _stat(this)->qdelay_var_stability          // 26
+          _stat(this)->qdelay_var_stability,         // 26
+          _stat(this)->avg_qd,                       // 27
+          _stat(this)->lost_or_discarded,            // 28
+          _stat(this)->qd_min,                       // 29
+          _stat(this)->qd_max,                       // 30
+          _stat(this)->arrived_packets,              // 31
+          _stat(this)->qdelay_stability_stab,         // 32
+          _stat(this)->qdelay_stability_avg        // 33
           );
 
   g_print("Stat:%s\n",result);
@@ -685,12 +706,19 @@ static void _undershoot(FRACTaLSubController *this, gint32 turning_point) {
   this->reducing_approved = FALSE;
 
   {
-    gdouble factor = _stat(this)->drate_avg / _stat(this)->rr_avg;
+    gdouble factor = 0. < _stat(this)->fraction_lost ? CONSTRAIN(.1, .6, _stat(this)->drr) : CONSTRAIN(.1, .2, _stat(this)->drr);
     gint32 decrease;
-    factor = CONSTRAIN(.1, .4, factor);
     decrease = MAX(_min_ramp_up(this), this->congested_bitrate * factor);
     new_target = MIN(turning_point - decrease, _stat(this)->rr_avg - _min_ramp_up(this));
   }
+
+//  {
+//    gdouble factor = _stat(this)->drate_avg / _stat(this)->rr_avg;
+//    gint32 decrease;
+//    factor = CONSTRAIN(.1, .4, factor);
+//    decrease = MAX(_min_ramp_up(this), this->congested_bitrate * factor);
+//    new_target = MIN(turning_point - decrease, _stat(this)->rr_avg - _min_ramp_up(this));
+//  }
   _change_sndsubflow_target_bitrate(this, MIN(this->target_bitrate, new_target));
 }
 
@@ -1185,7 +1213,6 @@ void _change_sndsubflow_target_bitrate(FRACTaLSubController* this, gint32 new_ta
   }
   sndsubflow_set_target_rate(this->subflow, this->target_bitrate);
 }
-
 
 
 void _probe_helper(FRACTaLSubController *this) {

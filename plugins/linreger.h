@@ -11,7 +11,7 @@
 #include <gst/gst.h>
 #include "lib_datapuffer.h"
 #include "notifier.h"
-
+#include "slidingwindow.h"
 
 typedef struct _LinearRegressor LinearRegressor;
 typedef struct _LinearRegressorClass LinearRegressorClass;
@@ -36,12 +36,21 @@ struct _LinearRegressor
   guint                length;
   guint                index;
   guint                added;
+  gboolean             calculate_r;
 
   gdouble              b,m,r;
 
   guint                refresh_period;
 
+  gdouble   sumx;                      /* sum of x     */
+  gdouble   sumx2;                     /* sum of x**2  */
+  gdouble   sumxy;                     /* sum of x * y */
+  gdouble   sumy;                      /* sum of y     */
+  gdouble   sumy2;                     /* sum of y**2  */
 };
+
+typedef gdouble (*LinearRegressorSampleConverter) (gpointer udata, gpointer item);
+
 struct _LinearRegressorClass{
   GObjectClass parent_class;
 };
@@ -49,9 +58,14 @@ struct _LinearRegressorClass{
 LinearRegressor*
 make_linear_regressor(guint length, guint refresh_period);
 
-
 void
 linear_regressor_add_samples(LinearRegressor* this, gdouble x, gdouble y);
+
+gdouble
+linear_regressor_get_m(LinearRegressor* this);
+
+gdouble
+linear_regressor_get_r(LinearRegressor* this);
 
 gdouble
 linear_regressor_predict(LinearRegressor* this, gdouble x);

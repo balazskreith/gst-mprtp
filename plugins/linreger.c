@@ -45,14 +45,21 @@ static void
 linear_regressor_finalize (
     GObject * object);
 
-static int
-_process(
-    int n,
-    const gdouble x[],
-    const gdouble y[],
-    gdouble* m,
-    gdouble* b,
-    gdouble* r);
+inline static gdouble sqr(gdouble x) {
+    return x*x;
+}
+
+static void _calculate_params(
+    LinearRegressor* this);
+
+//static int
+//_process(
+//    int n,
+//    const gdouble x[],
+//    const gdouble y[],
+//    gdouble* m,
+//    gdouble* b,
+//    gdouble* r);
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -87,6 +94,7 @@ linear_regressor_init (LinearRegressor * this)
   this->sysclock       = gst_system_clock_obtain ();
   this->made           = _now(this);
   this->m = this->r = this->b = 0;
+  this->calculate_r = TRUE;
 }
 
 LinearRegressor*
@@ -104,14 +112,41 @@ make_linear_regressor(guint length, guint refresh_period)
 
 void linear_regressor_add_samples(LinearRegressor* this, gdouble x, gdouble y)
 {
+  gdouble obsolated_x, obsolated_y;
+
+  obsolated_x =this->x[this->index];
+  obsolated_y =this->y[this->index];
+
   this->x[this->index] = x;
   this->y[this->index] = y;
   this->index = (this->index + 1) % this->length;
   ++this->added;
 
-  if (!this->refresh_period || this->added % this->refresh_period == 0) {
-    _process(MIN(this->added, this->length), this->x, this->y, &this->m, &this->b, &this->r);
+//  if (!this->refresh_period || this->added % this->refresh_period == 0) {
+//    _process(MIN(this->added, this->length), this->x, this->y, &this->m, &this->b, &this->r);
+//  }
+
+  this->sumx += x;
+  this->sumy += y;
+  this->sumx2 += sqr(x);
+  this->sumy2 += sqr(y);
+  this->sumxy += x * y;
+
+  if (this->added < this->length) {
+    goto done;
   }
+
+  this->sumx -= obsolated_x;
+  this->sumy -= obsolated_y;
+  this->sumx2 -= sqr(obsolated_x);
+  this->sumy2 -= sqr(obsolated_y);
+  this->sumxy -= obsolated_x * obsolated_y;
+
+done:
+  if (!this->refresh_period || this->added % this->refresh_period == 0) {
+    _calculate_params(this);
+  }
+  return;
 }
 
 gdouble
@@ -119,45 +154,77 @@ linear_regressor_predict(LinearRegressor* this, gdouble x) {
   return this->m * x + this->b;
 }
 
-
-inline static gdouble sqr(gdouble x) {
-    return x*x;
+gdouble
+linear_regressor_get_m(LinearRegressor* this) {
+  return this->m;
 }
 
 
-int _process(int n, const gdouble x[], const gdouble y[], gdouble* m, gdouble* b, gdouble* r) {
-  gdouble   sumx = 0.0;                      /* sum of x     */
-  gdouble   sumx2 = 0.0;                     /* sum of x**2  */
-  gdouble   sumxy = 0.0;                     /* sum of x * y */
-  gdouble   sumy = 0.0;                      /* sum of y     */
-  gdouble   sumy2 = 0.0;                     /* sum of y**2  */
+gdouble
+linear_regressor_get_r(LinearRegressor* this) {
+  return this->r;
+}
+
+
+void _calculate_params(LinearRegressor* this) {
   gdouble denom;
+  gdouble n = MIN(this->added, this->length);
 
-  for (int i=0; i<n; ++i){
-      sumx  += x[i];
-      sumx2 += sqr(x[i]);
-      sumxy += x[i] * y[i];
-      sumy  += y[i];
-      sumy2 += sqr(y[i]);
-  }
-
-  denom = (n * sumx2 - sqr(sumx));
+  denom = (n * this->sumx2 - sqr(this->sumx));
   if (denom == 0) {
       // singular matrix. can't solve the problem.
-      *m = 0;
-      *b = 0;
-      if (r) *r = 0;
-          return 1;
+      this->m = 0;
+      this->b = 0;
+      this->r = 0;
+      return;
   }
 
-  *m = (n * sumxy  -  sumx * sumy) / denom;
-  *b = (sumy * sumx2  -  sumx * sumxy) / denom;
-  if (r!=NULL) {
-      *r = (sumxy - sumx * sumy / n) /    /* compute correlation coeff */
-            sqrt((sumx2 - sqr(sumx)/n) *
-            (sumy2 - sqr(sumy)/n));
+  this->m = (n * this->sumxy  -  this->sumx * this->sumy) / denom;
+  this->b = (this->sumy * this->sumx2  -  this->sumx * this->sumxy) / denom;
+  if (this->calculate_r) {
+    this->r = (this->sumxy - this->sumx * this->sumy / n) /    /* compute correlation coeff */
+              sqrt((this->sumx2 - sqr(this->sumx)/n) *
+              (this->sumy2 - sqr(this->sumy)/n));
   }
 
-  return 0;
 }
+
+
+
+//
+//int _process(int n, const gdouble x[], const gdouble y[], gdouble* m, gdouble* b, gdouble* r) {
+//  gdouble   sumx = 0.0;                      /* sum of x     */
+//  gdouble   sumx2 = 0.0;                     /* sum of x**2  */
+//  gdouble   sumxy = 0.0;                     /* sum of x * y */
+//  gdouble   sumy = 0.0;                      /* sum of y     */
+//  gdouble   sumy2 = 0.0;                     /* sum of y**2  */
+//  gdouble denom;
+//
+//  for (int i=0; i<n; ++i){
+//      sumx  += x[i];
+//      sumx2 += sqr(x[i]);
+//      sumxy += x[i] * y[i];
+//      sumy  += y[i];
+//      sumy2 += sqr(y[i]);
+//  }
+//
+//  denom = (n * sumx2 - sqr(sumx));
+//  if (denom == 0) {
+//      // singular matrix. can't solve the problem.
+//      *m = 0;
+//      *b = 0;
+//      if (r) *r = 0;
+//          return 1;
+//  }
+//
+//  *m = (n * sumxy  -  sumx * sumy) / denom;
+//  *b = (sumy * sumx2  -  sumx * sumxy) / denom;
+//  if (r!=NULL) {
+//      *r = (sumxy - sumx * sumy / n) /    /* compute correlation coeff */
+//            sqrt((sumx2 - sqr(sumx)/n) *
+//            (sumy2 - sqr(sumy)/n));
+//  }
+//
+//  return 0;
+//}
 

@@ -69,6 +69,7 @@ typedef struct _SndPacket
   // TODO: delete it when statistical analysis is finished
   guint32 dts;
   guint32 qts;
+  gdouble qsample;
   guint32 subflow_skew;
   guint arrival_status;
 

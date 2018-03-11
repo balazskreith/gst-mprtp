@@ -168,14 +168,14 @@ SlidingWindowPlugin* make_swstd(ListenerFunc on_calculated_cb,
                                   gint32          window_size
                           );
 
-void swbuckets_change_bucket_chain_size(SlidingWindowPlugin* plugin,
-    gdouble bucket_chain_increasement);
+void swbuckets_change_thresholds(SlidingWindowPlugin* plugin,
+    gdouble* thresholds);
+
+void swbuckets_get_buckets(SlidingWindowPlugin* plugin, ...);
 
 SlidingWindowPlugin* make_swbuckets(SWDataExtractor extractor,
-    gint* buckets_vector,
-    gint buckets_size,
-    gdouble bucket_chain_increasement,
-    gdouble first_bucket_size);
+    gint buckets_length,
+    gdouble* thresholds);
 
 
 SlidingWindowPlugin* make_swcorr(ListenerFunc on_calculated_cb,

@@ -292,6 +292,30 @@ gint32 slidingwindow_get_counter(SlidingWindow* this){
   return datapuffer_readcapacity(this->items);
 }
 
+typedef struct {
+  gint index;
+  gchar* items;
+  guint item_length;
+}ItemsCopy;
+
+static void _copy_helper(SlidingWindowItem* item, ItemsCopy* items_copy) {
+  memcpy(items_copy->items + items_copy->index, item->data, items_copy->item_length);
+  items_copy->index += items_copy->item_length;
+}
+
+gpointer* slidingwindow_get_items_copy(SlidingWindow* this, gint* length, guint item_length) {
+  gpointer result;
+  ItemsCopy items_copy;
+
+  *length = datapuffer_readcapacity(this->items);
+  result = g_malloc0(item_length * *length);
+  items_copy.item_length = item_length;
+  items_copy.index = 0;
+  items_copy.items = (gchar*)result;
+  datapuffer_iterate(this->items, (DataPufferIterator) _copy_helper, &items_copy);
+  return result;
+}
+
 static void _slidingwindow_obsolate_num_limit(SlidingWindow* this)
 {
   while(datapuffer_isfull(this->items) || this->num_act_limit < datapuffer_readcapacity(this->items)){

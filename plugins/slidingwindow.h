@@ -124,6 +124,7 @@ void slidingwindow_setup_debug(SlidingWindow* this, SlidingWindowItemSprintf spr
 void slidingwindow_set_min_itemnum(SlidingWindow* this, gint min_itemnum);
 void slidingwindow_setup_custom_obsolation(SlidingWindow* this, SlidingWindowObsolateFunc custom_obsolate, gpointer custom_obsolation_udata);
 gint32 slidingwindow_get_counter(SlidingWindow* this);
+gpointer* slidingwindow_get_items_copy(SlidingWindow* this, gint* length, guint item_length);
 void slidingwindow_add_plugin(SlidingWindow* this, SlidingWindowPlugin *plugin);
 void slidingwindow_add_plugins (SlidingWindow* this, ... );
 

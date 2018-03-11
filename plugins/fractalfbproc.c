@@ -83,6 +83,7 @@ static void _print_packet_stat(FRACTaLFBProcessor *this, SndPacket* packet) {
         "End Sequcence,"          // 10
         "Sending Rate,"           // 11
         "Fraction Lost,"          // 12
+        "QSample,"                // 13
         );
 
     g_print("Packet:%s\n",result);
@@ -103,6 +104,7 @@ static void _print_packet_stat(FRACTaLFBProcessor *this, SndPacket* packet) {
           "%6hu,"    // 10
           "%6d,"     // 11
           "%f,"      // 12
+          "%f,"      // 13
           ,
           this->subflow->id,                         // 1
           GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000., // 2
@@ -115,7 +117,8 @@ static void _print_packet_stat(FRACTaLFBProcessor *this, SndPacket* packet) {
           this->cc_begin_seq,                        // 9
           this->cc_end_seq,                          // 10
           _stat(this)->sender_bitrate / 1000,        // 11
-          _stat(this)->fraction_lost                 // 12
+          _stat(this)->fraction_lost,                // 12
+          packet->qsample                            // 13
           );
 
   g_print("Packet:%s\n",result);
@@ -229,7 +232,23 @@ static void _setup_buckets(FRACTaLFBProcessor* this) {
   }
 }
 
+swplugin_define_swselfdoubleextractor(_self_double_extractor, gdouble)
 
+static void _recalculate_thresholds(FRACTaLFBProcessor* this, SndSubflow* subflow) {
+  gdouble* values;
+  gint th_position;
+  gdouble alpha;
+  if (subflow->state != SNDSUBFLOW_STATE_CONGESTED || subflow->id != this->subflow->id) {
+    return;
+  }
+  values = g_malloc0(sizeof(gdouble) * 1000);
+  alpha = (gdouble)MIN(_now(this) - this->last_heavy_th_refresh, 10 * GST_SECOND) / (gdouble) (20 * GST_SECOND);
+  memcpy(values, this->qsamples, sizeof(gdouble) * 1000);
+  th_position = threshold_finder_do(this->thresholdfinder, values, MIN(this->qsamples_index, 1000));
+  _stat(this)->heavy_th = alpha * values[th_position] + (1.-alpha) * _stat(this)->heavy_th;
+  this->last_heavy_th_refresh = _now(this);
+  g_free(values);
+}
 
 FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* subflow, FRACTaLStat *stat)
 {
@@ -250,6 +269,17 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
   this->qdelay_new = make_bucket(3, GST_SECOND);
   this->rate_regressor = make_linear_regressor(32, 0);
   this->queue_regressor = make_linear_regressor(50, 0);
+
+  this->last_heavy_th_refresh = _now(this);
+  {
+    gdouble th = 5.0;
+    this->qdelay_buckets_new = make_swbuckets(_self_double_extractor, 2, &th);
+  }
+  this->qdelay_sw = make_slidingwindow_double(100, GST_SECOND);
+  this->qsamples = g_malloc0(sizeof(gdouble) * 1000);
+  this->thresholdfinder = make_threshold_finder();
+  slidingwindow_add_plugin(this->qdelay_sw, this->qdelay_buckets_new);
+
   _setup_buckets(this);
 
   sndtracker_add_on_packet_sent(this->sndtracker, (ListenerFunc)_on_packet_sent, this);
@@ -268,6 +298,8 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
           NULL);
 
   fractalfbprocessor_set_evaluation_window_margins(this, 0.25 * GST_SECOND, 0.5 * GST_SECOND);
+
+  sndsubflows_add_on_subflow_state_changed_cb(this->subflow->base_db, (ListenerFunc)_recalculate_thresholds, this);
 
   return this;
 }
@@ -356,6 +388,7 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
   }
   _stat(this)->HSN = end_seq;
   this->min_dts += timestamp_generator_get_ts_for_time(this->ts_generator, 5 * GST_MSECOND);
+  this->min_qts += timestamp_generator_get_ts_for_time(this->ts_generator, 1 * GST_MSECOND);
 
   _stat(this)->lost_or_discarded = 0;
   _stat(this)->avg_qd = 0.0;
@@ -407,12 +440,17 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
       if (this->min_dts < dts) {
         qts = _delta_ts(this->min_dts, dts);
       }
+      if (qts < this->min_qts) {
+        this->min_qts = qts;
+      }
 //      g_print("bucket index: %d, qts: %u, min_dts: %u, dts: %u, dts_std: %f \n", bucket_index, qts, this->min_dts, dts, this->qts_std);
       bucket_add_value(this->qdelay_bucket, qts);
       {
         guint32 qts_dist = this->last_qts < qts ? qts - this->last_qts : this->last_qts - qts;
+        guint32 min_qts_dist = this->min_qts < qts ? qts - this->min_qts : this->min_qts - qts;
         this->last_qts = qts;
         this->qts_std = (qts_dist + 31. * this->qts_std) / 32.;
+        this->min_qts_std = (min_qts_dist + 255. * this->min_qts_std) / 256.;
       }
 
       _stat(this)->avg_qd += qts;
@@ -421,6 +459,18 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
 
       packet->dts = dts;
       packet->qts = qts;
+
+      {
+//        gdouble sample = (gdouble)(1 + _stat(this)->lost_or_discarded) /
+//                 (gdouble)(1 + _stat(this)->lost_or_discarded + _stat(this)->arrived_packets)
+//                 * qts;
+//        sample = qts;
+//        this->qsamples[this->qsamples_index++ % 1000] = sample;
+//        packet->qsample = sample;
+        // TODO: a new qdelay stability here
+//        slidingwindow_add_data(this->qdelay_sw, &sample);
+      }
+
       if (0 < this->last_dts) {
         packet->subflow_skew = dts < this->last_dts ? this->last_dts - dts : dts - this->last_dts;
       }
@@ -458,6 +508,8 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
     sample = (gdouble)(1 + _stat(this)->lost_or_discarded) /
              (gdouble)(1 + _stat(this)->lost_or_discarded + _stat(this)->arrived_packets)
              * _stat(this)->avg_qd;
+    // TODO: a new qdelay stability here
+//    slidingwindow_add_data(this->qdelay_sw, &sample);
     this->max_sample = MAX(log(1.+sample), this->max_sample * .98);
     this->max_sr = MAX((1.+sr), this->max_sr * .98);
 //    _stat(this)->qdelay_stability_avg = sample * .01 + _stat(this)->qdelay_stability_stab * .99;
@@ -465,10 +517,10 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
 //    bucket_add_value(this->qdelay_new, sample);
 
 //    linear_regressor_add_samples(this->queue_regressor, sr / this->max_sr, sample / this->max_sample);
-    linear_regressor_add_samples(this->queue_regressor, sr * this->max_sample, log(1 + sample) * this->max_sr);
-    _stat(this)->qdelay_stability_stab = linear_regressor_get_m(this->queue_regressor);
+//    linear_regressor_add_samples(this->queue_regressor, sr * this->max_sample, log(1 + sample) * this->max_sr);
+//    _stat(this)->qdelay_stability_stab = CONSTRAIN(0., 1., linear_regressor_get_m(this->queue_regressor));
 //    _stat(this)->qdelay_stability = 1.-_stat(this)->qdelay_stability_stab;
-    _stat(this)->qdelay_stability_avg = linear_regressor_get_r(this->queue_regressor);
+//    _stat(this)->qdelay_stability_avg = linear_regressor_get_r(this->queue_regressor);
 //    _stat(this)->qdelay_stability_stab = _stat(this)->qdelay_stability_stab * .1 + MAX(0, sample - _stat(this)->qdelay_stability_avg) * .9;
 //    _stat(this)->qdelay_stability_stab = MAX(bucket_get_stability(this->qdelay_new), 0.);
 
@@ -488,7 +540,10 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
 
 //  this->first_bucket_size = MAX(timestamp_generator_get_ts_for_time(this->ts_generator, 10 * GST_MSECOND), this->qts_std * 2);
   {
-    gdouble first_bucket_size = MAX(timestamp_generator_get_ts_for_time(this->ts_generator, 10 * GST_MSECOND), this->qts_std);
+//    gdouble th = MAX(this->qts_std, this->max_sample_th);
+    gdouble th = exp(this->min_qts_std) * this->qts_std;
+//    gdouble th = exp(this->qts_std);
+    gdouble first_bucket_size = MAX(timestamp_generator_get_ts_for_time(this->ts_generator, 10 * GST_MSECOND), th);
     bucket_set_bucket_chain(this->qdelay_bucket, first_bucket_size, 2);
   }
 //  bucket_print(this->qdelay_bucket, "Qdelay");
@@ -516,6 +571,15 @@ void _process_stat(FRACTaLFBProcessor *this)
 //  _stat(this)->measurements_num      = slidingwindow_get_counter(this->reference_sw);
   _stat(this)->sent_packets_in_1s    = sndstat->sent_packets_in_1s;
 
+
+  // TODO: 2
+  {
+    gdouble good, bad;
+    swbuckets_get_buckets(this->qdelay_buckets_new, &good, &bad, NULL);
+    _stat(this)->qdelay_stability_avg = good / (good + bad);
+  }
+
+// TODO 1
   _stat(this)->qdelay_stability = .5 * bucket_get_positive_cosine_similarity(this->qdelay_bucket) +
       .5 * (1. - bucket_get_negative_cosine_similarity(this->qdelay_bucket));
 
@@ -538,12 +602,12 @@ void _process_stat(FRACTaLFBProcessor *this)
     _stat(this)->rr_avg = _stat(this)->receiver_bitrate;
   }
 
-  {
-    gdouble rr_t = _stat(this)->receiver_bitrate;
-    _stat(this)->rr_hat = linear_regressor_predict(this->rate_regressor, _stat(this)->sender_bitrate);
-    _stat(this)->drr = pow((rr_t - _stat(this)->rr_hat) / (rr_t), 2);
-    linear_regressor_add_samples(this->rate_regressor, _stat(this)->sender_bitrate, _stat(this)->receiver_bitrate);
-  }
+//  {
+//    gdouble rr_t = _stat(this)->receiver_bitrate;
+//    _stat(this)->rr_hat = linear_regressor_predict(this->rate_regressor, _stat(this)->sender_bitrate);
+//    _stat(this)->drr = pow((rr_t - _stat(this)->rr_hat) / (rr_t), 2);
+//    linear_regressor_add_samples(this->rate_regressor, _stat(this)->sender_bitrate, _stat(this)->receiver_bitrate);
+//  }
 
   if (0 < sndstat->lost_packets_in_1s) {
     _stat(this)->fraction_lost = (gdouble)sndstat->lost_packets_in_1s / (gdouble) (sndstat->lost_packets_in_1s + sndstat->received_packets_in_1s);
@@ -554,6 +618,8 @@ void _process_stat(FRACTaLFBProcessor *this)
   {
     gint32 drate = (sndstat->sent_bytes_in_1s - sndstat->received_bytes_in_1s) * 8;
     gdouble alpha = this->fb_interval_avg / (gdouble) (200 * GST_MSECOND) * _stat(this)->qdelay_var_stability;
+    _stat(this)->heavy_sample = abs(drate) / (gdouble)(sndstat->received_bytes_in_1s * 8.) * _stat(this)->fraction_lost;
+    this->qsamples[this->qsamples_index++ % 1000] = _stat(this)->heavy_sample;
     alpha = CONSTRAIN(.1, .5, alpha);
     _stat(this)->drate_avg = drate * alpha + _stat(this)->drate_avg * (1.-alpha);
   }
@@ -591,6 +657,8 @@ static void _refresh_windows_thresholds(FRACTaLFBProcessor *this) {
   bucket_set_window_size(this->qdelay_bucket, ewi_in_ns);
 
   bucket_set_window_size(this->qdelay_new, ewi_in_ns);
+
+  slidingwindow_set_threshold(this->qdelay_sw, ewi_in_ns);
 
   slidingwindow_set_threshold(this->ewi_sw, ewi_in_ns);
 }

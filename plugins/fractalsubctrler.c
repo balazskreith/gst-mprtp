@@ -540,8 +540,8 @@ static void _stat_print(FRACTaLSubController *this)
           _stat(this)->qd_min,                       // 29
           _stat(this)->qd_max,                       // 30
           _stat(this)->arrived_packets,              // 31
-          _stat(this)->qdelay_stability_stab,         // 32
-          _stat(this)->qdelay_stability_avg        // 33
+          _stat(this)->heavy_th,         // 32
+          _stat(this)->heavy_sample        // 33
           );
 
   g_print("Stat:%s\n",result);
@@ -687,8 +687,10 @@ static gboolean _congestion(FRACTaLSubController *this)
 //    return _stat(this)->FL_th < _stat(this)->fraction_lost;
 //  }
 //  this->FL_th = _stat(this)->FL_th + MIN(_stat(this)->fraction_lost_avg, .1) *  (1.-alpha);
-  this->FL_th = _stat(this)->FL_th + this->tcp_flow_presented * .05;
+//  this->FL_th = _stat(this)->FL_th + this->tcp_flow_presented * .05;
+  this->FL_th = MIN(.05, _stat(this)->fraction_lost_avg) + _stat(this)->FL_th;
   return this->FL_th < _stat(this)->fraction_lost;
+//  return  _stat(this)->heavy_th < _stat(this)->heavy_sample;
 }
 
 static void _undershoot(FRACTaLSubController *this, gint32 turning_point) {
@@ -1266,4 +1268,5 @@ void _increase_helper(FRACTaLSubController *this) {
 void _check_tcp(FRACTaLSubController *this){
   gdouble alpha = 1. - MIN(pow((_tcp_lost_threshold(this) - _stat(this)->fraction_lost_avg) / _tcp_lost_threshold(this), 2.), 1.);
   this->tcp_flow_presented = alpha * (1.-_stat(this)->qdelay_var_stability);
+//  this->tcp_flow_presented = 0.;
 }

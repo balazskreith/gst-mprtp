@@ -18,6 +18,7 @@
 #include "correlator.h"
 #include "bucket.h"
 #include "linreger.h"
+#include "thresholdfinder.h"
 
 
 typedef struct _FRACTaLFBProcessor FRACTaLFBProcessor;
@@ -75,12 +76,14 @@ typedef struct _FRACTaLStat
   gdouble                  qdelay_var_stability;
   gdouble                  drate_avg;
 
+  gdouble heavy_sample;
+
 
   gdouble avg_qd;
   gint qd_min, qd_max;
   gint lost_or_discarded;
   gint arrived_packets;
-  gdouble qdelay_stability_stab,qdelay_stability_avg;
+  gdouble heavy_th,qdelay_stability_avg;
 
 
 }FRACTaLStat;
@@ -98,6 +101,7 @@ struct _FRACTaLFBProcessor
   guint32                  min_ewi_in_ts;
   guint32                  max_ewi_in_ts;
   guint32                  min_dts;
+  guint32                  min_qts;
   guint32                  rtt_in_ts;
 
   GstClockTime             dts;
@@ -115,7 +119,7 @@ struct _FRACTaLFBProcessor
   guint16                  HSN;
 
   guint32                  srtt_in_ts;
-  gdouble                  qts_std;
+  gdouble                  qts_std, min_qts_std;
   gdouble                  last_qts;
   Bucket*                  qdelay_bucket;
   Bucket*                  qdelay_devs;
@@ -130,6 +134,15 @@ struct _FRACTaLFBProcessor
   guint16 cc_begin_seq, cc_end_seq;
 
   LinearRegressor* rate_regressor;
+
+
+  SlidingWindow* qdelay_sw;
+  gdouble* qsamples;
+  gdouble max_sample_th;
+  gint qsamples_index;
+  ThresholdFinder* thresholdfinder;
+  SlidingWindowPlugin* qdelay_buckets_new;
+  GstClockTime last_heavy_th_refresh;
 //  gdouble sr_history[32];
 //  gdouble rr_history[32];
 //  guint history_index;

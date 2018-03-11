@@ -173,6 +173,7 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-bintree.lo \
 	libgstmprtp_la-sndtracker.lo libgstmprtp_la-sndpackets.lo \
 	libgstmprtp_la-streamjoiner.lo \
 	libgstmprtp_la-streamsplitter.lo \
+	libgstmprtp_la-thresholdfinder.lo \
 	libgstmprtp_la-timestampgenerator.lo \
 	libgstmprtp_la-swperctester.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
@@ -461,6 +462,7 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          sndpackets.c          \
                          streamjoiner.c        \
                          streamsplitter.c      \
+                         thresholdfinder.c     \
                          timestampgenerator.c  \
                          swperctester.c
 
@@ -500,6 +502,7 @@ noinst_HEADERS = bintree.h             \
                  sndtracker.h          \
                  streamjoiner.h        \
                  streamsplitter.h      \
+                 thresholdfinder.h     \
                  timestampgenerator.h  \
                  swperctester.h 
 
@@ -642,6 +645,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-streamjoiner.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-streamsplitter.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-swperctester.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-thresholdfinder.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-timestampgenerator.Plo@am__quote@
 
 .c.o:
@@ -958,6 +962,13 @@ libgstmprtp_la-streamsplitter.lo: streamsplitter.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='streamsplitter.c' object='libgstmprtp_la-streamsplitter.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-streamsplitter.lo `test -f 'streamsplitter.c' || echo '$(srcdir)/'`streamsplitter.c
+
+libgstmprtp_la-thresholdfinder.lo: thresholdfinder.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-thresholdfinder.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-thresholdfinder.Tpo -c -o libgstmprtp_la-thresholdfinder.lo `test -f 'thresholdfinder.c' || echo '$(srcdir)/'`thresholdfinder.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-thresholdfinder.Tpo $(DEPDIR)/libgstmprtp_la-thresholdfinder.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='thresholdfinder.c' object='libgstmprtp_la-thresholdfinder.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-thresholdfinder.lo `test -f 'thresholdfinder.c' || echo '$(srcdir)/'`thresholdfinder.c
 
 libgstmprtp_la-timestampgenerator.lo: timestampgenerator.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-timestampgenerator.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-timestampgenerator.Tpo -c -o libgstmprtp_la-timestampgenerator.lo `test -f 'timestampgenerator.c' || echo '$(srcdir)/'`timestampgenerator.c

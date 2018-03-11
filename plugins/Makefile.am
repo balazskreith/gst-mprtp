@@ -43,6 +43,7 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          sndpackets.c          \
                          streamjoiner.c        \
                          streamsplitter.c      \
+                         thresholdfinder.c     \
                          timestampgenerator.c  \
                          swperctester.c
                     
@@ -83,6 +84,7 @@ noinst_HEADERS = bintree.h             \
                  sndtracker.h          \
                  streamjoiner.h        \
                  streamsplitter.h      \
+                 thresholdfinder.h     \
                  timestampgenerator.h  \
                  swperctester.h 
 

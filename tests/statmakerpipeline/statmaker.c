@@ -1816,6 +1816,45 @@ static void _write_accumulated_lr(gchar* snd_packets_path, gchar* rcv_packets_pa
   _dispose_mapper(paired_packets_unrefer);
 }
 
+
+
+static void _sprintf_tracked_packets_for_lots_num(gchar* result, TrackedPackets* tracked_packets) {
+  sprintf(result, "%d", tracked_packets->lost_num);
+}
+
+
+static void _write_accumulated_lrn(gchar* snd_packets_path, gchar* rcv_packets_path, gchar* output_path) {
+
+  //Construction
+  TrackedPackets tracked_packets = {0,0,0,0};
+  RTPPacketsMerger* rtp_packets_merger = _make_rtp_packets_merger(snd_packets_path, rcv_packets_path);
+  Reducer* rcv_packets_reducer = _make_reducer(_tracking_rcved_packets, &tracked_packets);
+  Reducer* lost_packets_reducer = _make_reducer(_tracking_lost_packets, &tracked_packets);
+  Mapper* paired_packets_unrefer = _make_mapper(_paired_packets_unref);
+  FileWriter* writer = _make_writer(output_path, _sprintf_tracked_packets_for_lots_num);
+
+  //Connection
+  _pushconnect_cmp(rtp_packets_merger, RTP_PACKETS_MERGER_OUTPUT, rcv_packets_reducer, _reducer_process);
+  _pushconnect_cmp(rtp_packets_merger, RTP_PACKETS_MERGER_TRASH_OUTPUT, lost_packets_reducer, _reducer_process);
+  _pushconnect_cmp(rcv_packets_reducer, REDUCER_DATA_OUTPUT, paired_packets_unrefer, _mapper_process);
+  _pushconnect_cmp(rcv_packets_reducer, REDUCER_RESULT_OUTPUT, writer, _file_writer_process);
+
+  //Event handlers
+  _merger_add_on_input_x_flushed_handler(rtp_packets_merger->merger, &tracked_packets, _on_inputs_flushed_for_lr);
+  _merger_add_on_input_y_flushed_handler(rtp_packets_merger->merger, &tracked_packets, _on_inputs_flushed_for_lr);
+
+  //Start
+  _rtp_packets_merger_start_and_join(rtp_packets_merger);
+
+  //Dispose
+  _dispose_rtp_packets_merger(rtp_packets_merger);
+  _dispose_writer(writer);
+  _dispose_reducer(lost_packets_reducer);
+  _dispose_reducer(rcv_packets_reducer);
+
+  _dispose_mapper(paired_packets_unrefer);
+}
+
 typedef struct {
   gboolean added_init;
   gboolean removed_init;
@@ -2393,6 +2432,7 @@ int main (int argc, char **argv)
     g_print("fec_avg fec_packets - calculates the average fec rate for packets\n");
     g_print("tcprate tcpdump - calculates the tcp sending rates for tcpdump\n");
     g_print("lr snd_packets rcv_packets - calculates the loss rate for packets\n");
+    g_print("lrn snd_packets rcv_packets - calculates the lost number of packets\n");
     g_print("lp ply_packets - calculates the loss rate for packets in 100ms time resolution\n");
     g_print("ffre fec_packets snd_packets rcv_packets ply_packets - calculates the ffre\n");
     g_print("tfs snd_packets tcpdump - calculates traffic fair share\n");
@@ -2412,6 +2452,8 @@ int main (int argc, char **argv)
     _write_qmd(argv[3], argv[4], argv[1]);
   }else if(strcmp(argv[2], "lr") == 0) {
     _write_accumulated_lr(argv[3], argv[4], argv[1]);
+  }else if(strcmp(argv[2], "lrn") == 0) {
+    _write_accumulated_lrn(argv[3], argv[4], argv[1]);
   }else if(strcmp(argv[2], "ffre") == 0) {
     _write_ffre(argv[3], argv[4], argv[5], argv[6], argv[1]);
   }else if(strcmp(argv[2], "gp") == 0) {

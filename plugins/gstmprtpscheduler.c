@@ -385,8 +385,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
 
-  sndsubflows_add_on_target_bitrate_changed_cb(this->subflows,
-      (ListenerFunc) stream_splitter_on_subflow_target_bitrate_chaned,
+  sndsubflows_add_on_desired_bitrate_changed_cb(this->subflows,
+      (ListenerFunc) stream_splitter_on_subflow_desired_target_chaned,
       this->splitter);
 
   sndsubflows_add_on_stable_target_bitrate_changed_cb(this->subflows,
@@ -425,7 +425,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
      (ListenerFunc) sndqueue_on_subflow_detached,
      this->sndqueue);
 
-  sndsubflows_add_on_target_bitrate_changed_cb(this->subflows,
+  sndsubflows_add_on_desired_bitrate_changed_cb(this->subflows,
      (ListenerFunc) sndqueue_on_subflow_target_bitrate_changed,
      this->sndqueue);
 

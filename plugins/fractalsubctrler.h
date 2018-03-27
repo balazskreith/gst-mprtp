@@ -46,7 +46,7 @@ struct _FRACTaLSubController
 
   gint32                    target_bitrate;
   gint32                    tracked_target;
-  gint32                    set_target;
+  gint32                    desired_target;
 
   gdouble                   tcp_flow_presented;
 
@@ -66,6 +66,7 @@ struct _FRACTaLSubController
   gboolean                  set_border_packet;
 
   guint                     monitoring_interval;
+  guint                     prev_monitoring_interval;
   gint32                    monitoring_target_bitrate;
   GstClockTime              monitoring_started;
   GstClockTime              monitoring_approvement_started;

@@ -39,7 +39,7 @@ struct _StreamSplitter
   SndQueue*            sndqueue;
 
   volatile gint32      stable_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  volatile gint32      set_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32      desired_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   guint8               max_state;
   gboolean             keyframe_filtering;
   gint32               total_target;
@@ -99,7 +99,7 @@ stream_splitter_on_subflow_stable_target_bitrate_chaned(
     SndSubflow* subflow);
 
 void
-stream_splitter_on_subflow_target_bitrate_chaned(
+stream_splitter_on_subflow_desired_target_chaned(
     StreamSplitter* this,
     SndSubflow* subflow);
 

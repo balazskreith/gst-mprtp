@@ -437,7 +437,7 @@ static void _update_sndsubflow(gpointer item, gpointer udata)
   MPRTPSubflowUtilizationSignal *subflowdata;
 
   subflowdata = &signaldata->subflow[subflow->id];
-  subflowdata->target_bitrate = subflow->target_bitrate;
+  subflowdata->target_bitrate = subflow->desired_target;
 //  g_print("Subflow %d target: %d\n", subflow->id, subflow->target_bitrate / 1000);
 }
 

@@ -126,10 +126,13 @@ class Plotter:
                 sr_plot.append(line)
 
             if tcpstat_csv is not None:
-                sr_plot.append('\t\'' + tcpstat_csv + \
+                line = 'plot' if sr_plot_written is False else '\t'
+                line += '\t\'' + tcpstat_csv + \
                                '\' using ($0*0.1):(($1+$2)/125) with point pointtype 7 ps 0.3 lc rgb "' + \
                                next(colors) + '" title "' + title + '"' + \
-                               (", \\" if last_one is False or plot_bandwidth is True else ""))
+                               (", \\" if last_one is False or plot_bandwidth is True else "")
+                sr_plot_written = True
+                sr_plot.append(line)
 
             if last_one and plot_bandwidth:
                 sr_plot.append(

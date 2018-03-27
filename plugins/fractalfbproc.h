@@ -76,15 +76,10 @@ typedef struct _FRACTaLStat
   gdouble                  qdelay_var_stability;
   gdouble                  drate_avg;
 
-  gdouble heavy_sample;
-
-
   gdouble avg_qd;
   gint qd_min, qd_max;
   gint lost_or_discarded;
   gint arrived_packets;
-  gdouble heavy_th,qdelay_stability_avg;
-
 
 }FRACTaLStat;
 
@@ -123,31 +118,11 @@ struct _FRACTaLFBProcessor
   gdouble                  last_qts;
   Bucket*                  qdelay_bucket;
   Bucket*                  qdelay_devs;
-  Bucket*                  qdelay_new;
 
   guint32                  last_dts;
   gdouble                  fb_interval_avg;
 
-  LinearRegressor*         queue_regressor;
-  gdouble max_sr, max_sample;
-
   guint16 cc_begin_seq, cc_end_seq;
-
-  LinearRegressor* rate_regressor;
-
-
-  SlidingWindow* qdelay_sw;
-  gdouble* qsamples;
-  gdouble max_sample_th;
-  gint qsamples_index;
-  ThresholdFinder* thresholdfinder;
-  SlidingWindowPlugin* qdelay_buckets_new;
-  GstClockTime last_heavy_th_refresh;
-//  gdouble sr_history[32];
-//  gdouble rr_history[32];
-//  guint history_index;
-//  gdouble b,m,r;
-
 
 };
 

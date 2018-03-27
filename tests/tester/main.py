@@ -11,6 +11,7 @@ import argparse
 from plotter import *
 import threading
 
+
 class Tester:
     def __init__(self):
         signal.signal(signal.SIGINT, self.on_exit_signal)
@@ -46,13 +47,15 @@ class Tester:
 
     def setup(self, algorithm, type, params):
         self.__target_dir = params.target
-        self.__test = self.__make_test(type, algorithm, params.latency, params.jitter, params.source, params.sink, params.subflows_num)
+        tcp_flag = False if params.tcp < 1 else True
+        self.__test = self.__make_test(type, algorithm, params.latency, params.jitter, params.source, params.sink,
+                                       params.subflows_num, tcp_flag)
 
         self.__test_ctrler = TestCtrlerBuilder.make(self.__test)
         self.__duration = self.__test.duration + self.__test_ctrler.get_max_source_to_sink_delay() + 2
 
     def start(self):
-        subprocess.call("./statsrelayer.out -d &", shell = True)
+        subprocess.call("./statsrelayer.out -d &", shell=True)
         sleep(1)
         self.__end = False
         self.__timeout = self.__duration + 60
@@ -82,67 +85,64 @@ class Tester:
         print(self.__test.get_descriptions())
         self.__end = True
 
-
-
-
-    def __make_test(self, type, algorithm, latencies, jitters, source_type, sink_type, subflows_num):
+    def __make_test(self, type, algorithm, latencies, jitters, source_type, sink_type, subflows_num, tcp_flag):
         result = None
         if (type == "rmcat1"):
             result = RMCAT1(
-              algorithm = algorithm,
-              latency=latencies[0],
-              jitter=jitters[0],
-              source_type=source_type,
-              sink_type=sink_type
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type
             )
         elif (type == "rmcat2"):
             result = RMCAT2(
-              algorithm = algorithm,
-              latency=latencies[0],
-              jitter=jitters[0],
-              source_type=source_type,
-              sink_type=sink_type
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type
             )
         elif (type == "rmcat3"):
             result = RMCAT3(
-              algorithm = algorithm,
-              latency=latencies[0],
-              jitter=jitters[0],
-              source_type=source_type,
-              sink_type=sink_type
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type
             )
         elif (type == "rmcat4"):
             result = RMCAT4(
-              algorithm = algorithm,
-              latency=latencies[0],
-              jitter=jitters[0],
-              source_type=source_type,
-              sink_type=sink_type
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type
             )
         elif (type == "rmcat6"):
             result = RMCAT6(
-              algorithm = algorithm,
-              latency=latencies[0],
-              jitter=jitters[0],
-              source_type=source_type,
-              sink_type=sink_type
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type
             )
         elif (type == "rmcat7"):
             result = RMCAT7(
-              algorithm = algorithm,
-              latency=latencies[0],
-              jitter=jitters[0],
-              source_type=source_type,
-              sink_type=sink_type
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type
             )
         elif (type == "mprtp1"):
             result = MPRTP1(
-              algorithm = algorithm,
-              latency=latencies[0],
-              jitter=jitters[0],
-              source_type=source_type,
-              sink_type=sink_type,
-              subflows_num=subflows_num
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type,
+                subflows_num=subflows_num
             )
         elif (type == "mprtp2"):
             result = MPRTP2(
@@ -171,16 +171,30 @@ class Tester:
                 sink_type=sink_type,
                 subflows_num=subflows_num
             )
+        elif (type == "mprtp5"):
+            result = MPRTP5(
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type,
+                subflows_num=subflows_num,
+                tcp=tcp_flag
+            )
         else:
             raise ValueError("Unknown value: " + type)
         return result
 
+
 parser = argparse.ArgumentParser()
-parser.add_argument("types", help="The latency of the path", choices=['rmcat1', 'rmcat2', 'rmcat3', 'rmcat4', 'rmcat5', 'rmcat6', 'rmcat7',
-    'mprtp1', 'mprtp2', 'mprtp3', 'mprtp4', 'mprtp5', 'mprtp6', 'mprtp7'], nargs='+')
-parser.add_argument("-l", "--latency", help="The latency of the path", type=int, nargs='+', choices=[50, 100, 150, 300], default=[50])
+parser.add_argument("types", help="The latency of the path",
+                    choices=['rmcat1', 'rmcat2', 'rmcat3', 'rmcat4', 'rmcat5', 'rmcat6', 'rmcat7',
+                             'mprtp1', 'mprtp2', 'mprtp3', 'mprtp4', 'mprtp5', 'mprtp6', 'mprtp7'], nargs='+')
+parser.add_argument("-l", "--latency", help="The latency of the path", type=int, nargs='+', choices=[50, 100, 150, 300],
+                    default=[50])
 parser.add_argument("-j", "--jitter", help="The jitter for the test", type=int, nargs='+', default=[0])
-parser.add_argument("-a", "--algorithm", help="The algorithm for the test", default="FRACTaL", choices=["FRACTaL", "SCReAM"])
+parser.add_argument("-a", "--algorithm", help="The algorithm for the test", default="FRACTaL",
+                    choices=["FRACTaL", "SCReAM"])
 parser.add_argument("-r", "--runs", help="The runtimes", type=int, default=1)
 parser.add_argument("-t", "--target", help="The target directory", default="temp/")
 # default_video = "FILE:Kristen.yuv:1:1280:720:2:60/1"
@@ -191,6 +205,8 @@ default_video = "FILE:Kristen_1024.yuv:1:1024:576:2:60/1"
 parser.add_argument("-s", "--source", help="The source type format", default=default_video)
 parser.add_argument("-i", "--sink", help="The sink type format", default="FAKESINK")
 parser.add_argument("-u", "--subflows_num", help="The number of subflows we want", default=2, type=int)
+parser.add_argument("--tcp", help="TCP Indicator", default=0, type=int)
+
 args = parser.parse_args()
 
 root = logging.getLogger()
@@ -205,10 +221,22 @@ algorithm = Algorithms.FRACTaL
 if (args.algorithm == "SCReAM"):
     algorithm = Algorithms.SCReAM
 
-print('Run test %s, algorithm: %s by %d times with [%s] path latency and jitter [%s] on %d subflows' %
-      (args.types, str(algorithm.name), args.runs, ", ".join(map(str, args.latency)), ", ".join(map(str, args.jitter)), args.subflows_num))
+print('Run test %s, algorithm: %s by %d times with [%s] path latency and jitter [%s] on %d subflows and TCP flag is %d' %
+      (args.types, str(algorithm.name), args.runs, ", ".join(map(str, args.latency)), ", ".join(map(str, args.jitter)),
+       args.subflows_num, args.tcp))
+
+import string
+import random
+
+
+def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
+    return ''.join(random.choice(chars) for _ in range(size))
+
+
+running_id = id_generator()
 
 from shutil import move
+
 moving = 1 < args.runs or 1 < len(args.types)
 for type_ in args.types:
     for run in range(args.runs):
@@ -221,14 +249,15 @@ for type_ in args.types:
 
         if moving is False:
             continue
-        dirname = 'temp_super/' + type_ + '/' +\
-                   '_'.join([
-                           args.algorithm,
-                           str(run).lower(),
-                           '_'.join(list(map(lambda x: str(x) + "ms", args.latency))),
-                           '_'.join(list(map(lambda x: str(x) + "ms", args.jitter))),
-                            str(args.subflows_num),
-                           ])
+        dirname = 'temp_super/' + type_ + '/' + \
+                  '_'.join([
+                      args.algorithm,
+                      running_id,
+                      str(run).lower(),
+                      '_'.join(list(map(lambda x: str(x) + "ms", args.latency))),
+                      '_'.join(list(map(lambda x: str(x) + "ms", args.jitter))),
+                      str(args.subflows_num),
+                  ])
         if not os.path.isdir(dirname):
             os.makedirs(dirname)
         else:
@@ -238,7 +267,7 @@ for type_ in args.types:
                 try:
                     if os.path.isfile(file_path):
                         os.unlink(file_path)
-                    #elif os.path.isdir(file_path): shutil.rmtree(file_path)
+                        # elif os.path.isdir(file_path): shutil.rmtree(file_path)
                 except Exception as e:
                     print(e)
         folder = 'temp'
@@ -250,5 +279,4 @@ for type_ in args.types:
                     print("Move ", file_path, "under", dirname)
             except Exception as e:
                 print(e)
-        # move('temp/*', dirname)
-
+                # move('temp/*', dirname)

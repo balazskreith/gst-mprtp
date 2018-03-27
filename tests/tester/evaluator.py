@@ -99,11 +99,13 @@ class Evaluator:
 
                 if ply_flowlog:
                     execute("lr", snd_flowlog, ply_flowlog)
+                    execute("lrn", snd_flowlog, ply_flowlog)
                     execute("nlf", snd_flowlog, ply_flowlog)
 
             if ply_flowlog:
                 execute("gp_avg", snd_flowlog, ply_flowlog)
                 execute("lr", snd_flowlog, ply_flowlog)
+                execute("lrn", snd_flowlog, ply_flowlog)
                 execute("nlf", snd_flowlog, ply_flowlog)
 
     def __save_sources(self, source_files):

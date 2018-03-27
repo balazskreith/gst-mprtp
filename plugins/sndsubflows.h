@@ -48,7 +48,7 @@ typedef struct _SndSubflow
   gboolean                   congested;
   gboolean                   active;
 
-  gint32                     target_bitrate;
+  gint32                     desired_target;
   guint32                    packet_counter_for_fec;
 
   guint32                    total_sent_packets_num;
@@ -95,7 +95,7 @@ struct _SndSubflows
   Notifier*            on_subflow_joined;
   Notifier*            on_congestion_controlling_type_changed;
   Notifier*            on_path_active_changed;
-  Notifier*            on_target_bitrate_changed;
+  Notifier*            on_desired_bitrate_changed;
   Notifier*            on_stable_target_bitrate_changed;
   Notifier*            on_subflow_state_changed;
   Notifier*            on_subflow_state_stat_changed;
@@ -124,7 +124,7 @@ GSList* sndsubflows_get_subflows(SndSubflows* this);
 void sndsubflows_iterate(SndSubflows* this, GFunc process, gpointer udata);
 
 void sndsubflow_monitoring_request(SndSubflow* subflow);
-void sndsubflow_set_target_rate(SndSubflow* subflow, gint32 target_rate);
+void sndsubflow_set_desired_bitrate(SndSubflow* subflow, gint32 target_rate);
 void sndsubflow_set_stable_target_rate(SndSubflow* subflow, gint32 target_rate);
 void sndsubflow_set_rtt(SndSubflow* subflow, GstClockTime rtt);
 void sndsubflow_set_eqd(SndSubflow* subflow, gint32 eqd);
@@ -151,7 +151,7 @@ void sndsubflows_add_on_subflow_state_changed_cb(SndSubflows* this, ListenerFunc
 void sndsubflows_add_on_subflow_state_stat_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
-void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
+void sndsubflows_add_on_desired_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_stable_target_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 //------------------------------------------------------------------------------------------------
 void sndsubflow_set_state(SndSubflow* this, SndSubflowState state);

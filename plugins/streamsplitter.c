@@ -68,7 +68,7 @@ static void _print_ratios(StreamSplitter *this){
     SndSubflow* subflow = it->data;
     g_print("%d: %f-%f | ",
         subflow->id,
-        (gdouble)subflow->target_bitrate / (gdouble)this->total_stable_target,
+        (gdouble)subflow->desired_target / (gdouble)this->total_stable_target,
 //        (gdouble) this->stable_targets[subflow->id] / 1000,
         (gdouble)_qstat(this)->actual_bitrates[subflow->id] / (gdouble)_qstat(this)->total_bitrate
         );
@@ -168,18 +168,23 @@ stream_splitter_on_packet_obsolated(StreamSplitter* this, SndPacket* packet)
 }
 
 void
+stream_splitter_on_subflow_state_reported(StreamSplitter* this, SndSubflow* subflow) {
+  // Here we calculate everything related to coupled congestion control.
+}
+
+void
 stream_splitter_on_subflow_stable_target_bitrate_chaned(StreamSplitter* this, SndSubflow* subflow) {
   this->total_stable_target -= this->stable_targets[subflow->id];
-  this->stable_targets[subflow->id] = subflow->target_bitrate;
+  this->stable_targets[subflow->id] = subflow->desired_target;
   this->total_stable_target += this->stable_targets[subflow->id];
 }
 
 void
-stream_splitter_on_subflow_target_bitrate_chaned(StreamSplitter* this, SndSubflow* subflow)
+stream_splitter_on_subflow_desired_target_chaned(StreamSplitter* this, SndSubflow* subflow)
 {
-  this->total_target -= this->set_targets[subflow->id];
-  this->set_targets[subflow->id] = subflow->target_bitrate;
-  this->total_target += this->set_targets[subflow->id];
+  this->total_target -= this->desired_targets[subflow->id];
+  this->desired_targets[subflow->id] = subflow->desired_target;
+  this->total_target += this->desired_targets[subflow->id];
 }
 
 void
@@ -229,9 +234,9 @@ SndSubflow* _select_next_subflow(StreamSplitter * this, SndPacket *packet) {
       subflow = it->data;
       drate = _qstat(this)->actual_bitrates[subflow->id] + _qstat(this)->queued_bytes[subflow->id] * 8;
       if (0 < this->stable_targets[subflow->id]) {
-        drate -= this->stable_targets[subflow->id] * (1.-this->target_off) + this->set_targets[subflow->id] * this->target_off;
+        drate -= this->stable_targets[subflow->id] * (1.-this->target_off) + this->desired_targets[subflow->id] * this->target_off;
       } else {
-        drate -= this->set_targets[subflow->id];
+        drate -= this->desired_targets[subflow->id];
       }
 
       if(!subflow->active){

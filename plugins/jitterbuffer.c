@@ -189,6 +189,7 @@ gboolean jitterbuffer_is_packet_discarded(JitterBuffer* this, RcvPacket* packet)
 
 void jitterbuffer_push_packet(JitterBuffer *this, RcvPacket* packet)
 {
+  packet = rcvpacket_ref(packet);
   g_queue_insert_sorted(this->playoutq, packet, (GCompareDataFunc) _cmp_rcvpacket_abs_seq, NULL);
 }
 
@@ -231,6 +232,9 @@ RcvPacket* jitterbuffer_pop_packet(JitterBuffer *this)
   }
   this->last_seq = packet->abs_seq;
 done:
+  if (packet) {
+    rcvpacket_unref(packet);
+  }
   return packet;
 }
 

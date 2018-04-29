@@ -61,21 +61,21 @@ Source* make_source(SourceParams *params, SinkParams* sink_params)
   );
 
   if(sink_params){
-        GstElement* tee     = gst_element_factory_make("tee", NULL);
-        GstElement* q1      = gst_element_factory_make("queue", NULL);
-        GstElement* q2      = gst_element_factory_make("queue", NULL);
-        Sink*       sink    = make_sink(sink_params);
+      GstElement* tee     = gst_element_factory_make("tee", NULL);
+      GstElement* q1      = gst_element_factory_make("queue", NULL);
+      GstElement* q2      = gst_element_factory_make("queue", NULL);
+      Sink*       sink    = make_sink(sink_params);
 
-        objects_holder_add(this->objects_holder, sink, (GDestroyNotify)sink_dtor);
+      objects_holder_add(this->objects_holder, sink, (GDestroyNotify)sink_dtor);
 
-        gst_bin_add_many(sourceBin, tee, q1, q2, sink->element, NULL);
+      gst_bin_add_many(sourceBin, tee, q1, q2, sink->element, NULL);
 
-        gst_element_link(source, tee);
-        gst_element_link_pads(tee, "src_1", q1, "sink");
-        src = q1;
+      gst_element_link(source, tee);
+      gst_element_link_pads(tee, "src_1", q1, "sink");
+      src = q1;
 
-        gst_element_link_pads(tee, "src_2", q2, "sink");
-        gst_element_link_many(q2, sink->element, NULL);
+      gst_element_link_pads(tee, "src_2", q2, "sink");
+      gst_element_link_many(q2, sink->element, NULL);
     }
 
   setup_ghost_src(src,  sourceBin);
@@ -117,15 +117,69 @@ static void _on_playing(GstPipeline *readerPipe, gpointer user_data)
   gst_element_set_state (GST_ELEMENT (readerPipe), GST_STATE_PLAYING);
 }
 
-static void _on_destroy(GstPipeline *readerPipe, gpointer user_data)
+static void _on_destroy_readerpipeline(GstPipeline *readerPipe, gpointer user_data)
 {
   g_print("Livefile source called to destroy\n");
   gst_element_set_state (GST_ELEMENT (readerPipe), GST_STATE_NULL);
   gst_object_unref (readerPipe);
 }
 
+static gboolean _push_frames(gpointer user_data) {
+  Source* this = user_data;
+  GstBuffer* buffer = g_queue_pop_head(this->livesource.buffers);
+  GstFlowReturn result = gst_app_src_push_buffer (GST_APP_SRC (this->livesource.appsrc), gst_buffer_ref(buffer));
+  g_queue_push_tail(this->livesource.buffers, gst_buffer_ref(buffer));
+  return result == GST_FLOW_OK;
+}
 
-static GstFlowReturn _on_new_sample_from_sink (GstElement * sink, GstElement* source)
+static void _on_destroy_frames_pusher(GstPipeline *readerPipe, gpointer user_data)
+{
+//  Source* this = user_data;
+
+}
+
+static gboolean
+_readerpipe_bus_callback (GstBus *bus,
+         GstMessage *message,
+         gpointer    data)
+{
+  Source* this = data;
+  gint message_type = GST_MESSAGE_TYPE (message);
+
+  if (message_type != GST_MESSAGE_EOS) {
+    if (message_type == GST_MESSAGE_ERROR) {
+      GError *err;
+      gchar *debug;
+      gst_message_parse_error (message, &err, &debug);
+      g_print ("Error: %s\n", err->message);
+      g_error_free (err);
+      g_free (debug);
+    }
+    /* we want to be notified again the next time there is a message
+     * on the bus, so returning TRUE (FALSE means we want to stop watching
+     * for messages on the bus and our callback should not be called again)
+     */
+    return TRUE;
+  }
+
+  // Print information about the queue
+  g_print("The file has been read. Number of frames read: %d, Source frequency from now: %d, The collected bytes: %d\n",
+      g_queue_get_length(this->livesource.buffers),
+      this->livesource.interval_in_ms,
+      this->livesource.cached_bytes);
+
+  _on_destroy_readerpipeline(this->livesource.readerPipe, NULL);
+  g_queue_pop_tail(this->livesource.buffers);
+
+  this->on_destroy.subscriber_obj  = this;
+  this->on_destroy.subscriber_func = (subscriber) _on_destroy_frames_pusher;
+
+  g_timeout_add(this->livesource.interval_in_ms, _push_frames, this);
+  // we destroy readerpipeline and stop receiving messages
+  return FALSE;
+}
+
+static GstFlowReturn _on_new_sample_from_sink (GstElement * sink, Source* this)
 {
   GstSample *sample;
   GstFlowReturn result;
@@ -133,9 +187,10 @@ static GstFlowReturn _on_new_sample_from_sink (GstElement * sink, GstElement* so
 
   sample = gst_app_sink_pull_sample (GST_APP_SINK (sink));
   buffer = gst_sample_get_buffer(sample);
-  result = gst_app_src_push_buffer (GST_APP_SRC (source), gst_buffer_ref(buffer));
+  g_queue_push_tail(this->livesource.buffers, gst_buffer_ref(buffer));
+  result = gst_app_src_push_buffer (GST_APP_SRC (this->livesource.appsrc), gst_buffer_ref(buffer));
   gst_sample_unref (sample);
-
+  this->livesource.cached_bytes += gst_buffer_get_size(buffer);
   return result;
 }
 
@@ -143,13 +198,18 @@ GstElement* _make_file_source(Source* this, SourceParams *params)
 {
   GstPipeline* readerPipe      = gst_pipeline_new(NULL);
   GstBin* sourceBin            = gst_bin_new(NULL);
-  GstElement* multifilesrc     = gst_element_factory_make ("multifilesrc", NULL);
+//  GstElement* multifilesrc     = gst_element_factory_make ("multifilesrc", NULL);
+  GstElement* multifilesrc     = gst_element_factory_make ("filesrc", NULL);
   GstElement* sink_videoparse  = gst_element_factory_make ("videoparse", NULL);
   GstElement* src_videoparse   = gst_element_factory_make ("videoparse", NULL);
   GstElement* autovideoconvert = gst_element_factory_make ("autovideoconvert", NULL);
 
   GstElement* appsink    = gst_element_factory_make ("appsink", NULL);
-  GstElement *appsrc     = gst_element_factory_make ("appsrc", NULL);
+  GstElement* appsrc = gst_element_factory_make ("appsrc", NULL);
+
+  this->livesource.appsrc = appsrc;
+  this->livesource.buffers = g_queue_new();
+  this->livesource.readerPipe = readerPipe;
 
   gst_bin_add_many(GST_BIN(readerPipe),
 
@@ -163,7 +223,7 @@ GstElement* _make_file_source(Source* this, SourceParams *params)
 
   g_object_set(multifilesrc,
       "location", params->file.location,
-      "loop",     params->file.loop,
+//      "loop",     params->file.loop,
       NULL
   );
 
@@ -183,11 +243,23 @@ GstElement* _make_file_source(Source* this, SourceParams *params)
       NULL
   );
 
+  {
+    GstBus* bus = gst_element_get_bus (GST_ELEMENT (readerPipe));
+    gint bus_watch_id = gst_bus_add_watch (bus, _readerpipe_bus_callback, this);
+    gst_object_unref (bus);
+  }
+
+  // calculate the frequency
+  {
+    this->livesource.interval_in_ms = 1000 / params->file.framerate.numerator;
+  }
+
+
   g_object_set (G_OBJECT (appsink), "emit-signals", TRUE,
 //      "sync", FALSE, "async", FALSE,
       NULL);
 
-  g_signal_connect (appsink, "new-sample", G_CALLBACK (_on_new_sample_from_sink), appsrc);
+  g_signal_connect (appsink, "new-sample", G_CALLBACK (_on_new_sample_from_sink), this);
 
   gst_element_link_many(multifilesrc, sink_videoparse, autovideoconvert, appsink, NULL);
 
@@ -195,19 +267,19 @@ GstElement* _make_file_source(Source* this, SourceParams *params)
   this->on_playing.subscriber_func = (subscriber) _on_playing;
 
   this->on_destroy.subscriber_obj  = readerPipe;
-  this->on_destroy.subscriber_func = (subscriber) _on_destroy;
+  this->on_destroy.subscriber_func = (subscriber) _on_destroy_readerpipeline;
 
   gst_bin_add_many(sourceBin,
-      appsrc,
+      this->livesource.appsrc,
       src_videoparse,
       NULL);
 
-  g_object_set (appsrc,
+  g_object_set (this->livesource.appsrc,
       "is-live", TRUE,
       "format", GST_FORMAT_TIME,
       NULL);
 
-  gst_element_link(appsrc, src_videoparse);
+  gst_element_link(this->livesource.appsrc, src_videoparse);
   setup_ghost_src(src_videoparse, sourceBin);
   return GST_ELEMENT(sourceBin);
 }

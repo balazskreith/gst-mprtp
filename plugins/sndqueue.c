@@ -140,10 +140,10 @@ void sndqueue_on_subflow_detached(SndQueue* this, SndSubflow* subflow)
 void
 sndqueue_on_subflow_state_changed(SndQueue* this, SndSubflow* subflow)
 {
-  if (subflow->state == SNDSUBFLOW_STATE_OVERUSED) {
+  if (subflow->state == SNDSUBFLOW_STATE_CONGESTED) {
     this->queued_bytes_considered = FALSE;
     ++this->num_subflow_overused;
-  } else if (this->tracked_states[subflow->id] == SNDSUBFLOW_STATE_OVERUSED){
+  } else if (this->tracked_states[subflow->id] == SNDSUBFLOW_STATE_CONGESTED){
     if (--this->num_subflow_overused < 1) {
       this->queued_bytes_considered = TRUE;
     }
@@ -155,7 +155,7 @@ void
 sndqueue_on_subflow_target_bitrate_changed(SndQueue* this, SndSubflow* subflow)
 {
   this->total_target -= this->actual_targets[subflow->id];
-  this->actual_targets[subflow->id] = subflow->target_bitrate;
+  this->actual_targets[subflow->id] = subflow->approved_target;
   this->total_target += this->actual_targets[subflow->id];
 }
 
@@ -181,12 +181,12 @@ static gboolean _is_queue_over_threshold(SndQueue* this, SndSubflow* subflow) {
   gint32 boundary;
   if (_stat(this)->queued_bytes[subflow->id] < 15000) {
     return FALSE;
-  } else if (subflow->state != SNDSUBFLOW_STATE_OVERUSED) {
+  } else if (subflow->state != SNDSUBFLOW_STATE_CONGESTED) {
     boundary = MAX(this->actual_targets[subflow->id], 0) * 3;
   } else {
     boundary = MAX(this->actual_targets[subflow->id], 0);
   }
-//  g_print("%d < %f\n", _stat(this)->queued_bytes[subflow->id]<<3, boundary * this->threshold);
+//  g_print("queued bytes: %d < %f\n", _stat(this)->queued_bytes[subflow->id]<<3, boundary * this->threshold);
 //  return FALSE;
   return  boundary * this->threshold < (_stat(this)->queued_bytes[subflow->id]<<3);
 }
@@ -287,13 +287,13 @@ static void _set_pacing_time(SndQueue * this, guint8 subflow_id, SndPacket* pack
 
   if (*pacing_bitrate == 0) {
     *pacing_bitrate = this->actual_targets[subflow_id] / 8;
-  } else if (subflow->state == SNDSUBFLOW_STATE_OVERUSED || !this->queued_bytes_considered) {
+  } else if (subflow->state == SNDSUBFLOW_STATE_CONGESTED || !this->queued_bytes_considered) {
     *pacing_bitrate = this->actual_targets[subflow_id] / 8;
   } else if (subflow->state == SNDSUBFLOW_STATE_STABLE) {
     *pacing_bitrate = *pacing_bitrate * alpha +
         (MAX(this->stat.actual_bitrates[subflow_id], this->actual_targets[subflow_id]) / 7) * (1.-alpha);
 //    *pacing_bitrate = (1.0 * this->actual_targets[subflow_id]) / 8;
-  } else if (subflow->state == SNDSUBFLOW_STATE_UNDERUSED) {
+  } else if (subflow->state == SNDSUBFLOW_STATE_INCREASING) {
     *pacing_bitrate = *pacing_bitrate * alpha +
             (MAX(this->stat.actual_bitrates[subflow_id], this->actual_targets[subflow_id]) / 7) * (1.-alpha);
 //    *pacing_bitrate = (1.2 * this->actual_targets[subflow_id]) / 8;
@@ -316,12 +316,13 @@ SndPacket* sndqueue_pop_packet(SndQueue * this, GstClockTime* next_approve)
     this->empty = TRUE;
     goto done;
   }else if(now < pop_helper.next_approve){
-    if(next_approve){
-      *next_approve = MIN(pop_helper.next_approve, *next_approve);
-    }
-    if (*next_approve < now - GST_MSECOND) {
-      goto done;
-    }
+    // TODO: here we can switch pacing back.
+//    if(next_approve){
+//      *next_approve = MIN(pop_helper.next_approve, *next_approve);
+//    }
+//    if (*next_approve < now - GST_MSECOND) {
+//      goto done;
+//    }
   }
 
   queue = this->packets[pop_helper.subflow_id];

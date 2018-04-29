@@ -292,6 +292,30 @@ gint32 slidingwindow_get_counter(SlidingWindow* this){
   return datapuffer_readcapacity(this->items);
 }
 
+typedef struct {
+  gint index;
+  gchar* items;
+  guint item_length;
+}ItemsCopy;
+
+static void _copy_helper(SlidingWindowItem* item, ItemsCopy* items_copy) {
+  memcpy(items_copy->items + items_copy->index, item->data, items_copy->item_length);
+  items_copy->index += items_copy->item_length;
+}
+
+gpointer* slidingwindow_get_items_copy(SlidingWindow* this, gint* length, guint item_length) {
+  gpointer result;
+  ItemsCopy items_copy;
+
+  *length = datapuffer_readcapacity(this->items);
+  result = g_malloc0(item_length * *length);
+  items_copy.item_length = item_length;
+  items_copy.index = 0;
+  items_copy.items = (gchar*) result;
+  datapuffer_iterate(this->items, (DataPufferIterator) _copy_helper, &items_copy);
+  return result;
+}
+
 static void _slidingwindow_obsolate_num_limit(SlidingWindow* this)
 {
   while(datapuffer_isfull(this->items) || this->num_act_limit < datapuffer_readcapacity(this->items)){
@@ -320,6 +344,23 @@ again:
     return;
   }
   if(!this->obsolate(this->obsolate_udata, item)){
+    return;
+  }
+  _slidingwindow_rem(this);
+  goto again;
+}
+
+void slidingwindow_filter_out_from_tail(SlidingWindow* this, SlidingWindowPredicator predicator, gpointer udata) {
+  volatile SlidingWindowItem *item;
+again:
+  if(datapuffer_readcapacity(this->items) <= this->min_itemnum) {
+    return;
+  }
+  item = datapuffer_peek_first(this->items);
+  if(!item){
+    return;
+  }
+  if(predicator(udata, item->data) == FALSE) {
     return;
   }
   _slidingwindow_rem(this);
@@ -380,6 +421,29 @@ gpointer slidingwindow_peek_custom(SlidingWindow* this, gint (*comparator)(gpoin
   return result ? result->data : NULL;
 }
 
+typedef struct{
+  SlidingWindowIterator iterator;
+  gpointer udata;
+}IteratorHelper;
+
+static void _slidingwindow_iterator_helper(gpointer item, gpointer udata)
+{
+  IteratorHelper* helper = udata;
+  SlidingWindowItem* sitem = item;
+  helper->iterator(sitem->data, helper->udata);
+}
+
+void slidingwindow_iterate(SlidingWindow* this, SlidingWindowIterator iterator, gpointer udata)
+{
+  IteratorHelper helper;
+  if(datapuffer_isempty(this->items)){
+    return;
+  }
+  helper.iterator = iterator;
+  helper.udata = udata;
+  datapuffer_iterate(this->items, (DataPufferIterator)_slidingwindow_iterator_helper, &helper);
+}
+
 void slidingwindow_set_threshold(SlidingWindow* this, GstClockTime obsolation_treshold)
 {
   this->treshold = obsolation_treshold;
@@ -420,7 +484,7 @@ void slidingwindow_add_data(SlidingWindow* this, gpointer data)
       gchar item_data_str[1024];
       this->debug.sprintf(item->data, item_data_str);
       this->debug.logger("Item added: %p->%s t(%2.1f), c(%d)\n",
-          item,
+          this->items,
           item_data_str,
           (gdouble) (_now(this) - this->made) / (gdouble) GST_SECOND,
           datapuffer_readcapacity(this->items)

@@ -69,6 +69,12 @@ struct _SndTracker
   SndTrackerStat            stat;
   SndQueue*                 sndqueue;
 
+  gdouble                   packets_per_frame;
+  guint32                   last_timestamp;
+  gint                      packets_in_frame;
+  GstClockTime              last_frame_ts;
+  GstClockTime              intervals_per_frame;
+
   Notifier*                 on_packet_sent;
   Notifier*                 on_packet_obsolated;
   Notifier*                 on_stat_changed;
@@ -89,6 +95,8 @@ void sndtracker_refresh(SndTracker * this);
 
 void sndtracker_packet_sent(SndTracker * this, SndPacket* packet);
 SndPacket* sndtracker_retrieve_sent_packet(SndTracker * this, guint8 subflow_id, guint16 subflow_seq);
+gdouble sndtracker_get_packets_per_frame(SndTracker* this);
+GstClockTime sndtracker_get_intervals_per_frame(SndTracker* this);
 void sndtracker_packet_found(SndTracker * this, SndPacket* packet);
 void sndtracker_packet_acked(SndTracker * this, SndPacket* packet);
 void sndtracker_add_fec_response(SndTracker * this, FECEncoderResponse *fec_response);

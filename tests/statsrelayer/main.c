@@ -124,7 +124,7 @@ void _execute_default(StatsRelayer* this)
   g_print("_execute_default\n");
   sprintf(command, "lst *");
   _execute(this, command);
-  for (i = 0; i < 3; ++i) {
+  for (i = 0; i < 10; ++i) {
     for (j = 0; j < 3; ++j) {
       gchar pipe_name[255], src[255], snk[255];
       sprintf(pipe_name, "%s_packets_%d.csv", sources[j], i + 1);
@@ -201,5 +201,3 @@ void _execute(StatsRelayer* this, gchar* strings) {
     }
   }
 }
-
-

@@ -148,7 +148,7 @@ libgstmprtp_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 am_libgstmprtp_la_OBJECTS = libgstmprtp_la-bintree.lo \
 	libgstmprtp_la-bucket.lo libgstmprtp_la-correlator.lo \
 	libgstmprtp_la-fecdec.lo libgstmprtp_la-fecenc.lo \
-	libgstmprtp_la-fractalfbproc.lo \
+	libgstmprtp_la-flstabcalcer.lo libgstmprtp_la-fractalfbproc.lo \
 	libgstmprtp_la-fractalfbprod.lo \
 	libgstmprtp_la-fractalsubctrler.lo \
 	libgstmprtp_la-gstmprtcpbuffer.lo \
@@ -160,9 +160,11 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-bintree.lo \
 	libgstmprtp_la-gstrtpstatmaker2.lo \
 	libgstmprtp_la-jitterbuffer.lo libgstmprtp_la-lib_bintree.lo \
 	libgstmprtp_la-lib_datapuffer.lo \
-	libgstmprtp_la-lib_swplugins.lo libgstmprtp_la-mediator.lo \
-	libgstmprtp_la-messenger.lo libgstmprtp_la-mkfifo.lo \
-	libgstmprtp_la-mprtputils.lo libgstmprtp_la-notifier.lo \
+	libgstmprtp_la-lib_swplugins.lo libgstmprtp_la-linreger.lo \
+	libgstmprtp_la-mediator.lo libgstmprtp_la-messenger.lo \
+	libgstmprtp_la-mkfifo.lo libgstmprtp_la-mprtputils.lo \
+	libgstmprtp_la-notifier.lo \
+	libgstmprtp_la-qdelaystabilitycalcer.lo \
 	libgstmprtp_la-rcvctrler.lo libgstmprtp_la-rcvpackets.lo \
 	libgstmprtp_la-rcvsubflows.lo libgstmprtp_la-rcvtracker.lo \
 	libgstmprtp_la-recycle.lo libgstmprtp_la-reportproc.lo \
@@ -170,8 +172,10 @@ am_libgstmprtp_la_OBJECTS = libgstmprtp_la-bintree.lo \
 	libgstmprtp_la-rtpfecbuffer.lo libgstmprtp_la-slidingwindow.lo \
 	libgstmprtp_la-sndctrler.lo libgstmprtp_la-sndqueue.lo \
 	libgstmprtp_la-sndsubflows.lo libgstmprtp_la-sndtracker.lo \
-	libgstmprtp_la-sndpackets.lo libgstmprtp_la-streamjoiner.lo \
+	libgstmprtp_la-sndpackets.lo libgstmprtp_la-stdcalcer.lo \
+	libgstmprtp_la-streamjoiner.lo \
 	libgstmprtp_la-streamsplitter.lo \
+	libgstmprtp_la-thresholdfinder.lo \
 	libgstmprtp_la-timestampgenerator.lo \
 	libgstmprtp_la-swperctester.lo
 libgstmprtp_la_OBJECTS = $(am_libgstmprtp_la_OBJECTS)
@@ -423,6 +427,7 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          correlator.c          \
 					     fecdec.c              \
                          fecenc.c              \
+                         flstabcalcer.c        \
                          fractalfbproc.c       \
                          fractalfbprod.c       \
                          fractalsubctrler.c    \
@@ -437,11 +442,13 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          lib_bintree.c         \
                          lib_datapuffer.c      \
                          lib_swplugins.c       \
+                         linreger.c            \
                          mediator.c            \
                          messenger.c           \
                          mkfifo.c              \
                          mprtputils.c          \
                          notifier.c            \
+                         qdelaystabilitycalcer.c \
                          rcvctrler.c           \
                          rcvpackets.c          \
                          rcvsubflows.c         \
@@ -457,8 +464,10 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          sndsubflows.c         \
                          sndtracker.c          \
                          sndpackets.c          \
+                         stdcalcer.c           \
                          streamjoiner.c        \
                          streamsplitter.c      \
+                         thresholdfinder.c     \
                          timestampgenerator.c  \
                          swperctester.c
 
@@ -467,6 +476,7 @@ noinst_HEADERS = bintree.h             \
                  correlator.h          \
 				 fecdec.h              \
                  fecenc.h              \
+                 flstabcalcer.h        \
                  fractalfbproc.h       \
                  fractalfbprod.h       \
                  fractalsubctrler.h    \
@@ -475,11 +485,13 @@ noinst_HEADERS = bintree.h             \
                  lib_bintree.h         \
                  lib_datapuffer.h      \
                  lib_swplugins.h       \
+                 linreger.h            \
                  mediator.h            \
                  messenger.h           \
                  mkfifo.h              \
                  mprtputils.h          \
                  notifier.h            \
+                 qdelaystabilitycalcer.h \
                  rcvctrler.h           \
                  rcvsubflows.h         \
                  rcvpackets.h          \
@@ -495,8 +507,10 @@ noinst_HEADERS = bintree.h             \
                  sndsubflows.h         \
                  sndpackets.h          \
                  sndtracker.h          \
+                 stdcalcer.h           \
                  streamjoiner.h        \
                  streamsplitter.h      \
+                 thresholdfinder.h     \
                  timestampgenerator.h  \
                  swperctester.h 
 
@@ -601,6 +615,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-correlator.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fecdec.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fecenc.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-flstabcalcer.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fractalfbproc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fractalfbprod.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fractalsubctrler.Plo@am__quote@
@@ -615,11 +630,13 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-lib_bintree.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-lib_datapuffer.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-lib_swplugins.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-linreger.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-mediator.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-messenger.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-mkfifo.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-mprtputils.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-notifier.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-qdelaystabilitycalcer.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-rcvctrler.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-rcvpackets.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-rcvsubflows.Plo@am__quote@
@@ -635,9 +652,11 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-sndqueue.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-sndsubflows.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-sndtracker.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-stdcalcer.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-streamjoiner.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-streamsplitter.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-swperctester.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-thresholdfinder.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-timestampgenerator.Plo@am__quote@
 
 .c.o:
@@ -695,6 +714,13 @@ libgstmprtp_la-fecenc.lo: fecenc.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fecenc.c' object='libgstmprtp_la-fecenc.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-fecenc.lo `test -f 'fecenc.c' || echo '$(srcdir)/'`fecenc.c
+
+libgstmprtp_la-flstabcalcer.lo: flstabcalcer.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-flstabcalcer.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-flstabcalcer.Tpo -c -o libgstmprtp_la-flstabcalcer.lo `test -f 'flstabcalcer.c' || echo '$(srcdir)/'`flstabcalcer.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-flstabcalcer.Tpo $(DEPDIR)/libgstmprtp_la-flstabcalcer.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='flstabcalcer.c' object='libgstmprtp_la-flstabcalcer.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-flstabcalcer.lo `test -f 'flstabcalcer.c' || echo '$(srcdir)/'`flstabcalcer.c
 
 libgstmprtp_la-fractalfbproc.lo: fractalfbproc.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-fractalfbproc.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-fractalfbproc.Tpo -c -o libgstmprtp_la-fractalfbproc.lo `test -f 'fractalfbproc.c' || echo '$(srcdir)/'`fractalfbproc.c
@@ -794,6 +820,13 @@ libgstmprtp_la-lib_swplugins.lo: lib_swplugins.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-lib_swplugins.lo `test -f 'lib_swplugins.c' || echo '$(srcdir)/'`lib_swplugins.c
 
+libgstmprtp_la-linreger.lo: linreger.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-linreger.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-linreger.Tpo -c -o libgstmprtp_la-linreger.lo `test -f 'linreger.c' || echo '$(srcdir)/'`linreger.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-linreger.Tpo $(DEPDIR)/libgstmprtp_la-linreger.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='linreger.c' object='libgstmprtp_la-linreger.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-linreger.lo `test -f 'linreger.c' || echo '$(srcdir)/'`linreger.c
+
 libgstmprtp_la-mediator.lo: mediator.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-mediator.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-mediator.Tpo -c -o libgstmprtp_la-mediator.lo `test -f 'mediator.c' || echo '$(srcdir)/'`mediator.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-mediator.Tpo $(DEPDIR)/libgstmprtp_la-mediator.Plo
@@ -828,6 +861,13 @@ libgstmprtp_la-notifier.lo: notifier.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='notifier.c' object='libgstmprtp_la-notifier.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-notifier.lo `test -f 'notifier.c' || echo '$(srcdir)/'`notifier.c
+
+libgstmprtp_la-qdelaystabilitycalcer.lo: qdelaystabilitycalcer.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-qdelaystabilitycalcer.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-qdelaystabilitycalcer.Tpo -c -o libgstmprtp_la-qdelaystabilitycalcer.lo `test -f 'qdelaystabilitycalcer.c' || echo '$(srcdir)/'`qdelaystabilitycalcer.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-qdelaystabilitycalcer.Tpo $(DEPDIR)/libgstmprtp_la-qdelaystabilitycalcer.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='qdelaystabilitycalcer.c' object='libgstmprtp_la-qdelaystabilitycalcer.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-qdelaystabilitycalcer.lo `test -f 'qdelaystabilitycalcer.c' || echo '$(srcdir)/'`qdelaystabilitycalcer.c
 
 libgstmprtp_la-rcvctrler.lo: rcvctrler.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-rcvctrler.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-rcvctrler.Tpo -c -o libgstmprtp_la-rcvctrler.lo `test -f 'rcvctrler.c' || echo '$(srcdir)/'`rcvctrler.c
@@ -934,6 +974,13 @@ libgstmprtp_la-sndpackets.lo: sndpackets.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-sndpackets.lo `test -f 'sndpackets.c' || echo '$(srcdir)/'`sndpackets.c
 
+libgstmprtp_la-stdcalcer.lo: stdcalcer.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-stdcalcer.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-stdcalcer.Tpo -c -o libgstmprtp_la-stdcalcer.lo `test -f 'stdcalcer.c' || echo '$(srcdir)/'`stdcalcer.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-stdcalcer.Tpo $(DEPDIR)/libgstmprtp_la-stdcalcer.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='stdcalcer.c' object='libgstmprtp_la-stdcalcer.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-stdcalcer.lo `test -f 'stdcalcer.c' || echo '$(srcdir)/'`stdcalcer.c
+
 libgstmprtp_la-streamjoiner.lo: streamjoiner.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-streamjoiner.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-streamjoiner.Tpo -c -o libgstmprtp_la-streamjoiner.lo `test -f 'streamjoiner.c' || echo '$(srcdir)/'`streamjoiner.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-streamjoiner.Tpo $(DEPDIR)/libgstmprtp_la-streamjoiner.Plo
@@ -947,6 +994,13 @@ libgstmprtp_la-streamsplitter.lo: streamsplitter.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='streamsplitter.c' object='libgstmprtp_la-streamsplitter.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-streamsplitter.lo `test -f 'streamsplitter.c' || echo '$(srcdir)/'`streamsplitter.c
+
+libgstmprtp_la-thresholdfinder.lo: thresholdfinder.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-thresholdfinder.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-thresholdfinder.Tpo -c -o libgstmprtp_la-thresholdfinder.lo `test -f 'thresholdfinder.c' || echo '$(srcdir)/'`thresholdfinder.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-thresholdfinder.Tpo $(DEPDIR)/libgstmprtp_la-thresholdfinder.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='thresholdfinder.c' object='libgstmprtp_la-thresholdfinder.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-thresholdfinder.lo `test -f 'thresholdfinder.c' || echo '$(srcdir)/'`thresholdfinder.c
 
 libgstmprtp_la-timestampgenerator.lo: timestampgenerator.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-timestampgenerator.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-timestampgenerator.Tpo -c -o libgstmprtp_la-timestampgenerator.lo `test -f 'timestampgenerator.c' || echo '$(srcdir)/'`timestampgenerator.c

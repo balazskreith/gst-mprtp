@@ -73,6 +73,7 @@ class Evaluator:
             evaluations = flow_description.get('evaluations', {})
             sources = flow_description.get('sources', {})
             snd_flowlog = sources.get("snd", None)
+            snd_fall_lowlog = sources.get("snd_all", None)
             fec_flowlog = sources.get("fec", None)
             rcv_flowlog = sources.get("rcv", None)
             ply_flowlog = sources.get("ply", None)
@@ -91,18 +92,20 @@ class Evaluator:
                 execute("fec_avg", fec_flowlog)
 
             if snd_flowlog:
-                execute("sr", snd_flowlog)
+                execute("sr", snd_fall_lowlog)
 
                 if rcv_flowlog:
                     execute("qmd", snd_flowlog, rcv_flowlog)
 
                 if ply_flowlog:
                     execute("lr", snd_flowlog, ply_flowlog)
+                    execute("lrn", snd_flowlog, ply_flowlog)
                     execute("nlf", snd_flowlog, ply_flowlog)
 
             if ply_flowlog:
                 execute("gp_avg", snd_flowlog, ply_flowlog)
                 execute("lr", snd_flowlog, ply_flowlog)
+                execute("lrn", snd_flowlog, ply_flowlog)
                 execute("nlf", snd_flowlog, ply_flowlog)
 
     def __save_sources(self, source_files):
@@ -144,6 +147,7 @@ class Evaluator:
                 commands.append([self.__logsplitter, source, snd_fec_packets, "payload_type 126"])
                 result.update({"snd": snd_rtp_packets})
                 result.update({"fec": snd_fec_packets})
+                result.update({"snd_all": source})
             elif "rcv" in source:
                 result.update({"rcv": source})
             elif "ply" in source:

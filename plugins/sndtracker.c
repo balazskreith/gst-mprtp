@@ -213,6 +213,21 @@ void sndtracker_packet_sent(SndTracker * this, SndPacket* packet)
 
   slidingwindow_add_data(this->sent_sw, sndpacket_ref(packet));
 
+  // packet per frame and intervals per frame calculation
+  if (this->last_timestamp != packet->timestamp) {
+    gdouble alpha = CONSTRAIN(.001, .25, 10. / (gdouble)this->stat.acked_packets_in_1s);
+    this->packets_per_frame = this->packets_per_frame * (1.-alpha) + this->packets_in_frame * alpha;
+    this->last_timestamp = packet->timestamp;
+    this->packets_in_frame = 1;
+
+    if (0 < this->last_frame_ts) {
+      this->intervals_per_frame = this->intervals_per_frame * (1.-alpha) + (packet->sent - this->last_frame_ts) * alpha;
+    }
+    this->last_frame_ts = packet->sent;
+  } else {
+    ++this->packets_in_frame;
+  }
+
   notifier_do(this->on_stat_changed, &this->stat);
 }
 
@@ -221,6 +236,14 @@ SndPacket* sndtracker_retrieve_sent_packet(SndTracker * this, guint8 subflow_id,
   Subflow* subflow = _get_subflow(this, subflow_id);
   SndPacket* result = subflow->sent_packets[subflow_seq];
   return result;
+}
+
+gdouble sndtracker_get_packets_per_frame(SndTracker* this) {
+  return this->packets_per_frame;
+}
+
+GstClockTime sndtracker_get_intervals_per_frame(SndTracker* this) {
+  return this->intervals_per_frame;
 }
 
 void sndtracker_packet_found(SndTracker * this, SndPacket* packet)

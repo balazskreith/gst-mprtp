@@ -37,18 +37,24 @@ struct _StreamSplitter
   SndSubflows*         subflows;
   GQueue*              packets;
   SndQueue*            sndqueue;
-//  gint32               total_bitrate;
-//  volatile gint32               actual_rates[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  volatile gint32               actual_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  volatile gint32               extra_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  volatile gboolean             target_is_reached;
-//  gdouble              actual_weights[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+
+  volatile gint32      stable_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32      desired_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   guint8               max_state;
   gboolean             keyframe_filtering;
   gint32               total_target;
+  gint32               total_stable_target;
+  gdouble              target_off;
+  gint32               sending_rate_avg;
+  gint32               min_sending_rate;
 
   SndSubflow*          last_selected;
   guint32              last_ts;
+  gint                 mode;
+  guint32              last_timestamp;
+  SndSubflow*          last_subflow;
+
+  SndTracker*          tracker;
 
 };
 
@@ -57,7 +63,7 @@ struct _StreamSplitterClass{
 };
 
 StreamSplitter*
-make_stream_splitter(SndSubflows* sndsubflows, SndQueue* sndqueue);
+make_stream_splitter(SndSubflows* sndsubflows, SndTracker* tracker, SndQueue* sndqueue);
 
 void
 stream_splitter_set_keyframe_filtering(
@@ -75,6 +81,16 @@ stream_splitter_on_packet_queued(
     SndPacket* packet);
 
 void
+stream_splitter_on_subflow_joined(
+    StreamSplitter* this,
+    SndSubflow* subflow);
+
+void
+stream_splitter_on_subflow_detached(
+    StreamSplitter* this,
+    SndSubflow* subflow);
+
+void
 stream_splitter_on_packet_sent(
     StreamSplitter* this,
     SndPacket* packet);
@@ -85,9 +101,13 @@ stream_splitter_on_packet_obsolated(
     StreamSplitter* this,
     SndPacket* packet);
 
+void
+stream_splitter_on_subflow_stable_target_bitrate_chaned(
+    StreamSplitter* this,
+    SndSubflow* subflow);
 
 void
-stream_splitter_on_subflow_target_bitrate_chaned(
+stream_splitter_on_subflow_desired_target_chaned(
     StreamSplitter* this,
     SndSubflow* subflow);
 

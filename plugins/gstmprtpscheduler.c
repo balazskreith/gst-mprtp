@@ -372,8 +372,8 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
   this->allowed_ssrc  = 0;
 
   this->sndqueue      = make_sndqueue(this->subflows);
-  this->splitter      = make_stream_splitter(this->subflows, this->sndqueue);
   this->sndtracker    = make_sndtracker(this->subflows, this->sndqueue);
+  this->splitter      = make_stream_splitter(this->subflows, this->sndtracker, this->sndqueue);
   this->fec_encoder   = make_fecencoder(this->monitoring);
 
 
@@ -385,8 +385,12 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
 
   fecencoder_set_payload_type(this->fec_encoder, this->fec_payload_type);
 
-  sndsubflows_add_on_target_bitrate_changed_cb(this->subflows,
-      (ListenerFunc) stream_splitter_on_subflow_target_bitrate_chaned,
+  sndsubflows_add_on_desired_bitrate_changed_cb(this->subflows,
+      (ListenerFunc) stream_splitter_on_subflow_desired_target_chaned,
+      this->splitter);
+
+  sndsubflows_add_on_stable_target_bitrate_changed_cb(this->subflows,
+      (ListenerFunc) stream_splitter_on_subflow_stable_target_bitrate_chaned,
       this->splitter);
 
   sndsubflows_add_on_subflow_state_changed_cb(this->subflows,
@@ -410,6 +414,14 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
       this->splitter);
 
   sndsubflows_add_on_subflow_joined_cb(this->subflows,
+     (ListenerFunc) stream_splitter_on_subflow_joined,
+     this->splitter);
+
+  sndsubflows_add_on_subflow_detached_cb(this->subflows,
+       (ListenerFunc) stream_splitter_on_subflow_detached,
+       this->splitter);
+
+  sndsubflows_add_on_subflow_joined_cb(this->subflows,
      (ListenerFunc) sndqueue_on_subflow_joined,
      this->sndqueue);
 
@@ -417,7 +429,7 @@ gst_mprtpscheduler_init (GstMprtpscheduler * this)
      (ListenerFunc) sndqueue_on_subflow_detached,
      this->sndqueue);
 
-  sndsubflows_add_on_target_bitrate_changed_cb(this->subflows,
+  sndsubflows_add_on_desired_bitrate_changed_cb(this->subflows,
      (ListenerFunc) sndqueue_on_subflow_target_bitrate_changed,
      this->sndqueue);
 
@@ -1009,6 +1021,7 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
 
   now = _now(this);
   next_time = now;
+  // TODO: Pacing is turned off now, by commenting out the important code snippet in sending queue.
   packet = sndqueue_pop_packet(this->sndqueue, &next_time);
   if (now < next_time) {
     // It is really important to place a cond wait here.

@@ -20,6 +20,7 @@ typedef struct datapuffer_struct_t
         volatile gpointer        read;
 } datapuffer_t;
 
+typedef void (*DataPufferIterator)(gpointer item, gpointer udata);
 
 datapuffer_t* datapuffer_ctor(gint32 items_num);
 void datapuffer_dtor(datapuffer_t *datapuffer);
@@ -27,6 +28,7 @@ gpointer datapuffer_read(datapuffer_t *datapuffer);
 gpointer datapuffer_peek_first(datapuffer_t* puffer);
 gpointer datapuffer_peek_last(datapuffer_t* puffer);
 gpointer datapuffer_peek_custom(datapuffer_t* puffer, gint (*comparator)(gpointer item, gpointer udata), gpointer udata);
+void datapuffer_iterate(datapuffer_t* puffer, DataPufferIterator iterator, gpointer udata);
 void datapuffer_write(datapuffer_t *datapuffer, void *item);
 gint32 datapuffer_readcapacity(datapuffer_t *datapuffer);
 gint32 datapuffer_writecapacity(datapuffer_t *datapuffer);

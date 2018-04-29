@@ -74,7 +74,7 @@ typedef struct{
 
 typedef struct{
   GSList* subscribers;
-  gchar   name[256];
+  gchar   name[512];
   guint   ref;
 }Eventer;
 
@@ -106,7 +106,7 @@ struct _SourceParams{
      gchar     width[16];
      gchar     height[16];
 
-     gchar     location[256];
+     gchar     location[512];
      gint      loop;
      Framerate framerate;
      gint32    format;
@@ -116,7 +116,7 @@ struct _SourceParams{
      gchar     width[16];
      gchar     height[16];
 
-     gchar     location[256];
+     gchar     location[512];
      gint      loop;
      Framerate framerate;
      gint32    format;
@@ -124,7 +124,7 @@ struct _SourceParams{
 
   };
 
-  gchar to_string[256];
+  gchar to_string[512];
 };
 
 
@@ -148,20 +148,21 @@ struct _SinkParams{
     }rawproxy;
 
     struct{
-      gchar location[256];
+      gchar location[512];
     }file;
 
     struct{
       GSList* items;
     }multifile;
   };
-  gchar      to_string[256];
+  gchar      to_string[512];
 };
 
 
 typedef enum{
   CODEC_TYPE_THEORA = 1,
   CODEC_TYPE_VP8    = 2,
+  CODEC_TYPE_VP9    = 3,
 }CodecTypes;
 
 struct _CodecParams{
@@ -169,7 +170,7 @@ struct _CodecParams{
   gint       keyframe_mode;
   gint       keyframe_max_dist;
   gchar      type_str[32];
-  gchar      to_string[256];
+  gchar      to_string[512];
 
 };
 
@@ -178,13 +179,13 @@ struct _VideoParams{
   gchar      height[16];
   gint32     clock_rate;
   Framerate  framerate;
-  gchar      to_string[256];
+  gchar      to_string[512];
 
 };
 
 
 struct _StatParams{
-  gchar      mkfifo[256];
+  gchar      mkfifo[512];
   guint8     mprtp_ext_header_id;
 //  guint8     fec_payload_header_id;
   gchar      to_string[1024];
@@ -212,7 +213,7 @@ typedef enum{
 typedef struct{
   guint8  id;
   guint16 dest_port;
-  gchar   dest_ip[256];
+  gchar   dest_ip[512];
 }SenderSubflow;
 
 typedef struct{
@@ -252,7 +253,7 @@ struct _SchedulerParams{
     }mprtp_fractal;
   };
 
-  gchar to_string[256];
+  gchar to_string[512];
 };
 
 struct _PlayouterParams{
@@ -270,12 +271,12 @@ struct _PlayouterParams{
     }mprtp_fractal;
   };
 
-  gchar to_string[256];
+  gchar to_string[512];
 };//TODO: write this
 
 typedef struct{
   GstElement* element;
-  gchar       padname[256];
+  gchar       padname[512];
 }Interface;
 
 typedef struct _SinkFileItem{

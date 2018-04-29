@@ -126,9 +126,10 @@ sndsubflows_finalize (GObject * object)
   g_object_unref(this->on_subflow_joined);
   g_object_unref(this->on_congestion_controlling_type_changed);
   g_object_unref(this->on_path_active_changed);
-  g_object_unref(this->on_target_bitrate_changed);
+  g_object_unref(this->on_desired_bitrate_changed);
   g_object_unref(this->on_subflow_state_changed);
   g_object_unref(this->on_subflow_state_stat_changed);
+  g_object_unref(this->on_stable_target_bitrate_changed);
 
   g_object_unref(this->changed_subflows);
 
@@ -146,7 +147,8 @@ sndsubflows_init (SndSubflows * this)
   this->on_subflow_joined                       = make_notifier("SndSubflow: on-subflow-joined");
   this->on_congestion_controlling_type_changed  = make_notifier("SndSubflow: on-congestion-controlling-type-changed");
   this->on_path_active_changed                  = make_notifier("SndSubflow: on-path-active-changed");
-  this->on_target_bitrate_changed               = make_notifier("SndSubflow: on-target-bitrate-changed");
+  this->on_desired_bitrate_changed               = make_notifier("SndSubflow: on-target-bitrate-changed");
+  this->on_stable_target_bitrate_changed        = make_notifier("SndSubflow: on-stable-target-bitrate-changed");
   this->on_subflow_state_changed                = make_notifier("SndSubflow: on-subflow-state-changed");
   this->on_subflow_state_stat_changed           = make_notifier("SndSubflow: on-subflow-state-stat");
 
@@ -169,6 +171,7 @@ void sndsubflows_join(SndSubflows* this, guint8 id)
 
   this->subflows[id] = subflow;
   ++this->subflows_num;
+  ++this->active_subflows_num;
 
   this->joined = g_slist_prepend(this->joined, subflow);
   sndsubflows_set_target_bitrate(this, id, SUBFLOW_DEFAULT_SENDING_RATE);
@@ -240,9 +243,14 @@ void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, ListenerFunc c
   notifier_add_listener(this->on_path_active_changed, callback, udata);
 }
 
-void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata)
+void sndsubflows_add_on_desired_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata)
 {
-  notifier_add_listener(this->on_target_bitrate_changed, callback, udata);
+  notifier_add_listener(this->on_desired_bitrate_changed, callback, udata);
+}
+
+void sndsubflows_add_on_stable_target_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata)
+{
+  notifier_add_listener(this->on_stable_target_bitrate_changed, callback, udata);
 }
 
 void sndsubflow_monitoring_request(SndSubflow* subflow)
@@ -251,14 +259,20 @@ void sndsubflow_monitoring_request(SndSubflow* subflow)
   mediator_set_request(subflows->monitoring_handler, subflow);
 }
 
-void sndsubflow_set_target_rate(SndSubflow* subflow, gint32 target_rate)
+void sndsubflow_set_desired_bitrate(SndSubflow* subflow, gint32 desired_rate)
 {
   SndSubflows *subflows = subflow->base_db;
 //  subflows->target_rate -= subflow->target_bitrate;
 //  subflows->target_rate += subflow->target_bitrate = target_rate;
-  subflow->target_bitrate = target_rate;
+  subflow->approved_target = desired_rate;
 
-  notifier_do(subflows->on_target_bitrate_changed, subflow);
+  notifier_do(subflows->on_desired_bitrate_changed, subflow);
+}
+
+void sndsubflow_set_stable_target_rate(SndSubflow* subflow, gint32 target_rate)
+{
+  SndSubflows *subflows = subflow->base_db;
+  notifier_do(subflows->on_stable_target_bitrate_changed, subflow);
 }
 
 void sndsubflow_set_rtt(SndSubflow* subflow, GstClockTime rtt) {
@@ -279,6 +293,13 @@ guint sndsubflows_get_subflows_num(SndSubflows* this)
   return this->subflows_num;
 }
 
+gint sndsubflows_get_active_subflows_num(SndSubflows* this)
+{
+  return this->active_subflows_num;
+}
+
+
+
 SndSubflow* sndsubflows_get_subflow(SndSubflows* this, guint8 subflow_id)
 {
   return this->subflows[subflow_id];
@@ -295,6 +316,7 @@ void sndsubflows_set_path_active(SndSubflows* this, guint8 subflow_id, gboolean 
 {
   CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, active, value, this->changed_subflows);
   NOTIFY_CHANGED_SUBFLOWS(this->changed_subflows, this->on_path_active_changed);
+  this->active_subflows_num += value ? 1 : -1;
 }
 
 void sndsubflows_set_rtcp_interval_type(SndSubflows* this, guint8 subflow_id, RTCPIntervalType new_type)
@@ -312,17 +334,17 @@ void sndsubflows_set_path_congested(SndSubflows* this, guint8 subflow_id, gboole
   CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, congested, value, NULL);
 }
 
-static void _on_subflow_target_changed(SndSubflow* subflow, SndSubflows* subflows)
+static void _on_subflow_desired_bitrate_changed(SndSubflow* subflow, SndSubflows* subflows)
 {
 //  subflows->target_rate += subflow->target_bitrate;
-  notifier_do(subflows->on_target_bitrate_changed, subflow);
+  notifier_do(subflows->on_desired_bitrate_changed, subflow);
 }
 
 void sndsubflows_set_target_bitrate(SndSubflows* this, guint8 subflow_id, gint32 target_bitrate)
 {
-  CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, target_bitrate, target_bitrate, NULL);
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, approved_target, target_bitrate, NULL);
 //  this->target_rate = 0;
-  g_slist_foreach(this->joined, (GFunc) _on_subflow_target_changed, this);
+  g_slist_foreach(this->joined, (GFunc) _on_subflow_desired_bitrate_changed, this);
 }
 
 void sndsubflows_set_report_timeout(SndSubflows* this, guint8 subflow_id, GstClockTime report_timeout)
@@ -348,11 +370,12 @@ void sndsubflow_set_state(SndSubflow* subflow, SndSubflowState state)
 {
   SndSubflows* this = subflow->base_db;
   SndSubflowsStateStat state_stat;
+  subflow->prev_state = subflow->state;
   subflow->state = state;
   notifier_do(this->on_subflow_state_changed, subflow);
 
-  state_stat.min = SNDSUBFLOW_STATE_UNDERUSED;
-  state_stat.max = SNDSUBFLOW_STATE_OVERUSED;
+  state_stat.min = SNDSUBFLOW_STATE_INCREASING;
+  state_stat.max = SNDSUBFLOW_STATE_CONGESTED;
   g_slist_foreach(this->joined, (GFunc) _collect_on_subflow_state_stat, &state_stat);
   notifier_do(this->on_subflow_state_stat_changed, &state_stat);
 }
@@ -391,11 +414,13 @@ SndSubflow* _make_subflow(SndSubflows* base_db, guint8 subflow_id)
   SndSubflow* result = g_malloc0(sizeof(SndSubflow));
   result->base_db         = base_db;
   result->id              = subflow_id;
+  result->control_channel = make_mediator();
   return result;
 }
 
 void _dispose_subflow(SndSubflow *subflow)
 {
+  g_object_unref(subflow->control_channel);
   g_free(subflow);
 }
 

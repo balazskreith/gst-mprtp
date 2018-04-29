@@ -114,7 +114,7 @@ RcvPacket* rcvpackets_get_packet(RcvPackets* this, GstBuffer* buffer)
 
 
   packet = recycle_retrieve_and_shape(this->recycle, NULL);
-
+//  g_print("packet %p from recycle: %p\n", packet, this->recycle);
   gst_rtp_buffer_map(buffer, GST_MAP_READ, &rtp);
 
   _setup_rcvpacket(packet, &rtp);
@@ -159,7 +159,7 @@ void rcvpacket_unref(RcvPacket *packet)
   if(0 < --packet->ref){
     return;
   }
-
+//  g_print("%p has went to the recycle: %hu, %hu\n", packet, packet->subflow_id, packet->subflow_seq);
   recycle_add(packet->destiny, packet);
 }
 

@@ -28,9 +28,9 @@ typedef struct _SndSubflowsPrivate SndSubflowsPrivate;
 
 typedef enum
 {
-  SNDSUBFLOW_STATE_OVERUSED     = -1,
-  SNDSUBFLOW_STATE_STABLE       = 0,
-  SNDSUBFLOW_STATE_UNDERUSED     = 1,
+  SNDSUBFLOW_STATE_CONGESTED      = -1,
+  SNDSUBFLOW_STATE_STABLE         = 0,
+  SNDSUBFLOW_STATE_INCREASING     = 1,
 } SndSubflowState;
 
 typedef struct {
@@ -48,12 +48,20 @@ typedef struct _SndSubflow
   gboolean                   congested;
   gboolean                   active;
 
-  gint32                     target_bitrate;
+  gboolean                   target_is_approved;
+  gint32                     min_sending_rate;
+  gint32                     requested_target;
+  gint32                     approved_target;
+  gint32                     stable_bitrate;
+  gint32                     max_increasement;
+  GstClockTime               last_increased_target;
+
   guint32                    packet_counter_for_fec;
 
   guint32                    total_sent_packets_num;
   guint32                    total_sent_payload_bytes;
 
+  SndSubflowState            prev_state;
   SndSubflowState            state;
 
   GstClockTime               pacing_time;
@@ -70,9 +78,12 @@ typedef struct _SndSubflow
   GstClockTime               report_interval;
   GstClockTime               last_report;
 
-  GstClockTime               rtt;
+  gdouble                    rtt;
   gint32                     eqd;
   gdouble                    cwnd;
+
+  Mediator*                  control_channel;
+
 
 }SndSubflow;
 
@@ -94,15 +105,24 @@ struct _SndSubflows
   Notifier*            on_subflow_joined;
   Notifier*            on_congestion_controlling_type_changed;
   Notifier*            on_path_active_changed;
-  Notifier*            on_target_bitrate_changed;
+  Notifier*            on_desired_bitrate_changed;
+  Notifier*            on_stable_target_bitrate_changed;
   Notifier*            on_subflow_state_changed;
   Notifier*            on_subflow_state_stat_changed;
 
   Mediator*            monitoring_handler;
 
+
+
 //  gint32               target_rate;
   guint                subflows_num;
+  gint                 active_subflows_num;
 
+  // extra fields not necessary
+  gdouble target_off;
+  gint32 total_stable_target;
+  gint32 total_desired_target;
+  gint32 total_sending_rate;
 };
 
 
@@ -121,11 +141,13 @@ GSList* sndsubflows_get_subflows(SndSubflows* this);
 void sndsubflows_iterate(SndSubflows* this, GFunc process, gpointer udata);
 
 void sndsubflow_monitoring_request(SndSubflow* subflow);
-void sndsubflow_set_target_rate(SndSubflow* subflow, gint32 target_rate);
+void sndsubflow_set_desired_bitrate(SndSubflow* subflow, gint32 target_rate);
+void sndsubflow_set_stable_target_rate(SndSubflow* subflow, gint32 target_rate);
 void sndsubflow_set_rtt(SndSubflow* subflow, GstClockTime rtt);
 void sndsubflow_set_eqd(SndSubflow* subflow, gint32 eqd);
 //gint32 sndsubflows_get_total_target(SndSubflows* this);
 guint sndsubflows_get_subflows_num(SndSubflows* this);
+gint sndsubflows_get_active_subflows_num(SndSubflows* this);
 SndSubflow* sndsubflows_get_subflow(SndSubflows* this, guint8 subflow_id);
 
 void sndsubflows_set_mprtp_ext_header_id(SndSubflows* this, guint8 mprtp_ext_header_id);
@@ -146,8 +168,8 @@ void sndsubflows_add_on_subflow_state_changed_cb(SndSubflows* this, ListenerFunc
 void sndsubflows_add_on_subflow_state_stat_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
-void sndsubflows_add_on_target_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
-
+void sndsubflows_add_on_desired_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
+void sndsubflows_add_on_stable_target_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 
 //------------------------------------------------------------------------------------------------
 void sndsubflow_set_state(SndSubflow* this, SndSubflowState state);

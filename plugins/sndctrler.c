@@ -62,11 +62,6 @@ static void
 sndctrler_finalize (GObject * object);
 
 static void
-_on_subflow_state_changed(
-    SndController *this,
-    SndSubflow* subflow);
-
-static void
 _on_subflow_active_changed(
     SndController* this,
     SndSubflow *subflow);
@@ -94,6 +89,11 @@ _create_fractalplus(
 //----------------------------------------------------------------------------
 
 //------------------------ Outgoing Report Producer -------------------------
+
+static void
+_perform_adaptive_activation (
+    SndController *this);
+
 static void
 _emit_signal (
     SndController *this);
@@ -167,7 +167,9 @@ sndctrler_init (SndController * this)
   this->controllers        = NULL;
   this->ricalcer           = make_ricalcer(TRUE);
   this->mprtp_signal_data  = g_slice_new0(MPRTPPluginSignal);
-  this->time_update_period = 200 * GST_MSECOND;
+  this->time_update_period = 100 * GST_MSECOND;
+  this->adaptive_activation = FALSE;
+  this->first_update = 0;
 
   report_processor_set_logfile(this->report_processor, "snd_reports.log");
   report_producer_set_logfile(this->report_producer, "snd_produced_reports.log");
@@ -198,8 +200,6 @@ make_sndctrler(
   sndsubflows_add_on_path_active_changed_cb(
       this->subflows, (ListenerFunc)_on_subflow_active_changed, this);
 
-  sndsubflows_add_on_subflow_state_changed_cb(
-      this->subflows, (ListenerFunc)_on_subflow_state_changed, this);
   return this;
 }
 
@@ -217,6 +217,15 @@ sndctrler_time_update (SndController *this)
   if(0 < this->last_regular_emit && now < this->last_regular_emit + this->time_update_period){
     goto done;
   }
+
+  if (this->adaptive_activation) {
+    if (!this->first_update) {
+      this->first_update = _now(this);
+    } else if (this->first_update < _now(this) - 5 * GST_SECOND) {
+      _perform_adaptive_activation(this);
+    }
+  }
+
 PROFILING("sndctrler_time_update",
   for(it = this->controllers; it; it = it->next){
     CongestionController* controller = it->data;
@@ -267,6 +276,40 @@ done:
 
 
 //---------------------------------------------------------------------------
+
+void
+_perform_adaptive_activation (SndController *this) {
+  guint subflows_num = sndsubflows_get_subflows_num(this->subflows);
+  gint active_subflows_num = sndsubflows_get_active_subflows_num(this->subflows);
+  gdouble packets_per_frame = sndtracker_get_packets_per_frame(this->sndtracker);
+  GstClockTime intervals_per_frame = sndtracker_get_intervals_per_frame(this->sndtracker);
+
+  gdouble ratio = (GST_SECOND * packets_per_frame) / (intervals_per_frame * active_subflows_num);
+  g_print("ratio: %f, actives: %d, subflows: %d, packets/frame: %f, intervals: %lu\n",
+      ratio, active_subflows_num, subflows_num, packets_per_frame, intervals_per_frame);
+
+  if (active_subflows_num < subflows_num && 40. < ratio) {
+    GSList* it = sndsubflows_get_subflows(this->subflows);
+    SndSubflow* subflow = NULL;
+    for (; it; it = it->next) {
+      subflow = it->data;
+      if (!subflow->active) {
+        break;
+      }
+    }
+    sndsubflows_set_path_active(this->subflows, subflow->id, TRUE);
+  } else if (1 < active_subflows_num && ratio < 20.) {
+    GSList* it = sndsubflows_get_subflows(this->subflows);
+    SndSubflow* subflow = NULL;
+    for (; it; it = it->next) {
+      subflow = it->data;
+      if (subflow->active) {
+        break;
+      }
+    }
+    sndsubflows_set_path_active(this->subflows, subflow->id, FALSE);
+  }
+}
 
 void
 _emit_signal (SndController *this)
@@ -387,7 +430,7 @@ static void _update_sndsubflow(gpointer item, gpointer udata)
   MPRTPSubflowUtilizationSignal *subflowdata;
 
   subflowdata = &signaldata->subflow[subflow->id];
-  subflowdata->target_bitrate = subflow->target_bitrate;
+  subflowdata->target_bitrate = subflow->approved_target;
 //  g_print("Subflow %d target: %d\n", subflow->id, subflow->target_bitrate / 1000);
 }
 
@@ -404,32 +447,6 @@ void _update_subflow_target_utilization(SndController* this)
 
 
 //---------------------- Event handlers ----------------------------------
-
-void _on_subflow_state_changed(SndController *this, SndSubflow* subflow)
-{
-//  if(subflow->state_t1 != SNDSUBFLOW_STATE_OVERUSED && subflow->state == SNDSUBFLOW_STATE_OVERUSED){
-//    ++this->overused_subflows;
-//    this->time_update_period = 50 * GST_MSECOND;
-//    _emit_signal(this);
-//    goto done;
-//  }
-//
-//  if(subflow->state_t1 == SNDSUBFLOW_STATE_OVERUSED && subflow->state != SNDSUBFLOW_STATE_OVERUSED){
-//    if(--this->overused_subflows < 1){
-//      this->time_update_period = 200 * GST_MSECOND;
-//    }
-//    goto done;
-//  }
-
-  {
-//    GstClockTime reporting_interval = MIN(subflow->report_interval, this->time_update_period);
-//    this->time_update_period = CONSTRAIN(50 * GST_MSECOND, 200 * GST_MSECOND, reporting_interval);
-    this->time_update_period = 100 * GST_MSECOND;
-  }
-
-//done:
-  return;
-}
 
 static gint _controller_by_subflow_id(gconstpointer item, gconstpointer udata)
 {

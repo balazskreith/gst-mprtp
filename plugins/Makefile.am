@@ -6,6 +6,7 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          correlator.c          \
 					     fecdec.c              \
                          fecenc.c              \
+                         flstabcalcer.c        \
                          fractalfbproc.c       \
                          fractalfbprod.c       \
                          fractalsubctrler.c    \
@@ -20,11 +21,13 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          lib_bintree.c         \
                          lib_datapuffer.c      \
                          lib_swplugins.c       \
+                         linreger.c            \
                          mediator.c            \
                          messenger.c           \
                          mkfifo.c              \
                          mprtputils.c          \
                          notifier.c            \
+                         qdelaystabilitycalcer.c \
                          rcvctrler.c           \
                          rcvpackets.c          \
                          rcvsubflows.c         \
@@ -40,8 +43,10 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          sndsubflows.c         \
                          sndtracker.c          \
                          sndpackets.c          \
+                         stdcalcer.c           \
                          streamjoiner.c        \
                          streamsplitter.c      \
+                         thresholdfinder.c     \
                          timestampgenerator.c  \
                          swperctester.c
                     
@@ -51,6 +56,7 @@ noinst_HEADERS = bintree.h             \
                  correlator.h          \
 				 fecdec.h              \
                  fecenc.h              \
+                 flstabcalcer.h        \
                  fractalfbproc.h       \
                  fractalfbprod.h       \
                  fractalsubctrler.h    \
@@ -59,11 +65,13 @@ noinst_HEADERS = bintree.h             \
                  lib_bintree.h         \
                  lib_datapuffer.h      \
                  lib_swplugins.h       \
+                 linreger.h            \
                  mediator.h            \
                  messenger.h           \
                  mkfifo.h              \
                  mprtputils.h          \
                  notifier.h            \
+                 qdelaystabilitycalcer.h \
                  rcvctrler.h           \
                  rcvsubflows.h         \
                  rcvpackets.h          \
@@ -79,8 +87,10 @@ noinst_HEADERS = bintree.h             \
                  sndsubflows.h         \
                  sndpackets.h          \
                  sndtracker.h          \
+                 stdcalcer.h           \
                  streamjoiner.h        \
                  streamsplitter.h      \
+                 thresholdfinder.h     \
                  timestampgenerator.h  \
                  swperctester.h 
 

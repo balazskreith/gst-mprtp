@@ -178,6 +178,7 @@ GstBuffer* fecdecoder_pop_rtp_packet(FECDecoder *this, guint16 seq_num)
 void fecdecoder_push_rcv_packet(FECDecoder *this, RcvPacket *packet)
 {
   g_mutex_lock (&this->mutex);
+  packet = rcvpacket_ref(packet);
   g_queue_insert_sorted(this->rcv_packets, packet, (GCompareDataFunc) _cmp_rcvpacket_abs_seq_custom, NULL);
   _obsolete_packets(this);
   g_mutex_unlock (&this->mutex);

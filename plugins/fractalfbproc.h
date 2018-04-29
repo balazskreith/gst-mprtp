@@ -17,6 +17,11 @@
 #include "reportproc.h"
 #include "correlator.h"
 #include "bucket.h"
+#include "linreger.h"
+#include "thresholdfinder.h"
+#include "stdcalcer.h"
+#include "qdelaystabilitycalcer.h"
+#include "flstabcalcer.h"
 
 
 typedef struct _FRACTaLFBProcessor FRACTaLFBProcessor;
@@ -29,7 +34,7 @@ typedef struct _FRACTaLFBProcessorClass FRACTaLFBProcessorClass;
 #define FRACTALFBPROCESSOR_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),FRACTALFBPROCESSOR_TYPE))
 #define FRACTALFBPROCESSOR_CAST(src)        ((FRACTALFBProcessor *)(src))
 
-#define QDELAY_BUCKET_LIST_LENGTH 5
+#define QDELAY_BUCKET_LIST_LENGTH 3
 #define DRATE_BUCKET_LIST_LENGTH 4
 
 typedef struct {
@@ -59,55 +64,74 @@ typedef struct _FRACTaLStat
   gdouble                  sr_avg;
   gdouble                  rr_avg;
 
-  gdouble                  FL_10;
+  gdouble                  rr_hat;
+  gdouble                  drr;
+
+  gdouble                  fl_stability;
 
   gdouble                  FL_th;
   gdouble                  fraction_lost;
+  gdouble                  fraction_lost_avg;
   gdouble                  ewi_in_s;
   guint16                  sent_packets_in_1s;
 
   gdouble                  qdelay_stability;
-  gdouble                  qdelay_var_stability;
+  gboolean                 qdelay_is_stable;
   gdouble                  drate_avg;
+  gdouble                  drate_stability;
+
+  gdouble avg_qd;
+  gint qd_min, qd_max;
+  gint lost_or_discarded;
+  gint arrived_packets;
 
 
 }FRACTaLStat;
+
 
 struct _FRACTaLFBProcessor
 {
   GObject                  object;
   GstClock*                sysclock;
   TimestampGenerator*      ts_generator;
-  Recycle*                 reference_point_recycle;
+  QDelayStabilityCalcer*   qdelay_stability_calcer;
+  FLStabilityCalcer*       fl_stability_calcer;
+//  Recycle*                 reference_point_recycle;
+  GstClockTime             made;
 
   guint32                  ewi_in_ts;
   guint32                  min_ewi_in_ts;
   guint32                  max_ewi_in_ts;
   guint32                  min_dts;
+  guint32                  min_qts;
   guint32                  rtt_in_ts;
 
   GstClockTime             dts;
   GstClockTime             rtt;
-  GQueue*                  sent_packets;
-  SlidingWindow*           reference_sw;
-  SlidingWindow*           measurements;
-  SlidingWindow*           ewi_sw;
+//  SlidingWindow*           reference_sw;
+//  SlidingWindow*           ewi_sw;
 
   FRACTaLStat*             stat;
   SndTracker*              sndtracker;
   SndSubflow*              subflow;
 
+//  StdCalcer*               qts_std_calcer;
+
   GstClockTime             last_report_update;
+  GstClockTime             first_report_update;
 
   guint16                  HSN;
 
   guint32                  srtt_in_ts;
-  gdouble                  qts_std;
+  gdouble                  qts_std, min_qts_std;
   gdouble                  last_qts;
-  Bucket*                  qdelay_bucket;
-  Bucket*                  qdelay_devs;
+//  Bucket*                  qdelay_bucket;
+//  Bucket*                  qdelay_devs;
 
+  guint32                  last_dts;
   gdouble                  fb_interval_avg;
+
+  guint16 cc_begin_seq, cc_end_seq;
 
 };
 

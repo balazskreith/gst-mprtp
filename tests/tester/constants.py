@@ -17,7 +17,8 @@ class Codecs(Enum):
     """
     Represent the available codecs supported by the tester
     """
-    VP8 = 1
+    VP8 = 1,
+    VP9 = 2,
 
 class CommandInterfaces(Enum):
     """

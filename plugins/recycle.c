@@ -89,6 +89,7 @@ gpointer recycle_retrieve(Recycle* this)
     goto done;
   }
   result = datapuffer_read(this->items);
+//  g_print("from recycle %p item %p is read\n", this, result);
   if (!result) {
     result = this->ctor();
   }

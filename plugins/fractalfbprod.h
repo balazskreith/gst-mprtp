@@ -25,6 +25,7 @@ typedef struct _FRACTaLFBProducerClass FRACTaLFBProducerClass;
 
 typedef struct _CorrBlock CorrBlock;
 
+#define FRACTALPRODUCER_CHUNKS_MAX_LENGTH 64
 
 struct _FRACTaLFBProducer
 {
@@ -39,10 +40,6 @@ struct _FRACTaLFBProducer
 
   guint16                  begin_seq;
   guint16                  end_seq;
-  gboolean*                lost_vector;
-  gboolean*                ecn_vector;
-  guint32*                 timestamp_vector;
-  guint32*                 ato_vector;
 
   SlidingWindow*           rle_sw;
   TimestampGenerator*      ts_generator;
@@ -50,15 +47,17 @@ struct _FRACTaLFBProducer
   GstClockTime             last_fb;
   gint                     rcved_packets;
 
+  GstRTCPXRChunk           chunks[FRACTALPRODUCER_CHUNKS_MAX_LENGTH];
+
 //  gint32                   discarded_bytes;
   gint32                   received_bytes;
+
 
 
 };
 
 struct _FRACTaLFBProducerClass{
   GObjectClass parent_class;
-
 };
 
 GType fractalfbproducer_get_type (void);

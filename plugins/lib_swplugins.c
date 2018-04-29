@@ -592,31 +592,31 @@ SlidingWindowPlugin* make_swstd(ListenerFunc on_calculated_cb, gpointer udata,
 
 typedef struct _swbuckets{
   SlidingWindowPlugin*  base;
-  gint* buckets_vector;
-  gint buckets_size;
-  gdouble bucket_chain_increasement;
+  gdouble* thresholds;
+  gdouble* buckets;
+  gint buckets_length;
   SWDataExtractor extractor;
-  gdouble first_bucket_size;
   GQueue* pushed_indexes;
   GQueue* integers;
 }swbuckets_t;
 
 
 static swbuckets_t* _swbucketspriv_ctor(SlidingWindowPlugin* base, SWDataExtractor extractor,
-    gint* buckets_vector, gint buckets_size, gdouble bucket_chain_increasement,
-    gdouble first_bucket_size)
+    gint buckets_length, gdouble* thresholds)
 {
   swbuckets_t* this;
   this = g_malloc(sizeof(swbuckets_t));
   memset(this, 0, sizeof(swbuckets_t));
-  this->buckets_vector = buckets_vector;
-  this->buckets_size = buckets_size;
-  this->bucket_chain_increasement = bucket_chain_increasement;
-  this->first_bucket_size = first_bucket_size;
+  this->thresholds = g_malloc0(sizeof(gdouble) * (buckets_length - 1));
+  this->buckets = g_malloc0(sizeof(gdouble) * buckets_length);
+  this->buckets_length = buckets_length;
   this->pushed_indexes = g_queue_new();
   this->integers = g_queue_new();
   this->extractor = extractor;
   this->base = base;
+  if (thresholds) {
+    memcpy(this->thresholds, thresholds, sizeof(gdouble) * (buckets_length - 1));
+  }
   return this;
 }
 
@@ -654,21 +654,18 @@ static void _swbuckets_add_pipe(gpointer dataptr, gpointer itemptr)
   swbuckets_t* this = dataptr;
   gdouble new_value = this->extractor(itemptr);
   gint bucket_index = 0;
-  gdouble actual_bucket = this->first_bucket_size;
+  const gint threshold_length = this->buckets_length - 1;
   gint* integer;
-  for (; bucket_index < this->buckets_size; ++bucket_index) {
-    if (actual_bucket < new_value) {
-      actual_bucket*=this->bucket_chain_increasement;
-      continue;
+  gdouble threshold;
+  for (bucket_index = 0; bucket_index < threshold_length; ++bucket_index) {
+    threshold = this->thresholds[bucket_index];
+    if (new_value <= threshold) {
+      break;
     }
-    break;
   }
-  if (bucket_index == this->buckets_size) {
-    bucket_index = this->buckets_size;
-  }
-  ++this->buckets_vector[bucket_index];
+  this->buckets[bucket_index] += new_value;
 
-  if (g_queue_is_empty(this->integers)) {
+  if (!g_queue_is_empty(this->integers)) {
      integer = g_queue_pop_head(this->integers);
   } else {
     integer = g_malloc0(sizeof(gint));
@@ -681,26 +678,37 @@ static void _swbuckets_add_pipe(gpointer dataptr, gpointer itemptr)
 static void _swbuckets_rem_pipe(gpointer dataptr, gpointer itemptr)
 {
   swbuckets_t* this = dataptr;
+  gdouble new_value = this->extractor(itemptr);
   gint* bucket_index = g_queue_pop_head(this->pushed_indexes);
-  --this->buckets_vector[*bucket_index];
+  this->buckets[*bucket_index] -= new_value;
   g_queue_push_tail(this->integers, bucket_index);
 }
 
-void swbuckets_change_bucket_chain_size(SlidingWindowPlugin* plugin, gdouble bucket_chain_increasement) {
+void swbuckets_change_thresholds(SlidingWindowPlugin* plugin, gdouble* thresholds) {
   swbuckets_t* this = plugin->priv;
-  this->bucket_chain_increasement = bucket_chain_increasement;
+  memcpy(this->thresholds, thresholds, sizeof(gdouble) * (this->buckets_length - 1));
 }
 
-SlidingWindowPlugin* make_swbuckets(SWDataExtractor extractor, gint* buckets_vector, gint buckets_size,
-    gdouble bucket_chain_increasement,
-    gdouble first_bucket_size)
+void swbuckets_get_buckets(SlidingWindowPlugin* plugin, ...) {
+  swbuckets_t* this = plugin->priv;
+  gdouble* argument;
+  va_list arguments;
+  gint bucket_index = 0;
+  va_start ( arguments, plugin );
+  for(argument = va_arg( arguments, gdouble*); argument; argument = va_arg(arguments, gdouble*)){
+    *argument = this->buckets[bucket_index];
+    ++bucket_index;
+  }
+  va_end ( arguments );
+}
+
+SlidingWindowPlugin* make_swbuckets(SWDataExtractor extractor, gint buckets_size, gdouble* thresholds)
 {
   SlidingWindowPlugin* this;
   swbuckets_t* priv;
   this = swplugin_ctor();
   this = make_swplugin(NULL, NULL); // Danger! we can not call swplugin_notify here, then!
-  this->priv = priv = _swbucketspriv_ctor(this, extractor, buckets_vector, buckets_size,
-      bucket_chain_increasement, first_bucket_size);
+  this->priv = priv = _swbucketspriv_ctor(this, extractor, buckets_size, thresholds);
   this->add_data = this->priv;
   this->rem_data = this->priv;
   this->disposer = _swbuckets_disposer;

@@ -112,7 +112,7 @@ gboolean ricalcer_rtcp_regular_allowed_sndsubflow(ReportIntervalCalculator * thi
       _get_rtcp_interval (
                           1,                                       //senders
                           2,                                       //members
-                          subflow->desired_target * .05,           //rtcp_bw
+                          subflow->approved_target * .05,           //rtcp_bw
                           this->sender_side?1:0,                   //we_sent
                           128,                                     //avg_rtcp_size
                           subflow->next_regular_rtcp == 0?0:1);    //initialized

@@ -168,6 +168,14 @@ SlidingWindowPlugin* make_swstd(ListenerFunc on_calculated_cb,
                                   gint32          window_size
                           );
 
+
+//SlidingWindowPlugin* make_checked_wellman(ListenerFunc on_calculated_cb,
+//                                  gpointer        udata,
+//                                  SWDataExtractor extractor,
+//                                  gint32          window_size
+//                          );
+
+
 void swbuckets_change_thresholds(SlidingWindowPlugin* plugin,
     gdouble* thresholds);
 

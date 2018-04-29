@@ -155,7 +155,7 @@ void
 sndqueue_on_subflow_target_bitrate_changed(SndQueue* this, SndSubflow* subflow)
 {
   this->total_target -= this->actual_targets[subflow->id];
-  this->actual_targets[subflow->id] = subflow->desired_target;
+  this->actual_targets[subflow->id] = subflow->approved_target;
   this->total_target += this->actual_targets[subflow->id];
 }
 
@@ -316,12 +316,13 @@ SndPacket* sndqueue_pop_packet(SndQueue * this, GstClockTime* next_approve)
     this->empty = TRUE;
     goto done;
   }else if(now < pop_helper.next_approve){
-    if(next_approve){
-      *next_approve = MIN(pop_helper.next_approve, *next_approve);
-    }
-    if (*next_approve < now - GST_MSECOND) {
-      goto done;
-    }
+    // TODO: here we can switch pacing back.
+//    if(next_approve){
+//      *next_approve = MIN(pop_helper.next_approve, *next_approve);
+//    }
+//    if (*next_approve < now - GST_MSECOND) {
+//      goto done;
+//    }
   }
 
   queue = this->packets[pop_helper.subflow_id];

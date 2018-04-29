@@ -311,7 +311,7 @@ gpointer* slidingwindow_get_items_copy(SlidingWindow* this, gint* length, guint 
   result = g_malloc0(item_length * *length);
   items_copy.item_length = item_length;
   items_copy.index = 0;
-  items_copy.items = (gchar*)result;
+  items_copy.items = (gchar*) result;
   datapuffer_iterate(this->items, (DataPufferIterator) _copy_helper, &items_copy);
   return result;
 }

@@ -6,6 +6,7 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          correlator.c          \
 					     fecdec.c              \
                          fecenc.c              \
+                         flstabcalcer.c        \
                          fractalfbproc.c       \
                          fractalfbprod.c       \
                          fractalsubctrler.c    \
@@ -26,6 +27,7 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          mkfifo.c              \
                          mprtputils.c          \
                          notifier.c            \
+                         qdelaystabilitycalcer.c \
                          rcvctrler.c           \
                          rcvpackets.c          \
                          rcvsubflows.c         \
@@ -41,6 +43,7 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          sndsubflows.c         \
                          sndtracker.c          \
                          sndpackets.c          \
+                         stdcalcer.c           \
                          streamjoiner.c        \
                          streamsplitter.c      \
                          thresholdfinder.c     \
@@ -53,6 +56,7 @@ noinst_HEADERS = bintree.h             \
                  correlator.h          \
 				 fecdec.h              \
                  fecenc.h              \
+                 flstabcalcer.h        \
                  fractalfbproc.h       \
                  fractalfbprod.h       \
                  fractalsubctrler.h    \
@@ -67,6 +71,7 @@ noinst_HEADERS = bintree.h             \
                  mkfifo.h              \
                  mprtputils.h          \
                  notifier.h            \
+                 qdelaystabilitycalcer.h \
                  rcvctrler.h           \
                  rcvsubflows.h         \
                  rcvpackets.h          \
@@ -82,6 +87,7 @@ noinst_HEADERS = bintree.h             \
                  sndsubflows.h         \
                  sndpackets.h          \
                  sndtracker.h          \
+                 stdcalcer.h           \
                  streamjoiner.h        \
                  streamsplitter.h      \
                  thresholdfinder.h     \

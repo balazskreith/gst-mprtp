@@ -46,12 +46,15 @@ struct _StreamSplitter
   gint32               total_stable_target;
   gdouble              target_off;
   gint32               sending_rate_avg;
+  gint32               min_sending_rate;
 
   SndSubflow*          last_selected;
   guint32              last_ts;
   gint                 mode;
   guint32              last_timestamp;
   SndSubflow*          last_subflow;
+
+  SndTracker*          tracker;
 
 };
 
@@ -60,7 +63,7 @@ struct _StreamSplitterClass{
 };
 
 StreamSplitter*
-make_stream_splitter(SndSubflows* sndsubflows, SndQueue* sndqueue);
+make_stream_splitter(SndSubflows* sndsubflows, SndTracker* tracker, SndQueue* sndqueue);
 
 void
 stream_splitter_set_keyframe_filtering(
@@ -79,6 +82,11 @@ stream_splitter_on_packet_queued(
 
 void
 stream_splitter_on_subflow_joined(
+    StreamSplitter* this,
+    SndSubflow* subflow);
+
+void
+stream_splitter_on_subflow_detached(
     StreamSplitter* this,
     SndSubflow* subflow);
 

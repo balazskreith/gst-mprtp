@@ -44,11 +44,10 @@ struct _FRACTaLSubController
   gboolean                  approve_measurement;
   GstClockTime              obligated_approvement;
 
-  gint32                    target_bitrate;
-  gint32                    tracked_target;
-  gint32                    desired_target;
+//  gint32                    target_bitrate;
+//  gint32                    approved_target;
 
-  gdouble                   tcp_flow_presented;
+  gboolean                  tcp_flow_presented;
 
   guint                     rcved_fb_since_changed;
 
@@ -75,7 +74,7 @@ struct _FRACTaLSubController
   gboolean                  increasing_approved;
   GstClockTime              increasing_started;
   GstClockTime              increasing_sr_reached;
-  gint32                    increasement;
+//  gint32                    increasement;
 
   gint32 last_approved_sr;
   GstClockTime sr_reached;
@@ -90,7 +89,9 @@ struct _FRACTaLSubController
   gint32                    distortion_num;
 
   GstClockTime              congestion_detected;
+  gdouble                   pivot_fl_stability;
 
+  GstClockTime              last_std_checked;
   GstClockTime              last_approved;
   GstClockTime              last_settled;
   GstClockTime              last_distorted;
@@ -102,6 +103,8 @@ struct _FRACTaLSubController
   GstClockTime            (*refresh_target)(FRACTaLSubController* this);
 
   gpointer                  priv;
+  gdouble low_point;
+//  StdCalcer*                sending_rate_std_calcer;
 
   SndTracker*               sndtracker;
 };

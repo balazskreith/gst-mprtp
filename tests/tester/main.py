@@ -181,15 +181,72 @@ class Tester:
                 subflows_num=subflows_num,
                 tcp=tcp_flag
             )
+        elif (type == "mprtp6"):
+            result = MPRTP6(
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type,
+                subflows_num=subflows_num,
+                tcp=tcp_flag
+            )
+        elif (type == "mprtp7"):
+            result = MPRTP7(
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type,
+                subflows_num=subflows_num,
+                tcp=tcp_flag
+            )
+        elif (type == "mprtp8"):
+            result = MPRTP8(
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type,
+                subflows_num=subflows_num
+            )
+        elif (type == "mprtp9"):
+            result = MPRTP9(
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type,
+                subflows_num=subflows_num
+            )
+        elif (type == "mprtp10"):
+            result = MPRTP10(
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type,
+                subflows_num=subflows_num
+            )
+        elif (type == "mprtp11"):
+            result = MPRTP11(
+                algorithm=algorithm,
+                latency=latencies[0],
+                jitter=jitters[0],
+                source_type=source_type,
+                sink_type=sink_type,
+                subflows_num=subflows_num
+            )
         else:
             raise ValueError("Unknown value: " + type)
         return result
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("types", help="The latency of the path",
+parser.add_argument("types", help="The type of the test",
                     choices=['rmcat1', 'rmcat2', 'rmcat3', 'rmcat4', 'rmcat5', 'rmcat6', 'rmcat7',
-                             'mprtp1', 'mprtp2', 'mprtp3', 'mprtp4', 'mprtp5', 'mprtp6', 'mprtp7'], nargs='+')
+                             'mprtp1', 'mprtp2', 'mprtp3', 'mprtp4', 'mprtp5', 'mprtp6', 'mprtp7',
+                             'mprtp8', 'mprtp9', 'mprtp10', 'mprtp11'], nargs='+')
 parser.add_argument("-l", "--latency", help="The latency of the path", type=int, nargs='+', choices=[50, 100, 150, 300],
                     default=[50])
 parser.add_argument("-j", "--jitter", help="The jitter for the test", type=int, nargs='+', default=[0])

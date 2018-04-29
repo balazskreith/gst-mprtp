@@ -48,7 +48,14 @@ typedef struct _SndSubflow
   gboolean                   congested;
   gboolean                   active;
 
-  gint32                     desired_target;
+  gboolean                   target_is_approved;
+  gint32                     min_sending_rate;
+  gint32                     requested_target;
+  gint32                     approved_target;
+  gint32                     stable_bitrate;
+  gint32                     max_increasement;
+  GstClockTime               last_increased_target;
+
   guint32                    packet_counter_for_fec;
 
   guint32                    total_sent_packets_num;
@@ -71,9 +78,12 @@ typedef struct _SndSubflow
   GstClockTime               report_interval;
   GstClockTime               last_report;
 
-  GstClockTime               rtt;
+  gdouble                    rtt;
   gint32                     eqd;
   gdouble                    cwnd;
+
+  Mediator*                  control_channel;
+
 
 }SndSubflow;
 
@@ -102,10 +112,17 @@ struct _SndSubflows
 
   Mediator*            monitoring_handler;
 
+
+
 //  gint32               target_rate;
   guint                subflows_num;
   gint                 active_subflows_num;
 
+  // extra fields not necessary
+  gdouble target_off;
+  gint32 total_stable_target;
+  gint32 total_desired_target;
+  gint32 total_sending_rate;
 };
 
 
@@ -153,6 +170,7 @@ void sndsubflows_add_on_congestion_controlling_type_changed_cb(SndSubflows* this
 void sndsubflows_add_on_path_active_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_desired_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
 void sndsubflows_add_on_stable_target_bitrate_changed_cb(SndSubflows* this, ListenerFunc callback, gpointer udata);
+
 //------------------------------------------------------------------------------------------------
 void sndsubflow_set_state(SndSubflow* this, SndSubflowState state);
 void sndsubflow_refresh_report_interval(SndSubflow* subflow);

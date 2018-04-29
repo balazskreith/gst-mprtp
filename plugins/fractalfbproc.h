@@ -19,6 +19,9 @@
 #include "bucket.h"
 #include "linreger.h"
 #include "thresholdfinder.h"
+#include "stdcalcer.h"
+#include "qdelaystabilitycalcer.h"
+#include "flstabcalcer.h"
 
 
 typedef struct _FRACTaLFBProcessor FRACTaLFBProcessor;
@@ -64,7 +67,7 @@ typedef struct _FRACTaLStat
   gdouble                  rr_hat;
   gdouble                  drr;
 
-  gdouble                  FL_10;
+  gdouble                  fl_stability;
 
   gdouble                  FL_th;
   gdouble                  fraction_lost;
@@ -73,13 +76,15 @@ typedef struct _FRACTaLStat
   guint16                  sent_packets_in_1s;
 
   gdouble                  qdelay_stability;
-  gdouble                  qdelay_var_stability;
+  gboolean                 qdelay_is_stable;
   gdouble                  drate_avg;
+  gdouble                  drate_stability;
 
   gdouble avg_qd;
   gint qd_min, qd_max;
   gint lost_or_discarded;
   gint arrived_packets;
+
 
 }FRACTaLStat;
 
@@ -89,7 +94,9 @@ struct _FRACTaLFBProcessor
   GObject                  object;
   GstClock*                sysclock;
   TimestampGenerator*      ts_generator;
-  Recycle*                 reference_point_recycle;
+  QDelayStabilityCalcer*   qdelay_stability_calcer;
+  FLStabilityCalcer*       fl_stability_calcer;
+//  Recycle*                 reference_point_recycle;
   GstClockTime             made;
 
   guint32                  ewi_in_ts;
@@ -101,12 +108,14 @@ struct _FRACTaLFBProcessor
 
   GstClockTime             dts;
   GstClockTime             rtt;
-  SlidingWindow*           reference_sw;
-  SlidingWindow*           ewi_sw;
+//  SlidingWindow*           reference_sw;
+//  SlidingWindow*           ewi_sw;
 
   FRACTaLStat*             stat;
   SndTracker*              sndtracker;
   SndSubflow*              subflow;
+
+//  StdCalcer*               qts_std_calcer;
 
   GstClockTime             last_report_update;
   GstClockTime             first_report_update;
@@ -116,8 +125,8 @@ struct _FRACTaLFBProcessor
   guint32                  srtt_in_ts;
   gdouble                  qts_std, min_qts_std;
   gdouble                  last_qts;
-  Bucket*                  qdelay_bucket;
-  Bucket*                  qdelay_devs;
+//  Bucket*                  qdelay_bucket;
+//  Bucket*                  qdelay_devs;
 
   guint32                  last_dts;
   gdouble                  fb_interval_avg;

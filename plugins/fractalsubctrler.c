@@ -71,7 +71,7 @@ G_DEFINE_TYPE (FRACTaLSubController, fractalsubctrler, G_TYPE_OBJECT);
 #define MIN_PACING_BITRATE 10000
 
 //determines the minimum monitoring interval
-#define MIN_MONITORING_INTERVAL 1
+#define MIN_MONITORING_INTERVAL 2
 
 //determines the maximum monitoring interval
 #define MAX_MONITORING_INTERVAL 12
@@ -452,6 +452,7 @@ gboolean _rtp_sending_filter(FRACTaLSubController* this, SndPacket *packet)
 
 void _on_rtp_sending(FRACTaLSubController* this, SndPacket *packet)
 {
+
   ++this->sent_packets;
   if(!this->enabled || this->stat->measurements_num < 10){
     return;

@@ -1444,7 +1444,7 @@ class MPRTP3(MyTest):
 
 class MPRTP4(MyTest):
     def __init__(self, algorithm, latency, jitter, source_type, sink_type, mprtp_ext_header = 3, fec_payload_type_id = 126, subflows_num=2):
-        MyTest.__init__(self, "mprtp4", max(125, 25 + 25 * subflows_num * 2), algorithm, str(latency), str(jitter))
+        MyTest.__init__(self, "mprtp4", 100, algorithm, str(latency), str(jitter))
 
         self._forward_bandwidths = []
         self.__algorithm = algorithm
@@ -1501,26 +1501,52 @@ class MPRTP4(MyTest):
         # min_bw = max(400, int(2000 / self._subflows_num))
         min_bw = 1000
         space = max(1, self._subflows_num - 1)
-        flow_stages = [{
+        flow_stages_1 = [{
+            "duration": 25,
+            "config": PathConfig(bandwidth=1000, latency=self.__latency, jitter=self.__jitter)
+        },
+            {
                 "duration": 25,
-                "config": PathConfig(bandwidth=min_bw, latency=self.__latency, jitter=self.__jitter)
-            }]
-        flow_stages.extend([{
+                "config": PathConfig(bandwidth=500, latency=self.__latency, jitter=self.__jitter)
+            },
+            {
                 "duration": 25,
-                "config": PathConfig(bandwidth=min_bw + offset, latency=self.__latency, jitter=self.__jitter)
-            }] * space)
-        flow_stages = flow_stages * 2
-        for subflow_id in range(self._subflows_num):
-            flow_stage = deque(flow_stages)
-            flow_stage.rotate(subflow_id)
-            flow_stage.appendleft({
+                "config": PathConfig(bandwidth=1000, latency=self.__latency, jitter=self.__jitter)
+            },
+            {
                 "duration": 25,
-                "config": PathConfig(bandwidth=min_bw, latency=self.__latency, jitter=self.__jitter)
-            })
-            forward_bandwidths, path_stage = self.make_bandwidths_and_path_stage(flow_stage)
-            forward_path_ctrler = PathShellCtrler(path_name=path_names[subflow_id], path_stage=path_stage)
-            self._forward_bandwidths.append(forward_bandwidths)
-            result.append(forward_path_ctrler)
+                "config": PathConfig(bandwidth=500, latency=self.__latency, jitter=self.__jitter)
+            },
+        ]
+        flow_stage = deque(flow_stages_1)
+        forward_bandwidths, path_stage = self.make_bandwidths_and_path_stage(flow_stage)
+        forward_path_ctrler = PathShellCtrler(path_name=path_names[0], path_stage=path_stage)
+        self._forward_bandwidths.append(forward_bandwidths)
+        result.append(forward_path_ctrler)
+
+        flow_stages_2 = [{
+                "duration": 25,
+                "config": PathConfig(bandwidth=500, latency=self.__latency, jitter=self.__jitter)
+            },
+            {
+                "duration": 25,
+                "config": PathConfig(bandwidth=1000, latency=self.__latency, jitter=self.__jitter)
+            },
+            {
+                "duration": 25,
+                "config": PathConfig(bandwidth=500, latency=self.__latency, jitter=self.__jitter)
+            },
+            {
+                "duration": 25,
+                "config": PathConfig(bandwidth=1000, latency=self.__latency, jitter=self.__jitter)
+            },
+        ]
+        flow_stage = deque(flow_stages_2)
+        forward_bandwidths, path_stage = self.make_bandwidths_and_path_stage(flow_stage)
+        forward_path_ctrler = PathShellCtrler(path_name=path_names[1], path_stage=path_stage)
+        self._forward_bandwidths.append(forward_bandwidths)
+
+        result.append(forward_path_ctrler)
         return result
 
     def __generate_description(self):

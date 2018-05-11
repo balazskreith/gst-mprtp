@@ -284,7 +284,7 @@ static gdouble sigma(gdouble x, gdouble x0, gdouble k) {
 static void _refresh_target_off(StreamSplitter * this)
 {
   gint32 total_sending_rate = sndtracker_get_stat(this->tracker)->sent_bytes_in_1s * 8;
-  gdouble halfway;
+  gdouble midpoint;
   gdouble stepness;
   gdouble distance = abs(this->subflows->total_stable_target - this->subflows->total_desired_target);
   this->sending_rate_avg = total_sending_rate * .5 + this->sending_rate_avg * .5;
@@ -294,14 +294,14 @@ static void _refresh_target_off(StreamSplitter * this)
     goto done;
   }
   if (this->subflows->total_stable_target < this->subflows->total_desired_target) {
-    halfway = this->subflows->total_stable_target + distance / 2.;
+    midpoint = this->subflows->total_stable_target + distance / 2.;
     stepness = -5./distance;
   } else {
-    halfway = this->subflows->total_desired_target + distance / 2.;
+    midpoint = this->subflows->total_desired_target + distance / 2.;
     stepness = 5./distance;
   }
 
-  this->target_off = sigma(this->sending_rate_avg, halfway, stepness);
+  this->target_off = sigma(this->sending_rate_avg, midpoint, stepness);
 
 //  gdouble stable_off, desired_off;
 //  stable_off = (this->subflows->total_stable_target - this->sending_rate_avg) / (gdouble) this->subflows->total_stable_target;

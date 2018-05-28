@@ -80,16 +80,16 @@ static guint32 _delta_ts(guint32 last_ts, guint32 actual_ts) {
 }
 
 //
-//static gint
-//_cmp_seq (guint16 x, guint16 y)
-//{
-//  if(x == y) return 0;
-//  if(x < y && y - x < 32768) return -1;
-//  if(x > y && x - y > 32768) return -1;
-//  if(x < y && y - x > 32768) return 1;
-//  if(x > y && x - y < 32768) return 1;
-//  return 0;
-//}
+static gint
+_cmp_seq (guint16 x, guint16 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 32768) return -1;
+  if(x > y && x - y > 32768) return -1;
+  if(x < y && y - x > 32768) return 1;
+  if(x > y && x - y < 32768) return 1;
+  return 0;
+}
 //
 //static gint
 //_cmp_ts (guint32 x, guint32 y)
@@ -124,8 +124,15 @@ stream_joiner_finalize (GObject * object)
 {
   StreamJoiner *this = STREAM_JOINER (object);
   RcvPacket* packet;
+  gpointer item;
   while((packet = g_queue_pop_head(this->outq)) != NULL){
     rcvpacket_unref(packet);
+  }
+  while((item = g_queue_pop_head(this->subflow_skews)) != NULL){
+      g_free(item);
+  }
+  while((item = g_queue_pop_head(this->subflow_skews_recycle)) != NULL){
+      g_free(item);
   }
   g_object_unref(this->rtp_ts_generator);
   g_queue_free(this->outq);
@@ -137,8 +144,8 @@ stream_joiner_init (StreamJoiner * this)
 {
   this->sysclock           = gst_system_clock_obtain ();
   this->made               = _now(this);
-  this->max_join_delay_in_ts = DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE / 2;
-  this->min_join_delay_in_ts = DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE / 100;
+  this->max_join_delay_in_ts = DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE / 4; // 250ms
+  this->min_join_delay_in_ts = DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE / 100; // 10ms
   this->join_delay_in_ts     = (this->max_join_delay_in_ts + this->min_join_delay_in_ts) / 2;
 }
 
@@ -153,9 +160,50 @@ make_stream_joiner(TimestampGenerator* rtp_ts_generator)
   result->frames_recycle = make_recycle_frame(50, NULL);
   result->rtp_ts_generator = g_object_ref(rtp_ts_generator);
 //  result->joinq2 = make_bintree3((bintree3cmp) _cmp_rcvpacket_abs_seq);
+  result->subflow_skews = g_queue_new();
+  result->subflow_skews_recycle = g_queue_new();
 
   return result;
 }
+
+
+
+static gboolean header_printed = FALSE;
+static void _stat_print(StreamJoiner *this)
+{
+  gchar result[1024];
+  memset(result, 0, 1024);
+
+  if (!header_printed) {
+    sprintf(result,
+        "Elapsed time in sec,"    // 1
+        "Join Delay,"             // 2
+        "Max Skew,"               // 3
+        "Min Join Delay,"         // 4
+        "Max Join Delay,"         // 5
+        );
+    g_print("Stat:%s\n",result);
+    header_printed = TRUE;
+    memset(result, 0, 1024);
+  }
+
+  sprintf(result,
+          "%3.1f,"   // 1
+          "%3lu,"    // 2
+          "%5ld,"     // 3
+          "%5u,"     // 4
+          "%5u,"     // 5
+          ,
+          GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000., // 1
+          GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->rtp_ts_generator, this->join_delay_in_ts)), // 2
+          this->max_skew, // 3
+          this->min_join_delay_in_ts,  // 4
+          this->max_join_delay_in_ts   // 5
+
+          );
+  g_print("Stat:%s\n", result);
+}
+
 
 guint32 stream_joiner_get_max_join_delay_in_ts(StreamJoiner *this)
 {
@@ -276,32 +324,96 @@ RcvPacket* stream_joiner_pop_packet(StreamJoiner *this)
 
   _dispose_frame(this, first);
 done:
+  DISABLE_LINE _stat_print(this);
+  _stat_print(this);
+
   if(!packet) {
     return NULL;
   }
   rcvpacket_unref(packet);
   _refresh_join_delay(this, packet);
 
-  if(this->hsn_init){
+  if(this->hsn_init) {
     this->hsn = _max_seq(this->hsn, packet->abs_seq);
-  }else{
+  } else {
     this->hsn = packet->abs_seq;
   }
 
   return packet;
 }
 
+//void _refresh_join_delay(StreamJoiner *this, RcvPacket* packet) {
+//  gint64 skew;
+//  if (!this->last_abs_seq) {
+//    goto done;
+//  }
+//  if (packet->subflow_id == this->last_subflow_id) {
+//    goto done;
+//  }
+//  skew = (gint64)_delta_ts(this->last_rcv_rtp_ts, packet->rcv_rtp_ts) - (gint64)_delta_ts(this->last_snd_rtp_ts, packet->snd_rtp_ts);
+//  this->join_delay_in_ts = (CONSTRAIN(this->min_join_delay_in_ts, this->max_join_delay_in_ts, skew) + 255 * this->join_delay_in_ts) / 256;
+//done:
+//  this->last_abs_seq = packet->abs_seq;
+//  this->last_subflow_id = packet->subflow_id;
+//  this->last_snd_rtp_ts = packet->snd_rtp_ts;
+//  this->last_rcv_rtp_ts = packet->rcv_rtp_ts;
+//}
+
+typedef struct {
+  GstClockTime added;
+  gint64 value;
+}Skew;
+
 void _refresh_join_delay(StreamJoiner *this, RcvPacket* packet) {
-  gint64 skew;
+  Skew* skew;
+  Skew* obsolated;
   if (!this->last_abs_seq) {
     goto done;
+  } else if (0 < _cmp_seq(this->last_abs_seq, packet->abs_seq)) {
+    return;
   }
   if (packet->subflow_id == this->last_subflow_id) {
     goto done;
   }
-  skew = (gint64)_delta_ts(this->last_rcv_rtp_ts, packet->rcv_rtp_ts) - (gint64)_delta_ts(this->last_snd_rtp_ts, packet->snd_rtp_ts);
-  this->join_delay_in_ts = (CONSTRAIN(this->min_join_delay_in_ts, this->max_join_delay_in_ts, skew) + 255 * this->join_delay_in_ts) / 256;
+  if (g_queue_is_empty(this->subflow_skews_recycle)) {
+    skew = g_malloc(sizeof(Skew));
+  } else {
+    skew = g_queue_pop_head(this->subflow_skews_recycle);
+  }
+
+  // TODO: need to handle the frame arrival interval
+
+  skew->added = _now(this);
+  skew->value = (gint64)_delta_ts(this->last_rcv_rtp_ts, packet->rcv_rtp_ts);
+
+  if (this->max_skew < skew->value) {
+    this->max_skew = skew->value;
+    this->last_max_skew_updated = _now(this);
+  }
+
+  if (g_queue_is_empty(this->subflow_skews)) {
+    g_queue_push_tail(this->subflow_skews, skew);
+    goto done;
+  }
+  while (!g_queue_is_empty(this->subflow_skews)) {
+    obsolated = g_queue_peek_head(this->subflow_skews);
+    if (_now(this) - GST_SECOND < obsolated->added) {
+      break;
+    }
+    obsolated = g_queue_pop_head(this->subflow_skews);
+    if (obsolated->value == this->max_skew) {
+      this->max_skew *= .8;
+    }
+    g_queue_push_tail(this->subflow_skews_recycle, obsolated);
+  }
+  g_queue_push_tail(this->subflow_skews, skew);
+
 done:
+  if (this->last_join_delay_updated < _now(this) - 0.2 * GST_SECOND) {
+    this->join_delay_in_ts = (this->max_skew * 1.5 + 127 * this->join_delay_in_ts) / 128;
+    this->join_delay_in_ts = CONSTRAIN(this->min_join_delay_in_ts, this->max_join_delay_in_ts, this->join_delay_in_ts);
+    this->last_join_delay_updated = _now(this);
+  }
   this->last_abs_seq = packet->abs_seq;
   this->last_subflow_id = packet->subflow_id;
   this->last_snd_rtp_ts = packet->snd_rtp_ts;

@@ -61,14 +61,14 @@ _select_next_subflow(
 
 
 static GstClockTime last_ratio_printed = 0;
-static void _print_ratios(StreamSplitter *this){
+static void _print_ratios(StreamSplitter *this) {
   GSList* it;
   if(_now(this) < last_ratio_printed  + 200 * GST_MSECOND) return;
   for(it = sndsubflows_get_subflows(this->subflows); it; it = it->next){
     SndSubflow* subflow = it->data;
     g_print("%d: %f-%f | ",
         subflow->id,
-        (gdouble)subflow->approved_target / (gdouble)this->total_stable_target,
+        (gdouble)subflow->allocated_target / (gdouble)this->stable_rate,
 //        (gdouble) this->stable_targets[subflow->id] / 1000,
         (gdouble)_qstat(this)->actual_bitrates[subflow->id] / (gdouble)_qstat(this)->total_bitrate
         );
@@ -101,8 +101,8 @@ StreamSplitter* make_stream_splitter(SndSubflows* sndsubflows, SndTracker* track
   this->sndqueue = sndqueue;
   this->tracker = tracker;
 
-  this->total_target = TOTAL_MIN_SENDING_RATE;
-  this->total_stable_target = 0;
+  this->media_rate = TOTAL_MIN_SENDING_RATE;
+  this->stable_rate = 0;
   this->mode = PACKET_SCHEDULING;
 
   return this;
@@ -129,86 +129,112 @@ stream_splitter_init (StreamSplitter * this)
 
 gint32 stream_splitter_get_total_media_rate(StreamSplitter* this)
 {
-  this->total_target = MAX(this->total_target, this->min_sending_rate);
-  return this->total_target;
+  // NOT HERE, BUT WHEN UPDATE IS REGULAR IN TIME
+  gint32 targets_dif = abs(this->media_rate - this->stable_rate);
+  if (this->media_rate_std == 0) {
+    this->media_rate_std = targets_dif;
+  } else {
+    this->media_rate_std = (this->media_rate_std * 31 + targets_dif) / 32;
+  }
+
+  this->media_rate = MAX(this->media_rate, this->min_sending_rate);
+  return this->media_rate;
 }
+
 
 static void _subflow_report_handler(StreamSplitter* this, SndSubflow* source)
 {
   GSList* it;
   SndSubflow* subflow;
-  gint32 max_increasement = 0;
-  gint32 total_increasement = 0;
-  gint32 total_desired_target = 0;
-  gint32 total_stable_target = 0;
-  gint32 total_sending_rate = 0;
-//  gdouble weight;
+//  gint32 ongoing_ramp_up = 0;
+  gint32 max_ramp_up = 0;
+  gdouble total_weight = 0.0;
   gint32 sum_reduction = 0;
-  gint32 remaining_increasement = 0;
-  gdouble accumulated_influence = 0.;
+//  gint32 remaining_increase = 0;
 
+  this->stable_rate = 0;
   this->min_sending_rate = 0;
   for (it = sndsubflows_get_subflows(this->subflows); it; it = it->next) {
     subflow = it->data;
     if (!subflow->active) continue;
-    if (subflow->stable_bitrate < subflow->requested_target) {
-      gint32 subflow_increasement = subflow->requested_target - subflow->stable_bitrate;
-      max_increasement = MAX(max_increasement, subflow_increasement);
-      total_increasement += subflow->requested_target - subflow->stable_bitrate;
-      accumulated_influence += (gdouble) GST_TIME_AS_MSECONDS(_now(this) - subflow->last_increased_target) / (gdouble) (subflow_increasement / 1000.);
-    } else if (subflow->requested_target <= subflow->stable_bitrate){
-      sum_reduction += subflow->stable_bitrate - subflow->requested_target;
+//    if (subflow->stable_bitrate < subflow->allocated_target)
+//    {
+//      ongoing_ramp_up += subflow->allocated_target - subflow->stable_bitrate;
+//    }
+//    else
+    if (subflow->stable_bitrate < subflow->estimated_target)
+    {
+      gint32 ramp_up = subflow->estimated_target - subflow->stable_bitrate;
+      max_ramp_up = MAX(max_ramp_up, ramp_up);
+      if (0. < subflow->rtt) {
+        gdouble rtt_in_s = (gdouble) GST_TIME_AS_SECONDS(subflow->rtt * 10) / 10000.;
+        total_weight += (gdouble)ramp_up / rtt_in_s;
+      } else {
+        total_weight += ramp_up;
+      }
     }
-    total_sending_rate += sndtracker_get_subflow_stat(this->tracker, subflow->id)->sent_bytes_in_1s * 8;
-    total_stable_target += subflow->stable_bitrate;
+    else if (subflow->estimated_target <= subflow->stable_bitrate)
+    {
+      sum_reduction += subflow->stable_bitrate - subflow->estimated_target;
+      this->allocated_targets[subflow->id] = subflow->allocated_target = MAX(subflow->min_sending_rate, subflow->estimated_target);
+    }
+
+    this->stable_rate += subflow->stable_bitrate;
     this->stable_targets[subflow->id] = subflow->stable_bitrate;
     this->min_sending_rate += subflow->min_sending_rate;
+
+    // Note: Not necessary, since subflow->allocated_target is considered in subflow cong controller
+    //mediator_set_response(subflow->control_channel, subflow);
   }
 
-  total_desired_target = total_stable_target - sum_reduction + max_increasement;
-  remaining_increasement = max_increasement;
-//  g_print("Max increasement: %d\n", max_increasement);
+  this->media_rate = this->stable_rate - sum_reduction;
+//  if (0 < ongoing_ramp_up) {
+//    this->media_rate += ongoing_ramp_up;
+//    goto done;
+//  } else if (!max_ramp_up) { // no ramping up request
+//    goto done;
+//  }
+  if (!max_ramp_up) {
+    goto done;
+  }
+
+//  g_print("new ramping up: %d\n", max_ramp_up);
+  // New ramping up.
+  this->media_rate += max_ramp_up;
 
   for (it = sndsubflows_get_subflows(this->subflows); it; it = it->next) {
+    gdouble weight;
+    gint32 subflow_ramp_up;
+    gint32 allocated_ramp_up = MAX(0, subflow->allocated_target - subflow->stable_bitrate);
     subflow = it->data;
-    if (!subflow->active) continue;
-    if (subflow->requested_target <= subflow->stable_bitrate)
-    {
-      subflow->approved_target = subflow->requested_target;
-      this->desired_targets[subflow->id] = subflow->approved_target;
-    }
-    else if (subflow->stable_bitrate < subflow->requested_target)
-    {
-      gdouble subflow_increasement = subflow->requested_target - subflow->stable_bitrate;
-      gint32 approved_increasement;
-      gdouble weight; // = subflow_increasement / (gdouble) total_increasement;
-      weight = (gdouble) GST_TIME_AS_MSECONDS(_now(this) - subflow->last_increased_target) / (gdouble) (subflow_increasement / 1000.);
-      weight /= accumulated_influence;
-      approved_increasement = MIN(max_increasement * weight, subflow_increasement);
-      approved_increasement = MIN(approved_increasement, remaining_increasement);
-//      subflow->approved_target = subflow->stable_bitrate + max_increasement * weight;
-      subflow->approved_target = subflow->stable_bitrate + approved_increasement;
-      this->desired_targets[subflow->id] = subflow->approved_target;
-      remaining_increasement -= approved_increasement;
-//      g_print("Max increasement: %f, %f\n", subflow_increasement, weight);
-    }
-    else // the desired rate is equal to the sending rate
-    {
-      this->desired_targets[subflow->id] = subflow->requested_target;
+    if (!subflow->active || subflow->estimated_target <= subflow->stable_bitrate) continue;
+
+    subflow_ramp_up = subflow->estimated_target - subflow->stable_bitrate;
+    if (0. < subflow->rtt) {
+      gdouble rtt_in_s = (gdouble) GST_TIME_AS_SECONDS(subflow->rtt * 10) / 10000.;
+      weight = (gdouble)subflow_ramp_up / rtt_in_s;
+    } else {
+      weight = subflow_ramp_up;
     }
 
-    subflow->approved_target = MAX(subflow->approved_target, subflow->min_sending_rate);
-    mediator_set_response(subflow->control_channel, subflow);
+    if (0 < allocated_ramp_up) {
+      allocated_ramp_up = MIN(allocated_ramp_up, subflow_ramp_up * weight / total_weight);
+    } else {
+      allocated_ramp_up = subflow_ramp_up * weight / total_weight;
+    }
+
+    this->allocated_targets[subflow->id] = subflow->allocated_target = MAX(subflow->min_sending_rate, subflow->stable_bitrate + allocated_ramp_up);
   }
 
-  this->total_target = total_desired_target;
-//  g_print("this->total_target: %d , %d\n", this->total_target, sum_reduction);
-
+done:
   source->base_db->target_off = this->target_off;
-  source->base_db->total_desired_target = total_desired_target;
-  source->base_db->total_stable_target = total_stable_target;
+  source->base_db->total_desired_target = this->media_rate;
+  source->base_db->total_stable_target = this->stable_rate;
   source->base_db->total_sending_rate = this->sending_rate_avg;
 }
+
+
+
 
 void
 stream_splitter_on_packet_queued(StreamSplitter* this, SndPacket* packet)
@@ -276,46 +302,31 @@ stream_splitter_set_keyframe_filtering(StreamSplitter* this, gboolean keyframe_f
   this->keyframe_filtering = keyframe_filtering;
 }
 
-static gdouble sigma(gdouble x, gdouble x0, gdouble k) {
-//  g_print("1/(1+e^(%1.2f*(%d-%d)))\n", k, (gint32)x, (gint32)x0);
-  return 1./(1.+exp(k*(x-x0)));
-}
-
 static void _refresh_target_off(StreamSplitter * this)
 {
   gint32 total_sending_rate = sndtracker_get_stat(this->tracker)->sent_bytes_in_1s * 8;
-  gdouble midpoint;
-  gdouble stepness;
-  gdouble distance = abs(this->subflows->total_stable_target - this->subflows->total_desired_target);
-  this->sending_rate_avg = total_sending_rate * .5 + this->sending_rate_avg * .5;
+  gdouble alpha = MIN(.5, (gdouble)this->media_rate_std / (2. * abs(this->media_rate - this->stable_rate)));
+  gdouble numerator;
+  gdouble divider;
+  this->sending_rate_avg = total_sending_rate * alpha + this->sending_rate_avg * (1.-alpha);
 
-  if (this->subflows->total_stable_target == this->subflows->total_desired_target) {
+  if (this->media_rate == this->stable_rate) {
     this->target_off = 1.;
     goto done;
+  } else if (this->stable_rate < this->media_rate) {
+    numerator = MAX(0, this->media_rate - this->sending_rate_avg);
+    divider = this->media_rate - this->stable_rate;
+  } else { // media_rate < stable_rate
+    numerator = MAX(0, this->sending_rate_avg - this->media_rate);
+    divider =  this->stable_rate - this->media_rate;
   }
-  if (this->subflows->total_stable_target < this->subflows->total_desired_target) {
-    midpoint = this->subflows->total_stable_target + distance / 2.;
-    stepness = -5./distance;
-  } else {
-    midpoint = this->subflows->total_desired_target + distance / 2.;
-    stepness = 5./distance;
-  }
+  this->target_off = 1. - MIN(1., numerator / divider);
 
-  this->target_off = sigma(this->sending_rate_avg, midpoint, stepness);
-
-//  gdouble stable_off, desired_off;
-//  stable_off = (this->subflows->total_stable_target - this->sending_rate_avg) / (gdouble) this->subflows->total_stable_target;
-//  if (this->total_stable_target == this->subflows->total_desired_target) {
-//    this->target_off = 0.;
-//  } else {
-//    this->target_off = (gdouble) (this->subflows->total_desired_target - this->sending_rate_avg);
-//    this->target_off /= (gdouble) (this->subflows->total_desired_target - this->total_stable_target);
-//    this->target_off = CONSTRAIN(0., 1., this->target_off);
-//  }
 done:
   this->subflows->target_off = this->target_off;
   this->subflows->total_sending_rate = this->sending_rate_avg;
 }
+
 
 SndSubflow* stream_splitter_select_subflow(StreamSplitter * this, SndPacket *packet) {
   gboolean new_frame = this->last_timestamp == 0 || packet->timestamp != this->last_timestamp;
@@ -350,9 +361,9 @@ SndSubflow* _select_next_subflow(StreamSplitter * this, SndPacket *packet) {
       subflow = it->data;
       drate = _qstat(this)->actual_bitrates[subflow->id] + _qstat(this)->queued_bytes[subflow->id] * 8;
       if (0 < this->stable_targets[subflow->id]) {
-        drate -= this->stable_targets[subflow->id] * (1.-this->target_off) + this->desired_targets[subflow->id] * (this->target_off);
+        drate -= this->stable_targets[subflow->id] * (1.-this->target_off) + this->allocated_targets[subflow->id] * (this->target_off);
       } else {
-        drate -= this->desired_targets[subflow->id];
+        drate -= this->allocated_targets[subflow->id];
       }
 
       if(!subflow->active){

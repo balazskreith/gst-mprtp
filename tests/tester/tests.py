@@ -1501,10 +1501,11 @@ class MPRTP4(MyTest):
         # min_bw = max(400, int(2000 / self._subflows_num))
         min_bw = 1000
         space = max(1, self._subflows_num - 1)
-        flow_stages_1 = [{
-            "duration": 25,
-            "config": PathConfig(bandwidth=1000, latency=self.__latency, jitter=self.__jitter)
-        },
+        flow_stages_1 = [
+            {
+                "duration": 25,
+                "config": PathConfig(bandwidth=1000, latency=self.__latency, jitter=self.__jitter)
+            },
             {
                 "duration": 25,
                 "config": PathConfig(bandwidth=500, latency=self.__latency, jitter=self.__jitter)
@@ -1524,7 +1525,8 @@ class MPRTP4(MyTest):
         self._forward_bandwidths.append(forward_bandwidths)
         result.append(forward_path_ctrler)
 
-        flow_stages_2 = [{
+        flow_stages_2 = [
+            {
                 "duration": 25,
                 "config": PathConfig(bandwidth=500, latency=self.__latency, jitter=self.__jitter)
             },
@@ -3031,5 +3033,3 @@ class MPRTP11(MyTest):
 
     def get_descriptions(self):
         return self.__description
-
-

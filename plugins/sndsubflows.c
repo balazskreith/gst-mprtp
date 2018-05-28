@@ -264,7 +264,7 @@ void sndsubflow_set_desired_bitrate(SndSubflow* subflow, gint32 desired_rate)
   SndSubflows *subflows = subflow->base_db;
 //  subflows->target_rate -= subflow->target_bitrate;
 //  subflows->target_rate += subflow->target_bitrate = target_rate;
-  subflow->approved_target = desired_rate;
+  subflow->allocated_target = desired_rate;
 
   notifier_do(subflows->on_desired_bitrate_changed, subflow);
 }
@@ -342,7 +342,7 @@ static void _on_subflow_desired_bitrate_changed(SndSubflow* subflow, SndSubflows
 
 void sndsubflows_set_target_bitrate(SndSubflows* this, guint8 subflow_id, gint32 target_bitrate)
 {
-  CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, approved_target, target_bitrate, NULL);
+  CHANGE_SUBFLOW_PROPERTY_VALUE(this->joined, subflow_id, allocated_target, target_bitrate, NULL);
 //  this->target_rate = 0;
   g_slist_foreach(this->joined, (GFunc) _on_subflow_desired_bitrate_changed, this);
 }

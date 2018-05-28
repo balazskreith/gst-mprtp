@@ -155,7 +155,7 @@ void
 sndqueue_on_subflow_target_bitrate_changed(SndQueue* this, SndSubflow* subflow)
 {
   this->total_target -= this->actual_targets[subflow->id];
-  this->actual_targets[subflow->id] = subflow->approved_target;
+  this->actual_targets[subflow->id] = subflow->allocated_target;
   this->total_target += this->actual_targets[subflow->id];
 }
 

@@ -242,6 +242,7 @@ done:
 void fractalfbprocessor_approve_feedback(FRACTaLFBProcessor *this)
 {
   this->srtt_in_ts = this->srtt_in_ts * .9 + this->rtt_in_ts * .1;
+  this->subflow->rtt = _stat(this)->srtt = timestamp_generator_get_time(this->ts_generator, this->srtt_in_ts);
 }
 
 
@@ -396,7 +397,7 @@ void _process_stat(FRACTaLFBProcessor *this)
   gdouble ewma_factor         = _get_ewma_factor(this);
   gdouble alpha;
 
-  _stat(this)->rtpq_delay            = (gdouble) rtpqstat->bytes_in_queue * 8 / (gdouble) this->subflow->approved_target;
+  _stat(this)->rtpq_delay            = (gdouble) rtpqstat->bytes_in_queue * 8 / (gdouble) this->subflow->allocated_target;
   _stat(this)->sender_bitrate        = sndstat->sent_bytes_in_1s * 8;
   _stat(this)->receiver_bitrate      = sndstat->received_bytes_in_1s * 8;
   _stat(this)->fec_bitrate           = sndstat->sent_fec_bytes_in_1s * 8;

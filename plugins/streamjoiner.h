@@ -46,7 +46,11 @@ struct _StreamJoiner
   guint32              min_join_delay_in_ts;
   guint32              join_delay_in_ts;
 
-
+  gint64               max_skew;
+  GstClockTime         last_max_skew_updated;
+  GstClockTime         last_join_delay_updated;
+  GQueue*              subflow_skews;
+  GQueue*              subflow_skews_recycle;
 };
 struct _StreamJoinerClass{
   GObjectClass parent_class;

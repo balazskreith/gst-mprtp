@@ -173,11 +173,11 @@ struct _Private{
 #define _set_stable_target(this, value) this->subflow->stable_bitrate = value
 #define _get_stable_target(this) this->subflow->stable_bitrate
 
-#define _set_approved_target(this, value) this->subflow->approved_bitrate = value
-#define _get_approved_target(this) this->subflow->approved_target
+#define _set_allocated_target(this, value) this->subflow->allocated_target = value
+#define _get_allocated_target(this) this->subflow->allocated_target
 
-#define _set_requested_target(this, value) this->subflow->requested_target = value
-#define _get_requested_target(this) this->subflow->requested_target
+#define _set_estimated_target(this, value) this->subflow->estimated_target = value
+#define _get_estimated_target(this) this->subflow->estimated_target
 
 #define _set_max_incresement(this, value) this->subflow->max_increasement = value
 #define _get_max_incresement(this) this->subflow->max_increasement
@@ -297,7 +297,12 @@ _check_tcp(
     FRACTaLSubController *this);
 
 static void
-_set_target_bitrate(
+_set_estimated_bitrate(
+    FRACTaLSubController* this,
+    gint32 value);
+
+static void
+_set_stable_bitrate(
     FRACTaLSubController* this,
     gint32 value);
 
@@ -426,21 +431,23 @@ FRACTaLSubController *make_fractalsubctrler(SndTracker *sndtracker, SndSubflow *
   g_object_ref(subflow->control_channel);
   mediator_set_response_handler(subflow->control_channel, (ListenerFunc) _multipath_controller_response, this);
   subflow->min_sending_rate = _min_target(this);
-  _set_target_bitrate(this, _min_target(this));
+  _set_stable_target(this, _min_target(this));
+  _set_allocated_target(this, _min_target(this));
+  _set_estimated_bitrate(this, _min_target(this));
   return this;
 }
 
 
 void fractalsubctrler_enable(FRACTaLSubController *this)
 {
-  _set_target_bitrate(this, _min_target(this));
+  _set_estimated_bitrate(this, _min_target(this));
   this->enabled = TRUE;
 }
 
 void fractalsubctrler_disable(FRACTaLSubController *this)
 {
   _switch_stage_to(this, STAGE_KEEP, FALSE);
-  _set_target_bitrate(this, 0);
+  _set_estimated_bitrate(this, 0);
   _stop_monitoring(this);
   this->enabled = FALSE;
 }
@@ -490,9 +497,9 @@ static void _stat_print(FRACTaLSubController *this)
         "Sending Rate [kbps],"    // 10
         "Receiver Rate [kbps],"   // 11
         "Received in EWI [kbps]," // 12
-        "Requested Rate [kbps],"  // 13
+        "Estimated Rate [kbps],"  // 13
         "Bottleneck Point [kbps],"// 14
-        "Approved Target [kbps]," // 15
+        "Allocated Target [kbps],"// 15
         "Congested Target [kbps],"// 16
         "dRate [kbps],"           // 17
         "FRACTaL Stage,"          // 18
@@ -578,9 +585,9 @@ static void _stat_print(FRACTaLSubController *this)
           (gint32)(stat->sr_avg / 1000),             // 10
           (gint32)(stat->rr_avg / 1000),             // 11
           (gint32)(stat->rcved_bytes_in_ewi / 125),  // 12
-          _get_requested_target(this) / 1000,        // 13
+          _get_estimated_target(this) / 1000,        // 13
           this->bottleneck_point / 1000,             // 14
-          _get_approved_target(this) / 1000,         // 15
+          _get_allocated_target(this) / 1000,         // 15
           this->congested_bitrate / 1000,            // 16
           (gint32)(_stat(this)->drate_avg / 1000),   // 17
           _priv(this)->stage,                        // 18
@@ -627,7 +634,7 @@ void fractalsubctrler_time_update(FRACTaLSubController *this)
     _stop_monitoring(this);
     _set_event(this, EVENT_DISTORTION);
     _switch_stage_to(this, STAGE_KEEP, FALSE);
-    _set_target_bitrate(this, MIN(_stat(this)->sr_avg, _stat(this)->rr_avg) * .9);
+    _set_estimated_bitrate(this, MIN(_stat(this)->sr_avg, _stat(this)->rr_avg) * .9);
     this->backward_congestion = TRUE;
     goto done;
   } else if(this->backward_congestion) {
@@ -727,7 +734,7 @@ static gboolean _congestion(FRACTaLSubController *this)
 
 static void _undershoot(FRACTaLSubController *this, gint32 turning_point) {
   gint32 new_target;
-  if (_get_approved_target(this) < _stat(this)->sr_avg - _max_ramp_up(this)) {
+  if (_get_allocated_target(this) < _stat(this)->sr_avg - _max_ramp_up(this)) {
     this->reducing_sr_reached = 0;
     this->reducing_approved = FALSE;
     this->congestion_detected = _now(this);
@@ -740,10 +747,10 @@ static void _undershoot(FRACTaLSubController *this, gint32 turning_point) {
   this->reducing_approved = FALSE;
   this->congestion_detected = _now(this);
   this->pivot_fl_stability = _stat(this)->fl_stability;
-  this->bottleneck_point = MIN(_stat(this)->rr_avg, _get_approved_target(this) - _min_ramp_up(this) * 2) * _stat(this)->fl_stability  + this->congested_bitrate * .6 * (1.-_stat(this)->fl_stability);
+  this->bottleneck_point = MIN(_stat(this)->rr_avg, _get_allocated_target(this) - _min_ramp_up(this) * 2) * _stat(this)->fl_stability  + this->congested_bitrate * .6 * (1.-_stat(this)->fl_stability);
 //  new_target = this->congested_bitrate * .8 * _stat(this)->fl_stability + this->congested_bitrate * .5 * (1.-_stat(this)->fl_stability);
   new_target = MIN(this->bottleneck_point * .9, this->bottleneck_point - 2 * _min_ramp_up(this));
-  _set_target_bitrate(this, MIN(_get_approved_target(this) - _min_ramp_up(this) * 2, new_target));
+  _set_estimated_bitrate(this, MIN(_get_allocated_target(this) - _min_ramp_up(this) * 2, new_target));
 }
 
 void
@@ -753,10 +760,10 @@ _reduce_stage(
   gint32 new_target;
 
   if (_congestion(this)) {
-    if (this->congestion_detected < _now(this) - 2 * _stat(this)->srtt && this->congested_bitrate * .6 < _get_approved_target(this)) {
+    if (this->congestion_detected < _now(this) - 2 * _stat(this)->srtt && this->congested_bitrate * .6 < _get_allocated_target(this)) {
       this->bottleneck_point = MAX(_stat(this)->rr_avg, _stat(this)->sr_avg * .9) * _stat(this)->fl_stability  + this->congested_bitrate * .6 * (1.-_stat(this)->fl_stability);
       new_target = MIN(this->bottleneck_point * .9, this->bottleneck_point - 2 * _min_ramp_up(this));
-      _set_target_bitrate(this, MIN(_get_approved_target(this), new_target));
+      _set_estimated_bitrate(this, MIN(_get_allocated_target(this), new_target));
       goto done;
     }
     if (_stat(this)->rr_avg < _stat(this)->sr_avg * .8) {
@@ -765,7 +772,7 @@ _reduce_stage(
     }
     this->bottleneck_point = MAX(_stat(this)->rr_avg, _stat(this)->sr_avg * .9) * _stat(this)->fl_stability  + this->congested_bitrate * .6 * (1.-_stat(this)->fl_stability);
     new_target = MIN(this->bottleneck_point * .9, this->bottleneck_point - 2 * _min_ramp_up(this));
-    _set_target_bitrate(this, MIN(_get_approved_target(this), new_target));
+    _set_estimated_bitrate(this, MIN(_get_allocated_target(this), new_target));
     goto done;
   }
 
@@ -775,7 +782,7 @@ _reduce_stage(
   }
 
   if (this->bottleneck_point == 0) {
-    this->bottleneck_point = _get_approved_target(this);
+    this->bottleneck_point = _get_allocated_target(this);
   }
 
   _switch_stage_to(this, STAGE_KEEP, FALSE);
@@ -813,9 +820,8 @@ _keep_stage(
   }
 
   _start_monitoring(this);
-//  sndsubflow_set_stable_target_rate(this->subflow, this->target_bitrate);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
-  _set_stable_target(this, _get_approved_target(this));
+  _set_stable_bitrate(this, _get_allocated_target(this));
 done:
   return;
 }
@@ -836,11 +842,11 @@ _probe_stage(
   if (_stat(this)->qdelay_is_stable && _stat(this)->qdelay_stability < .5) { //
     gdouble alpha = _stat(this)->qdelay_stability;
     gint32 new_target = _get_stable_target(this) * alpha + _stat(this)->rr_avg * .8 * (1.-alpha);
-    if (!_is_target_approved(this) && _get_approved_target(this) < _stat(this)->sr_avg) {
+    if (!_is_target_approved(this) && _get_allocated_target(this) < _stat(this)->sr_avg) {
       goto done;
     }
 //    this->bottleneck_point = _get_approved_target(this);
-    _set_target_bitrate(this, CONSTRAIN(_get_approved_target(this) - 25000, _get_approved_target(this) + 25000, new_target));
+    _set_estimated_bitrate(this, CONSTRAIN(_get_allocated_target(this) - 25000, _get_allocated_target(this) + 25000, new_target));
     goto done;
   }
 
@@ -851,10 +857,10 @@ _probe_stage(
 
   _set_event(this, EVENT_READY);
   _start_increasement(this);
-  _switch_stage_to(this, STAGE_INCREASE, FALSE);
+  if (_get_stable_target(this) < _get_allocated_target(this)) {
+    _switch_stage_to(this, STAGE_INCREASE, FALSE);
+  }
 
-  // TODO: reduce the max bitrate if this is the case
-//  this->approved_target = MAX(this->approved_target * .95, this->target_bitrate);
 //  g_print("set target: %d | target: %d\n", this->set_target, this->target_bitrate);
 done:
   return;
@@ -875,20 +881,20 @@ _increase_stage(
   DISABLE_LINE _increase_helper(this);
   if (_stat(this)->qdelay_is_stable && _stat(this)->qdelay_stability < .5) {
     gdouble alpha = 1. - _stat(this)->qdelay_stability / .5;
-    gint32 increasement = _get_approved_target(this) - _get_stable_target(this);
+    gint32 increasement = _get_allocated_target(this) - _get_stable_target(this);
     gint32 refpoint;
     gint32 new_target;
 
     refpoint = MAX(_get_stable_target(this), _stat(this)->rr_avg * .9) - MIN(increasement * 2, _max_ramp_up(this) * 1.5);
     new_target = _get_stable_target(this) * alpha + refpoint * (1.-alpha);
-    _set_target_bitrate(this, new_target);
+    _set_estimated_bitrate(this, new_target);
   }
 
-  if (_get_approved_target(this) <= _get_stable_target(this)) {
+  if (_get_allocated_target(this) <= _get_stable_target(this)) {
     if (this->bottleneck_point < _get_stable_target(this)) {
-      this->bottleneck_point = _get_approved_target(this);
+      this->bottleneck_point = _get_allocated_target(this);
     }
-    _set_stable_target(this, MIN(_get_approved_target(this), _get_stable_target(this)));
+    _set_stable_bitrate(this, MIN(_get_allocated_target(this), _get_stable_target(this)));
     _set_event(this, EVENT_SETTLED);
     _start_monitoring(this);
     _switch_stage_to(this, STAGE_PROBE, FALSE);
@@ -903,7 +909,7 @@ _increase_stage(
   _set_event(this, EVENT_SETTLED);
   _start_monitoring(this);
   _switch_stage_to(this, STAGE_PROBE, FALSE);
-  _set_stable_target(this, _get_approved_target(this));
+  _set_stable_bitrate(this, _get_allocated_target(this));
   this->subflow->last_increased_target = _now(this);
 done:
   return;
@@ -1065,11 +1071,31 @@ void _refresh_monitoring_approvement(FRACTaLSubController *this)
 void _start_monitoring(FRACTaLSubController *this)
 {
   this->prev_monitoring_interval = this->monitoring_interval;
-  this->monitoring_interval = _get_monitoring_interval(this);
+  this->prev_monitoring_target_bitrate = this->monitoring_target_bitrate;
+
+  if (!this->prev_monitoring_target_bitrate) {
+    this->monitoring_target_bitrate = _min_ramp_up(this);
+  } else {
+    gint32 max_ramp_up = this->prev_monitoring_target_bitrate * 1.5;
+    this->monitoring_target_bitrate = MIN(max_ramp_up, _sensitivity(this, _min_ramp_up(this), _max_ramp_up(this)));
+  }
+
+  this->monitoring_interval = CONSTRAIN(_mon_min_int(this), _mon_max_int(this), _get_stable_target(this) / this->monitoring_target_bitrate);
+
+//  if (this->monitoring_interval < this->prev_monitoring_interval) {
+//    gint32 dif = this->monitoring_target_bitrate - this->prev_monitoring_target_bitrate;
+//    if (_min_ramp_up(this) / 1.5 < dif) {
+//      this->monitoring_interval = CONSTRAIN(_mon_min_int(this), _mon_max_int(this), this->prev_monitoring_target_bitrate - 1);
+//    }
+//  } else if (!this->prev_monitoring_interval) { // This is the first after a congestion or anything.
+//    this->monitoring_interval = CONSTRAIN(_mon_max_int(this) / 2, _mon_max_int(this), this->monitoring_interval);
+//  }
+
+  DISABLE_LINE this->monitoring_target_bitrate = _get_allocated_target(this) / this->monitoring_interval;
+  DISABLE_LINE this->monitoring_interval = _get_monitoring_interval(this);
   this->monitoring_approvement_started  = 0;
   this->monitoring_started  = _now(this);
   this->monitoring_approved  = FALSE;
-  this->monitoring_target_bitrate = _get_approved_target(this) / this->monitoring_interval;
   this->approvement_interval = _get_approvement_interval(this);
 }
 
@@ -1078,6 +1104,8 @@ void _stop_monitoring(FRACTaLSubController *this)
   this->monitoring_interval = 0;
   this->monitoring_approvement_started  = 0;
   this->monitoring_approved = FALSE;
+  this->prev_monitoring_interval = 0;
+  this->prev_monitoring_target_bitrate = 0;
 }
 
 void _refresh_increasing_approvement(FRACTaLSubController *this)
@@ -1158,7 +1186,7 @@ void _start_increasement(FRACTaLSubController *this)
   this->increasing_sr_reached    = 0;
   this->increasing_approved      = FALSE;
   this->approvement_interval     = _get_approvement_interval(this);
-  _set_target_bitrate(this, MIN(_get_stable_target(this), _get_approved_target(this)) + _get_max_incresement(this));
+  _set_estimated_bitrate(this, MIN(_get_stable_target(this), _get_allocated_target(this)) + _get_max_incresement(this));
 
 }
 
@@ -1166,10 +1194,10 @@ gdouble _scale_t(FRACTaLSubController *this)
 {
   gdouble result   = 0.;
   gint32 refpoint = MAX(_min_target(this), this->bottleneck_point);
-  gint32 drate = MAX(_get_approved_target(this) - refpoint, refpoint - _get_approved_target(this));
+  gint32 drate = MAX(_get_allocated_target(this) - refpoint, refpoint - _get_allocated_target(this));
   gint32 epspoint;
 
-  if (_get_approved_target(this) < refpoint) {
+  if (_get_allocated_target(this) < refpoint) {
     epspoint = 1.5 * _max_ramp_up(this);
   } else {
     epspoint = _max_ramp_up(this) * 1;
@@ -1192,7 +1220,7 @@ guint _get_approvement_interval(FRACTaLSubController* this)
 
   min = MAX(_appr_min_time(this) * GST_SECOND, _stat(this)->srtt * 1);
   max = MIN(_appr_max_time(this) * GST_SECOND, _stat(this)->srtt * 5);
-  if (_get_approved_target(this) < _min_target(this) * 3) {
+  if (_get_allocated_target(this) < _min_target(this) * 3) {
     return min;
   }
   interval = scale_t * min + (1.-scale_t) * max;
@@ -1204,7 +1232,7 @@ guint _get_monitoring_interval(FRACTaLSubController* this)
   gint result;
   gint32 monitoring_target_bitrate;
   monitoring_target_bitrate = _sensitivity(this, _min_ramp_up(this), _max_ramp_up(this));
-  result = CONSTRAIN(_mon_min_int(this), _mon_max_int(this), _get_approved_target(this) / monitoring_target_bitrate);
+  result = CONSTRAIN(_mon_min_int(this), _mon_max_int(this), _get_allocated_target(this) / monitoring_target_bitrate);
   if (4 < this->prev_monitoring_interval && this->prev_monitoring_interval < 10) {
     result = MAX(this->prev_monitoring_interval - 2, result);
   }
@@ -1222,13 +1250,13 @@ void _probe_helper(FRACTaLSubController *this) {
     return;
   } else if (alpha < .5) {
     new_target = _get_stable_target(this) - _get_stable_target(this) * .2 * (1.-alpha);
-    _set_target_bitrate(this, new_target);
+    _set_estimated_bitrate(this, new_target);
     this->last_inflicted = _now(this);
     return;
   }
   new_target = _get_stable_target(this) - _get_stable_target(this) * .2 * (1.-alpha);
-  new_target = _get_approved_target(this) + CONSTRAIN(-10000, 10000, new_target - _get_approved_target(this));
-  _set_target_bitrate(this, MIN(_get_stable_target(this), new_target));
+  new_target = _get_allocated_target(this) + CONSTRAIN(-10000, 10000, new_target - _get_allocated_target(this));
+  _set_estimated_bitrate(this, MIN(_get_stable_target(this), new_target));
 }
 
 
@@ -1266,7 +1294,7 @@ void _increase_helper(FRACTaLSubController *this) {
     return;
   } else if (alpha < .5) {
     new_target = _get_stable_target(this) - 1;
-    _set_target_bitrate(this, new_target);
+    _set_estimated_bitrate(this, new_target);
     return;
   }
   if (!_is_target_approved(this)) {
@@ -1279,8 +1307,8 @@ void _increase_helper(FRACTaLSubController *this) {
     new_target = _get_stable_target(this) + _get_max_incresement(this) * alpha - _get_max_incresement(this) * (1.-alpha);
   }
 
-  new_target = _get_approved_target(this) + CONSTRAIN(-10000, 10000, new_target - _get_stable_target(this));
-  _set_target_bitrate(this, new_target);
+  new_target = _get_allocated_target(this) + CONSTRAIN(-10000, 10000, new_target - _get_stable_target(this));
+  _set_estimated_bitrate(this, new_target);
 }
 
 
@@ -1291,7 +1319,7 @@ void _check_tcp(FRACTaLSubController *this){
 }
 
 
-void _set_target_bitrate(FRACTaLSubController* this, gint32 value)
+void _set_estimated_bitrate(FRACTaLSubController* this, gint32 value)
 {
   gint32 desired_rate;
   if(0 < _max_target(this)){
@@ -1302,9 +1330,17 @@ void _set_target_bitrate(FRACTaLSubController* this, gint32 value)
 
   {
     SndSubflow* subflow = this->subflow;
-    _set_requested_target(this, desired_rate);
+    _set_estimated_target(this, desired_rate);
     mediator_set_request(subflow->control_channel, subflow);
   }
+}
+
+
+void _set_stable_bitrate(FRACTaLSubController* this, gint32 value)
+{
+  SndSubflow* subflow = this->subflow;
+  _set_stable_target(this, value);
+  mediator_set_request(subflow->control_channel, subflow);
 }
 
 void _multipath_controller_response(FRACTaLSubController* this, SndSubflow* subflow) {
@@ -1320,7 +1356,7 @@ gboolean _is_target_approved(FRACTaLSubController *this) {
   gint32 boundary;
   boundary = CONSTRAIN(_min_ramp_up(this) / 2, _max_ramp_up(this), _stat(this)->sr_avg * .1);
 
-  if (abs(_get_approved_target(this) - _stat(this)->sr_avg) < boundary) {
+  if (abs(_get_allocated_target(this) - _stat(this)->sr_avg) < boundary) {
     this->last_approved = _now(this);
     return this->subflow->target_is_approved = TRUE;
   }

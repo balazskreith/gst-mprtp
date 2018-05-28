@@ -50,8 +50,8 @@ typedef struct _SndSubflow
 
   gboolean                   target_is_approved;
   gint32                     min_sending_rate;
-  gint32                     requested_target;
-  gint32                     approved_target;
+  gint32                     estimated_target;
+  gint32                     allocated_target;
   gint32                     stable_bitrate;
   gint32                     max_increasement;
   GstClockTime               last_increased_target;

@@ -66,6 +66,7 @@ struct _FRACTaLSubController
 
   guint                     monitoring_interval;
   guint                     prev_monitoring_interval;
+  gint32                    prev_monitoring_target_bitrate;
   gint32                    monitoring_target_bitrate;
   GstClockTime              monitoring_started;
   GstClockTime              monitoring_approvement_started;

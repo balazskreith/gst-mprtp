@@ -39,11 +39,14 @@ struct _StreamSplitter
   SndQueue*            sndqueue;
 
   volatile gint32      stable_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  volatile gint32      desired_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
+  volatile gint32      allocated_targets[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
   guint8               max_state;
   gboolean             keyframe_filtering;
-  gint32               total_target;
-  gint32               total_stable_target;
+
+  gint32               media_rate_std;
+  gint32               media_rate;
+  gint32               stable_rate;
+
   gdouble              target_off;
   gint32               sending_rate_avg;
   gint32               min_sending_rate;

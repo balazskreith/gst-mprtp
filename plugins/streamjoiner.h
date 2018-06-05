@@ -45,19 +45,32 @@ struct _StreamJoiner
   guint32              max_join_delay_in_ts;
   guint32              min_join_delay_in_ts;
   guint32              join_delay_in_ts;
+  gint                 join_frame_nr;
+  gdouble              max_skew_in_ts, playout_delay_in_ts;
 
-  gint64               max_skew;
+  gint64               max_diff_delay_in_ts;
   GstClockTime         last_max_skew_updated;
-  GstClockTime         last_join_delay_updated;
-  GQueue*              subflow_skews;
-  GQueue*              subflow_skews_recycle;
+  GstClockTime         last_updated;
+  GQueue*              playout_items;
+  GQueue*              playour_items_recycle;
+  RcvSubflows*         subflows;
+
+  guint32              frame_inter_arrival_avg_in_ts;
+  guint32              last_frame_ts;
+  gboolean             first_frame_popped;
+
+  struct {
+    gdouble skew;
+    gint32 meas_num;
+    guint16 last_seq;
+  }skew_info[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
 };
 struct _StreamJoinerClass{
   GObjectClass parent_class;
 };
 
 StreamJoiner*
-make_stream_joiner(TimestampGenerator* rtp_ts_generator);
+make_stream_joiner(TimestampGenerator* rtp_ts_generator, RcvSubflows* subflows);
 
 guint32
 stream_joiner_get_max_join_delay_in_ts(

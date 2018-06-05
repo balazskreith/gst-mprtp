@@ -305,7 +305,7 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->rcvtracker               = make_rcvtracker();
   this->cc_ts_generator          = g_object_ref(rcvtracker_get_cc_ts_generator(this->rcvtracker));
   this->rtp_ts_generator         = g_object_ref(rcvtracker_get_rtp_ts_generator(this->rcvtracker));
-  this->joiner                   = make_stream_joiner(this->rtp_ts_generator);
+  this->joiner                   = make_stream_joiner(this->rtp_ts_generator, this->subflows);
 
   this->controller               = make_rcvctrler(this->rcvtracker, this->subflows, this->on_rtcp_ready);
 

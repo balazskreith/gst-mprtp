@@ -1201,27 +1201,29 @@ class MPRTP2(MyTest):
         # min_bw = max(400, int(2500 / self._subflows_num))
         max_bw = 1000
         min_bw = 500
+        latency = self.__latency
         for subflow_id in range(self._subflows_num):
+            latency = 50 if subflow_id < 1 else 150
             flow_stage = [
             {
                 "duration": 25,
-                "config": PathConfig(bandwidth=min_bw, latency=self.__latency, jitter=self.__jitter)
+                "config": PathConfig(bandwidth=min_bw, latency=latency, jitter=self.__jitter)
             },
             {
                 "duration": 25,
-                "config": PathConfig(bandwidth=max_bw, latency=self.__latency, jitter=self.__jitter)
+                "config": PathConfig(bandwidth=max_bw, latency=latency, jitter=self.__jitter)
             },
             {
                 "duration": 25,
-                "config": PathConfig(bandwidth=min_bw, latency=self.__latency, jitter=self.__jitter)
+                "config": PathConfig(bandwidth=min_bw, latency=latency, jitter=self.__jitter)
             },
             {
                 "duration": 25,
-                "config": PathConfig(bandwidth=max_bw, latency=self.__latency, jitter=self.__jitter)
+                "config": PathConfig(bandwidth=max_bw, latency=latency, jitter=self.__jitter)
             },
             {
                 "duration": 50,
-                "config": PathConfig(bandwidth=min_bw, latency=self.__latency, jitter=self.__jitter)
+                "config": PathConfig(bandwidth=min_bw, latency=latency, jitter=self.__jitter)
             }]
             forward_bandwidths, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stage))
             forward_path_ctrler = PathShellCtrler(path_name=path_names[subflow_id], path_stage=path_stage)

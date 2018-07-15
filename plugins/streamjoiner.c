@@ -91,16 +91,16 @@ _cmp_seq (guint16 x, guint16 y)
   return 0;
 }
 //
-static gint
-_cmp_ts (guint32 x, guint32 y)
-{
-  if(x == y) return 0;
-  if(x < y && y - x < 2147483648) return -1;
-  if(x > y && x - y > 2147483648) return -1;
-  if(x < y && y - x > 2147483648) return 1;
-  if(x > y && x - y < 2147483648) return 1;
-  return 0;
-}
+//static gint
+//_cmp_ts (guint32 x, guint32 y)
+//{
+//  if(x == y) return 0;
+//  if(x < y && y - x < 2147483648) return -1;
+//  if(x > y && x - y > 2147483648) return -1;
+//  if(x < y && y - x > 2147483648) return 1;
+//  if(x > y && x - y < 2147483648) return 1;
+//  return 0;
+//}
 
 //----------------------------------------------------------------------
 //--------- Private functions implementations to SchTree object --------
@@ -124,15 +124,8 @@ stream_joiner_finalize (GObject * object)
 {
   StreamJoiner *this = STREAM_JOINER (object);
   RcvPacket* packet;
-  gpointer item;
   while((packet = g_queue_pop_head(this->outq)) != NULL){
     rcvpacket_unref(packet);
-  }
-  while((item = g_queue_pop_head(this->playout_items)) != NULL){
-      g_free(item);
-  }
-  while((item = g_queue_pop_head(this->playour_items_recycle)) != NULL){
-      g_free(item);
   }
   g_object_unref(this->rtp_ts_generator);
   g_queue_free(this->outq);
@@ -161,8 +154,6 @@ make_stream_joiner(TimestampGenerator* rtp_ts_generator, RcvSubflows* subflows)
   result->frames_recycle = make_recycle_frame(50, NULL);
   result->rtp_ts_generator = g_object_ref(rtp_ts_generator);
 //  result->joinq2 = make_bintree3((bintree3cmp) _cmp_rcvpacket_abs_seq);
-  result->playout_items = g_queue_new();
-  result->playour_items_recycle = g_queue_new();
   result->subflows = subflows;
   return result;
 }
@@ -192,6 +183,8 @@ static void _stat_print(StreamJoiner *this, RcvPacket* packet)
         "Max Skew,"                // 13
         "Frames Queue Length,"     // 14
         "Outbound Packets Length," // 15
+        "Join Frame Number,"       // 16
+        "Frame Inter Arrival,"     // 17
         );
     g_print("Stat:%s\n",result);
     header_printed = TRUE;
@@ -218,9 +211,11 @@ static void _stat_print(StreamJoiner *this, RcvPacket* packet)
               "%1.3f,"   // 13
               "%d,"      // 14
               "%d,"      // 15
+              "%d,"      // 16
+              "%1.3f,"   // 17
               ,
               GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000., // 1
-              GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->rtp_ts_generator, this->join_delay_in_ts)) / 1000., // 2
+              GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->rtp_ts_generator, this->frame_inter_arrival_avg_in_ts)) / 1000., // 2
               GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->rtp_ts_generator, this->max_diff_delay_in_ts)) / 1000., // 3
               this->min_join_delay_in_ts,  // 4
               this->max_join_delay_in_ts,   // 5
@@ -233,7 +228,9 @@ static void _stat_print(StreamJoiner *this, RcvPacket* packet)
               GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->rtp_ts_generator, this->max_skew_in_ts)) / 1000., // 12
               GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->rtp_ts_generator, this->playout_delay_in_ts)) / 1000., // 13
               g_queue_get_length(this->frames), // 14
-              g_queue_get_length(this->outq)    // 15
+              g_queue_get_length(this->outq),   // 15
+              this->join_frame_nr,   // 16
+              GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->rtp_ts_generator, this->frame_inter_arrival_avg_in_ts)) / 1000. // 17
               );
   }
 
@@ -316,10 +313,35 @@ void stream_joiner_push_packet(StreamJoiner *this, RcvPacket* packet)
   if(!list){
     frame = _make_frame(this, packet);
     g_queue_insert_sorted(this->frames, frame, (GCompareDataFunc) _frames_data_cmp, NULL);
-  }else{
+  } else {
     frame = list->data;
     frame->packets = g_slist_insert_sorted(frame->packets, packet, (GCompareFunc) _packets_cmp);
     frame->marked |= packet->marker;
+  }
+
+  // Refresh skews
+  if (!this->skew_info[packet->subflow_id].init ||
+      _cmp_seq(this->skew_info[packet->subflow_id].subflow_HSN, packet->subflow_seq) < 0)
+  {
+    if (this->skew_info[packet->subflow_id].init) {
+      guint32 snd_dts = _delta_ts(this->skew_info[packet->subflow_id].last_snd_rtp_ts, packet->snd_rtp_ts);
+      guint32 rcv_dts = _delta_ts(this->skew_info[packet->subflow_id].last_rcv_rtp_ts, packet->rcv_rtp_ts);
+      guint32 skew_in_ts = snd_dts < rcv_dts ? rcv_dts - snd_dts : snd_dts - rcv_dts;
+      if (skew_in_ts < 400000000) {
+        // A short investigation showed that even in monotonically increased
+        // sequence numbers the snd_ts can be smaller in a consecutive one,
+        // so with this condition we try to filter these out.
+        if (this->skew_info[packet->subflow_id].skew_in_ts == 0) {
+          this->skew_info[packet->subflow_id].skew_in_ts = skew_in_ts;
+        } else {
+          this->skew_info[packet->subflow_id].skew_in_ts = (this->skew_info[packet->subflow_id].skew_in_ts * 255 + skew_in_ts) / 256;
+        }
+      }
+    }
+    this->skew_info[packet->subflow_id].last_rcv_rtp_ts = packet->rcv_rtp_ts;
+    this->skew_info[packet->subflow_id].last_snd_rtp_ts = packet->snd_rtp_ts;
+    this->skew_info[packet->subflow_id].subflow_HSN = packet->subflow_seq;
+    this->skew_info[packet->subflow_id].init = TRUE;
   }
 
 done:
@@ -342,11 +364,8 @@ RcvPacket* stream_joiner_pop_packet(StreamJoiner *this)
   }
 
   first = g_queue_peek_head(this->frames);
-  timeout = this->join_delay_in_ts + playout_delay_in_ts < _delta_ts(first->created_in_ts, timestamp_generator_get_ts(this->rtp_ts_generator));
-//  g_print("join_delay_in_ts: %u elapsed_time_in_ts: %u\n",
-//      this->join_delay_in_ts, _delta_ts(first->created_in_ts, timestamp_generator_get_ts(this->rtp_ts_generator)));
+  timeout = this->join_frame_nr * this->frame_inter_arrival_avg_in_ts + playout_delay_in_ts < _delta_ts(first->created_in_ts, timestamp_generator_get_ts(this->rtp_ts_generator));
   DISABLE_LINE _frame_is_ready(this, first);
-//  if(!_frame_is_ready(this, first) && !timeout){
   if(!timeout) {
     goto done;
   }
@@ -356,6 +375,23 @@ RcvPacket* stream_joiner_pop_packet(StreamJoiner *this)
     GSList* it;
     for(it = first->packets; it; it = it->next){
       RcvPacket* packet = it->data;
+      if (this->last_subflow_id == 0) {
+        goto continue_;
+      }
+      if (this->last_subflow_id != packet->subflow_id && (this->last_abs_seq + 1) == packet->abs_seq) {
+        guint32 dts = _delta_ts(this->last_rcv_rtp_ts, packet->rcv_rtp_ts);
+        if (this->max_diff_delay_in_ts < dts) {
+          guint32 max_plus_ts = timestamp_generator_get_ts_for_time(this->rtp_ts_generator, 10 * GST_MSECOND);
+          this->max_diff_delay_in_ts = MIN(this->max_diff_delay_in_ts + max_plus_ts, dts);
+        } else {
+//          guint32 max_minus_ts = timestamp_generator_get_ts_for_time(this->rtp_ts_generator, 5 * GST_MSECOND);
+//          this->max_diff_delay_in_ts = MAX(this->max_diff_delay_in_ts * .99, dts);
+        }
+      }
+    continue_:
+      this->last_abs_seq = packet->abs_seq;
+      this->last_subflow_id = packet->subflow_id;
+      this->last_rcv_rtp_ts = packet->rcv_rtp_ts;
       g_queue_push_tail(this->outq, packet);
     }
     packet = g_queue_pop_head(this->outq);
@@ -363,11 +399,13 @@ RcvPacket* stream_joiner_pop_packet(StreamJoiner *this)
 
   // refresh frame inter arrival
   if (this->first_frame_popped) {
-    gint32 dts = _delta_ts(this->last_frame_ts, packet->snd_rtp_ts);
-    if (this->frame_inter_arrival_avg_in_ts) {
-      this->frame_inter_arrival_avg_in_ts = (this->frame_inter_arrival_avg_in_ts + dts) / 128;
-    } else {
-      this->frame_inter_arrival_avg_in_ts = dts;
+    guint32 dts = _delta_ts(this->last_frame_ts, packet->snd_rtp_ts);
+    if (dts < 40000000) {
+      if (this->frame_inter_arrival_avg_in_ts) {
+        this->frame_inter_arrival_avg_in_ts = (this->frame_inter_arrival_avg_in_ts * 127 + dts) / 128;
+      } else {
+        this->frame_inter_arrival_avg_in_ts = dts;
+      }
     }
     this->last_frame_ts = packet->snd_rtp_ts;
   } else {
@@ -375,9 +413,27 @@ RcvPacket* stream_joiner_pop_packet(StreamJoiner *this)
     this->last_frame_ts = packet->snd_rtp_ts;
   }
 
-  _dispose_frame(this, first);
-done:
+  if (this->avg_join_delay_in_ts == 0) {
+    this->avg_join_delay_in_ts = this->max_diff_delay_in_ts;
+  } else {
+    this->avg_join_delay_in_ts = (this->avg_join_delay_in_ts * 127 + this->max_diff_delay_in_ts) / 128;
+  }
+  this->max_diff_delay_in_ts *= .99;
 
+  {
+    gdouble frame_num = this->avg_join_delay_in_ts / this->frame_inter_arrival_avg_in_ts;
+    gdouble diff = (gdouble)this->join_frame_nr - frame_num;
+    if (diff < -1.2) {
+      ++this->join_frame_nr;
+    } else if (1.2 < diff){
+      --this->join_frame_nr;
+    }
+    this->join_frame_nr = MAX(1, this->join_frame_nr);
+  }
+
+  _dispose_frame(this, first);
+
+done:
   if(!packet) {
     return NULL;
   }
@@ -394,128 +450,18 @@ done:
   return packet;
 }
 
-//void _refresh_join_delay(StreamJoiner *this, RcvPacket* packet) {
-//  gint64 skew;
-//  if (!this->last_abs_seq) {
-//    goto done;
-//  }
-//  if (packet->subflow_id == this->last_subflow_id) {
-//    goto done;
-//  }
-//  skew = (gint64)_delta_ts(this->last_rcv_rtp_ts, packet->rcv_rtp_ts) - (gint64)_delta_ts(this->last_snd_rtp_ts, packet->snd_rtp_ts);
-//  this->join_delay_in_ts = (CONSTRAIN(this->min_join_delay_in_ts, this->max_join_delay_in_ts, skew) + 255 * this->join_delay_in_ts) / 256;
-//done:
-//  this->last_abs_seq = packet->abs_seq;
-//  this->last_subflow_id = packet->subflow_id;
-//  this->last_snd_rtp_ts = packet->snd_rtp_ts;
-//  this->last_rcv_rtp_ts = packet->rcv_rtp_ts;
-//}
-
-typedef enum {
-  PLAYOUT_INFORMATION_TYPE_SUBFLOW_SKEW = 1,
-  PLAYOUT_INFORMATION_TYPE_SUBFLOW_DIFF = 2,
-}PlayoutInformation;
-
-typedef struct {
-  GstClockTime added;
-  gint64 value;
-  guint8 subflow_id;
-  PlayoutInformation  information;
-}PlayoutItem;
-
-static void _refresh_join_delay(StreamJoiner *this, PlayoutItem* playout_item) {
-  if (this->max_diff_delay_in_ts < playout_item->value) {
-    this->max_diff_delay_in_ts = playout_item->value;
-    this->last_max_skew_updated = _now(this);
-  } else {
-    this->max_diff_delay_in_ts *= CONSTRAIN(.85, .975, 1.- 1./(gdouble)g_queue_get_length(this->playout_items));
-  }
-}
-
-static void _refresh_playout_delay(StreamJoiner *this, PlayoutItem* playout_item) {
-  gdouble alpha;
-  gdouble skew = this->skew_info[playout_item->subflow_id].skew;
-  ++this->skew_info[playout_item->subflow_id].meas_num;
-  alpha = MAX(.2, 1./(gdouble) this->skew_info[playout_item->subflow_id].meas_num);
-  this->skew_info[playout_item->subflow_id].skew = alpha * playout_item->value + (1.-alpha) * skew;
-
-}
 
 static void _find_max_skew(RcvSubflow* subflow, StreamJoiner* this) {
-  this->max_skew_in_ts = MAX(this->max_skew_in_ts, this->skew_info[subflow->id].skew);
+  this->max_skew_in_ts = MAX(this->max_skew_in_ts, this->skew_info[subflow->id].skew_in_ts);
 }
 
 void _refresh_playout_items(StreamJoiner *this, RcvPacket* packet) {
-  PlayoutItem* playout_item;
-  PlayoutItem* obsolated;
-  gint cmp = _cmp_seq(this->last_abs_seq, packet->abs_seq);
-  if (!this->last_abs_seq) {
-    goto done;
-  } else if (0 < cmp) {
-    return;
-  }
-  if (g_queue_is_empty(this->playour_items_recycle)) {
-    playout_item = g_malloc(sizeof(PlayoutItem));
+  rcvsubflows_iterate(this->subflows, (GFunc)_find_max_skew, this);
+  if (this->playout_delay_in_ts < .000000001) {
+    this->playout_delay_in_ts = this->max_skew_in_ts;
   } else {
-    playout_item = g_queue_pop_head(this->playour_items_recycle);
+    this->playout_delay_in_ts = (this->playout_delay_in_ts * 127. + this->max_skew_in_ts) / 128.;
   }
-  playout_item->added = _now(this);
-  playout_item->subflow_id = packet->subflow_id;
-
-  if (packet->subflow_id == this->last_subflow_id) {
-    gint64 skew;
-    if (_cmp_ts(this->last_rcv_rtp_ts, packet->rcv_rtp_ts) < 0) {
-      skew = _delta_ts(this->last_rcv_rtp_ts, packet->rcv_rtp_ts);
-    } else {
-      skew = _delta_ts(packet->rcv_rtp_ts, this->last_rcv_rtp_ts);
-    }
-    skew -= _delta_ts(this->last_snd_rtp_ts, packet->snd_rtp_ts);
-    playout_item->information = PLAYOUT_INFORMATION_TYPE_SUBFLOW_SKEW;
-    playout_item->value = MAX(0, skew);
-    _refresh_playout_delay(this, playout_item);
-  } else {
-    if (_cmp_ts(this->last_rcv_rtp_ts, packet->rcv_rtp_ts) < 0) {
-     playout_item->value = (gint64)_delta_ts(this->last_rcv_rtp_ts, packet->rcv_rtp_ts);
-    } else {
-     playout_item->value = (gint64)_delta_ts(packet->rcv_rtp_ts, this->last_rcv_rtp_ts);
-    }
-    playout_item->information = PLAYOUT_INFORMATION_TYPE_SUBFLOW_DIFF;
-    if (this->last_snd_rtp_ts == packet->snd_rtp_ts) {
-      _refresh_join_delay(this, playout_item);
-    }
-  }
-
-  if (g_queue_is_empty(this->playout_items)) {
-    g_queue_push_tail(this->playout_items, playout_item);
-    goto done;
-  }
-  while (!g_queue_is_empty(this->playout_items)) {
-    obsolated = g_queue_peek_head(this->playout_items);
-    if (_now(this) - GST_SECOND < obsolated->added) {
-      break;
-    }
-    obsolated = g_queue_pop_head(this->playout_items);
-    if (obsolated->information == PLAYOUT_INFORMATION_TYPE_SUBFLOW_SKEW) {
-      --this->skew_info[playout_item->subflow_id].meas_num;
-    }
-
-    g_queue_push_tail(this->playour_items_recycle, obsolated);
-  }
-  g_queue_push_tail(this->playout_items, playout_item);
-
-done:
-  if (this->last_updated < _now(this) - 0.2 * GST_SECOND) {
-    this->max_skew_in_ts = 0;
-    this->join_delay_in_ts = (this->max_diff_delay_in_ts + 127 * this->join_delay_in_ts) / 128;
-    this->join_delay_in_ts = CONSTRAIN(this->min_join_delay_in_ts, this->max_join_delay_in_ts, this->join_delay_in_ts);
-    rcvsubflows_iterate(this->subflows, (GFunc)_find_max_skew, this);
-    this->playout_delay_in_ts = (this->max_skew_in_ts + this->playout_delay_in_ts * 255) / 256.;
-    this->last_updated = _now(this);
-  }
-  this->last_abs_seq = packet->abs_seq;
-  this->last_subflow_id = packet->subflow_id;
-  this->last_snd_rtp_ts = packet->snd_rtp_ts;
-  this->last_rcv_rtp_ts = packet->rcv_rtp_ts;
 }
 
 Frame* _make_frame(StreamJoiner* this, RcvPacket* packet)

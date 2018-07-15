@@ -38,7 +38,7 @@ struct _StreamJoiner
   TimestampGenerator*  rtp_ts_generator;
 
   guint16              last_abs_seq;
-  guint32              last_snd_rtp_ts;
+//  guint32              last_snd_rtp_ts;
   guint32              last_rcv_rtp_ts;
   guint8               last_subflow_id;
 
@@ -47,12 +47,13 @@ struct _StreamJoiner
   guint32              join_delay_in_ts;
   gint                 join_frame_nr;
   gdouble              max_skew_in_ts, playout_delay_in_ts;
+  gdouble              avg_join_delay_in_ts;
 
   gint64               max_diff_delay_in_ts;
-  GstClockTime         last_max_skew_updated;
-  GstClockTime         last_updated;
-  GQueue*              playout_items;
-  GQueue*              playour_items_recycle;
+//  GstClockTime         last_max_skew_updated;
+//  GstClockTime         last_updated;
+//  GQueue*              playout_items;
+//  GQueue*              playour_items_recycle;
   RcvSubflows*         subflows;
 
   guint32              frame_inter_arrival_avg_in_ts;
@@ -60,9 +61,10 @@ struct _StreamJoiner
   gboolean             first_frame_popped;
 
   struct {
-    gdouble skew;
-    gint32 meas_num;
-    guint16 last_seq;
+    gdouble skew_in_ts;
+    guint16 subflow_HSN;
+    guint32 last_snd_rtp_ts, last_rcv_rtp_ts;
+    gboolean init;
   }skew_info[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
 };
 struct _StreamJoinerClass{

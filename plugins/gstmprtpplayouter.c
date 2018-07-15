@@ -674,14 +674,13 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
 //
   packet = rcvpackets_get_packet(this->rcvpackets, gst_buffer_ref(buf));
   packet->cc_ts = rcv_ts;
-
   fecdecoder_push_rcv_packet(this->fec_decoder, packet);
   THIS_LOCK(this);
 
 //  PROFILING("rcvtracker_add_packet",
   rcvtracker_add_packet(this->rcvtracker, packet);
 //  );
-
+//  g_print("Packet %p in %hu with abs seq: %hu subflow seq: %hu - %u\n", packet, packet->subflow_id, packet->abs_seq, packet->subflow_seq, packet->rcv_rtp_ts);
   THIS_UNLOCK(this);
 
   g_async_queue_push(this->packets_in, packet);

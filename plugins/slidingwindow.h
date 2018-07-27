@@ -111,6 +111,7 @@ gpointer slidingwindow_peek_oldest(SlidingWindow* this);
 gpointer slidingwindow_peek_newest(SlidingWindow* this);
 gpointer slidingwindow_peek_custom(SlidingWindow* this, gint (*comparator)(gpointer item, gpointer udata), gpointer udata);
 void slidingwindow_iterate(SlidingWindow* this, SlidingWindowIterator iterator, gpointer udata);
+void slidingwindow_sort_to (SlidingWindow* this, gpointer to, GCompareDataFunc comparator, gpointer udata);
 void slidingwindow_set_act_limit(SlidingWindow* this, gint32 act_limit);
 void slidingwindow_add_int(SlidingWindow* this, gint data);
 void slidingwindow_add_data(SlidingWindow* this, gpointer data);
@@ -126,12 +127,14 @@ void slidingwindow_setup_custom_obsolation(SlidingWindow* this, SlidingWindowObs
 gint32 slidingwindow_get_counter(SlidingWindow* this);
 gpointer* slidingwindow_get_items_copy(SlidingWindow* this, gint* length, guint item_length);
 void slidingwindow_add_plugin(SlidingWindow* this, SlidingWindowPlugin *plugin);
+void slidingwindow_rem_plugin(SlidingWindow* this, SlidingWindowPlugin *plugin);
 void slidingwindow_add_plugins (SlidingWindow* this, ... );
 
 void slidingwindow_add_on_change(SlidingWindow* this, ListenerFunc add_callback, ListenerFunc rem_callback, gpointer udata);
 void slidingwindow_add_on_add_item_cb(SlidingWindow* this, ListenerFunc callback, gpointer udata);
 void slidingwindow_add_on_rem_item_cb(SlidingWindow* this, ListenerFunc callback, gpointer udata);
 gboolean slidingwindow_is_empty(SlidingWindow* this);
+
 
 void swplugin_notify(SlidingWindowPlugin* this, gpointer subject);
 SlidingWindowPlugin* make_swplugin(ListenerFunc on_calculated_cb, gpointer udata);

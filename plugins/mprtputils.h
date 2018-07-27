@@ -101,5 +101,6 @@ gboolean gst_rtp_buffer_is_mprtp(GstRTPBuffer* rtp, guint8 mprtp_ext_header_id);
 gboolean gst_rtp_buffer_is_fectype(GstRTPBuffer* rtp, guint8 fec_payload_type);
 
 guint16 subflowseqtracker_increase(SubflowSeqTrack *subseqtracker);
+void qsort_pointers_with_udata(gpointer to[], size_t items_number, GCompareDataFunc cmp, gpointer udata);
 
 #endif /* PLUGINS_MPRTPDEFS_H_ */

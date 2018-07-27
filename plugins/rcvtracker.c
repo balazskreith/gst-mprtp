@@ -225,7 +225,6 @@ RcvTrackerSubflowStat* rcvtracker_get_subflow_stat(RcvTracker * this, guint8 sub
 static void _subflow_add_packet(RcvTracker * this, Subflow *subflow, RcvPacket* packet)
 {
   gint cmp;
-  gint64 skew;
 
   if (subflow->seq_initialized == FALSE) {
     subflow->stat.highest_seq = packet->subflow_seq;
@@ -237,8 +236,11 @@ static void _subflow_add_packet(RcvTracker * this, Subflow *subflow, RcvPacket* 
     goto done;
   }
 
-  skew = (gint64)_delta_ts(subflow->last_rcv_rtp_ts, packet->rcv_rtp_ts) - (gint64)_delta_ts(subflow->last_snd_rtp_ts, packet->snd_rtp_ts);
-  subflow->stat.jitter += ((skew < 0?-1*skew:skew) - subflow->stat.jitter) / 16;
+  packet->subflow_skew_in_ts = (gint64)_delta_ts(subflow->last_rcv_rtp_ts, packet->rcv_rtp_ts) - (gint64)_delta_ts(subflow->last_snd_rtp_ts, packet->snd_rtp_ts);
+  packet->subflow_skew_in_ts = (packet->subflow_skew_in_ts < 0 ? -1 * packet->subflow_skew_in_ts : packet->subflow_skew_in_ts);
+  subflow->stat.jitter += abs(packet->subflow_skew_in_ts - subflow->stat.jitter) / 32;
+  packet->subflow_jitter_at_rcv = subflow->stat.jitter;
+
   subflow->last_rcv_rtp_ts = packet->rcv_rtp_ts; //TODO: this is a chaos if the generator clock rate not match to the rtp packet clock rate
   subflow->last_snd_rtp_ts = packet->snd_rtp_ts;
   subflow->stat.cycle_num = (++subflow->stat.total_received_packets)>>16;

@@ -444,6 +444,29 @@ void slidingwindow_iterate(SlidingWindow* this, SlidingWindowIterator iterator, 
   datapuffer_iterate(this->items, (DataPufferIterator)_slidingwindow_iterator_helper, &helper);
 }
 
+typedef struct{
+  GCompareDataFunc comparator;
+  gpointer udata;
+}SortToHelper;
+
+static gint _slidingwindow_sort_to_helper(gconstpointer  a, gconstpointer  b, SortToHelper* helper)
+{
+  const SlidingWindowItem* aItem = a;
+  const SlidingWindowItem* bItem = b;
+  return helper->comparator(aItem->data, bItem->data, helper->udata);
+
+}
+
+void slidingwindow_sort_to (SlidingWindow* this, gpointer to, GCompareDataFunc comparator, gpointer udata) {
+  SortToHelper helper;
+  if(datapuffer_isempty(this->items)){
+    return;
+  }
+  helper.comparator = comparator;
+  helper.udata = udata;
+  qsort_pointers_with_udata(to, this->num_act_limit - 1, (GCompareDataFunc) _slidingwindow_sort_to_helper, &helper);
+}
+
 void slidingwindow_set_threshold(SlidingWindow* this, GstClockTime obsolation_treshold)
 {
   this->treshold = obsolation_treshold;
@@ -504,6 +527,18 @@ void slidingwindow_add_plugin(SlidingWindow* this, SlidingWindowPlugin *swplugin
   }
 }
 
+void slidingwindow_rem_plugin(SlidingWindow* this, SlidingWindowPlugin *swplugin)
+{
+  this->plugins = g_list_remove(this->plugins, swplugin);
+  if(swplugin->add_pipe){
+    notifier_rem_listener(this->on_add_item, (ListenerFunc) swplugin->add_pipe);
+  }
+
+  if(swplugin->rem_pipe){
+    notifier_rem_listener(this->on_rem_item, (ListenerFunc) swplugin->rem_pipe);
+  }
+}
+
 
 void slidingwindow_add_plugins (SlidingWindow* this, ... )
 {
@@ -540,13 +575,18 @@ gboolean slidingwindow_is_empty(SlidingWindow* this)
 
 void swplugin_notify(SlidingWindowPlugin* this, gpointer subject)
 {
+  if (!this->on_calculated) {
+    return;
+  }
   notifier_do(this->on_calculated, subject);
 }
 
 SlidingWindowPlugin* make_swplugin(ListenerFunc on_calculated_cb, gpointer udata)
 {
   SlidingWindowPlugin* this = swplugin_ctor();
-  notifier_add_listener(this->on_calculated, on_calculated_cb, udata);
+  if (on_calculated_cb) {
+    notifier_add_listener(this->on_calculated, on_calculated_cb, udata);
+  }
   return this;
 }
 

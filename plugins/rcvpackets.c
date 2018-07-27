@@ -128,6 +128,8 @@ RcvPacket* rcvpackets_get_packet(RcvPackets* this, GstBuffer* buffer)
   packet->ref      = 1;
   packet->received = _now(this);
   packet->destiny  = this->recycle;
+  packet->subflow_skew_in_ts = -1;
+  packet->subflow_jitter_at_rcv = 0;
 
   return packet;
 }

@@ -243,6 +243,22 @@ SlidingWindowPlugin* make_swlinpercentile(
                               SWMeanCalcer mean_calcer
                               );
 
+void swhistogram_add_percentiletracker(SlidingWindowPlugin* this,
+                              guint percentile,
+                              ListenerFunc on_calculated_cb,
+                              gpointer on_calculated_cb_udata);
+
+typedef guint (*SWHistogramIndex)(gpointer udata, gpointer item);
+SlidingWindowPlugin* make_swhistogram(
+                                  ListenerFunc on_calculated_cb,
+                                  gpointer on_calculated_cb_udata,
+                                  guint length,
+                                  SWHistogramIndex  get_index,
+                                  gpointer      get_index_udata,
+                                  ListenerFilterFunc filter_func,
+                                  gpointer filter_func_udata
+                              );
+
 
 SlidingWindowPlugin* make_swint32_stater(ListenerFunc on_calculated_cb, gpointer on_calculated_udata);
 

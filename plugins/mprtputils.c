@@ -191,3 +191,57 @@ static void _test_do_bitxor(void) {
         a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13], a[14]);
   }
 }
+
+
+
+
+// Code migrated from https://www.geeksforgeeks.org/iterative-quick-sort/
+// Function to swap numbers
+static void _swap(gpointer *a, gpointer *b){
+    gpointer temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+/* This function takes last element as pivot,
+   places the pivot element at its correct
+   position in sorted  array, and places
+   all smaller (smaller than pivot) to left
+   of pivot and all greater elements to
+   right of pivot */
+static int _partition (gpointer arr[], gint l, gint h, GCompareDataFunc cmp, gpointer udata)
+{
+    gpointer x = arr[h];
+    int i = (l - 1);
+
+    for (int j = l; j <= h- 1; j++)
+    {
+      if (cmp(arr[j], x, udata) <= 0)
+        {
+            i++;
+            _swap (&arr[i], &arr[j]);
+        }
+    }
+    _swap (&arr[i + 1], &arr[h]);
+    return (i + 1);
+}
+
+/* A[] --> Array to be sorted,
+l --> Starting index,
+h --> Ending index */
+static void _quickSort(gpointer A[], gint l, gint h, GCompareDataFunc cmp, gpointer udata)
+{
+    if (l < h)
+    {
+        /* Partitioning index */
+        int p = _partition(A, l, h, cmp, udata);
+        _quickSort(A, l, p - 1, cmp, udata);
+        _quickSort(A, p + 1, h, cmp, udata);
+    }
+}
+
+void qsort_pointers_with_udata(gpointer to[], size_t items_number, GCompareDataFunc cmp, gpointer udata) {
+  _quickSort(to, 0, items_number - 1, cmp, udata);
+}
+
+

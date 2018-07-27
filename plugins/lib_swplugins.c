@@ -1553,8 +1553,163 @@ SlidingWindowPlugin* make_swlinpercentile(
 
 
 
+typedef struct{
+  SlidingWindowPlugin* base;
+  guint values_length;
+  SWHistogramIndex  get_index;
+  gpointer      get_index_udata;
+  ListenerFilterFunc filter_func;
+  gpointer filter_func_udata;
+  GSList* plugins;
+  guint* values;
+}swhistogram_t;
+
+typedef struct {
+  guint before;
+  guint total;
+  guint actual_index;
+  guint values_length;
+  guint percentile;
+  ListenerFunc listener;
+  gpointer listener_udata;
+}swhistogramperctracker_t;
+static void _swhistogram_perctracker_change_values(swhistogramperctracker_t* this, guint* values, guint last_index, gint change);
 
 
+static swhistogram_t* _swhistogram_ctor(SlidingWindowPlugin* base,
+    guint length,
+    SWHistogramIndex  get_index,
+    gpointer      get_index_udata,
+    ListenerFilterFunc filter_func,
+    gpointer filter_func_udata)
+{
+  swhistogram_t* this;
+  this = malloc(sizeof(swhistogram_t));
+  memset(this, 0, sizeof(swhistogram_t));
+  this->base = base;
+  this->values_length = length;
+  this->values = malloc(sizeof(guint) * this->values_length);
+  memset(this->values, 0, sizeof(guint) * this->values_length);
+  this->get_index = get_index;
+  this->get_index_udata = get_index_udata;
+  this->filter_func = filter_func;
+  this->filter_func_udata = filter_func_udata;
+  return this;
+}
+
+static void _swhistogram_disposer(gpointer target)
+{
+  swhistogram_t* this = target;
+  if(!target){
+    return;
+  }
+  g_slist_free_full(this->plugins, (GDestroyNotify)g_free);
+  g_free(this->values);
+  g_free(this);
+}
+
+
+
+static void _swhistogram_on_add(gpointer dataptr, gpointer value)
+{
+  swhistogram_t* this;
+  guint index;
+  this = dataptr;
+  if (this->filter_func && !this->filter_func(this->filter_func_udata, value)) {
+    return;
+  }
+  index = MIN(this->values_length - 1, this->get_index(this->get_index_udata, value));
+  ++this->values[index];
+  swplugin_notify(this->base, this->values);
+
+  {
+    GSList* it;
+    for (it = this->plugins; it; it = it->next) {
+      _swhistogram_perctracker_change_values(it->data, this->values, index, 1);
+    }
+  }
+}
+
+static void _swhistogram_on_rem(gpointer dataptr, gpointer value)
+{
+  guint index;
+  swhistogram_t* this = dataptr;
+  if (this->filter_func && !this->filter_func(this->filter_func_udata, value)) {
+    return;
+  }
+  index = MIN(this->values_length - 1, this->get_index(this->get_index_udata, value));
+  --this->values[index];
+  swplugin_notify(this->base, this->values);
+
+  {
+    GSList* it;
+    for (it = this->plugins; it; it = it->next) {
+      _swhistogram_perctracker_change_values(it->data, this->values, index, -1);
+    }
+  }
+}
+
+
+SlidingWindowPlugin* make_swhistogram(
+                              ListenerFunc on_calculated_cb,
+                              gpointer on_calculated_cb_udata,
+                              guint length,
+                              SWHistogramIndex  get_index,
+                              gpointer      get_index_udata,
+                              ListenerFilterFunc filter_func,
+                              gpointer filter_func_udata
+                              )
+{
+  SlidingWindowPlugin* this;
+  this = make_swplugin(on_calculated_cb, on_calculated_cb_udata);
+  this->priv = _swhistogram_ctor(this, length, get_index, get_index_udata, filter_func, filter_func_udata);
+
+  this->add_pipe          = _swhistogram_on_add;
+  this->add_data          = this->priv;
+  this->rem_pipe          = _swhistogram_on_rem;
+  this->rem_data          = this->priv;
+  this->disposer          = _swhistogram_disposer;
+  return this;
+}
+
+void swhistogram_add_percentiletracker(SlidingWindowPlugin* this,
+                              guint percentile,
+                              ListenerFunc on_calculated_cb,
+                              gpointer on_calculated_cb_udata)
+{
+  swhistogram_t* priv = this->priv;
+  swhistogramperctracker_t* tracker = g_malloc(sizeof(swhistogramperctracker_t));
+  memset(tracker, 0, sizeof(swhistogramperctracker_t));
+  tracker->percentile = percentile;
+  tracker->values_length = priv->values_length;
+  tracker->listener = on_calculated_cb;
+  tracker->listener_udata = on_calculated_cb_udata;
+  priv->plugins = g_slist_prepend(priv->plugins, tracker);
+}
+
+
+void _swhistogram_perctracker_change_values(swhistogramperctracker_t* this, guint* values, guint last_index, gint change)
+{
+  guint position;
+  if (last_index < this->actual_index) {
+    this->before += change;
+  }
+  this->total += change;
+  position = this->total * ((gdouble)this->percentile / 100.);
+  if (position <= this->before) {
+    while(0 < this->actual_index && position <= this->before) {
+      this->before -= values[this->actual_index--];
+    }
+  } else if (this->before + values[this->actual_index] < position) {
+    while (this->actual_index < this->values_length - 1 && this->before + values[this->actual_index] < position) {
+      this->before += values[this->actual_index++];
+    }
+  }
+
+  if (this->listener) {
+    this->listener(this->listener_udata, &this->actual_index);
+  }
+}
 
 typedef struct _swint32stater{
   SlidingWindowPlugin* base;

@@ -48,10 +48,13 @@ struct _RcvPacket
 
   guint16              subflow_seq;
   guint8               subflow_id;
+  gint64               subflow_skew_in_ts;
+  guint32              subflow_jitter_at_rcv;
 
   Recycle*             destiny;
   guint32              cc_ts;
   guint32              rcv_rtp_ts;
+
 
 //  gint64               abs_rtp_skew;
 //  gint64               subflow_rtp_skew;

@@ -406,8 +406,8 @@ void _process_stat(FRACTaLFBProcessor *this)
 
   _stat(this)->qdelay_stability = qdelay_stability_calcer_do(this-> qdelay_stability_calcer, &_stat(this)->qdelay_is_stable);
 
-
-  if(_stat(this)->sr_avg){
+//  g_print("SR avg: %f <| %d\n", _stat(this)->sr_avg, _stat(this)->sender_bitrate);
+  if(0. < _stat(this)->sr_avg){
 //    alpha = ewma_factor * .5 + .5;
     alpha = .5;
     _stat(this)->sr_avg = alpha * _stat(this)->sender_bitrate + _stat(this)->sr_avg * (1.-alpha);
@@ -415,7 +415,7 @@ void _process_stat(FRACTaLFBProcessor *this)
     _stat(this)->sr_avg = _stat(this)->sender_bitrate;
   }
 
-  if(_stat(this)->rr_avg){
+  if(0. < _stat(this)->rr_avg){
     alpha = ewma_factor * .5 + .5;
     _stat(this)->rr_avg = alpha * _stat(this)->receiver_bitrate + _stat(this)->rr_avg * (1.-alpha);
   }else{

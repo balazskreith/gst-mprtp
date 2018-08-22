@@ -131,6 +131,9 @@ gint32 stream_splitter_get_total_media_rate(StreamSplitter* this)
 {
   // NOT HERE, BUT WHEN UPDATE IS REGULAR IN TIME
   gint32 targets_dif = abs(this->media_rate - this->stable_rate);
+  if (!this->media_rate || !this->stable_rate) {
+    return 0;
+  }
   if (this->media_rate_std == 0) {
     this->media_rate_std = targets_dif;
   } else {
@@ -305,9 +308,15 @@ stream_splitter_set_keyframe_filtering(StreamSplitter* this, gboolean keyframe_f
 static void _refresh_target_off(StreamSplitter * this)
 {
   gint32 total_sending_rate = sndtracker_get_stat(this->tracker)->sent_bytes_in_1s * 8;
-  gdouble alpha = MIN(.5, (gdouble)this->media_rate_std / (2. * abs(this->media_rate - this->stable_rate)));
+  gdouble alpha;
   gdouble numerator;
   gdouble divider;
+  if (this->media_rate_std == 0 || abs(this->media_rate - this->stable_rate) < 1) {
+    alpha = 1.;
+  } else {
+    alpha = MIN(.5, (gdouble)this->media_rate_std / (2. * abs(this->media_rate - this->stable_rate)));
+  }
+//  g_print("SR avg: %d <| %d .. %f\n", this->sending_rate_avg, total_sending_rate, alpha);
   this->sending_rate_avg = total_sending_rate * alpha + this->sending_rate_avg * (1.-alpha);
 
   if (this->media_rate == this->stable_rate) {

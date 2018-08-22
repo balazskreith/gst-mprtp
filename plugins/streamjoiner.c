@@ -455,7 +455,7 @@ done:
     this->hsn = packet->abs_seq;
   }
   DISABLE_LINE _stat_print(this, packet);
-  _stat_print(this, packet);
+//  _stat_print(this, packet);
   return packet;
 }
 

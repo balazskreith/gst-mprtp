@@ -163,7 +163,7 @@ class RMCAT1(MyTest):
         self.__forward_flow = RTPFlow(name="rtpflow_1",
             path="./",
             flownum=1,
-            codec=Codecs.VP8,
+            codec=Codecs.VP9,
             algorithm=self.algorithm,
             rtp_ip="10.0.0.6",
             rtp_port=5000,
@@ -1205,26 +1205,31 @@ class MPRTP2(MyTest):
         for subflow_id in range(self._subflows_num):
             latency = 50 if subflow_id < 1 else 150
             flow_stage = [
+            # {
+            #     "duration": 25,
+            #     "config": PathConfig(bandwidth=min_bw, latency=latency, jitter=self.__jitter)
+            # },
+            # {
+            #     "duration": 25,
+            #     "config": PathConfig(bandwidth=max_bw, latency=latency, jitter=self.__jitter)
+            # },
+            # {
+            #     "duration": 25,
+            #     "config": PathConfig(bandwidth=min_bw, latency=latency, jitter=self.__jitter)
+            # },
+            # {
+            #     "duration": 25,
+            #     "config": PathConfig(bandwidth=max_bw, latency=latency, jitter=self.__jitter)
+            # },
+            # {
+            #     "duration": 50,
+            #     "config": PathConfig(bandwidth=min_bw, latency=latency, jitter=self.__jitter)
+            # },
             {
-                "duration": 25,
+                "duration": 150,
                 "config": PathConfig(bandwidth=min_bw, latency=latency, jitter=self.__jitter)
-            },
-            {
-                "duration": 25,
-                "config": PathConfig(bandwidth=max_bw, latency=latency, jitter=self.__jitter)
-            },
-            {
-                "duration": 25,
-                "config": PathConfig(bandwidth=min_bw, latency=latency, jitter=self.__jitter)
-            },
-            {
-                "duration": 25,
-                "config": PathConfig(bandwidth=max_bw, latency=latency, jitter=self.__jitter)
-            },
-            {
-                "duration": 50,
-                "config": PathConfig(bandwidth=min_bw, latency=latency, jitter=self.__jitter)
-            }]
+            }
+            ]
             forward_bandwidths, path_stage = self.make_bandwidths_and_path_stage(deque(flow_stage))
             forward_path_ctrler = PathShellCtrler(path_name=path_names[subflow_id], path_stage=path_stage)
             self._forward_bandwidths.append(forward_bandwidths)

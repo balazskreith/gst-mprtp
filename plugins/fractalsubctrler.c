@@ -698,7 +698,7 @@ void fractalsubctrler_report_update(
   _check_tcp(this);
 
   DISABLE_LINE _stat_print(this);
-  _stat_print(this);
+//  _stat_print(this);
 
   this->approve_measurement = FALSE;
   if (_priv(this)->stage != STAGE_REDUCE) {
@@ -902,6 +902,14 @@ _increase_stage(
   }
 
   _refresh_increasing_approvement(this);
+  if (3 * GST_SECOND < _now(this) - this->increasing_started) {
+    _set_stable_bitrate(this, _stat(this)->sr_avg);
+    _set_event(this, EVENT_SETTLED);
+    _start_monitoring(this);
+    _switch_stage_to(this, STAGE_PROBE, FALSE);
+    this->subflow->last_increased_target = _now(this);
+    goto done;
+  }
   if (!this->increasing_approved) {
     goto done;
   }

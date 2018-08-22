@@ -366,13 +366,18 @@ void sndtracker_rem_on_packet_sent(SndTracker * this, ListenerFunc callback)
 
 void _sent_packets_rem_pipe(SndTracker* this, SndPacket* packet)
 {
-  this->stat.sent_bytes_in_1s -= packet->payload_size;
-  --this->stat.sent_packets_in_1s;
+  if (0 < this->stat.sent_packets_in_1s) {
+    this->stat.sent_bytes_in_1s -= packet->payload_size;
+    --this->stat.sent_packets_in_1s;
+  }
 
-  if(packet->subflow_id != 0){
+  if(packet->subflow_id != 0) {
     Subflow* subflow = _get_subflow(this, packet->subflow_id);
-    subflow->stat.sent_bytes_in_1s -= packet->payload_size;
-    --subflow->stat.sent_packets_in_1s;
+    if (0 < subflow->stat.sent_packets_in_1s) {
+      subflow->stat.sent_bytes_in_1s -= packet->payload_size;
+      --subflow->stat.sent_packets_in_1s;
+    }
+
     if(!packet->acknowledged){
 //      g_print("Packet %hu is not acknowledged in time\n", packet->subflow_seq);
     }

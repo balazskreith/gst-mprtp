@@ -1203,7 +1203,8 @@ class MPRTP2(MyTest):
         min_bw = 500
         latency = self.__latency
         for subflow_id in range(self._subflows_num):
-            latency = 50 if subflow_id < 1 else 150
+            # latency = 50 if subflow_id < 1 else 150
+            # latency = self.__latency
             flow_stage = [
             # {
             #     "duration": 25,

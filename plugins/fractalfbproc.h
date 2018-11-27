@@ -34,9 +34,6 @@ typedef struct _FRACTaLFBProcessorClass FRACTaLFBProcessorClass;
 #define FRACTALFBPROCESSOR_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),FRACTALFBPROCESSOR_TYPE))
 #define FRACTALFBPROCESSOR_CAST(src)        ((FRACTALFBProcessor *)(src))
 
-#define QDELAY_BUCKET_LIST_LENGTH 3
-#define DRATE_BUCKET_LIST_LENGTH 4
-
 typedef struct {
   guint length;
   GQueue* pushed_items;
@@ -52,10 +49,6 @@ typedef struct _FRACTaLStat
   gint32                   receiver_bitrate;
   gint32                   fec_bitrate;
   gint32                   rcved_bytes_in_ewi;
-
-//  GstClockTime             queue_delay_50th;
-//  GstClockTime             last_queue_delay;
-//  GstClockTime             queue_delay_std;
 
   guint16                  HSN;
 
@@ -96,7 +89,6 @@ struct _FRACTaLFBProcessor
   TimestampGenerator*      ts_generator;
   QDelayStabilityCalcer*   qdelay_stability_calcer;
   FLStabilityCalcer*       fl_stability_calcer;
-//  Recycle*                 reference_point_recycle;
   GstClockTime             made;
 
   guint32                  ewi_in_ts;
@@ -108,14 +100,10 @@ struct _FRACTaLFBProcessor
 
   GstClockTime             dts;
   GstClockTime             rtt;
-//  SlidingWindow*           reference_sw;
-//  SlidingWindow*           ewi_sw;
 
   FRACTaLStat*             stat;
   SndTracker*              sndtracker;
   SndSubflow*              subflow;
-
-//  StdCalcer*               qts_std_calcer;
 
   GstClockTime             last_report_update;
   GstClockTime             first_report_update;
@@ -125,8 +113,6 @@ struct _FRACTaLFBProcessor
   guint32                  srtt_in_ts;
   gdouble                  qts_std, min_qts_std;
   gdouble                  last_qts;
-//  Bucket*                  qdelay_bucket;
-//  Bucket*                  qdelay_devs;
 
   guint32                  last_dts;
   gdouble                  fb_interval_avg;
@@ -134,6 +120,7 @@ struct _FRACTaLFBProcessor
   guint16 cc_begin_seq, cc_end_seq;
 
 };
+
 
 struct _FRACTaLFBProcessorClass{
   GObjectClass parent_class;

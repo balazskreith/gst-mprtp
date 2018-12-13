@@ -121,6 +121,7 @@ void recycle_add(Recycle* this, gpointer item)
 
 //------------------------------------------------------------
 
+DEFINE_RECYCLE_TYPE(/*global scope*/, uint8, guint8)
 DEFINE_RECYCLE_TYPE(/*global scope*/, uint16, guint16)
 DEFINE_RECYCLE_TYPE(/*global scope*/, int32, gint32)
 DEFINE_RECYCLE_TYPE(/*global scope*/, int64, gint64)

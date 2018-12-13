@@ -52,8 +52,6 @@ typedef struct _Subflow{
   guint32               last_rcv_rtp_ts;
   guint32               last_snd_rtp_ts;
   gboolean              seq_initialized;
-
-  gdouble               path_skew;
 }Subflow;
 
 typedef struct _Priv{

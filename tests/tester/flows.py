@@ -87,7 +87,7 @@ class RTPFlow(Flow):
     """
     def __init__(self, name, flownum, path, codec, algorithm, rtp_ip, rtp_port, rtcp_ip, rtcp_port, start_delay = 0,
     source_type = "FILE:foreman_cif.yuv:1:352:288:2:25/1", sink_type = "FAKESINK", mprtp_ext_header_id = 0,
-                 flipped = False):
+                 flipped = False, saveyuv=False):
         """
         Init the parameter for the test
 
@@ -123,11 +123,12 @@ class RTPFlow(Flow):
         ply_packetlog = "ply_packets_" + str(self.__flownum) + ".csv"
         rtp_sender = RTPSenderShellTrafficUnit(name=name+"-snd", path=path, program_name = snd_pipeline, codec=codec,
             algorithm=algorithm, rtcp_port=rtcp_port, rtp_ip=rtp_ip, rtp_port=rtp_port, snd_stat="/tmp/"+snd_packetlog,
-            source_type=source_type, mprtp_ext_header_id=mprtp_ext_header_id)
+            source_type=source_type, mprtp_ext_header_id=mprtp_ext_header_id, saveyuv=saveyuv)
 
         rtp_receiver = RTPReceiverShellTrafficUnit(name=name+"-rcv", path=path, program_name = rcv_pipeline, codec=codec,
             algorithm=algorithm, rtp_port=rtp_port, rtcp_ip=rtcp_ip, rtcp_port=rtcp_port,
-            rcv_stat="/tmp/"+rcv_packetlog, ply_stat="/tmp/"+ply_packetlog, sink_type=sink_type, mprtp_ext_header_id=mprtp_ext_header_id)
+            rcv_stat="/tmp/"+rcv_packetlog, ply_stat="/tmp/"+ply_packetlog,
+            sink_type=sink_type, mprtp_ext_header_id=mprtp_ext_header_id)
 
         outputlogs = [rtp_sender.get_logfile(), rtp_receiver.get_logfile()]
         packetlogs = [snd_packetlog, rcv_packetlog, ply_packetlog]
@@ -181,9 +182,10 @@ class MPRTPFlow(Flow):
         snd_packetlog = "snd_packets_" + str(self.__flownum) + ".csv"
         rcv_packetlog = "rcv_packets_" + str(self.__flownum) + ".csv"
         ply_packetlog = "ply_packets_" + str(self.__flownum) + ".csv"
+        saveyuv = True if sink_type is not "FAKESINK" else False
         mprtp_sender = MPRTPSenderShellTrafficUnit(name=name+"-snd", path=path, program_name = snd_pipeline, codec=codec,
             algorithm=algorithm, rtcp_ports=rtcp_ports, rtp_ips=rtp_ips, rtp_ports=rtp_ports, snd_stat="/tmp/"+snd_packetlog,
-            source_type=source_type, mprtp_ext_header_id=mprtp_ext_header_id)
+            source_type=source_type, mprtp_ext_header_id=mprtp_ext_header_id, saveyuv=saveyuv)
 
         mprtp_receiver = MPRTPReceiverShellTrafficUnit(name=name+"-rcv", path=path, program_name=rcv_pipeline, codec=codec,
             algorithm=algorithm, rtp_ports=rtp_ports, rtcp_ips=rtcp_ips, rtcp_ports=rtcp_ports,

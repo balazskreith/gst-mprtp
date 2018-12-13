@@ -14,7 +14,7 @@ class MyTest(object):
     """
     Represent a test
     """
-    def __init__(self, name, duration, algorithm, latency, jitter):
+    def __init__(self, name, duration, algorithm, latency, jitter, saveYuv=False):
         """
         Private method making path stages
         Parameters:
@@ -32,12 +32,17 @@ class MyTest(object):
         self.__forward_path_bandwidths = []
         self.__backward_path_bandwidths = []
         self.__multipath = False
+        self.__saveYuv = saveYuv
 
     def set_multipath(self, value):
         self.__multipath = value
 
     def add_evaluator(self, evaluator):
         self.__evaluator = evaluator
+
+    @property
+    def saveYuv(self):
+        return self.__saveYuv
 
     @property
     def multipath(self):
@@ -163,7 +168,7 @@ class RMCAT1(MyTest):
         self.__forward_flow = RTPFlow(name="rtpflow_1",
             path="./",
             flownum=1,
-            codec=Codecs.VP9,
+            codec=Codecs.VP8,
             algorithm=self.algorithm,
             rtp_ip="10.0.0.6",
             rtp_port=5000,
@@ -1053,7 +1058,8 @@ class MPRTP1(MyTest):
             source_type = self.__source_type,
             sink_type = self.__sink_type,
             mprtp_ext_header_id = self.__mprtp_ext_header_id,
-            subflow_ids=subflow_ids[:self._subflows_num]
+            subflow_ids=subflow_ids[:self._subflows_num],
+
             )
 
         result = [self.__forward_rtp_flow]

@@ -880,6 +880,8 @@ typedef struct _swpercentile{
   swpercentilecandidates_t  candidates;
   gint32                    Mxc,Mnc;
   gboolean                  sprinted;
+  ListenerFilterFunc        filter;
+  gpointer                  filter_udata;
 }swpercentile_t;
 
 static void _swpercentile_set_percentile(swpercentile_t* this, gint32 percentile)
@@ -893,6 +895,11 @@ static void _swpercentile_set_percentile(swpercentile_t* this, gint32 percentile
   }else{
     this->required = 2;
   }
+}
+
+static void _swpercentile_set_filter(swpercentile_t* this, ListenerFilterFunc filter, gpointer filter_udata) {
+  this->filter = filter;
+  this->filter_udata = filter_udata;
 }
 
 static swpercentile_t* _swpercentilepriv_ctor(SlidingWindowPlugin* base, gint32 percentile, bintree3cmp cmp)
@@ -911,6 +918,7 @@ static swpercentile_t* _swpercentilepriv_ctor(SlidingWindowPlugin* base, gint32 
 //  this->maxtree         = make_bintree3(cmp);
 //  this->mintree         = make_bintree3(cmp);
   this->Mxc = this->Mnc = 0;
+  this->filter = this->filter_udata = NULL;
 
   _swpercentile_set_percentile(this, percentile);
 
@@ -1021,6 +1029,12 @@ static void _swpercentile_on_add(gpointer dataptr, gpointer itemptr)
   swpercentile_t* this;
   this = dataptr;
 
+  if (this->filter) {
+    if (!this->filter(this->filter_udata, itemptr)) {
+      return;
+    }
+  }
+
   if(!this->Mxc){
     bintree3_insert_data(this->maxtree, itemptr);
     ++this->Mxc;
@@ -1043,6 +1057,11 @@ static void _swpercentile_on_rem(gpointer dataptr, gpointer itemptr)
 {
   swpercentile_t* this;
   this = dataptr;
+  if (this->filter) {
+    if (!this->filter(this->filter_udata, itemptr)) {
+      return;
+    }
+  }
 
   if(bintree3_delete_value(this->maxtree, itemptr)){
     --this->Mxc;
@@ -1060,6 +1079,10 @@ static void _swpercentile_on_rem(gpointer dataptr, gpointer itemptr)
 void swpercentile_set_percentile(SlidingWindowPlugin* plugin, gint32 percentile)
 {
   _swpercentile_set_percentile(plugin->priv, percentile);
+}
+
+void swpercentile_set_filter(SlidingWindowPlugin* plugin, ListenerFilterFunc filter, gpointer filter_udata) {
+  _swpercentile_set_filter(plugin->priv, filter, filter_udata);
 }
 
 SlidingWindowPlugin* make_swpercentile(

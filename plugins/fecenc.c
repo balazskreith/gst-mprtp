@@ -338,7 +338,7 @@ static void _process_message(FECEncoder* this, Message* message)
     {
       RTPBufferMessage *rtp_buffer_msg = (RTPBufferMessage*) message;
       _fecencoder_add_rtpbuffer(this, rtp_buffer_msg->buffer);
-      gst_buffer_unref(rtp_buffer_msg->buffer);
+//      gst_buffer_unref(rtp_buffer_msg->buffer);
       if(!g_queue_is_empty(this->pending_responses)){
         _send_fec_response(this, g_queue_pop_head(this->pending_responses));
       }

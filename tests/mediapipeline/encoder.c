@@ -4,7 +4,7 @@
 
 #include <stdarg.h>
 
-static GstElement* _make_vp8_encoder(Encoder* this, CodecParams *params);
+static GstElement* _make_vp8_encoder(Encoder* this, CodecParams *params, SinkParams* sink_params);
 static GstElement* _make_vp9_encoder(Encoder* this, CodecParams *params);
 static GstElement* _make_theora_encoder(Encoder* this, CodecParams *params);
 static void _setup_listener(Encoder* this, subscriber listener_func, gpointer listener_obj);
@@ -35,7 +35,7 @@ Encoder* make_encoder(CodecParams *codec_params, SinkParams* sink_params)
 
   switch(codec_params->type){
     case CODEC_TYPE_VP8:
-      src = sink = encoder = _make_vp8_encoder(this, codec_params);
+      src = sink = encoder = _make_vp8_encoder(this, codec_params, sink_params);
       break;
     case CODEC_TYPE_VP9:
       src = sink = encoder = _make_vp9_encoder(this, codec_params);
@@ -46,26 +46,6 @@ Encoder* make_encoder(CodecParams *codec_params, SinkParams* sink_params)
   };
   gst_bin_add(encoderBin, encoder);
 
-  if(sink_params){
-      GstElement* tee     = gst_element_factory_make("tee", NULL);
-      GstElement* q1      = gst_element_factory_make("queue", NULL);
-      GstElement* q2      = gst_element_factory_make("queue", NULL);
-      Decoder*    decoder = make_decoder(codec_params);
-      Sink*       sink    = make_sink(sink_params);
-
-      objects_holder_add(this->objects_holder, sink, (GDestroyNotify)sink_dtor);
-      objects_holder_add(this->objects_holder, decoder, (GDestroyNotify)decoder_dtor);
-
-      gst_bin_add_many(encoderBin, tee, q1, q2, decoder->element, sink->element, NULL);
-
-      gst_element_link(encoder, tee);
-      gst_element_link_pads(tee, "src_1", q1, "sink");
-      src = q1;
-
-      gst_element_link_pads(tee, "src_2", q2, "sink");
-      gst_element_link_many(q2, decoder->element, sink->element, NULL);
-  }
-
   setup_ghost_sink(sink, encoderBin);
   setup_ghost_src (src,  encoderBin);
 
@@ -73,11 +53,11 @@ Encoder* make_encoder(CodecParams *codec_params, SinkParams* sink_params)
   return this;
 }
 
-Subscriber* encoder_get_on_bitrate_change_subscriber(Encoder* this){
+Subscriber* encoder_get_on_bitrate_change_subscriber(Encoder* this) {
   return &this->on_bitrate_change;
 }
 
-void _setup_listener(Encoder* this, subscriber subscriber_func, gpointer subscriber_obj){
+void _setup_listener(Encoder* this, subscriber subscriber_func, gpointer subscriber_obj) {
   this->on_bitrate_change.subscriber_func = subscriber_func;
   this->on_bitrate_change.subscriber_obj  = subscriber_obj;
 }
@@ -88,12 +68,11 @@ static void _on_change_vp8_target_bitrate(GstElement* encoder, gint32* target_bi
   g_object_set (encoder, "target-bitrate", *target_bitrate, NULL);
 }
 
-GstElement* _make_vp8_encoder(Encoder* this, CodecParams *params)
+GstElement* _make_vp8_encoder(Encoder* this, CodecParams *params, SinkParams* sink_params)
 {
   GstBin* encoderBin    = gst_bin_new(NULL);
   GstElement* encoder   = gst_element_factory_make ("vp8enc", NULL);
   GstElement *payloader = gst_element_factory_make ("rtpvp8pay", NULL);
-
 
   g_object_set (encoder, "target-bitrate", target_bitrate, NULL);
   _setup_listener(this, (subscriber) _on_change_vp8_target_bitrate, encoder);
@@ -110,8 +89,8 @@ GstElement* _make_vp8_encoder(Encoder* this, CodecParams *params)
       "lag-in-frames", 0,
       "timebase", 1, 90000,
       "error-resilient", 1,
-      "keyframe-mode", params->keyframe_mode,
-      "keyframe-max-dist", params->keyframe_max_dist,
+      "keyframe-mode", 1, //params->keyframe_mode,
+      "keyframe-max-dist", 20, //params->keyframe_max_dist,
       NULL);
 
 
@@ -122,7 +101,28 @@ GstElement* _make_vp8_encoder(Encoder* this, CodecParams *params)
 
       NULL);
 
-  gst_element_link (encoder, payloader);
+  if (sink_params) {
+        GstElement* tee     = gst_element_factory_make("tee", NULL);
+        GstElement* q1      = gst_element_factory_make("queue", NULL);
+        GstElement* q2      = gst_element_factory_make("queue", NULL);
+        GstElement* decoder = gst_element_factory_make("vp8dec", NULL);
+        Sink*       sink    = make_sink(sink_params);
+
+        objects_holder_add(this->objects_holder, sink, (GDestroyNotify) sink_dtor);
+
+        gst_bin_add_many(encoderBin, tee, q1, q2, decoder, sink->element, NULL);
+
+        gst_element_link(encoder, tee);
+        gst_element_link_pads(tee, "src_1", q1, "sink");
+
+        gst_element_link_pads(tee, "src_2", q2, "sink");
+        gst_element_link_many(q2, decoder, sink->element, NULL);
+
+        gst_element_link (q1, payloader);
+  }
+  else {
+      gst_element_link (encoder, payloader);
+  }
 
   setup_ghost_sink(encoder, encoderBin);
   setup_ghost_src (payloader, encoderBin);

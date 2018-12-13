@@ -343,8 +343,7 @@ done:
 }
 
 
-gboolean sndqueue_is_empty(SndQueue* this)
-{
+gboolean sndqueue_is_empty(SndQueue* this) {
   return this->empty;
 }
 

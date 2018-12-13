@@ -200,6 +200,12 @@ void swpercentile_set_percentile(
     gint32 percentile
     );
 
+void swpercentile_set_filter(
+    SlidingWindowPlugin* plugin,
+    ListenerFilterFunc filter,
+    gpointer filter_udata
+   );
+
 SlidingWindowPlugin* make_swpercentile(
                               gint32     percentile,
                               bintree3cmp  cmp,

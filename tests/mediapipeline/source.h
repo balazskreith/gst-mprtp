@@ -14,6 +14,14 @@ typedef struct{
   Subscriber     on_playing;
   Subscriber     on_destroy;
 
+  GstClockTime pts;
+  GstClockTime dts;
+  GstClockTime dpts;
+  GstClockTime ddts;
+  gboolean dinit;
+  guint64 offset;
+  guint64 doffset;
+
   union {
     struct{
       GQueue* buffers;

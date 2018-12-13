@@ -90,6 +90,7 @@ typedef gboolean (*SlidingWindowObsolateFunc)(gpointer udata, SlidingWindowItem*
 typedef gboolean (*SWPluginFilterFunc)(gpointer item);
 
 GType slidingwindow_get_type (void);
+SlidingWindow* make_slidingwindow_uint8(guint32 num_limit, GstClockTime obsolation_treshold);
 SlidingWindow* make_slidingwindow_uint16(guint32 num_limit, GstClockTime obsolation_treshold);
 SlidingWindow* make_slidingwindow_int32(guint32 num_limit, GstClockTime obsolation_treshold);
 SlidingWindow* make_slidingwindow_int64(guint32 num_limit, GstClockTime obsolation_treshold);

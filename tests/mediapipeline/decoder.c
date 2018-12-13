@@ -49,15 +49,19 @@ static void _setup_vp8_decoder(GstBin* decoderBin, CodecParams *params)
   gst_bin_add_many (decoderBin, depayloader, decoder, converter, NULL);
   gst_element_link_many (depayloader, decoder, converter, NULL);
 
+//    gst_bin_add_many (decoderBin, depayloader, decoder, NULL);
+//      gst_element_link_many (depayloader, decoder, NULL);
+
   setup_ghost_sink (depayloader, decoderBin);
   setup_ghost_src  (converter, decoderBin);
+//  setup_ghost_src  (decoder, decoderBin);
 
 }
 
 static void _setup_vp9_decoder(GstBin* decoderBin, CodecParams *params)
 {
-  GstElement *depayloader = gst_element_factory_make ("rtpvp8depay", NULL);
-  GstElement *decoder     = gst_element_factory_make ("vp8dec", NULL);
+  GstElement *depayloader = gst_element_factory_make ("rtpvp9depay", NULL);
+  GstElement *decoder     = gst_element_factory_make ("vp9dec", NULL);
   GstElement *converter   = gst_element_factory_make ("videoconvert", NULL);
 
   gst_bin_add_many (decoderBin, depayloader, decoder, converter, NULL);

@@ -73,6 +73,7 @@ gpointer recycle_retrieve(Recycle* this);
 gpointer recycle_retrieve_and_shape(Recycle *this, gpointer udata);
 void recycle_add(Recycle* this, gpointer item);
 
+Recycle* make_recycle_uint8(gint32 size, RecycleItemShaper shaper);
 Recycle* make_recycle_uint16(gint32 size, RecycleItemShaper shaper);
 Recycle* make_recycle_int32(gint32 size, RecycleItemShaper shaper);
 Recycle* make_recycle_int64(gint32 size, RecycleItemShaper shaper);

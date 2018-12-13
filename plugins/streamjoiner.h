@@ -5,8 +5,8 @@
  *      Author: balazs
  */
 
-#ifndef STREAM_JOINER_H_
-#define STREAM_JOINER_H_
+#ifndef STREAMJOINER_H_
+#define STREAMJOINER_H_
 
 #include <gst/gst.h>
 #include "lib_swplugins.h"
@@ -17,56 +17,63 @@ typedef struct _StreamJoiner StreamJoiner;
 typedef struct _StreamJoinerClass StreamJoinerClass;
 
 
-#define STREAM_JOINER_TYPE             (stream_joiner_get_type())
-#define STREAM_JOINER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),STREAM_JOINER_TYPE,StreamJoiner))
-#define STREAM_JOINER_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass),STREAM_JOINER_TYPE,StreamJoinerClass))
-#define STREAM_JOINER_IS_SOURCE(src)          (G_TYPE_CHECK_INSTANCE_TYPE((src),STREAM_JOINER_TYPE))
-#define STREAM_JOINER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),STREAM_JOINER_TYPE))
-#define STREAM_JOINER_CAST(src)        ((StreamJoiner *)(src))
+#define STREAMJOINER_TYPE             (stream_joiner_get_type())
+#define STREAMJOINER(src)             (G_TYPE_CHECK_INSTANCE_CAST((src),STREAMJOINER_TYPE,StreamJoiner))
+#define STREAMJOINER_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass),STREAMJOINER_TYPE,StreamJoinerClass))
+#define STREAMJOINER_IS_SOURCE(src)          (G_TYPE_CHECK_INSTANCE_TYPE((src),STREAMJOINER_TYPE))
+#define STREAMJOINER_IS_SOURCE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),STREAMJOINER_TYPE))
+#define STREAMJOINER_CAST(src)        ((StreamJoiner *)(src))
 
+#define MAX_JITTER_BUFFER_ALLOWED_SKEW 50 * GST_MSECOND
+
+//typedef struct _FrameNode FrameNode;
+//typedef struct _Frame Frame;
+
+typedef struct {
+  guint8 subflow_id;
+  gboolean active;
+  StreamJoiner* stream_joiner;
+  gboolean sampled;
+  gboolean played;
+  GstClockTime waiting_time;
+}StreamJoinerSubflow;
 
 struct _StreamJoiner
 {
   GObject              object;
   GstClock*            sysclock;
   GstClockTime         made;
-  GQueue*              outq;
-  GQueue*              frames;
+  guint32              last_played_sent_ts;
+  guint32              last_played_out_ts;
+  GstClockTime         last_played_out_time;
+  guint16              last_played_seq;
+  gboolean first_frame_played_out, reference_points_initialized;
+  gboolean             last_played_seq_init;
+  guint16 last_pushed_seq;
+  gint consecutive_good_seq;
+  guint32              last_ts;
+  gboolean join_delay_initialized, playout_delay_initialized;
+  gdouble joining_delay;
+
+  guint sampled_subflows;
+  guint joined_subflows;
+  gint played_subflows;
+  guint16 HSN;
+  gboolean joining_delay_first_updated;
+  guint16 last_joining_delay_update_HSN;
+//  gint32               clock_rate;
+  GQueue*              playoutq;
+  GQueue*              discardedq;
+  GList*               frames;
   Recycle*             frames_recycle;
-  guint16              hsn;
-  gboolean             hsn_init;
   TimestampGenerator*  rtp_ts_generator;
+  StreamJoinerSubflow* subflows;
 
-  guint16              last_abs_seq;
-//  guint32              last_snd_rtp_ts;
-  guint32              last_rcv_rtp_ts;
-  guint32              last_snd_rtp_ts;
-  guint8               last_subflow_id;
-  GstClockTime         max_median_delay;
-  GstClockTime         playout_delay;
-  GstClockTime         last_frame_sent;
+  gint32               gap_seq;
 
-  guint32              max_join_delay_in_ts;
-  guint32              min_join_delay_in_ts;
-  guint32              join_delay_in_ts;
-
-
-  gboolean             initial_timeout_initializes;
-  GstClockTime         initial_timeout_start;
-  GstClockTime         avg_frame_interval_time;
-  GstClockTime         initial_timeout;
-
-  struct {
-    SlidingWindowPlugin* skews_histogram;
-    GstClockTime skews_median;
-  }infos[MPRTP_PLUGIN_MAX_SUBFLOW_NUM];
-  gdouble max_skew;
-  SlidingWindow*       packets;
-
-  RcvPackets**         joined_packets;
-  guint                joined_packets_index;
-
-  RcvSubflows*         subflows;
+  gboolean initial_time_initialized;
+  gboolean first_frame_played;
+  GstClockTime first_waiting_started, desired_buffer_time;
 
 };
 struct _StreamJoinerClass{
@@ -74,37 +81,46 @@ struct _StreamJoinerClass{
 };
 
 StreamJoiner*
-make_stream_joiner(TimestampGenerator* rtp_ts_generator, RcvSubflows* subflows);
-
-guint32
-stream_joiner_get_max_join_delay_in_ts(
-    StreamJoiner *this);
+make_stream_joiner(TimestampGenerator* rtp_ts_generator);
 
 void
-stream_joiner_set_max_join_delay_in_ts(
-    StreamJoiner *this,
-    guint32 join_delay_in_ts
-);
+stream_joiner_set_desired_buffer_time(
+    StreamJoiner* this,
+    GstClockTime value);
 
+GstClockTime stream_joiner_get_max_join_delay_in_ts(
+    StreamJoiner* this);
 
-guint32
-stream_joiner_get_min_join_delay_in_ts(
-    StreamJoiner *this);
+gboolean
+stream_joiner_is_packet_discarded(
+    StreamJoiner* this,
+    RcvPacket* packet);
+
+RcvPacket*
+stream_joiner_pop_discarded_packet(
+    StreamJoiner* this);
 
 void
-stream_joiner_set_min_join_delay_in_ts(
-    StreamJoiner *this,
-    guint32 join_delay_in_ts
-);
+stream_joiner_on_subflow_joined(
+    StreamJoiner* this,
+    RcvSubflow* subflow
+    );
 
-guint32
-stream_joiner_get_join_delay_in_ts(
-    StreamJoiner *this);
+void
+stream_joiner_on_subflow_detached(
+    StreamJoiner* this,
+    RcvSubflow* subflow
+    );
 
 void
 stream_joiner_push_packet(
     StreamJoiner *this,
     RcvPacket* packet);
+
+gboolean
+stream_joiner_has_repair_request(
+    StreamJoiner *this,
+    guint16 *gap_seq);
 
 RcvPacket*
 stream_joiner_pop_packet(
@@ -113,4 +129,4 @@ stream_joiner_pop_packet(
 GType
 stream_joiner_get_type (void);
 
-#endif /* STREAM_JOINER_H_ */
+#endif /* STREAMJOINER_H_ */

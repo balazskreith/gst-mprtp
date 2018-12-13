@@ -21,6 +21,7 @@ Source* source_ctor(void)
 
   this->on_destroy.subscriber_func = on_fi_called;
   this->on_playing.subscriber_func = on_fi_called;
+  this->dinit = FALSE;
   return this;
 }
 
@@ -60,7 +61,7 @@ Source* make_source(SourceParams *params, SinkParams* sink_params)
       NULL
   );
 
-  if(sink_params){
+  if(sink_params) {
       GstElement* tee     = gst_element_factory_make("tee", NULL);
       GstElement* q1      = gst_element_factory_make("queue", NULL);
       GstElement* q2      = gst_element_factory_make("queue", NULL);
@@ -76,7 +77,7 @@ Source* make_source(SourceParams *params, SinkParams* sink_params)
 
       gst_element_link_pads(tee, "src_2", q2, "sink");
       gst_element_link_many(q2, sink->element, NULL);
-    }
+  }
 
   setup_ghost_src(src,  sourceBin);
 
@@ -127,7 +128,15 @@ static void _on_destroy_readerpipeline(GstPipeline *readerPipe, gpointer user_da
 static gboolean _push_frames(gpointer user_data) {
   Source* this = user_data;
   GstBuffer* buffer = g_queue_pop_head(this->livesource.buffers);
-  GstFlowReturn result = gst_app_src_push_buffer (GST_APP_SRC (this->livesource.appsrc), gst_buffer_ref(buffer));
+  GstFlowReturn result;
+
+  buffer = gst_buffer_make_writable(buffer);
+  this->dts = GST_BUFFER_DTS(buffer) = this->dts + this->ddts;
+  this->pts = GST_BUFFER_PTS(buffer) = this->pts + this->dpts;
+  this->offset = GST_BUFFER_OFFSET(buffer) = this->offset + this->doffset;
+//  g_print("BUFFER dts: %lu, pts: %lu, offset: %lu\n", this->dts, this->pts, this->offset);
+
+  result = gst_app_src_push_buffer (GST_APP_SRC (this->livesource.appsrc), gst_buffer_ref(buffer));
   g_queue_push_tail(this->livesource.buffers, gst_buffer_ref(buffer));
   return result == GST_FLOW_OK;
 }
@@ -184,13 +193,34 @@ static GstFlowReturn _on_new_sample_from_sink (GstElement * sink, Source* this)
   GstSample *sample;
   GstFlowReturn result;
   GstBuffer* buffer;
-
+  GstClockTime pts;
+  GstClockTime dts;
+  guint64 offset;
   sample = gst_app_sink_pull_sample (GST_APP_SINK (sink));
   buffer = gst_sample_get_buffer(sample);
   g_queue_push_tail(this->livesource.buffers, gst_buffer_ref(buffer));
+  this->livesource.cached_bytes += gst_buffer_get_size(buffer);
+  dts = GST_BUFFER_DTS (buffer);
+  pts = GST_BUFFER_PTS (buffer);
+  offset = GST_BUFFER_OFFSET (buffer);
+  if (this->dinit == FALSE) {
+    this->dts = dts;
+    this->pts = pts;
+    this->offset = offset;
+    this->dinit = TRUE;
+  } else {
+    this->ddts = dts - this->dts;
+    this->dpts = pts - this->pts;
+    this->doffset = offset - this->offset;
+    this->dts = dts;
+    this->pts = pts;
+    this->offset = offset;
+  }
+//  g_print("BUFFER dts: %lu (%lu), pts: %lu (%lu), offset: %lu (%lu)\n",
+//      this->dts, this->ddts, this->pts, this->dpts, this->offset, this->doffset);
   result = gst_app_src_push_buffer (GST_APP_SRC (this->livesource.appsrc), gst_buffer_ref(buffer));
   gst_sample_unref (sample);
-  this->livesource.cached_bytes += gst_buffer_get_size(buffer);
+
   return result;
 }
 

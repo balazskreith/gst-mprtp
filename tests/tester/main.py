@@ -255,14 +255,19 @@ parser.add_argument("-a", "--algorithm", help="The algorithm for the test", defa
 parser.add_argument("-r", "--runs", help="The runtimes", type=int, default=1)
 parser.add_argument("-t", "--target", help="The target directory", default="temp/")
 # default_video = "FILE:Kristen.yuv:1:1280:720:2:60/1"
-default_video = "FILE:Kristen_1024.yuv:1:1024:576:2:60/1"
+default_video = "FILE:Kristen.yuv:1:1280:720:2:20/1"
+# default_video = "FILE:Kristen_1024.yuv:1:1024:576:2:60/1"
 # default_video = "FILE:out.yuv:1:320:240:2:60/1" # Kristen
 # default_video = "FILE:out2.yuv:1:320:240:2:60/1" # Park
-# default_video = "FILE:foreman_cif.yuv:1:352:288:2:25/1"
+# default_video = "FILE:foreman_cif.yuv:1:352:288:2:20/1"
 parser.add_argument("-s", "--source", help="The source type format", default=default_video)
 parser.add_argument("-i", "--sink", help="The sink type format", default="FAKESINK")
 parser.add_argument("-u", "--subflows_num", help="The number of subflows we want", default=2, type=int)
 parser.add_argument("--tcp", help="TCP Indicator", default=0, type=int)
+
+parser.add_argument("--vqmt", help="Calculate metrics video quality metrics using VQMT after the run", default=None)
+vqmt_script = ""
+vqmt_target = "video_quality/kristen"
 
 args = parser.parse_args()
 
@@ -303,6 +308,8 @@ for type_ in args.types:
         while tester.is_ended() is False:
             print("Test has not been finished")
             sleep(10)
+
+        # TODO: implement here the VQMT part
 
         if moving is False:
             continue

@@ -376,11 +376,19 @@ GstElement* _make_mprtp_fractal_controller(Receiver* this, PlayouterParams* play
   Sender*     sender   = make_sender(NULL, NULL, playouter_params->snd_transfer_params, NULL);
   gint32      subflows_num = g_slist_length(playouter_params->snd_transfer_params->subflows);
 
+//  GstElement* rtpjitterbuffer = gst_element_factory_make("rtpjitterbuffer", "rtpjitterbuffer");
+
   gst_bin_add_many(plyBin,
       mprtpPly,
       sender->element,
+//      rtpjitterbuffer,
       NULL
   );
+
+//  g_object_set(rtpjitterbuffer,
+//        "mode", 1,
+//        NULL
+//    );
 
   g_object_set(mprtpPly,
       "controlling-mode", 2,
@@ -394,9 +402,11 @@ GstElement* _make_mprtp_fractal_controller(Receiver* this, PlayouterParams* play
 
   objects_holder_add(this->objects_holder, sender, (GDestroyNotify) sender_dtor);
   gst_element_link_pads(mprtpPly, "mprtcp_rr_src", sender_get_mprtcp_rr_sink_element(sender), "mprtcp_rr_sink");
+//  gst_element_link_pads(mprtpPly, "mprtp_src", rtpjitterbuffer, "sink");
 
   setup_ghost_sink_by_padnames(mprtpPly, "mprtp_sink", plyBin, "sink");
   setup_ghost_src_by_padnames(mprtpPly,  "mprtp_src", plyBin, "src");
+//  setup_ghost_src_by_padnames(rtpjitterbuffer,  "src", plyBin, "src");
   setup_ghost_sink_by_padnames(mprtpPly,  "mprtcp_sr_sink", plyBin, "mprtcp_sr_sink");
   return GST_ELEMENT(plyBin);
 }

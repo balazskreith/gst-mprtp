@@ -37,37 +37,34 @@ GST_DEBUG_CATEGORY_STATIC (stream_joiner_debug_category);
 
 G_DEFINE_TYPE (StreamJoiner, stream_joiner, G_TYPE_OBJECT);
 
-
-
 typedef struct{
   guint32      timestamp;
   guint32      created_in_ts;
   GSList*      packets;
-  gboolean     marked;
 }Frame;
 
 DEFINE_RECYCLE_TYPE(static, frame, Frame);
 
-//----------------------------------------------------------------------
-//-------- Private functions belongs to Scheduler tree object ----------
-//----------------------------------------------------------------------
-
-static void
-stream_joiner_finalize (
-    GObject * object);
-static Frame* _make_frame(StreamJoiner* this, RcvPacket* packet);
-static void _dispose_frame(StreamJoiner* this, Frame* frame);
-static gboolean _frame_is_ready(StreamJoiner* this, Frame* frame);
-
-static guint16
-_max_seq (guint16 x, guint16 y)
+static gint
+_cmp_ts (guint32 x, guint32 y)
 {
-  if(x == y) return x;
-  if(x < y && y - x < 32768) return y;
-  if(x > y && x - y > 32768) return y;
-  if(x < y && y - x > 32768) return x;
-  if(x > y && x - y < 32768) return x;
-  return x;
+  if(x == y) return 0;
+  if(x < y && y - x < 2147483648) return -1;
+  if(x > y && x - y > 2147483648) return -1;
+  if(x < y && y - x > 2147483648) return 1;
+  if(x > y && x - y < 2147483648) return 1;
+  return 0;
+}
+
+static gint
+_cmp_seq (guint16 x, guint16 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 32768) return -1;
+  if(x > y && x - y > 32768) return -1;
+  if(x < y && y - x > 32768) return 1;
+  if(x > y && x - y < 32768) return 1;
+  return 0;
 }
 
 static guint32 _delta_ts(guint32 last_ts, guint32 actual_ts) {
@@ -78,31 +75,38 @@ static guint32 _delta_ts(guint32 last_ts, guint32 actual_ts) {
   }
 }
 
-//
-//static gint
-//_cmp_seq (guint16 x, guint16 y)
-//{
-//  if(x == y) return 0;
-//  if(x < y && y - x < 32768) return -1;
-//  if(x > y && x - y > 32768) return -1;
-//  if(x < y && y - x > 32768) return 1;
-//  if(x > y && x - y < 32768) return 1;
-//  return 0;
-//}
-//
-//static gint
-//_cmp_ts (guint32 x, guint32 y)
-//{
-//  if(x == y) return 0;
-//  if(x < y && y - x < 2147483648) return -1;
-//  if(x > y && x - y > 2147483648) return -1;
-//  if(x < y && y - x > 2147483648) return 1;
-//  if(x > y && x - y < 2147483648) return 1;
-//  return 0;
-//}
+static gint _packets_cmp(RcvPacket* first, RcvPacket* second)
+{
+  //It should return 0 if the elements are equal,
+  //a negative value if the first element comes
+  //before the second, and a positive value
+  //if the second element comes before the first.
+
+  return _cmp_seq(first->abs_seq, second->abs_seq);
+}
+
+static gint _frames_data_cmp(Frame* first, Frame* second, gpointer udata)
+{
+  if (first->packets != NULL && second->packets != NULL) {
+    return _packets_cmp(first->packets->data, second->packets->data);
+  }
+  return _cmp_ts(first->timestamp, second->timestamp);
+}
 
 //----------------------------------------------------------------------
-//--------- Private functions implementations to SchTree object --------
+//-------- Private functions belongs to StreamJoiner object ----------
+//----------------------------------------------------------------------
+
+static void
+stream_joiner_finalize (
+    GObject * object);
+
+static Frame* _make_frame(StreamJoiner* this, RcvPacket* packet);
+static void _dispose_frame(StreamJoiner* this, Frame* frame);
+static void _update_joining_delay(StreamJoiner* this);
+
+//----------------------------------------------------------------------
+//--------- Private functions implementations to StreamJoiner object --------
 //----------------------------------------------------------------------
 
 void
@@ -121,342 +125,354 @@ stream_joiner_class_init (StreamJoinerClass * klass)
 void
 stream_joiner_finalize (GObject * object)
 {
-  StreamJoiner *this = STREAM_JOINER (object);
+  StreamJoiner *this = STREAMJOINER (object);
   RcvPacket* packet;
-  while((packet = g_queue_pop_head(this->outq)) != NULL){
+  while((packet = g_queue_pop_head(this->playoutq)) != NULL){
     rcvpacket_unref(packet);
   }
-  g_object_unref(this->rtp_ts_generator);
-  g_queue_free(this->outq);
+  g_queue_free(this->playoutq);
   g_object_unref(this->sysclock);
+
 }
-#define JOINED_PACKETS_LENGTH 256
+
 void
 stream_joiner_init (StreamJoiner * this)
 {
-  this->sysclock           = gst_system_clock_obtain ();
-  this->made               = _now(this);
-  this->max_join_delay_in_ts = DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE / 4; // 250ms
-  this->min_join_delay_in_ts = DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE / 100; // 10ms
-//  this->join_delay_in_ts     = (this->max_join_delay_in_ts + this->min_join_delay_in_ts) / 2;
-  this->join_delay_in_ts     = this->min_join_delay_in_ts;
-}
-
-static void _rcvpacket_ref(StreamJoiner * this, RcvPacket* packet) {rcvpacket_ref(packet);}
-static void _rcvpacket_unref(StreamJoiner * this, RcvPacket* packet) {rcvpacket_unref(packet);}
-
-static guint _get_bucket_index(StreamJoiner* this, RcvPacket* packet) {
-  GstClockTime skew_in_ms = GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->rtp_ts_generator, packet->subflow_skew_in_ts));
-  if (40 <= skew_in_ms) {
-    return 39;
-  }
-//  g_print("%d:%ld->%lu\n", packet->subflow_id, packet->subflow_skew_in_ts, skew_in_ms);
-  return skew_in_ms;
-}
-
-static gboolean _filter_packet_for_histogram(RcvSubflow* subflow, RcvPacket* packet) {
-//  g_print("filter: %d -> %d | %ld\n", subflow->id, packet->subflow_id, packet->subflow_skew_in_ts);
-  return subflow->id == packet->subflow_id;
-}
-
-static void _calculated_percentile_index(GstClockTime* median_store, gint* index) {
-  g_print("Median: %d\n", *index);
-  *median_store = (*index + 1) * GST_MSECOND;
-}
-
-static void _on_subflow_joined(StreamJoiner* this, RcvSubflow* subflow) {
-  this->infos[subflow->id].skews_histogram = make_swhistogram(
-      NULL, // notifier func about the hist values
-      NULL, // notifier func udata
-      40, // the histogram size <- 1ms until 40
-      (SWHistogramIndex) _get_bucket_index, // the transformation function for index
-      this, // the transformer udata
-      (ListenerFilterFunc) _filter_packet_for_histogram,
-      subflow);
-
-  swhistogram_add_percentiletracker( this->infos[subflow->id].skews_histogram,
-      50, // percentile
-      (ListenerFunc) _calculated_percentile_index, // callback
-      &this->infos[subflow->id].skews_median // callback udata
-      );
-  this->infos[subflow->id].skews_median = 0;
-  slidingwindow_add_plugin(this->packets, this->infos[subflow->id].skews_histogram);
-}
-
-static void _on_subflow_detached(StreamJoiner* this, RcvSubflow* subflow) {
-  slidingwindow_rem_plugin(this->packets, this->infos[subflow->id].skews_histogram);
-  swplugin_dtor(this->infos[subflow->id].skews_histogram);
-  this->infos[subflow->id].skews_histogram = NULL;
+  this->sysclock   = gst_system_clock_obtain ();
+  this->made       = _now(this);
 }
 
 StreamJoiner*
-make_stream_joiner(TimestampGenerator* rtp_ts_generator, RcvSubflows* subflows)
+make_stream_joiner(TimestampGenerator* rtp_ts_generator)
 {
   StreamJoiner *result;
-  result = (StreamJoiner *) g_object_new (STREAM_JOINER_TYPE, NULL);
-
-  result->outq   = g_queue_new();
-  result->frames = g_queue_new();
+  result = (StreamJoiner *) g_object_new (STREAMJOINER_TYPE, NULL);
+  result->frames = NULL;
   result->frames_recycle = make_recycle_frame(50, NULL);
   result->rtp_ts_generator = g_object_ref(rtp_ts_generator);
-//  result->joinq2 = make_bintree3((bintree3cmp) _cmp_rcvpacket_abs_seq);
-  result->subflows = subflows;
-  result->joined_packets = g_malloc0(sizeof(RcvPacket*)*JOINED_PACKETS_LENGTH);
-  result->joined_packets_index = 0;
-  result->initial_timeout = 100 * GST_MSECOND;
-  result->playout_delay = 0;
-
-  result->packets = make_slidingwindow(200, 2 * GST_SECOND);
-  slidingwindow_add_preprocessor(result->packets, (ListenerFunc)_rcvpacket_ref, result);
-  slidingwindow_add_postprocessor(result->packets, (ListenerFunc)_rcvpacket_unref, result);
-
-  rcvsubflows_add_on_subflow_joined_cb(result->subflows, (ListenerFunc) _on_subflow_joined, result);
-  rcvsubflows_add_on_subflow_detached_cb(result->subflows, (ListenerFunc) _on_subflow_detached, result);
+//  result->playout_history = make_slidingwindow_double(200, 2 * GST_SECOND);
+  result->playoutq   = g_queue_new();
+  result->discardedq = g_queue_new();
+  result->desired_buffer_time = 80 * GST_MSECOND;
+  result->subflows = g_malloc(sizeof(StreamJoinerSubflow) * MPRTP_PLUGIN_MAX_SUBFLOW_NUM);
+  memset(result->subflows, 0, sizeof(StreamJoinerSubflow) * MPRTP_PLUGIN_MAX_SUBFLOW_NUM);
 
   return result;
 }
 
+void stream_joiner_set_desired_buffer_time(StreamJoiner* this, GstClockTime value) {
+  this->desired_buffer_time = value;
+}
 
+GstClockTime stream_joiner_get_max_join_delay_in_ts(StreamJoiner* this) {
+  return this->desired_buffer_time + this->joining_delay;
+}
 
-static gboolean header_printed = FALSE;
-static void _stat_print(StreamJoiner *this, RcvPacket* packet)
-{
-  gchar result[1024];
-  memset(result, 0, 1024);
-
-  if (!header_printed) {
-    sprintf(result,
-        "Elapsed time in sec,"     // 1
-        "Min Join Delay,"          // 4
-        "Max Join Delay,"          // 5
-        "Packet Playout Delay,"    // 6
-        "Packet Rcv Ts,"           // 7
-        "Last Rcv Ts,"             // 8
-        "Packet Subflow Id,"       // 9
-        "Packet Abs Seq,"          // 10
-        "Packet Subflow Seq,"      // 11
-        "Frames Queue Length,"     // 14
-        "Outbound Packets Length," // 15
-        "Avg Playout Delay,"       // 16
-        ""
-        );
-    g_print("Stat:%s\n",result);
-    header_printed = TRUE;
-    memset(result, 0, 1024);
+void stream_joiner_on_subflow_joined(StreamJoiner* this, RcvSubflow* subflow) {
+  StreamJoinerSubflow* jitter_buffer_subflow = this->subflows + subflow->id;
+  if (jitter_buffer_subflow->active) {
+    return;
   }
+  jitter_buffer_subflow->active = TRUE;
+  jitter_buffer_subflow->subflow_id = subflow->id;
+  jitter_buffer_subflow->stream_joiner = this;
 
-  {
-    guint32 now_ts = timestamp_generator_get_ts(this->rtp_ts_generator);
-    GstClockTime playout_delay = timestamp_generator_get_time(this->rtp_ts_generator,  now_ts - packet->rcv_rtp_ts);
+  ++this->joined_subflows;
+}
 
-    sprintf(result,
-              "%3.1f,"   // 1
-              "%5u,"     // 4
-              "%5u,"     // 5
-              "%1.3f,"   // 6
-              "%u,"      // 7
-              "%u,"      // 8
-              "%hu,"     // 9
-              "%hu,"     // 10
-              "%hu,"     // 11
-              "%d,"      // 14
-              "%d,"      // 15
-              "%lu,"     // 16
-              ,
-              GST_TIME_AS_MSECONDS(_now(this) - this->made) / 1000., // 1
-              this->min_join_delay_in_ts,  // 4
-              this->max_join_delay_in_ts,   // 5
-              GST_TIME_AS_MSECONDS(playout_delay) / 1000., // 6
-              packet->rcv_rtp_ts,    // 7
-              this->last_rcv_rtp_ts, // 8
-              packet->subflow_id,    // 9
-              packet->abs_seq,       // 10
-              packet->subflow_seq,   // 11
-              g_queue_get_length(this->frames), // 14
-              g_queue_get_length(this->outq),   // 15
-              GST_TIME_AS_MSECONDS(this->playout_delay)    // 16
-              );
+void stream_joiner_on_subflow_detached(StreamJoiner* this, RcvSubflow* subflow) {
+  StreamJoinerSubflow* stream_joiner_subflow = this->subflows + subflow->id;
+  if (!stream_joiner_subflow->active) {
+    return;
   }
+  stream_joiner_subflow->active = FALSE;
 
-  g_print("Stat:%s\n", result);
+  --this->joined_subflows;
 }
 
-
-guint32 stream_joiner_get_max_join_delay_in_ts(StreamJoiner *this)
+gboolean stream_joiner_is_packet_discarded(StreamJoiner* this, RcvPacket* packet)
 {
-  return this->max_join_delay_in_ts;
-}
-
-void stream_joiner_set_max_join_delay_in_ts(StreamJoiner *this, guint32 max_join_delay_in_ts)
-{
-  this->max_join_delay_in_ts = max_join_delay_in_ts;
-  this->min_join_delay_in_ts = MIN(this->min_join_delay_in_ts, this->max_join_delay_in_ts);
-}
-
-guint32 stream_joiner_get_min_join_delay_in_ts(StreamJoiner *this)
-{
-  return this->min_join_delay_in_ts;
-}
-
-void stream_joiner_set_min_join_delay_in_ts(StreamJoiner *this, guint32 min_join_delay_in_ts)
-{
-  this->min_join_delay_in_ts = min_join_delay_in_ts;
-  this->max_join_delay_in_ts = MAX(this->min_join_delay_in_ts, this->max_join_delay_in_ts);
-}
-
-guint32 stream_joiner_get_join_delay_in_ts(StreamJoiner *this) {
-  return this->join_delay_in_ts;
-}
-
-static gint _packets_cmp(RcvPacket* first, RcvPacket* second)
-{
-  //It should return 0 if the elements are equal,
-  //a negative value if the first element comes
-  //before the second, and a positive value
-  //if the second element comes before the first.
-
-  if(first->abs_seq == second->abs_seq){
-    return 0;
+  if(!this->last_played_seq_init){
+    return FALSE;
   }
-  return first->abs_seq < second->abs_seq ? -1 : 1;
+  return _cmp_seq(packet->abs_seq, this->last_played_seq) < 0;
 }
 
-static gint _frames_data_cmp(Frame* first, Frame* second, gpointer udata)
-{
-  //It should return 0 if the elements are equal,
-  //a negative value if the first element comes
-  //before the second, and a positive value
-  //if the second element comes before the first.
-
-  if(first->timestamp == second->timestamp){
-    return 0;
+RcvPacket* stream_joiner_pop_discarded_packet(StreamJoiner* this) {
+  RcvPacket* result;
+  if (g_queue_is_empty(this->discardedq)) {
+    return NULL;
   }
-  return first->timestamp < second->timestamp ? -1 : 1;
+  result = g_queue_pop_head(this->discardedq);
+  rcvpacket_unref(result);
+  return result;
 }
 
-static gint _frame_by_packet(gconstpointer item, gconstpointer udata)
-{
-  const Frame* frame = item;
-  const RcvPacket* packet = udata;
-  return frame->timestamp == packet->snd_rtp_ts ? 0 : -1;
+static void _update_subflow_sampling(StreamJoiner *this, RcvPacket* packet) {
+  StreamJoinerSubflow* subflow = this->subflows + packet->subflow_id;
+  if (!subflow->active) {
+    // already detached or not joined subflows' packets are ignored completly
+    return;
+  }
+  if (subflow->played) {
+    // If we have a measurement from a played sequence,
+    // that one, which matters
+    return;
+  }
+  if (subflow->sampled) {
+    // if it is sampled before due to discarded packet, we don't care anymore.
+    return;
+  }
+  if (this->joining_delay_first_updated && _cmp_seq(packet->abs_seq, this->last_joining_delay_update_HSN) < 0) {
+    // If the last joining delay refresh has a HSN at that time
+    // which is higher than this packet, we do not want to consider
+    // this measurement as a sample
+    return;
+  }
+  g_print("Discarded packet is considered as a sample on subflow %hu (abs: %hu) \n",
+      packet->subflow_id, packet->abs_seq);
+  // Okay so not we do take an account
+  // we increase the sampled subflows and set the
+  // sampled to TRUE, which means
+  // the joining delay update process can be initiated
+  subflow->sampled = TRUE;
+  if (this->joined_subflows <= ++this->sampled_subflows) {
+    // update joining delay
+    _update_joining_delay(this);
+  }
 }
-
 
 void stream_joiner_push_packet(StreamJoiner *this, RcvPacket* packet)
 {
-  Frame* frame;
-  GList* list;
-//  g_print("Packet %hu on %u is pushed\n", packet->abs_seq, packet->subflow_id);
+  Frame* frame = NULL;
+  GList* it;
+  if (!packet) {
+    return;
+  }
+  if (this->reference_points_initialized && this->first_frame_played_out) {
+    if (_cmp_seq(packet->abs_seq, this->last_played_seq) < 0 ||
+        0
+        // We turned this off, because in test we used a video loop
+        // turned out to be given the same timestamp, which was used before.
+//        _cmp_ts(packet->snd_rtp_ts, this->last_played_sent_ts) < 0
+        )
+    {
+      _update_subflow_sampling(this, packet);
+      g_print("!!!!!!!! Packet %hu with ts %u is added to the discarded packets queue. last seq:%hu, packet seq: %hu last ts: %u\n",
+          packet->subflow_seq, packet->snd_rtp_ts,
+          this->last_played_seq, packet->abs_seq, this->last_played_sent_ts
+          );
+      g_queue_push_tail(this->discardedq, packet);
+      return;
+    }
+  } else if(!this->reference_points_initialized){
+    if (this->last_pushed_seq != 0) {
+      if ((guint16) (this->last_pushed_seq + 1) == packet->abs_seq) {
+        ++this->consecutive_good_seq;
+      } else {
+        this->consecutive_good_seq = 0;
+      }
+      if (3 < this->consecutive_good_seq) {
+        this->reference_points_initialized = TRUE;
+      }
+    }
+    this->last_pushed_seq = packet->abs_seq;
+
+  }
+
+  // because it seems g_list_find_custom does not work?????
+  for (it = this->frames; it; it = it->next) {
+    Frame* actual = it->data;
+    if (actual->timestamp == packet->snd_rtp_ts) {
+      frame = actual;
+      break;
+    }
+  }
+
   packet = rcvpacket_ref(packet);
-  if(this->max_join_delay_in_ts == 0) {
-    g_queue_push_tail(this->outq, packet);
-    goto done;
-  }
-
-  list = g_queue_find_custom(this->frames, (gconstpointer) packet, _frame_by_packet);
-  if(!list) {
+  if(!frame) {
     frame = _make_frame(this, packet);
-    g_queue_insert_sorted(this->frames, frame, (GCompareDataFunc) _frames_data_cmp, NULL);
+    this->frames = g_list_insert_sorted_with_data(this->frames, frame, (GCompareDataFunc) _frames_data_cmp, NULL);
   } else {
-    frame = list->data;
     frame->packets = g_slist_insert_sorted(frame->packets, packet, (GCompareFunc) _packets_cmp);
-    frame->marked |= packet->marker;
   }
-  slidingwindow_add_data(this->packets, packet);
 
-done:
+  if (_cmp_seq(this->HSN, packet->abs_seq) < 0) {
+    this->HSN = packet->abs_seq;
+  }
+
   return;
 }
 
-static void _select_max_median_delay(RcvSubflow* subflow, StreamJoiner* this) {
-  this->max_median_delay = MAX(this->max_median_delay, this->infos[subflow->id].skews_median);
+gboolean stream_joiner_has_repair_request(StreamJoiner* this, guint16 *gap_seq)
+{
+  if(this->gap_seq == -1){
+    return FALSE;
+  }
+  *gap_seq = this->gap_seq;
+  this->gap_seq = -1;
+  return TRUE;
 }
+
+static void _update_subflow_waiting_time(StreamJoinerSubflow* subflow, guint16 abs_seq, GstClockTime waiting_time) {
+  StreamJoiner* this = subflow->stream_joiner;
+
+  if (this->joining_delay_first_updated && _cmp_seq(abs_seq, this->last_joining_delay_update_HSN) < 0) {
+    // If the last joining delay refresh has a HSN at that time
+    // which is higher than this packet, we do not want to consider
+    // this measurement as a sample
+    return;
+  }
+
+  if (!subflow->played) {
+    subflow->waiting_time = waiting_time;
+    subflow->played = TRUE;
+    ++this->played_subflows;
+  } else {
+    subflow->waiting_time = MIN(subflow->waiting_time, waiting_time);
+  }
+
+//  g_print("Subflow %hu (abs: %hu) is updated by a waiting time of %lu, the minimal waiting time is %lu, the nr of played subflows: %d\n",
+//      subflow->subflow_id, abs_seq, GST_TIME_AS_MSECONDS(waiting_time), GST_TIME_AS_MSECONDS(subflow->waiting_time),
+//      this->played_subflows);
+
+  if (!subflow->sampled) {
+    subflow->sampled = TRUE;
+  }
+}
+
+
 
 RcvPacket* stream_joiner_pop_packet(StreamJoiner *this)
 {
   RcvPacket* packet = NULL;
-  Frame* first = NULL;
+  Frame* frame;
   GstClockTime now = _now(this);
-  if(!g_queue_is_empty(this->outq)) {
-    packet = g_queue_pop_head(this->outq);
-    goto done;
+  GSList* it;
+  GstClockTime dSending = 0;
+
+  if(!g_queue_is_empty(this->playoutq)){
+    goto playout_from_queue;
   }
 
-  if(this->max_join_delay_in_ts == 0 || g_queue_is_empty(this->frames)){
-    goto done;
-  }
-
-  // initial timout delay is here.
-  if (!this->initial_timeout_initializes) {
-    this->initial_timeout_start = now;
-    this->initial_timeout_initializes = TRUE;
-    goto done;
-  } else if (now < this->initial_timeout_start + this->initial_timeout) {
-    goto done;
-  } else if (now < this->last_frame_sent + this->avg_frame_interval_time + this->playout_delay ) {
-//    g_print("A %lu, %lu\n",  this->avg_frame_interval_time / GST_MSECOND, this->playout_delay / GST_MSECOND);
-    goto done;
-  }
-
-  first = g_queue_peek_head(this->frames);
-//  timeout = this->join_frame_nr * this->frame_inter_arrival_avg_in_ts + playout_delay_in_ts < _delta_ts(first->created_in_ts, timestamp_generator_get_ts(this->rtp_ts_generator));
-  DISABLE_LINE _frame_is_ready(this, first);
-//  if(!timeout) {
-//    goto done;
-//  }
-//  g_print("Timeout: %d - %d - %hu\n", timeout, _frame_is_ready(this, first), this->hsn);
-  first = g_queue_pop_head(this->frames);
-  {
-    GSList* it;
-    guint32 last_snd_rtp_ts = this->last_snd_rtp_ts;
-    for(it = first->packets; it; it = it->next) {
-      RcvPacket* packet = it->data;
-      this->last_abs_seq = packet->abs_seq;
-      this->last_subflow_id = packet->subflow_id;
-      this->last_rcv_rtp_ts = packet->rcv_rtp_ts;
-      this->last_snd_rtp_ts = packet->snd_rtp_ts;
-      g_queue_push_tail(this->outq, packet);
-    }
-    this->last_frame_sent = now;
-    // Frame interval refresh
-    if (last_snd_rtp_ts != 0 && this->last_snd_rtp_ts != 0) {
-      guint32 frame_interval_in_ts = _delta_ts(last_snd_rtp_ts, this->last_snd_rtp_ts);
-      GstClockTime frame_interval_in_ns = timestamp_generator_get_time(this->rtp_ts_generator, frame_interval_in_ts);
-      if (frame_interval_in_ns < 50 * GST_MSECOND) {
-        this->avg_frame_interval_time = this->avg_frame_interval_time * .98 + frame_interval_in_ns * .02;
-      }
-    }
-    // TODO: playout delay recalc
-    slidingwindow_refresh(this->packets);
-    {
-      this->max_median_delay = 0;
-      rcvsubflows_iterate(this->subflows, (GFunc)_select_max_median_delay, this);
-      this->max_median_delay = MIN(this->max_median_delay, 40 * GST_MSECOND);
-      if (!this->playout_delay) {
-        this->playout_delay = this->max_median_delay;
-      } else {
-        this->playout_delay = (this->max_median_delay + 254 * this->playout_delay) / 255;
-      }
-    }
-    packet = g_queue_pop_head(this->outq);
-  }
-
-  _dispose_frame(this, first);
-
-done:
-  if(!packet) {
+  if (this->frames == NULL) { // We have no frame to playout
     return NULL;
   }
-  rcvpacket_unref(packet);
+  frame = g_list_first(this->frames)->data;
 
-  if(this->hsn_init) {
-    this->hsn = _max_seq(this->hsn, packet->abs_seq);
-  } else {
-    this->hsn = packet->abs_seq;
+  // We have frame to playout
+  if (this->first_frame_played == FALSE) { // is this the first frame to playout?
+    if (!this->initial_time_initialized) {
+      this->first_waiting_started = now;
+      this->initial_time_initialized = TRUE;
+      return NULL;
+    }
+    if (now < this->first_waiting_started + this->desired_buffer_time) {
+//      g_print("First remaining time is %lu\n", GST_TIME_AS_MSECONDS(this->first_waiting_started + 2 * this->desired_buffer_time - now));
+      return NULL;
+    }
+    this->first_frame_played = TRUE;
   }
-  DISABLE_LINE _stat_print(this, packet);
-//  _stat_print(this, packet);
+  else
+  {
+    guint32 dSn_in_ts;
+    dSn_in_ts = _delta_ts(this->last_played_sent_ts, frame->timestamp);
+    dSending = timestamp_generator_get_time(this->rtp_ts_generator, dSn_in_ts);
+    if (now < this->last_played_out_time + dSending + this->joining_delay) {
+      return NULL;
+    }
+
+    g_print("Waiting time: %lu, Joining delay: %f, Buffer Time: %lu, Remaining time is %f Frames we have: %d\n",
+            GST_TIME_AS_MSECONDS(dSending),
+            GST_TIME_AS_MSECONDS(this->joining_delay),
+            GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->rtp_ts_generator, _delta_ts(frame->created_in_ts, timestamp_generator_get_ts(this->rtp_ts_generator)))),
+            GST_TIME_AS_MSECONDS(this->last_played_out_time + dSending + this->joining_delay - now),
+            g_list_length(this->frames));
+
+    // Check if played out time needs to be reset or not.
+    this->last_played_out_time += dSending + this->joining_delay;
+  }
+
+  for (it = frame->packets; it; it = it->next) {
+    packet = it->data;
+    g_queue_push_tail(this->playoutq, packet);
+    {
+      GstClockTime waiting_time = timestamp_generator_get_time(this->rtp_ts_generator, _delta_ts(packet->rcv_rtp_ts, timestamp_generator_get_ts(this->rtp_ts_generator)));
+      _update_subflow_waiting_time(this->subflows + packet->subflow_id, packet->abs_seq, waiting_time);
+    }
+  }
+  if (this->joined_subflows <= ++this->sampled_subflows) {
+    // update joining delay
+    _update_joining_delay(this);
+  }
+  this->last_played_out_time = now;
+  this->last_played_sent_ts = frame->timestamp;
+  this->last_played_out_ts = timestamp_generator_get_ts(this->rtp_ts_generator);
+//  this->last_played_out_time = now;
+
+  g_slist_free(frame->packets);
+  frame->packets = NULL;
+  this->frames = g_list_remove(this->frames, frame);
+  _dispose_frame(this, frame);
+  this->first_frame_played_out = TRUE;
+
+playout_from_queue:
+  packet = g_queue_pop_head(this->playoutq);
+  if(!this->last_played_seq_init){
+    this->last_played_seq = packet->abs_seq;
+    this->last_played_seq_init = TRUE;
+  } else if((guint16)(this->last_played_seq + 2) == packet->abs_seq) {
+    this->gap_seq = this->last_played_seq + 1;
+  }
+
+
+  this->last_played_seq = packet->abs_seq;
+  rcvpacket_unref(packet);
   return packet;
+}
+
+void _update_joining_delay(StreamJoiner* this) {
+  gdouble alpha;
+  gdouble dWaiting;
+  guint8 i;
+  GstClockTime min_waiting_time = -1;
+  for (i = 0; i < MPRTP_PLUGIN_MAX_SUBFLOW_NUM; ++i) {
+    StreamJoinerSubflow* subflow = this->subflows + i;
+    if (!subflow->active) {
+      continue;
+    }
+    min_waiting_time = MIN(min_waiting_time, subflow->waiting_time);
+    // We also do a reset for flags
+    subflow->sampled = FALSE;
+    subflow->played = FALSE;
+  }
+
+  // if it is positive, it means the minimal_waiting_time for the slowest subflow
+  // is not reached the desired_buffer_time,
+  // so we need to increase the joining delay
+  // if it is negative, it means we force the slowest subflow to wait more than the desired
+  // buffer time, so we need to decrease the joining delay
+  dWaiting =  (gint64) this->desired_buffer_time - (gint64) min_waiting_time;
+  dWaiting = CONSTRAIN(-.5 * this->desired_buffer_time, .5 * this->desired_buffer_time, dWaiting);
+  // by how drastically we need to increase depends on the
+  // distance from the desired buffer time
+  alpha = MIN(1.0, pow(dWaiting / (gdouble) this->desired_buffer_time, 2.0));
+
+  // then we need to decide how much we trust for this measurement
+  alpha *= (this->joined_subflows <= this->played_subflows) ? 1./16. : 1./32.;
+
+  this->joining_delay += dWaiting * alpha;
+//  g_print("Update the joining delay. min_waiting_time is %lu, sampled- (%d) and played subflows (%d), "
+//      "dWaiting is %f, alpha is %.2f new joining delay is %f\n",
+//      GST_TIME_AS_MSECONDS(min_waiting_time), this->sampled_subflows, this->played_subflows,
+//      GST_TIME_AS_MSECONDS(dWaiting), alpha, GST_TIME_AS_MSECONDS(this->joining_delay));
+
+  // Reset the counter for the next update
+  this->sampled_subflows = 0;
+  this->played_subflows = 0;
+  this->last_joining_delay_update_HSN = this->HSN;
+  this->joining_delay_first_updated = TRUE;
+  return;
 }
 
 
@@ -464,39 +480,18 @@ Frame* _make_frame(StreamJoiner* this, RcvPacket* packet)
 {
   Frame* result = recycle_retrieve(this->frames_recycle);
   result->timestamp = packet->snd_rtp_ts;
-//  result->created_in_ts = _now(this);
   result->created_in_ts = packet->rcv_rtp_ts;
-  result->marked = FALSE;
   result->packets = g_slist_prepend(NULL, packet);
   return result;
 }
 
 void _dispose_frame(StreamJoiner* this, Frame* frame)
 {
-  g_slist_free(frame->packets);
-  frame->packets = NULL;
+  if (frame->packets) {
+    g_slist_free(frame->packets);
+  }
+//  frame->packets = NULL;
+  memset(frame, 0, sizeof(Frame));
   recycle_add(this->frames_recycle, frame);
-}
-
-gboolean _frame_is_ready(StreamJoiner* this, Frame* frame)
-{
-  guint16 seq = this->hsn;
-  GSList* it;
-
-//  g_print("Frame is %-3s marked, ", frame->marked ? "": "not");
-  if(!frame->marked){
-//    g_print(" FALSE\n");
-    return FALSE;
-  }
-  for(it = frame->packets; it; it = it->next){
-    RcvPacket* packet = it->data;
-//    g_print("seq %hu, ", packet->abs_seq);
-    if(++seq != packet->abs_seq){
-//      g_print(" FALSE\n");
-      return FALSE;
-    }
-  }
-//  g_print(" TRUE\n");
-  return TRUE;
 }
 

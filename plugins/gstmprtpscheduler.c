@@ -1052,7 +1052,7 @@ PROFILING("approval process: _on_monitoring_request",
     _on_monitoring_request(this, subflow);
   }
 );
-
+//g_print("Packet %hu on %d with subflow seq %hu sent.\n", packet->abs_seq, packet->subflow_id, packet->subflow_seq);
   PROFILING("_mprtpscheduler_send_packet",
     _mprtpscheduler_send_packet(this, packet);
   );

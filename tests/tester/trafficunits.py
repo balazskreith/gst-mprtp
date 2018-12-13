@@ -115,7 +115,7 @@ class RTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
     """
     Represent an RTP sender for shell traffic unit
     """
-    def __init__(self, name, path, program_name, codec, algorithm, rtcp_port, rtp_ip, rtp_port, snd_stat, source_type, mprtp_ext_header_id = 0):
+    def __init__(self, name, path, program_name, codec, algorithm, rtcp_port, rtp_ip, rtp_port, snd_stat, source_type, mprtp_ext_header_id = 0, saveyuv=False):
         """
         Init the parameter for the test
 
@@ -146,6 +146,7 @@ class RTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
         self.__mprtp_ext_header_id = mprtp_ext_header_id
         self.__name = name
         self.__program_name = program_name
+        self.__saveyuv = saveyuv
         self.add_packetlogs(snd_stat)
 
     def get_logfile(self):
@@ -173,6 +174,9 @@ class RTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
             args.append("--stat=" + self.__snd_stat + ":" + str(self.__mprtp_ext_header_id))
         args.append("--source=" + str(self.__source_type))
 
+        if self.__saveyuv is True:
+            args.append("--encodersink=FILE:encoded.yuv")
+
         return ShellCommand(self.path + " ".join(args), stdout = self.logging, stderr = self.logging)
 
     def get_stop_cmd(self):
@@ -195,7 +199,8 @@ class MPRTPReceiverShellTrafficUnit(TrafficUnit, RTPReceiver):
     """
     Represent an RTP receiver for shell traffic unit
     """
-    def __init__(self, name, path, program_name, codec, algorithm, rtp_ports, rtcp_ips, rtcp_ports, rcv_stat, ply_stat, sink_type, mprtp_ext_header_id = 0):
+    def __init__(self, name, path, program_name, codec, algorithm,
+                 rtp_ports, rtcp_ips, rtcp_ports, rcv_stat, ply_stat, sink_type, mprtp_ext_header_id = 0):
         """
         Init the parameter for the test
 
@@ -282,7 +287,7 @@ class MPRTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
     Represent an RTP sender for shell traffic unit
     """
     def __init__(self, name, path, program_name, codec, algorithm, rtcp_ports,
-                 rtp_ips, rtp_ports, snd_stat, source_type, mprtp_ext_header_id = 0):
+                 rtp_ips, rtp_ports, snd_stat, source_type, mprtp_ext_header_id = 0, saveyuv=False):
         """
         Init the parameter for the test
 
@@ -313,6 +318,7 @@ class MPRTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
         self.__mprtp_ext_header_id = mprtp_ext_header_id
         self.__name = name
         self.__program_name = program_name
+        self.__saveyuv = saveyuv
         self.add_packetlogs(snd_stat)
 
     def get_logfile(self):
@@ -340,9 +346,13 @@ class MPRTPSenderShellTrafficUnit(TrafficUnit, RTPSender):
 
         args.append(sender)
         args.append(scheduler)
-        if (self.__snd_stat):
+        if self.__snd_stat:
             args.append("--stat=" + self.__snd_stat + ":" + str(self.__mprtp_ext_header_id))
         args.append("--source=" + str(self.__source_type))
+
+        # if self.__saveyuv:
+        #     args.append("--sourcesink=FILE:kristen_raw.yuv")
+            # args.append("--encodersink=FILE:encoded.yuv")
 
         return ShellCommand(self.path + " ".join(args), stdout = self.logging, stderr = self.logging)
 

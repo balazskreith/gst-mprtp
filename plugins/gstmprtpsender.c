@@ -922,6 +922,8 @@ PROFILING("gst_mprtpsender_mprtp_sink_chain",
     this->segment.position = position;
   }
 
+//  g_print("refcount: %d\n", buf->mini_object.refcount);
+//  gst_buffer_ref(buf);
   result = gst_pad_push (outpad, buf);
 
 

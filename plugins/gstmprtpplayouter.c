@@ -231,12 +231,6 @@ gst_mprtpplayouter_class_init (GstMprtpplayouterClass * klass)
 static void
 gst_mprtpplayouter_init (GstMprtpplayouter * this)
 {
-//  init_mprtp_logger();
-//  //TODO: Only for development use
-//  mprtp_logger_set_state(TRUE);
-//  mprtp_logger_set_system_command("bash -c '[ ! -d temp_logs ]' && mkdir temp_logs");
-//  mprtp_logger_set_system_command("rm temp_logs/*");
-//  mprtp_logger_set_target_directory("temp_logs/");
 
   this->mprtp_sinkpad =
       gst_pad_new_from_static_template (&gst_mprtpplayouter_mprtp_sink_template,
@@ -299,13 +293,13 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
   this->subflows                 = make_rcvsubflows();
 
   this->fec_decoder              = make_fecdecoder();
-  this->jitterbuffer             = make_jitterbuffer();
 
   this->rcvpackets               = make_rcvpackets();
   this->rcvtracker               = make_rcvtracker();
   this->cc_ts_generator          = g_object_ref(rcvtracker_get_cc_ts_generator(this->rcvtracker));
   this->rtp_ts_generator         = g_object_ref(rcvtracker_get_rtp_ts_generator(this->rcvtracker));
-  this->joiner                   = make_stream_joiner(this->rtp_ts_generator, this->subflows);
+  this->jitterbuffer             = make_jitterbuffer(this->rtp_ts_generator);
+  this->joiner                   = make_stream_joiner(this->rtp_ts_generator);
 
   this->controller               = make_rcvctrler(this->rcvtracker, this->subflows, this->on_rtcp_ready);
 
@@ -316,6 +310,12 @@ gst_mprtpplayouter_init (GstMprtpplayouter * this)
 
   notifier_add_listener(this->on_rtcp_ready,       (ListenerFunc) _playouter_on_rtcp_ready,       this);
   notifier_add_listener(this->on_recovered_buffer, (ListenerFunc) rcvtracker_on_recovered_buffer, this);
+
+  rcvsubflows_add_on_subflow_joined_cb(this->subflows, (ListenerFunc) jitterbuffer_on_subflow_joined, this->jitterbuffer);
+  rcvsubflows_add_on_subflow_detached_cb(this->subflows, (ListenerFunc) jitterbuffer_on_subflow_detached, this->jitterbuffer);
+
+  rcvsubflows_add_on_subflow_joined_cb(this->subflows, (ListenerFunc) stream_joiner_on_subflow_joined, this->joiner);
+  rcvsubflows_add_on_subflow_detached_cb(this->subflows, (ListenerFunc) stream_joiner_on_subflow_detached, this->joiner);
 
   this->packets_in = g_async_queue_new();
 
@@ -388,7 +388,8 @@ gst_mprtpplayouter_set_property (GObject * object, guint property_id,
     case PROP_MAX_JOIN_DELAY:
       guint_value = g_value_get_uint (value);
       g_print("Max Join delay is set to %dms\n", guint_value);
-      stream_joiner_set_max_join_delay_in_ts(this->joiner, guint_value);
+      // We turn this option off now.
+//      stream_joiner_set_desired_buffer_time(this->joiner, guint_value);
       //gst_pad_push_event(this->mprtp_srcpad, gst_event_new_latency(stream_joiner_get_latency(this->joiner)));
       break;
     default:
@@ -646,6 +647,7 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   if (*buf_2nd_byte > 192 && *buf_2nd_byte < 223) {
     //The packet is an rtcp packet not an mprtcp
     if(GST_IS_BUFFER(buf)){
+      g_print("I have forwarded RTCP\n");
       gst_pad_push(this->mprtp_srcpad, buf);
     }
     goto done;
@@ -654,6 +656,7 @@ gst_mprtpplayouter_mprtp_sink_chain (GstPad * pad, GstObject * parent,
   //if(!gst_rtp_buffer_is_mprtp(this->rcvpackets, buf)){
   if(!gst_buffer_is_mprtp(buf, rcvpackets_get_mprtp_ext_header_id(this->rcvpackets))){
     if(GST_IS_BUFFER(buf)){
+      g_print("I have forwarded sg\n");
       gst_pad_push(this->mprtp_srcpad, buf);
     }
     goto done;
@@ -773,8 +776,7 @@ void _playouter_on_rtcp_ready(GstMprtpplayouter *this, GstBuffer* buffer)
   gst_pad_push(this->mprtcp_rr_srcpad, buffer);
 }
 
-
-static GstBuffer* _get_buffer_for_forwarding(GstMprtpplayouter * this, RcvPacket *packet)
+static GstBuffer* _set_buffer_meta_addresses(GstMprtpplayouter * this, RcvPacket *packet)
 {
   GstBuffer* result = NULL;
   GstNetAddressMeta *meta;
@@ -783,17 +785,17 @@ static GstBuffer* _get_buffer_for_forwarding(GstMprtpplayouter * this, RcvPacket
   meta = gst_buffer_get_net_address_meta (result);
 
   if(!meta){
-    return result;
+    goto done;
   }
 
   if (!this->pivot_address) {
     this->pivot_address_subflow_id = packet->subflow_id;
     this->pivot_address = G_SOCKET_ADDRESS (g_object_ref (meta->addr));
-    return result;
+    goto done;
   }
 
-  if (packet->subflow_seq == this->pivot_address_subflow_id) {
-    return result;
+  if (packet->subflow_id == this->pivot_address_subflow_id) {
+    goto done;
   }
 
   if(gst_buffer_is_writable(result))
@@ -802,7 +804,27 @@ static GstBuffer* _get_buffer_for_forwarding(GstMprtpplayouter * this, RcvPacket
     result = gst_buffer_make_writable(result);
     gst_buffer_add_net_address_meta (result, this->pivot_address);
   }
+done:
+  return result;
+}
 
+static GstBuffer* _set_buffer_pts_dts_addresses(GstMprtpplayouter * this, RcvPacket *packet)
+{
+  GstBuffer* result = NULL;
+//  GstNetAddressMeta *meta;
+  result = packet->buffer;
+
+//done:
+  return result;
+}
+
+static GstBuffer* _get_buffer_for_forwarding(GstMprtpplayouter * this, RcvPacket *packet)
+{
+  GstBuffer* result;
+//  GstNetAddressMeta *meta;
+  packet->buffer = _set_buffer_meta_addresses(this, packet);
+  packet->buffer = _set_buffer_pts_dts_addresses(this, packet);
+  result = packet->buffer;
   return result;
 }
 
@@ -813,35 +835,26 @@ _render_process_ (GstMprtpplayouter *this)
   guint16 gap_seq;
   RcvPacket* packet;
   GstBuffer* buffer;
-  guint32 playout_time_in_ts;
 
-  while((packet = g_async_queue_timeout_pop(this->packets_in, 1000)) != NULL){
-    if(jitterbuffer_is_packet_discarded(this->jitterbuffer, packet)){
-//        g_print("Discarded packet: %hu - %hu - %lu\n", packet->abs_seq, this->jitterbuffer->last_seq, GST_TIME_AS_MSECONDS(this->jitterbuffer->playout_delay));
-      //rcvtracker_add_discarded_packet(this->rcvtracker, packet);
-      // TODO: decide whether send it immediately?
-      continue;
-    }
-    stream_joiner_push_packet(this->joiner, packet);
+  while((packet = g_async_queue_timeout_pop(this->packets_in, 1000)) != NULL) {
+    jitterbuffer_push_packet(this->jitterbuffer, packet);
+//    stream_joiner_push_packet(this->joiner, packet);
   }
 
-  while((packet = stream_joiner_pop_packet(this->joiner)) != NULL){
-    jitterbuffer_push_packet(this->jitterbuffer, packet);
+  // handle the discarded packets
+  while((packet = jitterbuffer_pop_discarded_packet(this->jitterbuffer)) != NULL) {
+//  while((packet = stream_joiner_pop_discarded_packet(this->joiner)) != NULL) {
+    rcvtracker_add_discarded_packet(this->rcvtracker, packet);
   }
 
 again:
+//  g_print("now in ms: %lu\n",GST_TIME_AS_MSECONDS(_now(this)));
   packet = jitterbuffer_pop_packet(this->jitterbuffer);
+//  packet = stream_joiner_pop_packet(this->joiner);
   if(!packet){
     goto done;
   }
-  playout_time_in_ts = jitterbuffer_get_playout_delay_in_ts(this->jitterbuffer);
 playout:
-  if(0 < playout_time_in_ts) {
-//    g_print("%hu (%d) -> playout delay: %lu\n",
-//        packet->abs_seq, packet->subflow_id, timestamp_generator_get_time(this->rtp_ts_generator, playout_time_in_ts) / 1000);
-    g_usleep(timestamp_generator_get_time(this->rtp_ts_generator, playout_time_in_ts) / 1000);
-  }
-
   // TODO: 0 for testing
   if(0 && jitterbuffer_has_repair_request(this->jitterbuffer, &gap_seq)){
     GstBuffer* repairedbuf = fecdecoder_pop_rtp_packet(this->fec_decoder, gap_seq);
@@ -855,9 +868,16 @@ playout:
     }
   }
 
+  // Note: _get_buffer_for_forwarding adds a meta data to the buffer
+  // in order not to drop the buffer if source address are checked
+  // and it can be only one.
+  DISABLE_LINE buffer = _get_buffer_for_forwarding(this, packet);
   buffer = _get_buffer_for_forwarding(this, packet);
 
-//  g_print("Packet arrived at subflow %d with abs seq %hu forwarded\n", packet->subflow_id, packet->abs_seq);
+  // TODO: If the above line has not been been disabled, than comment this one below
+//  buffer = packet->buffer;
+
+//  g_print("Packet (ref:%d) arrived at subflow %d with abs seq %hu ts: %u forwarded\n", packet->ref, packet->subflow_id, packet->abs_seq, packet->snd_rtp_ts);
 //  PROFILING("gst_pad_push",
   gst_pad_push(this->mprtp_srcpad, buffer);
 //  );

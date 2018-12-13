@@ -38,23 +38,30 @@ GST_DEBUG_CATEGORY_STATIC (jitterbuffer_debug_category);
 G_DEFINE_TYPE (JitterBuffer, jitterbuffer, G_TYPE_OBJECT);
 
 typedef struct{
-  SlidingWindow* packet_skews;
-  gdouble        path_skew_in_ts;
-  guint32        last_rcv_rtp_ts;
-  guint32        last_snd_rtp_ts;
-}Subflow;
+  guint32      timestamp;
+  guint32      created_in_ts;
+  GSList*      packets;
+}Frame;
 
-static void _refresh_playout_delay(JitterBuffer* this, RcvPacket* packet);
+typedef struct {
+  gint64 value;
+  guint8 subflow_id;
+}Skew;
 
-//----------------------------------------------------------------------
-//-------- Private functions belongs to Scheduler tree object ----------
-//----------------------------------------------------------------------
+DEFINE_RECYCLE_TYPE(static, frame, Frame);
+DEFINE_RECYCLE_TYPE(static, skew, Skew);
 
-static void
-jitterbuffer_finalize (
-    GObject * object);
+static gint
+_cmp_ts (guint32 x, guint32 y)
+{
+  if(x == y) return 0;
+  if(x < y && y - x < 2147483648) return -1;
+  if(x > y && x - y > 2147483648) return -1;
+  if(x < y && y - x > 2147483648) return 1;
+  if(x > y && x - y < 2147483648) return 1;
+  return 0;
+}
 
-//
 static gint
 _cmp_seq (guint16 x, guint16 y)
 {
@@ -74,55 +81,47 @@ static guint32 _delta_ts(guint32 last_ts, guint32 actual_ts) {
   }
 }
 
-static gint _cmp_rcvpacket_abs_seq(RcvPacket *a, RcvPacket* b, gpointer udata)
-{
-  return _cmp_seq(a->abs_seq, b->abs_seq);
+static gint _cmp_skew(Skew* a, Skew* b) {
+  return a->value < b->value ? -1 : b->value < a->value ? 1 : 0;
 }
 
-//
-//static gint
-//_cmp_ts (guint32 x, guint32 y)
-//{
-//  if(x == y) return 0;
-//  if(x < y && y - x < 2147483648) return -1;
-//  if(x > y && x - y > 2147483648) return -1;
-//  if(x < y && y - x > 2147483648) return 1;
-//  if(x > y && x - y < 2147483648) return 1;
-//  return 0;
-//}
-//
-
-#define _subflow(this, id) ((Subflow*)(((Subflow*)this->subflows) + id))
-
-static void _on_path_skew_calculated(Subflow *subflow, gint64* skew)
+static gint _packets_cmp(RcvPacket* first, RcvPacket* second)
 {
-  gint64 path_skew_in_ts;
-  gint64 min_skew_in_ts = -1 * (gint64) (DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE / 10);
-  gint64 max_skew_in_ts = (gint64) (DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE / 10);
-  path_skew_in_ts = CONSTRAIN(min_skew_in_ts, max_skew_in_ts, *skew);
-//g_print("%ld\n", skew_median);
-  if(subflow->path_skew_in_ts == 0.){
-    subflow->path_skew_in_ts = path_skew_in_ts;
-  }else{
-    subflow->path_skew_in_ts = subflow->path_skew_in_ts * .99 + .01 * path_skew_in_ts;
-  }
+  //It should return 0 if the elements are equal,
+  //a negative value if the first element comes
+  //before the second, and a positive value
+  //if the second element comes before the first.
+
+  return _cmp_seq(first->abs_seq, second->abs_seq);
 }
 
-static void _on_path_minmax_skew_calculated(JitterBuffer *this, swminmaxstat_t *stat)
+static gint _frames_data_cmp(Frame* first, Frame* second, gpointer udata)
 {
-  gdouble max;
-  max = MAX(0, *(gdouble*)stat->max);
-
-  if(this->playout_delay_in_ts == 0.){
-    this->playout_delay_in_ts = max;
-  }else{
-    this->playout_delay_in_ts = (this->playout_delay_in_ts * 255 + max) / 256;
+  if (first->packets != NULL && second->packets != NULL) {
+    return _packets_cmp(first->packets->data, second->packets->data);
   }
-//  this->playout_delay_in_ts = CONSTRAIN(0, GST_SECOND, this->playout_delay_in_ts);
+  return _cmp_ts(first->timestamp, second->timestamp);
+}
+
+static void _skew_shaper(Skew* to, Skew* from) {
+  to->subflow_id = from->subflow_id;
+  to->value = from->value;
 }
 
 //----------------------------------------------------------------------
-//--------- Private functions implementations to SchTree object --------
+//-------- Private functions belongs to JitterBuffer object ----------
+//----------------------------------------------------------------------
+
+static void
+jitterbuffer_finalize (
+    GObject * object);
+
+static Frame* _make_frame(JitterBuffer* this, RcvPacket* packet);
+static void _dispose_frame(JitterBuffer* this, Frame* frame);
+static void _refresh_playout_delay(JitterBuffer* this);
+
+//----------------------------------------------------------------------
+//--------- Private functions implementations to JitterBuffer object --------
 //----------------------------------------------------------------------
 
 void
@@ -149,48 +148,212 @@ jitterbuffer_finalize (GObject * object)
   g_queue_free(this->playoutq);
   g_object_unref(this->sysclock);
 
-  g_free(this->subflows);
 }
-
 
 void
 jitterbuffer_init (JitterBuffer * this)
 {
   this->sysclock   = gst_system_clock_obtain ();
   this->made       = _now(this);
-  this->playoutq   = g_queue_new();
-
-  this->subflows   = g_malloc0(sizeof(Subflow) * 256);
-  this->path_skews = make_slidingwindow_double(256, 0);
-
-  slidingwindow_add_plugin(this->path_skews,
-      make_swminmax((GCompareFunc)bintree3cmp_double, (ListenerFunc) _on_path_minmax_skew_calculated, this));
-
 }
 
 JitterBuffer*
-make_jitterbuffer(void)
+make_jitterbuffer(TimestampGenerator* rtp_ts_generator)
 {
   JitterBuffer *result;
   result = (JitterBuffer *) g_object_new (JITTERBUFFER_TYPE, NULL);
+  result->frames = NULL;
+  result->frames_recycle = make_recycle_frame(50, NULL);
+  result->rtp_ts_generator = g_object_ref(rtp_ts_generator);
+//  result->playout_history = make_slidingwindow_double(200, 2 * GST_SECOND);
+  result->playoutq   = g_queue_new();
+  result->discardedq = g_queue_new();
+  result->initial_buffer_time = 500 * GST_MSECOND; // The default buffer time for the jitterbuffer
+  result->skews_recycle = make_recycle_skew(50, (RecycleItemShaper)_skew_shaper);
+  result->skews = make_slidingwindow_with_data_recycle(500, 2 * GST_SECOND, result->skews_recycle);
+  result->subflows = g_malloc(sizeof(JitterBufferSubflow) * MPRTP_PLUGIN_MAX_SUBFLOW_NUM);
+  memset(result->subflows, 0, sizeof(JitterBufferSubflow) * MPRTP_PLUGIN_MAX_SUBFLOW_NUM);
+
 
   return result;
 }
 
+void jitterbuffer_set_initial_buffer_time(JitterBuffer* this, GstClockTime value) {
+  this->initial_buffer_time = value;
+}
+
+static gboolean _percentile_tracker_filter(guint8* subflow_id, Skew* skew) {
+//  g_print("Filter (%d) skew %ld|%d\n", *subflow_id, skew->value, skew->subflow_id);
+  return skew->subflow_id == *subflow_id;
+}
+
+static void _on_subflow_percentile_calculated(JitterBufferSubflow* this, swpercentilecandidates_t* data) {
+  gint64* skew_left = data->left;
+  gint64* skew_right = data->right;
+//  g_print("_on_subflow_percentile_calculated called by subflow %d\n", this->subflow_id);
+  if (data->processed == FALSE) {
+    return;
+  }
+  if (skew_left != NULL && skew_right != NULL) {
+    this->median_skew = (*skew_left + *skew_right) / 2;
+  } else if (skew_left != NULL) {
+    this->median_skew = *skew_left;
+  } else if (skew_right != NULL) {
+    this->median_skew = *skew_right;
+  }
+  this->median_skew = MAX(0, this->median_skew);
+
+//  g_print("Max skew on subflow %d is %lu\n", this->subflow_id, GST_TIME_AS_MSECONDS(this->median_skew));
+  this->jitter_buffer->max_skew = CONSTRAIN(this->jitter_buffer->max_skew, MAX_JITTER_BUFFER_ALLOWED_SKEW, this->median_skew);
+  this->jitter_buffer->max_skew_initialized = TRUE;
+}
+
+void jitterbuffer_on_subflow_joined(JitterBuffer* this, RcvSubflow* subflow) {
+  JitterBufferSubflow* jitter_buffer_subflow = this->subflows + subflow->id;
+  if (jitter_buffer_subflow->active) {
+    return;
+  }
+  jitter_buffer_subflow->active = TRUE;
+  jitter_buffer_subflow->subflow_id = subflow->id;
+  jitter_buffer_subflow->initialized = FALSE;
+  jitter_buffer_subflow->jitter_buffer = this;
+  jitter_buffer_subflow->percentile_tracker = make_swpercentile(
+      50,
+      (bintree3cmp) _cmp_skew,
+      (ListenerFunc) _on_subflow_percentile_calculated,
+      jitter_buffer_subflow);
+
+  swpercentile_set_filter(
+      jitter_buffer_subflow->percentile_tracker,
+      (ListenerFilterFunc) _percentile_tracker_filter,
+      &subflow->id
+  );
+
+  slidingwindow_add_plugin(this->skews, jitter_buffer_subflow->percentile_tracker);
+//  g_print("I joined subflow %d for jitterbuffer\n", subflow->id);
+}
+
+void jitterbuffer_on_subflow_detached(JitterBuffer* this, RcvSubflow* subflow) {
+  JitterBufferSubflow* jitter_buffer_subflow = this->subflows + subflow->id;
+  slidingwindow_rem_plugin(this->skews, jitter_buffer_subflow->percentile_tracker);
+  jitter_buffer_subflow->active = FALSE;
+//  g_print("I detached subflow %d from jitterbuffer\n", subflow->id);
+}
 
 gboolean jitterbuffer_is_packet_discarded(JitterBuffer* this, RcvPacket* packet)
 {
-  if(!this->last_seq_init){
+  if(!this->last_played_seq_init){
     return FALSE;
   }
-  return _cmp_seq(packet->abs_seq, this->last_seq) < 0;
+  return _cmp_seq(packet->abs_seq, this->last_played_seq) < 0;
+}
+
+RcvPacket* jitterbuffer_pop_discarded_packet(JitterBuffer* this) {
+  RcvPacket* result;
+  if (g_queue_is_empty(this->discardedq)) {
+    return NULL;
+  }
+  result = g_queue_pop_head(this->discardedq);
+  rcvpacket_unref(result);
+  return result;
 }
 
 
 void jitterbuffer_push_packet(JitterBuffer *this, RcvPacket* packet)
 {
+  Frame* frame = NULL;
+  GList* it;
+  if (!packet) {
+    return;
+  }
+  if (this->reference_points_initialized && this->first_frame_played_out) {
+    if (_cmp_seq(packet->abs_seq, this->last_played_seq) < 0 ||
+        0
+        // We turned this off, because in test we used a video loop
+        // turned out to be given the same timestamp, which was used before.
+//        _cmp_ts(packet->snd_rtp_ts, this->last_played_sent_ts) < 0
+        )
+    {
+//      g_print("!!!!!!!! Packet %hu with ts %u is added to the discarded packets queue. last seq:%hu, packet seq: %hu last ts: %u\n",
+//          packet->subflow_seq, packet->snd_rtp_ts,
+//          this->last_played_seq, packet->abs_seq, this->last_played_sent_ts
+//          );
+      g_queue_push_tail(this->discardedq, packet);
+      return;
+    }
+  } else if(!this->reference_points_initialized){
+    if (this->last_pushed_seq != 0) {
+      if ((guint16) (this->last_pushed_seq + 1) == packet->abs_seq) {
+        ++this->consecutive_good_seq;
+      } else {
+        this->consecutive_good_seq = 0;
+      }
+      if (3 < this->consecutive_good_seq) {
+        this->reference_points_initialized = TRUE;
+      }
+    }
+    this->last_pushed_seq = packet->abs_seq;
+
+  }
+
+  // because it seems g_list_find_custom does not work?????
+  for (it = this->frames; it; it = it->next) {
+    Frame* actual = it->data;
+    if (actual->timestamp == packet->snd_rtp_ts) {
+      frame = actual;
+      break;
+    }
+  }
+
   packet = rcvpacket_ref(packet);
-  g_queue_insert_sorted(this->playoutq, packet, (GCompareDataFunc) _cmp_rcvpacket_abs_seq, NULL);
+  if(!frame) {
+    frame = _make_frame(this, packet);
+    this->frames = g_list_insert_sorted_with_data(this->frames, frame, (GCompareDataFunc) _frames_data_cmp, NULL);
+  } else {
+    frame->packets = g_slist_insert_sorted(frame->packets, packet, (GCompareFunc) _packets_cmp);
+  }
+
+  // refresh skews
+  {
+    JitterBufferSubflow* subflow = this->subflows + packet->subflow_id;
+    if (_cmp_seq(subflow->last_subflow_seq, packet->subflow_seq) < 0) {
+      if (subflow->initialized) {
+        Skew skew;
+        guint32 dSnd_in_ts = _delta_ts(subflow->last_snd_ts, packet->snd_rtp_ts);
+        guint32 dRcv_ints = _delta_ts(subflow->last_rcv_ts, packet->rcv_rtp_ts);
+        gint64 dSending = timestamp_generator_get_time(this->rtp_ts_generator, dSnd_in_ts);
+        gint64 dReceiving = timestamp_generator_get_time(this->rtp_ts_generator, dRcv_ints);
+        if (dSending < 100 * GST_MSECOND && dReceiving < 100 * GST_MSECOND) {
+          skew.value = dReceiving - dSending;
+          skew.subflow_id = packet->subflow_id;
+//          g_print("Skew %ld|%d is added\n", skew.value, skew.subflow_id);
+          slidingwindow_add_data(this->skews, &skew);
+        }
+      }
+      subflow->last_rcv_ts = packet->rcv_rtp_ts;
+      subflow->last_snd_ts = packet->snd_rtp_ts;
+      subflow->last_subflow_seq = packet->subflow_seq;
+      subflow->initialized = TRUE;
+    }
+  }
+
+  // print
+//  for (it = this->frames; it; it = it->next) {
+//    Frame* actual = it->data;
+//    GSList* jt;
+//    g_print("Frame %u, packets: ", actual->timestamp);
+//    for (jt = actual->packets; jt; jt = jt->next) {
+//      RcvPacket* p = jt->data;
+//      g_print("%p->%hu|%d # ", p, p->abs_seq, p->marker);
+//    }
+//    g_print("\n");
+//  }
+//  g_print("--------\n");
+
+  //  slidingwindow_add_data(this->packets, packet);
+  //done:
+  return;
+
 }
 
 gboolean jitterbuffer_has_repair_request(JitterBuffer* this, guint16 *gap_seq)
@@ -203,80 +366,138 @@ gboolean jitterbuffer_has_repair_request(JitterBuffer* this, guint16 *gap_seq)
   return TRUE;
 }
 
-guint32 jitterbuffer_get_playout_delay_in_ts(JitterBuffer* this) {
-  return this->playout_delay_in_ts;
-}
-
 RcvPacket* jitterbuffer_pop_packet(JitterBuffer *this)
 {
   RcvPacket* packet = NULL;
+  Frame* frame;
+  GstClockTime now = _now(this);
+  GSList* it;
 
-  if(g_queue_is_empty(this->playoutq)){
-    goto done;
+  if(!g_queue_is_empty(this->playoutq)){
+    goto playout_from_queue;
   }
 
-  packet = g_queue_peek_head(this->playoutq);
+  if (this->frames == NULL) { // We have no frame to playout
+    return NULL;
+  }
+  frame = g_list_first(this->frames)->data;
 
-  _refresh_playout_delay(this, packet);
+  // We have frame to playout
+  if (this->first_frame_played == FALSE) { // is this the first frame to playout?
+    if (!this->initial_time_initialized) {
+      this->first_waiting_started = now;
+      this->initial_time_initialized = TRUE;
+      return NULL;
+    }
+    if (now < this->first_waiting_started + this->initial_buffer_time) {
+//      g_print("First remaining time is %lu\n", GST_TIME_AS_MSECONDS(this->first_waiting_started + 2 * this->desired_buffer_time - now));
+      return NULL;
+    }
+    this->last_played_out_time = now;
+    this->first_frame_played = TRUE;
+  }
+  else
+  { // We played out frame before
+    guint32 dSn_in_ts;
+    GstClockTime dSending;
+//    this->playout_delay = 0.;
+    if (_cmp_ts(frame->timestamp, this->last_played_sent_ts) < 0) {
+       dSending = 40 * GST_MSECOND;
+    } else {
+      dSn_in_ts = _delta_ts(this->last_played_sent_ts, frame->timestamp);
+      dSending = timestamp_generator_get_time(this->rtp_ts_generator, dSn_in_ts);
+    }
+//    dSending = 40 * GST_MSECOND;
+//    g_print("dSending: %lu\n", GST_TIME_AS_MSECONDS(dSending));
+    if (now < this->last_played_out_time + dSending + this->playout_delay) {
+      return NULL;
+    }
+//    g_print("Waiting time: %lu, Playout delay: %f, Buffer Time: %lu, Remaining time is %f\n",
+//            GST_TIME_AS_MSECONDS(dSending),
+//            GST_TIME_AS_MSECONDS(this->playout_delay),
+//            GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->rtp_ts_generator, _delta_ts(frame->created_in_ts, timestamp_generator_get_ts(this->rtp_ts_generator)))),
+//            GST_TIME_AS_MSECONDS(this->last_played_out_time + dSending + this->playout_delay - now));
 
-  if(!this->last_seq_init){
-    this->last_seq = packet->abs_seq;
-    this->last_seq_init = TRUE;
-    packet = g_queue_pop_head(this->playoutq);
-    goto done;
+    // TODO: it's a we playing out, so let's refresh the adjustment
+    // Check if played out time needs to be reset or not.
+    this->last_played_out_time += dSending + this->playout_delay;
+    if (this->last_played_out_time < now - this->initial_buffer_time * 2) {
+      // If the last played out time is lower than a initial buffer time with a long shot,
+      // then we either set an initial waiting if the buffer is empty or set the playout now.
+      if (g_list_length(this->frames) < 2) {
+//        g_print("We need to reset the jitterbuffer to the initial waiting\n");
+        this->first_frame_played = FALSE;
+      } else {
+//        g_print("We need to set the playout to the current time to jump the shift\n");
+        this->last_played_out_time = now;
+      }
+    }
+
+    _refresh_playout_delay(this);
   }
 
+  for (it = frame->packets; it; it = it->next) {
+    packet = it->data;
+    // TODO: Discards here!
+    g_queue_push_tail(this->playoutq, packet);
+  }
+  this->last_played_sent_ts = frame->timestamp;
+  this->last_played_out_ts = timestamp_generator_get_ts(this->rtp_ts_generator);
+//  this->last_played_out_time = now;
+
+  g_slist_free(frame->packets);
+  frame->packets = NULL;
+  this->frames = g_list_remove(this->frames, frame);
+  _dispose_frame(this, frame);
+
+playout_from_queue:
   packet = g_queue_pop_head(this->playoutq);
-  if((guint16)(this->last_seq + 2) == packet->abs_seq) {
-    this->gap_seq = this->last_seq + 1;
+  if(!this->last_played_seq_init){
+    this->last_played_seq = packet->abs_seq;
+    this->last_played_seq_init = TRUE;
+  } else if((guint16)(this->last_played_seq + 2) == packet->abs_seq) {
+    this->gap_seq = this->last_played_seq + 1;
   }
-  this->last_seq = packet->abs_seq;
-done:
-  if (packet) {
-    rcvpacket_unref(packet);
-  }
+  this->last_played_seq = packet->abs_seq;
+  this->first_frame_played_out = TRUE;
+  rcvpacket_unref(packet);
   return packet;
 }
 
-void _refresh_playout_delay(JitterBuffer* this, RcvPacket* packet) {
-  Subflow* subflow;
-  gint64 skew, margin;
-
-  if(!packet->subflow_id){
-    return;
+void _refresh_playout_delay(JitterBuffer* this) {
+  if (this->max_skew_initialized == FALSE) {
+    this->playout_delay = 0;
+    goto done;
   }
-  subflow = _subflow(this, packet->subflow_id);
-
-  if(!subflow->last_rcv_rtp_ts){
-    subflow->last_rcv_rtp_ts = packet->rcv_rtp_ts;
-    subflow->last_snd_rtp_ts = packet->snd_rtp_ts;
-    subflow->packet_skews = make_slidingwindow_int64(100, 2 * GST_SECOND);
-    slidingwindow_add_plugin(subflow->packet_skews,
-        make_swpercentile2(50,
-            (GCompareFunc)bintree3cmp_int64,
-            (ListenerFunc)_on_path_skew_calculated,
-            subflow,
-            (SWExtractorFunc) swpercentile2_self_extractor,
-            (SWMeanCalcer) swpercentile2_prefer_right_selector,
-            (SWEstimator) swpercentile2_prefer_right_selector)
-        );
-    return;
+  if (this->playout_delay_initialized == FALSE) {
+    this->playout_delay = this->max_skew;
+    this->playout_delay_initialized = TRUE;
+  } else {
+    this->playout_delay = (this->playout_delay * 31 + this->max_skew) / 32;
   }
 
-  margin = DEFAULT_RTP_TIMESTAMP_GENERATOR_CLOCKRATE / 100;
-  skew = (gint64)_delta_ts(subflow->last_rcv_rtp_ts, packet->rcv_rtp_ts) - (gint64)_delta_ts(subflow->last_snd_rtp_ts, packet->snd_rtp_ts);
-  skew = CONSTRAIN(-1 * margin, margin, skew);
-//  bintree_print(((swpercentile2_t*)((SlidingWindowPlugin*)subflow->packet_skews->plugins->data)->priv)->maxtree);
-//  bintree_print(((swpercentile2_t*)((SlidingWindowPlugin*)subflow->packet_skews->plugins->data)->priv)->mintree);
-//  bintree_foreach(((swpercentile2_t*)((SlidingWindowPlugin*)subflow->packet_skews->plugins->data)->priv)->maxtree,
-//      (GFunc) _node_foreach,
-//      ((swpercentile2_t*)((SlidingWindowPlugin*)subflow->packet_skews->plugins->data)->priv)->mintree
-//  );
-  slidingwindow_add_data(subflow->packet_skews, &skew);
-  subflow->last_rcv_rtp_ts = packet->rcv_rtp_ts;
-  subflow->last_snd_rtp_ts = packet->snd_rtp_ts;
-
-  slidingwindow_add_data(this->path_skews, &subflow->path_skew_in_ts);
+done:
+  this->max_skew = 0;
+  return;
 }
 
+
+Frame* _make_frame(JitterBuffer* this, RcvPacket* packet)
+{
+  Frame* result = recycle_retrieve(this->frames_recycle);
+  result->timestamp = packet->snd_rtp_ts;
+  result->created_in_ts = packet->rcv_rtp_ts;
+  result->packets = g_slist_prepend(NULL, packet);
+  return result;
+}
+
+void _dispose_frame(JitterBuffer* this, Frame* frame)
+{
+  if (frame->packets) {
+    g_slist_free(frame->packets);
+  }
+//  frame->packets = NULL;
+  memset(frame, 0, sizeof(Frame));
+  recycle_add(this->frames_recycle, frame);
+}
 

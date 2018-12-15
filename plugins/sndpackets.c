@@ -126,7 +126,7 @@ SndPacket* sndpackets_make_packet(SndPackets* this, GstBuffer* buffer)
 
 void sndpackets_set_keyframe_filter_mode(SndPackets* this, guint filtering_mode)
 {
-  switch(filtering_mode){
+  switch(filtering_mode) {
   case 1:
     this->keyframe_filtercb = _vp8_keyframe_filter;
     break;

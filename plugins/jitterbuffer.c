@@ -390,7 +390,7 @@ RcvPacket* jitterbuffer_pop_packet(JitterBuffer *this)
       return NULL;
     }
     if (now < this->first_waiting_started + this->initial_buffer_time) {
-//      g_print("First remaining time is %lu\n", GST_TIME_AS_MSECONDS(this->first_waiting_started + 2 * this->desired_buffer_time - now));
+      // g_print("First remaining time is %lu\n", GST_TIME_AS_MSECONDS(this->first_waiting_started + 2 * this->desired_buffer_time - now));
       return NULL;
     }
     this->last_played_out_time = now;
@@ -412,11 +412,11 @@ RcvPacket* jitterbuffer_pop_packet(JitterBuffer *this)
     if (now < this->last_played_out_time + dSending + this->playout_delay) {
       return NULL;
     }
-//    g_print("Waiting time: %lu, Playout delay: %f, Buffer Time: %lu, Remaining time is %f\n",
-//            GST_TIME_AS_MSECONDS(dSending),
-//            GST_TIME_AS_MSECONDS(this->playout_delay),
-//            GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->rtp_ts_generator, _delta_ts(frame->created_in_ts, timestamp_generator_get_ts(this->rtp_ts_generator)))),
-//            GST_TIME_AS_MSECONDS(this->last_played_out_time + dSending + this->playout_delay - now));
+    g_print("Waiting time: %lu, Playout delay: %f, Buffer Time: %lu, Remaining time is %f\n",
+            GST_TIME_AS_MSECONDS(dSending),
+            GST_TIME_AS_MSECONDS(this->playout_delay),
+            GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->rtp_ts_generator, _delta_ts(frame->created_in_ts, timestamp_generator_get_ts(this->rtp_ts_generator)))),
+            GST_TIME_AS_MSECONDS(this->last_played_out_time + dSending + this->playout_delay - now));
 
     // TODO: it's a we playing out, so let's refresh the adjustment
     // Check if played out time needs to be reset or not.
@@ -473,7 +473,7 @@ void _refresh_playout_delay(JitterBuffer* this) {
     this->playout_delay = this->max_skew;
     this->playout_delay_initialized = TRUE;
   } else {
-    this->playout_delay = (this->playout_delay * 31 + this->max_skew) / 32;
+    this->playout_delay = (this->playout_delay * 124 + this->max_skew) / 125;
   }
 
 done:

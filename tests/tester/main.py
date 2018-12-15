@@ -29,7 +29,7 @@ class Tester:
         if self.__end is True:
             return
         if self.__timeout < 1:
-            print('Self Stop checker found an issue!!!!!!!!!!!!!!!!!!!!!')
+            print('Self Stop checker found an issue!')
             self.__stop_test(self.__test)
             self.__checker_active = False
             return
@@ -247,7 +247,7 @@ parser.add_argument("types", help="The type of the test",
                     choices=['rmcat1', 'rmcat2', 'rmcat3', 'rmcat4', 'rmcat5', 'rmcat6', 'rmcat7',
                              'mprtp1', 'mprtp2', 'mprtp3', 'mprtp4', 'mprtp5', 'mprtp6', 'mprtp7',
                              'mprtp8', 'mprtp9', 'mprtp10', 'mprtp11'], nargs='+')
-parser.add_argument("-l", "--latency", help="The latency of the path", type=int, nargs='+', choices=[50, 100, 150, 300],
+parser.add_argument("-l", "--latency", help="The late ncy of the path", type=int, nargs='+', choices=[50, 100, 150, 300],
                     default=[50])
 parser.add_argument("-j", "--jitter", help="The jitter for the test", type=int, nargs='+', default=[0])
 parser.add_argument("-a", "--algorithm", help="The algorithm for the test", default="FRACTaL",
@@ -255,7 +255,7 @@ parser.add_argument("-a", "--algorithm", help="The algorithm for the test", defa
 parser.add_argument("-r", "--runs", help="The runtimes", type=int, default=1)
 parser.add_argument("-t", "--target", help="The target directory", default="temp/")
 # default_video = "FILE:Kristen.yuv:1:1280:720:2:60/1"
-default_video = "FILE:Kristen.yuv:1:1280:720:2:20/1"
+default_video = "FILE:Kristen.yuv:1:1280:720:2:25/1"
 # default_video = "FILE:Kristen_1024.yuv:1:1024:576:2:60/1"
 # default_video = "FILE:out.yuv:1:320:240:2:60/1" # Kristen
 # default_video = "FILE:out2.yuv:1:320:240:2:60/1" # Park

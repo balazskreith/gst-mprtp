@@ -620,7 +620,7 @@ gst_mprtpscheduler_change_state (GstElement * element,
   this = GST_MPRTPSCHEDULER (element);
   g_return_val_if_fail (GST_IS_MPRTPSCHEDULER (element),
       GST_STATE_CHANGE_FAILURE);
-
+   
   switch (transition) {
     case GST_STATE_CHANGE_NULL_TO_READY:
       break;
@@ -711,7 +711,7 @@ gst_mprtpscheduler_rtp_sink_chain (GstPad * pad, GstObject * parent,
     goto done;
   }
 
-//  g_print("Sent: %lu\n", GST_TIME_AS_MSECONDS(gst_clock_get_time(this->sysclock)-prev));
+  //g_print("Sent: %lu\n", GST_TIME_AS_MSECONDS(_now(this)));
 //  prev = gst_clock_get_time(this->sysclock);
   if (gst_buffer_extract (buffer, 0, &first_byte, 1) != 1 ||
       gst_buffer_extract (buffer, 1, &second_byte, 1) != 1) {

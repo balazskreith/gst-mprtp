@@ -206,10 +206,6 @@ void fractalsubctrler_finalize (GObject * object);
      gdouble at_bottleneck,
      gdouble far_from_bottleneck);
 
-// static gdouble
-// _skew_corr(
-//     FRACTaLSubController *this);
-
 static void
 _reduce_stage(
     FRACTaLSubController *this);

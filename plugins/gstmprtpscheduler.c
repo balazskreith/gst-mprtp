@@ -984,9 +984,9 @@ PROFILING("_mprtpscheduler_send_packet",
     response = messenger_try_pop_block(this->fec_responses);
     if(response){
       sndtracker_add_fec_response(this->sndtracker, response);
-      PROFILING("fec_requested",
+      //PROFILING("fec_requested",
       gst_pad_push(this->mprtp_srcpad, response->fecbuffer);
-      );
+      //);
 //        g_async_queue_push(this->sendq, response->fecbuffer);
       fecencoder_unref_response(response);
       this->fec_requested = FALSE;
@@ -1046,16 +1046,16 @@ mprtpscheduler_approval_process (GstMprtpscheduler *this)
 
  //  g_print("Subflow: %d\n", subflow->id);
 //  this->fec_interval = 5;
-PROFILING("approval process: _on_monitoring_request",
+//PROFILING("approval process: _on_monitoring_request",
   if(0 < this->fec_interval && (++this->sent_packets % this->fec_interval) == 0){
     SndSubflow* subflow = sndsubflows_get_subflow(this->subflows, packet->subflow_id);
     _on_monitoring_request(this, subflow);
   }
-);
+//);
 //g_print("Packet %hu on %d with subflow seq %hu sent.\n", packet->abs_seq, packet->subflow_id, packet->subflow_seq);
-  PROFILING("_mprtpscheduler_send_packet",
+  //PROFILING("_mprtpscheduler_send_packet",
     _mprtpscheduler_send_packet(this, packet);
-  );
+  //);
 
 done:
   THIS_UNLOCK(this);
@@ -1080,12 +1080,12 @@ mprtpscheduler_emitter_process (gpointer udata)
   if(!msg){
     goto done;
   }
-PROFILING("mprtpscheduler_emitter_process",
+//PROFILING("mprtpscheduler_emitter_process",
   msg->target_media_rate = stream_splitter_get_total_media_rate(this->splitter);// + 100000;
 //  g_print("Requested media rate: %d\n", msg->target_media_rate);
   g_signal_emit (this, _subflows_utilization, 0 /* details */, msg);
   messenger_throw_block_unlocked(this->emit_msger, msg);
-);
+//);
 done:
   messenger_unlock(this->emit_msger);
 

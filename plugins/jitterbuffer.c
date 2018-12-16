@@ -412,11 +412,11 @@ RcvPacket* jitterbuffer_pop_packet(JitterBuffer *this)
     if (now < this->last_played_out_time + dSending + this->playout_delay) {
       return NULL;
     }
-    g_print("Waiting time: %lu, Playout delay: %f, Buffer Time: %lu, Remaining time is %f\n",
-            GST_TIME_AS_MSECONDS(dSending),
-            GST_TIME_AS_MSECONDS(this->playout_delay),
-            GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->rtp_ts_generator, _delta_ts(frame->created_in_ts, timestamp_generator_get_ts(this->rtp_ts_generator)))),
-            GST_TIME_AS_MSECONDS(this->last_played_out_time + dSending + this->playout_delay - now));
+    //g_print("Waiting time: %lu, Playout delay: %f, Buffer Time: %lu, Remaining time is %f\n",
+            //GST_TIME_AS_MSECONDS(dSending),
+            //GST_TIME_AS_MSECONDS(this->playout_delay),
+            //GST_TIME_AS_MSECONDS(timestamp_generator_get_time(this->rtp_ts_generator, _delta_ts(frame->created_in_ts, timestamp_generator_get_ts(this->rtp_ts_generator)))),
+            //GST_TIME_AS_MSECONDS(this->last_played_out_time + dSending + this->playout_delay - now));
 
     // TODO: it's a we playing out, so let's refresh the adjustment
     // Check if played out time needs to be reset or not.

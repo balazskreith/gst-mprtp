@@ -1088,7 +1088,6 @@ mprtpscheduler_emitter_process (gpointer udata)
 //);
 done:
   messenger_unlock(this->emit_msger);
-
   return;
 }
 

@@ -16,8 +16,7 @@ path is found in this repository.
 
 gst-mprtp is a gstreamer plugin, hence can be installed
 as any individually developed plugin for gstreamer. 
-Use `autconf` and `make` to build the plugin, 
-`sudo make install` to install it in your system.
+Use  `autogen.sh && sudo make install` to build the plugin and install it in your system.
 You can verify the install by typing 
 `gst-inspect-1.0 mprtp`, and see whether the plugins are there.
 

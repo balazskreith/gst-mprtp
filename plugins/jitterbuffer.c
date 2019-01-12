@@ -473,7 +473,7 @@ void _refresh_playout_delay(JitterBuffer* this) {
     this->playout_delay = this->max_skew;
     this->playout_delay_initialized = TRUE;
   } else {
-    this->playout_delay = (this->playout_delay * 124 + this->max_skew) / 125;
+    this->playout_delay = (this->playout_delay * 31 + this->max_skew) / 32;
   }
 
 done:

@@ -6,6 +6,7 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          correlator.c          \
 					     fecdec.c              \
                          fecenc.c              \
+						 fluctuationcalcer.c   \
                          flstabcalcer.c        \
                          fractalfbproc.c       \
                          fractalfbprod.c       \
@@ -57,6 +58,7 @@ noinst_HEADERS = bintree.h             \
 				 fecdec.h              \
                  fecenc.h              \
                  flstabcalcer.h        \
+				 fluctuationcalcer.h   \
                  fractalfbproc.h       \
                  fractalfbprod.h       \
                  fractalsubctrler.h    \

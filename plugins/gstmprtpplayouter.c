@@ -838,7 +838,8 @@ _render_process_ (GstMprtpplayouter *this)
 
   while((packet = g_async_queue_timeout_pop(this->packets_in, 1000)) != NULL) {
     jitterbuffer_push_packet(this->jitterbuffer, packet);
-//    stream_joiner_push_packet(this->joiner, packet);
+    //stream_joiner_push_packet(this->joiner, packet);
+
   }
 
   // handle the discarded packets

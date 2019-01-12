@@ -1014,7 +1014,7 @@ class RMCAT7(MyTest):
 
 class MPRTP1(MyTest):
     def __init__(self, algorithm, latency, jitter, source_type, sink_type, mprtp_ext_header = 3, fec_payload_type_id = 126, subflows_num=2):
-        MyTest.__init__(self, "mprtp1", 150, algorithm, str(latency), str(jitter))
+        MyTest.__init__(self, "mprtp1", 180, algorithm, str(latency), str(jitter))
 
         self._forward_bandwidths = []
         self.__algorithm = algorithm
@@ -1073,7 +1073,7 @@ class MPRTP1(MyTest):
         for subflow_id in range(self._subflows_num):
             flow_stage = [
             {
-                "duration": 150,
+                "duration": 180,
                 "config": PathConfig(bandwidth=max_bw, latency=self.__latency, jitter=self.__jitter)
             }
             ]

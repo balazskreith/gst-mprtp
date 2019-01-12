@@ -148,6 +148,7 @@ libgstmprtp_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 am_libgstmprtp_la_OBJECTS = libgstmprtp_la-bintree.lo \
 	libgstmprtp_la-bucket.lo libgstmprtp_la-correlator.lo \
 	libgstmprtp_la-fecdec.lo libgstmprtp_la-fecenc.lo \
+	libgstmprtp_la-fluctuationcalcer.lo \
 	libgstmprtp_la-flstabcalcer.lo libgstmprtp_la-fractalfbproc.lo \
 	libgstmprtp_la-fractalfbprod.lo \
 	libgstmprtp_la-fractalsubctrler.lo \
@@ -427,6 +428,7 @@ libgstmprtp_la_SOURCES = bintree.c             \
                          correlator.c          \
 					     fecdec.c              \
                          fecenc.c              \
+						 fluctuationcalcer.c   \
                          flstabcalcer.c        \
                          fractalfbproc.c       \
                          fractalfbprod.c       \
@@ -477,6 +479,7 @@ noinst_HEADERS = bintree.h             \
 				 fecdec.h              \
                  fecenc.h              \
                  flstabcalcer.h        \
+				 fluctuationcalcer.h   \
                  fractalfbproc.h       \
                  fractalfbprod.h       \
                  fractalsubctrler.h    \
@@ -616,6 +619,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fecdec.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fecenc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-flstabcalcer.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fluctuationcalcer.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fractalfbproc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fractalfbprod.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgstmprtp_la-fractalsubctrler.Plo@am__quote@
@@ -714,6 +718,13 @@ libgstmprtp_la-fecenc.lo: fecenc.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fecenc.c' object='libgstmprtp_la-fecenc.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-fecenc.lo `test -f 'fecenc.c' || echo '$(srcdir)/'`fecenc.c
+
+libgstmprtp_la-fluctuationcalcer.lo: fluctuationcalcer.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-fluctuationcalcer.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-fluctuationcalcer.Tpo -c -o libgstmprtp_la-fluctuationcalcer.lo `test -f 'fluctuationcalcer.c' || echo '$(srcdir)/'`fluctuationcalcer.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstmprtp_la-fluctuationcalcer.Tpo $(DEPDIR)/libgstmprtp_la-fluctuationcalcer.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fluctuationcalcer.c' object='libgstmprtp_la-fluctuationcalcer.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -c -o libgstmprtp_la-fluctuationcalcer.lo `test -f 'fluctuationcalcer.c' || echo '$(srcdir)/'`fluctuationcalcer.c
 
 libgstmprtp_la-flstabcalcer.lo: flstabcalcer.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstmprtp_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstmprtp_la_CFLAGS) $(CFLAGS) -MT libgstmprtp_la-flstabcalcer.lo -MD -MP -MF $(DEPDIR)/libgstmprtp_la-flstabcalcer.Tpo -c -o libgstmprtp_la-flstabcalcer.lo `test -f 'flstabcalcer.c' || echo '$(srcdir)/'`flstabcalcer.c

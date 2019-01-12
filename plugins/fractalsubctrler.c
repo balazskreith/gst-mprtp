@@ -521,6 +521,7 @@ static void _stat_print(FRACTaLSubController *this)
         "Target Off,"                // 38
         "Total Stable Target,"       // 39
         "Total SR,"                  // 40
+		"Try QD Score,"              // 41
         );
     g_print("Stat:%s\n",result);
     header_printed = TRUE;
@@ -568,6 +569,7 @@ static void _stat_print(FRACTaLSubController *this)
           "%1.2f,"   // 38
           "%d,"      // 39
           "%d,"      // 40
+	      "%1.2f,"   // 41
           ,
           this->subflow->id,                         // 1
           stat->measurements_num,                    // 2
@@ -610,7 +612,8 @@ static void _stat_print(FRACTaLSubController *this)
           this->subflow->base_db->total_desired_target, // 37
           this->subflow->base_db->target_off,           // 38
           this->subflow->base_db->total_stable_target,  // 39
-          this->subflow->base_db->total_sending_rate    // 40
+          this->subflow->base_db->total_sending_rate,    // 40
+	      this->fbprocessor->try_qd_fluctuation          // 41
           );
   g_print("Stat:%s\n", result);
 }
@@ -694,7 +697,7 @@ void fractalsubctrler_report_update(
   _check_tcp(this);
 
   DISABLE_LINE _stat_print(this);
-//  _stat_print(this);
+  _stat_print(this);
 
   this->approve_measurement = FALSE;
   if (_priv(this)->stage != STAGE_REDUCE) {

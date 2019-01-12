@@ -172,6 +172,9 @@ void fractalfbprocessor_set_evaluation_window_margins(FRACTaLFBProcessor *this, 
   _refresh_windows_thresholds(this);
 }
 
+static GstClockTime _get_fluctuationcalcer_time_validity(FRACTaLFBProcessor* this) {
+	return  _stat(this)->srtt * 2;
+}
 
 FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* subflow, FRACTaLStat *stat)
 {
@@ -185,6 +188,9 @@ FRACTaLFBProcessor *make_fractalfbprocessor(SndTracker* sndtracker, SndSubflow* 
   this->fl_stability_calcer = make_fl_stability_calcer();
   this->dts = 0;
   this->made = _now(this);
+
+  this->qd_fluctuationcalcer = make_fluctuationcalcer();
+  fluctuationcalcer_setup_time_threshold_provider(this->qd_fluctuationcalcer, (FluctuationCalcerTimeValidityProvider) _get_fluctuationcalcer_time_validity, this);
 //  this->qdelay_bucket = make_bucket(QDELAY_BUCKET_LIST_LENGTH, 10 * GST_MSECOND);
 //  this->qdelay_devs = make_bucket(2, 0);
 
@@ -331,6 +337,18 @@ void _process_cc_rle_discvector(FRACTaLFBProcessor *this, GstMPRTCPXRReportSumma
       if (qts < this->min_qts) {
         this->min_qts = qts;
       }
+
+  	  if (qts < this->qts_std * 2.) {
+	    fluctuationcalcer_add_good_measurement(this->qd_fluctuationcalcer, 1.);
+	  } else {
+	    gdouble value = 1.;
+	    if (4 * this->qts_std < qts) {
+		  value *= 2;
+	    }
+	  fluctuationcalcer_add_bad_measurement(this->qd_fluctuationcalcer, value);
+	}
+	this->try_qd_fluctuation = fluctuationcalcer_get_stability_score(this->qd_fluctuationcalcer);
+
 //      g_print("bucket index: %d, qts: %u, min_dts: %u, dts: %u, dts_std: %f \n", bucket_index, qts, this->min_dts, dts, this->qts_std);
 //      bucket_add_value(this->qdelay_bucket, qts);
         qdelay_stability_calcer_add_ts(this->qdelay_stability_calcer, qts);

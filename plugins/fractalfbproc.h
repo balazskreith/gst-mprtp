@@ -22,6 +22,7 @@
 #include "stdcalcer.h"
 #include "qdelaystabilitycalcer.h"
 #include "flstabcalcer.h"
+#include "fluctuationcalcer.h"
 
 
 typedef struct _FRACTaLFBProcessor FRACTaLFBProcessor;
@@ -97,6 +98,9 @@ struct _FRACTaLFBProcessor
   guint32                  min_dts;
   guint32                  min_qts;
   guint32                  rtt_in_ts;
+
+  FluctuationCalcer* qd_fluctuationcalcer;
+  gdouble try_qd_fluctuation;
 
   GstClockTime             dts;
   GstClockTime             rtt;

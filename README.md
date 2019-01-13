@@ -20,6 +20,8 @@ Use  `./autogen.sh && sudo make install` to build the plugin and install it in y
 You can verify the install by typing 
 `gst-inspect-1.0 mprtp`, and see whether the plugins are there.
 
+_Note_: If you use binaries instead of building everything from source, type `export GST_PLUGIN_PATH=/usr/local/lib/gstreamer-1.0` in order to make mprtp plugins accessible. (and then validate gst-inspect-1.0 mprtp)
+
 **Plugins**
 
 **mprtpscheduler**: A multipath scheduler must be placed 

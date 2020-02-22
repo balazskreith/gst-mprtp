@@ -1,3 +1,6 @@
 [submodule "tests/reports_template"]
 	path = tests/reports_template
 	url = https://git.overleaf.com/4572360zxtrxz
+[submodule "common"]
+	path = common
+	url = https://github.com/GStreamer/common

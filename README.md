@@ -12,15 +12,14 @@ a test environment for evaluating congestion
 control algorithms for both single- and multiple 
 path is found in this repository.
 
-**Installation**
+**Install & Run**
 
-gst-mprtp is a gstreamer plugin, hence can be installed
-as any individually developed plugin for gstreamer. 
-Use  `./autogen.sh && sudo make install` to build the plugin and install it in your system.
-You can verify the install by typing 
-`gst-inspect-1.0 mprtp`, and see whether the plugins are there.
+Please follow the steps described at [docker-gst-mprtp](https://github.com/balazskreith/docker-gst-mprtp) 
+to install and run the plugin.
 
-_Note_: If you use binaries instead of building everything from source, type `export GST_PLUGIN_PATH=/usr/local/lib/gstreamer-1.0` in order to make mprtp plugins accessible. (and then validate gst-inspect-1.0 mprtp)
+**Contribute & Develop**
+
+
 
 **Plugins**
 

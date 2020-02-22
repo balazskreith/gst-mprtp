@@ -37,7 +37,8 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #define HAVE_UNISTD_H 1
 
-/* Define to the sub-directory where libtool stores uninstalled libraries. */
+/* Define to the sub-directory in which libtool stores uninstalled libraries.
+   */
 #define LT_OBJDIR ".libs/"
 
 /* Name of package */
@@ -60,9 +61,6 @@
 
 /* Define to the version of this package. */
 #define PACKAGE_VERSION "1.0.0"
-
-/* directory where plugins are located */
-#define PLUGINDIR "/usr/local/lib/gstreamer-1.0"
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1

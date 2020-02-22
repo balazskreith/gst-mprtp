@@ -55,6 +55,6 @@ buffercollector_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) \
                         
 buffercollector_LDADD = $(GST_LIBS) $(GST_BASE_LIBS) $(GST_PLUGINS_BASE_LIBS) \
             $(GST_NET_LIBS) -lgstrtp-@GST_API_VERSION@ \
-	        $(GST_BASE_LIBS) $(GST_LIBS_LIBS) \
-	        -lgstapp-$(GST_API_VERSION)	        
+	        $(GST_BASE_LIBS) $(GST_LIBS_LIBS)
+	        -lgstapp-$(GST_API_VERSION)
 

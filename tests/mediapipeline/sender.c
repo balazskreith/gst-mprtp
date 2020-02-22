@@ -113,6 +113,8 @@ Sender* make_sender(SchedulerParams* scheduler_params,
     };
     gst_element_link_pads(scheduler, "src", sink, "sink");
     sink = scheduler;
+
+    g_print("!!!!!!!!!!!! MPRTP !!!!!!!!\n");
   }
 
 
@@ -251,7 +253,6 @@ GstElement* _make_mprtp_scheduler(Sender* this, TransferParams* transfer_params)
 {
   GstElement* mprtpSch = gst_element_factory_make("mprtpscheduler", NULL);
   GSList* item;
-
   for(item = transfer_params->subflows; item; item = item->next){
     gchar padName[255];
     SenderSubflow* subflow = item->data;

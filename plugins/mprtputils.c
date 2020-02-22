@@ -213,8 +213,9 @@ static int _partition (gpointer arr[], gint l, gint h, GCompareDataFunc cmp, gpo
 {
     gpointer x = arr[h];
     int i = (l - 1);
+    int j;
 
-    for (int j = l; j <= h- 1; j++)
+    for (j = l; j <= h- 1; j++)
     {
       if (cmp(arr[j], x, udata) <= 0)
         {

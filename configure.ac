@@ -32,7 +32,7 @@ GST_API_VERSION=1.0
 AC_SUBST(GST_API_VERSION)
 AC_DEFINE_UNQUOTED(GST_API_VERSION, "$GST_API_VERSION",
   [GStreamer API Version])
-  
+
 AG_GST_LIBTOOL_PREPARE
 AS_LIBTOOL(GST, 502, 0, 502)
 
@@ -74,7 +74,7 @@ AC_DEFINE_UNQUOTED(GST_LICENSE, "$GST_LICENSE", [GStreamer license])
 AC_SUBST(GST_LICENSE)
 
 dnl set location of plugin directory
-AG_GST_SET_PLUGINDIR
+dnl AG_GST_SET_PLUGINDIR
 dnl *** autotools stuff ****
 
 
@@ -165,7 +165,11 @@ dnl   plugindir="$HOME/.gstreamer-1.0/plugins"
 dnl else
 dnl   plugindir="\$(libdir)/gstreamer-1.0"
 dnl fi
-plugindir="\$(libdir)/gstreamer-1.0"
+dnl plugindir="\$(libdir)/gstreamer-1.0"
+
+dnl plugindir="\$(prefix)/gstreamer-1.0"
+dnl plugindir="\$(prefix)/gstreamer-1.0"
+plugindir="/opt/gstreamer-dist-master/lib/gstreamer-1.0"
 AC_SUBST(plugindir)
 
 dnl set location of plugin directory
@@ -180,5 +184,14 @@ dnl set proper LDFLAGS for plugins
 GST_PLUGIN_LDFLAGS='-module -avoid-version -export-symbols-regex [_]*\(gst_\|Gst\|GST_\).*'
 AC_SUBST(GST_PLUGIN_LDFLAGS)
 
-AC_CONFIG_FILES([Makefile plugins/Makefile tools/Makefile tests/Makefile tests/mediapipeline/Makefile tests/statmakerpipeline/Makefile] tests/statsrelayer/Makefile)
+AC_CONFIG_FILES([Makefile plugins/Makefile tools/Makefile tests/Makefile tests/statsrelayer/Makefile tests/mediapipeline/Makefile tests/statmakerpipeline/Makefile])
 AC_OUTPUT
+
+
+echo "
+
+Configuration
+	Version                    : ${VERSION}
+	Source code location       : ${srcdir}
+	Prefix                     : ${prefix}
+"

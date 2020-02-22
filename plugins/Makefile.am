@@ -97,10 +97,11 @@ noinst_HEADERS = bintree.h             \
                  swperctester.h 
 
 
-#Oh it seems so terrible, but I do not so care!!!
+#Oh it seems so terrible, but I do not care!!!
 #libgstmprtp_ladir = /usr/include/gstreamer-@GST_API_VERSION@/gst/rtp
 
-libgstmprtp_ladir = $(includedir)/gstreamer-@GST_API_VERSION@/gst/rtp
+#libgstmprtp_ladir = $(includedir)/gstreamer-@GST_API_VERSION@/gst/rtp
+libgstmprtp_ladir = /opt/gstreamer-dist-master/include/gstreamer-@GST_API_VERSION@/gst/rtp
 libgstmprtp_la_HEADERS = gstmprtpdefs.h               
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
@@ -110,6 +111,7 @@ libgstmprtp_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) \
                         $(ERROR_CFLAGS)
 libgstmprtp_la_LIBADD = $(GST_LIBS) $(GST_BASE_LIBS) $(GST_PLUGINS_BASE_LIBS) \
             $(GST_NET_LIBS) -lgstrtp-@GST_API_VERSION@ \
-	        $(GST_BASE_LIBS) $(GST_LIBS_LIBS) 
+	        $(GST_BASE_LIBS) $(GST_LIBS_LIBS)
+
 libgstmprtp_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstmprtp_la_LIBTOOLFLAGS = $(GST_PLUGIN_LIBTOOLFLAGS)

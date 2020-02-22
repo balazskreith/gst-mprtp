@@ -288,7 +288,7 @@ int main (int argc, char **argv)
   Flow* flows;
   gint flownum;
   if(argc < 3){
-  usage:
+//  usage:
     g_print("Usage: ./program flownum datstats_dir result_path\n");
     return 0;
   }

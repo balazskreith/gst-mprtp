@@ -29,3 +29,4 @@ do
 done
 
 echo "lst *;" >> $CMDIN
+echo "Commands are done"

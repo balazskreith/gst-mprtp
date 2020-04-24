@@ -69,9 +69,7 @@ For tests you need tc and you need to run the following scripts:
 For more information please go to the test directory and read 
 the information available in the readme file.
 
-**Contacts**
 
-Balázs Kreith, Varun Singh, Jörg Ott
      
 **Acknowledgements** 
   
